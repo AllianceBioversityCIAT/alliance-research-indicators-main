@@ -58,6 +58,6 @@
   </div>
 
   <app-navigation-buttons
-    [showNext]="cache.currentMetadata().indicator_id === 1 || cache.currentMetadata().indicator_id === 2"
+    [showNext]="cache.currentMetadata().indicator_id === 1 || cache.currentMetadata().indicator_id === 2 || cache.currentMetadata().indicator_id === 6"
     (back)="saveData('back')" (next)="saveData('next')" (save)="saveData()" />
 </div>

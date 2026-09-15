@@ -4,6 +4,10 @@ import { CacheService } from '../../../services/cache/cache.service';
 import { UtilsService } from '../../../services/utils.service';
 import { signal } from '@angular/core';
 import { WordCountService } from '../../../services/word-count.service';
+import { By } from '@angular/platform-browser';
+import { InputNumber } from 'primeng/inputnumber';
+import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
+import { ActionsService } from '../../../services/actions.service';
 
 describe('InputComponent', () => {
   let component: InputComponent;
@@ -680,6 +684,820 @@ describe('InputComponent', () => {
         class: 'ng-invalid ng-dirty',
         message: 'Maximum 10 words allowed'
       });
+    });
+  });
+
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode precedence)
+  // Falsifying inputs and boundaries from design.md DD-1/DD-2 and requirements.md R-IUR-004/005/009/010.
+  // `inputValid()` is driven through the SIGNAL input (via the mocked `getNestedProperty`), exactly
+  // as `inputValid()` itself reads (`getNestedProperty(this.signal(), ...)`). `isInvalid()` is driven
+  // through `body()` directly, exactly as `isInvalid()` itself reads — the two sources are asserted
+  // separately on purpose (KZ-015 disqualifier: a same-source test would hide the divergence).
+  describe('T-01 — requiredMode precedence and boundaries', () => {
+    it('defaults to "off"', () => {
+      expect(component.requiredMode).toBe('off');
+    });
+
+    describe('mode "filled"', () => {
+      it('FALSIFYING (precedence) — isRequired=true AND requiredMode="filled" holding 0 renders NO amber and NO message', () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+        component.body.set({ value: 0 });
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it('FALSIFYING — a whitespace-only string is treated as empty and reddens', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '   ' });
+        utilsService.getNestedProperty.mockReturnValue('   ');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('empty string is invalid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: '' });
+        utilsService.getNestedProperty.mockReturnValue('');
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('a non-blank value is valid', () => {
+        component.requiredMode = 'filled';
+        component.signal = signal({ testField: 'hello' });
+        utilsService.getNestedProperty.mockReturnValue('hello');
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "positive"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is filled-but-not-positive: a distinct positivity message, not the required message', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be greater than 0');
+      });
+
+      it('1 ⇒ valid', () => {
+        component.requiredMode = 'positive';
+        component.signal = signal({ testField: 1 });
+        utilsService.getNestedProperty.mockReturnValue(1);
+
+        expect(component.inputValid().valid).toBe(true);
+      });
+    });
+
+    describe('mode "nonzero"', () => {
+      it('not filled ⇒ required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: null });
+        utilsService.getNestedProperty.mockReturnValue(null);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('This field is required');
+      });
+
+      it('FALSIFYING — 0 is invalid with a zero message, distinct from the required message', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: 0 });
+        utilsService.getNestedProperty.mockReturnValue(0);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(false);
+        expect(result.message).toBe('Must be different from 0');
+      });
+
+      it('FALSIFYING — a negative value (-5) is valid; negatives are accepted', () => {
+        component.requiredMode = 'nonzero';
+        component.signal = signal({ testField: -5 });
+        utilsService.getNestedProperty.mockReturnValue(-5);
+
+        const result = component.inputValid();
+        expect(result.valid).toBe(true);
+        expect(result.message).toBe('');
+      });
+    });
+
+    describe('isInvalid() honors requiredMode precedence, driven through body()', () => {
+      it("mode 'off' leaves the legacy isRequired falsy-0 behavior untouched (regression guard)", () => {
+        component.isRequired = true;
+        component.requiredMode = 'off';
+        component.body.set({ value: 0 });
+        // Pre-existing latent DC-2 behavior for 'off' mode — explicitly NOT this task's scope to fix.
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING (precedence) — mode 'filled' with isRequired=true and value 0: isInvalid() is false", () => {
+        component.isRequired = true;
+        component.requiredMode = 'filled';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(false);
+      });
+
+      it("mode 'positive' with value 0: isInvalid() is true", () => {
+        component.requiredMode = 'positive';
+        component.body.set({ value: 0 });
+        expect(component.isInvalid()).toBe(true);
+      });
+
+      it("FALSIFYING — mode 'nonzero' with value -5: isInvalid() is false", () => {
+        component.requiredMode = 'nonzero';
+        component.body.set({ value: -5 });
+        expect(component.isInvalid()).toBe(false);
+      });
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode asterisk)
+// A separate top-level suite for the same reason as the rendered p-inputNumber suite above: the
+// outer `describe('InputComponent', ...)` overrides the template with '', so the real label/asterisk
+// markup never renders there. The asterisk render condition (`:6`) must be asserted on the REAL
+// rendered template (KZ-001) — a presence check on `component.isRequired`/`component.requiredMode`
+// would prove the inputs were set, not that the template's `@if` reads them.
+describe('InputComponent — rendered asterisk (T-01 requiredMode)', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+
+  async function render(config: { isRequired?: boolean; requiredMode?: 'off' | 'filled' | 'positive' | 'nonzero' }): Promise<void> {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.label = 'Test label';
+    // `type: 'number'` avoids the `text` branch's `appSaveOnWriting` directive, which resolves a
+    // DI chain (ActionsService -> ApiService -> ToPromiseService -> HttpClient) not provided by this
+    // harness and unrelated to the asterisk being asserted — same reason the pre-existing "rendered
+    // p-inputNumber" suite above renders as `type: 'number'`.
+    component.type = 'number';
+    if (config.isRequired !== undefined) component.isRequired = config.isRequired;
+    if (config.requiredMode !== undefined) component.requiredMode = config.requiredMode;
+    fixture.detectChanges();
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('renders no asterisk when isRequired=false and requiredMode="off"', async () => {
+    await render({});
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).toBeNull();
+  });
+
+  it('FALSIFYING — renders the asterisk when requiredMode is active even with isRequired=false', async () => {
+    await render({ requiredMode: 'filled' });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
+
+  it('still renders the asterisk for the legacy isRequired=true, requiredMode="off" case', async () => {
+    await render({ isRequired: true });
+    const asterisk = fixture.debugElement.query(By.css('.label .text-red-500'));
+    expect(asterisk).not.toBeNull();
+  });
+});
+
+// @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
+// A separate top-level suite: the outer `describe('InputComponent', ...)` above overrides the
+// component's template with '' for every test, so none of those tests render the real
+// `p-inputNumber`. c1/c2/c3 must be asserted on the *rendered* PrimeNG binding (KZ-001), which
+// requires the real template — hence a fresh TestBed configuration that does not override it.
+describe('InputComponent — rendered p-inputNumber (T-02 maxFractionDigits)', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+
+  async function renderNumberInput(): Promise<InputNumber> {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+    fixture.detectChanges();
+
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    return inputNumberDe.componentInstance as InputNumber;
+  }
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('c1 — maxFractionDigits="0" forwards 0 to the rendered p-inputNumber', async () => {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn().mockReturnValue(null),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+    component.maxFractionDigits = 0;
+    fixture.detectChanges();
+
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    const inputNumberInstance = inputNumberDe.componentInstance as InputNumber;
+
+    expect(inputNumberInstance.maxFractionDigits).toBe(0);
+  });
+
+  it('c2 — omitting maxFractionDigits leaves the rendered p-inputNumber binding unchanged', async () => {
+    const inputNumberInstance = await renderNumberInput();
+
+    // Before this task there was no [maxFractionDigits] binding on p-inputNumber at all, so the
+    // rendered instance resolved no fraction-digit restriction. PrimeNG's `getOptions()`
+    // (`primeng@19.0.6`'s `primeng-inputnumber.mjs`) resolves it as
+    // `maximumFractionDigits: this.maxFractionDigits ?? undefined` — normalizing through that
+    // same operator is what "unchanged" means at the rendered binding (null and undefined are
+    // functionally identical to PrimeNG's Intl resolution; a bare `undefined` binding is not an
+    // available assertion because PrimeNG's `numberAttribute` transform maps an unbound input to
+    // `undefined` and a bound-but-undefined input to `null`).
+    expect(inputNumberInstance.maxFractionDigits ?? undefined).toBeUndefined();
+  });
+
+  it('c3 — [min]="0" continues to block a typed and a pasted minus sign', async () => {
+    const inputNumberInstance = await renderNumberInput();
+    expect(inputNumberInstance.min).toBe(0);
+
+    const setValueSpy = jest.spyOn(component, 'setValue');
+
+    // Typed minus sign (§6.3 row 1): onInputKeyPress reads keyCode 45 as '-', which reaches
+    // insert()'s isMinusSign arm; allowMinusSign() is `this.min == null || this.min < 0` — with
+    // min=0 that is false, so insert() returns before updateValue/setValue is ever reached.
+    inputNumberInstance.onInputKeyPress({
+      which: 45,
+      code: 'Minus',
+      preventDefault: jest.fn()
+    } as unknown as KeyboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).not.toHaveBeenCalled();
+    expect(component.body().value).not.toBe(-1);
+
+    // Pasted minus sign (§6.3 row 2): onPaste -> parseValue('-1') -> insert(), same early return.
+    inputNumberInstance.onPaste({
+      preventDefault: jest.fn(),
+      clipboardData: { getData: () => '-1' }
+    } as unknown as ClipboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).not.toHaveBeenCalled();
+    expect(component.body().value).not.toBe(-1);
+
+    // Positive control (KZ-001): a paste that is NOT a blocked minus sign DOES reach setValue,
+    // proving the two negative assertions above mean "blocked", not "nothing wired".
+    inputNumberInstance.onPaste({
+      preventDefault: jest.fn(),
+      clipboardData: { getData: () => '1' }
+    } as unknown as ClipboardEvent);
+    fixture.detectChanges();
+
+    expect(setValueSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+// @akili-spec docs/specs/changes/measure-number-signed-decimal (T-09 — max as @Input, character
+// guard asserted UNCHANGED)
+// Every assertion below reads the REAL rendered p-inputNumber instance, the real underlying
+// <input> DOM node, or the rendered warning text — never `component.max` / `component.MAX_SAFE_INTEGER`
+// directly. `KZ-001`: a presence-assertion on the class instance proves the field's value, not that
+// the template forwards it to PrimeNG — it would pass even with the [max] binding removed.
+describe('InputComponent — T-09: max as @Input, character guard asserted unchanged', () => {
+  let component: InputComponent;
+  let fixture: ComponentFixture<InputComponent>;
+  let utilsService: jest.Mocked<UtilsService>;
+
+  beforeEach(async () => {
+    const mockCacheService = { currentResultIsLoading: signal(false) };
+    const mockUtilsService = {
+      getNestedProperty: jest.fn(),
+      setNestedPropertyWithReduceSignal: jest.fn()
+    };
+    const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+    await TestBed.configureTestingModule({
+      imports: [InputComponent],
+      providers: [
+        { provide: CacheService, useValue: mockCacheService },
+        { provide: UtilsService, useValue: mockUtilsService },
+        { provide: WordCountService, useValue: mockWordCountService }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(InputComponent);
+    component = fixture.componentInstance;
+    utilsService = TestBed.inject(UtilsService) as jest.Mocked<UtilsService>;
+
+    // Arrange the TRANSITION the product performs (KZ-015): configure inputs the way a parent
+    // binding would, BEFORE the first detectChanges — do not construct into the end state.
+    component.signal = signal({});
+    component.optionValue = 'testField';
+    component.type = 'number';
+  });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  function getInputNumber(): InputNumber {
+    const inputNumberDe = fixture.debugElement.query(By.directive(InputNumber));
+    return inputNumberDe.componentInstance as InputNumber;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-012 AC.4 — default reaches the real instance
+  // ---------------------------------------------------------------------------------------------
+  it('AC.4 — with no [max] binding, the rendered p-inputNumber resolves max to Number.MAX_SAFE_INTEGER', () => {
+    fixture.detectChanges();
+    expect(getInputNumber().max).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-012 AC.1, AC.2 — DD-14's scale→bound table, and the scale-domain guard
+  // ---------------------------------------------------------------------------------------------
+  describe('DD-14 scale→bound table (AC.2) and the scale-domain guard (AC.1)', () => {
+    // `deriveMaxForScale` used to be a test-side reimplementation of DD-14's formula, duplicating
+    // `app-input`'s own scope (the `@Input` promotion only) with what T-11's call site derives for
+    // real. T-11 extracted the formula to `shared/utils/quantification-number-bound.util.ts` and
+    // this now imports THAT production implementation — so this table and the call site's actual
+    // `min`/`max` cannot silently disagree (the original hazard this comment used to just disclaim).
+
+    const scaleTable = [
+      { scale: 0, expectedMax: 9_007_199_254_740_991 },
+      { scale: 1, expectedMax: 562_949_953_421_311 },
+      { scale: 2, expectedMax: 70_368_744_177_663 },
+      { scale: 3, expectedMax: 8_796_093_022_207 },
+      { scale: 4, expectedMax: 549_755_813_887 }
+    ];
+
+    it.each(scaleTable)('scale $scale renders max=$expectedMax on the real p-inputNumber instance', ({ scale, expectedMax }) => {
+      const derived = deriveMaxForScale(scale);
+      expect(derived).toBe(expectedMax); // cross-check: the formula reproduces the Leader-verified table
+
+      component.max = derived;
+      fixture.detectChanges();
+
+      expect(getInputNumber().max).toBe(expectedMax);
+    });
+
+    it('scale 0 lands exactly on Number.MAX_SAFE_INTEGER as a CONSEQUENCE of the formula, not a special case', () => {
+      // Same call as every other scale above — no branch singles scale 0 out.
+      expect(deriveMaxForScale(0)).toBe(Number.MAX_SAFE_INTEGER);
+    });
+
+    it('AC.1 — a scale outside 0…4 is rejected as a configuration error, not silently clamped', () => {
+      expect(() => deriveMaxForScale(5)).toThrow();
+      expect(() => deriveMaxForScale(-1)).toThrow();
+      expect(() => deriveMaxForScale(2.5)).toThrow(); // non-integer scale is also a configuration error
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-006 AC.3, AC.5 — the character guard is unchanged; the false positive is PINNED, not
+  // denied (RK-16 / DC-10), and it fires at SCALES 1-4 — only scale 0 is clean, by arithmetic
+  // (its 16-digit bound plus a sign cannot exceed 17 characters). Values verified once with
+  // `node -e` before writing this test (see the implementer's / T-12's report — not re-derived
+  // from memory):
+  //   (-9007199254740991).toString()    -> 17 chars (scale 0 — no warning, ever)
+  //   (-562949953421311).toString()     -> 16 chars (scale 1's largest integer — no warning)
+  //   (-70368744177663).toString()      -> 15 chars (scale 2's largest integer — no warning)
+  //   (-156294995342131.1).toString()   -> "-156294995342131.1" (18 chars, scale 1 in-bound — WARNS)
+  //   (-18796093022206.99).toString()   -> "-18796093022206.99" (18 chars, scale 2 in-bound — WARNS)
+  //   (-8796093022206.999).toString()   -> "-8796093022206.999" (18 chars, scale 3 in-bound — WARNS)
+  //   (-549755813886.9999).toString()   -> "-549755813886.9999" (18 chars, scale 4 — RK-16's own example — WARNS)
+  // ---------------------------------------------------------------------------------------------
+  describe('the character guard is unchanged; the false positive fires at scales 1-4, only scale 0 is clean (R-MSD-006 AC.3, amended 2026-08-27)', () => {
+    type SignedBoundaryCase = { scale: number; max: number; value: number; chars: number };
+
+    const noWarningCases: SignedBoundaryCase[] = [
+      { scale: 0, max: 9_007_199_254_740_991, value: -9_007_199_254_740_991, chars: 17 },
+      { scale: 1, max: 562_949_953_421_311, value: -562_949_953_421_311, chars: 16 },
+      { scale: 2, max: 70_368_744_177_663, value: -70_368_744_177_663, chars: 15 }
+    ];
+
+    // T-12 (measure-number-signed-decimal): scale 1 and scale 2 were UNTESTED at 18 characters —
+    // T-09 pinned only scale 3/4, but the amended AC.3 (requirements.md R-MSD-006) states the
+    // defect fires at every scale except 0. These two rows close that gap; scale 3/4 rows are
+    // T-09's original evidence, unchanged.
+    const warningPresentCases: SignedBoundaryCase[] = [
+      { scale: 1, max: 562_949_953_421_311, value: -156294995342131.1, chars: 18 },
+      { scale: 2, max: 70_368_744_177_663, value: -18796093022206.99, chars: 18 },
+      { scale: 3, max: 8_796_093_022_207, value: -8796093022206.999, chars: 18 },
+      { scale: 4, max: 549_755_813_887, value: -549755813886.9999, chars: 18 } // RK-16's own pinned example
+    ];
+
+    // Titled on character length, not scale: R-MSD-006 AC.3 was amended after the implementer
+    // measured that "an in-bound value at this scale never warns" is FALSE for scales 1-4 (an
+    // 18-character in-bound value at those scales DOES warn — see warningPresentCases, which now
+    // covers all four). Only scale 0 is a true scale-wide guarantee, since its 16-digit bound plus
+    // a sign cannot exceed 17 characters. Each title below names the specific character count this
+    // row exercises, asserted in-test against value.toString().length, so it can never generalise
+    // past its case.
+    it.each(noWarningCases)(
+      'scale $scale — a $chars-character in-bound value stays under the 18-character guard',
+      fakeAsync(({ max, value, chars }: SignedBoundaryCase) => {
+        expect(value.toString().length).toBe(chars); // ties the title's claimed length to the actual value
+        utilsService.getNestedProperty.mockReturnValue(value);
+        component.max = max;
+        component.min = -max;
+        fixture.detectChanges();
+        tick();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).not.toContain('Maximum reached');
+      })
+    );
+
+    it.each(warningPresentCases)(
+      'scale $scale — the known 18-character in-bound signed value DOES render "Maximum reached" (pinned, not fixed)',
+      fakeAsync(({ max, value }: SignedBoundaryCase) => {
+        expect(value.toString().length).toBe(18); // the guard's exact, unchanged threshold
+        utilsService.getNestedProperty.mockReturnValue(value);
+        component.max = max;
+        component.min = -max;
+        fixture.detectChanges();
+        tick();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.textContent).toContain('Maximum reached');
+      })
+    );
+
+    it('AC.5 — the guard fires on the type "number" branch, and the shared type "text" paste path is untouched', fakeAsync(() => {
+      // "number" branch, unchanged threshold: 17 characters stays under it.
+      utilsService.getNestedProperty.mockReturnValue(-9_007_199_254_740_991);
+      component.max = 9_007_199_254_740_991;
+      component.min = -9_007_199_254_740_991;
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(component.type).toBe('number');
+      expect(fixture.nativeElement.textContent).not.toContain('Maximum reached');
+
+      // The shared type "text" 40,000-character paste-truncation path (L-02) is a DIFFERENT branch
+      // of the SAME guard signal and is not part of this task's diff — `handlePasteText`'s own
+      // suite above (describe('handlePasteText', ...)) already exercises it unmodified; asserting
+      // MAX_SAFE_TEXT is still 40000 here would be a class-field presence-assertion (KZ-001) and is
+      // not the claim this test makes. What this test asserts is narrower and DOM-grounded: the
+      // "number" branch above renders no warning at 17 characters, unmodified by this task's change.
+    }));
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // R-MSD-006 AC.6 — the three enforcement shapes are asymmetric; each asserted on the rendered
+  // value, never on the absence of a message (:363).
+  // ---------------------------------------------------------------------------------------------
+  describe('the three enforcement shapes are asymmetric (:363, AC.6)', () => {
+    it('maxFractionDigits PREVENTS an extra decimal digit per keystroke — the rendered value is unchanged', () => {
+      component.maxFractionDigits = 2;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+
+      inputNumber.input.nativeElement.value = '1.23';
+      inputNumber.input.nativeElement.selectionStart = 4;
+      inputNumber.input.nativeElement.selectionEnd = 4;
+
+      inputNumber.insert({ preventDefault: jest.fn() } as unknown as Event, '4');
+      fixture.detectChanges();
+
+      // A 3rd decimal digit never lands on the rendered input: prevention, not a post-hoc clamp.
+      expect(inputNumber.input.nativeElement.value).toBe('1.23');
+    });
+
+    it('min PREVENTS the minus key per keystroke — the rendered value never goes negative', () => {
+      component.min = 0;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+      const setValueSpy = jest.spyOn(component, 'setValue');
+
+      inputNumber.input.nativeElement.value = '';
+      inputNumber.input.nativeElement.selectionStart = 0;
+      inputNumber.input.nativeElement.selectionEnd = 0;
+
+      inputNumber.onInputKeyPress({ which: 45, code: 'Minus', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      fixture.detectChanges();
+
+      expect(setValueSpy).not.toHaveBeenCalled();
+      expect(inputNumber.input.nativeElement.value).not.toContain('-');
+    });
+
+    it('max CLAMPS only on blur/Tab/Enter/spinner — NOT per keystroke (L-07, AC.6)', () => {
+      component.max = 5;
+      component.min = 0;
+      fixture.detectChanges();
+      const inputNumber = getInputNumber();
+
+      inputNumber.input.nativeElement.value = '';
+      inputNumber.input.nativeElement.selectionStart = 0;
+      inputNumber.input.nativeElement.selectionEnd = 0;
+
+      // Typing '9' with max=5: per-keystroke insert() never calls validateValue/max at all.
+      inputNumber.onInputKeyPress({ which: 57, code: 'Digit9', preventDefault: jest.fn() } as unknown as KeyboardEvent);
+      fixture.detectChanges();
+      expect(inputNumber.input.nativeElement.value).toBe('9'); // unclamped while typing — the rendered DOM value
+      expect(inputNumber.value).toBe(9); // the real PrimeNG instance's own model — also unclamped
+
+      // Only on blur does PrimeNG's validateValue() run and clamp to max.
+      inputNumber.onInputBlur({} as Event);
+      fixture.detectChanges();
+
+      expect(inputNumber.input.nativeElement.value).toBe('5'); // clamped on the rendered DOM value
+      expect(inputNumber.value).toBe(5); // clamped on the real PrimeNG instance
+    });
+  });
+});
+
+// @akili-spec docs/specs/changes/innovation-use-required-fields (T-02 — app-input: tokenize the
+// five live literals, delete the dead [style])
+//
+// DD-10 (INVERTED by P-2) + DD-3's per-control gate. Per DD-3's resolution table:
+//   - pInputText branch (:30) LIVE mechanism is the `[style]` object binding — asserted with a
+//     `CSSStyleDeclaration.prototype.border` setter spy, exactly as the in-tree exemplar
+//     (innovation-use-actor-item.component.spec.ts:291) does, and for the SAME reason: cssstyle
+//     @2.3.0 drops a shorthand carrying var(), so `element.style.border` reads back empty
+//     whether the binding is correct or broken (KZ-017 — this is what that check CANNOT reach).
+//   - p-inputNumber branch (:49) LIVE mechanism is the Tailwind utility CLASS — the `[style]` at
+//     the old :55 was PROVEN DEAD by P-1 (`p-inputNumber` declares `style` as an `@Input` and
+//     never applies it) and has been DELETED, not converted. Asserted on the rendered class
+//     string, never on style.
+// Neither assertion proves PAINT (DC-7) — T-16's human browser check is the gate for that
+// (DC-1); these assertions are token-compliance only.
+describe('InputComponent — T-02: tokenized amber/grey literals (DD-10, DD-3)', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  describe(':30 — pInputText [style] binding is CONVERTED (kept, not deleted)', () => {
+    async function renderTextType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? '' : 'some value'),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+      // appSaveOnWriting (@if (type === 'text') branch) injects ActionsService — mocked here so
+      // the real `type: 'text'` template can render at all (the pre-existing sibling suites in
+      // this file avoid type: 'text' entirely for exactly this DI reason and render type:
+      // 'number' instead; :30 lives only on the text branch, so it cannot be avoided here).
+      const mockActionsService: Partial<ActionsService> = { saveCurrentSection: jest.fn() };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService },
+          { provide: ActionsService, useValue: mockActionsService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? '' : 'some value' });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'text';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('sets a warning-token inline-style border on the invalid text input (R-IUR-003 AC.2)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(true);
+
+      expect(borderSetSpy.mock.calls).toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+
+    it('does not set the warning-token border when the field is valid (R-IUR-003 AC.2, clears on fill)', async () => {
+      const borderSetSpy = jest.spyOn(CSSStyleDeclaration.prototype, 'border', 'set');
+      await renderTextType(false);
+
+      expect(borderSetSpy.mock.calls).not.toContainEqual(['2px solid var(--ac-warning-1)']);
+      borderSetSpy.mockRestore();
+    });
+  });
+
+  describe(':49/:55 — p-inputNumber CLASS is CONVERTED (LIVE); the dead [style] is DELETED (P-1/P-2)', () => {
+    async function renderNumberType(invalid: boolean): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // Drive `body` through the REAL mechanism (the `onChange` effect reads
+      // `getNestedProperty(signal(), optionValue)`) rather than calling `body.set()` directly —
+      // the effect's first run fires synchronously within this single `detectChanges()` and would
+      // clobber a directly-set `body` value back to whatever this mock returns.
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(invalid ? null : 5),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: invalid ? null : 5 });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.isRequired = true;
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('renders the warning-token border-color utility class when invalid (isInvalid() true)', async () => {
+      const localFixture = await renderNumberType(true);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).toContain('border-[var(--ac-warning-1)]');
+      expect(hostEl.className).not.toContain('#E69F00');
+    });
+
+    it('renders no border utility class when valid (isInvalid() false)', async () => {
+      const localFixture = await renderNumberType(false);
+      const hostEl = (localFixture.debugElement.query(By.directive(InputNumber)).nativeElement as HTMLElement);
+
+      expect(hostEl.className).not.toContain('border-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':58 — helper text is CONVERTED to --ac-grey-600 (not --ac-warning-1)', () => {
+    async function renderWithHelperText(): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(null),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({});
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      localComponent.helperText = 'Helper copy';
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it('applies the grey token, never the amber token, to the helper text row', async () => {
+      const localFixture = await renderWithHelperText();
+      // Matched by class, not by exact textContent equality: the outer wrapping <div>s have no
+      // text of their own when no label/description is set, so an exact-equality match on
+      // trimmed textContent picks up the FIRST ancestor div in traversal order instead of the
+      // helper row itself. The grey token is unique to this row (the warning-token rows below
+      // never carry it), so it is an unambiguous discriminator.
+      const helperDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-grey-600'));
+
+      expect(helperDiv).toBeTruthy();
+      expect((helperDiv!.nativeElement as HTMLElement).textContent).toContain('Helper copy');
+      expect((helperDiv!.nativeElement as HTMLElement).className).toContain('text-[var(--ac-grey-600)]');
+      expect((helperDiv!.nativeElement as HTMLElement).className).not.toContain('text-[var(--ac-warning-1)]');
+    });
+  });
+
+  describe(':64/:70 — amber required/max-reached messages keep the warning token and the fs-[14] decision', () => {
+    async function renderMessage(kind: 'required' | 'maxReached'): Promise<ComponentFixture<InputComponent>> {
+      const mockCacheService = { currentResultIsLoading: signal(false) };
+      // 'maxReached' is driven through the REAL threshold in `updateMaxReachedMessage` (an
+      // 18-character value, `MAX_SAFE_INTEGER`) via the mocked `getNestedProperty` — not by
+      // calling `showMaxReachedMessage.set(true)` directly, which the effect's own first,
+      // synchronous run (within this same `detectChanges()`) recomputes and overwrites from
+      // `body().value` regardless of what was set beforehand.
+      const value = kind === 'required' ? '' : '9'.repeat(18);
+      const mockUtilsService = {
+        getNestedProperty: jest.fn().mockReturnValue(value),
+        setNestedPropertyWithReduceSignal: jest.fn()
+      };
+      const mockWordCountService = { getWordCount: jest.fn().mockReturnValue(0) };
+
+      await TestBed.configureTestingModule({
+        imports: [InputComponent],
+        providers: [
+          { provide: CacheService, useValue: mockCacheService },
+          { provide: UtilsService, useValue: mockUtilsService },
+          { provide: WordCountService, useValue: mockWordCountService }
+        ]
+      }).compileComponents();
+
+      const localFixture = TestBed.createComponent(InputComponent);
+      const localComponent = localFixture.componentInstance;
+      localComponent.signal = signal({ testField: value });
+      localComponent.optionValue = 'testField';
+      localComponent.type = 'number';
+      if (kind === 'required') {
+        localComponent.isRequired = true;
+      }
+      localFixture.detectChanges();
+      return localFixture;
+    }
+
+    it.each([
+      { kind: 'required' as const, text: 'This field is required' },
+      { kind: 'maxReached' as const, text: 'Maximum reached' }
+    ])('the $kind message div carries the warning token, fs-[14], and an explicit 1.25rem line-height (text-sm decision, T-02)', async ({ kind, text }) => {
+      const localFixture = await renderMessage(kind);
+      // `.includes`, not exact equality: the div's own textContent concatenates the icon
+      // ligature text ("warning") with the message span's text (e.g. "warningThis field is
+      // required"), so an exact match against just the message string never matches.
+      const messageDiv = localFixture.debugElement
+        .queryAll(By.css('div'))
+        .find(d => (d.nativeElement as HTMLElement).className.includes('ac-warning-1') && (d.nativeElement as HTMLElement).textContent?.includes(text));
+
+      expect(messageDiv).toBeTruthy();
+      const className = (messageDiv!.nativeElement as HTMLElement).className;
+      expect(className).toContain('text-[var(--ac-warning-1)]');
+      expect(className).toContain('fs-[14]');
+      expect(className).toContain('leading-[1.25rem]');
+      expect(className).not.toContain('#E69F00');
+      expect(className).not.toContain('text-sm');
     });
   });
 });

@@ -21,6 +21,7 @@ import { ClarisaImpactAreasModule } from './entities/clarisa-impact-areas/claris
 import { ClarisaGlobalTargetsModule } from './entities/clarisa-global-targets/clarisa-global-targets.module';
 import { ClarisaSdgTargetsModule } from './entities/clarisa-sdg-targets/clarisa-sdg-targets.module';
 import { ClarisaScienceProgramsModule } from './entities/clarisa-science-programs/clarisa-science-programs.module';
+import { ClarisaInnovationUseLevelsModule } from './entities/clarisa-innovation-use-levels/clarisa-innovation-use-levels.module';
 
 @Module({
   providers: [ClarisaService],
@@ -39,6 +40,7 @@ import { ClarisaScienceProgramsModule } from './entities/clarisa-science-program
     ClarisaInnovationReadinessLevelsModule,
     ClarisaInnovationCharacteristicsModule,
     ClarisaInnovationTypesModule,
+    ClarisaInnovationUseLevelsModule,
     ClarisaActorTypesModule,
     ClarisaSdgsModule,
     ClarisaInitiativesModule,
