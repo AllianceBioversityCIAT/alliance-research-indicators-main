@@ -26,6 +26,13 @@
     background-color: var(--ac-white-1);
   }
 
+  // Header cell content: label + sort icon on one line (platform convention)
+  &__th-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   &__row {
     font-family: Barlow, sans-serif;
     font-size: 14px;
@@ -78,69 +85,6 @@
       font-size: 14px;
       font-weight: 600;
       line-height: 18px;
-    }
-  }
-
-  // ── Status pill ─────────────────────────────────────────────────────
-  &__status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: 100px;
-    font-size: 13px;
-    font-weight: 500;
-    border: 1px solid var(--ac-grey-300);
-    background-color: var(--ac-grey-100);
-    color: var(--ac-grey-700);
-
-    &__dot {
-      font-size: 8px;
-      flex-shrink: 0;
-    }
-
-    &__text {
-      white-space: nowrap;
-    }
-
-    &--ongoing, &--active {
-      background-color: var(--ac-green-100);
-      border-color: var(--ac-green-300);
-      color: var(--ac-green-600);
-
-      .by-project__status-pill__dot {
-        color: var(--ac-green-400);
-      }
-    }
-
-    &--completed {
-      background-color: var(--ac-primary-blue-100);
-      border-color: var(--ac-primary-blue-200);
-      color: var(--ac-primary-blue-500);
-
-      .by-project__status-pill__dot {
-        color: var(--ac-primary-blue-400);
-      }
-    }
-
-    &--closed {
-      background-color: var(--ac-grey-200);
-      border-color: var(--ac-grey-400);
-      color: var(--ac-grey-700);
-
-      .by-project__status-pill__dot {
-        color: var(--ac-grey-500);
-      }
-    }
-
-    &--pending {
-      background-color: var(--ac-grey-100);
-      border-color: var(--ac-orange-1);
-      color: var(--ac-grey-800);
-
-      .by-project__status-pill__dot {
-        color: var(--ac-orange-1);
-      }
     }
   }
 

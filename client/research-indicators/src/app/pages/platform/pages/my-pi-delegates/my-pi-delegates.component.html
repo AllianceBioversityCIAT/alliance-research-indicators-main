@@ -3,85 +3,106 @@
 <!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
 <!-- NFR-UI-002: Non-colour cues for every status (icon + text). -->
 <!-- NFR-UI-003: Loading / error / empty states. -->
+<!-- Layout is Tailwind; the only SCSS left is the ::ng-deep PrimeNG overrides. -->
+<!-- Page gutters follow project-detail: px-[24px], px-[28px] from md up. -->
 
-<div class="pi-delegates-page">
+<div class="pi-delegates-page flex flex-col bg-[var(--ac-white-1)] pt-[8px] sm:pt-[12px] md:pt-[20px]">
 
   <!-- ── Page header block ───────────────────────────────────────────── -->
-  <header class="pi-delegates-header">
-    <h1 class="pi-delegates-title atc-primary-blue-600">My PI Delegates</h1>
-    <p class="pi-delegates-description atc-grey-600">
+  <header class="pi-delegates-header flex flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
+    <h1 class="pi-delegates-title atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
+      My PI Delegates
+    </h1>
+    <p class="pi-delegates-description atc-grey-600 m-0 max-w-[52rem] font-['Barlow'] text-[15px] font-normal leading-[20px]">
       The people you delegate to review results on your behalf. Assign the PI Delegate role across
       the projects where you are the Principal Investigator — one by one or several at a time.
     </p>
 
-    <!-- Stat counters -->
-    <div class="pi-delegates-stats" role="list" aria-label="PI Delegates summary statistics">
-      <div class="pi-delegates-stats__counter" role="listitem">
-        <span class="pi-delegates-stats__counter-head">
-          <i class="pi pi-briefcase pi-delegates-stats__counter-icon atc-primary-blue-300" aria-hidden="true"></i>
-          <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS AS PI</span>
+    <!-- Stat cards — same treatment as the project-detail indicator tiles -->
+    <div class="pi-delegates-stats mt-[14px] flex flex-row flex-wrap gap-3" role="list"
+      aria-label="PI Delegates summary statistics">
+      <div
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-briefcase atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            AS PI</span>
         </span>
-        <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalProjects() }}</span>
+        <span
+          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.totalProjects() }}</span>
       </div>
-      <div class="pi-delegates-stats__counter" role="listitem">
-        <span class="pi-delegates-stats__counter-head">
-          <i class="pi pi-users pi-delegates-stats__counter-icon atc-primary-blue-300" aria-hidden="true"></i>
-          <span class="pi-delegates-stats__counter-label atc-grey-600">PI DELEGATES</span>
+
+      <div
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PI
+            DELEGATES</span>
         </span>
-        <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalDistinctDelegates() }}</span>
+        <span
+          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.totalDistinctDelegates() }}</span>
       </div>
-      <div class="pi-delegates-stats__counter" role="listitem">
-        <span class="pi-delegates-stats__counter-head">
-          <i class="pi pi-exclamation-triangle pi-delegates-stats__counter-icon atc-orange-1" aria-hidden="true"></i>
-          <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS WITHOUT PI DELEGATE</span>
+
+      <div
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-exclamation-triangle atc-orange-1 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            WITHOUT PI DELEGATE</span>
         </span>
-        <span class="pi-delegates-stats__counter-value atc-orange-1">{{ service.projectsWithoutDelegate().length }}</span>
+        <span
+          class="pi-delegates-stats__counter-value atc-orange-1 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsWithoutDelegate().length }}</span>
       </div>
     </div>
   </header>
 
   <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────── -->
   @if (loading()) {
-    <div class="pi-delegates-state pi-delegates-state--loading" role="status" aria-live="polite">
-      <i class="pi pi-spin pi-spinner pi-delegates-state__icon atc-primary-blue-400" aria-hidden="true"></i>
-      <span class="atc-grey-800">Loading PI delegates data…</span>
-    </div>
+  <div
+    class="pi-delegates-state--loading mb-4 flex items-center gap-3 border-y border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    role="status" aria-live="polite">
+    <i class="pi pi-spin pi-spinner atc-primary-blue-400 shrink-0 !text-[18px]" aria-hidden="true"></i>
+    <span class="atc-grey-800">Loading PI delegates data…</span>
+  </div>
   }
 
   <!-- ── Error state (NFR-UI-003) ───────────────────────────────────── -->
   @else if (error()) {
-    <div class="pi-delegates-state pi-delegates-state--error" role="alert">
-      <i class="pi pi-exclamation-circle pi-delegates-state__icon atc-red-1" aria-hidden="true"></i>
-      <span class="atc-red-1">
-        Could not load PI delegates data. Please refresh the page and try again.
-      </span>
-    </div>
+  <div
+    class="pi-delegates-state--error mb-4 flex items-center gap-3 border-y border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    role="alert">
+    <i class="pi pi-exclamation-circle atc-red-1 shrink-0 !text-[18px]" aria-hidden="true"></i>
+    <span class="atc-red-1">
+      Could not load PI delegates data. Please refresh the page and try again.
+    </span>
+  </div>
   }
 
   <!-- ── Tabs + content ─────────────────────────────────────────────── -->
   @else {
-    <p-tabView
-      [activeIndex]="activeTabIndex()"
-      (activeIndexChange)="onTabChange({ index: $event })"
-      styleClass="pi-delegates-tabview"
-    >
-      <!-- ── Tab 0: By project (DEFAULT — R-UI-002 AC.1) ─────────── -->
-      <p-tabPanel header="By project">
-        <app-by-project
-          (assignRequested)="onAssignFromProject($event)"
-          (historyRequested)="onHistoryFromProject($event)"
-        ></app-by-project>
-      </p-tabPanel>
+  <p-tabView [activeIndex]="activeTabIndex()" (activeIndexChange)="onTabChange({ index: $event })"
+    styleClass="pi-delegates-tabview">
+    <!-- ── Tab 0: By project (DEFAULT — R-UI-002 AC.1) ─────────── -->
+    <p-tabPanel header="By project">
+      <app-by-project (assignRequested)="onAssignFromProject($event)"
+        (historyRequested)="onHistoryFromProject($event)"></app-by-project>
+    </p-tabPanel>
 
-      <!-- ── Tab 1: By person (T-UI-06) ──────────────────────────────── -->
-      <p-tabPanel header="By person">
-        <app-by-person
-          (assignRequested)="onAssignFromPerson($event)"
-          (historyRequested)="onHistoryFromPerson($event)"
-        ></app-by-person>
-      </p-tabPanel>
-    </p-tabView>
-
+    <!-- ── Tab 1: By person (T-UI-06) ──────────────────────────────── -->
+    <p-tabPanel header="By person">
+      <app-by-person (assignRequested)="onAssignFromPerson($event)"
+        (historyRequested)="onHistoryFromPerson($event)"></app-by-person>
+    </p-tabPanel>
+  </p-tabView>
   }
 
 </div>

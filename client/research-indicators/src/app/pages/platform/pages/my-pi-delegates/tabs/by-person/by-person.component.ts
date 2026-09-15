@@ -25,6 +25,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
+import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 
@@ -46,7 +47,8 @@ export interface PersonRow {
     TableModule,
     ButtonModule,
     InputTextModule,
-    TooltipModule
+    TooltipModule,
+    SearchExportControlsComponent
   ],
   templateUrl: './by-person.component.html',
   styleUrl: './by-person.component.scss',
@@ -98,6 +100,11 @@ export class ByPersonComponent {
     if (!query) return this.personRows();
     return this.personRows().filter(row => this.matchesQuery(row, query));
   });
+
+  /** Clear Filters on the shared search control: resets the search term. */
+  clearFilters(): void {
+    this.searchTerm.set('');
+  }
 
   // ─── Summary line (rendered inside the table card) ───────────────────────────
   readonly summaryPeople = computed(() => this.personRows().length);

@@ -26,6 +26,13 @@
     background-color: var(--ac-white-1);
   }
 
+  // Header cell content: label + sort icon on one line (platform convention)
+  &__th-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   &__row {
     font-family: Barlow, sans-serif;
     font-size: 14px;

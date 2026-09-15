@@ -567,20 +567,37 @@ describe('ByPersonComponent', () => {
       await createComponent([ALICE, BOB, CAROL_INACTIVE]);
     });
 
-    it('renders the search box INSIDE the table card, not in the page shell', () => {
+    it('renders the shared search control INSIDE the table card, not in the page shell', () => {
       const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
-      expect(card.querySelector('#by-person-search')).not.toBeNull();
+      expect(card.querySelector('app-search-export-controls')).not.toBeNull();
+      // Table-local filtering: no Apply Filters button (there is no filters sidebar here)
+      expect(card.textContent).not.toContain('Apply Filters');
+      expect(card.textContent).toContain('Clear Filters');
     });
 
-    it('typing in the in-card search box filters the rows', () => {
+    it('searching through the shared control filters the rows', () => {
       expect(component.filteredRows().length).toBe(3);
 
-      const input = fixture.debugElement.query(By.css('#by-person-search'));
-      input.triggerEventHandler('ngModelChange', 'carol');
+      const input = fixture.debugElement.query(By.css('app-search-export-controls input'));
+      (input.nativeElement as HTMLInputElement).value = 'carol';
+      // Enter submits immediately; the (input) path is the same emitter, debounced.
+      input.triggerEventHandler('keydown.enter', { target: input.nativeElement });
       fixture.detectChanges();
 
       expect(component.filteredRows().length).toBe(1);
       expect(component.filteredRows()[0].name).toBe('Carol Gone');
+    });
+
+    it('Clear Filters resets the search term', () => {
+      component.searchTerm.set('carol');
+      fixture.detectChanges();
+      expect(component.filteredRows().length).toBe(1);
+
+      component.clearFilters();
+      fixture.detectChanges();
+
+      expect(component.searchTerm()).toBe('');
+      expect(component.filteredRows().length).toBe(3);
     });
   });
 
@@ -629,6 +646,33 @@ describe('ByPersonComponent', () => {
       marker = fixture.nativeElement.querySelector('.by-person__summary-left .atc-red-1');
       expect(marker).not.toBeNull();
       expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+    });
+  });
+  // ── 8. Sortable columns (platform table convention) ───────────────────
+
+  describe('column sorting', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB, CAROL_INACTIVE]);
+    });
+
+    it('renders a sort icon on Person, Email and Status', () => {
+      const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
+      expect(sortable.length).toBe(3);
+    });
+
+    it('sorts the rendered rows when the Person header is clicked', () => {
+      const firstName = () =>
+        (fixture.nativeElement.querySelector('.by-person__person__name') as HTMLElement).textContent?.trim();
+      expect(firstName()).toBe('Alice Example');
+
+      const personHeader = fixture.debugElement.queryAll(By.css('th[pSortableColumn]'))[0];
+      personHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Alice Example'); // ascending
+
+      personHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Carol Gone'); // descending
     });
   });
 });

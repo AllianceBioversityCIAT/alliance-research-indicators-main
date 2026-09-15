@@ -413,21 +413,39 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
     });
 
-    it('renders the search box INSIDE the table card, not in the page shell', () => {
+    it('renders the shared search control INSIDE the table card, not in the page shell', () => {
       const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
-      expect(card.querySelector('#by-project-search')).not.toBeNull();
+      expect(card.querySelector('app-search-export-controls')).not.toBeNull();
+      // Table-local filtering: no Apply Filters button (there is no filters sidebar here)
+      expect(card.textContent).not.toContain('Apply Filters');
+      expect(card.textContent).toContain('Clear Filters');
     });
 
-    it('typing in the in-card search box filters the rows', () => {
+    it('searching through the shared control filters the rows', () => {
       expect(component.filteredRows().length).toBe(3);
 
-      const input = fixture.debugElement.query(By.css('#by-project-search'));
+      const input = fixture.debugElement.query(By.css('app-search-export-controls input'));
       (input.nativeElement as HTMLInputElement).value = 'PRJ-002';
-      input.triggerEventHandler('ngModelChange', 'PRJ-002');
+      // Enter submits immediately; the (input) path is the same emitter, debounced.
+      input.triggerEventHandler('keydown.enter', { target: input.nativeElement });
       fixture.detectChanges();
 
       expect(component.filteredRows().length).toBe(1);
       expect(component.filteredRows()[0].project_code).toBe('PRJ-002');
+    });
+
+    it('Clear Filters resets the search term and the status back to All', () => {
+      component.searchTerm.set('PRJ-002');
+      component.statusTerm.set('Completed');
+      fixture.detectChanges();
+      expect(component.filteredRows().length).toBe(1);
+
+      component.clearFilters();
+      fixture.detectChanges();
+
+      expect(component.searchTerm()).toBe('');
+      expect(component.statusTerm()).toBe('All');
+      expect(component.filteredRows().length).toBe(3);
     });
 
     it('statusOptions is derived from the cache: "All" first, deduplicated and sorted', () => {
@@ -489,6 +507,73 @@ describe('ByProjectComponent', () => {
       marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
       expect(marker).not.toBeNull();
       expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+    });
+  });
+  // ── 10. Sortable columns (platform table convention) ──────────────────
+
+  describe('column sorting', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+    });
+
+    it('renders a sort icon on Project, Status and Pool funding', () => {
+      const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
+      expect(sortable.length).toBe(3);
+    });
+
+    it('sorts the rendered rows when the Project header is clicked', () => {
+      const firstName = () =>
+        (fixture.nativeElement.querySelector('.by-project__project__name') as HTMLElement).textContent?.trim();
+      expect(firstName()).toBe('Alpha Research');
+
+      const projectHeader = fixture.debugElement.queryAll(By.css('th[pSortableColumn]'))[0];
+      projectHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Alpha Research'); // ascending
+
+      projectHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Gamma Study'); // descending
+    });
+  });
+  // ── 11. Status column uses the shared project status tag ──────────────
+
+  describe('status tag (same component and colours as the My Projects table)', () => {
+    const suspended: ProjectDelegates = {
+      ...PROJECT_NO_DELEGATES,
+      project_code: 'PRJ-SUS',
+      project_name: 'Suspended Project',
+      status: 'Suspended'
+    };
+
+    it('maps the row status name to the shared status id (Ongoing/Completed/Suspended)', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+      expect(component.statusDisplay({ ...PROJECT_WITH_DELEGATES, status: 'Ongoing' }).statusId).toBe(1);
+      expect(component.statusDisplay({ ...PROJECT_WITH_DELEGATES, status: 'Completed' }).statusId).toBe(2);
+      expect(component.statusDisplay({ ...PROJECT_WITH_DELEGATES, status: 'Suspended' }).statusId).toBe(3);
+    });
+
+    it('renders <app-custom-tag> instead of the old bespoke pill', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+      expect(fixture.nativeElement.querySelector('app-custom-tag')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.by-project__status-pill')).toBeNull();
+    });
+
+    it('paints Suspended with the shared amber border (STATUS_COLOR_MAP id 3)', async () => {
+      await createComponent([suspended]);
+
+      const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement;
+      expect(tag.textContent?.trim()).toBe('Suspended');
+      // #F58220 — the same value the My Projects table paints for Suspended
+      expect(tag.style.borderColor.toLowerCase()).toBe('#f58220');
+    });
+
+    it('paints Ongoing with a different border than Suspended (discriminator)', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement;
+      expect(tag.textContent?.trim()).toBe('Ongoing');
+      expect(tag.style.borderColor.toLowerCase()).not.toBe('#f58220');
     });
   });
 });

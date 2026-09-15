@@ -10,21 +10,37 @@
   <!-- ── Table card: toolbar + table + paginator + summary ──────────── -->
   <div class="by-project__table-wrapper">
 
-    <!-- Per-table toolbar (search + status) — lives inside the card -->
-    <div class="by-project__toolbar">
-      <div class="by-project__search-wrapper">
-        <i class="pi pi-search by-project__search-icon" aria-hidden="true"></i>
-        <input
-          pInputText
-          type="text"
-          id="by-project-search"
-          [ngModel]="searchTerm()"
-          (ngModelChange)="searchTerm.set($event)"
-          placeholder="Search a project or a delegate"
-          aria-label="Search a project or a delegate"
-          class="by-project__search-input"
-        />
-      </div>
+    <!-- Summary line — top of the card, above the search -->
+    <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
+      <span class="by-project__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
+        {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
+        &nbsp;·&nbsp;
+        {{ summaryAssignments() }} active {{ summaryAssignments() === 1 ? 'assignment' : 'assignments' }}
+        across {{ summaryProjects() }} {{ summaryProjects() === 1 ? 'project' : 'projects' }}
+        @if (summaryInactive() > 0) {
+          &nbsp;·&nbsp;
+          <span class="atc-red-1">
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
+          </span>
+        }
+      </span>
+      <span class="by-project__summary-right atc-grey-600 text-[12px] italic">
+        Only projects where you are the Principal Investigator are listed
+      </span>
+    </div>
+
+    <!-- Per-table toolbar: the shared search control + status filter -->
+    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[var(--ac-grey-200)] px-4 py-3.5">
+      <app-search-export-controls
+        class="min-w-[20rem] flex-1"
+        [showApply]="false"
+        [showClear]="true"
+        [searchValue]="searchTerm()"
+        searchPlaceholder="Find a project by code, title or delegate"
+        (searchChange)="searchTerm.set($event)"
+        (clear)="clearFilters()"
+      ></app-search-export-controls>
       <p-dropdown
         [options]="statusOptions()"
         [ngModel]="statusTerm()"
@@ -41,8 +57,9 @@
       [scrollable]="true"
       [paginator]="true"
       [rows]="10"
-      [rowsPerPageOptions]="[10, 25, 50]"
+      [rowsPerPageOptions]="[5, 10, 25, 50]"
       [showCurrentPageReport]="true"
+      [tableStyle]="{ 'min-width': '100%' }"
       currentPageReportTemplate="Showing {first} to {last} of {totalRecords} projects"
       styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
       aria-label="PI Delegates by project"
@@ -50,11 +67,21 @@
       <!-- Header -->
       <ng-template pTemplate="header">
         <tr>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Project</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Status</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Pool funding</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">PI Delegates</th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">Actions</th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="project_name">
+            <div class="by-project__th-inner">Project <p-sortIcon field="project_name"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="status">
+            <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="is_pool_funding_contributor">
+            <div class="by-project__th-inner">Pool funding <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">
+            <div class="by-project__th-inner">PI Delegates</div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">
+            <div class="by-project__th-inner">Actions</div>
+          </th>
         </tr>
       </ng-template>
 
@@ -75,21 +102,13 @@
             </div>
           </td>
 
-          <!-- Status — pill with leading dot + text (NFR-UI-002) -->
+          <!-- Status — shared status tag, same colours as the My Projects table -->
           <td class="by-project__td by-project__td--status">
             @if (project.status) {
-              <span
-                class="by-project__status-pill"
-                [class.by-project__status-pill--ongoing]="project.status === 'Ongoing'"
-                [class.by-project__status-pill--completed]="project.status === 'Completed'"
-                [class.by-project__status-pill--closed]="project.status === 'Closed'"
-                [class.by-project__status-pill--pending]="project.status === 'Pending'"
-                [class.by-project__status-pill--active]="project.status === 'Active'"
-                [attr.aria-label]="'Status: ' + project.status"
-              >
-                <span class="by-project__status-pill__dot" aria-hidden="true">&#x25CF;</span>
-                <span class="by-project__status-pill__text">{{ project.status }}</span>
-              </span>
+              <app-custom-tag
+                [statusId]="statusDisplay(project).statusId"
+                [statusName]="statusDisplay(project).statusName"
+              ></app-custom-tag>
             } @else {
               <span class="atc-grey-500">—</span>
             }
@@ -201,25 +220,6 @@
       </ng-template>
     </p-table>
 
-    <!-- Summary line — inside the card, below the paginator -->
-    <div class="by-project__summary" aria-label="PI Delegates summary">
-      <span class="by-project__summary-left atc-grey-700">
-        {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
-        &nbsp;·&nbsp;
-        {{ summaryAssignments() }} active {{ summaryAssignments() === 1 ? 'assignment' : 'assignments' }}
-        across {{ summaryProjects() }} {{ summaryProjects() === 1 ? 'project' : 'projects' }}
-        @if (summaryInactive() > 0) {
-          &nbsp;·&nbsp;
-          <span class="atc-red-1">
-            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        }
-      </span>
-      <span class="by-project__summary-right atc-grey-600">
-        Only projects where you are the Principal Investigator are listed
-      </span>
-    </div>
   </div>
 
   <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->

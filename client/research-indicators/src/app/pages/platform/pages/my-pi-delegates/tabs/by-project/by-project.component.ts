@@ -26,6 +26,9 @@ import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { DropdownModule } from 'primeng/dropdown';
 import { TooltipModule } from 'primeng/tooltip';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
+import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
+import { ProjectUtilsService, type ProjectType } from '@services/project-utils.service';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates.interface';
@@ -40,7 +43,9 @@ import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates
     ButtonModule,
     InputTextModule,
     DropdownModule,
-    TooltipModule
+    TooltipModule,
+    SearchExportControlsComponent,
+    CustomTagComponent
   ],
   templateUrl: './by-project.component.html',
   styleUrl: './by-project.component.scss',
@@ -51,6 +56,7 @@ export class ByProjectComponent {
 
   readonly service = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
+  private readonly projectUtils = inject(ProjectUtilsService);
 
   // ─── Assign output (T-UI-07 wires the actual modal) ─────────────────────────
   // Assign button emits the project code; the parent/page shell opens the modal.
@@ -104,6 +110,12 @@ export class ByProjectComponent {
     }
     return seen.size;
   });
+
+  /** Clear Filters on the shared search control: resets search + status. */
+  clearFilters(): void {
+    this.searchTerm.set('');
+    this.statusTerm.set('All');
+  }
 
   /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {
@@ -160,6 +172,15 @@ export class ByProjectComponent {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  /**
+   * Status chip data for <app-custom-tag>, so this table shows the same colours
+   * as My Projects. The name→id mapping stays in ProjectUtilsService — the row
+   * only carries the status name, which is what `contract_status` holds there.
+   */
+  statusDisplay(project: ProjectDelegates): { statusId: number; statusName: string } {
+    return this.projectUtils.getStatusDisplay({ contract_status: project.status } as unknown as ProjectType);
+  }
 
   /**
    * Safely formats an ISO date string or Date object to a readable date.
