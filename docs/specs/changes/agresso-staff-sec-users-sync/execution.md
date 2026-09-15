@@ -9,7 +9,7 @@
 | Linked design | [`./design.md`](./design.md) |
 | Linked tasks | [`./tasks.md`](./tasks.md) |
 | Judgment ledger | [`./judgment.md`](./judgment.md) — two lineages, five rounds, terminal APPROVED-with-caveat |
-| Approval Mode | **gated** — the Leader pauses for the user after every task |
+| Approval Mode | **gated** → **pre-approved from T-08 onward** (user ruling 2026-09-15: *"sigue solo para cuando se acaben los tokens o un fatal_fail"*). Routine task gates auto-pass; a **HALT**, a **Pivot**, a **budget tripwire** or a **`FATAL_FAIL`** still stops for the user — pre-approval covers routine progress, never the cases whose content nobody could know in advance |
 | Execution started | 2026-09-14 |
 | Branch | `new-spec-auto-sync-sec-users` |
 | Leader model | Opus 5 (T1) |
@@ -612,3 +612,78 @@ Carried from T-03 and now testable with the service in place. The Reviewer verif
 #### Carried to T-09
 
 Real pagination against Agresso, real DB writes, and whether the summary log actually reaches an operator. Everything at this tier is mocked.
+
+---
+
+### T-08 — Restrict the trigger to `SYSTEM_ADMIN`
+
+- **Date:** 2026-09-15 · **Requirement:** R-AGS-006 · **Implementer:** Claude Opus (the Leader) · **Reviewer:** Antigravity `gemini-3.1-pro-high`
+
+`@UseGuards(RolesGuard)` + `@Roles(SecRolesEnum.SYSTEM_ADMIN)` on the **handler** (DD-10 — the handler does not `await` the service, so a check inside it would let the reconciliation begin and still return a refusal). `@ApiOperation` was **absent** before this task, in breach of root `CLAUDE.md` §4.1; added here because T-08 is what makes the route's authorization contract worth documenting.
+
+**K-004 — both mutations observed red:**
+
+| Mutation | Red |
+| --- | --- |
+| `@Roles(...)` removed | **three** tests: metadata `Expected: [1] / Received: undefined`; CONTRIBUTOR refusal `Expected: false / Received: true`; null-user refusal `Expected: false / Received: true` |
+| `@UseGuards(RolesGuard)` removed | `Received has value: undefined` |
+
+The CONTRIBUTOR red is the instructive one: without `@Roles`, `RolesGuard`'s `if (!requiredRoles) return true` admits **everyone, including a null `req.user`** — which is why both the metadata *and* the behaviour are asserted.
+
+**Verification:** `npm test -- --silent` → 369 suites / 3185 tests; `npx eslint` → exit 0.
+
+⚠️ **Breaking change for any non-admin caller.** `design.md` §12's reversion challenge found no in-repo callers but named what it **cannot** see — a cron, an ops runbook, a saved Postman collection — and the endpoint is fire-and-forget, so such a caller breaks **silently**. Rollback is removing one decorator.
+
+---
+
+### T-09 — Fixture tier: the DB-level claims, proven against a real database
+
+- **Date:** 2026-09-15 · **Requirements:** all, NFR-AGS-001, NFR-AGS-002 · **Implementer:** Claude Opus (the Leader)
+- **File:** `test/fixtures/agresso-staff-reconciler.fixture-spec.ts` — **15 tests, all passing against MySQL 8.0** in the disposable scratch schema.
+
+**Environment, probed before writing (not assumed):** Docker running; `research_indicators_server_test_mysql` up; `ari_scratch_test` already carrying **217 tables**, so `migration:test:bootstrap` was **not** re-run (FP-49 — it is not idempotent and would have stranded the schema mid-migration).
+
+**Reserved band:** email domain `@t09-agresso.test`, carnet prefix `T09`. The `results` band registry (FP-45) does not apply — this spec writes `sec_users` / `sec_user_roles` / `app_secrets`, which no sibling fixture touches. No DDL anywhere (FP-51).
+
+**Schema facts confirmed against the live database, several of which the spec had only asserted:**
+
+| Claim | Confirmed |
+| --- | --- |
+| `created_at timestamp(6) DEFAULT CURRENT_TIMESTAMP(6)` | ✅ so `created_at >= @run_start` really does have microsecond precision (DD-7, RB-9) |
+| `is_active tinyint NOT NULL DEFAULT 1` on both tables | ✅ T-01's coercion finding, now proven through a real driver |
+| `first_name` / `last_name` `varchar(60)`, `email varchar(150) NOT NULL`, `carnet varchar(10)` | ✅ |
+| No unique index on `sec_users.email` or `sec_user_roles (user_id, role_id)` | ✅ — which is why idempotence is entirely the code's job |
+
+#### Done-checks discharged here that NO earlier tier could reach
+
+R-AGS-001 AC.3 (unmatched row byte-identical **including `updated_at`**, which carries `ON UPDATE CURRENT_TIMESTAMP(6)` and therefore moves on *any* write) · T-01's inactive-row read · T-03's carnet survival · the 75-char truncation **and that the run completes** under strict mode · R-AGS-004 AC.1/AC.2/AC.3 · **NFR-AGS-001 idempotence** · R-AGS-007 AC.1 (original `sec_user_id` retained), the N-4 admin row, M-2's one-of-two flip, and **AC.6 (`app_secrets` unchanged)** · NFR-AGS-002 statement count at n=50 and n=120.
+
+#### Two findings the falsification produced — both real, both acted on
+
+**1. A silent seed failure that surfaced three tables away.** `sec_roles.focus_id` is `NOT NULL` with no default and FKs to `sec_role_focus` — a three-deep chain whose innermost link is easy to miss. The first seed omitted it; **`INSERT IGNORE` swallowed the error** (FP-46 is explicit that it downgrades FK/NOT NULL failures to warnings) and eight tests later failed with a bare FK error naming `sec_user_roles`. The seed is now **verified after insertion** and throws a named error if it did not take — a silent failure turned back into a loud one before any test runs.
+
+**2. ⚠️ The SQL guards did not discriminate on their own — the gate was incomplete.** Falsifying N-4 through the service showed that removing `AND role_id = 3` **from the SQL left all 13 tests green**, because `roleBranches()`'s in-memory filter already prevents a non-contributor id from reaching the statement. But `design.md` §5.4 wants that predicate precisely as **defence in depth** — *"the predicate makes that unreachable in SQL rather than merely unintended in TypeScript"* — because the in-memory guard was once removed by the very correction meant to harden it. **A guard whose only test cannot fail is not a guard.**
+
+Closed by two tests that call the repository **directly** with the id list a future TypeScript bug would produce. Re-measured: removing **only** the two SQL guards (in-memory guards intact) now reddens **3 tests** — `Expected "T0912345" / Received "T09999"`, the `role_id = 1` row flipping to `is_active: 1`, and `Expected "T09800" / Received "T09801"`. Before the fix that same mutation was invisible.
+
+#### K-004 evidence
+
+| Mutation | Red |
+| --- | --- |
+| SQL carnet guard removed | stored `T0912345` **overwritten** with `T09999` — the exact property T-03's done-check demanded and the unit tier could not observe |
+| `AND role_id = 3` removed (SQL only), **before** the direct tests existed | **13/13 still green** — the finding above |
+| Both SQL guards removed, **after** the direct tests exist | 3 failed / 12 passed |
+| Both SQL **and** in-memory role-3 guards removed | the `SYSTEM_ADMIN` row flips `is_active: 0 → 1` |
+
+#### Pre-existing fixture failures — measured, NOT caused by this spec
+
+The full fixture suite reports **5 failed suites / 45 failed tests**. Measured both ways:
+
+| Run | Result |
+| --- | --- |
+| Full suite **with** this file | 5 failed / 17 passed suites · 45 failed / **115** passed tests |
+| Full suite **without** this file (`--testPathIgnorePatterns`) | 5 failed / 16 passed suites · 45 failed / **100** passed tests |
+
+**Identical failure counts.** The delta is exactly this file's 15 passing tests. All five failures are in `test/fixtures/innovation-use/` (`section-round-trip`, `role-isolation`, `result-creation`, `edit-plus-add-id-collision`, `level-boundary`) and belong to another spec. Recorded rather than fixed — repairing them is outside this spec's scope and would be unapproved work.
+
+**Verification:** this fixture 15/15 · unit suite **369 suites / 3185 tests** · `npx eslint` on the touched paths → exit 0.
