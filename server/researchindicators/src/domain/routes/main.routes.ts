@@ -71,6 +71,8 @@ import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
+import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
+import { UsersModule } from '../entities/users/users.module';
 
 const capSharingChildren: Routes = [
   {
@@ -417,6 +419,14 @@ const children: Routes = [
   {
     path: 'impersonation',
     module: ImpersonationModule,
+  },
+  {
+    path: 'pi-delegates',
+    module: PiDelegatesModule,
+  },
+  {
+    path: 'users',
+    module: UsersModule,
   },
 ];
 

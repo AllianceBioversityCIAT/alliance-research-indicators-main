@@ -58,6 +58,30 @@ export class AllModalsService {
   refreshLinkedResults?: () => Promise<void> | void;
   setRefreshLinkedResults = (fn: (() => Promise<void> | void) | undefined) => (this.refreshLinkedResults = fn);
   syncSelectedResults = signal<Result[]>([]);
+
+  // ─── Assign PI Delegate modal context (T-UI-07) ─────────────────────────────
+  /**
+   * The open-context for the Assign/Edit modal.
+   * 'byProject' → the modal was opened from the By-project tab; projectCode is set.
+   * 'byPerson'  → the modal was opened from the By-person tab; delegateUserId is set.
+   */
+  assignPiDelegateContext = signal<
+    | { source: 'byProject'; projectCode: string }
+    | { source: 'byPerson'; delegateUserId: number }
+    | null
+  >(null);
+
+  // ─── PI Delegate History modal context ───────────────────────────────────────
+  /**
+   * The open-context for the Delegation History (read-only) modal.
+   * 'byProject' → opened from the By-project tab; projectCode + projectName are set.
+   * 'byPerson'  → opened from the By-person tab; delegateUserId + name are set.
+   */
+  piDelegateHistoryContext = signal<
+    | { source: 'byProject'; projectCode: string; projectName: string | null }
+    | { source: 'byPerson'; delegateUserId: number; name: string | null }
+    | null
+  >(null);
   setResultInformationEntryContext(context: 'results-center' | null): void {
     this.resultInformationEntryContext.set(context);
     this.modalConfig.update(modals => ({
@@ -164,6 +188,14 @@ export class AllModalsService {
       title: 'Simulate another profile',
       cancelText: 'Cancel',
       cancelAction: () => this.toggleModal('simulateProfile')
+    },
+    assignPiDelegate: {
+      isOpen: false,
+      title: 'Assign / Edit PI Delegate'
+    },
+    piDelegateHistory: {
+      isOpen: false,
+      title: 'Delegation History'
     }
   });
 
@@ -284,7 +316,9 @@ export class AllModalsService {
       editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
-      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false }
+      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false },
+      assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false },
+      piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);

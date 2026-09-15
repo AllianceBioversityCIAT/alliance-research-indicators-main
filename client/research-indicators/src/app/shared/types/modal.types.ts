@@ -12,4 +12,6 @@ export type ModalName =
   | 'projectGroundingSetup'
   | 'portfolioManagement'
   // @akili-spec changes/profile-simulation — R-IMP-007, design §2.2/§6
-  | 'simulateProfile';
+  | 'simulateProfile'
+  | 'assignPiDelegate'
+  | 'piDelegateHistory';

@@ -43,6 +43,31 @@
     }
   </div>
 
+  @if (!cache.isSidebarCollapsed()) {
+  <hr class="divider" />
+  <div class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]">
+    PRINCIPAL INVESTIGATOR</div>
+  <div class="options py-[15px]">
+    @for (option of this.piOptions(); track option.link) {
+    <a class="option atc-primary-blue-400" [routerLink]="option.link" routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }">
+      <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon" [style.fontSize]="option.iconSize ?? null"></i>
+      <div class="sidebar-option-label body-2 text flex">{{ option.label }}</div>
+    </a>
+    }
+  </div>
+  } @else {
+  <hr class="divider divider--collapsed-tight" />
+  <div class="options options--resources-collapsed">
+    @for (option of this.piOptions(); track option.link) {
+    <a class="option atc-primary-blue-400" [routerLink]="option.link" routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }" [pTooltip]="option.label" tooltipPosition="right" [positionLeft]="15">
+      <i class="sidebar-option-icon" [ngClass]="'pi ' + option.icon" [style.fontSize]="option.iconSize ?? null"></i>
+    </a>
+    }
+  </div>
+  }
+
   @if (rolesService.canAccessCenterAdmin() || rolesService.canAccessAppConfiguration()) {
   @if (!cache.isSidebarCollapsed()) {
   <hr class="divider" />

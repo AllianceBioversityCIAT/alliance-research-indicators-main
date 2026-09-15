@@ -1,0 +1,310 @@
+// @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-06)
+// NFR-UI-001: STAR tokens only — all colours via var(--ac-*) or .abc-*/.atc-* utility classes.
+// No hex literals in this file.
+
+.by-person {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  // ── Table wrapper — white card on the grey well (project-detail parity) ──
+  &__table-wrapper {
+    background-color: var(--ac-white-1);
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    overflow: hidden auto;
+  }
+
+
+  &__th {
+    padding: 14px 16px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
+    white-space: nowrap;
+    background-color: var(--ac-white-1);
+  }
+
+  // Header cell content: label + sort icon on one line (platform convention)
+  &__th-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__row {
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    color: var(--ac-grey-800);
+    transition: background-color 0.15s ease;
+  }
+
+  // Inactive row: light red wash + a solid red accent bar down the left edge.
+  &__row--inactive {
+    background-color: color-mix(in srgb, var(--ac-red-1) 7%, var(--ac-white-1));
+
+    td:first-child {
+      box-shadow: inset 3px 0 0 0 var(--ac-red-1);
+    }
+  }
+
+  &__td {
+    vertical-align: middle;
+    padding: 12px 16px;
+
+    &--person {
+      min-width: 200px;
+    }
+
+    &--email {
+      min-width: 180px;
+      white-space: nowrap;
+    }
+
+    &--status {
+      min-width: 110px;
+      white-space: nowrap;
+    }
+
+    &--projects {
+      min-width: 280px;
+    }
+
+    &--actions {
+      min-width: 80px;
+      text-align: center;
+    }
+  }
+
+  // ── Email cell ───────────────────────────────────────────────────────
+  &__email {
+    font-size: 13px;
+  }
+
+  // ── Avatar (initials) ────────────────────────────────────────────────
+  &__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background-color: var(--ac-grey-200);
+    color: var(--ac-primary-blue-300);
+
+    // Inactive: red avatar to match the row accent
+    &--inactive {
+      background-color: color-mix(in srgb, var(--ac-red-1) 14%, var(--ac-white-1));
+      color: var(--ac-red-1);
+    }
+  }
+
+  // ── Person cell (avatar + name) ──────────────────────────────────────
+  &__person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    line-height: 1.35;
+
+    &__name-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    &__name {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 18px;
+    }
+
+    &__inactive-badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid var(--ac-red-1);
+      border-radius: 4px;
+      padding: 1px 5px;
+      line-height: 1.4;
+      flex-shrink: 0;
+    }
+
+  }
+
+  // ── Project chips ────────────────────────────────────────────────────
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid var(--ac-grey-200);
+    font-size: 13px;
+
+    // Inactive person: red border + light red tint background
+    &--inactive {
+      border-color: var(--ac-red-1);
+      background-color: color-mix(in srgb, var(--ac-red-1) 6%, var(--ac-grey-100));
+    }
+
+    &__inactive-icon {
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+
+    &__info {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.3;
+    }
+
+    &__code {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    &__name {
+      font-size: 12px;
+    }
+
+    &__remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background-color: var(--ac-grey-300);
+      color: var(--ac-grey-800);
+      cursor: pointer;
+      font-size: 10px;
+      transition: background-color 0.15s ease, color 0.15s ease;
+      flex-shrink: 0;
+
+      &:hover {
+        background-color: var(--ac-red-1);
+        color: var(--ac-white-1);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--ac-light-blue-400);
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  // ── Actions wrapper (history + assign) ──────────────────────────────────
+  &__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  // ── History button ───────────────────────────────────────────────────
+  &__history-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--ac-grey-200);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-light-blue-400);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--ac-grey-300);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ac-light-blue-400);
+      outline-offset: 2px;
+    }
+  }
+
+  // ── Assign button ────────────────────────────────────────────────────
+  &__assign-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--ac-grey-200);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-light-blue-400);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.15s ease;
+
+    &:hover {
+      background-color: var(--ac-grey-300);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ac-light-blue-400);
+      outline-offset: 2px;
+    }
+  }
+
+  // ── Empty state (NFR-UI-003) ─────────────────────────────────────────
+  &__empty {
+    padding: 32px 16px;
+    text-align: center;
+  }
+
+  &__empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__empty__icon {
+    font-size: 32px;
+  }
+
+  &__empty__text {
+    margin: 0;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+  }
+
+  // ── Error state (NFR-UI-003) ─────────────────────────────────────────
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid var(--ac-grey-200);
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+  }
+
+  &__error__icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+}

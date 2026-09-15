@@ -1,0 +1,216 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-06) -->
+<!-- R-UI-003: By-person table (person name+email → project chips). -->
+<!-- R-UI-008: Per-project "X" revokes that pair only. -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text). -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+
+<div class="by-person">
+
+  <!-- ── Table card: toolbar + table + paginator + summary ──────────── -->
+  <div class="by-person__table-wrapper">
+
+    <!-- Summary line — top of the card, above the search -->
+    <div class="by-person__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
+      <span class="by-person__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
+        {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
+        &nbsp;·&nbsp;
+        {{ summaryAssignments() }} active {{ summaryAssignments() === 1 ? 'assignment' : 'assignments' }}
+        across {{ summaryProjects() }} {{ summaryProjects() === 1 ? 'project' : 'projects' }}
+        @if (summaryInactive() > 0) {
+          &nbsp;·&nbsp;
+          <span class="atc-red-1">
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
+          </span>
+        }
+      </span>
+      <span class="by-person__summary-right atc-grey-600 text-[12px] italic">
+        Only projects where you are the Principal Investigator are listed
+      </span>
+    </div>
+
+    <!-- Per-table toolbar: the shared search control -->
+    <div class="by-person__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 py-3.5">
+      <app-search-export-controls
+        class="min-w-[20rem] flex-1"
+        [showApply]="false"
+        [showClear]="true"
+        [searchValue]="searchTerm()"
+        searchPlaceholder="Find a person by name, email or project"
+        (searchChange)="searchTerm.set($event)"
+        (clear)="clearFilters()"
+      ></app-search-export-controls>
+    </div>
+
+    <p-table
+      [value]="filteredRows()"
+      [loading]="service.loading()"
+      [scrollable]="true"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[5, 10, 25, 50]"
+      [showCurrentPageReport]="true"
+      [tableStyle]="{ 'min-width': '100%' }"
+      paginatorStyleClass="justify-end! border-t border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] px-3 py-2"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} people"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
+      aria-label="PI Delegates by person"
+    >
+      <!-- Header -->
+      <ng-template pTemplate="header">
+        <tr>
+          <th scope="col" class="by-person__th atc-primary-blue-600" pSortableColumn="name">
+            <div class="by-person__th-inner">Person <p-sortIcon field="name"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-person__th atc-primary-blue-600" pSortableColumn="email">
+            <div class="by-person__th-inner">Email <p-sortIcon field="email"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-person__th atc-primary-blue-600" pSortableColumn="is_active">
+            <div class="by-person__th-inner">Status <p-sortIcon field="is_active"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-person__th atc-primary-blue-600">
+            <div class="by-person__th-inner">Managed projects</div>
+          </th>
+          <th scope="col" class="by-person__th atc-primary-blue-600">
+            <div class="by-person__th-inner">Actions</div>
+          </th>
+        </tr>
+      </ng-template>
+
+      <!-- Body -->
+      <ng-template pTemplate="body" let-row>
+        <tr class="by-person__row" [class.by-person__row--inactive]="row.is_active === false">
+
+          <!-- Person cell: avatar + name + INACTIVE badge; inactive rows carry a
+               red accent bar and a light red wash (see the --inactive styles). -->
+          <td class="by-person__td by-person__td--person">
+            <div class="by-person__person" [class.by-person__person--inactive]="row.is_active === false">
+              <span class="by-person__avatar" [class.by-person__avatar--inactive]="row.is_active === false"
+                aria-hidden="true">{{ initials(row.name) }}</span>
+              <div class="by-person__person__name-row">
+                <!-- The name stays dark and bold even when inactive; the red
+                     cues are the row accent, the avatar, the badge and the pill. -->
+                <span class="by-person__person__name atc-primary-blue-600">{{ row.name }}</span>
+                @if (row.is_active === false) {
+                  <span class="by-person__person__inactive-badge atc-red-1" aria-label="Inactive delegate">INACTIVE</span>
+                }
+              </div>
+            </div>
+          </td>
+
+          <!-- Email cell -->
+          <td class="by-person__td by-person__td--email">
+            <span class="by-person__email atc-grey-700">{{ row.email }}</span>
+          </td>
+
+          <!-- Status cell — same <app-custom-tag> design as the By project table.
+               Active/Inactive are not project statuses, so the colours come in
+               explicitly: the blue pair of the map for Active, red for Inactive.
+               The text itself is the non-colour cue (NFR-UI-002). -->
+          <td class="by-person__td by-person__td--status">
+            <app-custom-tag
+              class="by-person__status-tag"
+              [statusName]="row.is_active === false ? 'Inactive' : 'Active'"
+              [statusBorder]="row.is_active === false ? 'var(--ac-red-1)' : 'var(--ac-primary-blue-200)'"
+              [statusColor]="row.is_active === false ? 'var(--ac-red-1)' : 'var(--ac-primary-blue-400)'"
+            ></app-custom-tag>
+          </td>
+
+          <!-- Projects cell: chips with per-chip X (R-UI-008) -->
+          <td class="by-person__td by-person__td--projects">
+            <div
+              class="by-person__chips"
+              role="list"
+              [attr.aria-label]="'Projects managed by ' + row.name"
+            >
+              @for (project of row.projects; track project.project_code) {
+                <span
+                  class="by-person__chip"
+                  [class.by-person__chip--inactive]="row.is_active === false"
+                  role="listitem"
+                  [attr.aria-label]="project.project_code + (project.project_name ? ' — ' + project.project_name : '')"
+                >
+                  @if (row.is_active === false) {
+                    <i class="pi pi-exclamation-circle by-person__chip__inactive-icon atc-red-1" aria-hidden="true"></i>
+                  }
+                  <span class="by-person__chip__info">
+                    <span class="by-person__chip__code" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ project.project_code }}</span>
+                    @if (project.project_name) {
+                      <span class="by-person__chip__name atc-grey-700">{{ project.project_name }}</span>
+                    }
+                  </span>
+                  <!-- Per-project "X" revoke (R-UI-008: named pair only, not the whole person) -->
+                  <button
+                    type="button"
+                    class="by-person__chip__remove"
+                    [attr.aria-label]="'Revoke ' + row.name + ' from ' + project.project_code"
+                    pTooltip="Revoke from this project"
+                    tooltipPosition="top"
+                    (click)="onRevokeProject(row, project)"
+                    (keydown.enter)="onRevokeProject(row, project)"
+                  >
+                    <i class="pi pi-times" aria-hidden="true"></i>
+                  </button>
+                </span>
+              }
+            </div>
+          </td>
+
+          <!-- Actions — History + Assign affordances -->
+          <td class="by-person__td by-person__td--actions">
+            <div class="by-person__actions">
+              <button
+                type="button"
+                class="by-person__history-btn"
+                [attr.aria-label]="'Delegation history for ' + row.name"
+                pTooltip="Delegation history"
+                tooltipPosition="top"
+                (click)="onHistory(row)"
+                (keydown.enter)="onHistory(row)"
+              >
+                <i class="pi pi-history" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="by-person__assign-btn"
+                [attr.aria-label]="'Assign projects to ' + row.name"
+                pTooltip="Assign projects to this person"
+                tooltipPosition="top"
+                (click)="onAssign(row)"
+                (keydown.enter)="onAssign(row)"
+              >
+                <i class="pi pi-user-plus" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+
+        </tr>
+      </ng-template>
+
+      <!-- Empty state -->
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="5" class="by-person__empty" role="status">
+            <div class="by-person__empty-inner">
+              <i class="pi pi-users by-person__empty__icon atc-grey-500" aria-hidden="true"></i>
+              <p class="by-person__empty__text atc-grey-700">
+                No PI delegates found.
+              </p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+
+  </div>
+
+  <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->
+  @if (service.error()) {
+    <div class="by-person__error" role="alert">
+      <i class="pi pi-exclamation-circle by-person__error__icon atc-red-1" aria-hidden="true"></i>
+      <span class="atc-red-1">{{ service.error() }}</span>
+    </div>
+  }
+
+</div>

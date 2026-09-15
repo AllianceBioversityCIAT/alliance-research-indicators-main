@@ -168,6 +168,42 @@ describe('AllianceSidebarComponent', () => {
     expect(visible[0].label).toBe('Visible');
   });
 
+  // ─── T-UI-03: My PI Delegates as a direct (non-collapsible) option (R-UI-001) ──
+  it('should expose My PI Delegates as a flat option (no collapsible parent group)', () => {
+    const options = component.piOptions();
+    expect(options).toHaveLength(1);
+    expect(options[0].label).toBe('My PI Delegates');
+    expect(options[0].link).toBe('/my-pi-delegates');
+    expect((component as unknown as { piGroups?: unknown }).piGroups).toBeUndefined();
+  });
+
+  it('should not render a Principal Investigator toggle button in the sidebar', () => {
+    fixture.detectChanges();
+    const labels = (fixture.nativeElement as HTMLElement).querySelectorAll('.admin-parent .sidebar-option-label');
+    expect(Array.from(labels).some(el => el.textContent?.trim() === 'Principal Investigator')).toBe(false);
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/my-pi-delegates"]');
+    expect(link).toBeTruthy();
+  });
+
+  it('should still expose the center-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
+    expect(centerAdmin).toBeTruthy();
+    expect(centerAdmin?.children.length).toBeGreaterThan(0);
+  });
+
+  it('should still expose the system-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+    };
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+    const sysAdmin = component.administrationGroups().find(g => g.id === 'system-admin');
+    expect(sysAdmin).toBeTruthy();
+    expect(sysAdmin?.label).toBe('System admin');
+  });
+
   it('should include portfolio management in center admin navigation', () => {
     const roles = TestBed.inject(RolesService) as { canAccessCenterAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
@@ -249,7 +285,7 @@ describe('AllianceSidebarComponent', () => {
     expect(group?.s3Image).toBe('icons/graph.svg');
 
     const button = fixture.nativeElement.querySelector(
-      'button.admin-parent--collapsed'
+      'button.admin-parent--collapsed[aria-label="System admin"]'
     ) as HTMLButtonElement | null;
     const img = button?.querySelector('img') as HTMLImageElement | null;
     expect(img).toBeTruthy();
