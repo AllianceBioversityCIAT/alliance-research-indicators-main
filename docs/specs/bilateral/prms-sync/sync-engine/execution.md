@@ -1080,3 +1080,96 @@ reverted is worse than never having made it.
 | Integration gate (T-03) | 3 passed |
 | `npx eslint`, unpiped | **exit 0** |
 | LOC (after the lighter policy on T-06d) | production 1 365 · tests 1 865 · **total 3 230** |
+
+---
+
+### Wave 3 — T-09 (payload builder) + T-10 (eligibility gate)
+
+- **Status:** ✅ **PASS** — T-09 on attempt 1; T-10 on attempt 2 (one missing test case)
+- **Date:** 2026-09-15 · Run `run_3ed0320bedc0`
+  | Dispatch | Task | Role | Worker |
+  |---|---|---|---|
+  | `ctx_42cf9525565e` | `task_bf0c2fe3eea6` | T-09 impl | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_2672455b8dd4` | `task_2bafe6545c61` | T-10 impl | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_611b1dd4eb9c` | `task_c9fdc575dd07` | Reviewer | Cursor `gpt-5.6-sol-high` |
+  | `ctx_d9a89b6ab93c` | `task_37c7e25a0935` | T-10b fix | Cursor `cursor-grok-4.6-high-fast` |
+
+#### T-09 — payload builder — PASSED FIRST ATTEMPT
+
+Merges T-06's common block with the four type builders into the homologation §2 envelope. Envelope
+constants exact; **all four types build through it, including the two gated ones** (Innovation Use and
+policy type 1) — the stated disqualifier was *"testing only the two ungated types"*, which would let
+the gated builders rot until the PRMS PO meeting and make lifting a gate new development instead of a
+list edit (family R-F6). `indicator_id` `3`/`5`/out-of-range **raise `PrmsPayloadBuildError`** rather
+than emitting `type: undefined` — the T-05 map returns `null` for the unmappable pair deliberately, and
+that `null` is converted here rather than propagated. Nesting boundary respected: common fields flat at
+the `data` root, type blocks under their same-named sub-object, neither double-nested nor flattened.
+
+#### T-10 — eligibility gate — the shape IS the requirement
+
+One ordered `SYNC_GATE_ENTRIES` list with first-failure-wins `evaluateSyncGate`. **Data, not scattered
+conditionals** — which is what makes **QA-5** measurable and family **R-F6** true.
+
+The eight entries in order: `result_exists` · `not_already_synced` · `approved` · `alignment_green` ·
+`pool_funding_contributor` · `indicator_mappable` · `indicator_not_gated` · `policy_type_not_gated`.
+
+**Entries 6/7/8 carry genuinely distinct descriptions that explain *why*,** as R-PRMS-001 AC.2 demands
+— a user can tell the three refusals apart:
+- *"Indicator is unmappable to a PRMS type; Knowledge Product and OICR cannot be sent"*
+- *"Innovation Use is gated: STAR holds no investment declarations (usd_budget / is_determined)"*
+- *"Policy type Program, Budget, or Investment is gated: STAR holds no status_amount or amount fields"*
+
+Entry 5 names the specific contract: `` `Primary contract ${agreementId} is not a pool-funding contributor` ``.
+
+**`persistsRow` encodes design §5.1's JD-3 table exactly** — entries 1–2 `false` (no row), entries 3–8
+`true` (`REFUSED_BY_STAR`). The gate **returns** that decision and persists nothing; persistence is
+T-11's. The worker respected the boundary rather than reaching into the next task.
+
+#### Reviewer verdict: ❌ FAIL on T-10 only → ✅ resolved by T-10b
+
+> **T-09 cumple** — el sobre usa las constantes en sus posiciones correctas, los cuatro builders
+> (incluidos Innovation Use y policy-type-1) se ejecutan directamente, el anidamiento es correcto y los
+> indicadores 3, 5 y fuera de rango lanzan `PrmsPayloadBuildError`.
+>
+> **Discovered Issue (T-10):** no existe ningún caso con `pool_funding_alignment_green = false`, por lo
+> que la negativa `alignment_green` **es la única de las ocho que no afirma que el transporte no fue
+> llamado**, y la suite seguiría verde si esa entrada dejara pasar el resultado.
+> **Violated:** `tasks.md` T-10 Done check 3 y `requirements.md` R-PRMS-001 AC.3.
+
+**Leader-confirmed before dispatching the fix:** the spec held **7** transport-not-called assertions for
+**8** gate entries. The reviewer's count was exact. This is the highest-value hole it could have found —
+Done check 3 requires *every* refusal to prove no outbound call happened, and a non-green alignment
+slipping through would have reached PRMS with the suite still green.
+
+**The Reviewer also settled the Leader's open question** on Done check 4: the QA-5 entry-removal proof
+**is behavioural**, *"porque cambia la decisión de refused a allowed y observa una llamada al transporte
+sin tocar builders"* — not a dressed-up presence-assertion.
+
+#### T-10b — the missing refusal case
+
+One case added to `sync-gate.spec.ts` only: `eligible({ pool_funding_alignment_green: false })` asserting
+`entryId === 'alignment_green'`, its own description, `persistsRow === true`, and
+`transport.ingest not.toHaveBeenCalled()`. Coverage now **8 of 8**.
+
+**K-004 red observed and correctly targeted:** with `alignment_green.fails` forced to `false`, **only the
+new case failed** — `Expected: false Received: true` on `decision.allowed` (`sync-gate.spec.ts:135`),
+i.e. the gate allowing what it must refuse. **Implementation restored byte-identical**, SHA-256
+`55b2105d…76f61`, 5 419 bytes — **Leader-verified independently**; the only lasting change is the test.
+
+#### ⚠️ Leader error: a corrupted brief, caught and corrected in flight
+
+The T-10b task spec was dispatched with a word missing — backticks around `` `fails` `` were taken as
+shell command substitution, leaving *"make the alignment_green entry's ___ predicate return false"*.
+Found by reading the task **as stored in Orca**, not as the Leader believed it had been written.
+`dispatch-show` confirmed the dispatch was still **open** (the check that was missing in the T-06 incident),
+and a correction restating the whole task followed immediately — per `.agents/leader.md`: *"never
+economize on correcting a delegation you already know is malformed."* Cost: one message. Shipping it
+would have cost the wait, a wrong result and a re-dispatch.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **381 suites · 3231 passed · 0 skipped** |
+| `npx eslint`, unpiped | **exit 0** |
+| Restored `sync-gate.ts` | SHA-256 + byte size match the pre-mutation values |

@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-08 done (2026-09-15); T-09/T-10 next
+- **Status:** `in-progress` — T-01…T-10 done (2026-09-15); T-11/T-12 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -240,30 +240,30 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-09 — Payload builder, envelope, and the type map
+### T-09 — Payload builder, envelope, and the type map  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-002 AC.1–3 (+ scenario's *AND IT MUST build*)
 - **Files touched:** `builders/payload.builder.ts` (+ spec)
 - **Done check:**
-  - [ ] Envelope constants exactly `"prms.result-management.api"` / `"dataset.ingest.requested"`
-  - [ ] All four builders reachable **including the gated two** — a test builds an Innovation Use and a policy-type-`1` payload directly
-  - [ ] `indicator_id` of `3` or `5` raises an unmappable error, not `undefined`
+  - [x] Envelope constants exactly `"prms.result-management.api"` / `"dataset.ingest.requested"`
+  - [x] All four builders reachable **including the gated two** — a test builds an Innovation Use and a policy-type-`1` payload directly
+  - [x] `indicator_id` of `3` or `5` raises an unmappable error, not `undefined`
 - **Failing input:** an `indicator_id` outside 1–6 — must raise, not silently emit an envelope with `type: undefined`.
 - **Disqualifies the evidence:** testing only the two ungated types. That would let the gated builders rot until the PO meeting, defeating R-F6.
 - **Effort:** S · **Depends on:** T-06, T-07, T-08 · **Skills:** `nestjs-expert`
 
 ---
 
-### T-10 — Eligibility gate
+### T-10 — Eligibility gate  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-001 (both scenarios + all clauses, AC.1–4), R-PRMS-002 AC.2–3, R-PRMS-006 *AND IT MUST refuse type 1*
 - **Files touched:** `entities/result-prms-sync/eligibility/sync-gate.ts` (+ spec)
 - **Description:** The ordered, enumerated list of design §5.1 — **data, not scattered conditionals**.
 - **Done check:**
-  - [ ] All eight entries evaluated in order, first failure returned
-  - [ ] Each refusal carries a **distinct** `description` — a shared generic message fails R-PRMS-001 AC.2
-  - [ ] Every refusal asserts the transport spy was **not** called
-  - [ ] Removing one list entry in a test makes that type send **with no builder change** (proves QA-5 / R-F6 behaviourally)
+  - [x] All eight entries evaluated in order, first failure returned
+  - [x] Each refusal carries a **distinct** `description` — a shared generic message fails R-PRMS-001 AC.2
+  - [x] Every refusal asserts the transport spy was **not** called
+  - [x] Removing one list entry in a test makes that type send **with no builder change** (proves QA-5 / R-F6 behaviourally)
 - **Failing input:** a result that is Approved and aligned but whose primary contract has `is_pool_funding_contributor = false` — it must be refused naming the contract.
 - **Disqualifies the evidence:** asserting that the list *contains* eight entries. That is a presence-assertion; it proves neither order nor effect.
 - **Effort:** M · **Depends on:** — · **Skills:** `nestjs-expert`, `api-design-principles`
