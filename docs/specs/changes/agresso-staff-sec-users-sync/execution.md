@@ -705,3 +705,33 @@ The full fixture suite reports **5 failed suites / 45 failed tests**. Measured b
 Both carried done-checks were copied into T-09's scope and are now discharged against a real database: T-01's *"a seeded inactive `sec_users` row is returned by the bulk read"* and T-03's *"a stored non-empty carnet survives a conflicting payload value, **proven against the database**"*. The second was falsified there — removing the SQL guard overwrote the stored carnet.
 
 This is the mechanism the methodology asks for working end to end: a claim the unit tier could not reach was recorded as an explicit gap at T-01, refused a green tick through six intervening tasks, carried into T-09's scope, and settled with an observed red.
+
+---
+
+### Post-execution: `OQ-8` RESOLVED and `RSK-9` CLOSED BY CONSTRUCTION (2026-09-15)
+
+**Owed since the spec was written, blocked on VPN, and settled after implementation.** Recorded here because it changes a requirement's risk posture and touches shared code.
+
+**The measurement.** `SELECT DISTINCT status FROM alliance_user_staff` returned **`{'N', NULL}`** — two values, neither distinguishing an active employee from a departed one. **The column could never have gated anything**, so `OQ-8` dissolves rather than being answered: the pre-flight's purpose was to learn whether the field carried a "terminated" marker worth branching on, and it does not.
+
+**The fix, which is better than any gate this spec could have added.** The user found Agresso's documented **`?status=active`** query parameter. It is now on `agresso-staff-tools.service.ts`'s `private query()`, so the fetch itself returns only active staff. `RSK-9`'s feared outcome — *"this spec creates accounts and grants `CONTRIBUTOR` to departed people, and `R-AGS-007` reactivates them"* — is **unreachable**: departed staff never enter the payload.
+
+**Why the parameter's placement matters.** `private query()` is called by **both** `findNumberOfPages()` and the page loop. Adding it at only one site would **desynchronise pagination**: the count would report every employee while the pages returned only actives, so the loop would walk empty trailing pages. It is in the shared builder, which is the only correct place.
+
+**Gates.** The pre-existing URL assertion caught the change (`Expected …pageSize=1000 / Received …pageSize=1000&status=active`) — the test doing its job. It was updated, and a second test added asserting `status=active` reaches **both** the page fetch and the `getRaw` count. K-004: removing `&status=active` reddens **two** tests.
+
+**Documents corrected:** `requirements.md` §9 (`OQ-8` struck through, resolved), §8 (`RSK-9` closed by construction), `tasks.md` §0 precondition 2 (was *"blocked 2026-09-14 on VPN"*), `design.md` §10 (the "no harness can evaluate RSK-9" scope limit) and §11 rollout step 2 (no longer a gate).
+
+#### ⚠️ Cross-spec hazard handed to `changes/agresso-staff-deactivation`
+
+Filtering the fetch is unambiguously good for THIS spec and **moves the risk in the dangerous direction for the sibling**, which decides whom to deactivate **by absence from the payload**:
+
+| A member absent from the payload | Before | After |
+| --- | --- | --- |
+| means | "not on the Alliance staff list" | "not on the list, **OR inactive in Agresso, OR a page that failed**" |
+
+The absent population just grew by an unmeasured amount. `C-1`/`C-2`/`C-3` become **more** load-bearing; `EX-1` (externals exempt) now overlaps with genuinely non-active staff, indistinguishable by absence alone; and **`OQ-7`'s ruling was made when the payload carried every employee**, so "on the staff list" and "in the payload" are no longer the same set and the ruling should be re-confirmed rather than inherited.
+
+A full hazard note was appended to that spec's `proposal.md`, including the measurement to take first: compare `totalElements` with and without `?status=active`.
+
+**Verification after the change:** 369 suites / **3186 tests**; `npx eslint src/domain/tools/agresso/staff` → clean, 0 warnings.

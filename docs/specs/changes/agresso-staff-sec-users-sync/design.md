@@ -336,7 +336,7 @@ DB behaviour is proven against a real database, never against emitted SQL string
 - `npm test` has `rootDir: src` and **never runs `test/fixtures/`**. A green `npm test` is not evidence for any claim in §3 or §5.
 - Fixtures run against the disposable scratch schema. **Nothing here says anything about the composition of Dev or Prod `sec_users`** — in particular, how many duplicate-email rows exist (RSK-1).
 - **No harness can evaluate RSK-8** (suspension vs offboarding). The schema records no reason, so the property is not merely unmeasured but **unmeasurable**. The substitute is the operator ruling requested in OQ-7, not a test.
-- **No harness can evaluate RSK-9** (the Agresso `status` semantics). The substitute is a one-query pre-flight, not a test: `SELECT DISTINCT status FROM alliance_user_staff`, **or a terms aggregation on the `alliance_user_staff` OpenSearch index** *(RA-13)*. ⚠️ **Still owed as of 2026-09-14** — the owner could not reach the database (VPN). This blocks *trusting a first Prod run*, not implementation.
+- ~~**No harness can evaluate RSK-9**~~ → ✅ **RESOLVED 2026-09-15, and no harness was needed.** The pre-flight returned `{'N', NULL}` — the column cannot discriminate — and the risk is closed upstream by Agresso's documented `?status=active` filter on the fetch. Two unit gates now assert the parameter and redden when it is removed. Original text follows, kept because the reasoning about what a harness *cannot* reach is still correct: **No harness can evaluate RSK-9** (the Agresso `status` semantics). The substitute is a one-query pre-flight, not a test: `SELECT DISTINCT status FROM alliance_user_staff`, **or a terms aggregation on the `alliance_user_staff` OpenSearch index** *(RA-13)*. ⚠️ **Still owed as of 2026-09-14** — the owner could not reach the database (VPN). This blocks *trusting a first Prod run*, not implementation.
 - `migration:test:bootstrap` is **not idempotent** (FP-49): once per fresh container; recover with `compose:test:down` → `up` → `bootstrap`.
 - Fixture files must be named `*.fixture-spec.ts` or they are collected by **neither** runner — a silent zero-tests pass.
 
@@ -347,7 +347,7 @@ DB behaviour is proven against a real database, never against emitted SQL string
 | # | Step | Why |
 | --- | --- | --- |
 | 1 | **Answer OQ-7** before merge | It is the only open question that can change a requirement. If suspensions must be respected, `R-AGS-007` needs a gate that does not exist yet |
-| 2 | **Read the `status` value set** — either `SELECT DISTINCT status FROM alliance_user_staff`, or a terms aggregation on the `alliance_user_staff` **OpenSearch index**, which needs no Dev MySQL access at all *(M-6)* | Closes OQ-8 / RSK-9. If the payload carries terminated staff, this spec provisions and reactivates departed people |
+| ~~2~~ | ✅ **DONE 2026-09-15.** ~~Read the `status` value set~~ — it is `{'N', NULL}`, which discriminates nothing. Superseded by adding **`?status=active`** to the fetch, which closes RSK-9 upstream rather than by inspection. **No longer a rollout gate** |
 | 3 | **Count duplicate emails in Dev**: `SELECT email, COUNT(*) FROM sec_users GROUP BY email HAVING COUNT(*) > 1` | RSK-1's real magnitude. No fixture can tell you this |
 | 4 | Deploy to Dev, run the sync, read the summary | `created`, `reactivated` and `ambiguousMatches` are the three numbers that say whether the pass did what was expected |
 | 5 | Verify, then Prod | |

@@ -16,7 +16,7 @@
 | # | Precondition | Owner |
 | --- | --- | --- |
 | 1 | **No DDL, no migration.** If a task appears to need one, stop — the spec is wrong, not the schema | — |
-| 2 | **`OQ-8` pre-flight is OWED, not done.** `SELECT DISTINCT status FROM alliance_user_staff` (or a terms aggregation on its OpenSearch index). Blocked 2026-09-14 on VPN. **Blocks trusting a first Prod run, not implementation** | Human |
+| 2 | ~~**`OQ-8` pre-flight is OWED**~~ → ✅ **DONE 2026-09-15.** The query returned **`{'N', NULL}`** — the column cannot discriminate active from departed, so it could never have gated anything. Closed upstream instead: **`?status=active`** added to `private query()`. RSK-9 closed by construction | Human — **done** |
 | 3 | Read `design.md` §5.2's **collapse winner rule** and §5.4's **write table** before T-02. Every severe finding in five review rounds lived in one of those two sections | Implementer |
 
 **Budget (tripwire — `design.md` §14):** **9 tasks · ~1,580 LOC · 5 review rounds.** Exceeding it stops execution and escalates. Two of the five rounds are already spent.

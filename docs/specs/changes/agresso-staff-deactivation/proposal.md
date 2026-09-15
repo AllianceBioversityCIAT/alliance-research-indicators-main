@@ -158,3 +158,27 @@ These are **open, unfixed findings** from the parent's final re-judgment. Each i
 ```
 
 Start with **NEW-1** and **NEW-2** — both are unresolved contradictions, and both were produced by corrections rather than by the original design. Run `judgment-day` on the finished design with a **fresh** lineage; this spec has spent none of its rounds.
+
+---
+
+## ⚠️ Cross-spec impact — the payload is now filtered to ACTIVE staff (2026-09-15)
+
+**Recorded by the sibling spec `changes/agresso-staff-sec-users-sync` during its execution. Read this before specifying deactivation.**
+
+`agresso-staff-tools.service.ts`'s `private query()` now appends Agresso's documented **`?status=active`** parameter, so `cloneAllAgressoStaff` fetches **only active employees**. This was added to close that spec's `RSK-9` (provisioning and reactivating departed staff) at the source, after a pre-flight showed `alliance_user_staff.status` holds only `{'N', NULL}` and therefore cannot discriminate anything.
+
+**For the additive spec this is unambiguously good. For THIS spec it moves the risk in the dangerous direction, and it changes what an absent member MEANS.**
+
+| | Before the filter | After the filter |
+| --- | --- | --- |
+| A member absent from the payload | "not on the Alliance staff list" | "not on the list, **OR inactive in Agresso, OR a page that failed to fetch**" |
+
+Deactivation decides whom to switch off **by absence**. The absent population has just grown to include everyone Agresso marks non-active — a set this spec has never measured and whose size is unknown. Concretely:
+
+1. **`C-1` / `C-2` / `C-3` become more load-bearing, not less.** The completeness guard exists because `base()` catches a fetch error and returns `[]`, making an empty page indistinguishable from a failed one. That ambiguity now sits on top of a payload that is *already* a subset of the staff table, so a short payload is even harder to tell from a legitimately smaller one.
+2. **`EX-1` (externals exempt) interacts with this.** An external user was never in the Agresso payload at all; now a *genuine but non-active* staff member is also absent, and the two are indistinguishable by absence alone.
+3. **The `OQ-7` ruling assumed an unfiltered payload.** That ruling — *"staff users are governed by the staff list; only externals are genuinely suspended"* — was made when the payload carried every employee. With `?status=active`, "on the staff list" and "in the payload" are no longer the same set, and the ruling should be re-confirmed with the user rather than inherited.
+
+**Before specifying deactivation, measure the delta:** compare `totalElements` from the employees endpoint with and without `?status=active`. If the gap is large, absence-based deactivation is operating on a much bigger candidate set than the parent spec's analysis assumed.
+
+**Do not treat this note as settled design.** It is a hazard hand-off from a sibling that changed shared code, recorded so the next specifier does not rediscover it after the fact.

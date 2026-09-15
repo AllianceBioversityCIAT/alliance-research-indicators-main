@@ -24,7 +24,7 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
   }
 
   private query(pages: number, size: number) {
-    return `ErpEmploymentServices/api/v1/employees?page=${pages}&pageSize=${size}`;
+    return `ErpEmploymentServices/api/v1/employees?page=${pages}&pageSize=${size}&status=active`;
   }
 
   private async findNumberOfPages() {

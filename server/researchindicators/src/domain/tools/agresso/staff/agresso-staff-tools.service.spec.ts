@@ -93,9 +93,33 @@ describe('AgressoStaffToolsService', () => {
       await service.cloneAllAgressoStaff();
 
       expect(baseSpy).toHaveBeenCalledWith(
-        'ErpEmploymentServices/api/v1/employees?page=1&pageSize=1000',
+        'ErpEmploymentServices/api/v1/employees?page=1&pageSize=1000&status=active',
         expect.anything(),
         expect.any(Function),
+      );
+    });
+
+    it('filters the fetch to ACTIVE staff — this is what closes RSK-9 (2026-09-15)', async () => {
+      mockConnection.getRaw.mockResolvedValue({ totalElements: 1000 });
+      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
+
+      await service.cloneAllAgressoStaff();
+
+      // RSK-9 asked what happens if the employees endpoint returns terminated or on-leave staff:
+      // this spec would create accounts and grant CONTRIBUTOR to departed people, and R-AGS-007
+      // would reactivate them. A pre-flight on `alliance_user_staff.status` returned only
+      // {'N', NULL} — the column cannot discriminate, so it could never have gated anything.
+      // Agresso's own documented `?status=active` filter closes the risk UPSTREAM instead: if the
+      // payload only contains active staff, there is nothing departed to provision.
+      //
+      // The parameter lives in `private query()`, which BOTH `findNumberOfPages()` and the page
+      // loop call. Adding it at only one of those two sites would desynchronise pagination: the
+      // count would report every employee while the pages returned only actives, so the loop would
+      // walk empty trailing pages.
+      const [firstUrl] = baseSpy.mock.calls[0] as [string];
+      expect(firstUrl).toContain('status=active');
+      expect(mockConnection.getRaw).toHaveBeenCalledWith(
+        expect.stringContaining('status=active'),
       );
     });
 
