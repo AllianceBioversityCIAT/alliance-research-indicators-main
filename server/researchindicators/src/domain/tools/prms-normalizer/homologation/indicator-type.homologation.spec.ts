@@ -29,12 +29,4 @@ describe('IndicatorTypeHomologation', () => {
       expect(IndicatorTypeHomologation[indicator]).not.toBeUndefined();
     }
   });
-
-  it.skip('detects a seventh STAR indicator without an outbound map entry', () => {
-    Object.assign(IndicatorsEnum, { OUTBOUND_TOTALITY_FIXTURE: 7 });
-
-    expect(Object.keys(IndicatorTypeHomologation).map(Number).sort()).toEqual(
-      starIndicators().sort(),
-    );
-  });
 });

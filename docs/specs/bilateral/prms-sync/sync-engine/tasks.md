@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01, T-02, T-04, T-05 done (2026-09-15); T-03 next
+- **Status:** `in-progress` — T-01…T-05 done (2026-09-15); T-06/T-07/T-08 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -128,15 +128,15 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-03 — Entity + outcome enum
+### T-03 — Entity + outcome enum  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-012 AC.2, AC.3
 - **Files touched:** `entities/result-prms-sync/entities/result-prms-sync-log.entity.ts`, `tools/prms-normalizer/enum/prms-sync-outcome.enum.ts` (+ specs)
 - **Description:** TypeORM entity extending `AuditableEntity`; the outcome vocabulary as a **varchar-backed** enum so a future PRMS verdict needs no schema change.
 - **Done check:**
-  - [ ] Entity columns match the migration one-for-one
-  - [ ] Vocabulary holds exactly: `IN_FLIGHT`, `ACCEPTED`, `REJECTED_BY_PRMS`, `AUTH_FAILED`, `RETRYABLE`, `TRANSPORT_FAILED`, `UNKNOWN`, `REFUSED_BY_STAR`
-  - [ ] A test adds a hypothetical `APPROVED_BY_SP` value and compiles **without a migration** (proves R-PRMS-012 AC.3's extensibility claim behaviourally, not by assertion)
+  - [x] Entity columns match the migration one-for-one
+  - [x] Vocabulary holds exactly: `IN_FLIGHT`, `ACCEPTED`, `REJECTED_BY_PRMS`, `AUTH_FAILED`, `RETRYABLE`, `TRANSPORT_FAILED`, `UNKNOWN`, `REFUSED_BY_STAR`
+  - [x] A test adds a hypothetical `APPROVED_BY_SP` value and compiles **without a migration** (proves R-PRMS-012 AC.3's extensibility claim behaviourally, not by assertion)
 - **Disqualifies the evidence:** asserting the enum's member list. That is a presence-assertion — it proves the names exist, not that adding one needs no schema change.
 - **Effort:** S · **Depends on:** T-02 · **Skills:** `nestjs-expert`
 

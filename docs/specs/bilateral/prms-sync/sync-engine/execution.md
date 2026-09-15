@@ -680,3 +680,117 @@ grep returned **0**. Investigated rather than reported: the call is split across
 (`getEnv(\n  AppConfigKey.ARI_CLARISA_API_KEY,\n)`), so the single-line pattern **structurally could
 not match**. **The Reviewer was right and the Leader's measurement was wrong** — K-014 again, a
 confident zero over a pattern that could not have found the fact.
+
+---
+
+### T-03 — Entity + outcome enum (+ user-approved T-05 cleanup)
+
+- **Status:** ✅ **PASS on attempt 2 of 3**
+- **Date:** 2026-09-15
+- **Executor change:** Codex hit **94 % quota**, so the user re-routed implementation to **Cursor**,
+  which `docs/model-routing.md` already names *"a viable fallback executor for server work"*. The
+  Leader raised this rather than taking implementation inline — taking it would have cost
+  `author ≠ auditor` on the author axis, which the user's own 2026-09-15 ruling exists to protect.
+- **Orca provenance:** run `run_3ed0320bedc0`
+  | Attempt | Role | Task | Dispatch | Worker |
+  |---|---|---|---|---|
+  | 1 | Implementer | `task_8af0c0df9a38` | `ctx_13cd6726cd45` | Cursor `cursor-grok-4.6-high-fast` |
+  | 1 | Reviewer | `task_4ca6cbeca3f9` | `ctx_442b115b3f20` | Cursor `gpt-5.6-sol-high` |
+  | 2 | Implementer | `task_80755617ac92` | `ctx_3553ca162645` | Cursor `cursor-grok-4.6-high-fast` |
+  | 2 | Reviewer | `task_4d27adbb415f` | `ctx_ee1a82d6f7fc` | Cursor `gpt-5.6-sol-high` |
+
+  Three distinct families across the loop: author **xAI**, auditor **OpenAI**, Leader **Anthropic**.
+
+#### Item 1 — the approved T-05 cleanup (wave-1 advisory, user-approved)
+
+Deleted `it.skip('detects a seventh STAR indicator without an outbound map entry')` and with it
+`Object.assign(IndicatorsEnum, { OUTBOUND_TOTALITY_FIXTURE: 7 })`, whose global mutation would have
+polluted sibling suites had anyone removed the `.skip`. The live `is total over the current
+IndicatorsEnum members` test is untouched and remains the gate. **Leader-verified by the suite itself:
+skipped count went 1 → 0.**
+
+#### Attempt 1 — Reviewer verdict: ❌ **STATUS: FAIL** (one issue)
+
+Items A, B, C, E, F passed: cleanup bounded, entity/migration one-for-one, exact eight-member
+vocabulary, scope clean (no module/controller/service, **no early registration** in
+`entities.module.ts` or `main.routes.ts`), spec placement per child guide §9.
+
+> **Discovered Issue:** la prueba de `APPROVED_BY_SP` es una comprobación estática disfrazada de
+> comportamiento. **Violated Rule:** `tasks.md` §3 T-03 Done check 3 y su cláusula de evidencia
+> descalificada, junto con `design.md` §5.4 / **KZ-001**, porque el caso sí se pondría rojo si la
+> metadata de la entidad cambiara a `enum`, **pero no si el esquema generado/activo fuera `enum`
+> mientras los archivos estáticos siguieran diciendo `varchar`**, y la asignación al POJO mediante
+> cast no ejerce persistencia. **Remediation:** sustituir la lectura del texto de migración y la
+> asignación en memoria por una prueba contra el esquema scratch que inserte y recupere
+> `APPROVED_BY_SP`, de modo que un MySQL ENUM real haga rojo el gate.
+
+⚠️ **The Leader had accepted this test before the audit ran.** On inspection it asserted against the
+migration's SQL *text* rather than only the decorator, and that looked sufficient. It was not: the
+migration file is **also a proxy**. The property *"a future verdict needs no DDL"* lives in the live
+database schema and nowhere else. **A Leader auditing its own judgement would have shipped this
+defect with a PASS** — which is precisely what `author ≠ auditor` exists to prevent.
+
+#### Attempt 2 — the Leader's architectural ruling (endorsed by the Reviewer)
+
+The obvious fix — a DB round-trip — collided with the test architecture. The unit suite is
+`rootDir: "src"`, `testRegex: ".*\.spec\.ts$"`, **no `globalSetup`, no DB bootstrap**: DB-free by
+design. Putting a round-trip there would make `npm test` require Docker for everyone. The integration
+suite already exists for exactly this (`test/jest-integration.json`, `npm run test:integration`,
+precedent `test/bilateral-primary-contributing-sp.integration-spec.ts`). The rework brief ruled the
+test into the integration suite and asked the Reviewer to challenge that call; it
+**endorsed it**: *"ubicar el round-trip en `test:integration` es la decisión correcta."*
+
+#### Attempt 2 — the falsifier, observed (K-004)
+
+The brief mandated proving the new gate discriminates **against a real schema defect**, on the
+disposable scratch schema:
+
+| Step | Result |
+|---|---|
+| Green at `varchar(40)` | 3 passed |
+| `ALTER TABLE result_prms_sync_log MODIFY outcome ENUM(…eight members…) NOT NULL` | **RED — `QueryFailedError: Data truncated for column 'outcome'`** |
+| Restore `MODIFY outcome varchar(40) NOT NULL` | green again |
+
+**Leader-verified afterwards:** scratch `outcome` is back to `varchar(40)` and the table holds **0
+leftover rows**. That matters — T-11 and T-14 use this table.
+
+New file `test/result-prms-sync-log-outcome.integration-spec.ts`, three tests:
+1. connects via `ARI_TEST_MYSQL_*`, **never** `ARI_MYSQL_*` — a guard against the shared Dev database,
+   the hazard `orm.test.config.ts`'s own header warns about. Not requested; the worker added it.
+2. active column type is `varchar(40)`, not `ENUM` — read from **live `information_schema`**.
+3. inserts and reads back `APPROVED_BY_SP`, a verdict deliberately *not* among the current eight.
+
+#### Attempt 2 — Reviewer verdict: ✅ **STATUS: PASS**
+
+> La nueva integración consulta `information_schema` sobre el esquema activo y hace INSERT/SELECT de
+> `APPROVED_BY_SP`, por lo que cualquier ENUM real falla ya sea por la aserción de tipo o por
+> rechazo/truncamiento; la prueba unitaria ya declara su alcance estático, KZ-017 identifica
+> correctamente que `npm test` no la recoge, el datasource usa solo `ARI_TEST_MYSQL_*`, el teardown
+> elimina primero el log y después su resultado **incluso ante fallos ordinarios a mitad de prueba**,
+> no hay DDL, y ubicar el round-trip en `test:integration` es la decisión correcta.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **373 suites · 3155 passed · 0 skipped** (was 371/3138/1-skipped) |
+| New integration spec, isolated | **3 passed** |
+| `npx eslint`, unpiped | **exit 0** |
+| Done check 2 falsified | exactly **8** members, matching design §5.4 verbatim |
+| Done check 1 arithmetic | 18 live columns = 1 `@PrimaryGeneratedColumn` + 11 `@Column` + 6 inherited from `AuditableEntity` |
+
+#### Declared limit (KZ-017) — carried forward
+
+`npm test` (`rootDir: "src"`) **never runs the integration config**. The extensibility proof therefore
+requires `npm run test:integration` **and a live scratch schema**. Anyone reading only the unit
+suite's green does not have this proof. Stated in the spec file itself.
+
+#### Notes
+
+- **Scope creep, corrected.** The attempt-1 worker also wrote
+  `docs/specs/.../t-03-implementer-report.md`, outside its declared scope. The Leader **deleted** it:
+  a second audit document beside `execution.md` is two places asserting the same facts, which is what
+  KZ-005 ("a measured figure gets ONE home") exists to prevent. Its content is folded in here.
+- **Pre-existing, not this task's:** an unfiltered `npm run test:integration` fails in
+  `test/support/t13-data-source.ts` because `T13_MYSQL_PASSWORD` is unset. That file is tracked and
+  untouched by this change, and its refusal to fall back to a default password is a deliberate guard.
