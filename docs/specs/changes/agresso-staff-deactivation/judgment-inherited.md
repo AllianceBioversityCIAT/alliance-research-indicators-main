@@ -333,7 +333,7 @@ Backward: `EX-3`, `matchedInactive`, `abortReason`, `excludedAmbiguous`, `C-1`, 
 
 | Field | Value |
 | --- | --- |
-| Target | `design.md` + `requirements.md`, `docs/specs/changes/agresso-staff-sec-users-sync` |
+| Target | `design.md` + `requirements.md`, `docs/specs/archive/2026-09-15-changes--agresso-staff-sec-users-sync` |
 | Mode | `judgment_day` — blind dual review, different model families |
 | Rounds | **2 of 2 fix rounds used · 2 of 2 scoped re-judgments used — lineage exhausted** |
 | Round 1 | 6 confirmed SEVERE · 8 fixed (6 + S-1 + S-2) |

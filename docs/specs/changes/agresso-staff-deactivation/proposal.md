@@ -10,7 +10,7 @@
 | Approval Mode | `gated` |
 | Status | **Proposal — not yet specified.** `/akili-specify` has never run on this path |
 | Date created | 2026-09-14 |
-| Origin | Split out of [`changes/agresso-staff-sec-users-sync`](../agresso-staff-sec-users-sync/) on 2026-09-14, on the recommendation of that spec's exhausted Judgment Day lineage |
+| Origin | Split out of [`changes/agresso-staff-sec-users-sync`](../archive/2026-09-15-changes--agresso-staff-sec-users-sync/) on 2026-09-14, on the recommendation of that spec's exhausted Judgment Day lineage |
 | Depends on | `changes/agresso-staff-sec-users-sync` — **not because the code depends on it**, but because this spec's matching, indexes and classification are the *same pass*. Specify this only after the sibling's design is stable |
 | Inherited evidence | [`judgment-inherited.md`](./judgment-inherited.md) — the complete three-pass ledger from the parent spec. **Read it before writing requirements** |
 
