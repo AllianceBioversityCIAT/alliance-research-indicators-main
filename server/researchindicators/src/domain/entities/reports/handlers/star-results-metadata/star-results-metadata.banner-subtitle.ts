@@ -9,7 +9,7 @@ export const STAR_RAW_BANNER_SUBTITLE_PREFIX =
   'This file contains the results generated from the selected filters in STAR';
 
 /**
- * In-file notice appended to the raw-data subtitle (row 2) so users know that the
+ * In-file warning notice rendered on its own highlighted row so users know that the
  * Innovation Development and Innovation Use sections are not yet part of the export.
  */
 export const STAR_RAW_COMING_SOON_NOTICE =
@@ -56,7 +56,7 @@ export function buildStarRawBannerSubtitle(filters: FiltersReportDto): string {
     }
   }
   if (segments.length === 0) {
-    return `${STAR_RAW_BANNER_SUBTITLE_PREFIX}. ${STAR_RAW_COMING_SOON_NOTICE}`;
+    return `${STAR_RAW_BANNER_SUBTITLE_PREFIX}.`;
   }
-  return `${STAR_RAW_BANNER_SUBTITLE_PREFIX}: ${segments.join(' | ')} ${STAR_RAW_COMING_SOON_NOTICE}`;
+  return `${STAR_RAW_BANNER_SUBTITLE_PREFIX}: ${segments.join(' | ')}`;
 }

@@ -4,7 +4,6 @@ import { ResultStatusEnum } from '../../../result-status/enum/result-status.enum
 import {
   buildStarRawBannerSubtitle,
   STAR_RAW_BANNER_SUBTITLE_PREFIX,
-  STAR_RAW_COMING_SOON_NOTICE,
 } from './star-results-metadata.banner-subtitle';
 import type { FiltersReportDto } from '../../dto/filters-report.dto';
 
@@ -22,9 +21,9 @@ function filters(partial: Partial<FiltersReportDto>): FiltersReportDto {
 }
 
 describe('buildStarRawBannerSubtitle', () => {
-  it('ends with the coming-soon notice when no filter segments apply', () => {
+  it('ends with a period when no filter segments apply', () => {
     expect(buildStarRawBannerSubtitle(filters({}))).toBe(
-      `${STAR_RAW_BANNER_SUBTITLE_PREFIX}. ${STAR_RAW_COMING_SOON_NOTICE}`,
+      `${STAR_RAW_BANNER_SUBTITLE_PREFIX}.`,
     );
   });
 
@@ -49,7 +48,6 @@ describe('buildStarRawBannerSubtitle', () => {
     expect(s).toContain('Platform - STAR');
     expect(s).toContain('Indicator - Capacity Sharing for Development');
     expect(s).toContain('User - Ana López');
-    expect(s).toContain(STAR_RAW_COMING_SOON_NOTICE);
     expect(s.split(' | ').length).toBeGreaterThanOrEqual(7);
   });
 
@@ -57,8 +55,6 @@ describe('buildStarRawBannerSubtitle', () => {
     const s = buildStarRawBannerSubtitle(
       filters({ onlyOwnResults: true, currentUserDisplayName: '' }),
     );
-    expect(s).toBe(
-      `${STAR_RAW_BANNER_SUBTITLE_PREFIX}. ${STAR_RAW_COMING_SOON_NOTICE}`,
-    );
+    expect(s).toBe(`${STAR_RAW_BANNER_SUBTITLE_PREFIX}.`);
   });
 });
