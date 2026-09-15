@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-05 done (2026-09-15); T-06/T-07/T-08 next
+- **Status:** `in-progress` — T-01…T-06 done (2026-09-15); T-07/T-08 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -182,7 +182,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-06 — Common-fields builder
+### T-06 — Common-fields builder  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-003 (all ACs + scenario), R-PRMS-008 (scenario + AC.1–2)
 - **Files touched:** `tools/prms-normalizer/builders/common-fields.builder.ts`, repositories for the aggregate read (+ specs)
@@ -192,10 +192,10 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Geo conditionals pre-checked (scope 3 needs ≥ 2 countries).
   - A legacy alignment with no `PRIMARY` SP row is refused, not sent with a missing `toc_mapping`.
 - **Done check:**
-  - [ ] Serialized JSON matches homologation §4 for one fixture per type, expected values **transcribed from the document**
-  - [ ] `number_people_trained.unknown`, `innovation_developers`, `result_indicator_type_name` absent (P-1)
-  - [ ] `women` = `women_youth_count + women_not_youth_count` — arithmetic over entered values is permitted and covered
-  - [ ] `is_partner_not_applicable = true` omits the array rather than sending `[]`
+  - [x] Serialized JSON matches homologation §4 for one fixture per type, expected values **transcribed from the document**
+  - [x] `number_people_trained.unknown`, `innovation_developers`, `result_indicator_type_name` absent (P-1)
+  - [x] `women` = `women_youth_count + women_not_youth_count` — arithmetic over entered values is permitted and covered
+  - [x] `is_partner_not_applicable = true` omits the array rather than sending `[]`
 - **Failing input:** a fixture whose main contact is absent — the build must throw naming `lead_contact_person`, not emit a partial object.
 - **Disqualifies the evidence:** an expected value copied from the builder's own output. That proves self-consistency, not correctness.
 - **Effort:** L · **Depends on:** T-05 · **Skills:** `nestjs-expert`, `tdd`

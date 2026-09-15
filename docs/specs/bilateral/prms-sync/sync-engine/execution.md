@@ -794,3 +794,122 @@ suite's green does not have this proof. Stated in the spec file itself.
 - **Pre-existing, not this task's:** an unfiltered `npm run test:integration` fails in
   `test/support/t13-data-source.ts` because `T13_MYSQL_PASSWORD` is unset. That file is tracked and
   untouched by this change, and its refusal to fall back to a default password is a deliberate guard.
+
+---
+
+### T-06 — Common-fields builder
+
+- **Status:** ✅ **PASS on attempt 2** (the largest task in the spec, effort L)
+- **Date:** 2026-09-15
+- **Orca provenance:** run `run_3ed0320bedc0`
+  | Dispatch | Role | Task | Worker |
+  |---|---|---|---|
+  | `ctx_4b99c6a09b2b` | Implementer a1 | `task_9d52d0f1c823` | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_57922feebea4` | Reviewer a1 | `task_9782a9704dd3` | Cursor `gpt-5.6-sol-high` |
+  | `ctx_a7f11fb7cc43` | Implementer a2 | `task_2f7eb05f6f29` | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_9365d67ebc7f` | Implementer a2b (scope ext.) | `task_3f8b6e385459` | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_467b6ef3b801` | Reviewer a2 | `task_d164eab8ae92` | Cursor `gpt-5.6-sol-high` |
+
+**Files (5):** `dto/prms-sync-aggregate.ts` · `builders/common-fields.builder.ts` + spec ·
+`entities/result-prms-sync/repositories/result-prms-sync-aggregate.repository.ts` + spec.
+
+**Architecture held (design §2.1).** The builder contains **zero** references to `DataSource`,
+`Repository`, `httpService` or `axios` — Leader-verified. The repository loads the aggregate, the
+builder maps it, and every payload assertion runs with no DB and no HTTP. That separation is the
+tactic behind DC-1/DC-2/DC-4/DC-5.
+
+#### Attempt 1 — Reviewer verdict: ❌ **FAIL** (2 issues)
+
+Items A, B, D, E, F, G, H passed. Notably **B** (the disqualifier) held: expected values are
+independent literals traceable to `homologation.md`, not echoes of the builder. **G** confirmed the
+positional `?` placeholders receive arrays and mysql2 preserves them even with `namedPlaceholders`
+enabled. **C3** (`grant_title`) was adjudicated acceptable: the composition is unproven, but the risk
+stays explicitly open in `homologation.md` §4.6 / R-3 and the builder correctly **throws** on an empty
+`agreement_id` rather than emitting a partial title.
+
+> **Issue 1:** `submitted_by.submitted_date` elige `submission_history.created_at` sin justificar por
+> qué descarta `custom_date`. **Violated:** `homologation.md` §4 exige *"pick one and say why"*.
+>
+> **Issue 2:** `created_by` se resuelve mediante `results.created_by → sec_users.sec_user_id → email`,
+> mientras el único join por `carnet` pertenece al contacto principal y no al creador. **Violated:**
+> `homologation.md` §4 define la identidad del creador por `alliance_user_staff` con join en `carnet`
+> — una desviación silenciosa **DC-1**.
+
+⚠️ **The Leader had cleared Issue 2 before the audit.** Checking the worker's declared assumptions, the
+Leader grepped `carnet`, saw it present in the file, and wrote *"the carnet join the spec requires is
+there"* — **without ever reading the `ON` clause of the creator join**. The `carnet` seen belonged to
+the *main-contact* query. Seeing the token and inferring the relationship is **KZ-002** exactly:
+enumerating by a convenient proxy instead of by the real thing. Second time this session the Leader's
+verification was looser than the Reviewer's.
+
+#### Attempt 2 — the fixes
+
+**Issue 1 — closed with a substantive reason**, not a formality: `created_at` is the *immutable audit
+timestamp* of the approval transition and the same column that ranks "latest"
+(`ORDER BY sh.created_at DESC`), whereas `custom_date` is a nullable, later-editable display date
+(`green-checks updateChageStatusDate`) whose rewrite would desynchronise the selected row from the
+reported timestamp.
+
+**Issue 2 — closed:** `ON creator.carnet = su.carnet`, keeping `su.sec_user_id = r.created_by` as the
+id-resolution hop.
+
+#### ⚠️ Leader-initiated scope extension — and a Leader process error
+
+Attempt 2 fixed the creator join and **honestly reported in Not Done** that the `submitted_by` staff
+join still matched on email. The worker was right to stay inside the two-fix scope; **the Leader's
+boundary was wrong.** The same hop (`sec_users.sec_user_id → alliance_user_staff`) was left resolved
+two different ways in one file — worse than either form applied consistently. Extended per **KZ-005**:
+*sweep the CLAIM, not the literal string the reviewer cited.*
+
+**Process error, recorded:** the Leader first sent the extension as a message to the **already-settled
+dispatch** (`worker_done` at 15:02:04; the send went out after). Orca accepted it (`ok: true`) and
+nobody received it — the worker had ended its turn. This is `.agents/leader.md`'s *"idle is not
+delivered"* in a variant not previously covered: it is not enough to verify a send **arrived**, one
+must verify **someone still has an open turn to receive it**. `dispatch-show` costs one call before
+sending; discovering it afterwards cost two empty wait windows, and was only caught because the user
+asked *"¿estás esperando algo?"*. The fix was a fresh task (`task_3f8b6e385459`), not another message.
+
+#### The pin, and its observed RED (K-004)
+
+All three identity joins now resolve by `carnet`; **zero** `LOWER(TRIM` remain in the file:
+
+| Join | Form |
+|---|---|
+| creator → staff | `ON creator.carnet = su.carnet` |
+| main contact → staff | `ON aus.carnet = ru.user_id` (already correct) |
+| submitter → staff | `ON aus.carnet = su.carnet` |
+
+The spec pins **both** queries on the SQL *actually issued* to `dataSource.query`, positively and
+negatively:
+
+```
+expect(headerSql).toMatch(/LEFT JOIN alliance_user_staff creator\s+ON\s+creator\.carnet\s*=\s*su\.carnet/)
+expect(headerSql).not.toMatch(/LEFT JOIN alliance_user_staff creator\s+ON\s+LOWER\(TRIM\(creator\.email\)\)/)
+```
+…and the equivalent pair for `submissionSql`. **Red observed:** with the email form restored, the
+`submissionSql` carnet assertion failed; green after restoring.
+
+#### Attempt 2 — Reviewer verdict: ✅ **STATUS: PASS**
+
+> Issue 1 queda cerrado porque la elección de `created_at` está justificada junto a la consulta con
+> una razón correcta y localizable, y el Issue 2 queda cerrado porque ambos creadores se resuelven
+> desde `sec_users` por `carnet`. La prueba examina las cadenas SQL realmente entregadas a
+> `dataSource.query`, exige `carnet` y rechaza la forma anterior por email en ambas consultas, por lo
+> que cualquiera de las dos regresiones falla; **la extensión del submitter es correcta porque
+> `alliance_user_staff.carnet` es clave primaria y `sec_users.carnet` es el puente de identidad
+> estable, mientras email no es único.**
+
+**The Reviewer's justification is stronger than the Leader's was.** The Leader argued *"email is
+mutable"*; the Reviewer identified that **email is not unique**, so the old join could match
+**multiple rows** — a correctness bug, not merely fragility. **Leader-verified against the live
+schema:** `alliance_user_staff.carnet` → `PRI` (PRIMARY KEY, unique); `email` → **no index at all**.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **375 suites · 3176 passed · 0 skipped** |
+| Integration spec (T-03's separate gate) | 3 passed — still green |
+| `npx eslint`, unpiped | **exit 0** |
+| Builder DB/HTTP references | **0** (design §2.1 holds) |
+| `LOWER(TRIM` remaining on identity paths | **0** |
