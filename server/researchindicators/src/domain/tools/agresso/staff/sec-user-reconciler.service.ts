@@ -7,6 +7,7 @@ import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 import {
   CreatedSecUserRow,
   SecUserCreateRow,
+  SecUserRefreshRow,
   SecUserReconcilerRepository,
 } from './sec-user-reconciler.repository';
 
@@ -66,6 +67,10 @@ export interface CreateGrantOutcome {
   created: number;
   rolesGranted: number;
   createsDiscarded: number;
+  namesRefreshed: number;
+  namesTruncated: number;
+  carnetBackfilled: number;
+  carnetConflicts: number;
   abortReason?: 'GRANT_ASSERTION';
 }
 
@@ -192,6 +197,8 @@ export class SecUserReconcilerService {
     reconciliation: ReconciliationResult,
   ): Promise<CreateGrantOutcome> {
     const createRows = this.createRows(reconciliation.create);
+    const refreshRows = this.refreshRows(reconciliation.refresh);
+    const refreshSummary = this.refreshSummary(reconciliation.refresh);
 
     return this.dataSource.transaction(async (manager) => {
       // This is deliberately the first database statement in the transaction (M-1). Do not move
@@ -199,6 +206,9 @@ export class SecUserReconcilerService {
       await this.repository.setRunStart(manager);
 
       // T-05/T-06 seam: refresh and reactivation writes belong here, before create_grant.
+      await this.repository.refreshSecUserNames(manager, refreshRows);
+      await this.repository.backfillSecUserCarnets(manager, refreshRows);
+
       await manager.query('SAVEPOINT create_grant');
       await this.repository.createSecUsers(manager, createRows);
 
@@ -213,6 +223,7 @@ export class SecUserReconcilerService {
           created: 0,
           rolesGranted: 0,
           createsDiscarded: createRows.length,
+          ...refreshSummary,
           abortReason: 'GRANT_ASSERTION',
         };
       }
@@ -228,8 +239,61 @@ export class SecUserReconcilerService {
         created: createdUsers.length,
         rolesGranted: createdUsers.length,
         createsDiscarded: 0,
+        ...refreshSummary,
       };
     });
+  }
+
+  private refreshRows(targets: MatchedTarget[]): SecUserRefreshRow[] {
+    return targets.map(({ staffMember, secUser }) => ({
+      secUserId: secUser.sec_user_id,
+      firstName: staffMember.firstName,
+      lastName: staffMember.lastName,
+      carnet: staffMember.resourceId,
+    }));
+  }
+
+  private refreshSummary(
+    targets: MatchedTarget[],
+  ): Pick<
+    CreateGrantOutcome,
+    'namesRefreshed' | 'namesTruncated' | 'carnetBackfilled' | 'carnetConflicts'
+  > {
+    let namesTruncated = 0;
+    let carnetBackfilled = 0;
+    let carnetConflicts = 0;
+
+    for (const { staffMember, secUser } of targets) {
+      if (staffMember.firstName.length > 60) {
+        namesTruncated += 1;
+        this.logger._warn(
+          `Truncated first name for sec_user_id=${secUser.sec_user_id}`,
+        );
+      }
+      if (staffMember.lastName.length > 60) {
+        namesTruncated += 1;
+        this.logger._warn(
+          `Truncated last name for sec_user_id=${secUser.sec_user_id}`,
+        );
+      }
+
+      const storedCarnet = secUser.carnet;
+      if (storedCarnet == null || storedCarnet.trim().length === 0) {
+        carnetBackfilled += 1;
+      } else if (storedCarnet !== staffMember.resourceId) {
+        carnetConflicts += 1;
+        this.logger._warn(
+          `Carnet conflict for sec_user_id=${secUser.sec_user_id}: stored=${storedCarnet}, payload=${staffMember.resourceId}`,
+        );
+      }
+    }
+
+    return {
+      namesRefreshed: targets.length,
+      namesTruncated,
+      carnetBackfilled,
+      carnetConflicts,
+    };
   }
 
   private createRows(targets: CreateTarget[]): SecUserCreateRow[] {

@@ -148,12 +148,12 @@ graph TD
   - A carnet conflict is **logged at `warn` with both values**, never resolved.
   - `R-AGS-002` AC.4 (`is_active` unchanged) governs the **refresh** path only; on a reactivated row `R-AGS-007` AC.1 wins.
 - **Acceptance / done check:**
-  - [ ] `carnet = NULL` is backfilled; `carnet = '12345'` survives a payload `'99999'` and logs the conflict.
-  - [ ] `status_id`, `is_active` and `email` are byte-identical before and after.
-  - [ ] An unmatched account is byte-identical, `updated_at` included.
+  - [x] `carnet = NULL` is backfilled; `carnet = '12345'` survives a payload `'99999'` and logs the conflict. — the conflict `warn` carries **both** values and is asserted. ⚠️ *"survives"* against the **database** is the SQL guard's job and is **T-09**'s to prove.
+  - [ ] `status_id`, `is_active` and `email` are byte-identical before and after. — **DB claim, carried to T-09.** Verified structurally here: `SecUserRefreshRow` cannot carry those columns and the repository's SET lists were not widened.
+  - [ ] An unmatched account is byte-identical, `updated_at` included. — **DB claim, carried to T-09.**
 - **Dependencies:** T-02, T-03
-- **Estimated effort:** S (~90 LOC)
-- **Status:** todo
+- **Estimated effort:** S (~90 LOC) — **actual 168 LOC** (64 impl + 104 spec across two attempts).
+- **Status:** **done** — PASS 2026-09-15, **2 Implementer attempts / 2 Reviewer rounds**. Attempt 1 Codex `gpt-5.6-luna`; attempt 1 FAILED review (a seam test that asserted *presence*, not *order*, and passed with the defect reintroduced — KZ-001). Attempt 2 by the **Leader** after Codex hit its quota. See [`./execution.md`](./execution.md) → T-05.
 
 ---
 

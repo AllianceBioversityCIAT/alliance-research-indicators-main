@@ -422,3 +422,70 @@ Plus, unprompted: the new `DataSource` dependency **does not** complicate T-07's
 - **The Reviewer's `worker_done` was rejected** (`dispatch_capability_invalid`) — the same Antigravity false-negative class. Its verdict arrived as a one-line summary only. The Leader **poked once** (per `.agents/leader.md` → *idle is not delivered*) demanding the per-question answers be printed to the terminal rather than sent, and recovered the full nine-answer audit. The result had been produced and simply never delivered.
 - **`orca terminal close` does NOT kill the agent process** (`ptyKilled: false`). The T-03 reviewer ran orphaned for ~5 minutes after being reported closed. Workers must now be verified with `pgrep`, not with the `ok: true` of `terminal close`.
 - The Implementer wrote its report into the **spec folder** (`t04-implementation-report.md`). Moved out to the scratchpad; the spec folder holds only the methodology's own documents. Future briefs should state where a report may be written.
+
+---
+
+### T-05 — Refresh and carnet backfill
+
+- **Date:** 2026-09-15
+- **Requirements covered:** R-AGS-002
+- **Status:** **PASS** — 2 Implementer attempts / 2 Reviewer rounds
+- **Implementer (attempt 1):** Codex `gpt-5.6-luna` (effort `medium`) — Dispatch `ctx_c4856c394d79`
+- **Implementer (attempt 2):** **Claude Opus (the Leader)** — see the execution-architecture note below
+- **Reviewer (both rounds):** Antigravity `gemini-3.1-pro-high`
+
+> **⚙️ Second execution-architecture change, mid-task (user ruling 2026-09-15).** Codex reached **94%** of its quota during T-05 and the user directed the Leader to take over implementation. **T-05 attempt 1 landed before the quota ran out**; attempt 2 and every task from T-06 onward are written by Claude Opus.
+>
+> **`author ≠ auditor` is preserved, which is the guarantee that matters** — Antigravity audits the Leader's code exactly as it audited Codex's, with fresh context and a different model family. What was lost is the context-saving of a separate implementer, not the correctness gate. The Leader explicitly re-submitted its own one-test fix for audit rather than self-certifying it.
+
+**Files changed:** `sec-user-reconciler.service.ts` (+64), `sec-user-reconciler.service.spec.ts` (+79 in attempt 1, +25 in attempt 2). No repository change, no SQL.
+
+**What it does:** maps `reconciliation.refresh` to `SecUserRefreshRow[]`, calls `refreshSecUserNames` and `backfillSecUserCarnets` **at the T-04 seam**, and computes the four §9 counters (`namesRefreshed`, `namesTruncated`, `carnetBackfilled`, `carnetConflicts`) with `warn` logs for truncations and carnet conflicts.
+
+#### Attempt 1 — Reviewer verdict: **FAIL** (one issue; the production code was correct)
+
+The Reviewer confirmed **everything about the code**: the seam calls land before `SAVEPOINT create_grant` (DD-15); `refreshRows` is fed exclusively from `reconciliation.refresh`; no forbidden column (`email`, `status_id`, `is_active`, `last_login_at`, `deleted_at`) is mapped or reachable; per-field truncation counting is right; `namesRefreshed` as *attempted* is right; an empty refresh set is a safe no-op.
+
+**The FAIL was the test, not the code:**
+
+- **Discovered Issue:** the test *"refreshes active matches at the seam and reports refresh counters"* claims to verify seam behaviour but uses `toHaveBeenCalledWith` — a **presence** assertion. It cannot evaluate the order property, and **would pass with the refresh calls moved to the wrong side of the savepoint**.
+- **Violated Rule:** `.agents/reviewer.md` §5 — a presence-assertion is not a behavioural proof. (Project lesson **KZ-001**, 13 recurrences: a cohort assertion that doesn't evaluate what it stands in for produces a green suite over broken behaviour.)
+- **Remediation:** assert invocation order via `mock.invocationCallOrder`.
+
+**Leader note on why this was caught.** The Leader flagged attempt 1's K-004 evidence as **thin** in the review brief — Codex reported only "the intentional probes" where T-03 and T-04 had each listed four mutations with verbatim red — and explicitly instructed the Reviewer to judge falsifiability *independently of what the implementer reported*. The quota exhaustion very likely truncated that work. **The instruction is what surfaced the defect**; a brief that merely relayed the implementer's claim would have passed it.
+
+#### Attempt 2 — Leader remediation, Reviewer verdict: **PASS**
+
+Production code **unchanged**. One test added: *"issues BOTH refresh writes strictly before SAVEPOINT create_grant, so a create rollback cannot discard them (DD-15, R-AGS-004 AC.5)"*. It locates the `manager.query` call whose SQL is `'SAVEPOINT create_grant'`, reads its `invocationCallOrder`, and asserts both repository refresh calls were invoked strictly earlier.
+
+**K-004 — the falsification the read-only Reviewer structurally could not perform.** Mutation: both refresh calls moved to **after** `manager.query('SAVEPOINT create_grant')`. Verbatim red:
+
+```
+● SecUserReconcilerService › create + grant transaction (R-AGS-003, R-AGS-004, DD-5, DD-15) ›
+  issues BOTH refresh writes strictly before SAVEPOINT create_grant, so a create rollback
+  cannot discard them (DD-15, R-AGS-004 AC.5)
+  expect(received).toBeLessThan(expected)
+  Expected: < 51
+  Received:   52
+Tests: 1 failed, 25 passed, 26 total
+```
+
+**`25 passed` is the load-bearing number.** Under the mutation the *original* presence-assertion test stayed green. That is the empirical confirmation of the Reviewer's finding — not merely its argument. Mutation reverted (verified by diffing against a pre-mutation backup), T-05's own changes intact.
+
+**Re-review — the Reviewer verified the fix's own premise rather than accepting it.** The Leader put the question that could have voided the whole remediation: *is `mock.invocationCallOrder` a global monotonic counter comparable across different `jest.fn()` mocks, or is it per-mock — in which case the comparison is meaningless and the fix is theatre?* The Reviewer ran `node -e` against `jest-mock` and confirmed it **is** a monotonically increasing global counter, so cross-mock comparison is valid. It further confirmed the test fails **loudly** if the savepoint is absent (`expect(-1).toBeGreaterThanOrEqual(0)`) or if the refresh writes are skipped entirely (`undefined < number` throws a matcher error).
+
+**Verification (final, re-measured by the Leader with no worker active):** `npm test -- --silent` → **368 suites / 3166 tests**; `npx eslint src/domain/tools/agresso/staff` → exit 0 (bare, K-001).
+
+#### Reviewer's grounded answers
+
+- **Carnet counters can disagree with the database, and that is accepted.** Concrete interleaving: a concurrent process updates `sec_users.carnet` between the bulk read (which feeds the TypeScript counters) and the batch `UPDATE` — TypeScript counts a backfill because it read `NULL`, while the SQL guard skips the write because the stored value is now populated, or vice versa. **Accepted reporting imprecision**, inherent to the bulk-read + batch-write architecture under REPEATABLE READ: exact counts would require per-statement round trips, violating **NFR-AGS-002**'s `O(⌈n / CHUNK⌉)`.
+- **Per-field truncation counting is correct**, because either an over-length `first_name` or `last_name` independently triggers the strict-mode rollback W-4 exists to prevent, so each is a separately prevented failure.
+- **No scope absorbed** — reactivation untouched; only the internal `CreateGrantOutcome` was widened, avoiding premature wiring into T-07's DTO.
+
+#### ADVISORY — recorded only; never gates, never becomes a task
+
+- **RELIABILITY —** `invocationCallOrder[0]` proves the **first** invocation precedes the savepoint. That is exact for today's single-call implementation, but if the refresh writes were ever refactored into a paginated loop, **a later chunk could slip past the savepoint undetected**. Asserting `mock.invocationCallOrder.slice(-1)[0] < savepointOrder` as well would make the gate resilient to that. **Deliberately not applied now** (an advisory may not widen the task), but **carried as an obligation**: any future change that makes these writes chunked must strengthen this assertion in the same commit.
+
+#### Carried to T-09
+
+- *"`status_id`, `is_active` and `email` are byte-identical before and after"* and *"an unmatched account is byte-identical, `updated_at` included"* are **database** claims. `npm test` has `rootDir: src` and never runs `test/fixtures/`.

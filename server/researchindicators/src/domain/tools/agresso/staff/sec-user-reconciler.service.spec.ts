@@ -43,6 +43,8 @@ describe('SecUserReconcilerService', () => {
       createSecUsers: jest.fn().mockResolvedValue(undefined),
       findCreatedSecUsers: jest.fn().mockResolvedValue([]),
       grantContributorRoles: jest.fn().mockResolvedValue(undefined),
+      refreshSecUserNames: jest.fn().mockResolvedValue(undefined),
+      backfillSecUserCarnets: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<SecUserReconcilerRepository>;
     manager = { query: jest.fn().mockResolvedValue(undefined) };
     dataSource = {
@@ -472,6 +474,104 @@ describe('SecUserReconcilerService', () => {
   });
 
   describe('create + grant transaction (R-AGS-003, R-AGS-004, DD-5, DD-15)', () => {
+    it('refreshes active matches at the seam and reports refresh counters', async () => {
+      const member = staffMember({
+        resourceId: '99999',
+        firstName: 'F'.repeat(61),
+        lastName: 'Last',
+      });
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 23, carnet: '12345', is_active: true }),
+      ]);
+      const reconciliation = await service.reconcile([member]);
+
+      repository.findCreatedSecUsers.mockResolvedValue([]);
+      const outcome = await service.applyCreateAndGrant(reconciliation);
+
+      expect(repository.refreshSecUserNames).toHaveBeenCalledWith(manager, [
+        {
+          secUserId: 23,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          carnet: '99999',
+        },
+      ]);
+      expect(repository.backfillSecUserCarnets).toHaveBeenCalledWith(manager, [
+        {
+          secUserId: 23,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          carnet: '99999',
+        },
+      ]);
+      expect(outcome).toEqual({
+        created: 0,
+        rolesGranted: 0,
+        createsDiscarded: 0,
+        namesRefreshed: 1,
+        namesTruncated: 1,
+        carnetBackfilled: 0,
+        carnetConflicts: 1,
+      });
+      expect(service['logger']['_warn']).toHaveBeenCalledWith(
+        expect.stringContaining('stored=12345, payload=99999'),
+      );
+    });
+
+    it('issues BOTH refresh writes strictly before SAVEPOINT create_grant, so a create rollback cannot discard them (DD-15, R-AGS-004 AC.5)', async () => {
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 23, carnet: null, is_active: true }),
+      ]);
+      const reconciliation = await service.reconcile([
+        staffMember({ resourceId: 'A1' }),
+      ]);
+
+      await service.applyCreateAndGrant(reconciliation);
+
+      // The property under test is ORDER, not presence. `toHaveBeenCalledWith` passes just as
+      // happily when the refresh writes sit *after* the savepoint — where `ROLLBACK TO SAVEPOINT
+      // create_grant` would silently discard every one of them on a failed create assertion.
+      // Jest's invocationCallOrder is a monotonic global counter, so it compares across mocks.
+      const savepointCallIndex = (
+        manager.query as jest.Mock
+      ).mock.calls.findIndex(([sql]) => sql === 'SAVEPOINT create_grant');
+      expect(savepointCallIndex).toBeGreaterThanOrEqual(0);
+      const savepointOrder = (manager.query as jest.Mock).mock
+        .invocationCallOrder[savepointCallIndex];
+
+      expect(
+        repository.refreshSecUserNames.mock.invocationCallOrder[0],
+      ).toBeLessThan(savepointOrder);
+      expect(
+        repository.backfillSecUserCarnets.mock.invocationCallOrder[0],
+      ).toBeLessThan(savepointOrder);
+    });
+
+    it('backfills empty carnets but never refreshes inactive matches', async () => {
+      const active = staffMember({
+        resourceId: 'A100',
+        email: 'active@alliance.org',
+      });
+      const inactive = staffMember({
+        resourceId: 'A200',
+        email: 'inactive@alliance.org',
+      });
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 31, email: active.email, carnet: null }),
+        secUser({ sec_user_id: 32, email: inactive.email, is_active: false }),
+      ]);
+      const reconciliation = await service.reconcile([active, inactive]);
+
+      await service.applyCreateAndGrant(reconciliation);
+
+      expect(repository.refreshSecUserNames).toHaveBeenCalledWith(manager, [
+        expect.objectContaining({ secUserId: 31 }),
+      ]);
+      expect(repository.refreshSecUserNames).not.toHaveBeenCalledWith(manager, [
+        expect.objectContaining({ secUserId: 32 }),
+      ]);
+    });
+
     it('sets the database-clock marker first, then creates, asserts, and grants only the re-selected new id', async () => {
       const member = staffMember({
         resourceId: 'A100',
@@ -519,6 +619,10 @@ describe('SecUserReconcilerService', () => {
         created: 1,
         rolesGranted: 1,
         createsDiscarded: 0,
+        namesRefreshed: 0,
+        namesTruncated: 0,
+        carnetBackfilled: 0,
+        carnetConflicts: 0,
       });
     });
 
@@ -543,6 +647,10 @@ describe('SecUserReconcilerService', () => {
         created: 0,
         rolesGranted: 0,
         createsDiscarded: 1,
+        namesRefreshed: 0,
+        namesTruncated: 0,
+        carnetBackfilled: 0,
+        carnetConflicts: 0,
         abortReason: 'GRANT_ASSERTION',
       });
     });
