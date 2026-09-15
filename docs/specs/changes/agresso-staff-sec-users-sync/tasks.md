@@ -61,7 +61,7 @@ graph TD
   - `CHUNK` is **one module constant**, exported. `NFR-AGS-002`'s gate asserts an exact statement count and needs a fixed known value (`OQ-D4`).
   - **The bulk read runs OUTSIDE the transaction.** Its placement is load-bearing (`N-9`): moved inside, the re-select in T-04 goes blind to a concurrent insert under REPEATABLE READ.
 - **Acceptance / done check:**
-  - [ ] A seeded inactive `sec_users` row is returned by the bulk read. — **NOT discharged by T-01.** This is a database claim and T-01 has no fixture; the unit tier proves only that the emitted SQL carries no `WHERE` clause, which is a proxy. **Carried to T-09** (`execution.md` → T-01 → *Recorded gap*), which must copy this forward into its brief.
+  - [x] A seeded inactive `sec_users` row is returned by the bulk read. — **DISCHARGED AT T-09**, as the forward pointer required. The fixture seeds an inactive row, asserts the bulk read returns it, and asserts `is_active` is `false` (a real boolean, not `0`) through a live mysql2 driver.
   - [x] Statement count is `O(⌈n / CHUNK⌉)`, asserted exactly at n ≥ 50 **and** n ≥ 100. — exact counts at n=53 and n=127 against the exported `CHUNK`; observed red under a single-chunk mutation.
   - [x] Every statement is parameterised; id lists are numeric-validated before interpolation. — observed red under both a removed-validation mutation and a literal-interpolation mutation.
 - **Dependencies:** none
@@ -107,7 +107,7 @@ graph TD
   - **`role_id = 3` is pinned in SQL** in both reactivation statements — a `WHERE` predicate in the update, a **literal** in the insert. This is `N-4`, a severe finding: the guard was removed by the very correction meant to harden the statement.
   - Names are **truncated to 60** before the statement is built. Under strict mode an unhandled over-length value rolls back the whole transaction (`W-4`).
 - **Acceptance / done check:**
-  - [ ] A stored non-empty carnet survives a conflicting payload value, proven against the database, not the emitted string. — **NOT discharged by T-03.** The SQL guard `AND (carnet IS NULL OR TRIM(carnet) = '')` is present and its gate was observed red, but "proven against the database" is a DB claim and `npm test` never runs `test/fixtures/`. **Carried to T-09.**
+  - [x] A stored non-empty carnet survives a conflicting payload value, proven against the database, not the emitted string. — **DISCHARGED AT T-09.** Falsified there against real MySQL: removing the SQL guard overwrote the stored `T0912345` with `T09999`.
   - [x] The reactivation update carries `AND role_id = 3 AND is_active = 0`. — present in SQL; gate asserts it by regex and was observed red when the predicate was deleted (finding N-4, the task's most dangerous line).
   - [x] A 75-character `firstName` is written truncated and the run completes. — truncation to 60 happens **before** the parameter array is built; observed red at 59. ⚠️ The *"and the run completes"* half is a strict-mode DB claim and belongs to **T-09**.
 - **Dependencies:** T-01
