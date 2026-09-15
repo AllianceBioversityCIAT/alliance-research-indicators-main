@@ -135,7 +135,10 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     });
     expect(findStarResultsMetadataRows).toHaveBeenCalledWith(baseFilters);
     expect(raw?.presentation?.bannerSubtitle).toBe(
-      'This file contains the results generated from the selected filters in STAR.',
+      'This file contains the results generated from the selected filters in STAR. ' +
+        'Note: The Innovation Development section (readiness level, innovation nature, ' +
+        'innovation type, and related fields) and the Innovation Use section are not yet ' +
+        'included in this export — these sections are coming soon.',
     );
   });
 
