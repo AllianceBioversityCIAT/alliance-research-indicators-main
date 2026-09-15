@@ -48,7 +48,7 @@
   @if (inactiveSelectedPeople().length > 0) {
     <div class="assign-pi-delegate__inactive-warning" role="alert" aria-live="assertive">
       <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon" aria-hidden="true"></i>
-      <span class="assign-pi-delegate__inactive-warning-text fs-14">
+      <span class="assign-pi-delegate__inactive-warning-text">
         @if (inactiveSelectedPeople().length === 1) {
           <strong>{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
           They will not be able to review results until their account is reactivated.
@@ -97,8 +97,8 @@
        current delegate assignments (pre-loaded from the cache). -->
   @if (getSelectedPeopleList().length > 0 || getSelectedProjectsList().length > 0) {
     <div class="assign-pi-delegate__preload-notice" role="status" aria-live="polite">
-      <i class="pi pi-info-circle atc-primary-blue-400" aria-hidden="true"></i>
-      <span class="atc-grey-700 fs-14">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      <span>
         Pre-loaded selections reflect the current delegate assignments.
       </span>
     </div>

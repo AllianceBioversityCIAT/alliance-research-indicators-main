@@ -31,45 +31,44 @@
     }
   }
 
-  &__preload-notice {
+  // ── Banner pattern (matches the general result sections) ───────────────
+  // Flat grey band with a 5px accent bar on the left, icon + 14px Barlow copy.
+  &__preload-notice,
+  &__inactive-warning {
     display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    background: var(--ac-primary-blue-100);
+    align-items: center;
+    gap: 0.75rem; // 12px
+    padding: 0 0.75rem;
+    background: var(--ac-grey-100);
+    border-left: 5px solid var(--ac-light-blue-500);
 
     i {
-      margin-top: 0.125rem;
       flex-shrink: 0;
+      font-size: 18px;
+      color: var(--ac-light-blue-500);
     }
 
     span {
-      line-height: 1.5;
+      font-family: Barlow, sans-serif;
+      font-size: 14px;
+      font-weight: 400;
+      line-height: 17px;
+      text-align: left;
+      color: var(--ac-grey-700);
+      margin: 15px 0;
     }
   }
 
-  // CHANGE 2: amber warning for inactive pre-loaded delegates
+  // CHANGE 2: inactive delegates keep the warning accent, same banner shape
   &__inactive-warning {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--ac-orange-1);
-    background: var(--ac-grey-100);
-  }
+    border-left-color: var(--ac-orange-1);
 
-  &__inactive-warning-icon {
-    color: var(--ac-orange-1);
-    margin-top: 0.125rem;
-    flex-shrink: 0;
+    i {
+      color: var(--ac-orange-1);
+    }
   }
 
   &__inactive-warning-text {
-    line-height: 1.5;
-    color: var(--ac-grey-800);
-
     strong {
       font-weight: 600;
     }
