@@ -200,6 +200,8 @@ import { UsersModule } from './users/users.module';
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
+    PiDelegatesModule,
+    UsersModule,
     PortfoliosModule,
     StrategicObjectivesModule,
     ImpactOutcomesModule,
