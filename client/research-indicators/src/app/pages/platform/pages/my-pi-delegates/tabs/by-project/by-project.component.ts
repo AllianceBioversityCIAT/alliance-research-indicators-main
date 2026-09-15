@@ -1,9 +1,9 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05)
 //
 // By-project tab: enriched p-table with per-delegate "X" revoke.
-// The tab owns its own toolbar (search + status), paginator and summary line —
-// all three live INSIDE the table card. searchQuery/statusFilter remain inputs
-// that seed the local state, so a host can still preset a filter.
+// The tab owns its own search box, paginator and summary line — all three live
+// INSIDE the table card. searchQuery/statusFilter remain inputs that seed the
+// local state, so a host can still preset a filter (there is no status UI).
 // Covers: R-UI-002 (by-project view), R-UI-008 (revoke named pair only),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
 //
@@ -24,7 +24,6 @@ import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
-import { DropdownModule } from 'primeng/dropdown';
 import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
@@ -42,7 +41,6 @@ import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates
     TableModule,
     ButtonModule,
     InputTextModule,
-    DropdownModule,
     TooltipModule,
     SearchExportControlsComponent,
     CustomTagComponent
@@ -77,14 +75,11 @@ export class ByProjectComponent {
   readonly searchTerm = linkedSignal(() => this.searchQuery());
   readonly statusTerm = linkedSignal(() => this.statusFilter());
 
-  /** Status dropdown options, derived from the rows actually in the cache. */
-  readonly statusOptions = computed<string[]>(() => {
-    const all = new Set<string>();
-    for (const p of this.service.byProjectCache()) {
-      if (p.status) all.add(p.status);
-    }
-    return ['All', ...Array.from(all).sort()];
-  });
+  /** Clear Filters on the shared search control: resets search + status. */
+  clearFilters(): void {
+    this.searchTerm.set('');
+    this.statusTerm.set('All');
+  }
 
   // ─── Summary line (rendered inside the table card) ───────────────────────────
   readonly summaryPeople = computed(() => {
@@ -110,12 +105,6 @@ export class ByProjectComponent {
     }
     return seen.size;
   });
-
-  /** Clear Filters on the shared search control: resets search + status. */
-  clearFilters(): void {
-    this.searchTerm.set('');
-    this.statusTerm.set('All');
-  }
 
   /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {

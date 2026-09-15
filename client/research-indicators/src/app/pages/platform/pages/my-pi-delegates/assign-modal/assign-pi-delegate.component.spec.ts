@@ -739,6 +739,29 @@ describe('AssignPiDelegateComponent', () => {
       expect(warning).toBeNull();
     }));
 
+    it('uses the shared amber notice design (same as the project-dashboard cards)', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 3, name: 'Carol', email: 'c@test.com', is_active: false }])
+      ]);
+
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      const warning = el.querySelector('.assign-pi-delegate__inactive-warning') as HTMLElement;
+      // amber accent bar + cream background, as on the dashboard chart notices
+      expect(warning.className).toContain('border-l-[#E69F00]');
+      expect(warning.className).toContain('bg-[#fff8e6]');
+
+      const text = warning.querySelector('.assign-pi-delegate__inactive-warning-text') as HTMLElement;
+      expect(text.className).toContain('text-[12.5px]');
+      expect(text.className).toContain('font-semibold');
+      expect(text.className).toContain('text-[#8a4b08]/80');
+    }));
+
     it('names multiple inactive delegates in the warning text', fakeAsync(() => {
       // Arrange: two inactive delegates.
       piService.byProjectCache.set([

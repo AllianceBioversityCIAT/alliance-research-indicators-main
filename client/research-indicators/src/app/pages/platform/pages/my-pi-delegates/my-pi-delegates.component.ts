@@ -1,6 +1,9 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04)
 //
 // Page shell for My PI Delegates.
+// Styling is Tailwind only — the component has no stylesheet. The tab strip is
+// plain buttons (the project-detail pattern) instead of p-tabView, which would
+// have needed ::ng-deep to restyle PrimeNG's own DOM.
 // The search box, paginator and summary line live INSIDE each tab's table card —
 // the shell only owns the header, the load/error states and the tab strip.
 // Covers: R-UI-002 AC.1 (By-project default), NFR-UI-001 (STAR tokens),
@@ -13,8 +16,6 @@
 // and rely on the loading/empty/error states.
 
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { TabViewModule } from 'primeng/tabview';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ByProjectComponent } from './tabs/by-project/by-project.component';
 import { ByPersonComponent } from './tabs/by-person/by-person.component';
@@ -24,9 +25,8 @@ import { CacheService } from '@services/cache/cache.service';
 @Component({
   selector: 'app-my-pi-delegates',
   standalone: true,
-  imports: [CommonModule, TabViewModule, ByProjectComponent, ByPersonComponent],
-  templateUrl: './my-pi-delegates.component.html',
-  styleUrl: './my-pi-delegates.component.scss'
+  imports: [ByProjectComponent, ByPersonComponent],
+  templateUrl: './my-pi-delegates.component.html'
 })
 export default class MyPiDelegatesComponent implements OnInit {
   readonly service = inject(PiDelegatesClientService);

@@ -17,7 +17,6 @@ import { signal, computed } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { TabViewModule } from 'primeng/tabview';
 import MyPiDelegatesComponent from './my-pi-delegates.component';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -96,7 +95,7 @@ describe('MyPiDelegatesComponent', () => {
     mockCacheService = createMockCacheService(99);
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockService },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },
@@ -115,18 +114,30 @@ describe('MyPiDelegatesComponent', () => {
     fixture.detectChanges();
     expect(component.activeTabIndex()).toBe(0);
 
-    const tabViewEl =
-      fixture.nativeElement.querySelector('[data-pc-name="tabview"]') ||
-      fixture.nativeElement.querySelector('p-tabview') ||
-      fixture.nativeElement.querySelector('.p-tabs');
-    expect(tabViewEl).not.toBeNull();
+    const tabs = fixture.debugElement.queryAll(By.css('[role="tab"]'));
+    expect(tabs.length).toBe(2);
+    expect((tabs[0].nativeElement as HTMLElement).textContent?.trim()).toBe('By project');
+    expect((tabs[1].nativeElement as HTMLElement).textContent?.trim()).toBe('By person');
+    expect((tabs[0].nativeElement as HTMLElement).getAttribute('aria-selected')).toBe('true');
+    expect((tabs[1].nativeElement as HTMLElement).getAttribute('aria-selected')).toBe('false');
 
-    const tabPanels = fixture.debugElement.queryAll(By.css('p-tabPanel, p-tabpanel'));
-    expect(tabPanels.length).toBeGreaterThanOrEqual(2);
-    const firstHeader = (tabPanels[0].attributes as Record<string, string>)['header'];
-    const secondHeader = (tabPanels[1].attributes as Record<string, string>)['header'];
-    expect(firstHeader).toBe('By project');
-    expect(secondHeader).toBe('By person');
+    // By-project panel is the visible one; By-person stays mounted but hidden
+    const panels = fixture.debugElement.queryAll(By.css('[role="tabpanel"]'));
+    expect((panels[0].nativeElement as HTMLElement).hidden).toBe(false);
+    expect((panels[1].nativeElement as HTMLElement).hidden).toBe(true);
+  });
+
+  it('clicking the By person tab switches the visible panel', () => {
+    fixture.detectChanges();
+
+    const tabs = fixture.debugElement.queryAll(By.css('[role="tab"]'));
+    (tabs[1].nativeElement as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(component.activeTabIndex()).toBe(1);
+    const panels = fixture.debugElement.queryAll(By.css('[role="tabpanel"]'));
+    expect((panels[0].nativeElement as HTMLElement).hidden).toBe(true);
+    expect((panels[1].nativeElement as HTMLElement).hidden).toBe(false);
   });
 
   it('calls loadByUser with the current user id on init', () => {
@@ -362,6 +373,35 @@ describe('MyPiDelegatesComponent', () => {
       expect(allModals.isModalOpen('piDelegateHistory').isOpen).toBe(true);
     });
   });
+
+  // ── 11. Info banner about the PI Delegate role ──────────────────────────────
+
+  it('renders the PI Delegate info banner once, above the tables', () => {
+    fixture.detectChanges();
+
+    const banners = fixture.nativeElement.querySelectorAll('.pi-delegates-info');
+    expect(banners.length).toBe(1);
+
+    const text = (banners[0] as HTMLElement).textContent ?? '';
+    expect(text).toContain('approve, reject or request changes');
+    expect(text).toContain('revoke it at any time');
+    expect(text).toContain('Agresso');
+
+    // It sits before the table panels in document order
+    const panel = fixture.nativeElement.querySelector('[role="tabpanel"]');
+    expect(banners[0].compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('does NOT render the info banner while loading or on error', () => {
+    mockService.loading.set(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-info')).toBeNull();
+
+    mockService.loading.set(false);
+    mockService.error.set('boom');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-info')).toBeNull();
+  });
 });
 
 // ─── Null-user edge case ──────────────────────────────────────────────────────
@@ -383,7 +423,7 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
     const noUserCache = { dataCache: signal({ user: undefined }) };
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockSvc },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },

@@ -408,7 +408,7 @@ describe('ByProjectComponent', () => {
   });
   // ── 9. In-card toolbar, paginator and summary ─────────────────────────
 
-  describe('in-card toolbar (search + status)', () => {
+  describe('in-card toolbar (search only)', () => {
     beforeEach(async () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
     });
@@ -416,22 +416,11 @@ describe('ByProjectComponent', () => {
     it('renders the shared search control INSIDE the table card, not in the page shell', () => {
       const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
       expect(card.querySelector('app-search-export-controls')).not.toBeNull();
-      // Table-local filtering: no Apply Filters button (there is no filters sidebar here)
+      // Table-local filtering: Clear Filters yes, Apply Filters no (no sidebar),
+      // and no status dropdown — the toolbar is search + clear only.
       expect(card.textContent).not.toContain('Apply Filters');
       expect(card.textContent).toContain('Clear Filters');
-    });
-
-    it('searching through the shared control filters the rows', () => {
-      expect(component.filteredRows().length).toBe(3);
-
-      const input = fixture.debugElement.query(By.css('app-search-export-controls input'));
-      (input.nativeElement as HTMLInputElement).value = 'PRJ-002';
-      // Enter submits immediately; the (input) path is the same emitter, debounced.
-      input.triggerEventHandler('keydown.enter', { target: input.nativeElement });
-      fixture.detectChanges();
-
-      expect(component.filteredRows().length).toBe(1);
-      expect(component.filteredRows()[0].project_code).toBe('PRJ-002');
+      expect(card.querySelector('p-dropdown')).toBeNull();
     });
 
     it('Clear Filters resets the search term and the status back to All', () => {
@@ -448,20 +437,19 @@ describe('ByProjectComponent', () => {
       expect(component.filteredRows().length).toBe(3);
     });
 
-    it('statusOptions is derived from the cache: "All" first, deduplicated and sorted', () => {
-      expect(component.statusOptions()[0]).toBe('All');
-      expect(component.statusOptions()).toContain('Ongoing');
-      expect(component.statusOptions()).toContain('Completed');
-      expect(component.statusOptions().filter(o => o === 'Ongoing').length).toBe(1);
-    });
+    it('searching through the shared control filters the rows', () => {
+      expect(component.filteredRows().length).toBe(3);
 
-    it('setting the status term filters the rows (negative discriminator)', () => {
-      component.statusTerm.set('Completed');
+      const input = fixture.debugElement.query(By.css('app-search-export-controls input'));
+      (input.nativeElement as HTMLInputElement).value = 'PRJ-002';
+      // Enter submits immediately; the (input) path is the same emitter, debounced.
+      input.triggerEventHandler('keydown.enter', { target: input.nativeElement });
       fixture.detectChanges();
 
       expect(component.filteredRows().length).toBe(1);
       expect(component.filteredRows()[0].project_code).toBe('PRJ-002');
     });
+
   });
 
   describe('paginator', () => {

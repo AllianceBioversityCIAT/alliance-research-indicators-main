@@ -33,8 +33,9 @@
 
   // ── Banner pattern (matches the general result sections) ───────────────
   // Flat grey band with a 5px accent bar on the left, icon + 14px Barlow copy.
-  &__preload-notice,
-  &__inactive-warning {
+  // The inactive-delegate warning uses the amber notice design instead, written
+  // as Tailwind in the template (same as the project-dashboard chart cards).
+  &__preload-notice {
     display: flex;
     align-items: center;
     gap: 0.75rem; // 12px
@@ -56,15 +57,6 @@
       text-align: left;
       color: var(--ac-grey-700);
       margin: 15px 0;
-    }
-  }
-
-  // CHANGE 2: inactive delegates keep the warning accent, same banner shape
-  &__inactive-warning {
-    border-left-color: var(--ac-orange-1);
-
-    i {
-      color: var(--ac-orange-1);
     }
   }
 

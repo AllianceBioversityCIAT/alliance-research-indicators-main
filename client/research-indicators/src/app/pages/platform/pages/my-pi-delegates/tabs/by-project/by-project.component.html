@@ -11,7 +11,7 @@
   <div class="by-project__table-wrapper">
 
     <!-- Summary line — top of the card, above the search -->
-    <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
+    <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
       <span class="by-project__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
         {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
         &nbsp;·&nbsp;
@@ -30,8 +30,8 @@
       </span>
     </div>
 
-    <!-- Per-table toolbar: the shared search control + status filter -->
-    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[var(--ac-grey-200)] px-4 py-3.5">
+    <!-- Per-table toolbar: the shared search control (search only) -->
+    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 py-3.5">
       <app-search-export-controls
         class="min-w-[20rem] flex-1"
         [showApply]="false"
@@ -41,14 +41,6 @@
         (searchChange)="searchTerm.set($event)"
         (clear)="clearFilters()"
       ></app-search-export-controls>
-      <p-dropdown
-        [options]="statusOptions()"
-        [ngModel]="statusTerm()"
-        (ngModelChange)="statusTerm.set($event)"
-        [placeholder]="'Status: ' + statusTerm()"
-        styleClass="pi-delegates-status-dropdown"
-        aria-label="Filter by status"
-      />
     </div>
 
     <p-table
@@ -60,6 +52,7 @@
       [rowsPerPageOptions]="[5, 10, 25, 50]"
       [showCurrentPageReport]="true"
       [tableStyle]="{ 'min-width': '100%' }"
+      paginatorStyleClass="justify-end! border-t border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] px-3 py-2"
       currentPageReportTemplate="Showing {first} to {last} of {totalRecords} projects"
       styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
       aria-label="PI Delegates by project"

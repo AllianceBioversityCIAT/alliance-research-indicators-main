@@ -46,9 +46,14 @@
   <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->
   <!-- Amber box naming any pre-loaded delegates whose is_active === false. -->
   @if (inactiveSelectedPeople().length > 0) {
-    <div class="assign-pi-delegate__inactive-warning" role="alert" aria-live="assertive">
-      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon" aria-hidden="true"></i>
-      <span class="assign-pi-delegate__inactive-warning-text">
+    <!-- Same amber notice design as the project-dashboard chart cards. -->
+    <div
+      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[#E69F00] bg-[#fff8e6] px-3 py-2.5"
+      role="alert" aria-live="assertive">
+      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[#8a4b08]/80"
+        aria-hidden="true"></i>
+      <p
+        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">
         @if (inactiveSelectedPeople().length === 1) {
           <strong>{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
           They will not be able to review results until their account is reactivated.
@@ -58,7 +63,7 @@
           They will not be able to review results until their accounts are reactivated.
           The role can still be granted and will take effect once they are active again.
         }
-      </span>
+      </p>
     </div>
   }
 

@@ -6,14 +6,14 @@
 <!-- Layout is Tailwind; the only SCSS left is the ::ng-deep PrimeNG overrides. -->
 <!-- Page gutters follow project-detail: px-[24px], px-[28px] from md up. -->
 
-<div class="pi-delegates-page flex flex-col bg-[var(--ac-white-1)] pt-[8px] sm:pt-[12px] md:pt-[20px]">
+<div class="pi-delegates-page flex flex-col bg-[color:var(--ac-white-1)] pt-[8px] sm:pt-[12px] md:pt-[20px]">
 
   <!-- ── Page header block ───────────────────────────────────────────── -->
   <header class="pi-delegates-header flex flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
     <h1 class="pi-delegates-title atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
       My PI Delegates
     </h1>
-    <p class="pi-delegates-description atc-grey-600 m-0 max-w-[52rem] font-['Barlow'] text-[15px] font-normal leading-[20px]">
+    <p class="pi-delegates-description atc-grey-600 m-0 max-w-[52rem] font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
       The people you delegate to review results on your behalf. Assign the PI Delegate role across
       the projects where you are the Principal Investigator — one by one or several at a time.
     </p>
@@ -22,7 +22,7 @@
     <div class="pi-delegates-stats mt-[14px] flex flex-row flex-wrap gap-3" role="list"
       aria-label="PI Delegates summary statistics">
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-briefcase atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -36,7 +36,7 @@
       </div>
 
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -50,7 +50,7 @@
       </div>
 
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-exclamation-triangle atc-orange-1 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -68,7 +68,7 @@
   <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────── -->
   @if (loading()) {
   <div
-    class="pi-delegates-state--loading mb-4 flex items-center gap-3 border-y border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    class="pi-delegates-state--loading mb-4 flex items-center gap-3 border-y border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
     role="status" aria-live="polite">
     <i class="pi pi-spin pi-spinner atc-primary-blue-400 shrink-0 !text-[18px]" aria-hidden="true"></i>
     <span class="atc-grey-800">Loading PI delegates data…</span>
@@ -78,7 +78,7 @@
   <!-- ── Error state (NFR-UI-003) ───────────────────────────────────── -->
   @else if (error()) {
   <div
-    class="pi-delegates-state--error mb-4 flex items-center gap-3 border-y border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    class="pi-delegates-state--error mb-4 flex items-center gap-3 border-y border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
     role="alert">
     <i class="pi pi-exclamation-circle atc-red-1 shrink-0 !text-[18px]" aria-hidden="true"></i>
     <span class="atc-red-1">
@@ -88,21 +88,65 @@
   }
 
   <!-- ── Tabs + content ─────────────────────────────────────────────── -->
+  <!-- Plain buttons + a grey content well: the project-detail tab pattern, so
+       the whole strip is Tailwind and nothing needs ::ng-deep. Both panels stay
+       mounted (toggled with [hidden]) to keep each table's search and sort. -->
   @else {
-  <p-tabView [activeIndex]="activeTabIndex()" (activeIndexChange)="onTabChange({ index: $event })"
-    styleClass="pi-delegates-tabview">
-    <!-- ── Tab 0: By project (DEFAULT — R-UI-002 AC.1) ─────────── -->
-    <p-tabPanel header="By project">
+  <div class="flex items-end gap-0 border-b border-[color:var(--ac-grey-200)] px-2" role="tablist"
+    aria-label="PI Delegates views">
+    <button type="button" role="tab" id="pi-delegates-tab-by-project"
+      class="flex cursor-pointer items-center border-0 border-b-2 bg-transparent px-5 py-3 transition-all duration-200 hover:bg-white/60"
+      [class]="activeTabIndex() === 0
+        ? '-mb-px border-b-[color:var(--ac-light-blue-400)] bg-[color:var(--ac-white-1)]'
+        : 'border-b-[color:transparent]'"
+      [attr.aria-selected]="activeTabIndex() === 0" (click)="onTabChange({ index: 0 })">
+      <span class="font-['Barlow'] text-[14px] font-semibold leading-none transition-colors duration-200"
+        [class]="activeTabIndex() === 0 ? 'text-[color:var(--ac-light-blue-400)]' : 'text-[color:var(--ac-grey-600)]'">
+        By project
+      </span>
+    </button>
+
+    <button type="button" role="tab" id="pi-delegates-tab-by-person"
+      class="flex cursor-pointer items-center border-0 border-b-2 bg-transparent px-5 py-3 transition-all duration-200 hover:bg-white/60"
+      [class]="activeTabIndex() === 1
+        ? '-mb-px border-b-[color:var(--ac-light-blue-400)] bg-[color:var(--ac-white-1)]'
+        : 'border-b-[color:transparent]'"
+      [attr.aria-selected]="activeTabIndex() === 1" (click)="onTabChange({ index: 1 })">
+      <span class="font-['Barlow'] text-[14px] font-semibold leading-none transition-colors duration-200"
+        [class]="activeTabIndex() === 1 ? 'text-[color:var(--ac-light-blue-400)]' : 'text-[color:var(--ac-grey-600)]'">
+        By person
+      </span>
+    </button>
+  </div>
+
+  <div class="border border-t-0 border-[color:var(--ac-grey-200)] bg-[color:var(--ac-background)] p-4">
+
+    <!-- What the PI Delegate role does — the standard STAR info banner:
+         grey band with a blue accent bar, shown above the tables' search. -->
+    <div
+      class="pi-delegates-info mb-4 flex items-center gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[#e8ebed] px-3"
+      role="note">
+      <i class="pi pi-exclamation-circle shrink-0 !text-[18px] text-[color:var(--ac-light-blue-500)]"
+        aria-hidden="true"></i>
+      <p class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
+        PI Delegate lets someone approve, reject or request changes to the results of a project on your
+        behalf. It applies only to the projects you select here, and you can revoke it at any time.
+        Roles coming from <strong>Agresso</strong> are not affected.
+      </p>
+    </div>
+
+    <!-- Tab 0: By project (DEFAULT — R-UI-002 AC.1) -->
+    <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-project" [hidden]="activeTabIndex() !== 0">
       <app-by-project (assignRequested)="onAssignFromProject($event)"
         (historyRequested)="onHistoryFromProject($event)"></app-by-project>
-    </p-tabPanel>
+    </div>
 
-    <!-- ── Tab 1: By person (T-UI-06) ──────────────────────────────── -->
-    <p-tabPanel header="By person">
+    <!-- Tab 1: By person (T-UI-06) -->
+    <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-person" [hidden]="activeTabIndex() !== 1">
       <app-by-person (assignRequested)="onAssignFromPerson($event)"
         (historyRequested)="onHistoryFromPerson($event)"></app-by-person>
-    </p-tabPanel>
-  </p-tabView>
+    </div>
+  </div>
   }
 
 </div>
