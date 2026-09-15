@@ -194,12 +194,12 @@ graph TD
   - A failed page means fewer people provisioned this run. **Do not abort** — that behaviour belongs to the sibling spec, where the same ambiguity is not benign.
   - The summary is the **only** feedback channel: the controller does not `await` (RSK-4). Every field in `design.md` §9 earns its place on that basis.
 - **Acceptance / done check:**
-  - [ ] All pages' members reach the reconciler in one call.
-  - [ ] A failing page logs at `error` and the surviving members are still reconciled.
-  - [ ] The summary carries every field in §9, with `abortReason` **absent** on a clean run.
+  - [x] All pages' members reach the reconciler in one call. — observed red at `Expected 1 / Received 4` when `reconcile` was moved inside the loop.
+  - [x] A failing page logs at `error` and the surviving members are still reconciled. — `base()` owns the `error` log and returns `[]` without invoking the mapper; the surviving members still reach the reconciler. No abort path was added and `findNumberOfPages` is untouched.
+  - [x] The summary carries every field in §9, with `abortReason` **absent** on a clean run. — exact-key-list assertion; observed red when `abortReason` was assigned unconditionally. ⚠️ **The DTO follows NFR-AGS-003, not §9's table, which omits `createsDiscarded` and `rolesGrantedOnReactivation`** — recorded as an archive correction.
 - **Dependencies:** T-04, T-05, T-06
-- **Estimated effort:** S (~70 LOC)
-- **Status:** todo
+- **Estimated effort:** S (~70 LOC) — **actual ~330 LOC** (DTO + wiring + module spec + tests).
+- **Status:** **done** — PASS 2026-09-15, 1 Implementer attempt / 1 Reviewer round. Implemented by the **Leader**; audited by Antigravity `gemini-3.1-pro-high`, which upheld a deliberate deviation from `design.md` §2.1 and caught a Leader-written test that could not fail. See [`./execution.md`](./execution.md) → T-07.
 
 ---
 

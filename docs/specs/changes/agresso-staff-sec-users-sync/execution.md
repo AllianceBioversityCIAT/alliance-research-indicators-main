@@ -547,3 +547,68 @@ Item (e) was flagged to the Reviewer as *"the one the author wants challenged"*,
 
 - **AC.6 — "no `app_secrets` row changes"** is now explicitly **unproven at any tier below the fixtures**, and the only assertion that claimed it has been removed.
 - AC.1 (original `sec_user_id` retained), AC.2 (non-selected candidates byte-identical), AC.5 (role rows other than 3 byte-identical), AC.7 (idempotence across two runs) are all database claims.
+
+---
+
+### T-07 — Summary DTO and wiring into `cloneAllAgressoStaff`
+
+- **Date:** 2026-09-15
+- **Requirements covered:** NFR-AGS-003, R-AGS-001
+- **Status:** **PASS** — 1 Implementer attempt / 1 Reviewer round (+ two advisory remediations applied)
+- **Implementer:** **Claude Opus (the Leader)** — Codex quota exhausted
+- **Reviewer:** Antigravity `gemini-3.1-pro-high` — Task `task_2396963d4c44`
+
+**Files:** `dto/sec-user-reconciliation-summary.dto.ts` (new), `agresso-staff-tools.module.spec.ts` (new), plus `agresso-staff-tools.service.ts`, `agresso-staff-tools.module.ts`, `sec-user-reconciler.service.ts` (`buildSummary` only) and the two specs.
+
+**Verification:** `npm test -- --silent` → **369 suites / 3180 tests**; `npx eslint src/domain/tools/agresso/staff` → exit 0.
+
+#### K-004 — three mutations, each observed red, then reverted
+
+| # | Mutation | Observed red |
+| --- | --- | --- |
+| 1 | `reconcile` moved **inside** the page loop | `Expected number of calls: 1 / Received number of calls: 4` |
+| 2 | `SecUserReconcilerService` removed from module `providers` | `Expected value: [Function SecUserReconcilerService] / Received array: [[AgressoStaffToolsService], [SecUserReconcilerRepository]]` |
+| 3 | `summary.abortReason` assigned unconditionally | the exact-key-list assertion reddened with `+ "abortReason"` on a clean run |
+
+#### The deliberate deviation from `design.md` §2.1 — put to the Reviewer as question 1, UPHELD
+
+§2.1 says *"for each page: `base(...)` → saved rows (already exists; **accumulate them now**)"*, and §2.2 says `base()` *"still returns the saved rows — which is what makes accumulation free"*. The Leader did **not** accumulate `base()`'s return. It captures the raw `AgressoStaffRawDto` from inside the mapper callback:
+
+```ts
+(data) => { allStaff.push(data); return allianceStaffMapper(data); }
+```
+
+**Reviewer's ruling: the deviation is CORRECT and §2.1's wording is loose.** Accumulating the returned entities would (a) lose raw payload properties `reconcile()` consumes, and (b) — the load-bearing half — make **DD-14/N-2's FIRST-ARRIVAL collapse winner depend on `save()`'s uncontracted return order** instead of the guaranteed payload order. The mapper runs once per item in payload order; nothing specifies what `save()` returns. **→ `/akili-archive` correction for §2.1.**
+
+#### Two Reviewer findings the Leader acted on
+
+**1. A test of the Leader's that could not fail (KZ-001, second occurrence in Leader-written code).** *"reports every ambiguous candidate id from BOTH matched sets"* seeded one active + one inactive row — which the tie-break routes exclusively to `refresh`, leaving `reactivate` **empty**. The test was blind to the reactivate spread and would have passed with it deleted.
+
+**Confirmed empirically before fixing:** deleting `...reconciliation.reactivate` from `buildSummary` left **36/36 green**. The fixture now seeds a second staff member matching two inactive rows, forcing both spreads to matter, and asserts the fixture's own shape (`refresh` and `reactivate` each length 1) so it cannot silently degrade again. Re-falsified after the fix: the same mutation now gives **1 failed / 35 passed**.
+
+**2. The Leader misapplied `server/researchindicators/src/CLAUDE.md` §4.** The module spec's comment claimed the **silent-404** failure class. That class applies to a missing **route-tree import** (`RouterModule.register()` returns silently, every handler 404s, no boot error). A missing **provider** is different — Nest fails **loudly** at boot with `UnknownElementException`. The assertion is kept (it pins the registration and was observed red), but the comment now records the correction rather than repeating a false claim.
+
+#### Reviewer's other rulings
+
+- **§9's table is incomplete.** It omits `createsDiscarded` and `rolesGrantedOnReactivation`, both of which **NFR-AGS-003 requires**. The DTO implements NFR-AGS-003's list (the authority), and the exact-key assertion is correct. **→ `/akili-archive` correction for §9.**
+- **`abortReason` absence is the right assertion.** A present-but-`undefined` key would be visible to `Object.keys()` but stripped by `JSON.stringify()` — which is what the log emits. An unassigned optional property is strictly absent, which is what M-5 needs.
+- **`ambiguousMatches` drawing from both sets is correct** — a member matching several inactive rows resolves to `reactivate`, so ambiguity exists on both sides (RSK-1).
+- **No abort path introduced**; `findNumberOfPages` untouched; the four pre-existing pagination tests were not weakened beyond receiving the stub provider.
+
+#### ⚠️ `design.md` §8's audit-column promise is UNREACHABLE — confirmed at the service layer
+
+Carried from T-03 and now testable with the service in place. The Reviewer verified independently and agreed **completely**: the controller fires-and-forgets (RSK-4) so the async job **outlives the request**; the repository executes raw `manager.query()` statements that **bypass TypeORM subscribers entirely**; and `CurrentUserUtil` is **request-scoped** and unreachable from a singleton. **§8 promises behaviour no layer delivers. → `/akili-archive` correction.** No requirement depends on it: `NFR-AGS-003` is discharged by the run summary, not by DB audit columns.
+
+#### `/akili-archive` corrections accumulated by this spec
+
+| Document | Correction |
+| --- | --- |
+| `design.md` §2.1 / §2.2 | "accumulate the saved rows" is wrong — accumulation must preserve payload order for DD-14/N-2 |
+| `design.md` §5.2 | duplicated step-table rows (3/5 and 4/6 identical); the "Step 4 dominates step 5" vs "step 7" renumbering |
+| `design.md` §5.2 / §2.1 / §12 DD-14 | three stale pre-`OQ-D5` sites describing a carnet-based collapse comparator |
+| `design.md` §8 | audit columns promised but unreachable |
+| `design.md` §9 | table omits `createsDiscarded` and `rolesGrantedOnReactivation` |
+
+#### Carried to T-09
+
+Real pagination against Agresso, real DB writes, and whether the summary log actually reaches an operator. Everything at this tier is mocked.

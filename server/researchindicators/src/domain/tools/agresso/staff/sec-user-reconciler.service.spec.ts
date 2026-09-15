@@ -908,4 +908,149 @@ describe('SecUserReconcilerService', () => {
       );
     });
   });
+
+  describe("buildSummary — the run's only feedback channel (NFR-AGS-003, design.md §9)", () => {
+    const cleanOutcome = {
+      created: 2,
+      rolesGranted: 2,
+      createsDiscarded: 0,
+      namesRefreshed: 3,
+      namesTruncated: 1,
+      carnetBackfilled: 1,
+      carnetConflicts: 1,
+      reactivated: 1,
+      rolesReactivated: 1,
+      rolesGrantedOnReactivation: 0,
+      rolesLeftInactive: [{ userId: 50, roleId: 1 }],
+      accountsWithoutRole: [77],
+    };
+
+    it('carries every field NFR-AGS-003 names, and OMITS abortReason on a clean run', async () => {
+      repository.findAllSecUsers.mockResolvedValue([
+        secUser({ sec_user_id: 9, email: 'a@alliance.org', is_active: true }),
+      ]);
+      const reconciliation = await service.reconcile([
+        staffMember({ resourceId: 'A1', email: 'a@alliance.org' }),
+        staffMember({ resourceId: 'A2', email: null as unknown as string }),
+        staffMember({ resourceId: '12345678901', email: 'b@alliance.org' }),
+      ]);
+
+      const summary = service.buildSummary(reconciliation, cleanOutcome, 3);
+
+      // Every field NFR-AGS-003 enumerates. A field missing here is a failure mode made invisible
+      // forever: the controller does not await the service (RSK-4), so nothing else reports it.
+      expect(Object.keys(summary).sort()).toEqual(
+        [
+          'accountsWithoutRole',
+          'ambiguousMatches',
+          'carnetBackfilled',
+          'carnetConflicts',
+          'created',
+          'createsDiscarded',
+          'matched',
+          'namesRefreshed',
+          'namesTruncated',
+          'payloadEmailCollisions',
+          'reactivated',
+          'rolesGranted',
+          'rolesGrantedOnReactivation',
+          'rolesLeftInactive',
+          'rolesReactivated',
+          'skippedCarnetTooLong',
+          'skippedUnusableEmail',
+          'staffFetched',
+        ].sort(),
+      );
+      // M-5: abortReason ABSENT on a clean run is what makes a savepoint rollback distinguishable
+      // from a run that simply had nobody to create. Present-but-undefined would not do.
+      expect('abortReason' in summary).toBe(false);
+      expect(summary.staffFetched).toBe(3);
+      expect(summary.skippedUnusableEmail).toBe(1);
+      expect(summary.skippedCarnetTooLong).toBe(1);
+      expect(summary.matched).toBe(1);
+      expect(summary.rolesLeftInactive).toEqual([{ userId: 50, roleId: 1 }]);
+      expect(summary.accountsWithoutRole).toEqual([77]);
+    });
+
+    it('sets abortReason and zeroes the create counters when the savepoint rolled back (R-AGS-004 AC.5, RA-10)', async () => {
+      const reconciliation = await service.reconcile([staffMember({})]);
+
+      const summary = service.buildSummary(
+        reconciliation,
+        {
+          ...cleanOutcome,
+          created: 0,
+          rolesGranted: 0,
+          createsDiscarded: 2,
+          abortReason: 'GRANT_ASSERTION' as const,
+        },
+        1,
+      );
+
+      expect(summary.abortReason).toBe('GRANT_ASSERTION');
+      expect(summary.created).toBe(0);
+      expect(summary.rolesGranted).toBe(0);
+      // The attempted figure lives here, never in `created` — RA-10 exists because an implementer
+      // once reported created = 47 for a run that created nobody.
+      expect(summary.createsDiscarded).toBe(2);
+      // The refresh and reactivation counters survive: those writes committed (DD-15).
+      expect(summary.namesRefreshed).toBe(3);
+      expect(summary.reactivated).toBe(1);
+    });
+
+    it('reports every ambiguous candidate id from BOTH matched sets (RSK-1)', async () => {
+      // Two ambiguities, deliberately one per set. An earlier version seeded only ONE member
+      // matching an active + an inactive row. The tie-break routes that to `refresh`, leaving
+      // `reactivate` EMPTY — so the test was blind to the reactivate half and stayed green with
+      // that spread deleted from buildSummary. Confirmed empirically before this fix: the mutation
+      // left 36/36 passing. Caught in review; the fixture now forces BOTH spreads to matter.
+      repository.findAllSecUsers.mockResolvedValue([
+        // -> refresh: an active candidate is present, so the tie-break prefers it
+        secUser({
+          sec_user_id: 10,
+          email: 'dup@alliance.org',
+          is_active: true,
+        }),
+        secUser({
+          sec_user_id: 20,
+          email: 'dup@alliance.org',
+          is_active: false,
+        }),
+        // -> reactivate: BOTH candidates inactive
+        secUser({
+          sec_user_id: 30,
+          email: 'back@alliance.org',
+          is_active: false,
+        }),
+        secUser({
+          sec_user_id: 40,
+          email: 'back@alliance.org',
+          is_active: false,
+        }),
+      ]);
+      const reconciliation = await service.reconcile([
+        staffMember({ resourceId: 'A1', email: 'dup@alliance.org' }),
+        staffMember({ resourceId: 'A2', email: 'back@alliance.org' }),
+      ]);
+      // Guard the fixture itself: if either set were empty the assertion below could not
+      // discriminate — which is exactly how the previous version failed.
+      expect(reconciliation.refresh).toHaveLength(1);
+      expect(reconciliation.reactivate).toHaveLength(1);
+
+      const summary = service.buildSummary(reconciliation, cleanOutcome, 2);
+
+      expect(summary.ambiguousMatches).toEqual([
+        {
+          emailKey: 'dup@alliance.org',
+          candidateIds: [10, 20],
+          chosenId: 10,
+        },
+        {
+          emailKey: 'back@alliance.org',
+          candidateIds: [30, 40],
+          chosenId: 30,
+        },
+      ]);
+    });
+  });
 });

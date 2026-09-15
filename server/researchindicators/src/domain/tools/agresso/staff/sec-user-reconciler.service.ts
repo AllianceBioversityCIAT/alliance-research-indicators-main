@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
+import { SecUserReconciliationSummaryDto } from './dto/sec-user-reconciliation-summary.dto';
 import {
   CreatedSecUserRow,
   SecUserCreateRow,
@@ -417,6 +418,75 @@ export class SecUserReconcilerService {
       rolesLeftInactive: branches.rolesLeftInactive,
       accountsWithoutRole: branches.accountsWithoutRole,
     };
+  }
+
+  /**
+   * Composes the per-run summary `NFR-AGS-003` requires from the classification and the write
+   * outcome. This is the run's ONLY feedback channel — the controller does not `await` the service
+   * (RSK-4), so anything not counted here is invisible to a human forever.
+   */
+  buildSummary(
+    reconciliation: ReconciliationResult,
+    outcome: CreateGrantOutcome,
+    staffFetched: number,
+  ): SecUserReconciliationSummaryDto {
+    const summary = new SecUserReconciliationSummaryDto();
+
+    summary.staffFetched = staffFetched;
+    summary.matched =
+      reconciliation.refresh.length + reconciliation.reactivate.length;
+
+    summary.created = outcome.created;
+    summary.rolesGranted = outcome.rolesGranted;
+    summary.createsDiscarded = outcome.createsDiscarded;
+
+    summary.namesRefreshed = outcome.namesRefreshed;
+    summary.namesTruncated = outcome.namesTruncated;
+    summary.carnetBackfilled = outcome.carnetBackfilled;
+    summary.carnetConflicts = outcome.carnetConflicts;
+
+    summary.reactivated = outcome.reactivated;
+    summary.rolesReactivated = outcome.rolesReactivated;
+    summary.rolesGrantedOnReactivation = outcome.rolesGrantedOnReactivation;
+    summary.rolesLeftInactive = outcome.rolesLeftInactive;
+    summary.accountsWithoutRole = outcome.accountsWithoutRole;
+
+    summary.skippedUnusableEmail = reconciliation.skipped.filter(
+      ({ reason }) => reason === 'UNUSABLE_EMAIL',
+    ).length;
+    summary.skippedCarnetTooLong = reconciliation.skipped.filter(
+      ({ reason }) => reason === 'CARNET_TOO_LONG',
+    ).length;
+
+    summary.payloadEmailCollisions = reconciliation.collapsed.map(
+      ({ emailKey, winnerCarnet, loserCarnet }) => ({
+        emailKey,
+        winnerCarnet,
+        loserCarnet,
+      }),
+    );
+
+    // RSK-1: every candidate id behind an ambiguous match, from BOTH matched sets. A refresh-side
+    // ambiguity matters as much as a reactivate-side one — R-AGS-001's "two accounts share an
+    // email" scenario is a refresh.
+    summary.ambiguousMatches = [
+      ...reconciliation.refresh,
+      ...reconciliation.reactivate,
+    ]
+      .filter(({ ambiguousCandidateIds }) => ambiguousCandidateIds.length > 0)
+      .map(({ staffMember, secUser, ambiguousCandidateIds }) => ({
+        emailKey: this.normalizeEmail(staffMember.email),
+        candidateIds: ambiguousCandidateIds,
+        chosenId: secUser.sec_user_id,
+      }));
+
+    // Absent on a clean run: its presence is what distinguishes a savepoint rollback from a run
+    // that simply had nobody to create (DD-15, M-5).
+    if (outcome.abortReason) {
+      summary.abortReason = outcome.abortReason;
+    }
+
+    return summary;
   }
 
   private refreshRows(targets: MatchedTarget[]): SecUserRefreshRow[] {
