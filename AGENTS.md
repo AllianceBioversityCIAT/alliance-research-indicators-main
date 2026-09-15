@@ -205,6 +205,37 @@ Inherited from the client child guide + PRD constraints. Top-of-mind for every a
 
 Enforced wrappers: `akili-leader`→`opus` (T1) · `akili-implementer`→`sonnet` · `akili-reviewer`→`opus` + read-only `tools: Read, Grep, Glob` (≠ implementer, both axes) · `akili-tester`→`sonnet`. To change models edit only the registry (never pin a dated name where an alias exists); never add `model:` to command frontmatter.
 
+### Execution hosts — who actually runs what (standing arrangement, user ruling 2026-09-15)
+
+> **This is the DEFAULT for every AKILI activity in this repo — it does not need to be restated at the
+> start of a session.** If a run departs from it, say so and why. Canonical detail, host facts and
+> verified CLI flags: [`docs/model-routing.md`](docs/model-routing.md) → *Execution Hosts & Orchestration*.
+
+**Claude Code plans, reviews and adjudicates; it does NOT write production code.** Implementation goes
+to other hosts and the independent audit to a third, so `author ≠ auditor` holds across **model
+families**, not merely across two instances of one.
+
+| Role | Host | Model |
+| --- | --- | --- |
+| **Leader** — plan, decompose, select skills/effort, adjudicate, write the audit trail | Claude Code | `opus` (T1) |
+| **Implementer — server** | **Codex** (`codex exec`) | `gpt-5.3-codex` family, **execution tier** — a well-specified task does not need a deep reasoner |
+| **Implementer — client** | **Cursor** (`cursor-agent -p`) | `cursor-grok-4.6-*` |
+| **Reviewer** — read-only spec-conformance audit | **Antigravity** (`agy`) | **`gemini-3.1-pro-high`** — the *thinking* tier, **never `*-flash`** |
+
+Tester follows the Implementer's lane and must differ from the model that wrote the code under test.
+
+**Orchestrate through Orca, never through generic subagent spawns** — `Run → Task → Dispatch`
+provenance, injected lifecycle preambles and `worker_done` authority are the point. Load the
+`orchestration` skill, then `orca skills get orchestration` for the version-matched guide.
+`worker-start --agent codex|cursor --model <id>`; **Antigravity is not reachable that way** (`--model`
+takes Claude/Codex/Cursor ids only, and `--agent gemini` is disabled on this install) — use
+`terminal create --command "agy …"` + `dispatch --inject`, which keeps full provenance.
+
+⚠️ **Smoke-test the host before you plan against it.** `codex login status` reported *"Logged in"* on
+2026-09-15 while every request returned **HTTP 402 `deactivated_workspace`** — a billing state the auth
+check cannot see. The same class killed OpenCode (`Insufficient balance`). One cheap probe settles it;
+a guessed-live host fails as silence and then shapes the entire plan.
+
 ### Effort dial
 
 Effort is the second, **per-task** routing dimension, orthogonal to the tier: the tier picks the model, effort picks how hard it thinks on *this* task.
