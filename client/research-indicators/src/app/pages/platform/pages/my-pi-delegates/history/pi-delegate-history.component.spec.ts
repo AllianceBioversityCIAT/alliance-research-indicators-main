@@ -451,4 +451,14 @@ describe('PiDelegateHistoryComponent', () => {
       expect(component.getInitials(null)).toBe('?');
     });
   });
+  // ── 9. Fixed width — the modal must not resize with its content ─────────────
+
+  describe('fixed width', () => {
+    it('the content root declares a fixed width, not a content-driven one', () => {
+      fixture.detectChanges();
+      const root = fixture.nativeElement.querySelector('.pi-dh') as HTMLElement;
+      expect(root.className).toContain('w-[860px]');
+      expect(root.className).toContain('max-w-[88vw]');
+    });
+  });
 });

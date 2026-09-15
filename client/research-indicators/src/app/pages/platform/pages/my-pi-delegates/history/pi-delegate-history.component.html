@@ -2,123 +2,102 @@
 <!-- NFR-UI-001: STAR tokens only (atc-*, abc-*, var(--ac-*)) — no hex literals. -->
 <!-- NFR-UI-002: Non-colour cues: badge uses icon + text, not colour-only. -->
 <!-- NFR-UI-003: Loading / empty / error states. -->
+<!-- Layout is Tailwind only; the component has no stylesheet. -->
+<!-- Fixed width: the modal must not resize as entries load or change. -->
 
-<div class="pi-dh">
+<div class="pi-dh flex w-[860px] max-w-[88vw] flex-col gap-4 px-10 pb-8 pt-6">
 
-  <!-- ── Header ──────────────────────────────────────────────────────────── -->
-  <div class="pi-dh__header">
-    <h2 class="pi-dh__title atc-primary-blue-600">Delegation History</h2>
-    @if (subheader) {
-      <p class="pi-dh__subheader atc-grey-600">{{ subheader }}</p>
-    }
-  </div>
+  <!-- ── Subheader (the modal header already says "Delegation History") ──── -->
+  @if (subheader) {
+  <p class="pi-dh__subheader atc-grey-600 m-0 font-['Barlow'] text-[14px] leading-[18px]">{{ subheader }}</p>
+  }
 
   <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────────── -->
   @if (loading()) {
-    <div class="pi-dh__state pi-dh__state--loading" role="status" aria-live="polite">
-      <i class="pi pi-spin pi-spinner pi-dh__state__icon atc-primary-blue-400" aria-hidden="true"></i>
-      <span class="atc-grey-800">Loading delegation history…</span>
-    </div>
+  <div class="pi-dh__state--loading flex items-center gap-2 py-6 font-['Barlow'] text-[14px]" role="status"
+    aria-live="polite">
+    <i class="pi pi-spin pi-spinner atc-primary-blue-400 !text-[20px]" aria-hidden="true"></i>
+    <span class="atc-grey-800">Loading delegation history…</span>
+  </div>
   }
 
   <!-- ── Error state (NFR-UI-003) ───────────────────────────────────────── -->
   @else if (error()) {
-    <div class="pi-dh__state pi-dh__state--error" role="alert">
-      <i class="pi pi-exclamation-circle pi-dh__state__icon atc-red-1" aria-hidden="true"></i>
-      <span class="atc-red-1">{{ error() }}</span>
-    </div>
+  <div class="pi-dh__state--error flex items-center gap-2 py-6 font-['Barlow'] text-[14px]" role="alert">
+    <i class="pi pi-exclamation-circle atc-red-1 !text-[20px]" aria-hidden="true"></i>
+    <span class="atc-red-1">{{ error() }}</span>
+  </div>
   }
 
   <!-- ── Empty state (NFR-UI-003) ───────────────────────────────────────── -->
   @else if (entries().length === 0) {
-    <div class="pi-dh__state pi-dh__state--empty" role="status">
-      <i class="pi pi-inbox pi-dh__state__icon atc-grey-500" aria-hidden="true"></i>
-      <span class="atc-grey-700">No history yet.</span>
-    </div>
+  <div class="pi-dh__state--empty flex flex-col items-center gap-2 py-10 text-center font-['Barlow'] text-[14px]"
+    role="status">
+    <i class="pi pi-inbox atc-grey-500 !text-[32px]" aria-hidden="true"></i>
+    <span class="atc-grey-700">No history yet.</span>
+  </div>
   }
 
   <!-- ── Entry list ─────────────────────────────────────────────────────── -->
   @else {
-    <ul class="pi-dh__list" aria-label="Delegation history entries">
-      @for (entry of entries(); track entry.pi_delegate_history_id) {
-        <li class="pi-dh__entry">
+  <ul class="m-0 flex max-h-[55vh] list-none flex-col gap-3 overflow-y-auto p-0" aria-label="Delegation history entries">
+    @for (entry of entries(); track entry.pi_delegate_history_id) {
+    <li
+      class="flex items-start gap-3 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] p-3">
 
-          <!-- Avatar circle with actor initials -->
-          <div
-            class="pi-dh__avatar"
-            [attr.aria-label]="'Action by ' + (entry.actor.name ?? 'Unknown')"
-          >
-            <span class="pi-dh__avatar__initials" aria-hidden="true">
-              {{ getInitials(entry.actor.name) }}
-            </span>
-          </div>
+      <!-- Avatar circle with actor initials -->
+      <div
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[color:var(--ac-primary-blue-100)]"
+        [attr.aria-label]="'Action by ' + (entry.actor.name ?? 'Unknown')">
+        <span class="atc-primary-blue-600 font-['Barlow'] text-[12px] font-bold uppercase leading-none"
+          aria-hidden="true">{{ getInitials(entry.actor.name) }}</span>
+      </div>
 
-          <!-- Entry body -->
-          <div class="pi-dh__entry__body">
+      <!-- Entry body -->
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
 
-            <!-- Sentence row -->
-            <p class="pi-dh__sentence">
-              @if (entry.action === 'assign') {
-                <strong class="atc-grey-900">{{ entry.actor.name ?? 'Unknown' }}</strong>
-                <span class="atc-grey-700"> has granted the PI Delegate role to </span>
-                <span class="pi-dh__delegate-token atc-primary-blue-600">
-                  {{ entry.delegate.name ?? 'Unknown' }}
-                </span>
-                <span class="atc-grey-600">
-                  &nbsp;on project&nbsp;
-                  <span class="pi-dh__project-token atc-grey-800">{{ entry.project.project_code }}</span>
-                  @if (entry.project.project_name) {
-                    <span class="atc-grey-600"> — {{ entry.project.project_name }}</span>
-                  }
-                </span>
-              } @else {
-                <strong class="atc-grey-900">{{ entry.actor.name ?? 'Unknown' }}</strong>
-                <span class="atc-grey-700"> has revoked the PI Delegate role of </span>
-                <span class="pi-dh__delegate-token atc-primary-blue-600">
-                  {{ entry.delegate.name ?? 'Unknown' }}
-                </span>
-                <span class="atc-grey-600">
-                  &nbsp;on project&nbsp;
-                  <span class="pi-dh__project-token atc-grey-800">{{ entry.project.project_code }}</span>
-                  @if (entry.project.project_name) {
-                    <span class="atc-grey-600"> — {{ entry.project.project_name }}</span>
-                  }
-                </span>
-              }
-            </p>
+        <!-- Sentence: who did what, to whom, on which project -->
+        <p class="m-0 font-['Barlow'] text-[14px] leading-[20px] break-words">
+          <strong class="atc-primary-blue-600 font-semibold">{{ entry.actor.name ?? 'Unknown' }}</strong>
+          <span class="atc-grey-700">
+            {{ entry.action === 'assign' ? ' has granted the PI Delegate role to ' : ' has revoked the PI Delegate role of ' }}
+          </span>
+          <span
+            class="atc-primary-blue-600 rounded bg-[color:var(--ac-primary-blue-100)] px-1.5 py-0.5 text-[13px] font-semibold">{{
+            entry.delegate.name ?? 'Unknown' }}</span>
+          <span class="atc-grey-600"> on project </span>
+          <span class="atc-grey-800 font-medium">{{ entry.project.project_code }}</span>
+          @if (entry.project.project_name) {
+          <span class="atc-grey-600"> — {{ entry.project.project_name }}</span>
+          }
+        </p>
 
-            <!-- Badge row: icon + text (NFR-UI-002: non-colour cue) -->
-            <div class="pi-dh__meta">
-              @if (entry.action === 'assign') {
-                <span
-                  class="pi-dh__badge pi-dh__badge--granted"
-                  role="status"
-                  aria-label="PI Delegate Granted"
-                >
-                  <i class="pi pi-check-circle pi-dh__badge__icon" aria-hidden="true"></i>
-                  <span class="pi-dh__badge__text">PI DELEGATE GRANTED</span>
-                </span>
-              } @else {
-                <span
-                  class="pi-dh__badge pi-dh__badge--revoked"
-                  role="status"
-                  aria-label="PI Delegate Revoked"
-                >
-                  <i class="pi pi-times-circle pi-dh__badge__icon" aria-hidden="true"></i>
-                  <span class="pi-dh__badge__text">PI DELEGATE REVOKED</span>
-                </span>
-              }
+        <!-- Badge row: icon + text (NFR-UI-002: non-colour cue) + timestamp -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          @if (entry.action === 'assign') {
+          <span
+            class="pi-dh__badge--granted inline-flex items-center gap-1.5 rounded border border-[color:var(--ac-green-300)] bg-[color:var(--ac-green-100)] px-2 py-0.5 font-['Barlow'] text-[11px] font-bold tracking-[0.03em] text-[color:var(--ac-green-600)]"
+            role="status" aria-label="PI Delegate Granted">
+            <i class="pi pi-check-circle !text-[12px]" aria-hidden="true"></i>
+            PI DELEGATE GRANTED
+          </span>
+          } @else {
+          <span
+            class="pi-dh__badge--revoked inline-flex items-center gap-1.5 rounded border border-[color:var(--ac-red-1)] bg-[color:var(--ac-grey-100)] px-2 py-0.5 font-['Barlow'] text-[11px] font-bold tracking-[0.03em] text-[color:var(--ac-red-1)]"
+            role="status" aria-label="PI Delegate Revoked">
+            <i class="pi pi-times-circle !text-[12px]" aria-hidden="true"></i>
+            PI DELEGATE REVOKED
+          </span>
+          }
 
-              <!-- Date/time -->
-              <span class="pi-dh__date atc-grey-500" [attr.aria-label]="'Date: ' + formatDate(entry.created_at)">
-                {{ formatDate(entry.created_at) }}
-              </span>
-            </div>
+          <span class="atc-grey-500 whitespace-nowrap font-['Barlow'] text-[12px]"
+            [attr.aria-label]="'Date: ' + formatDate(entry.created_at)">{{ formatDate(entry.created_at) }}</span>
+        </div>
 
-          </div>
-        </li>
-      }
-    </ul>
+      </div>
+    </li>
+    }
+  </ul>
   }
 
 </div>

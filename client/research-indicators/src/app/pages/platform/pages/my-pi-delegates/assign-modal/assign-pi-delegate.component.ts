@@ -67,7 +67,6 @@ interface ProjectsFormState {
   standalone: true,
   imports: [CommonModule, MultiselectComponent],
   templateUrl: './assign-pi-delegate.component.html',
-  styleUrl: './assign-pi-delegate.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AssignPiDelegateComponent implements OnInit {

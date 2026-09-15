@@ -786,4 +786,14 @@ describe('AssignPiDelegateComponent', () => {
       expect(warning!.textContent).toContain('Dave');
     }));
   });
+  // ── Fixed width — the modal must not resize when the selection changes ──────
+
+  describe('fixed width', () => {
+    it('the content root declares a fixed width, not a content-driven one', () => {
+      fixture.detectChanges();
+      const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
+      expect(root.className).toContain('w-[720px]');
+      expect(root.className).toContain('max-w-[88vw]');
+    });
+  });
 });

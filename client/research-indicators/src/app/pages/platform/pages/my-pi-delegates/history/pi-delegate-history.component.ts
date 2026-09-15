@@ -10,6 +10,7 @@
 //   • Clears state on open→close transition.
 //
 // NFR-UI-001: STAR tokens only — no hex literals.
+// Styling is Tailwind in the template; the component has no stylesheet.
 // NFR-UI-002: Non-colour cues (badge icon + text, not colour-only).
 
 import {
@@ -29,7 +30,6 @@ import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface'
   standalone: true,
   imports: [CommonModule],
   templateUrl: './pi-delegate-history.component.html',
-  styleUrl: './pi-delegate-history.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PiDelegateHistoryComponent {

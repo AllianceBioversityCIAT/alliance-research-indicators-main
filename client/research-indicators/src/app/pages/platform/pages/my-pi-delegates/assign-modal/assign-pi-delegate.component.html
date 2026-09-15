@@ -5,17 +5,19 @@
 <!-- R-UI-006: Pre-load from context seeds both pickers (SYNC guard). -->
 <!-- R-UI-007: Delta confirm + success toast / error state handled in .ts. -->
 <!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- Layout is Tailwind only; the component has no stylesheet. -->
+<!-- Fixed width: the modal must not resize when the selections change. -->
 <!-- CHANGE 1: Projects picker disabled when source=byProject (project is pre-fixed). -->
 <!-- CHANGE 2: Inactive-delegate amber warning when pre-loaded chips are inactive. -->
 <!-- CHANGE 3: People picker disabled when source=byPerson (person is pre-fixed). -->
 
-<div class="assign-pi-delegate">
+<div class="assign-pi-delegate flex w-[720px] max-w-[88vw] flex-col gap-6 px-10 pb-8 pt-6">
 
   <!-- ── People picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
   <!-- optionFilter excludes the current user (R-UI-005 AC.3). -->
   <!-- CHANGE 3: disabled when source=byPerson — only the projects can be changed. -->
-  <div class="assign-pi-delegate__field">
+  <div class="flex flex-col gap-1.5">
     <app-multiselect
       [signal]="peopleSignal"
       signalOptionValue="selected_people"
@@ -31,12 +33,12 @@
     ></app-multiselect>
     <!-- CHANGE 3: helper text when person is fixed -->
     @if (peopleDisabled()) {
-      <p class="assign-pi-delegate__hint assign-pi-delegate__hint--locked atc-grey-600">
-        <i class="pi pi-lock" aria-hidden="true"></i>
+      <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
+        <i class="pi pi-lock shrink-0 !text-[12px]" aria-hidden="true"></i>
         Opened from this person — only the projects can be changed here.
       </p>
     } @else {
-      <p class="assign-pi-delegate__hint atc-grey-600">
+      <p class="atc-grey-600 m-0 font-['Barlow'] text-[13px] leading-[1.5]">
         Select the people who will act as PI Delegates.
         You cannot assign yourself.
       </p>
@@ -55,11 +57,11 @@
       <p
         class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">
         @if (inactiveSelectedPeople().length === 1) {
-          <strong>{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
+          <strong class="font-semibold">{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
           They will not be able to review results until their account is reactivated.
           The role can still be granted and will take effect once they are active again.
         } @else {
-          <strong>{{ inactiveNames() }}</strong> are inactive in STAR.
+          <strong class="font-semibold">{{ inactiveNames() }}</strong> are inactive in STAR.
           They will not be able to review results until their accounts are reactivated.
           The role can still be granted and will take effect once they are active again.
         }
@@ -70,7 +72,7 @@
   <!-- ── Projects picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegateProjects' → projects from byProjectCache (the page table) (T-UI-08). -->
   <!-- CHANGE 1: When source=byProject the picker is disabled — the project is pre-fixed. -->
-  <div class="assign-pi-delegate__field">
+  <div class="flex flex-col gap-1.5">
     <app-multiselect
       [signal]="projectsSignal"
       signalOptionValue="selected_projects"
@@ -85,12 +87,12 @@
     ></app-multiselect>
     <!-- CHANGE 1: helper text when project is fixed -->
     @if (projectsDisabled()) {
-      <p class="assign-pi-delegate__hint assign-pi-delegate__hint--locked atc-grey-600">
-        <i class="pi pi-lock" aria-hidden="true"></i>
+      <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
+        <i class="pi pi-lock shrink-0 !text-[12px]" aria-hidden="true"></i>
         Opened from this project — only the people can be changed here.
       </p>
     } @else {
-      <p class="assign-pi-delegate__hint atc-grey-600">
+      <p class="atc-grey-600 m-0 font-['Barlow'] text-[13px] leading-[1.5]">
         Select the projects for this delegation.
         Only your manageable projects will appear.
       </p>
@@ -101,9 +103,11 @@
   <!-- Informs the user that the selections shown on open reflect the project's
        current delegate assignments (pre-loaded from the cache). -->
   @if (getSelectedPeopleList().length > 0 || getSelectedProjectsList().length > 0) {
-    <div class="assign-pi-delegate__preload-notice" role="status" aria-live="polite">
-      <i class="pi pi-info-circle" aria-hidden="true"></i>
-      <span>
+    <div
+      class="flex items-center gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-100)] px-3"
+      role="status" aria-live="polite">
+      <i class="pi pi-info-circle shrink-0 !text-[18px] text-[color:var(--ac-light-blue-500)]" aria-hidden="true"></i>
+      <span class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
         Pre-loaded selections reflect the current delegate assignments.
       </span>
     </div>
