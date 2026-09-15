@@ -192,17 +192,7 @@ as the finding it is, not read as a green: **OQ-1's premise — that PRMS resolv
 
 ## `homologation.md` updates made
 
-Nine sections were edited across three passes: three in the first pass because this spike
-directly contradicts what they asserted or flagged as unknown (§4.3, §4.6, §10 response handling);
-two more in a rework pass after review found §6 left with no edit at all — despite an earlier
-draft of this report claiming one existed — and §11's open-question register still asserting the
-opposite of what §4.3/§10 already said (§6, §11); two more in a second rework pass after the
-Leader's own §6/§11 boundary was found to have hidden two further sites that still asserted the
-spike as pending rather than run (§1, §1.2); and two more in a third, exhaustive all-row pass
-after review found the first three passes' phrase-grepping could not reach a stale claim carrying
-none of the grepped markers (§4.1, §10 Authentication & webhooks). Every edit quotes the response
-text that forced it. See the diff in `homologation.md` §1, §1.2, §4.1, §4.3, §4.6, §6, §10
-(response handling), §10 (Authentication & webhooks) and §11:
+Nine sections were edited. Every edit quotes the response text that forced it. See the diff in `homologation.md` §1, §1.2, §4.1, §4.3, §4.6, §6, §10 (response handling), §10 (Authentication & webhooks) and §11:
 
 - **§1 Executive summary** — "what remains open is the TEST-env spike (§11)" is replaced with a
   one-sentence post-spike state: the spike ran 2026-09-14 and §11 now shows two items closed
@@ -229,9 +219,10 @@ text that forced it. See the diff in `homologation.md` §1, §1.2, §4.1, §4.3,
   critical-path blocker" (which contradicted its own neighbour row, and evidence already on
   disk) is replaced: a valid **TEST** key is in hand and confirmed by all 3 ACCEPTED calls
   resolving to `"external_platform_id": 34, "external_platform_code": "STAR"`, with zero `401`s
-  across all 12 calls; **PRODUCTION remains unobtained** and is the residual blocker. Carries the
-  A-1 limit (the spike proves the `.env` value works against the Normalizer, not that it equals
-  the `app_config` row).
+  across all 12 calls; **PRODUCTION is unverified and untested, not known missing** — the product
+  owner verified a value is present in both TEST and PROD, but the spike correctly made no PROD
+  call. Carries the A-1 limit (the spike proves the `.env` value works against the Normalizer,
+  not that it equals the `app_config` row).
 - **§6 `innovation_readiness_level`** — the "what is not knowable from the docs is which one the
   schema accepts — Spike it" note is replaced with what the spike actually showed: the **schema**
   layer is settled (`id`/`name`, `level`, or all three keys together — none rejected, quoting

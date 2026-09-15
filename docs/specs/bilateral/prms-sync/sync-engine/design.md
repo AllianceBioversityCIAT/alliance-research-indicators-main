@@ -313,14 +313,14 @@ otherwise have been blocked by the stale row (§7's "no new cron" stands).
 2. `null` → `TRANSPORT_FAILED`.
 3. `401` → `AUTH_FAILED` (non-retryable). `503` → `RETRYABLE`.
 4. `422` → `REJECTED_BY_PRMS`; read `rejected[]` for the reason.
-5. `2xx` (including **207**) → locate our row in `results[]` **by `external_reference`**, never by index (R-PRMS-011 AC.4). Accepted → `ACCEPTED`; failed → `REJECTED_BY_PRMS`.
+5. `2xx` (including **207**) → locate our row in `results[]` **by `external_reference`**, never by index (R-PRMS-011 AC.4). Accepted → `ACCEPTED`. For a failed row, classify the cause in `results[].error`: a downstream 5xx is `RETRYABLE`; a genuine validation/business rejection is `REJECTED_BY_PRMS`. The Normalizer can wrap its own downstream outage in a 207: discovery-log **D-D** recorded the verbatim row errors `HTTP 502: Proxy Error` and `HTTP 503: Service Unavailable` from its `/api/bilateral/create` hop, rather than a rejection of our data. The retained successful follow-up is `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`); D-D's two discovery-response bodies/requestIds were not retained, so D-D is the sole contemporaneous evidence for those exact errors.
 6. Persist the log row in every branch. Flip `is_synced_to_prms` (and `prms_result_code` when present) **only** on `ACCEPTED`, in the same transaction.
 
 > **The load-bearing rule.** Steps 5 and 6 are the whole of DC-3. A 2xx with a failed row that flips the flag 409-locks the alignment permanently, for everyone including SYSTEM_ADMIN (R-F3/R-F4). Its gate is a **live TEST call**, not a mocked 207.
 
 ### 5.4 Outcome vocabulary
 
-`IN_FLIGHT` (transient — the claim token, §5.1b) · `ACCEPTED` · `REJECTED_BY_PRMS` · `AUTH_FAILED` · `RETRYABLE` · `TRANSPORT_FAILED` · **`UNKNOWN`** (an abandoned claim — PRMS's verdict is genuinely unknown; never auto-retried) · `REFUSED_BY_STAR`
+`IN_FLIGHT` (transient — the claim token, §5.1b) · `ACCEPTED` · `REJECTED_BY_PRMS` (including a 207 row with a validation/business cause) · `AUTH_FAILED` · `RETRYABLE` (including a 207 row whose `results[].error` is a downstream 5xx; discovery-log D-D's `HTTP 502: Proxy Error` / `HTTP 503: Service Unavailable`) · `TRANSPORT_FAILED` · **`UNKNOWN`** (an abandoned claim — PRMS's verdict is genuinely unknown; never auto-retried) · `REFUSED_BY_STAR`
 
 Extensible to a future PRMS verdict (`APPROVED_BY_SP` / `REJECTED_BY_SP`) with no schema change — `outcome` is a varchar, not an enum column (family R-F1).
 
@@ -374,7 +374,7 @@ None. STAR client impact is children 2–4; this spec makes no change under `cli
 | **Unit — interpreter** | The five response branches, plus `external_reference`-based row location |
 | **Unit — config** | DC-7 (declared limit: config resolution only), DC-8 |
 | **E2E** | The endpoint's allowed and denied paths |
-| **T-SPIKE (live TEST)** | Per-type happy path against the real `/ingest`, evidence = the **verbatim** response body. Closes OQ-1, OQ-2, OQ-5, OQ-6 |
+| **T-SPIKE (live TEST)** | Per-type happy path against the real `/ingest`, evidence = the **verbatim** response body. OQ-5 and OQ-6 closed; OQ-1's failure premise was falsified while composition remains unproven; OQ-2 answered at the schema layer only, with persistence still open |
 | **Malformed-row e2e (live TEST)** | **DC-3** — a deliberately bad evidence link, proving the 207-with-failed-row branch leaves `is_synced_to_prms = false`. **A separate, independently required deliverable from T-SPIKE** (`requirements.md` DC-3: *"T-SPIKE + one e2e against TEST, both mandatory"*). Building only the spike does **not** close DC-3 |
 | **Executed migration** | **DC-9** — `npm run migration:dev:execute` against a scratch schema; no static gate can see the placeholder trap |
 
@@ -415,6 +415,7 @@ Coverage: the global 60 % threshold. Mock strategy: `HttpService` substituted at
 | **DD-12** | 2026-09-14 | `LoggerUtil` (`_error`/`_warn`), not `BaseApi`'s inherited plain `Logger` | Child guide §6/§8 mandates `LoggerUtil`; `BaseApi`'s logger bypasses the `[Context]` prefixing |
 | **DD-13** | 2026-09-14 | Write a **new** outbound indicator→type map rather than inverting `indicator.homologation.ts` | Different vocabularies: the inbound map's PRMS side is numeric `ResultTypeEnum`; the Normalizer takes strings. Inverting a partial function also yields a partial one, while the outbound side needs totality (homologation §12.3) |
 | **DD-14** | 2026-09-14 | **No `sync_process_log` row** in v1 | That table counts records across a *batch run* (`initiateSync`/`update`/`endSync`). A single user-triggered sync has no batch to count; `result_prms_sync_log` is the right grain. Revisit if bulk sync arrives |
+| **DD-18** | 2026-09-15 | Classify a failed HTTP `207` row by its `results[].error` cause, not by 2xx status alone | Discovery-log D-D recorded `HTTP 502: Proxy Error` and `HTTP 503: Service Unavailable` from the Normalizer's own `/api/bilateral/create` hop: transient downstream outages must settle `RETRYABLE`, while validation/business rejections settle `REJECTED_BY_PRMS`. The D-D discovery bodies/requestIds were not retained; `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`) is the retained successful follow-up. The accepted-only, same-transaction `is_synced_to_prms` invariant remains unchanged |
 
 ---
 
@@ -434,12 +435,12 @@ Not a quality cap — a tripwire. `/akili-execute` compares actuals and **escala
 
 | # | Question | Owner | Target |
 |---|---|---|---|
-| **OQ-1** | `grant_title` composition against CLARISA `/api/projects` | ARI | T-SPIKE |
-| **OQ-2** | `innovation_readiness_level` — `id`/`name` or `level` | ARI | T-SPIKE |
+| **OQ-1** | **PREMISE FALSIFIED 2026-09-14 (T-01):** an unresolvable `grant_title` does not fail the row; it returned `200`/`success: true` with `bilateral_projects: []`. Composition against a genuinely CLARISA-verified project remains unproven. Evidence: `spike/responses/05-capacity-sharing-failing-grant-title.json` (`requestId Root=1-6aa852e8-42962254355b61c50e0b74df`) | ARI | Persistence/composition follow-up |
+| **OQ-2** | **ANSWERED at the schema layer only 2026-09-14 (T-01):** `id`/`name`, `level`, and all three together are accepted; which key persists remains open because all calls stopped at unrelated `innovation_typology` rejection. Evidence: `spike/responses/03-innovation-development-level-only.json` (`requestId Root=1-6aa852b9-3fe9d93047debe46758a3a33`) and `02-innovation-development-combined-readiness.json` (`requestId Root=1-6aa8532c-5bc036d21bb27f3109931c8a`) | ARI | Persistence follow-up |
 | ~~OQ-3~~ | **CLOSED 2026-09-14** by Judgment Day JD-1/JD-4 and the user's ruling: adopt the Bilateral precedent. See DD-11 (revised) and DD-11b | — | Closed |
 | **OQ-4** | `keep_editing` — *Editing* or *Pending review* | PRMS PO | PO meeting |
-| **OQ-5** | `geo_focus.scope_code = 50` behaviour | ARI | T-SPIKE |
-| **OQ-6** | Where the PRMS result code returns (family OQ-F7) | ARI | T-SPIKE |
+| ~~OQ-5~~ | **CLOSED 2026-09-14 (T-01):** scope 50 accepts the literal label `"This is yet to be determined"` without companion geography. Evidence: `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`) | — | Closed |
+| ~~OQ-6~~ | **CLOSED 2026-09-14 (T-01):** the PRMS result code returns at `results[].result.result_code`. Evidence: `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`) | — | Closed |
 
 ---
 

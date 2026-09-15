@@ -254,7 +254,7 @@ already stores.
 
 **Acceptance criteria**
 - [ ] AC.1 — Typology sends `code` **and** `name` from `clarisa_innovation_types`.
-- [ ] AC.2 — Readiness sends the shape the spike proves (OQ-2), and the chosen shape is recorded.
+- [ ] AC.2 — Readiness sends a deliberately chosen shape and records it. T-01 proved schema tolerance only (`id`/`name`, `level`, and all three were accepted), not which key persists; do not claim a spike-proven persistence shape. Evidence: `spike/responses/03-innovation-development-level-only.json` (`requestId Root=1-6aa852b9-3fe9d93047debe46758a3a33`) and `spike/responses/02-innovation-development-combined-readiness.json` (`requestId Root=1-6aa8532c-5bc036d21bb27f3109931c8a`).
 - [ ] AC.3 — `innovation_developers` is **absent** (P-1 / DC-5).
 
 ---
@@ -516,7 +516,7 @@ A read endpoint for R-PRMS-014 is specified in `design.md`.
 | D-1 | Requires the TEST Normalizer to be reachable | OQ-F8 closed — key present; host is public |
 | R-1 | **A wrongly-flipped `is_synced_to_prms` permanently 409-locks the alignment for everyone incl. SYSTEM_ADMIN** (family R-F3 + R-F4) | DC-3's live-call gate; no un-sync path exists in v1 |
 | R-2 | Inverting `sex_and_age_disaggregation` is accepted by PRMS and recorded wrong, silently | DC-2 with contract-derived expectations |
-| R-3 | `grant_title` composition unproven (OQ-1) — an unresolvable title fails the row inside a 207 | T-SPIKE closes it before any builder depends on a guess |
+| R-3 | `grant_title` composition remains unproven, but its failure premise is falsified: an unresolvable title returned `200`/`success: true` with `bilateral_projects: []`, not a 207 row failure. Evidence: `spike/responses/05-capacity-sharing-failing-grant-title.json` (`requestId Root=1-6aa852e8-42962254355b61c50e0b74df`) | Do not treat the ingest response as proof that the bilateral-project link persisted; obtain a genuinely CLARISA-verified title before relying on a composition |
 | **R-4** | **ACCEPTED RESIDUAL RISK — re-driving an `UNKNOWN` can duplicate in PRMS.** When an attempt expires, STAR genuinely does not know whether PRMS accepted it. A human who re-sends may create a second ingest, and **no un-sync path exists**. An earlier draft claimed `external_reference` made this decidable via the **decision webhook** — that is a **non-goal of this spec** (Judgment Day FB2), so no reconciliation mechanism exists in v1 | **Controlled by a runbook step, not a mechanism:** an `UNKNOWN` may be re-driven only after checking its `external_reference` with PRMS out of band. AC.5's attention-required `409` carries that instruction to the person about to click; the late-settle `_warn` log is the operator-side signal. Child 3 inherits it as a requirement. Becomes mechanical only when the decision-webhook child exists |
 
 ---
@@ -525,12 +525,12 @@ A read endpoint for R-PRMS-014 is specified in `design.md`.
 
 | # | Question | Owner | Target |
 |---|---|---|---|
-| **OQ-1** | `grant_title` — what exactly does CLARISA `/api/projects` expose that PRMS matches on? | ARI | T-SPIKE |
-| **OQ-2** | `innovation_readiness_level` — `id`/`name`, or `level`? Contract and example disagree | ARI | T-SPIKE |
+| **OQ-1** | **PREMISE FALSIFIED (T-01):** an unresolvable `grant_title` does not fail a row; it returns `200`/`success: true` with `bilateral_projects: []`. The actual composition remains unproven. Evidence: `spike/responses/05-capacity-sharing-failing-grant-title.json` (`requestId Root=1-6aa852e8-42962254355b61c50e0b74df`) | ARI | Composition follow-up |
+| **OQ-2** | **Schema-layer answer only (T-01):** `id`/`name`, `level`, and all three are accepted; which key persists is still open because each call stopped at unrelated `innovation_typology` rejection. Evidence: `spike/responses/03-innovation-development-level-only.json` (`requestId Root=1-6aa852b9-3fe9d93047debe46758a3a33`) and `02-innovation-development-combined-readiness.json` (`requestId Root=1-6aa8532c-5bc036d21bb27f3109931c8a`) | ARI | Persistence follow-up |
 | ~~OQ-3~~ | **CLOSED 2026-09-14.** Judgment Day JD-1/JD-4 showed the "no `@Roles`" default rested on a false premise; the user ruled to adopt the Bilateral precedent | — | Closed |
 | **OQ-4** | `keep_editing` — *Editing* or *Pending review*? Default `false` until decided | PRMS PO | PO meeting |
-| **OQ-5** | `geo_focus.scope_code = 50` — accepted, and under what rule? | ARI | T-SPIKE |
-| **OQ-6** | Where the PRMS result code returns (family OQ-F7) | ARI | T-SPIKE |
+| ~~OQ-5~~ | **CLOSED (T-01):** scope 50 is accepted with the literal label `"This is yet to be determined"` and no companion geography. Evidence: `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`) | — | Closed |
+| ~~OQ-6~~ | **CLOSED (T-01):** the PRMS result code returns at `results[].result.result_code`. Evidence: `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`) | — | Closed |
 
 ---
 

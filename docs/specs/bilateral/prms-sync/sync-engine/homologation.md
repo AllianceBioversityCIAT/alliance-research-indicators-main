@@ -138,7 +138,7 @@ this?"*, not *"is a computation involved?"*.
 | `op` | ✅ | — | ⚫ Constant `"dataset.ingest.requested"` |
 | `results[]` | ✅ | one entry per sync trigger (single-result ingest) | ⚫ |
 | `results[].type` | ✅ | `results.indicator_id` → `IndicatorsEnum` | 🟢 **DERIVED** — new homologation map, see §3 |
-| `results[].data` | ✅ | the Result aggregate | ⚫ |
+| `results[].data` | ✅ | the Result aggregate | ⚫ **Envelope rule (D-B):** common fields in §4 remain flat at the `data` root; each type-specific block nests under its same-named object (for example, `data.capacity_sharing`). Confirmed by `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`), `02-innovation-development-combined-readiness.json` (`requestId Root=1-6aa8532c-5bc036d21bb27f3109931c8a`), and `04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`); see discovery-log D-B. |
 
 ### 3. Result type mapping (`IndicatorsEnum` → PRMS `type`)
 
@@ -291,6 +291,8 @@ thing to settle.
 
 ## 6. `innovation_development`
 
+> **Nesting rule (D-B, confirmed):** keep §4 common fields flat at the `data` root, but place every field in this section inside `data.innovation_development`. Evidence: `spike/responses/02-innovation-development-combined-readiness.json` (`requestId Root=1-6aa8532c-5bc036d21bb27f3109931c8a`) and `03-innovation-development-level-only.json` (`requestId Root=1-6aa852b9-3fe9d93047debe46758a3a33`).
+
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
 | `innovation_typology.code` | ⚙️ ≥1 | `result_innovation_dev.innovation_type_id` → `clarisa_innovation_types.code` | ✅ **EXACT** — same CLARISA catalogue on both sides. |
@@ -318,6 +320,8 @@ thing to settle.
 
 ## 7. `capacity_sharing`
 
+> **Nesting rule (D-B, confirmed):** keep §4 common fields flat at the `data` root, but place every field in this section inside `data.capacity_sharing`. Evidence: `spike/responses/01-capacity-sharing-scope50.json` (`requestId Root=1-6aa852fe-601bb8603e18414f743047c8`); discovery-log D-B records the initial flat form's `"(root) must have required property 'capacity_sharing'"` rejection (`requestId Root=1-6aa851eb-4ec93ae925475b33182f3ccf`).
+
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
 | `number_people_trained.women` | ⚠️ ≥1 of 4 | `result_capacity_sharing.session_participants_female` | ✅ **EXACT.** |
@@ -337,6 +341,8 @@ thing to settle.
 ---
 
 ## 8. `innovation_use`
+
+> **Nesting rule — INFERRED BY ANALOGY, NOT CONFIRMED:** if this v1-gated type is later enabled, its type-specific fields are expected to nest inside `data.innovation_use`, while §4 common fields remain flat at the `data` root. T-01 made no `innovation_use` call; this is an inference from D-B's confirmed `capacity_sharing`, `innovation_development`, and `policy_change` shapes, not tested evidence.
 
 ### 8.1 `innovation_use_level`
 
@@ -412,6 +418,8 @@ thing to settle.
 
 ## 9. `policy_change`
 
+> **Nesting rule (D-B, confirmed):** keep §4 common fields flat at the `data` root, but place every field in this section inside `data.policy_change`. Evidence: `spike/responses/04-policy-change.json` (`requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`).
+
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
 | `policy_type.id` / `.name` | ⚙️ ≥1 | `result_policy_change.policy_type_id` → `policy_types` | 🟡 **HOMOLOGABLE — id alignment unproven.** `policy-type.homologation.ts` exists for the inbound direction and is invertible. Whether STAR's seeded `policy_types.id` equals CLARISA's is **not** established by reading code. Prove it before sending an id. |
@@ -469,7 +477,7 @@ thing to settle.
 |---|---|
 | Transport | **Still REST `POST /ingest`.** The anticipated "hook-based model" did **not** replace ingest; hooks appear instead as **outbound decision webhooks** *from* PRMS. The family's hold reason is resolved. |
 | Auth | **`x-api-key` header, a CLARISA API key — CLOSED 2026-09-14.** No `Authorization: Bearer` alternative, no anonymous access. **Source: the `app_config` DB row `ARI_CLARISA_API_KEY`** (`AppConfigKey`, seeded by migration `1781879906673`), read through **`AppConfigService.getEnv(AppConfigKey.ARI_CLARISA_API_KEY)` → `.simple_value`** — the same manager and the same key `PdfViewerService` already uses. The value was **verified present in both TEST and PROD** by the product owner on 2026-09-14. See §10.1 for the two behaviours this manager imposes. |
-| Key scope | **One key per tool per environment — CONFIRMED for TEST by the TEST spike, 2026-09-14 (T-01).** The key *is* the platform identity: all 3 ACCEPTED calls resolved to `"external_platform_id": 34, "external_platform_code": "STAR"` (e.g. `spike/responses/04-policy-change.json`, `requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`), and none of the 12 calls this session drew a `401`. **This confirms the `.env` TEST value works and identifies STAR** (A-1 limit per `spike/README.md:4-17`: the spike shows the `.env` value is valid for the Normalizer, not that it equals the `app_config` row — re-confirm once DB access is restored). **PRODUCTION remains unobtained and is the residual critical-path item** — a TEST key does not substitute for it; must still be requested from PRMS Tech Support. |
+| Key scope | **One key per tool per environment — CONFIRMED for TEST by the TEST spike, 2026-09-14 (T-01).** The key *is* the platform identity: all 3 ACCEPTED calls resolved to `"external_platform_id": 34, "external_platform_code": "STAR"` (e.g. `spike/responses/04-policy-change.json`, `requestId Root=1-6aa852c3-48a0354007f30b9b35e91024`), and none of the 12 calls this session drew a `401`. **This confirms the `.env` TEST value works and identifies STAR** (A-1 limit per `spike/README.md:4-17`: the spike shows the `.env` value is valid for the Normalizer, not that it equals the `app_config` row — re-confirm once DB access is restored). **PRODUCTION is unverified and untested, not known missing:** the product owner verified a value is present in both TEST and PROD on 2026-09-14, but T-01 correctly made no PROD call. |
 | Environments | TEST `https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com` · PROD `https://v6a9z2e4y5.execute-api.us-east-1.amazonaws.com`. One `ARI_*` var per environment (K-005: hosts are branch selectors, never collapsed). |
 | Decision webhooks | Self-service `POST /webhook` with the same key. Registration carries **no platform field** — the key identifies us. **Decisions taken with no destination registered are not replayed**, so registration must precede the first result going under review. Out of scope for `sync-engine` v1; it is the natural fifth family member. |
 

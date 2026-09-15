@@ -446,3 +446,113 @@ citation-precision problem it had raised as an advisory in round 1.
 - **Review rounds:** 3 (budget 2 — tripwire fired and was escalated; the user approved the third as an
   exhaustive close-out rather than a one-line fix). Every failure was documentation consistency in
   `homologation.md`; **the empirical work passed on attempt 1 and was never challenged.**
+
+---
+
+## 4. Execution-host change — standing arrangement adopted 2026-09-15
+
+The user's ruling in `docs/model-routing.md` (main checkout, updated 2026-09-15) is now the default
+for every AKILI activity in this repo: **Claude Code plans, reviews and adjudicates; it does not
+write production code.** Implementation goes to another host and the independent audit to a third,
+so `author ≠ auditor` holds across **model families**, not two instances of one family.
+
+| Role | Host | Model |
+|---|---|---|
+| Leader | Claude Code | `opus` (T1) |
+| Implementer — server | **Codex** `codex exec` | `gpt-5.6-terra`, effort `medium` |
+| Implementer — client | **Cursor** `cursor-agent -p` | `cursor-grok-4.6-*` (n/a for this spec — design §6: no `client/` change) |
+| Reviewer | **Antigravity** `agy` | `gemini-3.1-pro-high` (never `*-flash`) |
+
+Orchestration runs through **Orca** (`Run → Task → Dispatch`), never generic subagent spawns.
+Run for this spec: `run_3ed0320bedc0`.
+
+**Hosts smoke-tested before first dispatch** (the routing doc's own rule: *"Always smoke-test, never
+trust the login line"*): Codex → `CODEX_OK` (`gpt-5.6-terra`, no `402`); Cursor → `CURSOR_OK`
+(requires `--force`, this worktree is not trusted); Antigravity → `AGY_OK`; `orca status` → ready.
+
+**Three drifts found in the canonical routing doc, reported to the user:** `agy models` returns
+**14** slugs, not the 15 the doc states (the list contents match exactly; only the count is wrong —
+and the correct number was in the `CLAUDE.md` mirror, so the error entered the canonical table);
+`opencode` is now **not installed at all**, not merely unusable; and Cursor needs `--force` on
+untrusted worktrees.
+
+> ⚠️ **T-01 ran under the PREVIOUS arrangement** — Claude subagents for both Implementer (sonnet)
+> and Reviewer (opus), outside Orca. Stated plainly per the orchestration skill's own rule (*"do not
+> retroactively describe the external worker as orchestrated"*). T-01's PASS is therefore **not**
+> cross-family independent. Its empirical core — 12 live calls with verbatim bodies — does not depend
+> on which model reviewed it, but the independence guarantee was not met for that task. A
+> cross-family re-review of T-01 is **available and not yet requested**.
+
+---
+
+### A-01 — Post-T-01 spec reconciliation (user-approved amendment, not a `tasks.md` task)
+
+- **Status:** ✅ **PASS on attempt 1**
+- **Date:** 2026-09-15
+- **Why it exists:** the user approved amending two spec defects the T-01 spike exposed **before**
+  the tasks that depend on them run. Recorded here as an amendment, **not** minted as a new task —
+  advisories may never grow the approved scope; only the user may authorize work outside `tasks.md`.
+- **Orca provenance:** run `run_3ed0320bedc0` · task `task_7bffae9eb91d` · dispatch `ctx_82598ca044c3`
+- **Implementer:** Codex `gpt-5.6-terra` (effort `medium`) — `launch.effective` confirmed
+- **Reviewer:** Antigravity `gemini-3.1-pro-high` — task `task_6a1a8451b63f`, dispatch `ctx_357ae70e36f9`
+
+**Files changed (4):** `design.md`, `requirements.md`, `homologation.md`, `spike/README.md`.
+29 insertions / 29 deletions. **Zero `src/` changes**, Leader-verified via `git status --porcelain`.
+
+**Edits landed:**
+
+1. ⚠️ **`design.md` §5.3 step 5 — the 207 rule (the highest-value edit).** Previously *any* 2xx with
+   a failed row mapped to `REJECTED_BY_PRMS`. Discovery-log **D-D** falsified this: two live `207`s
+   wrapped `HTTP 502: Proxy Error` / `HTTP 503: Service Unavailable` from the Normalizer's **own**
+   `/api/bilateral/create` hop — not a rejection of our data. A transient outage would have been
+   recorded durably as a PRMS rejection. Now classified **by the cause in `results[].error`**:
+   downstream 5xx → `RETRYABLE`; validation/business → `REJECTED_BY_PRMS`. §5.4 vocabulary updated to
+   match. **The load-bearing invariant is untouched** — `is_synced_to_prms` flips only on `ACCEPTED`,
+   same transaction — and the Reviewer confirmed the blockquote after step 5 is unharmed.
+2. **`design.md` §12 — `DD-18` added.** Number verified free against all 18 entries. Notably it
+   **declares its own evidentiary limit unprompted**: D-D's two discovery-response bodies were not
+   retained, so D-D is the sole contemporaneous evidence for those exact errors. That is KZ-017
+   discipline applied without being asked for it.
+3. **`homologation.md` §2/§6/§7/§9 — the D-B nesting rule.** Type-specific fields nest under a
+   same-named sub-object; §4 common fields stay **flat** at the `data` root. Each section cites its
+   own evidence. **§8 `innovation_use` recorded as INFERRED BY ANALOGY, NOT CONFIRMED** — that type
+   is gated and was never called, so no evidence exists. This is what protects T-06/T-07/T-08 from
+   building flat payloads that fail on the first live call.
+4. **`homologation.md` "Key scope"** — PROD is now **unverified/untested**, not "unobtained". The PO
+   verified a value present in both TEST and PROD; PROD was simply never called. *(This corrected an
+   error in the T-01 **Reviewer's own** remediation text, which the worker had implemented verbatim.)*
+5. **OQ tables reconciled** in `requirements.md` §13 + §12 R-3 + R-PRMS-005 AC.2 and `design.md` §14
+   + the T-SPIKE testing-strategy row: OQ-5/OQ-6 struck closed; OQ-1 premise falsified with
+   composition still unproven; OQ-2 schema-layer only with persistence open.
+6. **`spike/README.md`** — the thrice-miscounted pass-count sentence replaced by the bullet list
+   alone, per the T-01 advisory (the sentence itself was the defect, not the number).
+
+**Reviewer verdict — `STATUS: PASS`:**
+
+> The diff accurately reconciles the spec with the T-01 spike evidence, maintaining high citation
+> fidelity and introducing no overclaims. The 207 cause-classification rule and D-B nesting rule are
+> correctly documented without violating the `is_synced_to_prms` invariant, and all factual
+> corrections and OQ state updates have been applied without creating self-contradictions.
+
+**Leader's independent falsification of the verdict's central claim.** The audit ran in ~3 minutes,
+so citation fidelity was re-checked inline rather than taken on trust: **all 6 `requestId`s cited in
+the new text resolve to exactly the evidence file each is attributed to** (5 to their
+`spike/responses/*.json`, and the discovery-only `Root=1-6aa851eb-…` to `discovery-log.md`, correctly
+cited as such). The claim holds.
+
+**Reviewer finding handed to the Leader** (`tasks.md` was off-limits to it): T-01's *"Requirements
+covered: **closes** OQ-1, OQ-2, OQ-5, OQ-6"* overstated the outcome, matching the `design.md` row
+Codex had already fixed. **Leader corrected it.** The Reviewer also called §6's done-definition item
+stale — it is **not**: its text reads *"closed by T-01, **or carried forward explicitly**"*, and the
+Reviewer's paraphrase dropped the disjunct that makes it satisfiable. Grep-falsified before flipping
+(KZ-002): `~~OQ-5~~`/`~~OQ-6~~` struck closed in **both** documents, OQ-1/OQ-2 carried forward
+explicitly in both. Criterion met → flipped `[x]`.
+
+**Orca lifecycle note, recorded honestly.** `worker-start --terminal` returned
+`[failed] stage=dispatch_input — agent_prompt_stalled` for the Antigravity worker. **This was a false
+negative of the transport, not of the work:** `terminal read` showed the agent had already read
+`.agents/reviewer.md` and `CLAUDE.md` and run `git diff`. The consequence was real, though — the
+dispatch capability was revoked, so Orca **rejected** the `worker_done`
+(`dispatch_capability_invalid`) while preserving its body, which is how the verdict was recovered.
+The task was settled by explicit `task-update --status completed` recovery, not by an accepted
+`worker_done`. **The audit is genuine and cross-family; its lifecycle settlement was manual.**
