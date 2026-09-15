@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-10 done (2026-09-15); T-11/T-12 next
+- **Status:** `in-progress` — T-01…T-11 done (2026-09-15); T-12 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -270,7 +270,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-11 — Claim-then-settle, expiry, and persistence
+### T-11 — Claim-then-settle, expiry, and persistence  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-012 AC.1–4, R-PRMS-013 AC.1–5, NFR-002, NFR-003, risk **R-4**
 - **Files touched:** `result-prms-sync.service.ts` (claim/settle), repositories (+ specs)
@@ -282,11 +282,11 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Settle is **conditional on the row still being `IN_FLIGHT`**; a late settle writes nothing and logs `_warn` (AC.4, NFR-003).
   - Redact the API key **before** the row is written, never at read time.
 - **Done check:**
-  - [ ] Two syncs issued **before either settles** produce exactly one outbound POST, one `ACCEPTED` row, one `409` (R-PRMS-013 AC.2 / DC-11)
-  - [ ] An aged `IN_FLIGHT` is expired to `UNKNOWN` **by the next attempt**, which then refuses — and does not claim
-  - [ ] A settle arriving after expiry writes nothing and logs `_warn`
-  - [ ] The expiry `409`'s text names the unconfirmed attempt; a generic message fails AC.5
-  - [ ] `request_payload` contains no key material
+  - [x] Two syncs issued **before either settles** produce exactly one outbound POST, one `ACCEPTED` row, one `409` (R-PRMS-013 AC.2 / DC-11)
+  - [x] An aged `IN_FLIGHT` is expired to `UNKNOWN` **by the next attempt**, which then refuses — and does not claim
+  - [x] A settle arriving after expiry writes nothing and logs `_warn`
+  - [x] The expiry `409`'s text names the unconfirmed attempt; a generic message fails AC.5
+  - [x] `request_payload` contains no key material
 - **Failing input:** issue the second sync **after** the first settles — it must produce the *already-synced* `409`, not the collision one. If both paths return the same thing, the collision branch is untested.
 - **Disqualifies the evidence:** ⚠️ **a sequential two-call test does not exercise DC-11.** If the harness cannot issue genuinely concurrent calls, say so and record DC-11 as uncovered — do **not** let a sequential test stand in for it.
 - **Effort:** L · **Depends on:** T-03 · **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`

@@ -1173,3 +1173,99 @@ would have cost the wait, a wrong result and a re-dispatch.
 | Unit suite | **381 suites · 3231 passed · 0 skipped** |
 | `npx eslint`, unpiped | **exit 0** |
 | Restored `sync-gate.ts` | SHA-256 + byte size match the pre-mutation values |
+
+---
+
+### T-11 — Claim-then-settle, expiry, persistence
+
+- **Status:** ✅ **PASS on attempt 2 of 3** — the spec's most delicate logic
+- **Date:** 2026-09-15 · Run `run_3ed0320bedc0`
+  | Dispatch | Task | Role | Worker |
+  |---|---|---|---|
+  | `ctx_7b3429d56ecb` | `task_380f40403f11` | impl a1 | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_616a14478866` | `task_779bb4e82e6e` | Reviewer a1 | Cursor `gpt-5.6-sol-high` |
+  | `ctx_b54a61a83974` | `task_f0d487bfeb7a` | impl a2 | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_616a14478866`→`ctx_…` | `task_…` | Reviewer a2 | Cursor `gpt-5.6-sol-high` |
+
+**Files (6):** `result-prms-sync.service.ts` + spec · `result-prms-sync.constants.ts` ·
+`repositories/result-prms-sync-log.repository.ts` + spec ·
+`test/result-prms-sync-claim-concurrency.integration-spec.ts`.
+
+Constants named rather than magic: `PRMS_TRANSPORT_CEILING_MS = 30_000` (BaseApi's own timeout) +
+`PRMS_CLAIM_EXPIRY_MARGIN_MS = 60_000` → §5.1b's 90 s threshold.
+
+#### Attempt 1 — Reviewer verdict: ❌ **FAIL, five issues**
+
+Passed and left alone thereafter: the four claim branches inside **one** short transaction; the send
+**outside** it; **expiry-to-`UNKNOWN` without supersession** (the trap this design was corrected for
+twice — the worker avoided it); the AC.5 `409` reading *"Attention required: attempt … Verify … before
+re-sending"*; `persistsRow` consumed with correct NULLs; redaction before write; scope clean.
+
+> **(1)** El supuesto DC-11 es contención InnoDB real, pero **sólo existe un claim mientras un
+> QueryRunner crudo retiene el lock y el segundo claim empieza después de terminar el primero**; además
+> **nunca ejecuta `ResultPrmsSyncService`, POST, settle, `ACCEPTED` ni `409`** — viola R-PRMS-013 AC.2,
+> T-11 Done check 1 / DC-11 y QA-7.
+> **(2)** Esa prueba DB-dependiente vive en la suite unitaria DB-free y **convierte MySQL inaccesible en
+> pending/verde**, contra child guide §9 y **KZ-017**, mientras **T-03 demuestra el límite correcto**.
+> **(3)** Los settles de agregado ausente y `PrmsPayloadBuildError` **ignoran el retorno late**: una
+> expiración concurrente escribe cero pero **no emite el `_warn`** de AC.4 / §9.
+> **(4)** Los `REFUSED_BY_STAR` por fallo de build **no llaman `logAttempt`** (NFR-003 / §9).
+> **(5)** `insertRefusedByStar` asigna `MAX(attempt_number)+1` **fuera de transacción y sin bloquear
+> `results`**: dos rechazos concurrentes pueden recibir el mismo número, violando §3.
+
+⚠️ **The Leader had cleared DC-11 before the audit — wrongly, for the second time this spec.** The lock
+contention *was* genuine InnoDB contention, and the Leader concluded it proved at-most-once. **It
+proved the lock blocks; it did not prove the invariant the lock exists to guarantee.** The test
+instantiated the repository directly, never constructed the service, and asserted no POST count and
+neither outcome. **Testing the mechanism is not testing the property** — the same class of error as the
+`carnet` clearance earlier in this run.
+
+⚠️ **Issue (5) is a concurrency bug introduced while fixing a concurrency problem**, on the path nobody
+watches because "it only writes a refusal". Leader-confirmed in the code before re-dispatch:
+`SELECT COALESCE(MAX(attempt_number), 0)` with no `FOR UPDATE` and no surrounding transaction.
+
+#### Attempt 2 — the fixes, with both falsifiers observed
+
+| Break | Observed RED | Restored |
+|---|---|---|
+| Drop `FOR UPDATE` | **2 POSTs** where 1 is required | one POST / one `ACCEPTED` / one `409` |
+| Unlock `MAX+1` | duplicate `attempt_number` **[1, 1]** | **[1, 2]** |
+
+The first red is precisely what attempt 1 could not produce: **the end-to-end invariant failing**,
+not merely a blocked lock.
+
+DC-11 rebuilt as `test/result-prms-sync-claim-concurrency.integration-spec.ts`, driving **two
+concurrent `service.sync` calls started before either settles**. Moved out of the unit suite;
+`beforeAll` calls `dataSource.initialize()` with **no try/catch**, so a missing scratch schema **fails
+the file** instead of skipping. The header carries an explicit **KZ-017** declaration that `npm test`
+(`rootDir: "src"`) never collects it — the proof requires `npm run test:integration`.
+
+Late-settle handling centralised through `settleAttempt` so **every** path — including missing
+aggregate and `PrmsPayloadBuildError` — emits `_warn` on a late return; all terminal branches log; and
+`REFUSED_BY_STAR` numbering now runs under the **same** `results` row lock the claim path takes.
+
+#### Attempt 2 — Reviewer verdict: ✅ **STATUS: PASS**
+
+> La nueva integración lanza **dos `service.sync` antes del settle** y afirma **exactamente un POST, un
+> resultado `ACCEPTED` persistido y un `ConflictException` 409 de colisión**; inicializa MySQL TEST **sin
+> catch/skip** y declara correctamente que `npm test` no la recolecta. Todos los settle, incluidos
+> agregado ausente y `PrmsPayloadBuildError`, pasan por `settleAttempt`, que emite `_warn` en retorno
+> late y `LoggerUtil` en settle terminal; los `REFUSED_BY_STAR` del gate y de build también se
+> registran. **El bloqueo de `MAX+1` usa una transacción y el mismo `SELECT` sobre `results` por
+> `result_id` con `FOR UPDATE` del claim**, sin regresiones en atomicidad, settle condicional ni
+> expiración sin supersesión.
+
+#### Leader falsification note
+
+The Leader flagged a surviving `pending(` in the new integration spec and was **wrong a third time**:
+the occurrence sits **inside a comment** — `// A missing scratch schema FAILS THIS FILE — it does not
+pending() or skip.` The grep measured the documentation, not the code. Checking the context before
+reporting is what kept a false alarm from becoming someone's work.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **383 suites · 3249 passed · 0 skipped** |
+| Integration (both specs) | **2 suites · 6 tests passed** |
+| `npx eslint`, unpiped | **exit 0** |

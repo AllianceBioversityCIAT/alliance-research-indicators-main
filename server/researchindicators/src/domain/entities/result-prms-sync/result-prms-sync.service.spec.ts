@@ -1,0 +1,324 @@
+import {
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import { AppConfigService } from '../app-config/app-config.service';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
+import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { PrmsNormalizerRequestDto } from '../../tools/prms-normalizer/dto/prms-normalizer.dto';
+import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
+import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
+import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
+import { AppConfig } from '../../shared/utils/app-config.util';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { LoggerUtil } from '../../shared/utils/logger.util';
+import { PrmsSyncGateFacts } from './repositories/result-prms-sync-log.repository';
+import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
+import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
+import {
+  PRMS_SYNC_ALREADY_SYNCED,
+  PRMS_SYNC_CLAIM_COLLISION,
+  prmsSyncExpiryMessage,
+} from './result-prms-sync.constants';
+import {
+  redactPrmsPayload,
+  ResultPrmsSyncService,
+} from './result-prms-sync.service';
+
+const API_KEY = 'super-secret-key-material';
+
+const eligibleFacts = (
+  overrides: Partial<PrmsSyncGateFacts> = {},
+): PrmsSyncGateFacts => ({
+  exists: true,
+  result_id: 42,
+  result_official_code: 1001,
+  is_synced_to_prms: false,
+  result_status_id: ResultStatusEnum.APPROVED,
+  pool_funding_alignment_green: true,
+  primary_contract: {
+    agreement_id: 'C-POOL-001',
+    is_pool_funding_contributor: true,
+  },
+  indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+  prms_policy_type_id: null,
+  ...overrides,
+});
+
+const envelope = (
+  extra: Record<string, unknown> = {},
+): PrmsNormalizerRequestDto => ({
+  tenant: 'prms.result-management.api',
+  op: 'dataset.ingest.requested',
+  results: [
+    {
+      type: 'capacity_sharing',
+      data: {
+        external_reference: 'ARI-1001',
+        ...extra,
+      },
+    },
+  ],
+});
+
+describe('ResultPrmsSyncService', () => {
+  let logRepository: {
+    loadGateSnapshot: jest.Mock;
+    claimAttempt: jest.Mock;
+    settleIfInFlight: jest.Mock;
+    insertRefusedByStar: jest.Mock;
+  };
+  let aggregateRepository: { loadByResultId: jest.Mock };
+  let payloadBuilder: { build: jest.Mock };
+  let normalizer: { ingest: jest.Mock };
+  let appConfigService: { getEnv: jest.Mock };
+  let service: ResultPrmsSyncService;
+  let warnSpy: jest.SpyInstance;
+  let logSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    logRepository = {
+      loadGateSnapshot: jest.fn().mockResolvedValue(eligibleFacts()),
+      claimAttempt: jest.fn().mockResolvedValue({
+        kind: 'claimed',
+        attemptId: 9,
+        attemptNumber: 1,
+        resultOfficialCode: 1001,
+      }),
+      settleIfInFlight: jest.fn().mockResolvedValue('settled'),
+      insertRefusedByStar: jest.fn().mockResolvedValue({
+        attemptId: 3,
+        attemptNumber: 1,
+      }),
+    };
+    aggregateRepository = {
+      loadByResultId: jest.fn().mockResolvedValue({ result_id: 42 }),
+    };
+    payloadBuilder = { build: jest.fn().mockReturnValue(envelope()) };
+    normalizer = {
+      ingest: jest.fn().mockResolvedValue({
+        status: 200,
+        body: { requestId: 'Root=req-1' },
+      }),
+    };
+    appConfigService = {
+      getEnv: jest.fn().mockResolvedValue({ simple_value: API_KEY }),
+    };
+    warnSpy = jest
+      .spyOn(LoggerUtil.prototype, '_warn')
+      .mockImplementation(() => undefined);
+    logSpy = jest
+      .spyOn(LoggerUtil.prototype, '_log')
+      .mockImplementation(() => undefined);
+
+    service = new ResultPrmsSyncService(
+      logRepository as unknown as ResultPrmsSyncLogRepository,
+      aggregateRepository as unknown as ResultPrmsSyncAggregateRepository,
+      payloadBuilder as unknown as PayloadBuilder,
+      normalizer as unknown as PrmsNormalizerService,
+      appConfigService as unknown as AppConfigService,
+      { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
+      { user_id: 7 } as unknown as CurrentUserUtil,
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  /**
+   * K-004 failing input: second sync AFTER the first settles must be the
+   * already-synced 409, not the collision 409.
+   */
+  it('returns the already-synced 409, not the collision 409, after a settled ACCEPTED', async () => {
+    logRepository.loadGateSnapshot
+      .mockResolvedValueOnce(eligibleFacts())
+      .mockResolvedValueOnce(eligibleFacts({ is_synced_to_prms: true }));
+    logRepository.claimAttempt.mockResolvedValueOnce({
+      kind: 'claimed',
+      attemptId: 9,
+      attemptNumber: 1,
+      resultOfficialCode: 1001,
+    });
+
+    const first = await service.sync(42);
+    expect(first.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(normalizer.ingest).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalled();
+
+    let secondError: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      secondError = error;
+    }
+    expect(secondError).toBeInstanceOf(ConflictException);
+    expect((secondError as ConflictException).message).toBe(
+      PRMS_SYNC_ALREADY_SYNCED,
+    );
+    expect((secondError as ConflictException).message).not.toBe(
+      PRMS_SYNC_CLAIM_COLLISION,
+    );
+    expect(normalizer.ingest).toHaveBeenCalledTimes(1);
+    expect(logRepository.claimAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('expires an aged IN_FLIGHT, refuses 409 naming the attempt, and does not claim or send', async () => {
+    logRepository.claimAttempt.mockResolvedValue({
+      kind: 'expired',
+      attemptId: 8,
+      attemptNumber: 4,
+      resultOfficialCode: 1001,
+    });
+
+    let expiryError: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      expiryError = error;
+    }
+    expect(expiryError).toBeInstanceOf(ConflictException);
+    expect((expiryError as ConflictException).message).toBe(
+      prmsSyncExpiryMessage(4, 1001),
+    );
+    expect((expiryError as ConflictException).message).toMatch(
+      /Attention required/,
+    );
+    expect((expiryError as ConflictException).message).toMatch(/attempt 4/);
+    expect((expiryError as ConflictException).message).not.toMatch(
+      /already in progress/i,
+    );
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(payloadBuilder.build).not.toHaveBeenCalled();
+    expect(logRepository.claimAttempt).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/UNKNOWN/);
+  });
+
+  it('logs _warn and does not treat a late settle as a second write', async () => {
+    logRepository.settleIfInFlight.mockResolvedValue('late');
+
+    const result = await service.sync(42);
+
+    expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/Late settle/);
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/1001/);
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/Root=req-1/);
+  });
+
+  it('redacts the API key before settle writes request_payload', async () => {
+    payloadBuilder.build.mockReturnValue(
+      envelope({ 'x-api-key': API_KEY, note: `using ${API_KEY}` }),
+    );
+
+    await service.sync(42);
+
+    const settleArg = logRepository.settleIfInFlight.mock.calls[0][0];
+    const payload = JSON.stringify(settleArg.requestPayload);
+    expect(payload).not.toContain(API_KEY);
+    expect(payload).toContain('[REDACTED]');
+    expect(settleArg.requestPayload.results[0].data['x-api-key']).toBe(
+      '[REDACTED]',
+    );
+  });
+
+  it('persists REFUSED_BY_STAR only when the gate says persistsRow', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ pool_funding_alignment_green: false }),
+    );
+
+    await expect(service.sync(42)).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(logRepository.insertRefusedByStar).toHaveBeenCalledTimes(1);
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+
+    logRepository.insertRefusedByStar.mockClear();
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ is_synced_to_prms: true }),
+    );
+
+    await expect(service.sync(42)).rejects.toMatchObject({
+      message: PRMS_SYNC_ALREADY_SYNCED,
+    });
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('logs _warn when a missing-aggregate settle is late', async () => {
+    aggregateRepository.loadByResultId.mockResolvedValue(null);
+    logRepository.settleIfInFlight.mockResolvedValue('late');
+
+    await expect(service.sync(42)).rejects.toBeInstanceOf(NotFoundException);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/Late settle/);
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/1001/);
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it('logs the REFUSED_BY_STAR attempt when payload build fails', async () => {
+    payloadBuilder.build.mockImplementation(() => {
+      throw new PrmsPayloadBuildError(
+        "Missing mandatory field 'title'",
+        'title',
+      );
+    });
+
+    await expect(service.sync(42)).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(logRepository.settleIfInFlight).toHaveBeenCalledTimes(1);
+    expect(logSpy).toHaveBeenCalled();
+    expect(String(logSpy.mock.calls[0][0])).toMatch(/outcome=REFUSED_BY_STAR/);
+    expect(String(logSpy.mock.calls[0][0])).toMatch(
+      /result_official_code=1001/,
+    );
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('logs _warn when a build-failure settle is late', async () => {
+    payloadBuilder.build.mockImplementation(() => {
+      throw new PrmsPayloadBuildError(
+        "Missing mandatory field 'title'",
+        'title',
+      );
+    });
+    logRepository.settleIfInFlight.mockResolvedValue('late');
+
+    await expect(service.sync(42)).rejects.toBeInstanceOf(
+      UnprocessableEntityException,
+    );
+    expect(warnSpy).toHaveBeenCalled();
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/Late settle/);
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/1001/);
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('does not send when a live claim collides', async () => {
+    logRepository.claimAttempt.mockResolvedValue({
+      kind: 'collision',
+      attemptNumber: 1,
+      resultOfficialCode: 1001,
+    });
+
+    await expect(service.sync(42)).rejects.toMatchObject({
+      message: PRMS_SYNC_CLAIM_COLLISION,
+    });
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+});
+
+describe('redactPrmsPayload', () => {
+  it('strips key material from nested fields before any write', () => {
+    const redacted = redactPrmsPayload(
+      { headers: { 'x-api-key': API_KEY }, body: `token=${API_KEY}` },
+      API_KEY,
+    );
+    expect(JSON.stringify(redacted)).not.toContain(API_KEY);
+  });
+});
