@@ -556,3 +556,127 @@ dispatch capability was revoked, so Orca **rejected** the `worker_done`
 (`dispatch_capability_invalid`) while preserving its body, which is how the verdict was recovered.
 The task was settled by explicit `task-update --status completed` recovery, not by an accepted
 `worker_done`. **The audit is genuine and cross-family; its lifecycle settlement was manual.**
+
+---
+
+### Wave 1 — T-02, T-04, T-05 (parallel) + T-02b
+
+- **Status:** ✅ **PASS on attempt 1** (all three, one shared audit)
+- **Date:** 2026-09-15
+- **Orca provenance:** run `run_3ed0320bedc0`
+  | Task | Orca task | Dispatch | Worker |
+  |---|---|---|---|
+  | T-02 migration | `task_1aa9bccdfffc` | `ctx_bd2c5eada77f` | Codex `gpt-5.6-terra` / `medium` |
+  | T-04 transport | `task_64456b552b19` | `ctx_feb1951195ad` | Codex `gpt-5.6-terra` / `medium` |
+  | T-05 maps | `task_b561721a954e` | `ctx_5415ad5d7694` | Codex `gpt-5.6-terra` / `medium` |
+  | T-02b lint fix | `task_3763dbbca7bf` | `ctx_4bbc0a3e8c9a` | Codex `gpt-5.6-terra` / `low` |
+  | Wave review | `task_61a8d8a47717` | `ctx_1ab5f9fdf574` | **Cursor `cursor-grok-4.6-high-fast`** |
+
+**Parallelism justification.** `tasks.md` §1 declares the `{T-04}`, `{T-05}` and `{T-02}` lanes
+file-disjoint; root `CLAUDE.md` §4.3 forbids concurrent **full-suite runs**, not concurrent editing.
+Every worker was therefore briefed: *"NEVER run `npm test` with no path"*, run only its own scoped
+tests, and the **Leader re-measures the full suite after all workers report**. Scratch DB was brought
+up by the Leader (`compose:test:up`) and verified (`ari_scratch_test`, 216 tables) before T-02 was
+dispatched — Docker had been started by the user but the container had not.
+
+**Files (14):** migration + migration-spec · `prms-normalizer.{module,service}.ts` + spec + `dto/` ·
+three `homologation/*.ts` + three specs · `app-config.util.ts` · `.env.example`.
+
+#### Leader-measured gates (tree quiet, no worker active)
+
+| Gate | Result |
+|---|---|
+| Full suite `npm test -- --silent` | **371 suites passed · 3138 passed · 1 skipped · 3139 total** |
+| `npx eslint` over the wave, **unpiped** | **exit 0**, zero files with errors |
+| Migration **forward** on scratch | 18 columns; `idx_result_prms_sync_log_result` + `idx_result_prms_sync_log_request_id` + PRIMARY; `information_schema` types/nullability match design §3 incl. the `UNKNOWN` three-NULL case |
+| Migration **revert** | proven — the table was **absent** before the Leader's forward run, which is what the worker's revert left |
+
+#### Failing inputs — each gate was observed RED (K-004)
+
+- **T-02:** a `?` inside a SQL comment → `Named query contains placeholders, but parameters object is
+  undefined` + `ROLLBACK`; clean `COMMIT` after removal. **This is the trap the task exists for** —
+  migration `1784500000000` shipped unrunnable past every static gate this repo has.
+- **T-04:** a bare `{ validateStatus: () => true }` → `Expected: password normalizer-password and
+  username normalizer-user, Received: undefined`. The proof that `_defaultConfig`'s `auth` really is
+  dropped wholesale; green 10/10 after restoring the spread form.
+- **T-05:** a seventh `IndicatorsEnum` member → red diff missing `7`; green after removal.
+
+#### Reviewer verdict (Cursor `cursor-grok-4.6-high-fast`): ✅ **STATUS: PASS**
+
+> T-02, T-04 and T-05 match their Done checks and the cited design/homologation rules. No
+> spec-conformance defect.
+
+All nine audit items A–I confirmed with quoted evidence. The two that matter most:
+
+- **A — the sharpest line.** `prms-normalizer.service.ts` captures `const defaultConfig =
+  this._defaultConfig`, then passes `{ ...defaultConfig, headers: { ...defaultConfig.headers,
+  'x-api-key': apiKey }, validateStatus: () => true }`. **Both** the top-level spread **and** the
+  nested `headers` re-spread are present before `validateStatus` — the exact form design §2.3/§2.5
+  mandate given `base-api.ts:89`'s `config ?? this._defaultConfig`.
+- **B — KZ-001.** The assertion reads the object *passed to* `httpService.post`:
+  `const configActuallyPassedToHttpPost = httpService.post.mock.calls[0][2];` — and the Reviewer
+  traced `BaseApi.request` to confirm it posts that same `requestConfig` as the third argument. The
+  property is asserted in the generated output, not on the call sequence that produced it.
+
+Also confirmed: DC-7 declared as config-resolution-only in both the test comment and the spec; the
+key read **inside `ingest()`**, never the constructor (DD-6), with a missing row raising a clear STAR
+`ServiceUnavailableException` rather than an empty header and a PRMS `401` (R-PRMS-009 AC.2);
+`indicator-type.homologation.ts` a **new artefact** that neither imports nor inverts the inbound map
+(DD-13), total over six members with explicit `null` for the unmappable ids 3 and 5; both `ExCIAT`
+and `ExBIO` asserted through the `.toUpperCase().trim()` path (R-PRMS-003 AC.2); no `?`/`:word` in
+the migration and its spec correctly in `db/migration-specs/` (child guide §7/§9).
+
+#### ADVISORY (recorded; never gating, never minting a task)
+
+1. **T-05 — delete the permanent `it.skip`.** `indicator-type.homologation.spec.ts` retains
+   `it.skip('detects a seventh STAR indicator without an outbound map entry')`, which still contains
+   `Object.assign(IndicatorsEnum, { OUTBOUND_TOTALITY_FIXTURE: 7 })`. Reachable hazard: removing
+   `.skip` mutates the **global** enum for later suites. The Reviewer adjudicated it *not* a FAIL —
+   the live gate is the preceding "is total over the current IndicatorsEnum members" test, which
+   makes the same comparison — and recommends deleting the skipped fixture now that its K-004 red is
+   recorded. **Carried to the user at the gate; not actioned unilaterally.**
+2. **T-05 — `length-training` inverts inbound maps at call time** with `as PrmsLengthTraining`.
+   §12.2 mandates that inversion and the Master/MSc target-vocabulary resolution, which the code
+   handles. Reachable only if a later edit drops `'Short-term'` from `SessionLengthHomologation`,
+   where `BSC + SHORT_TERM` would return `undefined`. No action for this wave.
+
+#### Incidents — recorded because they are signal for later sessions
+
+1. **Cross-worker contamination (real, harmless).** The T-04 worker ran `prettier --write` across the
+   whole `prms-normalizer` directory, reformatting T-05's then-untracked files. **It self-reported
+   via escalation.** Leader verified `prettier --check` passes on all six and content is coherent;
+   the **Reviewer independently confirmed** no truncation, merge residue or semantic alteration
+   (item H). Impact: whitespace only. The brief had allowed `prettier --write` **on the worker's own
+   files**; the over-broad glob is what tripped.
+2. **T-02 shipped 4 lint errors and never ran eslint.** Found by the Leader (`npx eslint`, exit 1),
+   fixed by a scoped follow-up dispatch (T-02b, effort `low`), re-verified by the Leader at exit 0.
+   The fixer belongs to the worker and the gate to the Leader — no single command may do both (K-001).
+3. ⚠️ **`npm run migration:scan` is BROKEN in this repo.** It maps to
+   `node ./scripts/scan-migration-placeholders.js`, and **that file does not exist**
+   (`MODULE_NOT_FOUND`). It was offered to T-02 in its brief as an available helper. T-02 did not
+   rely on it and closed DC-9 by an actual run, which is what the task required. **A gate that looks
+   mandated and cannot execute is the K-004 failure mode at the tooling level** — worth fixing or
+   removing from `package.json`.
+4. ⚠️ **Antigravity Reviewer died mid-audit, twice** (`gemini-3.1-pro-high`). Attempt 1 exited after
+   reading `.agents/reviewer.md`; attempt 2 — re-briefed via a **file pointer** instead of a ~7 KB
+   inline prompt — got as far as audit item E before exiting. Both left `Resume with -c` and a shell
+   prompt. This is a **runtime failure, not a work FAIL**. Per `/akili-execute`'s fallback table the
+   Reviewer is **never** taken inline (the Leader auditing work it supervised breaks
+   `author ≠ auditor`, and a runtime failure does not suspend a correctness constraint), so the
+   options were escalated to the user, who chose **Cursor**. The failed review task had already
+   circuit-broken (`task_not_startable: only a ready Task can start`), so a fresh task was created
+   rather than forcing the old one.
+5. **Orca transport quirks worth knowing.** `worker-start --terminal` on Antigravity reports
+   `[failed] stage=dispatch_input — agent_prompt_stalled` while the prompt **has** landed and the
+   agent is working — read the terminal before believing it. A revoked dispatch capability makes Orca
+   **reject** a `worker_done` while preserving its body. `check --wait` can return **exit 0 with
+   `ok:false`** (`runtime_unavailable`) — read the body, not the exit code. Only **one** actionable
+   waiter per Run exists; a second returns `waiter_exists`.
+
+#### Leader falsification of the verdict (KZ-002)
+
+Done checks were grep-falsified before flipping. One check disagreed with the Reviewer — the key-read
+grep returned **0**. Investigated rather than reported: the call is split across two lines
+(`getEnv(\n  AppConfigKey.ARI_CLARISA_API_KEY,\n)`), so the single-line pattern **structurally could
+not match**. **The Reviewer was right and the Leader's measurement was wrong** — K-014 again, a
+confident zero over a pattern that could not have found the fact.

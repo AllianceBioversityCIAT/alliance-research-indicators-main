@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01 done (2026-09-14); T-02 next
+- **Status:** `in-progress` — T-01, T-02, T-04, T-05 done (2026-09-15); T-03 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -109,7 +109,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-02 — Migration: `result_prms_sync_log`
+### T-02 — Migration: `result_prms_sync_log`  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-012 (schema)
 - **Files touched:** `src/db/migrations/<timestamp>-createResultPrmsSyncLogTable.ts`
@@ -119,9 +119,9 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Indexes `idx_result_prms_sync_log_result` and `idx_result_prms_sync_log_request_id`.
   - Spec goes in `db/migration-specs/`, **never** beside the migration (child guide §9).
 - **Done check:**
-  - [ ] `npm run migration:dev:execute` against a scratch schema runs **forward clean**
-  - [ ] `npm run migration:revert` reverts clean
-  - [ ] Column set and nullability match design §3 exactly, `UNKNOWN`'s three-NULL case included
+  - [x] `npm run migration:dev:execute` against a scratch schema runs **forward clean**
+  - [x] `npm run migration:revert` reverts clean
+  - [x] Column set and nullability match design §3 exactly, `UNKNOWN`'s three-NULL case included
 - **Failing input:** add a `?` inside a SQL comment and re-run — it must fail with `Named query contains placeholders…`. That proves the gate can go red (K-004).
 - **Disqualifies the evidence:** compiling, linting or type-checking. **DC-9 is closed only by a run** — migration `1784500000000` shipped unrunnable past every static gate this repo has.
 - **Effort:** S · **Depends on:** — · **Skills:** `nestjs-expert`
@@ -142,7 +142,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-04 — Transport service + environment routing
+### T-04 — Transport service + environment routing  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-009 AC.1–4, R-PRMS-010 AC.1–3, NFR-001, NFR-002
 - **Files touched:** `tools/prms-normalizer/prms-normalizer.{module,service}.ts`, `tools/prms-normalizer/dto/`, `shared/utils/app-config.util.ts` (host var), `.env.example` (+ specs)
@@ -152,18 +152,18 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Key read **per request**, never in the constructor (DD-6).
   - Host from one `ARI_*` var per environment; **no hardcoded default** — unset fails loudly.
 - **Done check:**
-  - [ ] A `401`, a `422` **with its `rejected[]` body**, and a `503` each arrive intact — not `null`
-  - [ ] `null` occurs only for a network error or the 30 s timeout
-  - [ ] The outgoing request carries the `Authorization`/`auth`/`httpsAgent` that `_defaultConfig` provides — asserted **on the config actually passed to `httpService.post`**, not on our own builder
-  - [ ] The key appears in no log line (NFR-002)
-  - [ ] With the TEST host configured, no PROD URL is constructible
+  - [x] A `401`, a `422` **with its `rejected[]` body**, and a `503` each arrive intact — not `null`
+  - [x] `null` occurs only for a network error or the 30 s timeout
+  - [x] The outgoing request carries the `Authorization`/`auth`/`httpsAgent` that `_defaultConfig` provides — asserted **on the config actually passed to `httpService.post`**, not on our own builder
+  - [x] The key appears in no log line (NFR-002)
+  - [x] With the TEST host configured, no PROD URL is constructible
 - **Failing input:** pass a bare `{ validateStatus: () => true }` — the `Authorization`-header assertion must go red. If it stays green, that assertion is not testing what it claims.
 - **Disqualifies the evidence:** ⚠️ the env-routing check **verifies config resolution, not deployment correctness** (DC-7, accepted risk). Say so in the spec file; a test that implies otherwise overclaims.
 - **Effort:** M · **Depends on:** T-01 · **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ---
 
-### T-05 — Outbound homologation maps
+### T-05 — Outbound homologation maps  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-002 AC.1, R-PRMS-004 AC.1–2, R-PRMS-006
 - **Files touched:** `tools/prms-normalizer/homologation/{indicator-type,length-training,center}.homologation.ts` (+ specs)
@@ -173,9 +173,9 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - `length-training` combines `degree_id` and `session_length_id`; `DegreeHomologation` is **not injective** (`Master` and `MSc` both → `MSC`) so the inverse is resolved by the target vocabulary (§12.2).
   - `center` map: `ExCIAT` → `46`, `ExBIO` → `49`, reusing `AcronymExContractEnum` with its `.toUpperCase().trim()` (§1.3).
 - **Done check:**
-  - [ ] Indicator map total over all six `IndicatorsEnum` members, no `undefined` branch
-  - [ ] `PHD → "PhD"`, `MSC → "Master"`, `BSC`/`OTHER` → the session term, both session terms covered
-  - [ ] **Both** `ExCIAT` and `ExBIO` asserted (R-PRMS-003 AC.2 — one value fails the AC)
+  - [x] Indicator map total over all six `IndicatorsEnum` members, no `undefined` branch
+  - [x] `PHD → "PhD"`, `MSC → "Master"`, `BSC`/`OTHER` → the session term, both session terms covered
+  - [x] **Both** `ExCIAT` and `ExBIO` asserted (R-PRMS-003 AC.2 — one value fails the AC)
 - **Failing input:** add a seventh member to `IndicatorsEnum` in a test fixture — the totality check must go red.
 - **Disqualifies the evidence:** a test that inverts `indicator.homologation.ts` at runtime. It would pass and encode the wrong vocabulary.
 - **Effort:** S · **Depends on:** T-01 · **Skills:** `nestjs-expert`
