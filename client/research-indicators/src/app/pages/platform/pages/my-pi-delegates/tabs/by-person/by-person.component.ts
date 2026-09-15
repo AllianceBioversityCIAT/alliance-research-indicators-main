@@ -25,6 +25,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -48,7 +49,8 @@ export interface PersonRow {
     ButtonModule,
     InputTextModule,
     TooltipModule,
-    SearchExportControlsComponent
+    SearchExportControlsComponent,
+    CustomTagComponent
   ],
   templateUrl: './by-person.component.html',
   styleUrl: './by-person.component.scss',
@@ -163,6 +165,16 @@ export class ByPersonComponent {
       delegateUserId: row.delegate_user_id,
       name: row.name || null
     });
+  }
+
+  /** Two-letter avatar initials, same convention as the project-detail contacts. */
+  initials(name: string): string {
+    return (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() ?? '')
+      .join('');
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────

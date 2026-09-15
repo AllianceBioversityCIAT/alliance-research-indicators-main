@@ -163,21 +163,29 @@ describe('ByPersonComponent', () => {
   // ── 2. Inactive person indicator (red name + badge + red chips) ─────────────
 
   describe('inactive person rendering (is_active === false)', () => {
-    it('INACTIVE: renders inactive icon in the name row (K-015 transition: active→inactive)', async () => {
-      // Arrange: start with active person (no icon)
+    it('INACTIVE: marks the row and the avatar (K-015 transition: active→inactive)', async () => {
+      // Arrange: start with an active person — no inactive markers
       await createComponent([ALICE]);
-      const iconBefore = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
-      expect(iconBefore).toBeNull(); // no icon for active person (negative discriminator)
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__avatar--inactive'))).toBeNull();
 
-      // Act: switch to inactive person (K-015 transition)
+      // Act: switch to an inactive person (K-015 transition)
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Assert: inactive icon now present in the name row
-      const icon = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
-      expect(icon).toBeTruthy();
+      // Assert: the row carries the inactive treatment and the avatar turns red
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeTruthy();
+      expect(fixture.debugElement.query(By.css('.by-person__avatar--inactive'))).toBeTruthy();
+    });
+
+    it('renders avatar initials for every person', async () => {
+      await createComponent([ALICE, CAROL_INACTIVE]);
+      const avatars = fixture.debugElement.queryAll(By.css('.by-person__avatar'));
+      expect(avatars.length).toBe(2);
+      expect((avatars[0].nativeElement as HTMLElement).textContent?.trim()).toBe('AE'); // Alice Example
+      expect((avatars[1].nativeElement as HTMLElement).textContent?.trim()).toBe('CG'); // Carol Gone
     });
 
     it('INACTIVE: renders "INACTIVE" badge next to the name (K-015 transition)', async () => {
@@ -198,10 +206,10 @@ describe('ByPersonComponent', () => {
       expect((badge.nativeElement as HTMLElement).textContent?.trim().toUpperCase()).toContain('INACTIVE');
     });
 
-    it('INACTIVE: name has atc-red-1 class (K-015 transition)', async () => {
+    it('INACTIVE: the name stays dark and bold — it is never painted red (K-015 transition)', async () => {
       await createComponent([ALICE]);
       const nameBefore = fixture.debugElement.query(By.css('.by-person__person__name'));
-      expect((nameBefore.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(false);
+      expect((nameBefore.nativeElement as HTMLElement).classList.contains('atc-primary-blue-600')).toBe(true);
 
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
@@ -209,7 +217,8 @@ describe('ByPersonComponent', () => {
       fixture.detectChanges();
 
       const name = fixture.debugElement.query(By.css('.by-person__person__name'));
-      expect((name.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(true);
+      expect((name.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(false);
+      expect((name.nativeElement as HTMLElement).classList.contains('atc-primary-blue-600')).toBe(true);
     });
 
     it('INACTIVE: project chips have by-person__chip--inactive class (K-015 transition)', async () => {
@@ -474,49 +483,49 @@ describe('ByPersonComponent', () => {
     });
   });
 
-  // ── 10. Status pill (Active / Inactive) — KZ-015 discriminating ───────
+  // ── 10. Status tag (Active / Inactive) — KZ-015 discriminating ───────
 
-  describe('Status pill', () => {
-    it('ACTIVE: shows "Active" pill for is_active:true (KZ-015: start active, assert Active pill)', async () => {
+  describe('Status tag', () => {
+    function tag(): HTMLElement {
+      return fixture.debugElement.query(By.css('.by-person__status-tag div')).nativeElement as HTMLElement;
+    }
+
+    // jsdom's cssstyle drops var() values, so the colours are asserted on the
+    // tag component's inputs rather than on the rendered inline style.
+    function tagInputs(): { statusBorder?: string; statusColor?: string } {
+      return fixture.debugElement.query(By.css('app-custom-tag')).componentInstance as {
+        statusBorder?: string;
+        statusColor?: string;
+      };
+    }
+
+    it('ACTIVE: shows an "Active" tag for is_active:true (KZ-015: start active)', async () => {
       await createComponent([ALICE]); // ALICE has is_active: true
-      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
-      expect(pill).toBeTruthy();
-      expect((pill.nativeElement as HTMLElement).textContent?.trim()).toContain('Active');
-      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--active')).toBe(true);
-      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(false);
+      expect(tag().textContent?.trim()).toBe('Active');
+      expect(tagInputs().statusBorder).toBe('var(--ac-primary-blue-200)');
+      expect(tagInputs().statusColor).toBe('var(--ac-primary-blue-400)');
     });
 
-    it('INACTIVE: shows "Inactive" pill for is_active:false (KZ-015 transition: set inactive, assert Inactive pill)', async () => {
-      // Arrange: start with active person — pill says "Active"
+    it('INACTIVE: shows a red "Inactive" tag (KZ-015 transition: active → inactive)', async () => {
+      // Arrange: start with the active person
       await createComponent([ALICE]);
-      const pillBefore = fixture.debugElement.query(By.css('.by-person__status-pill'));
-      expect((pillBefore.nativeElement as HTMLElement).textContent?.trim()).toContain('Active');
-      expect((pillBefore.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(false);
+      expect(tag().textContent?.trim()).toBe('Active');
 
-      // Act: switch to inactive person (KZ-015 transition)
+      // Act: switch to the inactive person
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Assert: pill now shows "Inactive"
-      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
-      expect(pill).toBeTruthy();
-      expect((pill.nativeElement as HTMLElement).textContent?.trim()).toContain('Inactive');
-      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--inactive')).toBe(true);
-      expect((pill.nativeElement as HTMLElement).classList.contains('by-person__status-pill--active')).toBe(false);
+      expect(tag().textContent?.trim()).toBe('Inactive');
+      expect(tagInputs().statusBorder).toBe('var(--ac-red-1)');
+      expect(tagInputs().statusColor).toBe('var(--ac-red-1)');
     });
 
-    it('ACTIVE: pill does NOT show "Inactive" text for is_active:true (negative discriminator)', async () => {
+    it('uses the same tag component as the By project table, not the old pill', async () => {
       await createComponent([ALICE]);
-      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
-      expect((pill.nativeElement as HTMLElement).textContent?.trim()).not.toContain('Inactive');
-    });
-
-    it('INACTIVE: pill does NOT show "Active" text for is_active:false (negative discriminator)', async () => {
-      await createComponent([CAROL_INACTIVE]);
-      const pill = fixture.debugElement.query(By.css('.by-person__status-pill'));
-      expect((pill.nativeElement as HTMLElement).textContent?.trim()).not.toContain('Active');
+      expect(fixture.debugElement.query(By.css('app-custom-tag'))).toBeTruthy();
+      expect(fixture.debugElement.query(By.css('.by-person__status-pill'))).toBeNull();
     });
   });
 

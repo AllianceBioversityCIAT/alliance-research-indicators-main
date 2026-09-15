@@ -80,16 +80,18 @@
 
       <!-- Body -->
       <ng-template pTemplate="body" let-row>
-        <tr class="by-person__row">
+        <tr class="by-person__row" [class.by-person__row--inactive]="row.is_active === false">
 
-          <!-- Person cell: name + INACTIVE badge, inactive styling if is_active === false -->
+          <!-- Person cell: avatar + name + INACTIVE badge; inactive rows carry a
+               red accent bar and a light red wash (see the --inactive styles). -->
           <td class="by-person__td by-person__td--person">
             <div class="by-person__person" [class.by-person__person--inactive]="row.is_active === false">
+              <span class="by-person__avatar" [class.by-person__avatar--inactive]="row.is_active === false"
+                aria-hidden="true">{{ initials(row.name) }}</span>
               <div class="by-person__person__name-row">
-                @if (row.is_active === false) {
-                  <i class="pi pi-exclamation-circle by-person__person__inactive-icon atc-red-1" aria-hidden="true"></i>
-                }
-                <span class="by-person__person__name" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ row.name }}</span>
+                <!-- The name stays dark and bold even when inactive; the red
+                     cues are the row accent, the avatar, the badge and the pill. -->
+                <span class="by-person__person__name atc-primary-blue-600">{{ row.name }}</span>
                 @if (row.is_active === false) {
                   <span class="by-person__person__inactive-badge atc-red-1" aria-label="Inactive delegate">INACTIVE</span>
                 }
@@ -102,17 +104,17 @@
             <span class="by-person__email atc-grey-700">{{ row.email }}</span>
           </td>
 
-          <!-- Status cell — Active / Inactive pill (NFR-UI-002: dot + text, never colour-only) -->
+          <!-- Status cell — same <app-custom-tag> design as the By project table.
+               Active/Inactive are not project statuses, so the colours come in
+               explicitly: the blue pair of the map for Active, red for Inactive.
+               The text itself is the non-colour cue (NFR-UI-002). -->
           <td class="by-person__td by-person__td--status">
-            <span
-              class="by-person__status-pill"
-              [class.by-person__status-pill--active]="row.is_active !== false"
-              [class.by-person__status-pill--inactive]="row.is_active === false"
-              [attr.aria-label]="row.is_active === false ? 'Status: Inactive' : 'Status: Active'"
-            >
-              <span class="by-person__status-pill__dot" aria-hidden="true">&#x25CF;</span>
-              <span class="by-person__status-pill__text">{{ row.is_active === false ? 'Inactive' : 'Active' }}</span>
-            </span>
+            <app-custom-tag
+              class="by-person__status-tag"
+              [statusName]="row.is_active === false ? 'Inactive' : 'Active'"
+              [statusBorder]="row.is_active === false ? 'var(--ac-red-1)' : 'var(--ac-primary-blue-200)'"
+              [statusColor]="row.is_active === false ? 'var(--ac-red-1)' : 'var(--ac-primary-blue-400)'"
+            ></app-custom-tag>
           </td>
 
           <!-- Projects cell: chips with per-chip X (R-UI-008) -->
