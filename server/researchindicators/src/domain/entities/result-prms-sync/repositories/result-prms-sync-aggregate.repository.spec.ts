@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
@@ -51,14 +53,26 @@ describe('ResultPrmsSyncAggregateRepository', () => {
       if (sql.includes('FROM result_countries rc')) {
         return overrides.countries ?? [];
       }
-      if (sql.includes('FROM result_institutions ri')) {
+      if (
+        sql.includes('FROM result_institutions ri') &&
+        sql.includes('ci.code AS institution_id')
+      ) {
         return overrides.partners ?? [];
+      }
+      if (sql.includes('FROM result_institutions ri')) {
+        return overrides.implementingOrgs ?? [];
       }
       if (sql.includes('FROM result_evidences re')) {
         return overrides.evidence ?? [];
       }
       if (sql.includes('FROM result_capacity_sharing')) {
         return overrides.capacity ?? [];
+      }
+      if (sql.includes('clarisa_innovation_types')) {
+        return overrides.innovationType ?? [];
+      }
+      if (sql.includes('clarisa_innovation_readiness_levels')) {
+        return overrides.innovationReadiness ?? [];
       }
       if (sql.includes('FROM result_innovation_dev')) {
         return overrides.innovationDev ?? [];
@@ -80,6 +94,20 @@ describe('ResultPrmsSyncAggregateRepository', () => {
       }
       return empty();
     });
+  };
+
+  const headerRow = {
+    result_id: '11',
+    result_official_code: '1441061',
+    indicator_id: '1',
+    title: 'Loaded title',
+    description: 'Loaded description',
+    geo_scope_id: '50',
+    is_partner_not_applicable: 0,
+    created_at: '2024-03-01T10:00:00.000Z',
+    created_by_email: 'ada.lovelace@cgiar.org',
+    created_by_first_name: 'Ada',
+    created_by_last_name: 'Lovelace',
   };
 
   it('returns null when the result is missing', async () => {
@@ -285,6 +313,106 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     expect(submissionSql).not.toContain('custom_date');
     expect(aggregate?.submitted_by?.submitted_date).toEqual(
       new Date('2025-06-15T14:30:00.000Z'),
+    );
+  });
+
+  it('filters implementing organizations with InstitutionRolesEnum.POLICY_CHANGE, not a literal', () => {
+    const source = readFileSync(
+      join(__dirname, 'result-prms-sync-aggregate.repository.ts'),
+      'utf8',
+    );
+    expect(source).toContain('[resultId, InstitutionRolesEnum.POLICY_CHANGE]');
+    expect(source).not.toMatch(/\[resultId,\s*4\s*\]/);
+  });
+
+  it('attaches POLICY_CHANGE implementing_organizations to the policy_change slice', async () => {
+    mockQueries({
+      header: [headerRow],
+      policy: [{ result_id: 11, policy_type_id: 2 }],
+      implementingOrgs: [
+        {
+          institution_id: '46',
+          institution_role_id: String(InstitutionRolesEnum.POLICY_CHANGE),
+          acronym: 'ABC RH - CIAT (Alliance)',
+          name: 'Alliance of Bioversity and CIAT',
+        },
+      ],
+      partners: [
+        {
+          institution_id: '12',
+          acronym: 'FAO',
+          name: 'Food and Agriculture Organization',
+        },
+      ],
+    });
+
+    const aggregate = await repository.loadByResultId(11);
+    const implementingCall = query.mock.calls.find(
+      (call) =>
+        String(call[0]).includes('FROM result_institutions ri') &&
+        !String(call[0]).includes('ci.code AS institution_id'),
+    );
+
+    expect(implementingCall?.[1]).toEqual([
+      11,
+      InstitutionRolesEnum.POLICY_CHANGE,
+    ]);
+    expect(aggregate?.type_slices?.policy_change).toEqual(
+      expect.objectContaining({
+        result_id: 11,
+        policy_type_id: 2,
+        implementing_organizations: [
+          {
+            institution_id: 46,
+            institution_role_id: InstitutionRolesEnum.POLICY_CHANGE,
+            acronym: 'ABC RH - CIAT (Alliance)',
+            name: 'Alliance of Bioversity and CIAT',
+          },
+        ],
+      }),
+    );
+  });
+
+  it('attaches innovation_type { code, name } and innovation_readiness { id, name } to the innovation_dev slice', async () => {
+    mockQueries({
+      header: [headerRow],
+      innovationDev: [
+        {
+          result_id: 11,
+          innovation_type_id: 2,
+          innovation_readiness_id: 3,
+        },
+      ],
+      innovationType: [{ code: '2', name: 'Technological innovation' }],
+      innovationReadiness: [{ id: '3', name: 'Piloted', level: 3 }],
+    });
+
+    const aggregate = await repository.loadByResultId(11);
+    const typeSql = String(
+      query.mock.calls.find((call) =>
+        String(call[0]).includes('clarisa_innovation_types'),
+      )?.[0],
+    );
+    const readinessSql = String(
+      query.mock.calls.find((call) =>
+        String(call[0]).includes('clarisa_innovation_readiness_levels'),
+      )?.[0],
+    );
+
+    expect(typeSql).toMatch(/cit\.code\s*=\s*rid\.innovation_type_id/);
+    expect(readinessSql).toMatch(/cirl\.id\s*=\s*rid\.innovation_readiness_id/);
+    expect(readinessSql).not.toMatch(/cirl\.level/);
+    expect(aggregate?.type_slices?.innovation_dev).toEqual(
+      expect.objectContaining({
+        result_id: 11,
+        innovation_type: { code: 2, name: 'Technological innovation' },
+        innovation_readiness: { id: 3, name: 'Piloted' },
+      }),
+    );
+    expect(aggregate?.type_slices?.innovation_dev).not.toEqual(
+      expect.objectContaining({
+        innovation_readiness: expect.objectContaining({ level: 3 }),
+      }),
     );
   });
 });

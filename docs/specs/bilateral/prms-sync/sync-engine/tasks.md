@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-06 done (2026-09-15); T-07/T-08 next
+- **Status:** `in-progress` — T-01…T-08 done (2026-09-15); T-09/T-10 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -202,22 +202,22 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-07 — Capacity Sharing + Innovation Development builders
+### T-07 — Capacity Sharing + Innovation Development builders  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-004 AC.1–3, R-PRMS-005 AC.1–3
 - **Files touched:** `builders/{capacity-sharing,innovation-development}.builder.ts` (+ specs)
 - **Done check:**
-  - [ ] `length_training` correct for PhD, MSc, BSc, Other × both session terms
-  - [ ] `delivery_method` correct for all three modalities
-  - [ ] Readiness level uses the shape **T-01 proved** (OQ-2), and the spec file records which
-  - [ ] `unknown` and `innovation_developers` absent from every built payload
+  - [x] `length_training` correct for PhD, MSc, BSc, Other × both session terms
+  - [x] `delivery_method` correct for all three modalities
+  - [x] Readiness level uses the shape **T-01 proved** (OQ-2), and the spec file records which
+  - [x] `unknown` and `innovation_developers` absent from every built payload
 - **Failing input:** a BSc + Long-term fixture — it must fall through to `"Long-term"`, and the spec must record that this makes it indistinguishable from a non-degree long course in PRMS.
 - **Disqualifies the evidence:** asserting the readiness shape before T-01 ran. It would encode a guess.
 - **Effort:** M · **Depends on:** T-05, T-06 · **Skills:** `nestjs-expert`, `tdd`
 
 ---
 
-### T-08 — Policy Change + Innovation Use builders
+### T-08 — Policy Change + Innovation Use builders  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-006 (scenario + both clauses), R-PRMS-007 AC.1–5
 - **Files touched:** `builders/{policy-change,innovation-use}.builder.ts` (+ specs)
@@ -228,11 +228,11 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - Role filters, by **enum, never a literal**: actors `ActorRolesEnum.INNOVATION_USE (2)`, institution types `InstitutionTypeRoleEnum.INNOVATION_USE (2)`, quantifications `QuantificationRolesEnum.INNOVATION_USE (3)` — three different numbers for one concept (§12.5).
   - `sex_and_age_disaggregation` is a **pass-through** of `sex_age_disaggregation_not_apply`. ⚠️ **Never cite `prms.opensearch.service.ts:564`** — it negates the same-named field on a different PRMS surface (R-F7).
 - **Done check:**
-  - [ ] `level` asserted against the **seeded** `clarisa_innovation_use_levels`, not a fixture constant
-  - [ ] **Both** disaggregation modes asserted on serialized JSON, expected values taken from the contract
-  - [ ] A fixture carrying **both** Innovation Dev and Innovation Use rows yields a payload with **none** of the Dev rows (DC-4)
-  - [ ] Non-type-`1` policy payloads contain **no** `status_amount`/`amount` key at all
-  - [ ] `usd_budget`, `is_determined`, `innov_use_to_be_determined` absent (P-1)
+  - [x] `level` asserted against the **seeded** `clarisa_innovation_use_levels`, not a fixture constant
+  - [x] **Both** disaggregation modes asserted on serialized JSON, expected values taken from the contract
+  - [x] A fixture carrying **both** Innovation Dev and Innovation Use rows yields a payload with **none** of the Dev rows (DC-4)
+  - [x] Non-type-`1` policy payloads contain **no** `status_amount`/`amount` key at all
+  - [x] `usd_budget`, `is_determined`, `innov_use_to_be_determined` absent (P-1)
 - **Failing input:** feed a level whose `id` and `level` differ (e.g. `id = 3`, `level = 2`) — an implementation sending the id must go red. A fixture where they coincide cannot fail.
 - **Disqualifies the evidence:** covering one disaggregation mode. Both values are valid booleans, so a single-mode test passes under an inverted implementation.
 - **Effort:** L · **Depends on:** T-05, T-06 · **Skills:** `nestjs-expert`, `tdd`

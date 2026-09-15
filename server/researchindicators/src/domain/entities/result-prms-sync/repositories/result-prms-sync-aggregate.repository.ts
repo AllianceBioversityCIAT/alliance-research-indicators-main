@@ -101,6 +101,9 @@ export class ResultPrmsSyncAggregateRepository {
       actorRows,
       institutionTypeRows,
       quantificationRows,
+      implementingOrgRows,
+      innovationTypeRows,
+      innovationReadinessRows,
     ] = await Promise.all([
       this.dataSource.query(
         `
@@ -264,6 +267,51 @@ export class ResultPrmsSyncAggregateRepository {
         `SELECT * FROM result_quantifications WHERE result_id = ? AND is_active = TRUE`,
         [resultId],
       ),
+      // R-PRMS-006 AC.1: policy_change.implementing_organizations.
+      // Role filter is InstitutionRolesEnum.POLICY_CHANGE — not a literal,
+      // and not InstitutionTypeRoleEnum (different table, different numbering).
+      this.dataSource.query(
+        `
+        SELECT
+          ri.institution_id,
+          ri.institution_role_id,
+          ci.acronym,
+          ci.name
+        FROM result_institutions ri
+        LEFT JOIN clarisa_institutions ci ON ci.code = ri.institution_id
+        WHERE ri.result_id = ?
+          AND ri.institution_role_id = ?
+          AND ri.is_active = TRUE
+        `,
+        [resultId, InstitutionRolesEnum.POLICY_CHANGE],
+      ),
+      // R-PRMS-005 AC.1: innovation_dev.innovation_type { code, name }.
+      // clarisa_innovation_types is keyed on `code`, not `id`.
+      this.dataSource.query(
+        `
+        SELECT cit.code, cit.name
+        FROM result_innovation_dev rid
+        INNER JOIN clarisa_innovation_types cit
+          ON cit.code = rid.innovation_type_id
+        WHERE rid.result_id = ?
+          AND rid.is_active = TRUE
+        `,
+        [resultId],
+      ),
+      // R-PRMS-005 AC.2: innovation_dev.innovation_readiness { id, name }.
+      // Do not select `level` — T-07 chose { id, name } and recorded it as
+      // unproven at the persistence layer.
+      this.dataSource.query(
+        `
+        SELECT cirl.id, cirl.name
+        FROM result_innovation_dev rid
+        INNER JOIN clarisa_innovation_readiness_levels cirl
+          ON cirl.id = rid.innovation_readiness_id
+        WHERE rid.result_id = ?
+          AND rid.is_active = TRUE
+        `,
+        [resultId],
+      ),
     ]);
 
     const contracts = (
@@ -273,10 +321,52 @@ export class ResultPrmsSyncAggregateRepository {
       contracts.find((contract) => contract.is_primary) ?? null;
 
     const submission = submissionRows[0];
+    const implementingOrganizations = (
+      implementingOrgRows as Array<{
+        institution_id: number;
+        institution_role_id: number;
+        acronym: string | null;
+        name: string | null;
+      }>
+    ).map((row) => ({
+      institution_id: Number(row.institution_id),
+      institution_role_id: Number(row.institution_role_id),
+      acronym: row.acronym ?? null,
+      name: row.name ?? null,
+    }));
+
+    const innovationTypeRow = (
+      innovationTypeRows as Array<{ code: number; name: string }>
+    )[0];
+    const innovationReadinessRow = (
+      innovationReadinessRows as Array<{ id: number; name: string }>
+    )[0];
+
     const typeSlices: PrmsSyncTypeSlices = {
       capacity_sharing: capacityRows[0] ?? null,
-      innovation_dev: innovationDevRows[0] ?? null,
-      policy_change: policyRows[0] ?? null,
+      innovation_dev: innovationDevRows[0]
+        ? {
+            ...(innovationDevRows[0] as Record<string, unknown>),
+            innovation_type: innovationTypeRow
+              ? {
+                  code: Number(innovationTypeRow.code),
+                  name: innovationTypeRow.name,
+                }
+              : null,
+            innovation_readiness: innovationReadinessRow
+              ? {
+                  id: Number(innovationReadinessRow.id),
+                  name: innovationReadinessRow.name,
+                }
+              : null,
+          }
+        : null,
+      policy_change: policyRows[0]
+        ? {
+            ...(policyRows[0] as Record<string, unknown>),
+            implementing_organizations: implementingOrganizations,
+          }
+        : null,
       innovation_use: innovationUseRows[0] ?? null,
       actors: actorRows ?? [],
       institution_types: institutionTypeRows ?? [],

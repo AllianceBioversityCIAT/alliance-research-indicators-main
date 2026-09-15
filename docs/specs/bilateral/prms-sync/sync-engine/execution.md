@@ -913,3 +913,170 @@ schema:** `alliance_user_staff.carnet` → `PRI` (PRIMARY KEY, unique); `email` 
 | `npx eslint`, unpiped | **exit 0** |
 | Builder DB/HTTP references | **0** (design §2.1 holds) |
 | `LOWER(TRIM` remaining on identity paths | **0** |
+
+---
+
+## 5. BUDGET TRIPWIRE — fired 2026-09-15 at 6/14 tasks, escalated, user ruled
+
+`design.md` §13 budgets ≈ 2 000 LOC (≈ 1 150 production, ≈ 850 tests) and 2 review rounds.
+
+| Metric | Budget | Actual at 6/14 tasks | Delta |
+|---|---|---|---|
+| Production | ≈ 1 150 | **1 275** | **+11 %** |
+| Tests | ≈ 850 | **1 737** | **+104 %** |
+| **Total** | **≈ 2 000** | **3 012** | **+51 %** |
+
+**Cause: the overrun is almost entirely test code, and it is what this spec's own rules buy.** Expected
+values transcribed from `homologation.md` rather than snapshotted; both disaggregation modes because a
+single-mode test passes under an inverted implementation; all six degree × session-term crossings
+because `DegreeHomologation` is not injective; assertions against emitted SQL rather than returned
+objects; and an observed-red falsifier per gate. None of that is free, and each line traces to a named
+defect class.
+
+**User ruling — continue, with a LIGHTER test policy from here on.** Applies to T-06d and every
+remaining task:
+
+| Keep | Trim |
+|---|---|
+| One **observed-red K-004 falsifier** per gate, for that task's highest-risk property | Exhaustive table-driven coverage of every combination |
+| Defect-class assertions (**DC-1…DC-11**) | Restating a property already asserted elsewhere in the same spec file |
+| **Both-mode** assertions wherever a boolean could silently invert | Redundant fixtures that vary nothing discriminating |
+| Assertions on **generated output** (SQL, serialized JSON) — KZ-001 | |
+
+Target: the smallest test set that still fails if the property under test is broken.
+`design.md` §13's budget row is to be re-baselined at `/akili-archive` with the measured figure and
+this rationale, so the tripwire stops firing on a number everyone has now accepted.
+
+---
+
+## 6. SEAM GAP between T-06 and T-07/T-08 — found, escalated, user approved closing it (T-06d)
+
+**Every task passed its own Done check while the feature was broken end to end.** The aggregate
+repository loads all four type rows and the Innovation Use role rows, but produced **none** of the
+three *enriched* fields the type builders consume:
+
+| Field | In repository | Consequence |
+|---|---|---|
+| `implementing_organizations` | 0 occurrences | `policy-change.builder` **throws on every real row** (its R-PRMS-006 AC.1 guard is correct — the data simply never arrives) |
+| `innovation_type` | 0 | `innovation-development.builder` cannot build `innovation_typology` |
+| `innovation_readiness` | 0 | `innovation-development.builder` cannot build `innovation_readiness_level` |
+
+**Two of the four type builders were dead on arrival against real data**, and `tasks.md` assigns the
+work to nobody: T-06 is *"the `data` block shared by every type — homologation §4"* (common fields),
+T-07/T-08 are the builders (and the builders are **correct**, throw included), T-09 is envelope
+assembly, not data loading. A decomposition gap, not anyone's defect.
+
+**Surfaced by the T-08 worker in its own `Not Done` field** rather than left silent — exactly the
+behaviour the Not-Done contract exists for. Escalated to the user, who approved closing it now as
+sub-task **T-06d** (`task_9c2ac82ccde4`, dispatch `ctx_ca80806f6d59`, Cursor `cursor-grok-4.6-high-fast`).
+It is **already-approved scope**, not new: R-PRMS-005 AC.1/AC.2 and R-PRMS-006 AC.1 require these
+fields.
+
+**Leader-verified schema facts handed to the worker** so it would not rediscover them:
+`InstitutionRolesEnum.POLICY_CHANGE = 4` (and the *different* `InstitutionTypeRoleEnum` numbers
+`INNOVATION_DEV=1`/`INNOVATION_USE=2` — a real confusion hazard); `clarisa_innovation_types` is keyed
+on **`code`**, not `id`; `clarisa_innovation_readiness_levels` carries `id`, `level`, `name`. The brief
+also forbids widening the readiness shape to include `level`, since T-07 deliberately chose `{id, name}`
+and recorded it as unproven at the persistence layer.
+
+---
+
+### Wave 2 — T-07, T-08 (parallel) + T-06d (seam) + T-07b (evidence)
+
+- **Status:** ✅ **PASS** — T-08 and T-06d on attempt 1; T-07 on attempt 2 (evidence only)
+- **Date:** 2026-09-15 · Run `run_3ed0320bedc0`
+  | Dispatch | Task | Role | Worker |
+  |---|---|---|---|
+  | `ctx_bd227c1c3fcd` | `task_6407514d9094` | T-07 impl | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_6379c04f7cd6` | `task_4aa89b243e03` | T-08 impl | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_ca80806f6d59` | `task_9c2ac82ccde4` | T-06d seam | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_d9f3a4e06a38` | `task_6ae0ca1d9452` | Reviewer | Cursor `gpt-5.6-sol-high` |
+  | `ctx_9a7a6bc815b5` | `task_416bcad4204b` | T-07b evidence | Cursor `cursor-grok-4.6-high-fast` |
+
+**Leader dispatch error, recorded.** The parallel `worker-start` loop printed `None` for both tasks
+because the Leader's parser read the wrong JSON level. Reading the **raw** output showed T-07 had in
+fact started (`state: accepted`). Checking dispatches per task before reacting showed T-07 had exactly
+one and T-08 none — so only T-08 was relaunched. **A `None` from the Leader's own parser is not
+evidence that a command failed**; reacting to it would have put two workers on the same files.
+
+#### T-07 — Capacity Sharing + Innovation Development
+
+`length_training` across PhD/MSc/BSc/Other × both session terms; `delivery_method` for all three
+modalities; `unknown` and `innovation_developers` absent (P-1 / DC-5); D-B nesting under
+`data.capacity_sharing` / `data.innovation_development`.
+
+**The readiness shape — the task text was stale and the brief corrected it.** `tasks.md` T-07 says
+*"the shape **T-01 proved**"*; T-01 proved **no shape** — it settled the schema layer only (all three
+forms accepted, none named in any error) while **which key persists is open**, because every
+`innovation_development` call was stopped earlier by an unrelated `innovation_typology` catalogue
+rejection. The worker chose `{id, name}`, recorded it as **UNPROVEN at the persistence layer** in a
+file comment, in the test name *"(persistence unproven)"*, and asserted
+`expect(readiness).not.toHaveProperty('level')`. Following the task text literally would have written a
+guess as settled fact.
+
+**The lossiness is demonstrated, not merely described:** the BSc+Long-term test asserts that *both*
+BSc and Other yield `"Long-term"`, so the collision is visible in the assertion itself, and the test
+name records *"indistinguishable from a non-degree long course in PRMS"*.
+
+The `innovation_typology` live-rejection signal (D-F) was **reported, not encoded** — as briefed.
+
+#### T-08 — Policy Change + Innovation Use (highest defect density in the spec)
+
+All four silent traps handled, with the decisive falsifier observed:
+**`id=3` stub emitted `level 3` against seeded `level 2`** — i.e. a level whose `id` and `level`
+genuinely differ, which is the only fixture shape that *can* fail. Both disaggregation modes asserted;
+role filters by enum (`2`/`2`/`3` — three different numbers for one concept); policy `type`/`stage` by
+**name**, corroborated live by T-01 (PRMS resolved names to internal ids `2`/`6`, proving
+PRMS-internal ids ≠ STAR/CLARISA ids). Innovation Use **fully built though gated** (R-F6).
+
+#### T-06d — the seam, closed
+
+Three enriched fields added to the aggregate repository, each respecting a constraint that could have
+been widened silently:
+- `implementing_organizations` via **`InstitutionRolesEnum.POLICY_CHANGE`** — not the literal `4`, and
+  not the similarly-named `InstitutionTypeRoleEnum` whose numbering differs.
+- `innovation_type` as `{code, name}` joined on **`clarisa_innovation_types.code`** — that catalogue
+  has no `id` column.
+- `innovation_readiness` as `{id, name}`, **not `level`**. The only occurrence of the word `level` in
+  the whole repository is the comment explaining why it is excluded: *"T-07 chose { id, name } and
+  recorded it as unproven at the persistence layer."* The decision was respected **and** its reason
+  left where the next reader will find it.
+
+Falsifier: **`params [11, 3]` vs expected `[11, 4]`** when the role filter was pointed at `PARTNERS` —
+asserted on the parameters actually passed. Invariants held: zero `LOWER(TRIM`, the three identity
+joins still on `carnet`, existing SQL pins still passing.
+
+#### Reviewer verdict (wave): ❌ FAIL on T-07 only → ✅ resolved by T-07b
+
+> T-08 y T-06d cumplen sus propiedades de mapeo, filtros por enum, formas serializadas, invariantes SQL
+> y alcance sin registro anticipado. El único bloqueo pertenece a T-07: **K-004 no está satisfecho**
+> para el falsificador BSc + Long-term; el único rojo observado fue un `TypeError` causado por la
+> **ausencia del módulo**, no un fallo de la expectativa `length_training` — **aunque la prueba actual
+> sí discriminaría una implementación incorrecta.**
+
+**The Leader had flagged exactly this in the brief and the Reviewer independently confirmed it.** The
+distinction matters and the Reviewer stated it precisely: the *test* was sound, the *evidence* was not.
+A gate seen failing only because the module did not exist yet proves the runner runs, not that the
+assertion catches the defect. So the remediation was **evidence only — no new tests, no test edits.**
+
+#### T-07b — the correct red, observed
+
+| Step | Result |
+|---|---|
+| Targeted spec, green | 14/14 |
+| Force `BSc + LONG_TERM` → `'Short-term'` | **RED on the expectation**: test `BSc + Long-term falls through to "Long-term"` **and** the `it.each degree 3 × session 2` row, both `Expected "Long-term"` / `Received "Short-term"` |
+| Restore | byte-identical, sha1 `06af02cae83bf3a708ebddbf4d6aff745d270f3c` |
+| Final run | 14/14 green |
+
+**Leader-verified independently:** `shasum` of the restored file matches the claimed sha1 exactly, and
+no falsifier residue remains in any builder. That check matters — a deliberate break that is not
+reverted is worse than never having made it.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **379 suites · 3213 passed · 0 skipped** |
+| Integration gate (T-03) | 3 passed |
+| `npx eslint`, unpiped | **exit 0** |
+| LOC (after the lighter policy on T-06d) | production 1 365 · tests 1 865 · **total 3 230** |
