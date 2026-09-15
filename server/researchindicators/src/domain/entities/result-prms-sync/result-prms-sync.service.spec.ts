@@ -8,6 +8,7 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
 import { PrmsNormalizerRequestDto } from '../../tools/prms-normalizer/dto/prms-normalizer.dto';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { PRMS_RESULT_CODE_ABSENT } from '../../tools/prms-normalizer/response/prms-sync-response.interpreter';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
@@ -100,7 +101,16 @@ describe('ResultPrmsSyncService', () => {
     normalizer = {
       ingest: jest.fn().mockResolvedValue({
         status: 200,
-        body: { requestId: 'Root=req-1' },
+        body: {
+          requestId: 'Root=req-1',
+          results: [
+            {
+              success: true,
+              external_reference: 'ARI-1001',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
       }),
     };
     appConfigService = {
@@ -310,6 +320,148 @@ describe('ResultPrmsSyncService', () => {
       message: PRMS_SYNC_CLAIM_COLLISION,
     });
     expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('does not settle ACCEPTED when a 207 matching row failed after a successful earlier row', async () => {
+    const body = {
+      requestId: 'Root=two-row',
+      results: [
+        {
+          success: true,
+          external_reference: 'ARI-OTHER',
+          result: { result_code: 1111 },
+        },
+        {
+          success: false,
+          external_reference: 'ARI-1001',
+          error: 'Evidence link is not a valid URL',
+        },
+      ],
+    };
+    normalizer.ingest.mockResolvedValue({ status: 207, body });
+
+    const result = await service.sync(42);
+
+    expect(result.outcome).toBe(PrmsSyncOutcome.REJECTED_BY_PRMS);
+    expect(result.prms_result_code).toBeNull();
+    expect(result.request_id).toBe('Root=two-row');
+    const settleArg = logRepository.settleIfInFlight.mock.calls[0][0];
+    expect(settleArg.outcome).toBe(PrmsSyncOutcome.REJECTED_BY_PRMS);
+    expect(settleArg.outcome).not.toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(settleArg.responseBody).toEqual(body);
+    expect(settleArg.requestId).toBe('Root=two-row');
+    expect(settleArg.prmsResultCode).toBeNull();
+  });
+
+  it('forwards requestId to settle on TRANSPORT_FAILED, AUTH_FAILED, RETRYABLE, and REJECTED_BY_PRMS', async () => {
+    normalizer.ingest.mockResolvedValueOnce(null);
+    await service.sync(42);
+    expect(
+      logRepository.settleIfInFlight.mock.calls[0][0].requestId,
+    ).toBeNull();
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).toBe(
+      PrmsSyncOutcome.TRANSPORT_FAILED,
+    );
+
+    logRepository.settleIfInFlight.mockClear();
+    normalizer.ingest.mockResolvedValueOnce({
+      status: 401,
+      body: { requestId: 'Root=auth-1' },
+    });
+    await service.sync(42);
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].requestId).toBe(
+      'Root=auth-1',
+    );
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).toBe(
+      PrmsSyncOutcome.AUTH_FAILED,
+    );
+
+    logRepository.settleIfInFlight.mockClear();
+    normalizer.ingest.mockResolvedValueOnce({
+      status: 503,
+      body: { requestId: 'Root=svc-1' },
+    });
+    await service.sync(42);
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].requestId).toBe(
+      'Root=svc-1',
+    );
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).toBe(
+      PrmsSyncOutcome.RETRYABLE,
+    );
+
+    logRepository.settleIfInFlight.mockClear();
+    normalizer.ingest.mockResolvedValueOnce({
+      status: 422,
+      body: {
+        requestId: 'Root=unprocessable-1',
+        rejected: [{ external_reference: 'ARI-1001', reason: 'invalid title' }],
+      },
+    });
+    await service.sync(42);
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].requestId).toBe(
+      'Root=unprocessable-1',
+    );
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).toBe(
+      PrmsSyncOutcome.REJECTED_BY_PRMS,
+    );
+  });
+
+  it('settles ACCEPTED with the PRMS result_code and records its absence when missing', async () => {
+    const first = await service.sync(42);
+    expect(first.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(first.prms_result_code).toBe(9199);
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].prmsResultCode).toBe(
+      9199,
+    );
+
+    logRepository.settleIfInFlight.mockClear();
+    normalizer.ingest.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        requestId: 'Root=no-code',
+        results: [
+          {
+            success: true,
+            external_reference: 'ARI-1001',
+            resultId:
+              'prms.result-management.api:capacity_sharing:dataset.ingest.requested:auto-deadbeef',
+            result: { result_id: 11667 },
+          },
+        ],
+      },
+    });
+    const second = await service.sync(42);
+    expect(second.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(second.prms_result_code).toBeNull();
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].failureReason).toBe(
+      PRMS_RESULT_CODE_ABSENT,
+    );
+  });
+
+  it('settles RETRYABLE when a 207 row error is a downstream 5xx', async () => {
+    normalizer.ingest.mockResolvedValue({
+      status: 207,
+      body: {
+        requestId: 'Root=dd18-5xx',
+        results: [
+          {
+            success: false,
+            external_reference: 'ARI-1001',
+            error: 'HTTP 502: Proxy Error',
+          },
+        ],
+      },
+    });
+
+    const result = await service.sync(42);
+
+    expect(result.outcome).toBe(PrmsSyncOutcome.RETRYABLE);
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).not.toBe(
+      PrmsSyncOutcome.ACCEPTED,
+    );
+    expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).not.toBe(
+      PrmsSyncOutcome.REJECTED_BY_PRMS,
+    );
   });
 });
 

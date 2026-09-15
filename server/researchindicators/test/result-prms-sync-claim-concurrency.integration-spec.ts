@@ -62,6 +62,34 @@ const envelope = (): PrmsNormalizerRequestDto => ({
   ],
 });
 
+function readPayloadExternalReference(
+  payload: PrmsNormalizerRequestDto,
+): string {
+  const value = payload.results[0]?.data?.external_reference;
+  if (typeof value !== 'string') {
+    throw new Error(
+      'fixture payload is missing string data.external_reference',
+    );
+  }
+  return value;
+}
+
+function acceptedIngestResponse(payload: PrmsNormalizerRequestDto) {
+  return {
+    status: 200,
+    body: {
+      requestId: REQUEST_ID,
+      results: [
+        {
+          success: true,
+          external_reference: readPayloadExternalReference(payload),
+          result: { result_code: 9199 },
+        },
+      ],
+    },
+  };
+}
+
 const eligibleFacts = (
   resultId: number,
   officialCode: number,
@@ -168,10 +196,11 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
 
     const ingestStarted = deferred();
     const ingestRelease = deferred();
+    const payload = envelope();
     const ingest = jest.fn(async () => {
       ingestStarted.resolve();
       await ingestRelease.promise;
-      return { status: 200, body: { requestId: REQUEST_ID } };
+      return acceptedIngestResponse(payload);
     });
 
     const service = new ResultPrmsSyncService(
@@ -182,7 +211,7 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
           .mockResolvedValue({ result_id: dc11ResultId }),
       } as unknown as ResultPrmsSyncAggregateRepository,
       {
-        build: jest.fn().mockReturnValue(envelope()),
+        build: jest.fn().mockReturnValue(payload),
       } as unknown as PayloadBuilder,
       { ingest } as unknown as PrmsNormalizerService,
       {

@@ -1269,3 +1269,95 @@ reporting is what kept a false alarm from becoming someone's work.
 | Unit suite | **383 suites · 3249 passed · 0 skipped** |
 | Integration (both specs) | **2 suites · 6 tests passed** |
 | `npx eslint`, unpiped | **exit 0** |
+
+---
+
+### T-12 — Response interpreter (the 207 rule) + T-12b (fixture)
+
+- **Status:** ✅ **PASS on attempt 1** (plus T-12b, a regression fix the Leader's re-measure caught)
+- **Date:** 2026-09-15 · Run `run_3ed0320bedc0`
+  | Dispatch | Task | Role | Worker |
+  |---|---|---|---|
+  | `ctx_629be1ba59ed` | `task_3984bde4479c` | T-12 impl | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_51e2592b299e` | `task_6356958a70c3` | T-12b fixture | Cursor `cursor-grok-4.6-high-fast` |
+  | `ctx_da914ea5fb7d` | `task_39797e878676` | Reviewer | Cursor `gpt-5.6-sol-high` |
+
+`tasks.md` calls this **the spec's load-bearing logic**: it is what makes *"synced"* mean **PRMS
+accepted this row** rather than **the HTTP status was 2xx**.
+
+**Files:** `tools/prms-normalizer/response/prms-sync-response.interpreter.ts` + spec ·
+`result-prms-sync.service.ts` settle path + spec · `test/…claim-concurrency.integration-spec.ts` (T-12b).
+
+#### What landed
+
+The tri-state mapped onto §5.4: `null` → `TRANSPORT_FAILED` · `401` → `AUTH_FAILED` · `503` →
+`RETRYABLE` · `422` → `REJECTED_BY_PRMS` from `rejected[]` · `2xx` → **per row**.
+
+⚠️ **DD-18 implemented, not the pre-amendment rule.** A `2xx` whose row failed is classified **by the
+cause in `results[].error`** — a **downstream 5xx** settles `RETRYABLE`, a genuine validation/business
+rejection settles `REJECTED_BY_PRMS`. **This is the A-01 amendment reaching code.** Without the T-01
+spike (which caught two live `207`s wrapping `HTTP 502: Proxy Error` / `HTTP 503: Service Unavailable`
+from the Normalizer's **own** `/api/bilateral/create` hop — discovery-log D-D), the original rule would
+have been implemented and every transient PRMS outage would have been recorded **durably** as a PRMS
+rejection, with nothing failing to reveal it.
+
+**DD-8 honoured:** our row is located with `results.find(...)` on `external_reference`, never by index.
+**OQ-6 applied:** `result_code` read **only** from `results[].result.result_code`, and its absence
+recorded explicitly as `PRMS_RESULT_CODE_ABSENT` rather than a silent NULL (Done check 4).
+
+**K-004 red, correctly targeted:** the two-row / ours-**second** `207` produced
+`Expected REJECTED_BY_PRMS, Received ACCEPTED` under an index lookup — exactly the defect DD-8 names —
+then green after restoring find-by-reference.
+
+#### ⚠️ Regression caught by the Leader's re-measure — and it was good news
+
+The worker reported *"T-11 claim/expiry/late-settle is unchanged"* and 17 suites / 142 tests passing,
+and that was **true for the tests it ran** — it ran only the scoped **unit** tests, as briefed. The
+Leader's re-measure found the **integration** suite had gone from 2 suites / 6 passing to **1 failed**:
+
+```
+● T-11 … two service.sync calls … produce one POST, one ACCEPTED row, and one 409
+  Expected: "ACCEPTED"   Received: "RETRYABLE"
+```
+
+**This is precisely why the Leader re-measures after every worker.** A worker forbidden from running
+the full suite *cannot* see what it broke outside its own scope.
+
+**Diagnosis: T-12 was right and the fixture was stale.** T-11's stub returned
+`{ status: 200, body: { requestId } }` — a 200 with **no `results[]` at all** — which satisfied T-11's
+*provisional* "2xx = ACCEPTED" rule. Under the correct interpreter there is no row carrying our
+`external_reference`, so it settles `RETRYABLE`. **That is the honest outcome**: if PRMS does not
+return our row, we cannot prove it accepted us, and saying `ACCEPTED` would be the exact failure this
+whole spec exists to prevent. A weaker interpreter would have passed silently.
+
+**T-12b** made the stub realistic — `success: true`, `external_reference` taken **from the built
+payload** rather than hardcoded, `result.result_code: 9199` — after **reading the interpreter first**
+to match field names (`row.success`, `row.external_reference`, `row.result.result_code`). A fixture
+with invented field names would pass and prove nothing. Its own falsifier: a non-matching
+`external_reference` returns `RETRYABLE`, then green on restore — so the assertion depends on the
+interpreter *finding* our row, not on the stub merely existing. **The concurrency proof is now stronger
+than before**: it runs through the real interpreter end to end.
+
+#### Reviewer verdict: ✅ **STATUS: PASS** — including three judgement calls put to it
+
+- **B — the 422 fallback.** `const chosen = match ?? rejected[0]` is *"un fallback defendible **sólo**
+  para el 422 request-level de este envío monofila y **no comparte ruta** con el 2xx per-row."* No index
+  semantics leak into the per-row path.
+- **C — the absent-reference outcome.** A `2xx` without our reference settles `RETRYABLE`, *"no
+  `ACCEPTED` ni `UNKNOWN` **porque `UNKNOWN` está reservado al claim abandonado**"* — a sharper
+  vocabulary argument than the Leader's own: `UNKNOWN` carries a specific §5.4 meaning and reusing it
+  here would blur it.
+- **H — the Leader's regression ruling, confirmed.** T-11 *"tenía un fixture provisional obsoleto, cuya
+  corrección ahora atraviesa el intérprete real"*.
+
+Also confirmed: the flip happens **only** on `ACCEPTED` in the same transaction; `requestId` persisted
+on every branch; the K-004 falsifier targets the index defect; **T-11's machinery intact**; and **no
+comment, test name or report claims DC-3** — it remains T-14's, against live TEST.
+
+#### Leader-measured gates
+
+| Gate | Result |
+|---|---|
+| Unit suite | **384 suites · 3261 passed · 0 skipped** |
+| Integration (both specs) | **2 suites · 6 tests passed** |
+| `npx eslint`, unpiped | **exit 0** |

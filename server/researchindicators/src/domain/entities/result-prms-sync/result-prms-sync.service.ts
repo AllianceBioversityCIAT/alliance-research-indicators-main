@@ -8,11 +8,9 @@ import {
 } from '@nestjs/common';
 import { AppConfigService } from '../app-config/app-config.service';
 import { AppConfigKey } from '../app-config/enum/app-config-key.enum';
-import {
-  PrmsNormalizerRequestDto,
-  PrmsNormalizerTransportResponseDto,
-} from '../../tools/prms-normalizer/dto/prms-normalizer.dto';
+import { PrmsNormalizerRequestDto } from '../../tools/prms-normalizer/dto/prms-normalizer.dto';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { interpretPrmsSyncResponse } from '../../tools/prms-normalizer/response/prms-sync-response.interpreter';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
@@ -204,7 +202,7 @@ export class ResultPrmsSyncService {
     const externalReference = this.readExternalReference(payload);
 
     const transport = await this.normalizer.ingest(payload);
-    const interpreted = this.provisionalInterpret(transport);
+    const interpreted = interpretPrmsSyncResponse(transport, externalReference);
 
     await this.settleAttempt(
       {
@@ -231,56 +229,6 @@ export class ResultPrmsSyncService {
       request_id: interpreted.requestId,
       prms_result_code: interpreted.prmsResultCode,
       failure_reason: interpreted.failureReason,
-    };
-  }
-
-  /**
-   * T-12 owns the 207 / per-row interpreter. T-11 only needs a terminal
-   * outcome so claim-then-settle can be proven; a 2xx is ACCEPTED here.
-   */
-  private provisionalInterpret(
-    transport: PrmsNormalizerTransportResponseDto | null,
-  ): {
-    outcome: PrmsSyncOutcome;
-    httpStatus: number | null;
-    requestId: string | null;
-    responseBody: Record<string, unknown> | null;
-    failureReason: string | null;
-    prmsResultCode: number | null;
-  } {
-    if (transport == null) {
-      return {
-        outcome: PrmsSyncOutcome.TRANSPORT_FAILED,
-        httpStatus: null,
-        requestId: null,
-        responseBody: null,
-        failureReason: 'PRMS Normalizer returned no HTTP response',
-        prmsResultCode: null,
-      };
-    }
-
-    const body = (transport.body ?? {}) as Record<string, unknown>;
-    const requestId =
-      typeof body.requestId === 'string' ? body.requestId : null;
-
-    if (transport.status >= 200 && transport.status < 300) {
-      return {
-        outcome: PrmsSyncOutcome.ACCEPTED,
-        httpStatus: transport.status,
-        requestId,
-        responseBody: body,
-        failureReason: null,
-        prmsResultCode: null,
-      };
-    }
-
-    return {
-      outcome: PrmsSyncOutcome.RETRYABLE,
-      httpStatus: transport.status,
-      requestId,
-      responseBody: body,
-      failureReason: `PRMS Normalizer HTTP ${transport.status}`,
-      prmsResultCode: null,
     };
   }
 

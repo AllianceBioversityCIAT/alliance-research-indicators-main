@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-11 done (2026-09-15); T-12 next
+- **Status:** `in-progress` — T-01…T-12 done (2026-09-15); T-13/T-14 next
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -293,7 +293,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-12 — Response interpreter (the 207 rule)
+### T-12 — Response interpreter (the 207 rule)  ✅ `[x]` DONE
 
 - **Requirements covered:** R-PRMS-011 (scenario + all clauses, AC.1–5), NFR-003, NFR-004
 - **Files touched:** `tools/prms-normalizer/` response parser + `result-prms-sync.service.ts` settle path (+ specs)
@@ -303,10 +303,10 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - `null` → `TRANSPORT_FAILED`; `401` → `AUTH_FAILED` (non-retryable); `503` → `RETRYABLE`; `422` → `REJECTED_BY_PRMS` with `rejected[]`; `2xx` → per-row.
   - `is_synced_to_prms` and `prms_result_code` flip **only** on `ACCEPTED`, same transaction.
 - **Done check:**
-  - [ ] A **207 whose row failed** leaves `is_synced_to_prms = false` and records `FAILED` with the verbatim body
-  - [ ] `requestId` persisted on every branch, success or failure
-  - [ ] A response whose `results[]` order differs from the request still resolves our row correctly
-  - [ ] When no PRMS result code is present, the row records that fact — not a silent NULL
+  - [x] A **207 whose row failed** leaves `is_synced_to_prms = false` and records `FAILED` with the verbatim body
+  - [x] `requestId` persisted on every branch, success or failure
+  - [x] A response whose `results[]` order differs from the request still resolves our row correctly
+  - [x] When no PRMS result code is present, the row records that fact — not a silent NULL
 - **Failing input:** a 207 whose `results[]` contains **two** rows with ours **second** and failed. An index-based implementation reads the first row, sees success, and flips the flag — the assertion must go red.
 - **Disqualifies the evidence:** ⚠️ **a mocked 207 does not close DC-3.** It tests our parser against our own assumption of the shape. DC-3 closes only in T-14, against the live TEST endpoint.
 - **Effort:** M · **Depends on:** T-03, T-04 · **Skills:** `error-handling-patterns`, `tdd`
