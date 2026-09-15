@@ -7,27 +7,34 @@
   flex-direction: column;
   gap: 12px;
 
-  // ── Table wrapper ────────────────────────────────────────────────────
+  // ── Table wrapper — white card on the grey well (project-detail parity) ──
   &__table-wrapper {
+    background-color: var(--ac-white-1);
     border: 1px solid var(--ac-grey-200);
-    overflow-x: auto;
+    border-radius: 8px;
+    overflow: hidden auto;
   }
 
   &__th {
-    font-size: 13px;
-    font-weight: 600;
+    padding: 14px 16px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
     white-space: nowrap;
+    background-color: var(--ac-white-1);
   }
 
   &__row {
-    font-size: 13px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
     color: var(--ac-grey-800);
     transition: background-color 0.15s ease;
   }
 
   &__td {
     vertical-align: middle;
-    padding: 8px 12px;
+    padding: 12px 16px;
 
     &--project {
       min-width: 200px;
@@ -61,13 +68,15 @@
     line-height: 1.35;
 
     &__meta {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 400;
+      line-height: 16px;
     }
 
     &__name {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
+      line-height: 18px;
     }
   }
 
@@ -76,9 +85,9 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 100px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     border: 1px solid var(--ac-grey-300);
     background-color: var(--ac-grey-100);
@@ -139,10 +148,10 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: 13px;
 
     &__icon {
-      font-size: 13px;
+      font-size: 14px;
       color: var(--ac-pool-funding-fg);
     }
 
@@ -173,11 +182,11 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 4px 8px;
+    padding: 5px 9px;
     border-radius: 8px;
     background-color: var(--ac-grey-100);
-    border: 1px solid var(--ac-grey-300);
-    font-size: 12px;
+    border: 1px solid var(--ac-grey-200);
+    font-size: 13px;
 
     // INACTIVE chip — red border (is_active === false)
     &--inactive {
@@ -212,7 +221,7 @@
     }
 
     &__email {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--ac-grey-700);
     }
 
@@ -248,10 +257,10 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    border: 1px dashed var(--ac-grey-400);
+    font-size: 13px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 1px dashed var(--ac-grey-300);
     background-color: var(--ac-grey-100);
 
     &__icon {
@@ -275,14 +284,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
-    border: 1px solid var(--ac-grey-300);
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid var(--ac-grey-200);
     background-color: var(--ac-grey-100);
-    color: var(--ac-primary-blue-400);
+    color: var(--ac-light-blue-400);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     flex-shrink: 0;
     transition: background-color 0.15s ease;
 
@@ -300,15 +309,16 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 12px;
-    height: 28px;
-    border-radius: 6px;
+    padding: 4px 14px;
+    height: 30px;
+    border-radius: 8px;
     border: 1px solid var(--ac-primary-blue-400);
     background-color: transparent;
     color: var(--ac-primary-blue-400);
     cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
+    font-family: Barlow, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
     transition: background-color 0.15s ease, color 0.15s ease;
 
     &:hover {
@@ -341,6 +351,7 @@
 
   &__empty__text {
     margin: 0;
+    font-family: Barlow, sans-serif;
     font-size: 14px;
   }
 
@@ -350,10 +361,11 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: var(--ac-grey-100);
-    border: 1px solid var(--ac-grey-300);
-    font-size: 13px;
+    border: 1px solid var(--ac-grey-200);
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
   }
 
   &__error__icon {

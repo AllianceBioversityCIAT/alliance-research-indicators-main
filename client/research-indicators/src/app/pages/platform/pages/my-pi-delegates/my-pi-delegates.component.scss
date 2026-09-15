@@ -1,93 +1,118 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04)
 // NFR-UI-001: STAR design tokens only — no hex literals in this file.
+// Visual language mirrors project-detail: white header band over a grey-200
+// rule, Space Grotesk micro-labels, Barlow values, flat tab strip with a
+// light-blue active underline, and a grey well holding white table cards.
+// Page gutters follow the same rhythm (24px, 28px from md up).
+@mixin page-inline {
+  padding-inline: 24px;
+
+  @media (width >= 768px) {
+    padding-inline: 28px;
+  }
+}
 
 .pi-delegates-page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: 2rem 1.5rem;
-  max-width: 100%;
+  padding-top: 8px;
+  background-color: var(--ac-white-1);
+
+  @media (width >= 640px) {
+    padding-top: 12px;
+  }
+
+  @media (width >= 768px) {
+    padding-top: 20px;
+  }
 }
 
-// ─── Page header block ────────────────────────────────────────────────────────
+// ─── Page header block ───
 
 .pi-delegates-header {
+  @include page-inline;
+
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 4px;
+  padding-block: 9px 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ac-grey-200);
 }
 
 .pi-delegates-breadcrumb {
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  font-size: 0.75rem;
-
-  &__segment {
-    font-size: 0.75rem;
-  }
-
-  &__separator {
-    font-size: 0.75rem;
-  }
+  margin-bottom: 4px;
+  font-family: Barlow, sans-serif;
+  font-size: 12px;
+  line-height: 16px;
 
   &__current {
-    font-size: 0.75rem;
     font-weight: 600;
   }
 }
 
 .pi-delegates-title {
-  font-size: 1.375rem;
-  font-weight: 700;
-  line-height: 1.3;
   margin: 0;
+  font-family: Barlow, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .pi-delegates-description {
-  font-size: 0.8125rem;
-  line-height: 1.55;
-  margin: 0;
   max-width: 52rem;
+  margin: 0;
+  font-family: Barlow, sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 20px;
 }
 
-// ─── Stat counters ────────────────────────────────────────────────────────────
+// ─── Stat counters ───
 
 .pi-delegates-stats {
   display: flex;
-  flex-direction: row;
-  gap: 2.5rem;
-  margin-top: 0.5rem;
+  flex-flow: row wrap;
+  gap: 8px 40px;
+  margin-top: 12px;
 
   &__counter {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.125rem;
+    gap: 2px;
   }
 
   &__counter-value {
-    font-size: 1.75rem;
+    font-family: Barlow, sans-serif;
+    font-size: 20px;
     font-weight: 700;
-    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+    line-height: 22px;
   }
 
   &__counter-label {
-    font-size: 0.625rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.03rem;
+    line-height: 13px;
     text-transform: uppercase;
-    line-height: 1.3;
   }
 }
 
-// ─── Shared filter bar ────────────────────────────────────────────────────────
+// ─── Shared filter bar ───
 
 .pi-delegates-filterbar {
+  @include page-inline;
+
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  padding-bottom: 14px;
 
   &__search-wrapper {
     position: relative;
@@ -102,20 +127,21 @@
     left: 0;
     display: flex;
     align-items: center;
-    padding-left: 10px;
+    padding-left: 12px;
     pointer-events: none;
     color: var(--ac-grey-600);
-    font-size: 12px;
+    font-size: 13px;
     z-index: 1;
   }
 
   &__search-input {
     width: 100%;
-    padding-left: 2rem !important;
+    padding-left: 2.125rem !important;
     border-radius: 8px !important;
-    max-height: 32px !important;
-    font-size: 13px !important;
-    border-color: var(--ac-grey-400) !important;
+    max-height: 36px !important;
+    font-family: Barlow, sans-serif !important;
+    font-size: 14px !important;
+    border-color: var(--ac-grey-200) !important;
     color: var(--ac-grey-800) !important;
   }
 
@@ -124,55 +150,93 @@
   }
 
   &__status-dropdown {
-    height: 32px;
-    font-size: 13px;
+    height: 36px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
     border-radius: 8px;
   }
 }
 
-// ─── Loading / error states (NFR-UI-003) ──────────────────────────────────────
+// ─── Loading / error states (NFR-UI-003) ───
 
 .pi-delegates-state {
+  @include page-inline;
+
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
+  margin-bottom: 16px;
+  padding-block: 14px;
+  font-family: Barlow, sans-serif;
+  font-size: 14px;
+  background-color: var(--ac-grey-100);
+  border-block: 1px solid var(--ac-grey-200);
 }
 
 .pi-delegates-state__icon {
-  font-size: 1.25rem;
+  font-size: 18px;
   flex-shrink: 0;
 }
 
-.pi-delegates-state--loading {
-  background-color: var(--ac-grey-100);
-  border: 1px solid var(--ac-grey-200);
+// ─── Tab view — flat strip + grey content well (project-detail shell) ───
+
+/* stylelint-disable-next-line selector-pseudo-element-no-unknown */
+:host ::ng-deep {
+  .p-tablist {
+    padding-inline: 8px;
+    background-color: var(--ac-white-1);
+    border-bottom: 1px solid var(--ac-grey-200);
+  }
+
+  .p-tablist-active-bar {
+    display: none;
+  }
+
+  .p-tab {
+    padding: 12px 20px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--ac-grey-600);
+    background-color: transparent;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+
+    &:hover {
+      background-color: color-mix(in srgb, var(--ac-white-1) 60%, transparent);
+    }
+  }
+
+  .p-tab-active {
+    margin-bottom: -1px;
+    color: var(--ac-light-blue-400);
+    background-color: var(--ac-white-1);
+    border-bottom-color: var(--ac-light-blue-400);
+  }
+
+  .p-tabpanels {
+    padding: 16px;
+    background-color: var(--ac-background);
+    border: 1px solid var(--ac-grey-200);
+    border-top: 0;
+  }
 }
 
-.pi-delegates-state--error {
-  background-color: var(--ac-grey-100);
-  border: 1px solid var(--ac-grey-200);
-}
-
-// ─── Tab view ─────────────────────────────────────────────────────────────────
-
-.pi-delegates-tabview {
-  width: 100%;
-}
-
-// ─── Footer summary line ──────────────────────────────────────────────────────
+// ─── Footer summary line ───
 
 .pi-delegates-footer {
+  @include page-inline;
+
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.625rem 0;
-  border-top: 1px solid var(--ac-grey-200);
-  font-size: 0.8125rem;
+  padding-block: 12px;
+  background-color: var(--ac-white-1);
+  font-family: Barlow, sans-serif;
+  font-size: 13px;
   line-height: 1.5;
 
   &__left {
@@ -184,6 +248,6 @@
 
   &__right {
     font-style: italic;
-    font-size: 0.75rem;
+    font-size: 12px;
   }
 }

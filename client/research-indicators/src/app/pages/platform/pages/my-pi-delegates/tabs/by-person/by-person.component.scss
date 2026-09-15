@@ -7,20 +7,27 @@
   flex-direction: column;
   gap: 12px;
 
-  // ── Table wrapper ────────────────────────────────────────────────────
+  // ── Table wrapper — white card on the grey well (project-detail parity) ──
   &__table-wrapper {
+    background-color: var(--ac-white-1);
     border: 1px solid var(--ac-grey-200);
-    overflow-x: auto;
+    border-radius: 8px;
+    overflow: hidden auto;
   }
 
   &__th {
-    font-size: 13px;
-    font-weight: 600;
+    padding: 14px 16px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
     white-space: nowrap;
+    background-color: var(--ac-white-1);
   }
 
   &__row {
-    font-size: 13px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
     color: var(--ac-grey-800);
     transition: background-color 0.15s ease;
   }
@@ -33,7 +40,7 @@
 
   &__td {
     vertical-align: middle;
-    padding: 8px 12px;
+    padding: 12px 16px;
 
     &--person {
       min-width: 200px;
@@ -61,7 +68,7 @@
 
   // ── Email cell ───────────────────────────────────────────────────────
   &__email {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   // ── Person cell (name + email) ───────────────────────────────────────
@@ -84,13 +91,14 @@
 
     &__name {
       font-weight: 600;
-      font-size: 13px;
+      font-size: 14px;
+      line-height: 18px;
     }
 
     &__inactive-badge {
       display: inline-flex;
       align-items: center;
-      font-size: 9px;
+      font-size: 10px;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -108,9 +116,9 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 100px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     border: 1px solid var(--ac-grey-300);
     background-color: var(--ac-grey-100);
@@ -159,11 +167,11 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 5px 9px;
     border-radius: 8px;
     background-color: var(--ac-grey-100);
-    border: 1px solid var(--ac-grey-300);
-    font-size: 12px;
+    border: 1px solid var(--ac-grey-200);
+    font-size: 13px;
 
     // Inactive person: red border + light red tint background
     &--inactive {
@@ -184,11 +192,11 @@
 
     &__code {
       font-weight: 600;
-      font-size: 12px;
+      font-size: 13px;
     }
 
     &__name {
-      font-size: 11px;
+      font-size: 12px;
     }
 
     &__remove {
@@ -230,14 +238,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 27px;
-    height: 27px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
-    border: none;
-    background-color: var(--ac-grey-200);
-    color: var(--ac-primary-blue-400);
+    border: 1px solid var(--ac-grey-200);
+    background-color: var(--ac-grey-100);
+    color: var(--ac-light-blue-400);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
     transition: background-color 0.15s ease;
 
     &:hover {
@@ -255,14 +263,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 27px;
-    height: 27px;
+    width: 30px;
+    height: 30px;
     border-radius: 8px;
-    border: none;
-    background-color: var(--ac-grey-200);
+    border: 1px solid var(--ac-grey-200);
+    background-color: var(--ac-grey-100);
     color: var(--ac-light-blue-400);
     cursor: pointer;
-    font-size: 12px;
+    font-size: 14px;
     transition: background-color 0.15s ease;
 
     &:hover {
@@ -294,6 +302,7 @@
 
   &__empty__text {
     margin: 0;
+    font-family: Barlow, sans-serif;
     font-size: 14px;
   }
 
@@ -303,10 +312,11 @@
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    border-radius: 6px;
+    border-radius: 8px;
     background-color: var(--ac-grey-100);
-    border: 1px solid var(--ac-grey-300);
-    font-size: 13px;
+    border: 1px solid var(--ac-grey-200);
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
   }
 
   &__error__icon {
