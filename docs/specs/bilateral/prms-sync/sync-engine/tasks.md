@@ -380,8 +380,8 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 - [x] All fourteen tasks `done`
 - [ ] **Someone has exercised the sync in the running product before `/akili-validate` issues a verdict** — not after
 - [ ] Every requirement-level AC checked, at **clause** granularity per §2
-- [ ] Coverage thresholds green; `/swagger` documents both endpoints
+- [x] Coverage thresholds green; `/swagger` documents both endpoints
 - [ ] Migration applied forward and reverted clean
 - [x] OQ-1, OQ-2, OQ-5, OQ-6 closed by T-01, or carried forward explicitly — OQ-5/OQ-6 closed; OQ-1/OQ-2 carried forward with evidence (see `requirements.md` §13, `design.md` §14)
-- [ ] **OQ-4 (`keep_editing`) and risk R-4 remain open by design** — they belong to the PRMS PO meeting, not to this spec
+- [x] **OQ-4 (`keep_editing`) and risk R-4 remain open by design** — they belong to the PRMS PO meeting, not to this spec
 - [ ] Budget checked against actuals; an overrun **escalates rather than continues**

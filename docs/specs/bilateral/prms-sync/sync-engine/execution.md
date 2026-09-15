@@ -1752,3 +1752,83 @@ could not deliver.
   is verified at deploy time, and stays an accepted risk.
 - `npm test` (rootDir `src`) never runs this suite; `test:e2e` is a separate config and is not part of any
   default gate.
+
+---
+
+## Execution complete — all 14 tasks done (2026-09-15)
+
+Commit `02020cc5` closes T-14. Working tree clean. **Not pushed** — pushing is the human's action.
+
+### Spec-level exit criteria (`tasks.md` §Definition of Done)
+
+| Criterion | State | Evidence / owner |
+|---|---|---|
+| All fourteen tasks `done` | **[x]** | 11 spec commits, T-01…T-14, each with a Reviewer PASS recorded above |
+| Coverage thresholds green; `/swagger` documents both endpoints | **[x]** | See below |
+| OQ-4 and R-4 remain open **by design** | **[x]** | Verified still open: OQ-4 owned by the PRMS PO (`design.md:441`, `requirements.md:531`, default `false` until decided); R-4 recorded as **accepted residual risk** controlled by a runbook step (`requirements.md:520`), mechanical only once the decision-webhook child exists |
+| Every requirement-level AC at **clause** granularity | **[ ]** | Belongs to `/akili-validate`, not to this command |
+| Someone has exercised the sync in the running product | **[ ]** | **Human.** Must happen *before* `/akili-validate` issues a verdict, not after |
+| Migration applied forward and reverted clean | **[ ]** | **Human.** Touches the shared Dev database, which is not disposable |
+| Budget checked against actuals | **[ ]** | Measured below; the criterion says an overrun **escalates rather than continues**, so it is left for the human to close |
+
+### Coverage
+
+`npm run test:cov -- --silent` → **exit 0**, 387 suites / 3288 tests. Global
+**90.27 stmts · 76.89 branch · 86.54 funcs · 89.87 lines**, against a threshold of 60 on all four.
+
+The spec's own modules, and one finding worth stating plainly:
+
+| File | Stmts | Branch |
+|---|---|---|
+| `result-prms-sync.service.ts` | 94.23 | 73.46 |
+| `result-prms-sync-log.repository.ts` | 92.42 | 64.70 |
+| `result-prms-sync-aggregate.repository.ts` | 92.68 | 67.85 |
+| `prms-normalizer.service.ts` | 96.55 | 66.66 |
+| **`prms-sync-response.interpreter.ts`** | **67.12** | **58.18** |
+
+**The weakest-covered file in the module is the one implementing the 207 rule** — the DC-3 logic itself.
+Its branch coverage (58.18) sits **below the 60 bar** the rest of the repo clears, even though the *global*
+threshold is green and the gate therefore passes. Uncovered: lines 76, 99, 146, 152-160, 165, 170-181, 186,
+193-194, 203-209. The **behaviour** is proven live by T-14's e2e; what is thin is the unit-level branch
+exercise around DD-18's cause-split. Recorded as a known weakness for `/akili-validate`, not smoothed over.
+
+`/swagger`: verified earlier in this log by the Leader against the **generated document** (not decorator
+presence, per KZ-002) — both paths present, `@ApiBearerAuth` on both, POST documenting `200, 404, 409, 422,
+502, 503`.
+
+### Budget vs actuals (design §13: 14 tasks · ~2 000 LOC · 2 review rounds)
+
+Measured over the 11 spec commits only; the range `first^..HEAD` contains **11 commits, all of them this
+spec's**, so no foreign work is counted.
+
+| Dimension | Budget | Actual | Ratio |
+|---|---|---|---|
+| Tasks | 14 | 14 | 1.0× |
+| LOC (`src` + `test`) | ~2 000 | **9 724** | **4.9×** |
+| ↳ production `.ts` | — | 3 708 | **1.9× if the budget meant production only** |
+| ↳ co-located `.spec.ts` in `src` | — | 4 767 | — |
+| ↳ `test/` (e2e + integration) | — | 1 321 | — |
+| Review rounds | 2 | **14** | **7×** |
+
+Two-thirds of the volume is test code. Against production code alone the overrun is **1.9×**, not 4.9× — the
+honest reading, since a 2 000-LOC estimate for a 14-task integration almost certainly scoped production.
+The review-round overrun is the larger signal: the tripwire fired during execution, the human ruled
+*"seguir, pero aligerar los tests"*, and rounds still reached 14 — driven by T-13 (4 attempts) and T-14
+(3 attempts, 3 reviews). **Escalated to the human rather than self-closed.**
+
+### Coverage limits carried out of this spec (KZ-017)
+
+- **DC-7** — a non-prod environment reaching the PROD Normalizer — stays **structurally uncoverable** here.
+  T-14's abort-before-boot guard closes the hole inside this repo; nothing in this repo can prove the
+  deployed production build resolves the right host.
+- `npm test` (rootDir `src`) never runs `test:e2e` or `test:integration`. Neither is part of a default gate,
+  so both must be invoked deliberately.
+- The `bilateral/primary-contributing-sp` integration suite fails 9 tests in this environment for want of
+  `T13_MYSQL_PASSWORD`. Different spec, untouched by this work, fail-loud by design.
+
+### Leader measurement errors this run: **12**
+
+Recorded throughout rather than tallied at the end. The last two: `orca orchestration dispatch-list` does not
+exist and its failure envelope was parsed as *"0 dispatches"*; and a coverage run was captured through
+`tail -25`, so the `All files` row was truncated away and the follow-up greps returned a confident empty.
+Both are K-014 — a count over a failed command, and a filtered view mistaken for the output.
