@@ -35,6 +35,29 @@ export interface PrmsSyncResponseData {
   failure_reason: string | null;
 }
 
+/**
+ * Gate entries 3–8 and post-claim payload-build refusals persist a
+ * REFUSED_BY_STAR row (design.md §4 / §5.1). Carry the attempt_number the
+ * write already produced — never recompute, never null, never 0.
+ */
+export const persistedStarRefusalData = (
+  attemptNumber: number,
+  failureReason: string,
+): PrmsSyncResponseData => ({
+  outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
+  attempt_number: attemptNumber,
+  http_status: null,
+  request_id: null,
+  prms_result_code: null,
+  failure_reason: failureReason,
+});
+
+export class PrmsSyncPersistedRefusalException extends UnprocessableEntityException {
+  constructor(readonly responseData: PrmsSyncResponseData) {
+    super(responseData.failure_reason ?? 'Refused by STAR');
+  }
+}
+
 export interface SyncOptions {
   now?: Date;
 }
@@ -111,7 +134,7 @@ export class ResultPrmsSyncService {
 
     if (!gate.allowed) {
       if (gate.persistsRow) {
-        await this.logRepository.insertRefusedByStar({
+        const inserted = await this.logRepository.insertRefusedByStar({
           resultId,
           environment,
           userId,
@@ -124,9 +147,11 @@ export class ResultPrmsSyncService {
           outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
           requestId: null,
         });
-        throwHttp(
-          gate.httpStatus ?? HttpStatus.UNPROCESSABLE_ENTITY,
-          gate.description ?? 'Refused by STAR',
+        throw new PrmsSyncPersistedRefusalException(
+          persistedStarRefusalData(
+            inserted.attemptNumber,
+            gate.description ?? 'Refused by STAR',
+          ),
         );
       }
       throwHttp(
@@ -188,7 +213,9 @@ export class ResultPrmsSyncService {
           },
           { resultOfficialCode: claim.resultOfficialCode, environment },
         );
-        throw new UnprocessableEntityException(error.message);
+        throw new PrmsSyncPersistedRefusalException(
+          persistedStarRefusalData(claim.attemptNumber, error.message),
+        );
       }
       throw error;
     }

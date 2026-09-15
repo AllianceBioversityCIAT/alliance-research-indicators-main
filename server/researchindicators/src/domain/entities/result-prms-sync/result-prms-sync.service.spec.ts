@@ -26,6 +26,7 @@ import {
 import {
   redactPrmsPayload,
   ResultPrmsSyncService,
+  PrmsSyncPersistedRefusalException,
 } from './result-prms-sync.service';
 
 const API_KEY = 'super-secret-key-material';
@@ -256,6 +257,70 @@ describe('ResultPrmsSyncService', () => {
     });
     expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
     expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('propagates insertRefusedByStar attemptNumber on a persisted 422 refusal', async () => {
+    logRepository.insertRefusedByStar.mockResolvedValue({
+      attemptId: 11,
+      attemptNumber: 5,
+    });
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ pool_funding_alignment_green: false }),
+    );
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(refusal).toBeInstanceOf(PrmsSyncPersistedRefusalException);
+    expect(refusal).toBeInstanceOf(UnprocessableEntityException);
+    const data = (refusal as PrmsSyncPersistedRefusalException).responseData;
+    expect(data.attempt_number).toBe(5);
+    expect(data.attempt_number).not.toBeNull();
+    expect(data.attempt_number).not.toBe(0);
+    expect(data).toEqual({
+      outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
+      attempt_number: 5,
+      http_status: null,
+      request_id: null,
+      prms_result_code: null,
+      failure_reason: 'Pool Funding Alignment is not green-checked',
+    });
+    expect(logRepository.insertRefusedByStar).toHaveBeenCalledTimes(1);
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+  });
+
+  it('propagates the claimed attemptNumber on a post-claim payload-build 422', async () => {
+    logRepository.claimAttempt.mockResolvedValue({
+      kind: 'claimed',
+      attemptId: 9,
+      attemptNumber: 8,
+      resultOfficialCode: 1001,
+    });
+    payloadBuilder.build.mockImplementation(() => {
+      throw new PrmsPayloadBuildError(
+        "Missing mandatory field 'title'",
+        'title',
+      );
+    });
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(refusal).toBeInstanceOf(PrmsSyncPersistedRefusalException);
+    const data = (refusal as PrmsSyncPersistedRefusalException).responseData;
+    expect(data.attempt_number).toBe(8);
+    expect(data.attempt_number).not.toBeNull();
+    expect(data.attempt_number).not.toBe(0);
+    expect(data.failure_reason).toBe("Missing mandatory field 'title'");
+    expect(logRepository.settleIfInFlight).toHaveBeenCalledTimes(1);
   });
 
   it('logs _warn when a missing-aggregate settle is late', async () => {

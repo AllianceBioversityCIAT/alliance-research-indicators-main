@@ -2,7 +2,7 @@
 
 - **Module:** `bilateral` → `prms-sync`
 - **Spec id:** `2026-09-prms-sync-engine`
-- **Status:** `in-progress` — T-01…T-12 done (2026-09-15); T-13/T-14 next
+- **Status:** `in-progress` — T-01…T-13 done (2026-09-15); **T-14 is the last task**
 - **Owner:** ARI / David Casañas
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md) · **Field mapping:** [`./homologation.md`](./homologation.md) · **Review:** [`./judgment.md`](./judgment.md)
@@ -313,7 +313,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-13 — Controller, module registration, read surface
+### T-13 — Controller, module registration, read surface  ✅ `[x]` DONE (attempt 4, HALT lifted)
 
 - **Requirements covered:** R-PRMS-001 AC.1–2, R-PRMS-014 AC.1–2, NFR-004
 - **Files touched:** `result-prms-sync.controller.ts`, `result-prms-sync.module.ts`, `domain/routes/main.routes.ts`, `domain/entities/entities.module.ts` (+ specs)
@@ -324,10 +324,10 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
   - ⚠️ **Registration is two steps.** A route node alone returns `404` on every handler, with no boot error (child guide §4).
   - Swagger: `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation` required.
 - **Done check:**
-  - [ ] `expect(Reflect.getMetadata('imports', EntitiesModule)).toContain(ResultPrmsSyncModule)` — the falsifiable module-graph assertion, not a route-array shape check
-  - [ ] Both endpoints appear at `/swagger` with the bearer lock
-  - [ ] `GET` never returns `request_payload`
-  - [ ] Each error status carries a distinct `description` (NFR-004)
+  - [x] `expect(Reflect.getMetadata('imports', EntitiesModule)).toContain(ResultPrmsSyncModule)` — the falsifiable module-graph assertion, not a route-array shape check
+  - [x] Both endpoints appear at `/swagger` with the bearer lock
+  - [x] `GET` never returns `request_payload`
+  - [x] Each error status carries a distinct `description` (NFR-004)
 - **Failing input:** remove the `entities.module.ts` import but keep the route node — the metadata assertion must go red. A mocked-provider controller spec stays green through this, which is exactly why it is not the gate.
 - **Disqualifies the evidence:** a controller unit spec with mocked providers. It cannot see a missing registration — this shipped twice in one spec over four `404` endpoints.
 - **Effort:** M · **Depends on:** T-09, T-10, T-11, T-12 · **Skills:** `nestjs-expert`, `api-design-principles`
