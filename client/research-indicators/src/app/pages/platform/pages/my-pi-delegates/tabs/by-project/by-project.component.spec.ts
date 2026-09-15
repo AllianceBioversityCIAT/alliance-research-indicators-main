@@ -406,4 +406,89 @@ describe('ByProjectComponent', () => {
       expect(component.formatDate(undefined)).toBe('—');
     });
   });
+  // ── 9. In-card toolbar, paginator and summary ─────────────────────────
+
+  describe('in-card toolbar (search + status)', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+    });
+
+    it('renders the search box INSIDE the table card, not in the page shell', () => {
+      const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
+      expect(card.querySelector('#by-project-search')).not.toBeNull();
+    });
+
+    it('typing in the in-card search box filters the rows', () => {
+      expect(component.filteredRows().length).toBe(3);
+
+      const input = fixture.debugElement.query(By.css('#by-project-search'));
+      (input.nativeElement as HTMLInputElement).value = 'PRJ-002';
+      input.triggerEventHandler('ngModelChange', 'PRJ-002');
+      fixture.detectChanges();
+
+      expect(component.filteredRows().length).toBe(1);
+      expect(component.filteredRows()[0].project_code).toBe('PRJ-002');
+    });
+
+    it('statusOptions is derived from the cache: "All" first, deduplicated and sorted', () => {
+      expect(component.statusOptions()[0]).toBe('All');
+      expect(component.statusOptions()).toContain('Ongoing');
+      expect(component.statusOptions()).toContain('Completed');
+      expect(component.statusOptions().filter(o => o === 'Ongoing').length).toBe(1);
+    });
+
+    it('setting the status term filters the rows (negative discriminator)', () => {
+      component.statusTerm.set('Completed');
+      fixture.detectChanges();
+
+      expect(component.filteredRows().length).toBe(1);
+      expect(component.filteredRows()[0].project_code).toBe('PRJ-002');
+    });
+  });
+
+  describe('paginator', () => {
+    function manyProjects(count: number): ProjectDelegates[] {
+      return Array.from({ length: count }, (_, i) => ({
+        ...PROJECT_NO_DELEGATES,
+        project_code: `PRJ-${String(i).padStart(3, '0')}`,
+        project_name: `Project ${i}`
+      }));
+    }
+
+    it('renders a paginator inside the table card and caps the page at 10 rows', async () => {
+      await createComponent(manyProjects(12));
+
+      const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
+      expect(card.querySelector('.p-paginator')).not.toBeNull();
+      expect(component.filteredRows().length).toBe(12);
+      expect(card.querySelectorAll('tr.by-project__row').length).toBe(10);
+    });
+  });
+
+  describe('summary line', () => {
+    it('renders inside the table card with people / assignments / projects counts', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+
+      const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
+      const summary = card.querySelector('.by-project__summary-left') as HTMLElement | null;
+      expect(summary).not.toBeNull();
+      // 3 distinct delegates (Alice, Bob, Carol), 3 assignments, 2 projects
+      expect(summary?.textContent).toContain('3 people');
+      expect(summary?.textContent).toContain('3 active assignments');
+      expect(summary?.textContent).toContain('2 projects');
+    });
+
+    it('shows the inactive marker only when a delegate is inactive (discriminator)', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+      let marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
+      expect(marker).toBeNull();
+
+      serviceStub.byProjectCache.set([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+      fixture.detectChanges();
+
+      marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
+      expect(marker).not.toBeNull();
+      expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+    });
+  });
 });

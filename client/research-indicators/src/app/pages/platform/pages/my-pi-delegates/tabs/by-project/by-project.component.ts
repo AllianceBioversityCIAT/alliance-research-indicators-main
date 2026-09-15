@@ -1,7 +1,9 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05)
 //
 // By-project tab: enriched p-table with per-delegate "X" revoke.
-// searchQuery and statusFilter are now input() signals, driven by the shell filter bar.
+// The tab owns its own toolbar (search + status), paginator and summary line —
+// all three live INSIDE the table card. searchQuery/statusFilter remain inputs
+// that seed the local state, so a host can still preset a filter.
 // Covers: R-UI-002 (by-project view), R-UI-008 (revoke named pair only),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
 //
@@ -14,13 +16,15 @@ import {
   Output,
   computed,
   inject,
-  input
+  input,
+  linkedSignal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { DropdownModule } from 'primeng/dropdown';
 import { TooltipModule } from 'primeng/tooltip';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -35,6 +39,7 @@ import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates
     TableModule,
     ButtonModule,
     InputTextModule,
+    DropdownModule,
     TooltipModule
   ],
   templateUrl: './by-project.component.html',
@@ -58,14 +63,52 @@ export class ByProjectComponent {
     projectName: string | null;
   }>();
 
-  // ─── Input signals from shell filter bar ─────────────────────────────────────
+  // ─── Filter state ────────────────────────────────────────────────────────────
+  // The inputs seed the local writable state; the in-table toolbar then drives it.
   readonly searchQuery = input<string>('');
   readonly statusFilter = input<string>('All');
 
+  readonly searchTerm = linkedSignal(() => this.searchQuery());
+  readonly statusTerm = linkedSignal(() => this.statusFilter());
+
+  /** Status dropdown options, derived from the rows actually in the cache. */
+  readonly statusOptions = computed<string[]>(() => {
+    const all = new Set<string>();
+    for (const p of this.service.byProjectCache()) {
+      if (p.status) all.add(p.status);
+    }
+    return ['All', ...Array.from(all).sort()];
+  });
+
+  // ─── Summary line (rendered inside the table card) ───────────────────────────
+  readonly summaryPeople = computed(() => {
+    const ids = new Set<number>();
+    for (const p of this.service.byProjectCache()) {
+      for (const d of p.delegates) ids.add(d.delegate_user_id);
+    }
+    return ids.size;
+  });
+
+  readonly summaryAssignments = computed(() =>
+    this.service.byProjectCache().reduce((sum, p) => sum + p.delegates.length, 0)
+  );
+
+  readonly summaryProjects = computed(() => this.service.byProjectCache().length);
+
+  readonly summaryInactive = computed(() => {
+    const seen = new Set<number>();
+    for (const p of this.service.byProjectCache()) {
+      for (const d of p.delegates) {
+        if (d.is_active === false) seen.add(d.delegate_user_id);
+      }
+    }
+    return seen.size;
+  });
+
   /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {
-    const query = this.searchQuery().trim().toLowerCase();
-    const status = this.statusFilter();
+    const query = this.searchTerm().trim().toLowerCase();
+    const status = this.statusTerm();
     return this.service.byProjectCache().filter(row => {
       const matchesStatus = status === 'All' || row.status === status;
       const matchesQuery = !query || this.matchesQuery(row, query);

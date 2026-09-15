@@ -2,7 +2,8 @@
 //
 // By-person tab: reads service.byPersonCache() directly (populated by the
 // GET /api/pi-delegates/by-user/people endpoint via loadByUser).
-// searchQuery is now an input() signal driven by the shell filter bar.
+// The tab owns its own search box, paginator and summary line — all three live
+// INSIDE the table card. searchQuery remains an input that seeds the local state.
 // Covers: R-UI-003 (By-person view), R-UI-008 (revoke named pair only),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
 //
@@ -15,7 +16,8 @@ import {
   Output,
   computed,
   inject,
-  input
+  input,
+  linkedSignal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -67,8 +69,10 @@ export class ByPersonComponent {
     name: string | null;
   }>();
 
-  // ─── Input signal from shell filter bar ───────────────────────────────────────
+  // ─── Filter state ─────────────────────────────────────────────────────────────
+  // The input seeds the local writable state; the in-table search box drives it.
   readonly searchQuery = input<string>('');
+  readonly searchTerm = linkedSignal(() => this.searchQuery());
 
   // ─── byPersonCache read (R-UI-003 / R-UI-010 / by-user/people endpoint) ──────
   /**
@@ -90,10 +94,29 @@ export class ByPersonComponent {
 
   /** Search-filtered view: never mutates personRows (R-UI-010). */
   readonly filteredRows = computed<PersonRow[]>(() => {
-    const query = this.searchQuery().trim().toLowerCase();
+    const query = this.searchTerm().trim().toLowerCase();
     if (!query) return this.personRows();
     return this.personRows().filter(row => this.matchesQuery(row, query));
   });
+
+  // ─── Summary line (rendered inside the table card) ───────────────────────────
+  readonly summaryPeople = computed(() => this.personRows().length);
+
+  readonly summaryAssignments = computed(() =>
+    this.personRows().reduce((sum, row) => sum + row.projects.length, 0)
+  );
+
+  readonly summaryProjects = computed(() => {
+    const codes = new Set<string>();
+    for (const row of this.personRows()) {
+      for (const project of row.projects) codes.add(project.project_code);
+    }
+    return codes.size;
+  });
+
+  readonly summaryInactive = computed(
+    () => this.personRows().filter(row => row.is_active === false).length
+  );
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
   /**

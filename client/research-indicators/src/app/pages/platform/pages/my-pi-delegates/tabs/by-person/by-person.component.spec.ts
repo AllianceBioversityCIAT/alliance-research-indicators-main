@@ -560,4 +560,75 @@ describe('ByPersonComponent', () => {
       expect(assignEmitted.length).toBe(0);
     });
   });
+  // ── 7. In-card search, paginator and summary ──────────────────────────
+
+  describe('in-card search box', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB, CAROL_INACTIVE]);
+    });
+
+    it('renders the search box INSIDE the table card, not in the page shell', () => {
+      const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
+      expect(card.querySelector('#by-person-search')).not.toBeNull();
+    });
+
+    it('typing in the in-card search box filters the rows', () => {
+      expect(component.filteredRows().length).toBe(3);
+
+      const input = fixture.debugElement.query(By.css('#by-person-search'));
+      input.triggerEventHandler('ngModelChange', 'carol');
+      fixture.detectChanges();
+
+      expect(component.filteredRows().length).toBe(1);
+      expect(component.filteredRows()[0].name).toBe('Carol Gone');
+    });
+  });
+
+  describe('paginator', () => {
+    function manyPeople(count: number): DelegateProjects[] {
+      return Array.from({ length: count }, (_, i) => ({
+        delegate_user_id: i + 1,
+        name: `Person ${i}`,
+        email: `person${i}@test.org`,
+        is_active: true,
+        projects: [{ project_code: `PRJ-${i}`, project_name: `Project ${i}` }]
+      }));
+    }
+
+    it('renders a paginator inside the table card and caps the page at 10 rows', async () => {
+      await createComponent(manyPeople(12));
+
+      const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
+      expect(card.querySelector('.p-paginator')).not.toBeNull();
+      expect(component.filteredRows().length).toBe(12);
+      expect(card.querySelectorAll('tr.by-person__row').length).toBe(10);
+    });
+  });
+
+  describe('summary line', () => {
+    it('renders inside the table card with people / assignments / projects counts', async () => {
+      await createComponent([ALICE, BOB]);
+
+      const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
+      const summary = card.querySelector('.by-person__summary-left') as HTMLElement | null;
+      expect(summary).not.toBeNull();
+      // Alice (PRJ-A, PRJ-B) + Bob (PRJ-B) → 2 people, 3 assignments, 2 distinct projects
+      expect(summary?.textContent).toContain('2 people');
+      expect(summary?.textContent).toContain('3 active assignments');
+      expect(summary?.textContent).toContain('2 projects');
+    });
+
+    it('shows the inactive marker only when a person is inactive (discriminator)', async () => {
+      await createComponent([ALICE]);
+      let marker = fixture.nativeElement.querySelector('.by-person__summary-left .atc-red-1');
+      expect(marker).toBeNull();
+
+      serviceStub.byPersonCache.set([ALICE, CAROL_INACTIVE]);
+      fixture.detectChanges();
+
+      marker = fixture.nativeElement.querySelector('.by-person__summary-left .atc-red-1');
+      expect(marker).not.toBeNull();
+      expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+    });
+  });
 });

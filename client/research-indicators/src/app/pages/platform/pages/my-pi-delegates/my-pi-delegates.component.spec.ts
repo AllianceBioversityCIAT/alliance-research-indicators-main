@@ -6,10 +6,8 @@
 //   1. R-UI-002 AC.1  — opens with By-project tab active by DEFAULT.
 //   2. Title "My PI Delegates" + description text renders; info banner is ABSENT.
 //   3. 3 stat counters render service values (wrong wiring → wrong value → test fails).
-//   4. Footer summary computes people/assignments/projects/inactive from byProjectCache
-//      (wrong counts fail — discriminating).
-//   5. Status dropdown options derived from distinct statuses in byProjectCache.
-//   6. searchQuery and statusFilter signals are passed as inputs to by-project.
+//   4. The shell owns NO search box, status dropdown or summary line — those
+//      live inside each tab's table card (asserted as absent here).
 //   7. NFR-UI-003     — loading / error states (K-015 transitions).
 //   8. Tab signal     — activeTabIndex changes on tab switch.
 //
@@ -20,7 +18,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TabViewModule } from 'primeng/tabview';
-import { DropdownModule } from 'primeng/dropdown';
 import MyPiDelegatesComponent from './my-pi-delegates.component';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -99,7 +96,7 @@ describe('MyPiDelegatesComponent', () => {
     mockCacheService = createMockCacheService(99);
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, DropdownModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockService },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },
@@ -224,92 +221,24 @@ describe('MyPiDelegatesComponent', () => {
     expect((firstValue as HTMLElement | null)?.classList.contains('atc-orange-1')).toBe(false);
   });
 
-  // ── 3. Footer summary ───────────────────────────────────────────────────────
+  // ── 3. Search / summary live in the tables, not the shell ───────────────────
 
-  it('footer shows zero counts when cache is empty', () => {
+  it('does NOT render a shell-level filter bar (search + status moved into each table)', () => {
     fixture.detectChanges();
-    const footer = fixture.nativeElement.querySelector('.pi-delegates-footer__left');
-    const text = (footer as HTMLElement | null)?.textContent ?? '';
-    // 0 people, 0 active assignments, 0 projects
-    expect(text).toContain('0 people');
-    expect(text).toContain('0 active assignments');
-    expect(text).toContain('0 projects');
+    expect(fixture.nativeElement.querySelector('.pi-delegates-filterbar')).toBeNull();
+    expect(fixture.nativeElement.querySelector('#pi-delegates-search')).toBeNull();
   });
 
-  it('footer counts people/assignments/projects correctly after cache is populated', () => {
-    // Arrange: start empty (initial state)
-    fixture.detectChanges();
-
-    // Act: populate cache (K-015 transition)
-    // 2 projects: P001 has 2 delegates (Alice active, Bob inactive), P002 has 1 delegate (Carol active)
+  it('does NOT render a shell-level footer summary (moved into each table card)', () => {
     mockService.byProjectCache.set([
       makeProject({
         project_code: 'P001',
-        status: 'Ongoing',
-        delegates: [
-          { delegate_user_id: 1, name: 'Alice', email: 'alice@c.com', is_active: true },
-          { delegate_user_id: 2, name: 'Bob', email: 'bob@c.com', is_active: false }
-        ]
-      }),
-      makeProject({
-        project_code: 'P002',
-        status: 'Completed',
-        delegates: [
-          { delegate_user_id: 3, name: 'Carol', email: 'carol@c.com', is_active: true }
-        ]
+        delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@c.com', is_active: true }]
       })
     ]);
     fixture.detectChanges();
-
-    // Assert: people = 3 (distinct ids 1,2,3), activeAssignments = 3, projects = 2, inactive = 1 (Bob)
-    const footer = fixture.nativeElement.querySelector('.pi-delegates-footer__left');
-    const text = (footer as HTMLElement | null)?.textContent ?? '';
-    expect(text).toContain('3 people');
-    expect(text).toContain('3 active assignments');
-    expect(text).toContain('2 projects');
-    // Bob is inactive → inactive count shown
-    const inactiveEl = fixture.nativeElement.querySelector('.pi-delegates-footer__left .atc-red-1');
-    expect(inactiveEl).not.toBeNull();
-    expect((inactiveEl as HTMLElement).textContent).toContain('1');
-  });
-
-  it('footer does NOT show inactive marker when all delegates are active', () => {
-    mockService.byProjectCache.set([
-      makeProject({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'a@c.com', is_active: true }] })
-    ]);
-    fixture.detectChanges();
-
-    const inactiveEl = fixture.nativeElement.querySelector('.pi-delegates-footer__left .atc-red-1');
-    expect(inactiveEl).toBeNull();
-  });
-
-  it('footer right text says "Only projects where you are the Principal Investigator are listed"', () => {
-    fixture.detectChanges();
-    const footerRight = fixture.nativeElement.querySelector('.pi-delegates-footer__right');
-    expect((footerRight as HTMLElement | null)?.textContent).toContain('Principal Investigator');
-  });
-
-  // ── 4. Status options ───────────────────────────────────────────────────────
-
-  it('statusOptions starts with "All" and derives from byProjectCache statuses', () => {
-    // Pre-condition: empty
-    fixture.detectChanges();
-    expect(component.statusOptions()).toEqual(['All']);
-
-    // Act: add projects with statuses
-    mockService.byProjectCache.set([
-      makeProject({ project_code: 'P1', status: 'Ongoing', delegates: [] }),
-      makeProject({ project_code: 'P2', status: 'Completed', delegates: [] }),
-      makeProject({ project_code: 'P3', status: 'Ongoing', delegates: [] }) // duplicate
-    ]);
-    fixture.detectChanges();
-
-    // Assert: deduplicated, sorted, 'All' first
-    expect(component.statusOptions()).toContain('All');
-    expect(component.statusOptions()).toContain('Ongoing');
-    expect(component.statusOptions()).toContain('Completed');
-    // No duplicate Ongoing
-    expect(component.statusOptions().filter(s => s === 'Ongoing').length).toBe(1);
+    expect(fixture.nativeElement.querySelector('.pi-delegates-footer')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-footer__left')).toBeNull();
   });
 
   // ── 5. NFR-UI-003 — Loading state (K-015 transition) ───────────────────────
@@ -393,18 +322,6 @@ describe('MyPiDelegatesComponent', () => {
     expect(component.activeTabIndex()).toBe(0);
   });
 
-  // ── 9. searchQuery and statusFilter signals ─────────────────────────────────
-
-  it('searchQuery signal starts empty', () => {
-    fixture.detectChanges();
-    expect(component.searchQuery()).toBe('');
-  });
-
-  it('statusFilter signal starts as All', () => {
-    fixture.detectChanges();
-    expect(component.statusFilter()).toBe('All');
-  });
-
   // ── 10. Delegation History wiring ───────────────────────────────────────────
 
   describe('onHistoryFromProject handler (10)', () => {
@@ -466,7 +383,7 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
     const noUserCache = { dataCache: signal({ user: undefined }) };
 
     await TestBed.configureTestingModule({
-      imports: [MyPiDelegatesComponent, TabViewModule, DropdownModule, NoopAnimationsModule],
+      imports: [MyPiDelegatesComponent, TabViewModule, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: mockSvc },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },

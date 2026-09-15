@@ -8,13 +8,6 @@
 
   <!-- ── Page header block ───────────────────────────────────────────── -->
   <header class="pi-delegates-header">
-    <!-- Breadcrumb -->
-    <nav class="pi-delegates-breadcrumb" aria-label="Breadcrumb">
-      <span class="pi-delegates-breadcrumb__segment atc-grey-600">Principal Investigator</span>
-      <span class="pi-delegates-breadcrumb__separator atc-grey-400" aria-hidden="true"> › </span>
-      <span class="pi-delegates-breadcrumb__current atc-light-blue-400">My PI Delegates</span>
-    </nav>
-
     <h1 class="pi-delegates-title atc-primary-blue-600">My PI Delegates</h1>
     <p class="pi-delegates-description atc-grey-600">
       The people you delegate to review results on your behalf. Assign the PI Delegate role across
@@ -24,16 +17,25 @@
     <!-- Stat counters -->
     <div class="pi-delegates-stats" role="list" aria-label="PI Delegates summary statistics">
       <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-head">
+          <i class="pi pi-briefcase pi-delegates-stats__counter-icon atc-primary-blue-300" aria-hidden="true"></i>
+          <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS AS PI</span>
+        </span>
         <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalProjects() }}</span>
-        <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS AS PI</span>
       </div>
       <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-head">
+          <i class="pi pi-users pi-delegates-stats__counter-icon atc-primary-blue-300" aria-hidden="true"></i>
+          <span class="pi-delegates-stats__counter-label atc-grey-600">PI DELEGATES</span>
+        </span>
         <span class="pi-delegates-stats__counter-value atc-primary-blue-600">{{ service.totalDistinctDelegates() }}</span>
-        <span class="pi-delegates-stats__counter-label atc-grey-600">PI DELEGATES</span>
       </div>
       <div class="pi-delegates-stats__counter" role="listitem">
+        <span class="pi-delegates-stats__counter-head">
+          <i class="pi pi-exclamation-triangle pi-delegates-stats__counter-icon atc-orange-1" aria-hidden="true"></i>
+          <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS WITHOUT PI DELEGATE</span>
+        </span>
         <span class="pi-delegates-stats__counter-value atc-orange-1">{{ service.projectsWithoutDelegate().length }}</span>
-        <span class="pi-delegates-stats__counter-label atc-grey-600">PROJECTS WITHOUT PI DELEGATE</span>
       </div>
     </div>
   </header>
@@ -58,36 +60,6 @@
 
   <!-- ── Tabs + content ─────────────────────────────────────────────── -->
   @else {
-    <!-- ── Shared filter bar (search + status) ─────────────────────── -->
-    <div class="pi-delegates-filterbar">
-      <div class="pi-delegates-filterbar__search-wrapper">
-        <i class="pi pi-search pi-delegates-filterbar__search-icon" aria-hidden="true"></i>
-        <input
-          pInputText
-          type="text"
-          id="pi-delegates-search"
-          [ngModel]="searchQuery()"
-          (ngModelChange)="searchQuery.set($event)"
-          placeholder="Search a person or a project"
-          aria-label="Search a person or a project"
-          class="pi-delegates-filterbar__search-input"
-        />
-      </div>
-
-      @if (activeTabIndex() === 0) {
-        <div class="pi-delegates-filterbar__status-wrapper">
-          <p-dropdown
-            [options]="statusOptions()"
-            [ngModel]="statusFilter()"
-            (ngModelChange)="statusFilter.set($event)"
-            [placeholder]="'Status: ' + statusFilter()"
-            styleClass="pi-delegates-filterbar__status-dropdown"
-            aria-label="Filter by status"
-          />
-        </div>
-      }
-    </div>
-
     <p-tabView
       [activeIndex]="activeTabIndex()"
       (activeIndexChange)="onTabChange({ index: $event })"
@@ -96,8 +68,6 @@
       <!-- ── Tab 0: By project (DEFAULT — R-UI-002 AC.1) ─────────── -->
       <p-tabPanel header="By project">
         <app-by-project
-          [searchQuery]="searchQuery()"
-          [statusFilter]="statusFilter()"
           (assignRequested)="onAssignFromProject($event)"
           (historyRequested)="onHistoryFromProject($event)"
         ></app-by-project>
@@ -106,32 +76,12 @@
       <!-- ── Tab 1: By person (T-UI-06) ──────────────────────────────── -->
       <p-tabPanel header="By person">
         <app-by-person
-          [searchQuery]="searchQuery()"
           (assignRequested)="onAssignFromPerson($event)"
           (historyRequested)="onHistoryFromPerson($event)"
         ></app-by-person>
       </p-tabPanel>
     </p-tabView>
 
-    <!-- ── Footer summary line ─────────────────────────────────────────── -->
-    <footer class="pi-delegates-footer" aria-label="PI Delegates summary">
-      <span class="pi-delegates-footer__left atc-grey-700">
-        {{ footerPeople() }} {{ footerPeople() === 1 ? 'person' : 'people' }}
-        &nbsp;·&nbsp;
-        {{ footerActiveAssignments() }} active {{ footerActiveAssignments() === 1 ? 'assignment' : 'assignments' }}
-        across {{ footerProjects() }} {{ footerProjects() === 1 ? 'project' : 'projects' }}
-        @if (footerInactive() > 0) {
-          &nbsp;·&nbsp;
-          <span class="atc-red-1">
-            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-            {{ footerInactive() }} {{ footerInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        }
-      </span>
-      <span class="pi-delegates-footer__right atc-grey-600">
-        Only projects where you are the Principal Investigator are listed
-      </span>
-    </footer>
   }
 
 </div>

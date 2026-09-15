@@ -1,6 +1,8 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04)
 //
 // Page shell for My PI Delegates.
+// The search box, paginator and summary line live INSIDE each tab's table card —
+// the shell only owns the header, the load/error states and the tab strip.
 // Covers: R-UI-002 AC.1 (By-project default), NFR-UI-001 (STAR tokens),
 //         NFR-UI-002 (non-colour cues), NFR-UI-003 (states).
 //
@@ -12,10 +14,7 @@
 
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { TabViewModule } from 'primeng/tabview';
-import { DropdownModule } from 'primeng/dropdown';
-import { InputTextModule } from 'primeng/inputtext';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
 import { ByProjectComponent } from './tabs/by-project/by-project.component';
 import { ByPersonComponent } from './tabs/by-person/by-person.component';
@@ -25,7 +24,7 @@ import { CacheService } from '@services/cache/cache.service';
 @Component({
   selector: 'app-my-pi-delegates',
   standalone: true,
-  imports: [CommonModule, FormsModule, TabViewModule, DropdownModule, InputTextModule, ByProjectComponent, ByPersonComponent],
+  imports: [CommonModule, TabViewModule, ByProjectComponent, ByPersonComponent],
   templateUrl: './my-pi-delegates.component.html',
   styleUrl: './my-pi-delegates.component.scss'
 })
@@ -41,44 +40,6 @@ export default class MyPiDelegatesComponent implements OnInit {
   onTabChange(event: { index: number }): void {
     this.activeTabIndex.set(event.index);
   }
-
-  // ─── Shared filter bar signals ────────────────────────────────────────────────
-  readonly searchQuery = signal('');
-  readonly statusFilter = signal<string>('All');
-
-  // ─── Status dropdown options (derived from byProjectCache) ───────────────────
-  readonly statusOptions = computed<string[]>(() => {
-    const all = new Set<string>();
-    for (const p of this.service.byProjectCache()) {
-      if (p.status) all.add(p.status);
-    }
-    return ['All', ...Array.from(all).sort()];
-  });
-
-  // ─── Footer summary computeds ─────────────────────────────────────────────────
-  readonly footerPeople = computed(() => {
-    const ids = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) ids.add(d.delegate_user_id);
-    }
-    return ids.size;
-  });
-
-  readonly footerActiveAssignments = computed(() =>
-    this.service.byProjectCache().reduce((sum, p) => sum + p.delegates.length, 0)
-  );
-
-  readonly footerProjects = computed(() => this.service.byProjectCache().length);
-
-  readonly footerInactive = computed(() => {
-    const seen = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) {
-        if (d.is_active === false) seen.add(d.delegate_user_id);
-      }
-    }
-    return seen.size;
-  });
 
   // ─── State accessors ─────────────────────────────────────────────────────────
   readonly loading = computed(() => this.service.loading());

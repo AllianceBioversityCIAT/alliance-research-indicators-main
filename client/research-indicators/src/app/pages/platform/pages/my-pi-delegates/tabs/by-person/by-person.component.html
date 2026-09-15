@@ -7,12 +7,35 @@
 
 <div class="by-person">
 
-  <!-- ── Table ──────────────────────────────────────────────────────── -->
+  <!-- ── Table card: toolbar + table + paginator + summary ──────────── -->
   <div class="by-person__table-wrapper">
+
+    <!-- Per-table search — lives inside the card -->
+    <div class="by-person__toolbar">
+      <div class="by-person__search-wrapper">
+        <i class="pi pi-search by-person__search-icon" aria-hidden="true"></i>
+        <input
+          pInputText
+          type="text"
+          id="by-person-search"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          placeholder="Search a person or a project"
+          aria-label="Search a person or a project"
+          class="by-person__search-input"
+        />
+      </div>
+    </div>
+
     <p-table
       [value]="filteredRows()"
       [loading]="service.loading()"
       [scrollable]="true"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[10, 25, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} people"
       styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
       aria-label="PI Delegates by person"
     >
@@ -149,6 +172,26 @@
         </tr>
       </ng-template>
     </p-table>
+
+    <!-- Summary line — inside the card, below the paginator -->
+    <div class="by-person__summary" aria-label="PI Delegates summary">
+      <span class="by-person__summary-left atc-grey-700">
+        {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
+        &nbsp;·&nbsp;
+        {{ summaryAssignments() }} active {{ summaryAssignments() === 1 ? 'assignment' : 'assignments' }}
+        across {{ summaryProjects() }} {{ summaryProjects() === 1 ? 'project' : 'projects' }}
+        @if (summaryInactive() > 0) {
+          &nbsp;·&nbsp;
+          <span class="atc-red-1">
+            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
+          </span>
+        }
+      </span>
+      <span class="by-person__summary-right atc-grey-600">
+        Only projects where you are the Principal Investigator are listed
+      </span>
+    </div>
   </div>
 
   <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->

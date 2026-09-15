@@ -3,16 +3,12 @@
 // Visual language mirrors project-detail: white header band over a grey-200
 // rule, Space Grotesk micro-labels, Barlow values, flat tab strip with a
 // light-blue active underline, and a grey well holding white table cards.
-// Page gutters follow the same rhythm (24px, 28px from md up).
-@mixin page-inline {
-  padding-inline: 24px;
-
-  @media (width >= 768px) {
-    padding-inline: 28px;
-  }
-}
+// Page gutters follow the same rhythm (24px, 28px from md up), carried to every
+// section by the inherited --pi-gutter custom property.
 
 .pi-delegates-page {
+  --pi-gutter: 24px;
+
   display: flex;
   flex-direction: column;
   padding-top: 8px;
@@ -23,6 +19,8 @@
   }
 
   @media (width >= 768px) {
+    --pi-gutter: 28px;
+
     padding-top: 20px;
   }
 }
@@ -30,28 +28,11 @@
 // ─── Page header block ───
 
 .pi-delegates-header {
-  @include page-inline;
-
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-block: 9px 16px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--ac-grey-200);
-}
-
-.pi-delegates-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-  margin-bottom: 4px;
-  font-family: Barlow, sans-serif;
-  font-size: 12px;
-  line-height: 16px;
-
-  &__current {
-    font-weight: 600;
-  }
+  padding-block: 9px 18px;
+  padding-inline: var(--pi-gutter);
 }
 
 .pi-delegates-title {
@@ -76,92 +57,53 @@
 .pi-delegates-stats {
   display: flex;
   flex-flow: row wrap;
-  gap: 8px 40px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 14px;
 
+  // Card treatment mirrors the project-detail indicator tiles.
   &__counter {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
+    min-width: 150px;
+    padding: 8px 10px;
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    background-color: var(--ac-grey-100);
   }
 
-  &__counter-value {
-    font-family: Barlow, sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-    line-height: 22px;
+  &__counter-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  &__counter-icon {
+    flex-shrink: 0;
+    font-size: 13px;
+    line-height: 16px;
   }
 
   &__counter-label {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.03rem;
-    line-height: 13px;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 16px;
     text-transform: uppercase;
   }
-}
 
-// ─── Shared filter bar ───
-
-.pi-delegates-filterbar {
-  @include page-inline;
-
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding-bottom: 14px;
-
-  &__search-wrapper {
-    position: relative;
-    flex: 1;
-    min-width: 14rem;
-    max-width: 28rem;
-  }
-
-  &__search-icon {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    padding-left: 12px;
-    pointer-events: none;
-    color: var(--ac-grey-600);
-    font-size: 13px;
-    z-index: 1;
-  }
-
-  &__search-input {
-    width: 100%;
-    padding-left: 2.125rem !important;
-    border-radius: 8px !important;
-    max-height: 36px !important;
-    font-family: Barlow, sans-serif !important;
-    font-size: 14px !important;
-    border-color: var(--ac-grey-200) !important;
-    color: var(--ac-grey-800) !important;
-  }
-
-  &__status-wrapper {
-    flex-shrink: 0;
-  }
-
-  &__status-dropdown {
-    height: 36px;
-    font-family: Barlow, sans-serif;
-    font-size: 14px;
-    border-radius: 8px;
+  &__counter-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 20px;
   }
 }
 
 // ─── Loading / error states (NFR-UI-003) ───
 
 .pi-delegates-state {
-  @include page-inline;
-
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -171,6 +113,7 @@
   font-size: 14px;
   background-color: var(--ac-grey-100);
   border-block: 1px solid var(--ac-grey-200);
+  padding-inline: var(--pi-gutter);
 }
 
 .pi-delegates-state__icon {
@@ -221,33 +164,91 @@
     border: 1px solid var(--ac-grey-200);
     border-top: 0;
   }
-}
 
-// ─── Footer summary line ───
-
-.pi-delegates-footer {
-  @include page-inline;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding-block: 12px;
-  background-color: var(--ac-white-1);
-  font-family: Barlow, sans-serif;
-  font-size: 13px;
-  line-height: 1.5;
-
-  &__left {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    flex-wrap: wrap;
+  // Per-table card chrome: toolbar, paginator and summary line. Defined once
+  // here because both tab tables render the identical structure.
+  .p-paginator {
+    padding: 8px 12px;
+    font-family: Barlow, sans-serif;
+    font-size: 13px;
+    background-color: var(--ac-white-1);
+    border-top: 1px solid var(--ac-grey-200);
   }
 
-  &__right {
-    font-style: italic;
-    font-size: 12px;
+  // by-project only: the status dropdown next to the search box
+  .pi-delegates-status-dropdown {
+    height: 36px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    border-color: var(--ac-grey-200);
+    border-radius: 8px;
+  }
+
+  .by-project,
+  .by-person {
+    &__toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--ac-grey-200);
+    }
+
+    &__search-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 14rem;
+      max-width: 28rem;
+    }
+
+    &__search-icon {
+      position: absolute;
+      inset-block: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      pointer-events: none;
+      color: var(--ac-grey-600);
+      font-size: 13px;
+      z-index: 1;
+    }
+
+    &__search-input {
+      width: 100%;
+      padding-left: 2.125rem;
+      max-height: 36px;
+      font-family: Barlow, sans-serif;
+      font-size: 14px;
+      border-color: var(--ac-grey-200);
+      border-radius: 8px;
+      color: var(--ac-grey-800);
+    }
+
+    &__summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--ac-grey-200);
+      font-family: Barlow, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    &__summary-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    &__summary-right {
+      font-style: italic;
+      font-size: 12px;
+    }
   }
 }
