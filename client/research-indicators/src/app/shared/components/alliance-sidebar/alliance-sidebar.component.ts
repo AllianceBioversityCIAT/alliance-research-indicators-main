@@ -47,19 +47,13 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
     { icon: 'pi-external-link', label: 'Other Reporting Tools', link: '45', underConstruction: true, hide: true }
   ];
 
-  // ─── Principal Investigator groups (R-UI-001 / design §9) ───────────────────
-  // Shown unconditionally to authenticated users in the platform shell.
+  // ─── Principal Investigator options (R-UI-001 / design §9) ──────────────────
+  // Flat, direct links (no collapsible parent). Shown unconditionally to
+  // authenticated users in the platform shell.
   // TODO(eligibility): refine visibility to ≥1 managed project when
   //   the dedicated projects endpoint is wired (design §9 fallback in effect).
-  piGroups(): AdministrationNavGroup[] {
-    return [
-      {
-        id: 'pi',
-        label: 'Principal Investigator',
-        icon: 'pi-users',
-        children: [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-user-edit', iconSize: '13px' }]
-      }
-    ];
+  piOptions(): AdministrationNavChild[] {
+    return [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-user-edit', iconSize: '13px' }];
   }
 
   administrationGroups(): AdministrationNavGroup[] {

@@ -166,21 +166,21 @@ describe('AllianceSidebarComponent', () => {
     expect(visible[0].label).toBe('Visible');
   });
 
-  // ─── T-UI-03: Principal Investigator group + My PI Delegates child (R-UI-001) ──
-  it('should always expose a "pi" group in piGroups()', () => {
-    const groups = component.piGroups();
-    expect(groups).toHaveLength(1);
-    const piGroup = groups[0];
-    expect(piGroup.id).toBe('pi');
-    expect(piGroup.label).toBe('Principal Investigator');
-    expect(piGroup.icon).toBe('pi-users');
+  // ─── T-UI-03: My PI Delegates as a direct (non-collapsible) option (R-UI-001) ──
+  it('should expose My PI Delegates as a flat option (no collapsible parent group)', () => {
+    const options = component.piOptions();
+    expect(options).toHaveLength(1);
+    expect(options[0].label).toBe('My PI Delegates');
+    expect(options[0].link).toBe('/my-pi-delegates');
+    expect((component as unknown as { piGroups?: unknown }).piGroups).toBeUndefined();
   });
 
-  it('should include a My PI Delegates child linking to /my-pi-delegates', () => {
-    const piGroup = component.piGroups()[0];
-    const child = piGroup.children.find(c => c.link === '/my-pi-delegates');
-    expect(child).toBeDefined();
-    expect(child?.label).toBe('My PI Delegates');
+  it('should not render a Principal Investigator toggle button in the sidebar', () => {
+    fixture.detectChanges();
+    const labels = (fixture.nativeElement as HTMLElement).querySelectorAll('.admin-parent .sidebar-option-label');
+    expect(Array.from(labels).some(el => el.textContent?.trim() === 'Principal Investigator')).toBe(false);
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/my-pi-delegates"]');
+    expect(link).toBeTruthy();
   });
 
   it('should still expose the center-admin group when access is granted (no existing group removed)', () => {
