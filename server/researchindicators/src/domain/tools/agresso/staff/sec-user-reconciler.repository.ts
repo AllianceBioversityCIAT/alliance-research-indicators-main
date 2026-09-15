@@ -15,6 +15,28 @@ export interface SecUserRoleRow {
   is_active: boolean;
 }
 
+/** Values for a `sec_users` row that this reconciliation creates. */
+export interface SecUserCreateRow {
+  firstName: string;
+  lastName: string;
+  email: string;
+  carnet: string;
+}
+
+/** Values for an existing `sec_users` row whose display data is refreshed. */
+export interface SecUserRefreshRow {
+  secUserId: number;
+  firstName: string;
+  lastName: string;
+  carnet: string;
+}
+
+/** The minimal re-select shape used to grant a role after a create. */
+export interface CreatedSecUserRow {
+  sec_user_id: number;
+  carnet: string;
+}
+
 /**
  * Fixed batch size for every statement this repository chunks — the `sec_user_roles` read here,
  * and the writes T-03 adds. Exported as one module constant (design.md §5.4, OQ-D4) so
@@ -125,6 +147,167 @@ export class SecUserReconcilerRepository extends Repository<SecUser> {
     return results;
   }
 
+  /** Sets the database-clock marker used by the post-create re-select (DD-7). */
+  async setRunStart(manager: EntityManager): Promise<void> {
+    await manager.query('SET @run_start = NOW(6)');
+  }
+
+  /**
+   * Creates accounts in multi-row chunks. `created_by` is intentionally omitted: it is nullable
+   * in the existing schema and this background sync has no request actor; timestamps use their
+   * schema defaults, consistently with the existing raw-SQL account creation path.
+   */
+  async createSecUsers(
+    manager: EntityManager,
+    rows: SecUserCreateRow[],
+  ): Promise<void> {
+    for (const rowsChunk of this.chunk(rows, CHUNK)) {
+      const placeholders = rowsChunk
+        .map(() => '(?, ?, ?, ?, 1, TRUE)')
+        .join(', ');
+      const params = rowsChunk.flatMap((row) => [
+        this.truncateName(row.firstName),
+        this.truncateName(row.lastName),
+        row.email,
+        row.carnet,
+      ]);
+      await manager.query(
+        `INSERT INTO sec_users
+          (first_name, last_name, email, carnet, status_id, is_active)
+          VALUES ${placeholders}`,
+        params,
+      );
+    }
+  }
+
+  /** Re-selects created ids by carnet, never the non-unique email column (DD-7). */
+  async findCreatedSecUsers(
+    manager: EntityManager,
+    carnets: string[],
+  ): Promise<CreatedSecUserRow[]> {
+    if (!carnets.length) {
+      return [];
+    }
+
+    const rows: CreatedSecUserRow[] = [];
+    for (const carnetsChunk of this.chunk(carnets, CHUNK)) {
+      const placeholders = carnetsChunk.map(() => '?').join(', ');
+      const result: CreatedSecUserRow[] = await manager.query(
+        `SELECT sec_user_id, carnet
+          FROM sec_users
+          WHERE carnet IN (${placeholders})
+            AND is_active = 1
+            AND created_at >= @run_start`,
+        carnetsChunk,
+      );
+      rows.push(...result);
+    }
+
+    return rows;
+  }
+
+  /** Grants the literal CONTRIBUTOR role to accounts created or restored by this sync. */
+  async grantContributorRoles(
+    manager: EntityManager,
+    userIds: number[],
+  ): Promise<void> {
+    const uniqueIds = this.uniqueNumericIds(userIds);
+    for (const idsChunk of this.chunk(uniqueIds, CHUNK)) {
+      const placeholders = idsChunk.map(() => '(?, 3, TRUE)').join(', ');
+      await manager.query(
+        `INSERT INTO sec_user_roles (user_id, role_id, is_active)
+          VALUES ${placeholders}`,
+        idsChunk,
+      );
+    }
+  }
+
+  /** Refreshes display names only; email, status and activation state are deliberately absent. */
+  async refreshSecUserNames(
+    manager: EntityManager,
+    rows: SecUserRefreshRow[],
+  ): Promise<void> {
+    this.assertNumericIds(rows.map((row) => row.secUserId));
+    for (const rowsChunk of this.chunk(rows, CHUNK)) {
+      const firstNameCase = rowsChunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const lastNameCase = rowsChunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const ids = rowsChunk.map((row) => row.secUserId);
+      const params = [
+        ...rowsChunk.flatMap((row) => [
+          row.secUserId,
+          this.truncateName(row.firstName),
+        ]),
+        ...rowsChunk.flatMap((row) => [
+          row.secUserId,
+          this.truncateName(row.lastName),
+        ]),
+        ...ids,
+      ];
+      await manager.query(
+        `UPDATE sec_users
+          SET first_name = CASE sec_user_id ${firstNameCase} END,
+              last_name = CASE sec_user_id ${lastNameCase} END
+          WHERE sec_user_id IN (${ids.map(() => '?').join(', ')})`,
+        params,
+      );
+    }
+  }
+
+  /** Backfills carnet only when the database row is empty; the guard must stay in SQL. */
+  async backfillSecUserCarnets(
+    manager: EntityManager,
+    rows: SecUserRefreshRow[],
+  ): Promise<void> {
+    this.assertNumericIds(rows.map((row) => row.secUserId));
+    for (const rowsChunk of this.chunk(rows, CHUNK)) {
+      const carnetCase = rowsChunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const ids = rowsChunk.map((row) => row.secUserId);
+      const params = [
+        ...rowsChunk.flatMap((row) => [row.secUserId, row.carnet]),
+        ...ids,
+      ];
+      await manager.query(
+        `UPDATE sec_users
+          SET carnet = CASE sec_user_id ${carnetCase} END
+          WHERE sec_user_id IN (${ids.map(() => '?').join(', ')})
+            AND (carnet IS NULL OR TRIM(carnet) = '')`,
+        params,
+      );
+    }
+  }
+
+  /** Restores only the selected account's activation flag. */
+  async reactivateSecUsers(
+    manager: EntityManager,
+    userIds: number[],
+  ): Promise<void> {
+    const uniqueIds = this.uniqueNumericIds(userIds);
+    for (const idsChunk of this.chunk(uniqueIds, CHUNK)) {
+      await manager.query(
+        `UPDATE sec_users SET is_active = 1
+          WHERE sec_user_id IN (${idsChunk.map(() => '?').join(', ')})`,
+        idsChunk,
+      );
+    }
+  }
+
+  /** Restores selected inactive CONTRIBUTOR role rows, never an elevated role (N-4). */
+  async reactivateContributorRoles(
+    manager: EntityManager,
+    roleIds: number[],
+  ): Promise<void> {
+    const uniqueIds = this.uniqueNumericIds(roleIds);
+    for (const idsChunk of this.chunk(uniqueIds, CHUNK)) {
+      await manager.query(
+        `UPDATE sec_user_roles SET is_active = 1
+          WHERE sec_user_role_id IN (${idsChunk.map(() => '?').join(', ')})
+            AND role_id = 3
+            AND is_active = 0`,
+        idsChunk,
+      );
+    }
+  }
+
   private assertNumericIds(ids: number[]): void {
     const invalid = ids.filter(
       (id) => typeof id !== 'number' || !Number.isInteger(id) || id <= 0,
@@ -134,6 +317,16 @@ export class SecUserReconcilerRepository extends Repository<SecUser> {
         `SecUserReconcilerRepository: expected positive integer user ids, got: ${invalid.join(', ')}`,
       );
     }
+  }
+
+  private uniqueNumericIds(ids: number[]): number[] {
+    const uniqueIds = Array.from(new Set(ids));
+    this.assertNumericIds(uniqueIds);
+    return uniqueIds;
+  }
+
+  private truncateName(name: string): string {
+    return name.slice(0, 60);
   }
 
   private chunk<T>(items: T[], size: number): T[][] {

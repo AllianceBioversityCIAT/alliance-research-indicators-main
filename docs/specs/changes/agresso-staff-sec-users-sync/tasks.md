@@ -107,12 +107,12 @@ graph TD
   - **`role_id = 3` is pinned in SQL** in both reactivation statements — a `WHERE` predicate in the update, a **literal** in the insert. This is `N-4`, a severe finding: the guard was removed by the very correction meant to harden the statement.
   - Names are **truncated to 60** before the statement is built. Under strict mode an unhandled over-length value rolls back the whole transaction (`W-4`).
 - **Acceptance / done check:**
-  - [ ] A stored non-empty carnet survives a conflicting payload value, proven against the database, not the emitted string.
-  - [ ] The reactivation update carries `AND role_id = 3 AND is_active = 0`.
-  - [ ] A 75-character `firstName` is written truncated and the run completes.
+  - [ ] A stored non-empty carnet survives a conflicting payload value, proven against the database, not the emitted string. — **NOT discharged by T-03.** The SQL guard `AND (carnet IS NULL OR TRIM(carnet) = '')` is present and its gate was observed red, but "proven against the database" is a DB claim and `npm test` never runs `test/fixtures/`. **Carried to T-09.**
+  - [x] The reactivation update carries `AND role_id = 3 AND is_active = 0`. — present in SQL; gate asserts it by regex and was observed red when the predicate was deleted (finding N-4, the task's most dangerous line).
+  - [x] A 75-character `firstName` is written truncated and the run completes. — truncation to 60 happens **before** the parameter array is built; observed red at 59. ⚠️ The *"and the run completes"* half is a strict-mode DB claim and belongs to **T-09**.
 - **Dependencies:** T-01
-- **Estimated effort:** M (~120 LOC)
-- **Status:** todo
+- **Estimated effort:** M (~120 LOC) — **actual 385 LOC** (193 impl + 192 spec).
+- **Status:** **done** — PASS 2026-09-15, 1 Implementer attempt / 1 Reviewer round. First task executed by **Codex** (`gpt-5.6-terra`) and reviewed by **Antigravity** (`gemini-3.1-pro-high`). See [`./execution.md`](./execution.md) → T-03.
 
 ---
 

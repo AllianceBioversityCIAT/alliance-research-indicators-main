@@ -8,10 +8,14 @@ import {
 describe('SecUserReconcilerRepository', () => {
   let repository: SecUserReconcilerRepository;
   let querySpy: jest.SpyInstance;
+  let transactionManager: Pick<EntityManager, 'query'>;
 
   beforeEach(() => {
     repository = new SecUserReconcilerRepository({} as EntityManager);
     querySpy = jest.spyOn(repository, 'query').mockResolvedValue([]);
+    transactionManager = {
+      query: jest.fn().mockResolvedValue([]),
+    };
   });
 
   afterEach(() => {
@@ -148,5 +152,193 @@ describe('SecUserReconcilerRepository', () => {
       ).rejects.toThrow();
       expect(querySpy).not.toHaveBeenCalled();
     });
+  });
+
+  describe('write side (design.md §5.4)', () => {
+    const createRows = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        firstName: `First ${index}`,
+        lastName: `Last ${index}`,
+        email: `user-${index}@alliance.org`,
+        carnet: `C${index}`,
+      }));
+
+    const refreshRows = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        secUserId: index + 1,
+        firstName: `First ${index}`,
+        lastName: `Last ${index}`,
+        carnet: `C${index}`,
+      }));
+
+    it('sets runStart on the transaction connection with NOW(6), never a Node timestamp', async () => {
+      await repository.setRunStart(transactionManager as EntityManager);
+
+      expect(transactionManager.query).toHaveBeenCalledWith(
+        'SET @run_start = NOW(6)',
+      );
+    });
+
+    it('creates accounts in CHUNK-sized multi-row INSERTs, with status 1 and active TRUE', async () => {
+      await repository.createSecUsers(
+        transactionManager as EntityManager,
+        createRows(CHUNK + 3),
+      );
+
+      expect(transactionManager.query).toHaveBeenCalledTimes(2);
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/insert into sec_users/i);
+      expect(sql).toMatch(/\(\?, \?, \?, \?, 1, TRUE\)/);
+      expect(params).toHaveLength(CHUNK * 4);
+      expect(sql).not.toMatch(/created_by|updated_by/i);
+    });
+
+    it('truncates names to 60 characters before creating the SQL parameter array', async () => {
+      const firstName = 'F'.repeat(75);
+
+      await repository.createSecUsers(transactionManager as EntityManager, [
+        {
+          firstName,
+          lastName: 'Last',
+          email: 'new@alliance.org',
+          carnet: 'A100',
+        },
+      ]);
+
+      const [, params] = (transactionManager.query as jest.Mock).mock.calls[0];
+      expect(params[0]).toBe(firstName.slice(0, 60));
+      expect(params[0]).toHaveLength(60);
+    });
+
+    it('re-selects post-create ids by carnet, active state and the server-side run marker — never email', async () => {
+      await repository.findCreatedSecUsers(
+        transactionManager as EntityManager,
+        ['A100', 'B200'],
+      );
+
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/carnet\s+IN\s*\(\?, \?\)/i);
+      expect(sql).toMatch(/is_active\s*=\s*1/i);
+      expect(sql).toMatch(/created_at\s*>=\s*@run_start/i);
+      expect(sql).not.toMatch(/email/i);
+      expect(params).toEqual(['A100', 'B200']);
+    });
+
+    it('grants the literal role_id 3 in chunked multi-row INSERTs', async () => {
+      const ids = Array.from({ length: CHUNK + 3 }, (_, index) => index + 1);
+
+      await repository.grantContributorRoles(
+        transactionManager as EntityManager,
+        ids,
+      );
+
+      expect(transactionManager.query).toHaveBeenCalledTimes(2);
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/insert into sec_user_roles/i);
+      expect(sql).toMatch(/\(\?, 3, TRUE\)/);
+      expect(params).toHaveLength(CHUNK);
+    });
+
+    it('refreshes names through CASE and truncates values before the SQL parameters are built', async () => {
+      const firstName = 'F'.repeat(75);
+
+      await repository.refreshSecUserNames(
+        transactionManager as EntityManager,
+        [{ secUserId: 10, firstName, lastName: 'Last', carnet: 'A100' }],
+      );
+
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/first_name\s*=\s*CASE sec_user_id WHEN \? THEN \?/i);
+      expect(sql).toMatch(/last_name\s*=\s*CASE sec_user_id WHEN \? THEN \?/i);
+      expect(params[1]).toBe(firstName.slice(0, 60));
+      expect(params[1]).toHaveLength(60);
+    });
+
+    it('guards carnet backfill in SQL, so a non-empty stored carnet cannot be overwritten by a batch-building defect', async () => {
+      await repository.backfillSecUserCarnets(
+        transactionManager as EntityManager,
+        refreshRows(1),
+      );
+
+      const [sql] = (transactionManager.query as jest.Mock).mock.calls[0];
+      expect(sql).toMatch(
+        /where\s+sec_user_id\s+in[\s\S]*and\s+\(carnet\s+is\s+null\s+or\s+trim\(carnet\)\s*=\s*''\)/i,
+      );
+    });
+
+    it('reactivates only sec_users.is_active and chunks the id list', async () => {
+      const ids = Array.from({ length: CHUNK + 3 }, (_, index) => index + 1);
+
+      await repository.reactivateSecUsers(
+        transactionManager as EntityManager,
+        ids,
+      );
+
+      expect(transactionManager.query).toHaveBeenCalledTimes(2);
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/^UPDATE sec_users SET is_active = 1/i);
+      expect(sql).not.toMatch(/email|status_id|carnet/i);
+      expect(params).toHaveLength(CHUNK);
+    });
+
+    it('reactivates selected role rows only when they are inactive CONTRIBUTORS (N-4)', async () => {
+      await repository.reactivateContributorRoles(
+        transactionManager as EntityManager,
+        [700, 701],
+      );
+
+      const [sql, params] = (transactionManager.query as jest.Mock).mock
+        .calls[0];
+      expect(sql).toMatch(/sec_user_role_id\s+IN\s*\(\?, \?\)/i);
+      expect(sql).toMatch(/AND\s+role_id\s*=\s*3\s+AND\s+is_active\s*=\s*0/i);
+      expect(params).toEqual([700, 701]);
+    });
+
+    it.each([
+      [
+        'create',
+        (manager: EntityManager) =>
+          repository.createSecUsers(manager, createRows(CHUNK + 3)),
+      ],
+      [
+        'refresh',
+        (manager: EntityManager) =>
+          repository.refreshSecUserNames(manager, refreshRows(CHUNK + 3)),
+      ],
+      [
+        'backfill',
+        (manager: EntityManager) =>
+          repository.backfillSecUserCarnets(manager, refreshRows(CHUNK + 3)),
+      ],
+      [
+        'reactivate users',
+        (manager: EntityManager) =>
+          repository.reactivateSecUsers(
+            manager,
+            Array.from({ length: CHUNK + 3 }, (_, index) => index + 1),
+          ),
+      ],
+      [
+        'reactivate roles',
+        (manager: EntityManager) =>
+          repository.reactivateContributorRoles(
+            manager,
+            Array.from({ length: CHUNK + 3 }, (_, index) => index + 1),
+          ),
+      ],
+    ])(
+      '%s writes are chunked rather than issued per member',
+      async (_, write) => {
+        await write(transactionManager as EntityManager);
+
+        expect(transactionManager.query).toHaveBeenCalledTimes(2);
+        expect(transactionManager.query).not.toHaveBeenCalledTimes(CHUNK + 3);
+      },
+    );
   });
 });

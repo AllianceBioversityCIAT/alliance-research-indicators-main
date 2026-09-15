@@ -218,7 +218,7 @@ families**, not merely across two instances of one.
 | Role | Host | Model |
 | --- | --- | --- |
 | **Leader** — plan, decompose, select skills/effort, adjudicate, write the audit trail | Claude Code | `opus` (T1) |
-| **Implementer — server** | **Codex** (`codex exec`) | `gpt-5.3-codex` family, **execution tier** — a well-specified task does not need a deep reasoner |
+| **Implementer — server** | **Codex** (`codex exec`) | **`gpt-5.6-terra`**, effort `medium` — *"balanced agentic coding model for everyday work"*. **Not `gpt-6-astra`**, which is the *"most capable model for complex, demanding work"*. ⚠️ Valid slugs come from `~/.codex/models_cache.json`, **never** from asking the model what it is — see the trap below |
 | **Implementer — client** | **Cursor** (`cursor-agent -p`) | `cursor-grok-4.6-*` |
 | **Reviewer** — read-only spec-conformance audit | **Antigravity** (`agy`) | **`gemini-3.1-pro-high`** — the *thinking* tier, **never `*-flash`** |
 

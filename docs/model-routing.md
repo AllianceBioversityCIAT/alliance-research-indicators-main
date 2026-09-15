@@ -87,7 +87,7 @@ holds across **model families**, not merely across two instances of one family.
 | Role | Host | CLI | Model | Why this one |
 | --- | --- | --- | --- | --- |
 | **Leader** — plan, decompose, select skills/effort, adjudicate FAILs, decide pivots, write the audit trail | Claude Code | `claude` | `opus` (T1) | Orchestration judgment: low volume, high leverage |
-| **Implementer — server** (`server/researchindicators`) | **Codex** | `codex exec` | `gpt-5.3-codex` family, **execution tier** | Standing user instruction: *"no se necesita un super modelo pensante para ejecutar"* — a well-specified task does not need a deep reasoner |
+| **Implementer — server** (`server/researchindicators`) | **Codex** | `codex exec` | **`gpt-5.6-terra`** (`--effort medium`) | Standing user instruction: *"no se necesita un super modelo pensante para ejecutar"*. **`gpt-5.6-terra`** is *"Balanced agentic coding model for everyday work"*; **`gpt-6-astra`** is *"our most capable model for complex, demanding work"* — i.e. exactly the deep reasoner this rule declines. See the model table below |
 | **Implementer — client** (`client/research-indicators`) | **Cursor** | `cursor-agent -p` | `cursor-grok-4.6-*`; Cursor may pick the best available | Same rule, client lane |
 | **Reviewer** — read-only spec-conformance audit | **Antigravity** | `agy` | **`gemini-3.1-pro-high`** — the *thinking* tier, **never `*-flash`** | Cross-family independence from both implementers |
 
@@ -120,6 +120,26 @@ orca orchestration worker-release --dispatch <id> --json   # after each accepted
 | **Cursor** | `cursor-agent` → `~/.local/bin/cursor-agent`, **v2026.08.25**. Non-interactive: `-p/--print` (has write + shell tools), `--output-format text\|json\|stream-json`, `--model`, `--list-models`, `--force`/`--yolo`, `--workspace` | ✅ **Working**, logged in. `cursor-agent status` reports the account. Catalog includes **both** `cursor-grok-4.6-*` **and** the full `gpt-5.3-codex-{low,,-high,-xhigh}` family — so Cursor is a viable **fallback executor for server work** if the Codex CLI is ever down again |
 | **Antigravity** | `agy` (**not** `antigravity`) | ✅ Installed. Headless needs `--dangerously-skip-permissions` (even a file read is auto-denied without it). **Effort is baked into the slug**, so `--model gemini-3.1-pro-high` is the whole selection |
 | OpenCode | `opencode` | Installed; **unusable on this account** (`Insufficient balance`). Re-check before planning around it |
+
+**Codex model slugs — read them from `~/.codex/models_cache.json`, never infer them (probed 2026-09-15):**
+
+| Slug | Description (verbatim from the cache) | Default effort | Use for |
+| --- | --- | --- | --- |
+| `gpt-6-astra` | *"Our most capable model for complex, demanding work."* | `low` | ❌ Not the execution tier — this is the deep reasoner the standing rule declines |
+| `gpt-5.6-terra` | *"Balanced agentic coding model for everyday work."* | `medium` | ✅ **Default Implementer model** |
+| `gpt-5.6-sol` | *"Reliable agentic workhorse for everyday tasks."* | `medium` | ✅ Equivalent alternative |
+| `gpt-5.6-luna` | *"Fast and affordable agentic coding model."* | `medium` | Trivial/mechanical tasks |
+| `gpt-5.5` | *"Proven previous-generation model…"* | `xhigh` | Fallback only |
+| `gpt-reserve`, `codex-auto-review` | hidden (`visibility: hide`) | — | Do not select |
+
+⚠️ **Three slugs that look right and are NOT accepted:** `gpt-5.3-codex`, `gpt-6-codex` and **`gpt-6`**
+all return `400 … not supported when using Codex with a ChatGPT account`. The last one is the
+instructive failure: `codex exec` with **no** `-m` works, and asking that session *"what model are
+you?"* answers **`gpt-6`** — so the value was taken as fact and passed back as `-m gpt-6`, which the
+API rejected. **A model's self-report is not its API identifier.** The worker launched, looked
+healthy to `worker-show` (`state: ready`, `status: dispatched`), and failed only inside the TUI —
+Orca cannot see an in-TUI model error, so this is a *silent* failure mode. `models_cache.json` is the
+authority; verify a slug with a one-line `codex exec -m <slug> --sandbox read-only` before dispatching.
 
 **`agy models` re-probed 2026-09-15 — 15 slugs, unchanged from the 2026-09-09 probe:**
 `gemini-3.8-flash-{high,medium,low}` · `gemini-3.7-flash-{high,medium,low}` ·
