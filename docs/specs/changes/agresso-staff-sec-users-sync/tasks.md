@@ -84,14 +84,14 @@ graph TD
   - Tie-break when one email maps to several rows, in order: prefer **active**; then most recent `last_login_at` (**`NULL` sorts last**); then **lowest `sec_user_id`** as a pure determinism tiebreaker. Rule 3 is safe **only because this spec cannot deactivate** — see the warning in §5.2.
   - Carnet is **written, never matched on** (DD-12).
 - **Acceptance / done check:**
-  - [ ] `ana@alliance.org` is never resolved for a staff member carrying `susana@alliance.org`.
-  - [ ] A null-email member is counted in `skippedUnusableEmail`, **not** in `payloadEmailCollisions`.
-  - [ ] Two members sharing an email collapse to the **first**, and the loser carries both carnets into the log.
-  - [ ] Two runs over identical input classify identically (total ordering).
-  - [ ] A member matching only inactive rows classifies **reactivate**, never **create**.
+  - [x] `ana@alliance.org` is never resolved for a staff member carrying `susana@alliance.org`. — red observed under a substring-scan mutation emulating `LIKE '%…%'`.
+  - [x] A null-email member is counted in `skippedUnusableEmail`, **not** in `payloadEmailCollisions`. — red observed under a collapse-before-validate mutation (`N-3`).
+  - [x] Two members sharing an email collapse to the **first**, and the loser carries both carnets into the log. — red observed under **both** a lexicographic and a numeric comparator, using carnets `'90'`/`'10'` so both wrong orderings disagree with first-arrival. ⚠️ The **log** half is asserted only on the structured `collapsed` record, not on `logger._warn` — see the OBSERVABILITY advisory, carried to T-07.
+  - [x] Two runs over identical input classify identically (total ordering). — discharged, but by the sibling tie-break tests (rules 1/2/3 each observed red), **not** by the test of that name, which cannot fail for its stated reason. See the READABILITY advisory.
+  - [x] A member matching only inactive rows classifies **reactivate**, never **create**. — red observed under the literal J-4 defect (candidate set filtered to active rows before the emptiness check).
 - **Dependencies:** T-01
-- **Estimated effort:** L (~200 LOC)
-- **Status:** todo
+- **Estimated effort:** L (~200 LOC) — **actual 701 LOC** (242 impl + 459 spec).
+- **Status:** **done** — PASS 2026-09-15, 1 Implementer attempt / 1 Reviewer round. See [`./execution.md`](./execution.md) → T-02.
 
 ---
 

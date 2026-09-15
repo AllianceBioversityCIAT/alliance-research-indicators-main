@@ -154,3 +154,114 @@ Reverted; 13/13 green. The Reviewer confirmed `mockResolvedValueOnce` correctly 
 - **Decisions made:** no `ARI_MYSQL_NAME` schema prefix (majority convention: `app-secret.repository.ts` and 2 of 3 `sec_users` methods in `result.repository.ts` use bare names; only `createUserInSecUsers` prefixes — **flagged for T-03, which writes to the same tables and must match whatever is correct**); `CHUNK = 50`, exported, Implementer's choice within OQ-D4's "one module constant"; `extends Repository<SecUser>` with a DTO target, verified safe for `.query()` only.
 - **Issues encountered:** one FAIL (tinyint→boolean), fixed in attempt 2.
 - **Done-check status:** check 2 (exact statement count at n≥50 and n≥100) and check 3 (parameterised, numerically validated) are **discharged at the unit tier with observed reds**. Check 1 (a seeded inactive row is returned) is **NOT discharged** — it is a database claim, see the recorded gap above. It stays unticked and travels to T-09.
+
+---
+
+### T-02 — `SecUserReconcilerService`: validate → index → collapse → match → classify
+
+- **Date:** 2026-09-15
+- **Requirements covered:** R-AGS-001, R-AGS-003
+- **Skills assigned:** `nestjs-expert`, `tdd` (no deviation from the Skill Map; `tdd` added by the Leader because this task is pure decision logic with the repository mocked — algorithm, ordering and classification, the shape red-green actually pays for)
+- **Effort:** `xhigh` from the first attempt, not `medium`. Justification: `tasks.md` §0 precondition 3 states that **every severe finding across five review rounds lived in `design.md` §5.2 or §5.4**, and §5.2 is this task's entire specification.
+- **Status:** *in progress*
+
+#### Leader observation, recorded before dispatch — a cosmetic defect in `design.md` §5.2
+
+The step table in §5.2 contains **literal duplicate rows**. It numbers `1, 2, 3, 4` and then restarts `3, 4, 5, 6, 7`:
+
+| Printed # | Rule | Duplicate of |
+| --- | --- | --- |
+| 3 | Candidate set empty → **create** | — |
+| 4 | Candidate set contains an **active** row → **refresh** | — |
+| 5 | Candidate set empty → **create** | identical to row 3 |
+| 6 | Candidate set contains an **active** row → **refresh** | identical to row 4 |
+| 7 | Candidate set non-empty and **entirely inactive** → **reactivate exactly one** | — |
+
+**This is a documentation artifact from the spec's split/merge history, not two different rules.** The effective logic after the lookup is unambiguously three outcomes: empty → create; any active → refresh; non-empty and all-inactive → reactivate.
+
+**Not treated as a Pivot.** A pivot requires evidence that the spec is *wrong or unviable*; this is redundant presentation of a rule stated identically in both copies, and §5.3's classification table, R-AGS-001, R-AGS-003 AC.5 and R-AGS-007's Details all agree with that reading. No behaviour is ambiguous.
+
+**Carried into the Implementer brief** with the three effective outcomes named explicitly, plus an instruction to **stop and report rather than guess** if it concludes the duplication hides a semantic difference the Leader missed — that determination is the Leader's, not the worker's.
+
+**Recommended for `/akili-archive`:** fold the duplicate rows out of §5.2 when this spec is archived. It costs nothing now and misleads the next reader. Filed here rather than edited in place, because editing an approved spec mid-execution outside the Pivot Protocol is exactly the drift the protocol exists to prevent. Note also that §5.2's prose says *"Step 4 dominates step 5"* while the same rule is described in `tasks.md` T-06 as *"Step 4 dominates step 7"* — the renumbering is a consequence of the same duplication, and both phrasings point at the identical rule (an active match wins over an inactive one).
+
+#### Attempt 1 — Reviewer verdict: **PASS**
+
+**Files changed:** `sec-user-reconciler.service.ts` (new, 242 LOC), `sec-user-reconciler.service.spec.ts` (new, 459 LOC, 19 tests). Nothing else.
+
+**Verification (Implementer, then re-measured by the Leader with no worker active):**
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent` | `Test Suites: 368 passed` / `Tests: 3145 passed` — exactly +1 suite and +19 tests over T-01's 367/3126 |
+| `npx eslint src/domain/tools/agresso/staff` | exit 0 (bare — K-001) |
+
+*(The Implementer's first eslint pass surfaced 34 `prettier/prettier` formatting errors and nothing else; it fixed them with `npx prettier --write` and re-verified with bare eslint. Per the root guide, a formatter produces a file and measures nothing, so it cannot contaminate the evidence — worker may fix, Leader verifies, no single command does both.)*
+
+**Classification shape produced** — `reconcile(staffMembers): Promise<ReconciliationResult>` with five sets: `skipped` (`{staffMember, reason: 'UNUSABLE_EMAIL' | 'CARNET_TOO_LONG'}`), `collapsed` (`{emailKey, winnerCarnet, loserCarnet}`), `create`, `refresh`, `reactivate`. `refresh`/`reactivate` share the `MatchedTarget` shape (`{staffMember, secUser, ambiguousCandidateIds}`) — **the write tasks tell them apart by which array an item came from, never by re-inspecting `secUser.is_active`.** `ambiguousCandidateIds` carries every candidate id including the winner, and only when the set had more than one row.
+
+**K-004 mutation log — 7 gates, each broken, observed red, reverted:**
+
+| # | Gate | Mutation | Observed red |
+| --- | --- | --- | --- |
+| 1 | DD-6 exact match | `index.get(key)` → substring scan emulating `LIKE '%…%'` | `Expected length: 0 / Received length: 1` — `susana@` resolved against `ana@`'s account |
+| 2 | N-3 validate-before-collapse | collapse over raw `staffMembers` first, validate second | `Expected length: 2 / Received length: 1` — a null-email member vanished into a collapse instead of `skipped` |
+| 3a | N-2 first-arrival (lexicographic) | winner by string `<` on `resourceId` | carnets `'90'`/`'10'` chosen so lexicographic- and numeric-lowest **both** disagree with first-arrival → `create` returned `'10'` |
+| 3b | N-2 first-arrival (numeric) | winner by `Number(...) <` | same test, same red |
+| 4 | Tie-break rule 3 (lowest id) | rule 3 → `return 0` | `Expected: 15 / Received: 30` |
+| 5 | Tie-break rule 2 (`last_login_at`) | rule 2 deleted | chose id 10 (null login, lower id) over id 20 (recent login) |
+| 6 | Tie-break rule 1 (active first) | rule 1 deleted | `refresh` empty on a case where rules 2 **and** 3 both point at the inactive row |
+| 7 | All-inactive → reactivate | candidate set filtered to `is_active` before the emptiness check — the literal J-4 defect | `reactivate` empty; the member fell into `create` |
+
+**The Implementer self-detected two of its own gates as non-discriminating and replaced them** — the behaviour KZ-014 exists to produce, reported rather than hidden:
+
+- **Gate 6:** the first "step 4 dominates" fixture passed *even with rule 1 deleted*, because the active row incidentally held the lower `sec_user_id` and rule 3 rescued the answer by coincidence. Replaced with an adversarial fixture (active `id 50`/null-login vs inactive `id 10`/recent-login) where rule 1 is the **only** rule that can produce the right answer.
+- **Gate 3:** the first N-2 fixture (`'10'` vs `'9'`) discriminated only the numeric mutation, since `'10' < '9'` is coincidentally true lexicographically too. Replaced with `'90'`/`'10'`, which defeats both orderings at once.
+
+**Reviewer's independent proofs (not taken on trust):**
+
+- **`chosen.is_active` is a sound proxy for "the candidate set contains an active row"**, proven by induction on `chooseCandidate`'s seedless `reduce`: rule 1 dominates, so the first active candidate always becomes `best` and `best` never regresses to inactive. Therefore mixed → refresh (inactive sibling untouched, R-AGS-001's shared-email scenario), all-inactive → reactivate exactly one (R-AGS-007 AC.1/AC.2, M-3).
+- **The tie-break is a genuine total order** on every value T-01 can produce: reflexive; the comparison is on `getTime()` **numbers**, not `Date` objects, so two distinct `Date` instances at the same instant correctly fall through to rule 3 — had the guard been written `a.last_login_at !== b.last_login_at`, the "lowest `sec_user_id`" test would red. Null is a correct total extension (sorts last), and rule 3 on a primary key makes `compare` return `0` only for the same row.
+
+#### Leader adjudication — the `design.md` collapse-rule contradiction is RESOLVED as stale text
+
+I put a suspected contradiction to the Reviewer rather than deciding it alone. Three sites in `design.md` describe the collapse winner **two incompatible ways**:
+
+| Site | Text | Verdict |
+| --- | --- | --- |
+| §2.1 flow diagram | `winner chosen AGAINST the index, not blind (DD-14, M-4)` | **STALE** |
+| §5.2 paragraph | *"the collapse must see the index, because the stored `carnet` of the matched row is the only signal that says which payload member is the right one (N-2)"* | **STALE** |
+| §12 **DD-14** | *"Lowest `carnet` wins"* | **STALE** — the pre-ruling formulation verbatim |
+| §5.2 **Collapse winner rule** | *"FIRST ARRIVAL WINS"* (user ruling 2026-09-14, closing `OQ-D5`) | ✅ **GOVERNS** |
+
+**Ruling: first-arrival governs; the implementation is correct; the three stale sites are documentation defects, not a conformance FAIL.** The Reviewer's grounds, which are stronger than the ones I had:
+
+1. `OQ-D5` is a **dated, struck-through, resolved open question** — a resolved OQ outranks prose elsewhere in the same document by construction; that is what the OQ table is for.
+2. `requirements.md` R-AGS-003 *Payload collisions* mirrors it (*"the first member in payload order wins"*), and **requirements outrank design on behaviour**.
+3. §5.2's own accepted-consequence #2 states the disputed case and **refuses** it in writing: *"Preferring the carnet-matched member was considered and **not** adopted: it is a second rule where the user asked for one."*
+4. The three stale sites are **one textual stratum** — all describe a carnet comparator, all cite DD-14/M-4, and DD-14's *"Lowest carnet wins"* is *unambiguously* stale because `OQ-D5` says in so many words that first-arrival "retired" it.
+5. **The stale rule is not even well-formed.** "The stored carnet says which payload member is right" has no defined answer when zero payload members match the stored carnet (the rehire-with-a-new-employee-id case DD-14 was *written for*), when the matched row's carnet is `NULL` (the normal state R-AGS-002 exists to backfill), or when the candidate set is empty (a *create*, where there is no stored carnet at all). It could not be implemented as stated without inventing a fallback the spec never specifies — which is `N-2`'s entire argument.
+
+**Not a Pivot:** the spec is not wrong or unviable, and the governing behaviour is stated unambiguously in the two authoritative places. Recorded for `/akili-archive` instead.
+
+#### Leader rulings on the Implementer's two flagged assumptions
+
+1. **Skip-reason precedence — email checked first, so a member failing both is always `UNUSABLE_EMAIL`, never `CARNET_TOO_LONG`. RATIFIED.** The spec is genuinely silent and R-AGS-003 AC.3 is satisfied either way. It is also the *better* order: the `SkipReason` union is two-valued and each member yields exactly one entry, so §9's `skippedUnusableEmail + skippedCarnetTooLong` sums to the skipped population **with no double-count** — a reconciliation T-07 would otherwise owe on the run's only feedback channel. Semantically right too: without a usable email the member can be neither matched nor inserted, so the carnet width is moot. **→ T-09 must assert `UNUSABLE_EMAIL` for a both-invalid member rather than discovering the precedence.**
+2. **Email length measured on the RAW (untrimmed) value; null/blank measured on the trimmed value. RATIFIED.** R-AGS-003's literal text is *"email longer than 150 characters (the column width)"*, and the width governs what is **written** — §5.4 builds the create row with `email` from the staff member. Measuring the guard against the trimmed value while writing the raw one would let a 152-char padded address reach a `varchar(150)` under strict mode: exactly the W-4 class the spec truncates names to avoid. The error direction is the safe one — it can only over-skip (logged, counted, recoverable), never under-skip into an aborted transaction. **→ Carry to T-04:** the spec never says whether the *inserted* `email` is raw or trimmed. Decide it there and keep the two consistent.
+
+#### ADVISORY (4R lenses) — recorded only; never gates, never becomes a task
+
+- **RELIABILITY —** `compareCandidates` degrades to array-order dependence if `last_login_at` is ever unparseable: `new Date(x).getTime()` is `NaN`, `NaN !== NaN` enters the branch, and the returned `NaN` makes `< 0` false, so `reduce` keeps whichever row it saw first — precisely where §5.2 demands totality. **Reachability: could not be constructed.** `timestamp` + no `dateStrings` in `orm.config.ts` yields `Date | null` (confirmed by T-01's attempt-2 column sweep), and the mock harness cannot produce anything else. Becomes reachable the day `dateStrings` is set — the *same* config-sensitivity as T-01's `Boolean('0')` advisory. One guard closes it: treat a `NaN` time as null.
+- **RELIABILITY —** `validate` reads `member.resourceId.length` with no null guard, so a payload member with an absent `resourceId` throws a `TypeError` that aborts the whole `reconcile`. Once T-07 wires it, the caller already holds a `200` (RSK-4), so the run dies **in the logs only**. Reviewer could neither construct it nor prove it impossible: `AgressoStaffRawDto` carries no class-validator decorators and the payload is external ERP JSON, but `resourceId` is the `alliance_user_staff` PK, so a null would likely fail upstream in `base()` first. The spec lists no such error condition → not a conformance gap. **Decide at T-07.**
+- **OBSERVABILITY —** `logger._warn` is spied and **never asserted** in any of the 19 tests, so R-AGS-003 AC.3's *"one `warn` log naming their carnet"*, §5.3's *"logged at `warn` with both carnets"* and §5.2's *"every ambiguous match is reported"* are implemented but uncovered — **and a T-09 fixture cannot observe a logger either**, so nothing downstream picks this up by default. T-02's own done-check says *"the loser carries both carnets into the LOG"* while the test asserts the structured `collapsed` record; the log line does carry both carnets (verified by reading the source), but deleting it would redden nothing. **Carry to T-07** rather than reopening T-02.
+- **READABILITY —** the `'two runs over identical input classify identically (total ordering)'` test cannot fail for its stated reason: same array, same order, pure function, twice. A comparator mutated to `return 0` on ties passes it. The property *is* covered by the sibling `'lowest sec_user_id'` test (`[30, 15]` → asserts `15`). Strengthen by reversing the candidate array between runs.
+- **RELIABILITY —** `findAllSecUsers()` is awaited unconditionally, so `reconcile([])` — which T-07 hands it whenever every page fails to fetch — still issues a full-table read, while §5.1's table says a zero payload means *"Nothing is reconciled. No statement is issued."* Trivially reachable, harmless (read-only). Not gated: §5.1 is contrasting *consequences* with the sibling spec's mass deactivation, and §5.2 mandates the bulk read as an unconditional step 2. An early return on `survivors.length === 0` would make §5.1 literally true.
+- **WIRING (carry to T-07, silent-failure class) —** `SecUserReconcilerService` is **not** in `agresso-staff-tools.module.ts` providers (only `AgressoStaffToolsService` and `SecUserReconcilerRepository` are). Correct for T-02's scope bound, but `server/researchindicators/src/CLAUDE.md` §4 records that a missing registration is exactly the step that **fails silently**. T-07 must add it.
+- **COVERAGE —** `npm run test:cov` was not re-run at T-01 or T-02. Not gated: every branch of the new file is exercised by the 19 tests, so a high-coverage addition cannot pull the global 60% floor down. Worth one measured run before T-09's done-check cites it.
+- **ARCHIVE —** §5.2 carries **two independent merge artifacts**: the duplicated step rows already logged, *plus* the stale pre-`OQ-D5` carnet-comparator stratum (§2.1's ASCII line, §5.2's "must see the index" sentence, §12 DD-14's "Lowest carnet wins").
+
+#### T-02 final verdict: **PASS** (1 Implementer attempt, 1 Reviewer round)
+
+- **Requirements covered:** R-AGS-001, R-AGS-003 (validation + collapse), and the classification that makes R-AGS-002 / R-AGS-007 reachable.
+- **Scope:** clean in both directions. `findSecUserRolesByUserIds` is deliberately **not** called — that read is T-06's. `ReconciliationResult` carries none of §9's counter fields, so it does not pre-empt T-07's DTO, yet makes every §9 field computable downstream.
+- **Done-checks:** all five discharged at the unit tier with observed reds.
