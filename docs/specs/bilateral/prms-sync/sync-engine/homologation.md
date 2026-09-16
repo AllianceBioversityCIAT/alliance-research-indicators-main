@@ -75,7 +75,8 @@ The other **7 (G-1…G-7) were put to the product owner on 2026-09-14 and all 7 
 | **D-1** | **G-1** `usd_budget` / `is_determined` | **Not built, and not substituted (P-1).** STAR holds no per-result, per-contract USD contribution. Emitting `is_determined: true` instead was **considered and rejected**: it would assert a reporting claim the user never made. | 🔴 **Innovation Use is not synced in v1** — gated out at the endpoint with a stated reason (OQ-H1' closed → option (a)). Revisit only after the **PRMS PO meeting** (§11.1). |
 | **D-2** | **G-2** `status_amount` + `amount` | **Not built, and not substituted (P-1).** | ⚠️ **Reachable, not hypothetical.** STAR seeds *"Program, Budget, or Investment"* (`1730993015550`) and `PolicyTypeHomologation` maps it to PRMS `policy_type.id = 1`, which makes both fields mandatory. That **one subtype is gated out** at the endpoint (OQ-H2' closed → option (a)); *Legal instrument* and *Policy or strategy* sync cleanly. Revisit at the PRMS PO meeting. |
 | **D-3** | **G-3** `lead_contact_person` | **Closed — no gap.** Main contact is **mandatory on every STAR result**, so `result_users` + `MAIN_CONTACT (1)` is always populated. | ✅ No fallback chain needed. Row downgraded to **EXACT** in §4. |
-| **D-4** | **G-4** `knowledge_product.handle` | **Knowledge Product is out of scope.** KPs are not STAR's to create — STAR stores imported ones but cannot author them, so it has nothing to push. | ⚫ Supported type set drops **5 → 4**. Supersedes family OQ-F2. `handle` never has to be resolved. |
+| ~~**D-4**~~ | **G-4** `knowledge_product.handle` | **REVERSED 2026-09-16 by the product owner.** D-4 read: *"Knowledge Product is out of scope. KPs are not STAR's to create — STAR stores imported ones but cannot author them, so it has nothing to push."* The technical half of that argument is resolved — the handle **is** available, see **D-4b** below. The product half was a judgement and the owner has reversed it: KPs **will** be sent. | 🟡 Supported type set returns to **5**. `handle` is resolved from `result_evidences`. |
+| **D-4b** | **G-4** `knowledge_product.handle` | **2026-09-16 — the handle's source, measured.** The TIP importer writes **two** evidence rows per KP, discriminated by `evidence_description` (`tip-integration.service.ts:341-352`): `'Handled'` carries the handle, `'DOI'` carries the doi. `'Handled'` is almost certainly a typo for `'Handle'`; it is the literal value in the data and is matched **exactly**. Confirmed on a real Dev row: `result_id 8741` → evidence `13135` (`Handled`, `https://hdl.handle.net/10568/148990`) and `13136` (`DOI`). **Only TIP-imported KPs are syncable** — a KP arriving by any other route has no such row and is refused, never sent with a guessed value (P-1). | ✅ Closes G-4, which D-4 had closed *without resolving*. Full live evidence: [`docs/specs/changes/prms-sync-knowledge-products/spike/`](../../../changes/prms-sync-knowledge-products/spike/README.md) |
 | **D-5** | **G-5** `evidence[].link` | **No STAR-side restriction.** Links keep working exactly as they do today. | ⚠️ The 2026-08 PRMS rules (scheme required, file-storage hosts rejected) still apply **on their side**. With no pre-flight, the **207 per-row interpretation (R-E1) becomes the only thing standing between a refused link and a wrongly-synced result.** That single mechanism is now load-bearing. |
 | **D-6** | **G-6** `title` / `description` length | **Not blocking — confirmed with the PRMS developer.** Long titles and descriptions pass. | ⚫ No guard built. ⚠️ This is a **verbal confirmation that contradicts the written contract** (which states max 30 / 150 words). Record who and when; re-check if ingest starts rejecting on length (K-013). |
 | **D-7** | **G-7** centers | **Resolved via the primary contract, one institution each.** `agresso_contract.ubwClientDescription` holds `ExCIAT` or `ExBIO`: **`ExCIAT` → `46`**, **`ExBIO` → `49`** (see §1.3). | ✅ Mechanism exists and is already exercised inbound. **Confirms family OQ-F3's original 46/49 split** and supplies the field that drives it. *(Revised 2026-09-14 within the same session: an earlier reading of this decision collapsed both values onto `49` because the CIAT variant was thought inactive. The centres are active; the split stands.)* |
@@ -120,8 +121,8 @@ this?"*, not *"is a computation involved?"*.
 | `innovation_development` | 2 | ✅ **Syncs clean.** OQ-H6 (`readiness_level` shape) — the TEST spike settled the **schema** layer only (`id`+`name`+`level` together pass; no shape is rejected). **Which key persists is still open** — no `innovation_development` call reached persistence, each blocked earlier by an unrelated `innovation_typology` catalogue rejection. See §6. |
 | `policy_change` | 4 | ⚠️ **Two of three subtypes.** *Legal instrument* and *Policy or strategy* sync; *Program, Budget, or Investment* is **gated out** (D-2). |
 | `innovation_use` | 6 | ⛔ **Not synced in v1** — gated out with a stated reason (D-1 + P-1). |
-| `knowledge_product` | 3 | ⚫ **Out of scope** (D-4). |
-| — | 5 (OICR) | ⚫ Excluded; PRMS has no OICR type. |
+| `knowledge_product` | 3 | 🟡 **In scope since 2026-09-16 (D-4 reversed).** Mapped — one field, `handle`. **Built but still gated**: `KNOWLEDGE_PRODUCT` remains in `UNMAPPABLE_INDICATORS`, so the endpoint still refuses it. See D-4b and D-4c. |
+| — | 5 (OICR) | ⚫ **Never sent — product decision, 2026-09-16.** PRMS has no OICR type *and* the owner has confirmed OICRs will **never** be pushed. This is not a limitation awaiting a PRMS feature: if PRMS ever adds an OICR type, this stays excluded. |
 
 > **The honest headline:** v1 delivers **two types that sync cleanly and one that syncs for two of
 > its three subtypes.** Innovation Use waits. Nothing is attempted-and-failed: every exclusion is
@@ -146,9 +147,9 @@ this?"*, not *"is a computation involved?"*.
 |---|---|---|---|
 | 1 | Capacity Sharing for Development | `capacity_sharing` | ✅ |
 | 2 | Innovation Development | `innovation_development` | ✅ |
-| 3 | Knowledge Product | — | ⚫ **Out of scope (D-4).** STAR stores imported KPs but cannot author them, so it has nothing to push. |
+| 3 | Knowledge Product | `knowledge_product` | 🟡 **In scope since 2026-09-16 (D-4 reversed).** Handle from the `'Handled'` evidence row (D-4b). Mapping built; **flow deliberately not built** (D-4c). |
 | 4 | Policy Change | `policy_change` | ✅ |
-| 5 | OICR | — | ⚫ **Excluded from sync** (family OQ-F2, closed 2026-08-21). PRMS has no OICR type. |
+| 5 | OICR | — | ⚫ **Never sent — product decision, 2026-09-16.** Previously recorded as a technical limitation (*"PRMS has no OICR type"*, family OQ-F2). The owner has since confirmed it is permanent policy, so the exclusion does **not** lapse if PRMS adds the type. |
 | 6 | Innovation Use | `innovation_use` | ✅ |
 | — | — | `other_output`, `other_outcome` | ⚫ PRMS accepts them; **STAR has no such indicator**. Nothing to map. |
 
@@ -275,17 +276,40 @@ this?"*, not *"is a computation involved?"*.
 
 ---
 
-## 5. `knowledge_product` — **out of scope (D-4)**
+## 5. `knowledge_product` — **in scope since 2026-09-16 (D-4 reversed)**
 
-STAR does not author Knowledge Products. It stores KPs imported from TIP/CGSpace, but a KP is
-never created in STAR, so STAR has nothing to push to PRMS. The type is removed from the
-supported set; `results.indicator_id = 3` must be **refused at the sync endpoint** with a stated
-reason.
+> **D-4c — scope of what was built (2026-09-16).** The product owner asked for **the JSON mapping
+> only, not the flow**. The builder and the indicator mapping exist and are unit-tested;
+> `KNOWLEDGE_PRODUCT` deliberately **stays** in `UNMAPPABLE_INDICATORS`, so the sync endpoint still
+> refuses indicator 3. A test asserts that refusal holds even when every other gate entry would pass,
+> so the boundary is verifiable rather than promised. Enabling KP later is one line — removing that
+> set member — and that test turns red to say the boundary moved on purpose.
+>
+> The reason for building ahead: a pooled-funding development for KPs is expected and will use the
+> same section, so the mapping is ready when it lands.
 
-This closes **G-4** without resolving it: `result_knowledge_product` still has no `handle`/`doi`
-column, and the TIP importer still writes the DOI into `result_evidences.evidence_url`
-(`tip-integration.service.ts:347`). If KP sync is ever revived, that ambiguity is the first
-thing to settle.
+| PRMS field | Req | STAR source | Verdict |
+|---|---|---|---|
+| `handle` | ✅ **the only required field** | `result_evidences.evidence_url` where `evidence_description = 'Handled'` (D-4b) | ✅ **EXACT.** PRMS resolves title, description and the rest from the repository, so the type block carries nothing else. Verified live — see the spike. |
+
+**Five business rules PRMS enforces on KP, none of them documented by PRMS**, each returned as
+HTTP 207 with a failed row (so the existing response interpreter handles them unchanged): already
+reported (dedupe by handle) · handle must be from a supported repository · publication year must be
+in the current reporting cycle · type-specific date rules resolved from the repository · and for
+journal articles specifically, *Date Online* is preferred over *Date Issued*.
+
+**That last one is a contract mismatch, not a bug.** STAR/TIP takes `dcterms.issued`; PRMS takes
+`dcterms.available` when present. On the same CGSpace record that is 2026-02 versus 2024, so a KP
+STAR legitimately shows as 2026 can be told *"only 2026 is eligible"*. No STAR-side logic reconciles
+it — `publication_date` is not the field PRMS decides on. **Open question for the PRMS team.**
+
+**Two blockers precede all of that** (measured on Dev, 9,161 KP results): **zero** are in
+`result_status_id = 6` — KPs sit in status 20 *"Completed in TIP"* — and **zero** have a Pool Funding
+Alignment row. KPs do not travel STAR's approval workflow because STAR does not own their lifecycle.
+Until that changes, no KP reaches the point where PRMS could apply any rule above.
+
+**Never obtained: an ACCEPTED.** Four handles were tried, each hit a different rule. The builder is
+proven in its *shape*, not in its *result*.
 
 ---
 
