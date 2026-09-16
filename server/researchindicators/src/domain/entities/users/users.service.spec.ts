@@ -20,6 +20,7 @@ const ACCEPTED_USER_ROWS: Partial<SecUserEntity>[] = [
     first_name: 'Alice',
     last_name: 'Smith',
     email: 'a.smith@cgiar.org',
+    carnet: 'C00001',
     status_id: UserStatusEnum.ACCEPTED,
     is_active: true,
   },
@@ -28,6 +29,7 @@ const ACCEPTED_USER_ROWS: Partial<SecUserEntity>[] = [
     first_name: 'Bob',
     last_name: 'Doe',
     email: 'b.doe@cgiar.org',
+    carnet: null,
     status_id: UserStatusEnum.ACCEPTED,
     is_active: true,
   },
@@ -90,12 +92,15 @@ describe('UsersService', () => {
       first_name: 'Alice',
       last_name: 'Smith',
       email: 'a.smith@cgiar.org',
+      carnet: 'C00001',
     });
+    // carnet is optional in sec_users — a user without one maps to null
     expect(result[1]).toEqual({
       sec_user_id: 2,
       first_name: 'Bob',
       last_name: 'Doe',
       email: 'b.doe@cgiar.org',
+      carnet: null,
     });
   });
 

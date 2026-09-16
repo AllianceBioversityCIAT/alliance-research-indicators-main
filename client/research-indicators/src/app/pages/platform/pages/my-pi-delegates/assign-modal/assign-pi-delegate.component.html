@@ -30,8 +30,71 @@
       [optionFilter]="selfExclusionFilter()"
       [optionsDisabled]="piDisabledPeople"
       [isRequired]="true"
+      [itemHeight]="58"
       [disabled]="peopleDisabled()"
-    ></app-multiselect>
+    >
+      <!-- Option row inside the dropdown: name + email (+ carnet when present) -->
+      <ng-template #item let-person>
+        <div class="flex min-w-0 flex-col gap-1 py-0.5">
+          <p class="m-0 font-['Barlow'] text-[14px] font-semibold text-[color:var(--ac-primary-blue-600)]">
+            {{ person?.name }}
+          </p>
+          <p class="m-0 flex flex-wrap items-center gap-x-2 font-['Barlow'] text-[11px] text-[color:var(--ac-grey-700)]">
+            <span>{{ person?.email }}</span>
+            @if (person?.carnet) {
+              <span class="text-[color:var(--ac-grey-400)]">|</span>
+              <span>Carnet</span>
+              <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+              <span class="text-[color:var(--ac-primary-blue-300)]">{{ person?.carnet }}</span>
+            }
+          </p>
+        </div>
+      </ng-template>
+
+      <!-- Collapsed field label -->
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+          <span>{{ value.length }} {{ value.length === 1 ? 'person' : 'people' }} selected</span>
+        }
+      </ng-template>
+
+      <!-- Selected row rendered under the field -->
+      <ng-template #rows let-person>
+        <div class="flex w-full min-w-0 flex-col">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-['Barlow'] text-[15px] font-semibold text-[color:var(--ac-primary-blue-600)]">
+              {{ person?.name }}
+            </span>
+            @if (person?.is_active === false) {
+              <span
+                class="rounded border border-[color:var(--ac-red-1)] px-1.5 text-[9px] font-bold uppercase leading-[1.4] tracking-[0.06em] text-[color:var(--ac-red-1)]">
+                Inactive
+              </span>
+            }
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-5 pt-2 xl:pt-0.5">
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Email</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ person?.email }}
+              </span>
+            </div>
+
+            @if (person?.carnet) {
+              <div class="flex items-center">
+                <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Carnet</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+                <span class="font-['Space_Grotesk'] text-[13px] uppercase leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                  {{ person?.carnet }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </ng-template>
+    </app-multiselect>
     <!-- CHANGE 3: helper text when person is fixed -->
     @if (peopleDisabled()) {
       <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
@@ -96,8 +159,88 @@
       label="Projects"
       placeholder="Select projects to assign delegates to"
       [isRequired]="true"
+      [itemHeight]="66"
       [disabled]="projectsDisabled()"
-    ></app-multiselect>
+    >
+      <!-- Option row inside the dropdown -->
+      <ng-template #item let-project>
+        <div class="flex min-w-0 flex-col gap-1.5 py-0.5" [pTooltip]="project?.project_name ?? ''">
+          <p class="m-0 line-clamp-1 font-['Barlow'] text-[14px] text-[color:var(--ac-grey-800)]">
+            <b>{{ project?.project_code }} -</b> {{ project?.project_name }}
+          </p>
+          <p class="m-0 flex flex-wrap items-center gap-x-2 font-['Barlow'] text-[11px] text-[color:var(--ac-grey-700)]">
+            @if (project?.status) {
+              <app-custom-tag [statusId]="statusDisplay(project).statusId" [statusName]="statusDisplay(project).statusName"
+                [tiny]="true"></app-custom-tag>
+            }
+            <span>Start date</span>
+            <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+            <span class="text-[color:var(--ac-primary-blue-300)]">{{ formatDate(project?.start_date) }}</span>
+            <span class="text-[color:var(--ac-grey-400)]">|</span>
+            <span>End date</span>
+            <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+            <span class="text-[color:var(--ac-primary-blue-300)]">{{ formatDate(project?.end_date) }}</span>
+          </p>
+        </div>
+      </ng-template>
+
+      <!-- Collapsed field label -->
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+          <span>{{ value.length }} {{ value.length === 1 ? 'project' : 'projects' }} selected</span>
+        }
+      </ng-template>
+
+      <!-- Selected row rendered under the field -->
+      <ng-template #rows let-project>
+        <div class="flex w-full min-w-0 flex-col">
+          <div class="font-['Barlow'] text-[15px] font-semibold text-[color:var(--ac-grey-800)]">
+            {{ project?.project_code }} - {{ project?.project_name }}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 xl:pt-0.5">
+            @if (project?.status) {
+              <div class="flex items-center">
+                <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Status</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+                <app-custom-tag [statusId]="statusDisplay(project).statusId"
+                  [statusName]="statusDisplay(project).statusName" [tiny]="true"></app-custom-tag>
+              </div>
+            }
+
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Start date</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ formatDate(project?.start_date) }}
+              </span>
+            </div>
+
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">End date</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ formatDate(project?.end_date) }}
+              </span>
+            </div>
+
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Current delegates</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ project?.delegate_count ?? 0 }}
+              </span>
+            </div>
+          </div>
+
+          @if (project?.is_pool_funding_contributor) {
+            <div class="flex items-center pt-1">
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding" [tiny]="true"></app-custom-tag>
+            </div>
+          }
+        </div>
+      </ng-template>
+    </app-multiselect>
     <!-- CHANGE 1: helper text when project is fixed -->
     @if (projectsDisabled()) {
       <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">

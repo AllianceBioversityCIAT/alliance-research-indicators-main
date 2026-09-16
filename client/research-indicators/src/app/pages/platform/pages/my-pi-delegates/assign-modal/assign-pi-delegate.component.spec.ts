@@ -167,9 +167,9 @@ function buildProject(
     project_name: `Project ${code}`,
     is_pool_funding_contributor: false,
     pi_user_id: piUserId,
-    status: 'Active',
-    start_date: null,
-    end_date: null,
+    status: 'Ongoing',
+    start_date: '2024-01-15' as unknown as Date,
+    end_date: '2026-12-31' as unknown as Date,
     delegates: delegates.map(d => ({ ...d, is_active: d.is_active ?? true }))
   };
 }
@@ -881,6 +881,73 @@ describe('AssignPiDelegateComponent', () => {
       const other = options.find(o => o.delegate_user_id === 11);
       expect(pi?.disabled).toBeTruthy();
       expect(other?.disabled).toBeFalsy();
+    });
+  });
+  // ── Option rows: the info each picker shows (design parity with the
+  //    "Contributing projects" selector in Alliance Alignment) ────────────────
+
+  describe('option rows', () => {
+    async function openOnProjectWith(
+      delegates: { delegate_user_id: number; name: string; email: string; carnet?: string | null }[]
+    ): Promise<void> {
+      const project = {
+        ...buildProject('ROWS-1', []),
+        delegates: delegates.map(d => ({ ...d, is_active: true, carnet: d.carnet ?? null }))
+      };
+      piService.byProjectCache.set([project]);
+
+      // The multiselect only renders selected rows once its option list is loaded.
+      serviceLocator.getService('piDelegatePeople').list.set(project.delegates);
+      serviceLocator.getService('piDelegateProjects').list.set([project]);
+
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'ROWS-1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('shows name, email and carnet for a selected person', async () => {
+      await openOnProjectWith([
+        { delegate_user_id: 1, name: 'Alice Example', email: 'alice@test.org', carnet: 'C00042' }
+      ]);
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Alice Example');
+      expect(text).toContain('alice@test.org');
+      expect(text).toContain('Carnet');
+      expect(text).toContain('C00042');
+    });
+
+    it('omits the carnet line when the person has none (negative discriminator)', async () => {
+      await openOnProjectWith([
+        { delegate_user_id: 2, name: 'Bob Sample', email: 'bob@test.org', carnet: null }
+      ]);
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('bob@test.org');
+      expect(text).not.toContain('Carnet');
+    });
+
+    it('shows code, name, status tag and both dates for a selected project', async () => {
+      await openOnProjectWith([]);
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('ROWS-1 - Project ROWS-1');
+      expect(text).toContain('Start date');
+      expect(text).toContain('End date');
+      // Month/year only: the ISO date is rendered in the viewer's timezone, so the
+      // day can shift by one — the same behaviour as the By project table.
+      expect(text).toContain('Jan 2024');
+      expect(text).toContain('Dec 2026');
+      // Status renders through the shared tag, like the By project table
+      const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement | null;
+      expect(tag?.textContent?.trim()).toBe('Ongoing');
+    });
+
+    it('formatDate returns an em dash for a missing date', () => {
+      expect(component.formatDate(null)).toBe('—');
+      expect(component.formatDate(undefined)).toBe('—');
     });
   });
 });

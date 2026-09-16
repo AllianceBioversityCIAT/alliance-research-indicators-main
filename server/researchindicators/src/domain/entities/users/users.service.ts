@@ -36,7 +36,13 @@ export class UsersService {
 
     const qb = this.secUserRepository
       .createQueryBuilder('su')
-      .select(['su.sec_user_id', 'su.first_name', 'su.last_name', 'su.email'])
+      .select([
+        'su.sec_user_id',
+        'su.first_name',
+        'su.last_name',
+        'su.email',
+        'su.carnet',
+      ])
       .where('su.status_id IN (:...statusIds)', {
         statusIds: [UserStatusEnum.ACCEPTED, UserStatusEnum.EXTERNAL_ACCEPTED],
       })
@@ -59,6 +65,7 @@ export class UsersService {
       first_name: row.first_name ?? null,
       last_name: row.last_name ?? null,
       email: row.email,
+      carnet: row.carnet ?? null,
     }));
   }
 }

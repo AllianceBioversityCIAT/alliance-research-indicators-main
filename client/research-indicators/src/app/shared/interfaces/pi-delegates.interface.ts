@@ -22,6 +22,8 @@ export interface ActiveUser {
   last_name: string | null;
   /** sec_users.email */
   email: string;
+  /** sec_users.carnet — null when the user has none. */
+  carnet: string | null;
 }
 
 /**

@@ -20,12 +20,14 @@ const ACTIVE_USERS_FIXTURE: ActiveUserResponseDto[] = [
     first_name: 'Alice',
     last_name: 'Smith',
     email: 'a.smith@cgiar.org',
+    carnet: 'C00001',
   },
   {
     sec_user_id: 2,
     first_name: 'Bob',
     last_name: 'Doe',
     email: 'b.doe@cgiar.org',
+    carnet: null,
   },
 ];
 

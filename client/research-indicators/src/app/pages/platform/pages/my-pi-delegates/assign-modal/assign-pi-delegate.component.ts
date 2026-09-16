@@ -28,8 +28,11 @@ import { CacheService } from '@services/cache/cache.service';
 import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
+import { TooltipModule } from 'primeng/tooltip';
+import { ProjectUtilsService, type ProjectType } from '@services/project-utils.service';
 import { PiDelegatePeoplePickerStubService } from '../services/pi-delegate-picker-stub.service';
-import type { DelegateSummary } from '@interfaces/pi-delegates.interface';
+import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates.interface';
 
 // ─── Local form-state shape ───────────────────────────────────────────────────
 
@@ -37,14 +40,26 @@ interface PersonOption {
   delegate_user_id: number;
   name: string;
   email: string;
+  /** sec_users.carnet — rendered in the option row when present. */
+  carnet?: string | null;
   /** Carried from DelegateSummary.is_active when seeded from byProjectCache.
    *  undefined for newly-picked options (active-users endpoint — always active). */
   is_active?: boolean;
 }
 
+/**
+ * Project option. The extra fields feed the option row (status, dates, pool
+ * funding, delegate count) and are seeded from byProjectCache so a pre-loaded
+ * chip shows exactly what a freshly-picked one shows.
+ */
 interface ProjectOption {
   project_code: string;
   project_name: string | null;
+  status?: string | null;
+  start_date?: Date | null;
+  end_date?: Date | null;
+  is_pool_funding_contributor?: boolean;
+  delegate_count?: number;
 }
 
 /**
@@ -66,7 +81,7 @@ interface ProjectsFormState {
 @Component({
   selector: 'app-assign-pi-delegate',
   standalone: true,
-  imports: [CommonModule, MultiselectComponent],
+  imports: [CommonModule, MultiselectComponent, CustomTagComponent, TooltipModule],
   templateUrl: './assign-pi-delegate.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -78,6 +93,7 @@ export class AssignPiDelegateComponent implements OnInit {
   readonly piService = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
   private readonly peoplePicker = inject(PiDelegatePeoplePickerStubService);
+  private readonly projectUtils = inject(ProjectUtilsService);
 
   // ─── Current user (self-exclusion, R-UI-005 AC.3) ─────────────────────────────
   // `sec_user_id` from CacheService.dataCache().user — same pattern used by isMyResult.
@@ -180,6 +196,42 @@ export class AssignPiDelegateComponent implements OnInit {
     );
   });
 
+  // ─── Option-row helpers (picker templates) ───────────────────────────────────
+
+  /** Maps a cached project row to the picker's option shape (same fields the row renders). */
+  private toProjectOption(project: ProjectDelegates): ProjectOption {
+    return {
+      project_code: project.project_code,
+      project_name: project.project_name,
+      status: project.status,
+      start_date: project.start_date,
+      end_date: project.end_date,
+      is_pool_funding_contributor: project.is_pool_funding_contributor,
+      delegate_count: project.delegates.length
+    };
+  }
+
+  /**
+   * Status chip data for <app-custom-tag> — the same mapping the By-project
+   * table uses, so a project shows one status design across the feature.
+   */
+  statusDisplay(project: { status?: string | null } | null | undefined): {
+    statusId: number;
+    statusName: string;
+  } {
+    return this.projectUtils.getStatusDisplay({
+      contract_status: project?.status
+    } as unknown as ProjectType);
+  }
+
+  /** dd MMM yyyy, or an em dash when the date is absent. */
+  formatDate(value: Date | string | null | undefined): string {
+    if (value == null) return '—';
+    const date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
   // ─── Open-close tracking (to reset + pre-load on open) ────────────────────────
 
   private wasOpen = false;
@@ -247,9 +299,7 @@ export class AssignPiDelegateComponent implements OnInit {
       );
       if (projectEntry) {
         this.projectsSignal.set({
-          selected_projects: [
-            { project_code: projectEntry.project_code, project_name: projectEntry.project_name }
-          ]
+          selected_projects: [this.toProjectOption(projectEntry)]
         });
         // Seed current delegates — this is the anti-revoke guard: if user saves without
         // changing the people selection, the POST will include exactly the current delegates.
@@ -259,6 +309,7 @@ export class AssignPiDelegateComponent implements OnInit {
             delegate_user_id: d.delegate_user_id,
             name: d.name,
             email: d.email,
+            carnet: d.carnet ?? null,
             is_active: d.is_active
           }))
         });
@@ -275,7 +326,7 @@ export class AssignPiDelegateComponent implements OnInit {
       const allProjects = this.piService.byProjectCache();
       const personProjects: ProjectOption[] = allProjects
         .filter(p => p.delegates.some(d => d.delegate_user_id === ctx.delegateUserId))
-        .map(p => ({ project_code: p.project_code, project_name: p.project_name }));
+        .map(p => this.toProjectOption(p));
 
       // Find the person's identity from any project that has them as a delegate.
       const delegateEntry: DelegateSummary | undefined = allProjects
@@ -290,6 +341,7 @@ export class AssignPiDelegateComponent implements OnInit {
                 delegate_user_id: delegateEntry.delegate_user_id,
                 name: delegateEntry.name,
                 email: delegateEntry.email,
+                carnet: delegateEntry.carnet ?? null,
                 is_active: delegateEntry.is_active
               }
             ]
