@@ -116,13 +116,20 @@ export class ByPersonComponent {
    * Uses the same ActionsService.showGlobalAlert pattern as ByProjectComponent (T-UI-05).
    */
   onRevokeProject(row: PersonRow, project: { project_code: string; project_name: string | null }): void {
+    // Same block layout as the assign confirmation (project, blank line, change).
+    const projectLabel = project.project_name
+      ? `<strong>${project.project_code}</strong> — ${project.project_name}`
+      : `<strong>${project.project_code}</strong>`;
+
     this.actions.showGlobalAlert({
       severity: 'warning',
       summary: 'Revoke PI Delegate',
       detail:
-        `Remove ${row.name} (${row.email}) as PI Delegate from project ${project.project_code}` +
-        (project.project_name ? ` — ${project.project_name}` : '') +
-        `? This will revoke their delegate access for this project only.`,
+        `<div class="alert-detail-left">` +
+        `<div>The following changes will be made in project ${projectLabel}</div>` +
+        `<div>&nbsp;</div>` +
+        `<div><strong>Removed:</strong> ${row.name}</div>` +
+        `</div>`,
       confirmCallback: {
         label: 'Revoke',
         event: () => {
@@ -142,13 +149,22 @@ export class ByPersonComponent {
    * projects to someone who cannot review results.
    */
   onRemoveDelegate(row: PersonRow): void {
+    // One block per project, in the same shape as the assign confirmation.
+    const blocks = row.projects.map(project => {
+      const label = project.project_name
+        ? `<strong>${project.project_code}</strong> — ${project.project_name}`
+        : `<strong>${project.project_code}</strong>`;
+      return (
+        `<div>The following changes will be made in project ${label}</div>` +
+        `<div>&nbsp;</div>` +
+        `<div><strong>Removed:</strong> ${row.name}</div>`
+      );
+    });
+
     this.actions.showGlobalAlert({
       severity: 'warning',
       summary: 'Remove PI Delegate',
-      detail:
-        `Remove ${row.name} (${row.email}) as PI Delegate from ` +
-        `${row.projects.length} ${row.projects.length === 1 ? 'project' : 'projects'}? ` +
-        `This revokes their delegate access everywhere in this list.`,
+      detail: `<div class="alert-detail-left">${blocks.join('<div>&nbsp;</div>')}</div>`,
       confirmCallback: {
         label: 'Remove',
         event: () => {

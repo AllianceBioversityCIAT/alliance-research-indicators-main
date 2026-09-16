@@ -279,14 +279,17 @@ describe('ByPersonComponent', () => {
       expect(actionsStub.showGlobalAlert).toHaveBeenCalledTimes(1);
     });
 
-    it('confirmation detail names the person and project', () => {
+    it('confirmation uses the same block layout as the assign dialog', () => {
       const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
       (xBtns[0].nativeElement as HTMLButtonElement).click();
       fixture.detectChanges();
 
       const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-      expect(alert.detail).toContain('Alice Example');
-      expect(alert.detail).toContain('alice@test.org');
+      expect(alert.detail).toContain('class="alert-detail-left"');
+      expect(alert.detail).toContain(
+        '<div>The following changes will be made in project <strong>PRJ-A</strong> — Alpha Research</div><div>&nbsp;</div>'
+      );
+      expect(alert.detail).toContain('<div><strong>Removed:</strong> Alice Example</div>');
     });
 
     it('calls revokePair with the EXACT (project_code, delegate_user_id) pair on confirm', fakeAsync(() => {

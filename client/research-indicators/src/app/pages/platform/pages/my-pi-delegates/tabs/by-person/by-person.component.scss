@@ -141,9 +141,14 @@
       background-color: color-mix(in srgb, currentcolor 12%, transparent);
       color: inherit;
       cursor: pointer;
-      font-size: 8px;
       flex-shrink: 0;
       transition: background-color 0.15s ease;
+
+      // primeicons declares `.pi { font-size: 1rem }`, so sizing the button is
+      // not enough — the glyph itself has to be targeted.
+      .pi {
+        font-size: 9px;
+      }
 
       &:hover {
         background-color: color-mix(in srgb, currentcolor 25%, transparent);
@@ -178,7 +183,7 @@
     padding: 2px;
     border: 1px solid var(--ac-grey-200);
     border-radius: 8px;
-    background-color: var(--ac-grey-100);
+    background-color: var(--ac-white-1);
     color: var(--ac-light-blue-400);
     cursor: pointer;
     font-size: 12px;
@@ -192,8 +197,8 @@
 
   // Removing a delegate is destructive — same shape, red glyph on a red ground
   &__assign-btn--danger {
-    background-color: color-mix(in srgb, var(--ac-red-1) 12%, var(--ac-white-1));
-    border-color: color-mix(in srgb, var(--ac-red-1) 25%, transparent);
+    background-color: var(--ac-white-1);
+    border-color: color-mix(in srgb, var(--ac-red-1) 40%, transparent);
     color: var(--ac-red-1);
   }
 
