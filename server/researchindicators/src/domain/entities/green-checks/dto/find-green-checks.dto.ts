@@ -14,6 +14,7 @@ export class FindGreenChecksDto {
   public evidences: boolean;
   public cap_sharing?: boolean;
   public policy_change?: boolean;
+  public innovation_use?: boolean;
   // Visual-only check: excluded from `completness`, never gates submit.
   public pool_funding_alignment?: boolean;
   public completness?: boolean;

@@ -149,8 +149,8 @@ describe('DataOverviewComponent', () => {
     });
   });
 
-  describe('statusRowQueryParams', () => {
-    it('returns statusTab and statusLabel for Results Center navigation', () => {
+  describe('statusRowQueryParams (R-RCU-007 AC.1, AC.1b)', () => {
+    it('resolves the canonical status slug from the frozen vocabulary and adds tab=my', () => {
       expect(
         component.statusRowQueryParams({
           color: '#173F6F',
@@ -159,9 +159,112 @@ describe('DataOverviewComponent', () => {
           result_status_id: 7
         })
       ).toEqual({
-        statusTab: 7,
-        statusLabel: 'Submitted'
+        status: 'not-approved',
+        tab: 'my'
       });
+    });
+
+    it('resolves a different status id to its own distinct slug (KZ-004 — not a shared default)', () => {
+      expect(
+        component.statusRowQueryParams({
+          color: '#000',
+          label: 'Editing',
+          value: 3,
+          result_status_id: 1
+        })
+      ).toEqual({
+        status: 'editing',
+        tab: 'my'
+      });
+    });
+
+    it('emits no indicatorTab/statusTab/statusLabel keys (R-RCU-007 AC.3)', () => {
+      const params = component.statusRowQueryParams({
+        color: '#000',
+        label: 'Submitted',
+        value: 1,
+        result_status_id: 2
+      });
+      expect(params).not.toHaveProperty('statusTab');
+      expect(params).not.toHaveProperty('statusLabel');
+    });
+
+    it('degrades to an unfiltered tab=my link when the id has no slug (vocabulary drift)', () => {
+      expect(
+        component.statusRowQueryParams({
+          color: '#000',
+          label: 'Unknown',
+          value: 1,
+          result_status_id: 9999
+        })
+      ).toEqual({ tab: 'my' });
+    });
+  });
+
+  describe('indicatorRowQueryParams (R-RCU-007 AC.1, AC.1b)', () => {
+    it('resolves the canonical indicator slug from the frozen vocabulary and adds tab=my', () => {
+      expect(
+        component.indicatorRowQueryParams({
+          indicator_id: 1,
+          name: 'Capacity Sharing',
+          indicator_type_id: 1,
+          description: '',
+          long_description: '',
+          icon_src: 'science',
+          other_names: null,
+          amount_results: 2
+        })
+      ).toEqual({
+        indicator: 'capacity-sharing-for-development',
+        tab: 'my'
+      });
+    });
+
+    it('resolves a different indicator id to its own distinct slug (KZ-004 — not a shared default)', () => {
+      expect(
+        component.indicatorRowQueryParams({
+          indicator_id: 2,
+          name: 'Innovation Development',
+          indicator_type_id: 2,
+          description: '',
+          long_description: '',
+          icon_src: 'analytics',
+          other_names: null,
+          amount_results: 0
+        })
+      ).toEqual({
+        indicator: 'innovation-dev',
+        tab: 'my'
+      });
+    });
+
+    it('emits no indicatorTab key (R-RCU-007 AC.3)', () => {
+      const params = component.indicatorRowQueryParams({
+        indicator_id: 1,
+        name: 'Capacity Sharing',
+        indicator_type_id: 1,
+        description: '',
+        long_description: '',
+        icon_src: 'science',
+        other_names: null,
+        amount_results: 2
+      });
+      expect(params).not.toHaveProperty('indicatorTab');
+    });
+
+    it('degrades to an unfiltered tab=my link when the id has no slug (vocabulary drift)', () => {
+      expect(
+        component.indicatorRowQueryParams({
+          indicator_id: 9999,
+          name: 'Unknown',
+          indicator_type_id: 0,
+          description: '',
+          long_description: '',
+          icon_src: '',
+          other_names: null,
+          amount_results: 0
+        })
+      ).toEqual({ tab: 'my' });
     });
   });
 

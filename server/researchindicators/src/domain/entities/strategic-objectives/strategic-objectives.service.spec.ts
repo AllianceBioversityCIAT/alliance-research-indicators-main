@@ -120,6 +120,71 @@ describe('StrategicObjectivesService', () => {
     });
   });
 
+  describe('findActiveByIdsForPortfolio', () => {
+    // A genuine predicate evaluator over the fixture list — not a canned
+    // return value — so the portfolio-scoping and is_active exclusion cases
+    // can actually fail against an implementation that never applies them
+    // (KZ-001), matching the standard set in portfolios.service.spec.ts.
+    const evaluateWhere = (
+      objective: Record<string, any>,
+      where: Record<string, any>,
+    ): boolean =>
+      Object.entries(where).every(([key, condition]) => {
+        const actual = objective[key];
+        if (condition && typeof condition === 'object' && 'type' in condition) {
+          if (condition.type === 'in') {
+            return (condition.value as unknown[]).includes(actual);
+          }
+          throw new Error(
+            `Unsupported FindOperator type in test double: ${condition.type}`,
+          );
+        }
+        return actual === condition;
+      });
+
+    const buildObjective = (overrides: Record<string, any>) => ({
+      id: 1,
+      portfolio_id: 2,
+      is_active: true,
+      ...overrides,
+    });
+
+    const fakeFind = (fixtures: Record<string, any>[]) =>
+      jest.fn(async ({ where }: any) =>
+        fixtures.filter((objective) => evaluateWhere(objective, where)),
+      );
+
+    it('returns [] without querying when ids is empty', async () => {
+      const result = await service.findActiveByIdsForPortfolio([], 2);
+
+      expect(result).toEqual([]);
+      expect(mockFind).not.toHaveBeenCalled();
+    });
+
+    it('returns only ids that are active and owned by the given portfolio', async () => {
+      const fixtures = [
+        buildObjective({ id: 1 }),
+        buildObjective({ id: 2, portfolio_id: 1 }), // foreign portfolio
+        buildObjective({ id: 3, is_active: false }), // inactive
+      ];
+      mockFind.mockImplementation(fakeFind(fixtures));
+
+      const result = await service.findActiveByIdsForPortfolio(
+        [1, 2, 3, 999],
+        2,
+      );
+
+      expect(mockFind).toHaveBeenCalledWith({
+        where: {
+          id: expect.objectContaining({ type: 'in', value: [1, 2, 3, 999] }),
+          portfolio_id: 2,
+          is_active: true,
+        },
+      });
+      expect(result).toEqual([buildObjective({ id: 1 })]);
+    });
+  });
+
   describe('findOne', () => {
     it('should return an active strategic objective by id', async () => {
       const objective = { id: 5, name: 'Objective', is_active: true };

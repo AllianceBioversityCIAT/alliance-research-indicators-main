@@ -312,8 +312,87 @@ describe('AllianceAlignmentComponent', () => {
     );
   });
 
+  it('should load and save portfolio 2 alignment with portfolio-specific payload for Innovation Use', async () => {
+    cache.metadata.set({ indicator_id: 6, portfolio_id: 2 });
+    getContractsService.setCatalog([
+      {
+        agreement_id: 'abc',
+        description: 'Project ABC',
+        contract_id: 'abc',
+        select_label: 'abc - Project ABC',
+        project_lead_description: 'Lead',
+        start_date: '2024-01-01',
+        endDateGlobal: '2025-01-01'
+      }
+    ]);
+    api.GET_Alignments.mockResolvedValue({
+      data: {
+        contracts: [{ contract_id: 'abc', is_primary: true }],
+        result_sdgs: [{ clarisa_sdg_id: 2, id: 2 }],
+        research_areas: [{ lever_id: '42', full_name: 'Area 42' }],
+        strategic_objectives: [{ strategic_objective_id: 3, name: 'SO 3' }],
+        impact_outcomes: [{ impact_outcome_id: 5, name: 'IO 5' }],
+        primary_levers: [{ lever_id: 1 }],
+        contributor_levers: [{ lever_id: 2 }]
+      }
+    });
+
+    await component.getData();
+
+    expect(getContractsService.main).toHaveBeenCalled();
+    expect(api.GET_Alignments).toHaveBeenCalledWith(1, { portfolioId: 2, return: true });
+    expect(component.body().primary_levers).toEqual([]);
+    expect(component.body().contributor_levers).toEqual([]);
+    expect(component.body().contracts[0].agreement_id).toBe('abc');
+    expect(component.body().contracts[0].description).toBe('Project ABC');
+    expect(component.body().contracts[0].select_label).toBe('abc - Project ABC');
+    expect(component.body().research_areas[0].lever_id).toBe(42);
+    expect(component.body().strategic_objectives[0].id).toBe(3);
+
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    component.body.update(current => ({
+      ...current,
+      contracts: [{ contract_id: 'abc', is_primary: true } as never],
+      research_areas: [{ lever_id: 10, id: 10 } as never],
+      strategic_objectives: [{ id: 1, name: 'SO 1' }],
+      impact_outcomes: [{ id: 5, name: 'IO 5' }]
+    }));
+
+    await component.saveData();
+
+    expect(api.PATCH_Alignments).toHaveBeenCalledWith(
+      1,
+      {
+        contracts: [{ contract_id: 'abc', is_primary: true }],
+        result_sdgs: [{ clarisa_sdg_id: 2 }],
+        research_areas: [{ lever_id: '10' }],
+        strategic_objectives: [{ strategic_objective_id: 1 }],
+        impact_outcomes: [{ impact_outcome_id: 5 }]
+      },
+      { portfolioId: 2, return: true }
+    );
+  });
+
   it('should send empty impact_outcomes for portfolio 2 when indicator is not OICR or Policy Change', async () => {
     cache.metadata.set({ indicator_id: 1, portfolio_id: 2 });
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    component.body.set({
+      contracts: [],
+      result_sdgs: [{ id: 3, clarisa_sdg_id: 3 } as never],
+      primary_levers: [],
+      contributor_levers: [],
+      strategic_objectives: [],
+      impact_outcomes: [{ id: 5, name: 'IO 5' }]
+    });
+
+    await component.saveData();
+
+    expect(api.PATCH_Alignments.mock.calls[0][1].impact_outcomes).toBeUndefined();
+    expect(api.PATCH_Alignments.mock.calls[0][1].result_sdgs).toEqual([{ clarisa_sdg_id: 3 }]);
+  });
+
+  it('should send empty impact_outcomes for portfolio 2 when indicator is Innovation Development', async () => {
+    cache.metadata.set({ indicator_id: 2, portfolio_id: 2 });
     api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
     component.body.set({
       contracts: [],
@@ -583,6 +662,27 @@ describe('AllianceAlignmentComponent', () => {
     api.GET_Alignments.mockResolvedValue({ data: { contracts: [], result_sdgs: [] } });
     await component.saveData('next');
     expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'next-section'], { queryParams: { version: 'v1' }, replaceUrl: true });
+  });
+
+  // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+  // R-IUP-003 AC.3 / c6's call-site half: delegates to the REAL CacheService's
+  // `currentResultIndicatorSectionPath` (not a hand-rolled stub) so that deleting
+  // `case 6` from cache.service.ts makes THIS assertion fail, not only the
+  // cache.service.spec.ts presence assertion.
+  it('Next navigates to innovation-use-details for an indicator-6 result, never to the empty path', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    api.GET_Alignments.mockResolvedValue({ data: { contracts: [], result_sdgs: [] } });
+    const realCache = new CacheService();
+    realCache.currentMetadata.set({ indicator_id: 6 });
+    cache.currentResultIndicatorSectionPath.mockImplementation(() => realCache.currentResultIndicatorSectionPath());
+
+    await component.saveData('next');
+
+    expect(router.navigate).toHaveBeenCalledWith(['result', 1, 'innovation-use-details'], {
+      queryParams: { version: 'v1' },
+      replaceUrl: true
+    });
+    expect(router.navigate).not.toHaveBeenCalledWith(['result', 1, ''], { queryParams: { version: 'v1' }, replaceUrl: true });
   });
 
   it('should use version in queryParams if present', async () => {
