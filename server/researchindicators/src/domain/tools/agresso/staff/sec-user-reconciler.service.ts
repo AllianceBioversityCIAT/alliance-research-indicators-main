@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
+import { normalizeEmail as normalizeEmailKey } from './email-key.util';
 import { SecUserReconciliationSummaryDto } from './dto/sec-user-reconciliation-summary.dto';
 import {
   CreatedSecUserRow,
@@ -591,8 +592,10 @@ export class SecUserReconcilerService {
     return true;
   }
 
+  // Delegates to the shared util so this key and the deactivation shield key are the same
+  // expression (changes/agresso-staff-deactivation DD-D5). Behaviour is unchanged.
   private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
+    return normalizeEmailKey(email);
   }
 
   private buildIndex(secUsers: SecUser[]): Map<string, SecUser[]> {

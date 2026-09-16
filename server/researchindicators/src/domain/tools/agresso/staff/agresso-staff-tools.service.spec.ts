@@ -77,13 +77,104 @@ describe('AgressoStaffToolsService', () => {
       expect(baseSpy).toHaveBeenCalledTimes(2);
     });
 
-    it('should compute pages with round + remainder (1500 -> 3 calls)', async () => {
-      mockConnection.getRaw.mockResolvedValue({ totalElements: 1500 });
-      const baseSpy = jest.spyOn(service as any, 'base').mockResolvedValue([]);
+    // @akili-spec changes/agresso-staff-deactivation (T-02, DD-D2)
+    //
+    // This test previously asserted 3 calls for 1500 and was named "round + remainder" — it PINNED
+    // the arithmetic bug. `Math.round(1.5) = 2`, plus the remainder term, gave 3 pages where 2
+    // cover the data, so page 3 always came back empty. Updating it is the falsifier the design's
+    // reversion challenge named: restoring `round + remainder` reddens every row below.
+    it.each([
+      // [totalElements, expected pages] — the second column is ceil(total / 1000).
+      [500, 1], // old arithmetic: 2
+      [1000, 1],
+      [1500, 2], // old arithmetic: 3
+      [2000, 2],
+      [2400, 3],
+      [2500, 3], // old arithmetic: 4
+      [3500, 4], // old arithmetic: 5
+    ])(
+      'requests exactly ceil(total/1000) pages for totalElements=%i',
+      async (totalElements, expectedPages) => {
+        mockConnection.getRaw.mockResolvedValue({ totalElements });
+        const baseSpy = jest
+          .spyOn(service as any, 'base')
+          .mockResolvedValue([]);
 
-      await service.cloneAllAgressoStaff();
+        await service.cloneAllAgressoStaff();
 
-      expect(baseSpy).toHaveBeenCalledTimes(3);
+        expect(baseSpy).toHaveBeenCalledTimes(expectedPages);
+      },
+    );
+
+    // R-AGD-004 — C-2 reads these three numbers. They are measured, not assumed.
+    describe('fetch report', () => {
+      const member = (resourceId: string, email = 'a@cgiar.org') =>
+        ({ resourceId, email, firstName: 'F', lastName: 'L' }) as any;
+
+      const runWithPages = async (
+        totalElements: number,
+        pages: Array<ReturnType<typeof member>[]>,
+      ) => {
+        mockConnection.getRaw.mockResolvedValue({ totalElements });
+        let call = 0;
+        jest
+          .spyOn(service as any, 'base')
+          .mockImplementation(async (..._args: any[]) => {
+            const mapper = _args[2] as (d: any) => unknown;
+            for (const m of pages[call] ?? []) {
+              mapper(m);
+            }
+            call += 1;
+            return [];
+          });
+        const logSpy = jest.spyOn((service as any)._logger, 'log');
+        await service.cloneAllAgressoStaff();
+        const line = logSpy.mock.calls
+          .map((c) => String(c[0]))
+          .find((l) => l.startsWith('Agresso staff fetch report:'));
+        return JSON.parse(line!.replace('Agresso staff fetch report: ', ''));
+      };
+
+      it('records each page contribution separately, in page order', async () => {
+        const report = await runWithPages(2400, [
+          [member('A1'), member('A2')],
+          [member('B1')],
+          [member('C1'), member('C2'), member('C3')],
+        ]);
+
+        expect(report.pageRowCounts).toEqual([2, 1, 3]);
+        expect(report.totalElements).toBe(2400);
+      });
+
+      it('records a page that contributed nothing as 0, not as absent', async () => {
+        const report = await runWithPages(2400, [
+          [member('A1')],
+          [], // the shape `base()` produces when the fetch threw
+          [member('C1')],
+        ]);
+
+        expect(report.pageRowCounts).toEqual([1, 0, 1]);
+      });
+
+      // JD-1. Carnets are varied per row on purpose: a fixture whose rows share defaults cannot
+      // distinguish distinct counting from row counting (KZ-004).
+      it('counts DISTINCT carnets, so a repeated record does not mask an omitted one', async () => {
+        const report = await runWithPages(2000, [
+          [member('A1'), member('A2'), member('A3')],
+          [member('A3'), member('A4')], // A3 repeats across the page boundary
+        ]);
+
+        expect(report.pageRowCounts).toEqual([3, 2]); // 5 rows fetched
+        expect(report.distinctCarnets).toBe(4); // but only 4 distinct people
+      });
+
+      it('ignores empty and whitespace-only carnets when counting distinct', async () => {
+        const report = await runWithPages(1000, [
+          [member('A1'), member(''), member('   '), member('A2')],
+        ]);
+
+        expect(report.distinctCarnets).toBe(2);
+      });
     });
 
     it('should call base with the correct query for each page', async () => {

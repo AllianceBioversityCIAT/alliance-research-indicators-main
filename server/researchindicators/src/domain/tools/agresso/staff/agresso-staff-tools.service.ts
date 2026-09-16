@@ -8,6 +8,10 @@ import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
 import { allianceStaffMapper } from '../mappers/alliance-staff.mapper';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
+import { FetchReport } from './dto/fetch-report.dto';
+
+/** Agresso's page size for the employees endpoint. */
+const PAGE_SIZE = 1000;
 
 @Injectable()
 export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHttp> {
@@ -27,19 +31,45 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     return `ErpEmploymentServices/api/v1/employees?page=${pages}&pageSize=${size}&status=active`;
   }
 
-  private async findNumberOfPages() {
+  // @akili-spec changes/agresso-staff-deactivation (T-02, DD-D2)
+  //
+  // Was `Math.round(total / 1000) + (total % 1000 !== 0 ? 1 : 0)`, which OVERCOUNTS by one whenever
+  // `total % 1000 >= 500`, because `Math.round` rounds the half up and the remainder term then adds
+  // another page on top: 500 -> 2 (needs 1), 1500 -> 3 (needs 2), 2500 -> 4 (needs 3). That is
+  // roughly half of all possible totals, and the surplus page always returns zero rows.
+  //
+  // Harmless while nothing read the page counts — `base()` mapped an empty array and wrote nothing.
+  // Fatal to C-2, which aborts on a page that contributed no rows: over the old arithmetic that
+  // guard would have fired on about half of all healthy runs.
+  //
+  // `ceil(n) <= round(n) + 1` for every `n >= 0`, so this never requests FEWER pages than are
+  // needed — a property of the arithmetic, not of the data.
+  private async findNumberOfPages(): Promise<{
+    pages: number;
+    totalElements: number;
+  }> {
     const totalElements = await this.connection
       .getRaw<ResponseAgressoStaffDto<unknown>>(this.query(1, 1))
-      .then(({ totalElements }) => totalElements);
-    return (
-      Math.round(totalElements / 1000) + (totalElements % 1000 !== 0 ? 1 : 0)
-    );
+      .then(({ totalElements }) => Number(totalElements));
+    return { pages: Math.ceil(totalElements / PAGE_SIZE), totalElements };
+  }
+
+  /** Distinct non-empty carnets across the payload — C-2's measure. See FetchReport. */
+  private countDistinctCarnets(allStaff: AgressoStaffRawDto[]): number {
+    const carnets = new Set<string>();
+    for (const member of allStaff) {
+      const carnet = member?.resourceId?.trim();
+      if (carnet) {
+        carnets.add(carnet);
+      }
+    }
+    return carnets.size;
   }
 
   // @akili-spec changes/agresso-staff-sec-users-sync (T-07 — accumulate pages, reconcile once)
   async cloneAllAgressoStaff() {
-    const pages = await this.findNumberOfPages();
-    this._logger.log(`Total pages: ${pages}`);
+    const { pages, totalElements } = await this.findNumberOfPages();
+    this._logger.log(`Total pages: ${pages} (totalElements: ${totalElements})`);
 
     // Accumulated by capturing each raw payload member as `base()` maps it. The mapper runs once
     // per item, in payload order, so `allStaff` preserves page order then row order within the
@@ -48,17 +78,33 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     // whatever order TypeORM's `save()` happens to return, which nothing guarantees.
     const allStaff: AgressoStaffRawDto[] = [];
 
+    // Per-page contribution, measured as the delta in `allStaff` rather than inferred from what
+    // `base()` returns — `base()` reports saved entities, which is not the same count and is not
+    // the count C-2 needs.
+    const pageRowCounts: number[] = [];
+
     for (let i = 1; i <= pages; i++) {
       this._logger.log(`Processing page: ${i} of ${pages}`);
+      const before = allStaff.length;
       await this.base<AgressoStaffRawDto, AllianceUserStaff>(
-        this.query(i, 1000),
+        this.query(i, PAGE_SIZE),
         AllianceUserStaff,
         (data) => {
           allStaff.push(data);
           return allianceStaffMapper(data);
         },
       );
+      pageRowCounts.push(allStaff.length - before);
     }
+
+    const fetchReport: FetchReport = {
+      totalElements,
+      pageRowCounts,
+      distinctCarnets: this.countDistinctCarnets(allStaff),
+    };
+    this._logger.log(
+      `Agresso staff fetch report: ${JSON.stringify(fetchReport)}`,
+    );
 
     // A page that failed to fetch means fewer people provisioned THIS run — `base()` catches the
     // error, logs it at `error` and returns `[]`. That is deliberately NOT an abort: the next run
