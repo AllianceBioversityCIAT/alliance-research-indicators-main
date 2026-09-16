@@ -163,11 +163,10 @@ describe('ByPersonComponent', () => {
   // ── 2. Inactive person indicator (red name + badge + red chips) ─────────────
 
   describe('inactive person rendering (is_active === false)', () => {
-    it('INACTIVE: marks the row and the avatar (K-015 transition: active→inactive)', async () => {
+    it('INACTIVE: marks the row (K-015 transition: active→inactive)', async () => {
       // Arrange: start with an active person — no inactive markers
       await createComponent([ALICE]);
       expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeNull();
-      expect(fixture.debugElement.query(By.css('.by-person__avatar--inactive'))).toBeNull();
 
       // Act: switch to an inactive person (K-015 transition)
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
@@ -175,41 +174,39 @@ describe('ByPersonComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Assert: the row carries the inactive treatment and the avatar turns red
+      // Assert: the row carries the inactive treatment (wash + red accent bar)
       expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeTruthy();
-      expect(fixture.debugElement.query(By.css('.by-person__avatar--inactive'))).toBeTruthy();
     });
 
-    it('renders avatar initials for every person', async () => {
-      await createComponent([ALICE, CAROL_INACTIVE]);
-      const avatars = fixture.debugElement.queryAll(By.css('.by-person__avatar'));
-      expect(avatars.length).toBe(2);
-      expect((avatars[0].nativeElement as HTMLElement).textContent?.trim()).toBe('AE'); // Alice Example
-      expect((avatars[1].nativeElement as HTMLElement).textContent?.trim()).toBe('CG'); // Carol Gone
+    it('the Person cell shows the name only, in bold — no avatar, no INACTIVE badge', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      const cell = fixture.nativeElement.querySelector('.by-person__td--person') as HTMLElement;
+      expect(cell.textContent?.trim()).toBe('Carol Gone');
+      const name = cell.querySelector('.by-person__person__name') as HTMLElement;
+      expect(name.classList.contains('font-semibold')).toBe(true);
+      expect(fixture.debugElement.query(By.css('.by-person__avatar'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
     });
 
-    it('INACTIVE: renders "INACTIVE" badge next to the name (K-015 transition)', async () => {
-      // Arrange: start without badge
+    it('INACTIVE: the Status column carries the word, not a badge in the Person cell', async () => {
       await createComponent([ALICE]);
-      const badgeBefore = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
-      expect(badgeBefore).toBeNull(); // active person — no badge (negative discriminator)
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
 
-      // Act: switch to inactive
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
-      // Assert: badge present and says INACTIVE
-      const badge = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
-      expect(badge).toBeTruthy();
-      expect((badge.nativeElement as HTMLElement).textContent?.trim().toUpperCase()).toContain('INACTIVE');
+      // Still no badge in the Person cell …
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
+      // … the status tag is where "Inactive" is stated (NFR-UI-002 text cue)
+      const tag = fixture.debugElement.query(By.css('.by-person__status-tag div'));
+      expect((tag.nativeElement as HTMLElement).textContent?.trim()).toBe('Inactive');
     });
 
-    it('INACTIVE: the name stays dark and bold — it is never painted red (K-015 transition)', async () => {
+    it('INACTIVE: the name is plain text — never painted red (K-015 transition)', async () => {
       await createComponent([ALICE]);
-      const nameBefore = fixture.debugElement.query(By.css('.by-person__person__name'));
-      expect((nameBefore.nativeElement as HTMLElement).classList.contains('atc-primary-blue-600')).toBe(true);
 
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
@@ -218,7 +215,6 @@ describe('ByPersonComponent', () => {
 
       const name = fixture.debugElement.query(By.css('.by-person__person__name'));
       expect((name.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(false);
-      expect((name.nativeElement as HTMLElement).classList.contains('atc-primary-blue-600')).toBe(true);
     });
 
     it('INACTIVE: project chips have by-person__chip--inactive class (K-015 transition)', async () => {
@@ -235,26 +231,22 @@ describe('ByPersonComponent', () => {
       expect(chips.length).toBeGreaterThan(0);
     });
 
-    it('INACTIVE: chip has pi-exclamation-circle icon (K-015 transition)', async () => {
+    it('INACTIVE: the project chip keeps the red treatment (K-015 transition)', async () => {
       await createComponent([ALICE]);
-      const iconBefore = fixture.debugElement.query(By.css('.by-person__chip__inactive-icon'));
-      expect(iconBefore).toBeNull(); // active person — no exclamation icon in chip
+      expect(fixture.debugElement.query(By.css('.by-person__chip--inactive'))).toBeNull();
 
       serviceStub.byPersonCache.set([CAROL_INACTIVE]);
       fixture.detectChanges();
       await fixture.whenStable();
       fixture.detectChanges();
 
-      const icon = fixture.debugElement.query(By.css('.by-person__chip__inactive-icon'));
-      expect(icon).toBeTruthy();
+      expect(fixture.debugElement.query(By.css('.by-person__chip--inactive'))).toBeTruthy();
     });
 
-    it('ACTIVE person does NOT render the inactive icon or badge (negative discriminator)', async () => {
+    it('ACTIVE person renders no inactive markers at all (negative discriminator)', async () => {
       await createComponent([ALICE]);
-      const icon = fixture.debugElement.query(By.css('.by-person__person__inactive-icon'));
-      const badge = fixture.debugElement.query(By.css('.by-person__person__inactive-badge'));
-      expect(icon).toBeNull();
-      expect(badge).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__chip--inactive'))).toBeNull();
     });
   });
 
@@ -683,6 +675,22 @@ describe('ByPersonComponent', () => {
       personHeader.nativeElement.click();
       fixture.detectChanges();
       expect(firstName()).toBe('Carol Gone'); // descending
+    });
+  });
+  // ── Managed projects: code chip + tooltip with the project name ────────────
+
+  describe('project chips', () => {
+    it('shows the code only, with the project name in the info icon tooltip', async () => {
+      await createComponent([ALICE]); // PRJ-A "Alpha Research", PRJ-B "Beta Study"
+
+      const chip = fixture.debugElement.query(By.css('.by-person__chip'));
+      const chipText = (chip.nativeElement as HTMLElement).textContent?.trim() ?? '';
+      expect(chipText).toContain('PRJ-A');
+      expect(chipText).not.toContain('Alpha Research');
+
+      const icon = chip.query(By.css('.by-person__chip__icon'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe('Alpha Research');
     });
   });
 });

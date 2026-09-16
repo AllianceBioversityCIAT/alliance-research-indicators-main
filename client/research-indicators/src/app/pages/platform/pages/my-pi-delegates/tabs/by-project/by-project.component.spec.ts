@@ -127,30 +127,40 @@ describe('ByProjectComponent', () => {
       expect(text).toContain('Alpha Research');
     });
 
+    it('renders the project title in the row colour, not blue, but bold', () => {
+      const name = fixture.debugElement.query(By.css('.by-project__project__name'))
+        .nativeElement as HTMLElement;
+      expect(name.classList.contains('atc-primary-blue-600')).toBe(false);
+      expect(name.textContent?.trim()).toBe('Alpha Research');
+    });
+
     it('renders status pill for PRJ-001', () => {
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Ongoing');
     });
 
-    it('renders pool-funding Yes badge with icon for PRJ-001', () => {
-      const icons = fixture.debugElement.queryAll(By.css('.pi-check-circle'));
-      expect(icons.length).toBeGreaterThanOrEqual(1);
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('Yes');
+    it('renders pool funding as plain Yes / No — no icon', () => {
+      const values = fixture.debugElement
+        .queryAll(By.css('.by-project__pool-value'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(values).toContain('Yes'); // PRJ-001 contributes
+      expect(values).toContain('No'); // PRJ-002 does not
+
+      // the old icon badges are gone
+      expect(fixture.debugElement.queryAll(By.css('.pi-check-circle'))).toHaveLength(0);
+      expect(fixture.debugElement.queryAll(By.css('.pi-minus-circle'))).toHaveLength(0);
     });
 
-    it('renders pool-funding No badge with icon for PRJ-002', () => {
-      const icons = fixture.debugElement.queryAll(By.css('.pi-minus-circle'));
-      expect(icons.length).toBeGreaterThanOrEqual(1);
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('No');
-    });
+    it('renders a compact chip per delegate: name visible, email in the tooltip', () => {
+      const chips = fixture.debugElement.queryAll(By.css('.by-project__chip'));
+      expect(chips.length).toBeGreaterThanOrEqual(2);
 
-    it('renders delegate chips for PRJ-001', () => {
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('Alice Example');
-      expect(text).toContain('alice@test.org');
-      expect(text).toContain('Bob Sample');
+      const first = chips[0];
+      expect((first.nativeElement as HTMLElement).textContent?.trim()).toContain('Alice Example');
+      // the email is no longer printed in the chip — it lives in the icon tooltip
+      expect((first.nativeElement as HTMLElement).textContent).not.toContain('alice@test.org');
+      const icon = first.query(By.css('.by-project__chip__icon'));
+      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe('alice@test.org');
     });
   });
 
@@ -167,9 +177,12 @@ describe('ByProjectComponent', () => {
       expect(inactiveChip).toBeTruthy();
     });
 
-    it('INACTIVE chip has the inactive icon', () => {
-      const icon = fixture.debugElement.query(By.css('.by-project__chip--inactive .by-project__chip__inactive-icon'));
+    it('INACTIVE chip swaps the leading icon for the warning one', () => {
+      const icon = fixture.debugElement.query(
+        By.css('.by-project__chip--inactive .by-project__chip__icon')
+      );
       expect(icon).toBeTruthy();
+      expect((icon.nativeElement as HTMLElement).classList.contains('pi-exclamation-circle')).toBe(true);
     });
   });
 

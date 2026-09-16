@@ -77,26 +77,16 @@
       <ng-template pTemplate="body" let-row>
         <tr class="by-person__row" [class.by-person__row--inactive]="row.is_active === false">
 
-          <!-- Person cell: avatar + name + INACTIVE badge; inactive rows carry a
-               red accent bar and a light red wash (see the --inactive styles). -->
+          <!-- Person cell — just the name, in the Results Center table's type
+               treatment (14px, inherited colour). The inactive cues live in the
+               row wash/accent and in the Status column, not here. -->
           <td class="by-person__td by-person__td--person">
-            <div class="by-person__person" [class.by-person__person--inactive]="row.is_active === false">
-              <span class="by-person__avatar" [class.by-person__avatar--inactive]="row.is_active === false"
-                aria-hidden="true">{{ initials(row.name) }}</span>
-              <div class="by-person__person__name-row">
-                <!-- The name stays dark and bold even when inactive; the red
-                     cues are the row accent, the avatar, the badge and the pill. -->
-                <span class="by-person__person__name atc-primary-blue-600">{{ row.name }}</span>
-                @if (row.is_active === false) {
-                  <span class="by-person__person__inactive-badge atc-red-1" aria-label="Inactive delegate">INACTIVE</span>
-                }
-              </div>
-            </div>
+            <span class="by-person__person__name font-semibold">{{ row.name }}</span>
           </td>
 
           <!-- Email cell -->
           <td class="by-person__td by-person__td--email">
-            <span class="by-person__email atc-grey-700">{{ row.email }}</span>
+            <span class="by-person__email">{{ row.email }}</span>
           </td>
 
           <!-- Status cell — same <app-custom-tag> design as the By project table.
@@ -112,7 +102,9 @@
             ></app-custom-tag>
           </td>
 
-          <!-- Projects cell: chips with per-chip X (R-UI-008) -->
+          <!-- Projects cell — a compact chip per project: the code plus an info
+               icon whose tooltip carries the full project name, the same hover
+               pattern the Results Center uses for a status. -->
           <td class="by-person__td by-person__td--projects">
             <div
               class="by-person__chips"
@@ -126,15 +118,15 @@
                   role="listitem"
                   [attr.aria-label]="project.project_code + (project.project_name ? ' — ' + project.project_name : '')"
                 >
-                  @if (row.is_active === false) {
-                    <i class="pi pi-exclamation-circle by-person__chip__inactive-icon atc-red-1" aria-hidden="true"></i>
-                  }
-                  <span class="by-person__chip__info">
-                    <span class="by-person__chip__code" [class.atc-red-1]="row.is_active === false" [class.atc-primary-blue-600]="row.is_active !== false">{{ project.project_code }}</span>
-                    @if (project.project_name) {
-                      <span class="by-person__chip__name atc-grey-700">{{ project.project_name }}</span>
-                    }
-                  </span>
+                  <!-- Leading icon: hover shows the project name -->
+                  <i
+                    class="by-person__chip__icon"
+                    [ngClass]="row.is_active === false ? 'pi pi-exclamation-circle' : 'pi pi-info-circle'"
+                    [pTooltip]="project.project_name ?? project.project_code"
+                    tooltipPosition="top"
+                    [attr.aria-label]="project.project_name ?? project.project_code"
+                  ></i>
+                  <span class="by-person__chip__code">{{ project.project_code }}</span>
                   <!-- Per-project "X" revoke (R-UI-008: named pair only, not the whole person) -->
                   <button
                     type="button"
