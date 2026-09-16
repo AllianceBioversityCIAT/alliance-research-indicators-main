@@ -243,4 +243,73 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(snapshot.exists).toBe(true);
     expect(snapshot.pool_funding_alignment_green).toBe(true);
   });
+
+  /**
+   * Versions (`is_snapshot = TRUE`) are the approved rows, and they are what PRMS
+   * receives. ResultsUtil already chooses live-vs-version from `reportYear` before
+   * the id reaches this repository, so re-filtering here refused every version with
+   * a 404 "Result not found". Asserted on the emitted SQL, where the property lives.
+   */
+  describe('version (snapshot) rows are reachable', () => {
+    const snapshotRow = {
+      result_id: 555,
+      result_official_code: 19949,
+      is_synced_to_prms: 0,
+      result_status_id: 6,
+      indicator_id: 4,
+      alignment_green: 1,
+      agreement_id: 'C-POOL-001',
+      is_pool_funding_contributor: 1,
+      policy_type_id: null,
+    };
+
+    it('loadGateSnapshot does not constrain is_snapshot, and resolves a version row', async () => {
+      query.mockResolvedValueOnce([snapshotRow]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      expect(query.mock.calls[0][0] as string).not.toMatch(/is_snapshot/i);
+      expect(snapshot.exists).toBe(true);
+      expect(snapshot.result_id).toBe(555);
+      expect(snapshot.result_official_code).toBe(19949);
+    });
+
+    it('the claim lock does not constrain is_snapshot', async () => {
+      transactionQuery
+        .mockResolvedValueOnce([
+          { result_id: 555, result_official_code: 19949, is_synced_to_prms: 0 },
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ max_attempt: 0 }])
+        .mockResolvedValueOnce({ insertId: 1 });
+
+      await repository.claimAttempt(555, {
+        environment: 'TEST',
+        userId: 7,
+        now: new Date('2026-09-16T12:00:00.000Z'),
+      });
+
+      const lockSql = transactionQuery.mock.calls[0][0] as string;
+      expect(lockSql).toContain('FOR UPDATE');
+      expect(lockSql).not.toMatch(/is_snapshot/i);
+    });
+
+    it('the insertRefusedByStar lock does not constrain is_snapshot', async () => {
+      transactionQuery
+        .mockResolvedValueOnce([{ result_id: 555 }])
+        .mockResolvedValueOnce([{ max_attempt: 0 }])
+        .mockResolvedValueOnce({ insertId: 2 });
+
+      await repository.insertRefusedByStar({
+        resultId: 555,
+        environment: 'TEST',
+        userId: 7,
+        failureReason: 'Refused by STAR',
+      });
+
+      const lockSql = transactionQuery.mock.calls[0][0] as string;
+      expect(lockSql).toContain('FOR UPDATE');
+      expect(lockSql).not.toMatch(/is_snapshot/i);
+    });
+  });
 });

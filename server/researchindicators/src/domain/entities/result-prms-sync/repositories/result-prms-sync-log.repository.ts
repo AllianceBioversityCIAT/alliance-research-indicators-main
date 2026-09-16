@@ -126,7 +126,6 @@ export class ResultPrmsSyncLogRepository {
         AND rpc.is_active = TRUE
       WHERE r.result_id = ?
         AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
       `,
       [resultId],
     );
@@ -188,7 +187,6 @@ export class ResultPrmsSyncLogRepository {
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
-        AND is_snapshot = FALSE
       FOR UPDATE
       `,
       [resultId],
@@ -310,7 +308,6 @@ export class ResultPrmsSyncLogRepository {
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
-        AND is_snapshot = FALSE
       FOR UPDATE
       `,
       [input.resultId],

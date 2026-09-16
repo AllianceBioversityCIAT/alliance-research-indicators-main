@@ -25,9 +25,9 @@ const SessionLengthTrainingHomologation: Record<
  * BSc and Other intentionally fall through to the session-length term.
  */
 export function homologateLengthTraining(
-  degreeId: DegreesEnum,
-  sessionLengthId: SessionLengthEnum,
-): PrmsLengthTraining {
+  degreeId: DegreesEnum | null | undefined,
+  sessionLengthId: SessionLengthEnum | null | undefined,
+): PrmsLengthTraining | undefined {
   const inboundDegreeName = Object.entries(DegreeHomologation).find(
     ([, value]) => value === degreeId,
   )?.[0];

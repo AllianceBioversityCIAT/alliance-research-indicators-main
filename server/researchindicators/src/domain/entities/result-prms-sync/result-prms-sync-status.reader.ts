@@ -30,7 +30,6 @@ const RESULT_STATUS_SQL = `
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
-        AND is_snapshot = FALSE
     `;
 
 const asBoolean = (value: unknown): boolean =>

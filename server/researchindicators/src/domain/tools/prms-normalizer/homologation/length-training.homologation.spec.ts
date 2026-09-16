@@ -25,4 +25,30 @@ describe('homologateLengthTraining', () => {
       );
     },
   );
+
+  /**
+   * Measured on Dev: result 19949 (and its Approved version) carries
+   * degree_id NULL with session_length_id set — a non-degree training. PRMS wants
+   * one string enum, never a degree, so the session term is the whole answer.
+   */
+  it.each([
+    [null, SessionLengthEnum.SHORT_TERM, 'Short-term'],
+    [null, SessionLengthEnum.LONG_TERM, 'Long-term'],
+    [undefined, SessionLengthEnum.SHORT_TERM, 'Short-term'],
+  ])(
+    'resolves from the session length alone when the degree is %s',
+    (degreeId, sessionLengthId, expected) => {
+      expect(homologateLengthTraining(degreeId, sessionLengthId)).toBe(
+        expected,
+      );
+    },
+  );
+
+  it('still resolves a PhD when no session length is recorded', () => {
+    expect(homologateLengthTraining(DegreesEnum.PHD, null)).toBe('PhD');
+  });
+
+  it('resolves nothing when neither input can produce the enum', () => {
+    expect(homologateLengthTraining(null, null)).toBeUndefined();
+  });
 });

@@ -124,4 +124,23 @@ describe('ResultPrmsSyncStatusReader', () => {
     expect(status.sync_state).toBe('failed');
     expect(status.is_synced_to_prms).toBe(false);
   });
+
+  it('reads the status of a version (snapshot) row — the results query does not constrain is_snapshot', async () => {
+    // Versions are the approved rows PRMS receives; the GET surface must be able
+    // to report on the same row the POST syncs.
+    query
+      .mockResolvedValueOnce([
+        { is_synced_to_prms: 1, prms_result_code: 'PRMS-1' },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const status = await reader.getStatus(555);
+
+    const resultsSql = query.mock.calls
+      .map((call) => call[0] as string)
+      .find((sql) => /FROM results/i.test(sql));
+    expect(resultsSql).toBeDefined();
+    expect(resultsSql).not.toMatch(/is_snapshot/i);
+    expect(status.is_synced_to_prms).toBe(true);
+  });
 });
