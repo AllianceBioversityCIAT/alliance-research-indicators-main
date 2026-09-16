@@ -149,3 +149,104 @@ two vacuous falsifiers, and the two extra cases are offered to the user as an ex
 Fixture **RED on HEAD in exactly cases 1, 3, 6, 8** — observed twice (worker, then Leader). Teardown leaves
 zero seeded rows (`leftover_year 0`, zero results in band `905_000`). **Cannot prove** (KZ-017): anything about
 Dev, Testing or Prod — only the disposable scratch schema is exercised; nothing about the rendered screen.
+
+## T-03 — Migration: the delete routines clear the four tables
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-16 |
+| Implementer attempts | **1** |
+| Implementer | Cursor CLI `cursor-grok-4.6-high` — Orca `task_df222cc9fa57` / `ctx_21daf0c2d61a` (fresh terminal; the T-01 worker was released at 68% context because this task is bulk verbatim transcription) |
+| Reviewer | `akili-reviewer` (Opus 5, read-only) |
+| Skills assigned | `nestjs-expert` (as recommended — no deviation) |
+| Effort | high (correctness-critical: migration + delete routines; transcription is the dominant defect class, RB-2) |
+| Requirements covered | R-PFV-003 (hard-delete scenario proven; version-delete scenario gated only from T-02), R-PFV-006, NFR-PFV-001, NFR-PFV-002 |
+
+### Attempt 1
+
+**Files changed:** `server/researchindicators/src/db/migrations/1789583572262-addPoolFundingDeletesToDeleteRoutines.ts` (new, 773 lines — of which ~757 are mandatory verbatim re-declaration). Nothing else.
+
+**Body diff — measured independently by the Leader** (extracted each routine's template literal from both
+files and ran `difflib.unified_diff`, rather than trusting the worker's own diff):
+
+| Routine | `up()` vs deployed body | `down()` |
+| --- | --- | --- |
+| `SP_delete_result_version` | **+16 / −0**, one hunk | **byte-identical** to `1787083305648` `up()` |
+| `full_delete_result_version` | **+16 / −0**, one hunk | **byte-identical** to `1787083305648` `up()` |
+
+The single hunk, identical in both routines, sits immediately before `DELETE FROM results`: `_sp` (via the
+`alignment_id IN (SELECT …)` sub-select) → `alignment` → `toc_alignment` → `indicator_mapping`, all keyed on
+`temp_result_id`.
+
+**Verification (Implementer, then re-measured by the Leader after the worker exited):**
+
+| Command | Result |
+| --- | --- |
+| `npx jest --config ./test/jest-fixtures.json <fixture> --verbose` | 3 failed, 5 passed, 8 total |
+| `npm run test:fixtures` (full) | 6 failed / 16 passed suites; **48 failed / 105 passed tests** (was 49/104) |
+| `npx eslint src/db/migrations/1789583572262-*.ts` | exit 0, no output (`npm run lint` NOT used — K-001) |
+| `npm run build` | exit 0 |
+
+Colour transition: **case 8 RED (MySQL 1451 on `fk_rpfa_result`) → GREEN**; case 7 stays GREEN; cases 1, 3, 6
+stay RED for T-02. The single test gained across the whole suite is case 8 — that is the task's entire
+behavioural footprint, and it matches.
+
+**Reviewer verdict: `STATUS: PASS`.** Independently confirmed, beyond the Leader's checks:
+
+- **The DD-4 sharp edge is not reachable.** `temp_result_id` is assigned exactly once in
+  `SP_delete_result_version` (`SELECT r.result_id INTO temp_result_id … WHERE r.is_snapshot = TRUE AND
+  r.report_year_id = reportYear AND r.result_official_code = resultCode`) — the **snapshot** — with no second
+  `INTO`/`SET` between that resolution and the new blocks, and `resultCode` occurring in the whole body only
+  twice (signature + that `WHERE`). No `DELETE` keys on the code.
+- **The `_sp` sub-select is complete, not merely ordered:** `fk_rpfas_alignment` is the *single* FK anywhere
+  pointing at the four tables (`baseline.sql:3693`), so an orphaned `_sp` row cannot exist and the set deleted
+  is exactly the set the FK would block. `toc_alignment` and `indicator_mapping` have no child tables.
+- **Line-count corroboration of the +16/−0:** source `up()` SP 174 lines → new 190; source `up()` function 175
+  → new 191; both `down()` bodies exactly 174 / 175. Also proved the paste came from `up()` and not `down()` —
+  all four bodies contain `result_innovation_use`, which the source's `down()` routines do not.
+- Repo migration-killer checked (`src/CLAUDE.md` §7): no `?` and no `:word` anywhere in the file, so
+  `namedPlaceholders` cannot reject it.
+- `1787083305648` confirmed the latest prior declaration of either routine (15 files match, none newer);
+  `1789583572262` is the highest timestamp in the directory; no merged migration was modified.
+
+### Decisions made
+
+- **Case 6 stays RED by design, and `tasks.md`'s Done-when was corrected before dispatch.** The original
+  "cases 6, 7 and 8 are green" is unachievable at T-03 time: this task lands **before** T-02 deliberately (the
+  tree must never hold a copy the delete routines cannot clear), so case 6's mandated pre-delete premise
+  cannot pass. Forcing it green would require hand-seeding snapshot rows (hiding the missing copy) or pulling
+  T-02's copy blocks into this migration (destroying the FK-safety ordering). The brief carried an explicit
+  *"do not try to make case 6 green — if you find yourself editing the fixture or `SP_versioning`, STOP and
+  escalate"*. Reviewer independently agreed with the correction.
+- **Stated scope limit (KZ-017):** `SP_delete_result_version`'s new blocks are **not fixture-gated until T-02
+  lands** — before the copy exists, that routine never meets a pool-funding FK on a snapshot. Only the
+  `full_delete_result_version` half (case 8) is proven here. Accepted cost of the deliberate ordering.
+
+### Issues encountered
+
+- The scratch bootstrap is **not idempotent** (FP-49: `ER_TABLE_EXISTS_ERROR` on an already-migrated
+  container). Worker recovered the documented way — `compose:test:down` + `compose:test:up`, wait for
+  `mysqld is alive`, then bootstrap unchanged. No harness file touched.
+- A Leader check mid-run looked alarming and was falsified before acting on it: the worker was reading
+  `1784250000000-RepairSpDeleteResultVersionObjectiveTables.ts`, raising the possibility that a **later**
+  migration had re-declared these routines and that copying from `1787083305648` would revert a repair. First
+  grep (narrowed to `PROCEDURE \`SP_…\``) returned a single misleading file; re-run unfiltered, 15 files match
+  and `1787083305648` is the newest — the spec's source-of-truth claim holds. Recorded because the narrow grep
+  is exactly the KZ-017 shape, and acting on its confident answer would have derailed the task.
+
+### ADVISORY (4R lens — recorded, never gates, never becomes a task)
+
+1. **Risk — the rollback path is now asymmetric.** `down()` correctly removes the DELETE blocks (NFR-PFV-001
+   mandates verbatim restoration). Once T-02 is applied and a snapshot has actually received pool funding
+   rows, reverting **both** migrations leaves those rows in place while `SP_delete_result_version` loses the
+   ability to clear them — the next re-approval of that result hits MySQL 1451 again. TypeORM reverts
+   newest-first, so T-02's copy is removed *before* T-03's deletes are. **Not actionable in this task** — any
+   "safer" `down()` would violate NFR-PFV-001. Carried into the risk log as **RB-3** so the rollback path is a
+   deliberate decision rather than a discovery.
+
+### Final verification result
+
+Case 8 green from a real MySQL 1451, both body diffs +16/−0, both `down()` bodies byte-identical, eslint 0,
+build 0. **Cannot prove** (KZ-017): that Dev, Testing or Prod received this migration — applying it is a
+separate human decision (K-015); and `SP_delete_result_version`'s half is unproven by any test until T-02.

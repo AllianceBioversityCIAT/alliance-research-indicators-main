@@ -176,7 +176,7 @@ diff <(old body) <(new body)          # R-PFV-006
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S (logic) / L (bytes) |
 | Depends on | T-01 |
 | Requirements | R-PFV-003 (all three scenarios), R-PFV-006, NFR-PFV-001, NFR-PFV-002 |
@@ -223,7 +223,9 @@ npx eslint src/db/migrations/<new-file>.ts
 diff <(old body) <(new body)          # both routines, R-PFV-006
 ```
 
-- **Done when:** T-01 cases 6, 7 and 8 are green, and both body diffs show only the intended hunks.
+- **Done when:** T-01 **case 8 turns green** (it is red on HEAD with MySQL 1451), **case 7 stays green**, and both body diffs show only the intended hunks.
+  *Corrected 2026-09-16 while dispatching this task.* The original line — "cases 6, 7 and 8 are green" — is **unachievable at T-03 time and must not be chased**: `T-03` lands **before** `T-02` by design, so nothing is ever copied onto a snapshot yet, and case 6's own mandated pre-delete premise ("assert **before** the delete that the snapshot carries the rows") still fails. Case 6 stays red **at the premise, never at 1451** until T-02 lands; forcing it green at this point would require either seeding snapshot rows by hand (which hides the missing copy) or pulling T-02's copy blocks into this migration (which breaks the FK-safety ordering this task exists to guarantee). Same family as the already-adjudicated case-6/1451 nuance: the case text governs, the summary line was subordinate.
+- **Scope limit, stated (KZ-017):** this task's `SP_delete_result_version` blocks are **not provable by any test until T-02 lands** — before the copy exists, that routine never meets a pool-funding FK on a snapshot. Only the `full_delete_result_version` half (case 8) is gated here. That is the accepted cost of the deliberate T-03-before-T-02 ordering, not an omission.
 - **Input that makes it fail:** deleting `result_pool_funding_alignment` before `_sp` in either routine (→ FK 1451, cases 6 and 8 red); omitting the blocks from `SP_delete_result_version` (→ case 6 red with 1451); omitting them from `full_delete_result_version` (→ case 8 red); keying the `DELETE` on `resultCode` instead of `temp_result_id` in `SP_delete_result_version` (→ case 6's "the live result's rows were not touched" assertion red); placing the blocks **after** `DELETE FROM results` (→ 1451 on `results` itself).
 - **Disqualifier:** running this task's evidence **before** T-01 is red is not evidence — see K-004. A pass claimed from a suite that errored during bootstrap is a confident zero. Unintended diff hunks are a FAIL regardless of test colour.
 - **Cannot prove:** behaviour on any shared database.
@@ -401,3 +403,4 @@ T-06 is not a PR; it gates the release.
 | AR-1 | 2026-09-16 | Re-approving **without re-filling** the section leaves the new version empty (consequence of Decisions 1 + 4) | Owner-ruled accepted; pinned by T-01 case 7 so reversing the ruling is a visible test change | **accepted** |
 | RB-1 | 2026-09-16 | **Neither Dev nor the scratch schema has `uq_rpfa_active_result`.** *Corrected 2026-09-16 during T-01 — the original mitigation ("the scratch schema does have it, so the fixture exercises the enforced shape") is **false**, and the original cause ("migration not applied there") is imprecise.* Measured: `baseline.sql` carries the ledger row `1779190000014` marked **applied** while its own `CREATE TABLE result_pool_funding_alignment` has **no unique index at all**, so `migration:test:execute` skips it and scratch inherits Dev's drift. This is worse than a pending migration — `migration:show` can never flag it, because the ledger says applied | DD-2's conclusion is unaffected: every copied row lands on a **new** `result_id` (and `_sp` on a new `alignment_id`), so no unique index can collide on the copy path (design §4). The at-most-one-active invariant rests on `bilateral.service.ts:823-856` plus the Dev measurement (49 active / 49 distinct results, zero duplicates) — **not** on the index. T-01 seeds at most one active alignment per result and does not depend on it | **corrected — open as a schema-drift finding** |
 | RB-2 | 2026-09-16 | Three routines re-declared in full; transcription is the dominant defect class | Bodies copied verbatim from the deployed migrations, then diffed | open |
+| RB-3 | 2026-09-16 | **Asymmetric rollback.** Once T-02 is applied and a snapshot has received pool funding rows, reverting **both** migrations leaves those rows in place while `SP_delete_result_version` loses the ability to clear them — the next re-approval hits MySQL 1451 again. TypeORM reverts newest-first, so T-02's copy is removed *before* T-03's deletes are | **Not fixable in code**: NFR-PFV-001 mandates a verbatim `down()`, so any "safer" one violates the spec. Recorded so the rollback path is a deliberate decision, not a discovery. Surfaced by the T-03 Reviewer; reachability constructed, not hypothesised | open |
