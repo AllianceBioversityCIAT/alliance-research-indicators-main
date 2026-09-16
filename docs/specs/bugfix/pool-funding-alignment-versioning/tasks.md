@@ -236,7 +236,7 @@ diff <(old body) <(new body)          # both routines, R-PFV-006
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | — |
 | Requirements | R-PFV-004 (both scenarios, all clauses) |

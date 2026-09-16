@@ -11,6 +11,7 @@ import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { WebsocketService } from '@sockets/websocket.service';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
@@ -104,6 +105,7 @@ export default class PoolFundingAlignmentComponent {
     try { return inject(ClarityService); } catch { return null; }
   })();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly versionWatcher = inject(VersionWatcherService);
 
   readonly loadFailed = signal(false);
   readonly inlineErrors = signal<Record<string, string> | null>(null);
@@ -476,12 +478,29 @@ export default class PoolFundingAlignmentComponent {
   });
 
   constructor() {
+    this.versionWatcher.onVersionChange(() => {
+      this.loadAlignment();
+    });
+
+    this.websocketService
+      ?.listen('result.pool-funding-alignment.changed')
+      .pipe(
+        filter((evt): evt is AlignmentChangedEvent =>
+          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
+        ),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => this.handleRemoteChange());
+  }
+
+  private loadAlignment(): void {
     const resultCode = this.resultCode();
     void this.bilateralService.getAlignment(resultCode).then(alignment => {
       if (!alignment) {
         this.loadFailed.set(true);
         return;
       }
+      this.loadFailed.set(false);
       if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
@@ -500,16 +519,6 @@ export default class PoolFundingAlignmentComponent {
         is_read_only: alignment.is_read_only
       });
     });
-
-    this.websocketService
-      ?.listen('result.pool-funding-alignment.changed')
-      .pipe(
-        filter((evt): evt is AlignmentChangedEvent =>
-          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
-        ),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe(() => this.handleRemoteChange());
   }
 
   handleRemoteChange(): void {

@@ -2,13 +2,14 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ActivatedRoute } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import ResultComponent from './result.component';
 import { cacheServiceMock, getMetadataServiceMock } from 'src/app/testing/mock-services.mock';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { GetMetadataService } from '@shared/services/get-metadata.service';
 import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { ActionsService } from '@shared/services/actions.service';
+import { BilateralService } from '@shared/services/bilateral.service';
 
 const metadataMock = getMetadataServiceMock;
 const versionWatcherMock = { version: jest.fn().mockReturnValue('1.0') };
@@ -255,5 +256,70 @@ describe('ResultComponent branch coverage - constructor and metadata', () => {
     component.lastVersion = '3.0';
     component.checkAndUpdateMetadata();
     expect(mockMetadata.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ResultComponent pool funding pre-fetch memo includes version (R-PFV-004)', () => {
+  let fixture: ComponentFixture<ResultComponent>;
+  let params$: Subject<Record<string, string>>;
+  let queryParams$: Subject<Record<string, string>>;
+  let getAlignment: jest.Mock;
+
+  beforeEach(async () => {
+    params$ = new Subject();
+    queryParams$ = new Subject();
+    getAlignment = jest.fn().mockResolvedValue(null);
+
+    TestBed.overrideComponent(ResultComponent, { set: { template: '' } });
+    await TestBed.configureTestingModule({
+      imports: [RouterTestingModule, HttpClientTestingModule, ResultComponent],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { params: {} },
+            params: params$,
+            queryParams: queryParams$
+          }
+        },
+        {
+          provide: CacheService,
+          useValue: {
+            setCurrentResultId: jest.fn(),
+            getCurrentNumericResultId: jest.fn().mockReturnValue(19941)
+          }
+        },
+        { provide: GetMetadataService, useValue: { update: jest.fn() } },
+        VersionWatcherService,
+        { provide: BilateralService, useValue: { getAlignment } },
+        { provide: ActionsService, useValue: { showGlobalAlert: jest.fn(), showToast: jest.fn(), validateToken: jest.fn() } }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ResultComponent);
+    fixture.detectChanges();
+  });
+
+  it('re-issues getAlignment when switching version and when switching back to live', () => {
+    params$.next({ id: '19941' });
+    queryParams$.next({});
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    expect(getAlignment).toHaveBeenCalledTimes(1);
+    expect(getAlignment).toHaveBeenCalledWith('19941');
+
+    getAlignment.mockClear();
+    queryParams$.next({ version: '2026' });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    expect(getAlignment).toHaveBeenCalledTimes(1);
+    expect(getAlignment).toHaveBeenCalledWith('19941');
+
+    getAlignment.mockClear();
+    queryParams$.next({});
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    expect(getAlignment).toHaveBeenCalledTimes(1);
+    expect(getAlignment).toHaveBeenCalledWith('19941');
   });
 });

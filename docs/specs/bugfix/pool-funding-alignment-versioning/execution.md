@@ -423,3 +423,104 @@ more than one active alignment on one result, or the `ROW_COUNT()` guard's actua
 8/8 fixture cases green, body diff +86/−0 in 2 hunks, `down()` byte-identical, zero DDL, eslint 0, build 0.
 **Cannot prove** (KZ-017): that Dev, Testing or Prod received this migration — applying it is a separate human
 decision (K-015); nothing about the rendered screen (T-06).
+
+## T-04 — Client: the pool funding section follows the viewed version
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS (attempt 2)** — attempt 1 FAILed review |
+| Date | 2026-09-16 |
+| Implementer attempts | **2** |
+| Implementer | Cursor CLI `cursor-grok-4.6-high` — attempt 1 `ctx_bd24cfa30911`, attempt 2 `ctx_404e2491bcb0` (fresh worker) |
+| Reviewer | `akili-reviewer` (Opus 5, read-only) — full sweep on attempt 1, focused re-audit on attempt 2 |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max` (as recommended) |
+| Effort | medium (attempt 1) → high (attempt 2, per the rework rule) |
+| Requirements covered | R-PFV-004 (both scenarios) — **as amended**, see the Pivot Record above |
+
+### Attempt 1 — `STATUS: FAIL`
+
+**Files changed:** the three production files (`api.service.ts`, `pool-funding-alignment.component.ts`,
+`result.component.ts`) and their three specs.
+
+**Verification:** `npm test -- --silent` 323/323 suites, 7244/7244 tests; `npm run lint -- --quiet` clean;
+`tsc -p tsconfig.spec.json` exit 2 on the pre-existing 944-error corpus with **no TS1005 abort**. The
+Implementer ran all three mandated falsifiers and quoted each red.
+
+**Reviewer FAIL — three issues:**
+
+1. **The spec is wrong, not the code.** R-PFV-004's "byte-identical live request" cannot be satisfied by the
+   mandated design. → Resolved by the Leader as a **Pivot** (see `## Pivot Record: T-04` above). The Reviewer
+   stated the verdict in those words: *"The code is right and the SPEC is wrong … Do not ask the Implementer
+   to change `api.service.ts`."*
+2. **The test arrangement is a separate, implementation-side defect that survives the spec correction.**
+   Attempt 1 configured the Router stub with `'/page'` — a URL this page never has — so all **eight** new URL
+   assertions pinned a string production never emits. *"A gate arranged around the condition that falsifies it
+   is not a gate."* → This is what attempt 2 fixed.
+3. **Unexplained lockfile drift** (`client/.../package-lock.json` modified, root `pnpm-lock.yaml` untracked).
+   → **Leader determination: pre-existing, not this spec's.** Both were already dirty in the session's opening
+   `git status` before any work began; the package-lock delta is 1 insertion / 3 deletions and its last commit
+   is the monorepo migration. Neither is staged into any of this spec's commits. Reviewer confirmed the
+   disposition on re-audit, noting the residual risk is procedural: they must not be swept into a later commit.
+
+**Leader note on attempt 1's honesty:** the Implementer *disclosed* the `/page` arrangement in its own
+`NOT DONE / ASSUMPTIONS` — which is why it was caught. Disclosure is not discharge (the clause was unmet, not
+merely unverified), but the disclosure is what made the review cheap, and it is the behaviour the brief asks for.
+
+### Attempt 2 — `STATUS: PASS`
+
+**Files changed:** `client/research-indicators/src/app/shared/services/api.service.spec.ts` **only**. Production
+code and both component specs untouched from attempt 1 (which the Reviewer had passed explicitly).
+
+The URL block now arranges the **real route** — `/result/19941/pool-funding-alignment` and
+`…?version=2026` — and asserts, per call, via `it.each(POOL_FUNDING_CALLS)` over all four including the `PATCH`:
+
+| Scenario | Asserted |
+| --- | --- |
+| `?version=2026` | `…?reportYear=2026&reportingPlatforms=STAR` |
+| live | `…?reportingPlatforms=STAR` **and** `not.toContain('reportYear')` |
+
+**Verification, re-measured by the Leader:** `npm test -- --silent` → **323/323 suites, 7244/7244 tests**;
+`npm run lint -- --quiet` clean; `git diff --stat` on `result.interceptor.ts` **empty** (the falsifier mutation
+was genuinely restored — the Reviewer independently confirmed the `if (year)` guard is back by reading the file).
+
+**Falsifiers — both halves now OBSERVED red, not derived (K-004):**
+
+| Mutation | Observed |
+| --- | --- |
+| Drop `if (year)` in the interceptor (Implementer) | all four **live** cases red on `not.toContain`, received `…?reportYear=null&reportingPlatforms=STAR` |
+| Remove `useResultInterceptor` from `GET_PoolFundingAlignment` only (**Leader**, closing the Reviewer's K-004 advisory) | that **version** case red — expected `…?reportYear=2026&reportingPlatforms=STAR`, received the bare `…/pool-funding-alignment` — **and the other three stayed green**, proving the gate discriminates per call. Restored; 8/8 green after |
+
+**Reviewer re-audit confirmed, at source rather than on trust** (it has no `Bash`, so it read the files):
+the route table (`app.routes.ts:51/:82/:112`), that `19941` genuinely resolves to `STAR` via
+`platformFromResultCodeOrNull`, that `httpMock.verify()` sits in the outer `afterEach` and covers all 8, that
+production is untouched, and that the interceptor's `if (year)` guard is restored. It ruled **no assertion
+inert**, and the `startsWith` predicate acceptable because it is a *selector* followed by full-string equality —
+a missing param still reddens on the `toBe`.
+
+### ADVISORY (recorded, never gates)
+
+1. **Readability —** `expect(req.request.method).toBe(method)` can never fail; `expectOne` already filters on
+   method. Harmless, but it reads as coverage it does not provide.
+2. **Risk (no reachable path today) —** the assertions read `req.request.url`, which structurally cannot see a
+   param delivered via `HttpParams`. None of the four calls uses `params`, and the interceptor builds a string,
+   so the check covers the only mechanism in play. `urlWithParams` would be strictly stronger at zero cost.
+3. **Readability —** the Router stub's `parseUrl: () => ({ queryParams })` ignores its argument, so the URL
+   string feeds only `getPlatformFromUrl` while query params are supplied out-of-band. Consistent today; a real
+   `DefaultUrlSerializer().parse()` would remove the chance of the two drifting in a future edit.
+4. **Risk — release ordering (from the attempt-1 review, reachability constructed).** PR 2 (T-04/T-05) can
+   deploy while T-02's migration sits unapplied — K-015 measured exactly that, 4 days and several deploys. In
+   that window `#19941` at `?version=2026` renders the section **empty**, because the snapshot has zero pool
+   funding rows until `SP_versioning` copies them. Conformant with R-PFV-004 and arguably more honest than
+   today's contradiction, but user-visible and recorded nowhere else. **Carried into T-06 as a release-ordering
+   precondition.**
+5. **Reliability — the initial load path is now an effect.** `loadAlignment()`'s only call site is inside
+   `versionWatcher.onVersionChange`, an `effect()`, so the first section load moves from synchronous-constructor
+   to the first effect flush. Eleven sibling pages carry the same shape, but every spec stubs `onVersionChange`
+   and invokes the callback directly, so **no test exercises the real effect's initial run** for this page.
+   T-06's first checkbox covers it in the field.
+
+### Final verification result
+
+323/323 client suites green, lint clean, one file changed in the rework, both falsifier directions observed.
+**Cannot prove** (KZ-017): that the section *renders* the version's values — jsdom asserts the request, not the
+paint (T-06); and R-PFV-004's amended clause remains **pending owner ratification**.
