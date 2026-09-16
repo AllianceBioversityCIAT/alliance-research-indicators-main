@@ -132,6 +132,19 @@ export class ProjectDelegatesResponseDto {
   is_pool_funding_contributor!: boolean;
 
   @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      "sec_users.sec_user_id of the project's Principal Investigator, resolved " +
+      'through agresso_contracts.projectLeadId → alliance_user_staff.carnet → ' +
+      'sec_users.email. Null when the lead has no STAR account. This is the same ' +
+      'user the PI-exclusion rule (R-PID-008) rejects as a delegate of this ' +
+      'project, so clients can disable that option before calling POST.',
+    example: 42,
+  })
+  pi_user_id!: number | null;
+
+  @ApiProperty({
     type: String,
     description: 'agresso_contracts.contract_status',
     nullable: true,

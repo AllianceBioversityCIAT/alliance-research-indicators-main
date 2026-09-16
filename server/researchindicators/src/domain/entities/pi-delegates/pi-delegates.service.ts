@@ -547,6 +547,8 @@ export class PiDelegatesService {
       is_pool_funding_contributor: Boolean(
         project?.is_pool_funding_contributor,
       ),
+      pi_user_id:
+        project?.pi_user_id != null ? Number(project.pi_user_id) : null,
       status: project?.contract_status ?? null,
       start_date: project?.start_date ?? null,
       end_date: project?.end_date ?? null,
@@ -699,6 +701,7 @@ export class PiDelegatesService {
       project_code: p.agreement_id,
       project_name: p.description ?? null,
       is_pool_funding_contributor: Boolean(p.is_pool_funding_contributor),
+      pi_user_id: p.pi_user_id != null ? Number(p.pi_user_id) : null,
       status: p.contract_status ?? null,
       start_date: p.start_date ?? null,
       end_date: p.end_date ?? null,

@@ -28,6 +28,7 @@ import { CacheService } from '@services/cache/cache.service';
 import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
+import { PiDelegatePeoplePickerStubService } from '../services/pi-delegate-picker-stub.service';
 import type { DelegateSummary } from '@interfaces/pi-delegates.interface';
 
 // ─── Local form-state shape ───────────────────────────────────────────────────
@@ -76,6 +77,7 @@ export class AssignPiDelegateComponent implements OnInit {
   private readonly cache = inject(CacheService);
   readonly piService = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
+  private readonly peoplePicker = inject(PiDelegatePeoplePickerStubService);
 
   // ─── Current user (self-exclusion, R-UI-005 AC.3) ─────────────────────────────
   // `sec_user_id` from CacheService.dataCache().user — same pattern used by isMyResult.
@@ -147,6 +149,37 @@ export class AssignPiDelegateComponent implements OnInit {
     return (option: PersonOption) => option.delegate_user_id !== Number(userId);
   });
 
+  // ─── PI exclusion in the People picker (backend rule R-PID-008) ──────────────
+  //
+  // The API rejects assigning the PI of a project as a delegate of that same
+  // project with a 400. Rather than letting the user hit that error, the PI is
+  // greyed out in the picker as soon as their project is selected.
+  //
+  // The PI comes from ProjectDelegates.pi_user_id — the same sec_user_id the
+  // backend rule resolves — so the match is by id, never by name.
+
+  /** People to grey out: the PI of any currently-selected project. */
+  readonly piDisabledPeople: WritableSignal<PersonOption[]> = signal([]);
+
+  /** Names of those people — shown as a hint under the People picker. */
+  readonly piDisabledNames = computed(() =>
+    this.piDisabledPeople()
+      .map(p => p.name)
+      .join(', ')
+  );
+
+  /** sec_user_ids of the PIs of the currently-selected projects. */
+  private readonly selectedProjectPiIds = computed(() => {
+    const selectedCodes = new Set(this.selectedProjects().map(p => p.project_code));
+    return new Set(
+      this.piService
+        .byProjectCache()
+        .filter(project => selectedCodes.has(project.project_code))
+        .map(project => project.pi_user_id)
+        .filter((id): id is number => id != null)
+    );
+  });
+
   // ─── Open-close tracking (to reset + pre-load on open) ────────────────────────
 
   private wasOpen = false;
@@ -182,6 +215,15 @@ export class AssignPiDelegateComponent implements OnInit {
         this.clearState();
       }
       this.wasOpen = isOpen;
+    });
+
+    // Selected projects (or the loaded people list) changed → refresh the PI set.
+    effect(() => {
+      const piIds = this.selectedProjectPiIds();
+      const people = this.peoplePicker.list();
+      this.piDisabledPeople.set(
+        piIds.size === 0 ? [] : people.filter(person => piIds.has(person.delegate_user_id))
+      );
     });
   }
 

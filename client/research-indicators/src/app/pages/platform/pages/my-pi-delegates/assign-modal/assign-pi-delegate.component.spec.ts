@@ -19,6 +19,7 @@ import {
   flush
 } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { AssignPiDelegateComponent } from './assign-pi-delegate.component';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { CacheService } from '@services/cache/cache.service';
@@ -28,6 +29,7 @@ import { MultiselectComponent } from '@shared/components/custom-fields/multisele
 import { ProjectDelegates } from '@interfaces/pi-delegates.interface';
 import { ServiceLocatorService } from '@services/service-locator.service';
 import { UtilsService } from '@services/utils.service';
+import { PiDelegatePeoplePickerStubService } from '../services/pi-delegate-picker-stub.service';
 
 // ─── Minimal stubs ────────────────────────────────────────────────────────────
 
@@ -89,13 +91,18 @@ class MockCacheService {
  * Return a stub service that exposes the signals MultiselectComponent expects.
  */
 class MockServiceLocatorService {
-  getService(_name: string) {
-    return {
+  // One stable stub per name so a test can push options into the list the
+  // real MultiselectComponent renders.
+  readonly services: Record<string, { list: ReturnType<typeof signal<unknown[]>>; loading: ReturnType<typeof signal<boolean>>; isOpenSearch: ReturnType<typeof signal<boolean>>; main: () => Promise<void> }> = {};
+
+  getService(name: string) {
+    this.services[name] ??= {
       list: signal<unknown[]>([]),
       loading: signal(false),
       isOpenSearch: signal(false),
       main: async () => undefined
     };
+    return this.services[name];
   }
 }
 
@@ -152,12 +159,14 @@ class MockPiDelegatesClientService {
 
 function buildProject(
   code: string,
-  delegates: { delegate_user_id: number; name: string; email: string; is_active?: boolean }[]
+  delegates: { delegate_user_id: number; name: string; email: string; is_active?: boolean }[],
+  piUserId: number | null = null
 ): ProjectDelegates {
   return {
     project_code: code,
     project_name: `Project ${code}`,
     is_pool_funding_contributor: false,
+    pi_user_id: piUserId,
     status: 'Active',
     start_date: null,
     end_date: null,
@@ -167,6 +176,15 @@ function buildProject(
 
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
+// ─── PI-exclusion stub: the people the picker offers ────────────────────────
+
+class MockPeoplePickerService {
+  list = signal<{ delegate_user_id: number; name: string; email: string }[]>([]);
+  loading = signal(false);
+  isOpenSearch = signal(false);
+  main = jest.fn(async () => undefined);
+}
+
 describe('AssignPiDelegateComponent', () => {
   let fixture: ComponentFixture<AssignPiDelegateComponent>;
   let component: AssignPiDelegateComponent;
@@ -174,6 +192,8 @@ describe('AssignPiDelegateComponent', () => {
   let piService: MockPiDelegatesClientService;
   let actionsService: MockActionsService;
   let cacheService: MockCacheService;
+  let serviceLocator: MockServiceLocatorService;
+  let peoplePicker: MockPeoplePickerService;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -189,7 +209,8 @@ describe('AssignPiDelegateComponent', () => {
         { provide: PiDelegatesClientService, useClass: MockPiDelegatesClientService },
         { provide: ActionsService, useClass: MockActionsService },
         { provide: ServiceLocatorService, useClass: MockServiceLocatorService },
-        { provide: UtilsService, useClass: MockUtilsService }
+        { provide: UtilsService, useClass: MockUtilsService },
+        { provide: PiDelegatePeoplePickerStubService, useClass: MockPeoplePickerService }
       ]
     }).compileComponents();
 
@@ -197,6 +218,8 @@ describe('AssignPiDelegateComponent', () => {
     piService = TestBed.inject(PiDelegatesClientService) as unknown as MockPiDelegatesClientService;
     actionsService = TestBed.inject(ActionsService) as unknown as MockActionsService;
     cacheService = TestBed.inject(CacheService) as unknown as MockCacheService;
+    serviceLocator = TestBed.inject(ServiceLocatorService) as unknown as MockServiceLocatorService;
+    peoplePicker = TestBed.inject(PiDelegatePeoplePickerStubService) as unknown as MockPeoplePickerService;
 
     fixture = TestBed.createComponent(AssignPiDelegateComponent);
     component = fixture.componentInstance;
@@ -794,6 +817,70 @@ describe('AssignPiDelegateComponent', () => {
       const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
       expect(root.className).toContain('w-[720px]');
       expect(root.className).toContain('max-w-[88vw]');
+    });
+  });
+  // ── PI exclusion in the People picker (backend rule R-PID-008) ──────────────
+
+  describe('PI exclusion', () => {
+    const PEOPLE = [
+      { delegate_user_id: 10, name: 'Mayesse Da Silva', email: 'mayesse@test.com' },
+      { delegate_user_id: 11, name: 'Alice Example', email: 'alice@test.com' }
+    ];
+
+    /** Opens the modal on a project whose PI is `piUserId` (null = lead has no STAR account). */
+    async function openForProject(projectCode: string, piUserId: number | null): Promise<void> {
+      peoplePicker.list.set(PEOPLE);
+      piService.byProjectCache.set([buildProject(projectCode, [], piUserId)]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('disables the PI of the selected project, matched by sec_user_id', async () => {
+      await openForProject('P1', 10);
+
+      expect(component.piDisabledPeople().map(p => p.delegate_user_id)).toEqual([10]);
+      expect(component.piDisabledNames()).toBe('Mayesse Da Silva');
+    });
+
+    it('disables nobody when the project has no PI account (pi_user_id null)', async () => {
+      await openForProject('P2', null);
+
+      expect(component.piDisabledPeople()).toHaveLength(0);
+    });
+
+    it('disables nobody when the PI is not among the people offered (negative discriminator)', async () => {
+      await openForProject('P3', 999);
+
+      expect(component.piDisabledPeople()).toHaveLength(0);
+    });
+
+    it('renders a hint naming the disabled Principal Investigator', async () => {
+      await openForProject('P4', 10);
+
+      const hint = fixture.nativeElement.querySelector('.assign-pi-delegate__pi-hint') as HTMLElement | null;
+      expect(hint).not.toBeNull();
+      expect(hint!.textContent).toContain('Mayesse Da Silva');
+      expect(hint!.textContent).toContain('Principal Investigator');
+    });
+
+    it('marks the PI option as disabled inside the People multiselect', async () => {
+      // Feed the same options into the picker the multiselect renders from.
+      serviceLocator.getService('piDelegatePeople').list.set(PEOPLE);
+
+      await openForProject('P5', 10);
+      fixture.detectChanges();
+
+      const multiselects = fixture.debugElement.queryAll(By.directive(MultiselectComponent));
+      const peoplePickerCmp = multiselects[0].componentInstance as MultiselectComponent;
+      const options = peoplePickerCmp.availableOptions() as { delegate_user_id: number; disabled?: unknown }[];
+
+      const pi = options.find(o => o.delegate_user_id === 10);
+      const other = options.find(o => o.delegate_user_id === 11);
+      expect(pi?.disabled).toBeTruthy();
+      expect(other?.disabled).toBeFalsy();
     });
   });
 });

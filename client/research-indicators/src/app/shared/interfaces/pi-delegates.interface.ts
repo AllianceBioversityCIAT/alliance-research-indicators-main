@@ -68,6 +68,14 @@ export interface ProjectDelegates {
   project_name: string | null;
   /** agresso_contracts.is_pool_funding_contributor cast from tinyint to boolean. */
   is_pool_funding_contributor: boolean;
+  /**
+   * sec_users.sec_user_id of the project's Principal Investigator
+   * (projectLeadId → alliance_user_staff.carnet → sec_users.email), or null when
+   * the lead has no STAR account. This is the user the backend's PI-exclusion
+   * rule (R-PID-008) rejects as a delegate of this same project, so the UI
+   * disables that option instead of letting the request 400.
+   */
+  pi_user_id: number | null;
   /** agresso_contracts.contract_status. */
   status: string | null;
   /** agresso_contracts.start_date. */

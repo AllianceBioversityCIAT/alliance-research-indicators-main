@@ -382,6 +382,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     contract_status: string | null;
     start_date: Date | null;
     end_date: Date | null;
+    pi_user_id: number | null;
   } | null> {
     const rows: Array<{
       agreement_id: string;
@@ -390,11 +391,21 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       contract_status: string | null;
       start_date: Date | null;
       end_date: Date | null;
+      pi_user_id: number | null;
     }> = await this.dataSource.query(
-      `SELECT agreement_id, description, is_pool_funding_contributor,
-              contract_status, start_date, end_date
-       FROM agresso_contracts
-       WHERE agreement_id = ?
+      // pi_user_id resolves the SAME chain as isPiOfProject
+      // (projectLeadId → alliance_user_staff.carnet → sec_users.email). It is a
+      // correlated subquery, not a JOIN, so a duplicated carnet/email can never
+      // multiply the contract row.
+      `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
+              ac.contract_status, ac.start_date, ac.end_date,
+              (SELECT su.sec_user_id
+                 FROM alliance_user_staff aus
+                 INNER JOIN sec_users su ON su.email = aus.email
+                WHERE aus.carnet = ac.projectLeadId
+                LIMIT 1) AS pi_user_id
+       FROM agresso_contracts ac
+       WHERE ac.agreement_id = ?
        LIMIT 1`,
       [projectId],
     );
@@ -552,14 +563,22 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       contract_status: string | null;
       start_date: Date | null;
       end_date: Date | null;
+      pi_user_id: number | null;
     }>
   > {
     if (!projectIds.length) return [];
     return this.dataSource.query(
-      `SELECT agreement_id, description, is_pool_funding_contributor,
-              contract_status, start_date, end_date
-       FROM agresso_contracts
-       WHERE agreement_id IN (?)`,
+      // pi_user_id: same chain as isPiOfProject, as a correlated subquery so the
+      // contract row count is unaffected by duplicate carnets/emails.
+      `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
+              ac.contract_status, ac.start_date, ac.end_date,
+              (SELECT su.sec_user_id
+                 FROM alliance_user_staff aus
+                 INNER JOIN sec_users su ON su.email = aus.email
+                WHERE aus.carnet = ac.projectLeadId
+                LIMIT 1) AS pi_user_id
+       FROM agresso_contracts ac
+       WHERE ac.agreement_id IN (?)`,
       [projectIds],
     );
   }

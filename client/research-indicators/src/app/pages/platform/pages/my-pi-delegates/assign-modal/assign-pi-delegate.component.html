@@ -28,6 +28,7 @@
       label="People"
       placeholder="Select people to assign as delegates"
       [optionFilter]="selfExclusionFilter()"
+      [optionsDisabled]="piDisabledPeople"
       [isRequired]="true"
       [disabled]="peopleDisabled()"
     ></app-multiselect>
@@ -41,6 +42,18 @@
       <p class="atc-grey-600 m-0 font-['Barlow'] text-[13px] leading-[1.5]">
         Select the people who will act as PI Delegates.
         You cannot assign yourself.
+      </p>
+    }
+    <!-- The PI of a selected project cannot be its delegate (backend rule
+         R-PID-008): those people are greyed out in the list. -->
+    @if (piDisabledPeople().length > 0) {
+      <p class="assign-pi-delegate__pi-hint atc-grey-600 m-0 flex items-start gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
+        <i class="pi pi-info-circle shrink-0 pt-0.5 !text-[12px]" aria-hidden="true"></i>
+        <span>
+          <strong class="font-semibold">{{ piDisabledNames() }}</strong>
+          {{ piDisabledPeople().length === 1 ? 'is the Principal Investigator' : 'are Principal Investigators' }}
+          of a selected project, so they cannot be assigned as PI Delegate there.
+        </span>
       </p>
     }
   </div>
