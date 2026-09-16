@@ -6,6 +6,7 @@ import { CapacitySharingBuilder } from '../../tools/prms-normalizer/builders/cap
 import { CommonFieldsBuilder } from '../../tools/prms-normalizer/builders/common-fields.builder';
 import { InnovationDevelopmentBuilder } from '../../tools/prms-normalizer/builders/innovation-development.builder';
 import { InnovationUseBuilder } from '../../tools/prms-normalizer/builders/innovation-use.builder';
+import { KnowledgeProductBuilder } from '../../tools/prms-normalizer/builders/knowledge-product.builder';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PolicyChangeBuilder } from '../../tools/prms-normalizer/builders/policy-change.builder';
 import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalizer.module';
@@ -29,6 +30,7 @@ import { ResultPrmsSyncService } from './result-prms-sync.service';
     InnovationDevelopmentBuilder,
     PolicyChangeBuilder,
     InnovationUseBuilder,
+    KnowledgeProductBuilder,
     ResultOwnerGuard,
   ],
   exports: [ResultPrmsSyncService, ResultPrmsSyncStatusReader],

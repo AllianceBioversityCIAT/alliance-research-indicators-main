@@ -200,6 +200,19 @@ describe('evaluateSyncGate', () => {
     expect(transport.ingest).toHaveBeenCalledTimes(1);
   });
 
+  it('still refuses Knowledge Product (indicator 3) when every other gate entry would pass', () => {
+    const decision = attemptSend(
+      eligible({ indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('indicator_mappable');
+    expect(decision.httpStatus).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+    expect(decision.description).toMatch(/Knowledge Product/i);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
   it('lets an eligible Capacity Sharing result send', () => {
     const decision = attemptSend(eligible(), transport);
 
