@@ -82,6 +82,12 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() disabled = false;
   @Input() filterBy = '';
   @Input() optionsDisabled: WritableSignal<any[]> = signal([]);
+  /**
+   * Clears the dropdown's search box every time the panel closes, so reopening
+   * the picker (or the modal that hosts it) always starts from the full list.
+   * Off by default — other screens rely on the filter surviving a panel close.
+   */
+  @Input() clearFilterOnClose = false;
   @Input() set isRequired(value: boolean) {
     this._isRequired.set(value);
   }
@@ -461,10 +467,21 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   onMultiselectPanelHide(): void {
+    if (this.clearFilterOnClose) {
+      this.clearSearchFilter();
+    }
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
     this.clearMultiselectPanelMaxWidth();
+  }
+
+  /** Empties the dropdown's search box (PrimeNG keeps it between openings). */
+  clearSearchFilter(): void {
+    this.primeMultiSelect?.resetFilter?.();
+    if (this.service?.isOpenSearch?.()) {
+      this.onFilter({ filter: '' });
+    }
   }
 
   private applyMultiselectPanelMaxWidth(): void {
