@@ -40,8 +40,27 @@ export class PiDelegatesClientService {
 
   // ─── Derived example (proves a single cache feeds all consumers) ─────────────
 
-  /** Total distinct projects in the by-project cache. Consumed by the summary header (R-UI-004). */
+  /** Total distinct projects in the by-project cache (PI + delegated). */
   readonly totalProjects = computed(() => this.byProjectCache().length);
+
+  /** sec_user_id the caches were loaded for — exposed so views can derive the caller's role. */
+  readonly currentUserId = this._userId.asReadonly();
+
+  /**
+   * True when the logged-in user is the Principal Investigator of that project.
+   * The list also contains projects the user only delegates on, so "my projects"
+   * and "projects I am the PI of" are NOT the same set.
+   */
+  isPiOf(project: ProjectDelegates): boolean {
+    const userId = this._userId();
+    return userId != null && project.pi_user_id === userId;
+  }
+
+  /** Projects where the user is the Principal Investigator. */
+  readonly projectsAsPi = computed(() => this.byProjectCache().filter(p => this.isPiOf(p)));
+
+  /** Projects the user reaches through a delegation, not as their PI. */
+  readonly projectsAsDelegate = computed(() => this.byProjectCache().filter(p => !this.isPiOf(p)));
 
   /** Distinct delegate count across all projects. Consumed by the summary header (R-UI-004). */
   readonly totalDistinctDelegates = computed(() => {

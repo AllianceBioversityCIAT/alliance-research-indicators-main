@@ -33,7 +33,20 @@
         </span>
         <span
           class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
-          service.totalProjects() }}</span>
+          service.projectsAsPi().length }}</span>
+      </div>
+
+      <div class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            AS PI DELEGATE</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsAsDelegate().length }}</span>
       </div>
 
       <div

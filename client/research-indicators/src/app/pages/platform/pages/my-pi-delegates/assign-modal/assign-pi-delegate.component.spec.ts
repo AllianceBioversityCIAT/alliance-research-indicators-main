@@ -440,13 +440,10 @@ describe('AssignPiDelegateComponent', () => {
       component.onConfirm();
 
       const detail = actionsService.showGlobalAlertCalls[0].detail;
-      // KZ-014: the confirm must explicitly mention revoke-all.
-      // If this assertion fails, the delta logic is missing the revoke-all branch.
-      const lower = detail.toLowerCase();
-      const mentionsRevoke = lower.includes('revoke all') || lower.includes('revoke all');
-      expect(mentionsRevoke).toBe(true);
-
-      // Also: Alice and Bob must be named (they are the people being revoked from P1).
+      // KZ-014: emptying the selection must be called out, and the people who
+      // lose access must be named.
+      expect(detail.toLowerCase()).toContain('loses access');
+      expect(detail).toContain('Removed');
       expect(detail).toContain('Alice');
       expect(detail).toContain('Bob');
     });
@@ -1143,7 +1140,7 @@ describe('AssignPiDelegateComponent', () => {
   // ── Confirm detail is a readable block list, not a run-on sentence ─────────
 
   describe('confirm detail layout', () => {
-    it('lists each section on its own line, one name per line', async () => {
+    it('states the change inline: "Added: a, b" — no bullet list, no Unchanged block', async () => {
       piService.byProjectCache.set([
         buildProject('D514', [
           { delegate_user_id: 1, name: 'Manuel Almanzar', email: 'manuel@test.org' }
@@ -1167,14 +1164,24 @@ describe('AssignPiDelegateComponent', () => {
       component.onConfirm();
 
       const detail = actionsService.showGlobalAlertCalls[0].detail;
-      // Project header, then labelled counts — each on its own block
+      // Only what CHANGES: the project, then Added / Removed — no "Unchanged"
+      // block and no repeated removal summary.
       expect(detail).toContain('<strong>D514</strong>');
-      expect(detail).toContain('<div>Added (2)</div>');
-      expect(detail).toContain('<div>Unchanged (1)</div>');
-      // one name per line, never a comma-joined run of names
-      expect(detail).toContain('<div>&nbsp;&nbsp;• Emmanuel Mwema Musau</div>');
-      expect(detail).toContain('<div>&nbsp;&nbsp;• Manuel Almanzar</div>');
-      expect(detail).not.toContain('Emmanuel Mwema Musau, Juan Manuel Pardo Garcia');
+      // the block opts out of the dialog's centred text
+      expect(detail).toContain('class="alert-detail-left"');
+      // lead sentence naming the project, then exactly one blank line
+      expect(detail).toContain(
+        '<div>The following changes were made in project <strong>D514</strong> — Project D514</div><div>&nbsp;</div>'
+      );
+      // labelled and inline, so 20 names do not become 20 lines
+      expect(detail).toContain(
+        '<div><strong>Added:</strong> Emmanuel Mwema Musau, Juan Manuel Pardo Garcia</div>'
+      );
+      expect(detail).not.toContain('•');
+      expect(detail).not.toContain('Unchanged');
+      expect(detail).not.toContain('Removal:');
+      // Manuel was already a delegate — unchanged, so he is not listed
+      expect(detail).not.toContain('Manuel Almanzar');
     });
   });
   // ── Footer buttons live inside the content (Environment variables pattern) ──
@@ -1218,5 +1225,195 @@ describe('AssignPiDelegateComponent', () => {
 
       expect(accept.disabled).toBe(false);
     });
+  });
+  // ── Reopening the modal must not carry the previous session's selection ────
+
+  describe('state between openings', () => {
+    // Note: every preload branch overwrites both signals, so this proves the
+    // reseed rather than the clearState() guard that precedes it.
+    it('reseeds both selections when the modal is reopened from another source', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }]),
+        buildProject('P2', [])
+      ]);
+
+      // 1st opening: from a project
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+      expect(component.getSelectedProjectsList().map(p => p.project_code)).toEqual(['P1']);
+
+      // The user edits without saving, then closes
+      component.projectsSignal.set({
+        selected_projects: [
+          { project_code: 'P1', project_name: 'Project P1' },
+          { project_code: 'P2', project_name: 'Project P2' }
+        ]
+      });
+      modalService.closeModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      // 2nd opening: from a person who is a delegate of P1 only
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // P2 came from the previous session — it must be gone
+      expect(component.getSelectedProjectsList().map(p => p.project_code)).toEqual(['P1']);
+      expect(component.getSelectedPeopleList().map(p => p.delegate_user_id)).toEqual([1]);
+    }));
+  });
+  // ── Adding one person to more projects must not evict the other delegates ──
+
+  describe('per-axis sync semantics', () => {
+    /** P1 = Alice + Bob; P2 = Carol. Emmanuel is the person being managed. */
+    function seedTwoProjects(): void {
+      piService.byProjectCache.set([
+        buildProject('P1', [
+          { delegate_user_id: 1, name: 'Alice', email: 'alice@test.com' },
+          { delegate_user_id: 2, name: 'Bob', email: 'bob@test.com' }
+        ]),
+        buildProject('P2', [{ delegate_user_id: 3, name: 'Carol', email: 'carol@test.com' }])
+      ]);
+    }
+
+    /** Confirms the dialog and returns what was POSTed. */
+    function assignmentsFromConfirm(): { project_id: string; delegates: { delegate_user_id: number }[] }[] {
+      const alert = actionsService.showGlobalAlertCalls[0] as unknown as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      return piService.assignCalls[0] as unknown as {
+        project_id: string;
+        delegates: { delegate_user_id: number }[];
+      }[];
+    }
+
+    it('BY PERSON: adding the person to a project keeps that project other delegates', fakeAsync(() => {
+      seedTwoProjects();
+      // Emmanuel is a delegate of P1 only
+      piService.byProjectCache.update(projects =>
+        projects.map(p =>
+          p.project_code === 'P1'
+            ? { ...p, delegates: [...p.delegates, { delegate_user_id: 9, name: 'Emmanuel', email: 'e@test.com', is_active: true }] }
+            : p
+        )
+      );
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 9 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // The user adds P2 as well
+      component.projectsSignal.set({
+        selected_projects: [
+          { project_code: 'P1', project_name: 'Project P1' },
+          { project_code: 'P2', project_name: 'Project P2' }
+        ]
+      });
+      fixture.detectChanges();
+
+      component.onConfirm();
+      const assignments = assignmentsFromConfirm();
+
+      const p2 = assignments.find(a => a.project_id === 'P2')!;
+      const p2Ids = p2.delegates.map(d => d.delegate_user_id).sort();
+      // Carol (3) survives; Emmanuel (9) joins her
+      expect(p2Ids).toEqual([3, 9]);
+
+      const p1 = assignments.find(a => a.project_id === 'P1')!;
+      expect(p1.delegates.map(d => d.delegate_user_id).sort()).toEqual([1, 2, 9]);
+    }));
+
+    it('BY PERSON: dropping a project revokes only that person there', fakeAsync(() => {
+      seedTwoProjects();
+      piService.byProjectCache.update(projects =>
+        projects.map(p => ({
+          ...p,
+          delegates: [...p.delegates, { delegate_user_id: 9, name: 'Emmanuel', email: 'e@test.com', is_active: true }]
+        }))
+      );
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 9 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // Keep P1 only
+      component.projectsSignal.set({
+        selected_projects: [{ project_code: 'P1', project_name: 'Project P1' }]
+      });
+      fixture.detectChanges();
+
+      component.onConfirm();
+      const assignments = assignmentsFromConfirm();
+
+      const p2 = assignments.find(a => a.project_id === 'P2')!;
+      // Emmanuel leaves P2; Carol stays
+      expect(p2.delegates.map(d => d.delegate_user_id)).toEqual([3]);
+    }));
+
+    it('BY PROJECT: the People selection is still the full list for that project', fakeAsync(() => {
+      seedTwoProjects();
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      // The user removes Bob from this project
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 1, name: 'Alice', email: 'alice@test.com' }]
+      });
+      fixture.detectChanges();
+
+      component.onConfirm();
+      const assignments = assignmentsFromConfirm();
+
+      expect(assignments).toHaveLength(1);
+      expect(assignments[0].project_id).toBe('P1');
+      expect(assignments[0].delegates.map(d => d.delegate_user_id)).toEqual([1]);
+    }));
+  });
+  // ── The picker search must not survive a close ─────────────────────────────
+
+  describe('search box lifecycle', () => {
+    it('asks both pickers to clear their search when the panel closes', () => {
+      fixture.detectChanges();
+
+      const pickers = fixture.debugElement.queryAll(By.directive(MultiselectComponent));
+      expect(pickers).toHaveLength(2);
+      for (const picker of pickers) {
+        expect((picker.componentInstance as MultiselectComponent).clearFilterOnClose).toBe(true);
+      }
+    });
+
+    it('clears both pickers search when the modal closes', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const pickers = fixture.debugElement
+        .queryAll(By.directive(MultiselectComponent))
+        .map(p => p.componentInstance as MultiselectComponent);
+      const spies = pickers.map(p => jest.spyOn(p, 'clearSearchFilter'));
+
+      modalService.closeModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+
+      for (const spy of spies) {
+        expect(spy).toHaveBeenCalled();
+      }
+    }));
   });
 });

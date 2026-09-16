@@ -15,7 +15,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  QueryList,
   Signal,
+  ViewChildren,
   WritableSignal,
   computed,
   effect,
@@ -252,6 +254,9 @@ export class AssignPiDelegateComponent implements OnInit {
 
   private wasOpen = false;
 
+  /** Both pickers, so their search boxes can be emptied when the modal closes. */
+  @ViewChildren(MultiselectComponent) private readonly pickers?: QueryList<MultiselectComponent>;
+
   // ─── On init: register confirm/disabled into AllModalsService ─────────────────
 
   ngOnInit(): void {
@@ -275,7 +280,10 @@ export class AssignPiDelegateComponent implements OnInit {
     effect(() => {
       const isOpen = this.allModalsService.isModalOpen('assignPiDelegate')?.isOpen ?? false;
       if (!this.wasOpen && isOpen) {
-        // Transition: closed → open: pre-load from context (SYNC guard, R-UI-006).
+        // Transition: closed → open. Discard whatever the previous opening left
+        // behind BEFORE seeding — otherwise a modal opened from By person can
+        // still show the selection of the By project session that preceded it.
+        this.clearState();
         this.preLoadFromContext();
       }
       if (this.wasOpen && !isOpen) {
@@ -377,79 +385,118 @@ export class AssignPiDelegateComponent implements OnInit {
   onConfirm(): void {
     const selectedPeople = this.selectedPeople();
     const selectedProjects = this.selectedProjects();
-
-    // Build the delta for each selected project (SYNC: anyone currently a delegate
-    // but not in the new selected-people list is BEING REVOKED).
-    //
-    // The detail is rendered with [innerHTML] by the global alert, so it is laid
-    // out as short labelled blocks — one line per person — instead of one long
-    // run-on sentence. Angular's sanitiser strips style attributes, so the
-    // structure relies on tags and glyphs only.
     const allProjects = this.piService.byProjectCache();
+    const isPersonMode = this.allModalsService.assignPiDelegateContext()?.source === 'byPerson';
+
+    // ── Desired delegate list per project ────────────────────────────────────
+    //
+    // The POST is a per-project SYNC: whoever is missing from a project's list is
+    // revoked. What "the full list" means depends on which axis the modal is
+    // editing, and getting that wrong revokes people the user never touched:
+    //
+    //   • Opened from a PROJECT — the People picker is the edited axis, so the
+    //     selection IS that project's desired list (removing a chip revokes).
+    //   • Opened from a PERSON — the Projects picker is the edited axis. Only
+    //     THAT person may be added to or removed from a project; every other
+    //     delegate of those projects must survive untouched.
+    const desiredByProject = new Map<string, PersonOption[]>();
+
+    const currentDelegatesOf = (projectCode: string): PersonOption[] =>
+      (allProjects.find(p => p.project_code === projectCode)?.delegates ?? []).map(d => ({
+        delegate_user_id: d.delegate_user_id,
+        name: d.name,
+        email: d.email,
+        is_active: d.is_active
+      }));
+
+    if (isPersonMode) {
+      const person = selectedPeople[0];
+
+      // Selected projects: this person joins whoever is already there.
+      for (const proj of selectedProjects) {
+        const current = currentDelegatesOf(proj.project_code);
+        const alreadyThere = current.some(d => d.delegate_user_id === person?.delegate_user_id);
+        desiredByProject.set(
+          proj.project_code,
+          alreadyThere || !person ? current : [...current, person]
+        );
+      }
+
+      // Projects dropped from the selection: this person leaves, nobody else does.
+      if (person) {
+        const selectedCodes = new Set(selectedProjects.map(p => p.project_code));
+        for (const project of allProjects) {
+          const hasPerson = project.delegates.some(d => d.delegate_user_id === person.delegate_user_id);
+          if (hasPerson && !selectedCodes.has(project.project_code)) {
+            desiredByProject.set(
+              project.project_code,
+              currentDelegatesOf(project.project_code).filter(
+                d => d.delegate_user_id !== person.delegate_user_id
+              )
+            );
+          }
+        }
+      }
+    } else {
+      for (const proj of selectedProjects) {
+        desiredByProject.set(proj.project_code, selectedPeople);
+      }
+    }
+
+    // ── Confirmation text: only what changes, per project ────────────────────
     const deltaBlocks: string[] = [];
-    const allRemoved: DelegateSummary[] = [];
     let hasRevoke = false;
 
-    const nameList = (names: string[]): string =>
-      names.map(name => `<div>&nbsp;&nbsp;• ${name}</div>`).join('');
+    // Names inline, comma-separated: a bullet per person turned a 20-delegate
+    // change into a screenful.
+    const nameList = (names: string[]): string => names.join(', ');
 
-    for (const proj of selectedProjects) {
-      const currentEntry = allProjects.find(p => p.project_code === proj.project_code);
-      const currentDelegateIds = new Set<number>(
-        (currentEntry?.delegates ?? []).map(d => d.delegate_user_id)
-      );
-      const selectedIds = new Set<number>(selectedPeople.map(p => p.delegate_user_id));
+    for (const [projectCode, desired] of desiredByProject) {
+      const entry = allProjects.find(p => p.project_code === projectCode);
+      const currentIds = new Set((entry?.delegates ?? []).map(d => d.delegate_user_id));
+      const desiredIds = new Set(desired.map(p => p.delegate_user_id));
 
-      const added = selectedPeople.filter(p => !currentDelegateIds.has(p.delegate_user_id));
-      const removed = (currentEntry?.delegates ?? []).filter(d => !selectedIds.has(d.delegate_user_id));
-      const unchanged = selectedPeople.filter(p => currentDelegateIds.has(p.delegate_user_id));
-
+      const added = desired.filter(p => !currentIds.has(p.delegate_user_id));
+      const removed = (entry?.delegates ?? []).filter(d => !desiredIds.has(d.delegate_user_id));
       if (removed.length > 0) hasRevoke = true;
-      allRemoved.push(...removed);
 
+      const projectName =
+        entry?.project_name ??
+        selectedProjects.find(p => p.project_code === projectCode)?.project_name ??
+        null;
+
+      // Lead line, then ONE blank line, then the changes — no other spacing.
       const sections: string[] = [
-        `<div><strong>${proj.project_code}</strong>${proj.project_name ? ` — ${proj.project_name}` : ''}</div>`
+        `<div>The following changes were made in project <strong>${projectCode}</strong>${
+          projectName ? ` — ${projectName}` : ''
+        }</div>`,
+        '<div>&nbsp;</div>'
       ];
-
       if (added.length > 0) {
-        sections.push(
-          `<div>Added (${added.length})</div>${nameList(added.map(p => p.name))}`
-        );
+        sections.push(`<div><strong>Added:</strong> ${nameList(added.map(p => p.name))}</div>`);
       }
       if (removed.length > 0) {
-        sections.push(
-          `<div>Revoked (${removed.length})</div>${nameList(removed.map(d => d.name))}`
-        );
+        sections.push(`<div><strong>Removed:</strong> ${nameList(removed.map(d => d.name))}</div>`);
       }
-      if (unchanged.length > 0) {
-        sections.push(
-          `<div>Unchanged (${unchanged.length})</div>${nameList(unchanged.map(p => p.name))}`
-        );
+      if (added.length === 0 && removed.length === 0) {
+        sections.push('<div>No changes for this project.</div>');
       }
-      if (selectedPeople.length === 0 && (currentEntry?.delegates ?? []).length > 0) {
-        sections.push('<div><strong>All delegates will be revoked for this project.</strong></div>');
-      }
-
       deltaBlocks.push(sections.join(''));
     }
 
-    // Explicit warning about people losing access (named red input, R-UI-007 AC.1).
-    const revokeAllWarning =
-      hasRevoke && allRemoved.length > 0
-        ? `<div><strong>Removal:</strong> ${[...new Set(allRemoved.map(d => d.name))].join(', ')} will be revoked from the projects in this selection.</div>`
-        : '';
-
+    // alert-detail-left opts this detail out of the dialog's centred text.
     const deltaDetail =
+      `<div class="alert-detail-left">` +
       deltaBlocks.join('<div>&nbsp;</div>') +
-      revokeAllWarning +
-      (selectedPeople.length === 0
-        ? '<div><strong>No people selected — this will revoke all delegates from each selected project.</strong></div>'
-        : '');
+      (!isPersonMode && selectedPeople.length === 0 && hasRevoke
+        ? '<div>&nbsp;</div><div><strong>No people selected — every delegate above loses access.</strong></div>'
+        : '') +
+      `</div>`;
 
-    // Build POST payload: per selected project, the FULL desired delegate list (SYNC).
-    const assignments = selectedProjects.map(proj => ({
-      project_id: proj.project_code,
-      delegates: selectedPeople.map(p => ({ delegate_user_id: p.delegate_user_id }))
+    // POST payload: the same desired lists the confirmation just described.
+    const assignments = Array.from(desiredByProject, ([project_id, delegates]) => ({
+      project_id,
+      delegates: delegates.map(p => ({ delegate_user_id: p.delegate_user_id }))
     }));
 
     // Show delta confirmation before writing (R-UI-007 AC.1).
@@ -503,6 +550,8 @@ export class AssignPiDelegateComponent implements OnInit {
   private clearState(): void {
     this.peopleSignal.set({ selected_people: [] });
     this.projectsSignal.set({ selected_projects: [] });
+    // A search typed into either dropdown must not survive into the next opening.
+    this.pickers?.forEach(picker => picker.clearSearchFilter());
   }
 
   /**
