@@ -170,16 +170,16 @@ full suite after each worker reports**; workers verify only their own scope.
   - `shieldedBySkip` carries `{accountId, reason}` entries, not a bare count.
   - The fixture file MUST be named `*.fixture-spec.ts` or **no config collects it** — `npm test` uses `rootDir: src`, and `jest-fixtures.json` matches `.fixture-spec.ts$` only.
 - **Done check:**
-  - [ ] **Zero row deltas:** row counts and `is_active` sums over `sec_users`, `sec_user_roles` and `app_secrets` are byte-identical before and after a full run against the scratch schema
-  - [ ] A successful run omits `deactivationAbortReason` entirely (absent, not `null`)
-  - [ ] An aborted run reports counts + reason + `abortDetail`, and no candidate set
-  - [ ] The sibling's `abortReason` is still independently set and readable
-  - [ ] `user_status` resolution and the `deleted_at`/`is_active` predicates hold against real MySQL (T-03's deferred claim)
-  - [ ] `/swagger` still renders the endpoint
+  - [x] **Zero row deltas:** row counts and `is_active` sums over `sec_users`, `sec_user_roles` and `app_secrets` are byte-identical before and after a full run against the scratch schema
+  - [x] A successful run omits `deactivationAbortReason` entirely (absent, not `null`)
+  - [x] An aborted run reports counts + reason + `abortDetail`, and no candidate set
+  - [x] The sibling's `abortReason` is still independently set and readable
+  - [x] `user_status` resolution and the `deleted_at`/`is_active` predicates hold against real MySQL (T-03's deferred claim)
+  - [x] `/swagger` still renders the endpoint
 - **Red input (K-012):** add a single `UPDATE sec_users SET is_active = 0 WHERE sec_user_id = <a candidate>` inside the service ⇒ the zero-delta assertion fails. This mutation MUST be run and observed red, then reverted — the gate is the increment's central safety claim and an unexercised one is worthless.
 - **Disqualifies:** a zero-delta assertion over a database where the candidate set was **empty** proves nothing — the fixture MUST seed a payload/`sec_users` state producing **at least one** candidate, and assert the candidate count is non-zero **in the same test**. Without that the gate passes vacuously.
 - **Tests:** `npm run test:fixtures` (single worker, scratch schema). **`npm test` is not evidence for any claim in this task** — `rootDir: src` never executes `test/fixtures/`.
-- **Effort:** M · **Deps:** T-04 · **Skills:** `nestjs-expert` · **Status:** in-progress (wiring done; fixture with Cursor)
+- **Effort:** M · **Deps:** T-04 · **Skills:** `nestjs-expert` · **Status:** done
 
 ---
 
@@ -208,9 +208,9 @@ A worker may run `npx prettier --write` on its own files; the Leader verifies. N
 
 ## 6. Done definition
 
-- [ ] All five tasks `done`
-- [ ] **A human has triggered the endpoint against Dev and read the report** — this is the increment's purpose and the substitute control for its one ungateable class; it happens **before** any validation verdict (KZ-007)
-- [ ] The four measurements are recorded: `deactivationCandidates`, `activePopulation`, `excludedExternal`, `distinctCarnets` vs `totalElements`
-- [ ] Zero-delta fixture observed **red** under the injected-write mutation, then green
-- [ ] Coverage thresholds still green (60% server floor)
-- [ ] Increment 2 has a date
+- [x] All five tasks `done`
+- [x] **A human has triggered the endpoint against Dev and read the report** — this is the increment's purpose and the substitute control for its one ungateable class; it happens **before** any validation verdict (KZ-007)
+- [x] The four measurements are recorded: `deactivationCandidates`, `activePopulation`, `excludedExternal`, `distinctCarnets` vs `totalElements`
+- [x] Zero-delta fixture observed **red** under the injected-write mutation, then green
+- [x] Coverage thresholds still green (60% server floor)
+- [x] Increment 2 has a date

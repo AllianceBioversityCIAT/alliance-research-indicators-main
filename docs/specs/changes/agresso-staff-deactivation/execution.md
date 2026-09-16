@@ -128,7 +128,7 @@ fixture, which is where `tasks.md` T-03 already routed it. No change requested.
 
 ---
 
-## T-05 — summary, wiring, fixture · **IN PROGRESS**
+## T-05 — summary, wiring, fixture · **PASS**
 
 **Wiring (Claude Code): complete.** Summary DTO extended with 11 measurement fields plus two
 optional abort fields; stage 5 wired after `applyCreateAndGrant`; service registered in
@@ -140,9 +140,26 @@ performs no second read and opens no TOCTOU window.
 the assertion would have been the cheaper fix and would have destroyed the property that makes the
 test worth having.
 
-**Fixture (Cursor): dispatched.** Proves zero row deltas across all three tables, with a mandatory
-non-zero candidate count asserted **in the same test** — a zero-delta assertion over an empty
-candidate set passes vacuously, and a vacuous pass on this particular claim is worse than none.
+**Fixture (Cursor): delivered and Leader-verified.** `test/fixtures/agresso-staff-deactivation
+.fixture-spec.ts`, 1 test, green. It asserts a **non-zero candidate count before** the zero-delta
+comparison, and compares both `rowCount` **and** `SUM(is_active)` across `sec_users`,
+`sec_user_roles` and `app_secrets`.
+
+**The no-write gate was proven red by the Leader, not only by its author.** This is the increment's
+central safety claim, so it was not accepted on the implementer's report: injecting one
+`UPDATE sec_users SET is_active = 0 WHERE sec_user_id = 9050501` into `measureOrThrow` turned the
+fixture **RED** at `expect(after.secUsers.activeSum).toBe(before.secUsers.activeSum)` —
+`Expected: 1, Received: 0` — matching the worker's reported message exactly. Reverted; green.
+
+> **A first attempt at this proof produced a meaningless green and was discarded.** A failed `cd`
+> left the target path empty, so no mutation was ever applied and the fixture passed for the wrong
+> reason. Recorded because it is the same class the gate itself defends against: a green that
+> measured nothing. The mutation's presence in the source was verified by grep before the run was
+> trusted the second time.
+
+**It also closes T-03's deferred SQL claim** — the belt-and-braces predicate that the unit tier
+structurally could not falsify (sibling Kaizen **P1**). The fixture seeds a second, soft-deleted
+`External` row against real MySQL and asserts resolution still returns exactly one.
 
 ---
 
@@ -154,6 +171,7 @@ concurrent full-suite runs produce wrong results, not merely slow ones.
 | Gate | Result |
 | --- | --- |
 | `npm test -- --silent` | **372 suites / 3243 tests passed** |
+| `npm run test:fixtures` | **18 of 23 suites passed.** This increment's fixture passes; 5 Innovation Use suites fail — see below |
 | `npx eslint src/domain/tools/agresso/staff/` (bare — `npm run lint` carries `--fix` and cannot verify, K-001) | **clean** (2 errors found and fixed first) |
 | `npx tsc --noEmit` | **clean** |
 
@@ -181,3 +199,4 @@ only the fixture. Escalate if T-05's fixture pushes past ~1,200.
 | --- | --- |
 | RB-1 | **The problem is not solved.** Departed staff still keep accounts, roles and credentials. Increment 2 needs a date |
 | RB-2 | `JS-1` — C-4 proves a row named external exists, not that external accounts carry that id. The first Dev run's `excludedExternal` is the measurement that settles it |
+| RB-4 | **5 Innovation Use fixture suites fail, and it is NOT this increment's doing — measured, not asserted.** All five die on `Nest cannot create the ResultPolicyChangeModule instance. The module at index [0] of the "imports" array is undefined` — a circular-import symptom inside the results domain. The worker reported it as pre-existing; the Leader **verified** it by checking `src/` back out at `eee1bc5c` (the commit before any work on this spec) and reproducing the identical failure. This increment's changed files are confined to `domain/tools/agresso/staff/`. **Worth its own bugfix spec** — five fixture suites have been red on `dev` and nothing surfaced it |
