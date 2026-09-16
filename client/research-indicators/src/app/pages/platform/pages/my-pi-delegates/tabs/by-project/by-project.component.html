@@ -48,8 +48,12 @@
       <!-- Header -->
       <ng-template pTemplate="header">
         <tr>
-          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="project_name">
+          <th scope="col" class="by-project__th by-project__th--project atc-primary-blue-600"
+            pSortableColumn="project_name">
             <div class="by-project__th-inner">Project <p-sortIcon field="project_name"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">
+            <div class="by-project__th-inner">Role</div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="status">
             <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
@@ -99,6 +103,12 @@
             </div>
           </td>
 
+          <!-- My role — PI or delegate: this table lists both, and the two are
+               managed differently, so the row says which one applies. -->
+          <td class="by-project__td by-project__td--role">
+            <span class="by-project__role">{{ service.isPiOf(project) ? 'Principal Investigator' : 'PI Delegate' }}</span>
+          </td>
+
           <!-- Status — shared status tag, same colours as the My Projects table -->
           <td class="by-project__td by-project__td--status">
             @if (project.status) {
@@ -133,7 +143,9 @@
               </span>
             } @else {
               <div class="by-project__chips" role="list" [attr.aria-label]="'Delegates for ' + project.project_code">
-                @for (delegate of project.delegates; track delegate.delegate_user_id) {
+                <!-- Beyond MAX_VISIBLE_DELEGATES the cell would dominate the row,
+                     so the rest move behind a "+N more" popover. -->
+                @for (delegate of visibleDelegates(project); track delegate.delegate_user_id) {
                   <span
                     class="by-project__chip"
                     [class.by-project__chip--inactive]="delegate.is_active === false"
@@ -164,6 +176,51 @@
                       <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
                     </button>
                   </span>
+                }
+
+                @if (hiddenDelegateCount(project) > 0) {
+                  <button type="button" class="by-project__more" (click)="morePopover.toggle($event)"
+                    [attr.aria-label]="hiddenDelegateCount(project) + ' more delegates'">
+                    +{{ hiddenDelegateCount(project) }} more
+                  </button>
+
+                  <p-popover #morePopover [baseZIndex]="10000" styleClass="by-project__more-panel">
+                    <div class="by-project__more-title">PI Delegates</div>
+                    <div class="by-project__more-list">
+                      @for (delegate of project.delegates; track delegate.delegate_user_id) {
+                        <span
+                          class="by-project__chip by-project__chip--block"
+                          [class.by-project__chip--inactive]="delegate.is_active === false"
+                          role="listitem"
+                          [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
+                        >
+                          @if (delegate.is_active === false) {
+                            <!-- Same marker the status tags use: the exclamation circle
+                                 turned 180°, with the reason on hover. -->
+                            <i class="pi pi-exclamation-circle by-project__chip__inactive-icon"
+                              style="transform: rotate(180deg)" pTooltip="This delegate is inactive"
+                              tooltipPosition="top" aria-label="This delegate is inactive"></i>
+                          }
+                          <span class="by-project__chip__info">
+                            <span class="by-project__chip__name">{{ delegate.name }}</span>
+                            <span class="by-project__chip__email">{{ delegate.email }}</span>
+                          </span>
+                          <!-- Per-delegate "X" revoke (R-UI-008) -->
+                          <button
+                            type="button"
+                            class="by-project__chip__remove"
+                            [attr.aria-label]="'Revoke ' + delegate.name + ' from ' + project.project_code"
+                            pTooltip="Revoke delegate"
+                            tooltipPosition="top"
+                            (click)="onRevokeDelegate(project, delegate)"
+                            (keydown.enter)="onRevokeDelegate(project, delegate)"
+                          >
+                            <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
+                          </button>
+                        </span>
+                      }
+                    </div>
+                  </p-popover>
                 }
               </div>
             }
@@ -203,7 +260,7 @@
       <!-- Empty state -->
       <ng-template pTemplate="emptymessage">
         <tr>
-          <td colspan="5" class="by-project__empty" role="status">
+          <td colspan="6" class="by-project__empty" role="status">
             <div class="by-project__empty-inner">
               <i class="pi pi-inbox by-project__empty__icon atc-grey-500" aria-hidden="true"></i>
               <p class="by-project__empty__text atc-grey-700">No projects match your search.</p>

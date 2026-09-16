@@ -16,6 +16,10 @@
   }
 
 
+  &__th--project {
+    width: 34%;
+  }
+
   &__th {
     padding: 14px 16px;
     font-family: Barlow, sans-serif;
@@ -61,6 +65,12 @@
 
     &--project {
       min-width: 200px;
+      width: 34%;
+    }
+
+    &--role {
+      min-width: 150px;
+      white-space: nowrap;
     }
 
     &--status {
@@ -128,6 +138,11 @@
     }
   }
 
+  // ── Role — plain text, same treatment as Pool funding ──────────────────
+  &__role {
+    font-size: 14px;
+  }
+
   // ── Pool funding — plain Yes / No, same type as the rest of the row ─────
   &__pool-value {
     font-size: 14px;
@@ -155,6 +170,13 @@
 
     // Borderless — the tint and the name colour carry the state; the email
     // line stays grey so it reads as secondary in both states.
+    // Inside the "+N more" panel every chip is a full-width row, so the remove
+    // button sits flush right instead of hugging the name.
+    &--block {
+      width: 100%;
+      justify-content: space-between;
+    }
+
     // Inactive delegate — soft red hairline, mirroring the amber outline the
     // "No PI Delegate assigned" chip uses, instead of the neutral grey border.
     &--inactive {
@@ -216,9 +238,14 @@
       background-color: color-mix(in srgb, currentcolor 12%, transparent);
       color: inherit;
       cursor: pointer;
-      font-size: 8px;
       flex-shrink: 0;
       transition: background-color 0.15s ease;
+
+      // primeicons declares `.pi { font-size: 1rem }`, so sizing the button is
+      // not enough — the glyph itself has to be targeted.
+      .pi {
+        font-size: 9px;
+      }
 
       &:hover {
         background-color: color-mix(in srgb, currentcolor 25%, transparent);
@@ -229,6 +256,33 @@
         outline-offset: 2px;
       }
     }
+  }
+
+  // ── "+N more" trigger and its panel ────────────────────────────────────
+  &__more {
+    align-self: center;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ac-light-blue-400);
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: underline;
+  }
+
+  &__more-title {
+    margin-bottom: 10px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    color: var(--ac-primary-blue-600);
+  }
+
+  &__more-list {
+    display: flex;
+    max-height: 260px;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
   }
 
   // ── Actions cell ─────────────────────────────────────────────────────
@@ -253,7 +307,7 @@
     padding: 2px;
     border: 1px solid var(--ac-grey-200);
     border-radius: 8px;
-    background-color: var(--ac-grey-100);
+    background-color: var(--ac-white-1);
     color: var(--ac-light-blue-400);
     cursor: pointer;
     font-size: 12px;

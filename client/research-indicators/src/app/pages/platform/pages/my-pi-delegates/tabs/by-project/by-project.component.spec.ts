@@ -58,12 +58,15 @@ const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
 
 // ─── Service stubs ────────────────────────────────────────────────────────────
 
-function buildServiceStub(rows: ProjectDelegates[] = []) {
+function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
   return {
     byProjectCache: signal(rows),
     loading: signal(false),
     error: signal<string | null>(null),
-    revokePair: jest.fn().mockResolvedValue(undefined)
+    revokePair: jest.fn().mockResolvedValue(undefined),
+    currentUserId: signal(currentUserId),
+    // Mirrors the real service: PI when the project's pi_user_id is the caller.
+    isPiOf: (project: ProjectDelegates) => currentUserId != null && project.pi_user_id === currentUserId
   };
 }
 
@@ -94,8 +97,8 @@ describe('ByProjectComponent', () => {
   let serviceStub: ReturnType<typeof buildServiceStub>;
   let actionsStub: ReturnType<typeof buildActionsStub>;
 
-  async function createComponent(rows: ProjectDelegates[] = []) {
-    serviceStub = buildServiceStub(rows);
+  async function createComponent(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
+    serviceStub = buildServiceStub(rows, currentUserId);
     actionsStub = buildActionsStub();
 
     await TestBed.configureTestingModule({
@@ -262,6 +265,23 @@ describe('ByProjectComponent', () => {
   });
 
   // ── 4. Revoke delegate (R-UI-008) ─────────────────────────────────────
+
+  describe('revoke confirmation layout', () => {
+    it('uses the same block layout as the assign dialog', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const xBtn = fixture.debugElement.query(By.css('.by-project__chip__remove'));
+      (xBtn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('class="alert-detail-left"');
+      expect(alert.detail).toContain(
+        '<div>The following changes will be made in project <strong>PRJ-001</strong> — Alpha Research</div><div>&nbsp;</div>'
+      );
+      expect(alert.detail).toContain('<div><strong>Removed:</strong> Alice Example</div>');
+    });
+  });
 
   describe('revoke delegate', () => {
     beforeEach(async () => {
@@ -654,6 +674,94 @@ describe('ByProjectComponent', () => {
       const control = fixture.nativeElement.querySelector('app-search-export-controls') as HTMLElement;
       expect(control.className).not.toContain('flex-1');
       expect(control.className).toContain('w-fit');
+    });
+  });
+  // ── My role column: PI vs delegated project ────────────────────────────────
+
+  describe('role column', () => {
+    it('says Principal Investigator when the caller is the PI, PI Delegate otherwise', async () => {
+      await createComponent(
+        [
+          { ...PROJECT_WITH_DELEGATES, pi_user_id: 99 }, // caller is the PI
+          { ...PROJECT_NO_DELEGATES, pi_user_id: 7 } // caller only delegates here
+        ],
+        99
+      );
+
+      const roles = fixture.debugElement
+        .queryAll(By.css('.by-project__role'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(roles).toEqual(['Principal Investigator', 'PI Delegate']);
+
+      // plain text, like Pool funding — no emphasis variant
+      expect(fixture.debugElement.queryAll(By.css('.by-project__role--delegate'))).toHaveLength(0);
+    });
+
+    it('treats a project with no PI account as delegated (negative discriminator)', async () => {
+      await createComponent([{ ...PROJECT_WITH_DELEGATES, pi_user_id: null }], 99);
+
+      const role = fixture.debugElement.query(By.css('.by-project__role'))
+        .nativeElement as HTMLElement;
+      expect(role.textContent?.trim()).toBe('PI Delegate');
+    });
+  });
+  // ── Delegates cell overflow: inline chips + "+N more" popover ──────────────
+
+  describe('delegates overflow', () => {
+    function projectWith(count: number): ProjectDelegates {
+      return {
+        ...PROJECT_WITH_DELEGATES,
+        project_code: 'MANY',
+        delegates: Array.from({ length: count }, (_, i) => ({
+          delegate_user_id: i + 1,
+          name: `Person ${i + 1}`,
+          email: `p${i + 1}@test.org`,
+          is_active: true
+        }))
+      };
+    }
+
+    it('shows every delegate inline while there are four or fewer', async () => {
+      await createComponent([projectWith(4)]);
+
+      expect(fixture.debugElement.queryAll(By.css('.by-project__chip'))).toHaveLength(4);
+      expect(fixture.debugElement.query(By.css('.by-project__more'))).toBeNull();
+    });
+
+    it('caps the cell at four chips and moves the rest behind "+N more"', async () => {
+      await createComponent([projectWith(7)]);
+
+      const cell = fixture.nativeElement.querySelector('.by-project__td--delegates') as HTMLElement;
+      expect(cell.querySelectorAll('.by-project__chip')).toHaveLength(4);
+
+      const more = fixture.debugElement.query(By.css('.by-project__more'))
+        .nativeElement as HTMLElement;
+      expect(more.textContent?.trim()).toBe('+3 more');
+    });
+
+    it('renders the popover chips as full-width rows so the X sits flush right', async () => {
+      await createComponent([projectWith(7)]);
+
+      const more = fixture.debugElement.query(By.css('.by-project__more'))
+        .nativeElement as HTMLButtonElement;
+      more.click();
+      fixture.detectChanges();
+
+      const panelChips = Array.from(
+        document.querySelectorAll('.by-project__more-list .by-project__chip')
+      );
+      expect(panelChips.length).toBe(7);
+      for (const chip of panelChips) {
+        expect(chip.classList.contains('by-project__chip--block')).toBe(true);
+      }
+    });
+
+    it('counts hidden delegates from the project row', async () => {
+      await createComponent([projectWith(7)]);
+
+      expect(component.visibleDelegates(projectWith(7))).toHaveLength(4);
+      expect(component.hiddenDelegateCount(projectWith(7))).toBe(3);
+      expect(component.hiddenDelegateCount(projectWith(2))).toBe(0);
     });
   });
 });
