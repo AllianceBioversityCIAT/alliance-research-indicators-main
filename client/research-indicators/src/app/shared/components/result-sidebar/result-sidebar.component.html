@@ -149,7 +149,7 @@
         'bg-[#035BA9] hover:bg-[#024987]': canSyncPrms(),
         'bg-[#E8EBED] !text-[#8D9299]': !canSyncPrms()
       }"
-      [pTooltip]="!canSyncPrms() ? 'This button will become available once the result is approved and Pool Funding Alignment is completed.' : ''"
+      [pTooltip]="prmsSyncTooltip()"
       tooltipPosition="bottom"
       [disabled]="!canSyncPrms()"
       (click)="onPrmsSync()"
