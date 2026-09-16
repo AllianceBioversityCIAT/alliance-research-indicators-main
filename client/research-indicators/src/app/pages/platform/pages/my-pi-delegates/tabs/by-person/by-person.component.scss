@@ -90,19 +90,19 @@
     gap: 6px;
   }
 
-  // ── Chips: [tooltip icon] label [×] — compact, green when active, red when
-  //    the row/delegate is inactive.
+  // ── Chips: [tooltip icon] label [×] — the Approved Versions treatment from
+  //    the Results Center: grey band, blue text, no border.
   &__chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     padding: 3px 6px 3px 7px;
-    border-radius: 8px;
-    background-color: var(--ac-green-100);
-    border: 1px solid var(--ac-green-300);
+    border-radius: 6px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid transparent;
     font-size: 12px;
     line-height: 16px;
-    color: var(--ac-green-600);
+    color: var(--ac-light-blue-300);
 
     &--inactive {
       background-color: color-mix(in srgb, var(--ac-red-1) 8%, var(--ac-white-1));

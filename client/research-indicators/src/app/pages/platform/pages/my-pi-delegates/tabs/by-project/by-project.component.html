@@ -12,17 +12,17 @@
 
     <!-- Summary line — top of the card, above the search -->
     <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
-      <span class="by-project__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
-        @if (summaryInactive() > 0) {
-          <span class="atc-red-1">
-            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        }
-      </span>
-      <span class="by-project__summary-right atc-grey-600 text-[12px] italic">
+      <span class="by-project__summary-left atc-grey-600 text-[12px] italic">
         Only projects where you are the Principal Investigator are listed
       </span>
+      @if (summaryInactive() > 0) {
+        <span class="by-project__summary-right atc-red-1 flex items-center gap-1.5">
+          <i class="pi pi-exclamation-triangle !text-[13px] leading-none" aria-hidden="true"></i>
+          <span class="leading-none">
+            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
+          </span>
+        </span>
+      }
     </div>
 
     <!-- Per-table toolbar: the shared search control (search only) -->
@@ -110,17 +110,17 @@
           <!-- Delegates cell — chips or no-delegate cue (R-UI-002 AC.2/AC.3) -->
           <td class="by-project__td by-project__td--delegates">
             @if (project.delegates.length === 0) {
-              <!-- No-delegate: non-colour cue (icon + text) — R-UI-002 AC.3 / NFR-UI-002 -->
+              <!-- No-delegate: same chip shape as a delegate chip, in the amber
+                   warning palette used by the modal's inactive-user notice.
+                   Icon + text keep it a non-colour cue (R-UI-002 AC.3 /
+                   NFR-UI-002); there is nothing to revoke, so there is no X. -->
               <span
-                class="by-project__no-delegate"
+                class="by-project__chip by-project__chip--warning"
                 aria-label="No PI Delegate assigned"
                 data-testid="no-delegate-cue"
               >
-                <i
-                  class="pi pi-exclamation-triangle by-project__no-delegate__icon atc-orange-1"
-                  aria-hidden="true"
-                ></i>
-                <span class="by-project__no-delegate__text atc-grey-700">No PI Delegate assigned</span>
+                <i class="pi pi-exclamation-triangle by-project__chip__icon" aria-hidden="true"></i>
+                <span class="by-project__chip__name">No PI Delegate assigned</span>
               </span>
             } @else {
               <div class="by-project__chips" role="list" [attr.aria-label]="'Delegates for ' + project.project_code">
@@ -135,9 +135,9 @@
                     <i
                       class="by-project__chip__icon"
                       [ngClass]="delegate.is_active === false ? 'pi pi-exclamation-circle' : 'pi pi-info-circle'"
-                      [pTooltip]="delegate.email"
+                      [pTooltip]="delegateTooltip(delegate)"
                       tooltipPosition="top"
-                      [attr.aria-label]="delegate.email"
+                      [attr.aria-label]="delegateTooltip(delegate)"
                     ></i>
                     <span class="by-project__chip__name">{{ delegate.name }}</span>
                     <!-- Per-delegate "X" revoke (R-UI-008) -->
@@ -150,7 +150,7 @@
                       (click)="onRevokeDelegate(project, delegate)"
                       (keydown.enter)="onRevokeDelegate(project, delegate)"
                     >
-                      <i class="pi pi-times" aria-hidden="true"></i>
+                      <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
                     </button>
                   </span>
                 }

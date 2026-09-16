@@ -151,16 +151,40 @@ describe('ByProjectComponent', () => {
       expect(fixture.debugElement.queryAll(By.css('.pi-minus-circle'))).toHaveLength(0);
     });
 
-    it('renders a compact chip per delegate: name visible, email in the tooltip', () => {
+    it('renders a compact chip per delegate: name visible, details in the tooltip', () => {
       const chips = fixture.debugElement.queryAll(By.css('.by-project__chip'));
       expect(chips.length).toBeGreaterThanOrEqual(2);
 
       const first = chips[0];
       expect((first.nativeElement as HTMLElement).textContent?.trim()).toContain('Alice Example');
-      // the email is no longer printed in the chip — it lives in the icon tooltip
+      // email/carnet/status are no longer printed in the chip — they live in the tooltip
       expect((first.nativeElement as HTMLElement).textContent).not.toContain('alice@test.org');
       const icon = first.query(By.css('.by-project__chip__icon'));
-      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe('alice@test.org');
+      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe(
+        'alice@test.org · Status: Active'
+      );
+    });
+
+    it('the chip tooltip carries email, carnet and status', () => {
+      expect(
+        component.delegateTooltip({
+          delegate_user_id: 9,
+          name: 'Carol Gone',
+          email: 'carol@test.org',
+          carnet: 'C00042',
+          is_active: false
+        })
+      ).toBe('carol@test.org · Carnet: C00042 · Status: Inactive');
+
+      // carnet is optional — it is simply left out when absent
+      expect(
+        component.delegateTooltip({
+          delegate_user_id: 10,
+          name: 'Alice Example',
+          email: 'alice@test.org',
+          is_active: true
+        })
+      ).toBe('alice@test.org · Status: Active');
     });
   });
 
@@ -485,6 +509,19 @@ describe('ByProjectComponent', () => {
   });
 
   describe('summary line', () => {
+    it('puts the PI note on the left and the inactive warning on the right', async () => {
+      await createComponent([PROJECT_INACTIVE_DELEGATE]);
+
+      const left = fixture.nativeElement.querySelector('.by-project__summary-left') as HTMLElement;
+      const right = fixture.nativeElement.querySelector('.by-project__summary-right') as HTMLElement;
+
+      expect(left.textContent).toContain('Only projects where you are the Principal Investigator are listed');
+      expect(right.textContent).toContain('1 delegate inactive');
+      // the marker uses the warning triangle, not the info circle
+      expect(right.querySelector('.pi-exclamation-triangle')).not.toBeNull();
+      expect(right.querySelector('.pi-exclamation-circle')).toBeNull();
+    });
+
     it('keeps only the PI note and drops the people / assignments / projects counts', async () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
 
@@ -502,13 +539,13 @@ describe('ByProjectComponent', () => {
 
     it('shows the inactive marker only when a delegate is inactive (discriminator)', async () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
-      let marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
+      let marker = fixture.nativeElement.querySelector('.by-project__summary-right');
       expect(marker).toBeNull();
 
       serviceStub.byProjectCache.set([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
       fixture.detectChanges();
 
-      marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
+      marker = fixture.nativeElement.querySelector('.by-project__summary-right');
       expect(marker).not.toBeNull();
       expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
     });
@@ -578,6 +615,22 @@ describe('ByProjectComponent', () => {
       const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement;
       expect(tag.textContent?.trim()).toBe('Ongoing');
       expect(tag.style.borderColor.toLowerCase()).not.toBe('#f58220');
+    });
+  });
+  // ── No-delegate cue: amber chip, same shape as a delegate chip, no X ───────
+
+  describe('no-delegate chip', () => {
+    it('renders the amber warning chip with the triangle icon and no remove button', async () => {
+      await createComponent([PROJECT_NO_DELEGATES]);
+
+      const cue = fixture.debugElement.query(By.css('[data-testid="no-delegate-cue"]'))
+        .nativeElement as HTMLElement;
+      expect(cue.classList.contains('by-project__chip')).toBe(true);
+      expect(cue.classList.contains('by-project__chip--warning')).toBe(true);
+      expect(cue.textContent?.trim()).toBe('No PI Delegate assigned');
+      expect(cue.querySelector('.pi-exclamation-triangle')).not.toBeNull();
+      // nothing to revoke here
+      expect(cue.querySelector('.by-project__chip__remove')).toBeNull();
     });
   });
 });

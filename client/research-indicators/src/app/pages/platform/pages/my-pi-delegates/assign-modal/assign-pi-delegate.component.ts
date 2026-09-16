@@ -380,10 +380,18 @@ export class AssignPiDelegateComponent implements OnInit {
 
     // Build the delta for each selected project (SYNC: anyone currently a delegate
     // but not in the new selected-people list is BEING REVOKED).
+    //
+    // The detail is rendered with [innerHTML] by the global alert, so it is laid
+    // out as short labelled blocks — one line per person — instead of one long
+    // run-on sentence. Angular's sanitiser strips style attributes, so the
+    // structure relies on tags and glyphs only.
     const allProjects = this.piService.byProjectCache();
-    const deltaLines: string[] = [];
+    const deltaBlocks: string[] = [];
     const allRemoved: DelegateSummary[] = [];
     let hasRevoke = false;
+
+    const nameList = (names: string[]): string =>
+      names.map(name => `<div>&nbsp;&nbsp;• ${name}</div>`).join('');
 
     for (const proj of selectedProjects) {
       const currentEntry = allProjects.find(p => p.project_code === proj.project_code);
@@ -394,55 +402,48 @@ export class AssignPiDelegateComponent implements OnInit {
 
       const added = selectedPeople.filter(p => !currentDelegateIds.has(p.delegate_user_id));
       const removed = (currentEntry?.delegates ?? []).filter(d => !selectedIds.has(d.delegate_user_id));
+      const unchanged = selectedPeople.filter(p => currentDelegateIds.has(p.delegate_user_id));
 
       if (removed.length > 0) hasRevoke = true;
       allRemoved.push(...removed);
 
-      const projLabel = proj.project_name
-        ? `${proj.project_code} — ${proj.project_name}`
-        : proj.project_code;
+      const sections: string[] = [
+        `<div><strong>${proj.project_code}</strong>${proj.project_name ? ` — ${proj.project_name}` : ''}</div>`
+      ];
 
-      const addedNames =
-        added.length > 0 ? `+ Added: ${added.map(p => p.name).join(', ')}` : null;
-      const removedNames =
-        removed.length > 0
-          ? `— Removed (revoked): ${removed.map(d => d.name).join(', ')}`
-          : null;
-      const unchangedPeople = selectedPeople.filter(p =>
-        currentDelegateIds.has(p.delegate_user_id)
-      );
-      const unchangedNames =
-        unchangedPeople.length > 0
-          ? `= Unchanged: ${unchangedPeople.map(p => p.name).join(', ')}`
-          : null;
-      const revokeAll =
-        selectedPeople.length === 0 && (currentEntry?.delegates ?? []).length > 0
-          ? 'This will REVOKE ALL delegates for this project.'
-          : null;
+      if (added.length > 0) {
+        sections.push(
+          `<div>Added (${added.length})</div>${nameList(added.map(p => p.name))}`
+        );
+      }
+      if (removed.length > 0) {
+        sections.push(
+          `<div>Revoked (${removed.length})</div>${nameList(removed.map(d => d.name))}`
+        );
+      }
+      if (unchanged.length > 0) {
+        sections.push(
+          `<div>Unchanged (${unchanged.length})</div>${nameList(unchanged.map(p => p.name))}`
+        );
+      }
+      if (selectedPeople.length === 0 && (currentEntry?.delegates ?? []).length > 0) {
+        sections.push('<div><strong>All delegates will be revoked for this project.</strong></div>');
+      }
 
-      const parts = [
-        `Project: ${projLabel}`,
-        addedNames,
-        unchangedNames,
-        removedNames,
-        revokeAll
-      ]
-        .filter(Boolean)
-        .join('\n');
-      deltaLines.push(parts);
+      deltaBlocks.push(sections.join(''));
     }
 
-    // Build the detail message — explicitly warn about revoke-all (named red input).
+    // Explicit warning about people losing access (named red input, R-UI-007 AC.1).
     const revokeAllWarning =
       hasRevoke && allRemoved.length > 0
-        ? `\n\n⚠ REMOVAL: ${[...new Set(allRemoved.map(d => d.name))].join(', ')} will be REVOKED from their assigned projects in this selection.`
+        ? `<div><strong>Removal:</strong> ${[...new Set(allRemoved.map(d => d.name))].join(', ')} will be revoked from the projects in this selection.</div>`
         : '';
 
     const deltaDetail =
-      deltaLines.join('\n\n') +
+      deltaBlocks.join('<div>&nbsp;</div>') +
       revokeAllWarning +
       (selectedPeople.length === 0
-        ? '\n\n⚠ No people selected — this will REVOKE ALL delegates from each selected project.'
+        ? '<div><strong>No people selected — this will revoke all delegates from each selected project.</strong></div>'
         : '');
 
     // Build POST payload: per selected project, the FULL desired delegate list (SYNC).

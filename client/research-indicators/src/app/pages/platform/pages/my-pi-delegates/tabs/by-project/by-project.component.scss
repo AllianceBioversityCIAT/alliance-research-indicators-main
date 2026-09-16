@@ -100,24 +100,31 @@
     gap: 6px;
   }
 
-  // ── Chips: [tooltip icon] label [×] — compact, green when active, red when
-  //    the row/delegate is inactive.
+  // ── Chips: [tooltip icon] label [×] — the Approved Versions treatment from
+  //    the Results Center: grey band, blue text, no border.
   &__chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
     padding: 3px 6px 3px 7px;
-    border-radius: 8px;
-    background-color: var(--ac-green-100);
-    border: 1px solid var(--ac-green-300);
+    border-radius: 6px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid transparent;
     font-size: 12px;
     line-height: 16px;
-    color: var(--ac-green-600);
+    color: var(--ac-light-blue-300);
 
     &--inactive {
       background-color: color-mix(in srgb, var(--ac-red-1) 8%, var(--ac-white-1));
       border-color: var(--ac-red-1);
       color: var(--ac-red-1);
+    }
+
+    // Amber warning variant — same palette as the modal's inactive-user notice
+    &--warning {
+      background-color: #fff8e6;
+      border-color: #e69f00;
+      color: #8a4b08;
     }
 
     &__icon {
@@ -155,27 +162,6 @@
         outline: 2px solid var(--ac-light-blue-400);
         outline-offset: 2px;
       }
-    }
-  }
-
-  // ── No-delegate cue (icon + text — R-UI-002 AC.3 / NFR-UI-002) ─────
-  &__no-delegate {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 13px;
-    padding: 5px 9px;
-    border-radius: 8px;
-    border: 1px dashed var(--ac-grey-300);
-    background-color: var(--ac-grey-100);
-
-    &__icon {
-      font-size: 13px;
-      flex-shrink: 0;
-    }
-
-    &__text {
-      white-space: nowrap;
     }
   }
 

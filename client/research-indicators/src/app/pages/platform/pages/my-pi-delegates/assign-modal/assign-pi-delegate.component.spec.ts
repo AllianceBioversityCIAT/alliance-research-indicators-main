@@ -1118,4 +1118,41 @@ describe('AssignPiDelegateComponent', () => {
       expect(fixture.nativeElement.querySelector('.assign-pi-delegate__pi-hint')).toBeNull();
     });
   });
+  // ── Confirm detail is a readable block list, not a run-on sentence ─────────
+
+  describe('confirm detail layout', () => {
+    it('lists each section on its own line, one name per line', async () => {
+      piService.byProjectCache.set([
+        buildProject('D514', [
+          { delegate_user_id: 1, name: 'Manuel Almanzar', email: 'manuel@test.org' }
+        ])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'D514' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Keep Manuel, add two more
+      component.peopleSignal.set({
+        selected_people: [
+          { delegate_user_id: 1, name: 'Manuel Almanzar', email: 'manuel@test.org' },
+          { delegate_user_id: 2, name: 'Emmanuel Mwema Musau', email: 'e.musau@test.org' },
+          { delegate_user_id: 3, name: 'Juan Manuel Pardo Garcia', email: 'j.pardo@test.org' }
+        ]
+      });
+
+      component.onConfirm();
+
+      const detail = actionsService.showGlobalAlertCalls[0].detail;
+      // Project header, then labelled counts — each on its own block
+      expect(detail).toContain('<strong>D514</strong>');
+      expect(detail).toContain('<div>Added (2)</div>');
+      expect(detail).toContain('<div>Unchanged (1)</div>');
+      // one name per line, never a comma-joined run of names
+      expect(detail).toContain('<div>&nbsp;&nbsp;• Emmanuel Mwema Musau</div>');
+      expect(detail).toContain('<div>&nbsp;&nbsp;• Manuel Almanzar</div>');
+      expect(detail).not.toContain('Emmanuel Mwema Musau, Juan Manuel Pardo Garcia');
+    });
+  });
 });

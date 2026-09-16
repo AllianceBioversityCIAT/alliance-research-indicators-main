@@ -639,13 +639,13 @@ describe('ByPersonComponent', () => {
 
     it('shows the inactive marker only when a person is inactive (discriminator)', async () => {
       await createComponent([ALICE]);
-      let marker = fixture.nativeElement.querySelector('.by-person__summary-left .atc-red-1');
+      let marker = fixture.nativeElement.querySelector('.by-person__summary-right');
       expect(marker).toBeNull();
 
       serviceStub.byPersonCache.set([ALICE, CAROL_INACTIVE]);
       fixture.detectChanges();
 
-      marker = fixture.nativeElement.querySelector('.by-person__summary-left .atc-red-1');
+      marker = fixture.nativeElement.querySelector('.by-person__summary-right');
       expect(marker).not.toBeNull();
       expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
     });

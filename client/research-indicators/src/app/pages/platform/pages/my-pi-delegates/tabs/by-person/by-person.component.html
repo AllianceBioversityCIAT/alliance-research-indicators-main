@@ -12,17 +12,17 @@
 
     <!-- Summary line — top of the card, above the search -->
     <div class="by-person__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
-      <span class="by-person__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
-        @if (summaryInactive() > 0) {
-          <span class="atc-red-1">
-            <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        }
-      </span>
-      <span class="by-person__summary-right atc-grey-600 text-[12px] italic">
+      <span class="by-person__summary-left atc-grey-600 text-[12px] italic">
         Only projects where you are the Principal Investigator are listed
       </span>
+      @if (summaryInactive() > 0) {
+        <span class="by-person__summary-right atc-red-1 flex items-center gap-1.5">
+          <i class="pi pi-exclamation-triangle !text-[13px] leading-none" aria-hidden="true"></i>
+          <span class="leading-none">
+            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
+          </span>
+        </span>
+      }
     </div>
 
     <!-- Per-table toolbar: the shared search control -->
@@ -137,7 +137,7 @@
                     (click)="onRevokeProject(row, project)"
                     (keydown.enter)="onRevokeProject(row, project)"
                   >
-                    <i class="pi pi-times" aria-hidden="true"></i>
+                    <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
                   </button>
                 </span>
               }
