@@ -524,3 +524,110 @@ a missing param still reddens on the `toBe`.
 323/323 client suites green, lint clean, one file changed in the rework, both falsifier directions observed.
 **Cannot prove** (KZ-017): that the section *renders* the version's values — jsdom asserts the request, not the
 paint (T-06); and R-PFV-004's amended clause remains **pending owner ratification**.
+
+## T-05 — Client: Save stays available for this section on a version
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-16 |
+| Implementer attempts | **1** (with one blocking question to the Leader mid-task) |
+| Implementer | Cursor CLI `cursor-grok-4.6-high` — Orca `task_265e6266753d` / `ctx_c7c455bf690c` |
+| Reviewer | `akili-reviewer` (Opus 5, read-only) |
+| Skills assigned | `angular-developer`, `ui-ux-pro-max` (as recommended) |
+| Effort | medium |
+| Requirements covered | R-PFV-005 (all clauses, including "AND IT MUST fail loudly if widened") |
+
+### Attempt 1
+
+**Files changed (5):** `navigation-buttons.component.html` (+ its spec), `pool-funding-alignment.component.spec.ts`,
+`links-to-result.component.html`, `innovation-use-details.component.html`. **`navigation-buttons.component.ts`
+is unchanged** — the `@Input() showSave = false;` it already declared is the carrier, exactly as DD-7 specifies.
+
+The production change is two lines: `@if (submission.isEditableStatus())` → `@if (submission.isEditableStatus() || showSave)`,
+plus removal of the attribute `[showSave]="true"` on the two pages below (every other attribute and handler kept).
+
+### The scope decision — raised by the Implementer, ruled by the Leader, audited by the Reviewer
+
+**The Implementer stopped and asked instead of implementing the spec's two literal edits.** It found that other
+pages already passed `[showSave]="true"` as a dead no-op — dead because the template never read the input — so
+wiring the input would make Save appear on those sections on a version, violating R-PFV-005's
+*"BUT not other sections"*. This is the single most valuable event in the run: the spec said two edits, the
+codebase had four call sites, and the literal reading would have shipped the defect the requirement forbids.
+
+Leader verified with an **unfiltered** grep (K-014) and found **three** other callers, not the two reported:
+
+| Caller | Passed | Ruling | Why |
+| --- | --- | --- | --- |
+| `links-to-result.component.html:109` | `[showSave]="true"` | **DROP the attribute** | no-op today; dropping *preserves* today's behaviour |
+| `innovation-use-details.component.html:432` | `[showSave]="true"` | **DROP the attribute** | same |
+| `general-information.component.html:59` | `[showSave]="submission.isEditableStatus()"` | **LEAVE ALONE** | once ORed, `X \|\| X = X` — byte-identical |
+
+**Reviewer audited the ruling and upheld it on both halves, verifying premises rather than the claim:**
+
+- Dropping the two is *discharge of a mandated clause, not owner-unapproved scope* — `tasks.md` §T-05 carries
+  "every caller that does not pass the override must be byte-identical in behaviour" and `requirements.md:247`
+  is a hard `BUT it must NOT make Save appear on … Innovation details/use … or Links on a version`. The literal
+  two-edit reading violates the requirement the task itself cites.
+- The `X || X` reasoning is sound **because** `SubmissionService` is `@Injectable({ providedIn: 'root' })` and a
+  repo-wide grep over non-spec sources found **zero** `providers: [SubmissionService]` — every consumer uses
+  bare `inject()`, so parent and child hold the same instance and `isEditableStatus` is a pure `computed` over
+  root singletons. Parent binding and child call are the same read in the same change-detection pass.
+
+**KZ-002 census (Reviewer, independent): 13 templates render `app-navigation-buttons`** — DD-7's "twelve" is the
+twelve *other* sections; the thirteenth is pool funding itself. Nine pass no override and are byte-identical by
+default; two are the ones just cleaned; one is the identity binding; one is the intended override. No renderer
+exists outside `result/pages/`.
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `npm test -- --silent` (**run by the Leader** — see below) | **323 passed / 323 suites, 7249 passed / 7249 tests**; coverage Statements 98.04 / Branches 95.66 / Functions 97.73 / Lines 98.38 — far above the repo floors (40/20/30/45) |
+| `npm run lint -- --quiet` | "All files pass linting." (`ng lint`, no `--fix`, so K-001 does not void it) |
+| `npx tsc -p tsconfig.spec.json --noEmit` | exit 2 on the pre-existing corpus, **zero `TS1005`** |
+
+**Falsifiers — all three observed red and restored (K-004).** The received value in each red is a **rendered
+`<button>` element**, which is itself proof the specs query the DOM rather than the input — the task's explicit
+disqualifier:
+
+| Mutation | Red observed |
+| --- | --- |
+| default the override to `true` | spec (a) red — `expect(received).toBeUndefined()`, received a rendered Save button. *This is R-PFV-005's "AND IT MUST fail loudly" clause* |
+| remove `!isReadOnly()` from the page binding | read-only spec red — received a disabled rendered Save button |
+| template condition = override alone | spec (d) red — `expect(received).toBeTruthy()`, received `undefined`. *This is what protects the other eleven sections* |
+
+### Issues encountered — both honest, neither a code defect
+
+1. **The Implementer could not run the mandated gate.** `npm test -- --silent` (coverage on) **SIGSEGV'd three
+   times on unrelated jest workers**; it measured with `--coverage=false` (7249/7249) and *said so* rather than
+   presenting it as the mandated command. **The Leader then ran the mandated command itself and it completed
+   cleanly.** Recorded because a worker that declares a gate it could not run is behaving correctly; silently
+   substituting a weaker command is the failure mode.
+2. **The Leader reproduced the same flakiness.** After the before/after type-check dance below, one
+   `npm test -- --silent` run reported `2 failed, 321 passed` suites with **zero failed tests** — i.e. two
+   suites never executed. Two immediate re-runs: `323 passed / 7249 passed` with coverage identical to two
+   decimal places. Same runner instability the worker hit, not a code defect, and the identical coverage
+   figures confirm the working tree was byte-correct.
+3. **Closing the Reviewer's type-check advisory properly (child-guide form, not a count).** The guide mandates
+   `tsc -p tsconfig.spec.json` for touched spec files and warns that citing errors by line number is drift-prone
+   (FP-50) — T-04's "errors remain at lines 1406/1407/1601" had already drifted to 1408/1409/1603 here, purely
+   from insertion above. The Leader therefore ran the **normalized set comparison**: backed up the five files,
+   `git checkout HEAD --` them, captured `tsc … | sed -E 's/\([0-9]+,[0-9]+\)//' | sort` (944 lines), restored
+   the work, re-captured (944 lines), and `diff`ed. **The sets are IDENTICAL — T-05 introduced zero new type
+   errors.** This is set equality, not count equality.
+
+### ADVISORY (recorded, never gates)
+
+1. **Risk — the `general-information` identity binding has no test.** If someone later edits it to a literal
+   `true`, nothing in the suite reddens; the `X || X` guarantee is static, not pinned. **T-06's "Save absent on
+   every other section of that version" box is the substitute control, and `general-information` is the one
+   section it is actually load-bearing for** — carried into T-06 below.
+2. **Risk — lockfiles.** `client/.../package-lock.json` (modified) and root `pnpm-lock.yaml` (untracked) predate
+   this spec and are outside the five-file diff. Explicitly excluded from this and every commit of this spec;
+   never use `git commit -a` here.
+
+### Final verification result
+
+323/323 suites, 7249/7249 tests, lint clean, zero new type errors (set-equality), all three falsifiers observed.
+**Cannot prove** (KZ-017): placement, spacing or contrast of the button — jsdom cannot evaluate them (T-06).

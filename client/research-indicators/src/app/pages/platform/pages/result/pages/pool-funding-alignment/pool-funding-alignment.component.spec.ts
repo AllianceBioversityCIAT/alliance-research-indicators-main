@@ -89,6 +89,7 @@ describe('PoolFundingAlignmentComponent', () => {
   let listenMock: jest.Mock;
   let trackEventMock: jest.Mock;
   let versionChangeCallbacks: Array<(version: string | null) => void>;
+  let isEditableStatus: ReturnType<typeof signal<boolean>>;
 
   const codes = (form: { selected_sps: { official_code: string }[] }) => form.selected_sps.map(sp => sp.official_code);
   const sp = (official_code: string) => ({ official_code });
@@ -129,6 +130,7 @@ describe('PoolFundingAlignmentComponent', () => {
     listenMock = jest.fn().mockReturnValue(socketEvents$.asObservable());
     trackEventMock = jest.fn();
     versionChangeCallbacks = [];
+    isEditableStatus = signal(true);
 
     const bilateralServiceMock = {
       currentAlignment,
@@ -180,7 +182,7 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActivatedRoute, useValue: routeMock },
         { provide: Router, useValue: { navigate: routerNavigate } },
         { provide: ActionsService, useValue: { showToast: showToastMock, showGlobalAlert: showGlobalAlertMock } },
-        { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+        { provide: SubmissionService, useValue: { isEditableStatus } },
         { provide: WebsocketService, useValue: { listen: listenMock } },
         { provide: ClarityService, useValue: { trackEvent: trackEventMock } },
         {
@@ -2024,6 +2026,19 @@ describe('PoolFundingAlignmentComponent', () => {
     it('banner copy constants are stable (regression guard against drift)', () => {
       expect(component.SYNCED_BANNER).toBe('This result has been pushed to PRMS. Alignment can no longer be edited from STAR.');
       expect(component.READ_ONLY_BANNER).toBe("You don't have permission to edit this section.");
+    });
+  });
+
+  describe('Save override on a version (R-PFV-005)', () => {
+    const saveButton = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Save'));
+
+    it('with is_read_only true the override is false even on a version — Save absent', () => {
+      isEditableStatus.set(false);
+      editable.set(true);
+      currentAlignment.set({ ...baseAlignment, is_read_only: true });
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
     });
   });
 
