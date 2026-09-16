@@ -51,8 +51,13 @@ export class ResultPrmsSyncAggregateRepository {
   async loadByResultId(resultId: number): Promise<PrmsSyncAggregate | null> {
     const secondary = this.appConfig.ARI_SECONDARY_MYSQL_NAME;
     // homologation.md §4 created_by.email: hop r.created_by → sec_users, then
-    // join staff on carnet (stable id). Email matching is DC-1: email is mutable
-    // and two staff rows can share one, so the payload would name the wrong creator.
+    // resolve the staff row. Carnet is preferred — it is the stable id — but
+    // `sec_users.carnet` is NULL for every creator of an Approved result measured
+    // on Dev (279/279), which made the whole payload unbuildable via P-1. Email is
+    // the fallback, and it is guarded rather than matched naively: DC-1 is real
+    // (`alliance_user_staff` holds duplicate emails, and 199 rows carry ''), so the
+    // subquery excludes blanks and picks ONE row deterministically (active first,
+    // then lowest carnet) instead of letting a LEFT JOIN multiply the header row.
     const headerRows = await this.dataSource.query(
       `
       SELECT
@@ -71,10 +76,18 @@ export class ResultPrmsSyncAggregateRepository {
       LEFT JOIN ${secondary}.sec_users su
         ON su.sec_user_id = r.created_by
       LEFT JOIN alliance_user_staff creator
-        ON creator.carnet = su.carnet
+        ON creator.carnet = COALESCE(
+          su.carnet,
+          (SELECT a.carnet
+             FROM alliance_user_staff a
+            WHERE a.email = su.email
+              AND su.email IS NOT NULL
+              AND su.email <> ''
+            ORDER BY a.is_active DESC, a.carnet ASC
+            LIMIT 1)
+        )
       WHERE r.result_id = ?
         AND r.is_active = TRUE
-        AND r.is_snapshot = FALSE
       `,
       [resultId],
     );
@@ -135,7 +148,16 @@ export class ResultPrmsSyncAggregateRepository {
         LEFT JOIN ${secondary}.sec_users su
           ON su.sec_user_id = sh.created_by
         LEFT JOIN alliance_user_staff aus
-          ON aus.carnet = su.carnet
+          ON aus.carnet = COALESCE(
+            su.carnet,
+            (SELECT a.carnet
+               FROM alliance_user_staff a
+              WHERE a.email = su.email
+                AND su.email IS NOT NULL
+                AND su.email <> ''
+              ORDER BY a.is_active DESC, a.carnet ASC
+              LIMIT 1)
+          )
         WHERE sh.result_id = ?
           AND sh.to_status_id = ?
           AND sh.is_active = TRUE

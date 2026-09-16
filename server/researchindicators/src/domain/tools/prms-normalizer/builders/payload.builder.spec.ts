@@ -23,6 +23,7 @@ import {
 import { CapacitySharingBuilder } from './capacity-sharing.builder';
 import { InnovationDevelopmentBuilder } from './innovation-development.builder';
 import { InnovationUseBuilder } from './innovation-use.builder';
+import { KnowledgeProductBuilder } from './knowledge-product.builder';
 import { PolicyChangeBuilder } from './policy-change.builder';
 import { PayloadBuilder } from './payload.builder';
 
@@ -158,6 +159,7 @@ describe('PayloadBuilder', () => {
     new InnovationDevelopmentBuilder(),
     new PolicyChangeBuilder(),
     new InnovationUseBuilder(),
+    new KnowledgeProductBuilder(),
   );
 
   const envelopeOf = (aggregate: PrmsSyncAggregate) =>
@@ -272,6 +274,37 @@ describe('PayloadBuilder', () => {
       expect(block.policy_change).toBeUndefined();
       expect(policyType.name).toBe('Program, Budget, or Investment');
     });
+
+    it('routes Knowledge Product (indicator_id 3) to the knowledge_product builder', () => {
+      const row = resultOf(
+        completeAggregate({
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          evidence: [
+            {
+              link: 'https://doi.org/10.1007/s10668-024-05173-5',
+              description: 'DOI',
+              is_private: false,
+            },
+            {
+              link: 'https://hdl.handle.net/10568/148990',
+              description: 'Handled',
+              is_private: false,
+            },
+          ],
+        }),
+      );
+      const data = row.data as Record<string, unknown>;
+      const block = data.knowledge_product as Record<string, unknown>;
+
+      expect(row.type).toBe('knowledge_product');
+      expect(data).toHaveProperty('knowledge_product');
+      expect(block).toEqual({
+        handle: 'https://hdl.handle.net/10568/148990',
+      });
+      expect(block.handle).not.toBe(
+        'https://doi.org/10.1007/s10668-024-05173-5',
+      );
+    });
   });
 
   describe('unmappable indicator_id raises (homologation.md §3, R-PRMS-002 AC.1)', () => {
@@ -282,10 +315,6 @@ describe('PayloadBuilder', () => {
         `Unmappable indicator_id '${indicatorId}'`,
       );
     };
-
-    it('raises for Knowledge Product (indicator_id 3) instead of returning undefined', () => {
-      expectUnmappable(IndicatorsEnum.KNOWLEDGE_PRODUCT);
-    });
 
     it('raises for OICR (indicator_id 5) instead of returning undefined', () => {
       expectUnmappable(IndicatorsEnum.OICR);

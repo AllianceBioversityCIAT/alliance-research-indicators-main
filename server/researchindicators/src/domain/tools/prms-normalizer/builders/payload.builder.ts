@@ -13,6 +13,7 @@ import {
 } from './common-fields.builder';
 import { InnovationDevelopmentBuilder } from './innovation-development.builder';
 import { InnovationUseBuilder } from './innovation-use.builder';
+import { KnowledgeProductBuilder } from './knowledge-product.builder';
 import { PolicyChangeBuilder } from './policy-change.builder';
 
 /**
@@ -31,6 +32,7 @@ export class PayloadBuilder {
     private readonly innovationDevelopment: InnovationDevelopmentBuilder,
     private readonly policyChange: PolicyChangeBuilder,
     private readonly innovationUse: InnovationUseBuilder,
+    private readonly knowledgeProduct: KnowledgeProductBuilder,
   ) {}
 
   /**
@@ -55,9 +57,11 @@ export class PayloadBuilder {
   }
 
   /**
-   * T-05's map returns `null` for KP (3) and OICR (5) on purpose. Convert
-   * that — and any id outside the map — into a raised error so the envelope
-   * never carries `type: undefined` / `type: null`.
+   * The map returns `null` for OICR (5) on purpose. Knowledge Product (3)
+   * is mapped so this builder can assemble the type block; production send
+   * still refuses it at the gate (`UNMAPPABLE_INDICATORS`). Convert a null
+   * map entry — and any id outside the map — into a raised error so the
+   * envelope never carries `type: undefined` / `type: null`.
    */
   private resolveType(indicatorId: number | null): PrmsIndicatorType {
     const type =
@@ -86,6 +90,8 @@ export class PayloadBuilder {
         return this.policyChange.build(aggregate);
       case 'innovation_use':
         return this.innovationUse.build(aggregate);
+      case 'knowledge_product':
+        return this.knowledgeProduct.build(aggregate);
     }
   }
 }

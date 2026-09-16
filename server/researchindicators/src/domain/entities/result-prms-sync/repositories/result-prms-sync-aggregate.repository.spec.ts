@@ -227,7 +227,7 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     expect(partnerCall?.[1]).toEqual([11, InstitutionRolesEnum.PARTNERS]);
   });
 
-  it('pins the creator and submitted_by staff joins to alliance_user_staff.carnet = sec_users.carnet, not email (homologation.md §4; carnet is stable, email is mutable DC-1)', async () => {
+  it('resolves creator and submitted_by staff by carnet first, then a guarded deterministic email fallback (homologation.md §4; DC-1 stays guarded)', async () => {
     mockQueries({
       header: [
         {
@@ -253,11 +253,21 @@ describe('ResultPrmsSyncAggregateRepository', () => {
         String(call[0]).includes('FROM results r'),
       )?.[0],
     );
+    // Carnet is still preferred — it is the stable id. The fallback exists because
+    // sec_users.carnet is NULL for 279/279 creators of Approved results on Dev,
+    // which made every payload unbuildable via P-1.
     expect(headerSql).toMatch(
-      /LEFT JOIN alliance_user_staff creator\s+ON\s+creator\.carnet\s*=\s*su\.carnet/,
+      /LEFT JOIN alliance_user_staff creator\s+ON\s+creator\.carnet\s*=\s*COALESCE\(\s*su\.carnet/,
     );
+    // DC-1: alliance_user_staff holds duplicate emails and 199 blank ones, so the
+    // fallback must exclude blanks and pick exactly ONE row, never multiply the header.
+    expect(headerSql).toMatch(/a\.email\s*=\s*su\.email/);
+    expect(headerSql).toMatch(/su\.email\s*<>\s*''/);
+    expect(headerSql).toMatch(/ORDER BY a\.is_active DESC, a\.carnet ASC/);
+    expect(headerSql).toMatch(/LIMIT 1/);
+    // never the naive equi-join on email, which is what multiplies rows
     expect(headerSql).not.toMatch(
-      /LEFT JOIN alliance_user_staff creator\s+ON\s+LOWER\(TRIM\(creator\.email\)\)/,
+      /LEFT JOIN alliance_user_staff creator\s+ON\s+creator\.email\s*=/,
     );
 
     const submissionSql = String(
@@ -266,10 +276,12 @@ describe('ResultPrmsSyncAggregateRepository', () => {
       )?.[0],
     );
     expect(submissionSql).toMatch(
-      /LEFT JOIN alliance_user_staff aus\s+ON\s+aus\.carnet\s*=\s*su\.carnet/,
+      /LEFT JOIN alliance_user_staff aus\s+ON\s+aus\.carnet\s*=\s*COALESCE\(\s*su\.carnet/,
     );
+    expect(submissionSql).toMatch(/su\.email\s*<>\s*''/);
+    expect(submissionSql).toMatch(/LIMIT 1/);
     expect(submissionSql).not.toMatch(
-      /LEFT JOIN alliance_user_staff aus\s+ON\s+LOWER\(TRIM\(aus\.email\)\)/,
+      /LEFT JOIN alliance_user_staff aus\s+ON\s+aus\.email\s*=/,
     );
   });
 
@@ -414,5 +426,20 @@ describe('ResultPrmsSyncAggregateRepository', () => {
         innovation_readiness: expect.objectContaining({ level: 3 }),
       }),
     );
+  });
+
+  it('builds the payload aggregate from a version (snapshot) row — the header query does not constrain is_snapshot', async () => {
+    // SP_versioning copies every result_* table this aggregate reads onto the
+    // version, so the header is the only place that could refuse one.
+    mockQueries({ header: [{ result_id: 555, result_official_code: 19949 }] });
+
+    const aggregate = await repository.loadByResultId(555);
+
+    const headerSql = query.mock.calls
+      .map((call) => call[0] as string)
+      .find((sql) => /FROM results r/.test(sql));
+    expect(headerSql).toBeDefined();
+    expect(headerSql).not.toMatch(/is_snapshot/i);
+    expect(aggregate).not.toBeNull();
   });
 });

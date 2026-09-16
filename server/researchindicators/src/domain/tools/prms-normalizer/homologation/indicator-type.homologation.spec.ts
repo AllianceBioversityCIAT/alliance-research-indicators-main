@@ -11,7 +11,7 @@ describe('IndicatorTypeHomologation', () => {
     expect(IndicatorTypeHomologation).toEqual({
       [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT]: 'capacity_sharing',
       [IndicatorsEnum.INNOVATION_DEV]: 'innovation_development',
-      [IndicatorsEnum.KNOWLEDGE_PRODUCT]: null,
+      [IndicatorsEnum.KNOWLEDGE_PRODUCT]: 'knowledge_product',
       [IndicatorsEnum.POLICY_CHANGE]: 'policy_change',
       [IndicatorsEnum.OICR]: null,
       [IndicatorsEnum.INNOVATION_USE]: 'innovation_use',

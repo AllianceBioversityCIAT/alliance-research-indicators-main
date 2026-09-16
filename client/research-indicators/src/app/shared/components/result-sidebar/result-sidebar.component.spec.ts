@@ -409,9 +409,7 @@ describe('ResultSidebarComponent', () => {
         } as GreenChecks);
         cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: 1 });
 
-        const visibleRequired = component
-          .allOptionsWithGreenChecks()
-          .filter(o => !o.hide && o.path !== 'pool-funding-alignment');
+        const visibleRequired = component.allOptionsWithGreenChecks().filter(o => !o.hide && o.path !== 'pool-funding-alignment');
 
         expect(component.getTotalCount()).toBe(visibleRequired.length);
         expect(component.getCompletedCount()).toBe(1);
@@ -470,14 +468,7 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('c3 — indicator 4 yields the byte-identical pre-change path list', () => {
-      expect(pathsFor(4)).toEqual([
-        'general-information',
-        'alliance-alignment',
-        'policy-change',
-        'partners',
-        'geographic-scope',
-        'evidence'
-      ]);
+      expect(pathsFor(4)).toEqual(['general-information', 'alliance-alignment', 'policy-change', 'partners', 'geographic-scope', 'evidence']);
     });
 
     it('c3 — indicator 5 yields the byte-identical pre-change path list', () => {
@@ -640,6 +631,27 @@ describe('ResultSidebarComponent', () => {
       const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button?.disabled).toBe(false);
     });
+    /**
+     * Restored 2026-09-16: this pin came with the fix (f37eea44) and was lost in an
+     * earlier merge on dev, leaving the "nothing to sync" tooltip branch — the whole
+     * point of that bugfix — with no test at all. "No" is a COMPLETE answer, so the
+     * green check passes; completeness alone must not enable the button.
+     */
+    it('disables PRMS SYNC when the result answered "No" to the Science Program question — nothing to sync', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: false
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+      expect(component.prmsSyncTooltip()).toContain('nothing to sync to PRMS');
+    });
+
     it('disables PRMS SYNC while the Science Program question is unanswered (has_contribution null)', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -776,6 +788,8 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('does not call POST_PrmsSync when the result is already synced to PRMS', async () => {
+      // has_contribution true on purpose: this must be blocked by "already synced",
+      // not by ineligibility, or it would pass for the wrong reason.
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
         ...contributingAlignment,
         is_synced_to_prms: true

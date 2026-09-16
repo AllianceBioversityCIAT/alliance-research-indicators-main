@@ -588,11 +588,9 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should not show toast when 400 comes from /pool-funding-tag (bilateral inline-error path)', done => {
-    const poolFundingTagRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag',
-      { is_pool_funding_contributor: true }
-    );
+    const poolFundingTagRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag', {
+      is_pool_funding_contributor: true
+    });
     const errorResponse = new HttpErrorResponse({
       error: { description: 'This contract is not bilateral. Only bilateral contracts can carry the Pool Funding tag.', errors: null },
       status: 400,
@@ -615,11 +613,9 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should still show toast for non-400 errors from /pool-funding-tag', done => {
-    const poolFundingTagRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag',
-      { is_pool_funding_contributor: true }
-    );
+    const poolFundingTagRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag', {
+      is_pool_funding_contributor: true
+    });
     const errorResponse = new HttpErrorResponse({
       error: { errors: 'Server exploded' },
       status: 500,
@@ -648,11 +644,10 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should not show toast when 400 comes from /pool-funding-alignment (bilateral inline-error path)', done => {
-    const poolFundingAlignmentRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/results/RES-001/pool-funding-alignment',
-      { has_contribution: true, lever_codes: [] }
-    );
+    const poolFundingAlignmentRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/results/RES-001/pool-funding-alignment', {
+      has_contribution: true,
+      lever_codes: []
+    });
     const errorResponse = new HttpErrorResponse({
       error: { description: 'At least one lever is required when has_contribution=true.', errors: null },
       status: 400,
@@ -675,11 +670,10 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should still show toast for non-400 errors from /pool-funding-alignment', done => {
-    const poolFundingAlignmentRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/results/RES-001/pool-funding-alignment',
-      { has_contribution: true, lever_codes: ['L1'] }
-    );
+    const poolFundingAlignmentRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/results/RES-001/pool-funding-alignment', {
+      has_contribution: true,
+      lever_codes: ['L1']
+    });
     const errorResponse = new HttpErrorResponse({
       error: { errors: 'Server exploded' },
       status: 500,
@@ -913,5 +907,38 @@ describe('httpErrorInterceptor', () => {
         }
       });
     });
-  });
+  describe('never shows a blank toast (measured 2026-09-16 on the PRMS sync 502/503)', () => {
+    const runWithError = (error: HttpErrorResponse) => {
+      mockCacheService.isLoggedIn.mockReturnValue(true);
+      mockApiService.saveErrors.mockResolvedValue(undefined);
+      const handler: HttpHandlerFn = () => throwError(() => error);
+      TestBed.runInInjectionContext(() => {
+        httpErrorInterceptor(mockRequest, handler).subscribe({ error: () => undefined });
+      });
+      tick();
+    };
+
+    it('falls back to description when the envelope carries no errors key', fakeAsync(() => {
+      runWithError(
+        new HttpErrorResponse({
+          error: { description: 'PRMS Normalizer returned no HTTP response', status: 503 },
+          status: 503,
+          statusText: 'Service Unavailable'
+        })
+      );
+
+      expect(mockActionsService.showToast).toHaveBeenCalledWith({
+        detail: 'PRMS Normalizer returned no HTTP response',
+        severity: 'error',
+        summary: 'Error'
+      });
+    }));
+
+    it('still reports something when the failure carries no body at all', fakeAsync(() => {
+      runWithError(new HttpErrorResponse({ error: null, status: 0, statusText: 'Unknown Error' }));
+
+      const call = mockActionsService.showToast.mock.calls.at(-1)?.[0];
+      expect(typeof call.detail).toBe('string');
+      expect(call.detail.trim()).not.toBe('');
+    }));  });
 });

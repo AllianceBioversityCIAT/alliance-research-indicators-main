@@ -160,10 +160,7 @@ export class ResultSidebarComponent {
     }
   }
 
-  private prmsSyncFailureMessage(response: {
-    description?: string;
-    errorDetail?: { errors?: string; description?: string } | null;
-  }): string {
+  private prmsSyncFailureMessage(response: { description?: string; errorDetail?: { errors?: string; description?: string } | null }): string {
     return (
       response.errorDetail?.errors ||
       response.errorDetail?.description ||
@@ -174,12 +171,7 @@ export class ResultSidebarComponent {
 
   showOicrStatusDropdown = computed(() => {
     const meta = this.cache.currentMetadata();
-    return (
-      this.roles.isAdmin() &&
-      meta.indicator_id === 5 &&
-      meta.status_id !== this.publishedOicrStatusId &&
-      !this.cache.isExternalResult()
-    );
+    return this.roles.isAdmin() && meta.indicator_id === 5 && meta.status_id !== this.publishedOicrStatusId && !this.cache.isExternalResult();
   });
 
   getResultChildQueryParams(): Record<string, string> {
@@ -305,15 +297,11 @@ export class ResultSidebarComponent {
   );
 
   getCompletedCount(): number {
-    return this.allOptionsWithGreenChecks()
-      .filter(option => !option.hide && this.countsTowardSectionCompletion(option) && option.greenCheck)
-      .length;
+    return this.allOptionsWithGreenChecks().filter(option => !option.hide && this.countsTowardSectionCompletion(option) && option.greenCheck).length;
   }
 
   getTotalCount(): number {
-    return this.allOptionsWithGreenChecks()
-      .filter(option => !option.hide && this.countsTowardSectionCompletion(option))
-      .length;
+    return this.allOptionsWithGreenChecks().filter(option => !option.hide && this.countsTowardSectionCompletion(option)).length;
   }
 
   submmitConfirm() {

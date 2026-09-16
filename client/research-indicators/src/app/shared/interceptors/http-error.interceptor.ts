@@ -12,6 +12,18 @@ import { Router } from '@angular/router';
 /** Server-set on any response that rejects an impersonation session (design §4/§5). */
 const IMPERSONATION_ERROR_HEADER = 'X-Impersonation-Error';
 
+/** First human-readable message an error envelope offers, never blank. */
+const errorDetailMessage = (error: HttpErrorResponse): string => {
+  const body = error.error as { errors?: unknown; description?: unknown } | null | undefined;
+  const candidates = [body?.errors, body?.description, error.message];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
+      return candidate;
+    }
+  }
+  return 'Something went wrong, please try again.';
+};
+
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const actions = inject(ActionsService);
   const cache = inject(CacheService);
@@ -69,15 +81,14 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           // Toast burst: short-circuit if a concurrent 403 already ended the session, so
           // N concurrent SESSION_INVALID responses produce exactly one end + one toast.
           if (impersonation.active()) {
-            from(impersonation.end('server-invalid'))
-              .subscribe({
-                next: () => {
-                  actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
-                },
-                error: (endError: unknown) => {
-                  console.error('Failed to end impersonation session after SESSION_INVALID', endError);
-                }
-              });
+            from(impersonation.end('server-invalid')).subscribe({
+              next: () => {
+                actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
+              },
+              error: (endError: unknown) => {
+                console.error('Failed to end impersonation session after SESSION_INVALID', endError);
+              }
+            });
           }
           return throwError(() => error);
         }
@@ -86,14 +97,11 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           return throwError(() => error);
         }
 
-        const isAiFormalizeError =
-          error.status === 502 && req.url.includes('results/ai/formalize');
+        const isAiFormalizeError = error.status === 502 && req.url.includes('results/ai/formalize');
 
-        const isPoolFundingTagValidationError =
-          error.status === 400 && req.url.includes('/pool-funding-tag');
+        const isPoolFundingTagValidationError = error.status === 400 && req.url.includes('/pool-funding-tag');
 
-        const isPoolFundingAlignmentValidationError =
-          error.status === 400 && req.url.includes('/pool-funding-alignment');
+        const isPoolFundingAlignmentValidationError = error.status === 400 && req.url.includes('/pool-funding-alignment');
 
         if (
           cache.isLoggedIn() &&
@@ -104,7 +112,17 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingTagValidationError &&
           !isPoolFundingAlignmentValidationError
         ) {
-          actions.showToast({ detail: error.error.errors, severity: 'error', summary: 'Error' });
+          // `error.error.errors` alone silently produced a blank toast for every
+          // endpoint whose envelope carries `description` instead of `errors`
+          // (measured 2026-09-16: the PRMS sync 502/503 bodies have no `errors`
+          // key at all), and it THREW a TypeError inside this catchError whenever
+          // a true network failure left `error.error` null — losing the message
+          // entirely, which is the worst case: a failed request that looks silent.
+          actions.showToast({
+            detail: errorDetailMessage(error),
+            severity: 'error',
+            summary: 'Error'
+          });
         }
 
         return throwError(() => error);

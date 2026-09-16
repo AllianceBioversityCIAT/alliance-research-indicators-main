@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { GenderEnum } from '../../../entities/genders/enums/gender.enum';
+import { SessionFormatEnum } from '../../../entities/session-formats/enums/session-format.enum';
 import { DeliveryModalityEnum } from '../../../entities/delivery-modalities/enum/delivery-modalities.enum';
 import { DegreesEnum } from '../../../entities/degrees/enum/degrees.enum';
 import { SessionLengthEnum } from '../../../entities/session-lengths/enum/session-lengths.enum';
@@ -32,6 +34,16 @@ const asEnteredCount = (value: unknown): number | undefined => {
   return Number.isFinite(parsed) ? parsed : undefined;
 };
 
+/**
+ * The `number_people_trained` buckets, keyed by the seeded `gender` catalogue so
+ * the ids never appear as literals at the call site.
+ */
+const GENDER_BUCKET: Partial<Record<GenderEnum, string>> = {
+  [GenderEnum.MALE]: 'men',
+  [GenderEnum.FEMALE]: 'women',
+  [GenderEnum.NON_BINARY]: 'non_binary',
+};
+
 @Injectable()
 export class CapacitySharingBuilder {
   /**
@@ -52,12 +64,13 @@ export class CapacitySharingBuilder {
       | SessionLengthEnum
       | null
       | undefined;
-    if (degreeId == null || sessionLengthId == null) {
-      throw new PrmsPayloadBuildError(
-        `Missing mandatory field 'length_training'`,
-        'length_training',
-      );
-    }
+    // A degree is NOT required: a non-degree training legitimately has none, and
+    // the homologation already falls through to the session-length term for BSc
+    // and Other. Requiring it here threw before the homologation could decide.
+    // PRMS receives one string enum ("Short-term"), never a degree id — so the
+    // only real failure is when neither input can produce that string, which the
+    // `!lengthTraining` guard below catches (e.g. PhD still resolves with no
+    // session length, and a null degree resolves from the session length alone).
 
     const deliveryModalityId = slice.delivery_modality_id as
       | DeliveryModalityEnum
@@ -83,11 +96,50 @@ export class CapacitySharingBuilder {
     if (nonBinary !== undefined) {
       numberPeopleTrained.non_binary = nonBinary;
     }
+    // An INDIVIDUAL training records one named trainee and their gender instead of
+    // the disaggregated counts a group training carries — measured on Dev, all 42
+    // approved individual versions have `gender_id` and 39 have no counts at all,
+    // so the group shape alone could never send a third of Approved CapDev.
+    // Counting that trainee as 1 is not the `unknown` arithmetic §1.4 rejected:
+    // the participant and their gender were both entered by a person.
+    if (
+      Object.keys(numberPeopleTrained).length === 0 &&
+      (slice.session_format_id as SessionFormatEnum | null | undefined) ===
+        SessionFormatEnum.INDIVIDUAL
+    ) {
+      const bucket = GENDER_BUCKET[slice.gender_id as GenderEnum];
+      if (bucket) {
+        // All three buckets are filled, not just the trainee's. PRMS rejects an
+        // absent `women` ("must be a number conforming to the specified
+        // constraints", measured 2026-09-16 on a payload carrying only `men`),
+        // and for ONE participant of a known gender the other two counts are
+        // entailed with certainty rather than inferred — which is what separates
+        // this from the group case, where an unreported count is not a zero.
+        for (const known of Object.values(GENDER_BUCKET)) {
+          numberPeopleTrained[known] = 0;
+        }
+        numberPeopleTrained[bucket] = 1;
+      }
+    }
+
     if (Object.keys(numberPeopleTrained).length === 0) {
       throw new PrmsPayloadBuildError(
         `Missing mandatory field 'number_people_trained'`,
         'number_people_trained',
       );
+    }
+
+    // PRMS rejects an absent bucket rather than treating it as optional
+    // ("women must be a number conforming to the specified constraints",
+    // measured 2026-09-16 against a payload carrying only `men`), so every bucket
+    // the reporter left blank is sent as 0. Product decision of 2026-09-16: for a
+    // GROUP training this does assert a zero the reporter never typed, which is
+    // why it only applies once at least one count exists — a group that reported
+    // nothing at all still refuses above rather than claiming nobody was trained.
+    for (const bucket of Object.values(GENDER_BUCKET)) {
+      if (numberPeopleTrained[bucket] === undefined) {
+        numberPeopleTrained[bucket] = 0;
+      }
     }
 
     const lengthTraining = homologateLengthTraining(degreeId, sessionLengthId);
