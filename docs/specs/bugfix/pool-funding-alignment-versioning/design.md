@@ -60,7 +60,7 @@ No DDL. The four tables and their constraints as they exist today:
 
 | Table | Parent key | Partial-unique index while active | Copy shape |
 | --- | --- | --- | --- |
-| `result_pool_funding_alignment` | `result_id` | `uq_rpfa_active_result` on generated `active_result_id` *(present only where migration `1779190000014` is applied — **not** on Dev, verified 2026-09-16)* | **Pattern A′** — single row, id captured |
+| `result_pool_funding_alignment` | `result_id` | ~~`uq_rpfa_active_result` on generated `active_result_id`~~ — **absent on Dev AND on the scratch schema** *(corrected 2026-09-16 in T-01: `baseline.sql` holds the `1779190000014` ledger row as applied while its own table definition carries no unique index, so the migration is skipped and the drift is invisible to `migration:show`. See tasks.md RB-1.)* | **Pattern A′** — single row, id captured |
 | `result_pool_funding_alignment_sp` | `alignment_id` | `idx_rpfas_active_primary` on generated `active_primary_alignment` | **Pattern B** — FK re-mapped to the new alignment id |
 | `result_pool_funding_toc_alignment` | `result_id` | `idx_rpfta_active_result_sp` on generated `result_id:sp_code` | **Pattern A** |
 | `result_pool_funding_indicator_mapping` | `result_id` | `uq_rpfim_result_indicator_active` on `(result_id, lever_code, indicator_code, is_active)` | **Pattern A** |
@@ -87,7 +87,7 @@ Pattern B re-resolves the parent by joining on a **natural key** (`lever_id`, `i
 This is sound because **at most one active alignment row exists per result**:
 
 - enforced in application code — `bilateral.service.ts:823-856` deactivates the previous row inside the same transaction before inserting the new one;
-- enforced in the schema wherever migration `1779190000014` is applied (generated `active_result_id` + `uq_rpfa_active_result`);
+- ~~enforced in the schema wherever migration `1779190000014` is applied~~ — **measured 2026-09-16 (T-01): enforced in NO environment reached by this spec.** Dev and the scratch schema both lack the index although the ledger marks the migration applied (tasks.md RB-1). The invariant therefore rests on the application layer and the measurement below, not on the schema;
 - **measured** on Dev 2026-09-16: 110 total rows, 49 active, 49 distinct results, **zero** results with more than one active row.
 
 **Degradation if the invariant is ever violated:** only one active alignment is copied — the same one `pool_funding_alignment_validation` (`limit 1`) and `findActiveAlignmentByResultId` already read. The snapshot would therefore match what the product displays, not diverge from it. Recorded so a later reader does not mistake it for this bug.

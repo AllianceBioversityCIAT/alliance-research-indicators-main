@@ -6,7 +6,7 @@
 
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
-- **Status:** not-started
+- **Status:** in-progress (T-01 done)
 - **Last updated:** 2026-09-16
 
 ---
@@ -30,7 +30,7 @@ graph TD
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | M |
 | Depends on | — |
 | Requirements | R-PFV-001 (all clauses), R-PFV-002 (all clauses), R-PFV-003 (all three scenarios), NFR-PFV-003 |
@@ -399,5 +399,5 @@ T-06 is not a PR; it gates the release.
 | # | Date | Risk / Blocker | Mitigation | Status |
 | --- | --- | --- | --- | --- |
 | AR-1 | 2026-09-16 | Re-approving **without re-filling** the section leaves the new version empty (consequence of Decisions 1 + 4) | Owner-ruled accepted; pinned by T-01 case 7 so reversing the ruling is a visible test change | **accepted** |
-| RB-1 | 2026-09-16 | Dev lacks `uq_rpfa_active_result` (migration `1779190000014` not applied there) | DD-2 states the degradation; the scratch schema does have it, so the fixture exercises the enforced shape | open |
+| RB-1 | 2026-09-16 | **Neither Dev nor the scratch schema has `uq_rpfa_active_result`.** *Corrected 2026-09-16 during T-01 — the original mitigation ("the scratch schema does have it, so the fixture exercises the enforced shape") is **false**, and the original cause ("migration not applied there") is imprecise.* Measured: `baseline.sql` carries the ledger row `1779190000014` marked **applied** while its own `CREATE TABLE result_pool_funding_alignment` has **no unique index at all**, so `migration:test:execute` skips it and scratch inherits Dev's drift. This is worse than a pending migration — `migration:show` can never flag it, because the ledger says applied | DD-2's conclusion is unaffected: every copied row lands on a **new** `result_id` (and `_sp` on a new `alignment_id`), so no unique index can collide on the copy path (design §4). The at-most-one-active invariant rests on `bilateral.service.ts:823-856` plus the Dev measurement (49 active / 49 distinct results, zero duplicates) — **not** on the index. T-01 seeds at most one active alignment per result and does not depend on it | **corrected — open as a schema-drift finding** |
 | RB-2 | 2026-09-16 | Three routines re-declared in full; transcription is the dominant defect class | Bodies copied verbatim from the deployed migrations, then diffed | open |
