@@ -146,6 +146,16 @@ export class ProjectDelegatesResponseDto {
 
   @ApiProperty({
     type: String,
+    nullable: true,
+    description:
+      "agresso_contracts.project_lead_description — the Principal Investigator's " +
+      'name as Agresso records it (title-cased). Null when the contract has no lead.',
+    example: 'Mayesse Da Silva',
+  })
+  pi_name!: string | null;
+
+  @ApiProperty({
+    type: String,
     description: 'agresso_contracts.contract_status',
     nullable: true,
     example: 'COMPLETED',

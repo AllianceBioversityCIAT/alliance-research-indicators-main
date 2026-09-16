@@ -1258,6 +1258,17 @@ export class ApiService {
   };
 
   /**
+   * GET /api/pi-delegates/by-user/access?user_id=<id>
+   *
+   * Cheap yes/no: does this user manage any project (as PI or active delegate)?
+   * Used to hide the whole My PI Delegates module for users with neither role.
+   */
+  GET_PiDelegateAccess = (userId: number): Promise<MainResponse<{ has_access: boolean }>> => {
+    const url = () => `pi-delegates/by-user/access?user_id=${encodeURIComponent(userId)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
    * GET /api/pi-delegates/by-user/people?user_id=<id>
    * Returns distinct DelegateProjects[] across all projects the user manages.
    * @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01 / by-user endpoints)

@@ -427,12 +427,12 @@ describe('ByPersonComponent', () => {
       await createComponent([ALICE]);
     });
 
-    it('renders the p-table header columns (Person, Email, Status, Managed projects, Actions)', () => {
+    it('renders the p-table header columns (Person, Email, User status, Managed projects, Actions)', () => {
       const headers = fixture.debugElement.queryAll(By.css('th'));
       const headerTexts = headers.map(h => (h.nativeElement as HTMLElement).textContent?.trim());
       expect(headerTexts).toContain('Person');
       expect(headerTexts).toContain('Email');
-      expect(headerTexts).toContain('Status');
+      expect(headerTexts).toContain('User status');
       expect(headerTexts).toContain('Managed projects');
     });
 

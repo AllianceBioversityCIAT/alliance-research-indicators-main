@@ -19,6 +19,7 @@ import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import { RolesService } from '@services/cache/roles.service';
 import { ActionsService } from '@services/actions.service';
 import { AccountSidebarOption, AdministrationNavChild, AdministrationNavGroup } from '@interfaces/administration-nav.interface';
+import { ApiService } from '@services/api.service';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 
@@ -34,6 +35,14 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
   allModalsService = inject(AllModalsService);
   rolesService = inject(RolesService);
   actions = inject(ActionsService);
+  private readonly api = inject(ApiService);
+
+  /**
+   * My PI Delegates only makes sense for someone who is the PI of a project or
+   * a delegate on one; for everyone else the whole section stays hidden.
+   * Answered by a boolean endpoint so no page pays for the enriched list.
+   */
+  readonly canSeePiDelegates = signal(false);
   private readonly router = inject(Router);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
   private readonly renderer = inject(Renderer2);
@@ -48,10 +57,8 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
   ];
 
   // ─── Principal Investigator options (R-UI-001 / design §9) ──────────────────
-  // Flat, direct links (no collapsible parent). Shown unconditionally to
-  // authenticated users in the platform shell.
-  // TODO(eligibility): refine visibility to ≥1 managed project when
-  //   the dedicated projects endpoint is wired (design §9 fallback in effect).
+  // Flat, direct links (no collapsible parent). Rendered only when
+  // canSeePiDelegates() is true — see the check in ngOnInit.
   piOptions(): AdministrationNavChild[] {
     return [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-users', iconSize: '13px' }];
   }
@@ -143,6 +150,24 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
     this.routerEventsSub = this.router.events
       .pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd))
       .subscribe(() => this.cdr.markForCheck());
+
+    void this.loadPiDelegatesVisibility();
+  }
+
+  /** Asks once whether this user manages any project; hides the section if not. */
+  private async loadPiDelegatesVisibility(): Promise<void> {
+    try {
+      const userId = this.cache.dataCache()?.user?.sec_user_id;
+      if (userId == null) return;
+
+      const res = await this.api.GET_PiDelegateAccess(Number(userId));
+      this.canSeePiDelegates.set(!!res.data?.has_access);
+    } catch {
+      // A failed check keeps the section hidden — no entry point to an empty module.
+      this.canSeePiDelegates.set(false);
+    } finally {
+      this.cdr.markForCheck();
+    }
   }
 
   toggleSidebarAndResize(): void {

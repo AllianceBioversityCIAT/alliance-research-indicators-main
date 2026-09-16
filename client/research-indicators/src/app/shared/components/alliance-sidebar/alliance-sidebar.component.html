@@ -43,6 +43,7 @@
     }
   </div>
 
+  @if (canSeePiDelegates()) {
   @if (!cache.isSidebarCollapsed()) {
   <hr class="divider" />
   <div class="sidebar-title text-[#8D9299] !text-[10.5px] uppercase font-[300] tracking-[4.5px] !font-[space_grotesk]">
@@ -66,6 +67,7 @@
     </a>
     }
   </div>
+  }
   }
 
   @if (rolesService.canAccessCenterAdmin() || rolesService.canAccessAppConfiguration()) {

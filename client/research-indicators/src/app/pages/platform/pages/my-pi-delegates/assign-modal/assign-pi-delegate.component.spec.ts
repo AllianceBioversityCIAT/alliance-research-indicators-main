@@ -27,6 +27,7 @@ import { PiDelegatesClientService } from '../services/pi-delegates.client.servic
 import { ActionsService } from '@services/actions.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { ProjectDelegates } from '@interfaces/pi-delegates.interface';
+import type { GlobalAlert } from '@interfaces/global-alert.interface';
 import { ServiceLocatorService } from '@services/service-locator.service';
 import { UtilsService } from '@services/utils.service';
 import { PiDelegatePeoplePickerStubService } from '../services/pi-delegate-picker-stub.service';
@@ -167,6 +168,7 @@ function buildProject(
     project_name: `Project ${code}`,
     is_pool_funding_contributor: false,
     pi_user_id: piUserId,
+    pi_name: null,
     status: 'Ongoing',
     start_date: '2024-01-15' as unknown as Date,
     end_date: '2026-12-31' as unknown as Date,
@@ -854,6 +856,15 @@ describe('AssignPiDelegateComponent', () => {
       expect(component.piDisabledPeople()).toHaveLength(0);
     });
 
+    it('marks the PI option itself, so the row says why it is greyed out', async () => {
+      await openForProject('P7', 10);
+
+      // the helper the option template calls
+      expect(component.isProjectPi({ delegate_user_id: 10 })).toBe(true);
+      expect(component.isProjectPi({ delegate_user_id: 11 })).toBe(false);
+      expect(component.isProjectPi(null)).toBe(false);
+    });
+
     it('renders a hint naming the disabled Principal Investigator', async () => {
       await openForProject('P4', 10);
 
@@ -1204,7 +1215,10 @@ describe('AssignPiDelegateComponent', () => {
     it('leaves the app-modal footer unregistered so no second pair renders', () => {
       fixture.detectChanges();
 
-      const config = modalService.modalConfig()['assignPiDelegate'];
+      const config = modalService.modalConfig()['assignPiDelegate'] as unknown as {
+        cancelAction?: () => void;
+        confirmAction?: () => void;
+      };
       expect(config?.cancelAction).toBeUndefined();
       expect(config?.confirmAction).toBeUndefined();
     });

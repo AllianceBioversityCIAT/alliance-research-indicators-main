@@ -12,6 +12,7 @@
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
 import { ByProjectComponent } from './by-project.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
@@ -30,6 +31,8 @@ const PROJECT_WITH_DELEGATES: ProjectDelegates = {
   project_code: 'PRJ-001',
   project_name: 'Alpha Research',
   is_pool_funding_contributor: true,
+  pi_user_id: null,
+  pi_name: 'Mayesse Da Silva',
   status: 'Ongoing',
   start_date: '2024-01-15' as unknown as Date,
   end_date: '2026-12-31' as unknown as Date,
@@ -40,6 +43,8 @@ const PROJECT_NO_DELEGATES: ProjectDelegates = {
   project_code: 'PRJ-002',
   project_name: 'Beta Project',
   is_pool_funding_contributor: false,
+  pi_user_id: null,
+  pi_name: null,
   status: 'Completed',
   start_date: null,
   end_date: null,
@@ -50,6 +55,8 @@ const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
   project_code: 'PRJ-003',
   project_name: 'Gamma Study',
   is_pool_funding_contributor: false,
+  pi_user_id: null,
+  pi_name: null,
   status: 'Ongoing',
   start_date: null,
   end_date: null,
@@ -104,6 +111,8 @@ describe('ByProjectComponent', () => {
     await TestBed.configureTestingModule({
       imports: [ByProjectComponent, NoopAnimationsModule],
       providers: [
+        // the project cell is a routerLink now
+        provideRouter([]),
         { provide: PiDelegatesClientService, useValue: serviceStub },
         { provide: ActionsService, useValue: actionsStub }
       ]
@@ -219,7 +228,8 @@ describe('ByProjectComponent', () => {
       expect(icon).not.toBeNull();
       expect(icon.classList.contains('pi-exclamation-circle')).toBe(true);
       expect(icon.style.transform).toBe('rotate(180deg)');
-      expect(icon.getAttribute('aria-label')).toBe('This delegate is inactive');
+      // the copy is about the user account, not the delegation
+      expect(icon.getAttribute('aria-label')).toBe('This user is no longer active');
     });
 
     it('INACTIVE chip keeps the red treatment and still prints name + email', () => {
@@ -762,6 +772,36 @@ describe('ByProjectComponent', () => {
       expect(component.visibleDelegates(projectWith(7))).toHaveLength(4);
       expect(component.hiddenDelegateCount(projectWith(7))).toBe(3);
       expect(component.hiddenDelegateCount(projectWith(2))).toBe(0);
+    });
+  });
+  // ── Project cell: link + Principal investigator line ───────────────────────
+
+  describe('project cell', () => {
+    it('links only the project title to the project detail route', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const link = fixture.debugElement.query(By.css('.by-project__project__link'))
+        .nativeElement as HTMLAnchorElement;
+      expect(link.getAttribute('href')).toBe('/project-detail/PRJ-001');
+
+      // the row itself must not navigate — the chips live there too
+      const row = fixture.nativeElement.querySelector('tr.by-project__row') as HTMLElement;
+      expect(row.getAttribute('href')).toBeNull();
+      expect(row.getAttribute('ng-reflect-router-link')).toBeNull();
+    });
+
+    it('shows the Principal investigator before the dates, and omits it when unknown', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
+
+      const cells = fixture.debugElement.queryAll(By.css('.by-project__td--project'));
+      const withPi = (cells[0].nativeElement as HTMLElement).textContent?.replace(/\s+/g, ' ') ?? '';
+      expect(withPi).toContain('Principal investigator');
+      expect(withPi).toContain('Mayesse Da Silva');
+      expect(withPi.indexOf('Principal investigator')).toBeLessThan(withPi.indexOf('Start date'));
+
+      // PRJ-002 has no lead recorded
+      const withoutPi = (cells[1].nativeElement as HTMLElement).textContent ?? '';
+      expect(withoutPi).not.toContain('Principal investigator');
     });
   });
 });

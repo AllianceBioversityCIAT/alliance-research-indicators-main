@@ -8,6 +8,16 @@ import { CacheService } from '@services/cache/cache.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { RolesService } from '@services/cache/roles.service';
 import { ActionsService } from '@services/actions.service';
+import { ApiService } from '@services/api.service';
+
+// The sidebar asks a boolean endpoint whether to show My PI Delegates.
+class MockApiService {
+  hasAccess = true;
+  GET_PiDelegateAccess = jest.fn(async () => ({
+    successfulRequest: true,
+    data: { has_access: this.hasAccess }
+  }));
+}
 
 describe('AllianceSidebarComponent', () => {
   let component: AllianceSidebarComponent;
@@ -19,7 +29,9 @@ describe('AllianceSidebarComponent', () => {
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
       // D-imp-14: the template binds the sidebar's marginTop to this measured signal.
       navbarHeight: jest.fn().mockReturnValue(70),
-      toggleSidebar: jest.fn()
+      toggleSidebar: jest.fn(),
+      // the sidebar reads the signed-in user to ask about PI-delegate access
+      dataCache: jest.fn().mockReturnValue({ user: { sec_user_id: 99 } })
     } as unknown as CacheService;
     const mockAllModalsService = {
       openModal: jest.fn()
@@ -45,7 +57,8 @@ describe('AllianceSidebarComponent', () => {
         { provide: CacheService, useValue: mockCacheService },
         { provide: AllModalsService, useValue: mockAllModalsService },
         { provide: RolesService, useValue: mockRolesService },
-        { provide: ActionsService, useValue: mockActionsService }
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: ApiService, useClass: MockApiService }
       ]
     }).compileComponents();
 
@@ -166,6 +179,45 @@ describe('AllianceSidebarComponent', () => {
     const visible = component.visibleAdministrationChildren(group);
     expect(visible).toHaveLength(1);
     expect(visible[0].label).toBe('Visible');
+  });
+
+  // ─── Module visibility: the section only exists for PIs and delegates ────────
+
+  it('renders the PI section when the user manages at least one project', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.canSeePiDelegates()).toBe(true);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PRINCIPAL INVESTIGATOR');
+    expect(fixture.nativeElement.querySelector('a[href="/my-pi-delegates"]')).not.toBeNull();
+  });
+
+  it('hides the whole PI section when the user manages none (negative discriminator)', async () => {
+    (TestBed.inject(ApiService) as unknown as MockApiService).hasAccess = false;
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.componentInstance.canSeePiDelegates()).toBe(false);
+    const text = (f.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('PRINCIPAL INVESTIGATOR');
+    expect(f.nativeElement.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
+  });
+
+  it('keeps the section hidden when the check fails', async () => {
+    const api = TestBed.inject(ApiService) as unknown as MockApiService;
+    api.GET_PiDelegateAccess.mockRejectedValueOnce(new Error('network'));
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.componentInstance.canSeePiDelegates()).toBe(false);
   });
 
   // ─── T-UI-03: My PI Delegates as a direct (non-collapsible) option (R-UI-001) ──
@@ -306,6 +358,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
     isSidebarCollapsed: jest.Mock;
     navbarHeight: jest.Mock;
     toggleSidebar: jest.Mock;
+    dataCache: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -317,7 +370,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
       isSidebarCollapsed: jest.fn().mockReturnValue(true),
       // D-imp-14: template binds the sidebar marginTop to this measured signal.
       navbarHeight: jest.fn().mockReturnValue(70),
-      toggleSidebar: jest.fn()
+      toggleSidebar: jest.fn(),
+      dataCache: jest.fn().mockReturnValue({ user: { sec_user_id: 99 } })
     };
     const routerMock = {
       events: routerEventsSubject.asObservable(),
@@ -333,6 +387,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
     await TestBed.configureTestingModule({
       imports: [AllianceSidebarComponent],
       providers: [
+        { provide: ApiService, useClass: MockApiService },
         { provide: Router, useValue: routerMock },
         {
           provide: ActivatedRoute,

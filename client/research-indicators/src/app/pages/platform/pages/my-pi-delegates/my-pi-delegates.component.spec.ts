@@ -16,6 +16,7 @@
 import { signal, computed } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { provideRouter } from '@angular/router';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import MyPiDelegatesComponent from './my-pi-delegates.component';
 import { PiDelegatesClientService } from './services/pi-delegates.client.service';
@@ -31,6 +32,8 @@ function makeProject(overrides: Partial<ProjectDelegates> = {}): ProjectDelegate
     project_code: 'P001',
     project_name: 'Alpha Project',
     is_pool_funding_contributor: false,
+    pi_user_id: null,
+    pi_name: null,
     status: 'Active',
     start_date: null,
     end_date: null,
@@ -107,6 +110,8 @@ describe('MyPiDelegatesComponent', () => {
     await TestBed.configureTestingModule({
       imports: [MyPiDelegatesComponent, NoopAnimationsModule],
       providers: [
+        // the By project cell links to /project-detail
+        provideRouter([]),
         { provide: PiDelegatesClientService, useValue: mockService },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },
         { provide: CacheService, useValue: mockCacheService }
@@ -437,6 +442,8 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
     await TestBed.configureTestingModule({
       imports: [MyPiDelegatesComponent, NoopAnimationsModule],
       providers: [
+        // the By project cell links to /project-detail
+        provideRouter([]),
         { provide: PiDelegatesClientService, useValue: mockSvc },
         { provide: ActionsService, useValue: { showGlobalAlert: jest.fn() } },
         { provide: CacheService, useValue: noUserCache }

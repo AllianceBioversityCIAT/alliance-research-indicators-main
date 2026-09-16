@@ -21,6 +21,8 @@ function makeProjectDelegates(overrides: Partial<ProjectDelegates> = {}): Projec
     project_code: 'P001',
     project_name: 'Alpha Project',
     is_pool_funding_contributor: false,
+    pi_user_id: null,
+    pi_name: null,
     status: 'Active',
     start_date: null,
     end_date: null,

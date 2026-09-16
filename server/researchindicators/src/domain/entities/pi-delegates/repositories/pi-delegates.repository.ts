@@ -74,21 +74,24 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     projectId: string,
     userId: number,
   ): Promise<boolean> {
+    // Each branch MUST stay wrapped in parentheses: MySQL only accepts a
+    // per-branch LIMIT inside a parenthesised SELECT, and an unparenthesised
+    // `... LIMIT 1 UNION SELECT ...` is an ER_PARSE_ERROR, not a slow query.
     const query = `
-      SELECT 1
-      FROM agresso_contracts ac
-        INNER JOIN alliance_user_staff aus ON aus.carnet = ac.projectLeadId
-        INNER JOIN sec_users su ON su.email = aus.email
-      WHERE ac.agreement_id = ?
-        AND su.sec_user_id = ?
-      LIMIT 1
+      (SELECT 1
+       FROM agresso_contracts ac
+         INNER JOIN alliance_user_staff aus ON aus.carnet = ac.projectLeadId
+         INNER JOIN sec_users su ON su.email = aus.email
+       WHERE ac.agreement_id = ?
+         AND su.sec_user_id = ?
+       LIMIT 1)
       UNION
-      SELECT 1
-      FROM pi_delegates pd
-      WHERE pd.project_id = ?
-        AND pd.delegate_user_id = ?
-        AND pd.is_active = TRUE
-      LIMIT 1;
+      (SELECT 1
+       FROM pi_delegates pd
+       WHERE pd.project_id = ?
+         AND pd.delegate_user_id = ?
+         AND pd.is_active = TRUE
+       LIMIT 1)
     `;
     const rows = await this.dataSource.query(query, [
       projectId,
@@ -383,6 +386,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     start_date: Date | null;
     end_date: Date | null;
     pi_user_id: number | null;
+    pi_name: string | null;
   } | null> {
     const rows: Array<{
       agreement_id: string;
@@ -392,6 +396,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       start_date: Date | null;
       end_date: Date | null;
       pi_user_id: number | null;
+      pi_name: string | null;
     }> = await this.dataSource.query(
       // pi_user_id resolves the SAME chain as isPiOfProject
       // (projectLeadId → alliance_user_staff.carnet → sec_users.email). It is a
@@ -399,6 +404,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       // multiply the contract row.
       `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
               ac.contract_status, ac.start_date, ac.end_date,
+              ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
                  FROM alliance_user_staff aus
                  INNER JOIN sec_users su ON su.email = aus.email
@@ -564,6 +570,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       start_date: Date | null;
       end_date: Date | null;
       pi_user_id: number | null;
+      pi_name: string | null;
     }>
   > {
     if (!projectIds.length) return [];
@@ -572,6 +579,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       // contract row count is unaffected by duplicate carnets/emails.
       `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
               ac.contract_status, ac.start_date, ac.end_date,
+              ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
                  FROM alliance_user_staff aus
                  INNER JOIN sec_users su ON su.email = aus.email

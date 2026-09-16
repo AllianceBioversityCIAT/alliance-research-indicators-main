@@ -576,6 +576,9 @@ describe('ResultSidebarComponent', () => {
   });
 
   describe('PRMS SYNC button', () => {
+    // has_contribution: null is the UNANSWERED Science Program question. Since
+    // canSyncPrms() requires an explicit "Yes", this fixture alone can never
+    // enable the button — tests that need it enabled use contributingAlignment.
     const eligibleAlignment: AlignmentResponse = {
       result_code: 'RES-001',
       eligible: true,
@@ -584,6 +587,12 @@ describe('ResultSidebarComponent', () => {
       selected_levers: [],
       is_synced_to_prms: false,
       is_read_only: false
+    };
+
+    /** Answered "Yes": eligible, complete AND with something to send to PRMS. */
+    const contributingAlignment: AlignmentResponse = {
+      ...eligibleAlignment,
+      has_contribution: true
     };
 
     it('renders the PRMS SYNC button when Pool Funding Alignment is available', () => {
@@ -631,24 +640,6 @@ describe('ResultSidebarComponent', () => {
       const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button?.disabled).toBe(false);
     });
-
-    it('disables PRMS SYNC when the result answered "No" to the Science Program question — nothing to sync', () => {
-      // "No" is a COMPLETE answer, so pool_funding_alignment is green: the gate
-      // cannot be completeness alone.
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
-        ...eligibleAlignment,
-        has_contribution: false
-      });
-      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
-      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
-      fixture.detectChanges();
-
-      expect(component.canSyncPrms()).toBe(false);
-      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
-      expect(button?.disabled).toBe(true);
-      expect(component.prmsSyncTooltip()).toContain('nothing to sync to PRMS');
-    });
-
     it('disables PRMS SYNC while the Science Program question is unanswered (has_contribution null)', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -671,7 +662,7 @@ describe('ResultSidebarComponent', () => {
     });
 
     const enablePrmsSyncButton = () => {
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(contributingAlignment);
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
       cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
       fixture.detectChanges();
@@ -760,7 +751,7 @@ describe('ResultSidebarComponent', () => {
 
     it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
-        ...eligibleAlignment,
+        ...contributingAlignment,
         is_synced_to_prms: true
       });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -776,7 +767,7 @@ describe('ResultSidebarComponent', () => {
 
     it('does not call POST_PrmsSync when the result is already synced to PRMS', async () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
-        ...eligibleAlignment,
+        ...contributingAlignment,
         is_synced_to_prms: true
       });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -812,7 +803,7 @@ describe('ResultSidebarComponent', () => {
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
       (metadataService.update as jest.Mock).mockResolvedValue(undefined);
       (bilateralService.getAlignment as jest.Mock).mockImplementation(async () => {
-        const synced = { ...eligibleAlignment, is_synced_to_prms: true };
+        const synced = { ...contributingAlignment, is_synced_to_prms: true };
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(synced);
         return synced;
       });

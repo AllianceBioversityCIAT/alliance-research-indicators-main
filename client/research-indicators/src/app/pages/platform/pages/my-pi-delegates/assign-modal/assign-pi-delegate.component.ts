@@ -195,6 +195,12 @@ export class AssignPiDelegateComponent implements OnInit {
   /** People to grey out: the PI of any currently-selected project. */
   readonly piDisabledPeople: WritableSignal<PersonOption[]> = signal([]);
 
+  /** True when this option is greyed out because they are a selected project's PI. */
+  isProjectPi(person: { delegate_user_id: number } | null | undefined): boolean {
+    if (!person) return false;
+    return this.piDisabledPeople().some(p => p.delegate_user_id === person.delegate_user_id);
+  }
+
   /** Names of those people — shown as a hint under the People picker. */
   readonly piDisabledNames = computed(() =>
     this.piDisabledPeople()

@@ -123,6 +123,7 @@ interface MockRepoOptions {
     start_date: Date | null;
     end_date: Date | null;
     pi_user_id?: number | null;
+    pi_name?: string | null;
   } | null;
   /** findActiveDelegatesWithUser result (default: []) */
   findActiveDelegatesWithUserResult?: Array<{
@@ -1751,6 +1752,7 @@ interface ManagedMockOpts {
     start_date: Date | null;
     end_date: Date | null;
     pi_user_id?: number | null;
+    pi_name?: string | null;
   }>;
   /** findActiveDelegatesForProjects result (default: []) */
   activeDelegatesForProjects?: Array<{
@@ -2046,6 +2048,7 @@ describe('pi_user_id exposure — listManagedProjects() and list()', () => {
           start_date: null,
           end_date: null,
           pi_user_id: 77,
+          pi_name: 'MAYESSE DA SILVA',
         },
         {
           agreement_id: 'G561',
@@ -2062,6 +2065,10 @@ describe('pi_user_id exposure — listManagedProjects() and list()', () => {
     const result = await service.listManagedProjects(ownUserId);
 
     expect(result.find((r) => r.project_code === 'G560')!.pi_user_id).toBe(77);
+    // the PI's name rides along, title-cased like every other name we return
+    expect(result.find((r) => r.project_code === 'G560')!.pi_name).toBe(
+      'Mayesse Da Silva',
+    );
     expect(
       result.find((r) => r.project_code === 'G561')!.pi_user_id,
     ).toBeNull();
@@ -2207,6 +2214,49 @@ describe('name casing is normalised on the way out', () => {
     const result = await service.list('G571');
 
     expect(result.delegates[0].name).toBe('Mayesse Da Silva');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// hasManagedProjects() — the flag the UI uses to hide the whole module
+// ─────────────────────────────────────────────────────────────────────────────
+describe('hasManagedProjects()', () => {
+  it('is true when the user manages at least one project', async () => {
+    const ownUserId = 380;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G580'],
+    });
+
+    await expect(service.hasManagedProjects(ownUserId)).resolves.toEqual({
+      has_access: true,
+    });
+  });
+
+  it('is false when the user manages none (negative discriminator)', async () => {
+    const ownUserId = 381;
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: [],
+    });
+
+    await expect(service.hasManagedProjects(ownUserId)).resolves.toEqual({
+      has_access: false,
+    });
+  });
+
+  it('refuses to answer for another user unless the caller is SYSTEM_ADMIN', async () => {
+    const { service } = makeServiceWithManagedMethods({
+      userId: 382,
+      roles: [],
+      managedProjectIds: ['G581'],
+    });
+
+    await expect(service.hasManagedProjects(999)).rejects.toThrow(
+      ForbiddenException,
+    );
   });
 });
 

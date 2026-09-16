@@ -310,6 +310,49 @@ export class PiDelegatesController {
   // 'by-user/projects' before the parameterless DELETE on the root path.
   // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
   // ─────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/access — does the user manage any project?
+  //
+  // Declared BEFORE @Delete() (static segments first) like its siblings.
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — module visibility
+  // ─────────────────────────────────────────────────────────────────────────
+  @Get('by-user/access')
+  @ApiOperation({
+    summary: 'Whether the user manages any project (PI or active delegate)',
+    description:
+      'Returns { has_access: boolean }. The client hides the My PI Delegates ' +
+      'module entirely when it is false, so this exists to avoid fetching the ' +
+      'full enriched list just to answer a yes/no question. ' +
+      'Authorization (own-or-admin): the caller may query their own user_id; ' +
+      'a SYSTEM_ADMIN may query any user_id.',
+  })
+  @ApiOkResponse({
+    description: 'True when the user is PI or active delegate of ≥1 project',
+  })
+  @ApiQuery({
+    name: 'user_id',
+    required: true,
+    type: Number,
+    description: 'sec_users.sec_user_id to check',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  async hasManagedProjects(@Query() dto: ListManagedDto) {
+    return this.piDelegatesService
+      .hasManagedProjects(dto.user_id)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: 'Managed-project access for the user',
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
   @Get('by-user/projects')
   @ApiOperation({
     summary:

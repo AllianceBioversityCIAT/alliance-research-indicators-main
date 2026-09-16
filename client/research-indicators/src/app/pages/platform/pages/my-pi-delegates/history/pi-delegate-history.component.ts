@@ -21,6 +21,7 @@ import {
   signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { ApiService } from '@services/api.service';
 import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface';
@@ -28,8 +29,9 @@ import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface'
 @Component({
   selector: 'app-pi-delegate-history',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CustomTagComponent],
   templateUrl: './pi-delegate-history.component.html',
+  styleUrl: './pi-delegate-history.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PiDelegateHistoryComponent {
@@ -53,7 +55,8 @@ export class PiDelegateHistoryComponent {
       const isOpen = this.allModalsService.isModalOpen('piDelegateHistory')?.isOpen ?? false;
 
       if (!this.wasOpen && isOpen) {
-        // Transition: closed → open. Read context and fetch.
+        // Transition: closed → open. The subject is named by the content
+        // heading, not the modal header, so there is nothing to retitle.
         void this.loadHistory();
       }
 
@@ -102,16 +105,26 @@ export class PiDelegateHistoryComponent {
   // ─── Helpers exposed to the template ─────────────────────────────────────────
 
   /**
-   * Returns the subheader text based on the current context.
-   * Called once per render cycle — context is stable while the modal is open.
+   * Project code for the content heading, which is where the subject is named
+   * now — the modal's own header stays the plain "Delegation History".
+   * Null when the history was opened from By person (a person has no code).
    */
-  get subheader(): string {
+  get contentCode(): string | null {
     const ctx = this.allModalsService.piDelegateHistoryContext();
-    if (!ctx) return '';
-    if (ctx.source === 'byProject') {
-      return `PI Delegate changes on project ${ctx.projectCode}`;
-    }
-    return `PI Delegate changes for ${ctx.name ?? 'Unknown'}`;
+    if (ctx?.source !== 'byProject') return null;
+    return ctx.projectCode;
+  }
+
+  /**
+   * The rest of the content heading: the project's full name, or the person's
+   * name when opened from By person. Null when a project has no name, so the
+   * heading falls back to the code alone rather than rendering a dangling "-".
+   */
+  get contentName(): string | null {
+    const ctx = this.allModalsService.piDelegateHistoryContext();
+    if (!ctx) return null;
+    if (ctx.source === 'byProject') return ctx.projectName ?? null;
+    return ctx.name ?? 'Unknown';
   }
 
   /**
@@ -154,6 +167,19 @@ export class PiDelegateHistoryComponent {
     const parts = name.trim().split(/\s+/);
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  /**
+   * One of five avatar palettes, chosen from the initials so the same person
+   * always gets the same colour and neighbouring entries look distinct.
+   */
+  avatarVariant(name: string | null): string {
+    const initials = this.getInitials(name);
+    let hash = 0;
+    for (const char of initials) {
+      hash = (hash + char.charCodeAt(0)) % 5;
+    }
+    return `pi-dh__avatar--c${hash}`;
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────
