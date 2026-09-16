@@ -65,7 +65,21 @@ No DDL. The four tables and their constraints as they exist today:
 | `result_pool_funding_toc_alignment` | `result_id` | `idx_rpfta_active_result_sp` on generated `result_id:sp_code` | **Pattern A** |
 | `result_pool_funding_indicator_mapping` | `result_id` | `uq_rpfim_result_indicator_active` on `(result_id, lever_code, indicator_code, is_active)` | **Pattern A** |
 
-Because every copied row lands on a **new** `result_id` (and the `_sp` rows on a **new** `alignment_id`), **none of the four unique indexes can collide** on the copy path. Under DD-4 nothing is ever moved back onto a live result, so there is no second path that could collide either.
+~~Because every copied row lands on a **new** `result_id` (and the `_sp` rows on a **new** `alignment_id`), **none of the four unique indexes can collide** on the copy path.~~
+
+**Corrected 2026-09-16 (T-02 review) — the claim is false in one reachable case.** It holds for the three
+`result_id`-keyed tables. It does **not** hold for `result_pool_funding_alignment_sp`: the copy block joins
+`src.is_active = TRUE AND src.result_id = temp_result_id`, so it collects `_sp` rows from **every** active
+source alignment and re-parents them all onto the single `new_alignment_id` produced by the `LIMIT 1` copy.
+If two source alignments each own a `sp_role = 'PRIMARY'` row, both copies compute the same generated
+`active_primary_alignment` and violate `idx_rpfas_active_primary` (`baseline.sql:3688-3690`) → **MySQL 1062,
+`SP_versioning` aborts, the approval fails**. DD-2's stated degradation ("only one active alignment is
+copied") does not cover this `_sp` merge.
+
+**Reachability is not blocked by the schema in any environment this spec reaches** — RB-1 records that
+`uq_rpfa_active_result` is absent from Dev *and* the scratch schema while its ledger row reads applied. The
+only guard is the application transaction (`bilateral.service.ts:823-856`), so two concurrent `PATCH`es are
+the constructible path. Dev's 110 rows show zero duplicates today, so this is latent, not live. Under DD-4 nothing is ever moved back onto a live result, so there is no second path that could collide either.
 
 "Pattern A" and "Pattern B" are the two shapes `SP_versioning` already uses for its 30 blocks; both are reused verbatim rather than invented (DD-1).
 
@@ -132,7 +146,9 @@ Both answers came back "accept" — but the challenge still earned its cost. Nei
 
 ### DD-6 — The client fix is one flag, not a new mechanism
 
-`useResultInterceptor: true` on the four pool funding calls is the *whole* transport fix. It is what every other result-section call already does, and it makes the request identical to today's when no `?version` is present (`getYearFromUrl` returns `null`, the interceptor appends nothing).
+`useResultInterceptor: true` on the four pool funding calls is the *whole* transport fix. It is what every other result-section call already does.
+
+~~It makes the request identical to today's when no `?version` is present (`getYearFromUrl` returns `null`, the interceptor appends nothing).~~ **False — corrected 2026-09-16 during T-04, pending owner ratification.** `getYearFromUrl` returning `null` suppresses only `reportYear`; `reportingPlatforms` sits behind a **separate, independent** `if (platform)` (`result.interceptor.ts:25-31`) and is appended whenever `router.url` matches `result/<code>`, regardless of the year. So on the live view the request **bytes do change** (they gain `reportingPlatforms=STAR`) while the **resolved server behaviour does not** — see the measurement carried in R-PFV-004. Both scenarios are affected, not just the live one: under a version the real URL is `…?reportYear=2026&reportingPlatforms=STAR`.
 
 Two supporting changes, both because the section is the only result page that is not already version-reactive:
 

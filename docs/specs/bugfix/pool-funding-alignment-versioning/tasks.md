@@ -75,7 +75,7 @@ npm run test:fixtures
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S (logic) / L (bytes) |
 | Depends on | T-01, T-03 |
 | Requirements | R-PFV-001, R-PFV-002, R-PFV-006, NFR-PFV-001, NFR-PFV-002, NFR-PFV-003 |
@@ -253,7 +253,8 @@ diff <(old body) <(new body)          # both routines, R-PFV-006
 
 Add/extend specs:
 
-- `api.service.spec.ts` — under a router URL carrying `?version=2026`, each of the four requests arrives with `reportYear=2026`; with no `?version`, each request URL is **byte-identical to today's**. Assert the **outgoing request URL** via `HttpTestingController`, never the call sequence (KZ-001).
+- `api.service.spec.ts` — **arrange the REAL route, not a stand-in** (*corrected 2026-09-16 after the T-04 review, pending owner ratification*): `/result/19941/pool-funding-alignment` and `/result/19941/pool-funding-alignment?version=2026`. Under a version each of the four requests arrives at `…?reportYear=2026&reportingPlatforms=STAR`; with no `?version` each arrives at `…?reportingPlatforms=STAR` **and must NOT contain `reportYear`** — that `not.toContain` is the clause that actually protects the live view, and it keeps the mandated falsifier (append `reportYear` unconditionally) red. Assert the **outgoing request URL** via `HttpTestingController`, never the call sequence (KZ-001).
+  The superseded instruction said "with no `?version`, each request URL is **byte-identical to today's**" under an arbitrary router URL. That is unachievable on the real route — `reportingPlatforms` is appended independently of the year — and arranging a URL the page never has, to make the clause read green, is the KZ-017 shape: a check narrower than the claim it backs. See R-PFV-004 and DD-6.
 - `pool-funding-alignment.component.spec.ts` — a version change triggers a refetch; switching **back** to the live view triggers another; the previous payload is not served in between. Arrange the **transition**, not the end state (KZ-015): do not set the version before the first `detectChanges()`.
 
 ### Verification
@@ -381,7 +382,7 @@ T-06 is not a PR; it gates the release.
 | R-PFV-003 re-approval scenario *(pins AR-1)* | T-01 case 7 |
 | R-PFV-003 hard-delete scenario + `AND IT MUST delete _sp first` | T-01 case 8, T-03 |
 | R-PFV-004 version scenario | T-04 `api.service.spec.ts` |
-| R-PFV-004 `BUT not change the live request` | T-04 byte-identity spec |
+| R-PFV-004 `BUT not send reportYear on the live view` *(re-scoped 2026-09-16)* | T-04 live-route spec — `not.toContain('reportYear')` |
 | R-PFV-004 `AND IT MUST apply to all four calls` | T-04 (four assertions, one per call) |
 | R-PFV-004 refetch scenario + `BUT not serve the previous payload` + `AND IT MUST refetch back to live` | T-04 component spec |
 | R-PFV-005 main scenario | T-05 specs 2 and 3, T-06 |

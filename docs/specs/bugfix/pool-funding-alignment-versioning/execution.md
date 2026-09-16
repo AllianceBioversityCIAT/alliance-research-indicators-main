@@ -250,3 +250,176 @@ behavioural footprint, and it matches.
 Case 8 green from a real MySQL 1451, both body diffs +16/−0, both `down()` bodies byte-identical, eslint 0,
 build 0. **Cannot prove** (KZ-017): that Dev, Testing or Prod received this migration — applying it is a
 separate human decision (K-015); and `SP_delete_result_version`'s half is unproven by any test until T-02.
+
+## Pivot Record: T-04 — R-PFV-004's "byte-identical" clause is false
+
+**Status: spec amended, PENDING OWNER RATIFICATION.** Raised 2026-09-16 by the Leader from the Implementer's
+own disclosure, confirmed and extended by the Reviewer. This is a **spec defect the implementation exposed**,
+not an implementation error — the mandated design (DD-6) *cannot* satisfy the mandated clause.
+
+### The blocker
+
+`R-PFV-004` required: *"BUT it must NOT change the request for the live view — with no `?version` the request
+must be **byte-identical** to today's"*, resting on `DD-6`'s claim that *"the interceptor appends nothing"*
+when no version is present.
+
+**Both are false.** `result.interceptor.ts:25-31` appends `reportYear` behind `if (year)` and
+`reportingPlatforms` behind a **separate, independent** `if (platform)`. `getPlatformFromUrl` matches
+`/result\/([A-Za-z]+-\d+|\d+)/` against `router.url`; the real route is `result/:id` → `pool-funding-alignment`
+(`app.routes.ts:82`, `:112`), and a numeric code resolves to `STAR`. So opting the four calls into the
+interceptor makes the **live** request gain `?reportingPlatforms=STAR` where today it carries nothing.
+
+**Reviewer's extension, which the Leader had missed:** the *version* scenario is affected too. The real URL is
+`…?reportYear=2026&reportingPlatforms=STAR`, so **all eight** new URL assertions (4 calls × 2 scenarios) — not
+only the four byte-identity ones — pinned a string production never emits.
+
+### Alternatives considered
+
+| Option | Verdict |
+| --- | --- |
+| Change the code to preserve byte-identity | **Impossible.** `reportingPlatforms` cannot be suppressed while opting into the interceptor; `X-Platform` overrides the value, never the append. Avoiding it means abandoning DD-6's whole transport fix |
+| Accept the changed bytes, correct the requirement | **Chosen.** The clause is false; the behaviour is sound |
+| Leave the clause and keep the test that hides it | Rejected — that is the KZ-017 shape, and it was exactly what attempt 1 shipped |
+
+### Why accepting is safe — measured, not assumed
+
+- `ResultsUtil.setup()` (`server/.../results.util.ts:31-38`) applies
+  `where.platform_code = ReportingPlatformEnum[reportingPlatforms] ?? STAR` **unconditionally** → a STAR result
+  resolves **identically** with or without the param.
+- The section is STAR-only: `bilateral.service.ts:156-160` gates every alignment fetch on
+  `isPoolFundingCapable()`, so the value is always `STAR` for these calls.
+- No global `ValidationPipe` with `forbidNonWhitelisted` (`main.ts`) → an extra query param cannot 400.
+- **`PATCH_PoolFundingTag` (`api.service.ts:811`) already ships `useResultInterceptor: true` in production
+  today** — a bilateral call already sends `reportingPlatforms` on the live view, with no incident.
+- For a **non-STAR** result the param would be strictly *more* correct than today's silent STAR fallback — the
+  exact failure the interceptor's own comment documents ("surfacing as *Result not found* on every service").
+
+### Spec edits landed (reversible in one commit if the owner rules otherwise)
+
+- `requirements.md` R-PFV-004 — clause replaced with "must NOT send `reportYear` on the live view", plus the
+  measured acceptance of `reportingPlatforms`.
+- `design.md` DD-6 — the false parenthetical struck and replaced with the real interceptor behaviour.
+- `tasks.md` T-04 — the spec instruction now mandates the **real route** and the exact assertions, and the
+  coverage row is re-scoped to `not.toContain('reportYear')`.
+- **Correction closure (K-003, both directions):** grepped `byte-identical` across the whole spec folder — 3
+  surviving sites found beyond the one edited, 2 corrected (`tasks.md` §T-04, coverage table) and 1 left
+  deliberately (`requirements.md:157`, which is R-PFV-001 about the procedure body, a different claim).
+
+### What the owner is being asked to ratify
+
+That STAR's four pool funding requests may carry `reportingPlatforms` on the **live** view, where today they
+carry no query string at all — accepted because the resolved server behaviour is unchanged for STAR and
+improved for non-STAR, and because a sibling bilateral call already does it in production. Reversing this
+ruling means abandoning the interceptor for these four calls and finding another transport for the version,
+which is a redesign of DD-6, not a tweak.
+
+## T-02 — Migration: `SP_versioning` copies the four tables and empties the source
+
+| Field | Value |
+| --- | --- |
+| Status | **PASS** |
+| Date | 2026-09-16 |
+| Implementer attempts | **1** |
+| Implementer | Cursor CLI `cursor-grok-4.6-high` — Orca `task_94b11a837128` / `ctx_f06dd393bf34` (fresh terminal) |
+| Reviewer | `akili-reviewer` (Opus 5, read-only), effort **xhigh** — this task writes to snapshots and deactivates live rows |
+| Skills assigned | `nestjs-expert` (as recommended) |
+| Effort | xhigh (correctness-critical; two of the task's own falsifiers are known vacuous) |
+| Requirements covered | R-PFV-001, R-PFV-002, R-PFV-006, NFR-PFV-001, NFR-PFV-002, NFR-PFV-003 |
+
+### Attempt 1
+
+**Files changed:** `server/researchindicators/src/db/migrations/1789586388552-addPoolFundingCopyToVersioningSp.ts` (new). Nothing else.
+
+**Body diff — measured independently by the Leader** (difflib over the extracted template literals):
+**+86 / −0, exactly 2 hunks** — the `DECLARE new_alignment_id BIGINT DEFAULT NULL;`, and the copy +
+deactivation blocks inserted immediately after the `link_results` block. `down()` **byte-identical** to the
+deployed `1789149538737` `up()` (1027 lines both). DDL scan of the whole file: **0**.
+
+**Verification (Implementer, then re-measured by the Leader after the worker reported):**
+
+| Command | Result |
+| --- | --- |
+| `npx jest --config ./test/jest-fixtures.json <fixture> --verbose` | **8 passed, 8 total** — the fixture closes |
+| `npm run test:fixtures` (full) | 5 failed / 17 passed suites; **45 failed / 108 passed** tests |
+| `npx eslint src/db/migrations/1789586388552-*.ts` | exit 0 |
+| `npm run build` | exit 0 |
+
+The arc across the three server tasks: **49 → 48 → 45** failing tests; failing suites **6 → 6 → 5**. The five
+that remain are the pre-existing `innovation-use` circular-import defect, verified independent of this spec.
+
+**Reviewer verdict: `STATUS: PASS`**, with six judgment points audited against the file rather than the colour:
+
+- **`LAST_INSERT_ID()` pairing correct and load-bearing.** `SET new_alignment_id = IF(ROW_COUNT() > 0, …)` sits
+  immediately after the alignment `INSERT` with *nothing* intervening. MySQL leaves `LAST_INSERT_ID()` at its
+  previous value when an `INSERT … SELECT` inserts zero rows, and the preceding block (`link_results`) is
+  itself an AUTO_INCREMENT insert — so without the guard the previous insert's id would leak into
+  `new_alignment_id`. The Implementer's by-construction argument was audited and upheld.
+- **`SIGNAL 45001` placement verified structurally, not by colour:** the guard sits ~775 lines above the new
+  blocks and before `INSERT INTO results`; the Reviewer grepped the whole file for `HANDLER` — **zero
+  matches**, so no `CONTINUE`/`EXIT` handler can swallow the `SIGNAL` and the `CALL` genuinely aborts.
+- **`_sp` FK re-mapping literal:** `new_alignment_id AS alignment_id` in the SELECT list; `sp.alignment_id`
+  appears only in the join predicate.
+- **Deactivation order correct** (`_sp` before parent), and none of the four `UPDATE`s can reach the rows just
+  copied — all are keyed on `temp_result_id`, the copies carry `new_result_id` / `new_alignment_id`.
+- **Column lists complete against `baseline.sql`, checked against the DDL and not against the fixture:**
+  alignment 8/8, `_sp` 9/9 (generated column correctly excluded), ToC 18/18 (ditto), mapping 16/16. No column
+  is dropped.
+- **Migration proven executed (K-006):** case 1 is RED on `HEAD` by construction and is green.
+
+### Decisions made
+
+- **The guard asymmetry was adjudicated, not waved through.** The two Pattern-A `INSERT`s are unguarded while
+  the deactivation of those same tables is inside `IF (new_alignment_id IS NOT NULL)`. The Leader raised it;
+  the Reviewer confirmed it is **literally what `tasks.md` §T-02 mandates** (block 2's `END IF;` closes before
+  block 3 and a new `IF` opens at block 4) and then tried to **construct** the divergent state and could not:
+  `bilateral.service.ts:823-903` writes ToC rows only inside the same transaction that unconditionally saves an
+  active alignment, and `upsertContribution` refuses without `getActiveAlignmentForLever`. Not API-reachable.
+- **Both vacuous falsifiers were handled by construction, not by colour.** The Implementer was told in-brief
+  that `tasks.md`'s claimed reds for the `ROW_COUNT()` guard (case 4) and the `SIGNAL` placement (case 5)
+  cannot happen, was forbidden from citing them, and was required to argue each guard structurally. Both
+  arguments were then audited by the Reviewer and upheld.
+
+### Spec correction landed with this task
+
+**`design.md` §4's claim "none of the four unique indexes can collide on the copy path" is false** for
+`result_pool_funding_alignment_sp` — see the corrected section. Struck and replaced with the measured truth.
+
+### ADVISORY (4R lens — recorded, never gates, never becomes a task)
+
+1. **RISK — the four sibling FK columns on `result_pool_funding_indicator_mapping` are copied verbatim instead
+   of re-mapped.** `result_capacity_sharing_id`, `result_knowledge_product_id`, `result_policy_change_id` and
+   `result_innovation_dev_id` each FK to `<table>.result_id`, and `SP_versioning` copies those parent tables
+   onto `new_result_id` — so the correct value on a snapshot is `new_result_id`, not the source's. **The
+   snapshot's mapping row therefore points at the LIVE result's section rows.** This is exactly what
+   `tasks.md` mandated ("full column lists, `new_result_id AS result_id`"), so it is a gap in the mandated SQL,
+   not a deviation. **Reachability constructed:** with one such row set, `full_delete_result_version(<live
+   result>)` deletes the live child row while the snapshot's mapping row still references it → **MySQL 1451**,
+   the exact failure class R-PFV-003 exists to eliminate. **Latent only** because `requirements.md` §2.2
+   measured **0 live rows** in that table. Needs a follow-up spec item before the table is populated.
+2. **RISK — the `_sp` merge can violate `idx_rpfas_active_primary`** when a result carries more than one active
+   alignment (→ MySQL 1062, `SP_versioning` aborts, approval fails). Corrected in `design.md` §4 above.
+   Reachability is not blocked by the schema anywhere this spec reaches (RB-1), only by the application
+   transaction; two concurrent `PATCH`es are the constructible path. Dev shows zero duplicates today.
+3. **RELIABILITY — a cheap drift check for the guard asymmetry**, foldable into T-06 with no code:
+   `SELECT t.result_id FROM result_pool_funding_toc_alignment t WHERE t.is_active = 1 AND NOT EXISTS (SELECT 1
+   FROM result_pool_funding_alignment a WHERE a.result_id = t.result_id AND a.is_active = 1);` — a non-empty
+   result on Testing would turn advisory 3 from unreachable into a live data-duplication path.
+4. **READABILITY — `LIMIT 1` with no `ORDER BY`.** Deterministic under the single-active-alignment invariant;
+   storage-order dependent and silently so if the invariant breaks. `ORDER BY pfa.id DESC` would make the
+   choice explicit and match what `findActiveAlignmentByResultId` returns. **Not applied** — it is outside the
+   SQL `tasks.md` mandates, and an advisory may not widen a task. Offered to the owner as a decision.
+
+### Scope limits of the green fixture, stated (KZ-017)
+
+A green fixture is **not** proof of the whole procedure. It exercises **4 of 31** copied tables; the other 30
+blocks rest entirely on the body diff. Within the four, it seeds and asserts **12/12** ToC payload columns but
+only **6/10** mapping payload columns — the four sibling FK columns are **copied but never asserted**, so
+deleting them from the `INSERT` list would leave all eight cases green. That hole was closed by reading
+`baseline.sql`, not by a test. The fixture also never exercises: an active `_sp` row under an inactive parent,
+more than one active alignment on one result, or the `ROW_COUNT()` guard's actual protective case.
+
+### Final verification result
+
+8/8 fixture cases green, body diff +86/−0 in 2 hunks, `down()` byte-identical, zero DDL, eslint 0, build 0.
+**Cannot prove** (KZ-017): that Dev, Testing or Prod received this migration — applying it is a separate human
+decision (K-015); nothing about the rendered screen (T-06).
