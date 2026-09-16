@@ -131,15 +131,10 @@
                     role="listitem"
                     [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
                   >
-                    <!-- Leading icon: hover shows the delegate's email -->
-                    <i
-                      class="by-project__chip__icon"
-                      [ngClass]="delegate.is_active === false ? 'pi pi-exclamation-circle' : 'pi pi-info-circle'"
-                      [pTooltip]="delegateTooltip(delegate)"
-                      tooltipPosition="top"
-                      [attr.aria-label]="delegateTooltip(delegate)"
-                    ></i>
-                    <span class="by-project__chip__name">{{ delegate.name }}</span>
+                    <span class="by-project__chip__info">
+                      <span class="by-project__chip__name">{{ delegate.name }}</span>
+                      <span class="by-project__chip__email">{{ delegate.email }}</span>
+                    </span>
                     <!-- Per-delegate "X" revoke (R-UI-008) -->
                     <button
                       type="button"

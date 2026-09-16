@@ -151,40 +151,15 @@ describe('ByProjectComponent', () => {
       expect(fixture.debugElement.queryAll(By.css('.pi-minus-circle'))).toHaveLength(0);
     });
 
-    it('renders a compact chip per delegate: name visible, details in the tooltip', () => {
+    it('renders each delegate chip as name over email, with no tooltip icon', () => {
       const chips = fixture.debugElement.queryAll(By.css('.by-project__chip'));
       expect(chips.length).toBeGreaterThanOrEqual(2);
 
-      const first = chips[0];
-      expect((first.nativeElement as HTMLElement).textContent?.trim()).toContain('Alice Example');
-      // email/carnet/status are no longer printed in the chip — they live in the tooltip
-      expect((first.nativeElement as HTMLElement).textContent).not.toContain('alice@test.org');
-      const icon = first.query(By.css('.by-project__chip__icon'));
-      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe(
-        'alice@test.org · Status: Active'
-      );
-    });
-
-    it('the chip tooltip carries email, carnet and status', () => {
-      expect(
-        component.delegateTooltip({
-          delegate_user_id: 9,
-          name: 'Carol Gone',
-          email: 'carol@test.org',
-          carnet: 'C00042',
-          is_active: false
-        })
-      ).toBe('carol@test.org · Carnet: C00042 · Status: Inactive');
-
-      // carnet is optional — it is simply left out when absent
-      expect(
-        component.delegateTooltip({
-          delegate_user_id: 10,
-          name: 'Alice Example',
-          email: 'alice@test.org',
-          is_active: true
-        })
-      ).toBe('alice@test.org · Status: Active');
+      const first = chips[0].nativeElement as HTMLElement;
+      expect(first.querySelector('.by-project__chip__name')?.textContent?.trim()).toBe('Alice Example');
+      expect(first.querySelector('.by-project__chip__email')?.textContent?.trim()).toBe('alice@test.org');
+      // the hover icon is gone — both values are printed in the chip
+      expect(first.querySelector('.by-project__chip__icon')).toBeNull();
     });
   });
 
@@ -201,12 +176,11 @@ describe('ByProjectComponent', () => {
       expect(inactiveChip).toBeTruthy();
     });
 
-    it('INACTIVE chip swaps the leading icon for the warning one', () => {
-      const icon = fixture.debugElement.query(
-        By.css('.by-project__chip--inactive .by-project__chip__icon')
-      );
-      expect(icon).toBeTruthy();
-      expect((icon.nativeElement as HTMLElement).classList.contains('pi-exclamation-circle')).toBe(true);
+    it('INACTIVE chip keeps the red treatment and still prints name + email', () => {
+      const chip = fixture.debugElement.query(By.css('.by-project__chip--inactive'))
+        .nativeElement as HTMLElement;
+      expect(chip.querySelector('.by-project__chip__name')?.textContent?.trim()).toBe('Carol Gone');
+      expect(chip.querySelector('.by-project__chip__email')?.textContent?.trim()).toBe('carol@test.org');
     });
   });
 

@@ -151,20 +151,6 @@ export class ByProjectComponent {
   // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   /**
-   * Hover text for a delegate chip: the details that no longer fit in the chip
-   * itself — email, carnet (when the user has one) and account status.
-   */
-  delegateTooltip(delegate: DelegateSummary): string {
-    return [
-      delegate.email,
-      delegate.carnet ? `Carnet: ${delegate.carnet}` : null,
-      `Status: ${delegate.is_active === false ? 'Inactive' : 'Active'}`
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  }
-
-  /**
    * Status chip data for <app-custom-tag>, so this table shows the same colours
    * as My Projects. The name→id mapping stays in ProjectUtilsService — the row
    * only carries the status name, which is what `contract_status` holds there.
