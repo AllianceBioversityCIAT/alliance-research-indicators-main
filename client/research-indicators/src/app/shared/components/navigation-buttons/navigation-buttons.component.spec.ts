@@ -143,4 +143,42 @@ describe('NavigationButtonsComponent', () => {
       expect(saveBtn?.disabled).toBe(true);
     });
   });
+
+  describe('Save visibility override (R-PFV-005)', () => {
+    const saveButton = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Save'));
+
+    it('a) default showSave + isEditableStatus false → Save absent', () => {
+      isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+    });
+
+    it('b) override true + isEditableStatus false → Save present', () => {
+      isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+      fixture.componentRef.setInput('showSave', true);
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeTruthy();
+    });
+
+    it('c) override true + disableSave true → Save present and disabled', () => {
+      isEditableStatus.mockReturnValue(false);
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+      fixture.componentRef.setInput('showSave', true);
+      fixture.componentRef.setInput('disableSave', true);
+      fixture.detectChanges();
+      const saveBtn = saveButton(fixture.nativeElement);
+      expect(saveBtn).toBeTruthy();
+      expect(saveBtn!.disabled).toBe(true);
+    });
+
+    it('d) isEditableStatus true with the default showSave → Save present', () => {
+      isEditableStatus.mockReturnValue(true);
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeTruthy();
+    });
+  });
 });
