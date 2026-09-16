@@ -662,7 +662,13 @@ describe('ResultSidebarComponent', () => {
     });
 
     const enablePrmsSyncButton = () => {
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(contributingAlignment);
+      // has_contribution: true is part of what ENABLES the button: syncing is only
+      // possible when the result actually contributes to a Science Program. The
+      // shared `eligibleAlignment` fixture carries null (question unanswered).
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true
+      });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
       cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
       fixture.detectChanges();
@@ -750,8 +756,12 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {
+      // has_contribution: true so the result WOULD otherwise be syncable -- that is
+      // what makes the next assertions prove the already-synced guard is doing the
+      // disabling, rather than the result simply having nothing to sync.
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
-        ...contributingAlignment,
+        ...eligibleAlignment,
+        has_contribution: true,
         is_synced_to_prms: true
       });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });

@@ -109,25 +109,23 @@ export class ResultSidebarComponent {
     return isApproved && isPoolFundingComplete && contributesToPoolFunding;
   });
 
+  prmsAlreadySynced = computed(() => !!this.bilateralService.currentAlignment()?.is_synced_to_prms);
+
   /** Why PRMS SYNC is unavailable, so a disabled button never explains itself wrongly. */
   prmsSyncTooltip = computed(() => {
-    if (this.canSyncPrms()) return '';
+    // Already-synced wins: canSyncPrms can still be true for a synced result
+    // (the button is disabled by prmsAlreadySynced), and returning '' there
+    // would leave the disabled button unexplained.
+    if (this.prmsAlreadySynced()) {
+      return 'This result has already been synced to PRMS.';
+    }
+    if (this.canSyncPrms()) {
+      return '';
+    }
     if (this.bilateralService.currentAlignment()?.has_contribution === false) {
       return 'This result does not contribute to a Science Program or Accelerator, so there is nothing to sync to PRMS.';
     }
     return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
-  });
-
-  prmsAlreadySynced = computed(() => !!this.bilateralService.currentAlignment()?.is_synced_to_prms);
-
-  prmsSyncTooltip = computed(() => {
-    if (this.prmsAlreadySynced()) {
-      return 'This result has already been synced to PRMS.';
-    }
-    if (!this.canSyncPrms()) {
-      return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
-    }
-    return '';
   });
 
   prmsSyncInFlight = signal(false);
