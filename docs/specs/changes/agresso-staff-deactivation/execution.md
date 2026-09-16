@@ -177,21 +177,45 @@ concurrent full-suite runs produce wrong results, not merely slow ones.
 
 ---
 
-## Budget tracking
+## Budget tracking — **BREACHED. Escalated, not absorbed.**
 
-| Metric | Budget | Actual so far |
+| Metric | Budget | Actual | Delta |
+| --- | --- | --- | --- |
+| Tasks | 5 | **5** | on |
+| LOC | ~850 | **1,657** | **+95%** |
+| Review rounds | 2 | **1** | under |
+
+| Tier | Budgeted | Actual |
 | --- | --- | --- |
-| Tasks | 5 | 4 done, 1 in progress |
-| LOC | ~850 | ~1,010 (implementation ~430, tests ~580) |
-| Review rounds | 2 | 1 |
+| Implementation | ~300 | **675** (+125%) |
+| Tests | ~550 | **982** (+79%) |
+| Test : impl ratio | 1.9x | **1.5x** |
 
-**~19% over the LOC line with one task open.** Recorded rather than absorbed. The overage is in
-tests and is traceable to two things the budget did not price: the five mandated mutation proofs
-needed their own discriminating fixtures, and `FetchReport` grew a field mid-task for AC.3. Not
-escalated yet — the tripwire is the *remaining* work, and T-05's wiring is already done, leaving
-only the fixture. Escalate if T-05's fixture pushes past ~1,200.
+**The estimate was wrong in the implementation dimension, and the reasoning that produced it is
+the thing to fix — not the number.** Design §14 sized implementation at "roughly a quarter of the
+sibling's" and applied the sibling's measured 1.9x test ratio to that. The ratio held up well
+(1.5x actual). The base did not: the measurement path is 675 lines, not 300.
 
----
+**Where the 375 extra implementation lines went**, since a breach without a cause is not information:
+
+| Cause | ~LOC | Was it foreseeable? |
+| --- | --- | --- |
+| Four exclusion rules, each with its own precedence, counter and log line | ~120 | **Yes.** §14 counted "no transaction, no migration" as the driver of a smaller base and never counted the *rules*, which are what this increment actually is |
+| Three preconditions with structured `abortDetail` operands | ~90 | Partly — `JS-7` added the operands after the budget was written |
+| `FetchReport` + the page-loop instrumentation | ~130 | **No.** `DD-D2` and the distinct-carnet measure were discovered during design and after |
+| Doc comments carrying the judgment findings to the code | ~35 | **No**, and deliberate: each explains a defect that has been reintroduced twice |
+
+**Why this was not escalated mid-flight.** The tripwire was checked after T-04 at ~1,010 and the
+stated threshold for stopping was ~1,200, on the reasoning that only T-05's fixture remained. That
+reasoning was wrong in a specific way worth recording: the *wiring* half of T-05 was counted as
+done, but the summary DTO, the module registration, the snapshot exposure and two sibling-spec
+repairs had not yet been written. **"The remaining work is one fixture" was an estimate presented as
+a fact**, and it is the same class as the budget error it was meant to catch.
+
+**Consequence for increment 2 — this is the part that matters.** Its budget will be produced by the
+same method against a *larger* surface (the three-table cascade, a transaction, a migration, config
+resolution, the C-3 ceiling). Sizing it as a fraction of the sibling will under-count it the same
+way. **Size increment 2 by counting its rules and statements, not by scaling a sibling.**
 
 ## Open at increment close
 
