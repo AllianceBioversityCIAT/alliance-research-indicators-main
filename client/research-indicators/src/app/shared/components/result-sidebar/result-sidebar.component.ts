@@ -102,13 +102,60 @@ export class ResultSidebarComponent {
     return isApproved && isPoolFundingComplete;
   });
 
+  prmsAlreadySynced = computed(() => !!this.bilateralService.currentAlignment()?.is_synced_to_prms);
+
+  prmsSyncTooltip = computed(() => {
+    if (this.prmsAlreadySynced()) {
+      return 'This result has already been synced to PRMS.';
+    }
+    if (!this.canSyncPrms()) {
+      return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
+    }
+    return '';
+  });
+
+  prmsSyncInFlight = signal(false);
+
   hasPoolFundingOption = computed(() => {
     return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
   });
 
-  onPrmsSync(): void {
-    if (!this.canSyncPrms()) return;
-    // PRMS sync functionality will be implemented in future task
+  async onPrmsSync(): Promise<void> {
+    if (!this.canSyncPrms() || this.prmsSyncInFlight() || this.prmsAlreadySynced()) return;
+    this.prmsSyncInFlight.set(true);
+    try {
+      const response = await this.api.POST_PrmsSync(this.cache.getCurrentNumericResultId());
+      if (response.successfulRequest) {
+        await this.metadata.update(this.cache.getCurrentNumericResultId());
+        const resultCode = this.route.snapshot.paramMap.get('id') ?? String(this.cache.getCurrentNumericResultId());
+        await this.bilateralService.getAlignment(resultCode);
+        this.actions.showToast({
+          severity: 'success',
+          summary: 'Sent to PRMS',
+          detail: 'The result was sent to PRMS and is pending review.'
+        });
+      } else {
+        this.actions.showToast({
+          severity: 'error',
+          summary: 'Error',
+          detail: this.prmsSyncFailureMessage(response)
+        });
+      }
+    } finally {
+      this.prmsSyncInFlight.set(false);
+    }
+  }
+
+  private prmsSyncFailureMessage(response: {
+    description?: string;
+    errorDetail?: { errors?: string; description?: string } | null;
+  }): string {
+    return (
+      response.errorDetail?.errors ||
+      response.errorDetail?.description ||
+      response.description ||
+      'Unable to send the result to PRMS, please try again.'
+    );
   }
 
   showOicrStatusDropdown = computed(() => {
