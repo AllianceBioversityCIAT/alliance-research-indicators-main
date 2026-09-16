@@ -82,20 +82,8 @@ export class ByProjectComponent {
   }
 
   // ─── Summary line (rendered inside the table card) ───────────────────────────
-  readonly summaryPeople = computed(() => {
-    const ids = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) ids.add(d.delegate_user_id);
-    }
-    return ids.size;
-  });
-
-  readonly summaryAssignments = computed(() =>
-    this.service.byProjectCache().reduce((sum, p) => sum + p.delegates.length, 0)
-  );
-
-  readonly summaryProjects = computed(() => this.service.byProjectCache().length);
-
+  // Only the inactive-delegate warning is surfaced; the counts were noise next
+  // to the paginator's own "Showing x to y of N" report.
   readonly summaryInactive = computed(() => {
     const seen = new Set<number>();
     for (const p of this.service.byProjectCache()) {

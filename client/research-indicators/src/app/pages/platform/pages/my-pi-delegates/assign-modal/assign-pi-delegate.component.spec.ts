@@ -912,8 +912,11 @@ describe('AssignPiDelegateComponent', () => {
         { delegate_user_id: 1, name: 'Alice Example', email: 'alice@test.org', carnet: 'C00042' }
       ]);
 
-      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      // Name on top, details below as label → value (same layout as Projects)
+      const row = fixture.nativeElement.querySelector('.selected-row-main') as HTMLElement;
+      const text = row.textContent?.replace(/\s+/g, ' ').trim() ?? '';
       expect(text).toContain('Alice Example');
+      expect(text).toContain('Email');
       expect(text).toContain('alice@test.org');
       expect(text).toContain('Carnet');
       expect(text).toContain('C00042');
@@ -924,7 +927,9 @@ describe('AssignPiDelegateComponent', () => {
         { delegate_user_id: 2, name: 'Bob Sample', email: 'bob@test.org', carnet: null }
       ]);
 
-      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      const row = fixture.nativeElement.querySelector('.selected-row-main') as HTMLElement;
+      const text = row.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+      expect(text).toContain('Bob Sample');
       expect(text).toContain('bob@test.org');
       expect(text).not.toContain('Carnet');
     });
@@ -943,6 +948,21 @@ describe('AssignPiDelegateComponent', () => {
       // Status renders through the shared tag, like the By project table
       const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement | null;
       expect(tag?.textContent?.trim()).toBe('Ongoing');
+    });
+
+    it('hides the End date block when the project has no end date', async () => {
+      const project = { ...buildProject('ROWS-2', []), end_date: null };
+      piService.byProjectCache.set([project]);
+      serviceLocator.getService('piDelegateProjects').list.set([project]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'ROWS-2' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+      expect(text).toContain('Start date');
+      expect(text).not.toContain('End date');
     });
 
     it('formatDate returns an em dash for a missing date', () => {
@@ -1026,5 +1046,76 @@ describe('AssignPiDelegateComponent', () => {
       expect(descriptions()[1]).toBe('Opened from this project — only the people can be changed here.');
       expect(descriptions()[0]).toBe('Select the people who will act as PI Delegates. You cannot assign yourself.');
     }));
+  });
+  // ── Banner placement and gating ────────────────────────────────────────────
+
+  describe('banners', () => {
+    async function openFrom(
+      context: { source: 'byProject'; projectCode: string } | { source: 'byPerson'; delegateUserId: number },
+      piUserId: number | null = null
+    ): Promise<void> {
+      peoplePicker.list.set([
+        { delegate_user_id: 10, name: 'Daniela Zuniga Pino', email: 'd.zuniga@test.org' },
+        { delegate_user_id: 11, name: 'Alice Example', email: 'alice@test.org' }
+      ]);
+      piService.byProjectCache.set([
+        buildProject('BAN-1', [{ delegate_user_id: 11, name: 'Alice Example', email: 'alice@test.org' }], piUserId)
+      ]);
+      modalService.assignPiDelegateContext.set(context);
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    it('searches people by name, email AND carnet', () => {
+      fixture.detectChanges();
+      const people = fixture.debugElement
+        .queryAll(By.directive(MultiselectComponent))[0]
+        .componentInstance as MultiselectComponent;
+      expect(people.filterBy).toBe('name,email,carnet');
+    });
+
+    it('puts both notices in a SINGLE banner at the top of the modal', async () => {
+      await openFrom({ source: 'byProject', projectCode: 'BAN-1' }, 10);
+
+      const banners = fixture.nativeElement.querySelectorAll('.assign-pi-delegate__notice');
+      expect(banners).toHaveLength(1);
+
+      const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
+      expect(root.firstElementChild).toBe(banners[0]);
+
+      const text = (banners[0] as HTMLElement).textContent ?? '';
+      expect(text).toContain('Pre-loaded selections reflect the current delegate assignments');
+      expect(text).toContain('cannot be assigned as PI Delegate');
+    });
+
+    it('renders the pre-load banner as the FIRST element of the modal', async () => {
+      await openFrom({ source: 'byProject', projectCode: 'BAN-1' });
+
+      const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
+      const first = root.firstElementChild as HTMLElement;
+      expect(first.classList.contains('assign-pi-delegate__notice')).toBe(true);
+      expect(first.textContent).toContain('Pre-loaded selections reflect the current delegate assignments');
+    });
+
+    it('shows the PI notice inside that banner while the People picker is editable', async () => {
+      await openFrom({ source: 'byProject', projectCode: 'BAN-1' }, 10);
+
+      const note = fixture.nativeElement.querySelector('.assign-pi-delegate__pi-hint') as HTMLElement | null;
+      expect(note).not.toBeNull();
+      expect(note!.closest('.assign-pi-delegate__notice')).not.toBeNull();
+      expect(note!.textContent).toContain('Daniela Zuniga Pino');
+      expect(note!.textContent).toContain('cannot be assigned as PI Delegate');
+    });
+
+    it('hides the PI notice when the People picker is disabled (negative discriminator)', async () => {
+      // Opened from a person → peopleDisabled() is true
+      await openFrom({ source: 'byPerson', delegateUserId: 11 }, 10);
+
+      expect(component.peopleDisabled()).toBe(true);
+      expect(component.piDisabledPeople().length).toBeGreaterThan(0);
+      expect(fixture.nativeElement.querySelector('.assign-pi-delegate__pi-hint')).toBeNull();
+    });
   });
 });

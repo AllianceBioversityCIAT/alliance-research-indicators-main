@@ -2128,6 +2128,89 @@ describe('pi_user_id exposure — listManagedProjects() and list()', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Name casing — sec_users holds 'MAYESSE DA SILVA' and 'juan cadavid' alike, so
+// every name this module returns is title-cased before it leaves the service.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('name casing is normalised on the way out', () => {
+  it('title-cases delegate names in listManagedProjects()', async () => {
+    const ownUserId = 370;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G570'],
+      projectSummaries: [
+        {
+          agreement_id: 'G570',
+          description: 'Casing',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G570',
+          delegate_user_id: 1,
+          first_name: 'MAYESSE',
+          last_name: 'DA SILVA',
+          email: 'm.dasilva@cgiar.org',
+          status_id: 1,
+        },
+        {
+          project_id: 'G570',
+          delegate_user_id: 2,
+          first_name: 'juan carlos',
+          last_name: 'cadavid',
+          email: 'j.cadavid@cgiar.org',
+          status_id: 1,
+        },
+      ],
+    });
+
+    const [project] = await service.listManagedProjects(ownUserId);
+
+    expect(project.delegates[0].name).toBe('Mayesse Da Silva');
+    expect(project.delegates[0].first_name).toBe('Mayesse');
+    expect(project.delegates[0].last_name).toBe('Da Silva');
+    expect(project.delegates[1].name).toBe('Juan Carlos Cadavid');
+  });
+
+  it('title-cases delegate names in list() (single project)', async () => {
+    const { service } = makeService({
+      userId: 371,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G571',
+          description: 'Casing',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 1,
+            first_name: 'MAYESSE',
+            last_name: 'DA SILVA',
+            email: 'm.dasilva@cgiar.org',
+            status_id: 1,
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G571');
+
+    expect(result.delegates[0].name).toBe('Mayesse Da Silva');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Scenario 15 — listManagedProjects(): empty managed set → []
 // ─────────────────────────────────────────────────────────────────────────────
 describe('listManagedProjects() — Scenario 15: empty managed project set → [] (no enrichment called)', () => {

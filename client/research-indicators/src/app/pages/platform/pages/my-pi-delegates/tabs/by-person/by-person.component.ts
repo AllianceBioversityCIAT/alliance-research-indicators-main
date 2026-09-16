@@ -109,20 +109,8 @@ export class ByPersonComponent {
   }
 
   // ─── Summary line (rendered inside the table card) ───────────────────────────
-  readonly summaryPeople = computed(() => this.personRows().length);
-
-  readonly summaryAssignments = computed(() =>
-    this.personRows().reduce((sum, row) => sum + row.projects.length, 0)
-  );
-
-  readonly summaryProjects = computed(() => {
-    const codes = new Set<string>();
-    for (const row of this.personRows()) {
-      for (const project of row.projects) codes.add(project.project_code);
-    }
-    return codes.size;
-  });
-
+  // Only the inactive-delegate warning is surfaced; the counts were noise next
+  // to the paginator's own "Showing x to y of N" report.
   readonly summaryInactive = computed(
     () => this.personRows().filter(row => row.is_active === false).length
   );

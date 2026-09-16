@@ -17,8 +17,8 @@ import { UserStatusEnum } from './enum/user-status.enum';
 const ACCEPTED_USER_ROWS: Partial<SecUserEntity>[] = [
   {
     sec_user_id: 1,
-    first_name: 'Alice',
-    last_name: 'Smith',
+    first_name: 'ALICE',
+    last_name: 'SMITH',
     email: 'a.smith@cgiar.org',
     carnet: 'C00001',
     status_id: UserStatusEnum.ACCEPTED,
@@ -26,8 +26,8 @@ const ACCEPTED_USER_ROWS: Partial<SecUserEntity>[] = [
   },
   {
     sec_user_id: 2,
-    first_name: 'Bob',
-    last_name: 'Doe',
+    first_name: 'bob',
+    last_name: 'doe',
     email: 'b.doe@cgiar.org',
     carnet: null,
     status_id: UserStatusEnum.ACCEPTED,
@@ -87,6 +87,8 @@ describe('UsersService', () => {
     const result = await service.findActiveUsers();
 
     expect(result).toHaveLength(2);
+    // sec_users stores mixed casing ('ALICE SMITH', 'bob doe') — both come back
+    // title-cased so the pickers render one consistent style.
     expect(result[0]).toEqual({
       sec_user_id: 1,
       first_name: 'Alice',

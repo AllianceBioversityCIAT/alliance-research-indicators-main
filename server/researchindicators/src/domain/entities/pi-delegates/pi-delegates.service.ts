@@ -66,6 +66,10 @@ import {
 import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
 import { HistoryQueryDto } from './dto/history.query.dto';
 import { UserStatusEnum } from '../users/enum/user-status.enum';
+// sec_users stores names in whatever case the source system used ("MAYESSE DA
+// SILVA", "juan cadavid"). Every name this module returns goes through
+// formatPersonName so consumers render one consistent casing.
+import { formatPersonName } from '../../shared/utils/name-format.util';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Response shapes
@@ -554,10 +558,10 @@ export class PiDelegatesService {
       end_date: project?.end_date ?? null,
       delegates: delegates.map((d) => ({
         delegate_user_id: Number(d.delegate_user_id),
-        name: `${d.first_name} ${d.last_name}`.trim(),
+        name: formatPersonName(`${d.first_name} ${d.last_name}`),
         email: d.email,
-        first_name: d.first_name ?? null,
-        last_name: d.last_name ?? null,
+        first_name: formatPersonName(d.first_name) || null,
+        last_name: formatPersonName(d.last_name) || null,
         carnet: d.carnet ?? null,
         status_id: d.status_id != null ? Number(d.status_id) : null,
         is_active: [
@@ -614,10 +618,12 @@ export class PiDelegatesService {
 
     return {
       delegate_user_id: delegateUserId,
-      name: user ? `${user.first_name} ${user.last_name}`.trim() : null,
+      name: user
+        ? formatPersonName(`${user.first_name} ${user.last_name}`) || null
+        : null,
       email: user?.email ?? null,
-      first_name: user?.first_name ?? null,
-      last_name: user?.last_name ?? null,
+      first_name: formatPersonName(user?.first_name) || null,
+      last_name: formatPersonName(user?.last_name) || null,
       carnet: user?.carnet ?? null,
       status_id: user?.status_id != null ? Number(user.status_id) : null,
       is_active: [
@@ -707,10 +713,10 @@ export class PiDelegatesService {
       end_date: p.end_date ?? null,
       delegates: (delegatesByProject.get(p.agreement_id) ?? []).map((d) => ({
         delegate_user_id: Number(d.delegate_user_id),
-        name: `${d.first_name} ${d.last_name}`.trim(),
+        name: formatPersonName(`${d.first_name} ${d.last_name}`),
         email: d.email,
-        first_name: d.first_name ?? null,
-        last_name: d.last_name ?? null,
+        first_name: formatPersonName(d.first_name) || null,
+        last_name: formatPersonName(d.last_name) || null,
         carnet: d.carnet ?? null,
         status_id: d.status_id != null ? Number(d.status_id) : null,
         is_active: [
@@ -802,10 +808,10 @@ export class PiDelegatesService {
 
     return Array.from(byDelegate.entries()).map(([delegateId, info]) => ({
       delegate_user_id: delegateId,
-      name: `${info.first_name} ${info.last_name}`.trim(),
+      name: formatPersonName(`${info.first_name} ${info.last_name}`),
       email: info.email,
-      first_name: info.first_name ?? null,
-      last_name: info.last_name ?? null,
+      first_name: formatPersonName(info.first_name) || null,
+      last_name: formatPersonName(info.last_name) || null,
       carnet: info.carnet ?? null,
       status_id: info.status_id,
       is_active: [
@@ -879,11 +885,14 @@ export class PiDelegatesService {
     const mapRow = (r: RawHistoryRow): PiDelegateHistoryEntryDto => {
       const actorName =
         r.actor_first || r.actor_last
-          ? `${r.actor_first ?? ''} ${r.actor_last ?? ''}`.trim() || null
+          ? formatPersonName(`${r.actor_first ?? ''} ${r.actor_last ?? ''}`) ||
+            null
           : null;
       const delegateName =
         r.target_first || r.target_last
-          ? `${r.target_first ?? ''} ${r.target_last ?? ''}`.trim() || null
+          ? formatPersonName(
+              `${r.target_first ?? ''} ${r.target_last ?? ''}`,
+            ) || null
           : null;
 
       return {

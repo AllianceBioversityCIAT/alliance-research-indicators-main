@@ -13,12 +13,7 @@
     <!-- Summary line — top of the card, above the search -->
     <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
       <span class="by-project__summary-left atc-grey-700 flex flex-wrap items-center gap-1">
-        {{ summaryPeople() }} {{ summaryPeople() === 1 ? 'person' : 'people' }}
-        &nbsp;·&nbsp;
-        {{ summaryAssignments() }} active {{ summaryAssignments() === 1 ? 'assignment' : 'assignments' }}
-        across {{ summaryProjects() }} {{ summaryProjects() === 1 ? 'project' : 'projects' }}
         @if (summaryInactive() > 0) {
-          &nbsp;·&nbsp;
           <span class="atc-red-1">
             <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
             {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive

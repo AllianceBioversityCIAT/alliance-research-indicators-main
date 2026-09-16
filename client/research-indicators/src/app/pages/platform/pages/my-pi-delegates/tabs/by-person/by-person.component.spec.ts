@@ -633,16 +633,16 @@ describe('ByPersonComponent', () => {
   });
 
   describe('summary line', () => {
-    it('renders inside the table card with people / assignments / projects counts', async () => {
+    it('keeps only the PI note and drops the people / assignments / projects counts', async () => {
       await createComponent([ALICE, BOB]);
 
       const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
-      const summary = card.querySelector('.by-person__summary-left') as HTMLElement | null;
-      expect(summary).not.toBeNull();
-      // Alice (PRJ-A, PRJ-B) + Bob (PRJ-B) → 2 people, 3 assignments, 2 distinct projects
-      expect(summary?.textContent).toContain('2 people');
-      expect(summary?.textContent).toContain('3 active assignments');
-      expect(summary?.textContent).toContain('2 projects');
+      const summary = card.querySelector('.by-person__summary') as HTMLElement;
+      const text = summary.textContent ?? '';
+
+      expect(text).toContain('Only projects where you are the Principal Investigator are listed');
+      expect(text).not.toContain('people');
+      expect(text).not.toContain('active assignment');
     });
 
     it('shows the inactive marker only when a person is inactive (discriminator)', async () => {
