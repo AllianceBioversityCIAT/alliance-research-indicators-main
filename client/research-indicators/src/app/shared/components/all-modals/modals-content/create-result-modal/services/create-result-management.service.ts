@@ -11,6 +11,16 @@ export class CreateResultManagementService {
   expandedItem = signal<AIAssistantResult | null>(null);
   items = signal<AIAssistantResult[]>([]);
   contractId = signal<string | null>(null);
+  /**
+   * Reporting Project carried between the create-result form (step 0) and the AI
+   * upload step (step 1), in both directions, so switching to "Upload file" does not
+   * drop a project the user already picked.
+   *
+   * Deliberately NOT `contractId`: that one is the project-results table's PRESET and
+   * is only honoured while `presetFromProjectResultsTable` is true, so writing a manual
+   * selection into it would be erased by the form's own preset effect.
+   */
+  carriedContractId = signal<string | null>(null);
   presetFromProjectResultsTable = signal<boolean>(false);
   resultCreationEntryContext = signal<'results-center' | 'project' | null>(null);
   resultTitle = signal<string | null>(null);
@@ -80,6 +90,7 @@ export class CreateResultManagementService {
     this.expandedItem.set(null);
     this.items.set([]);
     this.contractId.set(null);
+    this.carriedContractId.set(null);
     this.presetFromProjectResultsTable.set(false);
     this.resultCreationEntryContext.set(null);
     this.resultTitle.set(null);
@@ -89,6 +100,10 @@ export class CreateResultManagementService {
 
   setContractId(contractId: string | null) {
     this.contractId.set(contractId);
+  }
+
+  setCarriedContractId(contractId: string | null) {
+    this.carriedContractId.set(contractId);
   }
 
   setPresetFromProjectResultsTable(value: boolean) {

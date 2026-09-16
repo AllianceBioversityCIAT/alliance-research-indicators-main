@@ -618,8 +618,11 @@ describe('ResultSidebarComponent', () => {
       expect(button?.disabled).toBe(true);
     });
 
-    it('enables the PRMS SYNC button when result is approved (status_id === 6) AND pool_funding_alignment has green check', () => {
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+    it('enables the PRMS SYNC button when approved AND green-checked AND the result contributes (has_contribution true)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true
+      });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
       cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
       fixture.detectChanges();
@@ -627,6 +630,36 @@ describe('ResultSidebarComponent', () => {
       expect(component.canSyncPrms()).toBe(true);
       const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button?.disabled).toBe(false);
+    });
+
+    it('disables PRMS SYNC when the result answered "No" to the Science Program question — nothing to sync', () => {
+      // "No" is a COMPLETE answer, so pool_funding_alignment is green: the gate
+      // cannot be completeness alone.
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: false
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+      expect(component.prmsSyncTooltip()).toContain('nothing to sync to PRMS');
+    });
+
+    it('disables PRMS SYNC while the Science Program question is unanswered (has_contribution null)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+      // the generic reason, not the "No" one
+      expect(component.prmsSyncTooltip()).toContain('once the result is approved');
     });
 
     it('does not render the PRMS SYNC button when Pool Funding Alignment is hidden (e.g. OICR or ineligible)', () => {
@@ -638,7 +671,12 @@ describe('ResultSidebarComponent', () => {
     });
 
     const enablePrmsSyncButton = () => {
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      // has_contribution must be true: a complete "No" answer is green-checked but
+      // has nothing to send to PRMS, so completeness alone no longer enables the button.
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true
+      });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
       cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
       fixture.detectChanges();
@@ -728,6 +766,7 @@ describe('ResultSidebarComponent', () => {
     it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
         ...eligibleAlignment,
+        has_contribution: true,
         is_synced_to_prms: true
       });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -742,8 +781,11 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('does not call POST_PrmsSync when the result is already synced to PRMS', async () => {
+      // has_contribution true on purpose: this must be blocked by "already synced",
+      // not by ineligibility, or it would pass for the wrong reason.
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
         ...eligibleAlignment,
+        has_contribution: true,
         is_synced_to_prms: true
       });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
@@ -779,7 +821,7 @@ describe('ResultSidebarComponent', () => {
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
       (metadataService.update as jest.Mock).mockResolvedValue(undefined);
       (bilateralService.getAlignment as jest.Mock).mockImplementation(async () => {
-        const synced = { ...eligibleAlignment, is_synced_to_prms: true };
+        const synced = { ...eligibleAlignment, has_contribution: true, is_synced_to_prms: true };
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(synced);
         return synced;
       });
