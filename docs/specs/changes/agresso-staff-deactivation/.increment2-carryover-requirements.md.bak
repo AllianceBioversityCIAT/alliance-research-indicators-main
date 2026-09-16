@@ -1,0 +1,536 @@
+# Requirements — Agresso / Staff Deactivation
+
+- **Module:** agresso
+- **Spec id:** 2026-09-agresso-staff-deactivation
+- **Status:** draft
+- **Owner:** ARI server squad
+- **Linked PRD section:** [`docs/prd.md`](../../../prd.md) §G4 (integrate AGRESSO at the data layer), §US-SA-2 (cron/admin-driven sync)
+- **Linked tickets:** —
+- **Last updated:** 2026-09-15
+- **Extends:** [`changes/agresso-staff-sec-users-sync`](../../archive/2026-09-15-changes--agresso-staff-sec-users-sync/) (archived, shipped) — this spec is the destructive half split out of its retired `R-AGS-005`
+- **Depth:** **Full** — destructive, irreversible-by-default writes across three tables
+
+---
+
+## Executive summary
+
+The Agresso staff sync provisions, refreshes and reactivates platform accounts. **Nobody is ever retired.** A departed employee keeps a working `sec_users` account, its roles, and any machine credential they are the responsible user for, until a human notices.
+
+This spec adds the missing half: **an active account whose person is absent from the Agresso staff payload is deactivated across `sec_users`, `sec_user_roles` and `app_secrets`** — behind four preconditions that abort the whole pass, three exclusions that shield individual accounts, and a dry-run mode that makes the blast radius inspectable before it is irreversible.
+
+**The split invariant governs every requirement here: this spec only ever writes `is_active = 0`.** Creation, refresh and reactivation live in the sibling and are out of scope. A requirement that turns something *on* is in the wrong document if it is in this one.
+
+---
+
+## 1. Context
+
+`cloneAllAgressoStaff` fetches the Agresso employee list page by page, upserts `alliance_user_staff`, then reconciles every member against `sec_users` (create / refresh / reactivate). The reconciliation already reads **all** `sec_users` rows and matches on `lower(trim(email))`. What it never computes is the complement: the active accounts that matched nobody.
+
+**Why now.** Two things make the gap urgent rather than cosmetic:
+
+1. `AppSecretsService.validation()` returns `isValid` **independently of whether a responsible user was resolved** (verified, `app-secrets.service.ts:72-128`). A machine token whose responsible user is inactive still authenticates, arriving as `req.user = null` and reaching every handler that carries no `@Roles` decorator. Cascading `app_secrets` is therefore required for **correctness**, not merely for the record.
+2. The sibling shipped `?status=active` on the fetch, so departed staff no longer arrive at all — which closed the provisioning hole and simultaneously made this one the only remaining path by which access is ever withdrawn.
+
+**What is explicitly NOT changing:** the matching pass, the email index, the collapse rule, `findUserByEmail`, the three existing sync call sites, and the trigger endpoint's shape. This spec consumes the sibling's classification; it does not define a second one.
+
+**Affected surface, enumerated by what the run touches** *(KZ-002)* — not by folder: the staff sync service, the reconciler service and repository, the run summary DTO, three database tables, and one new `app_config`-seeding migration.
+
+---
+
+## 2. Requirement numbering
+
+Requirements use `R-AGD-<NNN>` and `NFR-AGD-<NNN>` — **`AGD`, not `AGS`**. The sibling's `R-AGS-005` is retired and never reused so that every finding in [`judgment-inherited.md`](./judgment-inherited.md) keeps its target; a fresh prefix guarantees no id in this document can be confused with one in that ledger.
+
+---
+
+## 3. Functional requirements
+
+### R-AGD-001 — The deactivation set is computed from the matching pass, never re-derived
+
+- **As a** platform administrator
+- **I want** the set of accounts to retire to be exactly the active accounts the staff payload matched nobody against
+- **So that** one matching rule governs both provisioning and retirement, and the two halves cannot disagree about who is present
+
+**Details:**
+- Inputs: the sibling reconciliation's output plus the same full `sec_users` read it already performs.
+- Behavior:
+  - The candidate set SHALL be every `sec_users` row with `is_active = 1` whose `sec_user_id` is not the chosen row of any matched staff member **and** is not shielded by R-AGD-002.
+  - Matching SHALL be by `lower(trim(email))` only, reusing the sibling's index. Carnet is written, never matched on.
+  - This spec SHALL NOT build a second index, a second normalization rule, or a second tie-break.
+- Outputs: an in-memory set consumed by R-AGD-004/005/006; nothing is written by this requirement.
+- Permissions: inherited from the trigger (`SYSTEM_ADMIN`, see NFR-AGD-003).
+
+**Acceptance criteria:**
+- [ ] AC.1 — An active `sec_users` row whose normalized email equals a matched staff member's normalized email is **absent** from the candidate set.
+- [ ] AC.2 — An active `sec_users` row whose normalized email equals no payload email is **present** in the candidate set, subject to R-AGD-002/003.
+- [ ] AC.3 — An **inactive** `sec_users` row is absent from the candidate set regardless of matching — this spec never writes `is_active = 0` over an already-`0` row.
+- [ ] AC.4 — The normalization applied is byte-identical to the sibling's `normalizeEmail` (`trim()` then `toLowerCase()`).
+
+#### Scenario: An account nobody on the staff list claims
+
+- GIVEN an active `sec_users` row `{id: 700, email: 'Gone.Person@cgiar.org'}`
+- AND a payload containing no member whose email normalizes to `gone.person@cgiar.org`
+- WHEN the sync runs and every precondition passes
+- THEN row 700 is in the deactivation set
+- AND IT MUST be selected by normalized-email comparison, not by carnet
+- BUT it must NOT be selected if any payload member's email normalizes to the same key, whatever that member's carnet is
+
+#### Scenario: Case and whitespace do not manufacture a deactivation
+
+- GIVEN an active `sec_users` row `{id: 701, email: 'j.doe@cgiar.org'}`
+- AND a staff member arriving as `{email: '  J.DOE@CGIAR.ORG '}`
+- WHEN the sync runs
+- THEN row 701 is **not** in the deactivation set
+- AND IT MUST be excluded because the normalized keys are equal
+- BUT it must NOT be excluded by a `LIKE` or prefix comparison
+
+**Out of scope:** changing how a matched row is chosen when several candidates share an email — that tie-break belongs to the sibling and is neutralized here by EX-3.
+
+---
+
+### R-AGD-002 — Every staff member the payload carries shields an account, including the ones the sync declines to write
+
+- **As a** staff member on the Alliance list
+- **I want** my platform account left alone even when the sync cannot write my record
+- **So that** a data-quality problem in my Agresso row never costs me my access
+
+> **This requirement exists because its absence has been reintroduced twice.** It is Judgment Day `J-3`'s outcome reached through `F-8`, `NEW-2` and `NEW-4` — three different doors into the same defect. It is stated as its own requirement, with its own id, so that no correction elsewhere can fold it away silently.
+
+**Details:**
+- Inputs: the sibling's `skipped[]` and `collapsed[]` arrays plus the raw payload.
+- Behavior:
+  - A staff member the sync **skips** SHALL still shield whatever account their email would have matched. Skipping a *write* is not a declaration that the person is absent.
+  - A staff member the sync **collapses** (lost its email group to an earlier arrival) SHALL likewise shield.
+  - The shield SHALL be computed from the **raw payload**, before validation and before collapse, so that neither step can remove a shield.
+- Outputs: the shield key set; no writes.
+
+**Acceptance criteria:**
+- [ ] AC.1 — A member skipped as `CARNET_TOO_LONG` whose email is usable shields the account at that email key.
+- [ ] AC.2 — A member skipped as `UNUSABLE_EMAIL` shields nothing *and needs to shield nothing* — see the dissolution note below; this AC is satisfied by proving the reachability argument, not by a shield.
+- [ ] AC.3 — A collapsed loser's email key is shielded (by construction it equals its winner's key; the AC asserts the equality holds, so a future change to either key breaks a test rather than an account).
+- [ ] AC.4 — The shield set is derived from the payload **before** `validate()` and **before** the collapse loop.
+
+> **Two of the three inherited forms dissolve on evidence; one is live. Recorded so no one re-fixes a closed case or trusts a closed argument for the open one.**
+>
+> | Form | Status | Evidence |
+> | --- | --- | --- |
+> | **NEW-4** — collapsed losers | **Dissolved** | The collapse key and the match key are the *same expression*, `lower(trim(email))` (`sec-user-reconciler.service.ts`, steps 3 and 4). A loser is grouped with its winner *because* the keys are equal, and the winner always participates in matching. AC.3 pins the equality so the dissolution cannot rot. |
+> | **UNUSABLE_EMAIL skips** | **Dissolved** | `isUsableEmail` rejects null, empty, whitespace-only, and `> 150` chars. `sec_users.email` is `varchar(150) NOT NULL`, so an over-length payload email cannot equal any stored email, and the other three cases produce no key at all. Such a member has no account to shield. |
+> | **CARNET_TOO_LONG skips** | **LIVE — this is F-8's only remaining target** | Validation runs *first* and removes the member from `survivors` before the index is built, yet the member's **email is valid**. Their account matches nobody and falls to deactivation. |
+
+#### Scenario: A bad carnet does not cost a real employee their account
+
+- GIVEN a staff member `{resourceId: 'ABCDEFGHIJK' (11 chars), email: 'real.person@cgiar.org'}`
+- AND an active `sec_users` row `{id: 800, email: 'real.person@cgiar.org'}`
+- WHEN the sync runs and the member is skipped as `CARNET_TOO_LONG`
+- THEN row 800 is **not** deactivated
+- AND IT MUST appear in the run summary as shielded-by-skip, with the reason, so the data problem stays visible
+- BUT it must NOT be refreshed, created or reactivated by this spec — shielding is the absence of a write, not a write
+
+#### Scenario: A duplicated person in the payload does not retire their own account
+
+- GIVEN two payload members sharing `email: 'shared@cgiar.org'` with carnets `A100` (first) and `B200`
+- AND an active `sec_users` row `{id: 801, email: 'shared@cgiar.org'}`
+- WHEN the sync runs and `B200` is collapsed as a loser
+- THEN row 801 is **not** deactivated
+- AND IT MUST be shielded by the winner's participation in matching, with AC.3 asserting the two keys are equal
+
+---
+
+### R-AGD-003 — Three exclusions shield individual accounts from an otherwise valid deactivation
+
+- **As a** platform administrator
+- **I want** externals, system admins and ambiguous rows left alone
+- **So that** absence from an Alliance staff list is only acted on where absence actually carries information
+
+**Details:**
+- Behavior — an account in the candidate set SHALL be excluded when any of:
+
+| # | Rule | Why absence carries no information |
+| --- | --- | --- |
+| **EX-1** | The account's `status_id` is the **external** user status, resolved by name (see C-4 in R-AGD-004) | An external user is provisioned by a different flow and never appears in an Alliance staff payload |
+| **EX-2** | The account holds an **active** `sec_user_roles` row with `role_id = 1` (`SYSTEM_ADMIN`) | Locking out the administrators is unrecoverable from inside the platform. Evaluated against active role rows only, so an ex-admin is not shielded |
+| **EX-3** | The account's email key maps to **more than one** `sec_users` row | The sibling's tie-break picks one row and leaves the others untouched; without EX-3 every loser falls here and is retired — Judgment Day `J-3` |
+
+  - EX-3 SHALL be computed as a **standalone pre-pass over the email index**, never inside a resolver and never short-circuited by an earlier match.
+  - EX-3 SHALL count **active rows only** toward ambiguity *(closes `F-10`)*. An already-inactive duplicate is not evidence of ambiguity and must not shield its active sibling permanently.
+- Outputs: each exclusion reported separately in the summary (NFR-AGD-002).
+
+**Acceptance criteria:**
+- [ ] AC.1 — An unmatched account whose status is the external status is not deactivated, and is counted as `excludedExternal`.
+- [ ] AC.2 — An unmatched account with an active `role_id = 1` row is not deactivated, and is counted as `excludedSystemAdmin`.
+- [ ] AC.3 — An unmatched account whose email key maps to two **active** rows is not deactivated; **both** rows are counted as `excludedAmbiguous`.
+- [ ] AC.4 — An unmatched account whose email key maps to one active and one **inactive** row **is** deactivated — the inactive row does not confer ambiguity.
+- [ ] AC.5 — An account holding only an **inactive** `role_id = 1` row **is** deactivated — EX-2 does not shield an ex-admin.
+
+#### Scenario: An ex-administrator is not shielded by a revoked role
+
+- GIVEN an unmatched active account holding exactly one `sec_user_roles` row `{role_id: 1, is_active: 0}`
+- WHEN the sync runs
+- THEN the account is deactivated
+- AND IT MUST be counted as a normal deactivation, not as `excludedSystemAdmin`
+- BUT it must NOT be deactivated if any of its `role_id = 1` rows is active
+
+#### Scenario: An already-inactive duplicate does not shield its live twin forever
+
+- GIVEN two `sec_users` rows sharing `email: 'twin@cgiar.org'` — `{id: 10, is_active: 0}` and `{id: 11, is_active: 1}`
+- AND no payload member with that email
+- WHEN the sync runs
+- THEN row 11 is deactivated
+- AND IT MUST NOT be counted as `excludedAmbiguous`, because ambiguity is measured over active rows only
+- BUT it must NOT touch row 10, which is already inactive (R-AGD-001 AC.3)
+
+---
+
+### R-AGD-004 — Four preconditions abort the entire pass before any write
+
+- **As a** platform administrator
+- **I want** the run to refuse to write anything when the payload cannot be trusted
+- **So that** a failed fetch never becomes a mass lockout
+
+> **Load-bearing, and more so since `?status=active`.** *(User ruling 2026-09-15: the filter stays and the growth in the absent population is accepted — which raises this requirement's obligations rather than reducing them.)* `base()` catches a fetch error, logs it and returns `[]` (verified, `base-control-list-save.ts:16-48`), so a failed page is **indistinguishable from a small one** at the call site. Absence is this spec's only trigger, and a silently short payload is absence for everybody it omitted.
+
+**Details:**
+- Behavior — the pass SHALL abort, write nothing, and report why, when any of:
+
+| # | Precondition | Defends against |
+| --- | --- | --- |
+| **C-1** | `totalElements > 0` | An empty payload, under which every account is unmatched. `findNumberOfPages` returns `0` for `totalElements = 0`, so the page loop never runs and `allStaff` is `[]` — this is Judgment Day `J-1`, reached *through* the guard rather than around it |
+| **C-2** | The fetch is **complete**: no page returned zero rows, and the accumulated member count reaches `totalElements` within a stated drift tolerance | A page that failed and returned `[]`. This is the class `base()` makes invisible |
+| **C-3** | `deactivationSet.size <= max(ceilingFraction × activePopulation, absoluteFloor)` | A payload that is internally consistent and still not the Alliance staff list |
+| **C-4** | The **external** user status resolves to exactly one `user_status` row by name | `user_status` contents are unknown to this repository. If the external status cannot be identified, EX-1 shields nobody and every external user is retired |
+
+  - `activePopulation` SHALL be the count of active `sec_users` rows at read time, **before** exclusions.
+  - An abort SHALL leave all three tables byte-identical and SHALL emit the full summary (R-AGD-006 AC.3).
+  - C-3 SHALL **report instead of aborting in dry-run mode** — the run whose purpose is to measure the blast radius must not be stopped by its size.
+
+> **C-2 is re-derived, not inherited.** The parent's formulation — distinct non-empty carnets, minus pre-write skips, equals `totalElements` — carried `F-1` (arithmetic that aborts permanently on a schema-permitted input), `R-4` (any duplicate carnet aborts forever) and `W-6` (a mid-run hire shifts the total by one). All three are artifacts of inferring fetch completeness from *carnet distinctness*, which is not what a failed page changes. **Measuring the fetch directly removes all three classes at once** rather than patching the arithmetic a fourth time. Distinct-carnet counting survives as a reported warning, never as an abort. *(Kaizen: "when removing machinery, enumerate what it does, not what it was for.")*
+
+**Acceptance criteria:**
+- [ ] AC.1 — `totalElements = 0` aborts with `abortReason = C-1`; no row in any of the three tables changes.
+- [ ] AC.2 — A run in which any page returned zero rows aborts with `abortReason = C-2`, naming the page number.
+- [ ] AC.3 — A deactivation set exceeding the ceiling aborts with `abortReason = C-3`, reporting `deactivationCount`, `activePopulation` and `ceiling`.
+- [ ] AC.4 — A run where no `user_status` row resolves as external aborts with `abortReason = C-4`.
+- [ ] AC.5 — A run where **more than one** `user_status` row resolves as external aborts with `abortReason = C-4` — an ambiguous status table is not a basis for shielding.
+- [ ] AC.6 — In dry-run mode a C-3 breach does **not** abort; the summary reports `ceilingBreached = true` and the full deactivation set.
+- [ ] AC.7 — Either C-3 config key (`CEILING_FRACTION`, `ABSOLUTE_FLOOR`) unset, non-numeric, or `<= 0` aborts with `abortReason = C-3`.
+- [ ] AC.8 — The external-status-name key unset or empty aborts with `abortReason = C-4`.
+
+#### Scenario: A page that failed to fetch does not retire the people it omitted
+
+- GIVEN `totalElements = 2400` across three pages
+- AND page 2 raises inside `base()`, which logs and returns `[]`
+- WHEN the sync runs
+- THEN the pass aborts with `abortReason = C-2`
+- AND IT MUST name the page that returned zero rows in the summary and at log level `error`
+- BUT it must NOT write `is_active = 0` to any row in `sec_users`, `sec_user_roles` or `app_secrets`
+- AND IT MUST still have performed the `alliance_user_staff` upserts the sibling owns — aborting deactivation does not roll back the sibling's work
+
+#### Scenario: The first live run is expected to breach the ceiling
+
+- GIVEN a deactivation set larger than `max(ceilingFraction × activePopulation, absoluteFloor)`
+- WHEN the sync runs with dry-run **enabled**
+- THEN the summary reports every count plus `ceilingBreached = true`
+- AND IT MUST NOT abort, because measuring the set is the run's entire purpose
+- BUT the same input with dry-run **disabled** MUST abort with `abortReason = C-3` and write nothing
+
+#### Scenario: An unverifiable status table refuses to run rather than shielding nobody
+
+- GIVEN a `user_status` table containing no row identifying the external status
+- WHEN the sync runs
+- THEN the pass aborts with `abortReason = C-4`
+- AND IT MUST abort in dry-run mode too — C-4 is a correctness precondition for EX-1, not a volume guard
+- BUT it must NOT fall back to a literal `status_id` value
+
+---
+
+### R-AGD-005 — A deactivated account is retired across three tables in one transaction
+
+- **As a** security owner
+- **I want** the account, its roles and its machine credentials switched off together
+- **So that** no half-retired account leaves a live credential behind
+
+**Details:**
+- Behavior — for every account in the final deactivation set, inside **one** transaction:
+
+| Table | Write |
+| --- | --- |
+| `sec_users` | `is_active = 0` on the matched row |
+| `sec_user_roles` | `is_active = 0` on **every** active role row for that user |
+| `app_secrets` | `is_active = 0` on **every** active row whose `responsible_user_id` is that user |
+
+  - Every write SHALL go through **the transaction's `manager`**. The `app_secrets` write SHALL use `manager.getRepository(AppSecret)` and SHALL NOT use `AppSecretRepository`, which extends `Repository<AppSecret>` bound to the injected root `EntityManager` and therefore **structurally cannot join the transaction** *(Judgment Day `J-6`, verified; in-repo precedent `app-secrets.service.ts:44-53`)*.
+  - Audit fields SHALL be written on every updated row.
+  - The pass SHALL NOT write to `alliance_user_staff`.
+
+**Acceptance criteria:**
+- [ ] AC.1 — After a live run, a deactivated user has `is_active = 0` in `sec_users`, `0` on every previously-active `sec_user_roles` row, and `0` on every previously-active `app_secrets` row naming them.
+- [ ] AC.2 — A failure during any of the three writes leaves **all three** tables unchanged.
+- [ ] AC.3 — `app_secrets` rows whose `responsible_user_id` is a **shielded or matched** user are untouched.
+- [ ] AC.4 — Rows already `is_active = 0` before the run are not rewritten, and do not inflate the reported counts.
+
+#### Scenario: A departed employee's machine token stops authenticating
+
+- GIVEN an unmatched active account `{id: 900}` that is the `responsible_user_id` of an active `app_secrets` row
+- WHEN a live run deactivates it
+- THEN that `app_secrets` row has `is_active = 0`
+- AND IT MUST have been written through the transaction's manager, so a later failure in the same transaction reverts it
+- BUT it must NOT have been written through `AppSecretRepository`
+- AND IT MUST close the live auth path in which `validation()` returns `isValid = true` with `user = null` (`RSK-6`) for that credential
+
+#### Scenario: A mid-transaction failure retires nobody
+
+- GIVEN a deactivation set of 40 accounts
+- AND the `sec_user_roles` update raises on the second chunk
+- WHEN the sync runs
+- THEN no `sec_users`, `sec_user_roles` or `app_secrets` row has changed
+- AND IT MUST report the failure with counts, not as a bare stack trace
+- BUT it must NOT commit the `sec_users` writes that had already succeeded
+
+---
+
+### R-AGD-006 — Dry-run mode computes the full outcome and writes nothing
+
+- **As a** platform administrator
+- **I want** to see exactly who would be retired before anyone is
+- **So that** the blast radius is inspectable while it is still reversible
+
+> **This is the substitute control for the defect class with no automated gate** (§10). No test in this repository can measure the real composition of the Dev or Production `sec_users` table, and no gate can tell a correct deactivation set from a plausible wrong one. A human reading a dry run can.
+
+**Details:**
+- Behavior:
+  - Dry-run SHALL be read from `app_config`, defaulting to **enabled**, so that a missing or unreadable flag fails safe.
+  - In dry-run the pass SHALL execute every read, every exclusion, and every precondition except C-3's abort, then report — and SHALL open no write transaction at all.
+  - Disabling dry-run is a deliberate operator action recorded in the rollout plan, including the step that restores it.
+
+**Acceptance criteria:**
+- [ ] AC.1 — A dry run over an input that would retire N accounts reports N and changes zero rows across all three tables.
+- [ ] AC.2 — The dry-run flag absent, unreadable, or non-boolean resolves to **enabled**.
+- [ ] AC.3 — The summary states which mode ran, in a field a reader cannot miss.
+
+#### Scenario: A dry run is indistinguishable from a live run except for the writes
+
+- GIVEN any payload and any database state
+- WHEN the sync runs in dry-run mode
+- THEN the summary's deactivation counts equal what a live run on the same input would have written
+- AND IT MUST report `dryRun = true`
+- BUT it must NOT open a write transaction, so a bug in the write path cannot fire
+- AND IT MUST still abort on C-1, C-2 and C-4 — a dry run over an untrustworthy payload reports a meaningless set
+
+---
+
+### R-AGD-007 — The run reports a complete, inspectable summary on every path
+
+- **As a** platform administrator
+- **I want** one structured summary covering success, exclusion, shield and abort
+- **So that** a run that did nothing is distinguishable from a run that failed
+
+**Details:**
+- Behavior: the existing `SecUserReconciliationSummaryDto` SHALL be extended with this spec's fields; no second summary shape is introduced.
+- The summary SHALL be emitted on the abort path as well as the success path *(closes Judgment Day `G-4`)*.
+
+**Acceptance criteria:**
+- [ ] AC.1 — The summary carries: `dryRun`, `activePopulation`, `ceiling`, `ceilingBreached`, `deactivated`, `rolesDeactivated`, `secretsDeactivated`, `excludedExternal`, `excludedSystemAdmin`, `excludedAmbiguous`, `shieldedBySkip`, `abortReason`.
+- [ ] AC.2 — An aborted run emits every count it managed to compute, plus `abortReason`.
+- [ ] AC.3 — `abortReason` is absent (not `null`, not empty-string) on a successful run, so its presence alone identifies an abort.
+
+#### Scenario: A run that retired nobody says why
+
+- GIVEN a run that aborts on C-2
+- WHEN the summary is logged
+- THEN it carries `abortReason = 'C-2'` and the counts computed before the abort
+- AND IT MUST be logged at `error`
+- BUT it must NOT report `deactivated = 0` without an `abortReason`, which would be indistinguishable from a healthy run with nothing to do
+
+---
+
+## 4. Non-functional requirements
+
+### NFR-AGD-001 — Bounded database work
+- **Category:** performance
+- **Target:** The deactivation pass adds **no per-account round trip**. Reads reuse the sibling's existing bulk read; writes are chunked at the module's existing `CHUNK = 50`. Query count is `O(⌈n/50⌉)` per table, not `O(n)`.
+- **How verified:** unit test asserting the chunk count for a known n; the query-count assertion must be able to go red when chunking is removed.
+
+### NFR-AGD-002 — Observability
+- **Category:** observability
+- **Target:** Every abort logs at `error` with its `abortReason`; every exclusion and shield logs at `warn` with the account id and the rule that fired; the summary is logged as one structured line on both paths.
+- **How verified:** unit tests on the logger calls; fixture-tier assertion that the summary is emitted on abort.
+
+### NFR-AGD-003 — Authorization is inherited, not re-declared
+- **Category:** security
+- **Target:** This spec adds **no endpoint**. It runs inside `cloneAllAgressoStaff`, already reachable only via `GET /api/agresso/staff/clone/execute` behind `@UseGuards(RolesGuard)` + `@Roles(SecRolesEnum.SYSTEM_ADMIN)`.
+- **How verified:** the sibling's existing controller spec; a test asserting no new route is registered.
+
+### NFR-AGD-004 — Raw reads coerce `tinyint` to boolean
+- **Category:** reliability
+- **Target:** Every new raw-SQL read of an `is_active` column SHALL coerce with `Boolean(...)` before the value is used in a branch.
+- **Rationale:** `Repository.query` returns the raw mysql2 driver result with no entity hydration and no `typeCast` configured, so a `tinyint` arrives as `0`/`1`. `0` is falsy, but `is_active` is typed `boolean` in `SecUser`, and `strictNullChecks` is off — a comparison like `row.is_active === true` silently fails for every row. This already produced one Reviewer FAIL in the sibling spec.
+- **How verified:** a regression test per new read, proven by reverting the coercion.
+
+---
+
+## 5. Data requirements
+
+**No schema changes.** No column is added, altered or dropped; no index is created.
+
+| Table | Change |
+| --- | --- |
+| `sec_users` | `is_active` updated `1 → 0`. Existing `tinyint NOT NULL DEFAULT 1` |
+| `sec_user_roles` | `is_active` updated `1 → 0` |
+| `app_secrets` | `is_active` updated `1 → 0` |
+| `user_status` | **read only**, by name, for C-4 / EX-1 |
+| `app_config` | **four rows seeded** by migration (below) |
+| `alliance_user_staff` | untouched by this spec |
+
+**One migration, data-only** — `<timestamp>-seedStaffDeactivationConfig.ts`, seeding four `app_config` keys following the in-repo pattern (`1786738949211-seedClarisaMappingPhase.ts`): parameterised insert, `ON DUPLICATE KEY UPDATE`, symmetric `down()` that deletes the keys.
+
+| Key | Seed value | Meaning |
+| --- | --- | --- |
+| `ARI_STAFF_DEACTIVATION_DRY_RUN` | `'true'` | Fails safe: the pass ships inert |
+| `ARI_STAFF_DEACTIVATION_CEILING_FRACTION` | `'0.05'` | C-3's relative ceiling |
+| `ARI_STAFF_DEACTIVATION_ABSOLUTE_FLOOR` | `'10'` | C-3's floor for small populations |
+| `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_NAME` | `'External'` | The `user_status.name` C-4 resolves EX-1 against (design `DD-D6`) |
+
+> **`F-2` is closed by evidence, and the parent's premise was simply wrong.** The parent forbade migrations (*"No migration is involved"*) and therefore had no way to create keys that `AppConfigService.getEnv` **throws** on when unset and `updateConfig` **throws** on when unknown — leaving a first live run that aborts forever. There are **six** existing migrations that seed `app_config`; the mechanism was always available.
+>
+> **`K-016`'s TTL warning does not apply here, and the proposal's `OQ-D2` misattributes it.** Verified: `AppConfigService` holds **no cache** and queries MySQL on every call. The 5-minute TTL lives in `MappingPhaseResolver`, `ClarisaProjectsService` and `ClarisaCgiarEntitiesService` — *consumers* of config, which is exactly what root `CLAUDE.md` K-016 names. This spec reads config directly and SHALL NOT add a cache of its own; if it ever does, K-016's window applies from that moment.
+
+---
+
+## 6. API surface delta
+
+**None.** No new endpoint, no new DTO on the wire, no version bump. The existing `GET /api/agresso/staff/clone/execute` gains deactivation behavior and a richer response body (R-AGD-007), still inside `ServerResponseDto`.
+
+> Note the reachable path carries **no `/v1`** — the handler declares no `@Version(...)`, and URI versioning is enabled with no `defaultVersion`. Any test or doc written against `/api/v1/agresso/...` will 404.
+
+---
+
+## 7. Cross-system impact
+
+| System | Impact |
+| --- | --- |
+| **AGRESSO** | Read only, via the existing `?status=active` employees fetch. No new call, no new parameter |
+| **`app_secrets` consumers** | Machine tokens whose responsible user is retired stop authenticating. **This is the intended security outcome** and the reason the cascade is required for correctness |
+| **STAR client** | A deactivated user can no longer log in. No client change; no STAR spec is opened by this one |
+| **OpenSearch / DynamoDB / RabbitMQ / Socket.IO** | Untouched |
+
+---
+
+## 8. Assumptions, dependencies, risks
+
+**Assumptions**
+
+| # | Assumption | If wrong |
+| --- | --- | --- |
+| ASM-1 | Absence from the `?status=active` payload is sufficient grounds to withdraw access *(user ruling 2026-09-15)* | Employees non-active in Agresso lose access earlier than intended — recoverable by the sibling's reactivation |
+| ASM-2 | `user_status` contains exactly one row identifying external users | C-4 aborts the pass. **Deliberately converted from an unverifiable assumption into a checkable precondition** |
+| ASM-3 | A false deactivation is recoverable: the sibling reactivates a returning member's `sec_users` row and `role_id = 3` | Recovery needs a human. `app_secrets` is **never** re-armed — see the asymmetry below |
+
+> **The asymmetry is deliberate and is stated, not quietly implemented:** deactivation kills machine secrets; reactivation does not re-arm them. A credential silently coming back to life is worse than someone having to re-issue it.
+
+**Dependencies**
+
+- [`changes/agresso-staff-sec-users-sync`](../../archive/2026-09-15-changes--agresso-staff-sec-users-sync/) — **shipped and archived**. This spec consumes its matching pass, its bulk read and its summary DTO.
+
+**Risks**
+
+| # | Risk | Mitigation |
+| --- | --- | --- |
+| RSK-1 | A failed page retires everyone it omitted | C-2, measured on the fetch directly |
+| RSK-2 | The real deactivation population is unknown and unmeasurable from this repo | Dry-run-first rollout; dry run **is** the measurement |
+| RSK-3 | `user_status` semantics are undocumented | C-4 aborts rather than shielding nobody |
+| RSK-4 | Long row locks on `sec_users` block concurrent logins writing `last_login_at` | Chunked, id-ordered writes; no isolation level is set because **the codebase has no such precedent** — all 22 transaction sites rely on InnoDB's default |
+| RSK-5 | The trigger is fire-and-forget: the controller does not `await`, and there is no `unhandledRejection` handler, so a rejection can terminate the process | The pass must catch and report rather than throw. Pre-existing (`W-5`), not introduced here |
+| RSK-6 | `validation()` returns `isValid` independently of user resolution, so an unguarded handler accepts a null-user machine token | **Not fixed here.** The cascade closes it for retired users; the general defect deserves its own bugfix spec |
+
+---
+
+## 9. Open questions
+
+| # | Question | Owner | Status |
+| --- | --- | --- | --- |
+| OQ-1 | What exactly names the external status in `user_status` — `'External'`, `'Externo'`, another spelling? | Platform admin | **Deferred by design, not blocking.** C-4 accepts a configurable match and aborts when it resolves to anything other than exactly one row |
+| OQ-2 | Should `RSK-6` be fixed now rather than in its own spec? | Security owner | Open. Out of scope here |
+| OQ-3 | After the dry run measures the real population, is `0.05 / 10` the right ceiling? | Platform admin | Open until the first dry run; the values are config, changeable without a deploy |
+
+---
+
+## 10. Verification reality and defect-class mapping
+
+**The gate must be chosen against the defect, not against the artifact.** Stated up front because this spec's dominant defect class has no automated gate anywhere in this repository.
+
+| # | Defect class this spec can produce | Gate that catches it | Can it go red? |
+| --- | --- | --- | --- |
+| D-1 | **Over-deactivation** — retiring someone who should keep access | Unit tests per exclusion/shield rule + fixture-tier DB assertions. **Partial only** — see the gap below | Yes, by removing a rule |
+| D-2 | Under-deactivation — leaving a departed account live | Unit tests on the candidate-set computation | Yes, by narrowing the set |
+| D-3 | Cascade incompleteness — account off, roles or secrets still on | Fixture test asserting all three tables after one run | Yes, by dropping one table's write |
+| D-4 | Partial write — some rows committed after a mid-run failure | Fixture test forcing a failure in the second chunk, asserting zero deltas | Yes, by committing per operation |
+| D-5 | `tinyint`/`boolean` coercion — `0`/`1` compared as boolean | Regression test per raw read | Yes, by reverting the coercion |
+| D-6 | A precondition that cannot fire | One test per precondition, **each observed failing before it is trusted** *(K-004)* | Yes, by definition of the test |
+| D-7 | Config keys absent → the pass aborts forever | Migration `up`/`down` test + a resolution test | Yes, by skipping the migration |
+| D-8 | Dry-run leakage — a "dry" run writes | Fixture test asserting zero row deltas across all three tables | Yes, by opening the transaction |
+| D-9 | Shield-rule regression — `F-8`'s class, reintroduced twice already | Dedicated tests named per skip reason and per collapse case | Yes, by validating before shielding |
+
+**Classes with no automated gate — recorded, with the substitute named:**
+
+| Gap | Why no gate exists | Substitute control |
+| --- | --- | --- |
+| The **real** deactivation set against Dev/Prod data | `npm test` has `rootDir: src` and never runs `test/fixtures/`; fixtures run against a **disposable scratch schema** that says nothing about real `sec_users` composition. Nothing in this repository knows who is actually in the table | **Human pre-flight: the dry run (R-AGD-006), read before any live run.** This is the accepted risk, recorded rather than solved |
+| The size of the newly-absent population created by `?status=active` | Requires a live Agresso call with credentials this session does not have | The dry run measures it **directly and better** than the proposed `totalElements` delta — it reports the actual consequence rather than a proxy for it |
+| `user_status` contents | Schema-only baseline; no seed, no migration, no enum. `AUTO_INCREMENT=5` implies four rows and says nothing about their meaning | **Converted into a gate:** C-4 aborts the pass, so the unknown produces a refusal to run instead of a silent mis-shield |
+
+**What these gates structurally cannot inspect** *(KZ-017)*: `npm test` (`rootDir: src`) never executes `test/fixtures/`, so **no `npm test` result is evidence for any claim about database state** in this spec. Fixture-tier claims require `npm run test:fixtures`, one worker, against the scratch schema. A unit test over a mocked query builder cannot represent SQL operator precedence — any `WHERE` clause combining `OR` and `AND` must be asserted against generated SQL or a real database, never against a call sequence.
+
+---
+
+## 11. Requirement ID index
+
+| ID | Title |
+| --- | --- |
+| R-AGD-001 | The deactivation set is computed from the matching pass, never re-derived |
+| R-AGD-002 | Every staff member the payload carries shields an account, including the ones the sync declines to write |
+| R-AGD-003 | Three exclusions shield individual accounts from an otherwise valid deactivation |
+| R-AGD-004 | Four preconditions abort the entire pass before any write |
+| R-AGD-005 | A deactivated account is retired across three tables in one transaction |
+| R-AGD-006 | Dry-run mode computes the full outcome and writes nothing |
+| R-AGD-007 | The run reports a complete, inspectable summary on every path |
+| NFR-AGD-001 | Bounded database work |
+| NFR-AGD-002 | Observability |
+| NFR-AGD-003 | Authorization is inherited, not re-declared |
+| NFR-AGD-004 | Raw reads coerce `tinyint` to boolean |
+
+---
+
+## 12. Inherited findings — disposition
+
+Every open finding carried in by [`proposal.md`](./proposal.md) §4, with where it is closed.
+
+| # | Disposition |
+| --- | --- |
+| **F-1** | **Dissolved.** C-2 no longer does skip arithmetic — it measures the fetch directly (R-AGD-004) |
+| **F-2** | **Closed.** Keys are seeded by migration; six in-repo precedents (§5) |
+| **F-5** | **Closed.** `activePopulation`, `ceiling`, `ceilingBreached` are summary fields; dry-run C-3 reports instead of aborting; the rollout plan carries the restore step (design §11) |
+| **F-8** | **Closed, and narrowed to its one live form** — `CARNET_TOO_LONG` skips (R-AGD-002 AC.1) |
+| **F-10** | **Closed.** EX-3 counts active rows only (R-AGD-003 AC.4) |
+| **F-11** | **Closed.** §10 maps every rule to a gate; each is required to be observed red |
+| **W-1** | **Converted into C-4** — an abort, not an assumption (R-AGD-004 AC.4/AC.5) |
+| **W-6** | **Dissolved with F-1** — drift no longer feeds an equality test |
+| **W-9** | **Accepted and narrowed.** Chunked, id-ordered writes; **no isolation level is set, because the codebase has none anywhere** — deviating here would be inventing a convention inside a destructive spec (RSK-4) |
+| **W-10** | **Avoided.** The `app_secrets` write goes through `manager.getRepository(AppSecret)`, so `AppSecretRepository` — and its `Scope.REQUEST` `CurrentUserUtil` dependency — is never injected (R-AGD-005) |
+| **RSK-6** | **Carried, not fixed.** Recorded as OQ-2; the cascade closes it for retired users only |
+| **NEW-1** | **Answered:** seed migration (§5) |
+| **NEW-2** | **Answered:** yes, a skipped member still shields (R-AGD-002) |
+| **NEW-3** | **Dissolved:** C-2 no longer counts carnets as a completeness measure |
+| **NEW-4** | **Dissolved on evidence:** collapse key ≡ match key (R-AGD-002, dissolution table) |
+| **OQ-6** | **Answered:** dry-run first, default enabled *(user ruling 2026-09-15)* |
+| **OQ-7** | **Re-asked and re-confirmed:** absence still deactivates *(user ruling 2026-09-15)* |
+| **OQ-D2** | **Answered and corrected:** `app_config`; the K-016 TTL warning was misattributed (§5) |
+
+---
+
+## 13. Sign-off
+
+- [ ] Engineering lead — <name>
+- [ ] MEL / product owner — <name>
+- [ ] Security review (auth + secrets touched) — <name>
+- [ ] DevOps (config seeding + rollout) — <name>

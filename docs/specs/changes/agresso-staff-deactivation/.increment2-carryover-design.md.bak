@@ -1,0 +1,324 @@
+# Design — Agresso / Staff Deactivation
+
+- **Module:** agresso
+- **Spec id:** 2026-09-agresso-staff-deactivation
+- **Status:** draft
+- **Owner:** ARI server squad
+- **Linked requirements:** [`./requirements.md`](./requirements.md)
+- **Linked TRD:** [`docs/trd/trd.md`](../../../trd/trd.md) §Integrations (AGRESSO), §Cron & sync jobs
+- **Last updated:** 2026-09-15
+
+> **Split invariant.** Every write in this document is `is_active = 0`. If a statement here turns something *on*, it is in the wrong document. Creation, refresh and reactivation belong to the archived sibling.
+
+---
+
+## 1. Goals & non-goals
+
+**Goals**
+
+| # | Goal | Requirements |
+| --- | --- | --- |
+| G-1 | Retire accounts whose person is absent from the staff payload, across three tables atomically | R-AGD-001, R-AGD-005 |
+| G-2 | Make the run refuse to act on a payload it cannot trust | R-AGD-004 |
+| G-3 | Make the blast radius inspectable before it is irreversible | R-AGD-006 |
+| G-4 | Reuse the sibling's matching pass exactly — one index, one normalization, one tie-break | R-AGD-001, R-AGD-002 |
+
+**Non-goals**
+
+| # | Non-goal | Why |
+| --- | --- | --- |
+| NG-1 | Reactivation, creation, refresh | Sibling's, by the split invariant |
+| NG-2 | Fixing `RSK-6` (`validation()` returns `isValid` with an unresolved user) | Its own bugfix spec. The cascade closes it for retired users only |
+| NG-3 | A new endpoint, a new cron, a new module | The pass rides the existing SYSTEM_ADMIN trigger |
+| NG-4 | Repairing duplicate `sec_users` rows | EX-3 shields them; repair is a human action |
+| NG-5 | Writing `alliance_user_staff` | Sibling's table |
+
+---
+
+## 2. Architecture
+
+The pass is a fourth stage inside `cloneAllAgressoStaff`, after the sibling's write stage.
+
+```
+cloneAllAgressoStaff()
+  1. findNumberOfPages()      ── FIXED (DD-D2): ceil, not round+1
+  2. page loop                ── NEW: records a FetchReport (per-page row counts)
+  3. reconciler.reconcile()   ── unchanged, + exposes its sec_users snapshot (DD-D4)
+  4. reconciler.applyCreateAndGrant()   ── unchanged
+  5. deactivation.apply(...)  ── NEW  ◀── this spec
+  6. buildSummary(...)        ── extended with this spec's fields
+```
+
+### 2.1 Composition
+
+| Path | Responsibility | New? |
+| --- | --- | --- |
+| `…/agresso/staff/sec-user-deactivation.service.ts` | Candidate set, shields, exclusions, preconditions, dry-run, orchestration of the write transaction | **new** |
+| `…/agresso/staff/sec-user-deactivation.repository.ts` | **Every destructive statement this spec issues**, plus its reads | **new** |
+| `…/agresso/staff/dto/deactivation-config.dto.ts` | The four resolved `app_config` values | **new** |
+| `…/agresso/staff/email-key.util.ts` | The single `normalizeEmail` both services use (DD-D5) | **new** |
+| `…/agresso/staff/sec-user-reconciler.service.ts` | Exposes its `sec_users` snapshot; delegates normalization to the util | modified |
+| `…/agresso/staff/agresso-staff-tools.service.ts` | Page-count fix, `FetchReport`, stage 5 wiring | modified |
+| `…/agresso/staff/dto/sec-user-reconciliation-summary.dto.ts` | This spec's summary fields | modified |
+| `…/agresso/staff/agresso-staff-tools.module.ts` | Registers the two new providers | modified |
+| `src/db/migrations/<ts>-seedStaffDeactivationConfig.ts` | Seeds four `app_config` keys | **new** |
+
+> **Why a separate service and repository rather than extending the reconciler** (DD-D1). The reconciler is already 642 LOC and its every statement is additive; folding `is_active = 0` into it would put the constructive and destructive halves in one file and make the split invariant a matter of reading care. A separate pair makes the invariant **structural**: the audit surface for "what can this spec switch off" is one repository file, and a reviewer can verify the sibling still contains no `is_active = 0` by reading a diff that does not touch it.
+
+### 2.2 Reuse
+
+- `SecUserReconcilerRepository.findSecUserRolesByUserIds` — reused for EX-2 and for the role cascade's read side. Already chunked at `CHUNK = 50`, already coerces `tinyint`.
+- `SecUserReconcilerService`'s classification output — the matched set is `refresh ∪ reactivate`.
+- `LoggerUtil`, `AppConfigService`, `dataSource.transaction`, `CHUNK`.
+- **Not reused:** `AppSecretRepository`. It extends `Repository<AppSecret>` bound to the injected root `EntityManager` **and** injects `CurrentUserUtil`, which is `Scope.REQUEST`. Using it would both escape the transaction (`J-6`) and drag request scope into a fire-and-forget path (`W-10`). The `app_secrets` write goes through `manager.getRepository(AppSecret)`.
+
+---
+
+## 3. Data model
+
+**No schema change.** Three tables are written (`sec_users`, `sec_user_roles`, `app_secrets` — `is_active` only), two are read (`user_status`, `app_config`), one is untouched (`alliance_user_staff`).
+
+**One data-only migration** seeding four keys, following `1786738949211-seedClarisaMappingPhase.ts` verbatim in shape: parameterised insert, `ON DUPLICATE KEY UPDATE`, symmetric `down()`.
+
+| Key | Seed | Read as |
+| --- | --- | --- |
+| `ARI_STAFF_DEACTIVATION_DRY_RUN` | `'true'` | boolean, **defaults to `true` on any resolution failure** |
+| `ARI_STAFF_DEACTIVATION_CEILING_FRACTION` | `'0.05'` | number `> 0` |
+| `ARI_STAFF_DEACTIVATION_ABSOLUTE_FLOOR` | `'10'` | integer `> 0` |
+| `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_NAME` | `'External'` | string, matched case-insensitively and trimmed against `user_status.name` |
+
+The four keys are added to `AppConfigKey` so `getEnv` is typed and a future `updateConfig` call can find them.
+
+> **Asymmetric failure handling is deliberate.** `dryRun` fails **safe** (unresolvable → `true` → the pass writes nothing). The other three fail **loud** (unresolvable → abort). A missing ceiling must never silently become "no ceiling", and a missing external-status name must never silently become "shield nobody".
+
+---
+
+## 4. API surface
+
+**No change.** No new route, no new version, no DTO on the wire beyond the enriched summary already returned inside `ServerResponseDto` by `GET /api/agresso/staff/clone/execute`.
+
+> The reachable path carries **no `/v1`** — the handler declares no `@Version(...)`. Anything written against `/api/v1/agresso/...` will 404.
+
+---
+
+## 5. Workflows & business rules
+
+### 5.1 Fetch completeness — C-2, and the bug that had to be fixed first
+
+`base()` catches a fetch error, logs it, and returns `[]`. A failed page is therefore **indistinguishable from a small one** at the call site, and absence is this spec's only trigger. C-2 measures the fetch directly: **the page loop records how many rows each page contributed**, and a page contributing zero is an abort.
+
+> ⚠️ **That check is unusable until `findNumberOfPages` is fixed, and the fix is load-bearing rather than cosmetic.**
+>
+> The current expression is `Math.round(total/1000) + (total % 1000 !== 0 ? 1 : 0)`. Whenever `total % 1000 >= 500` it returns **one more page than exists**, and that extra page legitimately returns zero rows. Measured across representative totals: `500→2 (needs 1)`, `1500→3 (needs 2)`, `2500→4 (needs 3)`, `3500→5 (needs 4)`. That is **roughly half of all possible totals**.
+>
+> Had C-2 shipped over the current arithmetic, it would have aborted about half of all healthy runs — a permanent-abort class, which is `F-1`'s family in its fourth incarnation, **introduced by the correction written to dissolve it**. Recorded because the pattern, not the instance, is the lesson: this correction was reviewed against the finding it closed, and the new defect lived somewhere the finding never pointed.
+>
+> **DD-D2** replaces the expression with `Math.ceil(total / pageSize)`.
+
+| C-2 clause | Aborts when |
+| --- | --- |
+| No empty page | any page contributed `0` rows |
+| Accumulation reaches the total | `allStaff.length < totalElements − driftTolerance` |
+
+`driftTolerance` is a small module constant (default `5`), sized to absorb a hire or edit landing mid-run (`W-6`) while staying two orders of magnitude below a lost page of 1000. A **surplus** never aborts — more members means fewer deactivations, which is always the safe direction. Distinct-carnet counting survives only as a `warn`, never as an abort, which is what retires `F-1`, `R-4` and `NEW-3` together.
+
+### 5.2 Building the candidate set (R-AGD-001)
+
+Operates on the `sec_users` snapshot the reconciler already read — **no second read**. The snapshot is safe against the intervening create/reactivate stage: rows created since are absent from it, and rows reactivated since were inactive in it and are therefore never candidates. Every write additionally carries `AND is_active = 1`, so a row switched off by any other path between snapshot and write is a no-op rather than a double write.
+
+| Step | Rule |
+| --- | --- |
+| 1 | `matchedIds` = chosen `sec_user_id` of every `refresh` and `reactivate` target |
+| 2 | `candidates` = snapshot rows with `is_active = 1` whose id is not in `matchedIds` |
+| 3 | Remove every row whose email key is in `shieldKeys` (§5.3) |
+| 4 | Remove every row an exclusion shields (§5.4) |
+
+### 5.3 The shield set (R-AGD-002) — one expression closing three inherited forms
+
+`shieldKeys` is built from the **raw payload**, before `validate()` and before the collapse, as the normalized email of every member whose email is usable as a key. Because it is computed before both filters, neither can remove a shield.
+
+| Inherited form | Why this expression covers it |
+| --- | --- |
+| `CARNET_TOO_LONG` skip (**the live one**) | The member's email is valid, so its key is in the set even though the member never reached the index |
+| Collapsed loser (`NEW-4`) | Its key equals its winner's key *by construction of the grouping*; covered twice over |
+| `UNUSABLE_EMAIL` skip | Produces no key — and needs none: `sec_users.email` is `varchar(150) NOT NULL`, so an over-length payload email cannot equal any stored email, and null/empty/whitespace produce no key either. Nothing is reachable to shield |
+
+> **The dissolution arguments above are load-bearing, so they are pinned by tests rather than trusted as prose** (R-AGD-002 AC.3). If a future change makes the collapse key differ from the match key, a test fails instead of an account being retired.
+
+### 5.4 Exclusions (R-AGD-003)
+
+| # | Evaluation |
+| --- | --- |
+| **EX-1** | `row.status_id === externalStatusId`, where `externalStatusId` is resolved by name (§5.5). Never a literal |
+| **EX-2** | The user has ≥ 1 `sec_user_roles` row with `role_id = 1` **and** `is_active = 1`. Read via the reconciler's chunked role read over the candidate ids only |
+| **EX-3** | A **standalone pre-pass** over the email index, counting **active rows only**: a key mapping to ≥ 2 active rows excludes **every** row under that key |
+
+EX-3 is computed before and independently of the resolver, and is never short-circuited by an earlier match — the shape that produced `J-3` and survived `R-3`. Counting active rows only is what closes `F-10`.
+
+> ⚠️ **The sibling's tie-break rule 3 is deliberately not inherited.** Its own design says so: that rule is safe there only because that spec cannot deactivate. Here, EX-3 replaces it — every ambiguous candidate is shielded rather than one being chosen.
+
+### 5.5 Resolving the external status (C-4)
+
+`SELECT user_status_id, name FROM user_status` → trim + lowercase both sides → match against the configured name. **Exactly one** row must match; zero or more than one aborts with `abortReason = C-4`, in dry-run mode too.
+
+This is the whole of `W-1`'s fix. `user_status` has no seed, no migration and no enum anywhere in the repository, so the literal `4` was never verifiable. The design does not make it verifiable — it makes the unknown **produce a refusal to run** instead of a silent mis-shield.
+
+### 5.6 The write transaction (R-AGD-005)
+
+One `dataSource.transaction(async (manager) => …)`, chunked at `CHUNK = 50`, ids sorted ascending in every chunk of every table to give a consistent lock order.
+
+| Order | Statement |
+| --- | --- |
+| 1 | `app_secrets` ← `is_active = 0 … WHERE responsible_user_id IN (…) AND is_active = 1`, via `manager.getRepository(AppSecret)` |
+| 2 | `sec_user_roles` ← `… WHERE user_id IN (…) AND is_active = 1` |
+| 3 | `sec_users` ← `… WHERE sec_user_id IN (…) AND is_active = 1` |
+
+Credentials die first and the account last, so a failure mid-transaction can never leave the account switched off with a live credential behind it — and the rollback makes even that ordering moot. Audit columns are written on every row.
+
+**No isolation level and no lock timeout are set.** The codebase has **no such precedent** at any of its 22 transaction sites, including the sibling's own write transaction; introducing one inside a destructive spec would be inventing a convention where none exists (`W-9`, accepted with the ceiling and chunking as the actual mitigations).
+
+### 5.7 Dry run (R-AGD-006) and failure surface
+
+In dry-run the pass executes §5.1–§5.5 and then **returns without opening a transaction at all** — not a transaction that rolls back. A bug in the write path cannot fire in a mode whose purpose is safety.
+
+The whole pass is wrapped so that **it never throws**: the controller does not `await` the service and the process has no `unhandledRejection` handler, so an escaping rejection terminates it (`W-5`, pre-existing). Failures become an `abortReason` plus a logged summary.
+
+---
+
+## 6. Frontend (Admin SSR panel) impact
+
+None.
+
+---
+
+## 7. Integration impact
+
+| System | Impact |
+| --- | --- |
+| **AGRESSO** | Read only. One **fewer** HTTP request on ~half of runs, from DD-D2 |
+| **`app_secrets` consumers** | Machine tokens whose responsible user is retired stop authenticating — the intended security outcome |
+| **STAR** | A retired user can no longer log in. No client change |
+
+New env vars: none. New cron: none. New events: none.
+
+---
+
+## 8. Security & authorization
+
+- Trigger unchanged: `GET /api/agresso/staff/clone/execute`, `@UseGuards(RolesGuard)` + `@Roles(SecRolesEnum.SYSTEM_ADMIN)`.
+- The pass **withdraws** authorization and grants none. EX-2 prevents self-lockout of administrators.
+- No new secret. The `app_secrets` cascade disables credentials; it never reads or logs a secret value.
+- All SQL is parameterised; id arrays are asserted numeric before interpolation, matching the sibling repository's existing `assertNumericIds` guard.
+
+---
+
+## 9. Observability
+
+| Level | Line |
+| --- | --- |
+| `error` | Every abort, with `abortReason` and its operands (page number, counts, ceiling) |
+| `warn` | Each exclusion and each shield, with the account id and the rule |
+| `log` | One structured summary line on **both** the success and the abort path |
+
+Summary fields added: `dryRun`, `activePopulation`, `ceiling`, `ceilingBreached`, `deactivated`, `rolesDeactivated`, `secretsDeactivated`, `excludedExternal`, `excludedSystemAdmin`, `excludedAmbiguous`, `shieldedBySkip`, `abortReason`. `abortReason` is **absent**, not null, on success — so its presence alone identifies an abort (`G-4`).
+
+---
+
+## 10. Testing strategy
+
+| Tier | Command | Covers | Cannot cover |
+| --- | --- | --- | --- |
+| Unit | `npm test -- --silent` | Candidate set, shields, all three exclusions, all four preconditions, config resolution, chunking, dry-run short-circuit | **Anything about database state** — `rootDir: src` never executes `test/fixtures/` |
+| Fixture | `npm run test:fixtures` | Three-table cascade, mid-transaction rollback, dry-run zero-delta, `tinyint` coercion, migration up/down | The real composition of Dev/Prod `sec_users` |
+| Human | Dry run read at the HITL pause | The actual deactivation population | — |
+
+Every precondition test must be **observed failing before it is trusted** (`K-004`). A mocked query builder cannot represent SQL operator precedence — any `WHERE` combining `AND` with `OR` is asserted against generated SQL or a real database, never against a call sequence (`KZ-017`).
+
+> **Belt-and-braces guards need an independent falsifier** (sibling Kaizen P1). Where a rule is pinned both in SQL (`AND is_active = 1`) and in memory (candidate filtering), the SQL clause must be falsified at the **fixture** tier — driving the service cannot reach it, because the in-memory filter shadows it. That is precisely the shape that left 13/13 green over a removed SQL predicate in the sibling.
+
+---
+
+## 11. Rollout
+
+| Step | Action | Restores |
+| --- | --- | --- |
+| 1 | Merge. **The migration is not applied by the pipeline** (`K-015`) — applying it is a separate human step | — |
+| 2 | Apply the migration. The pass is now present and **inert** (`dryRun = true`) | — |
+| 3 | Trigger the sync. Read the dry-run summary. **A C-3 breach is expected on the first run** | — |
+| 4 | If the population is correct, set `ARI_STAFF_DEACTIVATION_DRY_RUN = 'false'` | **Step 6 restores it** |
+| 5 | Trigger the sync. If C-3 aborts legitimately, raise `CEILING_FRACTION` **for this run** | **Step 6 restores it** |
+| 6 | **Restore `DRY_RUN = 'true'` and the original ceiling.** Both are explicit steps, not reminders | — |
+
+> Step 6 exists because `F-5` recorded the opposite: *"raise the ceiling for one run"* with no step restoring it — a forgotten restore disables the spec's only volume defence indefinitely and invisibly.
+
+**Backout:** revert the code; the migration's `down()` deletes the four keys. Already-written `is_active = 0` rows are **not** reverted by a code rollback — recovery is the sibling's reactivation for returning staff, and a manual `UPDATE` otherwise. `app_secrets` is never re-armed by any automatic path (the deliberate asymmetry).
+
+**Comms:** platform administrators before step 4; the security owner, because machine credentials will be disabled.
+
+---
+
+## 12. Design decisions log
+
+| # | Date | Decision | Rationale | Rejected alternative |
+| --- | --- | --- | --- | --- |
+| **DD-D1** | 2026-09-15 | A separate `SecUserDeactivationService` + `SecUserDeactivationRepository`, not an extension of the reconciler | Makes the split invariant structural rather than a reading convention; the destructive audit surface is one file. The reconciler is already 642 LOC | Fold into the reconciler — rejected: constructive and destructive halves in one file |
+| **DD-D2** | 2026-09-15 | Fix `findNumberOfPages` to `Math.ceil(total/pageSize)` | The current `round + remainder` overcounts by one whenever `total % 1000 >= 500`, producing a legitimately empty trailing page on ~half of all totals. C-2 is unusable over it. See the Step 2.3 challenge below | Tolerate a trailing empty page in C-2 — rejected: encodes a bug as a rule and blinds C-2 to a genuinely failed last page |
+| **DD-D3** | 2026-09-15 | C-2 measures the **fetch** (per-page row counts + accumulation vs `totalElements`), not carnet distinctness | Retires `F-1`, `R-4`, `W-6` and `NEW-3` at once by measuring what a failed page actually changes. *(Kaizen: enumerate what machinery **does**, not what it was **for**.)* | Patch the skip subtraction — rejected: a fourth arithmetic correction on a formula whose premise was wrong |
+| **DD-D4** | 2026-09-15 | The reconciler exposes its `sec_users` snapshot; deactivation performs no second read | NFR-AGD-001, and it removes a TOCTOU window between two reads. Snapshot safety argued in §5.2 | Re-read in the deactivation service — rejected: second read, second index, two truths |
+| **DD-D5** | 2026-09-15 | `normalizeEmail` is extracted to one shared util both services import | Two copies of a normalization rule is how the shield key and the match key drift apart — the failure mode is a retired account, and no test would fail | Duplicate the two-line function — rejected on blast radius, not on style |
+| **DD-D6** | 2026-09-15 | EX-1 resolves the external status **by name**, and C-4 aborts unless exactly one row matches | `user_status` has no seed, migration or enum anywhere; the literal `4` was never verifiable. Converts an unverifiable constant into a checkable precondition (`W-1`) | Hard-code `status_id = 4` — rejected: shields the wrong population silently if wrong |
+| **DD-D7** | 2026-09-15 | Dry-run opens **no transaction**, and defaults to enabled on any resolution failure | A rolled-back transaction still executes the write path; a mode whose purpose is safety must not be able to write | Transaction + rollback — rejected: exercises exactly the code it exists to avoid |
+| **DD-D8** | 2026-09-15 | `app_secrets` written via `manager.getRepository(AppSecret)`, written **first** | `AppSecretRepository` cannot join the transaction (`J-6`, verified) and drags `Scope.REQUEST` (`W-10`). Credentials-first ordering means no interleaving leaves a live credential on a dead account | `AppSecretRepository` — rejected: structurally cannot participate |
+| **DD-D9** | 2026-09-15 | The four config keys are seeded by **migration**, added to `AppConfigKey` | Closes `F-2`. `getEnv` throws on unset and `updateConfig` throws on unknown, so a key cannot be born through the API; six in-repo migrations already seed `app_config` | Env vars / code constants — rejected: no in-repo precedent, and not operator-changeable |
+| **DD-D10** | 2026-09-15 | No isolation level, no lock timeout | None of the codebase's 22 transaction sites sets one. Inventing a convention inside a destructive spec is the wrong place for it (`W-9`) | `SERIALIZABLE` — rejected: unprecedented here, and widens the lock window |
+
+---
+
+## 13. Step 2.3 — reversion challenge
+
+Only one decision removes or inverts behavior the codebase already ships.
+
+| DD | What it takes away | Challenge: *what does removing this break?* | Outcome |
+| --- | --- | --- | --- |
+| **DD-D2** | The `round + remainder` page count, shipped and in use by the sibling | The extra page is always the *last* one and always returns zero rows, so `base()` maps nothing and writes nothing from it. `ceil(n) <= round(n)+1` for all `n >= 0`, so the fix never requests **fewer** pages than are needed — the coverage claim is a property of the arithmetic, not of the data. The only observable differences are one fewer HTTP request on ~half of runs and one fewer `Processing page` log line. **Nothing depends on the extra page.** | **Safe — adopt.** Its existing test must be updated, and the update is itself the falsifier: reverting to `round` reddens the new page-count test |
+
+Two adjacent changes were checked and are **not** reversions: exposing the reconciler's snapshot (additive) and extracting `normalizeEmail` (a move, with the original delegating).
+
+**Deliberately not changed:** the controller's fire-and-forget call. Making it `await` would revert delivered behavior and change the endpoint's response timing for a problem this spec solves by never throwing (§5.7).
+
+---
+
+## 14. Budget
+
+Estimated from the finished design. `/akili-execute` trips against these — exceeding one is **information**, and the Leader escalates rather than continuing.
+
+| Metric | Expected |
+| --- | --- |
+| Tasks | **10** |
+| LOC | **~2,200** (≈ 750 implementation, ≈ 1,450 tests) |
+| Review rounds | **6** |
+
+**Basis, stated so a reader can falsify it.** The sibling — same module, same author-model arrangement, same test conventions — shipped **~2,200 LOC across 9 tasks**, of which the test tier was **~2.3×** the implementation tier and overran a budget that had assumed a conventional ratio. This spec's implementation surface is smaller (no create/grant/re-select machinery, no savepoint) but its **gate** surface is larger: four preconditions, three exclusions, one shield rule and a dry-run mode each need a falsifier, and `K-004` requires several to be observed red. The LOC figure therefore carries the sibling's measured test ratio rather than a fresh guess.
+
+**Review rounds at 6, not 5:** the destructive branch of the parent spec drew *every* severe finding across three adversarial passes and two judges, twice by reintroducing a class a previous correction had removed. Budgeting the sibling's round count for the half that historically consumed them would be planning for the wrong spec.
+
+**Against the declared depth:** 10 tasks / ~2,200 LOC / 6 rounds is consistent with **Full**, which is confirmed rather than revised. It is, however, well past the ~400 LOC single-PR threshold — see the PR strategy in `tasks.md`.
+
+---
+
+## 15. Open questions
+
+| # | Question | Owner | Due |
+| --- | --- | --- | --- |
+| OQ-1 | Does `user_status` actually contain a row named `'External'`? | Platform admin | Before step 4 of rollout. **Not blocking** — C-4 aborts, and the name is config |
+| OQ-2 | Fix `RSK-6` (`validation()` null-user auth hole) in its own spec? | Security owner | Out of scope here |
+| OQ-3 | Is `0.05 / 10` the right ceiling once the real population is known? | Platform admin | After the first dry run; config, no deploy |
+
+---
+
+## 16. References
+
+- [`./requirements.md`](./requirements.md), [`./proposal.md`](./proposal.md), [`./judgment-inherited.md`](./judgment-inherited.md)
+- Archived sibling: [`docs/specs/archive/2026-09-15-changes--agresso-staff-sec-users-sync/`](../../archive/2026-09-15-changes--agresso-staff-sec-users-sync/)
+- Sibling Kaizen (P1 — belt-and-braces guards need an independent falsifier): [`docs/specs/kaizen/changes--agresso-staff-sec-users-sync.md`](../../kaizen/changes--agresso-staff-sec-users-sync.md)
+- In-repo precedents: `app-secrets.service.ts:44-53` (transaction manager), `1786738949211-seedClarisaMappingPhase.ts` (config seeding), `sec-user-reconciler.repository.ts` (chunking, `tinyint` coercion, `assertNumericIds`)
