@@ -334,7 +334,7 @@ concurrent *full-suite* runs — workers verify their own scope, the Leader re-m
 
 ---
 
-### T-14 — E2E: the malformed-row proof and the guard matrix
+### T-14 — E2E: the malformed-row proof and the guard matrix  ✅ `[x]` DONE
 
 - **Requirements covered:** **DC-3**, R-PRMS-011 *AND IT MUST leave the alignment writable*, R-PRMS-001 AC.3, NFR-005
 - **Files touched:** `test/prms-sync.e2e-spec.ts`
