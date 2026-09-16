@@ -616,6 +616,17 @@ describe('ByProjectComponent', () => {
   });
   // ── No-delegate cue: amber chip, same shape as a delegate chip, no X ───────
 
+  describe('no-delegate row', () => {
+    it('marks a project with no delegate, the way By person marks an inactive person', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
+
+      const rows = fixture.debugElement.queryAll(By.css('tr.by-project__row'));
+      // PRJ-001 has delegates → no marker; PRJ-002 has none → amber marker
+      expect((rows[0].nativeElement as HTMLElement).classList.contains('by-project__row--no-delegate')).toBe(false);
+      expect((rows[1].nativeElement as HTMLElement).classList.contains('by-project__row--no-delegate')).toBe(true);
+    });
+  });
+
   describe('no-delegate chip', () => {
     it('renders the amber warning chip with the triangle icon and no remove button', async () => {
       await createComponent([PROJECT_NO_DELEGATES]);

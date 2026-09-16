@@ -45,6 +45,16 @@
     transition: background-color 0.15s ease;
   }
 
+  // A project with no delegate gets the amber counterpart of the red accent
+  // By person uses for an inactive account: light wash + a bar down the left.
+  &__row--no-delegate {
+    background-color: color-mix(in srgb, #e69f00 5%, var(--ac-white-1));
+
+    td:first-child {
+      box-shadow: inset 3px 0 0 0 #e69f00;
+    }
+  }
+
   &__td {
     vertical-align: middle;
     padding: 12px 16px;
@@ -145,9 +155,11 @@
 
     // Borderless — the tint and the name colour carry the state; the email
     // line stays grey so it reads as secondary in both states.
+    // Inactive delegate — soft red hairline, mirroring the amber outline the
+    // "No PI Delegate assigned" chip uses, instead of the neutral grey border.
     &--inactive {
       background-color: color-mix(in srgb, var(--ac-red-1) 8%, var(--ac-white-1));
-      border: 1px solid var(--ac-grey-200);
+      border: 1px solid color-mix(in srgb, var(--ac-red-1) 10%, transparent);
       color: var(--ac-red-1);
     }
 
@@ -158,13 +170,12 @@
       color: var(--ac-red-1);
     }
 
-    // "No PI Delegate assigned" — outline only: white ground, amber hairline
-    // and amber text. Deliberately quieter than a filled chip: it states an
-    // absence, it is not a warning about a person.
+    // "No PI Delegate assigned" — amber hairline and amber text on a ground one
+    // step darker than the row wash, so the chip reads above its own row.
     &--warning {
-      background-color: var(--ac-white-1);
-      border: 1px solid #e69f00;
-      color: #8a4b08;
+      background-color: color-mix(in srgb, #e69f00 12%, var(--ac-white-1));
+      border: 1px solid #e69d008f;
+      color: #a55b0c;
     }
 
     // The warning cue keeps its leading icon (there is no email line there)
@@ -181,7 +192,7 @@
 
     &__name {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 17px;
       white-space: nowrap;
     }

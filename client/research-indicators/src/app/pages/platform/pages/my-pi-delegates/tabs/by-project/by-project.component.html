@@ -68,7 +68,7 @@
 
       <!-- Body -->
       <ng-template pTemplate="body" let-project>
-        <tr class="by-project__row">
+        <tr class="by-project__row" [class.by-project__row--no-delegate]="project.delegates.length === 0">
 
           <!-- Project — "CODE - Title" on top, labelled dates underneath (the
                same label → value treatment the Assign modal uses). A project
