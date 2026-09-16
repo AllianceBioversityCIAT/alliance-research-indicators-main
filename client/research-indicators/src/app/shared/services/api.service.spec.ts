@@ -673,6 +673,17 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call POST_PrmsSync without v1 on results/:resultCode/prms-sync', () => {
+      (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.POST_PrmsSync(123);
+
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('results/123/prms-sync', {}, { useResultInterceptor: true });
+      const calledUrl = (mockToPromiseService.post as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain('v1/');
+      expect(calledUrl).toBe('results/123/prms-sync');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });

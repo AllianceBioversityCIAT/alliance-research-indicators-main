@@ -146,12 +146,12 @@
       type="button"
       class="font-medium cursor-pointer disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF] text-sm text-white px-6 py-2.5 rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
       [ngClass]="{
-        'bg-[#035BA9] hover:bg-[#024987]': canSyncPrms(),
-        'bg-[#E8EBED] !text-[#8D9299]': !canSyncPrms()
+        'bg-[#035BA9] hover:bg-[#024987]': canSyncPrms() && !prmsSyncInFlight() && !prmsAlreadySynced(),
+        'bg-[#E8EBED] !text-[#8D9299]': !canSyncPrms() || prmsSyncInFlight() || prmsAlreadySynced()
       }"
-      [pTooltip]="!canSyncPrms() ? 'This button will become available once the result is approved and Pool Funding Alignment is completed.' : ''"
+      [pTooltip]="prmsSyncTooltip()"
       tooltipPosition="bottom"
-      [disabled]="!canSyncPrms()"
+      [disabled]="!canSyncPrms() || prmsSyncInFlight() || prmsAlreadySynced()"
       (click)="onPrmsSync()"
       data-testid="sidebar-prms-sync-button">
       PRMS SYNC

@@ -64,7 +64,8 @@ describe('ResultSidebarComponent', () => {
     };
 
     apiService = {
-      PATCH_SubmitResult: jest.fn().mockResolvedValue({ successfulRequest: true })
+      PATCH_SubmitResult: jest.fn().mockResolvedValue({ successfulRequest: true }),
+      POST_PrmsSync: jest.fn().mockResolvedValue({ successfulRequest: true })
     };
 
     allModalsService = {
@@ -112,7 +113,8 @@ describe('ResultSidebarComponent', () => {
     };
 
     bilateralService = {
-      currentAlignment: signal<AlignmentResponse | null>(null)
+      currentAlignment: signal<AlignmentResponse | null>(null),
+      getAlignment: jest.fn().mockResolvedValue(null)
     };
 
     await TestBed.configureTestingModule({
@@ -633,6 +635,162 @@ describe('ResultSidebarComponent', () => {
 
       const button = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button).toBeNull();
+    });
+
+    const enablePrmsSyncButton = () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+    };
+
+    it('calls POST_PrmsSync exactly once when the enabled button is clicked', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(false);
+      button?.click();
+      await fixture.whenStable();
+
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(1);
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledWith(123);
+    });
+
+    it('does not call POST_PrmsSync when the button is disabled', async () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 1 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      await component.onPrmsSync();
+
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+    });
+
+    it('does not fire a second request when clicked again while a sync is in flight', async () => {
+      enablePrmsSyncButton();
+      let resolveSync: (value: unknown) => void = () => undefined;
+      (apiService.POST_PrmsSync as jest.Mock).mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveSync = resolve;
+          })
+      );
+
+      const firstClick = component.onPrmsSync();
+      fixture.detectChanges();
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(1);
+
+      resolveSync({ successfulRequest: true });
+      await firstClick;
+    });
+
+    it('refreshes metadata and shows a success toast after a successful sync', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+
+      await component.onPrmsSync();
+
+      expect(metadataService.update).toHaveBeenCalledWith(123);
+      expect(actionsService.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Sent to PRMS',
+        detail: 'The result was sent to PRMS and is pending review.'
+      });
+    });
+
+    it('surfaces the server failure message instead of a hardcoded error', async () => {
+      enablePrmsSyncButton();
+      const serverMessage = 'Result is ineligible, gated, or the payload is incomplete';
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: serverMessage }
+      });
+
+      await component.onPrmsSync();
+
+      expect(metadataService.update).not.toHaveBeenCalled();
+      expect(actionsService.showToast).toHaveBeenCalledWith({
+        severity: 'error',
+        summary: 'Error',
+        detail: serverMessage
+      });
+    });
+
+    it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        is_synced_to_prms: true
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(true);
+      expect(component.prmsAlreadySynced()).toBe(true);
+      expect(component.prmsSyncTooltip()).toBe('This result has already been synced to PRMS.');
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+    });
+
+    it('does not call POST_PrmsSync when the result is already synced to PRMS', async () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        is_synced_to_prms: true
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      await component.onPrmsSync();
+
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+    });
+
+    it('keeps the PRMS SYNC button enabled and re-clickable after a failed sync', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: 'PRMS rejected the result' }
+      });
+
+      await component.onPrmsSync();
+      fixture.detectChanges();
+
+      expect(component.prmsAlreadySynced()).toBe(false);
+      expect(bilateralService.getAlignment).not.toHaveBeenCalled();
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(false);
+
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(2);
+    });
+
+    it('refreshes alignment after a successful sync and then disables the button', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+      (bilateralService.getAlignment as jest.Mock).mockImplementation(async () => {
+        const synced = { ...eligibleAlignment, is_synced_to_prms: true };
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(synced);
+        return synced;
+      });
+
+      await component.onPrmsSync();
+      fixture.detectChanges();
+
+      expect(bilateralService.getAlignment).toHaveBeenCalledWith('123');
+      expect(component.prmsAlreadySynced()).toBe(true);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
     });
   });
 
