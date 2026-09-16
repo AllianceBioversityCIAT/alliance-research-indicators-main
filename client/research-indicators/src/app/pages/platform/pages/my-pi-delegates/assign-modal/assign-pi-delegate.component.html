@@ -26,11 +26,13 @@
       optionLabel="name"
       filterBy="name,email"
       label="People"
+      [description]="peopleDescription()"
       placeholder="Select people to assign as delegates"
       [optionFilter]="selfExclusionFilter()"
       [optionsDisabled]="piDisabledPeople"
       [isRequired]="true"
       [itemHeight]="58"
+      selectedItemsSurfaceColor="var(--ac-white-1)"
       [disabled]="peopleDisabled()"
     >
       <!-- Option row inside the dropdown: name + email (+ carnet when present) -->
@@ -95,18 +97,6 @@
         </div>
       </ng-template>
     </app-multiselect>
-    <!-- CHANGE 3: helper text when person is fixed -->
-    @if (peopleDisabled()) {
-      <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
-        <i class="pi pi-lock shrink-0 !text-[12px]" aria-hidden="true"></i>
-        Opened from this person — only the projects can be changed here.
-      </p>
-    } @else {
-      <p class="atc-grey-600 m-0 font-['Barlow'] text-[13px] leading-[1.5]">
-        Select the people who will act as PI Delegates.
-        You cannot assign yourself.
-      </p>
-    }
     <!-- The PI of a selected project cannot be its delegate (backend rule
          R-PID-008): those people are greyed out in the list. -->
     @if (piDisabledPeople().length > 0) {
@@ -157,9 +147,11 @@
       optionLabel="project_name"
       filterBy="project_code,project_name"
       label="Projects"
+      [description]="projectsDescription()"
       placeholder="Select projects to assign delegates to"
       [isRequired]="true"
       [itemHeight]="66"
+      selectedItemsSurfaceColor="var(--ac-white-1)"
       [disabled]="projectsDisabled()"
     >
       <!-- Option row inside the dropdown -->
@@ -241,18 +233,6 @@
         </div>
       </ng-template>
     </app-multiselect>
-    <!-- CHANGE 1: helper text when project is fixed -->
-    @if (projectsDisabled()) {
-      <p class="atc-grey-600 m-0 flex items-center gap-1.5 font-['Barlow'] text-[13px] leading-[1.5]">
-        <i class="pi pi-lock shrink-0 !text-[12px]" aria-hidden="true"></i>
-        Opened from this project — only the people can be changed here.
-      </p>
-    } @else {
-      <p class="atc-grey-600 m-0 font-['Barlow'] text-[13px] leading-[1.5]">
-        Select the projects for this delegation.
-        Only your manageable projects will appear.
-      </p>
-    }
   </div>
 
   <!-- ── Pre-load note ──────────────────────────────────────────────────── -->
@@ -260,7 +240,7 @@
        current delegate assignments (pre-loaded from the cache). -->
   @if (getSelectedPeopleList().length > 0 || getSelectedProjectsList().length > 0) {
     <div
-      class="flex items-center gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-100)] px-3"
+      class="flex items-center gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-200)] px-3"
       role="status" aria-live="polite">
       <i class="pi pi-info-circle shrink-0 !text-[18px] text-[color:var(--ac-light-blue-500)]" aria-hidden="true"></i>
       <span class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">

@@ -950,4 +950,81 @@ describe('AssignPiDelegateComponent', () => {
       expect(component.formatDate(undefined)).toBe('—');
     });
   });
+  // ── Modal-local surfaces: grey banner, white selected rows ─────────────────
+
+  describe('surfaces', () => {
+    it('renders the pre-load banner on the grey-200 band', async () => {
+      const project = buildProject('SURF-1', [
+        { delegate_user_id: 1, name: 'Alice Example', email: 'alice@test.org' }
+      ]);
+      piService.byProjectCache.set([project]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'SURF-1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const banner = fixture.nativeElement.querySelector('[role="status"]') as HTMLElement;
+      expect(banner.className).toContain('bg-[color:var(--ac-grey-200)]');
+    });
+
+    it('asks both pickers for white selected rows (scoped to this modal)', () => {
+      fixture.detectChanges();
+      const multiselects = fixture.debugElement.queryAll(By.directive(MultiselectComponent));
+      expect(multiselects).toHaveLength(2);
+      for (const ms of multiselects) {
+        expect((ms.componentInstance as MultiselectComponent).selectedItemsSurfaceColor).toBe(
+          'var(--ac-white-1)'
+        );
+      }
+    });
+  });
+  // ── Field descriptions (moved out of standalone hints) ─────────────────────
+
+  describe('field descriptions', () => {
+    function descriptions(): string[] {
+      return Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('.description')
+      ).map(el => (el as HTMLElement).textContent?.trim() ?? '');
+    }
+
+    it('renders both helper texts as the multiselects\' description, not as separate paragraphs', () => {
+      fixture.detectChanges();
+
+      expect(descriptions()).toEqual([
+        'Select the people who will act as PI Delegates. You cannot assign yourself.',
+        'Select the projects for this delegation. Only your manageable projects will appear.'
+      ]);
+      // The old standalone hint paragraphs are gone
+      expect(fixture.nativeElement.querySelectorAll('.pi-lock')).toHaveLength(0);
+    });
+
+    it('swaps the People description for the locked copy when opened from a person', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byPerson', delegateUserId: 1 });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(descriptions()[0]).toBe('Opened from this person — only the projects can be changed here.');
+      expect(descriptions()[1]).toBe('Select the projects for this delegation. Only your manageable projects will appear.');
+    }));
+
+    it('swaps the Projects description for the locked copy when opened from a project', fakeAsync(() => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      expect(descriptions()[1]).toBe('Opened from this project — only the people can be changed here.');
+      expect(descriptions()[0]).toBe('Select the people who will act as PI Delegates. You cannot assign yourself.');
+    }));
+  });
 });

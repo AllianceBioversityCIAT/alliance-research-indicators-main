@@ -128,6 +128,22 @@ export class AssignPiDelegateComponent implements OnInit {
     () => this.allModalsService.assignPiDelegateContext()?.source === 'byPerson'
   );
 
+  // ─── Field descriptions (rendered by app-multiselect under each label) ───────
+
+  /** People field description — swaps for the locked copy when the person is fixed. */
+  readonly peopleDescription = computed(() =>
+    this.peopleDisabled()
+      ? 'Opened from this person — only the projects can be changed here.'
+      : 'Select the people who will act as PI Delegates. You cannot assign yourself.'
+  );
+
+  /** Projects field description — swaps for the locked copy when the project is fixed. */
+  readonly projectsDescription = computed(() =>
+    this.projectsDisabled()
+      ? 'Opened from this project — only the people can be changed here.'
+      : 'Select the projects for this delegation. Only your manageable projects will appear.'
+  );
+
   // ─── Inactive delegate warning (CHANGE 2) ────────────────────────────────────
   /**
    * Pre-loaded delegates that have is_active === false.
