@@ -15,7 +15,9 @@ import {
   ChangeDetectionStrategy,
   Component,
   OnInit,
+  QueryList,
   Signal,
+  ViewChildren,
   WritableSignal,
   computed,
   effect,
@@ -28,7 +30,11 @@ import { CacheService } from '@services/cache/cache.service';
 import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
-import type { DelegateSummary } from '@interfaces/pi-delegates.interface';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
+import { TooltipModule } from 'primeng/tooltip';
+import { ProjectUtilsService, type ProjectType } from '@services/project-utils.service';
+import { PiDelegatePeoplePickerStubService } from '../services/pi-delegate-picker-stub.service';
+import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates.interface';
 
 // ─── Local form-state shape ───────────────────────────────────────────────────
 
@@ -36,14 +42,26 @@ interface PersonOption {
   delegate_user_id: number;
   name: string;
   email: string;
+  /** sec_users.carnet — rendered in the option row when present. */
+  carnet?: string | null;
   /** Carried from DelegateSummary.is_active when seeded from byProjectCache.
    *  undefined for newly-picked options (active-users endpoint — always active). */
   is_active?: boolean;
 }
 
+/**
+ * Project option. The extra fields feed the option row (status, dates, pool
+ * funding, delegate count) and are seeded from byProjectCache so a pre-loaded
+ * chip shows exactly what a freshly-picked one shows.
+ */
 interface ProjectOption {
   project_code: string;
   project_name: string | null;
+  status?: string | null;
+  start_date?: Date | null;
+  end_date?: Date | null;
+  is_pool_funding_contributor?: boolean;
+  delegate_count?: number;
 }
 
 /**
@@ -65,7 +83,7 @@ interface ProjectsFormState {
 @Component({
   selector: 'app-assign-pi-delegate',
   standalone: true,
-  imports: [CommonModule, MultiselectComponent],
+  imports: [CommonModule, MultiselectComponent, CustomTagComponent, TooltipModule],
   templateUrl: './assign-pi-delegate.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -76,6 +94,8 @@ export class AssignPiDelegateComponent implements OnInit {
   private readonly cache = inject(CacheService);
   readonly piService = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
+  private readonly peoplePicker = inject(PiDelegatePeoplePickerStubService);
+  private readonly projectUtils = inject(ProjectUtilsService);
 
   // ─── Current user (self-exclusion, R-UI-005 AC.3) ─────────────────────────────
   // `sec_user_id` from CacheService.dataCache().user — same pattern used by isMyResult.
@@ -108,6 +128,22 @@ export class AssignPiDelegateComponent implements OnInit {
    */
   readonly peopleDisabled = computed(
     () => this.allModalsService.assignPiDelegateContext()?.source === 'byPerson'
+  );
+
+  // ─── Field descriptions (rendered by app-multiselect under each label) ───────
+
+  /** People field description — swaps for the locked copy when the person is fixed. */
+  readonly peopleDescription = computed(() =>
+    this.peopleDisabled()
+      ? 'Opened from this person — only the projects can be changed here.'
+      : 'Select the people who will act as PI Delegates. You cannot assign yourself.'
+  );
+
+  /** Projects field description — swaps for the locked copy when the project is fixed. */
+  readonly projectsDescription = computed(() =>
+    this.projectsDisabled()
+      ? 'Opened from this project — only the people can be changed here.'
+      : 'Select the projects for this delegation. Only your manageable projects will appear.'
   );
 
   // ─── Inactive delegate warning (CHANGE 2) ────────────────────────────────────
@@ -147,24 +183,94 @@ export class AssignPiDelegateComponent implements OnInit {
     return (option: PersonOption) => option.delegate_user_id !== Number(userId);
   });
 
+  // ─── PI exclusion in the People picker (backend rule R-PID-008) ──────────────
+  //
+  // The API rejects assigning the PI of a project as a delegate of that same
+  // project with a 400. Rather than letting the user hit that error, the PI is
+  // greyed out in the picker as soon as their project is selected.
+  //
+  // The PI comes from ProjectDelegates.pi_user_id — the same sec_user_id the
+  // backend rule resolves — so the match is by id, never by name.
+
+  /** People to grey out: the PI of any currently-selected project. */
+  readonly piDisabledPeople: WritableSignal<PersonOption[]> = signal([]);
+
+  /** Names of those people — shown as a hint under the People picker. */
+  readonly piDisabledNames = computed(() =>
+    this.piDisabledPeople()
+      .map(p => p.name)
+      .join(', ')
+  );
+
+  /** sec_user_ids of the PIs of the currently-selected projects. */
+  private readonly selectedProjectPiIds = computed(() => {
+    const selectedCodes = new Set(this.selectedProjects().map(p => p.project_code));
+    return new Set(
+      this.piService
+        .byProjectCache()
+        .filter(project => selectedCodes.has(project.project_code))
+        .map(project => project.pi_user_id)
+        .filter((id): id is number => id != null)
+    );
+  });
+
+  // ─── Option-row helpers (picker templates) ───────────────────────────────────
+
+  /** Maps a cached project row to the picker's option shape (same fields the row renders). */
+  private toProjectOption(project: ProjectDelegates): ProjectOption {
+    return {
+      project_code: project.project_code,
+      project_name: project.project_name,
+      status: project.status,
+      start_date: project.start_date,
+      end_date: project.end_date,
+      is_pool_funding_contributor: project.is_pool_funding_contributor,
+      delegate_count: project.delegates.length
+    };
+  }
+
+  /**
+   * Status chip data for <app-custom-tag> — the same mapping the By-project
+   * table uses, so a project shows one status design across the feature.
+   */
+  statusDisplay(project: { status?: string | null } | null | undefined): {
+    statusId: number;
+    statusName: string;
+  } {
+    return this.projectUtils.getStatusDisplay({
+      contract_status: project?.status
+    } as unknown as ProjectType);
+  }
+
+  /** dd MMM yyyy, or an em dash when the date is absent. */
+  formatDate(value: Date | string | null | undefined): string {
+    if (value == null) return '—';
+    const date = value instanceof Date ? value : new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
   // ─── Open-close tracking (to reset + pre-load on open) ────────────────────────
 
   private wasOpen = false;
 
+  /** Both pickers, so their search boxes can be emptied when the modal closes. */
+  @ViewChildren(MultiselectComponent) private readonly pickers?: QueryList<MultiselectComponent>;
+
   // ─── On init: register confirm/disabled into AllModalsService ─────────────────
 
   ngOnInit(): void {
-    // Register the confirm action and disabled guard into the modal config so that
-    // the app-modal footer buttons call back into this component.
+    // The Cancel / Accept buttons are rendered by THIS component at the end of
+    // its content (the Edit environment variable pattern), so they scroll with
+    // the form. app-modal's footer must therefore stay empty — leaving a
+    // cancelAction/confirmAction registered would render a second pair.
     this.allModalsService.modalConfig.update(modals => ({
       ...modals,
       assignPiDelegate: {
         ...modals.assignPiDelegate,
-        cancelText: 'Cancel',
-        confirmText: 'Accept',
-        cancelAction: () => this.onCancel(),
-        confirmAction: () => this.onConfirm(),
-        disabledConfirmAction: () => this.disabledConfirmIf()
+        cancelAction: undefined,
+        confirmAction: undefined,
+        disabledConfirmAction: undefined
       }
     }));
   }
@@ -174,7 +280,10 @@ export class AssignPiDelegateComponent implements OnInit {
     effect(() => {
       const isOpen = this.allModalsService.isModalOpen('assignPiDelegate')?.isOpen ?? false;
       if (!this.wasOpen && isOpen) {
-        // Transition: closed → open: pre-load from context (SYNC guard, R-UI-006).
+        // Transition: closed → open. Discard whatever the previous opening left
+        // behind BEFORE seeding — otherwise a modal opened from By person can
+        // still show the selection of the By project session that preceded it.
+        this.clearState();
         this.preLoadFromContext();
       }
       if (this.wasOpen && !isOpen) {
@@ -182,6 +291,15 @@ export class AssignPiDelegateComponent implements OnInit {
         this.clearState();
       }
       this.wasOpen = isOpen;
+    });
+
+    // Selected projects (or the loaded people list) changed → refresh the PI set.
+    effect(() => {
+      const piIds = this.selectedProjectPiIds();
+      const people = this.peoplePicker.list();
+      this.piDisabledPeople.set(
+        piIds.size === 0 ? [] : people.filter(person => piIds.has(person.delegate_user_id))
+      );
     });
   }
 
@@ -205,9 +323,7 @@ export class AssignPiDelegateComponent implements OnInit {
       );
       if (projectEntry) {
         this.projectsSignal.set({
-          selected_projects: [
-            { project_code: projectEntry.project_code, project_name: projectEntry.project_name }
-          ]
+          selected_projects: [this.toProjectOption(projectEntry)]
         });
         // Seed current delegates — this is the anti-revoke guard: if user saves without
         // changing the people selection, the POST will include exactly the current delegates.
@@ -217,6 +333,7 @@ export class AssignPiDelegateComponent implements OnInit {
             delegate_user_id: d.delegate_user_id,
             name: d.name,
             email: d.email,
+            carnet: d.carnet ?? null,
             is_active: d.is_active
           }))
         });
@@ -233,7 +350,7 @@ export class AssignPiDelegateComponent implements OnInit {
       const allProjects = this.piService.byProjectCache();
       const personProjects: ProjectOption[] = allProjects
         .filter(p => p.delegates.some(d => d.delegate_user_id === ctx.delegateUserId))
-        .map(p => ({ project_code: p.project_code, project_name: p.project_name }));
+        .map(p => this.toProjectOption(p));
 
       // Find the person's identity from any project that has them as a delegate.
       const delegateEntry: DelegateSummary | undefined = allProjects
@@ -248,6 +365,7 @@ export class AssignPiDelegateComponent implements OnInit {
                 delegate_user_id: delegateEntry.delegate_user_id,
                 name: delegateEntry.name,
                 email: delegateEntry.email,
+                carnet: delegateEntry.carnet ?? null,
                 is_active: delegateEntry.is_active
               }
             ]
@@ -267,78 +385,118 @@ export class AssignPiDelegateComponent implements OnInit {
   onConfirm(): void {
     const selectedPeople = this.selectedPeople();
     const selectedProjects = this.selectedProjects();
-
-    // Build the delta for each selected project (SYNC: anyone currently a delegate
-    // but not in the new selected-people list is BEING REVOKED).
     const allProjects = this.piService.byProjectCache();
-    const deltaLines: string[] = [];
-    const allRemoved: DelegateSummary[] = [];
-    let hasRevoke = false;
+    const isPersonMode = this.allModalsService.assignPiDelegateContext()?.source === 'byPerson';
 
-    for (const proj of selectedProjects) {
-      const currentEntry = allProjects.find(p => p.project_code === proj.project_code);
-      const currentDelegateIds = new Set<number>(
-        (currentEntry?.delegates ?? []).map(d => d.delegate_user_id)
-      );
-      const selectedIds = new Set<number>(selectedPeople.map(p => p.delegate_user_id));
+    // ── Desired delegate list per project ────────────────────────────────────
+    //
+    // The POST is a per-project SYNC: whoever is missing from a project's list is
+    // revoked. What "the full list" means depends on which axis the modal is
+    // editing, and getting that wrong revokes people the user never touched:
+    //
+    //   • Opened from a PROJECT — the People picker is the edited axis, so the
+    //     selection IS that project's desired list (removing a chip revokes).
+    //   • Opened from a PERSON — the Projects picker is the edited axis. Only
+    //     THAT person may be added to or removed from a project; every other
+    //     delegate of those projects must survive untouched.
+    const desiredByProject = new Map<string, PersonOption[]>();
 
-      const added = selectedPeople.filter(p => !currentDelegateIds.has(p.delegate_user_id));
-      const removed = (currentEntry?.delegates ?? []).filter(d => !selectedIds.has(d.delegate_user_id));
+    const currentDelegatesOf = (projectCode: string): PersonOption[] =>
+      (allProjects.find(p => p.project_code === projectCode)?.delegates ?? []).map(d => ({
+        delegate_user_id: d.delegate_user_id,
+        name: d.name,
+        email: d.email,
+        is_active: d.is_active
+      }));
 
-      if (removed.length > 0) hasRevoke = true;
-      allRemoved.push(...removed);
+    if (isPersonMode) {
+      const person = selectedPeople[0];
 
-      const projLabel = proj.project_name
-        ? `${proj.project_code} — ${proj.project_name}`
-        : proj.project_code;
+      // Selected projects: this person joins whoever is already there.
+      for (const proj of selectedProjects) {
+        const current = currentDelegatesOf(proj.project_code);
+        const alreadyThere = current.some(d => d.delegate_user_id === person?.delegate_user_id);
+        desiredByProject.set(
+          proj.project_code,
+          alreadyThere || !person ? current : [...current, person]
+        );
+      }
 
-      const addedNames =
-        added.length > 0 ? `+ Added: ${added.map(p => p.name).join(', ')}` : null;
-      const removedNames =
-        removed.length > 0
-          ? `— Removed (revoked): ${removed.map(d => d.name).join(', ')}`
-          : null;
-      const unchangedPeople = selectedPeople.filter(p =>
-        currentDelegateIds.has(p.delegate_user_id)
-      );
-      const unchangedNames =
-        unchangedPeople.length > 0
-          ? `= Unchanged: ${unchangedPeople.map(p => p.name).join(', ')}`
-          : null;
-      const revokeAll =
-        selectedPeople.length === 0 && (currentEntry?.delegates ?? []).length > 0
-          ? 'This will REVOKE ALL delegates for this project.'
-          : null;
-
-      const parts = [
-        `Project: ${projLabel}`,
-        addedNames,
-        unchangedNames,
-        removedNames,
-        revokeAll
-      ]
-        .filter(Boolean)
-        .join('\n');
-      deltaLines.push(parts);
+      // Projects dropped from the selection: this person leaves, nobody else does.
+      if (person) {
+        const selectedCodes = new Set(selectedProjects.map(p => p.project_code));
+        for (const project of allProjects) {
+          const hasPerson = project.delegates.some(d => d.delegate_user_id === person.delegate_user_id);
+          if (hasPerson && !selectedCodes.has(project.project_code)) {
+            desiredByProject.set(
+              project.project_code,
+              currentDelegatesOf(project.project_code).filter(
+                d => d.delegate_user_id !== person.delegate_user_id
+              )
+            );
+          }
+        }
+      }
+    } else {
+      for (const proj of selectedProjects) {
+        desiredByProject.set(proj.project_code, selectedPeople);
+      }
     }
 
-    // Build the detail message — explicitly warn about revoke-all (named red input).
-    const revokeAllWarning =
-      hasRevoke && allRemoved.length > 0
-        ? `\n\n⚠ REMOVAL: ${[...new Set(allRemoved.map(d => d.name))].join(', ')} will be REVOKED from their assigned projects in this selection.`
-        : '';
+    // ── Confirmation text: only what changes, per project ────────────────────
+    const deltaBlocks: string[] = [];
+    let hasRevoke = false;
 
+    // Names inline, comma-separated: a bullet per person turned a 20-delegate
+    // change into a screenful.
+    const nameList = (names: string[]): string => names.join(', ');
+
+    for (const [projectCode, desired] of desiredByProject) {
+      const entry = allProjects.find(p => p.project_code === projectCode);
+      const currentIds = new Set((entry?.delegates ?? []).map(d => d.delegate_user_id));
+      const desiredIds = new Set(desired.map(p => p.delegate_user_id));
+
+      const added = desired.filter(p => !currentIds.has(p.delegate_user_id));
+      const removed = (entry?.delegates ?? []).filter(d => !desiredIds.has(d.delegate_user_id));
+      if (removed.length > 0) hasRevoke = true;
+
+      const projectName =
+        entry?.project_name ??
+        selectedProjects.find(p => p.project_code === projectCode)?.project_name ??
+        null;
+
+      // Lead line, then ONE blank line, then the changes — no other spacing.
+      const sections: string[] = [
+        `<div>The following changes were made in project <strong>${projectCode}</strong>${
+          projectName ? ` — ${projectName}` : ''
+        }</div>`,
+        '<div>&nbsp;</div>'
+      ];
+      if (added.length > 0) {
+        sections.push(`<div><strong>Added:</strong> ${nameList(added.map(p => p.name))}</div>`);
+      }
+      if (removed.length > 0) {
+        sections.push(`<div><strong>Removed:</strong> ${nameList(removed.map(d => d.name))}</div>`);
+      }
+      if (added.length === 0 && removed.length === 0) {
+        sections.push('<div>No changes for this project.</div>');
+      }
+      deltaBlocks.push(sections.join(''));
+    }
+
+    // alert-detail-left opts this detail out of the dialog's centred text.
     const deltaDetail =
-      deltaLines.join('\n\n') +
-      revokeAllWarning +
-      (selectedPeople.length === 0
-        ? '\n\n⚠ No people selected — this will REVOKE ALL delegates from each selected project.'
-        : '');
+      `<div class="alert-detail-left">` +
+      deltaBlocks.join('<div>&nbsp;</div>') +
+      (!isPersonMode && selectedPeople.length === 0 && hasRevoke
+        ? '<div>&nbsp;</div><div><strong>No people selected — every delegate above loses access.</strong></div>'
+        : '') +
+      `</div>`;
 
-    // Build POST payload: per selected project, the FULL desired delegate list (SYNC).
-    const assignments = selectedProjects.map(proj => ({
-      project_id: proj.project_code,
-      delegates: selectedPeople.map(p => ({ delegate_user_id: p.delegate_user_id }))
+    // POST payload: the same desired lists the confirmation just described.
+    const assignments = Array.from(desiredByProject, ([project_id, delegates]) => ({
+      project_id,
+      delegates: delegates.map(p => ({ delegate_user_id: p.delegate_user_id }))
     }));
 
     // Show delta confirmation before writing (R-UI-007 AC.1).
@@ -392,6 +550,8 @@ export class AssignPiDelegateComponent implements OnInit {
   private clearState(): void {
     this.peopleSignal.set({ selected_people: [] });
     this.projectsSignal.set({ selected_projects: [] });
+    // A search typed into either dropdown must not survive into the next opening.
+    this.pickers?.forEach(picker => picker.clearSearchFilter());
   }
 
   /**

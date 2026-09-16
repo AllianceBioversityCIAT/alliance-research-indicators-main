@@ -38,7 +38,22 @@
 import { Injectable, inject, signal, effect } from '@angular/core';
 import { ApiService } from '@services/api.service';
 import { PiDelegatesClientService } from './pi-delegates.client.service';
-import { DelegateSummary, ProjectSummary } from '@shared/interfaces/pi-delegates.interface';
+import { DelegateSummary } from '@shared/interfaces/pi-delegates.interface';
+
+/**
+ * Project option shown in the Assign/Edit modal. Extends the plain summary with
+ * the fields the option row renders (status, dates, pool funding, delegate
+ * count) — all of them already in byProjectCache, so there is no extra request.
+ */
+export interface ProjectPickerOption {
+  project_code: string;
+  project_name: string | null;
+  status: string | null;
+  start_date: Date | null;
+  end_date: Date | null;
+  is_pool_funding_contributor: boolean;
+  delegate_count: number;
+}
 
 /**
  * Live source for the **People** picker in the Assign/Edit modal.
@@ -69,6 +84,7 @@ export class PiDelegatePeoplePickerStubService {
             delegate_user_id: u.sec_user_id,
             name: (`${u.first_name ?? ''} ${u.last_name ?? ''}`).trim() || u.email,
             email: u.email,
+            carnet: u.carnet ?? null,
             // Active-users endpoint only returns is_active=true users.
             is_active: true
           }))
@@ -95,7 +111,7 @@ export class PiDelegateProjectsPickerStubService {
   private readonly piService = inject(PiDelegatesClientService);
 
   /** Projects available for delegation — kept in sync with the table cache. */
-  readonly list = signal<ProjectSummary[]>([]);
+  readonly list = signal<ProjectPickerOption[]>([]);
   readonly loading = signal(false);
   readonly isOpenSearch = signal(false);
 
@@ -105,7 +121,12 @@ export class PiDelegateProjectsPickerStubService {
       this.list.set(
         this.piService.byProjectCache().map(p => ({
           project_code: p.project_code,
-          project_name: p.project_name
+          project_name: p.project_name,
+          status: p.status,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          is_pool_funding_contributor: p.is_pool_funding_contributor,
+          delegate_count: p.delegates.length
         }))
       );
     });

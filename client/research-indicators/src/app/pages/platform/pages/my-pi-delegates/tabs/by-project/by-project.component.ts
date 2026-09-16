@@ -25,6 +25,7 @@ import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
+import { PopoverModule } from 'primeng/popover';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
 import { ProjectUtilsService, type ProjectType } from '@services/project-utils.service';
@@ -42,6 +43,7 @@ import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates
     ButtonModule,
     InputTextModule,
     TooltipModule,
+    PopoverModule,
     SearchExportControlsComponent,
     CustomTagComponent
   ],
@@ -81,31 +83,6 @@ export class ByProjectComponent {
     this.statusTerm.set('All');
   }
 
-  // ─── Summary line (rendered inside the table card) ───────────────────────────
-  readonly summaryPeople = computed(() => {
-    const ids = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) ids.add(d.delegate_user_id);
-    }
-    return ids.size;
-  });
-
-  readonly summaryAssignments = computed(() =>
-    this.service.byProjectCache().reduce((sum, p) => sum + p.delegates.length, 0)
-  );
-
-  readonly summaryProjects = computed(() => this.service.byProjectCache().length);
-
-  readonly summaryInactive = computed(() => {
-    const seen = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) {
-        if (d.is_active === false) seen.add(d.delegate_user_id);
-      }
-    }
-    return seen.size;
-  });
-
   /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {
     const query = this.searchTerm().trim().toLowerCase();
@@ -125,14 +102,21 @@ export class ByProjectComponent {
    * Does NOT affect the same person on other projects (R-UI-008 AC.1).
    */
   onRevokeDelegate(project: ProjectDelegates, delegate: DelegateSummary): void {
+    // Same block layout as the assign confirmation: the project on one line, a
+    // blank line, then the change in bold. Left-aligned via alert-detail-left.
+    const projectLabel = project.project_name
+      ? `<strong>${project.project_code}</strong> — ${project.project_name}`
+      : `<strong>${project.project_code}</strong>`;
+
     this.actions.showGlobalAlert({
       severity: 'warning',
       summary: 'Revoke PI Delegate',
       detail:
-        `Remove ${delegate.name} (${delegate.email}) as PI Delegate from` +
-        ` project ${project.project_code}` +
-        (project.project_name ? ` — ${project.project_name}` : '') +
-        `? This will revoke their delegate access for this project only.`,
+        `<div class="alert-detail-left">` +
+        `<div>The following changes will be made in project ${projectLabel}</div>` +
+        `<div>&nbsp;</div>` +
+        `<div><strong>Removed:</strong> ${delegate.name}</div>` +
+        `</div>`,
       confirmCallback: {
         label: 'Revoke',
         event: () => {
@@ -158,6 +142,19 @@ export class ByProjectComponent {
       projectCode: project.project_code,
       projectName: project.project_name
     });
+  }
+
+  // ─── Delegates cell overflow ─────────────────────────────────────────────────
+
+  /** Chips shown inline; the rest move into the "+N more" popover. */
+  private static readonly MAX_VISIBLE_DELEGATES = 4;
+
+  visibleDelegates(project: ProjectDelegates): DelegateSummary[] {
+    return project.delegates.slice(0, ByProjectComponent.MAX_VISIBLE_DELEGATES);
+  }
+
+  hiddenDelegateCount(project: ProjectDelegates): number {
+    return Math.max(0, project.delegates.length - ByProjectComponent.MAX_VISIBLE_DELEGATES);
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

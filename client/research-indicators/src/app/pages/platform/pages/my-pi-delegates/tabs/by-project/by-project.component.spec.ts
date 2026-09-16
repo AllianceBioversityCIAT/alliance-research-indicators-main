@@ -58,12 +58,15 @@ const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
 
 // ─── Service stubs ────────────────────────────────────────────────────────────
 
-function buildServiceStub(rows: ProjectDelegates[] = []) {
+function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
   return {
     byProjectCache: signal(rows),
     loading: signal(false),
     error: signal<string | null>(null),
-    revokePair: jest.fn().mockResolvedValue(undefined)
+    revokePair: jest.fn().mockResolvedValue(undefined),
+    currentUserId: signal(currentUserId),
+    // Mirrors the real service: PI when the project's pi_user_id is the caller.
+    isPiOf: (project: ProjectDelegates) => currentUserId != null && project.pi_user_id === currentUserId
   };
 }
 
@@ -94,8 +97,8 @@ describe('ByProjectComponent', () => {
   let serviceStub: ReturnType<typeof buildServiceStub>;
   let actionsStub: ReturnType<typeof buildActionsStub>;
 
-  async function createComponent(rows: ProjectDelegates[] = []) {
-    serviceStub = buildServiceStub(rows);
+  async function createComponent(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
+    serviceStub = buildServiceStub(rows, currentUserId);
     actionsStub = buildActionsStub();
 
     await TestBed.configureTestingModule({
@@ -127,30 +130,71 @@ describe('ByProjectComponent', () => {
       expect(text).toContain('Alpha Research');
     });
 
+    it('renders "CODE - Title" on one line, in the row colour, not blue', () => {
+      const name = fixture.debugElement.query(By.css('.by-project__project__name'))
+        .nativeElement as HTMLElement;
+      expect(name.classList.contains('atc-primary-blue-600')).toBe(false);
+      expect(name.textContent?.replace(/\s+/g, ' ').trim()).toBe('PRJ-001 - Alpha Research');
+    });
+
+    it('labels both dates when the project has them', () => {
+      const cell = (fixture.debugElement.queryAll(By.css('.by-project__td--project'))[0]
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).toContain('Start date');
+      expect(cell).toContain('End date');
+    });
+
     it('renders status pill for PRJ-001', () => {
       const text = fixture.nativeElement.textContent as string;
       expect(text).toContain('Ongoing');
     });
 
-    it('renders pool-funding Yes badge with icon for PRJ-001', () => {
-      const icons = fixture.debugElement.queryAll(By.css('.pi-check-circle'));
-      expect(icons.length).toBeGreaterThanOrEqual(1);
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('Yes');
+    it('renders pool funding as plain Yes / No — no icon', () => {
+      const values = fixture.debugElement
+        .queryAll(By.css('.by-project__pool-value'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(values).toContain('Yes'); // PRJ-001 contributes
+      expect(values).toContain('No'); // PRJ-002 does not
+
+      // the old icon badges are gone
+      expect(fixture.debugElement.queryAll(By.css('.pi-check-circle'))).toHaveLength(0);
+      expect(fixture.debugElement.queryAll(By.css('.pi-minus-circle'))).toHaveLength(0);
     });
 
-    it('renders pool-funding No badge with icon for PRJ-002', () => {
-      const icons = fixture.debugElement.queryAll(By.css('.pi-minus-circle'));
-      expect(icons.length).toBeGreaterThanOrEqual(1);
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('No');
+    it('renders each delegate chip as name over email, with no tooltip icon', () => {
+      const chips = fixture.debugElement.queryAll(By.css('.by-project__chip'));
+      expect(chips.length).toBeGreaterThanOrEqual(2);
+
+      const first = chips[0].nativeElement as HTMLElement;
+      expect(first.querySelector('.by-project__chip__name')?.textContent?.trim()).toBe('Alice Example');
+      expect(first.querySelector('.by-project__chip__email')?.textContent?.trim()).toBe('alice@test.org');
+      // the hover icon is gone — both values are printed in the chip
+      expect(first.querySelector('.by-project__chip__icon')).toBeNull();
+    });
+  });
+
+  describe('project dates', () => {
+    it('shows only Start date — and no dash — when the project has no end date', async () => {
+      await createComponent([
+        { ...PROJECT_WITH_DELEGATES, project_code: 'D514', end_date: null }
+      ]);
+
+      const cell = (fixture.debugElement.query(By.css('.by-project__td--project'))
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).toContain('Start date');
+      expect(cell).not.toContain('End date');
+      // the old rendering printed "31 Dec 2023 – —" for this row
+      expect(cell).not.toContain('—');
+      expect(cell).not.toContain('–');
     });
 
-    it('renders delegate chips for PRJ-001', () => {
-      const text = fixture.nativeElement.textContent as string;
-      expect(text).toContain('Alice Example');
-      expect(text).toContain('alice@test.org');
-      expect(text).toContain('Bob Sample');
+    it('omits both labels when the project has neither date', async () => {
+      await createComponent([PROJECT_NO_DELEGATES]); // start and end are null
+
+      const cell = (fixture.debugElement.query(By.css('.by-project__td--project'))
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).not.toContain('Start date');
+      expect(cell).not.toContain('End date');
     });
   });
 
@@ -167,15 +211,32 @@ describe('ByProjectComponent', () => {
       expect(inactiveChip).toBeTruthy();
     });
 
-    it('INACTIVE chip has the inactive icon', () => {
-      const icon = fixture.debugElement.query(By.css('.by-project__chip--inactive .by-project__chip__inactive-icon'));
-      expect(icon).toBeTruthy();
+    it('INACTIVE chip carries the rotated marker explaining why', () => {
+      const chip = fixture.debugElement.query(By.css('.by-project__chip--inactive'))
+        .nativeElement as HTMLElement;
+
+      const icon = chip.querySelector('.by-project__chip__inactive-icon') as HTMLElement;
+      expect(icon).not.toBeNull();
+      expect(icon.classList.contains('pi-exclamation-circle')).toBe(true);
+      expect(icon.style.transform).toBe('rotate(180deg)');
+      expect(icon.getAttribute('aria-label')).toBe('This delegate is inactive');
+    });
+
+    it('INACTIVE chip keeps the red treatment and still prints name + email', () => {
+      const chip = fixture.debugElement.query(By.css('.by-project__chip--inactive'))
+        .nativeElement as HTMLElement;
+      expect(chip.querySelector('.by-project__chip__name')?.textContent?.trim()).toBe('Carol Gone');
+      expect(chip.querySelector('.by-project__chip__email')?.textContent?.trim()).toBe('carol@test.org');
     });
   });
 
   describe('active delegate chip (is_active === true)', () => {
     beforeEach(async () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
+    });
+
+    it('ACTIVE chip carries no inactive marker (negative discriminator)', () => {
+      expect(fixture.debugElement.query(By.css('.by-project__chip__inactive-icon'))).toBeNull();
     });
 
     it('ACTIVE chip does NOT have --inactive class', () => {
@@ -204,6 +265,23 @@ describe('ByProjectComponent', () => {
   });
 
   // ── 4. Revoke delegate (R-UI-008) ─────────────────────────────────────
+
+  describe('revoke confirmation layout', () => {
+    it('uses the same block layout as the assign dialog', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const xBtn = fixture.debugElement.query(By.css('.by-project__chip__remove'));
+      (xBtn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('class="alert-detail-left"');
+      expect(alert.detail).toContain(
+        '<div>The following changes will be made in project <strong>PRJ-001</strong> — Alpha Research</div><div>&nbsp;</div>'
+      );
+      expect(alert.detail).toContain('<div><strong>Removed:</strong> Alice Example</div>');
+    });
+  });
 
   describe('revoke delegate', () => {
     beforeEach(async () => {
@@ -343,10 +421,14 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
     });
 
-    it('renders the "Assign people" text button', () => {
+    it('renders Assign people as an icon button with a tooltip, like By person', () => {
       const btn = fixture.debugElement.query(By.css('.by-project__assign-btn'));
       expect(btn).toBeTruthy();
-      expect((btn.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign people');
+      const el = btn.nativeElement as HTMLElement;
+      // icon-only now — the label lives in the tooltip
+      expect(el.textContent?.trim()).toBe('');
+      expect(el.querySelector('.pi-user-plus')).not.toBeNull();
+      expect(el.getAttribute('ng-reflect-text') ?? el.getAttribute('aria-label')).toContain('Assign');
     });
 
     it('renders the history icon button in an ENABLED state (disabled removed)', () => {
@@ -472,29 +554,15 @@ describe('ByProjectComponent', () => {
   });
 
   describe('summary line', () => {
-    it('renders inside the table card with people / assignments / projects counts', async () => {
-      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+    it('shows only the PI note — no counts, no inactive warning', async () => {
+      await createComponent([PROJECT_INACTIVE_DELEGATE]);
 
-      const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
-      const summary = card.querySelector('.by-project__summary-left') as HTMLElement | null;
-      expect(summary).not.toBeNull();
-      // 3 distinct delegates (Alice, Bob, Carol), 3 assignments, 2 projects
-      expect(summary?.textContent).toContain('3 people');
-      expect(summary?.textContent).toContain('3 active assignments');
-      expect(summary?.textContent).toContain('2 projects');
-    });
+      const summary = fixture.nativeElement.querySelector('.by-project__summary') as HTMLElement;
+      const text = summary.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
-    it('shows the inactive marker only when a delegate is inactive (discriminator)', async () => {
-      await createComponent([PROJECT_WITH_DELEGATES]);
-      let marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
-      expect(marker).toBeNull();
-
-      serviceStub.byProjectCache.set([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
-      fixture.detectChanges();
-
-      marker = fixture.nativeElement.querySelector('.by-project__summary-left .atc-red-1');
-      expect(marker).not.toBeNull();
-      expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+      expect(text).toBe('Only projects where you are the Principal Investigator or a PI Delegate are listed');
+      expect(text).not.toContain('inactive');
+      expect(fixture.nativeElement.querySelector('.by-project__summary-right')).toBeNull();
     });
   });
   // ── 10. Sortable columns (platform table convention) ──────────────────
@@ -511,17 +579,19 @@ describe('ByProjectComponent', () => {
 
     it('sorts the rendered rows when the Project header is clicked', () => {
       const firstName = () =>
-        (fixture.nativeElement.querySelector('.by-project__project__name') as HTMLElement).textContent?.trim();
-      expect(firstName()).toBe('Alpha Research');
+        (fixture.nativeElement.querySelector('.by-project__project__name') as HTMLElement)
+          .textContent?.replace(/\s+/g, ' ')
+          .trim();
+      expect(firstName()).toBe('PRJ-001 - Alpha Research');
 
       const projectHeader = fixture.debugElement.queryAll(By.css('th[pSortableColumn]'))[0];
       projectHeader.nativeElement.click();
       fixture.detectChanges();
-      expect(firstName()).toBe('Alpha Research'); // ascending
+      expect(firstName()).toBe('PRJ-001 - Alpha Research'); // ascending
 
       projectHeader.nativeElement.click();
       fixture.detectChanges();
-      expect(firstName()).toBe('Gamma Study'); // descending
+      expect(firstName()).toBe('PRJ-003 - Gamma Study'); // descending
     });
   });
   // ── 11. Status column uses the shared project status tag ──────────────
@@ -562,6 +632,136 @@ describe('ByProjectComponent', () => {
       const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement;
       expect(tag.textContent?.trim()).toBe('Ongoing');
       expect(tag.style.borderColor.toLowerCase()).not.toBe('#f58220');
+    });
+  });
+  // ── No-delegate cue: amber chip, same shape as a delegate chip, no X ───────
+
+  describe('no-delegate row', () => {
+    it('marks a project with no delegate, the way By person marks an inactive person', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
+
+      const rows = fixture.debugElement.queryAll(By.css('tr.by-project__row'));
+      // PRJ-001 has delegates → no marker; PRJ-002 has none → amber marker
+      expect((rows[0].nativeElement as HTMLElement).classList.contains('by-project__row--no-delegate')).toBe(false);
+      expect((rows[1].nativeElement as HTMLElement).classList.contains('by-project__row--no-delegate')).toBe(true);
+    });
+  });
+
+  describe('no-delegate chip', () => {
+    it('renders the amber warning chip with the triangle icon and no remove button', async () => {
+      await createComponent([PROJECT_NO_DELEGATES]);
+
+      const cue = fixture.debugElement.query(By.css('[data-testid="no-delegate-cue"]'))
+        .nativeElement as HTMLElement;
+      expect(cue.classList.contains('by-project__chip')).toBe(true);
+      expect(cue.classList.contains('by-project__chip--warning')).toBe(true);
+      expect(cue.textContent?.trim()).toBe('No PI Delegate assigned');
+      expect(cue.querySelector('.pi-exclamation-triangle')).not.toBeNull();
+      // nothing to revoke here
+      expect(cue.querySelector('.by-project__chip__remove')).toBeNull();
+    });
+  });
+  // ── Toolbar layout ─────────────────────────────────────────────────────────
+
+  describe('toolbar layout', () => {
+    it('draws no rule under the summary line and keeps Clear Filters beside the search', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const summary = fixture.nativeElement.querySelector('.by-project__summary') as HTMLElement;
+      expect(summary.className).not.toContain('border-b');
+
+      // the shared control is not stretched, so its two groups sit together
+      const control = fixture.nativeElement.querySelector('app-search-export-controls') as HTMLElement;
+      expect(control.className).not.toContain('flex-1');
+      expect(control.className).toContain('w-fit');
+    });
+  });
+  // ── My role column: PI vs delegated project ────────────────────────────────
+
+  describe('role column', () => {
+    it('says Principal Investigator when the caller is the PI, PI Delegate otherwise', async () => {
+      await createComponent(
+        [
+          { ...PROJECT_WITH_DELEGATES, pi_user_id: 99 }, // caller is the PI
+          { ...PROJECT_NO_DELEGATES, pi_user_id: 7 } // caller only delegates here
+        ],
+        99
+      );
+
+      const roles = fixture.debugElement
+        .queryAll(By.css('.by-project__role'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(roles).toEqual(['Principal Investigator', 'PI Delegate']);
+
+      // plain text, like Pool funding — no emphasis variant
+      expect(fixture.debugElement.queryAll(By.css('.by-project__role--delegate'))).toHaveLength(0);
+    });
+
+    it('treats a project with no PI account as delegated (negative discriminator)', async () => {
+      await createComponent([{ ...PROJECT_WITH_DELEGATES, pi_user_id: null }], 99);
+
+      const role = fixture.debugElement.query(By.css('.by-project__role'))
+        .nativeElement as HTMLElement;
+      expect(role.textContent?.trim()).toBe('PI Delegate');
+    });
+  });
+  // ── Delegates cell overflow: inline chips + "+N more" popover ──────────────
+
+  describe('delegates overflow', () => {
+    function projectWith(count: number): ProjectDelegates {
+      return {
+        ...PROJECT_WITH_DELEGATES,
+        project_code: 'MANY',
+        delegates: Array.from({ length: count }, (_, i) => ({
+          delegate_user_id: i + 1,
+          name: `Person ${i + 1}`,
+          email: `p${i + 1}@test.org`,
+          is_active: true
+        }))
+      };
+    }
+
+    it('shows every delegate inline while there are four or fewer', async () => {
+      await createComponent([projectWith(4)]);
+
+      expect(fixture.debugElement.queryAll(By.css('.by-project__chip'))).toHaveLength(4);
+      expect(fixture.debugElement.query(By.css('.by-project__more'))).toBeNull();
+    });
+
+    it('caps the cell at four chips and moves the rest behind "+N more"', async () => {
+      await createComponent([projectWith(7)]);
+
+      const cell = fixture.nativeElement.querySelector('.by-project__td--delegates') as HTMLElement;
+      expect(cell.querySelectorAll('.by-project__chip')).toHaveLength(4);
+
+      const more = fixture.debugElement.query(By.css('.by-project__more'))
+        .nativeElement as HTMLElement;
+      expect(more.textContent?.trim()).toBe('+3 more');
+    });
+
+    it('renders the popover chips as full-width rows so the X sits flush right', async () => {
+      await createComponent([projectWith(7)]);
+
+      const more = fixture.debugElement.query(By.css('.by-project__more'))
+        .nativeElement as HTMLButtonElement;
+      more.click();
+      fixture.detectChanges();
+
+      const panelChips = Array.from(
+        document.querySelectorAll('.by-project__more-list .by-project__chip')
+      );
+      expect(panelChips.length).toBe(7);
+      for (const chip of panelChips) {
+        expect(chip.classList.contains('by-project__chip--block')).toBe(true);
+      }
+    });
+
+    it('counts hidden delegates from the project row', async () => {
+      await createComponent([projectWith(7)]);
+
+      expect(component.visibleDelegates(projectWith(7))).toHaveLength(4);
+      expect(component.hiddenDelegateCount(projectWith(7))).toBe(3);
+      expect(component.hiddenDelegateCount(projectWith(2))).toBe(0);
     });
   });
 });

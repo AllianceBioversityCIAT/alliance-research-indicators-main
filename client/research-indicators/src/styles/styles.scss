@@ -283,3 +283,11 @@ textarea::placeholder {
     color: #334155bd !important;
   }
 }
+
+// Global-alert details are centred by default. A detail injected through
+// [innerHTML] gets no component attribute, so this opt-out lives here rather
+// than in global-alert.component.scss, where the scoped selector never matches.
+.alert .detail .alert-detail-left {
+  display: block;
+  text-align: left;
+}

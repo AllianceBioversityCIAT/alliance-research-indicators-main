@@ -108,25 +108,6 @@ export class ByPersonComponent {
     this.searchTerm.set('');
   }
 
-  // ─── Summary line (rendered inside the table card) ───────────────────────────
-  readonly summaryPeople = computed(() => this.personRows().length);
-
-  readonly summaryAssignments = computed(() =>
-    this.personRows().reduce((sum, row) => sum + row.projects.length, 0)
-  );
-
-  readonly summaryProjects = computed(() => {
-    const codes = new Set<string>();
-    for (const row of this.personRows()) {
-      for (const project of row.projects) codes.add(project.project_code);
-    }
-    return codes.size;
-  });
-
-  readonly summaryInactive = computed(
-    () => this.personRows().filter(row => row.is_active === false).length
-  );
-
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
   /**
    * Revoke this person from the named project only.
@@ -135,17 +116,62 @@ export class ByPersonComponent {
    * Uses the same ActionsService.showGlobalAlert pattern as ByProjectComponent (T-UI-05).
    */
   onRevokeProject(row: PersonRow, project: { project_code: string; project_name: string | null }): void {
+    // Same block layout as the assign confirmation (project, blank line, change).
+    const projectLabel = project.project_name
+      ? `<strong>${project.project_code}</strong> — ${project.project_name}`
+      : `<strong>${project.project_code}</strong>`;
+
     this.actions.showGlobalAlert({
       severity: 'warning',
       summary: 'Revoke PI Delegate',
       detail:
-        `Remove ${row.name} (${row.email}) as PI Delegate from project ${project.project_code}` +
-        (project.project_name ? ` — ${project.project_name}` : '') +
-        `? This will revoke their delegate access for this project only.`,
+        `<div class="alert-detail-left">` +
+        `<div>The following changes will be made in project ${projectLabel}</div>` +
+        `<div>&nbsp;</div>` +
+        `<div><strong>Removed:</strong> ${row.name}</div>` +
+        `</div>`,
       confirmCallback: {
         label: 'Revoke',
         event: () => {
           void this.service.revokePair(project.project_code, row.delegate_user_id);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel'
+      }
+    });
+  }
+
+  // ─── Remove-delegate affordance (inactive people only) ───────────────────────
+  /**
+   * Revokes the person from every project they are delegated on. Offered instead
+   * of "assign projects" when the account is inactive — there is no point adding
+   * projects to someone who cannot review results.
+   */
+  onRemoveDelegate(row: PersonRow): void {
+    // One block per project, in the same shape as the assign confirmation.
+    const blocks = row.projects.map(project => {
+      const label = project.project_name
+        ? `<strong>${project.project_code}</strong> — ${project.project_name}`
+        : `<strong>${project.project_code}</strong>`;
+      return (
+        `<div>The following changes will be made in project ${label}</div>` +
+        `<div>&nbsp;</div>` +
+        `<div><strong>Removed:</strong> ${row.name}</div>`
+      );
+    });
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: 'Remove PI Delegate',
+      detail: `<div class="alert-detail-left">${blocks.join('<div>&nbsp;</div>')}</div>`,
+      confirmCallback: {
+        label: 'Remove',
+        event: () => {
+          void this.service.revokeDelegate(
+            row.delegate_user_id,
+            row.projects.map(p => p.project_code)
+          );
         }
       },
       cancelCallback: {
@@ -165,16 +191,6 @@ export class ByPersonComponent {
       delegateUserId: row.delegate_user_id,
       name: row.name || null
     });
-  }
-
-  /** Two-letter avatar initials, same convention as the project-detail contacts. */
-  initials(name: string): string {
-    return (name || '')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(part => part[0]?.toUpperCase() ?? '')
-      .join('');
   }
 
   // ─── Private ──────────────────────────────────────────────────────────────────

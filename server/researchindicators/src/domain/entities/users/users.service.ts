@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { SecUserEntity } from './entities/sec-user.entity';
 import { ActiveUserResponseDto } from './dto/active-user-response.dto';
 import { UserStatusEnum } from './enum/user-status.enum';
+import { formatPersonName } from '../../shared/utils/name-format.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 
 @Injectable()
@@ -36,7 +37,13 @@ export class UsersService {
 
     const qb = this.secUserRepository
       .createQueryBuilder('su')
-      .select(['su.sec_user_id', 'su.first_name', 'su.last_name', 'su.email'])
+      .select([
+        'su.sec_user_id',
+        'su.first_name',
+        'su.last_name',
+        'su.email',
+        'su.carnet',
+      ])
       .where('su.status_id IN (:...statusIds)', {
         statusIds: [UserStatusEnum.ACCEPTED, UserStatusEnum.EXTERNAL_ACCEPTED],
       })
@@ -56,9 +63,11 @@ export class UsersService {
 
     return rows.map((row) => ({
       sec_user_id: Number(row.sec_user_id),
-      first_name: row.first_name ?? null,
-      last_name: row.last_name ?? null,
+      // sec_users holds mixed casing — normalise so pickers render one style.
+      first_name: formatPersonName(row.first_name) || null,
+      last_name: formatPersonName(row.last_name) || null,
       email: row.email,
+      carnet: row.carnet ?? null,
     }));
   }
 }

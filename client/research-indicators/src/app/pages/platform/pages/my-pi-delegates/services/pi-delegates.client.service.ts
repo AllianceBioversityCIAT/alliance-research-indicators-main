@@ -40,8 +40,27 @@ export class PiDelegatesClientService {
 
   // ─── Derived example (proves a single cache feeds all consumers) ─────────────
 
-  /** Total distinct projects in the by-project cache. Consumed by the summary header (R-UI-004). */
+  /** Total distinct projects in the by-project cache (PI + delegated). */
   readonly totalProjects = computed(() => this.byProjectCache().length);
+
+  /** sec_user_id the caches were loaded for — exposed so views can derive the caller's role. */
+  readonly currentUserId = this._userId.asReadonly();
+
+  /**
+   * True when the logged-in user is the Principal Investigator of that project.
+   * The list also contains projects the user only delegates on, so "my projects"
+   * and "projects I am the PI of" are NOT the same set.
+   */
+  isPiOf(project: ProjectDelegates): boolean {
+    const userId = this._userId();
+    return userId != null && project.pi_user_id === userId;
+  }
+
+  /** Projects where the user is the Principal Investigator. */
+  readonly projectsAsPi = computed(() => this.byProjectCache().filter(p => this.isPiOf(p)));
+
+  /** Projects the user reaches through a delegation, not as their PI. */
+  readonly projectsAsDelegate = computed(() => this.byProjectCache().filter(p => !this.isPiOf(p)));
 
   /** Distinct delegate count across all projects. Consumed by the summary header (R-UI-004). */
   readonly totalDistinctDelegates = computed(() => {
@@ -181,6 +200,25 @@ export class PiDelegatesClientService {
     } finally {
       // Always reload so the UI reflects server state, even on error (R-UI-007 AC.3).
       // _reloadForUser keeps BOTH caches fresh when a userId is known.
+      await this._reloadForUser();
+      this.loading.set(false);
+    }
+  }
+
+  /**
+   * DELETE every active delegation of one person, across the projects the
+   * caller manages. Used by the "remove delegate" action on an inactive person,
+   * where assigning more projects makes no sense.
+   */
+  async revokeDelegate(delegateUserId: number, projectIds: string[]): Promise<void> {
+    if (projectIds.length === 0) return;
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      await this.api.DELETE_PIDelegates({ project_ids: projectIds, delegate_user_ids: [delegateUserId] });
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to revoke the delegate');
+    } finally {
       await this._reloadForUser();
       this.loading.set(false);
     }

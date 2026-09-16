@@ -53,7 +53,7 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
   // TODO(eligibility): refine visibility to ≥1 managed project when
   //   the dedicated projects endpoint is wired (design §9 fallback in effect).
   piOptions(): AdministrationNavChild[] {
-    return [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-user-edit', iconSize: '13px' }];
+    return [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-users', iconSize: '13px' }];
   }
 
   administrationGroups(): AdministrationNavGroup[] {

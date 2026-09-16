@@ -14,8 +14,9 @@
       My PI Delegates
     </h1>
     <p class="pi-delegates-description atc-grey-600 m-0 max-w-[52rem] font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
-      The people you delegate to review results on your behalf. Assign the PI Delegate role across
-      the projects where you are the Principal Investigator — one by one or several at a time.
+      PI Delegate lets someone approve, reject or request changes to the results of a project on your
+      behalf. It applies only to the projects you select here, and you can revoke it at any time.
+      Roles coming from <strong class="font-semibold">Agresso</strong> are not affected.
     </p>
 
     <!-- Stat cards — same treatment as the project-detail indicator tiles -->
@@ -32,7 +33,20 @@
         </span>
         <span
           class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
-          service.totalProjects() }}</span>
+          service.projectsAsPi().length }}</span>
+      </div>
+
+      <div class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            AS PI DELEGATE</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsAsDelegate().length }}</span>
       </div>
 
       <div
@@ -120,20 +134,6 @@
   </div>
 
   <div class="border border-t-0 border-[color:var(--ac-grey-200)] bg-[color:var(--ac-background)] p-4">
-
-    <!-- What the PI Delegate role does — the standard STAR info banner:
-         grey band with a blue accent bar, shown above the tables' search. -->
-    <div
-      class="pi-delegates-info mb-4 flex items-center gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[#e8ebed] px-3"
-      role="note">
-      <i class="pi pi-exclamation-circle shrink-0 !text-[18px] text-[color:var(--ac-light-blue-500)]"
-        aria-hidden="true"></i>
-      <p class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
-        PI Delegate lets someone approve, reject or request changes to the results of a project on your
-        behalf. It applies only to the projects you select here, and you can revoke it at any time.
-        Roles coming from <strong>Agresso</strong> are not affected.
-      </p>
-    </div>
 
     <!-- Tab 0: By project (DEFAULT — R-UI-002 AC.1) -->
     <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-project" [hidden]="activeTabIndex() !== 0">

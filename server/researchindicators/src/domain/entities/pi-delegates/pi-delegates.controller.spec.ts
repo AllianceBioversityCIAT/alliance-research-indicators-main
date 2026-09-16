@@ -36,6 +36,7 @@ const PROJECT_DELEGATES_FIXTURE: ProjectDelegatesResponseDto = {
   project_code: 'PROJ-01',
   project_name: 'Test Project',
   is_pool_funding_contributor: false,
+  pi_user_id: 99,
   status: 'ACTIVE',
   start_date: null,
   end_date: null,

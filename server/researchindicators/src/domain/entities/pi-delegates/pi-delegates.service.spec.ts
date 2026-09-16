@@ -122,6 +122,7 @@ interface MockRepoOptions {
     contract_status: string | null;
     start_date: Date | null;
     end_date: Date | null;
+    pi_user_id?: number | null;
   } | null;
   /** findActiveDelegatesWithUser result (default: []) */
   findActiveDelegatesWithUserResult?: Array<{
@@ -1749,6 +1750,7 @@ interface ManagedMockOpts {
     contract_status: string | null;
     start_date: Date | null;
     end_date: Date | null;
+    pi_user_id?: number | null;
   }>;
   /** findActiveDelegatesForProjects result (default: []) */
   activeDelegatesForProjects?: Array<{
@@ -2019,6 +2021,192 @@ describe('listManagedProjects() — Scenario 14: own caller gets enriched Projec
 
     expect(result).toHaveLength(1);
     expect(result[0].delegates).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 14b — pi_user_id is surfaced so clients can pre-block the PI
+// (R-PID-008): the same user isPiOfProject() rejects must be identifiable by
+// the caller BEFORE it posts an assignment.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('pi_user_id exposure — listManagedProjects() and list()', () => {
+  it('listManagedProjects maps pi_user_id per project, null when the lead has no STAR account', async () => {
+    const ownUserId = 360;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G560', 'G561'],
+      projectSummaries: [
+        {
+          agreement_id: 'G560',
+          description: 'Has a PI',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: 77,
+        },
+        {
+          agreement_id: 'G561',
+          description: 'Lead without a STAR account',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: null,
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result.find((r) => r.project_code === 'G560')!.pi_user_id).toBe(77);
+    expect(
+      result.find((r) => r.project_code === 'G561')!.pi_user_id,
+    ).toBeNull();
+  });
+
+  it('listManagedProjects coerces a string pi_user_id from the driver to a number', async () => {
+    const ownUserId = 361;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G562'],
+      projectSummaries: [
+        {
+          agreement_id: 'G562',
+          description: 'Numeric coercion',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: '88' as unknown as number,
+        },
+      ],
+    });
+
+    const result = await service.listManagedProjects(ownUserId);
+
+    expect(result[0].pi_user_id).toBe(88);
+  });
+
+  it('list() returns pi_user_id for the single project', async () => {
+    const { service } = makeService({
+      userId: 362,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G563',
+          description: 'Single project',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: 91,
+        },
+      },
+    });
+
+    const result = await service.list('G563');
+
+    expect(result.pi_user_id).toBe(91);
+  });
+
+  it('list() returns pi_user_id null when the project row is missing (negative discriminator)', async () => {
+    const { service } = makeService({
+      userId: 363,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: { findProjectSummaryResult: null },
+    });
+
+    const result = await service.list('G564');
+
+    expect(result.pi_user_id).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Name casing — sec_users holds 'MAYESSE DA SILVA' and 'juan cadavid' alike, so
+// every name this module returns is title-cased before it leaves the service.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('name casing is normalised on the way out', () => {
+  it('title-cases delegate names in listManagedProjects()', async () => {
+    const ownUserId = 370;
+
+    const { service } = makeServiceWithManagedMethods({
+      userId: ownUserId,
+      roles: [],
+      managedProjectIds: ['G570'],
+      projectSummaries: [
+        {
+          agreement_id: 'G570',
+          description: 'Casing',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: null,
+        },
+      ],
+      activeDelegatesForProjects: [
+        {
+          project_id: 'G570',
+          delegate_user_id: 1,
+          first_name: 'MAYESSE',
+          last_name: 'DA SILVA',
+          email: 'm.dasilva@cgiar.org',
+          status_id: 1,
+        },
+        {
+          project_id: 'G570',
+          delegate_user_id: 2,
+          first_name: 'juan carlos',
+          last_name: 'cadavid',
+          email: 'j.cadavid@cgiar.org',
+          status_id: 1,
+        },
+      ],
+    });
+
+    const [project] = await service.listManagedProjects(ownUserId);
+
+    expect(project.delegates[0].name).toBe('Mayesse Da Silva');
+    expect(project.delegates[0].first_name).toBe('Mayesse');
+    expect(project.delegates[0].last_name).toBe('Da Silva');
+    expect(project.delegates[1].name).toBe('Juan Carlos Cadavid');
+  });
+
+  it('title-cases delegate names in list() (single project)', async () => {
+    const { service } = makeService({
+      userId: 371,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      repo: {
+        findProjectSummaryResult: {
+          agreement_id: 'G571',
+          description: 'Casing',
+          is_pool_funding_contributor: 0,
+          contract_status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          pi_user_id: null,
+        },
+        findActiveDelegatesWithUserResult: [
+          {
+            delegate_user_id: 1,
+            first_name: 'MAYESSE',
+            last_name: 'DA SILVA',
+            email: 'm.dasilva@cgiar.org',
+            status_id: 1,
+          },
+        ],
+      },
+    });
+
+    const result = await service.list('G571');
+
+    expect(result.delegates[0].name).toBe('Mayesse Da Silva');
   });
 });
 

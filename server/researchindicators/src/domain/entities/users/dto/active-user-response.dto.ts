@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
  * Response shape for a single active user returned by GET /api/users/active.
  *
  * CONTRACT (fixed — the frontend will call exactly this):
- *   ActiveUserResponseDto = { sec_user_id, first_name, last_name, email }
+ *   ActiveUserResponseDto = { sec_user_id, first_name, last_name, email, carnet }
  */
 export class ActiveUserResponseDto {
   @ApiProperty({
@@ -32,4 +32,12 @@ export class ActiveUserResponseDto {
     example: 'j.doe@cgiar.org',
   })
   email!: string;
+
+  @ApiProperty({
+    description:
+      'sec_users.carnet (Alliance staff carnet); null for users without one',
+    example: 'C12345',
+    nullable: true,
+  })
+  carnet!: string | null;
 }
