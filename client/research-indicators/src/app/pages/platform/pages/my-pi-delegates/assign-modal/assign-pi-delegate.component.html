@@ -92,6 +92,12 @@
         <div class="flex min-w-0 flex-col gap-1.5 py-0.5">
           <p class="m-0 font-['Barlow'] text-[14px] font-semibold text-[color:var(--ac-grey-800)]">
             {{ person?.name }}
+            @if (isProjectPi(person)) {
+              <!-- Says WHY the option is greyed out, right where the user looks. -->
+              <span class="assign-pi-delegate__pi-tag font-normal text-[color:var(--ac-grey-600)]">
+                (Principal Investigator)
+              </span>
+            }
           </p>
           <p class="m-0 flex flex-wrap items-center gap-x-2 font-['Barlow'] text-[11px] text-[color:var(--ac-grey-700)]">
             <span>Email</span>
