@@ -34,6 +34,9 @@ describe('DenyMachineTokenGuard — driven through the real JwtMiddleware', () =
   const next = jest.fn();
   const roarManagementService = { validateToken: jest.fn() };
   const appSecretsService = { validation: jest.fn() };
+  // Never reached by these tests: the impersonation branch requires the
+  // impersonation headers, and every case here drives a machine token.
+  const impersonationService = { resolve: jest.fn() };
   let middleware: JwtMiddleware;
   let guard: DenyMachineTokenGuard;
 
@@ -44,6 +47,7 @@ describe('DenyMachineTokenGuard — driven through the real JwtMiddleware', () =
       roarManagementService as never,
       {} as ResultsUtil,
       appSecretsService as never,
+      impersonationService as never,
     );
     guard = new DenyMachineTokenGuard();
   });

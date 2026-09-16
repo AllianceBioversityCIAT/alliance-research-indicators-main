@@ -5520,9 +5520,21 @@ describe('ResultsService', () => {
         // otherwise "no row survives" could not be asserted at all.
         mockQueryService.deleteFullResultById.mockImplementation(
           async (resultId: number) => {
+            const before = soRows.length;
             const remaining = soRows.filter((r) => r.result_id !== resultId);
             soRows.length = 0;
             soRows.push(...remaining);
+            // The double reports the outcome it actually produced, so the
+            // rollback's REFUSED check reads a real verdict, not a stub.
+            return [
+              {
+                resultId,
+                status:
+                  before === soRows.length
+                    ? ResultDeleteStatus.NOOP
+                    : ResultDeleteStatus.DELETED,
+              },
+            ];
           },
         );
         // Force the first item to fail after its alignment write, in the
@@ -5833,9 +5845,21 @@ describe('ResultsService', () => {
         // otherwise "no row survives" could not be asserted at all.
         mockQueryService.deleteFullResultById.mockImplementation(
           async (resultId: number) => {
+            const before = leverRows.length;
             const remaining = leverRows.filter((r) => r.result_id !== resultId);
             leverRows.length = 0;
             leverRows.push(...remaining);
+            // The double reports the outcome it actually produced, so the
+            // rollback's REFUSED check reads a real verdict, not a stub.
+            return [
+              {
+                resultId,
+                status:
+                  before === leverRows.length
+                    ? ResultDeleteStatus.NOOP
+                    : ResultDeleteStatus.DELETED,
+              },
+            ];
           },
         );
         // Force the first item to fail after its lever write, in the very
