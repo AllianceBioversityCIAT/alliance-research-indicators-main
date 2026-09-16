@@ -59,6 +59,14 @@ export interface MatchedTarget {
  * `secUser.is_active` again.
  */
 export interface ReconciliationResult {
+  /**
+   * The bulk `sec_users` read this pass already performed — ALL rows, active and inactive.
+   *
+   * Exposed so the deactivation measurement works from the same snapshot instead of reading again
+   * (changes/agresso-staff-deactivation DD-D4). A second read would also open a window in which a
+   * row could change between the two, which is a correctness problem, not only a cost one.
+   */
+  allSecUsers: SecUser[];
   skipped: SkippedStaffMember[];
   collapsed: PayloadEmailCollision[];
   create: CreateTarget[];
@@ -216,7 +224,14 @@ export class SecUserReconcilerService {
       }
     }
 
-    return { skipped, collapsed, create, refresh, reactivate };
+    return {
+      allSecUsers: secUsers,
+      skipped,
+      collapsed,
+      create,
+      refresh,
+      reactivate,
+    };
   }
 
   /**

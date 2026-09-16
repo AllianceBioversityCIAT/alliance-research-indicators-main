@@ -3,6 +3,7 @@ import { HttpService } from '@nestjs/axios';
 import { DataSource } from 'typeorm';
 import { AgressoStaffToolsService } from './agresso-staff-tools.service';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
+import { SecUserDeactivationService } from './sec-user-deactivation.service';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 
 describe('AgressoStaffToolsService', () => {
@@ -15,6 +16,25 @@ describe('AgressoStaffToolsService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          // changes/agresso-staff-deactivation increment 1. Stubbed here for the same reason the
+          // reconciler is: this suite covers the fetch pipeline, and the measurement's own
+          // behaviour is covered exhaustively in sec-user-deactivation.service.spec.ts.
+          provide: SecUserDeactivationService,
+          useValue: {
+            measure: jest.fn().mockResolvedValue({
+              totalElements: 0,
+              distinctCarnets: 0,
+              activePopulation: 0,
+              candidates: [],
+              excludedExternal: 0,
+              excludedSystemAdmin: 0,
+              excludedAmbiguous: 0,
+              excludedUnmatchable: 0,
+              shieldedBySkip: [],
+            }),
+          },
+        },
         AgressoStaffToolsService,
         { provide: HttpService, useValue: { get: jest.fn() } },
         {
@@ -31,6 +51,7 @@ describe('AgressoStaffToolsService', () => {
           provide: SecUserReconcilerService,
           useValue: {
             reconcile: jest.fn().mockResolvedValue({
+              allSecUsers: [],
               skipped: [],
               collapsed: [],
               create: [],
@@ -166,6 +187,9 @@ describe('AgressoStaffToolsService', () => {
 
         expect(report.pageRowCounts).toEqual([3, 2]); // 5 rows fetched
         expect(report.distinctCarnets).toBe(4); // but only 4 distinct people
+        // R-AGD-004 AC.3 — the abort is permanent while the condition holds, so it has to say
+        // WHICH carnet repeated or the operator cannot act on it.
+        expect(report.duplicatedCarnets).toEqual(['A3']);
       });
 
       it('ignores empty and whitespace-only carnets when counting distinct', async () => {

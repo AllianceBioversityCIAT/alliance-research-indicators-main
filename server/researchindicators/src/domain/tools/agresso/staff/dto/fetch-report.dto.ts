@@ -23,4 +23,13 @@ export interface FetchReport {
    * proxy for it.
    */
   distinctCarnets: number;
+  /**
+   * Carnets that arrived more than once, in first-seen order.
+   *
+   * C-2 aborts whenever `distinctCarnets < totalElements`, and that abort is permanent for as long
+   * as the condition holds. The trade was accepted on the explicit ground that the abort is
+   * DIAGNOSABLE rather than silent — this list is what makes it so. Without it the operator sees a
+   * run that refuses to proceed and no way to find out why.
+   */
+  duplicatedCarnets: string[];
 }

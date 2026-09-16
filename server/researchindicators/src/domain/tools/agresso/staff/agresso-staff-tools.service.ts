@@ -9,6 +9,7 @@ import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entitie
 import { allianceStaffMapper } from '../mappers/alliance-staff.mapper';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
 import { FetchReport } from './dto/fetch-report.dto';
+import { SecUserDeactivationService } from './sec-user-deactivation.service';
 
 /** Agresso's page size for the employees endpoint. */
 const PAGE_SIZE = 1000;
@@ -19,6 +20,7 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     dataSource: DataSource,
     http: HttpService,
     private readonly reconciler: SecUserReconcilerService,
+    private readonly deactivation: SecUserDeactivationService,
   ) {
     super(
       dataSource,
@@ -54,16 +56,28 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     return { pages: Math.ceil(totalElements / PAGE_SIZE), totalElements };
   }
 
-  /** Distinct non-empty carnets across the payload — C-2's measure. See FetchReport. */
-  private countDistinctCarnets(allStaff: AgressoStaffRawDto[]): number {
-    const carnets = new Set<string>();
+  /** Distinct non-empty carnets, plus the repeats — C-2's measure. See FetchReport. */
+  private summariseCarnets(allStaff: AgressoStaffRawDto[]): {
+    distinctCarnets: number;
+    duplicatedCarnets: string[];
+  } {
+    const seen = new Set<string>();
+    const duplicated = new Set<string>();
     for (const member of allStaff) {
       const carnet = member?.resourceId?.trim();
-      if (carnet) {
-        carnets.add(carnet);
+      if (!carnet) {
+        continue;
+      }
+      if (seen.has(carnet)) {
+        duplicated.add(carnet);
+      } else {
+        seen.add(carnet);
       }
     }
-    return carnets.size;
+    return {
+      distinctCarnets: seen.size,
+      duplicatedCarnets: Array.from(duplicated),
+    };
   }
 
   // @akili-spec changes/agresso-staff-sec-users-sync (T-07 — accumulate pages, reconcile once)
@@ -100,7 +114,7 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     const fetchReport: FetchReport = {
       totalElements,
       pageRowCounts,
-      distinctCarnets: this.countDistinctCarnets(allStaff),
+      ...this.summariseCarnets(allStaff),
     };
     this._logger.log(
       `Agresso staff fetch report: ${JSON.stringify(fetchReport)}`,
@@ -118,6 +132,33 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
       outcome,
       allStaff.length,
     );
+
+    // Stage 5 — changes/agresso-staff-deactivation, increment 1. READ-ONLY: this computes who
+    // WOULD be retired and reports it. It runs after create/grant so the snapshot it measures is
+    // the one reconciliation already decided against, and it writes nothing, so its position in
+    // the pipeline cannot affect any other stage.
+    const measurement = await this.deactivation.measure(
+      allStaff,
+      reconciliation,
+      reconciliation.allSecUsers,
+      fetchReport,
+    );
+
+    summary.deactivationDryRun = true;
+    summary.activePopulation = measurement.activePopulation;
+    summary.deactivationCandidates = measurement.candidates?.length ?? 0;
+    summary.candidateSample = (measurement.candidates ?? []).slice(0, 50);
+    summary.excludedExternal = measurement.excludedExternal;
+    summary.excludedSystemAdmin = measurement.excludedSystemAdmin;
+    summary.excludedAmbiguous = measurement.excludedAmbiguous;
+    summary.excludedUnmatchable = measurement.excludedUnmatchable;
+    summary.shieldedBySkip = measurement.shieldedBySkip;
+    summary.distinctCarnets = measurement.distinctCarnets;
+    summary.totalElements = measurement.totalElements;
+    if (measurement.abortReason) {
+      summary.deactivationAbortReason = measurement.abortReason;
+      summary.abortDetail = measurement.abortDetail;
+    }
 
     // NFR-AGS-003. The controller does not await this service (RSK-4), so the caller already holds
     // a 200 and this line is the only place a human can learn what the run did.

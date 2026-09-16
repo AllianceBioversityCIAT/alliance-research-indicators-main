@@ -80,4 +80,40 @@ export class SecUserReconciliationSummaryDto {
    * had nobody to create** (DD-15, M-5).
    */
   abortReason?: 'GRANT_ASSERTION';
+
+  // ---- changes/agresso-staff-deactivation, increment 1 (T-05) ------------------------------
+  // MEASUREMENT ONLY. Nothing below is written anywhere; these are the numbers a human reads
+  // before increment 2 is designed, and `deactivationCandidates` is a count of accounts that
+  // WOULD be retired, not of accounts that were.
+
+  /** Always `true` in increment 1 — there is no write path to disable. */
+  deactivationDryRun = true;
+  /** Active `sec_users` rows at read time, BEFORE any exclusion. */
+  activePopulation = 0;
+  deactivationCandidates = 0;
+  /** A bounded sample of candidate ids, so the report stays readable at any population size. */
+  candidateSample: number[] = [];
+  excludedExternal = 0;
+  excludedSystemAdmin = 0;
+  excludedAmbiguous = 0;
+  excludedUnmatchable = 0;
+  shieldedBySkip: DeactivationShieldReport[] = [];
+  distinctCarnets = 0;
+  totalElements = 0;
+
+  /**
+   * Deliberately NOT the `abortReason` above. That field belongs to the create+grant savepoint and
+   * is set independently; one field cannot carry two outcomes, and reusing it would make a sibling
+   * rollback read as an aborted measurement (Judgment Day JS-4).
+   */
+  deactivationAbortReason?: 'C-1' | 'C-2' | 'C-4';
+  /** The operand the abort names: page number, duplicated carnets, or status match count. */
+  abortDetail?: Record<string, unknown>;
+}
+
+/** One account held open by a staff member the sync skipped, with the reason it was skipped. */
+export class DeactivationShieldReport {
+  accountId: number;
+  carnet: string;
+  reason: string;
 }

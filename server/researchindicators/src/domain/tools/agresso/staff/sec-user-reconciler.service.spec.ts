@@ -959,6 +959,21 @@ describe('SecUserReconcilerService', () => {
           'skippedCarnetTooLong',
           'skippedUnusableEmail',
           'staffFetched',
+          // changes/agresso-staff-deactivation increment 1 — MEASUREMENT fields. They are defaulted
+          // by the DTO, so they are present on every summary including this spec's. Listed here
+          // rather than loosening the assertion: exhaustiveness is the property that makes this
+          // test worth having, and a missing field is a failure mode made invisible forever.
+          'activePopulation',
+          'candidateSample',
+          'deactivationCandidates',
+          'deactivationDryRun',
+          'distinctCarnets',
+          'excludedAmbiguous',
+          'excludedExternal',
+          'excludedSystemAdmin',
+          'excludedUnmatchable',
+          'shieldedBySkip',
+          'totalElements',
         ].sort(),
       );
       // M-5: abortReason ABSENT on a clean run is what makes a savepoint rollback distinguishable
