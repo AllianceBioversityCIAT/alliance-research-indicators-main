@@ -150,3 +150,55 @@ concrete and user-facing:
 existing gate entry 3 still applies: a KP must be Approved before it can be sent. Worth confirming
 that KP results in STAR do reach status 6 in practice, or the feature is unreachable for a different
 reason than the date rule.
+
+---
+
+## Population measurement (Dev, 2026-09-16) — the date rule is NOT the binding constraint
+
+Measured against the shared Dev database. **Limit declared: this is Dev, not Production; the
+distributions there may differ.**
+
+### KP population
+
+**9,161** active KP results (`indicator_id = 3`). By type, the top entries: Report 1,970 ·
+**Journal Article 1,905** · Brief 905 · Presentation 871 · Blog Post 427 · Dataset 360.
+
+The date rule PRMS quoted is scoped to journal articles (*"for journal articles, the reporting
+system automatically verifies…"*), so it bears on roughly **21%** of KPs — not the majority, which
+corrects the earlier estimate in this document. By STAR `publication_date` year: 2026 → 550 (143
+journal articles), 2025 → 1,913, 2024 → 2,059.
+
+### Two structural blockers that come BEFORE the date rule
+
+| Gate entry | Requirement | KP reality in Dev |
+|---|---|---|
+| 3 | `result_status_id = 6` (Approved) | **0 of 9,161.** KPs sit in status **20 "Completed in TIP"** (8,534), 26 "Completed in AICCRA" (321), 18 "QAed in PRMS" (288) |
+| 4 | Pool Funding Alignment green-checked | **0 of 9,161 have an alignment row at all.** All 48 alignment rows in Dev belong to indicators 1, 2, 4, 6 |
+
+Only **276** results in the entire Dev database are in status 6, and they belong to indicators
+**1, 2, 4 and 6 — never 3**.
+
+Status 20's own description is the explanation:
+
+> *"The Knowledge Product has been successfully finalized and disseminated. It is already available
+> in a recognized knowledge repository and is considered fully published and accessible."*
+
+**KPs do not travel through STAR's approval workflow at all**, because STAR does not own their
+lifecycle — it imports them already finished. This is D-4's original reasoning (*"KPs are not STAR's
+to create"*) showing up as a measurable property of 9,161 rows rather than as a judgement call.
+
+### What this means
+
+The KP scope change is **not a builder problem**. A single-field builder would be correct and still
+ship a feature that **cannot be reached by any existing KP**, for two reasons that have nothing to do
+with handles or dates. Before any code, the product decision is:
+
+1. **Does a KP bypass the Approved requirement?** Status 20 is arguably a KP's terminal state — the
+   equivalent of approved for an artifact STAR did not author. If so, gate entry 3 needs a
+   type-aware exception, which is a change to a rule the sync-engine spec settled deliberately.
+2. **Is Pool Funding Alignment meaningful for an imported publication at all?** If it is required,
+   someone must fill it for KPs — 9,161 of them have nothing. If it is not, gate entry 4 needs the
+   same kind of exception.
+
+The date mismatch is real but it is the **third** constraint in line; under today's workflow no KP
+reaches the point where PRMS could apply it.
