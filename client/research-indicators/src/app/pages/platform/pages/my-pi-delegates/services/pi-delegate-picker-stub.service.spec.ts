@@ -46,6 +46,8 @@ function makeProjectDelegates(overrides: Partial<ProjectDelegates> = {}): Projec
     project_code: 'PROJ-001',
     project_name: 'Test Project',
     is_pool_funding_contributor: false,
+    pi_user_id: null,
+    pi_name: null,
     status: 'active',
     start_date: null,
     end_date: null,
@@ -97,8 +99,8 @@ describe('PiDelegatePeoplePickerStubService', () => {
 
   it('main() populates list with correctly mapped DelegateSummary items', async () => {
     const users: ActiveUser[] = [
-      { sec_user_id: 10, first_name: 'Alice', last_name: 'Smith', email: 'alice@example.com' },
-      { sec_user_id: 20, first_name: 'Bob', last_name: 'Jones', email: 'bob@example.com' }
+      { sec_user_id: 10, first_name: 'Alice', last_name: 'Smith', email: 'alice@example.com', carnet: null },
+      { sec_user_id: 20, first_name: 'Bob', last_name: 'Jones', email: 'bob@example.com', carnet: null }
     ];
     mockApi.GET_ActiveUsers.mockResolvedValue(makeActiveUsersResponse(users));
 
@@ -120,7 +122,7 @@ describe('PiDelegatePeoplePickerStubService', () => {
 
   it('main() falls back to email as name when both first_name and last_name are null', async () => {
     const users: ActiveUser[] = [
-      { sec_user_id: 99, first_name: null, last_name: null, email: 'noname@example.com' }
+      { sec_user_id: 99, first_name: null, last_name: null, email: 'noname@example.com', carnet: null }
     ];
     mockApi.GET_ActiveUsers.mockResolvedValue(makeActiveUsersResponse(users));
 

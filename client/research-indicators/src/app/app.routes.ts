@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { piDelegatesGuard } from '@guards/pi-delegates.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
@@ -213,7 +214,7 @@ export const routes: Routes = [
         path: 'my-pi-delegates',
         loadComponent: () =>
           import('@pages/platform/pages/my-pi-delegates/my-pi-delegates.component').then(m => m.default),
-        canMatch: [rolesGuard],
+        canMatch: [rolesGuard, piDelegatesGuard],
         data: {
           title: 'My PI Delegates',
           isLoggedIn: true
