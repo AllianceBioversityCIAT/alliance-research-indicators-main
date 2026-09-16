@@ -2,13 +2,18 @@
 
 - **Module:** agresso
 - **Spec id:** 2026-09-agresso-staff-deactivation-i1
-- **Status:** draft
+- **Status:** implemented (increment 1) · PAUSED
 - **Owner:** ARI server squad
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) §G4, §US-SA-2
 - **Last updated:** 2026-09-16
 - **Depth:** **Standard** — read-only; the Full-depth destructive half is increment 2
 - **Extends:** [`changes/agresso-staff-sec-users-sync`](../../archive/2026-09-15-changes--agresso-staff-sec-users-sync/) (archived, shipped)
 - **Judgment:** [`judgment.md`](./judgment.md) — round 1, 4 confirmed SEVERE. This document carries the corrections for JD-1…JD-4
+
+
+> ⏸️ **PAUSED 2026-09-16 (priority change). Read [`HANDOFF.md`](./HANDOFF.md) first.**
+> Increment 1 is code-complete, green and committed — but **has never been run**, so the four
+> measurements it exists to produce do not exist yet. Increment 2 is unstarted and undated.
 
 ---
 

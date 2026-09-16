@@ -2,7 +2,7 @@
 
 - **Module:** agresso
 - **Spec id:** 2026-09-agresso-staff-deactivation-i1
-- **Status:** draft
+- **Status:** implemented (increment 1) · PAUSED
 - **Owner:** ARI server squad
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Judgment:** [`./judgment.md`](./judgment.md) — round 1 corrections applied
@@ -12,6 +12,11 @@
 > transaction. Not a guarded write, not a transaction that rolls back — none at all. That is what
 > makes the four confirmed-severe findings non-destructive here: each would produce a wrong *report*,
 > which a human reads, rather than a wrong *retirement*, which nothing undoes.
+
+
+> ⏸️ **PAUSED 2026-09-16 (priority change). Read [`HANDOFF.md`](./HANDOFF.md) first.**
+> Increment 1 is code-complete, green and committed — but **has never been run**, so the four
+> measurements it exists to produce do not exist yet. Increment 2 is unstarted and undated.
 
 ---
 

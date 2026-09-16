@@ -2,7 +2,7 @@
 
 - **Module:** agresso
 - **Spec id:** 2026-09-agresso-staff-deactivation-i1
-- **Status:** in-progress
+- **Status:** completed (increment 1) · PAUSED
 - **Owner:** ARI server squad
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -13,6 +13,11 @@
 >
 > **No task in this increment may introduce an `UPDATE`, `INSERT`, `DELETE` or a transaction.** T-05's
 > fixture gate exists to catch a violation; a task that needs one is increment 2's.
+
+
+> ⏸️ **PAUSED 2026-09-16 (priority change). Read [`HANDOFF.md`](./HANDOFF.md) first.**
+> Increment 1 is code-complete, green and committed — but **has never been run**, so the four
+> measurements it exists to produce do not exist yet. Increment 2 is unstarted and undated.
 
 ---
 
