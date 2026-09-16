@@ -81,19 +81,6 @@ export class ByProjectComponent {
     this.statusTerm.set('All');
   }
 
-  // ─── Summary line (rendered inside the table card) ───────────────────────────
-  // Only the inactive-delegate warning is surfaced; the counts were noise next
-  // to the paginator's own "Showing x to y of N" report.
-  readonly summaryInactive = computed(() => {
-    const seen = new Set<number>();
-    for (const p of this.service.byProjectCache()) {
-      for (const d of p.delegates) {
-        if (d.is_active === false) seen.add(d.delegate_user_id);
-      }
-    }
-    return seen.size;
-  });
-
   /** Derived filtered view: applies status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectDelegates[]>(() => {
     const query = this.searchTerm().trim().toLowerCase();

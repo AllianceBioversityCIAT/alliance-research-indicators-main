@@ -11,24 +11,17 @@
   <div class="by-project__table-wrapper">
 
     <!-- Summary line — top of the card, above the search -->
-    <div class="by-project__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
+    <div class="by-project__summary flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 font-['Barlow'] text-[13px] leading-[1.5]"
+      aria-label="PI Delegates summary">
       <span class="by-project__summary-left atc-grey-600 text-[12px] italic">
-        Only projects where you are the Principal Investigator are listed
+        Only projects where you are the Principal Investigator or a PI Delegate are listed
       </span>
-      @if (summaryInactive() > 0) {
-        <span class="by-project__summary-right atc-red-1 flex items-center gap-1.5">
-          <i class="pi pi-exclamation-triangle !text-[13px] leading-none" aria-hidden="true"></i>
-          <span class="leading-none">
-            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        </span>
-      }
     </div>
 
     <!-- Per-table toolbar: the shared search control (search only) -->
-    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 py-3.5">
+    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 pb-3 pt-1">
       <app-search-export-controls
-        class="min-w-[20rem] flex-1"
+        class="w-fit max-w-full"
         [showApply]="false"
         [showClear]="true"
         [searchValue]="searchTerm()"
@@ -68,7 +61,7 @@
             <div class="by-project__th-inner">PI Delegates</div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600">
-            <div class="by-project__th-inner">Actions</div>
+            <div class="by-project__th-inner by-project__th-inner--centered">Actions</div>
           </th>
         </tr>
       </ng-template>
@@ -77,16 +70,32 @@
       <ng-template pTemplate="body" let-project>
         <tr class="by-project__row">
 
-          <!-- Project (code · dates / name) -->
+          <!-- Project — "CODE - Title" on top, labelled dates underneath (the
+               same label → value treatment the Assign modal uses). A project
+               with no end date simply omits that pair. -->
           <td class="by-project__td by-project__td--project">
             <div class="by-project__project">
-              <span class="by-project__project__meta atc-grey-600">
-                {{ project.project_code }}
-                @if (project.start_date || project.end_date) {
-                  &nbsp;·&nbsp;{{ formatDate(project.start_date) }} – {{ formatDate(project.end_date) }}
-                }
+              <span class="by-project__project__name">
+                <span class="by-project__project__code">{{ project.project_code }}</span>
+                - {{ project.project_name || '—' }}
               </span>
-              <span class="by-project__project__name">{{ project.project_name || '—' }}</span>
+              @if (project.start_date || project.end_date) {
+                <span class="by-project__project__meta atc-grey-600">
+                  @if (project.start_date) {
+                    <span class="by-project__project__label">Start date</span>
+                    <i class="pi pi-arrow-right by-project__project__arrow" aria-hidden="true"></i>
+                    <span class="by-project__project__date">{{ formatDate(project.start_date) }}</span>
+                  }
+                  @if (project.end_date) {
+                    @if (project.start_date) {
+                      <span class="by-project__project__sep">|</span>
+                    }
+                    <span class="by-project__project__label">End date</span>
+                    <i class="pi pi-arrow-right by-project__project__arrow" aria-hidden="true"></i>
+                    <span class="by-project__project__date">{{ formatDate(project.end_date) }}</span>
+                  }
+                </span>
+              }
             </div>
           </td>
 
@@ -131,6 +140,13 @@
                     role="listitem"
                     [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
                   >
+                    @if (delegate.is_active === false) {
+                      <!-- Same marker the status tags use: the exclamation circle
+                           turned 180°, with the reason on hover. -->
+                      <i class="pi pi-exclamation-circle by-project__chip__inactive-icon"
+                        style="transform: rotate(180deg)" pTooltip="This delegate is inactive"
+                        tooltipPosition="top" aria-label="This delegate is inactive"></i>
+                    }
                     <span class="by-project__chip__info">
                       <span class="by-project__chip__name">{{ delegate.name }}</span>
                       <span class="by-project__chip__email">{{ delegate.email }}</span>
@@ -171,10 +187,12 @@
                 type="button"
                 class="by-project__assign-btn"
                 [attr.aria-label]="'Assign delegate to ' + project.project_code"
+                pTooltip="Assign people"
+                tooltipPosition="top"
                 (click)="onAssign(project)"
                 (keydown.enter)="onAssign(project)"
               >
-                Assign people
+                <i class="pi pi-user-plus" aria-hidden="true"></i>
               </button>
             </div>
           </td>

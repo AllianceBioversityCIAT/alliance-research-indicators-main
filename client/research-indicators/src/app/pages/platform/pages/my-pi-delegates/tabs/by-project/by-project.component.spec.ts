@@ -127,11 +127,18 @@ describe('ByProjectComponent', () => {
       expect(text).toContain('Alpha Research');
     });
 
-    it('renders the project title in the row colour, not blue, but bold', () => {
+    it('renders "CODE - Title" on one line, in the row colour, not blue', () => {
       const name = fixture.debugElement.query(By.css('.by-project__project__name'))
         .nativeElement as HTMLElement;
       expect(name.classList.contains('atc-primary-blue-600')).toBe(false);
-      expect(name.textContent?.trim()).toBe('Alpha Research');
+      expect(name.textContent?.replace(/\s+/g, ' ').trim()).toBe('PRJ-001 - Alpha Research');
+    });
+
+    it('labels both dates when the project has them', () => {
+      const cell = (fixture.debugElement.queryAll(By.css('.by-project__td--project'))[0]
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).toContain('Start date');
+      expect(cell).toContain('End date');
     });
 
     it('renders status pill for PRJ-001', () => {
@@ -163,6 +170,31 @@ describe('ByProjectComponent', () => {
     });
   });
 
+  describe('project dates', () => {
+    it('shows only Start date — and no dash — when the project has no end date', async () => {
+      await createComponent([
+        { ...PROJECT_WITH_DELEGATES, project_code: 'D514', end_date: null }
+      ]);
+
+      const cell = (fixture.debugElement.query(By.css('.by-project__td--project'))
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).toContain('Start date');
+      expect(cell).not.toContain('End date');
+      // the old rendering printed "31 Dec 2023 – —" for this row
+      expect(cell).not.toContain('—');
+      expect(cell).not.toContain('–');
+    });
+
+    it('omits both labels when the project has neither date', async () => {
+      await createComponent([PROJECT_NO_DELEGATES]); // start and end are null
+
+      const cell = (fixture.debugElement.query(By.css('.by-project__td--project'))
+        .nativeElement as HTMLElement).textContent ?? '';
+      expect(cell).not.toContain('Start date');
+      expect(cell).not.toContain('End date');
+    });
+  });
+
   // ── 2. Inactive delegate chip ────────────────────────────────────────
 
   describe('inactive delegate chip (is_active === false)', () => {
@@ -176,6 +208,17 @@ describe('ByProjectComponent', () => {
       expect(inactiveChip).toBeTruthy();
     });
 
+    it('INACTIVE chip carries the rotated marker explaining why', () => {
+      const chip = fixture.debugElement.query(By.css('.by-project__chip--inactive'))
+        .nativeElement as HTMLElement;
+
+      const icon = chip.querySelector('.by-project__chip__inactive-icon') as HTMLElement;
+      expect(icon).not.toBeNull();
+      expect(icon.classList.contains('pi-exclamation-circle')).toBe(true);
+      expect(icon.style.transform).toBe('rotate(180deg)');
+      expect(icon.getAttribute('aria-label')).toBe('This delegate is inactive');
+    });
+
     it('INACTIVE chip keeps the red treatment and still prints name + email', () => {
       const chip = fixture.debugElement.query(By.css('.by-project__chip--inactive'))
         .nativeElement as HTMLElement;
@@ -187,6 +230,10 @@ describe('ByProjectComponent', () => {
   describe('active delegate chip (is_active === true)', () => {
     beforeEach(async () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
+    });
+
+    it('ACTIVE chip carries no inactive marker (negative discriminator)', () => {
+      expect(fixture.debugElement.query(By.css('.by-project__chip__inactive-icon'))).toBeNull();
     });
 
     it('ACTIVE chip does NOT have --inactive class', () => {
@@ -354,10 +401,14 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES]);
     });
 
-    it('renders the "Assign people" text button', () => {
+    it('renders Assign people as an icon button with a tooltip, like By person', () => {
       const btn = fixture.debugElement.query(By.css('.by-project__assign-btn'));
       expect(btn).toBeTruthy();
-      expect((btn.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign people');
+      const el = btn.nativeElement as HTMLElement;
+      // icon-only now — the label lives in the tooltip
+      expect(el.textContent?.trim()).toBe('');
+      expect(el.querySelector('.pi-user-plus')).not.toBeNull();
+      expect(el.getAttribute('ng-reflect-text') ?? el.getAttribute('aria-label')).toContain('Assign');
     });
 
     it('renders the history icon button in an ENABLED state (disabled removed)', () => {
@@ -483,45 +534,15 @@ describe('ByProjectComponent', () => {
   });
 
   describe('summary line', () => {
-    it('puts the PI note on the left and the inactive warning on the right', async () => {
+    it('shows only the PI note — no counts, no inactive warning', async () => {
       await createComponent([PROJECT_INACTIVE_DELEGATE]);
 
-      const left = fixture.nativeElement.querySelector('.by-project__summary-left') as HTMLElement;
-      const right = fixture.nativeElement.querySelector('.by-project__summary-right') as HTMLElement;
+      const summary = fixture.nativeElement.querySelector('.by-project__summary') as HTMLElement;
+      const text = summary.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
-      expect(left.textContent).toContain('Only projects where you are the Principal Investigator are listed');
-      expect(right.textContent).toContain('1 delegate inactive');
-      // the marker uses the warning triangle, not the info circle
-      expect(right.querySelector('.pi-exclamation-triangle')).not.toBeNull();
-      expect(right.querySelector('.pi-exclamation-circle')).toBeNull();
-    });
-
-    it('keeps only the PI note and drops the people / assignments / projects counts', async () => {
-      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
-
-      const card = fixture.nativeElement.querySelector('.by-project__table-wrapper');
-      const summary = card.querySelector('.by-project__summary') as HTMLElement;
-      const text = summary.textContent ?? '';
-
-      expect(text).toContain('Only projects where you are the Principal Investigator are listed');
-      // the counts line is gone — only the inactive warning remains on the left
-      expect(text).toContain('1 delegate inactive');
-      expect(text).not.toContain('people');
-      expect(text).not.toContain('active assignment');
-      expect(text).not.toContain('across');
-    });
-
-    it('shows the inactive marker only when a delegate is inactive (discriminator)', async () => {
-      await createComponent([PROJECT_WITH_DELEGATES]);
-      let marker = fixture.nativeElement.querySelector('.by-project__summary-right');
-      expect(marker).toBeNull();
-
-      serviceStub.byProjectCache.set([PROJECT_WITH_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
-      fixture.detectChanges();
-
-      marker = fixture.nativeElement.querySelector('.by-project__summary-right');
-      expect(marker).not.toBeNull();
-      expect((marker as HTMLElement).textContent).toContain('1 delegate inactive');
+      expect(text).toBe('Only projects where you are the Principal Investigator or a PI Delegate are listed');
+      expect(text).not.toContain('inactive');
+      expect(fixture.nativeElement.querySelector('.by-project__summary-right')).toBeNull();
     });
   });
   // ── 10. Sortable columns (platform table convention) ──────────────────
@@ -538,17 +559,19 @@ describe('ByProjectComponent', () => {
 
     it('sorts the rendered rows when the Project header is clicked', () => {
       const firstName = () =>
-        (fixture.nativeElement.querySelector('.by-project__project__name') as HTMLElement).textContent?.trim();
-      expect(firstName()).toBe('Alpha Research');
+        (fixture.nativeElement.querySelector('.by-project__project__name') as HTMLElement)
+          .textContent?.replace(/\s+/g, ' ')
+          .trim();
+      expect(firstName()).toBe('PRJ-001 - Alpha Research');
 
       const projectHeader = fixture.debugElement.queryAll(By.css('th[pSortableColumn]'))[0];
       projectHeader.nativeElement.click();
       fixture.detectChanges();
-      expect(firstName()).toBe('Alpha Research'); // ascending
+      expect(firstName()).toBe('PRJ-001 - Alpha Research'); // ascending
 
       projectHeader.nativeElement.click();
       fixture.detectChanges();
-      expect(firstName()).toBe('Gamma Study'); // descending
+      expect(firstName()).toBe('PRJ-003 - Gamma Study'); // descending
     });
   });
   // ── 11. Status column uses the shared project status tag ──────────────
@@ -605,6 +628,21 @@ describe('ByProjectComponent', () => {
       expect(cue.querySelector('.pi-exclamation-triangle')).not.toBeNull();
       // nothing to revoke here
       expect(cue.querySelector('.by-project__chip__remove')).toBeNull();
+    });
+  });
+  // ── Toolbar layout ─────────────────────────────────────────────────────────
+
+  describe('toolbar layout', () => {
+    it('draws no rule under the summary line and keeps Clear Filters beside the search', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+
+      const summary = fixture.nativeElement.querySelector('.by-project__summary') as HTMLElement;
+      expect(summary.className).not.toContain('border-b');
+
+      // the shared control is not stretched, so its two groups sit together
+      const control = fixture.nativeElement.querySelector('app-search-export-controls') as HTMLElement;
+      expect(control.className).not.toContain('flex-1');
+      expect(control.className).toContain('w-fit');
     });
   });
 });

@@ -187,6 +187,25 @@ export class PiDelegatesClientService {
   }
 
   /**
+   * DELETE every active delegation of one person, across the projects the
+   * caller manages. Used by the "remove delegate" action on an inactive person,
+   * where assigning more projects makes no sense.
+   */
+  async revokeDelegate(delegateUserId: number, projectIds: string[]): Promise<void> {
+    if (projectIds.length === 0) return;
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      await this.api.DELETE_PIDelegates({ project_ids: projectIds, delegate_user_ids: [delegateUserId] });
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'Failed to revoke the delegate');
+    } finally {
+      await this._reloadForUser();
+      this.loading.set(false);
+    }
+  }
+
+  /**
    * DELETE by pi_delegate_ids then refetch ALL currently loaded projects.
    * Like revokePair, the DELETE may REJECT — always refetch after.
    */

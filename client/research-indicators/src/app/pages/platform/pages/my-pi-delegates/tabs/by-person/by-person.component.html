@@ -11,24 +11,17 @@
   <div class="by-person__table-wrapper">
 
     <!-- Summary line — top of the card, above the search -->
-    <div class="by-person__summary flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--ac-grey-200)] px-4 py-3 font-['Barlow'] text-[13px] leading-[1.5]" aria-label="PI Delegates summary">
+    <div class="by-person__summary flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 font-['Barlow'] text-[13px] leading-[1.5]"
+      aria-label="PI Delegates summary">
       <span class="by-person__summary-left atc-grey-600 text-[12px] italic">
-        Only projects where you are the Principal Investigator are listed
+        Only projects where you are the Principal Investigator or a PI Delegate are listed
       </span>
-      @if (summaryInactive() > 0) {
-        <span class="by-person__summary-right atc-red-1 flex items-center gap-1.5">
-          <i class="pi pi-exclamation-triangle !text-[13px] leading-none" aria-hidden="true"></i>
-          <span class="leading-none">
-            {{ summaryInactive() }} {{ summaryInactive() === 1 ? 'delegate' : 'delegates' }} inactive
-          </span>
-        </span>
-      }
     </div>
 
     <!-- Per-table toolbar: the shared search control -->
-    <div class="by-person__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 py-3.5">
+    <div class="by-person__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 pb-3 pt-1">
       <app-search-export-controls
-        class="min-w-[20rem] flex-1"
+        class="w-fit max-w-full"
         [showApply]="false"
         [showClear]="true"
         [searchValue]="searchTerm()"
@@ -68,7 +61,7 @@
             <div class="by-person__th-inner">Managed projects</div>
           </th>
           <th scope="col" class="by-person__th atc-primary-blue-600">
-            <div class="by-person__th-inner">Actions</div>
+            <div class="by-person__th-inner by-person__th-inner--centered">Actions</div>
           </th>
         </tr>
       </ng-template>
@@ -114,14 +107,12 @@
               @for (project of row.projects; track project.project_code) {
                 <span
                   class="by-person__chip"
-                  [class.by-person__chip--inactive]="row.is_active === false"
                   role="listitem"
                   [attr.aria-label]="project.project_code + (project.project_name ? ' — ' + project.project_name : '')"
                 >
                   <!-- Leading icon: hover shows the project name -->
                   <i
-                    class="by-person__chip__icon"
-                    [ngClass]="row.is_active === false ? 'pi pi-exclamation-circle' : 'pi pi-info-circle'"
+                    class="by-person__chip__icon pi pi-info-circle"
                     [pTooltip]="project.project_name ?? project.project_code"
                     tooltipPosition="top"
                     [attr.aria-label]="project.project_name ?? project.project_code"
@@ -144,7 +135,8 @@
             </div>
           </td>
 
-          <!-- Actions — History + Assign affordances -->
+          <!-- Actions — history always; assigning projects only makes sense for an
+               active account, so an inactive one offers removing the delegate. -->
           <td class="by-person__td by-person__td--actions">
             <div class="by-person__actions">
               <button
@@ -158,17 +150,31 @@
               >
                 <i class="pi pi-history" aria-hidden="true"></i>
               </button>
-              <button
-                type="button"
-                class="by-person__assign-btn"
-                [attr.aria-label]="'Assign projects to ' + row.name"
-                pTooltip="Assign projects to this person"
-                tooltipPosition="top"
-                (click)="onAssign(row)"
-                (keydown.enter)="onAssign(row)"
-              >
-                <i class="pi pi-user-plus" aria-hidden="true"></i>
-              </button>
+              @if (row.is_active === false) {
+                <button
+                  type="button"
+                  class="by-person__assign-btn by-person__assign-btn--danger"
+                  [attr.aria-label]="'Remove ' + row.name + ' as PI Delegate'"
+                  pTooltip="Remove delegate"
+                  tooltipPosition="top"
+                  (click)="onRemoveDelegate(row)"
+                  (keydown.enter)="onRemoveDelegate(row)"
+                >
+                  <i class="pi pi-user-minus" aria-hidden="true"></i>
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="by-person__assign-btn"
+                  [attr.aria-label]="'Assign projects to ' + row.name"
+                  pTooltip="Assign projects to this person"
+                  tooltipPosition="top"
+                  (click)="onAssign(row)"
+                  (keydown.enter)="onAssign(row)"
+                >
+                  <i class="pi pi-user-plus" aria-hidden="true"></i>
+                </button>
+              }
             </div>
           </td>
 

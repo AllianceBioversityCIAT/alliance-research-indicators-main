@@ -255,17 +255,17 @@ export class AssignPiDelegateComponent implements OnInit {
   // ─── On init: register confirm/disabled into AllModalsService ─────────────────
 
   ngOnInit(): void {
-    // Register the confirm action and disabled guard into the modal config so that
-    // the app-modal footer buttons call back into this component.
+    // The Cancel / Accept buttons are rendered by THIS component at the end of
+    // its content (the Edit environment variable pattern), so they scroll with
+    // the form. app-modal's footer must therefore stay empty — leaving a
+    // cancelAction/confirmAction registered would render a second pair.
     this.allModalsService.modalConfig.update(modals => ({
       ...modals,
       assignPiDelegate: {
         ...modals.assignPiDelegate,
-        cancelText: 'Cancel',
-        confirmText: 'Accept',
-        cancelAction: () => this.onCancel(),
-        confirmAction: () => this.onConfirm(),
-        disabledConfirmAction: () => this.disabledConfirmIf()
+        cancelAction: undefined,
+        confirmAction: undefined,
+        disabledConfirmAction: undefined
       }
     }));
   }

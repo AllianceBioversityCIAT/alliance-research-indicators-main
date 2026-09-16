@@ -155,11 +155,14 @@ describe('MyPiDelegatesComponent', () => {
     expect((title as HTMLElement).textContent?.trim()).toBe('My PI Delegates');
   });
 
-  it('renders the description text mentioning "Principal Investigator"', () => {
+  it('describes what the PI Delegate role does, in the page description', () => {
     fixture.detectChanges();
-    const desc = fixture.nativeElement.querySelector('.pi-delegates-description');
+    const desc = fixture.nativeElement.querySelector('.pi-delegates-description') as HTMLElement;
     expect(desc).not.toBeNull();
-    expect((desc as HTMLElement).textContent).toContain('Principal Investigator');
+    const text = desc.textContent ?? '';
+    expect(text).toContain('approve, reject or request changes');
+    expect(text).toContain('revoke it at any time');
+    expect(text).toContain('Agresso');
   });
 
   it('info banner is ABSENT (the description block supersedes it)', () => {
@@ -374,33 +377,24 @@ describe('MyPiDelegatesComponent', () => {
     });
   });
 
-  // ── 11. Info banner about the PI Delegate role ──────────────────────────────
+  // ── 11. The role explanation lives in the description, not in a banner ──────
 
-  it('renders the PI Delegate info banner once, above the tables', () => {
+  it('renders no separate info banner — the description carries that copy', () => {
     fixture.detectChanges();
 
-    const banners = fixture.nativeElement.querySelectorAll('.pi-delegates-info');
-    expect(banners.length).toBe(1);
-
-    const text = (banners[0] as HTMLElement).textContent ?? '';
-    expect(text).toContain('approve, reject or request changes');
-    expect(text).toContain('revoke it at any time');
-    expect(text).toContain('Agresso');
-
-    // It sits before the table panels in document order
-    const panel = fixture.nativeElement.querySelector('[role="tabpanel"]');
-    expect(banners[0].compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-info')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="note"]')).toBeNull();
   });
 
-  it('does NOT render the info banner while loading or on error', () => {
+  it('keeps the description visible while loading and on error', () => {
     mockService.loading.set(true);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.pi-delegates-info')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-description')).not.toBeNull();
 
     mockService.loading.set(false);
     mockService.error.set('boom');
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.pi-delegates-info')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.pi-delegates-description')).not.toBeNull();
   });
 });
 

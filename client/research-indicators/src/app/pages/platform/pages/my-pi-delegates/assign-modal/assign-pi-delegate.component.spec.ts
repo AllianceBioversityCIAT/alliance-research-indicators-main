@@ -1076,6 +1076,28 @@ describe('AssignPiDelegateComponent', () => {
       expect(people.filterBy).toBe('name,email,carnet');
     });
 
+    it('places the inactive-delegate warning right under the info banner', async () => {
+      // A pre-loaded delegate whose account is inactive
+      piService.byProjectCache.set([
+        buildProject('BAN-2', [
+          { delegate_user_id: 12, name: 'Manuel Almanzar', email: 'manuel@test.org', is_active: false }
+        ])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'BAN-2' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
+      const children = Array.from(root.children) as HTMLElement[];
+      expect(children[0].classList.contains('assign-pi-delegate__notice')).toBe(true);
+      expect(children[1].classList.contains('assign-pi-delegate__inactive-warning')).toBe(true);
+      expect(children[1].textContent).toContain('Manuel Almanzar');
+      // it now sits above the People picker, not between the two pickers
+      expect(children[2].querySelector('app-multiselect')).not.toBeNull();
+    });
+
     it('puts both notices in a SINGLE banner at the top of the modal', async () => {
       await openFrom({ source: 'byProject', projectCode: 'BAN-1' }, 10);
 
@@ -1153,6 +1175,48 @@ describe('AssignPiDelegateComponent', () => {
       expect(detail).toContain('<div>&nbsp;&nbsp;• Emmanuel Mwema Musau</div>');
       expect(detail).toContain('<div>&nbsp;&nbsp;• Manuel Almanzar</div>');
       expect(detail).not.toContain('Emmanuel Mwema Musau, Juan Manuel Pardo Garcia');
+    });
+  });
+  // ── Footer buttons live inside the content (Environment variables pattern) ──
+
+  describe('modal footer', () => {
+    it('renders its own Cancel / Accept pair at the end of the content', () => {
+      fixture.detectChanges();
+
+      const root = fixture.nativeElement.querySelector('.assign-pi-delegate') as HTMLElement;
+      const buttons = Array.from(root.querySelectorAll('button')).filter(b =>
+        ['Cancel', 'Accept'].includes(b.textContent?.trim() ?? '')
+      );
+      expect(buttons.map(b => b.textContent?.trim())).toEqual(['Cancel', 'Accept']);
+
+      // they are the last block of the scrollable content, not a floating footer
+      const footer = buttons[0].parentElement as HTMLElement;
+      expect(root.lastElementChild).toBe(footer);
+    });
+
+    it('leaves the app-modal footer unregistered so no second pair renders', () => {
+      fixture.detectChanges();
+
+      const config = modalService.modalConfig()['assignPiDelegate'];
+      expect(config?.cancelAction).toBeUndefined();
+      expect(config?.confirmAction).toBeUndefined();
+    });
+
+    it('Accept is disabled until both pickers have a selection', () => {
+      fixture.detectChanges();
+
+      const accept = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+      ).find(b => b.textContent?.trim() === 'Accept') as HTMLButtonElement;
+      expect(accept.disabled).toBe(true);
+
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' }]
+      });
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
+      fixture.detectChanges();
+
+      expect(accept.disabled).toBe(false);
     });
   });
 });

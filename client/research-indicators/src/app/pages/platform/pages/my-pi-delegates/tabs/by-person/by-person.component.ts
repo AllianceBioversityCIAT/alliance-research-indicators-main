@@ -108,13 +108,6 @@ export class ByPersonComponent {
     this.searchTerm.set('');
   }
 
-  // ─── Summary line (rendered inside the table card) ───────────────────────────
-  // Only the inactive-delegate warning is surfaced; the counts were noise next
-  // to the paginator's own "Showing x to y of N" report.
-  readonly summaryInactive = computed(
-    () => this.personRows().filter(row => row.is_active === false).length
-  );
-
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
   /**
    * Revoke this person from the named project only.
@@ -134,6 +127,35 @@ export class ByPersonComponent {
         label: 'Revoke',
         event: () => {
           void this.service.revokePair(project.project_code, row.delegate_user_id);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel'
+      }
+    });
+  }
+
+  // ─── Remove-delegate affordance (inactive people only) ───────────────────────
+  /**
+   * Revokes the person from every project they are delegated on. Offered instead
+   * of "assign projects" when the account is inactive — there is no point adding
+   * projects to someone who cannot review results.
+   */
+  onRemoveDelegate(row: PersonRow): void {
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: 'Remove PI Delegate',
+      detail:
+        `Remove ${row.name} (${row.email}) as PI Delegate from ` +
+        `${row.projects.length} ${row.projects.length === 1 ? 'project' : 'projects'}? ` +
+        `This revokes their delegate access everywhere in this list.`,
+      confirmCallback: {
+        label: 'Remove',
+        event: () => {
+          void this.service.revokeDelegate(
+            row.delegate_user_id,
+            row.projects.map(p => p.project_code)
+          );
         }
       },
       cancelCallback: {

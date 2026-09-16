@@ -39,6 +39,30 @@
     </div>
   }
 
+  <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->
+  <!-- Amber box naming any pre-loaded delegates whose is_active === false. -->
+  @if (inactiveSelectedPeople().length > 0) {
+    <!-- Same amber notice design as the project-dashboard chart cards. -->
+    <div
+      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[#E69F00] bg-[#fff8e6] px-3 py-2.5"
+      role="alert" aria-live="assertive">
+      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[#8a4b08]/80"
+        aria-hidden="true"></i>
+      <p
+        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">
+        @if (inactiveSelectedPeople().length === 1) {
+          <strong class="font-semibold">{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
+          They will not be able to review results until their account is reactivated.
+          The role can still be granted and will take effect once they are active again.
+        } @else {
+          <strong class="font-semibold">{{ inactiveNames() }}</strong> are inactive in STAR.
+          They will not be able to review results until their accounts are reactivated.
+          The role can still be granted and will take effect once they are active again.
+        }
+      </p>
+    </div>
+  }
+
   <!-- ── People picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
   <!-- optionFilter excludes the current user (R-UI-005 AC.3). -->
@@ -128,30 +152,6 @@
 
     </app-multiselect>
   </div>
-
-  <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->
-  <!-- Amber box naming any pre-loaded delegates whose is_active === false. -->
-  @if (inactiveSelectedPeople().length > 0) {
-    <!-- Same amber notice design as the project-dashboard chart cards. -->
-    <div
-      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[#E69F00] bg-[#fff8e6] px-3 py-2.5"
-      role="alert" aria-live="assertive">
-      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[#8a4b08]/80"
-        aria-hidden="true"></i>
-      <p
-        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">
-        @if (inactiveSelectedPeople().length === 1) {
-          <strong class="font-semibold">{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
-          They will not be able to review results until their account is reactivated.
-          The role can still be granted and will take effect once they are active again.
-        } @else {
-          <strong class="font-semibold">{{ inactiveNames() }}</strong> are inactive in STAR.
-          They will not be able to review results until their accounts are reactivated.
-          The role can still be granted and will take effect once they are active again.
-        }
-      </p>
-    </div>
-  }
 
   <!-- ── Projects picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegateProjects' → projects from byProjectCache (the page table) (T-UI-08). -->
@@ -255,6 +255,20 @@
         </div>
       </ng-template>
     </app-multiselect>
+  </div>
+
+  <!-- Footer lives INSIDE the scrollable content — the same arrangement the
+       Edit environment variable modal uses, so the buttons scroll with the
+       form instead of floating over it. -->
+  <div class="flex justify-end gap-[14px] pt-5 pb-2">
+    <button type="button" (click)="onCancel()"
+      class="cursor-pointer rounded-[14px] border-[1.5px] border-[#035BA9] px-5 py-2 text-[15px] font-medium text-[#035BA9]">
+      Cancel
+    </button>
+    <button type="button" (click)="onConfirm()" [disabled]="disabledConfirmIf()"
+      class="flex cursor-pointer items-center gap-2 rounded-[14px] bg-[#035BA9] px-5 py-2 text-[15px] text-white disabled:cursor-not-allowed disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+      Accept
+    </button>
   </div>
 
 </div>
