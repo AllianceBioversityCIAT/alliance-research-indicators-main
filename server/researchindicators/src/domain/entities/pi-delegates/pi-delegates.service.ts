@@ -553,6 +553,7 @@ export class PiDelegatesService {
       ),
       pi_user_id:
         project?.pi_user_id != null ? Number(project.pi_user_id) : null,
+      pi_name: formatPersonName(project?.pi_name) || null,
       status: project?.contract_status ?? null,
       start_date: project?.start_date ?? null,
       end_date: project?.end_date ?? null,
@@ -655,6 +656,32 @@ export class PiDelegatesService {
    *
    * @param userId  sec_users.sec_user_id of the user whose managed projects to list
    */
+  /**
+   * Cheap membership check: does this user manage ANY project, as PI or as an
+   * active delegate? The UI hides the whole My PI Delegates module when it does
+   * not, and a boolean avoids shipping the enriched list just to ask.
+   *
+   * Authorization (own-or-admin) mirrors listManagedProjects.
+   */
+  async hasManagedProjects(userId: number): Promise<{ has_access: boolean }> {
+    const callerUserId = this.currentUserUtil.user_id;
+    const roles = this.currentUserUtil.roles ?? [];
+
+    const isSelf = userId === callerUserId;
+    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
+
+    if (!isSelf && !isAdmin) {
+      throw new ForbiddenException(
+        'Access denied: you may only query your own managed projects, or you must be a SYSTEM_ADMIN.',
+      );
+    }
+
+    const projectIds =
+      await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+    return { has_access: projectIds.length > 0 };
+  }
+
   async listManagedProjects(
     userId: number,
   ): Promise<ProjectDelegatesResponseDto[]> {
@@ -708,6 +735,7 @@ export class PiDelegatesService {
       project_name: p.description ?? null,
       is_pool_funding_contributor: Boolean(p.is_pool_funding_contributor),
       pi_user_id: p.pi_user_id != null ? Number(p.pi_user_id) : null,
+      pi_name: formatPersonName(p.pi_name) || null,
       status: p.contract_status ?? null,
       start_date: p.start_date ?? null,
       end_date: p.end_date ?? null,

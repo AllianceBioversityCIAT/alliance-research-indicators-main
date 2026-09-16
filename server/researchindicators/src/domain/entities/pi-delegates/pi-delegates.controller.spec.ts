@@ -37,6 +37,7 @@ const PROJECT_DELEGATES_FIXTURE: ProjectDelegatesResponseDto = {
   project_name: 'Test Project',
   is_pool_funding_contributor: false,
   pi_user_id: 99,
+  pi_name: 'Mayesse Da Silva',
   status: 'ACTIVE',
   start_date: null,
   end_date: null,
