@@ -277,7 +277,7 @@ describe('PiDelegateHistoryComponent', () => {
       expect(granted).not.toBeNull();
       // KZ-014: must NOT show revoked badge for assign
       expect(revoked).toBeNull();
-      expect((granted!.nativeElement as HTMLElement).textContent).toContain('GRANTED');
+      expect((granted!.nativeElement as HTMLElement).textContent?.toUpperCase()).toContain('GRANTED');
     });
   });
 
@@ -313,7 +313,7 @@ describe('PiDelegateHistoryComponent', () => {
       expect(revoked).not.toBeNull();
       // KZ-014: must NOT show granted badge for revoke
       expect(granted).toBeNull();
-      expect((revoked!.nativeElement as HTMLElement).textContent).toContain('REVOKED');
+      expect((revoked!.nativeElement as HTMLElement).textContent?.toUpperCase()).toContain('REVOKED');
     });
   });
 
@@ -459,6 +459,161 @@ describe('PiDelegateHistoryComponent', () => {
       const root = fixture.nativeElement.querySelector('.pi-dh') as HTMLElement;
       expect(root.className).toContain('w-[860px]');
       expect(root.className).toContain('max-w-[88vw]');
+    });
+  });
+  // ── Modal title + content heading name the subject ────────────────────────
+
+  describe('titles', () => {
+    it('leaves the modal header as the plain module name and carries the code in the heading', async () => {
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'A1001',
+        projectName: 'EC-Fostering low cadmium and climate-relevant innovations'
+      });
+      modalService.openModal('piDelegateHistory');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // The header no longer names the subject — the heading below does.
+      expect(modalService.modalConfig()['piDelegateHistory'].title).toBe('Delegation History');
+
+      const heading = fixture.nativeElement.querySelector('.pi-dh__title') as HTMLElement;
+      expect(heading.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+        'A1001 - EC-Fostering low cadmium and climate-relevant innovations'
+      );
+      // The code is the emphasised half of the heading.
+      const code = heading.querySelector('.pi-dh__title__code') as HTMLElement;
+      expect(code.textContent?.trim()).toBe('A1001');
+      // the light-grey subheader is gone
+      expect(fixture.nativeElement.querySelector('.pi-dh__subheader')).toBeNull();
+    });
+
+    it('shows the code alone when the project has no name (no dangling separator)', async () => {
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'A1001',
+        projectName: null
+      });
+      modalService.openModal('piDelegateHistory');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const heading = fixture.nativeElement.querySelector('.pi-dh__title') as HTMLElement;
+      expect(heading.textContent?.replace(/\s+/g, ' ').trim()).toBe('A1001');
+    });
+
+    it('names the person when opened from By person, with no code', async () => {
+      modalService.piDelegateHistoryContext.set({
+        source: 'byPerson',
+        delegateUserId: 7,
+        name: 'Alison Rose'
+      });
+      modalService.openModal('piDelegateHistory');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(modalService.modalConfig()['piDelegateHistory'].title).toBe('Delegation History');
+      const heading = fixture.nativeElement.querySelector('.pi-dh__title') as HTMLElement;
+      expect(heading.textContent?.replace(/\s+/g, ' ').trim()).toBe('Alison Rose');
+      expect(heading.querySelector('.pi-dh__title__code')).toBeNull();
+    });
+  });
+
+  // ── Entry cards stay light: code only, no highlighted names ───────────────
+
+  describe('entry density', () => {
+    it('names the project by code only — the full name is not repeated per row', async () => {
+      apiService.nextResponse = makeResponse([makeEntry({ action: 'assign' })]);
+      // projectName is null in the context, so the heading cannot be the source
+      // of the project name: any match below comes from the entry card itself.
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'PRJ-001',
+        projectName: null
+      });
+      await openModalAndWait(modalService, fixture);
+
+      const sentence = fixture.nativeElement.querySelector('.pi-dh__sentence') as HTMLElement;
+      expect(sentence.textContent).toContain('PRJ-001');
+      expect(sentence.textContent).not.toContain('Alpha Research');
+    });
+
+    it('renders the delegate name as plain emphasis, with no highlight background', async () => {
+      apiService.nextResponse = makeResponse([makeEntry({ action: 'assign' })]);
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'PRJ-001',
+        projectName: null
+      });
+      await openModalAndWait(modalService, fixture);
+
+      const delegate = fixture.nativeElement.querySelector('.pi-dh__delegate') as HTMLElement;
+      expect(delegate.textContent?.trim()).toBe('Alice Delegate');
+      expect(delegate.className).toContain('font-semibold');
+      // The marker-pen chip is gone: no background, no rounding, no padding.
+      expect(delegate.className).not.toContain('bg-');
+      expect(delegate.className).not.toContain('rounded');
+      expect(delegate.className).not.toContain('px-');
+    });
+
+    it('uses the tables typography for the card: Barlow 14px body, Space Grotesk date', async () => {
+      apiService.nextResponse = makeResponse([makeEntry({ action: 'assign' })]);
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'PRJ-001',
+        projectName: null
+      });
+      await openModalAndWait(modalService, fixture);
+
+      const sentence = fixture.nativeElement.querySelector('.pi-dh__sentence') as HTMLElement;
+      expect(sentence.className).toContain("font-['Barlow']");
+      expect(sentence.className).toContain('text-[14px]');
+      expect(sentence.className).toContain('atc-grey-800');
+
+      const timestamp = fixture.nativeElement.querySelector('.pi-dh__timestamp') as HTMLElement;
+      expect(timestamp.className).toContain("font-['Space_Grotesk']");
+      expect(timestamp.className).toContain('text-[12px]');
+      expect(timestamp.className).toContain('atc-primary-blue-300');
+    });
+  });
+  // ── Avatar palette + status-style badges ──────────────────────────────────
+
+  describe('entry chrome', () => {
+    it('gives each actor a palette derived from their initials', () => {
+      // same person → same palette, every time
+      expect(component.avatarVariant('Daniela Zuniga Pino')).toBe(
+        component.avatarVariant('Daniela Zuniga Pino')
+      );
+
+      // different initials → different palettes (not one colour for everyone)
+      const variants = ['Daniela Zuniga Pino', 'Manuel Almanzar', 'Alice Delegate', 'Zoe Quinn'].map(
+        name => component.avatarVariant(name)
+      );
+      expect(new Set(variants).size).toBeGreaterThan(1);
+
+      // and every result is one of the five declared palettes
+      for (const variant of [...variants, component.avatarVariant(null)]) {
+        expect(variant).toMatch(/^pi-dh__avatar--c[0-4]$/);
+      }
+    });
+
+    it('renders the badge through the shared status tag, not a bespoke pill', async () => {
+      apiService.nextResponse = makeResponse([makeEntry({ action: 'assign' })]);
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'PRJ-001',
+        projectName: null
+      });
+      await openModalAndWait(modalService, fixture);
+
+      const tag = fixture.debugElement.query(By.css('app-custom-tag.pi-dh__badge--granted'));
+      expect(tag).not.toBeNull();
+      const instance = tag.componentInstance as { statusColor?: string; statusBorder?: string };
+      expect(instance.statusColor).toBe('var(--ac-green-600)');
+      expect(instance.statusBorder).toBe('var(--ac-green-300)');
     });
   });
 });
