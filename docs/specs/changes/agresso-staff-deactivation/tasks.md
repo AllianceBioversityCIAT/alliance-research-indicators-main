@@ -2,7 +2,7 @@
 
 - **Module:** agresso
 - **Spec id:** 2026-09-agresso-staff-deactivation-i1
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** ARI server squad
 - **Linked requirements:** [`./requirements.md`](./requirements.md)
 - **Linked design:** [`./design.md`](./design.md)
@@ -65,14 +65,14 @@ full suite after each worker reports**; workers verify only their own scope.
   - `shieldKeyFor` MUST NOT consult `isUsableEmail` or any length limit. It measures the trimmed value; `isUsableEmail` measures the raw one, and that mismatch is `JD-3`.
   - Do not change `isUsableEmail` itself — the sibling's create/refresh path depends on its current semantics.
 - **Done check:**
-  - [ ] `shieldKeyFor('  MARIA.GOMEZ@CGIAR.ORG ')` → `'maria.gomez@cgiar.org'`
-  - [ ] `shieldKeyFor('x@y.org' + ' '.repeat(140))` (raw 147+, trimmed short) → the trimmed key, **not** `null`
-  - [ ] `shieldKeyFor(null)`, `shieldKeyFor(undefined)`, `shieldKeyFor('   ')` → `null`, no throw
-  - [ ] The reconciler's existing suite passes **unchanged** — this is a behaviour-preserving move
+  - [x] `shieldKeyFor('  MARIA.GOMEZ@CGIAR.ORG ')` → `'maria.gomez@cgiar.org'`
+  - [x] `shieldKeyFor('x@y.org' + ' '.repeat(140))` (raw 147+, trimmed short) → the trimmed key, **not** `null`
+  - [x] `shieldKeyFor(null)`, `shieldKeyFor(undefined)`, `shieldKeyFor('   ')` → `null`, no throw
+  - [x] The reconciler's existing suite passes **unchanged** — this is a behaviour-preserving move
 - **Red input (K-012):** implement `shieldKeyFor` as `isUsableEmail(e) ? normalizeEmail(e) : null` → the padded-email case returns `null` and its test fails.
 - **Disqualifies:** if the reconciler's suite needed *any* edit to pass, the move was not behaviour-preserving — report the divergence instead of adjusting the test (K-019).
 - **Tests:** `email-key.util.spec.ts`. **Presence is not proof** — asserting the util exists proves nothing; the done-checks assert returned values.
-- **Effort:** S · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** todo
+- **Effort:** S · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** done
 
 ---
 
@@ -87,14 +87,14 @@ full suite after each worker reports**; workers verify only their own scope.
   - Per-page count = `allStaff.length` after minus before. Do not infer it from the mapper's return.
   - The `?status=active` parameter stays in the shared `query()` builder — it must reach both the count call and the page fetch, or pagination desynchronises.
 - **Done check:**
-  - [ ] `findNumberOfPages` returns `3` for `totalElements = 2500` (was `4`) and `1` for `500` (was `2`)
-  - [ ] `pageRowCounts.length === pages`, and each entry equals that page's contribution
-  - [ ] `distinctCarnets` counts distinct values, proven with a payload repeating one carnet
-  - [ ] The existing URL assertion still asserts `status=active` on **both** call sites
+  - [x] `findNumberOfPages` returns `3` for `totalElements = 2500` (was `4`) and `1` for `500` (was `2`)
+  - [x] `pageRowCounts.length === pages`, and each entry equals that page's contribution
+  - [x] `distinctCarnets` counts distinct values, proven with a payload repeating one carnet
+  - [x] The existing URL assertion still asserts `status=active` on **both** call sites
 - **Red input (K-012):** revert to `round + remainder` → the `2500 → 3` case fails. Separately, feed a payload where two rows share a `resourceId` → a `distinctCarnets` implemented as `allStaff.length` fails.
 - **Disqualifies:** a `distinctCarnets` test built from rows with identical defaults cannot distinguish distinct counting from row counting — **vary the carnet per row** (KZ-004).
 - **Tests:** extend `agresso-staff-tools.service.spec.ts`.
-- **Effort:** S · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** todo
+- **Effort:** S · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** done
 
 ---
 
@@ -110,15 +110,15 @@ full suite after each worker reports**; workers verify only their own scope.
   - Coerce every branched column: `Number(...)` for `user_status_id` and `status_id`, `Boolean(...)` for `is_active`. Raw `Repository.query` returns unhydrated driver values.
   - Register both new providers in `AgressoStaffModule`. **No new module import is needed** — verify that stays true.
 - **Done check:**
-  - [ ] Two `user_status` rows named `External` → returns a match count of 2, not an id
-  - [ ] Zero matches → match count 0
-  - [ ] A soft-deleted (`deleted_at` set) or `is_active = 0` `External` row is **not** counted
-  - [ ] Every statement is a `SELECT` — no `UPDATE`/`INSERT`/`DELETE` token anywhere in the file
-  - [ ] The module compiles with both providers as singletons
+  - [x] Two `user_status` rows named `External` → returns a match count of 2, not an id
+  - [x] Zero matches → match count 0
+  - [x] A soft-deleted (`deleted_at` set) or `is_active = 0` `External` row is **not** counted
+  - [x] Every statement is a `SELECT` — no `UPDATE`/`INSERT`/`DELETE` token anywhere in the file
+  - [x] The module compiles with both providers as singletons
 - **Red input (K-012):** drop `AND deleted_at IS NULL` → the soft-deleted-row case returns 2 matches and fails. Inject `AppConfigService` → the singleton-scope assertion fails.
 - **Disqualifies:** a mocked query builder **cannot represent SQL operator precedence or the effect of a `WHERE` predicate** — the `deleted_at`/`is_active` filtering claim is asserted against generated SQL or at the fixture tier (T-05), never against a call sequence (KZ-017).
 - **Tests:** `sec-user-deactivation.repository.spec.ts`; the predicate claims are re-asserted in T-05.
-- **Effort:** M · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** todo
+- **Effort:** M · **Deps:** none · **Skills:** `nestjs-expert` · **Status:** done
 
 ---
 
@@ -136,16 +136,16 @@ full suite after each worker reports**; workers verify only their own scope.
   - C-2: abort if `distinctCarnets < totalElements`, or if any page **except the last** contributed 0 rows.
   - The whole pass is wrapped so it never throws — the controller does not `await` it.
 - **Done check:**
-  - [ ] **The `JD-3` case:** a member with a 161-char padded email whose trimmed value matches active row 812 → 812 is **not** a candidate
-  - [ ] A `CARNET_TOO_LONG` member with a valid email shields its account
-  - [ ] A collapsed loser's key shields
-  - [ ] A member with `email: null` does not throw and the pass completes
-  - [ ] EX-4: a candidate whose own email is `''` or whitespace is excluded as `excludedUnmatchable`
-  - [ ] EX-3: two **active** rows at one unmatched key → both excluded; one active + one inactive → the active row **is** a candidate
-  - [ ] EX-2: an active `role_id = 1` row shields; an inactive-only one does not
-  - [ ] C-2 distinctness: 1995 distinct carnets against `totalElements = 2000` → abort, duplicated carnets listed
-  - [ ] C-2 last page: a final page contributing 0 rows does **not** trigger the empty-page clause
-  - [ ] C-1: `totalElements = 0` → abort, no candidate set
+  - [x] **The `JD-3` case:** a member with a 161-char padded email whose trimmed value matches active row 812 → 812 is **not** a candidate
+  - [x] A `CARNET_TOO_LONG` member with a valid email shields its account
+  - [x] A collapsed loser's key shields
+  - [x] A member with `email: null` does not throw and the pass completes
+  - [x] EX-4: a candidate whose own email is `''` or whitespace is excluded as `excludedUnmatchable`
+  - [x] EX-3: two **active** rows at one unmatched key → both excluded; one active + one inactive → the active row **is** a candidate
+  - [x] EX-2: an active `role_id = 1` row shields; an inactive-only one does not
+  - [x] C-2 distinctness: 1995 distinct carnets against `totalElements = 2000` → abort, duplicated carnets listed
+  - [x] C-2 last page: a final page contributing 0 rows does **not** trigger the empty-page clause
+  - [x] C-1: `totalElements = 0` → abort, no candidate set
 - **Red input (K-012), one per clause — each observed FAILING before it is trusted (K-004):**
   - Swap `shieldKeyFor` → `isUsableEmail` ⇒ the padded-email check fails
   - Compare `allStaff.length` instead of `distinctCarnets` ⇒ the 1995/2000 check fails
@@ -154,7 +154,7 @@ full suite after each worker reports**; workers verify only their own scope.
   - Build `shieldKeys` after `validate()` ⇒ the `CARNET_TOO_LONG` check fails
 - **Disqualifies:** a fixture whose members share identical emails/carnets cannot distinguish per-member scoping from a batch-wide bug — **vary at least one discriminating field per member** (KZ-004). A test asserting a rule "is applied" without asserting the resulting candidate set proves presence, not effect.
 - **Tests:** `sec-user-deactivation.service.spec.ts`. This is the task's own gate tier; DB-level claims belong to T-05.
-- **Effort:** L · **Deps:** T-01, T-02, T-03 · **Skills:** `nestjs-expert`, `tdd` · **Status:** todo
+- **Effort:** L · **Deps:** T-01, T-02, T-03 · **Skills:** `nestjs-expert`, `tdd` · **Status:** done
 
 ---
 
@@ -179,7 +179,7 @@ full suite after each worker reports**; workers verify only their own scope.
 - **Red input (K-012):** add a single `UPDATE sec_users SET is_active = 0 WHERE sec_user_id = <a candidate>` inside the service ⇒ the zero-delta assertion fails. This mutation MUST be run and observed red, then reverted — the gate is the increment's central safety claim and an unexercised one is worthless.
 - **Disqualifies:** a zero-delta assertion over a database where the candidate set was **empty** proves nothing — the fixture MUST seed a payload/`sec_users` state producing **at least one** candidate, and assert the candidate count is non-zero **in the same test**. Without that the gate passes vacuously.
 - **Tests:** `npm run test:fixtures` (single worker, scratch schema). **`npm test` is not evidence for any claim in this task** — `rootDir: src` never executes `test/fixtures/`.
-- **Effort:** M · **Deps:** T-04 · **Skills:** `nestjs-expert` · **Status:** todo
+- **Effort:** M · **Deps:** T-04 · **Skills:** `nestjs-expert` · **Status:** in-progress (wiring done; fixture with Cursor)
 
 ---
 
