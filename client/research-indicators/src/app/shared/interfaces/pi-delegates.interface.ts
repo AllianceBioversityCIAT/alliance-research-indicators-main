@@ -78,6 +78,8 @@ export interface ProjectDelegates {
    * disables that option instead of letting the request 400.
    */
   pi_user_id: number | null;
+  /** The Principal Investigator's name (agresso project lead), or null. */
+  pi_name: string | null;
   /** agresso_contracts.contract_status. */
   status: string | null;
   /** agresso_contracts.start_date. */
