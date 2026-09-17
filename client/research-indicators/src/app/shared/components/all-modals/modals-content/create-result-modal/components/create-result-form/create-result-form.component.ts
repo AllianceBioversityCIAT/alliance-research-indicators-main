@@ -377,7 +377,16 @@ export class CreateResultFormComponent {
         this.allModalsService.openModal('resultInformation');
       } else {
         const resultCode = `${platformCode}-${result.data.result_official_code}`;
-        this.router.navigate(['result', resultCode], { replaceUrl: true });
+        // Hold back the `version` query param until the router has actually
+        // moved. Until then the URL is still the one the user was standing on
+        // — possibly a versioned result — and `resultInterceptor` would stamp
+        // that year onto every request for the result just created, which has
+        // no versions yet. Cleared on failure too, so a rejected navigation
+        // cannot leave the flag raised.
+        this.cache.skipResultVersionParam.set(true);
+        void this.router.navigate(['result', resultCode], { replaceUrl: true }).finally(() => {
+          this.cache.skipResultVersionParam.set(false);
+        });
       }
 
       this.allModalsService.closeModal('createResult');

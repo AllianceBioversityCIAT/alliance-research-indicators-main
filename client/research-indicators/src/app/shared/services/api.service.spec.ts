@@ -2331,13 +2331,17 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
     currentResultIsLoading: ReturnType<typeof signal<boolean>>;
     greenChecks: ReturnType<typeof signal<GreenChecks>>;
     getCurrentNumericResultId: () => number;
+    skipResultVersionParam: ReturnType<typeof signal<boolean>>;
   };
 
   beforeEach(() => {
     cacheServiceStub = {
       currentResultIsLoading: signal(false),
       greenChecks: signal<GreenChecks>({}),
-      getCurrentNumericResultId: () => 123
+      getCurrentNumericResultId: () => 123,
+      // Down outside the create-result flow, which is what these outgoing-URL
+      // expectations describe.
+      skipResultVersionParam: signal(false)
     };
 
     TestBed.configureTestingModule({
@@ -2489,7 +2493,10 @@ function configurePoolFundingHttp(routerUrl: string, queryParams: Record<string,
         useValue: {
           currentResultIsLoading: signal(false),
           greenChecks: signal<GreenChecks>({}),
-          getCurrentNumericResultId: () => 19941
+          getCurrentNumericResultId: () => 19941,
+          // Down outside the create-result flow; these cases describe ordinary
+          // versioned browsing, where the year must still travel.
+          skipResultVersionParam: signal(false)
         }
       },
       { provide: ControlListCacheService, useValue: {} },
