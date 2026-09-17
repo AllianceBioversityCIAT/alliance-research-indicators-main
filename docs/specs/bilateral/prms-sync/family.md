@@ -9,12 +9,12 @@
 - **Family path:** `docs/specs/bilateral/prms-sync/`
 - **Parent spec / Feature:** `Bilateral / PRMS Sync`
 - **Date created:** `2026-08-21`
-- **Last updated:** `2026-08-21`
-- **Spec-family status:** `open` — **ON HOLD until 2026-08-25 (Tuesday):** the PRMS team is reworking the ingest contract to a **hook-based model** and will share auth + response details then. No `/akili-specify` before that; see §5 answers of 2026-08-21.
+- **Last updated:** `2026-09-17`
+- **Spec-family status:** `open` — **hold lifted 2026-09-17.** The 2026-08-21 hold (PRMS reworking the contract) is resolved: `sync-engine` executed against the delivered ingest contract (14/14 tasks, Reviewer PASS each, merged to `dev` in `1b981a07`), and the PRMS team has now published the **decision-webhook** contract, which enters this family as child 5. Live exercise of `sync-engine` in the running product is still open — see [`HANDOFF.md`](HANDOFF.md).
 - **Owner / Squad:** Juan Cadavid / ARI
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) §4.1 (G1, G4), §5.1 (federation), §3.5 (PRMS as downstream consumer)
 - **Linked TRD section:** [`docs/trd/trd.md`](../../../trd/trd.md) §9.1 (integrations), §7.1 (result lifecycle)
-- **Requirement source:** Jira **AC-1676** + user mockup (Image #60, chat) + [PRMS Normalizer – Technical Field Documentation](../../../technical-docs/) *(source file currently in `~/Downloads`; copy into the repo during `/akili-specify` — see family risk R-F5)*
+- **Requirement source:** Jira **AC-1676** + user mockup (Image #60, chat) + [PRMS Normalizer – Technical Field Documentation](../../../technical-docs/) *(source file currently in `~/Downloads`; copy into the repo during `/akili-specify` — see family risk R-F5)*. Child 5 adds **PRMS Result Decision Webhooks** (supplied 2026-09-17, also still in `~/Downloads` — same copy-into-repo obligation).
 - **Slug:** `prms-sync` — derived from free-text argument ("PRMS SYNC … sincronización con el PRMS"); never a path literal.
 - **Approval Mode:** gated
 
@@ -36,6 +36,7 @@ Split rationale: (1) the server integration is the contract everything else cons
 | 2 | `prms-sync/sync-button-ux` | Client: wire the existing PRMS SYNC button — confirm modal, loading, success/failure UX, synced badge, alignment lock refresh | `sync-engine` | `no` | `pending` | TBD |
 | 3 | `prms-sync/center-admin-resync` | Center Admin: sync status visibility + manual re-sync from the bilateral module for failed/pending results | `sync-engine` | `no` | `pending` | TBD |
 | 4 | `prms-sync/pi-sync-panel` | PI project-level control panel: per-result sync pipeline (pending alignment / ready / synced / failed / future PRMS verdict) | `sync-engine` | `no` | `pending` | TBD |
+| 5 | `prms-sync/decision-webhook` | Server: register STAR's callback destination with PRMS, receive the Science Program APPROVE/REJECT callback, deduplicate it, and record **every** delivery in an append-only history built to be displayed | `sync-engine` | `yes` | `pending` | TBD |
 
 > `Parallel-safe: no` on 2–4 because all three touch the client package; root guide §4.3 forbids two concurrent tasks in one package. 2, 3, 4 are functionally independent of each other (any order after 1).
 
@@ -48,6 +49,7 @@ graph TD
     C1["1. sync-engine (server)"] --> C2["2. sync-button-ux (client)"]
     C1 --> C3["3. center-admin-resync"]
     C1 --> C4["4. pi-sync-panel"]
+    C1 --> C5["5. decision-webhook (server)"]
 ```
 
 ---
@@ -55,7 +57,7 @@ graph TD
 ## 4. Closed-Set Rule (Non-Negotiable)
 
 > [!IMPORTANT]
-> The child table in Section 2 is the **exhaustive child set** of this family. No AKILI command or agent may create or execute a child spec folder without a prior registered row here. Adding, removing, or re-ordering children requires a HITL-approved manifest edit. The family is `complete` only when every child is `done` and verified. The anticipated "capture SP-leader accept/reject from PRMS" phase is **deliberately not a row yet** — it enters via a manifest edit once the PRMS side exists.
+> The child table in Section 2 is the **exhaustive child set** of this family. No AKILI command or agent may create or execute a child spec folder without a prior registered row here. Adding, removing, or re-ordering children requires a HITL-approved manifest edit. The family is `complete` only when every child is `done` and verified. The anticipated "capture SP-leader accept/reject from PRMS" phase **entered as child 5 on 2026-09-17** (HITL-approved manifest edit), because the PRMS side now exists: the *PRMS Result Decision Webhooks* contract was published. Child 5 is deliberately **server-only**; the UI that displays the decision history enters later as its own row.
 
 ---
 
