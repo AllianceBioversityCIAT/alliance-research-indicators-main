@@ -348,11 +348,11 @@ proven in its *shape*, not in its *result*.
 
 | PRMS field | Req | STAR source | Verdict |
 |---|---|---|---|
-| `number_people_trained.women` | ⚠️ ≥1 of 4 | `result_capacity_sharing.session_participants_female` | ✅ **EXACT.** |
+| `number_people_trained.women` | ⛔ **required** (corrected 2026-09-17) | `result_capacity_sharing.session_participants_female` | ✅ **EXACT** on the value. ⚠️ **"≥1 of 4" was wrong** — transcribed from PRMS's field documentation, never measured. The live TEST API rejects a payload carrying only `men`: *"women must not be less than 0"* / *"women must be a number conforming to the specified constraints"*. The spike missed it because its one accepted `capacity_sharing` call sent all three buckets. Blanks are therefore sent as `0`. Whether `men` and `non_binary` are equally required is **still unmeasured** — the error named only `women`. Open with the PRMS team. |
 | `number_people_trained.men` | | `session_participants_male` | ✅ **EXACT.** |
 | `number_people_trained.non_binary` | | `session_participants_non_binary` | ✅ **EXACT.** |
 | `number_people_trained.unknown` | | — | ⚫ **Omitted (P-1, §1.4).** No column, and the `session_participants_total` remainder is an arithmetic artefact rather than a reported figure. Optional → send nothing. |
-| `length_training` | ✅ enum | `session_length_id` **and** `degree_id` | 🟢 **DERIVED — two STAR fields collapse into one PRMS enum; full analysis in §12.2.** PRMS accepts `"PhD" \| "Master" \| "Short-term" \| "Long-term"`. Proposed rule: `degree_id = PHD (1)` → `"PhD"`; `MSC (2)` → `"Master"`; otherwise invert `SessionLengthHomologation` (`SHORT_TERM` → `"Short-term"`, `LONG_TERM` → `"Long-term"`). ⚠️ `BSC (3)` has **no** PRMS slot — it must fall through to the session length, which means a BSc long-course and a non-degree long-course become indistinguishable in PRMS. Accept and record, or escalate to PRMS. |
+| `length_training` | ✅ enum | `session_length_id` **and** `degree_id` (⚠️ **`degree_id` is NOT required** — corrected 2026-09-17: a non-degree training legitimately has none, and result 19949 on Dev carries `degree_id NULL` with a session length set. The builder used to throw before the homologation could decide) | 🟢 **DERIVED — two STAR fields collapse into one PRMS enum; full analysis in §12.2.** PRMS accepts `"PhD" \| "Master" \| "Short-term" \| "Long-term"`. Proposed rule: `degree_id = PHD (1)` → `"PhD"`; `MSC (2)` → `"Master"`; otherwise invert `SessionLengthHomologation` (`SHORT_TERM` → `"Short-term"`, `LONG_TERM` → `"Long-term"`). ⚠️ `BSC (3)` has **no** PRMS slot — it must fall through to the session length, which means a BSc long-course and a non-degree long-course become indistinguishable in PRMS. Accept and record, or escalate to PRMS. |
 | `delivery_method` | ✅ enum | `delivery_modality_id` | ✅ **EXACT — map already written.** Invert `DeliveryModalityHomologation`: `VIRTUAL` → `"Virtual / Online"`, `HYBRID` → `"Blended (in-person and virtual)"`, `IN_PERSON` → `"In person"`. |
 
 > Both tables exist in the repo for the **inbound** direction
@@ -363,6 +363,37 @@ proven in its *shape*, not in its *result*.
 > artefacts and which are safe to invert.
 
 ---
+
+### 7.1 Individual vs group training — **D-8, added 2026-09-17**
+
+This document never mentioned *individual*, *trainee*, `session_format_id` or `gender_id`. That was
+an omission, not a decision: STAR stores **two shapes** under one type, and only the group one was
+mapped.
+
+| `session_formats` | Approved versions (Dev, 2026-09-16) | Carry no counts | Carry `gender_id` |
+|---|---|---|---|
+| `1` Individual training | 42 | 39 | **42 (all)** |
+| `2` Group training | 84 | 7 | 0 |
+
+A **group** records disaggregated counts. An **individual** records one named trainee
+(`trainee_name`) and their `gender_id`, and no counts at all. Mapping only the group shape made a
+third of Approved CapDev permanently unsendable.
+
+**D-8 (product owner, 2026-09-17):** an individual training counts its trainee as **1 in that
+trainee's gender bucket** — `gender` catalogue `1 Male → men`, `2 Female → women`,
+`3 Non-binary → non_binary` (seeded values verified on Dev). This is **not** the `unknown`
+arithmetic §1.4 rejects: the participant and their gender were both entered by a person, and for a
+single participant the other two buckets are entailed with certainty, not inferred.
+
+**D-9 (product owner, 2026-09-17):** buckets the reporter left blank are sent as **`0`**, group
+trainings included, because PRMS rejects an absent bucket (see §7's `women` row). For an individual
+this is entailed. **For a group it asserts a zero nobody typed** — accepted deliberately, and
+recorded here rather than left implicit in the code.
+
+**Limit deliberately kept:** a group that reported **no** counts at all still refuses, rather than
+sending three zeros. A false "nobody was trained" that PRMS accepts silently is worse than a
+refusal that names the gap.
+
 
 ## 8. `innovation_use`
 
