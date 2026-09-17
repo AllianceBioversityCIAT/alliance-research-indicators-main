@@ -60,9 +60,9 @@ flag had been refused too, while the rest of the codebase treats null as live. T
 
 | Item | State |
 |---|---|
-| `AC-1441-US5-Push-Results-into-the-PRMS` | `5824ab6e` — the six fixes |
-| `dev` | `1b981a07` — merge of the branch into dev, **6 commits ahead of `origin/dev`** |
-| Pushed? | **No.** The owner pushes; never push from a session |
+| `AC-1441-US5-Push-Results-into-the-PRMS` | `5824ab6e` — the six fixes, **plus this handoff commit** |
+| `dev` | `1b981a07` — merge of the branch into dev |
+| Pushed? | **`dev` was pushed by the owner on 2026-09-17**, so `origin/dev` carries all six fixes. ⚠️ **This handoff itself landed on the feature branch, not on `dev`** — the owner switched branches while it was being written — so `origin/dev` does NOT have it yet. Merge the branch into `dev` again to carry it over. The owner pushes; never push from a session |
 | Server suite (on dev) | 413 suites / 3865 tests, build exit 0 |
 | Client suite (on dev) | 335 suites / 7707 tests, `ng lint` clean, build exit 0 |
 | Migrations | **None needed.** Dev reports **0 pending** of 333 (`migration:show`, ANSI-stripped) |
