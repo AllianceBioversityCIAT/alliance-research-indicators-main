@@ -3,6 +3,7 @@ import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpHeaders } from '@ang
 import { of } from 'rxjs';
 import { Router } from '@angular/router';
 import { resultInterceptor } from './result.interceptor';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('resultInterceptor', () => {
@@ -64,6 +65,33 @@ describe('resultInterceptor', () => {
     const calledRequest = mockHandler.mock.calls[0][0];
     expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
     expect(calledRequest.url).toBe('http://test.com/api/data?reportYear=2023');
+  });
+
+  // Raised only by the create-result flow while the router moves to the newly
+  // created result; see CacheService.skipResultVersionParam.
+  describe('skipResultVersionParam', () => {
+    const yearRequest = () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      return new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+    };
+
+    it('omits reportYear while the create-result flow holds the flag up', () => {
+      TestBed.inject(CacheService).skipResultVersionParam.set(true);
+      mockRouter.parseUrl.mockReturnValue({ queryParams: { version: '2026' } });
+
+      interceptor(yearRequest(), mockHandler);
+
+      expect(mockHandler.mock.calls[0][0].url).toBe('http://test.com/api/data');
+    });
+
+    it('sends reportYear as usual while the flag is down', () => {
+      TestBed.inject(CacheService).skipResultVersionParam.set(false);
+      mockRouter.parseUrl.mockReturnValue({ queryParams: { version: '2026' } });
+
+      interceptor(yearRequest(), mockHandler);
+
+      expect(mockHandler.mock.calls[0][0].url).toBe('http://test.com/api/data?reportYear=2026');
+    });
   });
 
   it('should add year parameter to URL with & separator when URL already has query parameters', () => {

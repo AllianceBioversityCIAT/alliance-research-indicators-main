@@ -83,7 +83,8 @@ describe('CreateResultFormComponent', () => {
     } as Partial<AllModalsService> 
 
     cacheServiceMock = {
-      currentResultId: signal<number | null>(null)
+      currentResultId: signal<number | null>(null),
+      skipResultVersionParam: signal(false)
     } as Partial<CacheService>
 
     createResultManagementServiceMock = {
@@ -273,6 +274,42 @@ describe('CreateResultFormComponent', () => {
     expect(cacheServiceMock.currentResultId()).toBe(999);
     expect(navigateSpy).toHaveBeenCalledWith(['result', 'STAR-999'], { replaceUrl: true });
     expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('createResult');
+  });
+
+  // The `version` of the result the user was standing on must not reach the
+  // result that was just created: it has no versions, and every request behind
+  // `X-Use-Year` would carry that year until the router finishes moving.
+  it('successRequest holds back the version param until the navigation settles', async () => {
+    jest.spyOn(router, 'navigate').mockResolvedValue(true as any);
+    const result = { data: { result_official_code: '999' } } as any;
+
+    component.successRequest(result, true);
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
+  });
+
+  it('successRequest clears the version hold when the navigation is rejected', async () => {
+    jest.spyOn(router, 'navigate').mockRejectedValue(new Error('nav failed'));
+    const result = { data: { result_official_code: '999' } } as any;
+
+    component.successRequest(result, true);
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
+  });
+
+  it('successRequest never raises the version hold for a non-STAR result', () => {
+    jest.spyOn(router, 'navigate').mockResolvedValue(true as any);
+    const result = { data: { result_official_code: '123', platform_code: 'TIP' } } as any;
+
+    component.successRequest(result, true);
+
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
   });
 
   it('successRequest with openresult true and non-STAR platform should open result info modal', () => {
