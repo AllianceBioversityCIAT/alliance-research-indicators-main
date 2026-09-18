@@ -76,6 +76,7 @@ import { BulkAssignPiDelegatesDto } from './dto/bulk-assign-pi-delegates.dto';
 import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
 import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
+import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -792,6 +793,30 @@ describe('assign() — T-21 Scenario 4: rolled-back = no history', () => {
       service.assign({
         assignments: [
           { project_id: 'PROJ-SC4D', delegates: [{ delegate_user_id: 66 }] },
+        ],
+      }),
+    ).resolves.toBeDefined();
+    expect(authCheck).not.toHaveBeenCalled();
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('4c: CENTER_ADMIN also bypasses it — they administer every project, not only their own', async () => {
+    const { service, isPiOrActiveDelegateOfProject: authCheck } = makeService({
+      userId: 92,
+      roles: [SecRolesEnum.CENTER_ADMIN],
+      repo: {
+        // A CENTER_ADMIN who is neither PI nor delegate of this project: before
+        // the admin-scope change this path threw 403.
+        isPiOrActiveDelegate: false,
+        resolvedUserIds: [67],
+        currentDelegatesByProject: { 'PROJ-SC4E': [] },
+      },
+    });
+
+    await expect(
+      service.assign({
+        assignments: [
+          { project_id: 'PROJ-SC4E', delegates: [{ delegate_user_id: 67 }] },
         ],
       }),
     ).resolves.toBeDefined();
@@ -1777,12 +1802,31 @@ interface ManagedMockOpts {
     agreement_id: string;
     description: string | null;
   }>;
+  // ── scope=all (admin view) — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  /** findAllProjectSummaries result (default: []) */
+  allProjectSummaries?: ManagedMockOpts['projectSummaries'];
+  /** findAllActiveDelegates result (default: []) */
+  allActiveDelegates?: ManagedMockOpts['activeDelegatesForProjects'];
+  /** findAllDelegatesWithProjects result (default: []) */
+  allDelegatesWithProjects?: ManagedMockOpts['delegatesForProjects'];
 }
 
 function makeServiceWithManagedMethods(opts: ManagedMockOpts) {
   const findManagedProjectIds = jest
     .fn()
     .mockResolvedValue(opts.managedProjectIds ?? []);
+
+  const findAllProjectSummaries = jest
+    .fn()
+    .mockResolvedValue(opts.allProjectSummaries ?? []);
+
+  const findAllActiveDelegates = jest
+    .fn()
+    .mockResolvedValue(opts.allActiveDelegates ?? []);
+
+  const findAllDelegatesWithProjects = jest
+    .fn()
+    .mockResolvedValue(opts.allDelegatesWithProjects ?? []);
 
   const findProjectSummariesByIds = jest
     .fn()
@@ -1817,6 +1861,9 @@ function makeServiceWithManagedMethods(opts: ManagedMockOpts) {
     findProjectSummariesByIds,
     findActiveDelegatesForProjects,
     findDelegatesForProjects,
+    findAllProjectSummaries,
+    findAllActiveDelegates,
+    findAllDelegatesWithProjects,
   } as unknown as import('./repositories/pi-delegates.repository').PiDelegatesRepository;
 
   const mockCurrentUser = {
@@ -1850,6 +1897,9 @@ function makeServiceWithManagedMethods(opts: ManagedMockOpts) {
     findProjectSummariesByIds,
     findActiveDelegatesForProjects,
     findDelegatesForProjects,
+    findAllProjectSummaries,
+    findAllActiveDelegates,
+    findAllDelegatesWithProjects,
   };
 }
 
@@ -3064,6 +3114,20 @@ function makeServiceForHistory(opts: {
     project_name: string | null;
   }>;
   managedProjectIds?: string[];
+  /** findAllDelegateHistory result — the scope=all admin branch (default: []) */
+  allDelegateHistoryRows?: Array<{
+    pi_delegate_history_id: number;
+    action: string;
+    created_at: Date;
+    actor_user_id: number | null;
+    actor_first: string | null;
+    actor_last: string | null;
+    delegate_user_id: number;
+    target_first: string | null;
+    target_last: string | null;
+    project_id: string;
+    project_name: string | null;
+  }>;
 }) {
   const findProjectHistory = jest
     .fn()
@@ -3072,6 +3136,10 @@ function makeServiceForHistory(opts: {
   const findDelegateHistory = jest
     .fn()
     .mockResolvedValue(opts.delegateHistoryRows ?? []);
+
+  const findAllDelegateHistory = jest
+    .fn()
+    .mockResolvedValue(opts.allDelegateHistoryRows ?? []);
 
   const findManagedProjectIds = jest
     .fn()
@@ -3102,6 +3170,7 @@ function makeServiceForHistory(opts: {
     findDelegatesForProjects: jest.fn().mockResolvedValue([]),
     findProjectHistory,
     findDelegateHistory,
+    findAllDelegateHistory,
   } as unknown as import('./repositories/pi-delegates.repository').PiDelegatesRepository;
 
   const mockCurrentUser = {
@@ -3133,6 +3202,7 @@ function makeServiceForHistory(opts: {
     mockRepo,
     findProjectHistory,
     findDelegateHistory,
+    findAllDelegateHistory,
     findManagedProjectIds,
     isPiOrActiveDelegateOfProject,
   };
@@ -3369,5 +3439,423 @@ describe('getHistory() — Scenario 23: exactly-one validation', () => {
     const { service } = makeServiceForHistory({ userId: 50 });
 
     await expect(service.getHistory({})).rejects.toThrow(BadRequestException);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 24 — scope=all: the administrator view
+// @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+//
+// The whole point of the parameter is that it BYPASSES findManagedProjectIds.
+// Every test below therefore asserts on which repository read was reached, not
+// only on the returned array: a regression that silently kept the managed
+// filter would still return rows, and only the call-site assertion catches it.
+//
+// KZ-004: each test uses its own user ids / project codes so a leak between
+// scenarios cannot pass as a match.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('scope=all — administrator view (listManagedProjects / listManagedDelegates / hasManagedProjects)', () => {
+  describe('authorization', () => {
+    it.each([
+      ['SYSTEM_ADMIN', SecRolesEnum.SYSTEM_ADMIN],
+      ['CENTER_ADMIN', SecRolesEnum.CENTER_ADMIN],
+    ])(
+      '%s is allowed and reaches the unfiltered read',
+      async (_label, role) => {
+        const { service, findAllProjectSummaries, findManagedProjectIds } =
+          makeServiceWithManagedMethods({
+            userId: 700,
+            roles: [role],
+            allProjectSummaries: [
+              {
+                agreement_id: 'ALL-1',
+                description: 'Someone else project',
+                is_pool_funding_contributor: 0,
+                contract_status: 'ACTIVE',
+                start_date: null,
+                end_date: null,
+                pi_user_id: 999,
+                pi_name: 'OTHER PI',
+              },
+            ],
+          });
+
+        const result = await service.listManagedProjects(
+          700,
+          PiDelegateScopeEnum.ALL,
+        );
+
+        expect(findAllProjectSummaries).toHaveBeenCalled();
+        // ★ discriminating: the managed filter must NOT run — it is what scope=all removes
+        expect(findManagedProjectIds).not.toHaveBeenCalled();
+        expect(result).toHaveLength(1);
+        expect(result[0].project_code).toBe('ALL-1');
+      },
+    );
+
+    it('a plain user asking for scope=all gets 403 before any read', async () => {
+      const { service, findAllProjectSummaries, findManagedProjectIds } =
+        makeServiceWithManagedMethods({ userId: 701, roles: [] });
+
+      await expect(
+        service.listManagedProjects(701, PiDelegateScopeEnum.ALL),
+      ).rejects.toThrow(ForbiddenException);
+
+      // ★ discriminating: rejecting AFTER the query would still throw but would
+      //   have already read the whole table for an unauthorized caller.
+      expect(findAllProjectSummaries).not.toHaveBeenCalled();
+      expect(findManagedProjectIds).not.toHaveBeenCalled();
+    });
+
+    it('CONTRIBUTOR (a non-admin role, not just an empty list) is refused too', async () => {
+      const { service } = makeServiceWithManagedMethods({
+        userId: 702,
+        roles: [SecRolesEnum.CONTRIBUTOR],
+      });
+
+      await expect(
+        service.listManagedDelegates(702, PiDelegateScopeEnum.ALL),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('default scope is unchanged', () => {
+    it('omitting scope keeps the managed path for an admin (no accidental widening)', async () => {
+      const {
+        service,
+        findManagedProjectIds,
+        findProjectSummariesByIds,
+        findAllProjectSummaries,
+      } = makeServiceWithManagedMethods({
+        userId: 710,
+        roles: [SecRolesEnum.SYSTEM_ADMIN],
+        managedProjectIds: ['OWN-1'],
+        projectSummaries: [
+          {
+            agreement_id: 'OWN-1',
+            description: 'Own project',
+            is_pool_funding_contributor: 0,
+            contract_status: 'ACTIVE',
+            start_date: null,
+            end_date: null,
+          },
+        ],
+      });
+
+      const result = await service.listManagedProjects(710);
+
+      expect(findManagedProjectIds).toHaveBeenCalledWith(710);
+      expect(findProjectSummariesByIds).toHaveBeenCalledWith(['OWN-1']);
+      expect(findAllProjectSummaries).not.toHaveBeenCalled();
+      expect(result.map((p) => p.project_code)).toEqual(['OWN-1']);
+    });
+  });
+
+  describe('listManagedProjects(scope=all)', () => {
+    it('returns projects with NO delegates — the managed path would have dropped them', async () => {
+      const { service } = makeServiceWithManagedMethods({
+        userId: 720,
+        roles: [SecRolesEnum.CENTER_ADMIN],
+        allProjectSummaries: [
+          {
+            agreement_id: 'EMPTY-1',
+            description: 'No delegates yet',
+            is_pool_funding_contributor: 1,
+            contract_status: 'ACTIVE',
+            start_date: null,
+            end_date: null,
+            pi_user_id: 888,
+            pi_name: 'jane doe',
+          },
+        ],
+        allActiveDelegates: [],
+      });
+
+      const result = await service.listManagedProjects(
+        720,
+        PiDelegateScopeEnum.ALL,
+      );
+
+      expect(result).toEqual([
+        {
+          project_code: 'EMPTY-1',
+          project_name: 'No delegates yet',
+          is_pool_funding_contributor: true,
+          pi_user_id: 888,
+          pi_name: 'Jane Doe',
+          status: 'ACTIVE',
+          start_date: null,
+          end_date: null,
+          delegates: [],
+        },
+      ]);
+    });
+
+    it('indexes delegates by project across the whole platform', async () => {
+      const { service } = makeServiceWithManagedMethods({
+        userId: 730,
+        roles: [SecRolesEnum.SYSTEM_ADMIN],
+        allProjectSummaries: [
+          {
+            agreement_id: 'X-1',
+            description: 'Alpha',
+            is_pool_funding_contributor: 0,
+            contract_status: 'ACTIVE',
+            start_date: null,
+            end_date: null,
+          },
+          {
+            agreement_id: 'X-2',
+            description: 'Beta',
+            is_pool_funding_contributor: 0,
+            contract_status: 'CLOSED',
+            start_date: null,
+            end_date: null,
+          },
+        ],
+        allActiveDelegates: [
+          {
+            project_id: 'X-2',
+            delegate_user_id: 41,
+            first_name: 'ana',
+            last_name: 'lopez',
+            email: 'a.lopez@cgiar.org',
+            status_id: 2,
+          },
+        ],
+      });
+
+      const result = await service.listManagedProjects(
+        730,
+        PiDelegateScopeEnum.ALL,
+      );
+
+      // ★ discriminating: the delegate belongs to X-2 only — a naive assembly
+      //   that ignored project_id would attach them to X-1 as well.
+      expect(result.find((p) => p.project_code === 'X-1')?.delegates).toEqual(
+        [],
+      );
+      expect(
+        result.find((p) => p.project_code === 'X-2')?.delegates,
+      ).toHaveLength(1);
+      expect(
+        result.find((p) => p.project_code === 'X-2')?.delegates[0],
+      ).toMatchObject({ delegate_user_id: 41, name: 'Ana Lopez' });
+    });
+  });
+
+  describe('listManagedDelegates(scope=all)', () => {
+    it('groups every delegate platform-wide, without the managed filter', async () => {
+      const {
+        service,
+        findAllDelegatesWithProjects,
+        findManagedProjectIds,
+        findDelegatesForProjects,
+      } = makeServiceWithManagedMethods({
+        userId: 740,
+        roles: [SecRolesEnum.CENTER_ADMIN],
+        allDelegatesWithProjects: [
+          {
+            delegate_user_id: 55,
+            first_name: 'carlos',
+            last_name: 'ruiz',
+            email: 'c.ruiz@cgiar.org',
+            status_id: 2,
+            agreement_id: 'Y-1',
+            description: 'Gamma',
+          },
+          {
+            delegate_user_id: 55,
+            first_name: 'carlos',
+            last_name: 'ruiz',
+            email: 'c.ruiz@cgiar.org',
+            status_id: 2,
+            agreement_id: 'Y-2',
+            description: 'Delta',
+          },
+          {
+            delegate_user_id: 56,
+            first_name: 'nora',
+            last_name: 'kim',
+            email: 'n.kim@cgiar.org',
+            status_id: 4,
+            agreement_id: 'Y-1',
+            description: 'Gamma',
+          },
+        ],
+      });
+
+      const result = await service.listManagedDelegates(
+        740,
+        PiDelegateScopeEnum.ALL,
+      );
+
+      expect(findAllDelegatesWithProjects).toHaveBeenCalled();
+      expect(findManagedProjectIds).not.toHaveBeenCalled();
+      expect(findDelegatesForProjects).not.toHaveBeenCalled();
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toMatchObject({
+        delegate_user_id: 55,
+        name: 'Carlos Ruiz',
+      });
+      expect(result[0].projects.map((p) => p.project_code)).toEqual([
+        'Y-1',
+        'Y-2',
+      ]);
+      expect(result[1].delegate_user_id).toBe(56);
+    });
+
+    it('returns [] when nothing is delegated anywhere — not the managed empty-guard', async () => {
+      const { service, findAllDelegatesWithProjects } =
+        makeServiceWithManagedMethods({
+          userId: 741,
+          roles: [SecRolesEnum.SYSTEM_ADMIN],
+          allDelegatesWithProjects: [],
+        });
+
+      const result = await service.listManagedDelegates(
+        741,
+        PiDelegateScopeEnum.ALL,
+      );
+
+      expect(findAllDelegatesWithProjects).toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('hasManagedProjects(scope=all)', () => {
+    it('answers true by role, without touching the database', async () => {
+      const { service, findManagedProjectIds } = makeServiceWithManagedMethods({
+        userId: 750,
+        roles: [SecRolesEnum.CENTER_ADMIN],
+        managedProjectIds: [], // admin manages nothing of their own
+      });
+
+      const result = await service.hasManagedProjects(
+        750,
+        PiDelegateScopeEnum.ALL,
+      );
+
+      // ★ discriminating: the managed path with [] would have returned false
+      expect(result).toEqual({ has_access: true });
+      expect(findManagedProjectIds).not.toHaveBeenCalled();
+    });
+
+    it('a non-admin still gets 403 for scope=all', async () => {
+      const { service } = makeServiceWithManagedMethods({
+        userId: 751,
+        roles: [],
+        managedProjectIds: ['SOME-1'],
+      });
+
+      await expect(
+        service.hasManagedProjects(751, PiDelegateScopeEnum.ALL),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scenario 25 — getHistory(delegate_user_id, scope=all)
+// @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getHistory() — Scenario 25: delegate branch with scope=all', () => {
+  const ts = new Date('2026-09-18T09:00:00.000Z');
+
+  const rowFor = (projectId: string) => ({
+    pi_delegate_history_id: 1,
+    action: PiDelegateHistoryActionEnum.ASSIGN,
+    created_at: ts,
+    actor_user_id: 11,
+    actor_first: 'iris',
+    actor_last: 'vega',
+    delegate_user_id: 88,
+    target_first: 'leo',
+    target_last: 'pardo',
+    project_id: projectId,
+    project_name: 'Elsewhere',
+  });
+
+  it('an admin gets the unscoped trail, even with no managed projects of their own', async () => {
+    const {
+      service,
+      findAllDelegateHistory,
+      findDelegateHistory,
+      findManagedProjectIds,
+    } = makeServiceForHistory({
+      userId: 760,
+      roles: [SecRolesEnum.SYSTEM_ADMIN],
+      managedProjectIds: [],
+      allDelegateHistoryRows: [rowFor('NOT-MINE-1')],
+    });
+
+    const result = await service.getHistory({
+      delegate_user_id: 88,
+      scope: PiDelegateScopeEnum.ALL,
+    });
+
+    expect(findAllDelegateHistory).toHaveBeenCalledWith(88);
+    // ★ discriminating: the managed branch would have returned [] here
+    expect(findDelegateHistory).not.toHaveBeenCalled();
+    expect(findManagedProjectIds).not.toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      delegate: { user_id: 88, name: 'Leo Pardo' },
+      project: { project_code: 'NOT-MINE-1' },
+    });
+  });
+
+  it('CENTER_ADMIN is accepted on this branch too', async () => {
+    const { service, findAllDelegateHistory } = makeServiceForHistory({
+      userId: 761,
+      roles: [SecRolesEnum.CENTER_ADMIN],
+      allDelegateHistoryRows: [rowFor('NOT-MINE-2')],
+    });
+
+    const result = await service.getHistory({
+      delegate_user_id: 88,
+      scope: PiDelegateScopeEnum.ALL,
+    });
+
+    expect(findAllDelegateHistory).toHaveBeenCalledWith(88);
+    expect(result[0].project.project_code).toBe('NOT-MINE-2');
+  });
+
+  it('a non-admin asking for scope=all is refused, not silently downgraded', async () => {
+    const { service, findAllDelegateHistory, findDelegateHistory } =
+      makeServiceForHistory({
+        userId: 762,
+        roles: [],
+        managedProjectIds: ['MINE-1'],
+      });
+
+    await expect(
+      service.getHistory({
+        delegate_user_id: 88,
+        scope: PiDelegateScopeEnum.ALL,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+
+    // ★ discriminating: a downgrade-to-managed regression would resolve, not throw
+    expect(findAllDelegateHistory).not.toHaveBeenCalled();
+    expect(findDelegateHistory).not.toHaveBeenCalled();
+  });
+
+  it('scope=all on the project_id branch does not bypass the per-project gate', async () => {
+    const { service, findProjectHistory } = makeServiceForHistory({
+      userId: 763,
+      roles: [],
+      isAuthorized: false,
+    });
+
+    await expect(
+      service.getHistory({
+        project_id: 'G-999',
+        scope: PiDelegateScopeEnum.ALL,
+      }),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(findProjectHistory).not.toHaveBeenCalled();
   });
 });

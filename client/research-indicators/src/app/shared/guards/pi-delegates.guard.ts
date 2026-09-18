@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { CanMatchFn, Router } from '@angular/router';
 import { CacheService } from '@services/cache/cache.service';
+import { RolesService } from '@services/cache/roles.service';
 import { ApiService } from '@services/api.service';
 
 /**
@@ -9,10 +10,15 @@ import { ApiService } from '@services/api.service';
  * landing on an empty module — the sidebar hides the entry point for the same
  * reason, and this closes the direct-URL path.
  *
+ * A System Admin or Center Admin administers delegations for every project, so
+ * they are asked with scope='all' and always get through
+ * (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope).
+ *
  * A failed check denies access: an empty module is worse than a redirect.
  */
 export const piDelegatesGuard: CanMatchFn = async () => {
   const cache = inject(CacheService);
+  const roles = inject(RolesService);
   const api = inject(ApiService);
   const router = inject(Router);
 
@@ -22,7 +28,7 @@ export const piDelegatesGuard: CanMatchFn = async () => {
   }
 
   try {
-    const res = await api.GET_PiDelegateAccess(Number(userId));
+    const res = await api.GET_PiDelegateAccess(Number(userId), roles.isAdmin() ? 'all' : undefined);
     return res.data?.has_access ? true : router.createUrlTree(['/home']);
   } catch {
     return router.createUrlTree(['/home']);

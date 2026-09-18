@@ -68,6 +68,11 @@ export class AllModalsService {
   assignPiDelegateContext = signal<
     | { source: 'byProject'; projectCode: string }
     | { source: 'byPerson'; delegateUserId: number }
+    // 'newDelegate' → the "Assign New Delegate" button on the By-person tab.
+    // Nothing is pre-selected, the person is picked one at a time, and Save only
+    // ADDS — see AssignPiDelegateComponent.isAddOnlyMode.
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    | { source: 'newDelegate' }
     | null
   >(null);
 

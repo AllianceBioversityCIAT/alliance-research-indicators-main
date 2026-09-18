@@ -32,6 +32,7 @@ import { By } from '@angular/platform-browser';
 import { PiDelegateHistoryComponent } from './pi-delegate-history.component';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { ApiService } from '@services/api.service';
+import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface';
 import type { MainResponse } from '@interfaces/responses.interface';
 
@@ -114,10 +115,10 @@ class MockApiService {
   nextError: Error | null = null;
 
   /** All argument objects passed to GET_PIDelegatesHistory, in call order. */
-  callArgs: Array<{ project_id?: string; delegate_user_id?: number }> = [];
+  callArgs: Array<{ project_id?: string; delegate_user_id?: number; scope?: string }> = [];
 
   GET_PIDelegatesHistory(
-    params: { project_id?: string; delegate_user_id?: number }
+    params: { project_id?: string; delegate_user_id?: number; scope?: string }
   ): Promise<MainResponse<PiDelegateHistoryEntry[]>> {
     this.callArgs.push(params);
     const { nextResponse, nextError } = this;
@@ -173,13 +174,18 @@ describe('PiDelegateHistoryComponent', () => {
   let component: PiDelegateHistoryComponent;
   let modalService: MockAllModalsService;
   let apiService: MockApiService;
+  /** What PiDelegatesClientService.scope() returns for the test being run. */
+  let piScope: 'all' | undefined;
 
   beforeEach(async () => {
+    piScope = undefined;
     await TestBed.configureTestingModule({
       imports: [PiDelegateHistoryComponent],
       providers: [
         { provide: AllModalsService, useClass: MockAllModalsService },
-        { provide: ApiService, useClass: MockApiService }
+        { provide: ApiService, useClass: MockApiService },
+        // Only `scope` is read here — 'all' for an admin, undefined otherwise.
+        { provide: PiDelegatesClientService, useValue: { scope: () => piScope } }
       ]
     }).compileComponents();
 
@@ -223,6 +229,44 @@ describe('PiDelegateHistoryComponent', () => {
     it('does NOT fetch while the modal is closed (KZ-015 guard)', () => {
       // Initial closed state: no calls
       expect(apiService.callCount).toBe(0);
+    });
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('administrator scope', () => {
+    it("passes scope='all' on the by-person branch for an admin", async () => {
+      piScope = 'all';
+      modalService.piDelegateHistoryContext.set({
+        source: 'byPerson',
+        delegateUserId: 42,
+        name: 'Alice'
+      });
+      await openModalAndWait(modalService, fixture);
+
+      expect(apiService.callArgs[0]).toHaveProperty('scope', 'all');
+    });
+
+    it('leaves the by-project branch alone — it is already gated per project', async () => {
+      piScope = 'all';
+      modalService.piDelegateHistoryContext.set({
+        source: 'byProject',
+        projectCode: 'PRJ-001',
+        projectName: 'Alpha Research'
+      });
+      await openModalAndWait(modalService, fixture);
+
+      expect(apiService.callArgs[0]).not.toHaveProperty('scope');
+    });
+
+    it('sends no scope for a PI or delegate (negative discriminator)', async () => {
+      modalService.piDelegateHistoryContext.set({
+        source: 'byPerson',
+        delegateUserId: 42,
+        name: 'Alice'
+      });
+      await openModalAndWait(modalService, fixture);
+
+      expect(apiService.callArgs[0].scope).toBeUndefined();
     });
   });
 

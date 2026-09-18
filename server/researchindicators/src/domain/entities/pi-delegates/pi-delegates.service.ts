@@ -32,13 +32,21 @@
 //
 // Authorization contract (R-PID-007 / DD-B):
 //   Three cases decide whether a caller may manage a project's delegations:
-//     1. SYSTEM_ADMIN (SecRolesEnum = 1) — allowed unconditionally.
-//        Checked directly on user.roles (not via validateRoles, which throws for
-//        non-admins and would prevent the PI/delegate path from running at all).
+//     1. Platform admin — SYSTEM_ADMIN (1) or CENTER_ADMIN (9) — allowed
+//        unconditionally, via isPlatformAdmin(). Checked directly on user.roles
+//        (not via validateRoles, which throws for non-admins and would prevent
+//        the PI/delegate path from running at all).
 //     2. PI or active delegate of project_id — allowed.
 //        Checked via PiDelegatesRepository.isPiOrActiveDelegateOfProject()
 //        (agresso_contracts PI join UNION pi_delegates active row).
 //     3. Neither — ForbiddenException (403).
+//
+// Read scope (scope=all) — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope:
+//   The three by-user reads and the history delegate branch accept an optional
+//   `scope`. The default, MANAGED, is the historical behaviour and is untouched.
+//   ALL drops the managed-project filter entirely — every contract, every active
+//   delegation, the delegate's full history — and is gated by assertAdminScope(),
+//   so a non-admin asking for it gets a 403 rather than a widened result set.
 //
 // pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
 import {
@@ -65,6 +73,7 @@ import {
 } from './dto/pi-delegate-response.dto';
 import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
 import { HistoryQueryDto } from './dto/history.query.dto';
+import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
 import { UserStatusEnum } from '../users/enum/user-status.enum';
 // sec_users stores names in whatever case the source system used ("MAYESSE DA
 // SILVA", "juan cadavid"). Every name this module returns goes through
@@ -143,20 +152,65 @@ export class PiDelegatesService {
   // Authorization helper
   // ─────────────────────────────────────────────────────────────────────────
 
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
   /**
-   * Throws ForbiddenException (403) unless the current user is SYSTEM_ADMIN
-   * or is the PI / an active delegate of the given project (R-PID-007).
+   * True when the caller holds a platform-wide administration role.
    *
-   * SYSTEM_ADMIN is tested first via a direct roles array check (not through
-   * validateRoles, which throws ForbiddenException for non-admins and would
-   * short-circuit the PI/delegate path).
+   * SYSTEM_ADMIN and CENTER_ADMIN both administer delegations across the whole
+   * platform, so every "…or an admin" decision in this service reads from here
+   * rather than re-listing the roles — a role added to the set is added once.
+   *
+   * Tested via a direct roles-array check, never through validateRoles: that
+   * one throws for non-admins and would short-circuit the PI/delegate paths
+   * that must still be evaluated afterwards.
+   */
+  private isPlatformAdmin(): boolean {
+    const roles = this.currentUserUtil.roles ?? [];
+    return (
+      roles.includes(SecRolesEnum.SYSTEM_ADMIN) ||
+      roles.includes(SecRolesEnum.CENTER_ADMIN)
+    );
+  }
+
+  /**
+   * Gate for `scope=all`: the platform-wide read that ignores the managed-project
+   * filter entirely. Anything but an admin asking for it is a 403 — the parameter
+   * must never be able to widen an ordinary user's result set.
+   */
+  private assertAdminScope(): void {
+    if (!this.isPlatformAdmin()) {
+      throw new ForbiddenException(
+        'Access denied: scope=all is reserved for SYSTEM_ADMIN and CENTER_ADMIN.',
+      );
+    }
+  }
+
+  /**
+   * The own-or-admin gate shared by every `by-user` read: the caller may ask
+   * about themselves, and an admin may ask about anyone.
+   *
+   * @param userId  the user_id being queried
+   * @param subject what the 403 message calls the data ("managed projects", …)
+   */
+  private assertCanQueryUser(userId: number, subject: string): void {
+    const isSelf = userId === this.currentUserUtil.user_id;
+
+    if (!isSelf && !this.isPlatformAdmin()) {
+      throw new ForbiddenException(
+        `Access denied: you may only query your own ${subject}, or you must be an administrator.`,
+      );
+    }
+  }
+
+  /**
+   * Throws ForbiddenException (403) unless the current user is a platform admin
+   * or is the PI / an active delegate of the given project (R-PID-007).
    */
   private async assertCanManageProject(projectId: string): Promise<void> {
     const userId = this.currentUserUtil.user_id;
-    const roles = this.currentUserUtil.roles ?? [];
 
-    // Case 1 — SYSTEM_ADMIN bypass.
-    if (roles.includes(SecRolesEnum.SYSTEM_ADMIN)) {
+    // Case 1 — platform-admin bypass (SYSTEM_ADMIN or CENTER_ADMIN).
+    if (this.isPlatformAdmin()) {
       return;
     }
 
@@ -172,7 +226,7 @@ export class PiDelegatesService {
 
     // Case 3 — Neither: 403.
     throw new ForbiddenException(
-      'Access denied: caller is not the PI, an active delegate, or a SYSTEM_ADMIN for this project.',
+      'Access denied: caller is not the PI, an active delegate, or an administrator for this project.',
     );
   }
 
@@ -601,14 +655,12 @@ export class PiDelegatesService {
     delegateUserId: number,
   ): Promise<DelegateProjectsResponseDto> {
     const callerUserId = this.currentUserUtil.user_id;
-    const roles = this.currentUserUtil.roles ?? [];
 
     const isSelf = delegateUserId === callerUserId;
-    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
 
-    if (!isSelf && !isAdmin) {
+    if (!isSelf && !this.isPlatformAdmin()) {
       throw new ForbiddenException(
-        'Access denied: you may only query your own delegate assignments, or you must be a SYSTEM_ADMIN.',
+        'Access denied: you may only query your own delegate assignments, or you must be an administrator.',
       );
     }
 
@@ -663,18 +715,19 @@ export class PiDelegatesService {
    *
    * Authorization (own-or-admin) mirrors listManagedProjects.
    */
-  async hasManagedProjects(userId: number): Promise<{ has_access: boolean }> {
-    const callerUserId = this.currentUserUtil.user_id;
-    const roles = this.currentUserUtil.roles ?? [];
-
-    const isSelf = userId === callerUserId;
-    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
-
-    if (!isSelf && !isAdmin) {
-      throw new ForbiddenException(
-        'Access denied: you may only query your own managed projects, or you must be a SYSTEM_ADMIN.',
-      );
+  async hasManagedProjects(
+    userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
+  ): Promise<{ has_access: boolean }> {
+    // scope=all — an admin administers every project, so the answer is yes by
+    // role alone. Counting contracts to say so would be a table scan on a
+    // question the role has already settled.
+    if (scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      return { has_access: true };
     }
+
+    this.assertCanQueryUser(userId, 'managed projects');
 
     const projectIds =
       await this.piDelegatesRepository.findManagedProjectIds(userId);
@@ -684,30 +737,35 @@ export class PiDelegatesService {
 
   async listManagedProjects(
     userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
   ): Promise<ProjectDelegatesResponseDto[]> {
-    const callerUserId = this.currentUserUtil.user_id;
-    const roles = this.currentUserUtil.roles ?? [];
+    const isAllScope = scope === PiDelegateScopeEnum.ALL;
 
-    const isSelf = userId === callerUserId;
-    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
-
-    if (!isSelf && !isAdmin) {
-      throw new ForbiddenException(
-        'Access denied: you may only query your own managed projects, or you must be a SYSTEM_ADMIN.',
-      );
+    if (isAllScope) {
+      this.assertAdminScope();
+    } else {
+      this.assertCanQueryUser(userId, 'managed projects');
     }
 
-    const projectIds =
-      await this.piDelegatesRepository.findManagedProjectIds(userId);
+    // scope=all skips findManagedProjectIds entirely: there is no id list to
+    // build and no empty-set short-circuit, because every contract qualifies.
+    const projectIds = isAllScope
+      ? []
+      : await this.piDelegatesRepository.findManagedProjectIds(userId);
 
-    if (!projectIds.length) {
+    if (!isAllScope && !projectIds.length) {
       return [];
     }
 
-    const [projects, delegates] = await Promise.all([
-      this.piDelegatesRepository.findProjectSummariesByIds(projectIds),
-      this.piDelegatesRepository.findActiveDelegatesForProjects(projectIds),
-    ]);
+    const [projects, delegates] = isAllScope
+      ? await Promise.all([
+          this.piDelegatesRepository.findAllProjectSummaries(),
+          this.piDelegatesRepository.findAllActiveDelegates(),
+        ])
+      : await Promise.all([
+          this.piDelegatesRepository.findProjectSummariesByIds(projectIds),
+          this.piDelegatesRepository.findActiveDelegatesForProjects(projectIds),
+        ]);
 
     // Index delegates by project_id for O(1) lookup during assembly.
     const delegatesByProject = new Map<
@@ -778,28 +836,28 @@ export class PiDelegatesService {
    */
   async listManagedDelegates(
     userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
   ): Promise<DelegateProjectsResponseDto[]> {
-    const callerUserId = this.currentUserUtil.user_id;
-    const roles = this.currentUserUtil.roles ?? [];
+    let rows: Awaited<
+      ReturnType<PiDelegatesRepository['findDelegatesForProjects']>
+    >;
 
-    const isSelf = userId === callerUserId;
-    const isAdmin = roles.includes(SecRolesEnum.SYSTEM_ADMIN);
+    if (scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      rows = await this.piDelegatesRepository.findAllDelegatesWithProjects();
+    } else {
+      this.assertCanQueryUser(userId, 'managed delegates');
 
-    if (!isSelf && !isAdmin) {
-      throw new ForbiddenException(
-        'Access denied: you may only query your own managed delegates, or you must be a SYSTEM_ADMIN.',
-      );
+      const projectIds =
+        await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+      if (!projectIds.length) {
+        return [];
+      }
+
+      rows =
+        await this.piDelegatesRepository.findDelegatesForProjects(projectIds);
     }
-
-    const projectIds =
-      await this.piDelegatesRepository.findManagedProjectIds(userId);
-
-    if (!projectIds.length) {
-      return [];
-    }
-
-    const rows =
-      await this.piDelegatesRepository.findDelegatesForProjects(projectIds);
 
     // Group rows by delegate_user_id, collecting the distinct projects per delegate.
     const byDelegate = new Map<
@@ -952,6 +1010,16 @@ export class PiDelegatesService {
     }
 
     // ── delegate_user_id branch ──────────────────────────────────────────────
+    // scope=all — an admin sees the delegate's complete trail, unnarrowed by
+    // which projects the admin happens to manage themselves.
+    if (query.scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      const allRows = await this.piDelegatesRepository.findAllDelegateHistory(
+        query.delegate_user_id!,
+      );
+      return allRows.map(mapRow);
+    }
+
     const callerUserId = this.currentUserUtil.user_id;
     const managedIds =
       await this.piDelegatesRepository.findManagedProjectIds(callerUserId);

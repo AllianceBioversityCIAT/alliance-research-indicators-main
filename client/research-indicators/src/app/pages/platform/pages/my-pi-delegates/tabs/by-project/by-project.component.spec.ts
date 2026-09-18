@@ -66,6 +66,11 @@ const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
 // ─── Service stubs ────────────────────────────────────────────────────────────
 
 function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — writable so a
+  // test can put the table into the administrator view.
+  const isAdminView = signal(false);
+  const isPiOf = (project: ProjectDelegates) => currentUserId != null && project.pi_user_id === currentUserId;
+
   return {
     byProjectCache: signal(rows),
     loading: signal(false),
@@ -73,7 +78,16 @@ function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number |
     revokePair: jest.fn().mockResolvedValue(undefined),
     currentUserId: signal(currentUserId),
     // Mirrors the real service: PI when the project's pi_user_id is the caller.
-    isPiOf: (project: ProjectDelegates) => currentUserId != null && project.pi_user_id === currentUserId
+    isPiOf,
+    // Mirrors the real service: in the managed view every listed project the
+    // caller is not the PI of is one they delegate on; in the administrator view
+    // only actual membership of the delegate list counts.
+    isDelegateOf: (project: ProjectDelegates) => {
+      if (isPiOf(project)) return false;
+      if (!isAdminView()) return true;
+      return currentUserId != null && project.delegates.some(d => d.delegate_user_id === currentUserId);
+    },
+    isAdminView
   };
 }
 
@@ -582,10 +596,11 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
     });
 
-    it('renders a sort icon on Project, Status and Pool funding', () => {
+    it('renders a sort icon on Project, Role, Status and Pool funding', () => {
       const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
-      expect(sortable.length).toBe(3);
+      expect(sortable.length).toBe(4);
     });
+
 
     it('sorts the rendered rows when the Project header is clicked', () => {
       const firstName = () =>
@@ -714,6 +729,116 @@ describe('ByProjectComponent', () => {
         .nativeElement as HTMLElement;
       expect(role.textContent?.trim()).toBe('PI Delegate');
     });
+
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    it('names the admin-only case in words instead of "PI Delegate"', async () => {
+      await createComponent(
+        [
+          { ...PROJECT_WITH_DELEGATES, pi_user_id: 99 }, // the admin IS the PI here
+          // Someone else's project with no delegates at all: the admin sees it only
+          // because they are an admin, so claiming they delegate on it is false.
+          { ...PROJECT_NO_DELEGATES, pi_user_id: 7 }
+        ],
+        99
+      );
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const roles = fixture.debugElement
+        .queryAll(By.css('.by-project__role'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      // Not a bare dash: the cell has to say WHY the project is listed.
+      expect(roles).toEqual(['Principal Investigator', 'No role (admin)']);
+    });
+
+    it('still says PI Delegate for an admin who IS on the delegate list', async () => {
+      await createComponent(
+        [
+          {
+            ...PROJECT_NO_DELEGATES,
+            pi_user_id: 7,
+            delegates: [{ delegate_user_id: 99, name: 'Me', email: 'me@x.com', is_active: true }]
+          }
+        ],
+        99
+      );
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const role = fixture.debugElement.query(By.css('.by-project__role'))
+        .nativeElement as HTMLElement;
+      expect(role.textContent?.trim()).toBe('PI Delegate');
+    });
+
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    it('sorts on Role — p-table sorts the row field the cell renders', async () => {
+      // Three DIFFERENT roles, or a reversal proves nothing. Admin view, because
+      // that is the only one where all three can occur.
+      await createComponent(
+        [
+          {
+            ...PROJECT_NO_DELEGATES,
+            project_code: 'P-DEL',
+            pi_user_id: 7,
+            delegates: [{ delegate_user_id: 99, name: 'Me', email: 'me@x.com', is_active: true }]
+          },
+          { ...PROJECT_NO_DELEGATES, project_code: 'P-NONE', pi_user_id: 7, delegates: [] },
+          { ...PROJECT_WITH_DELEGATES, project_code: 'P-PI', pi_user_id: 99, delegates: [] }
+        ],
+        99
+      );
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const rolesOnScreen = () =>
+        fixture.debugElement
+          .queryAll(By.css('.by-project__role'))
+          .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+
+      // Addressed by its own binding, not by column index: clicking "whichever
+      // header is second" would still reorder the table via Status and pass.
+      const roleHeader = fixture.debugElement.query(By.css('th[pSortableColumn="role"]'));
+      expect(roleHeader).not.toBeNull();
+
+      roleHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(rolesOnScreen()).toEqual(['No role (admin)', 'PI Delegate', 'Principal Investigator']);
+
+      roleHeader.nativeElement.click();
+      fixture.detectChanges();
+      // ★ discriminating: a Role column sorted on a template expression cannot
+      //   move at all — p-table only ever sees row fields.
+      expect(rolesOnScreen()).toEqual(['Principal Investigator', 'PI Delegate', 'No role (admin)']);
+    });
+
+    it('the short label carries the full sentence as tooltip and spoken text', async () => {
+      await createComponent([{ ...PROJECT_NO_DELEGATES, pi_user_id: 7 }], 99);
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const role = fixture.debugElement.query(By.css('.by-project__role'))
+        .nativeElement as HTMLElement;
+      expect(role.getAttribute('aria-label')).toContain('no role on this project');
+      expect(role.getAttribute('aria-label')).toContain('administrator');
+      expect(role.getAttribute('title')).toBe(role.getAttribute('aria-label'));
+    });
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('summary line', () => {
+    it('stops claiming the list is filtered to the caller once it is not', async () => {
+      await createComponent([PROJECT_WITH_DELEGATES]);
+      const summaryText = () =>
+        (fixture.nativeElement.querySelector('.by-project__summary-left') as HTMLElement).textContent ?? '';
+
+      expect(summaryText()).toContain('Only projects where you are');
+
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      expect(summaryText()).not.toContain('Only projects where you are');
+      expect(summaryText()).toContain('Every project on the platform');
+    });
   });
   // ── Delegates cell overflow: inline chips + "+N more" popover ──────────────
 
@@ -804,4 +929,143 @@ describe('ByProjectComponent', () => {
       expect(withoutPi).not.toContain('Principal investigator');
     });
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  // ── Role quick filters: chips mirroring the three header counters ───────────
+
+  describe('role quick filters', () => {
+    /** The caller (99) leads P-PI, delegates on P-DEL, and has no role on P-NONE. */
+    const ADMIN_ROWS = [
+      { ...PROJECT_WITH_DELEGATES, project_code: 'P-PI', pi_user_id: 99, delegates: [] },
+      {
+        ...PROJECT_WITH_DELEGATES,
+        project_code: 'P-DEL',
+        pi_user_id: 7,
+        delegates: [{ delegate_user_id: 99, name: 'Me', email: 'me@x.com', is_active: true }]
+      },
+      { ...PROJECT_NO_DELEGATES, project_code: 'P-NONE', pi_user_id: 7, delegates: [] }
+    ];
+
+    const codesOnScreen = () =>
+      fixture.debugElement
+        .queryAll(By.css('.by-project__project__code'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+
+    const chip = (index: number) =>
+      fixture.debugElement.queryAll(By.css('.by-project__role-filter'))[index]
+        .nativeElement as HTMLButtonElement;
+
+    async function createAdminTable() {
+      await createComponent(ADMIN_ROWS, 99);
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+    }
+
+    it('marks the selected chip with a blue surface and weight — never an underline', async () => {
+      await createAdminTable();
+
+      // No underline: it read as a tab strip, and these filter the table below
+      // rather than switching views.
+      expect(fixture.nativeElement.querySelectorAll('.by-project__role-filters .absolute')).toHaveLength(0);
+
+      const classesOf = (i: number) => chip(i).className;
+      expect(classesOf(0)).toContain('var(--ac-light-blue-50)');
+      expect(classesOf(0)).toContain('font-semibold');
+      // ★ discriminating: an unselected chip keeps the neutral surface.
+      expect(classesOf(1)).toContain('var(--ac-grey-100)');
+      expect(classesOf(1)).not.toContain('var(--ac-light-blue-50)');
+
+      chip(1).click();
+      fixture.detectChanges();
+
+      expect(classesOf(1)).toContain('var(--ac-light-blue-50)');
+      expect(classesOf(0)).not.toContain('var(--ac-light-blue-50)');
+    });
+
+    it('renders one chip per header counter, in the same order, with All active', async () => {
+      await createAdminTable();
+
+      const labels = fixture.debugElement
+        .queryAll(By.css('.by-project__role-filter'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(labels).toEqual(['All projects', 'As PI', 'As PI delegate']);
+      expect(chip(0).getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('As PI narrows the table to the projects the caller leads', async () => {
+      await createAdminTable();
+
+      chip(1).click();
+      fixture.detectChanges();
+
+      expect(codesOnScreen()).toEqual(['P-PI']);
+      expect(chip(1).getAttribute('aria-pressed')).toBe('true');
+      expect(chip(0).getAttribute('aria-pressed')).toBe('false');
+    });
+
+    it('As PI delegate narrows it to actual delegations, not "everything else"', async () => {
+      await createAdminTable();
+
+      chip(2).click();
+      fixture.detectChanges();
+
+      // ★ discriminating: P-NONE is the row an admin's list is mostly made of.
+      //   A "not the PI" filter would include it here.
+      expect(codesOnScreen()).toEqual(['P-DEL']);
+    });
+
+    it('All projects restores the full list', async () => {
+      await createAdminTable();
+
+      chip(1).click();
+      fixture.detectChanges();
+      chip(0).click();
+      fixture.detectChanges();
+
+      expect(codesOnScreen()).toEqual(['P-PI', 'P-DEL', 'P-NONE']);
+    });
+
+    it('combines with the search box instead of replacing it', async () => {
+      await createAdminTable();
+
+      chip(2).click();
+      component.searchTerm.set('P-PI');
+      fixture.detectChanges();
+
+      // Both conditions apply: P-PI matches the search but not the chip.
+      expect(codesOnScreen()).toEqual([]);
+    });
+
+    it('Clear Filters resets the chip along with the search', async () => {
+      await createAdminTable();
+
+      chip(1).click();
+      component.searchTerm.set('nothing-matches-this');
+      fixture.detectChanges();
+
+      component.clearFilters();
+      fixture.detectChanges();
+
+      expect(component.roleTerm()).toBe('all');
+      expect(codesOnScreen()).toEqual(['P-PI', 'P-DEL', 'P-NONE']);
+    });
+
+    it('works for a PI/delegate too, where every listed project is one or the other', async () => {
+      await createComponent(
+        [
+          { ...PROJECT_WITH_DELEGATES, project_code: 'P-PI', pi_user_id: 99 },
+          { ...PROJECT_NO_DELEGATES, project_code: 'P-DEL', pi_user_id: 7 }
+        ],
+        99
+      );
+
+      chip(2).click();
+      fixture.detectChanges();
+
+      // Not admin: "not the PI" IS the delegate answer here, so P-DEL qualifies
+      // even though the delegate chip does not name the caller.
+      expect(codesOnScreen()).toEqual(['P-DEL']);
+    });
+  });
+
 });

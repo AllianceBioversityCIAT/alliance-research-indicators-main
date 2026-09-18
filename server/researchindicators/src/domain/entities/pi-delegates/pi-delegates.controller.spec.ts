@@ -29,6 +29,7 @@ import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
 import { HistoryQueryDto } from './dto/history.query.dto';
 import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
 import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
+import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -207,7 +208,7 @@ describe('PiDelegatesController.listManagedProjects() — GET /pi-delegates/by-u
     const result = await controller.listManagedProjects(dto);
 
     // KZ-001: the service must receive the correct numeric user_id
-    expect(mockService.listManagedProjects).toHaveBeenCalledWith(99);
+    expect(mockService.listManagedProjects).toHaveBeenCalledWith(99, undefined);
     expect(result).toMatchObject({
       status: HttpStatus.OK,
       description: 'Managed projects for the user',
@@ -235,6 +236,21 @@ describe('PiDelegatesController.listManagedProjects() — GET /pi-delegates/by-u
     expect(calls[0][0]).toBe(123);
     expect(calls[1][0]).toBe(456);
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('forwards scope=all to the service (the admin view is decided there, not here)', async () => {
+    const { controller, mockService } = await makeController();
+
+    await controller.listManagedProjects({
+      user_id: 5,
+      scope: PiDelegateScopeEnum.ALL,
+    });
+
+    expect(mockService.listManagedProjects).toHaveBeenCalledWith(
+      5,
+      PiDelegateScopeEnum.ALL,
+    );
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,7 +264,10 @@ describe('PiDelegatesController.listManagedDelegates() — GET /pi-delegates/by-
     const result = await controller.listManagedDelegates(dto);
 
     // KZ-001: the service must receive the correct numeric user_id
-    expect(mockService.listManagedDelegates).toHaveBeenCalledWith(77);
+    expect(mockService.listManagedDelegates).toHaveBeenCalledWith(
+      77,
+      undefined,
+    );
     expect(result).toMatchObject({
       status: HttpStatus.OK,
       description: "Distinct delegates across the user's managed projects",

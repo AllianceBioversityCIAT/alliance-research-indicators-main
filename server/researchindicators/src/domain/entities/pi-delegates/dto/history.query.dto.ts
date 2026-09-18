@@ -6,7 +6,8 @@
 // if both or neither are present.
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { PiDelegateScopeEnum } from '../enum/pi-delegate-scope.enum';
 
 export class HistoryQueryDto {
   @ApiPropertyOptional({
@@ -31,4 +32,19 @@ export class HistoryQueryDto {
   @Type(() => Number)
   @IsNumber()
   delegate_user_id?: number;
+
+  @ApiPropertyOptional({
+    enum: PiDelegateScopeEnum,
+    default: PiDelegateScopeEnum.MANAGED,
+    description:
+      'Read scope for the delegate_user_id branch only (the project_id branch is ' +
+      "already gated per project). 'managed' (default) scopes the history to the " +
+      "caller's own managed projects. 'all' returns the delegate's complete history " +
+      'across every project — reserved for SYSTEM_ADMIN and CENTER_ADMIN (403 for ' +
+      'anyone else).',
+    example: PiDelegateScopeEnum.ALL,
+  })
+  @IsOptional()
+  @IsEnum(PiDelegateScopeEnum)
+  scope?: PiDelegateScopeEnum;
 }

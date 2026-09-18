@@ -2267,6 +2267,33 @@ describe('ApiService', () => {
       });
     });
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('PI Delegates — scope query parameter', () => {
+    const urlOf = () => (mockToPromiseService.get as jest.Mock).mock.calls.at(-1)?.[0] as string;
+
+    it.each([
+      ['GET_PIDelegatesByUserProjects', 'pi-delegates/by-user/projects'],
+      ['GET_PIDelegatesByUserPeople', 'pi-delegates/by-user/people'],
+      ['GET_PiDelegateAccess', 'pi-delegates/by-user/access']
+    ] as const)('%s appends &scope=all only when a scope is given', (method, path) => {
+      (service[method] as (id: number, scope?: 'all') => unknown)(7);
+      expect(urlOf()).toBe(`${path}?user_id=7`);
+
+      (service[method] as (id: number, scope?: 'all') => unknown)(7, 'all');
+      expect(urlOf()).toBe(`${path}?user_id=7&scope=all`);
+    });
+
+    it('history carries the scope on the by-person branch', () => {
+      service.GET_PIDelegatesHistory({ delegate_user_id: 42, scope: 'all' });
+      expect(urlOf()).toBe('pi-delegates/history?delegate_user_id=42&scope=all');
+    });
+
+    it('history without a scope is unchanged', () => {
+      service.GET_PIDelegatesHistory({ project_id: 'INIT-268' });
+      expect(urlOf()).toBe('pi-delegates/history?project_id=INIT-268');
+    });
+  });
 });
 
 // T-01 c1/c2 — these three Innovation Use methods are asserted through HttpTestingController against a real
@@ -2507,5 +2534,6 @@ describe('ApiService — pool funding outgoing URLs (HttpTestingController, R-PF
       await promise;
     });
   });
-});
 
+
+});

@@ -36,6 +36,7 @@ The following variables are defined in the `:root` for both light and dark theme
 
 ### Light Blue
 
+- `--ac-light-blue-50`: `#e6f2ff` — surface tint, not a ramp step: the quietest blue that still reads as blue beside `--ac-grey-100`. Use it for "selected but calm" backgrounds (filter chips), never for text.
 - `--ac-light-blue-100`: `#79d9ff`
 - `--ac-light-blue-200`: `#00b6ff`
 - `--ac-light-blue-300`: `#1689ca`
@@ -91,6 +92,17 @@ The following variables are defined in the `:root` for both light and dark theme
 
 - `--ac-red-1`: `#cf0808`
 
+### Warning (amber notice)
+
+The three tokens an amber notice needs. Used by the inactive-delegate warning in
+the Assign PI Delegate modal and by the Administrator-view banner on My PI
+Delegates; they are the same value in dark mode, so the notice looks identical
+in both themes.
+
+- `--ac-warning-1`: `#e69f00` — the left rule / accent
+- `--ac-warning-surface`: `#fff8e6` — the surface the notice sits on
+- `--ac-warning-fg`: `#8a4b08` — text and icons on that surface
+
 ### Pool Funding
 
 Used by the bilateral-module "Pool Funding" tag (see `docs/specs/bilateral-module/tag-visibility/`).
@@ -110,6 +122,7 @@ Used by the project-dashboard Indicator-metadata band's result-count chip (see `
 When the dark mode is active, the following variables will be applied:
 
 - `--ac-background`: `#191919`
+- `--ac-light-blue-50`: `#2f3d4d`
 - `--ac-light-blue-100`: `#4a708b`
 - `--ac-light-blue-200`: `#369`
 - `--ac-light-blue-300`: `#2b5986`

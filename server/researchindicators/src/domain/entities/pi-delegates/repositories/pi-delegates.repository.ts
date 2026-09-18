@@ -22,6 +22,7 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { isEmpty } from '../../../shared/utils/object.utils';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 
 /** Minimum delegate identity needed to provision an absent sec_user (R-PID-005 AC.2 / OQ-D). */
 export interface DelegateNewUserIdentity {
@@ -43,6 +44,132 @@ export type DelegateInput = DelegateByUserId | DelegateNewUserIdentity;
 function isDelegateByUserId(d: DelegateInput): d is DelegateByUserId {
   return (d as DelegateByUserId).delegate_user_id != null;
 }
+
+// @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+//
+// Row shapes + SELECT bodies shared by the "managed" (filtered) and "all"
+// (administrator) variants of each read. The pair differs ONLY in its WHERE
+// clause, so the projection lives here once: a column added for one scope can
+// never go missing from the other.
+
+/** One agresso_contracts row as the delegates UI consumes it. */
+export interface ProjectSummaryRow {
+  agreement_id: string;
+  description: string | null;
+  is_pool_funding_contributor: number;
+  contract_status: string | null;
+  start_date: Date | null;
+  end_date: Date | null;
+  pi_user_id: number | null;
+  pi_name: string | null;
+}
+
+/** One active delegation joined with the delegate's sec_users identity. */
+export interface ProjectDelegateRow {
+  project_id: string;
+  delegate_user_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  carnet: string | null;
+  status_id: number | null;
+  is_active: number;
+}
+
+/** One active delegation joined with both the delegate identity and the project. */
+export interface DelegateWithProjectRow {
+  delegate_user_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  carnet: string | null;
+  status_id: number | null;
+  is_active: number;
+  agreement_id: string;
+  description: string | null;
+}
+
+/** One pi_delegate_history row with actor, target and project resolved. */
+export interface HistoryRow {
+  pi_delegate_history_id: number;
+  action: string;
+  created_at: Date;
+  actor_user_id: number | null;
+  actor_first: string | null;
+  actor_last: string | null;
+  delegate_user_id: number;
+  target_first: string | null;
+  target_last: string | null;
+  project_id: string;
+  project_name: string | null;
+}
+
+// pi_user_id: same chain as isPiOfProject, as a correlated subquery so the
+// contract row count is unaffected by duplicate carnets/emails.
+//
+// is_pool_funding_contributor comes from effectivePoolFundingContributorSql, NOT
+// from the raw column: a contract also counts as a contributor when it has an
+// active bilateral_project_mapping row, and reading the column alone made this
+// table answer "No" for projects My Projects tags as contributing
+// (@sdd-spec bilateral-module/mapping-drives-pool-funding-tag).
+const PROJECT_SUMMARY_SELECT = `SELECT ac.agreement_id, ac.description,
+              ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
+              ac.contract_status, ac.start_date, ac.end_date,
+              ac.project_lead_description AS pi_name,
+              (SELECT su.sec_user_id
+                 FROM alliance_user_staff aus
+                 INNER JOIN sec_users su ON su.email = aus.email
+                WHERE aus.carnet = ac.projectLeadId
+                LIMIT 1) AS pi_user_id
+       FROM agresso_contracts ac`;
+
+// No sec_users status/is_active filter — inactive/pending/rejected delegate
+// ACCOUNTS are intentionally included in the table (only pd.is_active gates the
+// delegation). Product decision 2026-09-14.
+const PROJECT_DELEGATES_SELECT = `SELECT pd.project_id,
+              pd.delegate_user_id,
+              su.first_name,
+              su.last_name,
+              su.email,
+              su.carnet,
+              su.status_id,
+              su.is_active
+       FROM pi_delegates pd
+         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+       WHERE pd.is_active = TRUE`;
+
+const DELEGATES_WITH_PROJECT_SELECT = `SELECT pd.delegate_user_id,
+              su.first_name,
+              su.last_name,
+              su.email,
+              su.carnet,
+              su.status_id,
+              su.is_active,
+              ac.agreement_id,
+              ac.description
+       FROM pi_delegates pd
+         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+         INNER JOIN agresso_contracts ac ON ac.agreement_id = pd.project_id
+       WHERE pd.is_active = TRUE`;
+
+// LEFT JOINs are intentional: a user could be deleted from sec_users after the
+// event was recorded; the history row must still be visible.
+// No is_active filter — history is an append-only log; every event counts.
+const HISTORY_SELECT = `SELECT h.pi_delegate_history_id,
+              h.action,
+              h.created_at,
+              h.created_by    AS actor_user_id,
+              actor.first_name AS actor_first,
+              actor.last_name  AS actor_last,
+              h.delegate_user_id,
+              tgt.first_name   AS target_first,
+              tgt.last_name    AS target_last,
+              h.project_id,
+              ac.description   AS project_name
+       FROM pi_delegate_history h
+         LEFT JOIN sec_users actor ON actor.sec_user_id = h.created_by
+         LEFT JOIN sec_users tgt   ON tgt.sec_user_id   = h.delegate_user_id
+         LEFT JOIN agresso_contracts ac ON ac.agreement_id = h.project_id`;
 
 @Injectable()
 export class PiDelegatesRepository extends Repository<PiDelegate> {
@@ -402,7 +529,10 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       // (projectLeadId → alliance_user_staff.carnet → sec_users.email). It is a
       // correlated subquery, not a JOIN, so a duplicated carnet/email can never
       // multiply the contract row.
-      `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
+      // is_pool_funding_contributor: the shared predicate, same as
+      // PROJECT_SUMMARY_SELECT — the flag OR an active bilateral mapping.
+      `SELECT ac.agreement_id, ac.description,
+              ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
               ac.contract_status, ac.start_date, ac.end_date,
               ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
@@ -561,34 +691,28 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    *
    * @param projectIds  agresso_contracts.agreement_id values to look up
    */
-  async findProjectSummariesByIds(projectIds: string[]): Promise<
-    Array<{
-      agreement_id: string;
-      description: string | null;
-      is_pool_funding_contributor: number;
-      contract_status: string | null;
-      start_date: Date | null;
-      end_date: Date | null;
-      pi_user_id: number | null;
-      pi_name: string | null;
-    }>
-  > {
+  async findProjectSummariesByIds(
+    projectIds: string[],
+  ): Promise<ProjectSummaryRow[]> {
     if (!projectIds.length) return [];
     return this.dataSource.query(
-      // pi_user_id: same chain as isPiOfProject, as a correlated subquery so the
-      // contract row count is unaffected by duplicate carnets/emails.
-      `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
-              ac.contract_status, ac.start_date, ac.end_date,
-              ac.project_lead_description AS pi_name,
-              (SELECT su.sec_user_id
-                 FROM alliance_user_staff aus
-                 INNER JOIN sec_users su ON su.email = aus.email
-                WHERE aus.carnet = ac.projectLeadId
-                LIMIT 1) AS pi_user_id
-       FROM agresso_contracts ac
+      `${PROJECT_SUMMARY_SELECT}
        WHERE ac.agreement_id IN (?)`,
       [projectIds],
     );
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+  /**
+   * Administrator variant of findProjectSummariesByIds: EVERY contract, with no
+   * project filter at all.
+   *
+   * Deliberately unparameterised — the callers (scope=all) have already proven
+   * the caller is SYSTEM_ADMIN or CENTER_ADMIN, and an id list would have to be
+   * the whole table anyway, which MySQL handles far worse than no WHERE clause.
+   */
+  async findAllProjectSummaries(): Promise<ProjectSummaryRow[]> {
+    return this.dataSource.query(PROJECT_SUMMARY_SELECT);
   }
 
   /**
@@ -600,35 +724,27 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    *
    * @param projectIds  project_id values to look up
    */
-  async findActiveDelegatesForProjects(projectIds: string[]): Promise<
-    Array<{
-      project_id: string;
-      delegate_user_id: number;
-      first_name: string;
-      last_name: string;
-      email: string;
-      carnet: string | null;
-      status_id: number | null;
-      is_active: number;
-    }>
-  > {
+  async findActiveDelegatesForProjects(
+    projectIds: string[],
+  ): Promise<ProjectDelegateRow[]> {
     if (!projectIds.length) return [];
-    // No sec_users status/is_active filter — inactive/pending/rejected delegate ACCOUNTS are intentionally included in the table (only pd.is_active gates the delegation). Product decision 2026-09-14.
     return this.dataSource.query(
-      `SELECT pd.project_id,
-              pd.delegate_user_id,
-              su.first_name,
-              su.last_name,
-              su.email,
-              su.carnet,
-              su.status_id,
-              su.is_active
-       FROM pi_delegates pd
-         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
-       WHERE pd.project_id IN (?)
-         AND pd.is_active = TRUE
+      `${PROJECT_DELEGATES_SELECT}
+         AND pd.project_id IN (?)
        ORDER BY su.last_name, su.first_name`,
       [projectIds],
+    );
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+  /**
+   * Administrator variant of findActiveDelegatesForProjects: every active
+   * delegation platform-wide, with no project filter.
+   */
+  async findAllActiveDelegates(): Promise<ProjectDelegateRow[]> {
+    return this.dataSource.query(
+      `${PROJECT_DELEGATES_SELECT}
+       ORDER BY su.last_name, su.first_name`,
     );
   }
 
@@ -644,38 +760,28 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    *
    * @param projectIds  project_id values to look up
    */
-  async findDelegatesForProjects(projectIds: string[]): Promise<
-    Array<{
-      delegate_user_id: number;
-      first_name: string;
-      last_name: string;
-      email: string;
-      carnet: string | null;
-      status_id: number | null;
-      is_active: number;
-      agreement_id: string;
-      description: string | null;
-    }>
-  > {
+  async findDelegatesForProjects(
+    projectIds: string[],
+  ): Promise<DelegateWithProjectRow[]> {
     if (!projectIds.length) return [];
-    // No sec_users status/is_active filter — inactive/pending/rejected delegate ACCOUNTS are intentionally included in the table (only pd.is_active gates the delegation). Product decision 2026-09-14.
     return this.dataSource.query(
-      `SELECT pd.delegate_user_id,
-              su.first_name,
-              su.last_name,
-              su.email,
-              su.carnet,
-              su.status_id,
-              su.is_active,
-              ac.agreement_id,
-              ac.description
-       FROM pi_delegates pd
-         INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
-         INNER JOIN agresso_contracts ac ON ac.agreement_id = pd.project_id
-       WHERE pd.project_id IN (?)
-         AND pd.is_active = TRUE
+      `${DELEGATES_WITH_PROJECT_SELECT}
+         AND pd.project_id IN (?)
        ORDER BY su.last_name, su.first_name, ac.agreement_id`,
       [projectIds],
+    );
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+  /**
+   * Administrator variant of findDelegatesForProjects: every active delegation
+   * platform-wide, so the "By person" tab can list every delegate that exists
+   * rather than only those on the caller's own projects.
+   */
+  async findAllDelegatesWithProjects(): Promise<DelegateWithProjectRow[]> {
+    return this.dataSource.query(
+      `${DELEGATES_WITH_PROJECT_SELECT}
+       ORDER BY su.last_name, su.first_name, ac.agreement_id`,
     );
   }
 
@@ -696,37 +802,9 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
    *
    * @param projectId  pi_delegate_history.project_id (agresso agreement_id)
    */
-  async findProjectHistory(projectId: string): Promise<
-    Array<{
-      pi_delegate_history_id: number;
-      action: string;
-      created_at: Date;
-      actor_user_id: number | null;
-      actor_first: string | null;
-      actor_last: string | null;
-      delegate_user_id: number;
-      target_first: string | null;
-      target_last: string | null;
-      project_id: string;
-      project_name: string | null;
-    }>
-  > {
+  async findProjectHistory(projectId: string): Promise<HistoryRow[]> {
     return this.dataSource.query(
-      `SELECT h.pi_delegate_history_id,
-              h.action,
-              h.created_at,
-              h.created_by    AS actor_user_id,
-              actor.first_name AS actor_first,
-              actor.last_name  AS actor_last,
-              h.delegate_user_id,
-              tgt.first_name   AS target_first,
-              tgt.last_name    AS target_last,
-              h.project_id,
-              ac.description   AS project_name
-       FROM pi_delegate_history h
-         LEFT JOIN sec_users actor ON actor.sec_user_id = h.created_by
-         LEFT JOIN sec_users tgt   ON tgt.sec_user_id   = h.delegate_user_id
-         LEFT JOIN agresso_contracts ac ON ac.agreement_id = h.project_id
+      `${HISTORY_SELECT}
        WHERE h.project_id = ?
        ORDER BY h.created_at DESC`,
       [projectId],
@@ -747,42 +825,28 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
   async findDelegateHistory(
     delegateUserId: number,
     projectIds: string[],
-  ): Promise<
-    Array<{
-      pi_delegate_history_id: number;
-      action: string;
-      created_at: Date;
-      actor_user_id: number | null;
-      actor_first: string | null;
-      actor_last: string | null;
-      delegate_user_id: number;
-      target_first: string | null;
-      target_last: string | null;
-      project_id: string;
-      project_name: string | null;
-    }>
-  > {
+  ): Promise<HistoryRow[]> {
     if (!projectIds.length) return [];
     return this.dataSource.query(
-      `SELECT h.pi_delegate_history_id,
-              h.action,
-              h.created_at,
-              h.created_by    AS actor_user_id,
-              actor.first_name AS actor_first,
-              actor.last_name  AS actor_last,
-              h.delegate_user_id,
-              tgt.first_name   AS target_first,
-              tgt.last_name    AS target_last,
-              h.project_id,
-              ac.description   AS project_name
-       FROM pi_delegate_history h
-         LEFT JOIN sec_users actor ON actor.sec_user_id = h.created_by
-         LEFT JOIN sec_users tgt   ON tgt.sec_user_id   = h.delegate_user_id
-         LEFT JOIN agresso_contracts ac ON ac.agreement_id = h.project_id
+      `${HISTORY_SELECT}
        WHERE h.delegate_user_id = ?
          AND h.project_id IN (?)
        ORDER BY h.created_at DESC`,
       [delegateUserId, projectIds],
+    );
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+  /**
+   * Administrator variant of findDelegateHistory: the delegate's COMPLETE
+   * history, with no managed-project allowlist narrowing it.
+   */
+  async findAllDelegateHistory(delegateUserId: number): Promise<HistoryRow[]> {
+    return this.dataSource.query(
+      `${HISTORY_SELECT}
+       WHERE h.delegate_user_id = ?
+       ORDER BY h.created_at DESC`,
+      [delegateUserId],
     );
   }
 

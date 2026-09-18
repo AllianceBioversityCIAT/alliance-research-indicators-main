@@ -2,7 +2,14 @@ import { Injectable, WritableSignal, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
-import { ActiveUser, DelegateProjects, PiDelegateHistoryEntry, ProjectDelegates } from '../interfaces/pi-delegates.interface';
+import {
+  ActiveUser,
+  DelegateProjects,
+  PiDelegateHistoryEntry,
+  PiDelegateScope,
+  piDelegateScopeParam,
+  ProjectDelegates
+} from '../interfaces/pi-delegates.interface';
 import { GetViewComponents, Indicator, IndicatorTypes } from '../interfaces/api.interface';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 import {
@@ -1227,6 +1234,11 @@ export class ApiService {
   };
 
   // ─── PI Delegates — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01) ──────────
+  //
+  // `scope` (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope): omitted for a
+  // PI or delegate, 'all' for a System/Center Admin. The endpoints are the same either
+  // way — only the breadth of what comes back changes, and the server refuses 'all' for
+  // anyone who is not an admin.
 
   /**
    * GET /api/pi-delegates?projectId=<id>
@@ -1248,33 +1260,38 @@ export class ApiService {
   };
 
   /**
-   * GET /api/pi-delegates/by-user/projects?user_id=<id>
-   * Returns all ProjectDelegates[] for the projects the user manages (PI or delegate).
+   * GET /api/pi-delegates/by-user/projects?user_id=<id>[&scope=all]
+   * Returns all ProjectDelegates[] for the projects the user manages (PI or delegate),
+   * or — with scope 'all' — every project on the platform (admins only; 403 otherwise).
    * @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01 / by-user endpoints)
+   * @akili-spec docs/specs/changes/my-pi-delegates-admin-scope (admin scope)
    */
-  GET_PIDelegatesByUserProjects = (userId: number): Promise<MainResponse<ProjectDelegates[]>> => {
-    const url = () => `pi-delegates/by-user/projects?user_id=${encodeURIComponent(userId)}`;
+  GET_PIDelegatesByUserProjects = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<ProjectDelegates[]>> => {
+    const url = () => `pi-delegates/by-user/projects?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
     return this.TP.get(url(), {});
   };
 
   /**
-   * GET /api/pi-delegates/by-user/access?user_id=<id>
+   * GET /api/pi-delegates/by-user/access?user_id=<id>[&scope=all]
    *
    * Cheap yes/no: does this user manage any project (as PI or active delegate)?
    * Used to hide the whole My PI Delegates module for users with neither role.
+   * With scope 'all' the answer is yes for any admin, since they administer every project.
    */
-  GET_PiDelegateAccess = (userId: number): Promise<MainResponse<{ has_access: boolean }>> => {
-    const url = () => `pi-delegates/by-user/access?user_id=${encodeURIComponent(userId)}`;
+  GET_PiDelegateAccess = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<{ has_access: boolean }>> => {
+    const url = () => `pi-delegates/by-user/access?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
     return this.TP.get(url(), {});
   };
 
   /**
-   * GET /api/pi-delegates/by-user/people?user_id=<id>
-   * Returns distinct DelegateProjects[] across all projects the user manages.
+   * GET /api/pi-delegates/by-user/people?user_id=<id>[&scope=all]
+   * Returns distinct DelegateProjects[] across all projects the user manages,
+   * or — with scope 'all' — every delegate on the platform (admins only; 403 otherwise).
    * @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01 / by-user endpoints)
+   * @akili-spec docs/specs/changes/my-pi-delegates-admin-scope (admin scope)
    */
-  GET_PIDelegatesByUserPeople = (userId: number): Promise<MainResponse<DelegateProjects[]>> => {
-    const url = () => `pi-delegates/by-user/people?user_id=${encodeURIComponent(userId)}`;
+  GET_PIDelegatesByUserPeople = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<DelegateProjects[]>> => {
+    const url = () => `pi-delegates/by-user/people?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
     return this.TP.get(url(), {});
   };
 
@@ -1317,7 +1334,7 @@ export class ApiService {
    * Returns delegation history entries NEWEST-FIRST.
    */
   GET_PIDelegatesHistory = (
-    params: { project_id?: string; delegate_user_id?: number }
+    params: { project_id?: string; delegate_user_id?: number; scope?: PiDelegateScope }
   ): Promise<MainResponse<PiDelegateHistoryEntry[]>> => {
     let qs: string;
     if (params.project_id !== undefined) {
@@ -1325,7 +1342,7 @@ export class ApiService {
     } else {
       qs = `delegate_user_id=${encodeURIComponent(params.delegate_user_id!)}`;
     }
-    const url = () => `pi-delegates/history?${qs}`;
+    const url = () => `pi-delegates/history?${qs}${piDelegateScopeParam(params.scope)}`;
     return this.TP.get(url(), {});
   };
 
