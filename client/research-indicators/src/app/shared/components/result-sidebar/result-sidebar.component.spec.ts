@@ -833,7 +833,9 @@ describe('ResultSidebarComponent', () => {
       await firstClick;
     });
 
-    it('refreshes metadata and shows a success toast after a successful sync', async () => {
+    it('refreshes metadata and shows the success MODAL after a successful sync', async () => {
+      // Was a green toast. A successful push is terminal -- the result becomes
+      // read-only in STAR -- so it must not scroll away unseen.
       enablePrmsSyncButton();
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
       (metadataService.update as jest.Mock).mockResolvedValue(undefined);
@@ -841,29 +843,65 @@ describe('ResultSidebarComponent', () => {
       await component.onPrmsSync();
 
       expect(metadataService.update).toHaveBeenCalledWith(123);
-      expect(actionsService.showToast).toHaveBeenCalledWith({
+      expect(actionsService.showGlobalAlert).toHaveBeenCalledWith({
         severity: 'success',
-        summary: 'Sent to PRMS',
-        detail: 'The result was sent to PRMS and is pending review.'
+        summary: 'Successfully synchronized with PRMS',
+        detail: 'This result was successfully synchronized.<br>You can now access it in PRMS.',
+        hasNoCancelButton: true,
+        generalButton: true,
+        confirmCallback: { label: 'Continue' }
       });
+      // The toast path is GONE on success, not merely accompanied by a modal.
+      expect(actionsService.showToast).not.toHaveBeenCalled();
     });
 
-    it('surfaces the server failure message instead of a hardcoded error', async () => {
+    it('shows the failure MODAL with friendly copy, never the technical reason', async () => {
+      enablePrmsSyncButton();
+      const technical =
+        "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'";
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: technical }
+      });
+
+      await component.onPrmsSync();
+
+      expect(actionsService.showGlobalAlert).toHaveBeenCalledWith({
+        severity: 'error',
+        summary: 'Could not synchronize with PRMS',
+        detail:
+          'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+        hasNoCancelButton: true,
+        generalButton: true,
+        confirmCallback: { label: 'Continue' }
+      });
+      // The guard that matters: the developer-facing string must NOT leak into the
+      // copy the user reads. Asserting the exact object above is not enough --
+      // this states the negative directly.
+      const alertArg = JSON.stringify((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0]);
+      expect(alertArg).not.toContain('innov_use_to_be_determined');
+      expect(actionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    it('still surfaces the server failure message -- to the console, not to the user', async () => {
+      // This test used to assert the server message reached the TOAST. The UI now
+      // shows friendly copy, but the original guarantee it protected -- that the
+      // server's reason is never silently discarded -- is kept, just relocated.
+      // (It is also persisted server-side in result_prms_sync_log.failure_reason.)
       enablePrmsSyncButton();
       const serverMessage = 'Result is ineligible, gated, or the payload is incomplete';
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
         successfulRequest: false,
         errorDetail: { errors: serverMessage }
       });
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
       await component.onPrmsSync();
 
       expect(metadataService.update).not.toHaveBeenCalled();
-      expect(actionsService.showToast).toHaveBeenCalledWith({
-        severity: 'error',
-        summary: 'Error',
-        detail: serverMessage
-      });
+      expect(consoleError).toHaveBeenCalledWith('PRMS sync failed:', serverMessage);
+
+      consoleError.mockRestore();
     });
 
     it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {

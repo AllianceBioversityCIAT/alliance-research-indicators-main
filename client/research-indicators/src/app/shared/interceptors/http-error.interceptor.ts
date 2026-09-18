@@ -103,6 +103,15 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
         const isPoolFundingAlignmentValidationError = error.status === 400 && req.url.includes('/pool-funding-alignment');
 
+        // The PRMS sync endpoint owns its own error UX: `result-sidebar` shows a
+        // friendly modal for EVERY failure. Without this the interceptor stacked a
+        // second, technical toast on top of that modal.
+        // Suppressed by URL alone, not by status, deliberately: the component
+        // handles the whole failure surface (422 refused/rejected, 502/503
+        // transport), so any status-narrowing here would let one of them leak a
+        // toast back. 401 and 409 are already excluded globally below.
+        const isPrmsSyncError = req.url.includes('/prms-sync');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -110,7 +119,8 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !req.url.includes('refresh-token') &&
           !isAiFormalizeError &&
           !isPoolFundingTagValidationError &&
-          !isPoolFundingAlignmentValidationError
+          !isPoolFundingAlignmentValidationError &&
+          !isPrmsSyncError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`
