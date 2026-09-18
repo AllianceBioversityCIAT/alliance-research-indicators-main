@@ -31,6 +31,8 @@ COPY --from=build /usr/src/app /usr/src/app
 # Use an official Nginx runtime AS a parent image
 FROM nginx:alpine
 
+RUN rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+
 # Remove the default Nginx website
 RUN rm -rf /usr/share/nginx/html/*
 
