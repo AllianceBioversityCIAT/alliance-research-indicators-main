@@ -20,6 +20,7 @@ import {
   isValidText,
 } from '../../../shared/utils/query-sanitizer.util';
 import { User } from '../../../complementary-entities/secondary/user/user.entity';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { ElasticFindEntity } from '../../../tools/open-search/dto/elastic-find-entity.dto';
 import { AgressoContractOpensearchDto } from '../../../tools/open-search/agresso-contract/dto/agresso-contract.opensearch.dto';
@@ -165,10 +166,11 @@ export class AgressoContractRepository
         'uac',
         'ac.agreement_id = uac.agreement_id',
       )
-      .where('ac.project_lead_description REGEXP :first_name', {
+      .leftJoin(AllianceUserStaff, 'aus', 'aus.carnet = ac.projectLeadId')
+      .where('UPPER(aus.first_name) REGEXP :first_name', {
         first_name: processed_first_name,
       })
-      .andWhere('ac.project_lead_description REGEXP :last_name', {
+      .andWhere('UPPER(aus.last_name) REGEXP :last_name', {
         last_name: processed_last_name,
       })
 
