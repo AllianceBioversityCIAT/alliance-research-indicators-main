@@ -127,6 +127,41 @@ Naming:
 
 Do NOT invent a new auth path. If a new partner type needs access, extend `app_secrets` / `app_secret_host_list` and document it in the relevant module spec.
 
+### PI Delegates — two audiences, one set of endpoints
+
+`domain/entities/pi-delegates/` serves **two** audiences from the same handlers, and the
+difference is a query parameter, never a second route:
+
+| Caller | `scope` | What comes back |
+| --- | --- | --- |
+| PI or active delegate | omitted (`managed`) | Only the projects that user manages |
+| `SYSTEM_ADMIN` or `CENTER_ADMIN` | `all` | Every contract and every active delegation, platform-wide |
+
+`scope=all` is accepted on `GET /pi-delegates/by-user/{projects,people,access}` and on the
+`delegate_user_id` branch of `GET /pi-delegates/history`. It **ignores `user_id`** and is gated
+by `PiDelegatesService.assertAdminScope()` — a non-admin asking for it gets **403**, so the
+parameter can never widen an ordinary user's result set.
+
+Three rules if you touch this module:
+
+- **`isPlatformAdmin()` is the single admin predicate.** `SYSTEM_ADMIN` *and* `CENTER_ADMIN`
+  both administer delegations everywhere, including through `assertCanManageProject()`, so a
+  Center Admin can assign or revoke on a project they neither lead nor delegate on. Add a role
+  to the set there, not at each call site.
+- **Every scoped read is a PAIR of repository methods** — `findProjectSummariesByIds` /
+  `findAllProjectSummaries`, and so on — differing only in the `WHERE` clause. The projection
+  lives in one shared `const` (`PROJECT_SUMMARY_SELECT`, `PROJECT_DELEGATES_SELECT`,
+  `DELEGATES_WITH_PROJECT_SELECT`, `HISTORY_SELECT`). **Do not inline the SQL back into one
+  half**: a column added to only one of them passes every mocked test and silently changes what
+  one audience sees. `pi-delegates.repository.spec.ts` asserts the two halves project the same
+  columns.
+- **The `all` variants pass no bind parameters and take no id list.** An `IN (?)` over the whole
+  contracts table is worse than no `WHERE` at all, and the empty-array guard that protects the
+  managed path has no meaning here — guard on the scope instead.
+
+`@Roles(...)` is deliberately absent from this controller: authorization is per project, decided
+in the service. Adding the decorator would lock out the PIs and delegates the module exists for.
+
 ---
 
 ## 6. Response, error, and logging envelope

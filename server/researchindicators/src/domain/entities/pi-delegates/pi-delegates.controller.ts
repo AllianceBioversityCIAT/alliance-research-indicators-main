@@ -33,14 +33,20 @@ import { ListByDelegateDto } from './dto/list-by-delegate.query.dto';
 import { ListManagedDto } from './dto/list-managed.query.dto';
 import { HistoryQueryDto } from './dto/history.query.dto';
 import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
+import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
 
 // ⚠ No @Roles(...) is applied here (R-PID-007 / DD-B).
 // RolesGuard.canActivate() returns true when no @Roles metadata is present,
 // so any authenticated user reaches the handler.  Authorization is enforced
 // inside PiDelegatesService.assertCanManageProject(), which throws 403 for
-// callers who are not the PI, an active delegate, or a SYSTEM_ADMIN of the
-// requested project.  Adding @Roles here would lock out legitimate
-// PIs/delegates — a feature-breaking misuse.
+// callers who are not the PI, an active delegate, or a platform admin
+// (SYSTEM_ADMIN / CENTER_ADMIN) of the requested project.  Adding @Roles here
+// would lock out legitimate PIs/delegates — a feature-breaking misuse.
+//
+// The `scope=all` administrator view (@akili-spec
+// docs/specs/changes/my-pi-delegates-admin-scope) is gated the same way — in the
+// service, not by a decorator — so the three by-user reads keep ONE handler each
+// for both audiences.
 @ApiTags('PI Delegates')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
@@ -63,7 +69,7 @@ export class PiDelegatesController {
       'An empty delegates array for a project revokes ALL its active delegates (R-PID-011 AC.3). ' +
       'Every movement (create and revoke) writes a history row in the SAME transaction (R-PID-012). ' +
       'The whole operation runs in ONE transaction — any error rolls back all projects (R-PID-011 AC.4). ' +
-      'Authorization per project (R-PID-007): caller must be PI, active delegate, or SYSTEM_ADMIN ' +
+      'Authorization per project (R-PID-007): caller must be PI, active delegate, or a platform admin ' +
       'of every project_id — fail-fast, nothing applied on any 403. ' +
       'PI-exclusion (R-PID-008): if any (project, delegate) pair names a user who is the PI ' +
       'of that project the whole request is rejected. ' +
@@ -176,7 +182,7 @@ export class PiDelegatesController {
       'Project fields (project_code, project_name, is_pool_funding_contributor, ' +
       'status, start_date, end_date) come from agresso_contracts. ' +
       'Delegate identity (delegate_user_id, name, email) comes from sec_users. ' +
-      'Caller must be the PI, an active delegate, or SYSTEM_ADMIN (R-PID-007).',
+      'Caller must be the PI, an active delegate, or a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) (R-PID-007).',
   })
   @ApiOkResponse({
     type: ProjectDelegatesResponseDto,
@@ -215,7 +221,7 @@ export class PiDelegatesController {
     summary: 'Verify whether an active delegation exists',
     description:
       'Returns { exists: boolean } for the given (project_id, delegate_user_id) pair. ' +
-      'Caller must be the PI, an active delegate, or SYSTEM_ADMIN (R-PID-007).',
+      'Caller must be the PI, an active delegate, or a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) (R-PID-007).',
   })
   @ApiQuery({
     name: 'project_id',
@@ -267,7 +273,7 @@ export class PiDelegatesController {
       'This is the inverse of GET /pi-delegates?projectId: instead of listing the delegates ' +
       'of a project, it lists the projects a delegate is assigned to. ' +
       'Authorization (own-or-admin): the caller may query their own delegate_user_id; ' +
-      'a SYSTEM_ADMIN may query any delegate_user_id. All other combinations return 403.',
+      'a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) may query any delegate_user_id. All other combinations return 403.',
   })
   @ApiOkResponse({
     type: DelegateProjectsResponseDto,
@@ -324,7 +330,7 @@ export class PiDelegatesController {
       'module entirely when it is false, so this exists to avoid fetching the ' +
       'full enriched list just to answer a yes/no question. ' +
       'Authorization (own-or-admin): the caller may query their own user_id; ' +
-      'a SYSTEM_ADMIN may query any user_id.',
+      'a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) may query any user_id.',
   })
   @ApiOkResponse({
     description: 'True when the user is PI or active delegate of ≥1 project',
@@ -335,6 +341,15 @@ export class PiDelegatesController {
     type: Number,
     description: 'sec_users.sec_user_id to check',
   })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: PiDelegateScopeEnum,
+    description:
+      "'managed' (default) keeps the historical behaviour: only what user_id " +
+      "manages as PI or active delegate. 'all' ignores user_id and returns the " +
+      'platform-wide set — reserved for SYSTEM_ADMIN and CENTER_ADMIN (403 otherwise).',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -343,7 +358,7 @@ export class PiDelegatesController {
   )
   async hasManagedProjects(@Query() dto: ListManagedDto) {
     return this.piDelegatesService
-      .hasManagedProjects(dto.user_id)
+      .hasManagedProjects(dto.user_id, dto.scope)
       .then((data) =>
         ResponseUtils.format({
           data,
@@ -366,7 +381,7 @@ export class PiDelegatesController {
       'status, start_date, end_date) come from agresso_contracts. ' +
       'Delegate identity (delegate_user_id, name, email) comes from sec_users. ' +
       'Authorization (own-or-admin): the caller may query their own user_id; ' +
-      'a SYSTEM_ADMIN may query any user_id. All other combinations return 403.',
+      'a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) may query any user_id. All other combinations return 403.',
   })
   @ApiOkResponse({
     type: ProjectDelegatesResponseDto,
@@ -381,6 +396,15 @@ export class PiDelegatesController {
     description:
       'sec_users.sec_user_id whose managed projects (PI or active delegate) to list',
   })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: PiDelegateScopeEnum,
+    description:
+      "'managed' (default) keeps the historical behaviour: only what user_id " +
+      "manages as PI or active delegate. 'all' ignores user_id and returns the " +
+      'platform-wide set — reserved for SYSTEM_ADMIN and CENTER_ADMIN (403 otherwise).',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -389,7 +413,7 @@ export class PiDelegatesController {
   )
   async listManagedProjects(@Query() dto: ListManagedDto) {
     return this.piDelegatesService
-      .listManagedProjects(dto.user_id)
+      .listManagedProjects(dto.user_id, dto.scope)
       .then((data) =>
         ResponseUtils.format({
           data,
@@ -427,7 +451,7 @@ export class PiDelegatesController {
       'Person fields (delegate_user_id, name, email) come from sec_users. ' +
       'Project fields (project_code, project_name) come from agresso_contracts. ' +
       'Authorization (own-or-admin): the caller may query their own user_id; ' +
-      'a SYSTEM_ADMIN may query any user_id. All other combinations return 403.',
+      'a platform admin (SYSTEM_ADMIN / CENTER_ADMIN) may query any user_id. All other combinations return 403.',
   })
   @ApiOkResponse({
     type: DelegateProjectsResponseDto,
@@ -441,6 +465,15 @@ export class PiDelegatesController {
     type: Number,
     description: 'sec_users.sec_user_id whose managed delegates to list',
   })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: PiDelegateScopeEnum,
+    description:
+      "'managed' (default) keeps the historical behaviour: only what user_id " +
+      "manages as PI or active delegate. 'all' ignores user_id and returns the " +
+      'platform-wide set — reserved for SYSTEM_ADMIN and CENTER_ADMIN (403 otherwise).',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -449,7 +482,7 @@ export class PiDelegatesController {
   )
   async listManagedDelegates(@Query() dto: ListManagedDto) {
     return this.piDelegatesService
-      .listManagedDelegates(dto.user_id)
+      .listManagedDelegates(dto.user_id, dto.scope)
       .then((data) =>
         ResponseUtils.format({
           data,
@@ -468,8 +501,9 @@ export class PiDelegatesController {
   //
   // Auth:
   //   project_id branch     → assertCanManageProject (PI / active delegate /
-  //                           SYSTEM_ADMIN of that project).
-  //   delegate_user_id branch → scoped to the CALLER's managed projects;
+  //                           platform admin of that project).
+  //   delegate_user_id branch → scoped to the CALLER's managed projects, unless
+  //                             scope=all (admins only) lifts the scoping;
   //                             empty managed set returns [] without a DB query.
   //
   // MUST be declared BEFORE @Delete() so Nest matches the static path segment
@@ -484,7 +518,7 @@ export class PiDelegatesController {
       'Supply EXACTLY ONE of the two query params — providing both or neither ' +
       'returns 400.\n\n' +
       '**project_id branch** — Returns the full history for that project. ' +
-      'Caller must be the PI, an active delegate, or SYSTEM_ADMIN of the project (403 otherwise).\n\n' +
+      'Caller must be the PI, an active delegate, or a platform admin of the project (403 otherwise).\n\n' +
       '**delegate_user_id branch** — Returns history for the given delegate, ' +
       'scoped to projects the CALLER manages (PI or active delegate). ' +
       'If the caller manages no projects, an empty array is returned without querying the history table.\n\n' +
@@ -515,6 +549,16 @@ export class PiDelegatesController {
       'sec_users.sec_user_id of the delegate whose history to return, scoped to ' +
       "the caller's managed projects. Mutually exclusive with project_id.",
     example: 42,
+  })
+  @ApiQuery({
+    name: 'scope',
+    required: false,
+    enum: PiDelegateScopeEnum,
+    description:
+      'Applies to the delegate_user_id branch only. ' +
+      "'managed' (default) scopes the history to the caller's own managed projects; " +
+      "'all' returns the delegate's complete history across every project — " +
+      'reserved for SYSTEM_ADMIN and CENTER_ADMIN (403 otherwise).',
   })
   @UsePipes(
     new ValidationPipe({
@@ -548,7 +592,7 @@ export class PiDelegatesController {
       '**Shape B** — `{ project_ids: string[], delegate_user_ids: number[] }`: ' +
       'revoke every active (project_id, delegate_user_id) pair in the cartesian product.\n\n' +
       'Authorization per project (R-PID-007): the caller must be PI, active delegate, ' +
-      'or SYSTEM_ADMIN of every project involved. ' +
+      'or a platform admin of every project involved. ' +
       'All writes run in one transaction.',
   })
   @ApiBody({

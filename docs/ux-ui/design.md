@@ -345,7 +345,8 @@ Tokens live in `client/research-indicators/src/styles/colors.scss`, `src/styles/
 
 | Family | Token range | Use |
 |---|---|---|
-| Light blue | `--ac-light-blue-100` … `-500` | Informational accents, links |
+| Light blue | `--ac-light-blue-50`, `-100` … `-500` | Informational accents, links. `-50` is a **surface tint**, not a ramp step: the quietest blue that still reads as blue beside `--ac-grey-100`, for "selected but calm" backgrounds such as filter chips. Never use it for text. |
+| Warning (amber) | `--ac-warning-1`, `--ac-warning-surface`, `--ac-warning-fg` | The three tokens an amber notice needs: left rule, surface, foreground. Same values in dark mode. Used by the inactive-delegate warning in the Assign PI Delegate modal and the Administrator-view banner. |
 | Primary blue | `--ac-primary-blue-100` … `-700` | Brand, navbar, primary CTAs |
 | Green | `--ac-green-100` … `-700` | Indicators 1–3 (capacity sharing, innovation dev, policy change A) |
 | Orange | `--ac-orange-1` | Indicators 4–5 |
