@@ -1,7 +1,8 @@
 // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty } from 'class-validator';
+import { IsEnum, IsInt, IsNotEmpty, IsOptional } from 'class-validator';
+import { PiDelegateScopeEnum } from '../enum/pi-delegate-scope.enum';
 
 /**
  * Query parameters for GET /pi-delegates/by-user/projects and
@@ -22,4 +23,18 @@ export class ListManagedDto {
   @IsInt()
   @IsNotEmpty()
   user_id!: number;
+
+  @ApiPropertyOptional({
+    enum: PiDelegateScopeEnum,
+    default: PiDelegateScopeEnum.MANAGED,
+    description:
+      "Read scope. 'managed' (default) returns only the projects user_id manages " +
+      "as PI or active delegate. 'all' returns EVERY project and EVERY active " +
+      'delegation platform-wide and ignores user_id — reserved for SYSTEM_ADMIN ' +
+      'and CENTER_ADMIN (403 for anyone else).',
+    example: PiDelegateScopeEnum.ALL,
+  })
+  @IsOptional()
+  @IsEnum(PiDelegateScopeEnum)
+  scope?: PiDelegateScopeEnum;
 }
