@@ -63,7 +63,9 @@ function buildServiceStub(people: DelegateProjects[] = []) {
     loading: signal(false),
     error: signal<string | null>(null),
     revokePair: jest.fn().mockResolvedValue(undefined),
-    revokeDelegate: jest.fn().mockResolvedValue(undefined)
+    revokeDelegate: jest.fn().mockResolvedValue(undefined),
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    isAdminView: signal(false)
   };
 }
 
@@ -686,8 +688,11 @@ describe('ByPersonComponent', () => {
       const remove = fixture.debugElement.query(By.css('.by-person__assign-btn--danger'));
       expect(remove).toBeTruthy();
       expect(remove.nativeElement.querySelector('.pi-user-minus')).not.toBeNull();
-      // assigning projects to someone who cannot review is not offered
-      expect(fixture.nativeElement.querySelector('.pi-user-plus')).toBeNull();
+      // assigning projects to someone who cannot review is not offered.
+      // Scoped to the ROW: the toolbar's "Assign New Delegate" button uses the
+      // same icon and is not what this rule is about.
+      const rowActions = fixture.debugElement.query(By.css('.by-person__actions'));
+      expect(rowActions.nativeElement.querySelector('.pi-user-plus')).toBeNull();
     });
 
     it('remove delegate asks for confirmation and revokes every project on confirm', async () => {
@@ -753,4 +758,45 @@ describe('ByPersonComponent', () => {
       expect(control.className).toContain('w-fit');
     });
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('summary line', () => {
+    it('stops claiming the list is filtered to the caller once it is not', async () => {
+      await createComponent([]);
+      const summaryText = () =>
+        (fixture.nativeElement.querySelector('.by-person__summary-left') as HTMLElement).textContent ?? '';
+
+      expect(summaryText()).toContain('Only projects where you are');
+
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      expect(summaryText()).not.toContain('Only projects where you are');
+      expect(summaryText()).toContain('Every PI Delegate on the platform');
+    });
+  });
+
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('Assign New Delegate button', () => {
+    it('sits in the toolbar and emits with no payload — the modal asks for both sides', async () => {
+      await createComponent([]);
+      const emitted: number[] = [];
+      component.assignNewRequested.subscribe(() => emitted.push(1));
+
+      const button = fixture.debugElement.query(By.css('.by-person__assign-new'));
+      expect(button).toBeTruthy();
+      expect((button.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign New Delegate');
+
+      button.nativeElement.click();
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('is offered on an EMPTY table — reaching a person who is not a delegate yet is the point', async () => {
+      await createComponent([]);
+
+      expect(fixture.debugElement.query(By.css('.by-person__assign-new'))).toBeTruthy();
+    });
+  });
+
 });

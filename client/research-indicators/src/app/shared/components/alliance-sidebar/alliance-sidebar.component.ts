@@ -39,7 +39,8 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
 
   /**
    * My PI Delegates only makes sense for someone who is the PI of a project or
-   * a delegate on one; for everyone else the whole section stays hidden.
+   * a delegate on one — or an admin, who administers them all; for everyone else
+   * the whole section stays hidden.
    * Answered by a boolean endpoint so no page pays for the enriched list.
    */
   readonly canSeePiDelegates = signal(false);
@@ -160,7 +161,9 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
       const userId = this.cache.dataCache()?.user?.sec_user_id;
       if (userId == null) return;
 
-      const res = await this.api.GET_PiDelegateAccess(Number(userId));
+      // Admins administer every project's delegations, so they ask with scope='all'
+      // (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope).
+      const res = await this.api.GET_PiDelegateAccess(Number(userId), this.rolesService.isAdmin() ? 'all' : undefined);
       this.canSeePiDelegates.set(!!res.data?.has_access);
     } catch {
       // A failed check keeps the section hidden — no entry point to an empty module.

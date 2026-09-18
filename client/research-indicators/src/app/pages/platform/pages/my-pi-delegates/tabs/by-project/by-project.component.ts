@@ -17,7 +17,8 @@ import {
   computed,
   inject,
   input,
-  linkedSignal
+  linkedSignal,
+  signal
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
@@ -33,6 +34,25 @@ import { ProjectUtilsService, type ProjectType } from '@services/project-utils.s
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates.interface';
+
+/** Which of the header counters the table is narrowed to. */
+export type RoleFilter = 'all' | 'pi' | 'delegate';
+
+/**
+ * A table row: the project plus the caller's role on it, resolved ONCE.
+ *
+ * `role` is a real field rather than a template expression because p-table sorts
+ * row properties — it never sees what a `{{ }}` renders. A sortable Role column
+ * therefore has to carry the label on the row.
+ */
+export interface ProjectRow extends ProjectDelegates {
+  role: string;
+  /** True for the admin-only "listed by role, not by involvement" case. */
+  hasNoRole: boolean;
+}
+
+/** Shown in Role when the caller is neither PI nor delegate of a listed project. */
+export const NO_ROLE_LABEL = 'No role (admin)';
 
 @Component({
   selector: 'app-by-project',
@@ -79,22 +99,65 @@ export class ByProjectComponent {
   readonly searchTerm = linkedSignal(() => this.searchQuery());
   readonly statusTerm = linkedSignal(() => this.statusFilter());
 
-  /** Clear Filters on the shared search control: resets search + status. */
+  // ─── Role quick filters (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+  //
+  // The three chips mirror the three counters in the page header, and each one
+  // narrows the table to exactly what its counter counts — so a number and the
+  // rows behind it can never disagree. 'all' is the unfiltered state.
+  //
+  // They matter most in the administrator view, where the table holds every
+  // project on the platform and "the two I actually lead" is otherwise a search
+  // the user cannot express.
+
+  readonly roleTerm = signal<RoleFilter>('all');
+
+  /** The chips, in the same order as the header counters. */
+  readonly roleFilterOptions: readonly { value: RoleFilter; label: string }[] = [
+    { value: 'all', label: 'All projects' },
+    { value: 'pi', label: 'As PI' },
+    { value: 'delegate', label: 'As PI delegate' }
+  ];
+
+  selectRoleFilter(value: RoleFilter): void {
+    this.roleTerm.set(value);
+  }
+
+  /** Clear Filters on the shared search control: resets search + status + role. */
   clearFilters(): void {
     this.searchTerm.set('');
     this.statusTerm.set('All');
+    this.roleTerm.set('all');
   }
 
-  /** Derived filtered view: applies status + search. Never mutates the cache. */
-  readonly filteredRows = computed<ProjectDelegates[]>(() => {
+  /** Derived filtered view: applies role + status + search. Never mutates the cache. */
+  readonly filteredRows = computed<ProjectRow[]>(() => {
     const query = this.searchTerm().trim().toLowerCase();
     const status = this.statusTerm();
-    return this.service.byProjectCache().filter(row => {
-      const matchesStatus = status === 'All' || row.status === status;
-      const matchesQuery = !query || this.matchesQuery(row, query);
-      return matchesStatus && matchesQuery;
-    });
+    const role = this.roleTerm();
+    return this.service
+      .byProjectCache()
+      .filter(row => {
+        const matchesRole = this.matchesRole(row, role);
+        const matchesStatus = status === 'All' || row.status === status;
+        const matchesQuery = !query || this.matchesQuery(row, query);
+        return matchesRole && matchesStatus && matchesQuery;
+      })
+      .map(row => {
+        const label = this.roleLabel(row);
+        return { ...row, role: label, hasNoRole: label === NO_ROLE_LABEL };
+      });
   });
+
+  /**
+   * Both branches read the SAME predicates the header counters and the Role
+   * column read, rather than re-deriving "am I the PI" here — that duplication
+   * is how a chip ends up showing a different set than the number it sits under.
+   */
+  private matchesRole(project: ProjectDelegates, role: RoleFilter): boolean {
+    if (role === 'pi') return this.service.isPiOf(project);
+    if (role === 'delegate') return this.service.isDelegateOf(project);
+    return true;
+  }
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
 
@@ -160,6 +223,32 @@ export class ByProjectComponent {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  /**
+   * What the caller personally is on this project.
+   *
+   * An administrator's list contains every project on the platform, and on most
+   * of them they are neither PI nor delegate — they are there by role, not by
+   * involvement. Saying "PI Delegate" for those rows is simply false, and it was
+   * visibly so on projects whose delegate list is empty. Those rows say so in
+   * words: a bare dash leaves the reader to guess why the project is there, and
+   * reads as nothing at all to a screen reader.
+   *
+   * For a PI or delegate NOTHING changes: service.isDelegateOf() still answers
+   * yes for every project in their (already managed-only) list.
+   */
+  roleLabel(project: ProjectDelegates): string {
+    if (this.service.isPiOf(project)) return 'Principal Investigator';
+    return this.service.isDelegateOf(project) ? 'PI Delegate' : NO_ROLE_LABEL;
+  }
+
+  /** The full sentence behind the short label — tooltip and screen-reader text. */
+  roleDescription(row: ProjectRow): string {
+    return row.hasNoRole
+      ? 'You have no role on this project — it is listed because you are an administrator'
+      : row.role;
+  }
 
   /**
    * Status chip data for <app-custom-tag>, so this table shows the same colours

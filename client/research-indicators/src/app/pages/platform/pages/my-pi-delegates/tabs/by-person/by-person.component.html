@@ -14,7 +14,11 @@
     <div class="by-person__summary flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 font-['Barlow'] text-[13px] leading-[1.5]"
       aria-label="PI Delegates summary">
       <span class="by-person__summary-left atc-grey-600 text-[12px] italic">
+        @if (service.isAdminView()) {
+        Every PI Delegate on the platform is listed
+        } @else {
         Only projects where you are the Principal Investigator or a PI Delegate are listed
+        }
       </span>
     </div>
 
@@ -29,6 +33,19 @@
         (searchChange)="searchTerm.set($event)"
         (clear)="clearFilters()"
       ></app-search-export-controls>
+
+      <!-- Assign New Delegate — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope.
+           Every other entry point into the modal starts from a row that already
+           exists; this is the only way to reach a person who is not a delegate yet,
+           so it lives here rather than on a row.
+           Same p-button recipe as "New Project Result" on Project Detail
+           (shared/components/project-results-table) — the platform's one
+           add-something affordance, so it must not look like a second design. -->
+      <div class="by-person__assign-new-wrapper ml-auto">
+        <p-button label="Assign New Delegate" icon="pi pi-plus" severity="info" size="small"
+          styleClass="by-person__assign-new !rounded-[9px] !h-7.5 !text-[13px]" [style]="{ 'min-width': '95px' }"
+          (onClick)="onAssignNewDelegate()" />
+      </div>
     </div>
 
     <p-table

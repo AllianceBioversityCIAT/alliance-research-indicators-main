@@ -38,7 +38,9 @@ describe('AllianceSidebarComponent', () => {
     } as unknown as AllModalsService;
     const mockRolesService = {
       canAccessCenterAdmin: jest.fn().mockReturnValue(false),
-      canAccessAppConfiguration: jest.fn().mockReturnValue(false)
+      canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+      // Admins ask the access endpoint with scope='all' — see the scope test below.
+      isAdmin: jest.fn().mockReturnValue(false)
     } as unknown as RolesService;
     const mockActionsService = {
       logOut: jest.fn()
@@ -206,6 +208,26 @@ describe('AllianceSidebarComponent', () => {
     const text = (f.nativeElement as HTMLElement).textContent ?? '';
     expect(text).not.toContain('PRINCIPAL INVESTIGATOR');
     expect(f.nativeElement.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('asks with scope=all for an admin, and without a scope otherwise', async () => {
+    const api = TestBed.inject(ApiService) as unknown as MockApiService;
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(api.GET_PiDelegateAccess).toHaveBeenCalledWith(99, undefined);
+
+    api.GET_PiDelegateAccess.mockClear();
+    (
+      TestBed.inject(RolesService) as unknown as { isAdmin: jest.Mock }
+    ).isAdmin.mockReturnValue(true);
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+
+    expect(api.GET_PiDelegateAccess).toHaveBeenCalledWith(99, 'all');
   });
 
   it('keeps the section hidden when the check fails', async () => {
@@ -402,7 +424,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
           provide: RolesService,
           useValue: {
             canAccessCenterAdmin: jest.fn().mockReturnValue(true),
-            canAccessAppConfiguration: jest.fn().mockReturnValue(false)
+            canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+            isAdmin: jest.fn().mockReturnValue(false)
           }
         },
         { provide: ActionsService, useValue: { logOut: jest.fn() } }

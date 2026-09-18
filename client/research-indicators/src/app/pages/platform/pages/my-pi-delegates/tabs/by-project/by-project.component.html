@@ -14,8 +14,32 @@
     <div class="by-project__summary flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 font-['Barlow'] text-[13px] leading-[1.5]"
       aria-label="PI Delegates summary">
       <span class="by-project__summary-left atc-grey-600 text-[12px] italic">
+        @if (service.isAdminView()) {
+        Every project on the platform is listed — Role shows your own involvement on each one
+        } @else {
         Only projects where you are the Principal Investigator or a PI Delegate are listed
+        }
       </span>
+    </div>
+
+    <!-- Role quick filters — one per header counter, so a number and the rows
+         behind it always agree.
+         No underline: it read as a tab strip, and these are filters on the table
+         below, not a change of view. The selected one is marked by a blue-tinted
+         surface plus a heavier weight, so the state survives without colour. -->
+    <div class="by-project__role-filters flex w-full flex-wrap gap-2 px-4 pt-2 pb-1" role="group"
+      aria-label="Filter projects by your role">
+      @for (option of roleFilterOptions; track option.value) {
+      <button type="button"
+        class="by-project__role-filter inline-flex min-w-[58px] cursor-pointer items-center justify-center rounded-lg border-0 px-2.5 py-1 font-['Barlow'] text-[13px] transition-colors hover:opacity-80"
+        [class]="roleTerm() === option.value
+          ? 'bg-[color:var(--ac-light-blue-50)] atc-grey-800 font-semibold'
+          : 'bg-[color:var(--ac-grey-100)] atc-grey-700 font-medium'"
+        [attr.aria-pressed]="roleTerm() === option.value" [attr.aria-label]="'Show ' + option.label"
+        (click)="selectRoleFilter(option.value)">
+        {{ option.label }}
+      </button>
+      }
     </div>
 
     <!-- Per-table toolbar: the shared search control (search only) -->
@@ -52,8 +76,8 @@
             pSortableColumn="project_name">
             <div class="by-project__th-inner">Project <p-sortIcon field="project_name"></p-sortIcon></div>
           </th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">
-            <div class="by-project__th-inner">Role</div>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="role">
+            <div class="by-project__th-inner">Role <p-sortIcon field="role"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="status">
             <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
@@ -118,7 +142,10 @@
           <!-- My role — PI or delegate: this table lists both, and the two are
                managed differently, so the row says which one applies. -->
           <td class="by-project__td by-project__td--role">
-            <span class="by-project__role">{{ service.isPiOf(project) ? 'Principal Investigator' : 'PI Delegate' }}</span>
+            <span class="by-project__role" [class.by-project__role--none]="project.hasNoRole"
+              [class]="project.hasNoRole ? 'atc-grey-600 italic' : ''"
+              [attr.aria-label]="roleDescription(project)"
+              [attr.title]="roleDescription(project)">{{ project.role }}</span>
           </td>
 
           <!-- Status — shared status tag, same colours as the My Projects table -->

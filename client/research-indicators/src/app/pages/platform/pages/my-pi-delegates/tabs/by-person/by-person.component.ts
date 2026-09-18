@@ -66,6 +66,14 @@ export class ByPersonComponent {
   // Assign button emits the delegate_user_id; the parent/page shell opens the modal.
   @Output() readonly assignRequested = new EventEmitter<{ delegateUserId: number }>();
 
+  // ─── Assign-new output (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+  // No payload: the modal opens empty and the user picks both sides.
+  @Output() readonly assignNewRequested = new EventEmitter<void>();
+
+  onAssignNewDelegate(): void {
+    this.assignNewRequested.emit();
+  }
+
   // ─── History output ───────────────────────────────────────────────────────────
   // History button emits delegate_user_id + name; the shell opens the history modal.
   @Output() readonly historyRequested = new EventEmitter<{
