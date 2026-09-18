@@ -85,13 +85,6 @@ export class InnovationUseBuilder {
       )
       .map((row) => mapActor(row));
 
-    if (actors.length === 0) {
-      throw new PrmsPayloadBuildError(
-        `Missing mandatory field 'actors'`,
-        'actors',
-      );
-    }
-
     const organization = (slices?.institution_types ?? [])
       .filter(
         (row) =>
@@ -112,17 +105,29 @@ export class InnovationUseBuilder {
           row != null,
       );
 
-    if (measures.length === 0) {
-      throw new PrmsPayloadBuildError(
-        `Missing mandatory field 'measures'`,
-        'measures',
-      );
+    // 2026-09-18 -- `actors` and `measures` no longer refuse the send when empty.
+    // Both threw `PrmsPayloadBuildError` ("Missing mandatory field ..."), which
+    // surfaces as REFUSED_BY_STAR/422 and means PRMS never sees the payload, so
+    // whether PRMS actually requires them could never be answered. This builder's
+    // own header records that its shape "follows D-B BY ANALOGY" and that the type
+    // "was never called in T-01" -- i.e. these were assumptions, never a contract
+    // PRMS confirmed. Empty collections are now simply OMITTED from the payload
+    // (not sent as `[]`, which would assert "we checked and there are none"), and
+    // PRMS decides. A real requirement comes back as REJECTED_BY_PRMS carrying
+    // PRMS's own field name, which is the evidence these throws stood in for.
+    //
+    // Per-row validation is deliberately UNCHANGED: `actor_type_id`,
+    // `other_actor_type`, `how_many` and `institution_types_id` still throw,
+    // because those fire only when a row EXISTS but is malformed. Sending a
+    // half-built row would make PRMS reject for the wrong reason and teach us
+    // nothing about the contract.
+    const numbers: Record<string, unknown> = {};
+    if (actors.length > 0) {
+      numbers.actors = actors;
     }
-
-    const numbers: Record<string, unknown> = {
-      actors,
-      measures,
-    };
+    if (measures.length > 0) {
+      numbers.measures = measures;
+    }
     if (organization.length > 0) {
       numbers.organization = organization;
     }

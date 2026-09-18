@@ -11,6 +11,8 @@ export interface PrmsSyncInterpretation {
   responseBody: Record<string, unknown> | null;
   failureReason: string | null;
   prmsResultCode: number | null;
+  /** PRMS reporting phase of the accepted row. Null on any non-ACCEPTED outcome. */
+  prmsPhaseId: number | null;
 }
 
 const DOWNSTREAM_5XX = /HTTP\s+(5\d{2})\b/i;
@@ -33,6 +35,7 @@ export function interpretPrmsSyncResponse(
       responseBody: null,
       failureReason: 'PRMS Normalizer returned no HTTP response',
       prmsResultCode: null,
+      prmsPhaseId: null,
     };
   }
 
@@ -43,6 +46,7 @@ export function interpretPrmsSyncResponse(
     requestId,
     responseBody: body,
     prmsResultCode: null as number | null,
+    prmsPhaseId: null as number | null,
   };
 
   if (transport.status === 401) {
@@ -88,6 +92,7 @@ function interpretPerRow(
     requestId: string | null;
     responseBody: Record<string, unknown>;
     prmsResultCode: number | null;
+    prmsPhaseId: number | null;
   },
 ): PrmsSyncInterpretation {
   const results = Array.isArray(body.results) ? body.results : [];
@@ -110,6 +115,9 @@ function interpretPerRow(
       ...base,
       outcome: PrmsSyncOutcome.ACCEPTED,
       prmsResultCode,
+      // Absent phase is NOT a failure: a sync that PRMS accepted stays ACCEPTED
+      // and simply stores null. Only the result code carries PRMS_RESULT_CODE_ABSENT.
+      prmsPhaseId: readPhaseId(row),
       failureReason: prmsResultCode == null ? PRMS_RESULT_CODE_ABSENT : null,
     };
   }
@@ -191,6 +199,38 @@ function readResultCode(row: Record<string, unknown>): number | null {
   }
   if (typeof code === 'string' && code.trim() !== '') {
     const parsed = Number(code);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * PRMS reporting phase of the accepted row. PRMS sends the same value twice:
+ * `version_id` at the top level and `obj_version.id` nested. `version_id` wins;
+ * `obj_version.id` is the fallback when it is absent or unparseable.
+ * `obj_version` also carries `phase_name` / `phase_year`, deliberately NOT stored
+ * -- the year is already ours (MAPPABLE_LIVE_VERSION) and a second copy could drift.
+ */
+function readPhaseId(row: Record<string, unknown>): number | null {
+  if (!isRecord(row.result)) {
+    return null;
+  }
+  const direct = toFiniteNumber(row.result.version_id);
+  if (direct != null) {
+    return direct;
+  }
+  if (isRecord(row.result.obj_version)) {
+    return toFiniteNumber(row.result.obj_version.id);
+  }
+  return null;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;

@@ -245,6 +245,7 @@ export class ResultPrmsSyncService {
         prmsType,
         externalReference,
         prmsResultCode: interpreted.prmsResultCode,
+        prmsPhaseId: interpreted.prmsPhaseId,
       },
       { resultOfficialCode: claim.resultOfficialCode, environment },
     );

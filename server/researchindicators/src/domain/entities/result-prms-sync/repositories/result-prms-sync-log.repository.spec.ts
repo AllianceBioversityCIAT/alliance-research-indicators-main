@@ -184,6 +184,7 @@ describe('ResultPrmsSyncLogRepository', () => {
       outcome: PrmsSyncOutcome.ACCEPTED,
       userId: 7,
       prmsResultCode: 555,
+      prmsPhaseId: 36,
       requestPayload: { tenant: 'prms.result-management.api' },
     });
 
@@ -192,7 +193,10 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(transactionQuery.mock.calls[1][0]).toMatch(
       /SET is_synced_to_prms = TRUE/,
     );
-    expect(transactionQuery.mock.calls[1][1]).toEqual([555, 42]);
+    // result code, phase id, result id -- ORDER MATTERS: these are positional
+    // `?` params, so a transposition here writes the phase into prms_result_code.
+    expect(transactionQuery.mock.calls[1][1]).toEqual([555, 36, 42]);
+    expect(transactionQuery.mock.calls[1][0]).toMatch(/prms_phase_id\s*=\s*\?/);
   });
 
   it('insertRefusedByStar assigns attempt_number under the results row lock', async () => {

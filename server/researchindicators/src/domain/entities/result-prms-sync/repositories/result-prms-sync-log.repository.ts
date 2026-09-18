@@ -77,6 +77,7 @@ export interface SettleIfInFlightInput {
   prmsType?: string | null;
   externalReference?: string | null;
   prmsResultCode?: number | null;
+  prmsPhaseId?: number | null;
 }
 
 export interface InsertRefusedByStarInput {
@@ -398,10 +399,15 @@ export class ResultPrmsSyncLogRepository {
           `
           UPDATE results
           SET is_synced_to_prms = TRUE,
-              prms_result_code = ?
+              prms_result_code = ?,
+              prms_phase_id = ?
           WHERE result_id = ?
           `,
-          [input.prmsResultCode ?? null, input.resultId],
+          [
+            input.prmsResultCode ?? null,
+            input.prmsPhaseId ?? null,
+            input.resultId,
+          ],
         );
       }
 

@@ -160,44 +160,51 @@ describe('evaluateSyncGate', () => {
     );
 
     expect(unmappable.entryId).toBe('indicator_mappable');
-    expect(gatedUse.entryId).toBe('indicator_not_gated');
     expect(gatedPolicy.entryId).toBe('policy_type_not_gated');
 
+    // Innovation Use is NO LONGER gated (entry lifted 2026-09-18): STAR now lets
+    // the payload reach PRMS so PRMS's own contract decides whether the
+    // investment declarations are required.
+    expect(gatedUse.allowed).toBe(true);
+    expect(gatedUse.entryId).toBe(null);
+
     expect(unmappable.httpStatus).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
-    expect(gatedUse.httpStatus).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
     expect(gatedPolicy.httpStatus).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
 
-    const descriptions = [
-      unmappable.description,
-      gatedUse.description,
-      gatedPolicy.description,
-    ];
-    expect(new Set(descriptions).size).toBe(3);
+    const descriptions = [unmappable.description, gatedPolicy.description];
+    expect(new Set(descriptions).size).toBe(2);
     expect(unmappable.description).toMatch(/unmappable/i);
-    expect(gatedUse.description).toMatch(/investment declarations/i);
     expect(gatedPolicy.description).toMatch(/status_amount|amount/i);
 
-    expect(transport.ingest).not.toHaveBeenCalled();
+    // The two still-gated types never reach transport; Innovation Use now does.
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
   });
 
-  it('lets Innovation Use send after that list entry is removed, with no builder involved', () => {
+  it('sends Innovation Use -- the gate entry was lifted, with no builder involved', () => {
+    // Was: "lets Innovation Use send AFTER that list entry is removed". The entry
+    // is now gone from SYNC_GATE_ENTRIES itself, so the assertion is direct.
+    // Still proves family R-F6 / QA-5: lifting cost one list entry and zero
+    // builder files, because the Innovation Use builder was always built.
     const snapshot = eligible({
       indicator_id: IndicatorsEnum.INNOVATION_USE,
     });
 
-    const refused = attemptSend(snapshot, transport);
-    expect(refused.allowed).toBe(false);
-    expect(refused.entryId).toBe('indicator_not_gated');
-    expect(transport.ingest).not.toHaveBeenCalled();
+    const decision = attemptSend(snapshot, transport);
 
-    const withoutInnovationUseGate = SYNC_GATE_ENTRIES.filter(
-      (entry) => entry.id !== 'indicator_not_gated',
-    );
-    const lifted = attemptSend(snapshot, transport, withoutInnovationUseGate);
-
-    expect(lifted.allowed).toBe(true);
-    expect(lifted.entryId).toBe(null);
+    expect(decision.allowed).toBe(true);
+    expect(decision.entryId).toBe(null);
     expect(transport.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries no gate entry that refuses a type unconditionally by indicator alone', () => {
+    // The lifted entry's `fails` only asked "is this Innovation Use?" while its
+    // description blamed usd_budget / is_determined -- a refusal whose stated
+    // reason it never actually checked. This guards the shape, not the type:
+    // no remaining entry may name an indicator without also reading a data field.
+    const ids = SYNC_GATE_ENTRIES.map((entry) => entry.id);
+
+    expect(ids).not.toContain('indicator_not_gated');
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('still refuses Knowledge Product (indicator 3) when every other gate entry would pass', () => {

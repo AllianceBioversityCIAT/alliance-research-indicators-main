@@ -28,7 +28,6 @@ export type SyncGateEntryId =
   | 'alignment_green'
   | 'pool_funding_contributor'
   | 'indicator_mappable'
-  | 'indicator_not_gated'
   | 'policy_type_not_gated';
 
 export interface SyncGateEntry {
@@ -124,15 +123,17 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     },
     persistsRow: true,
   },
-  {
-    id: 'indicator_not_gated',
-    httpStatus: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'Innovation Use is gated: STAR holds no investment declarations (usd_budget / is_determined)',
-    fails: (snapshot) =>
-      snapshot.indicator_id === IndicatorsEnum.INNOVATION_USE,
-    persistsRow: true,
-  },
+  // LIFTED 2026-09-18. The `indicator_not_gated` entry refused EVERY Innovation
+  // Use unconditionally -- its `fails` only asked "is the indicator Innovation
+  // Use?" and never looked at usd_budget or is_determined, despite what its
+  // description claimed. It was a placeholder pending confirmation from PRMS that
+  // those investment declarations are actually required, and STAR refusing the
+  // send locally meant that question could never be answered: PRMS never saw a
+  // payload. Removed so the real PRMS contract decides. Per family R-F6 / QA-5
+  // this costs exactly one list entry and zero builder changes -- the Innovation
+  // Use builder was always built and unit-tested. If PRMS does reject these, the
+  // rejection arrives as REJECTED_BY_PRMS with PRMS's own reason, which is the
+  // evidence this gate was standing in for.
   {
     id: 'policy_type_not_gated',
     httpStatus: HttpStatus.UNPROCESSABLE_ENTITY,
