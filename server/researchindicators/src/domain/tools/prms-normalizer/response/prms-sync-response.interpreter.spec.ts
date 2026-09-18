@@ -157,9 +157,7 @@ describe('interpretPrmsSyncResponse', () => {
         status: 200,
         body: {
           requestId: 'Root=phase-1',
-          results: [
-            { success: true, external_reference: OURS, result },
-          ],
+          results: [{ success: true, external_reference: OURS, result }],
         },
       },
       OURS,
@@ -209,7 +207,9 @@ describe('interpretPrmsSyncResponse', () => {
   });
 
   it('parses a phase sent as a numeric string', () => {
-    expect(acceptedWith({ result_code: 9427, version_id: '36' }).prmsPhaseId).toBe(36);
+    expect(
+      acceptedWith({ result_code: 9427, version_id: '36' }).prmsPhaseId,
+    ).toBe(36);
   });
 
   it('leaves the phase null on a non-accepted outcome', () => {

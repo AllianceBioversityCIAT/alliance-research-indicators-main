@@ -13,7 +13,9 @@ describe('addPrmsPhaseIdToResults migration', () => {
     const sql = await run('up');
 
     expect(sql).toHaveLength(1);
-    expect(sql[0]).toMatch(/ALTER TABLE `results` ADD `prms_phase_id` bigint NULL/);
+    expect(sql[0]).toMatch(
+      /ALTER TABLE `results` ADD `prms_phase_id` bigint NULL/,
+    );
     // No NOT NULL and no DEFAULT: rows synced before this column keep NULL, and
     // nothing backfills them (deliberate -- test data only, not yet in prod).
     expect(sql[0]).not.toMatch(/NOT NULL/);
@@ -31,7 +33,9 @@ describe('addPrmsPhaseIdToResults migration', () => {
     // orm.config.ts sets extra.namedPlaceholders, so a bare `?` or `:word`
     // anywhere in the SQL -- comments included -- throws before MySQL parses it.
     const query = jest.fn().mockResolvedValue(undefined);
-    await new AddPrmsPhaseIdToResults1789761421000().up({ query } as unknown as QueryRunner);
+    await new AddPrmsPhaseIdToResults1789761421000().up({
+      query,
+    } as unknown as QueryRunner);
 
     for (const call of query.mock.calls) {
       expect(call[1]).toBeUndefined();

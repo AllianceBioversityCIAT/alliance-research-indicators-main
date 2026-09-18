@@ -387,8 +387,14 @@ describe('InnovationUseBuilder', () => {
       // 2026-09-18: this used to throw `Missing mandatory field 'measures'`, which
       // surfaced as REFUSED_BY_STAR and stopped the payload ever reaching PRMS.
       // STAR no longer decides: the key is omitted and PRMS answers.
-      const built = builder.build(empty).innovation_use as Record<string, unknown>;
-      const numbers = built.current_innovation_use_numbers as Record<string, unknown>;
+      const built = builder.build(empty).innovation_use as Record<
+        string,
+        unknown
+      >;
+      const numbers = built.current_innovation_use_numbers as Record<
+        string,
+        unknown
+      >;
 
       expect('measures' in numbers).toBe(false);
       // Omitted, NOT sent as [] -- an empty array would assert "we checked and
@@ -411,10 +417,15 @@ describe('InnovationUseBuilder', () => {
           ],
         }),
       ).innovation_use as Record<string, unknown>;
-      const numbers = built.current_innovation_use_numbers as Record<string, unknown>;
+      const numbers = built.current_innovation_use_numbers as Record<
+        string,
+        unknown
+      >;
 
       expect('actors' in numbers).toBe(false);
-      expect(numbers.measures).toEqual([{ unit_of_measure: 'trials', quantity: 2 }]);
+      expect(numbers.measures).toEqual([
+        { unit_of_measure: 'trials', quantity: 2 },
+      ]);
     });
 
     it('still builds when BOTH actors and measures are empty', () => {
@@ -431,6 +442,15 @@ describe('InnovationUseBuilder', () => {
     it('STILL throws on a row that EXISTS but is malformed (per-row rules unchanged)', () => {
       // The relaxation is about empty collections only. A present-but-broken row
       // would make PRMS reject for the wrong reason and teach us nothing.
+      expect(() =>
+        builder.build(
+          useAggregate({
+            actors: [{ actor_role_id: ActorRolesEnum.INNOVATION_USE }],
+            quantifications: [],
+          }),
+        ),
+      ).toThrow(PrmsPayloadBuildError);
+
       expect(() =>
         builder.build(
           useAggregate({
