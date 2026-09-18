@@ -329,6 +329,73 @@ describe('ResultSidebarComponent', () => {
         expect(poolFundingOption).toBeUndefined();
       });
 
+      // --- Live-version (year) gate -------------------------------------------
+      // The reporting year is NOT a configurable parameter: the server resolves
+      // `report_year_id !== MAPPABLE_LIVE_VERSION` and ships the answer as
+      // `version_locked` on the alignment payload. These assert the sidebar
+      // consumes it ALONGSIDE the pre-existing contract gate, never instead of it.
+
+      it('hides the Pool Funding alignment tab when version_locked=true, even though eligible=true', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: true
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeUndefined();
+      });
+
+      it('hides the PRMS SYNC button and the OPTIONAL divider when version_locked=true', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: true
+        });
+        fixture.detectChanges();
+
+        // All three surfaces the user listed derive from the same filter, so this
+        // proves the gate reaches the button and the divider, not just the item.
+        expect(component.hasPoolFundingOption()).toBe(false);
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+      });
+
+      it('shows the Pool Funding alignment tab when eligible=true and version_locked=false', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: false
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeDefined();
+        expect(component.hasPoolFundingOption()).toBe(true);
+      });
+
+      it('FAILS OPEN: keeps the tab visible when the server omits version_locked entirely', () => {
+        // An older server that does not send the field must not hide Pool Funding
+        // for every result — the `=== true` comparison in the gate guarantees this.
+        const withoutField = { ...eligibleAlignment };
+        delete (withoutField as Partial<AlignmentResponse>).version_locked;
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(withoutField);
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeDefined();
+      });
+
+      it('hides the tab when version_locked=true AND eligible=false (both gates agree)', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          eligible: false,
+          has_pool_funding_alignment_eligible: false,
+          version_locked: true
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeUndefined();
+      });
+
       it('hides the Pool Funding alignment tab when the result indicator is OICR (indicator_id === 5)', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
         cacheService.currentMetadata?.set({
