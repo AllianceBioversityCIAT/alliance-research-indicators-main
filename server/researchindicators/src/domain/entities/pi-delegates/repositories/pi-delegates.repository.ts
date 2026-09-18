@@ -22,6 +22,7 @@ import { AppConfig } from '../../../shared/utils/app-config.util';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import { isEmpty } from '../../../shared/utils/object.utils';
+import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 
 /** Minimum delegate identity needed to provision an absent sec_user (R-PID-005 AC.2 / OQ-D). */
 export interface DelegateNewUserIdentity {
@@ -105,7 +106,14 @@ export interface HistoryRow {
 
 // pi_user_id: same chain as isPiOfProject, as a correlated subquery so the
 // contract row count is unaffected by duplicate carnets/emails.
-const PROJECT_SUMMARY_SELECT = `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
+//
+// is_pool_funding_contributor comes from effectivePoolFundingContributorSql, NOT
+// from the raw column: a contract also counts as a contributor when it has an
+// active bilateral_project_mapping row, and reading the column alone made this
+// table answer "No" for projects My Projects tags as contributing
+// (@sdd-spec bilateral-module/mapping-drives-pool-funding-tag).
+const PROJECT_SUMMARY_SELECT = `SELECT ac.agreement_id, ac.description,
+              ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
               ac.contract_status, ac.start_date, ac.end_date,
               ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
@@ -521,7 +529,10 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       // (projectLeadId → alliance_user_staff.carnet → sec_users.email). It is a
       // correlated subquery, not a JOIN, so a duplicated carnet/email can never
       // multiply the contract row.
-      `SELECT ac.agreement_id, ac.description, ac.is_pool_funding_contributor,
+      // is_pool_funding_contributor: the shared predicate, same as
+      // PROJECT_SUMMARY_SELECT — the flag OR an active bilateral mapping.
+      `SELECT ac.agreement_id, ac.description,
+              ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
               ac.contract_status, ac.start_date, ac.end_date,
               ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id

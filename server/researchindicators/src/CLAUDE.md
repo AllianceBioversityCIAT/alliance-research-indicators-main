@@ -158,6 +158,12 @@ Three rules if you touch this module:
 - **The `all` variants pass no bind parameters and take no id list.** An `IN (?)` over the whole
   contracts table is worse than no `WHERE` at all, and the empty-array guard that protects the
   managed path has no meaning here — guard on the scope instead.
+- **Pool funding is `effectivePoolFundingContributorSql('ac')`, never `ac.is_pool_funding_contributor`.**
+  A contract also counts as a contributor when it has an active `bilateral_project_mapping` row, so
+  reading the column alone makes a table answer **No** for projects My Projects tags as
+  *Contributing to Pool Funding*. This module shipped exactly that drift — the util's own docstring
+  claims "the agresso-contract and results repositories reuse this fragment", and PI Delegates was
+  a third reader that did not. **Any new query projecting that field is a fourth.**
 
 `@Roles(...)` is deliberately absent from this controller: authorization is per project, decided
 in the service. Adding the decorator would lock out the PIs and delegates the module exists for.

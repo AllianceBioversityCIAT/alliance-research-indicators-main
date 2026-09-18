@@ -134,9 +134,36 @@ describe('PiDelegatesRepository — scope=all variants', () => {
     await repository.findAllProjectSummaries();
 
     const [sql, params] = query.mock.calls[0];
-    expect(sql).not.toMatch(/\bWHERE\b[\s\S]*ac\.agreement_id/i);
+    // Matches the OUTER filter shape only. A looser "WHERE … ac.agreement_id"
+    // pattern also matches the correlated sub-select inside the pool-funding
+    // predicate, which is not a project filter at all (KZ-017).
+    expect(sql).not.toMatch(/WHERE\s+ac\.agreement_id/i);
     expect(params).toBeUndefined();
   });
+
+  // @sdd-spec bilateral-module/mapping-drives-pool-funding-tag
+  it.each([
+    ['findAllProjectSummaries', () => [] as unknown[]],
+    ['findProjectSummariesByIds', () => [['P-1']]],
+    ['findProjectSummary', () => ['P-1']],
+  ] as const)(
+    '%s reports pool funding through the shared predicate, not the raw column',
+    async (method, args) => {
+      const { repository, query } = buildRepository();
+
+      await (repository[method] as (...a: unknown[]) => Promise<unknown>).call(
+        repository,
+        ...args(),
+      );
+      const sql: string = query.mock.calls[0][0];
+
+      // ★ discriminating: `ac.is_pool_funding_contributor` alone answers "No" for
+      //   a contract that contributes through an active bilateral mapping, which
+      //   is what My Projects tags and this table used to contradict.
+      expect(sql).toContain('bilateral_project_mapping');
+      expect(sql).toMatch(/AS is_pool_funding_contributor/);
+    },
+  );
 
   it.each(['findAllActiveDelegates', 'findAllDelegatesWithProjects'] as const)(
     '%s keeps the is_active gate but drops the project filter',
