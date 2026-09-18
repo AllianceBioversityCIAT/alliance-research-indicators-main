@@ -40,7 +40,7 @@ export class CacheService {
   lastVersionParam = signal<string | null>(null);
   versionsList = signal<TransformResultCodeResponse[]>([]);
   liveVersionData = signal<TransformResultCodeResponse | null>(null);
-  allGreenChecksAreTrue = computed(() => Object.values(this.greenChecks()).every(check => check));
+  allGreenChecksAreTrue = computed(() => Boolean(this.greenChecks()?.completness));
   isMyResult = computed(() => Number(this.currentMetadata().created_by) === Number(this.dataCache().user.sec_user_id));
 
   loadingCurrentResult = signal(false);

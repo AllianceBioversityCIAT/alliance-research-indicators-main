@@ -89,7 +89,9 @@ describe('CreateResultFormComponent', () => {
     createResultManagementServiceMock = {
       presetFromProjectResultsTable: jest.fn().mockReturnValue(false),
       contractId: jest.fn().mockReturnValue(null),
+      carriedContractId: jest.fn().mockReturnValue(null),
       setContractId: jest.fn(),
+      setCarriedContractId: jest.fn(),
       setResultTitle: jest.fn(),
       setYear: jest.fn(),
       setModalTitle: jest.fn(),
@@ -173,6 +175,43 @@ describe('CreateResultFormComponent', () => {
     component.sharedFormValid = true;
     component.body.set({ indicator_id: 1, title: 't', contract_id: 2, year: 2024 });
     expect(component.isDisabled).toBe(false);
+  });
+
+  it('goToAiAssistant should hand the selected project to the AI step before navigating', () => {
+    component.onContractIdChange('A1048');
+
+    component.goToAiAssistant();
+
+    expect(createResultManagementServiceMock.setCarriedContractId).toHaveBeenCalledWith('A1048');
+    expect(createResultManagementServiceMock.resultPageStep()).toBe(1);
+  });
+
+  it('goToAiAssistant should carry null when no project is selected, so the AI step stays empty', () => {
+    component.goToAiAssistant();
+
+    expect(createResultManagementServiceMock.setCarriedContractId).toHaveBeenCalledWith(null);
+    expect(createResultManagementServiceMock.resultPageStep()).toBe(1);
+  });
+
+  it('should restore the carried project when returning from the AI step with no table preset', () => {
+    createResultManagementServiceMock.carriedContractId = jest.fn().mockReturnValue('A1065');
+
+    const returning = TestBed.createComponent(CreateResultFormComponent);
+    returning.detectChanges();
+
+    expect(returning.componentInstance.contractId).toBe('A1065');
+    expect(returning.componentInstance.body().contract_id).toBe('A1065');
+  });
+
+  it('should keep the project-results table preset winning over a carried project', () => {
+    createResultManagementServiceMock.presetFromProjectResultsTable = jest.fn().mockReturnValue(true);
+    createResultManagementServiceMock.contractId = jest.fn().mockReturnValue('A1048');
+    createResultManagementServiceMock.carriedContractId = jest.fn().mockReturnValue('A1065');
+
+    const preset = TestBed.createComponent(CreateResultFormComponent);
+    preset.detectChanges();
+
+    expect(preset.componentInstance.body().contract_id).toBe('A1048');
   });
 
   it('onContractIdChange should update contractId and body', () => {

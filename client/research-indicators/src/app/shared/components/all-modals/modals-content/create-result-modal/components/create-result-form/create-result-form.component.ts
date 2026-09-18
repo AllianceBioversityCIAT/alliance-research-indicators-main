@@ -85,16 +85,25 @@ export class CreateResultFormComponent {
     () => {
       const shouldPreset = this.createResultManagementService.presetFromProjectResultsTable();
       const presetId = this.createResultManagementService.contractId();
-      if (shouldPreset && presetId !== null) {
-        this.contractId = presetId;
-        this.body.update(b => ({ ...b, contract_id: presetId }));
-      } else {
-        this.contractId = null;
-        this.body.update(b => ({ ...b, contract_id: null }));
-      }
+      // The project-results preset still wins; otherwise fall back to whatever the user
+      // had selected before stepping into the AI upload, so Back does not clear the field.
+      const carriedId = this.createResultManagementService.carriedContractId();
+      const nextContractId = shouldPreset && presetId !== null ? presetId : carriedId;
+
+      this.contractId = nextContractId;
+      this.body.update(b => ({ ...b, contract_id: nextContractId }));
     },
     { allowSignalWrites: true }
   );
+
+  /**
+   * "Upload file" hands the currently selected Reporting Project to the AI step before
+   * navigating, because this component is destroyed by the modal's @switch on step change.
+   */
+  goToAiAssistant() {
+    this.createResultManagementService.setCarriedContractId(this.body().contract_id ?? null);
+    this.createResultManagementService.resultPageStep.set(1);
+  }
 
   private buildW1W2RestrictionHtml(): string {
     const agreementId = this.body()?.contract_id;

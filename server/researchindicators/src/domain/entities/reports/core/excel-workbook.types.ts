@@ -88,7 +88,18 @@ export type ExcelSheetPreamble = {
   logoEditAs?: 'oneCell' | 'absolute' | 'twoCell';
   /** Subtitle row (row 2), full-width merge. */
   bannerSubtitle?: string;
-  /** Group header row (row 3): merged regions with labels and section background colors. */
+  /**
+   * Optional warning/notice row rendered full-width on its own row, right after the subtitle
+   * and before the column-group row. Highlighted so it reads as a callout (e.g. "coming soon").
+   */
+  bannerNotice?: {
+    text: string;
+    /** Row background (ARGB `AARRGGBB`). Defaults to a warning amber. */
+    fillArgb?: string;
+    /** Text color (ARGB). Defaults to a dark amber. */
+    fontArgb?: string;
+  };
+  /** Group header row: merged regions with labels and section background colors. */
   columnGroups: Array<{
     fromCol: number;
     toCol: number;
