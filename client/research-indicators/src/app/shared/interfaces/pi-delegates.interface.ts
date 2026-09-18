@@ -141,3 +141,19 @@ export interface PiDelegateHistoryEntry {
   /** ISO 8601 timestamp of when the action occurred. */
   created_at: string;
 }
+
+// @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+/**
+ * Read scope for the `by-user` and `history` endpoints.
+ *
+ * Omitted (or 'managed') is the PI/delegate view: only the projects the user
+ * manages. 'all' is the administrator view — every project and every delegate
+ * on the platform — and the server rejects it with 403 for anyone who is not a
+ * System Admin or a Center Admin, so sending it is never a way to widen access.
+ */
+export type PiDelegateScope = 'managed' | 'all';
+
+/** `&scope=…` when a scope is given, the empty string otherwise. */
+export function piDelegateScopeParam(scope?: PiDelegateScope): string {
+  return scope ? `&scope=${encodeURIComponent(scope)}` : '';
+}

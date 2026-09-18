@@ -1,5 +1,9 @@
 :root {
   // Light blue
+  // 50 is a SURFACE tint, not a ramp step: the subtlest blue that still reads as
+  // blue next to --ac-grey-100. Used for selected chips and other "active but
+  // quiet" backgrounds.
+  --ac-light-blue-50: #e6f2ff;
   --ac-light-blue-100: #79d9ff;
   --ac-light-blue-200: #00b6ff;
   --ac-light-blue-300: #1689ca;
@@ -46,6 +50,12 @@
   --ac-background: #f5f5f5;
   --ac-red-1: #cf0808;
   --ac-warning-1: #e69f00;
+
+  // The amber notice pair that goes with --ac-warning-1: a surface to sit on and
+  // a foreground legible against it. Lifted out of the assign-PI-delegate modal,
+  // which had all three as hex literals.
+  --ac-warning-surface: #fff8e6;
+  --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
 }
@@ -81,6 +91,7 @@
 
 // Color map to be used in the mixins
 $colors: (
+  'light-blue-50': #e6f2ff,
   'light-blue-100': #79d9ff,
   'light-blue-200': #00b6ff,
   'light-blue-300': #1689ca,
@@ -121,6 +132,7 @@ $colors: (
 
 [data-theme='dark'] {
   --ac-background: #191919;
+  --ac-light-blue-50: #2f3d4d;
   --ac-light-blue-100: #4a708b;
   --ac-light-blue-200: #369;
   --ac-light-blue-300: #2b5986;
@@ -154,6 +166,8 @@ $colors: (
   --ac-white-2: #dcdcdc;
   --ac-red-1: #ff4d4d;
   --ac-warning-1: #e69f00;
+  --ac-warning-surface: #fff8e6;
+  --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
 }

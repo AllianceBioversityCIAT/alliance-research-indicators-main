@@ -3,6 +3,7 @@ import { Router, UrlTree } from '@angular/router';
 import { signal } from '@angular/core';
 import { piDelegatesGuard } from './pi-delegates.guard';
 import { CacheService } from '@services/cache/cache.service';
+import { RolesService } from '@services/cache/roles.service';
 import { ApiService } from '@services/api.service';
 
 // The guard closes the direct-URL path to a module the sidebar already hides.
@@ -17,7 +18,7 @@ describe('piDelegatesGuard', () => {
   let apiMock: { GET_PiDelegateAccess: jest.Mock };
   let routerMock: { createUrlTree: jest.Mock };
 
-  function configure(userId: number | null, hasAccess = true) {
+  function configure(userId: number | null, hasAccess = true, isAdmin = false) {
     apiMock = {
       GET_PiDelegateAccess: jest.fn().mockResolvedValue({
         successfulRequest: true,
@@ -33,6 +34,7 @@ describe('piDelegatesGuard', () => {
           provide: CacheService,
           useValue: { dataCache: signal({ user: userId != null ? { sec_user_id: userId } : undefined }) }
         },
+        { provide: RolesService, useValue: { isAdmin: () => isAdmin } },
         { provide: ApiService, useValue: apiMock },
         { provide: Router, useValue: routerMock }
       ]
@@ -43,7 +45,16 @@ describe('piDelegatesGuard', () => {
     configure(99, true);
 
     await expect(runGuard()).resolves.toBe(true);
-    expect(apiMock.GET_PiDelegateAccess).toHaveBeenCalledWith(99);
+    // No scope: a PI/delegate must keep asking the managed question.
+    expect(apiMock.GET_PiDelegateAccess).toHaveBeenCalledWith(99, undefined);
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('asks with scope=all for an admin', async () => {
+    configure(99, true, true);
+
+    await expect(runGuard()).resolves.toBe(true);
+    expect(apiMock.GET_PiDelegateAccess).toHaveBeenCalledWith(99, 'all');
   });
 
   it('redirects home when the user manages no project (negative discriminator)', async () => {
