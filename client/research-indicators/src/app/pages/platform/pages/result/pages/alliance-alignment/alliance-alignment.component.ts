@@ -11,6 +11,7 @@ import { MultiSelectModule } from 'primeng/multiselect';
 import { CacheService } from '../../../../../../shared/services/cache/cache.service';
 import { ActionsService } from '../../../../../../shared/services/actions.service';
 import { BilateralService } from '@shared/services/bilateral.service';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { MultiselectComponent } from '../../../../../../shared/components/custom-fields/multiselect/multiselect.component';
 import { GetAllianceAlignment } from '../../../../../../shared/interfaces/get-alliance-alignment.interface';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -53,7 +54,8 @@ const PORTFOLIO_P2_ID = 2;
     TooltipModule,
     AllianceLeverCardComponent,
     InputComponent,
-    AllianceAlignmentP2Component
+    AllianceAlignmentP2Component,
+    CustomTagComponent
   ],
   templateUrl: './alliance-alignment.component.html'
 })
