@@ -120,6 +120,30 @@ export class AssignPiDelegateComponent implements OnInit {
     () => this.allModalsService.assignPiDelegateContext()?.source === 'byProject'
   );
 
+  // ─── "Assign New Delegate" mode (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+  /**
+   * Opened from the By-person tab's "Assign New Delegate" button: nothing is
+   * pre-selected, ONE person is picked, and any number of projects.
+   *
+   * Available to every user, not only administrators — the projects a PI or
+   * delegate can pick are still only their own, because the picker is fed by the
+   * same cache their table is.
+   */
+  readonly isNewDelegateMode = computed(
+    () => this.allModalsService.assignPiDelegateContext()?.source === 'newDelegate'
+  );
+
+  /**
+   * In this mode Save may only ADD.
+   *
+   * The by-person flow treats the Projects picker as the full desired list, so
+   * clearing a project revokes that delegation. Starting from an EMPTY picker,
+   * that same rule would revoke every delegation the chosen person already has
+   * anywhere — the exact opposite of "assign a new one". So the removal pass is
+   * skipped entirely here.
+   */
+  readonly isAddOnlyMode = computed(() => this.isNewDelegateMode());
+
   // ─── People picker disabled (CHANGE 3) ───────────────────────────────────────
   /**
    * Mirror of projectsDisabled: when the modal is opened from a person row,
@@ -133,18 +157,33 @@ export class AssignPiDelegateComponent implements OnInit {
   // ─── Field descriptions (rendered by app-multiselect under each label) ───────
 
   /** People field description — swaps for the locked copy when the person is fixed. */
-  readonly peopleDescription = computed(() =>
-    this.peopleDisabled()
-      ? 'Opened from this person — only the projects can be changed here.'
-      : 'Select the people who will act as PI Delegates. You cannot assign yourself.'
-  );
+  readonly peopleDescription = computed(() => {
+    if (this.peopleDisabled()) {
+      return 'Opened from this person — only the projects can be changed here.';
+    }
+    return this.isNewDelegateMode()
+      ? 'Select the person who will act as PI Delegate. One person at a time; you cannot assign yourself.'
+      : 'Select the people who will act as PI Delegates. You cannot assign yourself.';
+  });
 
-  /** Projects field description — swaps for the locked copy when the project is fixed. */
-  readonly projectsDescription = computed(() =>
-    this.projectsDisabled()
-      ? 'Opened from this project — only the people can be changed here.'
-      : 'Select the projects for this delegation. Only your manageable projects will appear.'
-  );
+  /**
+   * Projects field description — swaps for the locked copy when the project is
+   * fixed, and tells an administrator that the picker spans the whole platform
+   * (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope).
+   */
+  readonly projectsDescription = computed(() => {
+    if (this.projectsDisabled()) {
+      return 'Opened from this project — only the people can be changed here.';
+    }
+    if (this.isNewDelegateMode()) {
+      return this.piService.isAdminView()
+        ? 'Select the projects this person will be a delegate on. Any project on the platform is available, and existing delegations elsewhere are left untouched.'
+        : 'Select the projects this person will be a delegate on. Existing delegations elsewhere are left untouched.';
+    }
+    return this.piService.isAdminView()
+      ? 'Select the projects for this delegation. As an administrator you can pick any project on the platform.'
+      : 'Select the projects for this delegation. Only your manageable projects will appear.';
+  });
 
   // ─── Inactive delegate warning (CHANGE 2) ────────────────────────────────────
   /**
@@ -322,6 +361,13 @@ export class AssignPiDelegateComponent implements OnInit {
       return;
     }
 
+    // "Assign New Delegate": nothing to seed — the anti-revoke guard the other
+    // two modes need does not apply, because this mode never revokes.
+    if (ctx.source === 'newDelegate') {
+      this.clearState();
+      return;
+    }
+
     if (ctx.source === 'byProject') {
       // Pre-select the project and seed its current delegates as the People selection.
       const projectEntry = this.piService.byProjectCache().find(
@@ -392,7 +438,11 @@ export class AssignPiDelegateComponent implements OnInit {
     const selectedPeople = this.selectedPeople();
     const selectedProjects = this.selectedProjects();
     const allProjects = this.piService.byProjectCache();
-    const isPersonMode = this.allModalsService.assignPiDelegateContext()?.source === 'byPerson';
+    const isAddOnly = this.isAddOnlyMode();
+    // Add-only edits the SAME axis as by-person — one person across projects —
+    // so it shares that branch and only skips the removal pass below.
+    const isPersonMode =
+      isAddOnly || this.allModalsService.assignPiDelegateContext()?.source === 'byPerson';
 
     // ── Desired delegate list per project ────────────────────────────────────
     //
@@ -429,7 +479,9 @@ export class AssignPiDelegateComponent implements OnInit {
       }
 
       // Projects dropped from the selection: this person leaves, nobody else does.
-      if (person) {
+      // Skipped in add-only mode, where "not selected" means "not touched" — the
+      // picker started empty, so every existing delegation would look dropped.
+      if (person && !isAddOnly) {
         const selectedCodes = new Set(selectedProjects.map(p => p.project_code));
         for (const project of allProjects) {
           const hasPerson = project.delegates.some(d => d.delegate_user_id === person.delegate_user_id);

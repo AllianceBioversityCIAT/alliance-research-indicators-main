@@ -45,9 +45,12 @@ class MockAllModalsService {
   private _modalConfig = signal<Record<string, { isOpen: boolean; title: string }>>({
     assignPiDelegate: { isOpen: false, title: 'Assign / Edit PI Delegate' }
   });
+  // Mirrors AllModalsService.assignPiDelegateContext exactly — a stub that is
+  // narrower than the real signal type-errors on a context the product accepts.
   assignPiDelegateContext = signal<
     | { source: 'byProject'; projectCode: string }
     | { source: 'byPerson'; delegateUserId: number }
+    | { source: 'newDelegate' }
     | null
   >(null);
 
@@ -148,6 +151,10 @@ class MockPiDelegatesClientService {
   byProjectCache = signal<ProjectDelegates[]>([]);
   loading = signal(false);
   error = signal<string | null>(null);
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — drives the
+  // Projects field description; writable so a test can flip the modal into the
+  // administrator view.
+  isAdminView = signal(false);
   assignCalls: Parameters<PiDelegatesClientService['assign']>[0][] = [];
 
   async assign(assignments: Parameters<PiDelegatesClientService['assign']>[0]) {
@@ -775,13 +782,13 @@ describe('AssignPiDelegateComponent', () => {
       const el: HTMLElement = fixture.nativeElement;
       const warning = el.querySelector('.assign-pi-delegate__inactive-warning') as HTMLElement;
       // amber accent bar + cream background, as on the dashboard chart notices
-      expect(warning.className).toContain('border-l-[#E69F00]');
-      expect(warning.className).toContain('bg-[#fff8e6]');
+      expect(warning.className).toContain('border-l-[color:var(--ac-warning-1)]');
+      expect(warning.className).toContain('bg-[color:var(--ac-warning-surface)]');
 
       const text = warning.querySelector('.assign-pi-delegate__inactive-warning-text') as HTMLElement;
       expect(text.className).toContain('text-[12.5px]');
       expect(text.className).toContain('font-semibold');
-      expect(text.className).toContain('text-[#8a4b08]/80');
+      expect(text.className).toContain('text-[color:var(--ac-warning-fg)]/80');
     }));
 
     it('names multiple inactive delegates in the warning text', fakeAsync(() => {
@@ -1430,4 +1437,147 @@ describe('AssignPiDelegateComponent', () => {
       }
     }));
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('projects field description', () => {
+    it('tells an administrator the picker spans the whole platform', () => {
+      piService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      expect(component.projectsDescription()).toContain('any project on the platform');
+    });
+
+    it('keeps the manageable-projects wording for a PI or delegate', () => {
+      piService.isAdminView.set(false);
+      fixture.detectChanges();
+
+      expect(component.projectsDescription()).toContain('Only your manageable projects');
+    });
+
+    it('the locked copy still wins when the modal was opened from a project', () => {
+      piService.isAdminView.set(true);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'P1' });
+      fixture.detectChanges();
+
+      expect(component.projectsDescription()).toContain('only the people can be changed here');
+    });
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  // ── "Assign New Delegate": one person, many projects, ADD only ─────────────
+
+  describe('newDelegate mode', () => {
+    /** The chosen person already delegates on P1; the user is adding P2. */
+    function arrangeExistingDelegate() {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 5, name: 'Alice', email: 'a@test.com' }]),
+        buildProject('P2', [])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'newDelegate' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 5, name: 'Alice', email: 'a@test.com' }]
+      });
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P2', project_name: 'P2' }] });
+      fixture.detectChanges();
+    }
+
+    it('opens with BOTH pickers empty and editable', () => {
+      piService.byProjectCache.set([buildProject('P1', [])]);
+      modalService.assignPiDelegateContext.set({ source: 'newDelegate' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+
+      expect(component.isNewDelegateMode()).toBe(true);
+      expect(component.getSelectedPeopleList()).toEqual([]);
+      expect(component.getSelectedProjectsList()).toEqual([]);
+      expect(component.peopleDisabled()).toBe(false);
+      expect(component.projectsDisabled()).toBe(false);
+    });
+
+    it('puts the People picker in single-selection mode, and only there', () => {
+      modalService.assignPiDelegateContext.set({ source: 'newDelegate' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+
+      const people = fixture.debugElement
+        .queryAll(By.directive(MultiselectComponent))
+        .map(p => p.componentInstance as MultiselectComponent)[0];
+      expect(people.singleSelection).toBe(true);
+
+      // ★ discriminating: the Projects picker must stay multi-select.
+      const projects = fixture.debugElement
+        .queryAll(By.directive(MultiselectComponent))
+        .map(p => p.componentInstance as MultiselectComponent)[1];
+      expect(projects.singleSelection).toBe(false);
+    });
+
+    it('adds the person to the selected projects, keeping the delegates already there', () => {
+      piService.byProjectCache.set([
+        buildProject('P1', [{ delegate_user_id: 9, name: 'Bob', email: 'b@test.com' }])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'newDelegate' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 5, name: 'Alice', email: 'a@test.com' }]
+      });
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
+      fixture.detectChanges();
+
+      component.onConfirm();
+      actionsService.showGlobalAlertCalls.at(-1)?.confirmCallback?.event?.();
+
+      expect(piService.assignCalls).toHaveLength(1);
+      const submitted = piService.assignCalls[0];
+      expect(submitted).toHaveLength(1);
+      expect(submitted[0].project_id).toBe('P1');
+      expect(submitted[0].delegates.map(d => (d as { delegate_user_id: number }).delegate_user_id).sort()).toEqual([
+        5, 9
+      ]);
+    });
+
+    it('NEVER revokes the delegations the person already has elsewhere', () => {
+      arrangeExistingDelegate();
+
+      component.onConfirm();
+      actionsService.showGlobalAlertCalls.at(-1)?.confirmCallback?.event?.();
+
+      const submitted = piService.assignCalls[0];
+      // ★ discriminating: the by-person rule would submit P1 with Alice removed,
+      //   because the picker started empty and P1 looks "deselected".
+      expect(submitted.map(a => a.project_id)).toEqual(['P2']);
+    });
+
+    it('the confirmation names only additions', () => {
+      arrangeExistingDelegate();
+
+      component.onConfirm();
+
+      const detail = actionsService.showGlobalAlertCalls.at(-1)?.detail ?? '';
+      expect(detail).toContain('Added:');
+      expect(detail).not.toContain('Removed:');
+    });
+
+    it('Accept stays disabled until BOTH a person and a project are chosen', () => {
+      modalService.assignPiDelegateContext.set({ source: 'newDelegate' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      expect(component.disabledConfirmIf()).toBe(true);
+
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 5, name: 'Alice', email: 'a@test.com' }]
+      });
+      fixture.detectChanges();
+      expect(component.disabledConfirmIf()).toBe(true);
+
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
+      fixture.detectChanges();
+      expect(component.disabledConfirmIf()).toBe(false);
+    });
+  });
+
 });

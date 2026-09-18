@@ -11,6 +11,7 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { PiDelegatesClientService } from './pi-delegates.client.service';
 import { ApiService } from '@services/api.service';
+import { RolesService } from '@services/cache/roles.service';
 import type { DelegateProjects, ProjectDelegates } from '@interfaces/pi-delegates.interface';
 import type { MainResponse } from '@shared/interfaces/responses.interface';
 
@@ -54,6 +55,8 @@ function makeDelegateProjects(overrides: Partial<DelegateProjects> = {}): Delega
 
 describe('PiDelegatesClientService', () => {
   let service: PiDelegatesClientService;
+  /** Flipped by a test to put the service into the administrator view. */
+  let isAdmin: boolean;
   let mockApi: jest.Mocked<
     Pick<
       ApiService,
@@ -67,6 +70,7 @@ describe('PiDelegatesClientService', () => {
   >;
 
   beforeEach(() => {
+    isAdmin = false;
     mockApi = {
       GET_PIDelegatesByProject: jest.fn(),
       GET_PIDelegatesByDelegate: jest.fn(),
@@ -79,7 +83,8 @@ describe('PiDelegatesClientService', () => {
     TestBed.configureTestingModule({
       providers: [
         PiDelegatesClientService,
-        { provide: ApiService, useValue: mockApi }
+        { provide: ApiService, useValue: mockApi },
+        { provide: RolesService, useValue: { isAdmin: () => isAdmin } }
       ]
     });
 
@@ -339,6 +344,90 @@ describe('PiDelegatesClientService', () => {
       mockApi.GET_PIDelegatesByDelegate.mockResolvedValue(makeOkResponse(delegateProjects));
       await service.loadByPerson([1]);
       expect(service.loading()).toBe(false);
+    });
+  });
+
+  // ── 4b. administrator scope (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+
+  describe('administrator scope', () => {
+    beforeEach(() => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([]));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+    });
+
+    it('sends no scope for a PI or delegate', async () => {
+      await service.loadByUser(7);
+
+      expect(service.isAdminView()).toBe(false);
+      expect(service.scope()).toBeUndefined();
+      expect(mockApi.GET_PIDelegatesByUserProjects).toHaveBeenCalledWith(7, undefined);
+      expect(mockApi.GET_PIDelegatesByUserPeople).toHaveBeenCalledWith(7, undefined);
+    });
+
+    it("sends scope='all' on BOTH reads for an admin", async () => {
+      isAdmin = true;
+
+      await service.loadByUser(7);
+
+      expect(service.isAdminView()).toBe(true);
+      // ★ discriminating: passing the scope to only one endpoint would show every
+      //   project under By project and only the admin's own people under By person.
+      expect(mockApi.GET_PIDelegatesByUserProjects).toHaveBeenCalledWith(7, 'all');
+      expect(mockApi.GET_PIDelegatesByUserPeople).toHaveBeenCalledWith(7, 'all');
+    });
+
+    it('keeps the scope on the post-write reload', async () => {
+      isAdmin = true;
+      await service.loadByUser(7);
+      mockApi.GET_PIDelegatesByUserProjects.mockClear();
+      mockApi.DELETE_PIDelegates.mockResolvedValue(makeOkResponse(null));
+
+      await service.revokePair('P001', 42);
+
+      expect(mockApi.GET_PIDelegatesByUserProjects).toHaveBeenCalledWith(7, 'all');
+    });
+  });
+
+  // ── 4c. projectsAsDelegate / isDelegateOf answer per view ──────────────────
+
+  describe('isDelegateOf', () => {
+    /** MINE: caller is PI. DELEGATED: caller is on the delegate list. UNRELATED: neither. */
+    const threeProjects = () => [
+      makeProjectDelegates({ project_code: 'MINE', pi_user_id: 7, delegates: [] }),
+      makeProjectDelegates({
+        project_code: 'DELEGATED',
+        pi_user_id: 3,
+        delegates: [{ delegate_user_id: 7, name: 'Me', email: 'me@x.com', is_active: true }]
+      }),
+      makeProjectDelegates({ project_code: 'UNRELATED', pi_user_id: 3, delegates: [] })
+    ];
+
+    beforeEach(() => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse(threeProjects()));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+    });
+
+    it('in the admin view, counts ONLY projects the user is actually a delegate on', async () => {
+      isAdmin = true;
+
+      await service.loadByUser(7);
+
+      expect(service.projectsAsPi().map(p => p.project_code)).toEqual(['MINE']);
+      // ★ discriminating: the admin list is mostly UNRELATED rows — a "not the PI"
+      //   definition would report every one of them as a delegation.
+      expect(service.projectsAsDelegate().map(p => p.project_code)).toEqual(['DELEGATED']);
+    });
+
+    it('in the PI/delegate view, every listed project the user is not PI of still counts', async () => {
+      await service.loadByUser(7);
+
+      // That list only ever contains projects the user manages, so UNRELATED cannot
+      // occur — and the row IS reachable when pi_user_id failed to resolve. Changing
+      // this would regress the PI/delegate view the admin scope must not touch.
+      expect(service.projectsAsDelegate().map(p => p.project_code)).toEqual([
+        'DELEGATED',
+        'UNRELATED'
+      ]);
     });
   });
 

@@ -24,6 +24,7 @@ import { CommonModule } from '@angular/common';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { ApiService } from '@services/api.service';
+import { PiDelegatesClientService } from '../services/pi-delegates.client.service';
 import type { PiDelegateHistoryEntry } from '@interfaces/pi-delegates.interface';
 
 @Component({
@@ -39,6 +40,7 @@ export class PiDelegateHistoryComponent {
 
   readonly allModalsService = inject(AllModalsService);
   private readonly api = inject(ApiService);
+  private readonly piService = inject(PiDelegatesClientService);
 
   // ─── State signals ────────────────────────────────────────────────────────────
 
@@ -83,10 +85,14 @@ export class PiDelegateHistoryComponent {
     this.entries.set([]);
 
     try {
+      // scope only affects the by-person branch: the by-project branch is already
+      // gated per project, and an admin passes that gate anyway. Without it an
+      // admin would see only the events on projects they personally manage —
+      // usually none (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope).
       const params =
         ctx.source === 'byProject'
           ? { project_id: ctx.projectCode }
-          : { delegate_user_id: ctx.delegateUserId };
+          : { delegate_user_id: ctx.delegateUserId, scope: this.piService.scope() };
 
       const res = await this.api.GET_PIDelegatesHistory(params);
 

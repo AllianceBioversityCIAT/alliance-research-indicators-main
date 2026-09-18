@@ -11,13 +11,29 @@
 
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { ApiService } from '@services/api.service';
-import type { DelegateProjects, ProjectDelegates } from '@interfaces/pi-delegates.interface';
+import { RolesService } from '@services/cache/roles.service';
+import type { DelegateProjects, PiDelegateScope, ProjectDelegates } from '@interfaces/pi-delegates.interface';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PiDelegatesClientService {
   private readonly api = inject(ApiService);
+  private readonly roles = inject(RolesService);
+
+  // ─── Administrator view (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+  //
+  // A System Admin or Center Admin administers delegations for the WHOLE platform,
+  // not only for the projects they happen to be PI or delegate of. For them every
+  // read goes out with scope='all' and the same endpoints answer with every project
+  // and every delegate. For everyone else nothing changes: no scope is sent and the
+  // server keeps applying the managed-projects filter.
+
+  /** True when the logged-in user is a System Admin or a Center Admin. */
+  readonly isAdminView = computed(() => this.roles.isAdmin());
+
+  /** The scope every request in this service sends — 'all' for admins, none otherwise. */
+  readonly scope = computed<PiDelegateScope | undefined>(() => (this.isAdminView() ? 'all' : undefined));
 
   // ─── Current-user context (set by loadByUser; drives _reloadForUser) ─────────
 
@@ -59,8 +75,29 @@ export class PiDelegatesClientService {
   /** Projects where the user is the Principal Investigator. */
   readonly projectsAsPi = computed(() => this.byProjectCache().filter(p => this.isPiOf(p)));
 
+  /**
+   * True when the user reaches this project through a delegation rather than as
+   * its Principal Investigator.
+   *
+   * The two views answer this differently, and both answers are right:
+   *
+   *   • PI/delegate view — the cache ONLY holds projects the user manages, so a
+   *     project they are not the PI of is one they delegate on. This is also the
+   *     answer for rows whose `pi_user_id` did not resolve: the user is in that
+   *     list for a reason, and the delegate chip may simply not name them.
+   *   • Administrator view — the cache holds EVERY project on the platform, so
+   *     the same negation would call thousands of unrelated projects delegations.
+   *     Only actual membership of the delegate list counts.
+   */
+  isDelegateOf(project: ProjectDelegates): boolean {
+    if (this.isPiOf(project)) return false;
+    if (!this.isAdminView()) return true;
+    const userId = this._userId();
+    return userId != null && project.delegates.some(d => d.delegate_user_id === userId);
+  }
+
   /** Projects the user reaches through a delegation, not as their PI. */
-  readonly projectsAsDelegate = computed(() => this.byProjectCache().filter(p => !this.isPiOf(p)));
+  readonly projectsAsDelegate = computed(() => this.byProjectCache().filter(p => this.isDelegateOf(p)));
 
   /** Distinct delegate count across all projects. Consumed by the summary header (R-UI-004). */
   readonly totalDistinctDelegates = computed(() => {
@@ -88,9 +125,10 @@ export class PiDelegatesClientService {
     this.loading.set(true);
     this.error.set(null);
     try {
+      const scope = this.scope();
       const [proj, people] = await Promise.all([
-        this.api.GET_PIDelegatesByUserProjects(userId),
-        this.api.GET_PIDelegatesByUserPeople(userId)
+        this.api.GET_PIDelegatesByUserProjects(userId, scope),
+        this.api.GET_PIDelegatesByUserPeople(userId, scope)
       ]);
       if (proj.successfulRequest) {
         this.byProjectCache.set(proj.data ?? []);

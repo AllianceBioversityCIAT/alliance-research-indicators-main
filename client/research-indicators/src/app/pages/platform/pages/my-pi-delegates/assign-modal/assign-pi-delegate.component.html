@@ -44,12 +44,12 @@
   @if (inactiveSelectedPeople().length > 0) {
     <!-- Same amber notice design as the project-dashboard chart cards. -->
     <div
-      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[#E69F00] bg-[#fff8e6] px-3 py-2.5"
+      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
       role="alert" aria-live="assertive">
-      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[#8a4b08]/80"
+      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[color:var(--ac-warning-fg)]/80"
         aria-hidden="true"></i>
       <p
-        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">
+        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
         @if (inactiveSelectedPeople().length === 1) {
           <strong class="font-semibold">{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
           They will not be able to review results until their account is reactivated.
@@ -60,6 +60,22 @@
           The role can still be granted and will take effect once they are active again.
         }
       </p>
+    </div>
+  }
+
+  <!-- ── "Assign New Delegate" intro ───────────────────────────────────── -->
+  <!-- @akili-spec docs/specs/changes/my-pi-delegates-admin-scope -->
+  @if (isNewDelegateMode()) {
+    <div
+      class="assign-pi-delegate__new-note flex items-start gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-200)] px-3"
+      role="status">
+      <i class="pi pi-user-plus mt-[15px] shrink-0 !text-[16px] text-[color:var(--ac-light-blue-500)]"
+        aria-hidden="true"></i>
+      <div
+        class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
+        Pick one person and the projects they should be a delegate on. This only
+        <strong class="font-semibold">adds</strong> delegations — nothing they already have is revoked.
+      </div>
     </div>
   }
 
@@ -85,6 +101,7 @@
       [itemHeight]="58"
       selectedItemsSurfaceColor="var(--ac-white-1)"
       [disabled]="peopleDisabled()"
+      [singleSelection]="isNewDelegateMode()"
     >
       <!-- Option row: name on top, details below as label → value — the same
            layout the Projects picker uses. -->
@@ -113,10 +130,13 @@
         </div>
       </ng-template>
 
-      <!-- Collapsed field label -->
+      <!-- Collapsed field label — the name itself once exactly one is picked,
+           which is the whole selection in single-selection mode. -->
       <ng-template #selectedItems let-value>
-        @if (value?.length > 0) {
-          <span>{{ value.length }} {{ value.length === 1 ? 'person' : 'people' }} selected</span>
+        @if (value?.length === 1) {
+          <span>{{ getSelectedPeopleList()[0]?.name }}</span>
+        } @else if (value?.length > 1) {
+          <span>{{ value.length }} people selected</span>
         }
       </ng-template>
 
