@@ -66,7 +66,18 @@ function createMockService() {
   const isPiOf = (project: ProjectDelegates) =>
     currentUserId() != null && project.pi_user_id === currentUserId();
   const projectsAsPi = computed(() => byProjectCache().filter(isPiOf));
-  const projectsAsDelegate = computed(() => byProjectCache().filter(p => !isPiOf(p)));
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — writable so a
+  // test can flip the page into the administrator view.
+  const isAdminView = signal(false);
+  // Mirrors the real service: in the managed view every listed project the caller
+  // is not the PI of is one they delegate on; in the admin view only membership
+  // of the delegate list counts.
+  const isDelegateOf = (project: ProjectDelegates) => {
+    if (isPiOf(project)) return false;
+    if (!isAdminView()) return true;
+    return project.delegates.some(d => d.delegate_user_id === currentUserId());
+  };
+  const projectsAsDelegate = computed(() => byProjectCache().filter(isDelegateOf));
 
   return {
     byProjectCache,
@@ -81,7 +92,9 @@ function createMockService() {
     currentUserId,
     isPiOf,
     projectsAsPi,
-    projectsAsDelegate
+    projectsAsDelegate,
+    isDelegateOf,
+    isAdminView
   };
 }
 
@@ -178,6 +191,138 @@ describe('MyPiDelegatesComponent', () => {
     expect(text).toContain('approve, reject or request changes');
     expect(text).toContain('revoke it at any time');
     expect(text).toContain('Agresso');
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('administrator view', () => {
+    it('says the list spans the whole platform, and adds the ALL PROJECTS counter', () => {
+      mockService.byProjectCache.set([
+        makeProject({ project_code: 'P001', pi_user_id: 7 }),
+        makeProject({ project_code: 'P002', pi_user_id: 8 })
+      ]);
+      mockService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const notice = fixture.nativeElement.querySelector('.pi-delegates-admin-notice');
+      expect(notice).not.toBeNull();
+      expect((notice as HTMLElement).textContent).toContain('Administrator view');
+
+      const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+      expect(counters.length).toBe(5);
+      const first = counters[0] as HTMLElement;
+      expect(first.querySelector('.pi-delegates-stats__counter-label')?.textContent).toContain('ALL PROJECTS');
+      expect(first.querySelector('.pi-delegates-stats__counter-value')?.textContent?.trim()).toBe('2');
+    });
+
+    it('wears the amber warning treatment, the same one the Assign modal uses', () => {
+      mockService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const notice = fixture.nativeElement.querySelector('.pi-delegates-admin-notice') as HTMLElement;
+      expect(notice.className).toContain('border-l-[color:var(--ac-warning-1)]');
+      expect(notice.className).toContain('bg-[color:var(--ac-warning-surface)]');
+      // ★ discriminating: it used to be the neutral grey card.
+      expect(notice.className).not.toContain('bg-[color:var(--ac-grey-100)]');
+
+      // The sentence wraps at narrow widths; items-center keeps the icon on the
+      // block's mid-line either way, which items-start does not.
+      expect(notice.className).toContain('items-center');
+      expect(notice.className).not.toContain('items-start');
+
+      const icon = notice.querySelector('.pi-shield') as HTMLElement;
+      expect(icon.className).toContain('var(--ac-warning-fg)');
+      // ★ discriminating: `atc-warning-1` LOOKS like a token utility but none is
+      //   generated — warning-1 is absent from the $colors map — so that class
+      //   would leave the icon uncoloured.
+      expect(icon.className).not.toContain('atc-warning-1');
+    });
+
+    it('keeps the numbers on one baseline without reserving an empty label line', () => {
+      mockService.byProjectCache.set([makeProject({ project_code: 'P001', pi_user_id: 7 })]);
+      mockService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const cards = Array.from(
+        fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter')
+      ) as HTMLElement[];
+      expect(cards.length).toBe(5);
+
+      for (const card of cards) {
+        // The value is pushed to the bottom of a stretched column, so a label
+        // that wraps pushes nothing out of line.
+        const value = card.querySelector('.pi-delegates-stats__counter-value') as HTMLElement;
+        expect(value.className).toContain('mt-auto');
+
+        // ★ discriminating: the earlier fix reserved two label lines, which aligned
+        //   them at the cost of an empty line in every card whose label fits on one.
+        const labelRow = card.querySelector('span') as HTMLElement;
+        expect(labelRow.className).not.toContain('min-h-[2rem]');
+      }
+    });
+
+    it('aligns every counter to the start, not the centre', () => {
+      mockService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const cards = Array.from(
+        fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter')
+      ) as HTMLElement[];
+
+      for (const card of cards) {
+        expect(card.className).toContain('items-start');
+        // ★ discriminating: centred contents read as a different component than
+        //   the project-detail tiles these follow.
+        expect(card.className).not.toContain('items-center');
+        expect((card.querySelector('span') as HTMLElement).className).not.toContain('justify-center');
+      }
+    });
+
+    it('gives the long-labelled counters a wider share of the row than the short ones', () => {
+      mockService.isAdminView.set(true);
+      fixture.detectChanges();
+
+      const cards = Array.from(
+        fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter')
+      ) as HTMLElement[];
+      const shareOf = (label: string) => {
+        const card = cards.find(c => (c.textContent ?? '').replace(/\s+/g, ' ').includes(label));
+        return card?.className ?? '';
+      };
+
+      // The two that wrap need the room; the three that do not were holding
+      // whitespace they had no use for.
+      expect(shareOf('PROJECTS AS PI DELEGATE')).toContain('flex-[1.6_1_185px]');
+      expect(shareOf('PROJECTS WITHOUT PI DELEGATE')).toContain('flex-[1.6_1_185px]');
+
+      // ★ discriminating: an equal-share layout would give these the same class.
+      expect(shareOf('ALL PROJECTS')).toContain('flex-[1_1_120px]');
+      expect(shareOf('PI DELEGATES')).toContain('flex-[1_1_120px]');
+      expect(shareOf('ALL PROJECTS')).not.toContain('flex-[1.6_1_185px]');
+    });
+
+    it('neither the notice nor the counter exist for a PI or delegate (negative discriminator)', () => {
+      mockService.byProjectCache.set([makeProject({ project_code: 'P001', pi_user_id: 99 })]);
+      mockService.isAdminView.set(false);
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.pi-delegates-admin-notice')).toBeNull();
+      const counters = fixture.nativeElement.querySelectorAll('.pi-delegates-stats__counter');
+      expect(counters.length).toBe(4);
+      expect(
+        (counters[0] as HTMLElement).querySelector('.pi-delegates-stats__counter-label')?.textContent
+      ).not.toContain('ALL PROJECTS');
+    });
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('Assign New Delegate opens the modal with an empty newDelegate context', () => {
+    fixture.detectChanges();
+
+    component.onAssignNewDelegate();
+
+    const modals = TestBed.inject(AllModalsService);
+    expect(modals.assignPiDelegateContext()).toEqual({ source: 'newDelegate' });
+    expect(modals.isModalOpen('assignPiDelegate')?.isOpen).toBe(true);
   });
 
   it('info banner is ABSENT (the description block supersedes it)', () => {
@@ -434,8 +579,10 @@ describe('MyPiDelegatesComponent — unauthenticated edge', () => {
       projectsWithoutDelegate: computed(() => byProjectCache().filter(p => p.delegates.length === 0)),
       currentUserId: signal<number | null>(null),
       isPiOf: () => false,
+      isDelegateOf: () => true,
       projectsAsPi: computed(() => []),
-      projectsAsDelegate: computed(() => byProjectCache())
+      projectsAsDelegate: computed(() => byProjectCache()),
+      isAdminView: signal(false)
     };
     const noUserCache = { dataCache: signal({ user: undefined }) };
 

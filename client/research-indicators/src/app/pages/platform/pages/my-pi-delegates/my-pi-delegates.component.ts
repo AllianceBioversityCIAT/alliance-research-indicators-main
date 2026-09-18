@@ -45,6 +45,15 @@ export default class MyPiDelegatesComponent implements OnInit {
   readonly loading = computed(() => this.service.loading());
   readonly error = computed(() => this.service.error());
 
+  // ─── Administrator view (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope) ──
+  /**
+   * True for a System Admin or Center Admin: both tabs then list EVERY project
+   * and EVERY delegate on the platform, not just the ones this user manages.
+   * The page says so explicitly — an admin seeing thousands of unfamiliar
+   * projects under a heading that says "My" would otherwise read as a bug.
+   */
+  readonly isAdminView = computed(() => this.service.isAdminView());
+
   // ─── Init ─────────────────────────────────────────────────────────────────────
   ngOnInit(): void {
     const uid = this.cache.dataCache().user?.sec_user_id;
@@ -76,6 +85,16 @@ export default class MyPiDelegatesComponent implements OnInit {
       source: 'byPerson',
       delegateUserId: event.delegateUserId
     });
+    this.allModalsService.openModal('assignPiDelegate');
+  }
+
+  /**
+   * Opened from the By-person tab's "Assign New Delegate" button: nothing is
+   * pre-selected — the modal asks for one person and the projects to add them to.
+   * @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+   */
+  onAssignNewDelegate(): void {
+    this.allModalsService.assignPiDelegateContext.set({ source: 'newDelegate' });
     this.allModalsService.openModal('assignPiDelegate');
   }
 

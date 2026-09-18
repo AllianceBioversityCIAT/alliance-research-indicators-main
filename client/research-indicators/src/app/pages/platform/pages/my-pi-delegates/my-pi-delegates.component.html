@@ -9,21 +9,69 @@
 <div class="pi-delegates-page flex flex-col bg-[color:var(--ac-white-1)] pt-[8px] sm:pt-[12px] md:pt-[20px]">
 
   <!-- ── Page header block ───────────────────────────────────────────── -->
-  <header class="pi-delegates-header flex flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
+  <!-- The description, the Administrator notice and the stat cards all share ONE
+       max-width, declared here. Setting it per block let the cards grow past the
+       text and the three edges stepped down the page like a staircase.
+       60rem, not the 52rem the prose used to have: five cards at their minimum
+       width do not fit in 52rem and would wrap to a second row. -->
+  <header
+    class="pi-delegates-header flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
     <h1 class="pi-delegates-title atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
       My PI Delegates
     </h1>
-    <p class="pi-delegates-description atc-grey-600 m-0 max-w-[52rem] font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
+    <p class="pi-delegates-description atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
       PI Delegate lets someone approve, reject or request changes to the results of a project on your
       behalf. It applies only to the projects you select here, and you can revoke it at any time.
       Roles coming from <strong class="font-semibold">Agresso</strong> are not affected.
     </p>
 
-    <!-- Stat cards — same treatment as the project-detail indicator tiles -->
+    <!-- Administrator notice — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope -->
+    @if (isAdminView()) {
+    <!-- Same amber notice as the inactive-delegate warning in the Assign modal
+         (assign-pi-delegate.component.html): left rule, warning surface, amber
+         foreground. items-center keeps the icon on the block's mid-line whether
+         the sentence wraps to one line or two. -->
+    <div
+      class="pi-delegates-admin-notice flex items-center gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+      role="note">
+      <i class="pi pi-shield shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
+      <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+        <strong class="font-semibold">Administrator view.</strong>
+        You are seeing every project and every PI Delegate on the platform, not only your own, and you
+        can assign or revoke delegates on any of them.
+      </p>
+    </div>
+    }
+
+    <!-- Stat cards — same treatment as the project-detail indicator tiles.
+         The numbers share a baseline because each value is mt-auto inside a
+         stretched flex column, NOT because the labels reserve a fixed height:
+         reserving two lines aligned them, but paid for it with an empty line in
+         every card whose label fits on one — which is all of them at this width.
+         Widths are NOT equal: the two long-labelled cards take ~1.6× the share of
+         the three short ones, so "PROJECTS WITHOUT PI DELEGATE" gets room while
+         "PI DELEGATES" stops holding whitespace it has no use for. The row still
+         fills the shared header width exactly, because every card grows. -->
     <div class="pi-delegates-stats mt-[14px] flex flex-row flex-wrap gap-3" role="list"
       aria-label="PI Delegates summary statistics">
+      @if (isAdminView()) {
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-globe atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">ALL
+            PROJECTS</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.totalProjects() }}</span>
+      </div>
+      }
+
+      <div
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-briefcase atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -32,11 +80,11 @@
             AS PI</span>
         </span>
         <span
-          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
           service.projectsAsPi().length }}</span>
       </div>
 
-      <div class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-2"
+      <div class="pi-delegates-stats__counter flex flex-[1.6_1_185px] min-w-[160px] flex-col items-start gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-1.5"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -45,12 +93,12 @@
             AS PI DELEGATE</span>
         </span>
         <span
-          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
           service.projectsAsDelegate().length }}</span>
       </div>
 
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -59,12 +107,12 @@
             DELEGATES</span>
         </span>
         <span
-          class="pi-delegates-stats__counter-value atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
           service.totalDistinctDelegates() }}</span>
       </div>
 
       <div
-        class="pi-delegates-stats__counter flex min-w-[150px] flex-col gap-1.5 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-2"
+        class="pi-delegates-stats__counter flex flex-[1.6_1_185px] min-w-[160px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
         role="listitem">
         <span class="flex items-start gap-[5px]">
           <i class="pi pi-exclamation-triangle atc-orange-1 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
@@ -73,7 +121,7 @@
             WITHOUT PI DELEGATE</span>
         </span>
         <span
-          class="pi-delegates-stats__counter-value atc-orange-1 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          class="pi-delegates-stats__counter-value mt-auto atc-orange-1 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
           service.projectsWithoutDelegate().length }}</span>
       </div>
     </div>
@@ -144,6 +192,7 @@
     <!-- Tab 1: By person (T-UI-06) -->
     <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-person" [hidden]="activeTabIndex() !== 1">
       <app-by-person (assignRequested)="onAssignFromPerson($event)"
+        (assignNewRequested)="onAssignNewDelegate()"
         (historyRequested)="onHistoryFromPerson($event)"></app-by-person>
     </div>
   </div>
