@@ -79,11 +79,27 @@ export class ResultSidebarComponent {
       }));
   });
 
+  // Two gates, both server-computed, applied at ONE point so the `OPTIONAL`
+  // divider, the Pool funding alignment item and the PRMS SYNC button cannot
+  // disagree with each other (the button reads `hasPoolFundingOption()`, which
+  // derives from this same filter).
+  //
+  //  1. CONTRACT — `alignment.eligible` is the server's
+  //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
+  //     contract does not contribute to pool funding. Pre-existing behaviour.
+  //  2. YEAR — `alignment.version_locked` is the server's
+  //     `report_year_id !== MAPPABLE_LIVE_VERSION`. The reporting year is NOT a
+  //     configurable parameter anywhere in this system (no app_config row, no ENV
+  //     var, and `report_years.is_active` is the soft-delete flag, not a reporting
+  //     window); it is the constant in toc-level-rules.util.ts, and the server
+  //     resolves the comparison for us. Compared with `=== true` on purpose: a
+  //     server that omits the field leaves the section VISIBLE, matching today.
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
     if (meta?.indicator_id === 5) return true;
-    return !alignment || alignment.eligible === false;
+    if (!alignment || alignment.eligible === false) return true;
+    return alignment.version_locked === true;
   }
 
   /** Optional sections (AR.3) — excluded from the progress counter and from submit gating. */

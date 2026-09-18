@@ -10,6 +10,8 @@ import { ApiService } from '../../../../../../shared/services/api.service';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { CacheService } from '../../../../../../shared/services/cache/cache.service';
 import { ActionsService } from '../../../../../../shared/services/actions.service';
+import { BilateralService } from '@shared/services/bilateral.service';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { MultiselectComponent } from '../../../../../../shared/components/custom-fields/multiselect/multiselect.component';
 import { GetAllianceAlignment } from '../../../../../../shared/interfaces/get-alliance-alignment.interface';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -52,7 +54,8 @@ const PORTFOLIO_P2_ID = 2;
     TooltipModule,
     AllianceLeverCardComponent,
     InputComponent,
-    AllianceAlignmentP2Component
+    AllianceAlignmentP2Component,
+    CustomTagComponent
   ],
   templateUrl: './alliance-alignment.component.html'
 })
@@ -76,6 +79,7 @@ export default class AllianceAlignmentComponent {
   apiService = inject(ApiService);
   cache = inject(CacheService);
   actions = inject(ActionsService);
+  bilateralService = inject(BilateralService);
   router = inject(Router);
   loading = signal(false);
   submission = inject(SubmissionService);
@@ -390,6 +394,32 @@ export default class AllianceAlignmentComponent {
     });
 
     await this.getData();
+
+    // The sidebar's Pool Funding block (OPTIONAL divider + item + PRMS SYNC) is
+    // gated on `alignment.eligible` (the primary CONTRACT, edited here) and
+    // `alignment.version_locked` (the reporting YEAR, edited in General
+    // Information). Both are SERVER-computed and reach the sidebar only through
+    // `BilateralService.currentAlignment`, which nothing refreshes on a section
+    // save -- `result.component.ts` memoizes its fetch on `code + URL version`,
+    // and neither changes when the contract is edited here. Without this re-fetch
+    // the block keeps its pre-save visibility until a full page reload
+    // (user-reported). Runs only after the PATCH succeeded (the early `return`
+    // above covers the failure path).
+    await this.refreshPoolFundingVisibility();
+  }
+
+  /**
+   * Re-reads the pool funding alignment so the sidebar re-evaluates whether the
+   * Pool Funding block stays visible. Never throws into the caller: the save
+   * already succeeded, and a failed refresh must leave the stale-but-harmless
+   * previous visibility rather than surface a false save error.
+   */
+  private async refreshPoolFundingVisibility(): Promise<void> {
+    try {
+      await this.bilateralService.getAlignment(String(this.cache.currentResultId()));
+    } catch {
+      // Intentionally swallowed -- see doc comment.
+    }
   }
 
   private buildResultSdgsFromLevers(levers: Lever[], resultId: number) {
