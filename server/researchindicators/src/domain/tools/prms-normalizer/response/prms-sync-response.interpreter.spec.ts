@@ -145,6 +145,83 @@ describe('interpretPrmsSyncResponse', () => {
     expect(interpreted.failureReason).toBeNull();
   });
 
+  // --- PRMS reporting phase (2026-09-18) --------------------------------------
+  // PRMS sends the same value twice on an accepted row: `version_id` at the top
+  // level and `obj_version.id` nested. `version_id` wins; `obj_version.id` is the
+  // fallback. `obj_version` also carries phase_name / phase_year, deliberately
+  // not stored.
+
+  const acceptedWith = (result: Record<string, unknown>) =>
+    interpretPrmsSyncResponse(
+      {
+        status: 200,
+        body: {
+          requestId: 'Root=phase-1',
+          results: [
+            { success: true, external_reference: OURS, result },
+          ],
+        },
+      },
+      OURS,
+    );
+
+  it('reads the phase from result.version_id', () => {
+    const interpreted = acceptedWith({
+      result_code: 9427,
+      version_id: 36,
+      obj_version: { id: 36, phase_name: 'Reporting 2026', phase_year: 2026 },
+    });
+
+    expect(interpreted.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(interpreted.prmsPhaseId).toBe(36);
+  });
+
+  it('falls back to obj_version.id when version_id is absent', () => {
+    const interpreted = acceptedWith({
+      result_code: 9427,
+      obj_version: { id: 36, phase_name: 'Reporting 2026', phase_year: 2026 },
+    });
+
+    expect(interpreted.prmsPhaseId).toBe(36);
+  });
+
+  it('prefers version_id over obj_version.id when the two disagree', () => {
+    // They are the same value in every response seen so far. Pinning the
+    // precedence means a future divergence resolves the same way every time
+    // instead of depending on object key order.
+    const interpreted = acceptedWith({
+      result_code: 9427,
+      version_id: 36,
+      obj_version: { id: 99 },
+    });
+
+    expect(interpreted.prmsPhaseId).toBe(36);
+  });
+
+  it('leaves the phase null when neither source is present, WITHOUT failing the sync', () => {
+    const interpreted = acceptedWith({ result_code: 9427 });
+
+    expect(interpreted.prmsPhaseId).toBeNull();
+    // An absent phase must not degrade an accepted sync: only the result code
+    // carries a failureReason when missing.
+    expect(interpreted.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(interpreted.failureReason).toBeNull();
+  });
+
+  it('parses a phase sent as a numeric string', () => {
+    expect(acceptedWith({ result_code: 9427, version_id: '36' }).prmsPhaseId).toBe(36);
+  });
+
+  it('leaves the phase null on a non-accepted outcome', () => {
+    const interpreted = interpretPrmsSyncResponse(
+      { status: 422, body: { requestId: 'Root=phase-2' } },
+      OURS,
+    );
+
+    expect(interpreted.outcome).toBe(PrmsSyncOutcome.REJECTED_BY_PRMS);
+    expect(interpreted.prmsPhaseId).toBeNull();
+  });
+
   it('records that no PRMS result code is present instead of leaving a silent null', () => {
     const interpreted = interpretPrmsSyncResponse(
       {

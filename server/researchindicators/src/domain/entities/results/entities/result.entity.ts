@@ -201,6 +201,19 @@ export class Result extends AuditableEntity {
   })
   prms_result_code?: number;
 
+  // PRMS reporting phase the accepted result was filed under (PRMS calls it
+  // `version_id`; the same value also appears as `obj_version.id`). Written by
+  // the same UPDATE as `prms_result_code` on a successful sync; NULL for results
+  // synced before the column existed -- nothing backfills them.
+  @Column('bigint', {
+    name: 'prms_phase_id',
+    nullable: true,
+  })
+  @OpenSearchProperty({
+    type: 'integer',
+  })
+  prms_phase_id?: number;
+
   @Column('boolean', {
     name: 'is_partner_not_applicable',
     nullable: true,
