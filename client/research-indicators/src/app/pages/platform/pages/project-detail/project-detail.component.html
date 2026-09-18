@@ -145,7 +145,7 @@
             <app-project-indicator-filters [project]="currentProject()" [enableFilter]="true"
               (indicatorClick)="onIndicatorClick($event)"></app-project-indicator-filters>
           </div>
-          <app-results-center-table [showNewProjectResultButton]="true"
+          <app-results-center-table [showNewProjectResultButton]="true" [showPlatformFilters]="true"
             [roundedBottom]="true"></app-results-center-table>
         </div>
         } @else {

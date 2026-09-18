@@ -13,6 +13,7 @@ import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
 import { SubmissionService } from '@shared/services/submission.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import {
   AlignmentResponse,
   BilateralTocCatalogResponse,
@@ -87,6 +88,8 @@ describe('PoolFundingAlignmentComponent', () => {
   let socketEvents$: Subject<unknown>;
   let listenMock: jest.Mock;
   let trackEventMock: jest.Mock;
+  let versionChangeCallbacks: Array<(version: string | null) => void>;
+  let isEditableStatus: ReturnType<typeof signal<boolean>>;
 
   const codes = (form: { selected_sps: { official_code: string }[] }) => form.selected_sps.map(sp => sp.official_code);
   const sp = (official_code: string) => ({ official_code });
@@ -126,6 +129,8 @@ describe('PoolFundingAlignmentComponent', () => {
     socketEvents$ = new Subject<unknown>();
     listenMock = jest.fn().mockReturnValue(socketEvents$.asObservable());
     trackEventMock = jest.fn();
+    versionChangeCallbacks = [];
+    isEditableStatus = signal(true);
 
     const bilateralServiceMock = {
       currentAlignment,
@@ -177,9 +182,19 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActivatedRoute, useValue: routeMock },
         { provide: Router, useValue: { navigate: routerNavigate } },
         { provide: ActionsService, useValue: { showToast: showToastMock, showGlobalAlert: showGlobalAlertMock } },
-        { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+        { provide: SubmissionService, useValue: { isEditableStatus } },
         { provide: WebsocketService, useValue: { listen: listenMock } },
-        { provide: ClarityService, useValue: { trackEvent: trackEventMock } }
+        { provide: ClarityService, useValue: { trackEvent: trackEventMock } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => {
+              versionChangeCallbacks.push(cb);
+              cb(null);
+            })
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -293,7 +308,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -352,7 +374,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         // The poisoned record: truthy, but no `listen` function on it.
         { provide: WebsocketService, useValue: {} },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -650,7 +679,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: ActivatedRoute, useValue: route },
           { provide: Router, useValue: { navigate } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
-          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } }
+          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -726,7 +762,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
           { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-          { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+          { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -1986,6 +2029,19 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  describe('Save override on a version (R-PFV-005)', () => {
+    const saveButton = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Save'));
+
+    it('with is_read_only true the override is false even on a version — Save absent', () => {
+      isEditableStatus.set(false);
+      editable.set(true);
+      currentAlignment.set({ ...baseAlignment, is_read_only: true });
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+    });
+  });
+
   describe('read-only DOM (banners + badge + Save visibility) — regression', () => {
     it('renders synced badge + synced banner when is_read_only && is_synced_to_prms; Save absent', () => {
       currentAlignment.set({ ...baseAlignment, is_read_only: true, is_synced_to_prms: true });
@@ -2784,6 +2840,51 @@ describe('PoolFundingAlignmentComponent', () => {
       const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
       bannerLink.click();
       expect(component.showHelpModal()).toBe(true);
+    });
+  });
+
+  describe('version change refetch (R-PFV-004)', () => {
+    const liveAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: false,
+      selected_science_programs: []
+    };
+    const versionAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: true,
+      selected_science_programs: [{ code: 'SP06', name: 'Climate action', role: 'PRIMARY' }]
+    };
+
+    it('refetches on version change, again on return to live, and does not serve the previous payload', async () => {
+      fixture.detectChanges();
+      expect(versionChangeCallbacks).toHaveLength(1);
+      getAlignmentMock.mockClear();
+
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(versionAlignment);
+      versionChangeCallbacks[0]('2026');
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(true);
+      expect(codes(component.formData())).toEqual(['SP06']);
+      expect(component.formData().primary_sp_code).toBe('SP06');
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
     });
   });
 });

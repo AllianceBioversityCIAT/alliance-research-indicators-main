@@ -81,9 +81,15 @@ export class ExcelWorkbookBuilder {
     }
   }
 
+  /** Default warning-notice colors (amber fill, dark-amber text). */
+  private static readonly defaultNoticeFillArgb = 'FFFFF2CC';
+  private static readonly defaultNoticeFontArgb = 'FF9C5700';
+
   /**
-   * Renders banner (rows 1–2), column-group row (row 3). Returns row index for column headers (4).
-   * Keep in sync with {@link EXCEL_RESERVED_ROWS_WITH_PRESENTATION} in `./excel-workbook.row-limit`.
+   * Renders banner (rows 1–2), optional warning-notice row, then the column-group row.
+   * Returns the row index for the column headers (4 without a notice, 5 with one).
+   * Keep in sync with {@link reservedPreambleRows} / {@link EXCEL_RESERVED_ROWS_WITH_PRESENTATION}
+   * in `./excel-workbook.row-limit`.
    */
   private renderPreamble(
     workbook: ExcelJS.Workbook,
@@ -106,7 +112,6 @@ export class ExcelWorkbookBuilder {
 
     ws.getRow(1).height = 54;
     ws.getRow(2).height = 28;
-    ws.getRow(3).height = 22;
 
     const fromC = pre.logoMergeFromCol ?? 1;
     const toC = pre.logoMergeToCol ?? 2;
@@ -189,15 +194,37 @@ export class ExcelWorkbookBuilder {
       };
     }
 
+    let groupRow = 3;
+    if (pre.bannerNotice) {
+      const noticeRow = 3;
+      groupRow = 4;
+      ws.getRow(noticeRow).height = 30;
+      ws.mergeCells(`A${noticeRow}:${lastLetter}${noticeRow}`);
+      const notice = ws.getCell(`A${noticeRow}`);
+      notice.value = pre.bannerNotice.text;
+      const noticeFill =
+        pre.bannerNotice.fillArgb ?? ExcelWorkbookBuilder.defaultNoticeFillArgb;
+      const noticeFont =
+        pre.bannerNotice.fontArgb ?? ExcelWorkbookBuilder.defaultNoticeFontArgb;
+      notice.fill = this.solidFill(noticeFill);
+      notice.font = { bold: true, size: 11, color: { argb: noticeFont } };
+      notice.alignment = {
+        vertical: 'middle',
+        horizontal: 'left',
+        wrapText: true,
+      };
+    }
+    ws.getRow(groupRow).height = 22;
+
     for (const g of pre.columnGroups) {
       const from = Math.min(g.fromCol, lastCol);
       const to = Math.min(g.toCol, lastCol);
       if (from > to) {
         continue;
       }
-      const merge = `${this.excelColumnLetter(from)}3:${this.excelColumnLetter(to)}3`;
+      const merge = `${this.excelColumnLetter(from)}${groupRow}:${this.excelColumnLetter(to)}${groupRow}`;
       ws.mergeCells(merge);
-      const c = ws.getCell(this.excelColumnLetter(from) + '3');
+      const c = ws.getCell(this.excelColumnLetter(from) + String(groupRow));
       c.value = g.label;
       const groupFill = g.fillArgb ?? fillArgb;
       this.applySolidHeaderCell(c, groupFill, fontArgb, true);
@@ -208,7 +235,7 @@ export class ExcelWorkbookBuilder {
       };
     }
 
-    return 4;
+    return groupRow + 1;
   }
 
   private applySolidHeaderCell(

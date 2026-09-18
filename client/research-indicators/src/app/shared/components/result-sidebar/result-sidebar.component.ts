@@ -99,7 +99,23 @@ export class ResultSidebarComponent {
     const meta = this.cache.currentMetadata();
     const isApproved = meta?.status_id === 6;
     const isPoolFundingComplete = Boolean(this.cache.greenChecks()?.pool_funding_alignment);
-    return isApproved && isPoolFundingComplete;
+    // Completeness is NOT the same as "there is something to sync". Answering
+    // "No" to the Science Program question is a COMPLETE answer -- the
+    // validation function returns true for it ("Answered No: nothing else
+    // applies", pool_funding_alignment_validation) -- so the green check goes
+    // green with nothing to send to PRMS. An unanswered question (null) is
+    // likewise nothing to sync.
+    const contributesToPoolFunding = this.bilateralService.currentAlignment()?.has_contribution === true;
+    return isApproved && isPoolFundingComplete && contributesToPoolFunding;
+  });
+
+  /** Why PRMS SYNC is unavailable, so a disabled button never explains itself wrongly. */
+  prmsSyncTooltip = computed(() => {
+    if (this.canSyncPrms()) return '';
+    if (this.bilateralService.currentAlignment()?.has_contribution === false) {
+      return 'This result does not contribute to a Science Program or Accelerator, so there is nothing to sync to PRMS.';
+    }
+    return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
   });
 
   hasPoolFundingOption = computed(() => {
@@ -143,6 +159,13 @@ export class ResultSidebarComponent {
       label: 'Alliance alignment',
       path: 'alliance-alignment',
       greenCheckKey: 'alignment'
+    },
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    {
+      label: 'Innovation use details',
+      path: 'innovation-use-details',
+      indicator_id: 6,
+      greenCheckKey: 'innovation_use'
     },
     {
       label: 'OICR Details',
@@ -201,6 +224,13 @@ export class ResultSidebarComponent {
       label: 'IP rights',
       path: 'ip-rights',
       indicator_id: 2,
+      greenCheckKey: 'ip_rights'
+    },
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    {
+      label: 'IP rights',
+      path: 'ip-rights',
+      indicator_id: 6,
       greenCheckKey: 'ip_rights'
     },
     {

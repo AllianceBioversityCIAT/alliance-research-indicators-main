@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1180, "h": 880, "title": "Alliance Alignment — Innovation Use", "expand": "fit" }
+  ],
+  "annotations": [
+    {
+      "id": "how-to-try",
+      "x": 1260,
+      "y": 0,
+      "w": 280,
+      "text": "How to try it:\n\n1. Open the \"Indicator\" tweak above the artboard.\n2. Switch between OICR / Policy Change / Innovation Use / Innovation Development / Capacity Sharing.\n3. Watch \"Impact Outcomes\" appear only for OICR, Policy Change and Innovation Use — tagged NEW only for Innovation Use, since that's the one this proposal adds.\n\nAll dropdowns, checkboxes, the Research Areas search box and Save button are functional.\n\nSpec: docs/specs/changes/add-strategic-outcomes-field/proposal.md\n\nSample data note: project / objective / outcome / SDG labels are illustrative placeholders — the real CLARISA-backed catalogs weren't available in this session."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

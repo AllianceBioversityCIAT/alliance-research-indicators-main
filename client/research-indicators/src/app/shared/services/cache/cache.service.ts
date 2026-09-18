@@ -40,7 +40,7 @@ export class CacheService {
   lastVersionParam = signal<string | null>(null);
   versionsList = signal<TransformResultCodeResponse[]>([]);
   liveVersionData = signal<TransformResultCodeResponse | null>(null);
-  allGreenChecksAreTrue = computed(() => Object.values(this.greenChecks()).every(check => check));
+  allGreenChecksAreTrue = computed(() => Boolean(this.greenChecks()?.completness));
   isMyResult = computed(() => Number(this.currentMetadata().created_by) === Number(this.dataCache().user.sec_user_id));
 
   loadingCurrentResult = signal(false);
@@ -62,6 +62,9 @@ export class CacheService {
         return 'policy-change';
       case 5:
         return 'oicr-details';
+      // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+      case 6:
+        return 'innovation-use-details';
       default:
         return '';
     }

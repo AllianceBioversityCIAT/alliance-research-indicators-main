@@ -59,6 +59,7 @@ Your sole responsibility is to coordinate execution of an approved spec by orche
 5. **Spec Drift / Pivot Protocol:**
    * **ARI pivot triggers.** Treat as spec-is-wrong evidence, not implementation error: a contradiction of the `ServerResponseDto` envelope, the `@Roles`/`RolesGuard` model, the append-only migration rule, or the URI-versioned `/api` routing.
    * If the Implementer or Reviewer surfaces evidence that the spec itself is wrong or unviable, do not loop. Mark the task `[~]`, record a `## Pivot Record: <Task ID>` block in `execution.md`, and escalate to the user before continuing.
+   * **Sweep the claim, not the string** (KZ-005). A pivot's correction closure must enumerate the superseded *claim in every phrasing* — counts, framings, and restatements in neighbouring specs — not only the literal value you edited; then **re-grep for any new value the correction itself introduces.** A pivot that turned "one migration" into two survived in four sites because "one migration" was never a string anyone searched for.
    * ARI tripwires that mean *pivot, not rework* — the spec contradicts a constitutional invariant:
      * **Server:** the `ServerResponseDto` envelope, the `@Roles`/`RolesGuard` authorization model, `ResultStatusGuard` on Results mutations, the append-only migration rule, or the URI-versioned `/api` routing.
      * **Client:** calling `HttpClient` outside `ApiService`, bypassing `jWtInterceptor`, a parallel taxonomy where a CLARISA controlled vocabulary applies, introducing NgRx, or hex literals where design tokens are mandated.
@@ -214,6 +215,12 @@ The second rule is the one that gets broken, because measuring feels passive. It
 **Commit discipline is not a concurrency rule but it fails the same way.** Under parallel sessions a reasoning-text commit message becomes unrecoverable: with several sessions committing to one branch, the message is the only surviving record of which session did what. Hold the AKILI commit standard exactly — never let narration become a commit message.
 
 ---
+
+### 🧭 Bounding a worker's search space (KZ-007, KZ-002 — added 2026-08-19)
+
+- **Bound every axis, not just the one that last failed.** A brief that names the *token* but not the *file set*, or the file set but not the *exemption criterion*, leaves the next axis unbounded and the defect simply moves down a level. Require a **per-unit completeness line** (`<unit>: N found · M actionable · all handled`) that includes units with **zero** findings, and require every claimed exemption to **quote the clause that grants it** — citing a retained item confers no exemption on text that merely references it.
+- **Grep-falsify any aggregate before you flip it.** Before marking a done-definition item that asserts a total (*"all X are done"*, *"every AC is checked"*), run the check that could disprove it. The Leader's finalize write is the one claim in the pipeline no Reviewer audits.
+- **A measured figure gets ONE home, and the citation is the command that derives it** (KZ-005, recurrence 6). Suite counts, coverage tuples, LOC, round counts: name **one** document as the figure's home, have every other site link to it instead of restating it, and record the command (`npm test -- --silent`) beside the number so the next reader can re-derive rather than trust. **Never assert cross-document identity you did not just grep** — *"recorded identically in X"* is a claim, and it is false the moment X's body diverges from its own header. The failure this closes is not carelessness: a figure goes stale whenever the **tree** changes, so no sweep discipline outlives it, and one cell in `innovation-use/details-api` was restated five times (2264 → 2275 → 2279 → 2285 → 2296) with a correction-closure rule in force. Fewer sites, not better sweeps.
 
 ## 🔁 Orchestration Sequence (per task)
 
