@@ -346,7 +346,7 @@ describe('InnovationUseBuilder', () => {
   });
 
   describe('measures completeness (homologation.md §8.5)', () => {
-    it('keeps quantity 0 and drops incomplete extras, refusing when none survive', () => {
+    it('keeps quantity 0, drops incomplete extras, and OMITS measures when none survive', () => {
       const zero = builtBlock(
         useAggregate({
           actors: [disaggregatedUseActor],
@@ -384,8 +384,61 @@ describe('InnovationUseBuilder', () => {
           },
         ],
       });
-      expect(() => builder.build(empty)).toThrow(PrmsPayloadBuildError);
-      expect(() => builder.build(empty)).toThrow(/measures/);
+      // 2026-09-18: this used to throw `Missing mandatory field 'measures'`, which
+      // surfaced as REFUSED_BY_STAR and stopped the payload ever reaching PRMS.
+      // STAR no longer decides: the key is omitted and PRMS answers.
+      const built = builder.build(empty).innovation_use as Record<string, unknown>;
+      const numbers = built.current_innovation_use_numbers as Record<string, unknown>;
+
+      expect('measures' in numbers).toBe(false);
+      // Omitted, NOT sent as [] -- an empty array would assert "we checked and
+      // there are none", which is a different claim than "we are not telling you".
+      expect(numbers.measures).toBeUndefined();
+    });
+  });
+
+  describe('empty collections no longer refuse the send (2026-09-18)', () => {
+    it('omits actors instead of throwing when the result has none', () => {
+      const built = builder.build(
+        useAggregate({
+          actors: [],
+          quantifications: [
+            {
+              unit: 'trials',
+              quantification_number: 2,
+              quantification_role_id: QuantificationRolesEnum.INNOVATION_USE,
+            },
+          ],
+        }),
+      ).innovation_use as Record<string, unknown>;
+      const numbers = built.current_innovation_use_numbers as Record<string, unknown>;
+
+      expect('actors' in numbers).toBe(false);
+      expect(numbers.measures).toEqual([{ unit_of_measure: 'trials', quantity: 2 }]);
+    });
+
+    it('still builds when BOTH actors and measures are empty', () => {
+      // The worst case the gate lift exposes: nothing to declare either way.
+      // STAR must still produce a payload so PRMS can answer.
+      const built = builder.build(
+        useAggregate({ actors: [], quantifications: [] }),
+      ).innovation_use as Record<string, unknown>;
+
+      expect(built.innovation_use_level).toBeDefined();
+      expect(built.current_innovation_use_numbers).toEqual({});
+    });
+
+    it('STILL throws on a row that EXISTS but is malformed (per-row rules unchanged)', () => {
+      // The relaxation is about empty collections only. A present-but-broken row
+      // would make PRMS reject for the wrong reason and teach us nothing.
+      expect(() =>
+        builder.build(
+          useAggregate({
+            actors: [{ actor_role_id: ActorRolesEnum.INNOVATION_USE }],
+            quantifications: [],
+          }),
+        ),
+      ).toThrow(/actor_type_id/);
     });
   });
 
