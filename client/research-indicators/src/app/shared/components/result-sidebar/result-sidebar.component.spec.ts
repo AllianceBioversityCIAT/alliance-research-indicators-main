@@ -307,6 +307,38 @@ describe('ResultSidebarComponent', () => {
         is_read_only: false
       };
 
+      // --- PRMS code line under the sync button --------------------------------
+
+      it('shows the PRMS code under the sync button once PRMS has assigned one', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          prms_result_code: 54321
+        });
+        fixture.detectChanges();
+
+        const line = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+        expect(line).not.toBeNull();
+        expect(line.textContent.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+      });
+
+      it('renders nothing when the result has not been synced (prms_result_code null)', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          prms_result_code: null
+        });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+      });
+
+      it('renders nothing when the server omits prms_result_code entirely', () => {
+        // An older server must not produce an empty "PRMS code #" label.
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+      });
+
       it('hides the Pool Funding alignment tab when currentAlignment is null (loading state — AC-01.3)', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(null);
 

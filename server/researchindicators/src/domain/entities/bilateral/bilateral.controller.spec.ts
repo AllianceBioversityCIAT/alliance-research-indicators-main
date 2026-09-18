@@ -506,6 +506,7 @@ describe('BilateralController (T-15.6)', () => {
           'selected_levers',
           'selected_science_programs',
           'is_synced_to_prms',
+          'prms_result_code',
           'is_read_only',
           'version_locked',
           'toc_alignments',

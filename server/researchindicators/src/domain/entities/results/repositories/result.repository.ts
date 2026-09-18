@@ -24,6 +24,8 @@ export interface PoolFundingAlignmentContext {
   version_id?: number;
   report_year_id?: number;
   is_synced_to_prms: boolean | number | string;
+  // Code PRMS assigns on a successful ingest; null until the result has synced.
+  prms_result_code: number | string | null;
   is_pool_funding_contributor: boolean | number | string;
   // @sdd-spec bilateral-module/pending-items T-15.11 / R-BIL-078 — primary
   // contract id is needed by the per-result SP endpoint to look up the
@@ -200,6 +202,7 @@ export class ResultRepository
         r.version_id,
         r.report_year_id,
         r.is_synced_to_prms,
+        r.prms_result_code,
         r.platform_code,
         r.indicator_id,
         ac.agreement_id AS agresso_agreement_id,

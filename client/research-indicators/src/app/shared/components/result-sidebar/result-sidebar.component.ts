@@ -144,6 +144,12 @@ export class ResultSidebarComponent {
     return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
   });
 
+  // Shown under the PRMS SYNC button once PRMS has assigned a code. Mirrors the
+  // `Result code #…` line at the top of the sidebar so the two read as one family.
+  // Null/absent -- the normal state before a sync -- renders nothing at all rather
+  // than an empty label.
+  prmsResultCode = computed(() => this.bilateralService.currentAlignment()?.prms_result_code ?? null);
+
   prmsSyncInFlight = signal(false);
 
   hasPoolFundingOption = computed(() => {

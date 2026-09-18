@@ -157,6 +157,12 @@
       PRMS SYNC
       <i class="pi pi-sync !text-[12px]" aria-hidden="true"></i>
     </button>
+    @if (prmsResultCode() !== null) {
+      <span class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200] mt-2 text-center"
+            data-testid="sidebar-prms-result-code">
+        PRMS code <span class="!font-[200] !font-[space_grotesk]"> #{{ prmsResultCode() }}</span>
+      </span>
+    }
   </div>
   }
 </div>
