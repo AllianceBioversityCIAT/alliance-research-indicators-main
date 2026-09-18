@@ -162,16 +162,47 @@ export class ResultSidebarComponent {
         await this.metadata.update(this.cache.getCurrentNumericResultId());
         const resultCode = this.route.snapshot.paramMap.get('id') ?? String(this.cache.getCurrentNumericResultId());
         await this.bilateralService.getAlignment(resultCode);
-        this.actions.showToast({
+        // A successful push is a terminal, irreversible event -- the result becomes
+        // read-only in STAR -- so it gets a blocking modal rather than a toast that
+        // scrolls away unseen. Reuses the SAME `showGlobalAlert` the reporting-year
+        // change uses in General Information; no new modal component.
+        //   severity 'success'   -> green `pi pi-check-circle` + green title (#509C55)
+        //   generalButton        -> the full-width blue Continue button
+        //   hasNoCancelButton    -> single button, per the approved design
+        // `.summary` is uppercased by CSS, so the copy is written in sentence case.
+        // `detail` renders through [innerHTML], which is why the line break is a <br>.
+        this.actions.showGlobalAlert({
           severity: 'success',
-          summary: 'Sent to PRMS',
-          detail: 'The result was sent to PRMS and is pending review.'
+          summary: 'Successfully synchronized with PRMS',
+          detail: 'This result was successfully synchronized.<br>You can now access it in PRMS.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: { label: 'Continue' }
         });
       } else {
-        this.actions.showToast({
+        // Same modal shape as the success path, so a failure is as impossible to
+        // miss as a success. `severity: 'error'` gives the red `pi pi-times-circle`.
+        //
+        // The TECHNICAL reason is deliberately NOT shown: the strings that reach
+        // here are developer-facing -- "Missing mandatory field 'actors'", or a raw
+        // PRMS JSON-Schema path like
+        // "/innovation_use/current_innovation_use_numbers must have required
+        // property 'innov_use_to_be_determined'". Nothing is lost by hiding it: the
+        // server persists it verbatim in `result_prms_sync_log.failure_reason`, and
+        // it is logged to the console below for whoever is debugging.
+        //
+        // "was not synchronized" is a claim about STAR, which is safe to make: any
+        // non-ACCEPTED outcome leaves `is_synced_to_prms` false. It deliberately
+        // does NOT say PRMS received nothing -- on a timeout that is unknowable.
+        console.error('PRMS sync failed:', this.prmsSyncFailureMessage(response));
+        this.actions.showGlobalAlert({
           severity: 'error',
-          summary: 'Error',
-          detail: this.prmsSyncFailureMessage(response)
+          summary: 'Could not synchronize with PRMS',
+          detail:
+            'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: { label: 'Continue' }
         });
       }
     } finally {
