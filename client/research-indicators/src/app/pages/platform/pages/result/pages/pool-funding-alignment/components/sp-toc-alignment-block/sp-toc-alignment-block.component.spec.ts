@@ -1227,7 +1227,13 @@ describe('SpTocAlignmentBlockComponent', () => {
     });
     fixture.detectChanges();
     const err = fixture.nativeElement.querySelector('[data-testid="sp-toc-error-contribution-SP01"]') as HTMLElement;
-    expect(err.textContent?.trim()).toBe('Contribution is required');
+    // The message is in its own span: the shared validation recipe puts a
+    // `material-symbols-rounded` glyph first, whose ligature text ("warning") is
+    // part of the element's textContent but is not the message.
+    expect(err.querySelector('span')?.textContent?.trim()).toBe('Contribution is required');
+    // The amber treatment every other field-level message in the app uses.
+    expect(err.className).toContain('text-[var(--ac-warning-1)]');
+    expect(err.className).not.toContain('text-red-600');
   });
 
   // R-BIL-110 — the per-SP question asks whether the contributor wants to
