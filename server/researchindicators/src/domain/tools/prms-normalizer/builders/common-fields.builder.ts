@@ -207,6 +207,47 @@ const mapSubnationals = (aggregate: PrmsSyncAggregate) =>
     name: area.name,
   }));
 
+/**
+ * Reconciles the National / Multi-national pair with the country count.
+ *
+ * 2026-09-21, and unlike the cardinality rules removed the same day, this one is
+ * CONFIRMED BY PRMS, not assumed: PRMS rejected a payload carrying
+ * `scope_code: 3` with a single country. Scope 3 means "more than one country",
+ * so a scope-3 result holding one is internally contradictory and PRMS says so.
+ *
+ * Only scopes 3 and 4 participate -- they are the same question ("which
+ * countries?") answered at two cardinalities, so the count settles which one it
+ * is. Regional, Sub-national, Global and TBD are left exactly as chosen: their
+ * scope is not a function of the country count.
+ *
+ * ZERO countries is deliberately NOT normalised. There is nothing to reconcile
+ * with, and turning a scope-3 result with no countries into scope 4 would be a
+ * fresh guess of the kind this file just stopped making. PRMS answers that one.
+ *
+ * NOTE: this can emit a scope that differs from the one chosen in STAR's UI. That
+ * is intentional -- the payload must be internally consistent -- but it means
+ * STAR and PRMS can disagree on the label for the same result, and the STAR-side
+ * data stays as the user left it.
+ */
+const resolveNationalScope = (
+  scopeCode: number,
+  countryCount: number,
+): number => {
+  if (
+    scopeCode !== ClarisaGeoScopeEnum.MULTI_NATIONAL &&
+    scopeCode !== ClarisaGeoScopeEnum.NATIONAL
+  ) {
+    return scopeCode;
+  }
+  if (countryCount === 1) {
+    return ClarisaGeoScopeEnum.NATIONAL;
+  }
+  if (countryCount > 1) {
+    return ClarisaGeoScopeEnum.MULTI_NATIONAL;
+  }
+  return scopeCode;
+};
+
 const buildGeoFocus = (
   aggregate: PrmsSyncAggregate,
 ): Record<string, unknown> => {
@@ -216,7 +257,10 @@ const buildGeoFocus = (
       'geo_focus',
     );
   }
-  const scopeCode = Number(aggregate.geo_scope_id);
+  const scopeCode = resolveNationalScope(
+    Number(aggregate.geo_scope_id),
+    aggregate.countries.length,
+  );
   const scopeLabel = SCOPE_LABELS[scopeCode];
   if (!scopeLabel) {
     throw new PrmsPayloadBuildError(

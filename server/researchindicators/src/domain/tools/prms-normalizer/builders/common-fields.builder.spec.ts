@@ -669,28 +669,64 @@ describe('CommonFieldsBuilder', () => {
   });
 
   describe('geo_focus conditionals (homologation.md §4.3, R-PRMS-003 scenario)', () => {
-    it('SENDS a scope-3 result with one country, and does not invent a second', () => {
-      // Was: "fails ... naming the >=2-country rule". STAR no longer refuses on
-      // cardinality -- that rule was never confirmed by PRMS, and refusing locally
-      // is what stopped anyone finding out. What the test still guards is the half
-      // that always mattered: STAR must not FABRICATE a second country to satisfy
-      // a rule it invented.
-      const aggregate = baseAggregate({
-        geo_scope_id: ClarisaGeoScopeEnum.MULTI_NATIONAL,
-        countries: [
-          {
-            id: 170,
-            name: 'Colombia',
-            iso_alpha_3: 'COL',
-            iso_alpha_2: 'CO',
-          },
-        ],
-      });
+    const country = (id: number, name: string, a3: string, a2: string) => ({
+      id,
+      name,
+      iso_alpha_3: a3,
+      iso_alpha_2: a2,
+    });
+    const COL = country(170, 'Colombia', 'COL', 'CO');
+    const KEN = country(404, 'Kenya', 'KEN', 'KE');
 
-      const geo = builder.build(aggregate).geo_focus as Record<string, unknown>;
+    const geoFor = (scope: number, countries: unknown[]) =>
+      builder.build(
+        baseAggregate({ geo_scope_id: scope, countries: countries as never }),
+      ).geo_focus as Record<string, unknown>;
+
+    // --- National / Multi-national reconciled against the country count --------
+    // CONFIRMED by PRMS (2026-09-21): it rejected scope_code 3 carrying a single
+    // country. Unlike the cardinality rules removed the same day, this is not an
+    // assumption -- so STAR emits a scope that matches the data instead of
+    // refusing, and does NOT fabricate a country to justify the chosen scope.
+
+    it('sends scope 4 (National) when a scope-3 result holds ONE country', () => {
+      const geo = geoFor(ClarisaGeoScopeEnum.MULTI_NATIONAL, [KEN]);
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.NATIONAL);
+      expect(geo.scope_label).toBe('National');
+      // The country is still exactly the one STAR holds -- no second invented.
+      expect(geo.countries).toHaveLength(1);
+    });
+
+    it('sends scope 3 (Multi-national) when a scope-4 result holds TWO countries', () => {
+      const geo = geoFor(ClarisaGeoScopeEnum.NATIONAL, [COL, KEN]);
 
       expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.MULTI_NATIONAL);
-      expect(geo.countries).toHaveLength(1);
+      expect(geo.scope_label).toBe('Multi-national');
+      expect(geo.countries).toHaveLength(2);
+    });
+
+    it('leaves a scope-3 result with ZERO countries alone -- nothing to reconcile with', () => {
+      // Deliberately NOT normalised to 4: that would be a fresh guess, and PRMS
+      // is the one that answers it.
+      const geo = geoFor(ClarisaGeoScopeEnum.MULTI_NATIONAL, []);
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.MULTI_NATIONAL);
+      expect('countries' in geo).toBe(false);
+    });
+
+    it('never rewrites a scope OUTSIDE the National / Multi-national pair', () => {
+      // Regional, Sub-national, Global and TBD are not a function of the country
+      // count, so the count must not move them.
+      expect(geoFor(ClarisaGeoScopeEnum.SUB_NATIONAL, [KEN]).scope_code).toBe(
+        ClarisaGeoScopeEnum.SUB_NATIONAL,
+      );
+      expect(geoFor(ClarisaGeoScopeEnum.REGIONAL, [COL, KEN]).scope_code).toBe(
+        ClarisaGeoScopeEnum.REGIONAL,
+      );
+      expect(geoFor(ClarisaGeoScopeEnum.GLOBAL, [COL, KEN]).scope_code).toBe(
+        ClarisaGeoScopeEnum.GLOBAL,
+      );
     });
 
     it('OMITS the collection when a scope has no companion rows, rather than sending []', () => {
