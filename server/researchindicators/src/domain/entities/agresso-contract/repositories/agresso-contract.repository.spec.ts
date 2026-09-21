@@ -10,6 +10,7 @@ import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-f
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
+import { AllianceUserStaff } from '../../alliance-user-staff/entities/alliance-user-staff.entity';
 import {
   isValidText,
   escapeLikeString,
@@ -294,12 +295,17 @@ describe('AgressoContractRepository', () => {
         'uac',
         'ac.agreement_id = uac.agreement_id',
       );
+      expect(mockQueryBuilder.leftJoin).toHaveBeenCalledWith(
+        AllianceUserStaff,
+        'aus',
+        'aus.carnet = ac.projectLeadId',
+      );
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'ac.project_lead_description REGEXP :first_name',
+        'UPPER(aus.first_name) REGEXP :first_name',
         { first_name: 'JOHN' },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'ac.project_lead_description REGEXP :last_name',
+        'UPPER(aus.last_name) REGEXP :last_name',
         { last_name: 'DOE' },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
@@ -317,11 +323,11 @@ describe('AgressoContractRepository', () => {
       await repository.findByName(firstName, lastName);
 
       expect(mockQueryBuilder.where).toHaveBeenCalledWith(
-        'ac.project_lead_description REGEXP :first_name',
+        'UPPER(aus.first_name) REGEXP :first_name',
         { first_name: 'JOHN|PAUL' },
       );
       expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
-        'ac.project_lead_description REGEXP :last_name',
+        'UPPER(aus.last_name) REGEXP :last_name',
         { last_name: 'SMITH|JONES' },
       );
     });

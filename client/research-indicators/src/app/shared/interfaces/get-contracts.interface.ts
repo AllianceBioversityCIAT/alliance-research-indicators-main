@@ -12,6 +12,11 @@ export interface GetContracts {
   divisionId: null | string;
   donor: null | string;
   is_science_program: boolean;
+  // Already returned by GET agresso/contracts/find-contracts (the SQL selects
+  // `effectivePoolFundingContributorSql(...) AS is_pool_funding_contributor` and
+  // MappedContractsDto maps it) -- it simply was never declared here. Optional so
+  // a response without it renders no tag rather than breaking the option row.
+  is_pool_funding_contributor?: boolean;
   donor_reference: null | string;
   endDateGlobal: null | string;
   endDatefinance: string;

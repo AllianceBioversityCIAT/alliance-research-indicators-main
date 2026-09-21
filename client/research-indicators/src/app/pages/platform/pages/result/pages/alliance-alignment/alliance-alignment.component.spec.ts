@@ -561,6 +561,52 @@ describe('AllianceAlignmentComponent', () => {
     expect(text).toContain('Contributing projects');
   });
 
+  // --- Pool Funding sidebar visibility refresh -------------------------------
+  // The primary CONTRACT is edited HERE, and it gates the sidebar's Pool Funding
+  // block through the server-computed `eligible`. Nothing else re-fetches the
+  // alignment on a section save, so without this call the block keeps its
+  // pre-save visibility until a full page reload.
+
+  const arrangeAlignmentBody = () => {
+    api.GET_Alignments.mockResolvedValue({ data: { contracts: [{ id: 1 }] } });
+    component.body.set({
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: []
+    } as any);
+  };
+
+  it('re-reads the pool funding alignment after a successful save, so the sidebar re-evaluates visibility', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    arrangeAlignmentBody();
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).toHaveBeenCalled();
+  });
+
+  it('does NOT re-read the pool funding alignment when the PATCH failed', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: false });
+    arrangeAlignmentBody();
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).not.toHaveBeenCalled();
+  });
+
+  it('still completes the save when the alignment refresh throws', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    arrangeAlignmentBody();
+    jest.spyOn(component.bilateralService, 'getAlignment').mockRejectedValue(new Error('network'));
+
+    // A refresh failure must not reject the save -- the PATCH already committed.
+    await expect(component.saveData()).resolves.toBeUndefined();
+    expect(component.loading()).toBe(false);
+  });
+
   it('should call PATCH_Alignments and show toast on saveData', async () => {
     api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
     api.GET_Alignments.mockResolvedValue({ data: { contracts: [{ id: 1 }] } });

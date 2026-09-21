@@ -1,0 +1,390 @@
+{
+    "ok": true,
+    "message": "All results processed successfully",
+    "processed": 1,
+    "successful": 1,
+    "failed": 0,
+    "rejectedCount": 0,
+    "rejected": [],
+    "results": [
+        {
+            "success": true,
+            "result": {
+                "type": "policy_change",
+                "received_at": "2026-09-14T20:02:12.175Z",
+                "idempotencyKey": "prms.result-management.api:policy_change:dataset.ingest.requested:auto-1933f834c92ffeb1",
+                "tenant": "prms.result-management.api",
+                "op": "dataset.ingest.requested",
+                "external_reference": "ARI-SPIKE-20260914-04",
+                "keep_editing": false,
+                "created_date": "2026-09-14T12:00:00.000Z",
+                "created_by": {
+                    "email": "ari-spike-tester@cgiar.org",
+                    "name": "ARI Spike Tester"
+                },
+                "submitted_by": {
+                    "email": "ari-spike-tester@cgiar.org",
+                    "name": "ARI Spike Tester",
+                    "submitted_date": "2026-09-14T12:00:00.000Z",
+                    "comment": "ARI sync-engine T-01 TEST-environment contract spike. Synthetic data, not a real result."
+                },
+                "lead_contact_person": {
+                    "email": "ari-spike-tester@cgiar.org",
+                    "name": "ARI Spike Tester"
+                },
+                "lead_center": "ABC RH - CIAT (Alliance)",
+                "title": "ARI SPIKE 04 - synthetic policy change result (do not process)",
+                "description": "Synthetic payload generated for the PRMS Normalizer TEST-environment contract spike (ARI sync-engine T-01, call 04: policy_change, non-gated subtype). Not a real result.",
+                "geo_focus": {
+                    "scope_code": 1,
+                    "scope_label": "Global"
+                },
+                "contributing_bilateral_projects": [
+                    {
+                        "grant_title": "D-000000-ARI SPIKE Contract Title Test",
+                        "is_lead": true
+                    }
+                ],
+                "toc_mapping": {
+                    "science_program_id": "SP01"
+                },
+                "policy_change": {
+                    "policy_type": {
+                        "name": "Legal instrument"
+                    },
+                    "policy_stage": {
+                        "name": "Stage 1"
+                    },
+                    "implementing_organization": [
+                        {
+                            "institutions_id": 46
+                        }
+                    ]
+                },
+                "data": {
+                    "external_reference": "ARI-SPIKE-20260914-04",
+                    "keep_editing": false,
+                    "created_date": "2026-09-14T12:00:00.000Z",
+                    "created_by": {
+                        "email": "ari-spike-tester@cgiar.org",
+                        "name": "ARI Spike Tester"
+                    },
+                    "submitted_by": {
+                        "email": "ari-spike-tester@cgiar.org",
+                        "name": "ARI Spike Tester",
+                        "submitted_date": "2026-09-14T12:00:00.000Z",
+                        "comment": "ARI sync-engine T-01 TEST-environment contract spike. Synthetic data, not a real result."
+                    },
+                    "lead_contact_person": {
+                        "email": "ari-spike-tester@cgiar.org",
+                        "name": "ARI Spike Tester"
+                    },
+                    "lead_center": {
+                        "institution_id": 46,
+                        "acronym": "ABC RH - CIAT (Alliance)",
+                        "name": "Alliance of Bioversity and CIAT - Regional Hub"
+                    },
+                    "title": "ARI SPIKE 04 - synthetic policy change result (do not process)",
+                    "description": "Synthetic payload generated for the PRMS Normalizer TEST-environment contract spike (ARI sync-engine T-01, call 04: policy_change, non-gated subtype). Not a real result.",
+                    "geo_focus": {
+                        "scope_code": 1,
+                        "scope_label": "Global"
+                    },
+                    "contributing_bilateral_projects": [
+                        {
+                            "grant_title": "D-000000-ARI SPIKE Contract Title Test",
+                            "is_lead": true
+                        }
+                    ],
+                    "toc_mapping": {
+                        "science_program_id": "SP01"
+                    },
+                    "policy_change": {
+                        "policy_type": {
+                            "name": "Legal instrument"
+                        },
+                        "policy_stage": {
+                            "name": "Stage 1"
+                        },
+                        "implementing_organization": [
+                            {
+                                "institutions_id": 46
+                            }
+                        ]
+                    },
+                    "result_type_id": 1,
+                    "result_level_id": 3
+                },
+                "result_id": 11665,
+                "result_code": 9197
+            },
+            "externalApiResponse": {
+                "response": {
+                    "source": "API",
+                    "id": "11665",
+                    "result_code": "9197",
+                    "title": "ARI SPIKE 04 - synthetic policy change result (do not process)",
+                    "description": "Synthetic payload generated for the PRMS Normalizer TEST-environment contract spike (ARI sync-engine T-01, call 04: policy_change, non-gated subtype). Not a real result.",
+                    "result_type_id": 1,
+                    "result_level_id": 3,
+                    "gender_tag_level_id": null,
+                    "gender_impact_area_id": null,
+                    "climate_change_tag_level_id": null,
+                    "climate_impact_area_id": null,
+                    "nutrition_tag_level_id": null,
+                    "nutrition_impact_area_id": null,
+                    "environmental_biodiversity_tag_level_id": null,
+                    "environmental_biodiversity_impact_area_id": null,
+                    "poverty_tag_level_id": null,
+                    "poverty_impact_area_id": null,
+                    "is_active": true,
+                    "in_qa": 0,
+                    "version_id": "36",
+                    "created_by": 1160,
+                    "created_date": "2026-09-14T12:00:00.000Z",
+                    "last_updated_by": null,
+                    "last_updated_date": "2026-09-14T20:02:13.000Z",
+                    "status": 0,
+                    "status_id": "5",
+                    "reported_year_id": 2026,
+                    "legacy_id": null,
+                    "krs_url": null,
+                    "is_krs": null,
+                    "no_applicable_partner": false,
+                    "geographic_scope_id": 1,
+                    "has_extra_geo_scope": null,
+                    "extra_geo_scope_id": null,
+                    "has_extra_regions": null,
+                    "has_extra_countries": null,
+                    "has_regions": false,
+                    "lead_contact_person": "ARI Spike Tester",
+                    "lead_contact_person_id": null,
+                    "has_countries": false,
+                    "is_discontinued": null,
+                    "is_replicated": false,
+                    "last_action_type": null,
+                    "justification_action_type": null,
+                    "is_lead_by_partner": null,
+                    "has_innovation_link": null,
+                    "creation_method": "UNKNOWN",
+                    "external_submitter": 1160,
+                    "external_submitted_date": "2026-09-14T12:00:00.000Z",
+                    "external_submitted_comment": "ARI sync-engine T-01 TEST-environment contract spike. Synthetic data, not a real result.",
+                    "external_platform_id": 34,
+                    "external_platform_code": "STAR",
+                    "external_reference": "ARI-SPIKE-20260914-04",
+                    "reviewed_by": null,
+                    "reviewed_at": null,
+                    "obj_result_by_initiatives": [
+                        {
+                            "id": 13706,
+                            "result_id": "11665",
+                            "initiative_id": 50,
+                            "initiative_role_id": "1",
+                            "is_active": true,
+                            "from_toc": false,
+                            "created_by": 1160,
+                            "created_date": "2026-09-14T20:02:13.230Z",
+                            "last_updated_by": 1160,
+                            "last_updated_date": "2026-09-14T20:02:13.230Z",
+                            "obj_initiative": {
+                                "id": 50,
+                                "official_code": "SP01",
+                                "name": "Breeding for Tomorrow",
+                                "short_name": "Breeding for Tomorrow",
+                                "active": true,
+                                "portfolio_id": 3,
+                                "toc_id": "dc81f773-4dbd-408e-ad02-9b8fa9e072bf",
+                                "cgiar_entity_type_id": "22"
+                            }
+                        }
+                    ],
+                    "obj_version": {
+                        "id": "36",
+                        "phase_year": 2026,
+                        "phase_name": "Reporting 2026"
+                    },
+                    "obj_geographic_scope": {
+                        "id": 1,
+                        "name": "Global",
+                        "description": "The activity scope is global"
+                    },
+                    "obj_result_type": {
+                        "id": 1,
+                        "name": "Policy change",
+                        "description": "",
+                        "isActive": true
+                    },
+                    "obj_result_level": {
+                        "id": 3,
+                        "name": "Outcome",
+                        "description": "A change in knowledge, attitudes, skills, and/or relationships (KASR), which manifests as a change in behavior within the spheres of influence and interest, that results in whole or in part from the research and its outputs."
+                    },
+                    "obj_status": {
+                        "result_status_id": "5",
+                        "status_name": "Pending Review",
+                        "status_description": "API Bilateral Status"
+                    },
+                    "obj_created": {
+                        "id": 1160,
+                        "first_name": "ARI Spike Tester",
+                        "last_name": "(external)",
+                        "email": "ari-spike-tester@cgiar.org",
+                        "is_cgiar": true,
+                        "password": null,
+                        "last_login": null,
+                        "active": true,
+                        "created_date": "2026-09-14T20:00:22.570Z",
+                        "last_updated_date": "2026-09-14T20:00:22.570Z",
+                        "last_pop_up_viewed": null
+                    },
+                    "obj_external_submitter": {
+                        "id": 1160,
+                        "first_name": "ARI Spike Tester",
+                        "last_name": "(external)",
+                        "email": "ari-spike-tester@cgiar.org",
+                        "is_cgiar": true,
+                        "password": null,
+                        "last_login": null,
+                        "active": true,
+                        "created_date": "2026-09-14T20:00:22.570Z",
+                        "last_updated_date": "2026-09-14T20:00:22.570Z",
+                        "last_pop_up_viewed": null
+                    },
+                    "result_region_array": [],
+                    "result_country_array": [],
+                    "result_center_array": [
+                        {
+                            "id": 15080,
+                            "center_id": "CENTER-03",
+                            "result_id": "11665",
+                            "is_primary": true,
+                            "from_cgspace": false,
+                            "from_toc": false,
+                            "is_leading_result": true,
+                            "is_active": true,
+                            "created_date": "2026-09-14T20:02:13.199Z",
+                            "last_updated_date": "2026-09-14T20:02:13.199Z",
+                            "clarisa_center_object": {
+                                "code": "CENTER-03",
+                                "institutionId": 46,
+                                "financial_code": "C",
+                                "isActive": true,
+                                "clarisa_institution": {
+                                    "id": 46,
+                                    "name": "Alliance of Bioversity and CIAT - Regional Hub (International Center for Tropical Agriculture / Centro Internacional de Agricultura Tropical)",
+                                    "acronym": "CIAT (Alliance)",
+                                    "website_link": "https://ciat.cgiar.org/",
+                                    "institution_type_code": 54,
+                                    "is_active": true,
+                                    "last_updated_date": "2026-08-03T14:32:59.915Z",
+                                    "headquarter_country_iso2": "CO"
+                                }
+                            }
+                        }
+                    ],
+                    "obj_results_toc_result": [
+                        {
+                            "official_code": "SP01",
+                            "name": "Breeding for Tomorrow",
+                            "initiative_role": "Primary submitter",
+                            "toc_mappings": [
+                                {
+                                    "aow": null,
+                                    "name": "Breeding for Tomorrow",
+                                    "level": null,
+                                    "title": null,
+                                    "official_code": null,
+                                    "toc_result_id": null,
+                                    "planned_result": "Yes"
+                                }
+                            ]
+                        }
+                    ],
+                    "evidence_array": [],
+                    "result_by_institution_array": [],
+                    "leading_result": {
+                        "lead_kind": "center",
+                        "id": 46,
+                        "code": "CENTER-03",
+                        "name": "Alliance of Bioversity and CIAT - Regional Hub (International Center for Tropical Agriculture / Centro Internacional de Agricultura Tropical)",
+                        "acronym": "CIAT (Alliance)"
+                    },
+                    "dac_scores": {
+                        "gender": {
+                            "tag_title": null,
+                            "impact_area_names": []
+                        },
+                        "climate_change": {
+                            "tag_title": null,
+                            "impact_area_names": []
+                        },
+                        "nutrition": {
+                            "tag_title": null,
+                            "impact_area_names": []
+                        },
+                        "environmental_biodiversity": {
+                            "tag_title": null,
+                            "impact_area_names": []
+                        },
+                        "poverty": {
+                            "tag_title": null,
+                            "impact_area_names": []
+                        }
+                    },
+                    "bilateral_projects": [],
+                    "policy_change_summary": {
+                        "amount": null,
+                        "amount_status_label": null,
+                        "policy_type": {
+                            "id": 2,
+                            "name": "Legal instrument",
+                            "definition": "Legal instruments include laws, which are defined as Bills passed into law by the highest elected body (a parliament, congress or equivalent); or regulations, which are defined as rules or norms adopted by a government."
+                        },
+                        "policy_stage": {
+                            "id": 6,
+                            "name": "Stage 1",
+                            "definition": "Research taken up by next user, policy change not yet enacted."
+                        },
+                        "linked_innovation_dev": false,
+                        "linked_innovation_use": false,
+                        "result_related_to": [],
+                        "policy_implementing_organizations": [
+                            {
+                                "id": 46,
+                                "name": "Alliance of Bioversity and CIAT - Regional Hub (International Center for Tropical Agriculture / Centro Internacional de Agricultura Tropical)",
+                                "acronym": "CIAT (Alliance)",
+                                "institution_type_name": "Research organizations and universities International (CGIAR)"
+                            }
+                        ]
+                    }
+                },
+                "statusCode": 201,
+                "message": "Results Bilateral created successfully.",
+                "timestamp": "2026-09-14T20:02:14.011Z",
+                "path": "/api/bilateral/create"
+            },
+            "opensearchResponse": null,
+            "resultId": "prms.result-management.api:policy_change:dataset.ingest.requested:auto-1933f834c92ffeb1",
+            "resultType": "policy_change",
+            "external_reference": "ARI-SPIKE-20260914-04"
+        }
+    ],
+    "processingTimeMs": 1942,
+    "logs": {
+        "total": 5,
+        "byLevel": {
+            "INFO": 4,
+            "WARN": 0,
+            "ERROR": 0,
+            "SUCCESS": 1
+        }
+    },
+    "requestId": "Root=1-6aa852c3-48a0354007f30b9b35e91024",
+    "offload": {
+        "bucket": "prms-results-bucket",
+        "key": "ingest-full/1789416132180-a9af3f7d7e44fcf1857911e0cc56fb2c.json"
+    },
+    "correlationId": "e2cb5730-7962-41a4-95ba-93556a9baf7b",
+    "timestamp": "2026-09-14T20:02:14.117Z"
+}

@@ -39,7 +39,16 @@ export interface AlignmentResponse {
   selected_levers: AlignmentLever[];
   justification?: string;
   is_synced_to_prms: boolean;
+  // Code PRMS assigns on a successful ingest, read off `results.prms_result_code`.
+  // Null until the result has synced -- the sidebar shows the line only when set.
+  prms_result_code?: number | null;
   is_read_only: boolean;
+  // Server-computed live-version gate: `report_year_id !== MAPPABLE_LIVE_VERSION`
+  // (bilateral.service.ts getAlignment). The server has always emitted this on the
+  // alignment payload; it simply was not declared here. Optional so an older server
+  // that omits it leaves the sidebar gate FAILING OPEN (section stays visible)
+  // rather than hiding Pool Funding for everyone.
+  version_locked?: boolean;
   toc_alignments?: SavedTocAlignment[];
 }
 

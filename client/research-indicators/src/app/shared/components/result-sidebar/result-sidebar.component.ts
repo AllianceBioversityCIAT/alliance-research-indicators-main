@@ -79,11 +79,27 @@ export class ResultSidebarComponent {
       }));
   });
 
+  // Two gates, both server-computed, applied at ONE point so the `OPTIONAL`
+  // divider, the Pool funding alignment item and the PRMS SYNC button cannot
+  // disagree with each other (the button reads `hasPoolFundingOption()`, which
+  // derives from this same filter).
+  //
+  //  1. CONTRACT — `alignment.eligible` is the server's
+  //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
+  //     contract does not contribute to pool funding. Pre-existing behaviour.
+  //  2. YEAR — `alignment.version_locked` is the server's
+  //     `report_year_id !== MAPPABLE_LIVE_VERSION`. The reporting year is NOT a
+  //     configurable parameter anywhere in this system (no app_config row, no ENV
+  //     var, and `report_years.is_active` is the soft-delete flag, not a reporting
+  //     window); it is the constant in toc-level-rules.util.ts, and the server
+  //     resolves the comparison for us. Compared with `=== true` on purpose: a
+  //     server that omits the field leaves the section VISIBLE, matching today.
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
     if (meta?.indicator_id === 5) return true;
-    return !alignment || alignment.eligible === false;
+    if (!alignment || alignment.eligible === false) return true;
+    return alignment.version_locked === true;
   }
 
   /** Optional sections (AR.3) — excluded from the progress counter and from submit gating. */
@@ -109,8 +125,15 @@ export class ResultSidebarComponent {
     return isApproved && isPoolFundingComplete && contributesToPoolFunding;
   });
 
+  prmsAlreadySynced = computed(() => !!this.bilateralService.currentAlignment()?.is_synced_to_prms);
+
   /** Why PRMS SYNC is unavailable, so a disabled button never explains itself wrongly. */
   prmsSyncTooltip = computed(() => {
+    // Checked first: an already-synced result leaves canSyncPrms() true, and
+    // the button is disabled by prmsAlreadySynced() in the template.
+    if (this.prmsAlreadySynced()) {
+      return 'This result has already been synced to PRMS.';
+    }
     if (this.canSyncPrms()) return '';
     if (this.bilateralService.currentAlignment()?.has_contribution === false) {
       return 'This result does not contribute to a Science Program or Accelerator, so there is nothing to sync to PRMS.';
@@ -118,13 +141,85 @@ export class ResultSidebarComponent {
     return 'This button will become available once the result is approved and Pool Funding Alignment is completed.';
   });
 
+  // Shown under the PRMS SYNC button once PRMS has assigned a code. Mirrors the
+  // `Result code #…` line at the top of the sidebar so the two read as one family.
+  // Null/absent -- the normal state before a sync -- renders nothing at all rather
+  // than an empty label.
+  prmsResultCode = computed(() => this.bilateralService.currentAlignment()?.prms_result_code ?? null);
+
+  prmsSyncInFlight = signal(false);
+
   hasPoolFundingOption = computed(() => {
     return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
   });
 
-  onPrmsSync(): void {
-    if (!this.canSyncPrms()) return;
-    // PRMS sync functionality will be implemented in future task
+  async onPrmsSync(): Promise<void> {
+    if (!this.canSyncPrms() || this.prmsSyncInFlight() || this.prmsAlreadySynced()) return;
+    this.prmsSyncInFlight.set(true);
+    try {
+      const response = await this.api.POST_PrmsSync(this.cache.getCurrentNumericResultId());
+      if (response.successfulRequest) {
+        await this.metadata.update(this.cache.getCurrentNumericResultId());
+        const resultCode = this.route.snapshot.paramMap.get('id') ?? String(this.cache.getCurrentNumericResultId());
+        await this.bilateralService.getAlignment(resultCode);
+        // A successful push is a terminal, irreversible event -- the result becomes
+        // read-only in STAR -- so it gets a blocking modal rather than a toast that
+        // scrolls away unseen. Reuses the SAME `showGlobalAlert` the reporting-year
+        // change uses in General Information; no new modal component.
+        //   severity 'success'   -> green `pi pi-check-circle` + green title (#509C55)
+        //   generalButton        -> the full-width blue Continue button
+        //   hasNoCancelButton    -> single button, per the approved design
+        // `.summary` is uppercased by CSS, so the copy is written in sentence case.
+        // `detail` renders through [innerHTML], which is why the line break is a <br>.
+        this.actions.showGlobalAlert({
+          severity: 'success',
+          summary: 'Successfully synchronized with PRMS',
+          detail: 'This result was successfully synchronized.<br>You can now access it in PRMS.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: { label: 'Continue' }
+        });
+      } else {
+        // Same modal shape as the success path, so a failure is as impossible to
+        // miss as a success. `severity: 'error'` gives the red `pi pi-times-circle`.
+        //
+        // The TECHNICAL reason is deliberately NOT shown: the strings that reach
+        // here are developer-facing -- "Missing mandatory field 'actors'", or a raw
+        // PRMS JSON-Schema path like
+        // "/innovation_use/current_innovation_use_numbers must have required
+        // property 'innov_use_to_be_determined'". Nothing is lost by hiding it: the
+        // server persists it verbatim in `result_prms_sync_log.failure_reason`, and
+        // it is logged to the console below for whoever is debugging.
+        //
+        // "was not synchronized" is a claim about STAR, which is safe to make: any
+        // non-ACCEPTED outcome leaves `is_synced_to_prms` false. It deliberately
+        // does NOT say PRMS received nothing -- on a timeout that is unknowable.
+        console.error('PRMS sync failed:', this.prmsSyncFailureMessage(response));
+        this.actions.showGlobalAlert({
+          severity: 'error',
+          summary: 'Could not synchronize with PRMS',
+          detail:
+            'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: { label: 'Continue' }
+        });
+      }
+    } finally {
+      this.prmsSyncInFlight.set(false);
+    }
+  }
+
+  private prmsSyncFailureMessage(response: {
+    description?: string;
+    errorDetail?: { errors?: string; description?: string } | null;
+  }): string {
+    return (
+      response.errorDetail?.errors ||
+      response.errorDetail?.description ||
+      response.description ||
+      'Unable to send the result to PRMS, please try again.'
+    );
   }
 
   showOicrStatusDropdown = computed(() => {
