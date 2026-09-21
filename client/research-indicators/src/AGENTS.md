@@ -166,8 +166,14 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
     every user; a PI or delegate still only sees their own projects, because the picker is fed by
     the same cache their table is.
   - `app-multiselect` grew a `singleSelection` input for that picker rather than swapping in
-    `app-select`, which has no `optionFilter` (self-exclusion) or `optionsDisabled` (the PI the
-    API would reject). It caps the selection at one by **replacing**, and is inert when unset.
+    `app-select`, which has no `optionFilter` or `optionsDisabled` (the PI the API would reject).
+    It caps the selection at one by **replacing**, and is inert when unset.
+  - **The People picker does NOT hide the signed-in user** (the old R-UI-005 AC.3 self-exclusion was
+    removed). Neither `PiDelegatesService.assign()` nor `GET /api/users/active` excludes the caller,
+    so hiding them removed an action the platform allows — an admin assigning themselves to a
+    project with no delegate could not do it at all. The one real restriction, PI-of-that-project
+    (R-PID-008, a 400 from the API), is enforced for everyone by `piDisabledPeople`, which greys the
+    option out. **Don't reintroduce a client-only rule the server does not have.**
   - The page header's description, Administrator notice and stat cards share ONE `max-w` on the
     `<header>`; the cards are `flex-1`. Per-block widths made their right edges step down the page.
   - ⚠️ **"Not the PI" means "is a delegate" in ONE of the two views, and the answer is not the

@@ -1,6 +1,9 @@
 <!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-07) -->
 <!-- R-UI-005: Two searchable app-multiselects (People × Projects). -->
-<!-- R-UI-005 AC.3: People multiselect excludes the current user via [optionFilter]. -->
+<!-- The People picker no longer excludes the signed-in user (was R-UI-005 AC.3):
+     you may delegate to yourself on any project you are not the PI of. The PI of a
+     selected project is greyed out by [optionsDisabled], which covers the one case
+     the API rejects — for you and for everyone else alike. -->
 <!-- R-UI-005 AC.4: Accept gating handled by disabledConfirmIf (wired in all-modals.html). -->
 <!-- R-UI-006: Pre-load from context seeds both pickers (SYNC guard). -->
 <!-- R-UI-007: Delta confirm + success toast / error state handled in .ts. -->
@@ -81,7 +84,6 @@
 
   <!-- ── People picker ─────────────────────────────────────────────────── -->
   <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
-  <!-- optionFilter excludes the current user (R-UI-005 AC.3). -->
   <!-- CHANGE 3: disabled when source=byPerson — only the projects can be changed. -->
   <div class="flex flex-col gap-1.5">
     <app-multiselect
@@ -94,7 +96,6 @@
       label="People"
       [description]="peopleDescription()"
       placeholder="Select people to assign as delegates"
-      [optionFilter]="selfExclusionFilter()"
       [optionsDisabled]="piDisabledPeople"
       [isRequired]="true"
       [clearFilterOnClose]="true"

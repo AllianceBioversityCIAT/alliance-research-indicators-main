@@ -3519,6 +3519,139 @@ describe('scope=all — administrator view (listManagedProjects / listManagedDel
     });
   });
 
+  // The question this block answers: can a PI/delegate ever reach the admin data?
+  describe('a PI or delegate NEVER reaches the platform-wide reads', () => {
+    const NON_ADMIN_ROLES: Array<[string, number[]]> = [
+      ['no roles at all', []],
+      ['CONTRIBUTOR', [SecRolesEnum.CONTRIBUTOR]],
+      ['TECHNICAL_SUPPORT', [SecRolesEnum.TECHNICAL_SUPPORT]],
+    ];
+
+    it.each(NON_ADMIN_ROLES)(
+      '%s: listManagedProjects stays on the managed filter and touches no findAll* read',
+      async (_label, roles) => {
+        const {
+          service,
+          findManagedProjectIds,
+          findProjectSummariesByIds,
+          findAllProjectSummaries,
+          findAllActiveDelegates,
+        } = makeServiceWithManagedMethods({
+          userId: 800,
+          roles,
+          managedProjectIds: ['OWN-1'],
+          projectSummaries: [
+            {
+              agreement_id: 'OWN-1',
+              description: 'Only mine',
+              is_pool_funding_contributor: 0,
+              contract_status: 'ACTIVE',
+              start_date: null,
+              end_date: null,
+            },
+          ],
+          // Present in the repo but must never be read on this path.
+          allProjectSummaries: [
+            {
+              agreement_id: 'SOMEONE-ELSE',
+              description: 'Not mine',
+              is_pool_funding_contributor: 0,
+              contract_status: 'ACTIVE',
+              start_date: null,
+              end_date: null,
+            },
+          ],
+        });
+
+        const result = await service.listManagedProjects(800);
+
+        expect(findManagedProjectIds).toHaveBeenCalledWith(800);
+        expect(findProjectSummariesByIds).toHaveBeenCalledWith(['OWN-1']);
+        // ★ discriminating: the admin fixture holds a project that is NOT theirs.
+        //   If the two paths crossed, it would appear here.
+        expect(result.map((p) => p.project_code)).toEqual(['OWN-1']);
+        expect(findAllProjectSummaries).not.toHaveBeenCalled();
+        expect(findAllActiveDelegates).not.toHaveBeenCalled();
+      },
+    );
+
+    it('listManagedDelegates stays on the managed filter too', async () => {
+      const {
+        service,
+        findDelegatesForProjects,
+        findAllDelegatesWithProjects,
+      } = makeServiceWithManagedMethods({
+        userId: 801,
+        roles: [],
+        managedProjectIds: ['OWN-1'],
+        delegatesForProjects: [
+          {
+            delegate_user_id: 11,
+            first_name: 'ana',
+            last_name: 'diaz',
+            email: 'a.diaz@cgiar.org',
+            status_id: 2,
+            agreement_id: 'OWN-1',
+            description: 'Only mine',
+          },
+        ],
+        allDelegatesWithProjects: [
+          {
+            delegate_user_id: 99,
+            first_name: 'someone',
+            last_name: 'else',
+            email: 's.else@cgiar.org',
+            status_id: 2,
+            agreement_id: 'SOMEONE-ELSE',
+            description: 'Not mine',
+          },
+        ],
+      });
+
+      const result = await service.listManagedDelegates(801);
+
+      expect(findDelegatesForProjects).toHaveBeenCalledWith(['OWN-1']);
+      expect(findAllDelegatesWithProjects).not.toHaveBeenCalled();
+      expect(result.map((d) => d.delegate_user_id)).toEqual([11]);
+    });
+
+    it('manages nothing → empty, NOT the platform-wide list', async () => {
+      const { service, findAllProjectSummaries } =
+        makeServiceWithManagedMethods({
+          userId: 802,
+          roles: [],
+          managedProjectIds: [],
+          allProjectSummaries: [
+            {
+              agreement_id: 'SOMEONE-ELSE',
+              description: 'Not mine',
+              is_pool_funding_contributor: 0,
+              contract_status: 'ACTIVE',
+              start_date: null,
+              end_date: null,
+            },
+          ],
+        });
+
+      await expect(service.listManagedProjects(802)).resolves.toEqual([]);
+      expect(findAllProjectSummaries).not.toHaveBeenCalled();
+    });
+
+    it('cannot borrow the admin view by sending scope=all by hand', async () => {
+      const { service, findAllProjectSummaries } =
+        makeServiceWithManagedMethods({
+          userId: 803,
+          roles: [],
+          managedProjectIds: ['OWN-1'],
+        });
+
+      await expect(
+        service.listManagedProjects(803, PiDelegateScopeEnum.ALL),
+      ).rejects.toThrow(ForbiddenException);
+      expect(findAllProjectSummaries).not.toHaveBeenCalled();
+    });
+  });
+
   describe('default scope is unchanged', () => {
     it('omitting scope keeps the managed path for an admin (no accidental widening)', async () => {
       const {
