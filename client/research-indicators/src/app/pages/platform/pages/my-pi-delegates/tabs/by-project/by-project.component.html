@@ -162,7 +162,15 @@
 
           <!-- Pool funding — plain Yes / No in the row's own typography -->
           <td class="by-project__td by-project__td--pool">
-            <span class="by-project__pool-value">{{ project.is_pool_funding_contributor ? 'Yes' : 'No' }}</span>
+            <!-- Same tag as the My Projects table (my-projects.component.html) — one
+                 platform, one way of saying a project contributes to pool funding.
+                 Like there, a project that does not contribute shows nothing. -->
+            @if (project.is_pool_funding_contributor) {
+            <div class="by-project__pool-tag flex w-fit items-center" data-testid="pool-funding-tag">
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding"
+                [tiny]="true"></app-custom-tag>
+            </div>
+            }
           </td>
 
           <!-- Delegates cell — chips or no-delegate cue (R-UI-002 AC.2/AC.3) -->

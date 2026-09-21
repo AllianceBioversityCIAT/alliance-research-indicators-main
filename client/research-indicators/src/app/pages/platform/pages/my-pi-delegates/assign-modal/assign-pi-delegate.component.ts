@@ -97,8 +97,10 @@ export class AssignPiDelegateComponent implements OnInit {
   private readonly peoplePicker = inject(PiDelegatePeoplePickerStubService);
   private readonly projectUtils = inject(ProjectUtilsService);
 
-  // ─── Current user (self-exclusion, R-UI-005 AC.3) ─────────────────────────────
+  // ─── Current user ─────────────────────────────────────────────────────────────
   // `sec_user_id` from CacheService.dataCache().user — same pattern used by isMyResult.
+  // NOT used to hide yourself from the picker: you may delegate to yourself on any
+  // project you are not the PI of (see the self-exclusion note below).
   readonly currentUserId = computed(() => this.cache.dataCache().user?.sec_user_id ?? null);
 
   // ─── Form state: the two multiselects' signals ─────────────────────────────────
@@ -162,8 +164,8 @@ export class AssignPiDelegateComponent implements OnInit {
       return 'Opened from this person — only the projects can be changed here.';
     }
     return this.isNewDelegateMode()
-      ? 'Select the person who will act as PI Delegate. One person at a time; you cannot assign yourself.'
-      : 'Select the people who will act as PI Delegates. You cannot assign yourself.';
+      ? 'Select the person who will act as PI Delegate. One person at a time.'
+      : 'Select the people who will act as PI Delegates.';
   });
 
   /**
@@ -212,15 +214,20 @@ export class AssignPiDelegateComponent implements OnInit {
     () => this.selectedPeople().length === 0 || this.selectedProjects().length === 0
   );
 
-  // ─── Self-exclusion filter (R-UI-005 AC.3) ────────────────────────────────────
-  /**
-   * Returns a filter function that excludes the current user from People options.
-   * Passed to app-multiselect [optionFilter].
-   */
-  readonly selfExclusionFilter = computed(() => {
-    const userId = this.currentUserId();
-    return (option: PersonOption) => option.delegate_user_id !== Number(userId);
-  });
+  // ─── Self-exclusion: REMOVED (was R-UI-005 AC.3) ─────────────────────────────
+  //
+  // The picker used to drop the signed-in user from the options. That hid a
+  // legitimate action behind a rule the platform does not actually have: neither
+  // PiDelegatesService.assign() nor GET /api/users/active excludes the caller —
+  // the only exclusion on the write path is PI-of-that-project (R-PID-008).
+  //
+  // So the user now appears like anyone else, and the ONE case where they may not
+  // be picked is already handled, by the same mechanism that handles it for
+  // everybody: piDisabledPeople greys out the PI of any selected project. That
+  // gives exactly the three behaviours the product wants —
+  //   • PI of the selected project  → visible, greyed out (the API would 400),
+  //   • delegate on it              → selectable,
+  //   • admin on a project they neither lead nor delegate → selectable.
 
   // ─── PI exclusion in the People picker (backend rule R-PID-008) ──────────────
   //

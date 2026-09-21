@@ -279,25 +279,42 @@ describe('AssignPiDelegateComponent', () => {
 
   // ─── Self-exclusion (R-UI-005 AC.3) ─────────────────────────────────────────
 
-  describe('Self-exclusion filter (R-UI-005 AC.3)', () => {
-    it('excludes the current user from People options', () => {
-      // Current user id = 99 (from MockCacheService).
-      const filter = component.selfExclusionFilter();
+  // Was "Self-exclusion filter (R-UI-005 AC.3)". The rule is gone: neither the
+  // assign endpoint nor GET /api/users/active excludes the caller, so hiding
+  // yourself removed an action the platform allows. What remains is the PI rule,
+  // which the API really does enforce — and it applies to you like anyone else.
+  describe('the signed-in user is offered like anyone else', () => {
+    it('passes no optionFilter to the People picker', () => {
+      const people = fixture.debugElement
+        .queryAll(By.directive(MultiselectComponent))
+        .map(p => p.componentInstance as MultiselectComponent)[0];
 
-      // The filter must EXCLUDE user 99.
-      expect(filter({ delegate_user_id: 99, name: 'Me', email: 'me@test.com' })).toBe(false);
-
-      // The filter must INCLUDE anyone else.
-      expect(filter({ delegate_user_id: 1, name: 'Alice', email: 'a@test.com' })).toBe(true);
-      expect(filter({ delegate_user_id: 2, name: 'Bob', email: 'b@test.com' })).toBe(true);
+      // ★ discriminating: the removed filter was wired here. Its default keeps
+      //   every option, including the caller's own.
+      expect(people.optionFilter({ delegate_user_id: 99, name: 'Me', email: 'me@test.com' })).toBe(
+        true
+      );
     });
 
-    it('recomputes the filter when the current user changes', () => {
-      cacheService.dataCache.set({ user: { sec_user_id: 42 } });
+    it('greys YOURSELF out when you are the PI of a selected project', () => {
+      // Caller is 99 (MockCacheService) and is the PI of P1.
+      piService.byProjectCache.set([buildProject('P1', [], 99)]);
+      peoplePicker.list.set([{ delegate_user_id: 99, name: 'Me', email: 'me@test.com' }]);
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
       fixture.detectChanges();
-      const filter = component.selfExclusionFilter();
-      expect(filter({ delegate_user_id: 42, name: 'Changed', email: 'c@test.com' })).toBe(false);
-      expect(filter({ delegate_user_id: 99, name: 'Old', email: 'o@test.com' })).toBe(true);
+
+      expect(component.isProjectPi({ delegate_user_id: 99 })).toBe(true);
+    });
+
+    it('leaves you selectable on a project you do NOT lead — delegate or admin alike', () => {
+      piService.byProjectCache.set([buildProject('P1', [], 7)]);
+      peoplePicker.list.set([{ delegate_user_id: 99, name: 'Me', email: 'me@test.com' }]);
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
+      fixture.detectChanges();
+
+      // ★ discriminating: this is the case the old filter made unreachable —
+      //   an admin assigning themselves to a project with no delegate.
+      expect(component.isProjectPi({ delegate_user_id: 99 })).toBe(false);
     });
   });
 
@@ -1027,7 +1044,7 @@ describe('AssignPiDelegateComponent', () => {
       fixture.detectChanges();
 
       expect(descriptions()).toEqual([
-        'Select the people who will act as PI Delegates. You cannot assign yourself.',
+        'Select the people who will act as PI Delegates.',
         'Select the projects for this delegation. Only your manageable projects will appear.'
       ]);
       // The old standalone hint paragraphs are gone
@@ -1059,7 +1076,7 @@ describe('AssignPiDelegateComponent', () => {
       fixture.detectChanges();
 
       expect(descriptions()[1]).toBe('Opened from this project — only the people can be changed here.');
-      expect(descriptions()[0]).toBe('Select the people who will act as PI Delegates. You cannot assign yourself.');
+      expect(descriptions()[0]).toBe('Select the people who will act as PI Delegates.');
     }));
   });
   // ── Banner placement and gating ────────────────────────────────────────────
