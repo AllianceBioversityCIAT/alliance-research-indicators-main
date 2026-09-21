@@ -13,6 +13,12 @@ export interface PrmsScienceProgramSnapshot {
   sp_code: string;
   /** Null on legacy rows (R-BIL-126); those alignments are not syncable. */
   sp_role: 'PRIMARY' | 'CONTRIBUTING' | null;
+  /**
+   * ToC result the SP is aligned to. 2026-09-21: the ID is what PRMS matches on;
+   * the title is kept on the snapshot because the read surface still shows it,
+   * but it is no longer sent in the sync payload.
+   */
+  toc_result_id: number | null;
   toc_result_title: string | null;
   indicator_description: string | null;
   aligns_with_toc: boolean | null;
@@ -20,6 +26,20 @@ export interface PrmsScienceProgramSnapshot {
 
 export interface PrmsContractSnapshot {
   agreement_id: string;
+  /**
+   * CLARISA project short name for this contract, from
+   * `bilateral_project_mapping.clarisa_project_short_name` (e.g. `B-A1080`).
+   * Null when the contract has no active mapping row, or the row has no short
+   * name. PRMS resolves the project by this value, not by `agreement_id`.
+   */
+  clarisa_project_short_name: string | null;
+  /**
+   * `bilateral_project_mapping.clarisa_external_code`. Measured 2026-09-21: it
+   * equals `agreement_id` in all 199 active rows, because a migration backfilled
+   * it as `TRIM(UPPER(agresso_agreement_id))`. Kept only as the middle rung of
+   * the grant_title fallback.
+   */
+  clarisa_external_code: string | null;
   description: string | null;
   ubwClientDescription: string | null;
   is_primary: boolean;

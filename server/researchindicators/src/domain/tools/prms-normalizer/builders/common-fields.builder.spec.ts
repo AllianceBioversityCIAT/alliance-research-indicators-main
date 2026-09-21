@@ -69,6 +69,8 @@ const baseAggregate = (
   lead_contact: ADA,
   primary_contract: {
     agreement_id: 'D-1441061',
+    clarisa_project_short_name: 'B-D-1441061',
+    clarisa_external_code: 'D-1441061',
     description: 'Capacity sharing grant',
     ubwClientDescription: 'ExCIAT',
     is_primary: true,
@@ -76,6 +78,8 @@ const baseAggregate = (
   contracts: [
     {
       agreement_id: 'D-1441061',
+      clarisa_project_short_name: 'B-D-1441061',
+      clarisa_external_code: 'D-1441061',
       description: 'Capacity sharing grant',
       ubwClientDescription: 'ExCIAT',
       is_primary: true,
@@ -85,6 +89,7 @@ const baseAggregate = (
     {
       sp_code: 'SP01',
       sp_role: 'PRIMARY',
+      toc_result_id: 6339,
       toc_result_title: 'Primary ToC result for SP01',
       indicator_description: 'Primary indicator description for SP01',
       aligns_with_toc: true,
@@ -143,6 +148,7 @@ describe('CommonFieldsBuilder', () => {
         description: 'Common-fields payload for capacity_sharing',
         toc_mapping: {
           science_program_id: 'SP01',
+          toc_result_id: 6339,
           result_title: 'Primary ToC result for SP01',
           result_indicator_description:
             'Primary indicator description for SP01',
@@ -167,7 +173,7 @@ describe('CommonFieldsBuilder', () => {
         ],
         contributing_bilateral_projects: [
           {
-            grant_title: 'D-1441061-Capacity sharing grant',
+            grant_title: 'B-D-1441061',
             is_lead: true,
           },
         ],
@@ -193,6 +199,8 @@ describe('CommonFieldsBuilder', () => {
             lead_contact: GRACE,
             primary_contract: {
               agreement_id: 'D-1441062',
+              clarisa_project_short_name: 'B-D-1441062',
+              clarisa_external_code: 'D-1441062',
               description: 'Innovation development grant',
               ubwClientDescription: 'ExBIO',
               is_primary: true,
@@ -200,12 +208,16 @@ describe('CommonFieldsBuilder', () => {
             contracts: [
               {
                 agreement_id: 'D-1441062',
+                clarisa_project_short_name: 'B-D-1441062',
+                clarisa_external_code: 'D-1441062',
                 description: 'Innovation development grant',
                 ubwClientDescription: 'ExBIO',
                 is_primary: true,
               },
               {
                 agreement_id: 'D-1441062B',
+                clarisa_project_short_name: 'B-D-1441062B',
+                clarisa_external_code: 'D-1441062B',
                 description: 'Secondary development grant',
                 ubwClientDescription: 'ExBIO',
                 is_primary: false,
@@ -215,6 +227,7 @@ describe('CommonFieldsBuilder', () => {
               {
                 sp_code: 'SP02',
                 sp_role: 'PRIMARY',
+                toc_result_id: null,
                 toc_result_title: null,
                 indicator_description: null,
                 aligns_with_toc: false,
@@ -222,6 +235,7 @@ describe('CommonFieldsBuilder', () => {
               {
                 sp_code: 'SP03',
                 sp_role: 'CONTRIBUTING',
+                toc_result_id: 6401,
                 toc_result_title: 'Contributing ToC for SP03',
                 indicator_description: 'Contributing indicator for SP03',
                 aligns_with_toc: true,
@@ -259,6 +273,7 @@ describe('CommonFieldsBuilder', () => {
         contributing_programs: [
           {
             science_program_id: 'SP03',
+            toc_result_id: 6401,
             result_title: 'Contributing ToC for SP03',
             result_indicator_description: 'Contributing indicator for SP03',
           },
@@ -270,12 +285,8 @@ describe('CommonFieldsBuilder', () => {
         contributing_center: [EXBIO_CENTER],
         contributing_bilateral_projects: [
           {
-            grant_title: 'D-1441062-Innovation development grant',
+            grant_title: 'B-D-1441062',
             is_lead: true,
-          },
-          {
-            grant_title: 'D-1441062B-Secondary development grant',
-            is_lead: false,
           },
         ],
       });
@@ -302,6 +313,8 @@ describe('CommonFieldsBuilder', () => {
             lead_contact: ALAN,
             primary_contract: {
               agreement_id: 'D-1441063',
+              clarisa_project_short_name: 'B-D-1441063',
+              clarisa_external_code: 'D-1441063',
               description: 'Policy change grant',
               ubwClientDescription: 'ExCIAT',
               is_primary: true,
@@ -309,6 +322,8 @@ describe('CommonFieldsBuilder', () => {
             contracts: [
               {
                 agreement_id: 'D-1441063',
+                clarisa_project_short_name: 'B-D-1441063',
+                clarisa_external_code: 'D-1441063',
                 description: 'Policy change grant',
                 ubwClientDescription: 'ExCIAT',
                 is_primary: true,
@@ -318,6 +333,7 @@ describe('CommonFieldsBuilder', () => {
               {
                 sp_code: 'SP04',
                 sp_role: 'PRIMARY',
+                toc_result_id: 6518,
                 toc_result_title: 'Policy ToC result',
                 indicator_description: 'Policy indicator description',
                 aligns_with_toc: true,
@@ -383,6 +399,7 @@ describe('CommonFieldsBuilder', () => {
         description: 'Common-fields payload for policy_change',
         toc_mapping: {
           science_program_id: 'SP04',
+          toc_result_id: 6518,
           result_title: 'Policy ToC result',
           result_indicator_description: 'Policy indicator description',
         },
@@ -420,7 +437,7 @@ describe('CommonFieldsBuilder', () => {
         ],
         contributing_bilateral_projects: [
           {
-            grant_title: 'D-1441063-Policy change grant',
+            grant_title: 'B-D-1441063',
             is_lead: true,
           },
         ],
@@ -447,6 +464,8 @@ describe('CommonFieldsBuilder', () => {
             lead_contact: KATHERINE,
             primary_contract: {
               agreement_id: 'D-1441064',
+              clarisa_project_short_name: 'B-D-1441064',
+              clarisa_external_code: 'D-1441064',
               description: 'Innovation use grant',
               ubwClientDescription: 'exbio',
               is_primary: true,
@@ -454,6 +473,8 @@ describe('CommonFieldsBuilder', () => {
             contracts: [
               {
                 agreement_id: 'D-1441064',
+                clarisa_project_short_name: 'B-D-1441064',
+                clarisa_external_code: 'D-1441064',
                 description: 'Innovation use grant',
                 ubwClientDescription: 'exbio',
                 is_primary: true,
@@ -463,6 +484,7 @@ describe('CommonFieldsBuilder', () => {
               {
                 sp_code: 'SP05',
                 sp_role: 'PRIMARY',
+                toc_result_id: null,
                 toc_result_title: null,
                 indicator_description: null,
                 aligns_with_toc: false,
@@ -513,7 +535,7 @@ describe('CommonFieldsBuilder', () => {
         contributing_center: [EXBIO_CENTER],
         contributing_bilateral_projects: [
           {
-            grant_title: 'D-1441064-Innovation use grant',
+            grant_title: 'B-D-1441064',
             is_lead: true,
           },
         ],
@@ -577,6 +599,8 @@ describe('CommonFieldsBuilder', () => {
         baseAggregate({
           primary_contract: {
             agreement_id: 'D-1441061',
+            clarisa_project_short_name: 'B-D-1441061',
+            clarisa_external_code: 'D-1441061',
             description: 'Capacity sharing grant',
             ubwClientDescription: ' ExBIO ',
             is_primary: true,
@@ -632,6 +656,7 @@ describe('CommonFieldsBuilder', () => {
           {
             sp_code: 'SP01',
             sp_role: null,
+            toc_result_id: null,
             toc_result_title: null,
             indicator_description: null,
             aligns_with_toc: null,
@@ -655,6 +680,7 @@ describe('CommonFieldsBuilder', () => {
             {
               sp_code: 'SP09',
               sp_role: 'PRIMARY',
+              toc_result_id: null,
               toc_result_title: null,
               indicator_description: null,
               aligns_with_toc: false,
@@ -665,6 +691,148 @@ describe('CommonFieldsBuilder', () => {
 
       expect(payload.toc_mapping).toEqual({ science_program_id: 'SP09' });
       expect(payload).not.toHaveProperty('contributing_programs');
+    });
+  });
+
+  describe('contributing_bilateral_projects (2026-09-21)', () => {
+    // PRMS refused the old shape by name: "no project of the 2026 reporting phase
+    // matches grant_title \"A1080-CROP TRUST Providing for ...\". Send the
+    // project's registry code (its `external_code` / short name) rather than its
+    // full title." The registry code is the CLARISA short name.
+
+    const entryFor = (contract: Record<string, unknown>) =>
+      (
+        builder.build(baseAggregate({ contracts: [contract] as never }))
+          .contributing_bilateral_projects as Record<string, unknown>[]
+      )[0];
+
+    it('sends ONLY is_lead and grant_title', () => {
+      const entry = entryFor({
+        agreement_id: 'A1080',
+        description: 'CROP TRUST Providing for the long-term funding',
+        clarisa_project_short_name: 'B-A1080',
+        clarisa_external_code: 'A1080',
+        is_primary: true,
+      });
+
+      expect(Object.keys(entry).sort()).toEqual(['grant_title', 'is_lead']);
+      expect(entry.grant_title).toBe('B-A1080');
+      expect(entry.is_lead).toBe(true);
+    });
+
+    it('never lets the project description reach grant_title', () => {
+      // The concatenated title is precisely what PRMS could not match.
+      const entry = entryFor({
+        agreement_id: 'A1080',
+        description: 'CROP TRUST Providing for the long-term funding',
+        clarisa_project_short_name: 'B-A1080',
+        clarisa_external_code: 'A1080',
+        is_primary: true,
+      });
+
+      expect(JSON.stringify(entry)).not.toContain('CROP TRUST');
+    });
+
+    it('falls back to clarisa_external_code when the short name is missing', () => {
+      // Measured: 1 of the 28 contracts in use has a mapping row with a null
+      // short name (D514).
+      const entry = entryFor({
+        agreement_id: 'D514',
+        description: 'x',
+        clarisa_project_short_name: null,
+        clarisa_external_code: 'D514',
+        is_primary: true,
+      });
+
+      expect(entry.grant_title).toBe('D514');
+    });
+
+    it('falls back to agreement_id when the contract has NO mapping row', () => {
+      // Measured: 8 of the 28 contracts in use have no active mapping row, so the
+      // LEFT JOIN leaves both columns null. Sending the AGRESSO id keeps the
+      // project in the payload and lets PRMS say what is wrong, instead of STAR
+      // refusing a send over a data gap it cannot fix.
+      const entry = entryFor({
+        agreement_id: 'D527',
+        description: 'x',
+        clarisa_project_short_name: null,
+        clarisa_external_code: null,
+        is_primary: true,
+      });
+
+      expect(entry.grant_title).toBe('D527');
+    });
+
+    it('sends ONLY the lead contract, never the others', () => {
+      const entries = builder.build(
+        baseAggregate({
+          contracts: [
+            {
+              agreement_id: 'A1065',
+              clarisa_project_short_name: 'B-A1065',
+              is_primary: false,
+            },
+            {
+              agreement_id: 'A1080',
+              clarisa_project_short_name: 'B-A1080',
+              is_primary: true,
+            },
+            {
+              agreement_id: 'A999',
+              clarisa_project_short_name: 'B-A999',
+              is_primary: false,
+            },
+          ] as never,
+        }),
+      ).contributing_bilateral_projects as Record<string, unknown>[];
+
+      expect(entries).toEqual([{ grant_title: 'B-A1080', is_lead: true }]);
+    });
+
+    it('omits the key entirely when no contract is the lead', () => {
+      // Not `[]`: an empty array asserts "there is no lead project", which is a
+      // different claim from "we are not declaring one".
+      const data = builder.build(
+        baseAggregate({
+          contracts: [
+            {
+              agreement_id: 'A1065',
+              clarisa_project_short_name: 'B-A1065',
+              is_primary: false,
+            },
+          ] as never,
+        }),
+      );
+
+      expect('contributing_bilateral_projects' in data).toBe(false);
+    });
+
+    it('prefers the short name over both fallbacks', () => {
+      const entry = entryFor({
+        agreement_id: 'A1',
+        clarisa_project_short_name: 'SHORT',
+        clarisa_external_code: 'EXT',
+        is_primary: true,
+      });
+
+      expect(entry.grant_title).toBe('SHORT');
+    });
+
+    it('refuses only when every candidate is empty', () => {
+      expect(() =>
+        builder.build(
+          baseAggregate({
+            contracts: [
+              {
+                agreement_id: '   ',
+                clarisa_project_short_name: null,
+                clarisa_external_code: null,
+                is_primary: true,
+              },
+            ] as never,
+          }),
+        ),
+      ).toThrow(/grant_title/);
     });
   });
 
@@ -713,6 +881,62 @@ describe('CommonFieldsBuilder', () => {
 
       expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.MULTI_NATIONAL);
       expect('countries' in geo).toBe(false);
+    });
+
+    // --- Global / TBD carry their companion geography (2026-09-21) -----------
+    // These scopes used to drop regions, countries and sub-nationals silently, so
+    // a global result with countries recorded in STAR reached PRMS with none.
+
+    it('sends countries AND regions on a Global result that has them', () => {
+      const geo = builder.build(
+        baseAggregate({
+          geo_scope_id: ClarisaGeoScopeEnum.GLOBAL,
+          countries: [COL, KEN] as never,
+          regions: [{ um49code: 2, name: 'Africa' }] as never,
+        }),
+      ).geo_focus as Record<string, unknown>;
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.GLOBAL);
+      expect(geo.scope_label).toBe('Global');
+      expect(geo.countries).toHaveLength(2);
+      expect(geo.regions).toEqual([{ um49code: 2, name: 'Africa' }]);
+    });
+
+    it('does NOT reclassify a Global result that carries two countries', () => {
+      // The National/Multi-national reconciliation must not reach Global: the
+      // country count says nothing about whether a result is global.
+      const geo = builder.build(
+        baseAggregate({
+          geo_scope_id: ClarisaGeoScopeEnum.GLOBAL,
+          countries: [COL, KEN] as never,
+        }),
+      ).geo_focus as Record<string, unknown>;
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.GLOBAL);
+    });
+
+    it('sends companions on a yet-to-be-determined result too', () => {
+      const geo = builder.build(
+        baseAggregate({
+          geo_scope_id: ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED,
+          countries: [KEN] as never,
+        }),
+      ).geo_focus as Record<string, unknown>;
+
+      expect(geo.scope_code).toBe(
+        ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED,
+      );
+      expect(geo.countries).toHaveLength(1);
+    });
+
+    it('a Global result with no geography stays byte-identical to before', () => {
+      // Omitting-when-empty is what makes this change safe for every result that
+      // has nothing to declare.
+      const geo = builder.build(
+        baseAggregate({ geo_scope_id: ClarisaGeoScopeEnum.GLOBAL }),
+      ).geo_focus as Record<string, unknown>;
+
+      expect(Object.keys(geo).sort()).toEqual(['scope_code', 'scope_label']);
     });
 
     it('never rewrites a scope OUTSIDE the National / Multi-national pair', () => {
