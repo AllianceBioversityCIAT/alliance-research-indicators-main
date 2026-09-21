@@ -46,7 +46,6 @@ import { ResultImpactArea } from '../../result-impact-areas/entities/result-impa
 import { ResultKnowledgeProduct } from '../../result-knowledge-product/entities/result-knowledge-product.entity';
 import { ResultPoolFundingAlignment } from '../../bilateral/entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingIndicatorMapping } from '../../bilateral/entities/result-pool-funding-indicator-mapping.entity';
-import { ResultReviewHistory } from '../../result-review-history/entities/result-review-history.entity';
 import { ResultImpactOutcome } from '../../result-impact-outcomes/entities/result-impact-outcome.entity';
 import { ResultStrategicObjective } from '../../result-strategic-objectives/entities/result-strategic-objective.entity';
 import { BulkUploadResults } from '../../ai-reports/entities/bulk-upload-results.entity';
@@ -401,9 +400,6 @@ export class Result extends AuditableEntity {
     (mapping) => mapping.result,
   )
   pool_funding_indicator_mappings?: ResultPoolFundingIndicatorMapping[];
-
-  @OneToMany(() => ResultReviewHistory, (history) => history.result)
-  review_history?: ResultReviewHistory[];
 
   @OneToMany(
     () => ResultImpactOutcome,
