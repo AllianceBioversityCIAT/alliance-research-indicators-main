@@ -669,7 +669,12 @@ describe('CommonFieldsBuilder', () => {
   });
 
   describe('geo_focus conditionals (homologation.md §4.3, R-PRMS-003 scenario)', () => {
-    it('fails a scope-3 result with one country naming the ≥2-country rule and does not invent a second country', () => {
+    it('SENDS a scope-3 result with one country, and does not invent a second', () => {
+      // Was: "fails ... naming the >=2-country rule". STAR no longer refuses on
+      // cardinality -- that rule was never confirmed by PRMS, and refusing locally
+      // is what stopped anyone finding out. What the test still guards is the half
+      // that always mattered: STAR must not FABRICATE a second country to satisfy
+      // a rule it invented.
       const aggregate = baseAggregate({
         geo_scope_id: ClarisaGeoScopeEnum.MULTI_NATIONAL,
         countries: [
@@ -682,8 +687,33 @@ describe('CommonFieldsBuilder', () => {
         ],
       });
 
-      expect(() => builder.build(aggregate)).toThrow(/at least 2 countries/);
+      const geo = builder.build(aggregate).geo_focus as Record<string, unknown>;
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.MULTI_NATIONAL);
+      expect(geo.countries).toHaveLength(1);
+    });
+
+    it('OMITS the collection when a scope has no companion rows, rather than sending []', () => {
+      // `[]` would assert "we checked and there are none"; omitting says "we are
+      // not declaring this". PRMS decides which it wants.
+      const aggregate = baseAggregate({
+        geo_scope_id: ClarisaGeoScopeEnum.MULTI_NATIONAL,
+        countries: [],
+      });
+
+      const geo = builder.build(aggregate).geo_focus as Record<string, unknown>;
+
+      expect(geo.scope_code).toBe(ClarisaGeoScopeEnum.MULTI_NATIONAL);
+      expect('countries' in geo).toBe(false);
+    });
+
+    it('still refuses a result with NO resolvable scope -- the one structural check kept', () => {
+      // Without a scope there is no scope_code/scope_label to emit at all, so this
+      // is not an assumption about PRMS; it is the field being unbuildable.
+      const aggregate = baseAggregate({ geo_scope_id: 9999 as never });
+
       expect(() => builder.build(aggregate)).toThrow(PrmsPayloadBuildError);
+      expect(() => builder.build(aggregate)).toThrow(/geo_focus/);
     });
 
     it('accepts scope 50 with no companion geography and the exact T-01 label', () => {

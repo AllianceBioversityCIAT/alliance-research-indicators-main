@@ -187,11 +187,6 @@ const buildContributingPrograms = (
       return entry;
     });
 
-const hasCompanionGeography = (aggregate: PrmsSyncAggregate): boolean =>
-  aggregate.regions.length > 0 ||
-  aggregate.countries.length > 0 ||
-  aggregate.subnational_areas.length > 0;
-
 const mapRegions = (aggregate: PrmsSyncAggregate) =>
   aggregate.regions.map((region) => ({
     um49code: region.um49code,
@@ -235,55 +230,46 @@ const buildGeoFocus = (
     scope_label: scopeLabel,
   };
 
+  // 2026-09-21 -- the five CARDINALITY refusals that used to live in this switch
+  // were removed (>=1 region, >=2 countries, >=1 country, >=1 country + >=1
+  // sub-national, and "global must not carry companions").
+  //
+  // None of them came from a contract PRMS confirmed; they were STAR's guesses at
+  // what PRMS would demand, and because they threw `PrmsPayloadBuildError` the
+  // send was refused locally -- so PRMS never saw the payload and the guesses
+  // could never be checked. The first one to be exercised for real
+  // ("scope 3 (Multi-national) requires at least 2 countries") blocked a result
+  // whose data STAR itself considers complete.
+  //
+  // Only the STRUCTURAL check survives, above: without a resolvable scope there is
+  // no `scope_code` / `scope_label` to emit at all.
+  //
+  // Collections are attached when present and OMITTED when empty -- not sent as
+  // `[]`, which would assert "we checked and there are none" rather than "we are
+  // not declaring this". Same rule as the Innovation Use builder.
+  const attachIfAny = (key: string, values: unknown[]): void => {
+    if (values.length > 0) {
+      geo[key] = values;
+    }
+  };
+
   switch (scopeCode) {
     case ClarisaGeoScopeEnum.GLOBAL:
     case ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED:
-      if (hasCompanionGeography(aggregate)) {
-        throw new PrmsPayloadBuildError(
-          `geo_focus scope ${scopeCode} must not include regions, countries or sub-nationals`,
-          'geo_focus',
-        );
-      }
+      // Companion geography is not emitted for these scopes -- that is the shape
+      // the payload has always had. What changed is that carrying some no longer
+      // REFUSES the send.
       return geo;
     case ClarisaGeoScopeEnum.REGIONAL:
-      if (aggregate.regions.length < 1) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 2 (Regional) requires at least 1 region',
-          'geo_focus',
-        );
-      }
-      geo.regions = mapRegions(aggregate);
+      attachIfAny('regions', mapRegions(aggregate));
       return geo;
     case ClarisaGeoScopeEnum.MULTI_NATIONAL:
-      if (aggregate.countries.length < 2) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 3 (Multi-national) requires at least 2 countries',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
-      return geo;
     case ClarisaGeoScopeEnum.NATIONAL:
-      if (aggregate.countries.length < 1) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 4 (National) requires at least 1 country',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
+      attachIfAny('countries', mapCountries(aggregate));
       return geo;
     case ClarisaGeoScopeEnum.SUB_NATIONAL:
-      if (
-        aggregate.countries.length < 1 ||
-        aggregate.subnational_areas.length < 1
-      ) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 5 (Sub-national) requires at least 1 country and at least 1 sub-national',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
-      geo.subnational_areas = mapSubnationals(aggregate);
+      attachIfAny('countries', mapCountries(aggregate));
+      attachIfAny('subnational_areas', mapSubnationals(aggregate));
       return geo;
     default:
       throw new PrmsPayloadBuildError(
