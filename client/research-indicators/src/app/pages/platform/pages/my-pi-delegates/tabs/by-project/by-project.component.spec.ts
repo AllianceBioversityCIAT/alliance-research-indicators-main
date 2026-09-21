@@ -12,6 +12,7 @@
 
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { provideRouter } from '@angular/router';
 import { ByProjectComponent } from './by-project.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
@@ -172,16 +173,26 @@ describe('ByProjectComponent', () => {
       expect(text).toContain('Ongoing');
     });
 
-    it('renders pool funding as plain Yes / No — no icon', () => {
-      const values = fixture.debugElement
-        .queryAll(By.css('.by-project__pool-value'))
-        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
-      expect(values).toContain('Yes'); // PRJ-001 contributes
-      expect(values).toContain('No'); // PRJ-002 does not
+    it('renders pool funding with the SAME tag as the My Projects table', () => {
+      // PRJ-001 contributes, PRJ-002 does not.
+      const tags = fixture.debugElement.queryAll(By.css('[data-testid="pool-funding-tag"]'));
+      expect(tags).toHaveLength(1);
 
-      // the old icon badges are gone
-      expect(fixture.debugElement.queryAll(By.css('.pi-check-circle'))).toHaveLength(0);
-      expect(fixture.debugElement.queryAll(By.css('.pi-minus-circle'))).toHaveLength(0);
+      const tag = tags[0].query(By.directive(CustomTagComponent))
+        .componentInstance as CustomTagComponent;
+      expect(tag.statusId).toBe('pool-funding');
+      expect(tag.statusName).toBe('Contributing to Pool Funding');
+      expect(tag.tiny).toBe(true);
+
+      // ★ discriminating: the column used to spell it out as plain Yes / No.
+      const cells = fixture.debugElement
+        .queryAll(By.css('.by-project__td--pool'))
+        .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
+      expect(cells).not.toContain('Yes');
+      expect(cells).not.toContain('No');
+
+      // A project that does not contribute shows nothing, as in My Projects.
+      expect(cells.filter(c => c === '')).toHaveLength(cells.length - 1);
     });
 
     it('renders each delegate chip as name over email, with no tooltip icon', () => {
