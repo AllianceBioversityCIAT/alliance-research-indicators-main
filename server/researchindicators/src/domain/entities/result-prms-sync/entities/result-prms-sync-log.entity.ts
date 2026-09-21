@@ -1,13 +1,5 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
-import { Result } from '../../results/entities/result.entity';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 
 /**
@@ -20,7 +12,10 @@ import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-o
  * Nest module / route registration is T-13 — this file is entity-only.
  */
 @Entity('result_prms_sync_log')
-@Index('idx_result_prms_sync_log_result', ['result_id'])
+@Index('idx_result_prms_sync_log_code_year', [
+  'external_reference',
+  'result_year',
+])
 @Index('idx_result_prms_sync_log_request_id', ['request_id'])
 export class ResultPrmsSyncLog extends AuditableEntity {
   @PrimaryGeneratedColumn({
@@ -29,12 +24,23 @@ export class ResultPrmsSyncLog extends AuditableEntity {
   })
   id!: number;
 
+  /**
+   * Reporting year of the result this attempt describes. Paired with
+   * `external_reference` -- which already carries the result official code -- it
+   * identifies the subject the way PRMS does, with no surrogate key.
+   *
+   * Deliberately NOT a foreign key (2026-09-21). The log is a permanent record of
+   * what was sent to an external system; an FK made it hostage to the row it
+   * describes, blocking result deletion and making the alternative -- deleting the
+   * history -- destroy evidence of a push PRMS had already accepted. Nullable so a
+   * deleted result leaves a readable, orphaned record rather than a broken one.
+   */
   @Column({
-    type: 'bigint',
-    name: 'result_id',
-    nullable: false,
+    type: 'year',
+    name: 'result_year',
+    nullable: true,
   })
-  result_id!: number;
+  result_year?: number | null;
 
   @Column({
     type: 'int',
@@ -110,11 +116,4 @@ export class ResultPrmsSyncLog extends AuditableEntity {
     nullable: true,
   })
   failure_reason?: string | null;
-
-  @ManyToOne(() => Result, { nullable: false })
-  @JoinColumn({
-    name: 'result_id',
-    foreignKeyConstraintName: 'FK_result_prms_sync_log_result_id',
-  })
-  result!: Result;
 }

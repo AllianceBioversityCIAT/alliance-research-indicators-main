@@ -19,7 +19,12 @@ const LAST_ATTEMPT_SQL = `
         prms_type,
         created_at
       FROM result_prms_sync_log
-      WHERE result_id = ?
+      WHERE external_reference = (
+              SELECT result_official_code FROM results WHERE result_id = ?
+            )
+        AND result_year = (
+              SELECT report_year_id FROM results WHERE result_id = ?
+            )
         AND is_active = TRUE
       ORDER BY attempt_number DESC
       LIMIT 1
@@ -90,7 +95,10 @@ export class ResultPrmsSyncStatusReader {
       throw new NotFoundException(PRMS_SYNC_HTTP_DESCRIPTIONS.notFound);
     }
 
+    // Twice: the log keys on (official code, year) now, and each is resolved from
+    // the same `results` row the caller asked about.
     const attemptRows = await this.dataSource.query(LAST_ATTEMPT_SQL, [
+      resultId,
       resultId,
     ]);
     const lastAttempt = mapLastAttempt(
