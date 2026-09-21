@@ -123,6 +123,8 @@ const completeAggregate = (
   lead_contact: ADA,
   primary_contract: {
     agreement_id: 'D-1441080',
+    clarisa_project_short_name: 'B-D-1441080',
+    clarisa_external_code: 'D-1441080',
     description: 'Assembly grant',
     ubwClientDescription: 'ExCIAT',
     is_primary: true,
@@ -132,6 +134,7 @@ const completeAggregate = (
     {
       sp_code: 'SP01',
       sp_role: 'PRIMARY',
+      toc_result_id: null,
       toc_result_title: null,
       indicator_description: null,
       aligns_with_toc: true,

@@ -5,6 +5,7 @@ import { PolicyTypeHomologation } from '../../../tools/open-search/prms/homologa
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
@@ -89,6 +90,10 @@ export interface InsertRefusedByStarInput {
 
 @Injectable()
 export class ResultPrmsSyncLogRepository {
+  private readonly logger = new LoggerUtil({
+    name: 'ResultPrmsSyncLogRepository',
+  });
+
   constructor(private readonly dataSource: DataSource) {}
 
   async loadGateSnapshot(resultId: number): Promise<PrmsSyncGateFacts> {
@@ -184,7 +189,7 @@ export class ResultPrmsSyncLogRepository {
   ): Promise<ClaimDecision> {
     const resultRows = await manager.query(
       `
-      SELECT result_id, result_official_code, is_synced_to_prms
+      SELECT result_id, result_official_code, report_year_id, is_synced_to_prms
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
@@ -199,6 +204,17 @@ export class ResultPrmsSyncLogRepository {
     }
 
     const resultOfficialCode = Number(resultRow.result_official_code);
+    // The log now keys on (official code, year) rather than the surrogate
+    // `result_id`. That is the identity PRMS uses -- `result_official_code` is sent
+    // as `external_reference` -- so an in-flight claim covers every `results` row
+    // sharing it (a live row and its snapshots), which is exactly the set that
+    // would otherwise be pushed to PRMS twice under one external reference.
+    const resultYear = Number(resultRow.report_year_id);
+    // `external_reference` IS the official code -- the payload builder sends the
+    // same value -- so it doubles as the log's identity column and no separate
+    // code column is stored. Written here, at CLAIM time, so rows that never
+    // reach PRMS (REFUSED_BY_STAR, expired UNKNOWN) carry it too.
+    const externalReference = String(resultOfficialCode);
 
     if (asBoolean(resultRow.is_synced_to_prms)) {
       return { kind: 'already_synced', resultOfficialCode };
@@ -208,12 +224,13 @@ export class ResultPrmsSyncLogRepository {
       `
       SELECT id, attempt_number, created_at
       FROM result_prms_sync_log
-      WHERE result_id = ?
+      WHERE external_reference = ?
+        AND result_year = ?
         AND outcome = ?
         AND is_active = TRUE
       FOR UPDATE
       `,
-      [resultId, PrmsSyncOutcome.IN_FLIGHT],
+      [externalReference, resultYear, PrmsSyncOutcome.IN_FLIGHT],
     );
 
     const inFlight = inFlightRows[0];
@@ -257,20 +274,28 @@ export class ResultPrmsSyncLogRepository {
       `
       SELECT COALESCE(MAX(attempt_number), 0) AS max_attempt
       FROM result_prms_sync_log
-      WHERE result_id = ?
+      WHERE external_reference = ?
+        AND result_year = ?
       `,
-      [resultId],
+      [externalReference, resultYear],
     );
     const attemptNumber = Number(nextRows[0]?.max_attempt ?? 0) + 1;
 
     const insertResult = await manager.query(
       `
       INSERT INTO result_prms_sync_log
-        (result_id, attempt_number, environment, outcome, created_by, is_active)
-      VALUES (?, ?, ?, ?, ?, TRUE)
+        (external_reference, result_year, attempt_number,
+         environment, outcome, created_by, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, TRUE)
       `,
+      // 7 columns, 6 placeholders + literal TRUE. Keep this list and the array
+      // below in lockstep: a stray extra param shifts every value one column to
+      // the right, and MySQL reports it at the FIRST type mismatch it reaches
+      // ("Incorrect integer value: 'IN_FLIGHT' for column 'created_by'"), not at
+      // the column that is actually wrong.
       [
-        resultId,
+        externalReference,
+        resultYear,
         attemptNumber,
         input.environment,
         PrmsSyncOutcome.IN_FLIGHT,
@@ -303,9 +328,9 @@ export class ResultPrmsSyncLogRepository {
     manager: EntityManager,
     input: InsertRefusedByStarInput,
   ): Promise<{ attemptId: number; attemptNumber: number }> {
-    await manager.query(
+    const lockRows = await manager.query(
       `
-      SELECT result_id
+      SELECT result_id, result_official_code, report_year_id
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
@@ -314,26 +339,35 @@ export class ResultPrmsSyncLogRepository {
       [input.resultId],
     );
 
+    // Read under the SAME results lock the claim uses, so the attempt counter
+    // stays monotonic across both paths (design.md section 3).
+    const lockedRow = lockRows[0];
+    const resultOfficialCode = Number(lockedRow?.result_official_code);
+    const resultYear = Number(lockedRow?.report_year_id);
+    const externalReference = String(resultOfficialCode);
+
     const nextRows = await manager.query(
       `
       SELECT COALESCE(MAX(attempt_number), 0) AS max_attempt
       FROM result_prms_sync_log
-      WHERE result_id = ?
+      WHERE external_reference = ?
+        AND result_year = ?
       `,
-      [input.resultId],
+      [externalReference, resultYear],
     );
     const attemptNumber = Number(nextRows[0]?.max_attempt ?? 0) + 1;
 
     const insertResult = await manager.query(
       `
       INSERT INTO result_prms_sync_log
-        (result_id, attempt_number, environment, outcome, failure_reason,
-         prms_type, http_status, request_id, request_payload, response_body,
-         created_by, is_active)
-      VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, TRUE)
+        (external_reference, result_year, attempt_number,
+         environment, outcome, failure_reason, prms_type, http_status,
+         request_id, request_payload, response_body, created_by, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, TRUE)
       `,
       [
-        input.resultId,
+        externalReference,
+        resultYear,
         attemptNumber,
         input.environment,
         PrmsSyncOutcome.REFUSED_BY_STAR,
@@ -355,6 +389,20 @@ export class ResultPrmsSyncLogRepository {
   async settleIfInFlight(
     input: SettleIfInFlightInput,
   ): Promise<'settled' | 'late'> {
+    const status = await this.settleTransaction(input);
+
+    // Runs only on a settled ACCEPTED, so a 'late' settle still writes nothing
+    // (R-PRMS-013 AC.4). Cannot throw -- see `recordAcceptedPrmsMetadata`.
+    if (status === 'settled' && input.outcome === PrmsSyncOutcome.ACCEPTED) {
+      await this.recordAcceptedPrmsMetadata(input);
+    }
+
+    return status;
+  }
+
+  private async settleTransaction(
+    input: SettleIfInFlightInput,
+  ): Promise<'settled' | 'late'> {
     return this.dataSource.transaction(async (manager) => {
       const updateResult = await manager.query(
         `
@@ -366,7 +414,10 @@ export class ResultPrmsSyncLogRepository {
             response_body = ?,
             failure_reason = ?,
             prms_type = ?,
-            external_reference = ?,
+            -- COALESCE, not a plain assignment: the claim already wrote the
+            -- official code here, and a settle that built no payload (or an
+            -- expiry) must not erase it back to NULL.
+            external_reference = COALESCE(?, external_reference),
             updated_by = ?
         WHERE id = ?
           AND outcome = ?
@@ -395,23 +446,64 @@ export class ResultPrmsSyncLogRepository {
       }
 
       if (input.outcome === PrmsSyncOutcome.ACCEPTED) {
+        // ONLY the safety-critical flag rides this transaction. `is_synced_to_prms`
+        // is the single thing that stops a second push (`claimAttempt` reads it and
+        // nothing else -- the log is not consulted), so losing it means STAR can
+        // send a result PRMS already holds.
+        //
+        // `prms_result_code` and `prms_phase_id` are METADATA and deliberately do
+        // NOT ride along. They used to, and it cost us: a failure writing them
+        // rolled the whole transaction back, which un-did the log settle too. The
+        // row stayed IN_FLIGHT, the acceptance vanished, and the only evidence that
+        // PRMS had accepted was gone -- while PRMS still held the result.
         await manager.query(
           `
           UPDATE results
-          SET is_synced_to_prms = TRUE,
-              prms_result_code = ?,
-              prms_phase_id = ?
+          SET is_synced_to_prms = TRUE
           WHERE result_id = ?
           `,
-          [
-            input.prmsResultCode ?? null,
-            input.prmsPhaseId ?? null,
-            input.resultId,
-          ],
+          [input.resultId],
         );
       }
 
       return 'settled';
     });
+  }
+
+  /**
+   * Best-effort metadata write, deliberately OUTSIDE the settle transaction and
+   * deliberately unable to throw.
+   *
+   * These two columns are descriptive: nothing reads them to make a decision.
+   * Losing them costs a lookup; losing the settle costs correctness. So a failure
+   * here is logged loudly and swallowed, leaving a diagnosable mismatch (an
+   * ACCEPTED row whose result has no code) instead of a silent rollback.
+   */
+  private async recordAcceptedPrmsMetadata(
+    input: SettleIfInFlightInput,
+  ): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `
+        UPDATE results
+        SET prms_result_code = ?,
+            prms_phase_id = ?
+        WHERE result_id = ?
+        `,
+        [
+          input.prmsResultCode ?? null,
+          input.prmsPhaseId ?? null,
+          input.resultId,
+        ],
+      );
+    } catch (error) {
+      this.logger._error(
+        `PRMS metadata not stored for result ${input.resultId} (attempt ${input.attemptId}): ` +
+          `the sync IS recorded as ACCEPTED and is_synced_to_prms is set, but prms_result_code / ` +
+          `prms_phase_id were not written. Do NOT re-sync. Cause: ${
+            (error as Error)?.message ?? error
+          }`,
+      );
+    }
   }
 }

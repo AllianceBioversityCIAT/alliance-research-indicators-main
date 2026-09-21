@@ -173,12 +173,8 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(sql).toMatch(/AND outcome = \?/);
   });
 
-  it('settleIfInFlight flips is_synced_to_prms only on ACCEPTED in the same transaction', async () => {
-    transactionQuery
-      .mockResolvedValueOnce({ affectedRows: 1 })
-      .mockResolvedValueOnce({ affectedRows: 1 });
-
-    const result = await repository.settleIfInFlight({
+  const acceptedSettle = () =>
+    repository.settleIfInFlight({
       attemptId: 8,
       resultId: 42,
       outcome: PrmsSyncOutcome.ACCEPTED,
@@ -188,15 +184,179 @@ describe('ResultPrmsSyncLogRepository', () => {
       requestPayload: { tenant: 'prms.result-management.api' },
     });
 
-    expect(result).toBe('settled');
+  // --- identity columns + external_reference from claim time (2026-09-21) ----
+
+  it('claims on (external_reference, result_year), never on result_id', async () => {
+    transactionQuery
+      .mockResolvedValueOnce([
+        {
+          result_id: 42,
+          result_official_code: 19999,
+          report_year_id: 2026,
+          is_synced_to_prms: 0,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ max_attempt: 0 }])
+      .mockResolvedValueOnce({ insertId: 7 });
+
+    await claim();
+
+    const inFlightSql = String(transactionQuery.mock.calls[1][0]);
+    expect(inFlightSql).toMatch(/external_reference = \?/);
+    expect(inFlightSql).toMatch(/result_year = \?/);
+    // The surrogate key is gone from the log entirely; keying on it would leave a
+    // live row and its snapshots as separate identities, and PRMS resolves both
+    // to ONE result via external_reference.
+    expect(inFlightSql).not.toMatch(/WHERE result_id/);
+    // A STRING: external_reference is varchar, and it already carries the result
+    // official code, so no separate numeric code column is stored.
+    expect(transactionQuery.mock.calls[1][1]).toEqual([
+      '19999',
+      2026,
+      PrmsSyncOutcome.IN_FLIGHT,
+    ]);
+  });
+
+  it('writes external_reference on the CLAIM, so a row that never reaches PRMS still has it', async () => {
+    // Measured before this change: all 15 REFUSED_BY_STAR and both UNKNOWN rows
+    // had a null external_reference, because it was only extracted from a built
+    // payload.
+    transactionQuery
+      .mockResolvedValueOnce([
+        {
+          result_id: 42,
+          result_official_code: 19999,
+          report_year_id: 2026,
+          is_synced_to_prms: 0,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ max_attempt: 0 }])
+      .mockResolvedValueOnce({ insertId: 7 });
+
+    await claim();
+
+    const insertSql = String(transactionQuery.mock.calls[3][0]);
+    const insertParams = transactionQuery.mock.calls[3][1] as unknown[];
+
+    expect(insertSql).toMatch(/external_reference/);
+    // The EXACT array, in order -- not `toContain`. A params list one item too
+    // long still "contains" the right value while shifting every column one to
+    // the right, and MySQL then reports the mismatch at whichever column first
+    // rejects the type ("Incorrect integer value: 'IN_FLIGHT' for column
+    // 'created_by'"), which points nowhere near the real mistake. This exact
+    // bug shipped on 2026-09-22 under a `toContain` assertion.
+    expect(insertParams).toEqual([
+      '19999',
+      2026,
+      1,
+      'TEST',
+      PrmsSyncOutcome.IN_FLIGHT,
+      7,
+    ]);
+    // Structural guard for the whole class: one placeholder per bound param.
+    expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
+  });
+
+  it('a settle with no payload does NOT erase the external_reference', async () => {
+    // COALESCE, not a plain assignment: an expiry or a refusal settles with
+    // null and must leave the claim-time value standing.
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.REJECTED_BY_PRMS,
+      userId: 7,
+      failureReason: 'rejected',
+      externalReference: null,
+    });
+
+    expect(String(transactionQuery.mock.calls[0][0])).toMatch(
+      /external_reference = COALESCE\(\?, external_reference\)/,
+    );
+  });
+
+  it('settleIfInFlight flips is_synced_to_prms in the settle transaction, and NOTHING else', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    expect(await acceptedSettle()).toBe('settled');
+
     expect(transactionQuery).toHaveBeenCalledTimes(2);
     expect(transactionQuery.mock.calls[1][0]).toMatch(
       /SET is_synced_to_prms = TRUE/,
     );
-    // result code, phase id, result id -- ORDER MATTERS: these are positional
-    // `?` params, so a transposition here writes the phase into prms_result_code.
-    expect(transactionQuery.mock.calls[1][1]).toEqual([555, 36, 42]);
-    expect(transactionQuery.mock.calls[1][0]).toMatch(/prms_phase_id\s*=\s*\?/);
+    expect(transactionQuery.mock.calls[1][1]).toEqual([42]);
+    // The metadata columns must NOT ride the transaction. They used to, and a
+    // failure writing them rolled the settle back -- losing the record that PRMS
+    // had accepted while PRMS still held the result.
+    expect(transactionQuery.mock.calls[1][0]).not.toMatch(/prms_result_code/);
+    expect(transactionQuery.mock.calls[1][0]).not.toMatch(/prms_phase_id/);
+  });
+
+  it('writes the PRMS metadata OUTSIDE the transaction, after it commits', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await acceptedSettle();
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls[0][0]).toMatch(/prms_result_code\s*=\s*\?/);
+    expect(query.mock.calls[0][0]).toMatch(/prms_phase_id\s*=\s*\?/);
+    // result code, phase id, result id -- ORDER MATTERS: positional `?` params,
+    // so a transposition writes the phase into prms_result_code.
+    expect(query.mock.calls[0][1]).toEqual([555, 36, 42]);
+  });
+
+  it('SURVIVES a metadata write failure: still settled, never throws', async () => {
+    // The exact shape of the 2026-09-21 incident: the metadata UPDATE failed (the
+    // prms_phase_id column was missing) and took the whole settle down with it.
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockRejectedValue(
+      new Error("Unknown column 'prms_phase_id' in 'field list'"),
+    );
+
+    await expect(acceptedSettle()).resolves.toBe('settled');
+
+    // The settle itself still happened -- both transaction writes were issued.
+    expect(transactionQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not attempt the metadata write on a LATE settle', async () => {
+    // R-PRMS-013 AC.4: a settle arriving after expiry writes nothing at all.
+    transactionQuery.mockResolvedValueOnce({ affectedRows: 0 });
+
+    expect(await acceptedSettle()).toBe('late');
+
+    expect(transactionQuery).toHaveBeenCalledTimes(1);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('does not attempt the metadata write on a non-ACCEPTED outcome', async () => {
+    transactionQuery.mockResolvedValueOnce({ affectedRows: 1 });
+
+    const result = await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.REJECTED_BY_PRMS,
+      userId: 7,
+      failureReason: 'rejected',
+    });
+
+    expect(result).toBe('settled');
+    expect(transactionQuery).toHaveBeenCalledTimes(1);
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('insertRefusedByStar assigns attempt_number under the results row lock', async () => {
@@ -218,7 +378,7 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(lockSql).toMatch(/FROM results[\s\S]*FOR UPDATE/);
     const insertSql = transactionQuery.mock.calls[2][0] as string;
     expect(insertSql).toMatch(
-      /prms_type, http_status, request_id, request_payload, response_body/,
+      /prms_type,\s+http_status,\s+request_id,\s+request_payload,\s+response_body/,
     );
     expect(insertSql).toMatch(/NULL, NULL, NULL, NULL, NULL/);
     expect(transactionQuery.mock.calls[2][1]).toContain(

@@ -86,6 +86,24 @@ export class ENV {
   }
 
   /**
+   * Reporting year sent to the lambda-toc catalog as `?year=`.
+   *
+   * A variable rather than a constant on purpose: the reporting year rolls, and
+   * nothing else in STAR holds it — there is no app_config row and no ENV var for
+   * the PRMS reporting year (verified against the Dev database 2026-09-21;
+   * `ARI_CLARISA_PROJECTS_PHASE` is the CLARISA project phase, a different thing,
+   * and every `report_years` row is `is_active = 1`, so that flag is a
+   * soft-delete, not a window).
+   *
+   * Empty string when unset, mirroring the hosts above. `TocIntegrationService`
+   * then OMITS the query param rather than sending `year=`, so an unset value
+   * leaves the upstream call exactly as it was before this parameter existed.
+   */
+  static get PRMS_SYNC_YEAR(): string {
+    return process.env.ARI_PRMS_SYNC?.trim() || '';
+  }
+
+  /**
    * LOCAL DEVELOPMENT ONLY: skip JWT validation and inject a mock SYSTEM_ADMIN user.
    *
    * Purpose: lets a developer hit the API from their machine without setting up a
