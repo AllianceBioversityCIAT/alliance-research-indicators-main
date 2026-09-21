@@ -5,6 +5,7 @@ import { PolicyTypeHomologation } from '../../../tools/open-search/prms/homologa
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
@@ -89,6 +90,10 @@ export interface InsertRefusedByStarInput {
 
 @Injectable()
 export class ResultPrmsSyncLogRepository {
+  private readonly logger = new LoggerUtil({
+    name: 'ResultPrmsSyncLogRepository',
+  });
+
   constructor(private readonly dataSource: DataSource) {}
 
   async loadGateSnapshot(resultId: number): Promise<PrmsSyncGateFacts> {
@@ -355,6 +360,20 @@ export class ResultPrmsSyncLogRepository {
   async settleIfInFlight(
     input: SettleIfInFlightInput,
   ): Promise<'settled' | 'late'> {
+    const status = await this.settleTransaction(input);
+
+    // Runs only on a settled ACCEPTED, so a 'late' settle still writes nothing
+    // (R-PRMS-013 AC.4). Cannot throw -- see `recordAcceptedPrmsMetadata`.
+    if (status === 'settled' && input.outcome === PrmsSyncOutcome.ACCEPTED) {
+      await this.recordAcceptedPrmsMetadata(input);
+    }
+
+    return status;
+  }
+
+  private async settleTransaction(
+    input: SettleIfInFlightInput,
+  ): Promise<'settled' | 'late'> {
     return this.dataSource.transaction(async (manager) => {
       const updateResult = await manager.query(
         `
@@ -395,23 +414,64 @@ export class ResultPrmsSyncLogRepository {
       }
 
       if (input.outcome === PrmsSyncOutcome.ACCEPTED) {
+        // ONLY the safety-critical flag rides this transaction. `is_synced_to_prms`
+        // is the single thing that stops a second push (`claimAttempt` reads it and
+        // nothing else -- the log is not consulted), so losing it means STAR can
+        // send a result PRMS already holds.
+        //
+        // `prms_result_code` and `prms_phase_id` are METADATA and deliberately do
+        // NOT ride along. They used to, and it cost us: a failure writing them
+        // rolled the whole transaction back, which un-did the log settle too. The
+        // row stayed IN_FLIGHT, the acceptance vanished, and the only evidence that
+        // PRMS had accepted was gone -- while PRMS still held the result.
         await manager.query(
           `
           UPDATE results
-          SET is_synced_to_prms = TRUE,
-              prms_result_code = ?,
-              prms_phase_id = ?
+          SET is_synced_to_prms = TRUE
           WHERE result_id = ?
           `,
-          [
-            input.prmsResultCode ?? null,
-            input.prmsPhaseId ?? null,
-            input.resultId,
-          ],
+          [input.resultId],
         );
       }
 
       return 'settled';
     });
+  }
+
+  /**
+   * Best-effort metadata write, deliberately OUTSIDE the settle transaction and
+   * deliberately unable to throw.
+   *
+   * These two columns are descriptive: nothing reads them to make a decision.
+   * Losing them costs a lookup; losing the settle costs correctness. So a failure
+   * here is logged loudly and swallowed, leaving a diagnosable mismatch (an
+   * ACCEPTED row whose result has no code) instead of a silent rollback.
+   */
+  private async recordAcceptedPrmsMetadata(
+    input: SettleIfInFlightInput,
+  ): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `
+        UPDATE results
+        SET prms_result_code = ?,
+            prms_phase_id = ?
+        WHERE result_id = ?
+        `,
+        [
+          input.prmsResultCode ?? null,
+          input.prmsPhaseId ?? null,
+          input.resultId,
+        ],
+      );
+    } catch (error) {
+      this.logger._error(
+        `PRMS metadata not stored for result ${input.resultId} (attempt ${input.attemptId}): ` +
+          `the sync IS recorded as ACCEPTED and is_synced_to_prms is set, but prms_result_code / ` +
+          `prms_phase_id were not written. Do NOT re-sync. Cause: ${
+            (error as Error)?.message ?? error
+          }`,
+      );
+    }
   }
 }
