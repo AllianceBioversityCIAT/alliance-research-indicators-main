@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **4 / 10 tasks closed** (T-01, T-02, T-03, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **5 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -286,7 +286,7 @@ graph TD
 
 ---
 
-### T-05 — Delivery repository: the dedupe transaction, the retry, and the history queries  `[ ]`
+### T-05 — Delivery repository: the dedupe transaction, the retry, and the history queries  `[x]`
 
 - **Requirements covered:** R-PWH-006 AC.1, AC.2, AC.4, AC.5, AC.6, AC.7 · R-PWH-005 AC.7, AC.8 · R-PWH-003 AC.5 · NFR-PWH-001
 - **Design references:** §3.1 (`prms-webhook-delivery.repository.ts` — **sole owner of the transaction**) · §6.3 steps 3 and 3b · DD-5 · DC-2, DC-12
@@ -299,7 +299,7 @@ graph TD
   - **Step 3b — the retry.** On `ER_LOCK_DEADLOCK` (**1213**) **or** `ER_LOCK_WAIT_TIMEOUT` (**1205**), retry the transaction **once**, then fail loud. Both codes, not one. Rationale (DD-5): no isolation level is configured anywhere in this repo, so InnoDB runs REPEATABLE READ; an empty `FOR UPDATE` range read takes gap locks, gap locks are **mutually compatible**, and each insert then needs an insert-intention lock that waits on the other's gap. Genuine simultaneity therefore yields a **deadlock and a lost delivery**, not a double-apply — which would violate R-PWH-005 and NFR-PWH-005.
   - **A delivery with no `x-prms-delivery-id` is recorded and is never a duplicate of anything** (AC.4) — a `NULL` delivery id must not match another `NULL`.
   - Dedupe is keyed on the **delivery id**, never on a body hash: two deliveries with different ids and identical bodies are **both** applied (AC.5).
-  - No method updates a stored row's `decision`, `justification`, `decided_at` or `raw_body` after insert (R-PWH-005 AC.7). `processing_state` and `result_id` are the **only** mutable columns, and they are the correlator's (T-06).
+  - No method updates a stored row's `decision`, `justification`, `decided_at` or `raw_body` after insert (R-PWH-005 AC.7). `processing_state`, `result_id` **and `correlation_outcome`** are the mutable columns, and they are the correlator's (T-06). *(**Amended 2026-09-22, execute-time edit at T-05's close.** This line previously read *"`processing_state` and `result_id` are the **only** mutable columns"*, which is **narrower than the design it implements** and would have blocked T-06 from doing what §6.4 step 5 requires. Source, all three verified by the Leader before the edit: `requirements.md:259` AC.7 enumerates **content** columns and states in its own parenthesis *"The row's processing state may change; its content may not"*; `design.md:233` §6.4 step 5 reads *"One row → `CORRELATED`, write `result_id`, `processing_state = PROCESSED`"* — the correlator writes the outcome; `design.md:162` fixes the vocabulary `RECEIVED → PROCESSED | PROCESSING_FAILED`. Flagged by the T-05 Implementer, which declined to decide it; ruled by the T-05 Reviewer citing source. **No requirement's meaning changed** — a contradiction between a task and its design was removed.)*
   - History reads: by STAR `result_id` ordered by `received_at`, and across all results including uncorrelated rows.
   - Precedent worth reading, and why it does not apply: this repo already anchors such transactions on an existing PK row (`result-prms-sync-log.repository.ts:185-194`, `:306-315`) — unavailable here, because `UNKNOWN_REFERENCE` and `NO_REFERENCE` rows have no result to anchor on.
 - **Scope boundary — do NOT touch:** the correlator, the controller, `result_prms_sync_log`'s repository.

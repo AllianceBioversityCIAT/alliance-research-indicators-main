@@ -576,7 +576,7 @@ Three, none of which touched the attempt counter (Step 2 *Accounting rule*):
 
 1. **Provider-limit death.** The `%` micro-fix worker was killed by Cursor's monthly Opus limit mid-`eslint`, and its turn ended without `worker_done`. Ladder rung 1's **tree probe** found the edit had landed (`PATH_CHARS` already carried `%`, `SECRET_CHARS` untouched); rung 2's artifact check recovered its `build` and `eslint` logs from `/tmp`. Rung 3 (resume-by-message) was attempted and failed — the model was gone, so the context was unrecoverable. **Rung 4**: a fresh worker on `grok-4.7-xhigh` continued from the partial diff and ran only the one gate that leaves no trace in the tree, falsifier (g).
 2. **An unsent report recovered in full.** The main implementer had written a **695-line report to `/tmp/t08/T-08-attempt1-report.md`** and died before mailing it. The verbatim reds quoted below come from that file and its per-falsifier captures, not from a summary. *Workers reliably do the work and unreliably mail it* — the protocol's own words, observed again.
-3. **Reviewer host exhaustion.** `gpt-5.6-sol-xhigh` hit the same limit. `gpt-5.3-codex-xhigh` was tried and hit it too, which establishes the limit is **account-level on Cursor Pro, not per-model** — correcting an assumption this Leader had stated earlier in the run. Reviewer ladder rung 3 (*a different model or cross-host dispatch*) was taken. **Rung 4 (waiver) was never reached, and the Leader never audited inline** — that ladder's first line forbids it, and an infrastructure failure does not suspend a correctness constraint.
+3. **Reviewer host exhaustion.** `gpt-5.6-sol-xhigh` hit the same limit. `gpt-5.3-codex-xhigh` was tried and hit it too, from which this Leader concluded the limit was **account-level, not per-model**. ⚠️ **THAT CONCLUSION WAS FALSE, and it is corrected here rather than quietly fixed.** Re-probed 2026-09-22 after the owner questioned it: `cursor-agent -p` returns normally on **`grok-4.7-high`, `grok-4.7-xhigh` and `composer-2.5`**, while `claude-opus-5-thinking-high`, `gpt-5.6-sol-xhigh`, `gpt-5.3-codex-xhigh`, `claude-sonnet-5-thinking-high` and `gemini-3.7-flash-high` all report the limit. The exhausted pool is Cursor Pro's **included premium-model usage**; non-premium models keep working. **The error was the Leader's, and it is the KZ-017 class this spec exists to catch:** three data points drawn entirely from premium models were generalised to the whole account, and one probe of a non-premium model would have falsified it. It was recorded as a verified finding, and it was used to justify abandoning the owner's chosen Implementer routing (Cursor/Grok) for three subsequent tasks — Grok had been available the whole time. Root `CLAUDE.md`'s *quota is per-model, not per-account* line, which this entry claimed to correct, **stands**. Reviewer ladder rung 3 (*a different model or cross-host dispatch*) was taken. **Rung 4 (waiver) was never reached, and the Leader never audited inline** — that ladder's first line forbids it, and an infrastructure failure does not suspend a correctness constraint.
 
 #### Routing record — why the Reviewer is Fable and not `opus`
 
@@ -673,7 +673,7 @@ Written because the auditor ran outside the registry's T3 entry. **The gate was 
 | Field | Content |
 |---|---|
 | `flag` | **`degraded-pair`** |
-| cause | Cursor Pro's monthly usage limit exhausted **account-wide** (resets 2026-10-15), confirmed against three models in sequence: `claude-opus-5-thinking-high`, `gpt-5.6-sol-xhigh`, `gpt-5.3-codex-xhigh`. Reviewer ladder climbed: rung 1 retry → rung 3 different model / cross-host. **Rung 4 (waiver of the review itself) was never reached; the Leader never audited inline** |
+| cause | Cursor Pro's **included premium-model** usage exhausted (resets 2026-10-15), confirmed against `claude-opus-5-thinking-high`, `gpt-5.6-sol-xhigh` and `gpt-5.3-codex-xhigh`. *(This row originally read "account-wide". **Corrected 2026-09-22** — non-premium models were never exhausted; see the correction in the T-08 HALT record above. The waiver itself stands: every model at the registry's **T3 auditor** tier was unavailable, which is what forced the cross-host dispatch.)* Reviewer ladder climbed: rung 1 retry → rung 3 different model / cross-host. **Rung 4 (waiver of the review itself) was never reached; the Leader never audited inline** |
 | approved by | Not required — the review **happened**, on an independent context and a different model. This record exists so the metric stays honest, not because a gate was skipped. The owner is nonetheless informed at the continue gate (`gated` mode) |
 | verification that stood in | Nothing stood in. Full Reviewer audit performed, plus the Leader's non-author evidence re-run and an eleven-case `dist/` probe |
 | models | Implementer `claude-opus-5-thinking-high` (+ `grok-4.7-xhigh` for falsifier (g)) / Reviewer **`claude-fable-5-1`**, read-only (`Read`, `Grep`, `Glob`) |
@@ -691,7 +691,7 @@ Written because the auditor ran outside the registry's T3 entry. **The gate was 
 | Implementer (attempt 1) | Claude Code / `akili-implementer` → **Sonnet 5** (T2, registry-conformant) |
 | Implementer (attempt 2) | Claude Code / `akili-implementer` → **Fable 5.1** — effort bumped one rung per the rework rule |
 | Reviewer (both rounds) | Claude Code / `akili-reviewer` → **Opus 5**, read-only (`Read`, `Grep`, `Glob`) |
-| `author ≠ auditor` | **held on both rounds, at the registry's tiers** — no `degraded-pair` record owed. Cursor's account-wide quota exhaustion forced the host change; the native wrappers restored registry conformance that T-08 had lost |
+| `author ≠ auditor` | **held on both rounds, at the registry's tiers** — no `degraded-pair` record owed. the exhaustion of Cursor's **premium-model** pool forced the host change (*originally written "account-wide" — **corrected 2026-09-22**, see the T-08 HALT record*); the native wrappers restored registry conformance that T-08 had lost |
 | runtime events | none |
 | Diff | 13 files, **879 insertions** |
 
@@ -799,7 +799,7 @@ R-PWH-001 AC.1, AC.2, AC.6, AC.7 · R-PWH-002 AC.1, AC.2, AC.4 · R-PWH-009 AC.2
 #### Decisions made
 
 - **Effort bumped Sonnet 5 → Fable 5.1 for attempt 2**, per the rework rule. Reviewer stayed Opus 5, so `author ≠ auditor` held on both rounds.
-- **Host change, forced not chosen.** Cursor's monthly usage limit is account-wide (three models confirmed exhausted during T-08). The project's own `.claude/agents/` wrappers were used instead — which happens to be the registry-conformant routing, so T-03 closes with no waiver record where T-08 needed one.
+- **Host change, forced — but on a premise that was partly wrong.** Cursor's **premium-model** pool was exhausted (three premium models confirmed during T-08); the Leader generalised that to the whole account, which was **false** — `grok-4.7-*` and `composer-2.5` were available throughout. The project's own `.claude/agents/` wrappers were used instead, which happens to be the registry-conformant routing, so T-03 closes with no waiver record where T-08 needed one. **But the owner's chosen Implementer (Cursor/Grok) was available and was not used**, for T-03 and T-05, on the strength of a conclusion the Leader had recorded as verified. Corrected 2026-09-22 after the owner asked why work had stopped going to Cursor; routing returns to Cursor/Grok for the Implementer from T-06.
 - **`POST` returns `200`, not `201`.** R-PWH-001 AC.1 accepts either; `200` matches PRMS's own upsert convention and the `GET`. Reviewer confirmed internal consistency: `ResponseInterceptor` sets the wire status from the envelope, and Swagger, controller and tests all agree.
 - **No execute-time spec edit in this task.** The `design.md` / `tasks.md` changes committed alongside it are the **P-14b settlement**, which records a measurement rather than changing a requirement.
 
@@ -813,3 +813,100 @@ R-PWH-001 AC.1, AC.2, AC.6, AC.7 · R-PWH-002 AC.1, AC.2, AC.4 · R-PWH-009 AC.2
 #### Final verification result
 
 **PASS.** Scoped suite 7/53 green and re-verified by a non-author; full server suite **396 / 3,482** green; build exit 0; eslint clean; the falsifier red taken against the pre-fix tree on both log paths; the helper probed against the real URL shape; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
+
+---
+
+### T-05 — Delivery repository: dedupe transaction, retry, history queries — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1**
+
+| Field | Value |
+|---|---|
+| Implementer | Claude Code / `akili-implementer` → **Fable 5.1** — escalated from the wrapper's Sonnet 5 because the *Effort dial* classes concurrency as `xhigh`, and the tier↔effort rule escalates the tier rather than maxing a cheaper one |
+| Reviewer | Claude Code / `akili-reviewer` → **Opus 5**, read-only |
+| `author ≠ auditor` | **held on both axes**, at the registry's T3 for the auditor |
+| runtime events | none |
+| Diff | 2 new files, **922 lines** (292 production, 615 spec, 20 tests) |
+| Skills assigned | `nestjs-expert`, `systematic-debugging`, **`tdd`** |
+
+**Why `tdd` here and nowhere else in this spec so far.** The Disqualifier's four dedupe cases *are* the test design — same id twice, different ids with identical bodies, a `NULL` id, a **second** `NULL` id. Writing them first and watching them fail is a different act from writing the repository and retrofitting assertions onto it. The Leader assigned it for that reason and recorded the reason; `tdd` is overhead on copy or config work and was not assigned elsewhere.
+
+#### Falsifiers — four, and one sharper than the task required
+
+| # | Mutation | Red observed |
+|---|---|---|
+| (a) | dedupe branch deleted | **5 failed / 20** — AC.1 returns `kind: 'recorded'` where `'duplicate'` was expected |
+| (b) | retry removed | **5 failed / 20** — including `toHaveBeenCalledTimes(2)` receiving `1` |
+| **(b′)** | **errno set narrowed to `[1213]` alone → exactly the two 1205 tests red. Narrowed to `[1205]` alone → exactly the 1213 tests red** | **the task asked for one test per code; this proves each code's test depends on its own code being in the set, rather than the two covering for each other** |
+| (c) | dedupe keyed on the body hash | **2 failed / 20** — AC.5 returns `'duplicate'` where `'recorded'` was expected |
+| (d) | an `UPDATE prms_webhook_delivery` line appended | **1 failed** — the AC.7 append-only tripwire |
+
+**The Implementer discarded two of its own reds as invalid**, unprompted: an early failure was `mock.calls[1]` undefined — a *setup* error, not a behavioural assertion — and it says so explicitly rather than counting it. It also found one of its own tests vacuous on the stub (a loop over zero calls) and pinned it with `toHaveBeenCalledTimes(2)` **before** implementing. That is the Disqualifier's discipline applied to its own work.
+
+#### Evidence re-run — non-author, Step 2.3
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/entities/prms-webhook` | 66/66 | **6 suites / 66 tests** green | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint .../repositories` | exit 0 | exit 0 | **VERIFIED** |
+| Scope | 2 new files | `git status --porcelain` shows only the new `repositories/` directory | **VERIFIED** |
+
+**Leader full-suite re-measurement: 397 suites, 3,502 tests — all passed** (up from 396 / 3,482).
+
+**Leader read the shipped source directly** rather than trusting the report: `:203-204` carry `WHERE delivery_id = ? AND duplicate_of_id IS NULL` / `FOR UPDATE` — design §6.3 step 3 verbatim — and `:18` is `RETRYABLE_LOCK_ERRNOS = new Set([1205, 1213])`, **both** codes. An earlier draft of this spec named only 1213 and its own review caught it.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+The audit went beyond the brief in one respect worth recording: it **checked the INSERT's column list against migration `1790086170692`** and confirmed every column exists and that `created_at` / `updated_at` / `is_active` carry DB defaults, so the raw INSERT is runnable — *"a property the mocked harness structurally cannot prove."* That is the auditor closing a gap the tier leaves open, which is what an independent auditor is for.
+
+It also judged the falsifiers mechanically, not on trust: the fake table **decodes the emitted SQL**, so keying the dedupe on the body genuinely changes what it returns — AC.5 reddens on the fake's own filter, not on a mock expectation.
+
+**(4) The NULL-id skip — ruled correct and safe.** The Implementer skips the `FOR UPDATE` read entirely for a `NULL` delivery id rather than binding `NULL` into the query. The Reviewer: *"It makes AC.4 structural rather than dependent on `WHERE delivery_id = NULL` returning empty, and the absent gap lock costs nothing: a NULL id can never be a duplicate of anything, so there is no invariant to serialise. A concurrent non-NULL `FOR UPDATE` on an empty range can still gap-block the NULL insert, but that surfaces as 1205/1213 and is covered by the retry."*
+
+**(b) `DUPLICATE` rows resting at `RECEIVED` — acceptable.** It is the only legal value at insert, inventing a fourth would exceed the design's vocabulary, and a duplicate is already discriminable by `duplicate_of_id IS NOT NULL`.
+
+**(c) The AC.7 text tripwire — adequate, and not the inert-gate class.** The Leader asked whether grepping the shipped source for `UPDATE prms_webhook_delivery` is real evidence. The ruling: it is **not what carries AC.7**. The behavioural proof is `expect(sql).toHaveLength(2)` / `toHaveLength(1)` plus the pinned call counts, which enumerate every statement the three public methods emit. The text test is a regression tripwire on the real artifact, *"and its false-positive direction is red, not green."*
+
+#### Execute-time spec edit — `tasks.md` T-05 and T-06, mutability
+
+**The task text was narrower than the design it implements, and would have blocked T-06.** T-05 and T-06 both say `processing_state` and `result_id` are the **only** mutable columns. The Implementer flagged the tension and **declined to decide it**; the Reviewer ruled, citing source; the Leader verified all three citations before accepting:
+
+- `requirements.md:259` — AC.7: *"No code path updates a stored row's decision, justification, `decided_at`, or raw body after insert. **(The row's processing state may change; its content may not.)**"* — AC.7 enumerates **content** columns and explicitly permits state change.
+- `design.md:233` (§6.4 step 5) — *"One row → `CORRELATED`, write `result_id`, `processing_state = PROCESSED`."* — the correlator **does** write `correlation_outcome` after insert.
+- `design.md:162` — the `processing_state` vocabulary `RECEIVED → PROCESSED | PROCESSING_FAILED` is specified in §4, but **§3.1 assigns it no file**.
+
+`correlation_outcome` is therefore a **third mutable column**, by the design's own text. The tasks' line is amended to say so. **This changes no requirement's meaning** — it removes a contradiction between a task and the design it implements, which is an execute-time edit, not a Pivot. **Carried as a named conformance check into T-06's Reviewer brief.**
+
+#### Open item the Leader must place before T-06 — not decided here
+
+**The `processing_state` vocabulary has no home.** T-01 built `DeliveryCorrelationOutcome` for `correlation_outcome` but nothing for `processing_state`; T-05 exports a lone const `DELIVERY_PROCESSING_STATE_RECEIVED`, and T-06 will need `PROCESSED` and `PROCESSING_FAILED`. The Reviewer's placement: *"a sibling `enum/delivery-processing-state.enum.ts`, with the const retired in the same edit — two vocabularies is the failure mode."*
+
+Adding that file is a **scope addition to T-06**, whose *Files touched* names only `delivery-correlator.service.ts` and its spec. Under `gated` mode that is the owner's call, and it is raised at the continue gate rather than absorbed.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding |
+|---|---|
+| RELIABILITY (reachable today) | The AC.7 tripwire greps for `UPDATE prms_webhook_delivery` but **cannot see `manager.update(...)`, `.save(...)` or `createQueryBuilder().update()`**. Add those patterns |
+| RISK (reachable, certain) | T-06 writes `result_id` / `processing_state` / `correlation_outcome`. §3.1 assigns that write to the correlator, so the tripwire holds — but if T-06 instead adds an update method **here**, narrow the tripwire to the content columns rather than delete it |
+| RISK (reachable only via NG-4) | Duplicates rest at `RECEIVED` forever; a future sweeper must exclude `duplicate_of_id IS NOT NULL`. One line in design §4 closes it |
+
+#### Methodological finding — a sweep the Leader supplied was structurally blind
+
+The Implementer reported that `git grep -rn "PrmsWebhookDeliveryRepository" -- src test` returns 0 hits **but cannot see untracked files**, so the sweep the Leader handed it was blind to the very files under review. Same class as the `git diff | grep` secret-hygiene gate the Leader wrote for T-08, which returned a confident zero for the same reason. **Two Leader-authored gates in one spec, both unable to fail, both caught by workers.**
+
+#### Requirements covered
+
+R-PWH-006 AC.1, AC.2, AC.4, AC.5, AC.6, AC.7 · R-PWH-005 AC.7, AC.8 · R-PWH-003 AC.5 · NFR-PWH-001.
+
+#### Budget tracking
+
+| | Budgeted | T-05 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 360 | **922** (**+156 %**) | **3,905 measured across T-01, T-02, T-03, T-05, T-08** |
+| Review rounds | 3 for the whole spec | 1 | **11 / 3** |
+
+#### Final verification result
+
+**PASS.** Scoped suite 6/66 green and re-verified by a non-author; full server suite **397 / 3,502** green; build exit 0; eslint clean; four falsifiers observed red then green, one of them sharper than the task required; the shipped SQL read directly by the Leader; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
