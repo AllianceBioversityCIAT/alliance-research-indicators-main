@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `not-started`
+- **Status:** `in-progress` — 1 / 10 tasks closed (T-01, `PASS` 2026-09-22). See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -113,7 +113,7 @@ graph TD
 
 ---
 
-### T-01 — Schema: `prms_webhook_delivery` entity, enum, migration, migration spec  `[ ]`
+### T-01 — Schema: `prms_webhook_delivery` entity, enum, migration, migration spec  `[x]`
 
 - **Requirements covered:** R-PWH-005 (row shape, AC.5 column nullability) · R-PWH-006 AC.2 (`duplicate_of_id`) · R-PWH-009 AC.4 (`environment` column) · NFR-PWH-004 (`raw_body` whole)
 - **Design references:** §4 *Data Model* · §3.1 (composition rows for the entity, migration and migration spec) · DD-8 · P-2
