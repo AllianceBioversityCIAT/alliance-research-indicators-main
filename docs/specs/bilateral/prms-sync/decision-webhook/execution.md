@@ -541,3 +541,141 @@ Supporting evidence: every attempt was green on every mandated gate. `npm test` 
 - **Decision on the two open issues.** Issue 1's reachability is unproven and may be `n/a` for this codebase; Issue 2 is a bounded, declarable residual. Both are candidates for an explicit accepted-risk record rather than more rework — but that is the owner's call, not the Leader's, because both touch a credential (NFR-PWH-002) and requirements §14 makes Security sign-off **required** for this spec.
 - **If the work is kept:** `tasks.md` T-08's *Falsifier* and *Done criteria* need amending to carry the cases three review rounds discovered — absolute-URL forms, delimiter sequences, mixed case, and URL-bearing exception text. That is a **spec amendment**, and under `gated` mode it needs owner approval before any further attempt.
 - **Ordering constraint stands regardless:** `tasks.md` §1 — *"T-08 must merge before T-04 reaches any deployed environment."* Without the redaction the callback endpoint returns the credential to PRMS in every `2xx` body. **T-04 must not be dispatched while T-08 is `[~]`.**
+
+---
+
+### T-08 — AMENDED task, attempt 1 — **`PASS (degraded-pair)`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts on the amended task: 1 · Reviewer rounds: 1 (8 across the task's whole life)**
+
+This closes the task that HALTed above. The amendment (`c056b253`, owner-approved) is recorded in `tasks.md` T-08 as the `> AMENDED` and `> C-T08` callouts. The attempt counter reset because **the task changed**, not by Leader fiat.
+
+| Field | Value |
+|---|---|
+| Implementer (main rewrite) | Cursor / `claude-opus-5-thinking-high` · `ctx_841ad727666d` |
+| Implementer (micro-fix, `%`) | Cursor / `claude-opus-5-thinking-high` · `ctx_9e9f834f9e84` — **killed mid-command by a provider quota limit** |
+| Implementer (falsifier **g**) | Cursor / `grok-4.7-xhigh` · `ctx_d1a64447b62d` |
+| Reviewer | **Claude Code / `claude-fable-5-1`** via the project's own `.claude/agents/akili-reviewer.md` wrapper (read-only: `Read`, `Grep`, `Glob`) |
+| `author ≠ auditor` | **held** — different model, fresh context, no command access. See the routing record below for why it is not the registry's `opus` |
+| runtime events | **provider-limit death ×1** (recovered at ladder rung 4) · **idle-without-report ×1** (recovered by tree probe + artifact recovery) · **Reviewer host exhaustion ×1** (recovered at Reviewer ladder rung 3). **None consumed an attempt** |
+| Diff | 8 files, **937 insertions**, 12 deletions |
+
+#### The mechanism that closed it
+
+The amendment's constraint **C-T08** is what made the task solvable. Previous attempts oscillated between leaking bytes and destroying surrounding text because the code had to *guess* where the secret ended inside arbitrary prose. Fixing the credential's alphabet removes the guess:
+
+- `SECRET_CHARS = 'A-Za-z0-9_\-'` — expresses C-T08, the **credential's** grammar.
+- `PATH_CHARS = SECRET_CHARS + '/%'` — the **scanner's** reach, deliberately a superset.
+- `SEGMENT_END` uses `SECRET_CHARS`, so the sibling route `/api/prms-callbacks/x` is not matched; the discard uses `PATH_CHARS`, so `/guess/extra` is dropped whole.
+
+The Reviewer named the load-bearing invariant better than the brief did: **`SECRET_CHARS ⊆ PATH_CHARS`** — any C-T08-conformant secret is entirely inside the consumed token, so **no byte of a real secret can survive, whatever follows it.**
+
+#### Runtime events, and what they cost
+
+Three, none of which touched the attempt counter (Step 2 *Accounting rule*):
+
+1. **Provider-limit death.** The `%` micro-fix worker was killed by Cursor's monthly Opus limit mid-`eslint`, and its turn ended without `worker_done`. Ladder rung 1's **tree probe** found the edit had landed (`PATH_CHARS` already carried `%`, `SECRET_CHARS` untouched); rung 2's artifact check recovered its `build` and `eslint` logs from `/tmp`. Rung 3 (resume-by-message) was attempted and failed — the model was gone, so the context was unrecoverable. **Rung 4**: a fresh worker on `grok-4.7-xhigh` continued from the partial diff and ran only the one gate that leaves no trace in the tree, falsifier (g).
+2. **An unsent report recovered in full.** The main implementer had written a **695-line report to `/tmp/t08/T-08-attempt1-report.md`** and died before mailing it. The verbatim reds quoted below come from that file and its per-falsifier captures, not from a summary. *Workers reliably do the work and unreliably mail it* — the protocol's own words, observed again.
+3. **Reviewer host exhaustion.** `gpt-5.6-sol-xhigh` hit the same limit. `gpt-5.3-codex-xhigh` was tried and hit it too, which establishes the limit is **account-level on Cursor Pro, not per-model** — correcting an assumption this Leader had stated earlier in the run. Reviewer ladder rung 3 (*a different model or cross-host dispatch*) was taken. **Rung 4 (waiver) was never reached, and the Leader never audited inline** — that ladder's first line forbids it, and an infrastructure failure does not suspend a correctness constraint.
+
+#### Routing record — why the Reviewer is Fable and not `opus`
+
+The `.claude/agents/akili-reviewer.md` wrapper binds `model: opus`. It was **overridden to `claude-fable-5-1`** because the diff's author was `claude-opus-5-thinking-high`: running the auditor on `opus` would have collapsed the gate to `same-model` and cost the owner an approval for nothing. Fable 5.1 is a current-generation model outside the registry's T3 entry, so this is recorded as **`degraded-pair`** per the Execution Log Format — `author ≠ auditor` is **fully preserved on both axes** (different weights, fresh context), and the `PASS` stands. **The registry entry is stale rather than the choice wrong**, and `docs/model-routing.md` should gain Fable at T3.
+
+#### Falsifiers — seven, each applied independently and observed red
+
+Six mandated by the amended task, plus (g) added by the Implementer for the `%` decision. Suite sizes are from the runs themselves.
+
+| # | Mutation | Red observed |
+|---|---|---|
+| (a) | redaction removed from the envelope `path` | **2 failed** / 295 |
+| (b) | predicate widened to every route | **12 failed** / 295 |
+| (c) | comparison made case-sensitive | **8 failed** / 295 |
+| (d) | diagnostics sanitization removed | **7 failed** / 295 |
+| (e) | token restored to whitespace-bounded | **8 failed** / 295 |
+| (f) | path-only predicate (no authority) | **4 failed** / 295, re-run **5 failed** / 297 |
+| (g) | `%` removed from `PATH_CHARS` | red on `body.errors`, verbatim: `Cannot POST /api/prms-callback%2Fdef%2Fghi` |
+
+Final state after restoring all seven: **297 passed**, then **300 passed** once (g)'s tests landed.
+
+**(e) verbatim — it reproduces the attempt-2 regression exactly, which is what makes it a real gate:**
+
+```
+● redactCallbackDiagnostics › (e) keeps every delimiter around a callback path it truncates
+  Expected: "{\"path\":\"/api/prms-callback\",\"reason\":\"invalid\"}"
+  Received: "{\"path\":\"/api/prms-callback"
+● redactCallbackDiagnostics › (e) leaves a non-callback token byte-for-byte intact around delimiters
+  Expected: "{\"path\":\"/api/results/99\",\"callback\":\"/api/prms-callback\"}"
+  Received: "{\"path\":\"/api/results/99\",\"callback\":\"/api/prms-callback"
+```
+
+#### Evidence re-run — non-author, Step 2.3 (never waived)
+
+Leader-inline, after every worker reported and its terminal was released.
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/shared` | 300/300 | **44 suites / 300 tests** green | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint <paths>` | exit 0 | exit 0 | **VERIFIED** |
+| five `request.url` sites | all wrapped | **all wrapped, none bare** | **VERIFIED** |
+| secret hygiene | no literal value | only variable names; the one assigned value is the placeholder `'configured-after-import'` | **VERIFIED** |
+
+**Leader full-suite re-measurement:** `npm test -- --silent` → **393 suites, 3,453 tests — all passed.**
+**Leader e2e:** `npm run test:e2e -- test/results-ai-formalize-bulk.e2e-spec.ts` → **3/3 green.** This discharges the Done criterion that no worker could: it runs under a jest config `npm test` never invokes (P-10).
+
+**Leader probe of the compiled `dist/`** (asserting on generated output, never on the call sequence — KZ-001). Eleven cases; the four that must **not** change came back byte-identical, including the two traps — the sibling route `GET /api/prms-callbacks/list failed` and the mid-path embed `/api/results/compare/api/prms-callback/x`. And `redactCallbackPath('/api/prms-callback/abc%2Fdef')` → `/api/prms-callback`, which is why **all five wrapped sites are immune** to the `%` class entirely.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+All five prior findings closed **at the mechanism level, not patched around**. Scope exactly the 8 permitted files; no literal credential.
+
+**The round's open judgement call, and the Reviewer's ruling.** The (g) worker disclosed that the assertion on the first `_error` logger argument *passed green but never executed as red*, because Jest stopped at the first failing `expect` in that test. The Leader handed this over unresolved and asked for reasoning, not a ruling. The Reviewer ruled it **acceptable, not a K-004 violation**, on grounds the Leader accepts and records:
+
+> K-004 targets gates that *structurally cannot* redden. This one can: the identical assertion shape was **observed red** in falsifier (d), whose **first** redaction assertion is the `loggedStack` one — no earlier `expect` can pre-empt it. The `_error` first-argument site is therefore independently proven live and reddenable. What rests on composition is only *"the `%` behaviour also reaches the logger stack"*, and **both factors were each observed red**.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding | Reviewer's own reachability check |
+|---|---|---|
+| RELIABILITY | `global.exception.ts` redacts `rawErrors` only when it is a `string`; a `ValidationPipe` `BadRequestException` carries `response.message` as `string[]` and passes through unredacted | **Could not construct a reaching payload** — the secret is in the path, not the body, and the callback parses leniently and never returns `400`. Cheap hardening: map the array |
+| RISK | `response.interceptor.ts` logs `res?.stack` (`:72`) and copies `res.message` into `errors` (`:64`) without sanitization. Not one of the five enumerated sites | **Could not construct one** — thrown exceptions bypass this `map`; it would need a handler *returning* an error-shaped object whose stack embeds the callback URL. No such code exists |
+| READABILITY | Split the (g) percent test into two `it()`s mirroring the (d) pair, so the logger assertion is first in its own test | Smallest change that would make it independently falsifiable |
+| SECURITY (util-declared) | A **percent-encoded guess** is no longer a residual — the `%` micro-fix closed it. The remaining declared behaviour is that a query string survives in diagnostics (`…/prms-callback/SECRET?x=1` → `…/prms-callback?x=1`), which is safe **because the credential is a path segment** and `redactCallbackPath` drops the query at all five wrapped sites. **If a future variant moves the secret into the query string, this needs revisiting** | Declared in the util's own comments, not claimed away |
+
+Both reachability findings are the right shape: a finding whose author states *"I could not construct a reaching payload"* is more useful than one that asserts a leak it cannot demonstrate.
+
+#### Requirements covered
+
+R-PWH-004 AC.4, AC.7 · NFR-PWH-002 · DC-11 (both directions).
+
+#### Decisions made
+
+- **Execute-time spec edits**, all owner-approved at the amendment gate and carried into this Reviewer's brief: `tasks.md` T-08 (`> AMENDED`, `> C-T08`, six falsifiers, Done criteria, `Effort` M→L, LOC 240→750); `requirements.md` DC-11 widened from two assertions to six; `design.md` §*Verification* row updated to match. The **requirement's meaning is unchanged** — only its gate was made adequate to it, which is why this is an edit and not a Pivot.
+- **The `%` scanner widening was the Leader's call, correctly escalated by the Implementer.** It declined to change `PATH_CHARS` because it believed that changed C-T08. It does not: C-T08 governs the **credential's** grammar, `PATH_CHARS` the **scanner's** reach, and a scanner may consume a superset provided it consumes nothing that is ordinary sentence punctuation. `%` is not; `.` `,` `;` `:` are, and adding those is what destroyed surrounding text at attempt 2.
+- **A defect in this Leader's own brief, found by a worker and recorded rather than quietly fixed:** the mandated secret-hygiene gate `git diff --unified=0 | grep -niE "…secret"` **could not fail**, because both util files are untracked and `git diff` cannot see them. It returned a confident zero. Replaced with a form that covers untracked paths. This is the same class as the three gates root `CLAUDE.md` §4.3 already records — **authored by the Leader, in a brief whose whole subject was falsifiability.**
+
+#### Budget tracking
+
+| | Budgeted | Actual | Running total |
+|---|---|---|---|
+| LOC (T-08) | ≈ 750 after the amendment (≈ 240 before) | **937** | **2,104 measured across T-01, T-02, T-08** |
+| Review rounds | 3 for the whole spec | **8 on T-08 alone** | **8 / 3 — crossed, escalated at the amendment gate** |
+
+#### Final verification result
+
+**PASS (degraded-pair: `claude-opus-5-thinking-high` / `claude-fable-5-1`).** Scoped suite 44/300 green and re-verified by a non-author; full server suite **393 / 3,453** green; e2e envelope-path consumer 3/3; build exit 0; eslint clean; all five `request.url` sites wrapped; seven falsifiers observed red then green; Reviewer `PASS` from an independent context on a different model with no command access.
+
+## REVIEW_WAIVED: T-08
+
+Written because the auditor ran outside the registry's T3 entry. **The gate was not lost — only its registry conformance.**
+
+| Field | Content |
+|---|---|
+| `flag` | **`degraded-pair`** |
+| cause | Cursor Pro's monthly usage limit exhausted **account-wide** (resets 2026-10-15), confirmed against three models in sequence: `claude-opus-5-thinking-high`, `gpt-5.6-sol-xhigh`, `gpt-5.3-codex-xhigh`. Reviewer ladder climbed: rung 1 retry → rung 3 different model / cross-host. **Rung 4 (waiver of the review itself) was never reached; the Leader never audited inline** |
+| approved by | Not required — the review **happened**, on an independent context and a different model. This record exists so the metric stays honest, not because a gate was skipped. The owner is nonetheless informed at the continue gate (`gated` mode) |
+| verification that stood in | Nothing stood in. Full Reviewer audit performed, plus the Leader's non-author evidence re-run and an eleven-case `dist/` probe |
+| models | Implementer `claude-opus-5-thinking-high` (+ `grok-4.7-xhigh` for falsifier (g)) / Reviewer **`claude-fable-5-1`**, read-only (`Read`, `Grep`, `Glob`) |
+
+**This is not a `REVIEW_SKIPPED`.** No predicate proved a review was never owed; one was owed, and one was performed.

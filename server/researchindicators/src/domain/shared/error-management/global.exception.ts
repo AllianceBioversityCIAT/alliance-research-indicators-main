@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { ServerResponseDto } from '../global-dto/server-response.dto';
 import { LoggerUtil } from '../utils/logger.util';
+import {
+  redactCallbackDiagnostics,
+  redactCallbackPath,
+} from '../utils/path-redaction.util';
 
 @Catch()
 export class GlobalExceptions implements ExceptionFilter {
@@ -14,26 +18,37 @@ export class GlobalExceptions implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();
-    const stack = exception?.stack ?? '';
+    const loggedStack = (exception as InternalServerErrorException)?.stack;
+    const safeStack =
+      typeof loggedStack === 'string'
+        ? redactCallbackDiagnostics(loggedStack)
+        : loggedStack;
     const _logger: LoggerUtil = new LoggerUtil({
-      stack: stack,
+      stack: safeStack ?? '',
     });
 
     const status = exception?.status ?? HttpStatus.INTERNAL_SERVER_ERROR;
     const description = exception?.name;
     const error = exception?.message;
+    const rawErrors = exception?.response?.message
+      ? exception.response.message
+      : error;
+    const errors =
+      typeof rawErrors === 'string'
+        ? redactCallbackDiagnostics(rawErrors)
+        : rawErrors;
 
     const res: ServerResponseDto<unknown> = {
       description: description,
       status: status,
-      errors: exception?.response?.message ? exception.response.message : error,
+      errors,
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: redactCallbackPath(request.url),
     };
 
-    _logger._error((exception as InternalServerErrorException)?.stack, {
+    _logger._error(safeStack, {
       method: request.method,
-      url: request.url,
+      url: redactCallbackPath(request.url),
       userId: request?.user?.sec_user_id,
     });
     response.status(status).json(res);

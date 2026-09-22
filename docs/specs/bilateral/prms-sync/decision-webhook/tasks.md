@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — 2 / 10 tasks closed (T-01, T-02 — both `PASS` 2026-09-22). **T-08 is `[~]`: it HALTed on three Reviewer `FAIL` verdicts and was AMENDED and reopened 2026-09-22 with owner approval** (six falsifiers, and constraint **C-T08** fixing the secret's grammar). Prior work preserved on branch `akili/t08-halted`. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **3 / 10 tasks closed** (T-01, T-02, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -399,7 +399,7 @@ graph TD
 
 ---
 
-### T-08 — `path-redaction.util.ts` and the five `request.url` read sites  `[~]`
+### T-08 — `path-redaction.util.ts` and the five `request.url` read sites  `[x]`
 
 > **This task changes three globally-registered, application-wide wrappers.** Its blast radius is every controller in the server. Design DD-10 has been **wrong three times** about the mechanism (never about the decision) — read DD-10 v2 and P-16 in full before editing, and trust the grep over the prose.
 
