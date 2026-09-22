@@ -304,7 +304,7 @@ No new `sync_process_log` row type — that table models scheduled sync jobs, an
 | Build | `npm run build` | **DC-5.** `tsconfig.build.json` excludes `**/*spec.ts`, so the unit tier is structurally blind to this class |
 | Lint | `npx eslint <paths>` | **Not** `npm run lint` — it carries `--fix` and mutates (P-9, K-001) |
 | Migration | `npm run migration:test:execute` then `npm run migration:test:revert` | Against the disposable TEST scratch schema — **never** the shared Dev database. Note `npm run migration:run` **does not exist** (JD-10). The spec file goes in `src/db/migration-specs/`, not beside the migration (JD-9) |
-| Secret redaction | `npm test -- --silent` | **DC-11, widened at round 2** — the callback's `2xx` body and the wrong-secret `404` log carry no segment beyond the route prefix, **AND** a non-callback route's `data.path` is unchanged (DD-10 v2). The second assertion is what makes the redaction's *scope*, not just its presence, falsifiable — see requirements DC-11 |
+| Secret redaction | `npm test -- --silent` | **DC-11, widened at round 2 and again 2026-09-22 (T-08 amendment — six assertions, not two; see requirements DC-11)** — the callback's `2xx` body and the wrong-secret `404` log carry no segment beyond the route prefix, **AND** a non-callback route's `data.path` is unchanged (DD-10 v2). The second assertion is what makes the redaction's *scope*, not just its presence, falsifiable — see requirements DC-11 |
 
 Mock strategy: `PrmsNormalizerService` stubbed at the HTTP boundary for registration tests; the correlator stubbed with a **deferred, never-settling promise** for R-PWH-003 AC.2 — a synchronous stub cannot exercise that assertion and is explicitly disqualified.
 
