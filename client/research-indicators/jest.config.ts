@@ -4,6 +4,8 @@ const config: Config = {
   preset: 'jest-preset-angular',
   setupFilesAfterEnv: ['<rootDir>/src/setup-jest.ts'],
   globalSetup: 'jest-preset-angular/global-setup',
+  // Recycle workers before their heap grows large enough to SIGSEGV on Node 24 (the crash hit a random suite each run).
+  workerIdleMemoryLimit: '1GB',
   collectCoverage: true,
   collectCoverageFrom: ['./src/app/**/*.ts', './src/app/**/*.html', '!./src/app/**/*routing.ts', '!./src/app/**/*module.ts'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/dist/', '<rootDir>/src/app/shared/components/alert/alert.component.spec.ts'],
