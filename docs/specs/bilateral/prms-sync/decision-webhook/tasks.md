@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **7 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-06, T-07, T-08 — all `PASS` 2026-09-22). Remaining: **T-09** (eligible) → **T-04** → **T-10**, a strict chain. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **8 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-06, T-07, T-08, T-09 — all `PASS` 2026-09-22). Remaining: **T-04** (eligible) → **T-10**. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -240,6 +240,12 @@ graph TD
 
 ### T-04 — Callback edge: controller, `CallbackSecretGuard`, `JwtMiddleware` exclusion, and the non-stubbing e2e harness  `[ ]`
 
+> **Two gates carried in from T-09's review (2026-09-22). Both are reachable and both are T-04's to close.**
+>
+> **1 — An unparseable JSON body never reaches the lenient classifier, and that violates NFR-PWH-005.** T-09 receives `input.body` already parsed, so Express's JSON body-parser emits a **`400` before the handler runs** — *the endpoint failing the caller for its own reasons*, which NFR-PWH-005 forbids. T-09's `MALFORMED` path cannot help because it is never reached. **Constructible:** `Content-Type: application/json` with body `{`. **T-04 owns the body-parser configuration** for this route; settle it there, with a falsifier.
+>
+> **2 — `raw_headers` must be an ALLOWLIST, never `req.headers`.** T-09 stores `raw_headers` exactly as it is handed them, and the *"never the secret"* rule is a **comment, not a type**. The callback secret travels in the path, but headers are the other place a credential can arrive, and **NFR-PWH-002 is unconditional**. T-04 constructs what the service receives — pass a named allowlist, and prove it with a falsifier that puts a credential-shaped header in and asserts it is absent from the stored row.
+
 > **Anchored by `design.md` P-17 and DD-11.** This task carries the spec's highest-impact structural risk: **the repo's existing e2e harness cannot observe `JwtMiddleware` at all**, so the obvious gate for the auth boundary is one that *cannot go red*. Read P-17 before starting.
 
 - **Requirements covered:** R-PWH-004 AC.1, AC.2, AC.3, AC.5, AC.6, AC.8 · R-PWH-009 AC.5 (secret variable) · R-PWH-003 (the HTTP edge) · NFR-PWH-002
@@ -455,7 +461,7 @@ graph TD
 
 ---
 
-### T-09 — `PrmsWebhookDeliveryService`: classify, store, acknowledge, detach  `[ ]`
+### T-09 — `PrmsWebhookDeliveryService`: classify, store, acknowledge, detach  `[x]`
 
 > **Gate carried in from T-06's review (2026-09-22).** `DeliveryCorrelator.finish()` overwrites `correlation_outcome` **unconditionally**, so invoking the correlator on a `MALFORMED` row would replace that classification with `NO_REFERENCE`. `design.md:226` exempts `DUPLICATE` from the detached step but says nothing about `MALFORMED`. **T-09 owns which rows reach the detached step**, so this is T-09's to settle: either it must not dispatch `MALFORMED` rows to the correlator, or the exemption must be widened in the design. Reachable only through this task — the correlator has no other caller. Add a falsifier for it.
 

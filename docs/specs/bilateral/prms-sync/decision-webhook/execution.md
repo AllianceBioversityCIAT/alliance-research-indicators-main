@@ -1105,3 +1105,93 @@ The smallest overrun of any task in this spec, and the only one under 2×.
 #### Final verification result
 
 **PASS.** Scoped suite 8/99 green and re-verified by a non-author; full server suite **399 / 3,528** green; build exit 0; eslint clean; zero deletions in any file; `client/` untouched; both protected blocks proven byte-identical **twice — once by a corrected Leader measurement and once independently by the auditor**; both falsifiers observed red and independently judged reachable; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
+
+---
+
+### T-09 — `PrmsWebhookDeliveryService`: classify, store, acknowledge, detach — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1**
+
+| Field | Value |
+|---|---|
+| Implementer | **Cursor / `grok-4.7-xhigh`** · dispatch `ctx_79fde6f1570b` |
+| Reviewer | Claude Code / `akili-reviewer` → **Opus 5**, read-only |
+| `author ≠ auditor` | **held on both axes and across hosts** |
+| runtime events | none |
+| Diff | 2 new files, **946 lines** |
+
+**DC-6 is the class this task exists to avoid, and the spec names its own blind spot**: *this defect is invisible to any gate that uses the wrong stub.*
+
+#### Evidence re-run — non-author, Step 2.3
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/entities/prms-webhook` | 111/111 | **9 suites / 111 tests** green (from 8/89) | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint src/domain/entities/prms-webhook` | exit 0 | exit 0 | **VERIFIED** |
+
+**Leader full-suite re-measurement: 400 suites, 3,550 tests — all passed** (from 399 / 3,528).
+
+Leader read the shipped source: `correlate(...)` invoked at `:336` **without `await`**, detached at `:353` with `void correlation.then(...)`; the `MALFORMED` predicate at `:325` with its rationale at `:311`; `environmentLabel()` at `:385` documenting that it reuses the existing `ARI_IS_PRODUCTION` discriminator rather than inventing a second.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+**The Disqualifier check, done at source rather than from the diff — this is the check that decides the task.** A synchronous or resolved stub makes the awaited and the detached implementations indistinguishable, so AC.2 would pass either way and prove nothing.
+
+> `prms-webhook-delivery.service.spec.ts:171` is `correlate.mockReturnValue(new Promise(() => {}))` inside the AC.2 `it`, with a 1000 ms timeout at `:183`. **The executor body is empty — no `resolve`, no `reject`, no closure capture. It never settles.**
+
+Two things the auditor added that were not asked for:
+
+- **`:177-182` pins `correlate` to exactly one call with the exact payload**, so *"never called at all"* cannot pass the same test. Without that, a service that simply dropped the correlator would be indistinguishable from one that detached it correctly.
+- **The *other* stub at `:195-206` is deliberately RESOLVED, and that is correct** — it must model `finish()`'s write, not defer. The auditor discriminated between two stubs with opposite jobs instead of applying one rule to both.
+
+#### Rulings on the three judgement calls
+
+**(a) Does `void ... .then()` genuinely detach?** Yes. It is the **two-argument** form `then(onFulfilled, onRejected)`, so a correlator rejection is consumed by `onRejected` and cannot reach `unhandledRejection`; synchronous throws are caught one level earlier in `beginCorrelation`'s `try`. The auditor then found the **one surviving window** — a throw *inside* `onFulfilled`, which the two-arg form does not route to `onRejected` — **and tried to build it**: it would need the correlator to resolve `undefined`, which its return type forbids on every branch. *"Could not construct a production path."* A finding that states its own failed attempt is worth more than one that asserts a leak it cannot demonstrate.
+
+**(b) Is the `2xx` produced after the row exists?** Yes. `await this.repository.recordDelivery(...)` at `:782` precedes every other statement; the acknowledgement is constructed only at `:808`/`:822`. And `:141-163` **proves** it by withholding the repository promise and observing the handler stay unsettled. The detached call is *initiated* before the return — inherent to fire-and-forget, and not an await — and `correlate`'s synchronous prologue is pure up to its first query, so nothing blocks the acknowledgement.
+
+**(c) Is `MALFORMED` reachable on both paths AC.3 names?** Structurally-wrong-but-valid JSON: yes, four covered cases (missing `decision`, bad `decided_at`, `'APPROVED'`, `'approve'`), plus non-object bodies. **The syntactically unparseable body is structurally outside this service** — and that is a real finding, carried to T-04. See below.
+
+#### The carried gate from T-06 — settled, and the design is the thing that is wrong
+
+Skipping the detached step for `MALFORMED` is **correct, not a shortcut**. The auditor's reasoning:
+
+> `finish()` writes `correlation_outcome` unconditionally (`delivery-correlator.service.ts:203`), so a malformed row carrying a reference would be rewritten `CORRELATED` with `decision = NULL` — **which R-PWH-008's read surface treats as a verdict.**
+
+That is the consequence neither T-06 nor the Leader had traced: the reclassification would not merely lose a label, it would manufacture a phantom verdict visible through `last_decision`. Falsifier (d) proves the predicate behaviourally.
+
+**`design.md` §6.3:226 exempts only `DUPLICATE` and should name `MALFORMED` too** — recorded as an advisory rather than edited, because widening a design exemption is not a Leader-inline edit and T-09's rationale comment is the correct artifact for now.
+
+#### Two gates carried into T-04 — both real, both recorded in `tasks.md` T-04
+
+1. **An unparseable JSON body never reaches this service.** `input.body` is already parsed, and Express's JSON parser would emit a **`400` before the handler runs** — which **NFR-PWH-005 forbids** (*the endpoint does not fail the caller for its own reasons*). Constructible: `Content-Type: application/json` with body `{`. T-09's lenient classification cannot help, because it is never reached. **T-04 owns the body-parser configuration.**
+2. **`raw_headers` is stored exactly as given, and the "no secret among them" rule is a comment, not a type.** **T-04 must pass an allowlist, never `req.headers`** — the callback secret is in the path, but headers are the other place a credential can arrive, and NFR-PWH-002 is unconditional.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding |
+|---|---|
+| RELIABILITY | A correlator that **never settles logs nothing** — the single NFR-PWH-003 line is emitted only inside the `.then` handlers. **Reachable** via a stalled `dataSource.query` in `finish()`. Consider a settle-or-log fallback |
+| READABILITY | `design.md` §6.3:226 exempts only `DUPLICATE`; widen it to name `MALFORMED` so the next reader does not read the predicate as drift |
+| RELIABILITY | A non-object body discards the payload (`raw_body: null`) because T-05 types it `Record<string, unknown> \| null`. **Reachable** with body `[]`. Mild NFR-PWH-004 tension, owned upstream |
+
+#### Requirements covered
+
+R-PWH-003 AC.1–AC.4 · R-PWH-005 AC.3, AC.4, AC.5 (write path), AC.6 · R-PWH-006 AC.3 · R-PWH-009 AC.4 · NFR-PWH-001, NFR-PWH-003, NFR-PWH-005.
+
+#### Decisions made
+
+- **No execute-time spec edit.** The `MALFORMED` exemption lives as a code rationale plus a recorded advisory; widening design §6.3 is a spec change and was not taken unilaterally.
+- Effort `xhigh`: store-then-acknowledge is what PRMS actually depends on, and the defect class is invisible to a wrong gate.
+
+#### Budget tracking
+
+| | Budgeted | T-09 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 340 | **946** (**+178 %**) | **6,086 measured across eight closed tasks** |
+| Review rounds | 3 for the whole spec | 1 | **14 / 3** |
+
+#### Final verification result
+
+**PASS.** Scoped suite 9/111 green and re-verified by a non-author; full server suite **400 / 3,550** green; build exit 0; eslint clean; the AC.2 stub read at source and confirmed non-settling; four falsifiers observed red, (a) by **timeout** as the class requires; the carried gate from T-06 settled with its own falsifier; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
