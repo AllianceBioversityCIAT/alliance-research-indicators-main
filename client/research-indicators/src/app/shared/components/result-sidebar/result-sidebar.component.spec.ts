@@ -286,6 +286,21 @@ describe('ResultSidebarComponent', () => {
       expect(innovationOption?.indicator_id).toBe(2);
     });
 
+    // The crash reported from Alliance Alignment: greenChecks momentarily held
+    // `undefined` and the sidebar's computed indexed into it.
+    it('survives greenChecks being undefined instead of blanking the sidebar', () => {
+      cacheService.greenChecks?.set(undefined as unknown as GreenChecks);
+
+      // ★ discriminating: without the `?? {}` these three throw
+      //   "Cannot read properties of undefined (reading 'general_information')".
+      expect(() => component.allOptionsWithGreenChecks()).not.toThrow();
+      expect(() => component.getCompletedCount()).not.toThrow();
+      expect(() => component.getTotalCount()).not.toThrow();
+
+      expect(component.getCompletedCount()).toBe(0);
+      expect(component.allOptionsWithGreenChecks().length).toBeGreaterThan(0);
+    });
+
     it('should handle null/undefined greenChecks', () => {
       cacheService.greenChecks?.set({} as GreenChecks);
 

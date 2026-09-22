@@ -75,7 +75,10 @@ export class ResultSidebarComponent {
       )
       .map(option => ({
         ...option,
-        greenCheck: Boolean(this.cache.greenChecks()[option.greenCheckKey as keyof GreenChecks])
+        // `?? {}` as well as the guard in updateGreenChecks: this computed feeds
+        // the section list, the counter and the submit gate, so a single bad
+        // write must not be able to blank the sidebar.
+        greenCheck: Boolean((this.cache.greenChecks() ?? {})[option.greenCheckKey as keyof GreenChecks])
       }));
   });
 
