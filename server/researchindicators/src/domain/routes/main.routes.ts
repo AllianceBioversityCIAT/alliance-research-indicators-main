@@ -66,6 +66,7 @@ import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-t
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
 import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
+import { PrmsWebhookModule } from '../entities/prms-webhook/prms-webhook.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
@@ -417,6 +418,14 @@ const children: Routes = [
     // SYSTEM_ADMIN) on the controller. See execution.md Pivot Record #1.
     path: 'bilateral-project-mappings',
     module: BilateralProjectMappingModule,
+  },
+  {
+    // Top-level and disjoint from `prms-callback` (design.md DD-3, P-13) —
+    // neither prefix may be a glob-match of the other. This is the
+    // SYSTEM_ADMIN registration surface only; `prms-callback` (public,
+    // secret-authenticated) is a later task (T-04) in this same child.
+    path: 'prms-webhook',
+    module: PrmsWebhookModule,
   },
 ];
 

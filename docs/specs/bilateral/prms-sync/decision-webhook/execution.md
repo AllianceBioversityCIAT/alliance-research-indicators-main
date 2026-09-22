@@ -679,3 +679,137 @@ Written because the auditor ran outside the registry's T3 entry. **The gate was 
 | models | Implementer `claude-opus-5-thinking-high` (+ `grok-4.7-xhigh` for falsifier (g)) / Reviewer **`claude-fable-5-1`**, read-only (`Read`, `Grep`, `Glob`) |
 
 **This is not a `REVIEW_SKIPPED`.** No predicate proved a review was never owed; one was owed, and one was performed.
+
+---
+
+### T-03 — Registration surface: module, controller, service, route, env var, Swagger — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 2 · Reviewer rounds: 2**
+
+| Field | Value |
+|---|---|
+| Implementer (attempt 1) | Claude Code / `akili-implementer` → **Sonnet 5** (T2, registry-conformant) |
+| Implementer (attempt 2) | Claude Code / `akili-implementer` → **Fable 5.1** — effort bumped one rung per the rework rule |
+| Reviewer (both rounds) | Claude Code / `akili-reviewer` → **Opus 5**, read-only (`Read`, `Grep`, `Glob`) |
+| `author ≠ auditor` | **held on both rounds, at the registry's tiers** — no `degraded-pair` record owed. Cursor's account-wide quota exhaustion forced the host change; the native wrappers restored registry conformance that T-08 had lost |
+| runtime events | none |
+| Diff | 13 files, **879 insertions** |
+
+#### P-14b settled before dispatch — the spec's only `UNVERIFIED` premise
+
+T-03's first bullet requires settling P-14b *before* anything is built on it. The **Leader** did it as the Step 2.1 pre-check, by reading the table directly rather than through the TTL-cached service:
+
+```
+SELECT is_active, CASE WHEN simple_value IS NULL THEN 'NULL'
+                       WHEN simple_value = '' THEN 'EMPTY'
+                       ELSE CONCAT('POPULATED len=', LENGTH(simple_value)) END
+FROM app_config WHERE `key` = 'ARI_CLARISA_API_KEY';
+  -> row present · is_active = 1 · POPULATED len=47
+```
+
+The value itself was never printed. So on TEST **neither** failure mode this premise was open about is reachable: not the `404` (missing/inactive row), not the `503` (present but empty). RB-3's TEST half is closed; **the PROD half stays `UNVERIFIED` and moves to T-10** with OQ-6 / R-1 — this checkout has no PROD access, and saying otherwise would be the KZ-017 failure the spec keeps naming.
+
+**This relieved the code of nothing**, and the brief said so: a premise being healthy *today* does not prove the code handles it *correctly*. Both branches were still required, each with its own test.
+
+#### Attempt 1 — Reviewer `FAIL`: the registration log line wrote the secret
+
+One issue, and it is the spec's own defect class reappearing three tasks later.
+
+**The callback URL *is* the credential.** `.env.example`, written by this same task, documents it: *"The trailing segment is the path secret configured separately in `ARI_PRMS_WEBHOOK_SECRET`."* And `attemptLine` emitted `url=${url ?? 'unset'}` verbatim, on **both** the success `_log` and the failure `_warn` paths. Every registration attempt wrote the secret into the application log — violating R-PWH-001 AC.6, NFR-PWH-002, design §9 and §10, and T-03's own Done criterion.
+
+**The test did not merely miss it — it certified it.** The `_log` assertion was `toContain('url=' + callbackUrl)`, where `callbackUrl` ends in `/secret`. And the only secrecy assertions in the file were `not.toContain('x-api-key')` / `not.toContain('apikey')` — **structurally unable to fail**, because the API key never enters this service at all: it is read and attached entirely inside `PrmsNormalizerService` (T-02), a jest mock here. Two assertions that look like security hygiene and evaluate nothing.
+
+**Leader verified all three claims at source before accepting the verdict** — the `.env.example` wording, the template at `:109`, and the assertion set. The finding is correct.
+
+#### Attempt 2 — the fix, and the red that could only be taken once
+
+One import and one call site: `url=${url ? redactCallbackPath(url) : 'unset'}` in `attemptLine`, which both paths route through. Plus the `attemptLine` docstring, which had claimed the secret is *"never passed into this helper"* — the false belief that produced the leak — rewritten to state that the URL **is** the credential.
+
+The fix cost one line because **T-08 had already built and audited the helper**, and its absolute-URL handling (added for T-08's own falsifier (f)) is exactly what was needed here.
+
+**The red was taken against the pre-fix tree, before the fix existed** — the brief required that ordering, because that red is obtainable exactly once and is worth more than one manufactured by re-breaking a fix:
+
+```
+● logs the attempt … never a key or a secret (AC.6)
+  Expected substring: not "/secret"
+  Received string: "… url=https://star.example.org/api/prms-callback/secret message=…"
+● logs a warn line (still no key/secret) and rethrows on failure …
+  Expected substring: not "/secret"
+  Received string: "… url=https://star.example.org/api/prms-callback/secret message=\"Config not found\" …"
+Tests: 2 failed, 8 passed, 10 total
+```
+
+Green after the fix: 10/10.
+
+#### Evidence re-run — non-author, Step 2.3 (never waived)
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/entities/prms-webhook src/domain/routes src/domain/entities/entities.module.spec.ts` | 53/53 | **7 suites / 53 tests** green | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint <touched paths>` | exit 0 | exit 0 | **VERIFIED** |
+| Scope | 13 files | matches `git status --porcelain` exactly | **VERIFIED** |
+
+**Leader full-suite re-measurement:** **396 suites, 3,482 tests — all passed** (up from 393 / 3,453; +3 suites, +29 tests).
+
+**Leader probe of the compiled helper against the REAL registered-URL shape**, not the test placeholder (KZ-001 — assert on generated output):
+
+```
+redactCallbackPath('https://main-allianceindicatorstest.ciat.cgiar.org/api/prms-callback/a3f8SECRETVAL')
+  -> 'https://main-allianceindicatorstest.ciat.cgiar.org/api/prms-callback'   includes the secret? false
+```
+
+§10's *"the URL registered"* field survives with host and route intact, minus the credential.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+> The leak is closed at the single formatting site … `registerWebhook` is still asserted to receive the **unredacted** `callbackUrl`, so redaction did not leak into what is actually registered with PRMS.
+
+That last clause is the check the Leader had not thought to ask for: the fix must redact the **log**, not the value sent to PRMS. It does.
+
+**The Reviewer also corrected the Leader's framing of its own question.** The Leader asked whether `toContain('url=https://…/api/prms-callback')` was inert, since it passes against the leaking line. The ruling:
+
+> it is not inert: it reddens on **over**-redaction (a "fix" that dropped the URL, or emitted `unset`), which is the other way §10's "URL registered" field can be lost. So the pair covers both directions, one each.
+
+Neither the Leader nor the Implementer had seen that. Recorded because it is the more accurate reading.
+
+#### Rulings on the three Implementer disclosures
+
+| # | Disclosure | Reviewer's ruling |
+|---|---|---|
+| a | The scoped test count did **not** grow — assertions were replaced inside two existing `it` blocks rather than a new case added | **Acceptable.** Both new assertions were observed red individually with distinct failure output, so evidence is attributable without a separate block |
+| b | The `_warn` test was widened beyond the brief's literal step, which named only `_log` | **Required, not optional.** NFR-PWH-002 is unconditional, the falsifier unredacts both paths, and the failure line is the one an operator actually reads. *"A brief step narrower than the requirement does not narrow the requirement"* |
+| c | The `x-api-key` / `apikey` assertions were kept, with a code comment stating they cannot redden here | **The right call.** They are inert only under the current data flow — they **would** redden if a later edit passed key material into `attemptLine`. That makes them a regression tripwire rather than evidence, and the comment says exactly that. *"Deleting them would remove a cheap guard; leaving them undocumented would have been the actual error"* |
+
+The 401 deferral and the `entities.module.spec.ts` scope addition were both ruled on in round 1 and stand: **401** is only e2e-provable and T-04's falsifier already carries it, so `[~]` is the honest mark; **the module-graph assertion** is justified and would genuinely redden, since it reads the decorator's literal `imports` array — and `src/CLAUDE.md` §4 records this exact gap shipping twice over four silent `404`s.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| RELIABILITY | `not.toContain('/secret')` is coupled to the fixture's literal trailing segment. Rename it and the gate goes **vacuously true against a leaking line, silently.** Robust form: `not.toContain(callbackUrl)` | **Recorded, not applied.** The gate demonstrably reddened in the tree under review, which is the standard. Acting on it here would widen a task to absorb an advisory — the one thing the methodology forbids outright, and for the right reason: advisories are the least-vetted findings in a run |
+| RISK — **constructible** | `redactCallbackPath` anchors the prefix immediately after the authority, so a URL carrying a **path prefix ahead of** `/api/prms-callback` (reverse proxy, path-rewriting gateway) is logged whole. `redactCallbackDiagnostics` misses it too | **Verified by the Leader against the compiled helper** — see **RB-7** in `tasks.md` §6. Not T-03's to fix; it is T-08's helper, and it is reachable through T-03's new log path only if an operator configures such a URL |
+| OBSERVABILITY | On a PRMS refusal the warn line always prints `requestId=none` — T-02's exception carries only `message`, dropping the trace id §10 names | Outside this task's file list. Carried to the family owner |
+| RISK (carried from round 1) | `prms-webhook.module.ts` plans to host the callback controller, but `RouterModule` stamps **one** `MODULE_PATH` per module — two route entries on one module cannot yield two disjoint prefixes (DD-3) | **Carried to T-04**, which mounts `prms-callback`. Verify before mounting, or give the callback its own module |
+
+#### Requirements covered
+
+R-PWH-001 AC.1, AC.2, AC.6, AC.7 · R-PWH-002 AC.1, AC.2, AC.4 · R-PWH-009 AC.2, AC.3, AC.5 (URL half) · NFR-PWH-003.
+
+#### Decisions made
+
+- **Effort bumped Sonnet 5 → Fable 5.1 for attempt 2**, per the rework rule. Reviewer stayed Opus 5, so `author ≠ auditor` held on both rounds.
+- **Host change, forced not chosen.** Cursor's monthly usage limit is account-wide (three models confirmed exhausted during T-08). The project's own `.claude/agents/` wrappers were used instead — which happens to be the registry-conformant routing, so T-03 closes with no waiver record where T-08 needed one.
+- **`POST` returns `200`, not `201`.** R-PWH-001 AC.1 accepts either; `200` matches PRMS's own upsert convention and the `GET`. Reviewer confirmed internal consistency: `ResponseInterceptor` sets the wire status from the envelope, and Swagger, controller and tests all agree.
+- **No execute-time spec edit in this task.** The `design.md` / `tasks.md` changes committed alongside it are the **P-14b settlement**, which records a measurement rather than changing a requirement.
+
+#### Budget tracking
+
+| | Budgeted | T-03 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 350 | **879** (**+151 %**) | **2,983 measured across T-01, T-02, T-03, T-08** |
+| Review rounds | 3 for the whole spec | 2 | **10 / 3 — crossed at T-08, escalated then** |
+
+#### Final verification result
+
+**PASS.** Scoped suite 7/53 green and re-verified by a non-author; full server suite **396 / 3,482** green; build exit 0; eslint clean; the falsifier red taken against the pre-fix tree on both log paths; the helper probed against the real URL shape; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
