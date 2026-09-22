@@ -29,16 +29,27 @@ const asStaff = (row: {
   };
 };
 
+const trimOrNull = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim() ?? '';
+  return trimmed === '' ? null : trimmed;
+};
+
 const mapContract = (row: {
   agreement_id: string;
   description?: string | null;
   ubwClientDescription?: string | null;
   is_primary?: unknown;
+  clarisa_project_short_name?: string | null;
+  clarisa_external_code?: string | null;
 }): PrmsContractSnapshot => ({
   agreement_id: row.agreement_id,
   description: row.description ?? null,
   ubwClientDescription: row.ubwClientDescription ?? null,
   is_primary: asBoolean(row.is_primary),
+  // Blank strings are normalised to null so the builder's fallback chain does not
+  // have to distinguish "absent" from "present but empty".
+  clarisa_project_short_name: trimOrNull(row.clarisa_project_short_name),
+  clarisa_external_code: trimOrNull(row.clarisa_external_code),
 });
 
 @Injectable()
@@ -172,9 +183,18 @@ export class ResultPrmsSyncAggregateRepository {
           ac.agreement_id,
           ac.description,
           ac.ubwClientDescription,
-          rc.is_primary
+          rc.is_primary,
+          bpm.clarisa_project_short_name,
+          bpm.clarisa_external_code
         FROM result_contracts rc
         INNER JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id
+        -- LEFT, not INNER: 8 of the 28 contracts currently used by pool-funding
+        -- results have no active mapping row at all (measured 2026-09-21).
+        -- Dropping those contracts from the payload would be worse than sending
+        -- them with a fallback identifier.
+        LEFT JOIN bilateral_project_mapping bpm
+          ON bpm.agresso_agreement_id = rc.contract_id
+          AND bpm.is_active = TRUE
         WHERE rc.result_id = ?
           AND rc.is_active = TRUE
         `,
@@ -185,6 +205,7 @@ export class ResultPrmsSyncAggregateRepository {
         SELECT
           sp.sp_code,
           sp.sp_role,
+          toc.toc_result_id,
           toc.toc_result_title,
           toc.indicator_description,
           toc.aligns_with_toc
@@ -425,6 +446,7 @@ export class ResultPrmsSyncAggregateRepository {
         (row: {
           sp_code: string;
           sp_role: string | null;
+          toc_result_id: number | null;
           toc_result_title: string | null;
           indicator_description: string | null;
           aligns_with_toc: unknown;
@@ -434,6 +456,8 @@ export class ResultPrmsSyncAggregateRepository {
             row.sp_role === 'PRIMARY' || row.sp_role === 'CONTRIBUTING'
               ? row.sp_role
               : null,
+          toc_result_id:
+            row.toc_result_id == null ? null : Number(row.toc_result_id),
           toc_result_title: row.toc_result_title ?? null,
           indicator_description: row.indicator_description ?? null,
           aligns_with_toc:

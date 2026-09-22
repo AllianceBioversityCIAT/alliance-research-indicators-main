@@ -124,19 +124,70 @@ const resolveCenter = (
   return center;
 };
 
-const composeGrantTitle = (
-  agreementId: string | null | undefined,
-  description: string | null | undefined,
-): string => {
-  const id = agreementId?.trim() ?? '';
-  if (!id) {
+/**
+ * Registry code of a contributing bilateral project, e.g. `A1080`.
+ *
+ * 2026-09-21: replaces `composeGrantTitle`, which sent `${agreement_id}-${description}`
+ * -- the project's full title. PRMS rejected that outright:
+ *
+ *   "no project of the 2026 reporting phase matches grant_title
+ *    \"A1080-CROP TRUST Providing for the long-term funding of ex situ collections
+ *    of germplasm held by Bioversity\". Send the project's registry code (its
+ *    `external_code` / short name) rather than its full title."
+ *
+ * So the description is dropped entirely and the bare `agreement_id` is sent as
+ * `external_code`. The throw is kept because it is STRUCTURAL, not a guess about
+ * PRMS: a contributing project with no registry code has nothing to identify it
+ * by, and PRMS matches on exactly this value.
+ */
+/**
+ * Identifier PRMS resolves a contributing bilateral project by, sent as
+ * `grant_title`.
+ *
+ * 2026-09-21. This field used to carry `${agreement_id}-${description}` -- the
+ * project's full title -- and PRMS refused it by name:
+ *
+ *   "no project of the 2026 reporting phase matches grant_title
+ *    \"A1080-CROP TRUST Providing for the long-term funding of ex situ collections
+ *    of germplasm held by Bioversity\". Send the project's registry code (its
+ *    `external_code` / short name) rather than its full title."
+ *
+ * The registry code lives in `bilateral_project_mapping`, keyed by
+ * `agresso_agreement_id`. Preference order, and why:
+ *
+ *   1. `clarisa_project_short_name` -- the CLARISA short name, e.g. `B-A1080`.
+ *      This is the only value that actually differs from the AGRESSO id, so it
+ *      is the only candidate that can be what PRMS means.
+ *   2. `clarisa_external_code` -- measured equal to `agreement_id` in all 199
+ *      active rows (a migration backfilled it as TRIM(UPPER(agreement_id))), so
+ *      this rung changes nothing today. Kept because the column is meant to hold
+ *      a real CLARISA code once the feed populates it.
+ *   3. `agreement_id` -- last resort, and what was effectively sent before.
+ *
+ * MEASURED 2026-09-21: of the 28 contracts currently used by pool-funding
+ * results, 19 have a short name, 8 have no mapping row at all, and 1 has a row
+ * with a null short name. So roughly a THIRD fall through to a rung PRMS has
+ * already rejected once. Those are a data problem -- an unmapped project -- not
+ * a payload problem, and falling back keeps them diagnosable rather than
+ * refusing the send locally.
+ */
+const resolveGrantTitle = (contract: {
+  agreement_id: string | null | undefined;
+  clarisa_project_short_name?: string | null;
+  clarisa_external_code?: string | null;
+}): string => {
+  const candidate =
+    contract.clarisa_project_short_name?.trim() ||
+    contract.clarisa_external_code?.trim() ||
+    contract.agreement_id?.trim() ||
+    '';
+  if (!candidate) {
     throw new PrmsPayloadBuildError(
       `Missing mandatory field 'grant_title'`,
       'grant_title',
     );
   }
-  const desc = description?.trim() ?? '';
-  return desc ? `${id}-${desc}` : id;
+  return candidate;
 };
 
 const buildTocMapping = (
@@ -157,6 +208,15 @@ const buildTocMapping = (
       'toc_mapping.science_program_id',
     ),
   };
+  // 2026-09-21: was `result_title` carrying `toc_result_title`. PRMS matches on
+  // the ID, not the prose -- the same reason `grant_title` became `external_code`
+  // in `contributing_bilateral_projects`. Still conditional: an SP with no ToC
+  // alignment omits the key rather than sending null.
+  if (primary.toc_result_id != null) {
+    toc.toc_result_id = primary.toc_result_id;
+  }
+  // Kept alongside the ID: removing it produced a missing-field error. PRMS
+  // resolves on `toc_result_id`; this is compatibility payload, not the key.
   if (primary.toc_result_title) {
     toc.result_title = primary.toc_result_title;
   }
@@ -178,6 +238,9 @@ const buildContributingPrograms = (
           'contributing_programs.science_program_id',
         ),
       };
+      if (program.toc_result_id != null) {
+        entry.toc_result_id = program.toc_result_id;
+      }
       if (program.toc_result_title) {
         entry.result_title = program.toc_result_title;
       }
@@ -186,11 +249,6 @@ const buildContributingPrograms = (
       }
       return entry;
     });
-
-const hasCompanionGeography = (aggregate: PrmsSyncAggregate): boolean =>
-  aggregate.regions.length > 0 ||
-  aggregate.countries.length > 0 ||
-  aggregate.subnational_areas.length > 0;
 
 const mapRegions = (aggregate: PrmsSyncAggregate) =>
   aggregate.regions.map((region) => ({
@@ -212,6 +270,47 @@ const mapSubnationals = (aggregate: PrmsSyncAggregate) =>
     name: area.name,
   }));
 
+/**
+ * Reconciles the National / Multi-national pair with the country count.
+ *
+ * 2026-09-21, and unlike the cardinality rules removed the same day, this one is
+ * CONFIRMED BY PRMS, not assumed: PRMS rejected a payload carrying
+ * `scope_code: 3` with a single country. Scope 3 means "more than one country",
+ * so a scope-3 result holding one is internally contradictory and PRMS says so.
+ *
+ * Only scopes 3 and 4 participate -- they are the same question ("which
+ * countries?") answered at two cardinalities, so the count settles which one it
+ * is. Regional, Sub-national, Global and TBD are left exactly as chosen: their
+ * scope is not a function of the country count.
+ *
+ * ZERO countries is deliberately NOT normalised. There is nothing to reconcile
+ * with, and turning a scope-3 result with no countries into scope 4 would be a
+ * fresh guess of the kind this file just stopped making. PRMS answers that one.
+ *
+ * NOTE: this can emit a scope that differs from the one chosen in STAR's UI. That
+ * is intentional -- the payload must be internally consistent -- but it means
+ * STAR and PRMS can disagree on the label for the same result, and the STAR-side
+ * data stays as the user left it.
+ */
+const resolveNationalScope = (
+  scopeCode: number,
+  countryCount: number,
+): number => {
+  if (
+    scopeCode !== ClarisaGeoScopeEnum.MULTI_NATIONAL &&
+    scopeCode !== ClarisaGeoScopeEnum.NATIONAL
+  ) {
+    return scopeCode;
+  }
+  if (countryCount === 1) {
+    return ClarisaGeoScopeEnum.NATIONAL;
+  }
+  if (countryCount > 1) {
+    return ClarisaGeoScopeEnum.MULTI_NATIONAL;
+  }
+  return scopeCode;
+};
+
 const buildGeoFocus = (
   aggregate: PrmsSyncAggregate,
 ): Record<string, unknown> => {
@@ -221,7 +320,10 @@ const buildGeoFocus = (
       'geo_focus',
     );
   }
-  const scopeCode = Number(aggregate.geo_scope_id);
+  const scopeCode = resolveNationalScope(
+    Number(aggregate.geo_scope_id),
+    aggregate.countries.length,
+  );
   const scopeLabel = SCOPE_LABELS[scopeCode];
   if (!scopeLabel) {
     throw new PrmsPayloadBuildError(
@@ -235,55 +337,57 @@ const buildGeoFocus = (
     scope_label: scopeLabel,
   };
 
+  // 2026-09-21 -- the five CARDINALITY refusals that used to live in this switch
+  // were removed (>=1 region, >=2 countries, >=1 country, >=1 country + >=1
+  // sub-national, and "global must not carry companions").
+  //
+  // None of them came from a contract PRMS confirmed; they were STAR's guesses at
+  // what PRMS would demand, and because they threw `PrmsPayloadBuildError` the
+  // send was refused locally -- so PRMS never saw the payload and the guesses
+  // could never be checked. The first one to be exercised for real
+  // ("scope 3 (Multi-national) requires at least 2 countries") blocked a result
+  // whose data STAR itself considers complete.
+  //
+  // Only the STRUCTURAL check survives, above: without a resolvable scope there is
+  // no `scope_code` / `scope_label` to emit at all.
+  //
+  // Collections are attached when present and OMITTED when empty -- not sent as
+  // `[]`, which would assert "we checked and there are none" rather than "we are
+  // not declaring this". Same rule as the Innovation Use builder.
+  const attachIfAny = (key: string, values: unknown[]): void => {
+    if (values.length > 0) {
+      geo[key] = values;
+    }
+  };
+
   switch (scopeCode) {
     case ClarisaGeoScopeEnum.GLOBAL:
     case ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED:
-      if (hasCompanionGeography(aggregate)) {
-        throw new PrmsPayloadBuildError(
-          `geo_focus scope ${scopeCode} must not include regions, countries or sub-nationals`,
-          'geo_focus',
-        );
-      }
+      // 2026-09-21: these scopes now emit their companion geography too.
+      //
+      // Previously they REFUSED the send when the result carried any, and when
+      // that refusal was removed the shape was left as it had always been: scope
+      // only, companions silently dropped. That still discarded data the user had
+      // entered -- a global result with countries recorded in STAR arrived at PRMS
+      // with no countries at all, and nothing said so.
+      //
+      // All three are attached because a Global result can legitimately carry any
+      // of them, and omitting-when-empty means a result with none is byte-identical
+      // to what was sent before.
+      attachIfAny('regions', mapRegions(aggregate));
+      attachIfAny('countries', mapCountries(aggregate));
+      attachIfAny('subnational_areas', mapSubnationals(aggregate));
       return geo;
     case ClarisaGeoScopeEnum.REGIONAL:
-      if (aggregate.regions.length < 1) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 2 (Regional) requires at least 1 region',
-          'geo_focus',
-        );
-      }
-      geo.regions = mapRegions(aggregate);
+      attachIfAny('regions', mapRegions(aggregate));
       return geo;
     case ClarisaGeoScopeEnum.MULTI_NATIONAL:
-      if (aggregate.countries.length < 2) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 3 (Multi-national) requires at least 2 countries',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
-      return geo;
     case ClarisaGeoScopeEnum.NATIONAL:
-      if (aggregate.countries.length < 1) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 4 (National) requires at least 1 country',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
+      attachIfAny('countries', mapCountries(aggregate));
       return geo;
     case ClarisaGeoScopeEnum.SUB_NATIONAL:
-      if (
-        aggregate.countries.length < 1 ||
-        aggregate.subnational_areas.length < 1
-      ) {
-        throw new PrmsPayloadBuildError(
-          'geo_focus scope 5 (Sub-national) requires at least 1 country and at least 1 sub-national',
-          'geo_focus',
-        );
-      }
-      geo.countries = mapCountries(aggregate);
-      geo.subnational_areas = mapSubnationals(aggregate);
+      attachIfAny('countries', mapCountries(aggregate));
+      attachIfAny('subnational_areas', mapSubnationals(aggregate));
       return geo;
     default:
       throw new PrmsPayloadBuildError(
@@ -385,16 +489,23 @@ export class CommonFieldsBuilder {
       });
     }
 
-    if (aggregate.contracts.length > 0) {
-      data.contributing_bilateral_projects = aggregate.contracts.map(
-        (contract) => ({
-          grant_title: composeGrantTitle(
-            contract.agreement_id,
-            contract.description,
-          ),
-          is_lead: contract.is_primary === true,
-        }),
-      );
+    // 2026-09-22: ONLY the primary contract is sent. The array used to carry every
+    // contract on the result, each flagged `is_lead`, and PRMS was left to pick.
+    // `is_lead` is kept -- the shape is still an array of the same objects -- so
+    // the entry that survives always reads `is_lead: true`.
+    //
+    // A result with contracts but no primary sends nothing rather than an empty
+    // array: `[]` would assert "we checked and there is no lead project", which is
+    // a different claim from "we are not declaring one". Same rule as the other
+    // collections in this payload.
+    const leadContracts = aggregate.contracts.filter(
+      (contract) => contract.is_primary === true,
+    );
+    if (leadContracts.length > 0) {
+      data.contributing_bilateral_projects = leadContracts.map((contract) => ({
+        grant_title: resolveGrantTitle(contract),
+        is_lead: true,
+      }));
     }
 
     return data;

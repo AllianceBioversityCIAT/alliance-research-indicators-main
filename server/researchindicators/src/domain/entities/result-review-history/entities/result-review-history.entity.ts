@@ -1,13 +1,5 @@
-import {
-  Column,
-  Entity,
-  Index,
-  JoinColumn,
-  ManyToOne,
-  PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
-import { Result } from '../../results/entities/result.entity';
 
 @Entity('result_review_history')
 @Index('idx_result_review_history_result_created', ['result_id', 'created_at'])
@@ -69,7 +61,9 @@ export class ResultReviewHistory extends AuditableEntity {
   })
   payload_after?: Record<string, unknown>;
 
-  @ManyToOne(() => Result, (result) => result.review_history)
-  @JoinColumn({ name: 'result_id' })
-  result!: Result;
+  // No @ManyToOne on purpose (2026-09-22). `fk_rrh_result` was dropped: this is an
+  // append-only audit trail, and the constraint blocked deleting a result while
+  // the alternative -- deleting the history -- destroyed the record of what
+  // changed. `result_id` remains a plain indexed column, so a row whose result is
+  // later deleted stays readable instead of blocking the delete.
 }

@@ -47,10 +47,36 @@ describe('ResultPrmsSyncLog entity metadata', () => {
     expect(isGenerated('id')).toBe(true);
   });
 
-  it('result_id is bigint NOT NULL', () => {
-    const column = getColumn('result_id');
-    expect(column.options.type).toBe('bigint');
-    expect(column.options.nullable).toBe(false);
+  it('carries NO result_id column -- the FK is gone and nothing replaced it', () => {
+    // Was `result_id` bigint NOT NULL with an FK to `results`. The log is a
+    // permanent record of what STAR sent PRMS, so it must outlive the row it
+    // describes: the FK blocked result deletion, and deleting the history to
+    // allow it would destroy evidence of a push PRMS had already accepted.
+    // Identity is now `external_reference` (which already holds the result
+    // official code) plus `result_year`.
+    expect(
+      columns.find((column) => column.propertyName === 'result_id'),
+    ).toBeUndefined();
+    expect(
+      columns.find((column) => column.propertyName === 'result_official_code'),
+    ).toBeUndefined();
+  });
+
+  it('result_year is a year column, also nullable', () => {
+    const column = getColumn('result_year');
+    expect(column.options.type).toBe('year');
+    expect(column.options.nullable).toBe(true);
+  });
+
+  it('declares NO relation to Result -- the FK is gone on purpose', () => {
+    const relation = storage.relations.find(
+      (candidate) => candidate.target === ResultPrmsSyncLog,
+    );
+    expect(relation).toBeUndefined();
+    const joinColumn = storage.joinColumns.find(
+      (candidate) => candidate.target === ResultPrmsSyncLog,
+    );
+    expect(joinColumn).toBeUndefined();
   });
 
   it('attempt_number is int NOT NULL', () => {
@@ -119,25 +145,15 @@ describe('ResultPrmsSyncLog entity metadata', () => {
     expect(column.options.nullable).toBe(true);
   });
 
-  it('declares the migration indexes and FK name', () => {
+  it('declares the migration indexes -- keyed on the code/year pair', () => {
     const indexNames = storage.indices
       .filter((index) => index.target === ResultPrmsSyncLog)
       .map((index) => index.name)
       .sort();
     expect(indexNames).toEqual([
+      'idx_result_prms_sync_log_code_year',
       'idx_result_prms_sync_log_request_id',
-      'idx_result_prms_sync_log_result',
     ]);
-
-    const joinColumn = storage.joinColumns.find(
-      (candidate) =>
-        candidate.target === ResultPrmsSyncLog &&
-        candidate.propertyName === 'result',
-    );
-    expect(joinColumn?.name).toBe('result_id');
-    expect(joinColumn?.foreignKeyConstraintName).toBe(
-      'FK_result_prms_sync_log_result_id',
-    );
   });
 
   it('own columns match the migration one-for-one (no extras)', () => {
@@ -145,7 +161,7 @@ describe('ResultPrmsSyncLog entity metadata', () => {
     expect(ownNames).toEqual(
       [
         'id',
-        'result_id',
+        'result_year',
         'attempt_number',
         'environment',
         'prms_type',
