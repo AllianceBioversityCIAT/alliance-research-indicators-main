@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **6 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-06, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **7 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-06, T-07, T-08 — all `PASS` 2026-09-22). Remaining: **T-09** (eligible) → **T-04** → **T-10**, a strict chain. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -362,7 +362,7 @@ graph TD
 
 ---
 
-### T-07 — Reader: the additive `last_decision` field  `[ ]`
+### T-07 — Reader: the additive `last_decision` field  `[x]`
 
 > **Anchored by `design.md` P-6 and P-8** — both name this task as the one whose blast radius widens if the consumer sweep was wrong.
 

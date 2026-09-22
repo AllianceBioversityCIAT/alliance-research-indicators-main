@@ -71,6 +71,34 @@ export class PrmsSyncLastAttemptDto {
   created_at: Date | string;
 }
 
+export class PrmsSyncLastDecisionDto {
+  @ApiProperty({
+    enum: ['APPROVE', 'REJECT'],
+    description:
+      'Science Program verdict on the latest non-duplicate correlated delivery.',
+  })
+  decision: string | null;
+
+  @ApiProperty({ nullable: true })
+  decided_at: Date | string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Reviewer text verbatim. Null when PRMS sent none (typical for APPROVE).',
+  })
+  justification: string | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  prms_result_code: number | null;
+
+  @ApiProperty({
+    description: 'When STAR received the delivery (column received_at).',
+  })
+  delivery_received_at: Date | string | null;
+}
+
 export class PrmsSyncStatusDto {
   @ApiProperty({
     enum: ['never_synced', 'synced', 'failed'],
@@ -92,4 +120,12 @@ export class PrmsSyncStatusDto {
       'Most recent attempt. Never includes request_payload (R-PRMS-014 AC.2).',
   })
   last_attempt: PrmsSyncLastAttemptDto | null;
+
+  @ApiPropertyOptional({
+    type: () => PrmsSyncLastDecisionDto,
+    nullable: true,
+    description:
+      'Latest non-duplicate correlated decision, or null when none exists (R-PWH-008). A projection — earlier decisions stay in the history.',
+  })
+  last_decision: PrmsSyncLastDecisionDto | null;
 }

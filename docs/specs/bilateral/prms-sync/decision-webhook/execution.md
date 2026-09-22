@@ -1005,3 +1005,103 @@ R-PWH-007 (all ACs) · R-PWH-005 AC.1, AC.2 · R-PWH-008 AC.5 (correlation branc
 #### Final verification result
 
 **PASS.** Scoped suite 8/89 green and re-verified by a non-author; full server suite **399 / 3,525** green; build exit 0; eslint clean; three falsifiers observed red on their own assertions and independently judged reachable by the auditor; the four-predicate SQL and the absence of any `results` write read directly from the shipped source; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
+
+---
+
+### T-07 — Reader: the additive `last_decision` field — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1**
+
+| Field | Value |
+|---|---|
+| Implementer | **Cursor / `grok-4.7-high`** · dispatch `ctx_e28da5e727e7` |
+| Reviewer | Claude Code / `akili-reviewer` → **Opus 5**, read-only |
+| `author ≠ auditor` | **held on both axes and across hosts** |
+| runtime events | none |
+| Diff | 3 files, **374 lines**, **zero deletions anywhere** |
+
+`Effort` held at `high` rather than escalated: the task is sized `S`, its scope is one additive field, and its gates are mechanical rather than deep. Escalating every task empties the dial of meaning.
+
+#### The Leader captured the AC.4 baseline **before** dispatch
+
+T-07's *Red run* requires the pre-edit baseline to exist before the first edit, and its *Disqualifier* states that an AC.4 assertion written afterwards from the new code's own output *"proves self-consistency and nothing else."* Rather than trust the ordering to the worker, the Leader captured it at `HEAD 6540e33f`: pristine copies of all three files into the session scratchpad, plus the existing spec green at **1 suite / 8 tests**.
+
+#### A Leader-authored gate that gave a FALSE ALARM — recorded, not quietly fixed
+
+The Leader also hashed the two protected blocks with an `awk` range, and on re-measurement **both hashes had moved**. That was **wrong, and the fault was in the gate**: each symbol (`LAST_ATTEMPT_SQL`, `deriveSyncState`) appears **twice** in the file — declaration and usage — so `awk`'s range operator opened a *second* range at the second occurrence and swept up the file's tail, which had grown. The gate was measuring the end of the file, not the block.
+
+Re-measured correctly, by extracting each block between exact delimiters and comparing against the pristine copy:
+
+```
+LAST_ATTEMPT_SQL   -> IDENTICAL, 556 chars both sides
+deriveSyncState    -> IDENTICAL, 372 chars both sides
+diff baseline vs current: 0 deleted or modified lines — purely additive
+```
+
+**This is the third Leader-authored gate in this spec that did not measure what it claimed.** The others: the `git diff --unified=0 | grep` secret-hygiene check in T-08, blind to untracked files; and the `git grep` consumer sweep handed to T-05, blind for the same reason. All three failed in the **safe** direction — a false alarm or a false zero that a worker caught — but the pattern is the point, not the luck: **a Leader's gate is the one no Reviewer audits.** The Reviewer for this task was therefore handed the corrected measurement *and told explicitly it was not obliged to accept it.*
+
+#### Evidence re-run — non-author, Step 2.3
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/entities/result-prms-sync` | green | **8 suites / 99 tests** green | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint src/domain/entities/result-prms-sync` | exit 0 | exit 0 | **VERIFIED** |
+| Deletions in the reader | — | **0** | **VERIFIED** |
+| Deletions in the DTO | — | **0** | **VERIFIED** |
+| `git status --porcelain client` | untouched | **empty** | **VERIFIED** |
+
+**Leader full-suite re-measurement: 399 suites, 3,528 tests — all passed.**
+
+#### Reviewer verdict — `STATUS: PASS`, and it re-derived the Leader's claim
+
+> I re-derived the protected-block claim myself rather than accepting it: baseline `:11-31` vs current `:12-32` (`LAST_ATTEMPT_SQL`) and baseline `:67-81` vs current `:83-97` (`deriveSyncState`) are **character-for-character identical**, and **`RESULT_STATUS_SQL` and `mapLastAttempt` are untouched too.**
+
+Those last two were not in the Leader's check at all — the auditor widened the protected set on its own judgement.
+
+**On the Disqualifier, the check that decides this task.** The Reviewer verified at source that the new test's `baselineLastAttempt` **reproduces the pre-edit fixture value for value** — *"an independently authored literal, not a re-serialisation of new output."* And that `sync_state` and `last_attempt` are asserted **separately**, with `last_decision` absent from that test entirely, so a `sync_state` regression is isolable. That is precisely the trap the Disqualifier names, checked rather than assumed.
+
+**On falsifier credibility**, it found the non-obvious one: the spec's `projectDeliveries` helper **only sorts when the emitted SQL actually contains `ORDER BY decided_at DESC`**, so dropping the clause returns the earlier `APPROVE` and reddens. *"The ordering assertion is not decorative."*
+
+#### Rulings on the three judgement calls
+
+**(a) The cross-package mirror — CONFIRMED, and closed by structure rather than by inspection.** `client/.../prms-sync.interface.ts` holds only `PrmsSyncOutcome` and `PrmsSyncResponse { outcome, attempt_number, http_status, request_id, prms_result_code, failure_reason }` — a field-for-field mirror of the server's **`PrmsSyncResponseDto`**, the sync **POST** contract. It has no `sync_state` and no `last_attempt`, so it does not model this GET at all; `last_decision` hangs off `PrmsSyncStatusDto` and **cannot reach that file by any path**. No client edit was owed, and the empty `git status --porcelain client` is consistent with that rather than merely with restraint.
+
+**(b) Exporting `mapLastDecision` — justified.** The file already exports `mapLastAttempt` and `deriveSyncState` as free functions and the pre-existing spec imports both directly. *"Withholding it would make the new mapper the only untestable-in-isolation one of three."*
+
+**(c) Type looseness — faithful, and keep it.** The Leader suspected `decision: string | null` should have been `'APPROVE' | 'REJECT'`. The ruling refuses that, with the better argument:
+
+> `decision` is `varchar(20) nullable` on the entity and is already typed `string | null` on the write path, populated **verbatim** from PRMS. A `'APPROVE' | 'REJECT'` union on the read side would be an **unenforced cast asserting a constraint no validator applies** — it would lie at runtime the first time PRMS sends a third verb. The enum lives where it belongs: in `@ApiProperty({ enum: ['APPROVE','REJECT'] })`.
+
+A narrower type would have looked like rigour and been a latent lie. Recorded because the Leader would have asked for the union.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding |
+|---|---|
+| READABILITY | `@ApiProperty` on `decision` and `delivery_received_at` omits `nullable: true` though both types carry `| null`; Swagger under-documents nullability. Cosmetic, and it mirrors the existing `created_at` treatment |
+| RELIABILITY | A `CORRELATED` row with a NULL `decision`/`decided_at` yields an object with null members rather than `last_decision: null`. **Reachable** — the correlator sets `CORRELATED` independently of the ingest-time decision parse. Faithful to design §6.5's wording, so not an issue here; **worth a line in the future UI spec** (OQ-5's sequel) |
+| RISK | `query.mockResolvedValue([])` in `beforeEach` makes unstubbed calls return `[]` rather than throwing, slightly weakening the spec's strictness. Necessary for the third query |
+
+#### Requirements covered
+
+R-PWH-008 (all ACs) · NFR-PWH-005.
+
+#### Decisions made
+
+- **No execute-time spec edit.** None was needed.
+- **The consumer sweep was re-run before dispatch** per RB-1 (the sibling `sync-engine` is in flight and has moved this file once): **7 files**, matching the task's record at `170da206` exactly.
+- **`last_decision` is fed by its own query**, never by `LAST_ATTEMPT_SQL`. A verdict and an outbound attempt are different events — conflating them is the family's R-F1 failure, and DD-9 exists to prevent it.
+
+#### Budget tracking
+
+| | Budgeted | T-07 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 250 | **374** (**+50 %**) | **5,140 measured across T-01, T-02, T-03, T-05, T-06, T-07, T-08** |
+| Review rounds | 3 for the whole spec | 1 | **13 / 3** |
+
+The smallest overrun of any task in this spec, and the only one under 2×.
+
+#### Final verification result
+
+**PASS.** Scoped suite 8/99 green and re-verified by a non-author; full server suite **399 / 3,528** green; build exit 0; eslint clean; zero deletions in any file; `client/` untouched; both protected blocks proven byte-identical **twice — once by a corrected Leader measurement and once independently by the auditor**; both falsifiers observed red and independently judged reachable; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.

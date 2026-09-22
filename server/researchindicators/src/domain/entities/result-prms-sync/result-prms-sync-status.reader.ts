@@ -4,6 +4,7 @@ import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outc
 import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
   PrmsSyncLastAttemptDto,
+  PrmsSyncLastDecisionDto,
   PrmsSyncState,
   PrmsSyncStatusDto,
 } from './dto/prms-sync.dto';
@@ -35,6 +36,21 @@ const RESULT_STATUS_SQL = `
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
+    `;
+
+const LAST_DECISION_SQL = `
+      SELECT
+        decision,
+        decided_at,
+        justification,
+        prms_result_code,
+        received_at
+      FROM prms_webhook_delivery
+      WHERE result_id = ?
+        AND correlation_outcome = 'CORRELATED'
+        AND duplicate_of_id IS NULL
+      ORDER BY decided_at DESC
+      LIMIT 1
     `;
 
 const asBoolean = (value: unknown): boolean =>
@@ -80,6 +96,25 @@ export function deriveSyncState(
   return 'failed';
 }
 
+export function mapLastDecision(
+  row: Record<string, unknown> | null | undefined,
+): PrmsSyncLastDecisionDto | null {
+  if (!row) {
+    return null;
+  }
+  return {
+    decision: typeof row.decision === 'string' ? row.decision : null,
+    decided_at:
+      row.decided_at == null ? null : (row.decided_at as Date | string),
+    justification:
+      typeof row.justification === 'string' ? row.justification : null,
+    prms_result_code:
+      row.prms_result_code == null ? null : Number(row.prms_result_code),
+    delivery_received_at:
+      row.received_at == null ? null : (row.received_at as Date | string),
+  };
+}
+
 @Injectable()
 export class ResultPrmsSyncStatusReader {
   constructor(private readonly dataSource: DataSource) {}
@@ -104,6 +139,12 @@ export class ResultPrmsSyncStatusReader {
     const lastAttempt = mapLastAttempt(
       attemptRows[0] as Record<string, unknown> | undefined,
     );
+    const decisionRows = await this.dataSource.query(LAST_DECISION_SQL, [
+      resultId,
+    ]);
+    const lastDecision = mapLastDecision(
+      decisionRows[0] as Record<string, unknown> | undefined,
+    );
     const isSynced = asBoolean(resultRow.is_synced_to_prms);
     const prmsResultCode =
       resultRow.prms_result_code == null
@@ -115,6 +156,7 @@ export class ResultPrmsSyncStatusReader {
       is_synced_to_prms: isSynced,
       prms_result_code: prmsResultCode,
       last_attempt: lastAttempt,
+      last_decision: lastDecision,
     };
   }
 }
