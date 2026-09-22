@@ -1012,6 +1012,65 @@ describe('ExcelWorkbookBuilder', () => {
     });
   });
 
+  it('renders a highlighted warning-notice row and shifts groups/header/data down', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      bannerSubtitle: 'Sub',
+      bannerNotice: { text: 'Heads up: coming soon' },
+      columnGroups: [
+        { fromCol: 1, toCol: 5, label: 'G', fillArgb: 'FF203C61' },
+      ],
+    };
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [{ c1: 'v1' }],
+          presentation,
+        },
+      ],
+    });
+    const ws = (await loadWorkbook(buf)).getWorksheet('S')!;
+    // Row 2 subtitle, row 3 notice, row 4 groups, row 5 headers, row 6 data.
+    expect(ws.getCell('A2').value).toBe('Sub');
+    const notice = ws.getCell('A3');
+    expect(notice.value).toBe('Heads up: coming soon');
+    expect((notice.fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFFFF2CC');
+    expect(notice.font?.bold).toBe(true);
+    expect(notice.font?.color?.argb).toBe('FF9C5700');
+    expect(ws.getCell('A4').value).toBe('G');
+    expect(ws.getRow(5).getCell(1).value).toBe('C1');
+    expect(ws.getRow(6).getCell(1).value).toBe('v1');
+  });
+
+  it('honors custom warning-notice colors when provided', async () => {
+    const presentation: ExcelSheetPreamble = {
+      ...preambleBase(),
+      bannerNotice: {
+        text: 'Custom',
+        fillArgb: 'FFFFC7CE',
+        fontArgb: 'FF9C0006',
+      },
+      columnGroups: [],
+    };
+    const buf = await bufferFrom({
+      sheets: [
+        {
+          sheetKey: 's',
+          name: 'S',
+          columns: preambleSheetColumns,
+          rows: [],
+          presentation,
+        },
+      ],
+    });
+    const notice = (await loadWorkbook(buf)).getWorksheet('S')!.getCell('A3');
+    expect((notice.fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFFFC7CE');
+    expect(notice.font?.color?.argb).toBe('FF9C0006');
+  });
+
   it('does not set autoFilter when presentation exists but there are no columns', async () => {
     const presentation: ExcelSheetPreamble = {
       bannerTitle: 'T',

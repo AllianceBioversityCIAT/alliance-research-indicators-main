@@ -69,6 +69,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
   @Input() excludedColumnFields: readonly string[] = [];
   @Input() emptyMessage = '';
   @Input() resultEntryContext: 'results-center' | 'project' = 'project';
+  @Input() showPlatformFilters = false;
   @Input() roundedBottom = false;
   private dt2Table: Table | undefined;
 
