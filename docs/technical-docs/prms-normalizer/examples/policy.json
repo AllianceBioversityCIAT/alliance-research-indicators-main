@@ -1,0 +1,74 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "policy_change",
+      "data": {
+        "result_type_id": 1,
+        "result_level_id": 3,
+        "created_date": "2025-10-24T19:36:04Z",
+        "created_by": { "name": "Sara Jani", "email": "s.jani@cgiar.org" },
+        "submitted_by": {
+          "email": "mohammad.salem@codeobia.com",
+          "name": "Mohammad Salem",
+          "comment": "",
+          "submitted_date": "2025-11-24T14:28:02Z"
+        },
+        "lead_center": { "institution_id": 1279, "acronym": "ICARDA" },
+        "title": "National climate-smart agriculture policy framework adoption",
+        "description": "Government adoption of climate-smart agriculture policy framework with allocated budget for implementation across multiple regions",
+        "toc_mapping": {
+          "science_program_id": "SP01",
+          "aow_compose_code": "SP01-AOW05",
+          "result_title": "HLO20.AOW5.IO3 Assess performance",
+          "result_indicator_description": "Availability of MELIA Report on AoWs (performance data)",
+          "result_indicator_type_name": "Number of policies"
+        },
+        "geo_focus": {
+          "scope_code": 4,
+          "scope_label": "National",
+          "countries": [{ "id": 788, "name": "Tunisia" }]
+        },
+        "contributing_center": [],
+        "contributing_partners": [],
+        "evidence": [
+          {
+            "link": "www.gipiti.com",
+            "description": "Policy document and implementation plan"
+          }
+        ],
+        "contributing_bilateral_projects": [
+          {
+            "grant_title": "D-200358-Enhancing Food Security and Climate Resilience in Morocco and Tunisia"
+          }
+        ],
+        "policy_change": {
+          "policy_type": {
+            "name": "Program, budget or investment",
+            "status_amount": {
+              "id": 1,
+              "name": "Approved"
+            },
+            "amount": 5000000
+          },
+          "policy_stage": {
+            "name": "Stage 1"
+          },
+          "implementing_organization": [
+            {
+              "institutions_id": 456,
+              "institutions_acronym": "MOA",
+              "institutions_name": "Ministry of Agriculture"
+            },
+            {
+              "institutions_id": 457,
+              "institutions_acronym": "MOE",
+              "institutions_name": "Ministry of Environment"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

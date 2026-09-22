@@ -1,0 +1,35 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "knowledge_product",
+      "data": {
+        "created_date": "2025-10-24T19:36:04Z",
+        "created_by": {
+          "name": "Sara Jani",
+          "email": "s.jani@cgiar.org"
+        },
+        "lead_center": {
+          "institution_id": 1279,
+          "acronym": "ICARDA"
+        },
+        "toc_mapping": {
+          "science_program_id": "SP01",
+          "aow_compose_code": "SP01-AOW05",
+          "result_title": "HLO20.AOW5.IO3 Assess performance",
+          "result_indicator_description": "Availability of MELIA Report on AoWs (performance data)",
+          "result_indicator_type_name": "Number of knowledge products"
+        },
+        "contributing_bilateral_projects": [
+          {
+            "grant_title": "D-200358-Enhancing Food Security and Climate Resilience in Morocco and Tunisia"
+          }
+        ],
+        "knowledge_product": {
+          "handle": "https://hdl.handle.net/20.500.1176/70001"
+        }
+      }
+    }
+  ]
+}
