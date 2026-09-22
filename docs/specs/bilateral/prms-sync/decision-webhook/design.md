@@ -389,6 +389,8 @@ Exceeding any of these is **information, not failure** — the Leader stops and 
 
 Carried from `requirements.md` §12 — **OQ-1** (verdict as lifecycle status?) · **OQ-2** (does REJECT reopen editing?) · **OQ-3** (what may be retained from `data`?) · **OQ-4** (may the callback populate `result.prms_result_code`?) · **OQ-5** (who reads the history?) · **OQ-6** (the PROD callback host — **this is R-1**).
 
+> **OQ-5 — sequencing settled 2026-09-22, substance still open.** The owner was asked at the Phase 3 gate whether to widen this child with a history read endpoint, given that the visual requirements now exist. The answer was to **finish this child as specified, then open the visual proposal**. Consequence for an implementer: **NG-1 and the server-only boundary stand exactly as written** — the history is persisted and queryable at the repository level (R-PWH-005 AC.8, T-05), and the only HTTP surface is the additive `last_decision` field (R-PWH-008). No `GET` over the delivery history is built here, and building one is out of scope, not an oversight. The open half of OQ-5 — *who* reads it and at *what grain* — transfers to the future UI family row, which cannot specify a read surface without answering it first.
+
 Design-level additions:
 
 - **OQ-D1** — Should a `DUPLICATE` row retain the full `raw_body` a second time, or reference the original? v1 retains it (simplest, and the two bodies are not guaranteed identical). Owner: product owner; revisit if storage growth matters.
