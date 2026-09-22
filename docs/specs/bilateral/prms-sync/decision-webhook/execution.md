@@ -910,3 +910,98 @@ R-PWH-006 AC.1, AC.2, AC.4, AC.5, AC.6, AC.7 · R-PWH-005 AC.7, AC.8 · R-PWH-00
 #### Final verification result
 
 **PASS.** Scoped suite 6/66 green and re-verified by a non-author; full server suite **397 / 3,502** green; build exit 0; eslint clean; four falsifiers observed red then green, one of them sharper than the task required; the shipped SQL read directly by the Leader; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
+
+---
+
+### T-06 — `DeliveryCorrelator`: resolve the live result and apply the verdict — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1**
+
+| Field | Value |
+|---|---|
+| Implementer | **Cursor / `grok-4.7-xhigh`** · dispatch `ctx_414243a20984` — the owner's chosen routing, restored after the quota error was corrected |
+| Reviewer | Claude Code / `akili-reviewer` → **Opus 5**, read-only |
+| `author ≠ auditor` | **held on both axes and across hosts** |
+| runtime events | none |
+| Diff | 6 files, **861 insertions** — 4 new, plus **6 lines** across T-05's repository and spec |
+
+This is the spec's most silent defect class (**DC-1**): a verdict landing on a snapshot row is *valid data in the wrong row* — nothing downstream notices, no test fails, no log complains.
+
+#### Pre-checks run by the Leader before dispatch
+
+- **P-3 re-verified at HEAD `b2b2233d`.** T-06 is *anchored* by it — if STAR's outbound `external_reference` were not `String(result_official_code)`, the task is discarded outright. `common-fields.builder.ts:421-426` still resolves exactly. **RB-1 requires this re-run at each task's own start commit**, because the sibling `sync-engine` has already invalidated five Premise Ledger citations mid-review once.
+- **The live-row convention re-verified** at `results.util.ts:38-46`: all four predicates are the repo's own convention, not this spec's invention.
+- **The untouchable sweep:** `git grep -rln "is_synced_to_prms\|prms_result_code\|prms_phase_id" -- src` → **31 files**, every one of which this task must leave untouched.
+
+#### Evidence re-run — non-author, Step 2.3
+
+| Command | Reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/entities/prms-webhook` | 89/89 | **8 suites / 89 tests** green (from 6/66) | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint src/domain/entities/prms-webhook` | exit 0 | exit 0 | **VERIFIED** |
+
+**Leader full-suite re-measurement: 399 suites, 3,525 tests — all passed** (from 397 / 3,502).
+
+**Leader read the shipped source directly:**
+
+```sql
+WHERE platform_code = '${ReportingPlatformEnum.STAR}'
+  AND result_official_code = ?
+  AND is_active = TRUE
+  AND is_snapshot = FALSE
+```
+
+Four predicates, all joined by `AND` — **not** the `OR` precedence trap the Disqualifier warns about — and `platform_code` a literal from the enum. `grep -nE "UPDATE results|INSERT INTO results|resultsRepo|\.save\(|\.update\("` over the service returns **nothing**: no write path to `results` exists in the file.
+
+**Scope verified by diffing T-05's two files in full**, not by trusting the report: the only change is the enum import, the deletion of `DELIVERY_PROCESSING_STATE_RECEIVED` plus its doc comment, and one usage swap. **Six lines.** The Reviewer independently confirmed **zero remaining references repo-wide** — one vocabulary survives, which is the whole point of the addition.
+
+#### Reviewer verdict — `STATUS: PASS`
+
+The audit judged the falsifiers **mechanically, not on trust**, which is what the brief asked for:
+
+> (a) Dropping `is_snapshot = FALSE` leaves rows `{10, 40}`; `ORDER BY result_id ASC` makes 10 first, so the AC.1 `winner(...)` lookup fails on `is_snapshot: false`, the SQL-text regex fails, and `expect(warn).not.toHaveBeenCalled()` fails — **three assertion-level reds, no fixture-setup error.** (b) Dropping `platform_code` leaves `{20, 40}` … the fake's placeholder/param count still balances, so it reddens on the assertion, not on a parse throw. (c) A `dataSource.query('UPDATE results …')` is captured by `table.writes`; a `getRepository(...).update` is captured by the `resultsWriter` mock. **Both reachable forms are covered.**
+
+That last clause matters: the AC.3 gate would be worth little if it caught only one of the two ways this codebase can write to a table.
+
+#### Rulings on the three judgement calls
+
+**(a) `platform_code` interpolated as a template literal — acceptable, no finding, with a condition.** The value is a TypeScript enum member resolved at module load and never request-derived, so there is no injection surface; `design.md:231` §6.4 step 3 itself writes `platform_code = 'STAR'` as a literal; and a literal is what makes the Done criterion *"all four predicates present in the emitted query, asserted on the SQL text"* assertable at all. The service's own comment supplies a second reason — binding it would shift the `?` ordinal for the official code. **The ruling is conditional: if a future task parameterises the platform by input, it must bind.**
+
+**(b) The ambiguity `warn`, and whether *"take the first"* is deterministic.** Both fields are present (`external_reference=1441061`, `2 live rows matched`), satisfying design §10 and R-PWH-007 AC.4. And determinism does **not** rest on the result set's natural order: `LIVE_ROW_SQL` ends `ORDER BY result_id ASC`, and **the test proves the ordering is load-bearing** by `unshift`-ing id 50 ahead of id 40 and still expecting 40. A test that would pass identically with or without the `ORDER BY` would have proved nothing here.
+
+**(c) The Leader's own `tasks.md` amendment — confirmed faithful, and better argued than the Leader argued it.** This was handed over deliberately: the Leader edited the spec after T-05's ruling and then dispatched T-06 to build on that edit, so nobody had audited it. The Reviewer's grounds:
+
+> `requirements.md:259` AC.7 enumerates exactly four protected columns — decision, justification, `decided_at`, raw body — and `correlation_outcome` is **not among them**; its parenthetical explicitly permits state change. `design.md:233` §6.4 step 5 reads *"One row → `CORRELATED`, write `result_id`, `processing_state = PROCESSED`"*, and steps 1/2/4 likewise assign `NO_REFERENCE`/`UNKNOWN_REFERENCE` to this detached step — **outcomes that are unknowable at insert time** (§6.3 step 3 can only classify shape and duplication). The amendment removes a task/design contradiction; it changes no requirement's meaning.
+
+The *"unknowable at insert time"* argument is the decisive one and the Leader had not made it.
+
+#### `ADVISORY` — recorded, never gating
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| **RISK** | **`finish()` overwrites `correlation_outcome` unconditionally**, so calling `correlate` on a `MALFORMED` row would replace it with `NO_REFERENCE`. `design.md:226` already exempts `DUPLICATE` but says nothing about `MALFORMED` | **Reachable only through T-09**, which does not exist. **Carried as a named gate into T-09's brief** — T-09 owns which rows reach the detached step |
+| RELIABILITY | `MARK_FAILED_SQL` writes `processing_state` only; the `processing_error` column (design §4) stays null, so a failure reason survives **only in logs** | Recorded; the column exists and is unused |
+| RISK | `Number.isSafeInteger` and `Number(rows[0].result_id)` both cap at 2^53−1 on `bigint` columns | **"Could not construct a reachable payload"** — live official codes are 7 digits and `result_id` is a low auto-increment |
+| READABILITY | `classifyReference`'s `typeof !== 'string'` branch is unreachable under its own signature | Recorded |
+
+#### Requirements covered
+
+R-PWH-007 (all ACs) · R-PWH-005 AC.1, AC.2 · R-PWH-008 AC.5 (correlation branch) · R-PWH-003 (the detached step) · NFR-PWH-003.
+
+#### Decisions made
+
+- **Routing restored to the owner's choice.** Implementer back on Cursor / `grok-4.7-xhigh` after the Leader's false account-wide-quota conclusion was corrected. `xhigh` because DC-1 is correctness-critical and silent.
+- **The `enum/delivery-processing-state.enum.ts` addition was owner-approved** at T-05's continue gate, with the T-05 const retired in the same edit. Design §4 fixed the vocabulary but §3.1 assigned it no file — the gap was found by T-05's Implementer, ruled real by T-05's Reviewer, and placed by the owner.
+- **No execute-time spec edit in this task.** The mutability amendment belongs to T-05's close and was carried into this Reviewer's brief as a named conformance check, where it was confirmed.
+
+#### Budget tracking
+
+| | Budgeted | T-06 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 310 | **861** (**+178 %**) | **4,766 measured across T-01, T-02, T-03, T-05, T-06, T-08** |
+| Review rounds | 3 for the whole spec | 1 | **12 / 3** |
+
+#### Final verification result
+
+**PASS.** Scoped suite 8/89 green and re-verified by a non-author; full server suite **399 / 3,525** green; build exit 0; eslint clean; three falsifiers observed red on their own assertions and independently judged reachable by the auditor; the four-predicate SQL and the absence of any `results` write read directly from the shipped source; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.

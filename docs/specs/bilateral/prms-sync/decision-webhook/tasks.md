@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **5 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **6 / 10 tasks closed** (T-01, T-02, T-03, T-05, T-06, T-08 — all `PASS` 2026-09-22). T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -324,7 +324,7 @@ graph TD
 
 ---
 
-### T-06 — `DeliveryCorrelator`: resolve the live result and apply the verdict  `[ ]`
+### T-06 — `DeliveryCorrelator`: resolve the live result and apply the verdict  `[x]`
 
 > **Anchored by `design.md` P-3** — if the `external_reference` convention is false, this task is discarded outright.
 
@@ -456,6 +456,8 @@ graph TD
 ---
 
 ### T-09 — `PrmsWebhookDeliveryService`: classify, store, acknowledge, detach  `[ ]`
+
+> **Gate carried in from T-06's review (2026-09-22).** `DeliveryCorrelator.finish()` overwrites `correlation_outcome` **unconditionally**, so invoking the correlator on a `MALFORMED` row would replace that classification with `NO_REFERENCE`. `design.md:226` exempts `DUPLICATE` from the detached step but says nothing about `MALFORMED`. **T-09 owns which rows reach the detached step**, so this is T-09's to settle: either it must not dispatch `MALFORMED` rows to the correlator, or the exemption must be widened in the design. Reachable only through this task — the correlator has no other caller. Add a falsifier for it.
 
 - **Requirements covered:** R-PWH-003 AC.1–AC.4 · R-PWH-005 AC.3, AC.4, AC.5 (write path), AC.6 · R-PWH-006 AC.3 · R-PWH-009 AC.4 · NFR-PWH-001, NFR-PWH-003, NFR-PWH-005
 - **Design references:** §3.1 (`prms-webhook-delivery.service.ts` — *"does not own the transaction"*) · §6.3 steps 2, 4, 5 · §10 · DD-4 · DC-6

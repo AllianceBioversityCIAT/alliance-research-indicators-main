@@ -3,8 +3,8 @@ import { join } from 'path';
 import { DataSource, EntityManager } from 'typeorm';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome.enum';
+import { DeliveryProcessingState } from '../enum/delivery-processing-state.enum';
 import {
-  DELIVERY_PROCESSING_STATE_RECEIVED,
   PrmsWebhookDeliveryRepository,
   RecordDeliveryInput,
 } from './prms-webhook-delivery.repository';
@@ -195,7 +195,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         // `JSON.stringify(input.requestPayload)` for the same reason).
         raw_body: JSON.stringify({ result_id: 9001, decision: 'APPROVE' }),
         raw_headers: JSON.stringify({ 'x-prms-delivery-id': '4172' }),
-        processing_state: DELIVERY_PROCESSING_STATE_RECEIVED,
+        processing_state: DeliveryProcessingState.RECEIVED,
         processing_error: null,
         duplicate_of_id: null,
         created_by: null,
@@ -224,7 +224,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         DECIDED_AT,
         JSON.stringify({ result_id: 9001, decision: 'APPROVE' }),
         JSON.stringify({ 'x-prms-delivery-id': '4172' }),
-        DELIVERY_PROCESSING_STATE_RECEIVED,
+        DeliveryProcessingState.RECEIVED,
         null,
       ]);
       expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome.enum';
+import { DeliveryProcessingState } from '../enum/delivery-processing-state.enum';
 import { PrmsWebhookDelivery } from '../entities/prms-webhook-delivery.entity';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-05 /
@@ -98,9 +99,6 @@ const asOk = (result: unknown): { insertId?: number } => {
   }
   return (result ?? {}) as { insertId?: number };
 };
-
-/** Initial `processing_state` of every row this repository writes (design §4). */
-export const DELIVERY_PROCESSING_STATE_RECEIVED = 'RECEIVED';
 
 /**
  * What the caller (T-09) hands over for one inbound delivery. The caller
@@ -243,7 +241,7 @@ export class PrmsWebhookDeliveryRepository {
         input.decided_at,
         input.raw_body === null ? null : JSON.stringify(input.raw_body),
         input.raw_headers === null ? null : JSON.stringify(input.raw_headers),
-        DELIVERY_PROCESSING_STATE_RECEIVED,
+        DeliveryProcessingState.RECEIVED,
         duplicateOfId,
       ],
     );
