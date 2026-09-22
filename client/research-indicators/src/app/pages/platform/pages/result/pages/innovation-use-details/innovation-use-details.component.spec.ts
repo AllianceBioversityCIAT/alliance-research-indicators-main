@@ -3208,6 +3208,26 @@ describe('InnovationUseDetailsComponent', () => {
     });
   });
 
+  // Bug (browser freeze): the Number field accepts negatives, so PrimeNG emits the bare string '-'
+  // mid-typing. It round-trips back here through the card's `update` output, and `Number('-')` is
+  // NaN. A NaN re-emitted to `app-input` made its sync effect re-enter forever (NaN !== NaN), which
+  // hung the tab. The adapter must never be the layer that manufactures it.
+  describe('the read adapter never yields NaN', () => {
+    it.each([
+      ['the half-typed negative', '-'],
+      ['a bare decimal point', '.'],
+      ['free text', 'abc'],
+      ['an explicit NaN', NaN]
+    ])('%s maps to null, not NaN', (_label, raw) => {
+      component.body.set({
+        ...component.body(),
+        quantifications: [{ id: 1, quantification_number: raw as unknown as number, unit: 'kg', description: '' }]
+      });
+
+      expect(component.quantificationsView()[0].number).toBeNull();
+    });
+  });
+
   // Same claim, at the RENDERED-DOM seam R-MSD-009's AC actually names ("the field renders -0.75").
   describe('T-11 — R-MSD-009 :430/:431 — a wire value of "-0.7500" (string) renders identically to -0.75 (number)', () => {
     it('wire type NUMBER (-0.75): renders "-0.75"', async () => {
