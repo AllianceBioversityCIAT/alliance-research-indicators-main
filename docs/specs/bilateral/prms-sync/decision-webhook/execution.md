@@ -314,3 +314,134 @@ R-PWH-005 (row shape; AC.5 `justification` nullability; AC.7 append-only column 
 #### Final verification result
 
 **PASS.** Scoped suite green and re-verified by a non-author; full server suite **392 / 3392 green**; `npm run build` exit 0; `npx eslint` clean; the migration applies **and** reverts against the disposable TEST scratch schema with both outputs recorded; both falsifiers observed red then green; Reviewer `PASS` from an independent context on a different model.
+
+---
+
+### T-02 — `PrmsNormalizerService`: `registerWebhook` + `getWebhook`
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1**
+
+| Field | Value |
+|---|---|
+| Implementer | Cursor / `grok-4.7-high` · dispatch `ctx_bc4e0b8ba393` |
+| Reviewer | Cursor / `gpt-5.6-sol-xhigh` · dispatch `ctx_b4bfe3900e20` |
+| `author ≠ auditor` | **held** — different models. No `REVIEW_WAIVED` record owed |
+| runtime events | none |
+| Diff | 3 files, **585 insertions** (service +151, spec +383, new DTO +51) |
+| Wave | 2 — run concurrently with T-08 (disjoint files, lanes B and C) |
+
+#### Files changed
+
+- `src/domain/tools/prms-normalizer/prms-normalizer.service.ts` (additive)
+- `src/domain/tools/prms-normalizer/prms-normalizer.service.spec.ts`
+- `src/domain/tools/prms-normalizer/dto/prms-webhook.dto.ts` (new)
+
+#### Evidence re-run — non-author, Step 2.3 (never waived)
+
+Performed by the **Leader**, inline, **after both wave-2 workers reported and their terminals were released**. The measurement was deliberately deferred while T-08's worker was live: T-08's own verification includes `git diff --unified=0 | grep -i secret`, and a `git add -N` taken to extract T-02's diff would have pulled T-02's files into the diff T-08 was auditing for credentials. Root `CLAUDE.md` §4.3 — *measure after the worker reports, never beside it*.
+
+| Command | Implementer reported | Leader re-run | Verdict |
+|---|---|---|---|
+| `npm test -- --silent -- src/domain/tools/prms-normalizer` | 154/154 | **13 suites / 154 tests** green | **VERIFIED** |
+| `npm run build` | exit 0 | exit 0 | **VERIFIED** |
+| `npx eslint src/domain/tools/prms-normalizer` | exit 0 | exit 0 | **VERIFIED** |
+
+**Result: `VERIFIED`** — no `MISMATCH`, no rework attempt consumed.
+
+**Leader full-suite re-measurement:** `npm test -- --silent` → **393 suites, 3423 tests, 1 snapshot — all passed.** (Wave 2 measured once, covering T-02 and T-08 together.)
+
+#### Falsifiers — both observed red, then green
+
+1. Extra property added to the registration body → `expect(Object.keys(sentBody)).toEqual(['url'])` red.
+2. `registered` rewritten as `response.status === 200` → the nothing-registered case (`200` + `{}`) asserts `true` and reddens.
+
+The Reviewer independently judged that **both mutations can genuinely redden for the reason claimed** — it did not take the Implementer's claim on trust (K-004 / KZ-014).
+
+#### Reviewer verdict — `STATUS: PASS`, no `ADVISORY`
+
+The audit confirmed the two points the *Disqualifier* singles out, which is where this task was most likely to produce an inert gate:
+
+- the exactness assertion is `Object.keys(...).toEqual(['url'])`, **not** `toMatchObject({ url })` — the latter cannot detect an extra property and is disqualified for AC.3;
+- the body is read off **`httpService.post.mock.calls[0][1]`**, i.e. the stub's *arguments*, not merely asserting that `postRequest` was called. Asserting the call proves dispatch, not payload (KZ-001).
+
+Also confirmed: `registered` derived from emptiness with `200` + `{}` covered; the key re-read per call; `NotFoundException` and empty-key on **distinct** `404`/`503` paths (the JD-5 collapse avoided); PRMS messages preserved; host only from `ARI_PRMS_NORMALIZER_HOST`; new log lines carry only the status — **no credential**.
+
+#### Consumers
+
+`git grep -rn "PrmsNormalizerService" -- src test` → 22 hits at `3978304f`. **Zero call sites modified**; the constructor signature is unchanged. That last point is load-bearing and was briefed as a FAIL condition: `test/result-prms-sync-claim-concurrency.integration-spec.ts:216` casts a stub to this class and `test/prms-sync.e2e-spec.ts:249` spies on `ingest` — **neither tier is run by `npm test`** (P-10). See §4 below for what those tiers actually report.
+
+#### Requirements covered
+
+R-PWH-001 AC.3, AC.4, AC.5 + both scenarios · R-PWH-002 AC.3 · R-PWH-009 AC.1 · NFR-PWH-002.
+
+#### Decisions made
+
+- Effort `grok-4.7-high` (task says `M`). Held at the task's level: the scope is well-specified and additive; the credential handling is reuse of an existing, reviewed pattern rather than new design.
+- **No execute-time spec edit.** No edit-carry owed to the next Reviewer brief.
+- The brief pointed the Implementer at `ingest` as the exemplar **after the Leader read it** and confirmed it already implements the required `NotFoundException`-propagates / empty-`simple_value`-`503` split. The exemplar was verified before being cited, not assumed correct (KZ-007).
+
+#### Budget tracking
+
+| | Budgeted | T-02 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 230 for this task | **585** (**+154 %**) | **1,487 / 2,970** after T-01 + T-02 + T-08 |
+| Tasks | 10 | — | 2 closed, 1 in rework |
+| Review rounds | 3 | 1 | 3 used |
+
+The overage is test volume, as `tasks.md` §5 predicted: 383 of the 585 lines are the spec. **Review rounds are now at 3 of 3 budgeted with 7 tasks outstanding** — that figure will cross first, ahead of LOC. Recorded, not absorbed.
+
+#### Final verification result
+
+**PASS.** Scoped suite 13/154 green and re-verified by a non-author; full server suite 393/3423 green; build exit 0; eslint clean; both falsifiers observed red then green; Reviewer `PASS` from an independent context on a different model.
+
+---
+
+## 4. Branch-level finding: the `test:e2e` and `test:integration` tiers are RED, and it is not this spec's doing
+
+Recorded here once, at wave 2, so no later task re-diagnoses it. **This is RB-1 materializing** — `tasks.md` §6 predicted exactly this.
+
+### What was measured (Leader, 2026-09-22, tree quiet)
+
+| Tier | Command | Result |
+|---|---|---|
+| Unit (root config) | `npm test -- --silent` | **393 suites / 3,423 tests — all green** |
+| E2E | `npm run test:e2e` | **1 suite failed of 3** — `test/prms-sync.e2e-spec.ts`, 2 tests |
+| E2E (T-08's consumer) | `npm run test:e2e -- test/results-ai-formalize-bulk.e2e-spec.ts` | **3 / 3 green** |
+| Integration | `npm run test:integration` | multiple failures across T-03 / T-11 / T-13 suites |
+
+The first row against the second is **KZ-017 in the flesh**: `npm test` runs the root config only and invokes none of the other three jest configs (P-10). A check narrower than the claim it backs returns a confident green.
+
+### Causation established by measurement, not by argument
+
+The obvious reasoning — *"T-02 is additive and T-08 only touches `request.url`, so neither can change a gate-reason string or produce a SQL error"* — is reasoning from the change's own frame, which **K-004 / KZ-014 explicitly refuse as evidence**. It was therefore tested:
+
+1. `git stash push -u -m "akili-wave2-probe-1790089228"` — both wave-2 diffs set aside, SHA captured (`39d5927354b3`). *(The stash stack is shared with other worktrees and held four other sessions' entries; the tagged-push / apply-by-SHA / drop-by-retagged-index procedure was used throughout, and no other entry was touched.)*
+2. Tree confirmed clean at `3978304f`; `npm run test:e2e -- test/prms-sync.e2e-spec.ts` re-run.
+3. **Identical result** — same two tests, same assertions, same messages.
+4. `git stash apply 39d5927354b3`, all 11 files restored, entry dropped by re-finding its index from the tag.
+
+**Conclusion: T-02 and T-08 do not cause these failures.**
+
+### Root cause
+
+One cause covers the e2e failure #2 and every failure in T-02's integration consumer: `QueryFailedError: Unknown column 'result_id' in 'where clause'`.
+
+Migration **`1790023167000-replaceResultIdWithOfficialCodeInPrmsSyncLog`** (sibling `sync-engine`, merged on this branch) runs `ALTER TABLE result_prms_sync_log DROP COLUMN result_id`. Confirmed live: the scratch schema's `result_prms_sync_log` has **no `result_id` column**, and `result-prms-sync-log.entity.ts` no longer declares one. But `result-prms-sync-log.repository.ts` still issues `WHERE result_id = ?` against that table.
+
+The remaining e2e failure is a gate-reason string mismatch (`"Innovation Use is gated: …"` vs `"Missing mandatory field 'submitted_by'"`) — also sibling territory, in the sync gate / builders.
+
+### The honest part about T-01
+
+T-01's `migration:test:execute` applied four pending migrations to the scratch schema, **including 1790023167000**, and left them applied. So T-01 **changed the failure mode** of these suites.
+
+It did not introduce the failure. Before T-01 the scratch schema had no `result_prms_sync_log` table **at all** — `grep -ril result_prms_sync_log src/db/baseline/` returns **0**, and the head was `391` while the table's creating migration is `392`. Suites exercising that table could not have passed; they failed on a missing table and now fail on a missing column.
+
+What T-01 *did* do is useful: it revealed that the sibling's own migrations, **when actually applied**, break the sibling's own tests. That finding was unreachable while the scratch schema sat four migrations behind.
+
+### Consequence for this spec
+
+- **T-02 and T-08 are not blocked.** Neither touches `result_prms_sync_log`, and T-08's own e2e consumer is green.
+- **T-07 is not blocked either** — checked directly rather than assumed. `LAST_ATTEMPT_SQL` in `result-prms-sync-status.reader.ts` is already migrated: it filters `result_prms_sync_log` by `external_reference` and `result_year`, using `result_id` only as a parameter against the `results` table. P-5 / P-6 / P-8 hold.
+- **The defect is in the write-path repository, not the reader**, and it belongs to family child 1 (`sync-engine`, status `pending`). Escalated to the owner; logged as **RB-6** in `tasks.md` §6.
+
+**What this section cannot reach (KZ-017):** it establishes that the wave-2 diffs are not causal and names one root cause covering most failures. It does **not** prove the gate-reason failure shares that cause, and it has not been run against the shared Dev database (deliberately untouched) — only against the disposable scratch schema the e2e tier redirects itself to.

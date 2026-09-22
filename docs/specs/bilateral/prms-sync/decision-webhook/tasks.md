@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — 1 / 10 tasks closed (T-01, `PASS` 2026-09-22). See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — 2 / 10 tasks closed (T-01, T-02 — both `PASS` 2026-09-22); T-08 is `[~]` in rework after a Reviewer `FAIL`. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -154,7 +154,7 @@ graph TD
 
 ---
 
-### T-02 — `PrmsNormalizerService`: `registerWebhook(url)` + `getWebhook()`  `[ ]`
+### T-02 — `PrmsNormalizerService`: `registerWebhook(url)` + `getWebhook()`  `[x]`
 
 - **Requirements covered:** R-PWH-001 AC.3, AC.4, AC.5 · R-PWH-002 AC.3 · R-PWH-009 AC.1 · NFR-PWH-002 (credential handling)
 - **Design references:** §3.1 (*Modified:* `prms-normalizer.service.ts`) · §8 *Integration Impact* · §6.1 steps 3–5 · §6.2 · P-14, P-14b
@@ -399,7 +399,7 @@ graph TD
 
 ---
 
-### T-08 — `path-redaction.util.ts` and the five `request.url` read sites  `[ ]`
+### T-08 — `path-redaction.util.ts` and the five `request.url` read sites  `[~]`
 
 > **This task changes three globally-registered, application-wide wrappers.** Its blast radius is every controller in the server. Design DD-10 has been **wrong three times** about the mechanism (never about the decision) — read DD-10 v2 and P-16 in full before editing, and trust the grep over the prose.
 
@@ -576,6 +576,7 @@ Append-only.
 | RB-3 | 2026-09-22 | **P-14b is `UNVERIFIED` with Impact High** — whether `ARI_CLARISA_API_KEY.simple_value` is populated in TEST and PROD rests on a 2026-09-14 owner statement, which citation rule (d) classes as `user-stated`. | **T-03 settles it as its first step**, before anything is built on it, and records the observed status code (`404` vs `503`) in the Premise Ledger row. | T-03 | open |
 | RB-4 | 2026-09-22 | **The repo's e2e harness cannot observe `JwtMiddleware`** (P-17). The obvious gate for the auth boundary is one that cannot go red, and the repo has twice declined to build the alternative. | T-04 builds a non-stubbing harness **or** states the substitution and what it stops covering. A green run under the stub is reported **inconclusive**, never as a pass. | T-04 | open |
 | RB-5 | 2026-09-22 | **DC-8 — PII retained without a decision.** `data` is *"the full enriched result document"* and may carry contributor names and emails; v1 retains it whole. **No automated gate exists for this class.** | Declared, not filtered on an unstated rule. Substitute: the product owner's answer to OQ-3 at the HITL gate, quoted. Parent: PRD OQ-7. | Product owner + compliance | open |
+| RB-6 | 2026-09-22 | **The `test:e2e` and `test:integration` tiers are RED on this branch, and the cause is the sibling `sync-engine`, not this child.** Migration `1790023167000` drops `result_prms_sync_log.result_id`, and `result-prms-sync-log.repository.ts` still queries `WHERE result_id = ?` — one root cause covering `prms-sync.e2e-spec.ts` and every failure in `result-prms-sync-claim-concurrency.integration-spec.ts`. A second e2e failure is a sync-gate reason-string mismatch. **Measured, not inferred:** both wave-2 diffs were stashed and the e2e re-run at `3978304f` reproduced the failures identically. `npm test` is fully green (393/3,423), which is why this was invisible until the Leader ran the other tiers — KZ-017. | **Does not block this child.** T-02 / T-08 touch none of it, and T-08's own e2e consumer (`results-ai-formalize-bulk`) is green. **T-07 verified unaffected**: `LAST_ATTEMPT_SQL` already filters by `external_reference` + `result_year`. Escalate to the `sync-engine` owner; do not repair from inside this spec. Full analysis in [`./execution.md`](./execution.md) §4. | `sync-engine` owner (family child 1, status `pending`) | open |
 
 ---
 
