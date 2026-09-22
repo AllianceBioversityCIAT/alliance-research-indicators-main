@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
 import { WebsocketService } from '@sockets/websocket.service';
+import { AllModalsService } from '@services/cache/all-modals.service';
 
 import PoolFundingAlignmentComponent from './pool-funding-alignment.component';
 import { SpTocAlignmentBlockComponent } from './components/sp-toc-alignment-block/sp-toc-alignment-block.component';
@@ -2828,7 +2829,8 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(bannerLink.textContent).toContain('Learn more & view workflow');
     });
 
-    it('toggles showHelpModal signal when help button or banner link is clicked', () => {
+    it('both triggers open the help panel', () => {
+      const modals = TestBed.inject(AllModalsService);
       fixture.detectChanges();
       expect(component.showHelpModal()).toBe(false);
 
@@ -2836,10 +2838,52 @@ describe('PoolFundingAlignmentComponent', () => {
       helpBtn.click();
       expect(component.showHelpModal()).toBe(true);
 
-      component.showHelpModal.set(false);
+      // Closed the way the shell closes it, not by poking a local signal — the
+      // open state lives in AllModalsService now.
+      modals.closeModal('poolFundingHelp');
+      expect(component.showHelpModal()).toBe(false);
+
       const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
       bannerLink.click();
       expect(component.showHelpModal()).toBe(true);
+    });
+
+    it('registers a title with the shared service so the shell can render it', () => {
+      const config = TestBed.inject(AllModalsService).isModalOpen('poolFundingHelp');
+      expect(config.title).toContain('Pool Funding');
+    });
+
+    // It used to be a bare <p-dialog>, which is why it did not look like any
+    // other modal in the app.
+    it('renders through the shared app-modal shell, not a bare p-dialog', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      expect(template).toContain('<app-modal modalName="poolFundingHelp"');
+      // ★ discriminating: the old shell is gone, header and footer included.
+      expect(template).not.toContain('<p-dialog');
+      expect(template).not.toContain('#footer');
+    });
+
+    it('carries no colour token that colors.scss does not define', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const helpPanel = template.slice(template.indexOf('<app-modal modalName="poolFundingHelp"'));
+
+      // ★ discriminating: these four are still used elsewhere in this file but are
+      //   NOT in colors.scss, so every rule using them rendered with no colour.
+      for (const phantom of [
+        'var(--ac-primary-blue-50)',
+        'var(--ac-primary-blue-800)',
+        'var(--ac-primary-blue-900)',
+        'var(--ac-grey-50)'
+      ]) {
+        expect(helpPanel).not.toContain(phantom);
+      }
     });
   });
 
@@ -2887,6 +2931,112 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(component.formData().primary_sp_code).toBeNull();
     });
   });
+
+  // @sdd-spec docs/specs/bilateral — section-opening banner matches GEOGRAPHIC SCOPE
+  describe('info banner follows the Geographic Scope recipe', () => {
+    it('uses the shared banner shape, not a rounded blue card', () => {
+      const banner = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"]'
+      ) as HTMLElement;
+      expect(banner).toBeTruthy();
+
+      // Geographic Scope: grey ground, 5px light-blue left rule, square corners.
+      expect(banner.className).toContain('bg-[color:var(--ac-grey-100)]');
+      expect(banner.className).toContain('border-l-[5px]');
+      expect(banner.className).toContain('border-l-[color:var(--ac-light-blue-500)]');
+      expect(banner.className).toContain('mb-[30px]');
+
+      // ★ discriminating: the old design was a rounded primary-blue card.
+      expect(banner.className).not.toContain('rounded-r-[8px]');
+      expect(banner.className).not.toContain('bg-[var(--ac-primary-blue-50)]');
+    });
+
+    it('sets the copy in Barlow 14/17 grey-700, like the reference section', () => {
+      const text = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"] h3'
+      ) as HTMLElement;
+
+      expect(text.className).toContain("font-['Barlow']");
+      expect(text.className).toContain('text-[14px]');
+      expect(text.className).toContain('leading-[17px]');
+      expect(text.className).toContain('text-[color:var(--ac-grey-700)]');
+      // ★ discriminating: it used to be text-xs with a relaxed leading.
+      expect(text.className).not.toContain('text-xs');
+    });
+
+    it('keeps the 20px gap under the section title that every other section has', () => {
+      const title = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-title"]'
+      ) as HTMLElement;
+      // title → .pf-alignment-section-heading → the flex row that owns the gap
+      const titleRow = title.closest('.pf-alignment-section-heading')?.parentElement as HTMLElement;
+
+      // .section-title carries margin-bottom: 20px, which `m-0` removes here.
+      expect(title.className).toContain('m-0');
+      expect(titleRow.className).toContain('mb-5');
+    });
+  });
+
+
+  // The section used to spell its validation messages in red, while every shared
+  // field component (input, multiselect, radio-button, textarea) spells them amber
+  // with a warning glyph. Red now means "something failed", not "you still have
+  // to fill this in".
+  describe('validation messages use the shared amber recipe', () => {
+    const VALIDATION_TESTIDS = [
+      'pf-alignment-error-has_contribution',
+      'pf-alignment-error-sp_codes',
+      'pf-alignment-sp-required',
+      'pf-alignment-primary-required'
+    ];
+
+    it.each(VALIDATION_TESTIDS)('%s is amber, never red', testid => {
+      // Read from the template source: these render behind several signals, and
+      // this test is about the treatment they carry, not about when they appear.
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      const block = template.slice(
+        template.lastIndexOf('<small', template.indexOf(testid)),
+        template.indexOf('</small>', template.indexOf(testid))
+      );
+
+      expect(block).toContain('text-[var(--ac-warning-1)]');
+      // ★ discriminating: every one of these carried text-red-700 before.
+      expect(block).not.toContain('text-red-700');
+    });
+
+    it.each(VALIDATION_TESTIDS)('%s carries the warning glyph in its own row', testid => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const start = template.lastIndexOf('<small', template.indexOf(testid));
+      const block = template.slice(start, template.indexOf('</small>', start));
+
+      expect(block).toContain('material-symbols-rounded');
+      expect(block).toContain('warning');
+      expect(block).toContain('<span>');
+    });
+
+    it('leaves the FAILURE banners red — they report a break, not a missing answer', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      for (const testid of [
+        'pf-alignment-load-failed',
+        'pf-alignment-hlo-catalog-error',
+        'pf-alignment-error-global'
+      ]) {
+        const start = template.lastIndexOf('<', template.indexOf(testid) - 200);
+        const block = template.slice(start, template.indexOf(testid) + 200);
+        expect(block).toContain('red');
+      }
+    });
+  });
+
 });
-
-

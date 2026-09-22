@@ -190,7 +190,14 @@ export class ToPromiseService {
 
   async updateGreenChecks() {
     const response = await this.getGreenChecks();
-    this.cacheService.greenChecks.set(response.data);
+    // `greenChecks` is read as an object by every consumer — most directly by
+    // ResultSidebarComponent's `greenChecks()[option.greenCheckKey]`. A failed
+    // request resolves with `data: undefined` (see the catchError above, which
+    // maps the error body through), and storing that turned the whole sidebar
+    // into `TypeError: Cannot read properties of undefined`, taking the section
+    // list and the "sections completed" counter down with it. An empty object is
+    // the honest value: nothing is known to be complete.
+    this.cacheService.greenChecks.set(response?.data ?? {});
   }
 }
 
