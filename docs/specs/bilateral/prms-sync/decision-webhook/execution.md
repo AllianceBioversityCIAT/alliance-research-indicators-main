@@ -445,3 +445,99 @@ What T-01 *did* do is useful: it revealed that the sibling's own migrations, **w
 - **The defect is in the write-path repository, not the reader**, and it belongs to family child 1 (`sync-engine`, status `pending`). Escalated to the owner; logged as **RB-6** in `tasks.md` §6.
 
 **What this section cannot reach (KZ-017):** it establishes that the wave-2 diffs are not causal and names one root cause covering most failures. It does **not** prove the gate-reason failure shares that cause, and it has not been run against the shared Dev database (deliberately untouched) — only against the disposable scratch schema the e2e tier redirects itself to.
+
+---
+
+## HALT: T-08 — `path-redaction.util.ts` and the five `request.url` read sites
+
+**Status `[~]` · 3 Implementer attempts · 3 Reviewer `FAIL` verdicts · rework ceiling reached 2026-09-22 · escalated to the owner, not auto-advanced.**
+
+| Field | Value |
+|---|---|
+| Attempt 1 | Cursor / `grok-4.7-xhigh` · `ctx_8d90b7a0986c` |
+| Attempt 2 | Cursor / `grok-4.7-xhigh` · `ctx_e6cdb6f605b1` |
+| Attempt 3 | Cursor / **`claude-opus-5-thinking-high`** · `ctx_cc61f5905e0c` — tier escalation, **owner-approved** at the attempt-3 gate |
+| Reviewer (all three rounds) | Cursor / `gpt-5.6-sol-xhigh` · `ctx_8313fa29bb94`, `ctx_f17b770188b9`, `ctx_fb34ee482f12` |
+| `author ≠ auditor` | **held on all three rounds** |
+| runtime events | none on any attempt |
+
+### Work preserved — nothing was discarded
+
+The working tree was **not** restored. The full attempt-3 state is preserved three ways before any decision:
+
+| Where | What |
+|---|---|
+| **branch `akili/t08-halted`** (`f0036aa2`) | all **8** files, durable in git. Recover with `git checkout akili/t08-halted -- server/researchindicators/src/domain/shared` |
+| tag `akili-t08-halted-20260922-105615` (`2f39a6cc`) | the 6 tracked files only — `git stash create` does not capture untracked files, so this copy is **incomplete**; prefer the branch |
+| session scratchpad | `t08-a3.diff` (879 lines, includes both new files) + copies of the two untracked files |
+
+The shared stash stack was not used and holds only other sessions' entries, untouched.
+
+**Rollback deliberately deferred to the owner.** `/akili-execute` Step 4 prescribes a blanket restore when the tree holds only the halted task's changes, which is the case here. It was not executed, for a reason that is stated rather than assumed: the rule exists so a HALT does not leave **broken** code behind, and this code is not broken — it is green on every gate and closes three confirmed leak vectors that `HEAD` does not close at all. Destroying 714 lines of verified work to satisfy the letter of a rule aimed at a different failure mode is the owner's call, not the Leader's. **No live exposure results from deferring**: T-04, the endpoint that would carry the secret in its path, does not exist yet.
+
+### Attempt-by-attempt history
+
+#### Attempt 1 — Reviewer `FAIL`, 2 issues
+
+Implementer delivered `redactCallbackPath` + the five wrap sites. Scoped suite 44/270 green, build 0, eslint 0.
+
+Reviewer confirmed: all five `request.url` sites wrapped including both logger paths; nothing bound at module load; no envelope or interceptor bypass; `app-microservice.module.ts`, `setup.interceptor.ts`, `jwr.middleware.ts` and the registration order untouched; scope clean; both DC-11 mutations able to redden.
+
+**Issue 1 — case sensitivity.** `/API/PRMS-CALLBACK/segment-k7` reaches the callback because Express builds its router with `caseSensitive: this.enabled('case sensitive routing')`, that setting is false by default and `main.ts` never enables it — while the helper compared case-sensitively. **Leader verified both halves at source before accepting the verdict:** `grep -niE "case.?sensitive" src/main.ts` returns nothing, and the helper used `===` / `startsWith` on the raw string.
+
+**Issue 2 — URL-bearing exception text.** A callback-prefixed URL that misses the route reaches Nest's `registerNotFoundHandler`, whose message is `Cannot POST <full-url>`. `GlobalExceptions` returned it via `errors` and logged the same URL-bearing stack, so the guess leaked despite a redacted `path`. The attempt-1 test substituted a synthetic `Not Found` / `stack-trace`, **which is why its gate could not see the leak** — a test that invents the exception it protects against.
+
+#### Attempt 2 — Reviewer `FAIL`, 1 issue (introduced by the fix)
+
+Both attempt-1 issues **closed and confirmed closed**. Scoped suite 44/284 green (+14 tests), build 0, eslint 0, full suite 393/3,437 green, e2e consumer 3/3.
+
+**Issue — over-redaction.** `redactCallbackDiagnostics` used `value.replace(/\/[^\s]*/g, …)`, consuming from any `/` to the next whitespace, so a delimiter was swallowed into the token and the remainder destroyed:
+
+```
+input : {"path":"/api/prms-callback/example","reason":"invalid"}
+got   : {"path":"/api/prms-callback
+```
+
+That is DC-11's second direction — degrading diagnostics for the **whole application** — and a violation of R-PWH-004 AC.7. *(The Leader had flagged this exact risk in the attempt-2 Reviewer brief, as one of three named regression suspicions; the auditor confirmed it.)*
+
+#### Attempt 3 — Reviewer `FAIL`, 2 issues
+
+Tier escalated to `claude-opus-5-thinking-high` (owner-approved): `grok-4.7-xhigh` is the ceiling of its family, so the rework rule's *"bump effort one level"* could only be honoured by changing tier.
+
+Delivered: the token now stops at the RFC 3986-excluded set plus whitespace, and trailing delimiter punctuation is split off and restored verbatim. **The Implementer also found and closed an under-redaction no Reviewer round had named** — under the old whitespace token, a callback path embedded in a JSON object was invisible to the predicate and leaked.
+
+Scoped suite **44 suites / 288 tests** green, build 0, eslint 0, **full suite 393 / 3,441 green**, e2e consumer 3/3, all five sites wrapped, secret grep clean (5 hits, all variable names).
+
+**Leader probe of the compiled `dist/` output** (asserting on generated output, never on the call sequence — KZ-001):
+
+```
+{"path":"/api/prms-callback/example","reason":"invalid"}       -> {"path":"/api/prms-callback","reason":"invalid"}   ✅
+Cannot POST /api/prms-callback/guess/extra                     -> Cannot POST /api/prms-callback                      ✅
+Cannot POST /API/PRMS-CALLBACK/segment-k7                      -> Cannot POST /api/prms-callback                      ✅
+at Object.<anonymous> (/Users/x/node_modules/@nestjs/core/…)    -> unchanged, byte-identical                           ✅
+{"path":"/api/results/910150901/prms-sync","reason":"invalid"} -> unchanged, byte-identical                           ✅
+redactCallbackPath('/api/prms-callbackers/x')                  -> unchanged (sibling prefix correctly not matched)     ✅
+```
+
+**The two issues that stopped it — both reproduced by the Leader against `dist/`, not taken on the Reviewer's word:**
+
+| # | Issue | Leader's reproduction | Reachability |
+|---|---|---|---|
+| 1 | **Absolute-URL forms are not recognised.** `PATH_TOKEN` consumes `//host/api/prms-callback/<secret>?x=1` as one token and the prefix is never matched | `Cannot POST //host/api/prms-callback/SECRET123?x=1` → **unchanged, full secret** · `failed https://star.ciat.cgiar.org/api/prms-callback/SECRET123` → **unchanged, full secret** | **Unproven.** `request.url` under Express is always origin-form (a path), so none of the five wrapped sites can produce this. It requires some other code to place an absolute callback URL into an exception message or stack. No such path was identified in this spec |
+| 2 | **The declared residual is inaccurate.** `[.,;:!?)\]']+` restores a whole **sequence**, not one character, and those bytes are legal in an RFC 3986 segment | `/api/prms-callback/SECRET!!!` → `/api/prms-callback!!!` · `/api/prms-callback/SECRET.,;` → `/api/prms-callback.,;` | **Reachable**, but leaks only trailing delimiter bytes of a guess — never a path segment |
+
+Issue 2 matters beyond its severity: the Implementer declared this residual itself as *"that single low-entropy character"*, and it is **not** a single character. The Leader deliberately handed that declaration to the Reviewer to judge rather than accepting it; the auditor judged it inaccurate and unacceptable, and the Leader's own probe confirms the auditor. **A self-declared residual is a claim, not evidence** (KZ-002 — a criterion discharged by an observation must quote what that observation actually covered).
+
+### Leader's root-cause hypothesis
+
+**Not under-thinking, and not a bad implementer.** The pattern across three rounds is consistent: each attempt fixed what it was told about and exposed an adjacent case in the same function, because **the task's own Falsifier list was incomplete for the mechanism it mandated**.
+
+`tasks.md` T-08 specifies exactly two falsifiers, both about `data.path` in the envelope. Neither can reach an exception **message** or a **stack**, and neither models route case-insensitivity. Yet DD-10 v2 requires redacting the credential wherever it appears. The gate the spec supplied was structurally narrower than the obligation the spec imposed — **KZ-017 in the spec itself**, not in the execution. Each Reviewer round was, in effect, authoring the falsifier the task should have carried; the rework ceiling was reached discovering requirements, not fixing defects.
+
+Supporting evidence: every attempt was green on every mandated gate. `npm test` never went red once across all three rounds. The defects were found only by an independent auditor reasoning about the mechanism.
+
+### What is owed
+
+- **Decision on the two open issues.** Issue 1's reachability is unproven and may be `n/a` for this codebase; Issue 2 is a bounded, declarable residual. Both are candidates for an explicit accepted-risk record rather than more rework — but that is the owner's call, not the Leader's, because both touch a credential (NFR-PWH-002) and requirements §14 makes Security sign-off **required** for this spec.
+- **If the work is kept:** `tasks.md` T-08's *Falsifier* and *Done criteria* need amending to carry the cases three review rounds discovered — absolute-URL forms, delimiter sequences, mixed case, and URL-bearing exception text. That is a **spec amendment**, and under `gated` mode it needs owner approval before any further attempt.
+- **Ordering constraint stands regardless:** `tasks.md` §1 — *"T-08 must merge before T-04 reaches any deployed environment."* Without the redaction the callback endpoint returns the credential to PRMS in every `2xx` body. **T-04 must not be dispatched while T-08 is `[~]`.**
