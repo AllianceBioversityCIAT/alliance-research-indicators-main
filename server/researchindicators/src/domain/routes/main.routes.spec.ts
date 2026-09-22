@@ -1,6 +1,7 @@
 import { Routes } from '@nestjs/core';
 import { route } from './main.routes';
 import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
+import { PrmsWebhookCallbackModule } from '../entities/prms-webhook/prms-webhook-callback.module';
 import { PrmsWebhookModule } from '../entities/prms-webhook/prms-webhook.module';
 
 /**
@@ -48,14 +49,29 @@ describe('main.routes — prms-webhook registration (T-03)', () => {
     expect(prmsWebhookNode.module).toBe(PrmsWebhookModule);
   });
 
+  it('registers PrmsWebhookCallbackModule as a TOP-LEVEL prms-callback entry', () => {
+    const prmsCallbackNode = (route as Routes).find(
+      (node) => (node as { path?: string }).path === 'prms-callback',
+    ) as { module?: unknown; children?: Routes } | undefined;
+
+    expect(prmsCallbackNode).toBeDefined();
+    expect(prmsCallbackNode.module).toBe(PrmsWebhookCallbackModule);
+    expect(prmsCallbackNode.children).toBeUndefined();
+  });
+
   it('is disjoint from prms-callback — neither path is a prefix of the other', () => {
     const topLevelPaths = (route as Routes)
       .map((node) => (node as { path?: string }).path)
       .filter((path): path is string => typeof path === 'string');
 
     expect(topLevelPaths).toContain('prms-webhook');
-    // prms-callback does not exist yet (T-04) — this asserts the two
-    // strings themselves are disjoint prefixes, independent of load order.
+    expect(topLevelPaths).toContain('prms-callback');
+    expect(
+      topLevelPaths.filter((path) => path === 'prms-webhook'),
+    ).toHaveLength(1);
+    expect(
+      topLevelPaths.filter((path) => path === 'prms-callback'),
+    ).toHaveLength(1);
     expect('prms-webhook'.startsWith('prms-callback')).toBe(false);
     expect('prms-callback'.startsWith('prms-webhook')).toBe(false);
   });

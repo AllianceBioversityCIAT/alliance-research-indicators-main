@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalizer.module';
+import { PrmsWebhookCallbackModule } from './prms-webhook-callback.module';
 import { PrmsWebhookRegistrationController } from './prms-webhook-registration.controller';
 import { PrmsWebhookRegistrationService } from './prms-webhook-registration.service';
 
-// @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-03.
-// Registers the SYSTEM_ADMIN registration surface only. The public callback
-// controller (`prms-webhook-callback.controller.ts`) is a later task in
-// this same child (T-04) and is NOT part of this module yet.
+// @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-03, T-04.
+// Registration controllers stay on this module (`prms-webhook`). The
+// public callback is a separate module imported here so the container
+// instantiates it; its route prefix is its own MODULE_PATH (T-04).
+// One class cannot carry both prefixes.
 @Module({
-  imports: [PrmsNormalizerModule],
+  imports: [PrmsNormalizerModule, PrmsWebhookCallbackModule],
   controllers: [PrmsWebhookRegistrationController],
   providers: [PrmsWebhookRegistrationService],
 })

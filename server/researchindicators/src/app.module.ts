@@ -102,6 +102,10 @@ export class AppModule implements NestModule {
           path: `reports/${RESULT_CODE}/pdf`,
           method: RequestMethod.GET,
         },
+        {
+          path: 'prms-callback(.*)',
+          method: RequestMethod.ALL,
+        },
       )
       .forRoutes({
         path: '*',

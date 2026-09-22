@@ -1195,3 +1195,94 @@ R-PWH-003 AC.1–AC.4 · R-PWH-005 AC.3, AC.4, AC.5 (write path), AC.6 · R-PWH-
 #### Final verification result
 
 **PASS.** Scoped suite 9/111 green and re-verified by a non-author; full server suite **400 / 3,550** green; build exit 0; eslint clean; the AC.2 stub read at source and confirmed non-settling; four falsifiers observed red, (a) by **timeout** as the class requires; the carried gate from T-06 settled with its own falsifier; Reviewer `PASS` from an independent read-only context on a different model at the registry's tier.
+
+---
+
+### T-04 — Callback edge: controller, guard, `JwtMiddleware` exclusion, non-stubbing e2e harness — **`PASS`**
+
+**Final status: `PASS` · date 2026-09-22 · Implementer attempts: 1 · Reviewer rounds: 1 (`lenses` — security)**
+
+| Field | Value |
+|---|---|
+| Implementer | **Cursor / `grok-4.7-xhigh`** · dispatch `ctx_2b7420860683` |
+| Reviewer | Claude Code / `akili-reviewer` → **Opus 5**, read-only, security lens |
+| `author ≠ auditor` | **held on both axes and across hosts** |
+| runtime events | none |
+| Diff | 15 files, **1,125 lines** |
+
+**The application's first public, unauthenticated write endpoint.** The guard is the entire security boundary.
+
+#### The spec's highest structural risk — closed, not substituted
+
+**P-17 / DD-11:** the repo's existing e2e suites stub `JwtMiddleware.prototype.use`, and under that stub **AC.2 passes vacuously and AC.3 cannot redden at all** — the tokenless case yields `403`, never `401`. The task's one forbidden outcome was silently falling back to that pattern.
+
+**Verified twice, independently.** The Leader checked the untracked file separately, because `git grep` cannot see it — the lesson from T-05. The Reviewer then re-derived it and widened the search:
+
+> `JwtMiddleware.prototype` appears in `test/` at exactly two pre-existing sites. A separate grep over the untracked `test/prms-webhook.e2e-spec.ts` for `JwtMiddleware|overrideProvider|forRoutes|exclude(` returns **zero matches** — **the suite names the middleware nowhere at all.** DD-11's harness was built, not substituted; its AC.2/AC.3 evidence counts.
+
+**T-04's own e2e suite: `PASS`, 7/7**, running the real `JwtMiddleware`.
+
+#### Evidence re-run — non-author, Step 2.3
+
+| Command | Leader re-run | Verdict |
+|---|---|---|
+| `npm run test:e2e -- test/prms-webhook.e2e-spec.ts` | **1 suite / 7 tests PASS** | **VERIFIED** |
+| `npm test -- --silent` | **403 suites / 3,569 tests** green (from 400 / 3,550) | **VERIFIED** |
+| `npm run build` | exit 0 | **VERIFIED** |
+| `npx eslint <touched paths>` | exit 0 | **VERIFIED** |
+
+**Security-critical pieces read at source by the Leader:** the exclusion at `app.module.ts:106` is `path: 'prms-callback(.*)'` with `RequestMethod.ALL`, **no leading slash**; the guard compares lengths at `:35` **before** `timingSafeEqual` at `:38`, with an unset/empty guard at `:27-28`; `.env.example:47` is `# ARI_PRMS_WEBHOOK_SECRET=` — commented, **no value**; headers pass through a named `PRMS_CALLBACK_RAW_HEADER_ALLOWLIST`.
+
+#### The e2e tier is red for THREE distinct causes, and only one is a defect
+
+This was measured, not assumed, because T-04 modifies `app.module.ts` — which **every** e2e suite boots, making it a legitimate suspect.
+
+| Cause | Evidence | Whose |
+|---|---|---|
+| T-04's own suite | **GREEN, 7/7** | — |
+| A pre-existing sibling defect | `result_prms_sync_log.result_id` dropped by `sync-engine`'s migration while its repository still queries it, plus a `submitted_by` gate-reason mismatch | **RB-6**, established earlier by stashing an unrelated diff and reproducing |
+| **ENVIRONMENTAL, new this session** | **The Dev database `192.168.20.210:3306` became UNREACHABLE** mid-session (`nc` times out); the scratch container `127.0.0.1:3307` is up. Suites redirecting to scratch still run; suites on the default CORE datasource — including `results-ai-formalize-bulk.e2e-spec.ts`, **green earlier today** — now fail `connect ETIMEDOUT` | **Not a code defect at all.** The Leader reached Dev this morning for the P-14b probe; the connection dropped between then and now |
+
+The Reviewer was given this table with an explicit instruction not to charge T-04 for the second or third. Without it, a reasonable auditor would have failed the task for someone else's defects and a dropped network link.
+
+#### Reviewer verdict — `STATUS: PASS`, security lens
+
+**Fail-open analysis — four candidate paths, all closed.** (1) Guard absent for a handler: class-level `@UseGuards`, one handler, no per-route override — not reachable. (2) Unset/empty secret: refused **before any Buffer allocation**. (3) Empty path segment: `:secret` cannot match it, and the guard would refuse anyway — double-closed. (4) **Prefix confusion**: `/api/prms-callback%2f..`, `…/../prms-webhook` and uppercase paths each traced — *"the exclusion regex and the router consume the **same** raw path, so anything the exclusion over-matches has no route and 404s."* And `process.env` is read **per request**, so there is no K-016 cache window and rotation needs no restart.
+
+**Credential in output — none.** The guard logs only `remoteAddress` and the constant route prefix, never `request.url` or `params.secret`. `raw_headers` is an allowlist of three, so **`referer` / `origin` — the realistic carriers of a URL containing the secret — cannot reach the row.** The envelope `path` is redacted by T-08 and asserted on **both** the `200` and `404` branches.
+
+**Auth-boundary scope — tight in both directions.** `prms-callback(.*)` over-matches `/api/prms-callbackXYZ`, but no route exists there so it exempts nothing. No other exclusion can reach `prms-callback`, and this exclusion cannot reach `prms-webhook` — which is the entire point of DD-3 / P-13.
+
+#### Rulings on the three scope additions
+
+| # | Addition | Ruling |
+|---|---|---|
+| a | `prms-webhook-callback.module.ts` (new) | **Correct and necessary.** `RouterModule` stamps one `MODULE_PATH` per class, so two disjoint prefixes need two classes. This is the question the Leader carried in from T-03's review, and the answer is the one the brief anticipated |
+| b | `lenient-callback-json.ts` + spec (new) | **Defensible shape.** The only alternatives were `bodyParser: false` app-wide or accepting the `400`. Scoped by an anchored `^/api/prms-callback(?:/\|$)` regex with a negative test for `/api/prms-callbacks`, and it **fails loudly at boot** (throws on 0 wraps) rather than silently. Affects no other route |
+| c | `app.module.spec.ts`, `prms-webhook.module.spec.ts` (modified siblings) | Accepted — the exclusion-array assertion has to live somewhere, and this is the same class as T-03's `entities.module.spec.ts` addition that this auditor already ruled justified |
+
+#### `ADVISORY` — one of these is serious enough to name in the risks log
+
+| Lens | Finding | Disposition |
+|---|---|---|
+| **RISK — reachable, high value** | **No unit-tier assertion pins `@UseGuards(CallbackSecretGuard)` to the controller.** Deleting that one line leaves `npm test` **fully green with the public write endpoint open**. *"The exclusion array already has exactly this protection; the guard binding does not."* Fix is one line: `expect(Reflect.getMetadata('__guards__', PrmsWebhookCallbackController)).toContain(CallbackSecretGuard)` | **Recorded as RB-8. Not applied** — acting on it would widen a task to absorb an advisory, which is the one thing the methodology forbids outright. Raised to the owner at the continue gate |
+| RELIABILITY | The empty-secret falsifier **reddens, but not by the claimed mechanism**: it fires via the unit assertion `callbackSecretsMatch('','') === false`, not a route-level `404→200`. Dropping the unset check makes `Buffer.from(undefined)` throw — a `500`. *"The gate is real; the stated mechanism is not."* | A correction to the Implementer's claim, recorded rather than restated |
+| OBSERVABILITY | The guard's `source_ip` is `socket.remoteAddress` only; `jwr.middleware.ts:69` — this repo's own precedent — prefers `x-forwarded-for`. Behind the CIAT proxy, §10's *"source IP"* will log the proxy | Carried to T-10's rollout note |
+| RESILIENCE | `/api` is hardcoded in `isPrmsCallbackPath` **and** in `path-redaction.util.ts`. A global-prefix change silently reverts the callback to `400`. Also, production wraps `main.ts`'s 50 MB parser while the e2e wraps Nest's default 100 kB — **the suite cannot observe a large-payload difference** | Recorded; the second half is a genuine KZ-017 scope limit of the harness |
+
+**A correction to the Reviewer, in both directions.** Its reversion challenge says the only gate that reddens on a deleted `@UseGuards` is *"an e2e suite `npm test` does not run and which cannot run today at all."* The first half is right; **the second is not** — T-04's own suite redirects to the scratch schema and ran **7/7 green**. The accurate statement is narrower and still worth acting on: the binding **is** gated, but **only at a tier `npm test` never invokes**.
+
+#### Requirements covered
+
+R-PWH-004 AC.1, AC.2, AC.3, AC.5, AC.6, AC.8 · R-PWH-009 AC.5 (secret variable) · R-PWH-003 (the HTTP edge) · NFR-PWH-002, NFR-PWH-005.
+
+#### Budget tracking
+
+| | Budgeted | T-04 actual | Running total |
+|---|---|---|---|
+| LOC | ≈ 450 | **1,125** (**+150 %**) | **7,211 measured across nine closed tasks** |
+| Review rounds | 3 for the whole spec | 1 | **15 / 3** |
+
+#### Final verification result
+
+**PASS.** T-04's e2e suite 7/7 green on a **non-stubbing** harness, verified independently twice; unit tier **403 / 3,569** green; build exit 0; eslint clean; four falsifiers observed red including the exclusion swap breaking **both** AC.2 and AC.3 simultaneously; the guard's fail-open surface enumerated and closed on all four paths; Reviewer `PASS` on a security lens from an independent read-only context on a different model at the registry's tier.
