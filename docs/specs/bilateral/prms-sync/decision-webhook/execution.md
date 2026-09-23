@@ -1663,7 +1663,7 @@ This task has no authority to send them.
 | Audience | What they must be told | Who must send it | State |
 |---|---|---|---|
 | PRMS technical team | The destination registered, per environment | Family owner **Juan Cadavid** / ARI | **NOT YET SENT** |
-| Family owner | Children **2, 3 and 4** gain `last_decision` | Family owner **Juan Cadavid** / ARI — he is both the named recipient in T-10's notes and the only named sender in this family. Design §12 step 6 still says "children 3 and 4"; the task notes say 2, 3 and 4. The discrepancy is recorded, not resolved. | **NOT YET SENT** |
+| Family owner | Children **2, 3 and 4** gain `last_decision` | Family owner **Juan Cadavid** / ARI — he is both the named recipient in T-10's notes and the only named sender in this family. Design §12 step 6 said "children 3 and 4" while the task notes said 2, 3 and 4. **RESOLVED 2026-09-23 by owner decision** — `design.md` §12 step 6 now reads **2, 3 and 4**, with its basis cited. | **NOT YET SENT** |
 | Security | This is the application's first public unauthenticated **write** endpoint, plus a new credential | Family owner **Juan Cadavid** / ARI must request it. Requirements §14 names the Security review itself as **required**. | **NOT YET SENT** |
 
 **Security sign-off: REQUIRED and not obtained.** Requirements §14. Not requested by this task.
@@ -1766,7 +1766,15 @@ Per `/akili-execute` Step 2.3 item 0, a task with an outstanding gap never reach
 
 ### ADVISORY (recorded, never gating)
 
-- **`design.md` §12 step 6 is factually stale.** It says the comms reach *"children 3 and 4"*; the actual set is **2, 3 and 4** — children 2, 3 and 4 all gain `last_decision`. The worker recorded the discrepancy rather than silently resolving it, which was right. Per root `CLAUDE.md` §5 the wrong document should be fixed, so this is carried to the owner as a decision rather than left only in this log.
+- **`design.md` §12 step 6 was factually stale — CORRECTED 2026-09-23 on owner instruction.** It read *"children 3 and 4"*; the set is **2, 3 and 4**. The worker recorded the discrepancy rather than silently resolving it, which was right; the owner then ruled.
+
+  **Basis, verified before writing the correction (KZ-007):** `last_decision` is additive on `GET /api/results/:result-code/prms-sync` (R-PWH-008), so every child whose surface reads that endpoint gains it. `git grep -rln "prms-sync" -- client/research-indicators/src` returns `result-sidebar.component` as the client consumer today — the sidebar is child 2's surface, and its still-owed synced badge lives there.
+
+  **Correction closure — two-direction sweep, with two exemptions recorded rather than silently skipped (KZ-005, exemption-criterion axis).** The forward grep for the superseded string found two further sites that the analysis had NOT cited; both were read in full and both are **correctly exempt, because they assert something narrower**:
+  - `requirements.md:102` — scoped to the **Center Admin persona's** consumption route. Child 2 is the contributor sidebar, not a Center Admin surface.
+  - `proposal.md:80` — scoped to consuming the **PRMS-verdict** read surface. Child 2's remaining scope (confirm modal, synced badge, alignment-lock refresh) displays no verdict. It is also a point-in-time approval artifact.
+
+  Applying the correction to either would have propagated it onto a different assertion — the failure mode KZ-005 calls out on the exemption axis. Sweep outcome: **1 site corrected, 2 examined and exempt, 0 missed.**
 - **DC-9 and OQ-6 name a *role*, not a person** ("whoever owns the AWS deployment"). Faithful to `requirements.md` §12/§14, which names nobody either — so a **spec gap, not a diff defect** — but neither is actionable until a human is named.
 - The two BLOCKED evidence blocks are fenced like a terminal transcript and headed *"Verbatim result"*, while their content is a summarized one-liner. Nothing is ticked on them and the prose hedges it, so it does not gate; relabelling them "Leader's recorded summary line, not raw stdout" would remove the ambiguity.
 
