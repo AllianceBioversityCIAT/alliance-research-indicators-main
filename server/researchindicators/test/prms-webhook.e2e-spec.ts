@@ -34,7 +34,7 @@ const WRONG_GUESS = 'e2e-t04-guess-7kQ';
 const CREDENTIAL_HEADER = 'credential-shaped-e2e-t04';
 
 const CREATE_DELIVERY_TABLE = `
-CREATE TABLE IF NOT EXISTS \`prms_webhook_delivery\` (
+CREATE TABLE IF NOT EXISTS \`result_prms_sync_history\` (
   \`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   \`created_by\` bigint NULL,
   \`updated_at\` timestamp(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS \`prms_webhook_delivery\` (
   \`deleted_at\` timestamp NULL,
   \`id\` bigint NOT NULL AUTO_INCREMENT,
   \`delivery_id\` varchar(191) NULL,
-  \`received_at\` timestamp NOT NULL,
+  \`occurred_at\` timestamp NOT NULL,
   \`environment\` varchar(20) NOT NULL,
   \`correlation_outcome\` varchar(40) NOT NULL,
   \`result_id\` bigint NULL,
@@ -58,10 +58,17 @@ CREATE TABLE IF NOT EXISTS \`prms_webhook_delivery\` (
   \`processing_state\` varchar(20) NOT NULL,
   \`processing_error\` text NULL,
   \`duplicate_of_id\` bigint NULL,
+  \`event_source\` varchar(10) NOT NULL,
+  \`status\` varchar(30) NULL,
+  \`actor_user_id\` bigint NULL,
+  \`reviewer_name\` varchar(255) NULL,
+  \`reviewer_role\` varchar(191) NULL,
+  \`science_program_code\` varchar(20) NULL,
+  \`changes\` json NULL,
   PRIMARY KEY (\`id\`),
-  INDEX \`idx_prms_webhook_delivery_delivery_id\` (\`delivery_id\`),
-  INDEX \`idx_prms_webhook_delivery_result\` (\`result_id\`),
-  INDEX \`idx_prms_webhook_delivery_received_at\` (\`received_at\`)
+  INDEX \`idx_result_prms_sync_history_delivery_id\` (\`delivery_id\`),
+  INDEX \`idx_result_prms_sync_history_result\` (\`result_id\`),
+  INDEX \`idx_result_prms_sync_history_occurred_at\` (\`occurred_at\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
 `;
 
@@ -78,7 +85,7 @@ describe('PRMS webhook callback edge (T-04)', () => {
     deliveryId: string,
   ): Promise<Array<{ raw_headers: unknown; raw_body: unknown }>> =>
     dataSource.query(
-      'SELECT raw_headers, raw_body FROM prms_webhook_delivery WHERE delivery_id = ?',
+      'SELECT raw_headers, raw_body FROM result_prms_sync_history WHERE delivery_id = ?',
       [deliveryId],
     );
 
@@ -157,7 +164,7 @@ describe('PRMS webhook callback edge (T-04)', () => {
   afterAll(async () => {
     if (dataSource?.isInitialized) {
       await dataSource.query(
-        `DELETE FROM prms_webhook_delivery WHERE delivery_id LIKE 'e2e-t04-%'`,
+        `DELETE FROM result_prms_sync_history WHERE delivery_id LIKE 'e2e-t04-%'`,
       );
     }
     await app?.close();

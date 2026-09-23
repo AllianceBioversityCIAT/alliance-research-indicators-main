@@ -131,8 +131,8 @@ describe('ResultPrmsSyncStatusReader', () => {
   it('keeps sync_state and last_attempt byte-identical to the pre-change baseline', async () => {
     // Captured against the unmodified reader (HEAD 6540e33f, 8 tests green)
     // before last_decision existed. The mock answers by table, so routing
-    // last_attempt at prms_webhook_delivery returns a verdict row and this
-    // comparison goes red. The two fields are asserted on their own.
+    // last_attempt at result_prms_sync_history returns a verdict row and
+    // this comparison goes red. The two fields are asserted on their own.
     const baselineLastAttempt = {
       attempt_number: 1,
       outcome: PrmsSyncOutcome.TRANSPORT_FAILED,
@@ -152,14 +152,14 @@ describe('ResultPrmsSyncStatusReader', () => {
           },
         ]);
       }
-      if (/prms_webhook_delivery/.test(sql)) {
+      if (/result_prms_sync_history/.test(sql)) {
         return Promise.resolve([
           {
             decision: 'REJECT',
             decided_at: '2026-09-20T15:30:00.000Z',
             justification: 'a verdict is not an attempt',
             prms_result_code: 77,
-            received_at: '2026-09-20T15:30:04.000Z',
+            occurred_at: '2026-09-20T15:30:04.000Z',
           },
         ]);
       }
@@ -202,14 +202,14 @@ describe('ResultPrmsSyncStatusReader', () => {
 
   it('returns APPROVE with decided_at and null justification', async () => {
     query.mockImplementation((sql: string) => {
-      if (/prms_webhook_delivery/.test(sql)) {
+      if (/result_prms_sync_history/.test(sql)) {
         return Promise.resolve([
           {
             decision: 'APPROVE',
             decided_at: '2026-09-18T11:00:00.000Z',
             justification: null,
             prms_result_code: '9001',
-            received_at: '2026-09-18T11:00:03.000Z',
+            occurred_at: '2026-09-18T11:00:03.000Z',
           },
         ]);
       }
@@ -234,7 +234,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       delivery_received_at: '2026-09-18T11:00:03.000Z',
     });
     const decisionSql = issuedSql(query).find((sql) =>
-      /prms_webhook_delivery/.test(sql),
+      /result_prms_sync_history/.test(sql),
     );
     expect(decisionSql).toMatch(/correlation_outcome\s*=\s*'CORRELATED'/);
     expect(decisionSql).toMatch(/duplicate_of_id\s+IS\s+NULL/);
@@ -247,7 +247,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       decided_at: '2026-09-10T08:00:00.000Z',
       justification: null,
       prms_result_code: 11,
-      received_at: '2026-09-10T08:00:02.000Z',
+      occurred_at: '2026-09-10T08:00:02.000Z',
       correlation_outcome: 'CORRELATED',
       duplicate_of_id: null as number | null,
     };
@@ -256,7 +256,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       decided_at: '2026-09-20T15:30:00.000Z',
       justification: '  Evidence does not support the claim.\n',
       prms_result_code: null,
-      received_at: '2026-09-20T15:30:04.000Z',
+      occurred_at: '2026-09-20T15:30:04.000Z',
       correlation_outcome: 'CORRELATED',
       duplicate_of_id: null as number | null,
     };
@@ -265,7 +265,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       decided_at: '2026-09-21T00:00:00.000Z',
       justification: 'should-not-surface',
       prms_result_code: 99,
-      received_at: '2026-09-21T00:00:01.000Z',
+      occurred_at: '2026-09-21T00:00:01.000Z',
       correlation_outcome: 'DUPLICATE',
       duplicate_of_id: 5 as number | null,
     };
@@ -274,7 +274,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       decided_at: '2026-09-22T00:00:00.000Z',
       justification: 'unknown-ref',
       prms_result_code: 3,
-      received_at: '2026-09-22T00:00:01.000Z',
+      occurred_at: '2026-09-22T00:00:01.000Z',
       correlation_outcome: 'UNKNOWN_REFERENCE',
       duplicate_of_id: null as number | null,
     };
@@ -298,7 +298,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       if (/result_prms_sync_log/.test(sql)) {
         return Promise.resolve([outbound]);
       }
-      if (/prms_webhook_delivery/.test(sql)) {
+      if (/result_prms_sync_history/.test(sql)) {
         return Promise.resolve(projectDeliveries(sql, history));
       }
       if (/FROM results/i.test(sql)) {
@@ -328,7 +328,7 @@ describe('ResultPrmsSyncStatusReader', () => {
     }
     expect(issuedSql(query).join('\n')).not.toMatch(/prms_phase_id/);
     const decisionCall = query.mock.calls.find((call) =>
-      /prms_webhook_delivery/.test(call[0] as string),
+      /result_prms_sync_history/.test(call[0] as string),
     );
     expect(decisionCall?.[1]).toEqual([42]);
   });

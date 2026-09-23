@@ -28,7 +28,7 @@ ORDER BY result_id ASC
 `;
 
 const APPLY_OUTCOME_SQL = `
-UPDATE prms_webhook_delivery
+UPDATE result_prms_sync_history
 SET correlation_outcome = ?,
     result_id = ?,
     processing_state = ?
@@ -36,7 +36,7 @@ WHERE id = ?
 `;
 
 const MARK_FAILED_SQL = `
-UPDATE prms_webhook_delivery
+UPDATE result_prms_sync_history
 SET processing_state = ?
 WHERE id = ?
 `;

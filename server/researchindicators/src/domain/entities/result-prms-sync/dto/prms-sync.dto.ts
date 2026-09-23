@@ -94,7 +94,12 @@ export class PrmsSyncLastDecisionDto {
   prms_result_code: number | null;
 
   @ApiProperty({
-    description: 'When STAR received the delivery (column received_at).',
+    description:
+      // Physical column renamed to `occurred_at` by the 2026-09-23 Pivot
+      // (table is now the sync HISTORY, not only inbound deliveries).
+      // This DTO field name is kept for API-contract stability — a T-13
+      // naming choice this T-01b schema rename does not reopen.
+      'When STAR recorded the event (column occurred_at).',
   })
   delivery_received_at: Date | string | null;
 }

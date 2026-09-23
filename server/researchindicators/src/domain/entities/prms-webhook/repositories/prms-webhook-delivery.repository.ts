@@ -36,7 +36,7 @@ const isRetryableLockError = (error: unknown): boolean => {
 const HISTORY_COLUMNS = [
   'id',
   'delivery_id',
-  'received_at',
+  'occurred_at',
   'environment',
   'correlation_outcome',
   'result_id',
@@ -51,6 +51,13 @@ const HISTORY_COLUMNS = [
   'processing_state',
   'processing_error',
   'duplicate_of_id',
+  'event_source',
+  'status',
+  'actor_user_id',
+  'reviewer_name',
+  'reviewer_role',
+  'science_program_code',
+  'changes',
   'created_at',
   'updated_at',
   'is_active',
@@ -58,6 +65,14 @@ const HISTORY_COLUMNS = [
 
 /** One row as mysql2 returns it: BIGINT as string, JSON already parsed. */
 type RawDeliveryRow = Record<string, unknown>;
+
+/**
+ * `event_source` for every row `recordDelivery` writes. This method
+ * handles inbound PRMS deliveries only (see the class doc); T-11's
+ * outbound `PENDING_REVIEW` write is a separate, new method and is not
+ * routed through here (design Pivot, decision 6).
+ */
+const EVENT_SOURCE_INBOUND = 'PRMS';
 
 const asNullableNumber = (value: unknown): number | null =>
   value == null ? null : Number(value);
@@ -69,7 +84,7 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   const delivery = new PrmsWebhookDelivery();
   delivery.id = Number(row.id);
   delivery.delivery_id = (row.delivery_id as string | null) ?? null;
-  delivery.received_at = row.received_at as Date;
+  delivery.occurred_at = row.occurred_at as Date;
   delivery.environment = row.environment as string;
   delivery.correlation_outcome =
     row.correlation_outcome as DeliveryCorrelationOutcome;
@@ -87,6 +102,14 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   delivery.processing_state = row.processing_state as string;
   delivery.processing_error = (row.processing_error as string | null) ?? null;
   delivery.duplicate_of_id = asNullableNumber(row.duplicate_of_id);
+  delivery.event_source = row.event_source as string;
+  delivery.status = (row.status as string | null) ?? null;
+  delivery.actor_user_id = asNullableNumber(row.actor_user_id);
+  delivery.reviewer_name = (row.reviewer_name as string | null) ?? null;
+  delivery.reviewer_role = (row.reviewer_role as string | null) ?? null;
+  delivery.science_program_code =
+    (row.science_program_code as string | null) ?? null;
+  delivery.changes = (row.changes as Record<string, unknown> | null) ?? null;
   delivery.created_at = row.created_at as Date;
   delivery.updated_at = (row.updated_at as Date | null) ?? undefined;
   delivery.is_active = asBoolean(row.is_active);
@@ -107,7 +130,7 @@ const asOk = (result: unknown): { insertId?: number } => {
  */
 export interface RecordDeliveryInput {
   delivery_id: string | null;
-  received_at: Date;
+  occurred_at: Date;
   environment: string;
   correlation_outcome: Exclude<
     DeliveryCorrelationOutcome,
@@ -197,7 +220,7 @@ export class PrmsWebhookDeliveryRepository {
       const originals = await manager.query(
         `
         SELECT id
-        FROM prms_webhook_delivery
+        FROM result_prms_sync_history
         WHERE delivery_id = ? AND duplicate_of_id IS NULL
         FOR UPDATE
         `,
@@ -215,22 +238,29 @@ export class PrmsWebhookDeliveryRepository {
 
     const insertResult = await manager.query(
       `
-      INSERT INTO prms_webhook_delivery
-        (delivery_id, received_at, environment, correlation_outcome, result_id,
+      INSERT INTO result_prms_sync_history
+        (delivery_id, occurred_at, environment, correlation_outcome, result_id,
          external_reference, prms_result_id, prms_result_code, decision,
          justification, decided_at, raw_body, raw_headers, processing_state,
-         processing_error, duplicate_of_id, created_by, is_active)
-      VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE)
+         processing_error, duplicate_of_id, created_by, is_active,
+         event_source, status, actor_user_id, reviewer_name, reviewer_role,
+         science_program_code, changes)
+      VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
+              ?, NULL, NULL, NULL, NULL, NULL, NULL)
       `,
-      // 18 columns, 14 placeholders + 4 literals (result_id, processing_error
-      // and created_by are NULL at insert; is_active is TRUE). Keep this list
-      // and the array below in lockstep -- a stray param shifts every value
-      // one column right and MySQL reports it at the first type mismatch,
-      // nowhere near the real mistake (the same warning sits on the INSERT in
-      // `result-prms-sync-log.repository.ts`, `claimInsideLock`).
+      // 25 columns, 15 placeholders + 10 literals (result_id, processing_error
+      // and created_by are NULL at insert; is_active is TRUE; the six
+      // Pivot columns this ingest path never populates -- status,
+      // actor_user_id, reviewer_name, reviewer_role, science_program_code,
+      // changes -- are NULL, T-11's outbound write is the only path that
+      // fills them). Keep this list and the array below in lockstep -- a
+      // stray param shifts every value one column right and MySQL reports
+      // it at the first type mismatch, nowhere near the real mistake (the
+      // same warning sits on the INSERT in `result-prms-sync-log.repository.ts`,
+      // `claimInsideLock`).
       [
         input.delivery_id,
-        input.received_at,
+        input.occurred_at,
         input.environment,
         correlationOutcome,
         input.external_reference,
@@ -243,6 +273,11 @@ export class PrmsWebhookDeliveryRepository {
         input.raw_headers === null ? null : JSON.stringify(input.raw_headers),
         DeliveryProcessingState.RECEIVED,
         duplicateOfId,
+        // event_source is NOT NULL (the Pivot's discriminator). Every row
+        // this method writes is an inbound PRMS delivery -- the class doc
+        // says so -- so the literal is fixed here, not threaded through
+        // RecordDeliveryInput. T-11's own write path is a separate method.
+        EVENT_SOURCE_INBOUND,
       ],
     );
     const deliveryRowId = Number(asOk(insertResult).insertId);
@@ -265,9 +300,9 @@ export class PrmsWebhookDeliveryRepository {
     const rows = await this.dataSource.query(
       `
       SELECT ${HISTORY_COLUMNS}
-      FROM prms_webhook_delivery
+      FROM result_prms_sync_history
       WHERE result_id = ?
-      ORDER BY received_at ASC, id ASC
+      ORDER BY occurred_at ASC, id ASC
       `,
       [resultId],
     );
@@ -282,8 +317,8 @@ export class PrmsWebhookDeliveryRepository {
     const rows = await this.dataSource.query(
       `
       SELECT ${HISTORY_COLUMNS}
-      FROM prms_webhook_delivery
-      ORDER BY received_at ASC, id ASC
+      FROM result_prms_sync_history
+      ORDER BY occurred_at ASC, id ASC
       `,
     );
     return (rows as RawDeliveryRow[]).map(toDelivery);

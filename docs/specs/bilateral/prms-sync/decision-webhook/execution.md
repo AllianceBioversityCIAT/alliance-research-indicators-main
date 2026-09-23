@@ -1341,7 +1341,7 @@ The owner supplied the UI mock this spec's history was always meant to feed (OQ-
 | `science_program_code` | `varchar(20) NULL` | "SP02". **Deliberately separate from the role string**: the role is display, the code is data — filterable, and joinable to CLARISA later without parsing prose |
 | `changes` | `json NULL` | The mock's "See what changed" payload |
 
-**No column is removed.** Of the 24 columns T-01 shipped, 23 are untouched and one is renamed.
+**No column is removed.** Of the **23** columns T-01 shipped, 22 are untouched and one is renamed; the amended table resolves to **30** columns. *(Corrected 2026-09-23 during T-01b's evidence re-run — this record first said "24 / 23", a Leader off-by-one. Deriving command: `git show HEAD:server/researchindicators/src/db/migrations/1790086170692-createPrmsWebhookDeliveryTable.ts` counted 23 column lines in the original `CREATE TABLE`; the post-change count was read from `information_schema.columns`, which returned 30. This figure has ONE home — this line — per KZ-005.)*
 
 ### Design decisions taken with the owner, recorded here because they are not derivable from the schema
 
@@ -1383,3 +1383,90 @@ The owner updated the branch mid-discussion (`8ebc3117`, merging `AC-1441-US5-Pu
 - **T-11 is NEW** — the outbound `PENDING_REVIEW` write.
 
 Both are recorded in `tasks.md`. **No work has been dispatched for either; this record precedes execution, as the protocol requires.**
+
+---
+
+## T-01b — Rename the table to `result_prms_sync_history`, rename `received_at`, add the seven history columns
+
+| Field | Value |
+|---|---|
+| **Final status** | **`PASS`** (dual-lens, both independent) |
+| Date | 2026-09-23 |
+| Implementer attempts | **1** |
+| Start commit | `57267b4f` (tree clean) |
+| Implementer | `akili-implementer` · **Claude Sonnet** (T2) · effort `xhigh` |
+| Reviewers | `akili-reviewer` ×2 · **Claude Opus** (T3) — reliability lens + risk/resilience lens, spawned in parallel per the 4R table (task touches a migration) |
+| `author ≠ auditor` | **holds** on both axes (fresh context *and* different weights). No `REVIEW_WAIVED` owed |
+| runtime events | **none** |
+
+### 1.1 Routing change from the previous nine tasks, recorded
+
+T-01 – T-09 ran on **Cursor** (Implementer `grok-4.7-*`, Reviewer `gpt-5.6-sol-xhigh`) by owner direction of 2026-09-22 (§1.1). T-01b was routed by owner decision of **2026-09-23** onto the **Claude Code Step 8E wrappers** — the registry's enforced binding (`akili-implementer`→`sonnet` T2, `akili-reviewer`→`opus` T3). The one hard constraint is unchanged: Implementer and Reviewer are different models, so each task still closes on an ordinary Reviewer `PASS`.
+
+### Attempt 1 — `PASS`
+
+**Files changed (14, +372 / −109):**
+
+```
+src/db/migrations/1790086170692-createPrmsWebhookDeliveryTable.ts
+src/db/migration-specs/1790086170692-createPrmsWebhookDeliveryTable.spec.ts
+src/domain/entities/prms-webhook/entities/prms-webhook-delivery.entity.ts        (+ spec)
+src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository.ts (+ spec)
+src/domain/entities/prms-webhook/delivery-correlator.service.ts                  (+ spec)
+src/domain/entities/prms-webhook/enum/delivery-processing-state.enum.ts
+src/domain/entities/prms-webhook/prms-webhook-delivery.service.ts
+src/domain/entities/result-prms-sync/result-prms-sync-status.reader.ts           (+ spec)
+src/domain/entities/result-prms-sync/dto/prms-sync.dto.ts
+test/prms-webhook.e2e-spec.ts
+```
+
+**Implementer verification (reported):** unit tier 403 suites / 3577 tests green · `npm run build` exit 0 · migration revert→execute→revert with pre-execute absence confirmed · `npx eslint` (14 paths) exit 0 · `npm run test:e2e -- test/prms-webhook.e2e-spec.ts` 7/7 green. Three falsifiers each observed red then restored green.
+
+**Evidence re-run — Leader-inline, non-author (Step 2.3, never waived): `VERIFIED`**
+
+| Check | Reported | Leader re-run |
+|---|---|---|
+| Unit tier | 403 / 3577 | **403 / 3577** ✓ |
+| Build | exit 0 | **exit 0** ✓ |
+| eslint | clean | **exit 0, no findings** ✓ |
+| e2e `prms-webhook` | 7 / 7 | **7 / 7** ✓ |
+| Migration gate | revert→absent→execute→revert | **reproduced from an independently confirmed-absent baseline** (217 tables, head `395`) ✓ |
+| Sweeps | 0 old-table, 0 bare `received_at`, 12 files on the new name, 3 renamed indexes | **identical** ✓ |
+
+**Resolved-schema assertion (KZ-001 — asserted in `information_schema`, never on the decorator):** 30 columns · `event_source` `varchar(10) NOT NULL` · `status` `varchar(30) NULL` · `actor_user_id` `bigint NULL` · `reviewer_name` `varchar(255) NULL` · `reviewer_role` `varchar(191) NULL` · `science_program_code` `varchar(20) NULL` · `changes` `json NULL` · `occurred_at` `timestamp NOT NULL` · `received_at` **absent** · `correlation_outcome` / `processing_state` / `environment` all still `NOT NULL` · indexes `idx_result_prms_sync_history_{delivery_id,result,occurred_at}`.
+
+**Reviewer verdicts:**
+
+- **Reliability lens — `STATUS: PASS`.** Column fidelity, up/down symmetry, SQL fidelity across the five closed tasks, and KZ-001 compliance all verified at source. Independently re-derived the corrected 23→30 figure rather than accepting it.
+- **Risk & resilience lens — `STATUS: PASS`.** Scope boundary intact (no `result_prms_sync_log`, no `result-prms-sync.service.ts`, no `client/`). All three delegated judgment calls ruled **conformant**.
+
+### Decisions made
+
+1. **Execute-time spec edit — column-count correction (3 sites).** The Pivot Record stated T-01 shipped **24** columns; the original `CREATE TABLE` declares **23**. Corrected in `execution.md` (Pivot Record), `design.md` §4, and `tasks.md` T-01's superseded note, with a two-direction sweep (old value: zero hits). The figure now has **one home** with its deriving command attached, per KZ-005's escalation. Both Reviewers re-derived it independently and confirmed the correction. *Origin: a Leader arithmetic error in the Pivot Record, not an implementation defect — but it briefly read as a missing column (24 + 7 = 31 vs. the 30 observed), which is exactly how a wrong figure in a correction record does damage (KZ-007).*
+2. **`delivery_received_at` kept at 4 sites** — ruled conformant. The Done criterion targets schema identifiers; this is T-07's shipped API response field, and renaming it is behaviour the scope boundary excludes. Zero **bare** `received_at` remain.
+3. **Migration file and class name kept.** Ruled not merely allowed but **required**: `CreatePrmsWebhookDeliveryTable1790086170692` is the identity TypeORM matches applied records by.
+4. **Entity/repository symbols kept** (`PrmsWebhookDelivery`, `PrmsWebhookDeliveryRepository`) — the task delegated this; applied consistently and stated.
+
+### Issues encountered
+
+- **A reported end-state that did not match the database, resolved as not a defect.** The scratch schema showed migration record `400` present and the table applied, against a report claiming a clean final revert. Re-run from a confirmed-clean baseline showed the record advance to `402` after `test:e2e` alone: **the e2e harness runs the migration itself.** The Implementer's revert did happen; e2e re-applied it. The report's *mechanism* ("`CREATE TABLE IF NOT EXISTS`") is wrong; its *outcome* was right. No attempt consumed.
+- **Falsifier 3's inert-file statement — corrected against the Reviewer.** The risk Reviewer asked the Leader to confirm four files as comment-only and structurally unable to redden. Verified directly: **only two are** — `enum/delivery-processing-state.enum.ts` (JSDoc) and `dto/prms-sync.dto.ts` (a comment and an `@ApiProperty` description asserted by no spec). The other two are **live and do redden**: the migration emits the SQL its spec asserts, and `result-prms-sync-status.reader.spec.ts` carries `/result_prms_sync_history/.test(sql)` matchers that drive the fake. Recorded as the falsifier requires: **2 of the 12 files carry doc-only references and cannot redden.**
+
+### Requirements covered
+
+R-PWH-005 (population widens — see *Pivot Record* → *Requirement impact*) · the UI history contract supplied as a mock.
+
+### ADVISORY (4R lens — recorded, never gating, never a new task)
+
+- **`LAST_DECISION_SQL` becomes wrong once T-11 lands.** Both lenses reached this independently. `result-prms-sync-status.reader.ts:41-54` filters `correlation_outcome = 'CORRELATED' AND duplicate_of_id IS NULL`; T-11's outbound `PENDING_REVIEW` rows satisfy both (Pivot decision 2). Reachable sequence: a result pushed to `ACCEPTED` with **no** inbound verdict → the only matching row is T-11's STAR row → `last_decision` returns `{decision: null, decided_at: null, …}` instead of `null` — **a break of R-PWH-008 AC.3, in the common case.** Correctly deferred out of T-01b (adding a `WHERE` clause is behaviour the scope boundary excludes). **Recording is the gap: T-11's task text lists neither the reader in *Files touched* nor this in its Done criteria or Consumers.** → escalated to the owner at the Step 5 gate as a **spec gap**, not absorbed into T-11 by Leader fiat.
+- `EVENT_SOURCE_INBOUND = 'PRMS'` is a bare literal while sibling varchar-backed values live in `enum/`; a shared `event-source.enum.ts` would stop T-11 drifting. Not reachable today.
+- The e2e suite's `CREATE TABLE` now hand-duplicates 30 columns and 3 indexes of the migration with nothing asserting the two agree — future migration drift leaves e2e green against a stale schema.
+- Two inaccurate doc pointers: `prms-sync.dto.ts:~98` attributes the field to T-13 (it is this spec's T-07), and the entity doc points at the migration header for symbol-retention reasoning the header does not contain.
+- After T-11, STAR-generated rows will be written through `PrmsWebhookDeliveryRepository` into `PrmsWebhookDelivery` — the symbol no longer means "delivery".
+- `findHistory`/`findHistoryByResultId` order by `occurred_at ASC` and do not filter `duplicate_of_id IS NULL`, while amended `design.md` §4 specifies `COALESCE(decided_at, occurred_at)` and duplicate-filtered reads. Belongs to the UI spec (OQ-5's sequel).
+
+### Final verification result
+
+**Green and independently reproduced.** Unit 403/3577 · build exit 0 · eslint exit 0 · e2e 7/7 · migration applies and reverts cleanly from a confirmed-absent baseline · resolved schema matches the Pivot Record exactly · all rename axes swept to zero, including the index-name axis (KZ-005).
+
+**Scope this verification cannot reach (KZ-017):** the migration is applied **nowhere but the disposable TEST scratch schema** — nothing here speaks to Dev or PROD, where the table does not exist under either name. InnoDB locking is proven only on emitted SQL against a mocked `EntityManager`. The six inbound-relevant nullable columns (`status`, `reviewer_name`, `reviewer_role`, `science_program_code`, `changes`, `actor_user_id`) are proven to **store `NULL`**; no task in this spec yet populates them from a PRMS callback body, and T-11 covers only the **outbound** write.

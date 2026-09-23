@@ -265,7 +265,7 @@ export class PrmsWebhookDeliveryService {
 
     const stored = await this.repository.recordDelivery({
       delivery_id: input.deliveryId,
-      received_at: new Date(),
+      occurred_at: new Date(),
       environment,
       correlation_outcome: classified.correlationOutcome,
       external_reference: classified.externalReference,

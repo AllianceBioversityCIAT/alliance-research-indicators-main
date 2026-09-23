@@ -44,8 +44,8 @@ const LAST_DECISION_SQL = `
         decided_at,
         justification,
         prms_result_code,
-        received_at
-      FROM prms_webhook_delivery
+        occurred_at
+      FROM result_prms_sync_history
       WHERE result_id = ?
         AND correlation_outcome = 'CORRELATED'
         AND duplicate_of_id IS NULL
@@ -111,7 +111,7 @@ export function mapLastDecision(
     prms_result_code:
       row.prms_result_code == null ? null : Number(row.prms_result_code),
     delivery_received_at:
-      row.received_at == null ? null : (row.received_at as Date | string),
+      row.occurred_at == null ? null : (row.occurred_at as Date | string),
   };
 }
 

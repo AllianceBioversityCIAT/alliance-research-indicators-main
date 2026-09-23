@@ -108,7 +108,7 @@ class FakeResultsTable {
         result_id: String(row.result_id),
       }));
     }
-    if (/^\s*UPDATE\s+prms_webhook_delivery\b/i.test(sql)) {
+    if (/^\s*UPDATE\s+result_prms_sync_history\b/i.test(sql)) {
       return this.updateDelivery(sql, params);
     }
     if (/^\s*(UPDATE|INSERT|DELETE)\b/i.test(sql)) {
@@ -519,7 +519,7 @@ describe('DeliveryCorrelatorService', () => {
 
       expectNoResultsWrite();
       for (const update of table.updates) {
-        expect(update.sql).toMatch(/UPDATE\s+prms_webhook_delivery/i);
+        expect(update.sql).toMatch(/UPDATE\s+result_prms_sync_history/i);
         expect(update.sql).not.toMatch(
           /\b(decision|justification|decided_at|raw_body|is_synced_to_prms|prms_result_code|prms_phase_id)\b/,
         );

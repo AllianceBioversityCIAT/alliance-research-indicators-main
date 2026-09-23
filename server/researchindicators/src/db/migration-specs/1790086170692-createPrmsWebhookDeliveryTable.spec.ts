@@ -37,12 +37,12 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       expect(createTableSql).not.toMatch(/ALTER TABLE/i);
     });
 
-    it('creates prms_webhook_delivery with design section 4 columns and nullability', () => {
+    it('creates result_prms_sync_history with design section 4 columns and nullability', () => {
       expect(createTableSql).toMatch(
         /`id`\s+bigint\s+NOT NULL AUTO_INCREMENT/i,
       );
       expect(createTableSql).toMatch(/`delivery_id`\s+varchar\(191\)\s+NULL/i);
-      expect(createTableSql).toMatch(/`received_at`\s+timestamp\s+NOT NULL/i);
+      expect(createTableSql).toMatch(/`occurred_at`\s+timestamp\s+NOT NULL/i);
       expect(createTableSql).toMatch(
         /`environment`\s+varchar\(20\)\s+NOT NULL/i,
       );
@@ -67,6 +67,24 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       expect(createTableSql).toMatch(/`duplicate_of_id`\s+bigint\s+NULL/i);
     });
 
+    it('creates the seven Pivot-added columns with the exact types and nullability (event_source NOT NULL, the rest nullable)', () => {
+      expect(createTableSql).toMatch(
+        /`event_source`\s+varchar\(10\)\s+NOT NULL/i,
+      );
+      expect(createTableSql).toMatch(/`status`\s+varchar\(30\)\s+NULL/i);
+      expect(createTableSql).toMatch(/`actor_user_id`\s+bigint\s+NULL/i);
+      expect(createTableSql).toMatch(
+        /`reviewer_name`\s+varchar\(255\)\s+NULL/i,
+      );
+      expect(createTableSql).toMatch(
+        /`reviewer_role`\s+varchar\(191\)\s+NULL/i,
+      );
+      expect(createTableSql).toMatch(
+        /`science_program_code`\s+varchar\(20\)\s+NULL/i,
+      );
+      expect(createTableSql).toMatch(/`changes`\s+json\s+NULL/i);
+    });
+
     it('carries the AuditableEntity columns, with created_by NULL and is_active defaulting TRUE', () => {
       expect(createTableSql).toMatch(
         /`created_at`\s+timestamp\(6\)\s+NOT NULL DEFAULT CURRENT_TIMESTAMP\(6\)/i,
@@ -85,13 +103,13 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
     it('declares id as the sole primary key and the three non-unique indexes', () => {
       expect(createTableSql).toMatch(/PRIMARY KEY\s*\(\s*`id`\s*\)/i);
       expect(createTableSql).toMatch(
-        /INDEX\s+`idx_prms_webhook_delivery_delivery_id`\s*\(\s*`delivery_id`\s*\)/i,
+        /INDEX\s+`idx_result_prms_sync_history_delivery_id`\s*\(\s*`delivery_id`\s*\)/i,
       );
       expect(createTableSql).toMatch(
-        /INDEX\s+`idx_prms_webhook_delivery_result`\s*\(\s*`result_id`\s*\)/i,
+        /INDEX\s+`idx_result_prms_sync_history_result`\s*\(\s*`result_id`\s*\)/i,
       );
       expect(createTableSql).toMatch(
-        /INDEX\s+`idx_prms_webhook_delivery_received_at`\s*\(\s*`received_at`\s*\)/i,
+        /INDEX\s+`idx_result_prms_sync_history_occurred_at`\s*\(\s*`occurred_at`\s*\)/i,
       );
     });
 
@@ -115,13 +133,13 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
   });
 
   describe('down()', () => {
-    it('drops only prms_webhook_delivery', async () => {
+    it('drops only result_prms_sync_history', async () => {
       const migration = new CreatePrmsWebhookDeliveryTable1790086170692();
       const { runner, calls } = createRecordingQueryRunner();
       await migration.down(runner);
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]).toMatch(/DROP TABLE `prms_webhook_delivery`/i);
+      expect(calls[0]).toMatch(/DROP TABLE `result_prms_sync_history`/i);
       expect(calls[0]).not.toMatch(/FOREIGN KEY/i);
     });
   });

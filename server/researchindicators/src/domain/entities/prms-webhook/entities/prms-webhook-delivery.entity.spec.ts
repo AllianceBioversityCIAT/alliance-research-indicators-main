@@ -39,8 +39,8 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     );
   });
 
-  it('maps to prms_webhook_delivery', () => {
-    expect(metadata.tableName).toBe('prms_webhook_delivery');
+  it('maps to result_prms_sync_history', () => {
+    expect(metadata.tableName).toBe('result_prms_sync_history');
   });
 
   it('id is bigint primary key, generated, not nullable', () => {
@@ -58,17 +58,18 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(deliveryId.length).toBe('191');
     expect(deliveryId.isNullable).toBe(true);
     const index = metadata.indices.find(
-      (candidate) => candidate.name === 'idx_prms_webhook_delivery_delivery_id',
+      (candidate) =>
+        candidate.name === 'idx_result_prms_sync_history_delivery_id',
     );
     expect(index).toBeDefined();
     expect(index?.isUnique).toBe(false);
     expect(metadata.uniques).toHaveLength(0);
   });
 
-  it('received_at is timestamp NOT NULL', () => {
-    const receivedAt = column('received_at');
-    expect(receivedAt.type).toBe('timestamp');
-    expect(receivedAt.isNullable).toBe(false);
+  it('occurred_at is timestamp NOT NULL', () => {
+    const occurredAt = column('occurred_at');
+    expect(occurredAt.type).toBe('timestamp');
+    expect(occurredAt.isNullable).toBe(false);
   });
 
   it('environment is varchar(20) NOT NULL', () => {
@@ -157,6 +158,54 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(duplicateOfId.relationMetadata).toBeUndefined();
   });
 
+  it('event_source is varchar(10) NOT NULL — the only NOT NULL addition', () => {
+    const eventSource = column('event_source');
+    expect(eventSource.type).toBe('varchar');
+    expect(eventSource.length).toBe('10');
+    expect(eventSource.isNullable).toBe(false);
+  });
+
+  it('status is varchar(30) NULL', () => {
+    const status = column('status');
+    expect(status.type).toBe('varchar');
+    expect(status.length).toBe('30');
+    expect(status.isNullable).toBe(true);
+  });
+
+  it('actor_user_id is bigint NULL and carries no foreign key', () => {
+    const actorUserId = column('actor_user_id');
+    expect(actorUserId.type).toBe('bigint');
+    expect(actorUserId.isNullable).toBe(true);
+    expect(actorUserId.relationMetadata).toBeUndefined();
+  });
+
+  it('reviewer_name is varchar(255) NULL', () => {
+    const reviewerName = column('reviewer_name');
+    expect(reviewerName.type).toBe('varchar');
+    expect(reviewerName.length).toBe('255');
+    expect(reviewerName.isNullable).toBe(true);
+  });
+
+  it('reviewer_role is varchar(191) NULL', () => {
+    const reviewerRole = column('reviewer_role');
+    expect(reviewerRole.type).toBe('varchar');
+    expect(reviewerRole.length).toBe('191');
+    expect(reviewerRole.isNullable).toBe(true);
+  });
+
+  it('science_program_code is varchar(20) NULL', () => {
+    const scienceProgramCode = column('science_program_code');
+    expect(scienceProgramCode.type).toBe('varchar');
+    expect(scienceProgramCode.length).toBe('20');
+    expect(scienceProgramCode.isNullable).toBe(true);
+  });
+
+  it('changes is json NULL', () => {
+    const changes = column('changes');
+    expect(changes.type).toBe('json');
+    expect(changes.isNullable).toBe(true);
+  });
+
   it('created_by is NULL and is_active defaults TRUE', () => {
     const createdBy = column('created_by');
     expect(createdBy.isNullable).toBe(true);
@@ -175,30 +224,30 @@ describe('PrmsWebhookDelivery entity metadata', () => {
       .sort((left, right) => left.name.localeCompare(right.name));
     expect(indexes).toEqual([
       {
-        name: 'idx_prms_webhook_delivery_delivery_id',
+        name: 'idx_result_prms_sync_history_delivery_id',
         unique: false,
         columns: ['delivery_id'],
       },
       {
-        name: 'idx_prms_webhook_delivery_received_at',
+        name: 'idx_result_prms_sync_history_occurred_at',
         unique: false,
-        columns: ['received_at'],
+        columns: ['occurred_at'],
       },
       {
-        name: 'idx_prms_webhook_delivery_result',
+        name: 'idx_result_prms_sync_history_result',
         unique: false,
         columns: ['result_id'],
       },
     ]);
   });
 
-  it('owns exactly the design §4 columns plus AuditableEntity', () => {
+  it('owns exactly the design §4 columns (renamed + seven added) plus AuditableEntity', () => {
     const names = metadata.columns.map((item) => item.propertyName).sort();
     expect(names).toEqual(
       [
         'id',
         'delivery_id',
-        'received_at',
+        'occurred_at',
         'environment',
         'correlation_outcome',
         'result_id',
@@ -213,6 +262,13 @@ describe('PrmsWebhookDelivery entity metadata', () => {
         'processing_state',
         'processing_error',
         'duplicate_of_id',
+        'event_source',
+        'status',
+        'actor_user_id',
+        'reviewer_name',
+        'reviewer_role',
+        'science_program_code',
+        'changes',
         'created_at',
         'created_by',
         'updated_at',

@@ -39,7 +39,7 @@ class FakeDeliveryTable {
     if (/^\s*SELECT/i.test(sql)) {
       return this.select(sql, params);
     }
-    if (/^\s*INSERT\s+INTO\s+prms_webhook_delivery/i.test(sql)) {
+    if (/^\s*INSERT\s+INTO\s+result_prms_sync_history/i.test(sql)) {
       return this.insert(sql, params);
     }
     throw new Error(`FakeDeliveryTable: unsupported SQL\n${sql}`);
@@ -62,7 +62,7 @@ class FakeDeliveryTable {
 
   private insert(sql: string, params: unknown[]): { insertId: number } {
     const match =
-      /INSERT\s+INTO\s+prms_webhook_delivery\s*\(([\s\S]*?)\)\s*VALUES\s*\(([\s\S]*?)\)/i.exec(
+      /INSERT\s+INTO\s+result_prms_sync_history\s*\(([\s\S]*?)\)\s*VALUES\s*\(([\s\S]*?)\)/i.exec(
         sql,
       );
     if (!match) {
@@ -111,14 +111,14 @@ class FakeDeliveryTable {
   }
 }
 
-const RECEIVED_AT = new Date('2026-09-22T10:00:00.000Z');
+const OCCURRED_AT = new Date('2026-09-22T10:00:00.000Z');
 const DECIDED_AT = new Date('2026-09-22T09:59:00.000Z');
 
 const delivery = (
   overrides: Partial<RecordDeliveryInput> = {},
 ): RecordDeliveryInput => ({
   delivery_id: '4172',
-  received_at: RECEIVED_AT,
+  occurred_at: OCCURRED_AT,
   environment: 'TEST',
   correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
   external_reference: '1441061',
@@ -164,12 +164,12 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(sql).toHaveLength(2);
       // Asserted on the generated query TEXT (KZ-001), not on how it was built.
       expect(sql[0]).toMatch(
-        /SELECT\s+id\s+FROM\s+prms_webhook_delivery\s+WHERE\s+delivery_id\s*=\s*\?\s+AND\s+duplicate_of_id\s+IS\s+NULL\s+FOR\s+UPDATE/i,
+        /SELECT\s+id\s+FROM\s+result_prms_sync_history\s+WHERE\s+delivery_id\s*=\s*\?\s+AND\s+duplicate_of_id\s+IS\s+NULL\s+FOR\s+UPDATE/i,
       );
       expect(sql[0]).toContain('FOR UPDATE');
       expect(sql[0]).toContain('duplicate_of_id IS NULL');
       expect(table.query.mock.calls[0][1]).toEqual(['4172']);
-      expect(sql[1]).toMatch(/^\s*INSERT\s+INTO\s+prms_webhook_delivery/);
+      expect(sql[1]).toMatch(/^\s*INSERT\s+INTO\s+result_prms_sync_history/);
 
       expect(result).toEqual({
         kind: 'recorded',
@@ -180,7 +180,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(table.rows[0]).toEqual({
         id: 100,
         delivery_id: '4172',
-        received_at: RECEIVED_AT,
+        occurred_at: OCCURRED_AT,
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
         result_id: null,
@@ -200,6 +200,16 @@ describe('PrmsWebhookDeliveryRepository', () => {
         duplicate_of_id: null,
         created_by: null,
         is_active: true,
+        // The Pivot's discriminator: every row this method writes is an
+        // inbound PRMS delivery. The other six Pivot columns are NULL —
+        // T-11's outbound write is the only path that fills them.
+        event_source: 'PRMS',
+        status: null,
+        actor_user_id: null,
+        reviewer_name: null,
+        reviewer_role: null,
+        science_program_code: null,
+        changes: null,
       });
     });
 
@@ -213,7 +223,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       // bug that shipped under a `toContain`).
       expect(insertParams).toEqual([
         '4172',
-        RECEIVED_AT,
+        OCCURRED_AT,
         'TEST',
         DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
         '1441061',
@@ -226,6 +236,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         JSON.stringify({ 'x-prms-delivery-id': '4172' }),
         DeliveryProcessingState.RECEIVED,
         null,
+        'PRMS',
       ]);
       expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
     });
@@ -475,7 +486,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       {
         id: '100',
         delivery_id: '4172',
-        received_at: new Date('2026-09-22T10:00:00.000Z'),
+        occurred_at: new Date('2026-09-22T10:00:00.000Z'),
         environment: 'TEST',
         correlation_outcome: 'CORRELATED',
         result_id: '1441061',
@@ -490,6 +501,13 @@ describe('PrmsWebhookDeliveryRepository', () => {
         processing_state: 'PROCESSED',
         processing_error: null,
         duplicate_of_id: null,
+        event_source: 'PRMS',
+        status: null,
+        actor_user_id: null,
+        reviewer_name: null,
+        reviewer_role: null,
+        science_program_code: null,
+        changes: null,
         created_at: new Date('2026-09-22T10:00:00.100Z'),
         updated_at: new Date('2026-09-22T10:00:01.000Z'),
         is_active: 1,
@@ -497,7 +515,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       {
         id: '101',
         delivery_id: null,
-        received_at: new Date('2026-09-22T10:05:00.000Z'),
+        occurred_at: new Date('2026-09-22T10:05:00.000Z'),
         environment: 'TEST',
         correlation_outcome: 'UNKNOWN_REFERENCE',
         result_id: null,
@@ -512,13 +530,20 @@ describe('PrmsWebhookDeliveryRepository', () => {
         processing_state: 'RECEIVED',
         processing_error: null,
         duplicate_of_id: '100',
+        event_source: 'PRMS',
+        status: null,
+        actor_user_id: null,
+        reviewer_name: null,
+        reviewer_role: null,
+        science_program_code: null,
+        changes: null,
         created_at: new Date('2026-09-22T10:05:00.100Z'),
         updated_at: null,
         is_active: 1,
       },
     ];
 
-    it('by STAR result_id: filters on result_id, orders by received_at ascending, outside any transaction', async () => {
+    it('by STAR result_id: filters on result_id, orders by occurred_at ascending, outside any transaction', async () => {
       dataSourceQuery.mockResolvedValueOnce([rawRows[0]]);
 
       const history = await repository.findHistoryByResultId(1441061);
@@ -526,9 +551,9 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(transaction).not.toHaveBeenCalled();
       expect(dataSourceQuery).toHaveBeenCalledTimes(1);
       const sql = String(dataSourceQuery.mock.calls[0][0]);
-      expect(sql).toMatch(/FROM\s+prms_webhook_delivery/);
+      expect(sql).toMatch(/FROM\s+result_prms_sync_history/);
       expect(sql).toMatch(/WHERE\s+result_id\s*=\s*\?/);
-      expect(sql).toMatch(/ORDER\s+BY\s+received_at\s+ASC/);
+      expect(sql).toMatch(/ORDER\s+BY\s+occurred_at\s+ASC/);
       expect(sql).not.toMatch(/FOR UPDATE/);
       // Never filters on is_active: nothing in this spec flips it, and a
       // hidden filter would be a way to silently discard history.
@@ -546,19 +571,26 @@ describe('PrmsWebhookDeliveryRepository', () => {
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
         raw_body: { decision: 'APPROVE' },
         is_active: true,
+        event_source: 'PRMS',
+        status: null,
+        actor_user_id: null,
+        reviewer_name: null,
+        reviewer_role: null,
+        science_program_code: null,
+        changes: null,
       });
     });
 
-    it('across all results: NO result_id filter, so uncorrelated (result_id IS NULL) rows come back too, in received_at order', async () => {
+    it('across all results: NO result_id filter, so uncorrelated (result_id IS NULL) rows come back too, in occurred_at order', async () => {
       dataSourceQuery.mockResolvedValueOnce(rawRows);
 
       const history = await repository.findHistory();
 
       expect(transaction).not.toHaveBeenCalled();
       const sql = String(dataSourceQuery.mock.calls[0][0]);
-      expect(sql).toMatch(/FROM\s+prms_webhook_delivery/);
+      expect(sql).toMatch(/FROM\s+result_prms_sync_history/);
       expect(sql).not.toMatch(/WHERE/);
-      expect(sql).toMatch(/ORDER\s+BY\s+received_at\s+ASC/);
+      expect(sql).toMatch(/ORDER\s+BY\s+occurred_at\s+ASC/);
       expect(sql).not.toMatch(/FOR UPDATE/);
 
       expect(history).toHaveLength(2);
@@ -571,10 +603,11 @@ describe('PrmsWebhookDeliveryRepository', () => {
         prms_result_id: null,
         raw_body: null,
         decided_at: null,
+        event_source: 'PRMS',
       });
     });
 
-    it('both reads select the domain columns and leave the select:false audit columns out', async () => {
+    it('both reads select the domain columns (including the seven Pivot columns) and leave the select:false audit columns out', async () => {
       dataSourceQuery.mockResolvedValue([]);
 
       await repository.findHistoryByResultId(1);
@@ -586,12 +619,19 @@ describe('PrmsWebhookDeliveryRepository', () => {
         const sql = String(call[0]);
         for (const column of [
           'delivery_id',
-          'received_at',
+          'occurred_at',
           'correlation_outcome',
           'result_id',
           'duplicate_of_id',
           'raw_body',
           'processing_state',
+          'event_source',
+          'status',
+          'actor_user_id',
+          'reviewer_name',
+          'reviewer_role',
+          'science_program_code',
+          'changes',
         ]) {
           expect(sql).toContain(column);
         }
@@ -601,17 +641,17 @@ describe('PrmsWebhookDeliveryRepository', () => {
   });
 
   describe('append-only (R-PWH-005 AC.7)', () => {
-    it('the shipped repository source emits no UPDATE or DELETE against prms_webhook_delivery, and never flips is_active', () => {
+    it('the shipped repository source emits no UPDATE or DELETE against result_prms_sync_history, and never flips is_active', () => {
       // A lock on the real artifact, not on this suite's call log: a later
       // edit that adds a mutation reddens this without needing a fixture.
       const source = readFileSync(
         join(__dirname, 'prms-webhook-delivery.repository.ts'),
         'utf8',
       );
-      expect(source).not.toMatch(/UPDATE\s+prms_webhook_delivery/i);
-      expect(source).not.toMatch(/DELETE\s+FROM\s+prms_webhook_delivery/i);
+      expect(source).not.toMatch(/UPDATE\s+result_prms_sync_history/i);
+      expect(source).not.toMatch(/DELETE\s+FROM\s+result_prms_sync_history/i);
       expect(source).not.toMatch(/is_active\s*=\s*(FALSE|0)\b/i);
-      expect(source).toMatch(/INSERT\s+INTO\s+prms_webhook_delivery/);
+      expect(source).toMatch(/INSERT\s+INTO\s+result_prms_sync_history/);
     });
   });
 });

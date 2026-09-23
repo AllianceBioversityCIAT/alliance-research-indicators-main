@@ -1,5 +1,5 @@
 /**
- * Durable processing marker for one `prms_webhook_delivery` row
+ * Durable processing marker for one `result_prms_sync_history` row
  * (design.md §4 `processing_state`).
  *
  * VARCHAR-backed TypeScript enum — NOT a MySQL ENUM column.

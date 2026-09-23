@@ -3,13 +3,13 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **9 / 12 tasks closed** (T-01 – T-09, all `PASS` 2026-09-22). **Scope changed 2026-09-23 by an owner-approved Pivot** — see [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Two tasks added: **T-01b** (rename + extend the history table) and **T-11** (the outbound `PENDING_REVIEW` event). Remaining order: **T-01b → T-11 → T-10**. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **10 / 12 tasks closed** (T-01 – T-09, all `PASS` 2026-09-22). **Scope changed 2026-09-23 by an owner-approved Pivot** — see [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Two tasks added: **T-01b** (rename + extend the history table) and **T-11** (the outbound `PENDING_REVIEW` event). Remaining order: **T-11 → T-10**. **T-01b closed `PASS` 2026-09-23** on its first attempt, dual-lens (reliability + risk), evidence re-run `VERIFIED` by the Leader. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
 - **Family status warning:** the manifest row this child `Depends on` — [`../family.md`](../family.md) child 1, `sync-engine` — is **`pending`**, not `done`. Per the family-membership rule this **warns, it does not block**: the code this child extends is present on this branch (design P-3, P-5, P-8, all re-verified at `170da206`). The open risk is the one that already materialized once — see RB-1.
 - **Verified at:** `170da206` (the commands in §4 were run at this commit on 2026-09-22)
-- **Last updated:** 2026-09-22
+- **Last updated:** 2026-09-23
 
 ---
 
@@ -115,7 +115,7 @@ graph TD
 
 ### T-01 — Schema: `prms_webhook_delivery` entity, enum, migration, migration spec  `[x]`
 
-> ⚠️ **Superseded in part by T-01b (2026-09-23).** This task shipped and passed against the spec as it stood: 24 columns, table `prms_webhook_delivery`. An owner-approved Pivot then widened the table's purpose from *inbound delivery log* to **synchronization history**, which renames the table and one column and adds seven more. **T-01's `PASS` stands** — it delivered what was asked. The new work is **T-01b**, not a rework of this one.
+> ⚠️ **Superseded in part by T-01b (2026-09-23).** This task shipped and passed against the spec as it stood: 23 columns, table `prms_webhook_delivery`. An owner-approved Pivot then widened the table's purpose from *inbound delivery log* to **synchronization history**, which renames the table and one column and adds seven more. **T-01's `PASS` stands** — it delivered what was asked. The new work is **T-01b**, not a rework of this one.
 
 - **Requirements covered:** R-PWH-005 (row shape, AC.5 column nullability) · R-PWH-006 AC.2 (`duplicate_of_id`) · R-PWH-009 AC.4 (`environment` column) · NFR-PWH-004 (`raw_body` whole)
 - **Design references:** §4 *Data Model* · §3.1 (composition rows for the entity, migration and migration spec) · DD-8 · P-2
@@ -549,7 +549,7 @@ graph TD
 
 ---
 
-### T-01b — Rename the table to `result_prms_sync_history`, rename `received_at`, add the seven history columns  `[ ]`
+### T-01b — Rename the table to `result_prms_sync_history`, rename `received_at`, add the seven history columns  `[x]`
 
 > **Created by the owner-approved Pivot of 2026-09-23.** Read [`./execution.md`](./execution.md) → *Pivot Record: T-01* **in full** before starting — it carries the eight design decisions, the measured blast radius and the reasoning behind every column. This task does not restate them.
 

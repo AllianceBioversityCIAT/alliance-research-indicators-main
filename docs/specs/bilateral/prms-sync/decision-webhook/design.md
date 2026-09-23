@@ -145,7 +145,7 @@ Sibling `*.spec.ts` for every unit above (root guide §4.1).
 
 > ⚠️ **AMENDED 2026-09-23 by an owner-approved Pivot.** This table was specified as `prms_webhook_delivery`, an **inbound delivery log**. It is now the **synchronization history**: it also records STAR's own successful pushes, which PRMS never sends. Full reasoning, the eight design decisions and the measured blast radius are in [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Implemented by **T-01b**; the outbound write is **T-11**.
 >
-> **Renames:** `prms_webhook_delivery` → `result_prms_sync_history` · `received_at` → `occurred_at`. **Nothing was removed** — 23 of T-01's 24 columns are untouched.
+> **Renames:** `prms_webhook_delivery` → `result_prms_sync_history` · `received_at` → `occurred_at`. **Nothing was removed** — 22 of T-01's 23 columns are untouched, and the table resolves to **30** columns (23 + 7). Figure derived in [`./execution.md`](./execution.md) → *Pivot Record: T-01*; do not restate it elsewhere.
 >
 > **Seven columns added:**
 >
