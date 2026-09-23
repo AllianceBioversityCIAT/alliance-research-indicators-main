@@ -75,7 +75,10 @@ export class ResultSidebarComponent {
       )
       .map(option => ({
         ...option,
-        greenCheck: Boolean(this.cache.greenChecks()[option.greenCheckKey as keyof GreenChecks])
+        // `?? {}` as well as the guard in updateGreenChecks: this computed feeds
+        // the section list, the counter and the submit gate, so a single bad
+        // write must not be able to blank the sidebar.
+        greenCheck: Boolean((this.cache.greenChecks() ?? {})[option.greenCheckKey as keyof GreenChecks])
       }));
   });
 
@@ -195,11 +198,27 @@ export class ResultSidebarComponent {
         // non-ACCEPTED outcome leaves `is_synced_to_prms` false. It deliberately
         // does NOT say PRMS received nothing -- on a timeout that is unknowable.
         console.error('PRMS sync failed:', this.prmsSyncFailureMessage(response));
+
+        // PRMS's own validation messages, when it sent any, are shown verbatim --
+        // they name the field and say what to do about it. Everything else keeps
+        // the generic copy, because those failures are developer-facing.
+        const rejections = this.prmsRejectionMessages(response);
+        // A real <ul>, not bullet characters joined by <br>. `.alert` is
+        // text-align: center, so hand-made bullets centre line by line and never
+        // line up. The alignment lives in a CSS class rather than an inline
+        // style because Angular's [innerHTML] sanitizer strips `style` but keeps
+        // `class`.
+        const detail = rejections.length
+          ? 'This result was not synchronized. PRMS reported:' +
+            `<ul class="alert-detail-list">${rejections
+              .map(message => `<li>${this.escapeHtml(message)}</li>`)
+              .join('')}</ul>`
+          : 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.';
+
         this.actions.showGlobalAlert({
           severity: 'error',
           summary: 'Could not synchronize with PRMS',
-          detail:
-            'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+          detail,
           hasNoCancelButton: true,
           generalButton: true,
           confirmCallback: { label: 'Continue' }
@@ -220,6 +239,97 @@ export class ResultSidebarComponent {
       response.description ||
       'Unable to send the result to PRMS, please try again.'
     );
+  }
+
+  /**
+   * The validation messages PRMS itself returned, if any.
+   *
+   * These are written FOR the reporter -- "Links to file storage platforms
+   * (Google Drive, Dropbox...) are not accepted as evidence. Provide a publicly
+   * accessible link (CGSpace, DOI or a public site) instead." -- so unlike STAR's
+   * internal build errors they belong on screen.
+   *
+   * They arrive buried in `failure_reason`, which the server stores as
+   * `HTTP <code>: <text> - <json>`; the JSON carries `response.message`, a string
+   * OR an array of strings. Parsing never throws: anything unexpected returns []
+   * and the modal falls back to the generic copy.
+   */
+  private prmsRejectionMessages(response: unknown): string[] {
+    // Read structurally rather than by type: the server's envelope carries `data`
+    // on an error body, but the shared `ErrorResponse` interface does not declare
+    // it. Widening that shared type for one consumer would reach every caller in
+    // the app, so the narrowing stays here.
+    const raw = (
+      response as {
+        errorDetail?: { data?: { failure_reason?: unknown } | null } | null;
+      }
+    )?.errorDetail?.data?.failure_reason;
+    if (typeof raw !== 'string' || raw.trim() === '') return [];
+
+    const start = raw.indexOf('{');
+    if (start === -1) return [];
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw.slice(start));
+    } catch {
+      return [];
+    }
+
+    return this.collectPrmsMessages(parsed);
+  }
+
+  /**
+   * PRMS does not normalise its error bodies, so two shapes have been seen in
+   * production and both are handled:
+   *
+   *   1. Bad Request -- `{ response: { message: string | string[] } }`
+   *   2. validation_failed -- `{ rejected: [ { detailedErrors: [ { message } ] } ] }`
+   *      (the rejected entry may arrive on its own, because the server stores
+   *      `JSON.stringify(chosen)` when it cannot find a plain string reason)
+   *
+   * Both are searched; whichever yields messages wins, and duplicates are
+   * dropped so a body carrying the same text twice does not repeat it on screen.
+   */
+  private collectPrmsMessages(parsed: unknown): string[] {
+    const asList = (value: unknown): unknown[] =>
+      Array.isArray(value) ? value : value == null ? [] : [value];
+
+    const root = parsed as {
+      response?: { message?: unknown };
+      detailedErrors?: unknown;
+      rejected?: unknown;
+    };
+
+    const fromDetailed = (entry: unknown): unknown[] =>
+      asList((entry as { detailedErrors?: unknown })?.detailedErrors).map(
+        detail => (detail as { message?: unknown })?.message
+      );
+
+    const candidates = [
+      ...asList(root?.response?.message),
+      ...fromDetailed(root),
+      ...asList(root?.rejected).flatMap(fromDetailed)
+    ];
+
+    const seen = new Set<string>();
+    return candidates
+      .map(entry => (entry == null ? '' : String(entry).trim()))
+      .filter(entry => {
+        if (entry.length === 0 || seen.has(entry)) return false;
+        seen.add(entry);
+        return true;
+      });
+  }
+
+  /** Escapes before the modal renders it: `detail` goes through [innerHTML], and
+   * these strings come from an external system. */
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
   }
 
   showOicrStatusDropdown = computed(() => {

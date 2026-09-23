@@ -286,6 +286,21 @@ describe('ResultSidebarComponent', () => {
       expect(innovationOption?.indicator_id).toBe(2);
     });
 
+    // The crash reported from Alliance Alignment: greenChecks momentarily held
+    // `undefined` and the sidebar's computed indexed into it.
+    it('survives greenChecks being undefined instead of blanking the sidebar', () => {
+      cacheService.greenChecks?.set(undefined as unknown as GreenChecks);
+
+      // ★ discriminating: without the `?? {}` these three throw
+      //   "Cannot read properties of undefined (reading 'general_information')".
+      expect(() => component.allOptionsWithGreenChecks()).not.toThrow();
+      expect(() => component.getCompletedCount()).not.toThrow();
+      expect(() => component.getTotalCount()).not.toThrow();
+
+      expect(component.getCompletedCount()).toBe(0);
+      expect(component.allOptionsWithGreenChecks().length).toBeGreaterThan(0);
+    });
+
     it('should handle null/undefined greenChecks', () => {
       cacheService.greenChecks?.set({} as GreenChecks);
 
@@ -877,6 +892,135 @@ describe('ResultSidebarComponent', () => {
       const alertArg = JSON.stringify((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0]);
       expect(alertArg).not.toContain('innov_use_to_be_determined');
       expect(actionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    // --- PRMS's own validation messages reach the modal (2026-09-22) ----------
+    // They are written for the reporter ("Provide a publicly accessible link
+    // (CGSpace, DOI or a public site) instead"), unlike STAR's internal build
+    // errors, so they are shown verbatim.
+
+    const failWith = (failureReason: unknown) => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { data: { failure_reason: failureReason } }
+      });
+    };
+    const REJECTED_ENTRY = JSON.stringify({"type": "innovation_use", "index": 0, "errors": ["/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"], "detailedErrors": [{"path": "/innovation_use/current_innovation_use_numbers", "params": {"missingProperty": "innov_use_to_be_determined"}, "keyword": "required", "message": "must have required property 'innov_use_to_be_determined'", "fullMessage": "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"}], "external_reference": "19996"});
+    const FULL_BODY = JSON.stringify({"ok": false, "error": "validation_failed", "message": "Every result was rejected. See 'rejected'.", "rejected": [{"type": "innovation_use", "index": 0, "errors": ["/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"], "detailedErrors": [{"path": "/innovation_use/current_innovation_use_numbers", "params": {"missingProperty": "innov_use_to_be_determined"}, "keyword": "required", "message": "must have required property 'innov_use_to_be_determined'", "fullMessage": "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"}], "external_reference": "19996"}], "requestId": "Root=1-6ab2b650", "acceptedCount": 0, "rejectedCount": 1});
+
+    const alertDetail = () =>
+      ((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0] as { detail: string }).detail;
+
+    it('shows a single PRMS message in the modal', async () => {
+      failWith(
+        'HTTP 400: Bad Request - {"response":{"message":["data.evidence.0.Links to file storage platforms are not accepted as evidence."],"statusCode":400}}'
+      );
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('PRMS reported');
+      expect(alertDetail()).toContain('Links to file storage platforms are not accepted as evidence.');
+    });
+
+    it('shows EVERY message when PRMS returns several', async () => {
+      failWith(
+        'HTTP 400: Bad Request - {"response":{"message":["first problem","second problem","third problem"]}}'
+      );
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('first problem');
+      expect(alertDetail()).toContain('second problem');
+      expect(alertDetail()).toContain('third problem');
+    });
+
+    it('accepts a message that is a plain string, not an array', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":"just one, unwrapped"}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('just one, unwrapped');
+    });
+
+    it('ESCAPES the message -- it is data from an external system, rendered via innerHTML', async () => {
+      failWith(
+        'HTTP 400: Bad Request - {"response":{"message":["<img src=x onerror=alert(1)>"]}}'
+      );
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('&lt;img src=x onerror=alert(1)&gt;');
+      expect(alertDetail()).not.toContain('<img');
+    });
+
+    // PRMS does not normalise its error bodies. This second shape -- verbatim from
+    // a 2026-09-22 rejection -- carries the text under
+    // `rejected[].detailedErrors[].message` instead of `response.message`.
+
+    it('reads detailedErrors[].message when the WHOLE validation_failed body arrives', async () => {
+      failWith(`HTTP 422: Unprocessable Entity - ${FULL_BODY}`);
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('PRMS reported');
+      expect(alertDetail()).toContain(
+        "must have required property 'innov_use_to_be_determined'"
+      );
+    });
+
+    it('reads detailedErrors[].message when only the REJECTED ENTRY arrives', async () => {
+      // The server stores JSON.stringify(chosen) when the rejected entry carries
+      // no plain string reason, so the log can hold the entry on its own.
+      failWith(`HTTP 422: Unprocessable Entity - ${REJECTED_ENTRY}`);
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain(
+        "must have required property 'innov_use_to_be_determined'"
+      );
+    });
+
+    it('renders a real <ul>, not bullet characters -- .alert is text-align: center', async () => {
+      // Hand-made bullets joined by <br> centre line by line inside the alert and
+      // never line their markers up. A <ul> carrying the alignment class does.
+      failWith('HTTP 400: Bad Request - {"response":{"message":["one","two"]}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('<ul class="alert-detail-list">');
+      expect(alertDetail()).toContain('<li>one</li>');
+      expect(alertDetail()).toContain('<li>two</li>');
+      // The class matters: Angular's [innerHTML] sanitizer strips `style`, so an
+      // inline text-align would silently not survive.
+      expect(alertDetail()).not.toContain('style=');
+      expect(alertDetail()).not.toContain('•');
+    });
+
+    it('does not repeat a message that appears in more than one place', async () => {
+      failWith(
+        'HTTP 400: Bad Request - {"response":{"message":["duplicated"]},"detailedErrors":[{"message":"duplicated"}]}'
+      );
+
+      await component.onPrmsSync();
+
+      expect(alertDetail().split('duplicated').length - 1).toBe(1);
+    });
+
+    it('falls back to the generic copy when the reason carries no PRMS messages', async () => {
+      failWith('Result is ineligible, gated, or the payload is incomplete');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('Please try again');
+      expect(alertDetail()).not.toContain('PRMS reported');
+    });
+
+    it('falls back when the reason is unparseable JSON, without throwing', async () => {
+      failWith('HTTP 400: Bad Request - {this is not json');
+
+      await expect(component.onPrmsSync()).resolves.toBeUndefined();
+      expect(alertDetail()).toContain('Please try again');
     });
 
     it('still surfaces the server failure message -- to the console, not to the user', async () => {

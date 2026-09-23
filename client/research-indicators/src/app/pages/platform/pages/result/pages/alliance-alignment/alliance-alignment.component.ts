@@ -42,6 +42,20 @@ import {
 const OTHER_LEVER_ID = 9;
 const PORTFOLIO_P2_ID = 2;
 
+/**
+ * The subset of a contract / lever / SDG row that the Primary toggle needs.
+ * `agreement_id` and `is_pool_funding_contributor` exist on contract rows only —
+ * both optional, so lever and SDG callers keep passing what they always passed.
+ */
+export interface PrimaryCandidate {
+  is_primary: boolean;
+  contract_id?: string | number;
+  lever_id?: string | number;
+  sdg_id?: number;
+  agreement_id?: string;
+  is_pool_funding_contributor?: boolean;
+}
+
 @Component({
   selector: 'app-alliance-alignment',
   imports: [
@@ -393,7 +407,14 @@ export default class AllianceAlignmentComponent {
       detail: 'Data saved successfully'
     });
 
-    await this.getData();
+    // getData() is in a try/finally so the visibility refresh below runs even when
+    // the re-read fails: the PATCH already succeeded, so the sidebar is showing a
+    // state the server no longer has, and leaving it stale is the worse outcome.
+    try {
+      await this.getData();
+    } finally {
+      await this.refreshPoolFundingVisibility();
+    }
 
     // The sidebar's Pool Funding block (OPTIONAL divider + item + PRMS SYNC) is
     // gated on `alignment.eligible` (the primary CONTRACT, edited here) and
@@ -404,8 +425,7 @@ export default class AllianceAlignmentComponent {
     // and neither changes when the contract is edited here. Without this re-fetch
     // the block keeps its pre-save visibility until a full page reload
     // (user-reported). Runs only after the PATCH succeeded (the early `return`
-    // above covers the failure path).
-    await this.refreshPoolFundingVisibility();
+    // above covers the failure path) — in the `finally` beside getData().
   }
 
   /**
@@ -416,7 +436,14 @@ export default class AllianceAlignmentComponent {
    */
   private async refreshPoolFundingVisibility(): Promise<void> {
     try {
-      await this.bilateralService.getAlignment(String(this.cache.currentResultId()));
+      // The ROUTE code, falling back to the numeric id — the same pair every other
+      // caller uses (result.component.ts, result-sidebar.onPrmsSync). The numeric
+      // id alone still resolves to STAR, so this is not a behaviour change; it
+      // keeps one call site from being the odd one out when a code-shaped param
+      // starts mattering.
+      const resultCode =
+        this.route.snapshot.paramMap.get('id') ?? String(this.cache.currentResultId());
+      await this.bilateralService.getAlignment(resultCode);
     } catch {
       // Intentionally swallowed -- see doc comment.
     }
@@ -444,10 +471,119 @@ export default class AllianceAlignmentComponent {
     }));
   }
 
-  markAsPrimary(
-    item: { is_primary: boolean; contract_id?: string | number; lever_id?: string | number; sdg_id?: number },
+  // @sdd-spec docs/specs/bilateral — Pool Funding notice on the Primary contract
+  /**
+   * Whether a pool-funding contract is the Primary one RIGHT NOW. That is the
+   * single condition the optional Pool Funding Alignment section hangs on.
+   */
+  private hasPoolFundingPrimary(): boolean {
+    return (this.body().contracts ?? []).some(contract => {
+      const row = contract as PrimaryCandidate;
+      return row.is_primary === true && row.is_pool_funding_contributor === true;
+    });
+  }
+
+  /**
+   * What clicking Primary on `item` does to the Pool Funding Alignment section.
+   *
+   * applyPrimary toggles the clicked contract and clears every other, so the NEXT
+   * state has a pool-funding Primary exactly when the click is turning ON a
+   * contract that contributes. Comparing that with the current state gives the
+   * three transitions that matter:
+   *
+   *   'enable'  — none → one. An optional section the user never asked for appears.
+   *   'disable' — one → none. That section, and the Science Program alignment
+   *               inside it, stops applying. This covers BOTH switching to a
+   *               contract that does not contribute AND clearing the Primary
+   *               altogether: the consequence is identical.
+   *   null      — no change worth interrupting for, including swapping one
+   *               pool-funding contract for another.
+   *
+   * (An earlier version warned only on 'enable', reasoning that un-setting
+   * "enables nothing". True, but it DISABLES something, which is just as
+   * surprising to discover after the fact.)
+   */
+  private poolFundingSectionTransition(
+    item: PrimaryCandidate,
     type: 'contract' | 'lever' | 'sdg'
-  ) {
+  ): 'enable' | 'disable' | null {
+    if (type !== 'contract') return null;
+
+    const willHave = !item.is_primary && item.is_pool_funding_contributor === true;
+    const hasNow = this.hasPoolFundingPrimary();
+
+    if (!hasNow && willHave) return 'enable';
+    if (hasNow && !willHave) return 'disable';
+    return null;
+  }
+
+  markAsPrimary(item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') {
+    const transition = this.poolFundingSectionTransition(item, type);
+    if (transition) {
+      this.confirmPoolFundingPrimary(item, type, transition);
+      return;
+    }
+    this.applyPrimary(item, type);
+  }
+
+  /**
+   * One informative confirm before the change lands, the same treatment the
+   * reporting-year change gets in General Information
+   * (showReportingYearChangeWarning): Continue applies it, Cancel leaves
+   * everything untouched.
+   */
+  private confirmPoolFundingPrimary(
+    item: PrimaryCandidate,
+    type: 'contract' | 'lever' | 'sdg',
+    transition: 'enable' | 'disable'
+  ): void {
+    const label = item.agreement_id ? `<strong>${item.agreement_id}</strong>` : 'This project';
+
+    // Clearing the Primary has no incoming project to name, so the lead sentence
+    // differs even though the consequence is the same.
+    const isClearing = item.is_primary === true;
+
+    const body =
+      transition === 'enable'
+        ? `<div>${label} contributes to Pool Funding.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>Making it the Primary project enables the optional <strong>Pool Funding Alignment</strong> ` +
+          `section, where you align this result with a Science Program and its contribution to the ` +
+          `Theory of Change so it can later be synced to PRMS.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>The section appears in the sidebar once the change is saved.</div>`
+        : (isClearing
+            ? `<div>The current Primary project contributes to Pool Funding.</div>` +
+              `<div>&nbsp;</div>` +
+              `<div>Clearing it disables the optional <strong>Pool Funding Alignment</strong> section.</div>`
+            : `<div>${label} does not contribute to Pool Funding.</div>` +
+              `<div>&nbsp;</div>` +
+              `<div>Making it the Primary project disables the optional ` +
+              `<strong>Pool Funding Alignment</strong> section.</div>`) +
+          `<div>&nbsp;</div>` +
+          `<div>This result will no longer be aligned with a Science Program, and it will not be ` +
+          `available to sync to PRMS.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>The section disappears from the sidebar once the change is saved.</div>`;
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: transition === 'enable' ? 'Pool Funding contribution' : 'Pool Funding Alignment will be disabled',
+      detail: `<div class="alert-detail-left">${body}</div>`,
+      confirmCallback: {
+        label: 'Continue',
+        event: () => {
+          this.applyPrimary(item, type);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel'
+      },
+      buttonColor: '#035BA9'
+    });
+  }
+
+  private applyPrimary(item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') {
     this.body.update(current => {
       if (type === 'contract') {
         const contracts = current.contracts.map(contract => {
@@ -483,10 +619,8 @@ export default class AllianceAlignmentComponent {
     this.actions.saveCurrentSection();
   }
 
-  markAsPrimaryHandler = (
-    item: { is_primary: boolean; contract_id?: string | number; lever_id?: string | number; sdg_id?: number },
-    type: 'contract' | 'lever' | 'sdg'
-  ) => this.markAsPrimary(item, type);
+  markAsPrimaryHandler = (item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') =>
+    this.markAsPrimary(item, type);
 
   removePrimaryLever(lever: Lever) {
     if (!this.submission.isEditableStatus()) return;
