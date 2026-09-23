@@ -6,6 +6,7 @@ import {
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { redactCallbackPath } from '../../shared/utils/path-redaction.util';
+import { PRMS_CALLBACK_PATH } from '../../shared/utils/prms-callback.constants';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
 import {
   PrmsWebhookReadResultDto,
@@ -13,11 +14,12 @@ import {
 } from '../../tools/prms-normalizer/dto/prms-webhook.dto';
 
 /**
- * Resolves the configured callback URL and delegates to
- * `PrmsNormalizerService` (design.md §3.1). Owns exactly one check of its
- * own — `ARI_PRMS_WEBHOOK_CALLBACK_URL` unset → 503 naming it
- * (R-PWH-009 AC.2, AC.3) — and otherwise MUST NOT collapse or re-interpret
- * what `registerWebhook`/`getWebhook` throw: a missing/inactive
+ * Assembles the callback URL from the configured base and secret, then
+ * delegates to `PrmsNormalizerService` (design.md §3.1). Owns two checks
+ * of its own — `ARI_PRMS_WEBHOOK_CALLBACK_URL` unset → 503 naming it, and
+ * `ARI_PRMS_WEBHOOK_SECRET` unset → 503 naming it (R-PWH-009 AC.2, AC.3) —
+ * and otherwise MUST NOT collapse or re-interpret what
+ * `registerWebhook`/`getWebhook` throw: a missing/inactive
  * `ARI_CLARISA_API_KEY` row is `NotFoundException` (404) and an empty
  * `simple_value`, or an unset `ARI_PRMS_NORMALIZER_HOST`, is
  * `ServiceUnavailableException` (503) — both propagate untouched
@@ -35,16 +37,18 @@ export class PrmsWebhookRegistrationService {
   ) {}
 
   /**
-   * `POST /api/prms-webhook` (R-PWH-001). The URL comes ONLY from
-   * `ARI_PRMS_WEBHOOK_CALLBACK_URL` — no request-body input, no fallback
-   * built from the request's `Host` header (R-PWH-009 AC.2, K-005).
+   * `POST /api/prms-webhook` (R-PWH-001). The base and the secret come ONLY
+   * from `ARI_PRMS_WEBHOOK_CALLBACK_URL` and `ARI_PRMS_WEBHOOK_SECRET`. No
+   * request-body input, no fallback built from the request's `Host` header
+   * (R-PWH-009 AC.2, K-005).
    */
   async register(): Promise<PrmsWebhookRegistrationResultDto> {
     const environment = this.environmentLabel();
     const host = this.appConfig.ARI_PRMS_NORMALIZER_HOST;
-    const url = this.appConfig.ARI_PRMS_WEBHOOK_CALLBACK_URL;
+    const base = this.appConfig.ARI_PRMS_WEBHOOK_CALLBACK_URL;
+    const secret = this.appConfig.ARI_PRMS_WEBHOOK_SECRET;
 
-    if (!url?.trim()) {
+    if (!base?.trim()) {
       const reason = 'ARI_PRMS_WEBHOOK_CALLBACK_URL is not configured';
       this.logger._warn(
         this.attemptLine({
@@ -56,6 +60,21 @@ export class PrmsWebhookRegistrationService {
       );
       throw new ServiceUnavailableException(reason);
     }
+
+    if (!secret?.trim()) {
+      const reason = 'ARI_PRMS_WEBHOOK_SECRET is not configured';
+      this.logger._warn(
+        this.attemptLine({
+          environment,
+          host,
+          url: undefined,
+          outcome: reason,
+        }),
+      );
+      throw new ServiceUnavailableException(reason);
+    }
+
+    const url = `${base.trim().replace(/\/+$/, '')}/${PRMS_CALLBACK_PATH}/${secret}`;
 
     try {
       const result = await this.prmsNormalizerService.registerWebhook(url);

@@ -69,6 +69,7 @@ import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-s
 import { PrmsWebhookCallbackModule } from '../entities/prms-webhook/prms-webhook-callback.module';
 import { PrmsWebhookModule } from '../entities/prms-webhook/prms-webhook.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
+import { PRMS_CALLBACK_PATH } from '../shared/utils/prms-callback.constants';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
@@ -431,7 +432,7 @@ const children: Routes = [
     // Public write. Own module: RouterModule stamps one MODULE_PATH per
     // class, so this cannot share PrmsWebhookModule with the registration
     // prefix (DD-3). Authenticated only by CallbackSecretGuard.
-    path: 'prms-callback',
+    path: PRMS_CALLBACK_PATH,
     module: PrmsWebhookCallbackModule,
   },
 ];

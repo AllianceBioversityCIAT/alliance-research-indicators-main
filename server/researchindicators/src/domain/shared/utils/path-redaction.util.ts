@@ -1,21 +1,23 @@
+import { PRMS_CALLBACK_ROUTE_PREFIX } from './prms-callback.constants';
+
 /**
  * Truncates a request URL at the PRMS callback route prefix.
  *
- * The credential is the path segment after `/api/prms-callback`. The prefix
- * comparison is case-insensitive so it matches Express's default routing
- * (`case sensitive routing` is off). It never keys on the credential's value
- * and reads no environment variable, so the segment is still removed when
- * the variable is unset, rotated, or empty. Any other URL is returned
- * unchanged.
+ * The credential is the path segment after `PRMS_CALLBACK_ROUTE_PREFIX`. The
+ * prefix comparison is case-insensitive so it matches Express's default
+ * routing (`case sensitive routing` is off). It never keys on the
+ * credential's value and reads no environment variable, so the segment is
+ * still removed when the variable is unset, rotated, or empty. Any other
+ * URL is returned unchanged.
  */
-export const PRMS_CALLBACK_ROUTE_PREFIX = '/api/prms-callback';
+export { PRMS_CALLBACK_ROUTE_PREFIX };
 
 /**
  * The two alphabets below are deliberately different, and conflating them is
  * what a reader is most likely to get wrong.
  *
  * `SECRET_CHARS` is the **credential's grammar**, fixed by C-T08. The secret is
- * ours — we mint it and embed it in `ARI_PRMS_WEBHOOK_CALLBACK_URL` before
+ * ours — we mint it and append it after `PRMS_CALLBACK_ROUTE_PREFIX` when
  * registering that URL with PRMS — so it is the set of characters a real
  * credential can be made of, and nothing may be added to it without amending
  * C-T08. It is what decides where a *segment* ends (`SEGMENT_END`).

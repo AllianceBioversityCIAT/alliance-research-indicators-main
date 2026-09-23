@@ -19,13 +19,14 @@ import { PrmsWebhookRegistrationService } from './prms-webhook-registration.serv
 //        NotFoundException -> the 404 assertion reds the moment the
 //        handler collapses every config failure to 503.
 describe('PrmsWebhookRegistrationService', () => {
-  const callbackUrl = 'https://star.example.org/api/prms-callback/secret';
+  const callbackBase = 'https://star.example.org/api';
+  const callbackSecret = 'segment-k7';
   const destination: PrmsWebhookDestinationDto = {
     id: 3,
     recipient_type: 'PLATFORM',
     recipient_id: 12,
     recipient_acronym: 'STAR',
-    url: callbackUrl,
+    url: 'https://star.example.org/api/prms-callback/segment-k7',
     is_active: true,
     last_updated_date: '2026-08-25T14:22:10.000Z',
   };
@@ -74,7 +75,8 @@ describe('PrmsWebhookRegistrationService', () => {
         warnLines.push(String(message));
       });
     service = buildService({
-      ARI_PRMS_WEBHOOK_CALLBACK_URL: callbackUrl,
+      ARI_PRMS_WEBHOOK_CALLBACK_URL: callbackBase,
+      ARI_PRMS_WEBHOOK_SECRET: callbackSecret,
       ARI_PRMS_NORMALIZER_HOST:
         'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
       ARI_IS_PRODUCTION: false,
@@ -90,7 +92,7 @@ describe('PrmsWebhookRegistrationService', () => {
       await expect(service.register()).resolves.toEqual(registrationResult);
 
       expect(prmsNormalizerService.registerWebhook).toHaveBeenCalledWith(
-        callbackUrl,
+        'https://star.example.org/api/prms-callback/segment-k7',
       );
       expect(prmsNormalizerService.registerWebhook).toHaveBeenCalledTimes(1);
     });
@@ -109,14 +111,14 @@ describe('PrmsWebhookRegistrationService', () => {
       expect(line).toContain('url=https://star.example.org/api/prms-callback');
       // FALSIFIER (h) (R-PWH-001 AC.6, NFR-PWH-002). Remove the
       // `redactCallbackPath` call from `attemptLine` -> this assertion reds.
-      // Observed RED first against the unredacted line (paste in the task
-      // report), then GREEN once the redaction was applied.
-      expect(line).not.toContain('/secret');
+      // `segment-k7` is not a substring of the redacted URL, so this stays
+      // green only while the secret is absent from the log line.
+      expect(line).not.toContain('segment-k7');
       expect(line).toContain('Webhook endpoint registered successfully.');
       expect(line).toContain('Root=1-68e94068');
       // The two assertions below cannot redden in this service: the API key
       // is read and used entirely inside PrmsNormalizerService and never
-      // enters `attemptLine`. They document intent; `/secret` is the evidence.
+      // enters `attemptLine`. They document intent; `segment-k7` is the evidence.
       expect(line.toLowerCase()).not.toContain('x-api-key');
       expect(line.toLowerCase()).not.toContain('apikey');
     });
@@ -130,6 +132,7 @@ describe('PrmsWebhookRegistrationService', () => {
     it('fails loudly with 503 naming the variable when ARI_PRMS_WEBHOOK_CALLBACK_URL is unset — no fallback, no default', async () => {
       service = buildService({
         ARI_PRMS_WEBHOOK_CALLBACK_URL: undefined,
+        ARI_PRMS_WEBHOOK_SECRET: callbackSecret,
         ARI_PRMS_NORMALIZER_HOST:
           'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
         ARI_IS_PRODUCTION: false,
@@ -147,6 +150,7 @@ describe('PrmsWebhookRegistrationService', () => {
     it('fails loudly with 503 when ARI_PRMS_WEBHOOK_CALLBACK_URL is blank', async () => {
       service = buildService({
         ARI_PRMS_WEBHOOK_CALLBACK_URL: '   ',
+        ARI_PRMS_WEBHOOK_SECRET: callbackSecret,
         ARI_PRMS_NORMALIZER_HOST:
           'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
       });
@@ -158,6 +162,63 @@ describe('PrmsWebhookRegistrationService', () => {
         'ARI_PRMS_WEBHOOK_CALLBACK_URL',
       );
       expect(prmsNormalizerService.registerWebhook).not.toHaveBeenCalled();
+    });
+
+    it('fails loudly with 503 naming ARI_PRMS_WEBHOOK_SECRET when the secret is unset', async () => {
+      service = buildService({
+        ARI_PRMS_WEBHOOK_CALLBACK_URL: callbackBase,
+        ARI_PRMS_WEBHOOK_SECRET: undefined,
+        ARI_PRMS_NORMALIZER_HOST:
+          'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
+        ARI_IS_PRODUCTION: false,
+      });
+
+      const error = await service.register().catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).getStatus()).toBe(503);
+      expect((error as ServiceUnavailableException).message).toContain(
+        'ARI_PRMS_WEBHOOK_SECRET',
+      );
+      expect((error as ServiceUnavailableException).message).not.toContain(
+        'ARI_PRMS_WEBHOOK_CALLBACK_URL',
+      );
+      expect(prmsNormalizerService.registerWebhook).not.toHaveBeenCalled();
+      expect(warnLines.join('\n')).not.toContain(callbackSecret);
+    });
+
+    it('fails loudly with 503 naming ARI_PRMS_WEBHOOK_SECRET when the secret is blank', async () => {
+      service = buildService({
+        ARI_PRMS_WEBHOOK_CALLBACK_URL: callbackBase,
+        ARI_PRMS_WEBHOOK_SECRET: '   ',
+        ARI_PRMS_NORMALIZER_HOST:
+          'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
+      });
+
+      const error = await service.register().catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(ServiceUnavailableException);
+      expect((error as ServiceUnavailableException).getStatus()).toBe(503);
+      expect((error as ServiceUnavailableException).message).toContain(
+        'ARI_PRMS_WEBHOOK_SECRET',
+      );
+      expect(prmsNormalizerService.registerWebhook).not.toHaveBeenCalled();
+    });
+
+    it('treats a trailing slash on the base as the same callback URL', async () => {
+      service = buildService({
+        ARI_PRMS_WEBHOOK_CALLBACK_URL: 'https://star.example.org/api/',
+        ARI_PRMS_WEBHOOK_SECRET: callbackSecret,
+        ARI_PRMS_NORMALIZER_HOST:
+          'https://v2f4lv8av4.execute-api.us-east-1.amazonaws.com',
+        ARI_IS_PRODUCTION: false,
+      });
+
+      await service.register();
+
+      expect(prmsNormalizerService.registerWebhook).toHaveBeenCalledWith(
+        'https://star.example.org/api/prms-callback/segment-k7',
+      );
     });
 
     // FALSIFIER F2 / Red run (R-PWH-001 AC.7, JD-5). Observed RED first
@@ -204,7 +265,7 @@ describe('PrmsWebhookRegistrationService', () => {
       expect(warnLines[0]).toContain(
         'url=https://star.example.org/api/prms-callback',
       );
-      expect(warnLines[0]).not.toContain('/secret');
+      expect(warnLines[0]).not.toContain('segment-k7');
       expect(warnLines[0].toLowerCase()).not.toContain('x-api-key');
     });
   });

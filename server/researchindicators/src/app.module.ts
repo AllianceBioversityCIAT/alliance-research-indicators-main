@@ -29,6 +29,7 @@ import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/allian
 import { AdminModule } from './admin/admin.module';
 import { PrmsOpenSearchModule } from './domain/tools/open-search/prms/prms.opensearch.module';
 import { CronModule } from './domain/tools/cron-jobs/cron.module';
+import { PRMS_CALLBACK_PATH } from './domain/shared/utils/prms-callback.constants';
 import { RESULT_CODE } from './domain/shared/utils/results.util';
 
 @Module({
@@ -103,7 +104,7 @@ export class AppModule implements NestModule {
           method: RequestMethod.GET,
         },
         {
-          path: 'prms-callback(.*)',
+          path: `${PRMS_CALLBACK_PATH}(.*)`,
           method: RequestMethod.ALL,
         },
       )

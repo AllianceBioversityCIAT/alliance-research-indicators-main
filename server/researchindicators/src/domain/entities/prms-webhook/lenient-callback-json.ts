@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { PRMS_CALLBACK_ROUTE_PREFIX } from '../../shared/utils/prms-callback.constants';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-04 /
 // NFR-PWH-005 carried gate 1. Express's JSON parser answers `{` with
@@ -28,13 +29,21 @@ interface ExpressWithRouter {
 /**
  * The callback path, and nothing under a longer sibling prefix.
  * `/api/prms-callbacks` must keep the strict parser.
+ *
+ * `PRMS_CALLBACK_ROUTE_PREFIX` is interpolated raw. It has no regex
+ * metacharacters; escape it here if that ever changes.
  */
+const PRMS_CALLBACK_PATH_PATTERN = new RegExp(
+  `^${PRMS_CALLBACK_ROUTE_PREFIX}(?:/|$)`,
+  'i',
+);
+
 export function isPrmsCallbackPath(url: string | undefined): boolean {
   if (!url) {
     return false;
   }
   const path = url.split('?')[0];
-  return /^\/api\/prms-callback(?:\/|$)/i.test(path);
+  return PRMS_CALLBACK_PATH_PATTERN.test(path);
 }
 
 function isJsonParseFailure(err: unknown): err is { body?: unknown } {
