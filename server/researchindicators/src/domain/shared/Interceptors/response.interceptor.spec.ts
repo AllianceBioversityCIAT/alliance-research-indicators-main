@@ -51,8 +51,7 @@ describe('ResponseInterceptor', () => {
     urlOrOverrides: string | Record<string, unknown> = '/r',
     requestOverrides: Record<string, unknown> = {},
   ) {
-    const url =
-      typeof urlOrOverrides === 'string' ? urlOrOverrides : '/r';
+    const url = typeof urlOrOverrides === 'string' ? urlOrOverrides : '/r';
     const overrides =
       typeof urlOrOverrides === 'string' ? requestOverrides : urlOrOverrides;
     const statusFn = jest.fn();
