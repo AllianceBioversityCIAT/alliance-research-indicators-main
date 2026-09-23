@@ -6,6 +6,7 @@ import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalizer.module';
 import { AppConfigModule } from '../app-config/app-config.module';
 import { ResultUsersModule } from '../result-users/result-users.module';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 
 describe('ResultPrmsSyncModule', () => {
   it('declares the controller and write/read providers', () => {
@@ -21,6 +22,9 @@ describe('ResultPrmsSyncModule', () => {
     expect(controllers).toContain(ResultPrmsSyncController);
     expect(providers).toContain(ResultPrmsSyncService);
     expect(providers).toContain(ResultPrmsSyncStatusReader);
+    // T-11: the outbound history write's collaborator must be resolvable
+    // from this module — ResultPrmsSyncService's constructor now needs it.
+    expect(providers).toContain(PrmsWebhookDeliveryRepository);
   });
 
   it('imports the transport, config and ResultOwnerGuard graph', () => {

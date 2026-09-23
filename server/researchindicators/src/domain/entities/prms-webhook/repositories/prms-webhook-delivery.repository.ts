@@ -74,6 +74,14 @@ type RawDeliveryRow = Record<string, unknown>;
  */
 const EVENT_SOURCE_INBOUND = 'PRMS';
 
+/**
+ * `event_source` / `status` for every row `recordOutboundPendingReview`
+ * writes (T-11, Pivot decisions 2 + 3). STAR's own successful push, never
+ * a PRMS delivery.
+ */
+const EVENT_SOURCE_OUTBOUND = 'STAR';
+const OUTBOUND_STATUS_PENDING_REVIEW = 'PENDING_REVIEW';
+
 const asNullableNumber = (value: unknown): number | null =>
   value == null ? null : Number(value);
 
@@ -153,6 +161,23 @@ export type RecordDeliveryResult =
       correlationOutcome: DeliveryCorrelationOutcome;
     }
   | { kind: 'duplicate'; deliveryRowId: number; duplicateOfId: number };
+
+/**
+ * What T-11's guarded call in `ResultPrmsSyncService` hands over for one
+ * successful outbound push. Deliberately narrow: `decision`,
+ * `justification`, `decided_at`, `delivery_id`, `raw_body`, `raw_headers`
+ * and every `reviewer_*` field are not parameters here at all — an
+ * outbound event has none of them, and the row shape enforces that
+ * structurally rather than trusting every caller to pass `null`.
+ */
+export interface RecordOutboundPendingReviewInput {
+  resultId: number;
+  userId: number | null;
+  occurredAt: Date;
+  environment: string;
+  externalReference: string | null;
+  prmsResultCode: number | null;
+}
 
 @Injectable()
 export class PrmsWebhookDeliveryRepository {
@@ -322,5 +347,56 @@ export class PrmsWebhookDeliveryRepository {
       `,
     );
     return (rows as RawDeliveryRow[]).map(toDelivery);
+  }
+
+  /**
+   * T-11 — one row per successful outbound push, written from STAR's own
+   * data (Pivot decisions 2, 3). A plain `INSERT`, outside any
+   * transaction: unlike `recordDelivery`, there is no `delivery_id` to
+   * dedupe on, so the `SELECT … FOR UPDATE` dedupe read does not apply
+   * here (Pivot decision 6) — running it would take gap locks on the
+   * push's critical path and protect nothing.
+   *
+   * `decision`, `justification`, `decided_at`, `delivery_id`, `raw_body`,
+   * `raw_headers`, `prms_result_id` and every `reviewer_*` field are
+   * `NULL` literals, never parameters — an outbound event carries none of
+   * PRMS's inbound data (design Pivot).
+   *
+   * The caller (`ResultPrmsSyncService`) MUST catch: this write must
+   * never fail an already-successful push (Pivot decision 5 — the same
+   * discipline T-09's `PrmsWebhookDeliveryService` applies to its
+   * detached correlator).
+   */
+  async recordOutboundPendingReview(
+    input: RecordOutboundPendingReviewInput,
+  ): Promise<void> {
+    await this.dataSource.query(
+      `
+      INSERT INTO result_prms_sync_history
+        (delivery_id, occurred_at, environment, correlation_outcome, result_id,
+         external_reference, prms_result_id, prms_result_code, decision,
+         justification, decided_at, raw_body, raw_headers, processing_state,
+         processing_error, duplicate_of_id, created_by, is_active,
+         event_source, status, actor_user_id, reviewer_name, reviewer_role,
+         science_program_code, changes)
+      VALUES (NULL, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
+              ?, ?, ?, NULL, NULL, NULL, NULL)
+      `,
+      // 25 columns, 10 placeholders + 15 literals. Kept in lockstep with
+      // the column list for the same reason `recordInsideLock` flags —
+      // a stray param shifts every value one column right.
+      [
+        input.occurredAt,
+        input.environment,
+        DeliveryCorrelationOutcome.CORRELATED,
+        input.resultId,
+        input.externalReference,
+        input.prmsResultCode,
+        DeliveryProcessingState.PROCESSED,
+        EVENT_SOURCE_OUTBOUND,
+        OUTBOUND_STATUS_PENDING_REVIEW,
+        input.userId,
+      ],
+    );
   }
 }

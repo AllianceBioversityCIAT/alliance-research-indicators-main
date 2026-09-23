@@ -7,6 +7,7 @@ import { DeliveryProcessingState } from '../enum/delivery-processing-state.enum'
 import {
   PrmsWebhookDeliveryRepository,
   RecordDeliveryInput,
+  RecordOutboundPendingReviewInput,
 } from './prms-webhook-delivery.repository';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-05.
@@ -476,6 +477,132 @@ describe('PrmsWebhookDeliveryRepository', () => {
         .join('\n');
       expect(logged).not.toContain('BODY-MARKER');
       expect(logged).not.toContain('HEADER-MARKER');
+    });
+  });
+
+  describe('recordOutboundPendingReview (T-11, Pivot decisions 2, 3, 6)', () => {
+    const outboundInput = (
+      overrides: Partial<RecordOutboundPendingReviewInput> = {},
+    ): RecordOutboundPendingReviewInput => ({
+      resultId: 1441061,
+      userId: 7,
+      occurredAt: OCCURRED_AT,
+      environment: 'TEST',
+      externalReference: '1441061',
+      prmsResultCode: 9199,
+      ...overrides,
+    });
+
+    it('a plain INSERT, OUTSIDE any transaction — no FOR UPDATE, no dedupe read', async () => {
+      dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(outboundInput());
+
+      expect(transaction).not.toHaveBeenCalled();
+      expect(dataSourceQuery).toHaveBeenCalledTimes(1);
+      const sql = String(dataSourceQuery.mock.calls[0][0]);
+      expect(sql).toMatch(/^\s*INSERT\s+INTO\s+result_prms_sync_history/);
+      expect(sql).not.toMatch(/FOR UPDATE/);
+      expect(sql).not.toMatch(/SELECT/);
+    });
+
+    it('writes the row with event_source=STAR, status=PENDING_REVIEW, correlation_outcome=CORRELATED, processing_state=PROCESSED — asserted on the emitted SQL/params, never on a mock call sequence (KZ-001)', async () => {
+      dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(outboundInput());
+
+      expect(table.rows).toHaveLength(1);
+      expect(table.rows[0]).toEqual({
+        id: 100,
+        delivery_id: null,
+        occurred_at: OCCURRED_AT,
+        environment: 'TEST',
+        correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        result_id: 1441061,
+        external_reference: '1441061',
+        prms_result_id: null,
+        prms_result_code: 9199,
+        // The Disqualifier's named fields, proven NULL on the ACTUAL
+        // generated row — not on a repository-method call argument.
+        decision: null,
+        justification: null,
+        decided_at: null,
+        raw_body: null,
+        raw_headers: null,
+        processing_state: DeliveryProcessingState.PROCESSED,
+        processing_error: null,
+        duplicate_of_id: null,
+        created_by: null,
+        is_active: true,
+        event_source: 'STAR',
+        status: 'PENDING_REVIEW',
+        actor_user_id: 7,
+        reviewer_name: null,
+        reviewer_role: null,
+        science_program_code: null,
+        changes: null,
+      });
+    });
+
+    it('binds the INSERT with the EXACT parameter list, one placeholder per bound value', async () => {
+      dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(outboundInput());
+
+      const insertSql = String(dataSourceQuery.mock.calls[0][0]);
+      const insertParams = dataSourceQuery.mock.calls[0][1] as unknown[];
+      expect(insertParams).toEqual([
+        OCCURRED_AT,
+        'TEST',
+        DeliveryCorrelationOutcome.CORRELATED,
+        1441061,
+        '1441061',
+        9199,
+        DeliveryProcessingState.PROCESSED,
+        'STAR',
+        'PENDING_REVIEW',
+        7,
+      ]);
+      expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
+    });
+
+    it('a NULL externalReference / prmsResultCode / userId is bound as NULL, not coerced', async () => {
+      dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(
+        outboundInput({
+          userId: null,
+          externalReference: null,
+          prmsResultCode: null,
+        }),
+      );
+
+      expect(table.rows[0]).toMatchObject({
+        actor_user_id: null,
+        external_reference: null,
+        prms_result_code: null,
+      });
+    });
+
+    it("TWO calls for the same resultId write TWO independent rows (Falsifier 3's repository-level proof — no dedupe)", async () => {
+      dataSourceQuery.mockImplementation((sql: string, params: unknown[]) =>
+        table.execute(sql, params),
+      );
+
+      await repository.recordOutboundPendingReview(outboundInput());
+      await repository.recordOutboundPendingReview(outboundInput());
+
+      expect(table.rows).toHaveLength(2);
+      expect(dataSourceQuery).toHaveBeenCalledTimes(2);
+      expect(table.rows.every((row) => row.event_source === 'STAR')).toBe(true);
     });
   });
 

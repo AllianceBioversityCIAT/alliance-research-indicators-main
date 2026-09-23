@@ -1513,3 +1513,72 @@ The fix belongs to the task that **causes** the break. Routing it to a new T-12 
 
 - **Forward:** the stale `All 10 \`T-NN\` tasks are \`done\`` line in `tasks.md` §7 — the Pivot added two tasks and never updated it. Now **12**.
 - **Backward:** `tasks.md` §5 budget. The tripwire **has fired** and is recorded as an actual (12 tasks · ≈ 3,710 LOC · 11 review rounds) beside the HITL-approved figure, which is deliberately left unedited. The overrun is fully attributable to the owner-approved T-08 amendment and the owner-approved Pivot.
+
+---
+
+## T-11 — The outbound `PENDING_REVIEW` event
+
+| Field | Value |
+|---|---|
+| **Final status** | **`PASS`** (dual-lens, both independent) |
+| Date | 2026-09-23 |
+| Implementer attempts | **1** |
+| Implementer | `akili-implementer` · **Claude Sonnet** (T2) · effort `xhigh` |
+| Reviewers | `akili-reviewer` ×2 · **Claude Opus** (T3) — reliability + risk/resilience, in parallel |
+| `author ≠ auditor` | **holds** on both axes. No `REVIEW_WAIVED` owed |
+| runtime events | **none** |
+
+> **Routing note.** The owner set a standing rule mid-run (2026-09-23): **Cursor/Grok implements, Claude reviews.** T-11's implementation was already in flight on Claude Sonnet when the rule was given, and the owner directed: *"si ya lo hiciste tú, pues revísalo, y para lo próximo que lo ejecute cursor con grok."* **T-11 is therefore the last task implemented on Claude; from T-10 onward implementation goes to Cursor/Grok via Orca `/orchestration`.**
+>
+> **Correction to §1.1.** That section records the Cursor/Grok routing as an owner direction dated to the 2026-09-22 run. That was the Leader's misreading — it is the owner's **standing** preference. The switch to the Claude Code wrappers for T-01b and T-11 followed a Leader recommendation (presented labelled *"(Recommended)"*), not an owner request. Recorded so the log does not attribute to the owner a decision the Leader induced.
+
+### Attempt 1 — `PASS`
+
+**Files changed (10, +550 / −0 — pure additions):** the repository (+ spec), the sync service (+ spec), the status reader (+ spec), the module (+ spec, DI wiring), the controller spec and `test/result-prms-sync-claim-concurrency.integration-spec.ts` (consumer fixes).
+
+**Evidence re-run — Leader-inline, non-author (Step 2.3, never waived): `VERIFIED`**
+
+| Check | Reported | Leader re-run |
+|---|---|---|
+| Unit tier | 403 suites / **3594** tests | **403 / 3594** ✓ |
+| Build | exit 0 | **exit 0** ✓ |
+| eslint (bare, no `--fix`) | clean | **exit 0** ✓ |
+| The amendment's guard | present | **confirmed by direct grep in the real `LAST_DECISION_SQL`**, not only in a fake ✓ |
+
+**All four falsifiers observed red, then green:** (1) try/catch removed → the lock-timeout propagated out of `sync(42)`; (2) guard → `if (true)` → `AUTH_FAILED`/`TRANSPORT_FAILED`/`RETRYABLE` each red; (3) a `Set`-keyed dedupe added → "Expected 2 calls, Received 1"; (4) the `event_source` predicate removed → **the literal R-PWH-008 AC.3 regression the amendment exists to prevent**, a STAR-only row surfacing as a decision object where `null` is required.
+
+**Reviewer verdicts:**
+
+- **Reliability lens — `STATUS: PASS`.** Verified the KZ-001 Disqualifier is genuinely cleared: the NULL row shape is asserted on the **decoded emitted INSERT**, not on call arguments — the spec's fake parses the column list and VALUES tokens and *throws* on any count mismatch (25 columns / 25 tokens / 10 placeholders / 10 params, counted by hand). Confirmed the guard-placement claim by reading the file. Added a finding the Implementer did not make: `interpreted.outcome`'s real domain is only 5 enum values across the interpreter's 9 return sites, so the `IN_FLIGHT` exclusion is **structural**, and a test for it would have to mock the interpreter and would prove nothing.
+- **Risk & resilience lens — `STATUS: PASS`.** All nine Done criteria covered by assertions on generated SQL or call arguments; scope boundary intact; all three delegated judgment calls ruled conformant.
+
+### Decisions made
+
+1. **The four files outside the task's named `Files touched` — ruled *necessary consequence*, not scope expansion.** The 8th constructor parameter makes DI registration mandatory (without it the module cannot boot) and makes the three direct `new ResultPrmsSyncService(...)` sites uncompilable. The Reviewer swept the axis independently: exactly **3** such sites repo-wide, all three in the diff.
+2. **`occurred_at` = `new Date()` rather than `options.now` — ruled sound.** `SyncOptions.now` is threaded only into `claimAttempt`, where it ages the `IN_FLIGHT` window; `settleAttempt` takes no `now` either, so the history row is timestamped exactly as the settle it follows. The value is still asserted against a fixed fixture in the bound-parameter test.
+3. **`PrmsWebhookDeliveryRepository` registered directly in the module's providers — ruled correct, and the alternative was worse.** `PrmsWebhookCallbackModule` does **not** export it, so importing would have required editing a sibling closed task's module. The second instance is stateless, so instance identity carries no semantics.
+
+### Requirements covered
+
+The UI history contract (the mock's *"First synchronization"* / *"Mapping re-synced after rejection"* rows) · **R-PWH-008 AC.3 preserved** by the owner-approved amendment.
+
+### ADVISORY (4R lens — recorded, never gating, never a new task)
+
+- **The history write is `await`ed on the push's critical path.** Its *failure* is tolerated by the catch; its *latency* is not decoupled — a stalled pool delays an already-successful `ACCEPTED` response until the driver times out. This is the one place T-11 differs from T-09's detached correlator.
+- **Gap-lock contention arriving by a second route.** `idx_result_prms_sync_history_delivery_id` is **non-unique**, so `recordDelivery`'s `FOR UPDATE` takes next-key locks; a `delivery_id IS NULL` insert lands in that index's head gap, so a concurrent inbound dedupe on the lowest `delivery_id` could make the outbound INSERT wait — **the exact contention Pivot decision 6 meant to avoid, reached a different way.** Bounded by the catch: one lost history row and one `error` log, never a failed push. Reasoned, not measured — no live InnoDB session.
+- **`created_by` is `NULL`** on rows where the acting user *is* known (`actor_user_id` carries it). Both lenses raised it; root `CLAUDE.md` §4.1 *Audit* would favour populating it. Suggest the UI spec decide it once for both populations.
+- `findHistory` / `findHistoryByResultId` remain unfiltered on `duplicate_of_id`, but have **zero production consumers today** — deferred to the UI spec.
+
+### Final verification result
+
+**Green and independently reproduced.** Unit 403 / 3594 · build exit 0 · eslint exit 0 · the guard confirmed in the real SQL string · all four falsifiers red then green.
+
+**Scope this verification cannot reach (KZ-017):** no tier here executes the new `INSERT` against MySQL — the migration lives only in the disposable scratch schema — so a column/type mismatch against the real 30-column table is structurally outside what was proven. Mitigated, not closed: the column list is byte-identical to `recordInsideLock`'s, which T-04's e2e exercised. `test:e2e` and `test:integration` were not run (the amended Verification names only `npm test`, `npm run build`, `npx eslint`); the one integration consumer touched was spot-checked and fails **only** on the pre-existing RB-6 defect, undisturbed.
+
+---
+
+## Attribution cleanup — 2026-09-23
+
+Commits `f3a5210f` and `97eb358c` were authored carrying a Claude co-author trailer, violating the owner's standing global rule (`~/.claude/CLAUDE.md` §Commits). Both were unpushed and have been rewritten **message-only** to `fc22a199` and `50ac1767`; content tree hashes verified identical. **No pushed commit was rewritten** — roughly 18 older commits on this branch carry the trailer from earlier sessions and are left untouched pending an owner decision, because that is shared history.
+
+A `PreToolUse` hook (`~/.claude/hooks/no-claude-coauthor.sh`) now blocks any history-writing or PR command carrying a Claude attribution. Proven able to fail per K-004, and **refined after it over-blocked its own documentation**: the first version matched the pattern anywhere in the command, so writing *this very section* was blocked. It now anchors on command position. Final battery: **9 cases, 4 blocking, 5 passing**, no over-block.

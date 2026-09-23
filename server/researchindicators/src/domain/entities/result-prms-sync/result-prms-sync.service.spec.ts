@@ -15,6 +15,7 @@ import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normaliz
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { PrmsSyncGateFacts } from './repositories/result-prms-sync-log.repository';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
@@ -76,9 +77,14 @@ describe('ResultPrmsSyncService', () => {
   let payloadBuilder: { build: jest.Mock };
   let normalizer: { ingest: jest.Mock };
   let appConfigService: { getEnv: jest.Mock };
+  let outboundHistoryRepository: {
+    recordOutboundPendingReview: jest.Mock;
+    recordDelivery: jest.Mock;
+  };
   let service: ResultPrmsSyncService;
   let warnSpy: jest.SpyInstance;
   let logSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     logRepository = {
@@ -117,11 +123,20 @@ describe('ResultPrmsSyncService', () => {
     appConfigService = {
       getEnv: jest.fn().mockResolvedValue({ simple_value: API_KEY }),
     };
+    outboundHistoryRepository = {
+      recordOutboundPendingReview: jest.fn().mockResolvedValue(undefined),
+      // Present only so a test can prove the dedupe transaction's own
+      // method is never reached from this path (T-11, Pivot decision 6).
+      recordDelivery: jest.fn(),
+    };
     warnSpy = jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
     logSpy = jest
       .spyOn(LoggerUtil.prototype, '_log')
+      .mockImplementation(() => undefined);
+    errorSpy = jest
+      .spyOn(LoggerUtil.prototype, '_error')
       .mockImplementation(() => undefined);
 
     service = new ResultPrmsSyncService(
@@ -132,6 +147,7 @@ describe('ResultPrmsSyncService', () => {
       appConfigService as unknown as AppConfigService,
       { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
       { user_id: 7 } as unknown as CurrentUserUtil,
+      outboundHistoryRepository as unknown as PrmsWebhookDeliveryRepository,
     );
   });
 
@@ -527,6 +543,182 @@ describe('ResultPrmsSyncService', () => {
     expect(logRepository.settleIfInFlight.mock.calls[0][0].outcome).not.toBe(
       PrmsSyncOutcome.REJECTED_BY_PRMS,
     );
+  });
+
+  describe('T-11 — the outbound PENDING_REVIEW history write', () => {
+    it('writes exactly ONE PENDING_REVIEW row, with the correct arguments, after an ACCEPTED push', async () => {
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).toHaveBeenCalledTimes(1);
+
+      // Disqualifier (KZ-001): assert the ARGUMENTS, not just that the
+      // method was called. `RecordOutboundPendingReviewInput` structurally
+      // has no `decision` / `justification` / `decidedAt` / `deliveryId` /
+      // `rawBody` / `rawHeaders` / `reviewer*` fields at all — there is no
+      // slot here to populate them with. That every one of them lands as a
+      // NULL literal in the emitted INSERT is proven by the repository's
+      // own spec (KZ-001: a property in generated SQL is asserted there).
+      const arg =
+        outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
+      expect(arg).toEqual({
+        resultId: 42,
+        userId: 7,
+        occurredAt: expect.any(Date),
+        environment: 'TEST',
+        externalReference: 'ARI-1001',
+        prmsResultCode: 9199,
+      });
+      expect(Object.keys(arg).sort()).toEqual(
+        [
+          'resultId',
+          'userId',
+          'occurredAt',
+          'environment',
+          'externalReference',
+          'prmsResultCode',
+        ].sort(),
+      );
+    });
+
+    it('Falsifier 1 — a throwing history write does NOT fail an otherwise-successful push, and is logged at error', async () => {
+      outboundHistoryRepository.recordOutboundPendingReview.mockRejectedValueOnce(
+        new Error('ER_LOCK_WAIT_TIMEOUT'),
+      );
+
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(result.prms_result_code).toBe(9199);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(String(errorSpy.mock.calls[0][0])).toMatch(/PENDING_REVIEW/);
+      expect(String(errorSpy.mock.calls[0][0])).toMatch(/1001/);
+      expect(String(errorSpy.mock.calls[0][0])).toMatch(/ER_LOCK_WAIT_TIMEOUT/);
+    });
+
+    it('Falsifier 2 — AUTH_FAILED writes NO history row', async () => {
+      normalizer.ingest.mockResolvedValueOnce({
+        status: 401,
+        body: { requestId: 'Root=auth-1' },
+      });
+
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.AUTH_FAILED);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('Falsifier 2 — TRANSPORT_FAILED writes NO history row', async () => {
+      normalizer.ingest.mockResolvedValueOnce(null);
+
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.TRANSPORT_FAILED);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('Falsifier 2 — RETRYABLE writes NO history row', async () => {
+      normalizer.ingest.mockResolvedValueOnce({
+        status: 503,
+        body: { requestId: 'Root=svc-1' },
+      });
+
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.RETRYABLE);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("REJECTED_BY_PRMS writes NO history row (not in the task text's named list, but structurally never ACCEPTED)", async () => {
+      normalizer.ingest.mockResolvedValueOnce({
+        status: 422,
+        body: {
+          requestId: 'Root=unprocessable-1',
+          rejected: [
+            { external_reference: 'ARI-1001', reason: 'invalid title' },
+          ],
+        },
+      });
+
+      const result = await service.sync(42);
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.REJECTED_BY_PRMS);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('REFUSED_BY_STAR (gate refusal, persisted) writes NO history row', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({ pool_funding_alignment_green: false }),
+      );
+
+      await expect(service.sync(42)).rejects.toBeInstanceOf(
+        UnprocessableEntityException,
+      );
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('REFUSED_BY_STAR (missing aggregate) writes NO history row', async () => {
+      aggregateRepository.loadByResultId.mockResolvedValue(null);
+
+      await expect(service.sync(42)).rejects.toBeInstanceOf(NotFoundException);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('UNKNOWN (expired claim) writes NO history row', async () => {
+      logRepository.claimAttempt.mockResolvedValue({
+        kind: 'expired',
+        attemptId: 8,
+        attemptNumber: 4,
+        resultOfficialCode: 1001,
+      });
+
+      await expect(service.sync(42)).rejects.toBeInstanceOf(ConflictException);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).not.toHaveBeenCalled();
+    });
+
+    // IN_FLIGHT is structurally excluded, not tested by mutation: the guard
+    // reads the local `interpreted.outcome`, and
+    // `interpretPrmsSyncResponse` (prms-sync-response.interpreter.ts) never
+    // returns IN_FLIGHT under any status/body it handles — that value only
+    // ever appears as the transient claim-row state
+    // `result-prms-sync-log.repository.ts` writes at claim time. No call
+    // through the real `sync()` path can make the guard observe it, so
+    // there is no red/green mutation to run here; the exclusion is
+    // structural, proven by reading the interpreter's exhaustive return
+    // statements, not by a fixture.
+
+    it('Falsifier 3 — TWO successful pushes for one result write TWO rows (not deduped)', async () => {
+      const first = await service.sync(42);
+      const second = await service.sync(42);
+
+      expect(first.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(second.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(
+        outboundHistoryRepository.recordOutboundPendingReview,
+      ).toHaveBeenCalledTimes(2);
+    });
+
+    it('never calls recordDelivery — the dedupe transaction is not on this path (Pivot decision 6)', async () => {
+      await service.sync(42);
+
+      expect(outboundHistoryRepository.recordDelivery).not.toHaveBeenCalled();
+    });
   });
 });
 

@@ -238,6 +238,9 @@ describe('ResultPrmsSyncStatusReader', () => {
     );
     expect(decisionSql).toMatch(/correlation_outcome\s*=\s*'CORRELATED'/);
     expect(decisionSql).toMatch(/duplicate_of_id\s+IS\s+NULL/);
+    // T-11 amendment: the guard against reading T-11's own outbound rows
+    // back as a PRMS verdict, asserted on the emitted SQL text (KZ-001).
+    expect(decisionSql).toMatch(/event_source\s*=\s*'PRMS'/);
     expect(decisionSql).not.toMatch(/raw_body/);
   });
 
@@ -250,6 +253,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       occurred_at: '2026-09-10T08:00:02.000Z',
       correlation_outcome: 'CORRELATED',
       duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
     };
     const later = {
       decision: 'REJECT',
@@ -259,6 +263,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       occurred_at: '2026-09-20T15:30:04.000Z',
       correlation_outcome: 'CORRELATED',
       duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
     };
     const duplicateNewer = {
       decision: 'REJECT',
@@ -268,6 +273,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       occurred_at: '2026-09-21T00:00:01.000Z',
       correlation_outcome: 'DUPLICATE',
       duplicate_of_id: 5 as number | null,
+      event_source: 'PRMS',
     };
     const uncorrelatedNewer = {
       decision: 'REJECT',
@@ -277,6 +283,7 @@ describe('ResultPrmsSyncStatusReader', () => {
       occurred_at: '2026-09-22T00:00:01.000Z',
       correlation_outcome: 'UNKNOWN_REFERENCE',
       duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
     };
     const history = [earlier, later, duplicateNewer, uncorrelatedNewer];
     const outbound = {
@@ -332,6 +339,61 @@ describe('ResultPrmsSyncStatusReader', () => {
     );
     expect(decisionCall?.[1]).toEqual([42]);
   });
+
+  it("Falsifier 4 (T-11 amendment) — a result pushed ACCEPTED with NO inbound verdict returns last_decision = null, not T-11's own STAR row read back as a decision (R-PWH-008 AC.3 regression)", async () => {
+    // T-11's own write: correlation_outcome CORRELATED, duplicate_of_id
+    // NULL (Pivot decision 2) — satisfies every predicate in
+    // LAST_DECISION_SQL EXCEPT event_source. Decision/decided_at/
+    // justification are NULL exactly as the repository writes them.
+    const starOutboundRow = {
+      decision: null as string | null,
+      decided_at: null as string | null,
+      justification: null as string | null,
+      prms_result_code: 9199,
+      occurred_at: '2026-09-23T09:00:00.000Z',
+      correlation_outcome: 'CORRELATED',
+      duplicate_of_id: null as number | null,
+      event_source: 'STAR',
+    };
+    const history = [starOutboundRow];
+    const outbound = {
+      attempt_number: 1,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      http_status: 200,
+      request_id: 'req-star-only',
+      failure_reason: null,
+      environment: 'TEST',
+      prms_type: 'capacity_sharing',
+      created_at: '2026-09-23T09:00:00.000Z',
+    };
+
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([outbound]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve(projectDeliveries(sql, history));
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 1, prms_result_code: 9199 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    // This is THE assertion the amendment exists to protect. Deleting
+    // `AND event_source = 'PRMS'` from LAST_DECISION_SQL makes
+    // `projectDeliveries` stop filtering (its own filter is gated on the
+    // SAME text), the STAR-only row surfaces, and this reddens — a green
+    // here with the guard removed would mean the fixture asserted on the
+    // mock's shape instead of the emitted SQL (KZ-001).
+    expect(status.last_decision).toBeNull();
+    expect(status.sync_state).toBe('synced');
+    expect(status.last_attempt).toEqual(outbound);
+  });
 });
 
 function issuedSql(query: jest.Mock): string[] {
@@ -344,6 +406,7 @@ function projectDeliveries(
     decided_at: string;
     correlation_outcome: string;
     duplicate_of_id: number | null;
+    event_source?: string;
   }>,
 ) {
   let rows = history.slice();
@@ -352,6 +415,14 @@ function projectDeliveries(
   }
   if (/duplicate_of_id\s+IS\s+NULL/i.test(sql)) {
     rows = rows.filter((row) => row.duplicate_of_id == null);
+  }
+  // T-11 amendment (KZ-001): this filter is decoded from the SQL TEXT, not
+  // asserted on a mock call. Remove `AND event_source = 'PRMS'` from the
+  // real `LAST_DECISION_SQL` and this regex stops matching, so the filter
+  // silently stops applying and a STAR-only row surfaces — that is what
+  // makes Falsifier 4 an honest red, not a mock-return assertion.
+  if (/event_source\s*=\s*'PRMS'/.test(sql)) {
+    rows = rows.filter((row) => row.event_source === 'PRMS');
   }
   if (/ORDER BY\s+decided_at\s+DESC/i.test(sql)) {
     rows.sort((a, b) => (a.decided_at < b.decided_at ? 1 : -1));

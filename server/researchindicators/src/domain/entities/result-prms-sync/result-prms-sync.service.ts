@@ -17,6 +17,7 @@ import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normaliz
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { evaluateSyncGate } from './eligibility/sync-gate';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
@@ -121,6 +122,7 @@ export class ResultPrmsSyncService {
     private readonly appConfigService: AppConfigService,
     private readonly appConfig: AppConfig,
     private readonly currentUser: CurrentUserUtil,
+    private readonly outboundHistoryRepository: PrmsWebhookDeliveryRepository,
   ) {}
 
   async sync(
@@ -250,6 +252,17 @@ export class ResultPrmsSyncService {
       { resultOfficialCode: claim.resultOfficialCode, environment },
     );
 
+    if (interpreted.outcome === PrmsSyncOutcome.ACCEPTED) {
+      await this.recordOutboundHistory({
+        resultId,
+        userId,
+        environment,
+        externalReference,
+        prmsResultCode: interpreted.prmsResultCode,
+        resultOfficialCode: claim.resultOfficialCode,
+      });
+    }
+
     return {
       outcome: interpreted.outcome,
       attempt_number: claim.attemptNumber,
@@ -258,6 +271,44 @@ export class ResultPrmsSyncService {
       prms_result_code: interpreted.prmsResultCode,
       failure_reason: interpreted.failureReason,
     };
+  }
+
+  /**
+   * T-11 (Pivot decisions 2, 3, 5, 6): one `PENDING_REVIEW` history row
+   * per successful push, written from STAR's own data — PRMS never sends
+   * it. Guarded to ACCEPTED only by the caller; every other outcome
+   * (AUTH_FAILED, TRANSPORT_FAILED, RETRYABLE, REFUSED_BY_STAR, UNKNOWN,
+   * IN_FLIGHT) writes nothing here — *"para eso está la otra tabla de
+   * logs."* This write must NEVER fail an already-successful push: caught
+   * and logged at `error`, the same discipline T-09's
+   * `PrmsWebhookDeliveryService` applies to its detached correlator.
+   * Bypasses `recordDelivery`'s dedupe transaction entirely (decision 6)
+   * — an outbound row has no `delivery_id` to dedupe on.
+   */
+  private async recordOutboundHistory(input: {
+    resultId: number;
+    userId: number | null;
+    environment: string;
+    externalReference: string | null;
+    prmsResultCode: number | null;
+    resultOfficialCode: number | null;
+  }): Promise<void> {
+    try {
+      await this.outboundHistoryRepository.recordOutboundPendingReview({
+        resultId: input.resultId,
+        userId: input.userId,
+        occurredAt: new Date(),
+        environment: input.environment,
+        externalReference: input.externalReference,
+        prmsResultCode: input.prmsResultCode,
+      });
+    } catch (error) {
+      this.logger._error(
+        `PENDING_REVIEW history write failed for result_official_code=${input.resultOfficialCode} prms_result_code=${input.prmsResultCode}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private readExternalReference(

@@ -19,6 +19,7 @@ import { PayloadBuilder } from '../src/domain/tools/prms-normalizer/builders/pay
 import { PrmsNormalizerService } from '../src/domain/tools/prms-normalizer/prms-normalizer.service';
 import { AppConfig } from '../src/domain/shared/utils/app-config.util';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
+import { PrmsWebhookDeliveryRepository } from '../src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/sync-engine — T-11 rework
 //
@@ -219,6 +220,10 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
       } as unknown as AppConfigService,
       { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
       { user_id: 7 } as unknown as CurrentUserUtil,
+      // T-11: not the concern of this concurrency proof — a no-op stub.
+      {
+        recordOutboundPendingReview: jest.fn().mockResolvedValue(undefined),
+      } as unknown as PrmsWebhookDeliveryRepository,
     );
 
     const first = service.sync(dc11ResultId);

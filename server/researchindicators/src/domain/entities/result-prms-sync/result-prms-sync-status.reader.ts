@@ -38,6 +38,16 @@ const RESULT_STATUS_SQL = `
         AND is_active = TRUE
     `;
 
+/**
+ * T-11 amendment (owner-approved, 2026-09-23): `event_source = 'PRMS'` is
+ * REQUIRED. Without it, T-11's own outbound `PENDING_REVIEW` rows —
+ * `correlation_outcome = CORRELATED`, `duplicate_of_id IS NULL` (Pivot
+ * decision 2) — satisfy every other predicate here and would be read back
+ * as a PRMS verdict, breaking R-PWH-008 AC.3 (a result pushed ACCEPTED
+ * with no inbound decision must report `last_decision: null`). Do not
+ * widen beyond this one predicate — `findHistory` / `findHistoryByResultId`
+ * ordering and duplicate filtering belong to the UI spec, not here.
+ */
 const LAST_DECISION_SQL = `
       SELECT
         decision,
@@ -49,6 +59,7 @@ const LAST_DECISION_SQL = `
       WHERE result_id = ?
         AND correlation_outcome = 'CORRELATED'
         AND duplicate_of_id IS NULL
+        AND event_source = 'PRMS'
       ORDER BY decided_at DESC
       LIMIT 1
     `;
