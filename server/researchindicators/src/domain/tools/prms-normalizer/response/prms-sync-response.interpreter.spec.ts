@@ -1,4 +1,17 @@
 import { PrmsSyncOutcome } from '../enum/prms-sync-outcome.enum';
+/**
+ * Verbatim PRMS ingest response, copied from the spike capture committed at
+ * docs/specs/bilateral/prms-sync/sync-engine/spike/responses/01-capacity-sharing-scope50.json.
+ *
+ * It is VENDORED into this package on purpose. The server is built and deployed
+ * on its own, without the monorepo `docs/` tree, so a spec that reached out to
+ * that path passed locally and died on the deploy host with ENOENT. A test
+ * fixture may not depend on anything outside its own package.
+ *
+ * Re-copy it if the spike capture is ever refreshed; do NOT hand-edit it, since
+ * the whole point is that this shape is PRMS's and not ours.
+ */
+import PRMS_ACCEPTED_CAPTURE from './__fixtures__/prms-accepted-response.capture.json';
 import {
   PRMS_RESULT_CODE_ABSENT,
   interpretPrmsSyncResponse,
@@ -145,29 +158,44 @@ describe('interpretPrmsSyncResponse', () => {
     expect(interpreted.failureReason).toBeNull();
   });
 
-  // --- PRMS reporting phase (2026-09-18) --------------------------------------
-  // PRMS sends the same value twice on an accepted row: `version_id` at the top
-  // level and `obj_version.id` nested. `version_id` wins; `obj_version.id` is the
-  // fallback. `obj_version` also carries phase_name / phase_year, deliberately
-  // not stored.
+  // --- PRMS reporting phase -------------------------------------------------
+  // CORRECTED 2026-09-23. The phase comes from the PRMS backend that the
+  // Normalizer forwards to, so it arrives in the row's `externalApiResponse.
+  // response` -- NOT in `result`, which is the Normalizer's echo of our own
+  // submission plus the assigned `result_code`. Inside `response` the value is
+  // sent twice: `version_id` flat and `obj_version.id` nested.
+  //
+  // The tests this block replaces asserted against a hand-built `result` object
+  // carrying a `version_id` key. No PRMS response has ever contained that key, so
+  // six tests passed over a payload shape that does not exist while the real
+  // reader returned null on every accepted sync (KZ-017). `replays a captured
+  // PRMS response` below is the guard against that recurring: it reads a
+  // committed spike capture off disk rather than trusting a shape typed here.
 
-  const acceptedWith = (result: Record<string, unknown>) =>
+  const acceptedWith = (response: Record<string, unknown>) =>
     interpretPrmsSyncResponse(
       {
         status: 200,
         body: {
           requestId: 'Root=phase-1',
-          results: [{ success: true, external_reference: OURS, result }],
+          results: [
+            {
+              success: true,
+              external_reference: OURS,
+              result: { result_code: 9427 },
+              externalApiResponse: { path: '/api/bilateral/create', response },
+            },
+          ],
         },
       },
       OURS,
     );
 
-  it('reads the phase from result.version_id', () => {
+  it('reads the phase from externalApiResponse.response.version_id', () => {
     const interpreted = acceptedWith({
-      result_code: 9427,
-      version_id: 36,
-      obj_version: { id: 36, phase_name: 'Reporting 2026', phase_year: 2026 },
+      result_code: '9427',
+      version_id: '36',
+      obj_version: { id: '36', phase_name: 'Reporting 2026', phase_year: 2026 },
     });
 
     expect(interpreted.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
@@ -176,8 +204,7 @@ describe('interpretPrmsSyncResponse', () => {
 
   it('falls back to obj_version.id when version_id is absent', () => {
     const interpreted = acceptedWith({
-      result_code: 9427,
-      obj_version: { id: 36, phase_name: 'Reporting 2026', phase_year: 2026 },
+      obj_version: { id: '36', phase_name: 'Reporting 2026', phase_year: 2026 },
     });
 
     expect(interpreted.prmsPhaseId).toBe(36);
@@ -188,16 +215,43 @@ describe('interpretPrmsSyncResponse', () => {
     // precedence means a future divergence resolves the same way every time
     // instead of depending on object key order.
     const interpreted = acceptedWith({
-      result_code: 9427,
-      version_id: 36,
-      obj_version: { id: 99 },
+      version_id: '36',
+      obj_version: { id: '99' },
     });
 
     expect(interpreted.prmsPhaseId).toBe(36);
   });
 
+  it('parses a phase sent as a numeric string', () => {
+    // PRMS quotes it: `"version_id": "36"`, not 36.
+    expect(acceptedWith({ version_id: '36' }).prmsPhaseId).toBe(36);
+  });
+
+  it('still reads a phase hoisted onto the echoed result row', () => {
+    // Trailing fallback: costless, and it keeps the reader working if PRMS ever
+    // moves the field up. No captured response uses this path today.
+    const interpreted = interpretPrmsSyncResponse(
+      {
+        status: 200,
+        body: {
+          requestId: 'Root=phase-hoisted',
+          results: [
+            {
+              success: true,
+              external_reference: OURS,
+              result: { result_code: 9427, version_id: '36' },
+            },
+          ],
+        },
+      },
+      OURS,
+    );
+
+    expect(interpreted.prmsPhaseId).toBe(36);
+  });
+
   it('leaves the phase null when neither source is present, WITHOUT failing the sync', () => {
-    const interpreted = acceptedWith({ result_code: 9427 });
+    const interpreted = acceptedWith({ result_code: '9427' });
 
     expect(interpreted.prmsPhaseId).toBeNull();
     // An absent phase must not degrade an accepted sync: only the result code
@@ -206,10 +260,21 @@ describe('interpretPrmsSyncResponse', () => {
     expect(interpreted.failureReason).toBeNull();
   });
 
-  it('parses a phase sent as a numeric string', () => {
-    expect(
-      acceptedWith({ result_code: 9427, version_id: '36' }).prmsPhaseId,
-    ).toBe(36);
+  it('replays a captured PRMS response and reads BOTH the result code and the phase', () => {
+    // Anti-fabrication guard. This payload is not typed here -- it is a verbatim
+    // PRMS capture (see the import's provenance note), so the test cannot drift
+    // from what PRMS actually sends the way its predecessor did.
+    const body = PRMS_ACCEPTED_CAPTURE as unknown as Record<string, unknown>;
+
+    const interpreted = interpretPrmsSyncResponse(
+      { status: 200, body },
+      'ARI-SPIKE-20260914-01',
+    );
+
+    expect(interpreted.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(interpreted.prmsResultCode).toBe(9199);
+    expect(interpreted.prmsPhaseId).toBe(36);
+    expect(interpreted.failureReason).toBeNull();
   });
 
   it('leaves the phase null on a non-accepted outcome', () => {
