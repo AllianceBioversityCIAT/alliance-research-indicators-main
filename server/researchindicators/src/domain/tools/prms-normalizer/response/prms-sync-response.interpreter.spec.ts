@@ -1,7 +1,17 @@
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-
 import { PrmsSyncOutcome } from '../enum/prms-sync-outcome.enum';
+/**
+ * Verbatim PRMS ingest response, copied from the spike capture committed at
+ * docs/specs/bilateral/prms-sync/sync-engine/spike/responses/01-capacity-sharing-scope50.json.
+ *
+ * It is VENDORED into this package on purpose. The server is built and deployed
+ * on its own, without the monorepo `docs/` tree, so a spec that reached out to
+ * that path passed locally and died on the deploy host with ENOENT. A test
+ * fixture may not depend on anything outside its own package.
+ *
+ * Re-copy it if the spike capture is ever refreshed; do NOT hand-edit it, since
+ * the whole point is that this shape is PRMS's and not ours.
+ */
+import PRMS_ACCEPTED_CAPTURE from './__fixtures__/prms-accepted-response.capture.json';
 import {
   PRMS_RESULT_CODE_ABSENT,
   interpretPrmsSyncResponse,
@@ -251,18 +261,10 @@ describe('interpretPrmsSyncResponse', () => {
   });
 
   it('replays a captured PRMS response and reads BOTH the result code and the phase', () => {
-    // Anti-fabrication guard. This payload is not typed here: it is the verbatim
-    // capture committed at
-    // docs/specs/bilateral/prms-sync/sync-engine/spike/responses/, so the test
-    // cannot drift from what PRMS actually sends the way its predecessor did.
-    const capturePath = resolve(
-      __dirname,
-      '../../../../../../../docs/specs/bilateral/prms-sync/sync-engine/spike/responses/01-capacity-sharing-scope50.json',
-    );
-    const body = JSON.parse(readFileSync(capturePath, 'utf-8')) as Record<
-      string,
-      unknown
-    >;
+    // Anti-fabrication guard. This payload is not typed here -- it is a verbatim
+    // PRMS capture (see the import's provenance note), so the test cannot drift
+    // from what PRMS actually sends the way its predecessor did.
+    const body = PRMS_ACCEPTED_CAPTURE as unknown as Record<string, unknown>;
 
     const interpreted = interpretPrmsSyncResponse(
       { status: 200, body },
