@@ -45,8 +45,14 @@ const RESULT_STATUS_SQL = `
  * decision 2) — satisfy every other predicate here and would be read back
  * as a PRMS verdict, breaking R-PWH-008 AC.3 (a result pushed ACCEPTED
  * with no inbound decision must report `last_decision: null`). Do not
- * widen beyond this one predicate — `findHistory` / `findHistoryByResultId`
- * ordering and duplicate filtering belong to the UI spec, not here.
+ * widen beyond this one predicate — `findHistory` /
+ * `findHistoryByResultCodeAndYear` ordering and duplicate filtering belong
+ * to the UI spec, not here.
+ *
+ * Keyed on the durable pair (`result_official_code`, `result_year`) rather
+ * than an internal id, resolved through `results` exactly as the sync-log
+ * query above does: overwriting a version deletes the id permanently, and
+ * `result_prms_sync_history` carries no `result_id` column at all.
  */
 const LAST_DECISION_SQL = `
       SELECT
@@ -56,7 +62,12 @@ const LAST_DECISION_SQL = `
         prms_result_code,
         occurred_at
       FROM result_prms_sync_history
-      WHERE result_id = ?
+      WHERE result_official_code = (
+              SELECT result_official_code FROM results WHERE result_id = ?
+            )
+        AND result_year = (
+              SELECT report_year_id FROM results WHERE result_id = ?
+            )
         AND correlation_outcome = 'CORRELATED'
         AND duplicate_of_id IS NULL
         AND event_source = 'PRMS'
@@ -150,7 +161,10 @@ export class ResultPrmsSyncStatusReader {
     const lastAttempt = mapLastAttempt(
       attemptRows[0] as Record<string, unknown> | undefined,
     );
+    // Two placeholders: the official code and the year are each resolved
+    // through `results` by the same id, exactly as LAST_ATTEMPT_SQL does.
     const decisionRows = await this.dataSource.query(LAST_DECISION_SQL, [
+      resultId,
       resultId,
     ]);
     const lastDecision = mapLastDecision(

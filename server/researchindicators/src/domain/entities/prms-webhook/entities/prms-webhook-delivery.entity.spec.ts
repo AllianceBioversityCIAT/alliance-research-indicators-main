@@ -87,11 +87,12 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(outcome.enum).toBeUndefined();
   });
 
-  it('result_id is bigint NULL and carries no foreign key', () => {
-    const resultId = column('result_id');
-    expect(resultId.type).toBe('bigint');
-    expect(resultId.isNullable).toBe(true);
-    expect(resultId.relationMetadata).toBeUndefined();
+  it('has NO result_id column at all, and no foreign key or relation to results', () => {
+    // The id is deleted when a version is overwritten, which would orphan
+    // the history. The durable key is (result_official_code, result_year).
+    expect(metadata.columns.map((item) => item.propertyName)).not.toContain(
+      'result_id',
+    );
     expect(metadata.foreignKeys).toHaveLength(0);
     expect(metadata.relations).toHaveLength(0);
   });
@@ -231,7 +232,7 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(isActive.default).toBe(true);
   });
 
-  it('declares exactly the four non-unique indexes', () => {
+  it('declares exactly the three non-unique indexes', () => {
     const indexes = metadata.indices
       .map((index) => ({
         name: index.name,
@@ -255,11 +256,6 @@ describe('PrmsWebhookDelivery entity metadata', () => {
         unique: false,
         columns: ['occurred_at'],
       },
-      {
-        name: 'idx_result_prms_sync_history_result',
-        unique: false,
-        columns: ['result_id'],
-      },
     ]);
   });
 
@@ -272,7 +268,6 @@ describe('PrmsWebhookDelivery entity metadata', () => {
         'occurred_at',
         'environment',
         'correlation_outcome',
-        'result_id',
         'result_official_code',
         'result_year',
         'prms_result_id',

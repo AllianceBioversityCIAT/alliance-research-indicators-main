@@ -566,7 +566,6 @@ describe('ResultPrmsSyncService', () => {
       const arg =
         outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
       expect(arg).toEqual({
-        resultId: 42,
         userId: 7,
         occurredAt: expect.any(Date),
         environment: 'TEST',
@@ -576,7 +575,6 @@ describe('ResultPrmsSyncService', () => {
       });
       expect(Object.keys(arg).sort()).toEqual(
         [
-          'resultId',
           'userId',
           'occurredAt',
           'environment',

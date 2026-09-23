@@ -297,7 +297,6 @@ export class ResultPrmsSyncService {
   }): Promise<void> {
     try {
       await this.outboundHistoryRepository.recordOutboundPendingReview({
-        resultId: input.resultId,
         userId: input.userId,
         occurredAt: new Date(),
         environment: input.environment,

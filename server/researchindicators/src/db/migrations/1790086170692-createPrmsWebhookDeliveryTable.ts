@@ -6,9 +6,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * see execution.md "Pivot Record: T-01"). Originally specified as an
  * inbound-only delivery log under the class's own former table name; it
  * now also records STAR's own successful outbound pushes
- * (`event_source = 'STAR'`), which PRMS never sends. `result_id` is
- * nullable and has no foreign key (P-2). `delivery_id` is nullable and
- * not unique (DD-5).
+ * (`event_source = 'STAR'`), which PRMS never sends. `delivery_id` is
+ * nullable and not unique (DD-5).
+ *
+ * There is NO `result_id` column and never was a foreign key (P-2). The id
+ * is deleted when a result version is overwritten, which would orphan the
+ * history; the correlator resolves it transiently and stores the year.
  *
  * Durable identity of the subject is the pair (`result_official_code`,
  * `result_year`) — the same pair `result_prms_sync_log` keeps (it names
@@ -18,9 +21,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * reference, which may not be a valid code — `parseOfficialCode` validates
  * it and may classify the delivery `invalid`. The name does not promise
  * validity. Reason for the pair, because
- * overwriting a result version deletes `result_id` and a foreign key
- * would take the history with it. `result_id` stays as a convenience
- * pointer and still has no foreign key. `result_year` is MySQL YEAR
+ * overwriting a result version deletes the internal id and a foreign key
+ * would take the history with it. `result_year` is MySQL YEAR
  * NULL, matching the log. An inbound PRMS delivery does not carry the
  * year, so that path stores NULL; the outbound PENDING_REVIEW path
  * copies `results.report_year_id`.
@@ -56,7 +58,6 @@ export class CreatePrmsWebhookDeliveryTable1790086170692
         \`occurred_at\` timestamp NOT NULL,
         \`environment\` varchar(20) NOT NULL,
         \`correlation_outcome\` varchar(40) NOT NULL,
-        \`result_id\` bigint NULL,
         \`result_official_code\` varchar(191) NULL,
         \`result_year\` year NULL,
         \`prms_result_id\` bigint NULL,
@@ -78,7 +79,6 @@ export class CreatePrmsWebhookDeliveryTable1790086170692
         \`changes\` json NULL,
         PRIMARY KEY (\`id\`),
         INDEX \`idx_result_prms_sync_history_delivery_id\` (\`delivery_id\`),
-        INDEX \`idx_result_prms_sync_history_result\` (\`result_id\`),
         INDEX \`idx_result_prms_sync_history_occurred_at\` (\`occurred_at\`),
         INDEX \`idx_result_prms_sync_history_code_year\` (\`result_official_code\`, \`result_year\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci

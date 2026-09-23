@@ -337,7 +337,10 @@ describe('ResultPrmsSyncStatusReader', () => {
     const decisionCall = query.mock.calls.find((call) =>
       /result_prms_sync_history/.test(call[0] as string),
     );
-    expect(decisionCall?.[1]).toEqual([42]);
+    // Two params, both the same id: the query resolves the official code AND
+    // the year through `results`, because the history is keyed on the PAIR.
+    // Neither half identifies a version on its own.
+    expect(decisionCall?.[1]).toEqual([42, 42]);
   });
 
   it("Falsifier 4 (T-11 amendment) — a result pushed ACCEPTED with NO inbound verdict returns last_decision = null, not T-11's own STAR row read back as a decision (R-PWH-008 AC.3 regression)", async () => {

@@ -49,7 +49,8 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       expect(createTableSql).toMatch(
         /`correlation_outcome`\s+varchar\(40\)\s+NOT NULL/i,
       );
-      expect(createTableSql).toMatch(/`result_id`\s+bigint\s+NULL/i);
+      // No result_id column: an overwrite deletes it and orphans the history.
+      expect(createTableSql).not.toMatch(/`result_id`\s+bigint/i);
       expect(createTableSql).toMatch(
         /`result_official_code`\s+varchar\(191\)\s+NULL/i,
       );
@@ -101,13 +102,10 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       expect(createTableSql).toMatch(/`deleted_at`\s+timestamp\s+NULL/i);
     });
 
-    it('declares id as the sole primary key and the four non-unique indexes', () => {
+    it('declares id as the sole primary key and the three non-unique indexes', () => {
       expect(createTableSql).toMatch(/PRIMARY KEY\s*\(\s*`id`\s*\)/i);
       expect(createTableSql).toMatch(
         /INDEX\s+`idx_result_prms_sync_history_delivery_id`\s*\(\s*`delivery_id`\s*\)/i,
-      );
-      expect(createTableSql).toMatch(
-        /INDEX\s+`idx_result_prms_sync_history_result`\s*\(\s*`result_id`\s*\)/i,
       );
       expect(createTableSql).toMatch(
         /INDEX\s+`idx_result_prms_sync_history_occurred_at`\s*\(\s*`occurred_at`\s*\)/i,

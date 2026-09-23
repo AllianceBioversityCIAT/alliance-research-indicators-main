@@ -13,19 +13,20 @@ import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome
  * comment and the task report for the reasoning. Nest module
  * registration is T-03 — this file is entity-only.
  *
- * `result_id` is deliberately NOT a foreign key (P-2). An
- * UNKNOWN_REFERENCE row must survive, and deleting a result later must
- * not erase the history of what the hook sent. The durable identity is
- * the pair (`result_official_code`, `result_year`); `result_id` is only a
- * convenience pointer. Inbound PRMS deliveries do not carry the year,
- * so `result_year` stays NULL on that path.
+ * There is NO `result_id` column, and there never was a foreign key
+ * (P-2). An UNKNOWN_REFERENCE row must survive, and deleting or
+ * overwriting a result must not erase the history of what the hook sent —
+ * an overwrite deletes the internal id permanently. The durable identity
+ * is the pair (`result_official_code`, `result_year`). An inbound PRMS
+ * delivery carries neither year nor id; the correlator resolves the live
+ * row, keeps its id only to pick and validate that row, and stores
+ * `results.report_year_id`.
  *
  * `delivery_id` is deliberately NOT unique (DD-5). A unique index would
  * forbid the repeat row R-PWH-005 requires.
  */
 @Entity('result_prms_sync_history')
 @Index('idx_result_prms_sync_history_delivery_id', ['delivery_id'])
-@Index('idx_result_prms_sync_history_result', ['result_id'])
 @Index('idx_result_prms_sync_history_occurred_at', ['occurred_at'])
 @Index('idx_result_prms_sync_history_code_year', [
   'result_official_code',
@@ -68,13 +69,6 @@ export class PrmsWebhookDelivery extends AuditableEntity {
     nullable: false,
   })
   correlation_outcome!: DeliveryCorrelationOutcome;
-
-  @Column({
-    type: 'bigint',
-    name: 'result_id',
-    nullable: true,
-  })
-  result_id?: number | null;
 
   @Column({
     type: 'varchar',

@@ -24,11 +24,20 @@ const OTHER_PLATFORM_ID = 20;
 const INACTIVE_ID = 30;
 const LIVE_ID = 40;
 const SECOND_LIVE_ID = 50;
+/**
+ * Distinct years per row on purpose: the correlator now stores
+ * `report_year_id`, so "takes the FIRST by result_id ASC" is only provable
+ * if the two candidate rows carry different years. Same year on both would
+ * make the ambiguity assertion pass whichever row won.
+ */
+const LIVE_YEAR = 2026;
+const SECOND_LIVE_YEAR = 2025;
 const DELIVERY_ROW_ID = 100;
 const DELIVERY_HEADER_ID = '4172';
 
 interface ResultRow {
   result_id: number;
+  report_year_id: number;
   result_official_code: number;
   platform_code: string;
   is_active: boolean;
@@ -49,6 +58,7 @@ interface RecordedUpdate {
 
 const resultRow = (overrides: Partial<ResultRow> = {}): ResultRow => ({
   result_id: LIVE_ID,
+  report_year_id: LIVE_YEAR,
   result_official_code: OFFICIAL,
   platform_code: ReportingPlatformEnum.STAR,
   is_active: true,
@@ -69,17 +79,31 @@ const resultRow = (overrides: Partial<ResultRow> = {}): ResultRow => ({
  * ORDER BY still fails the same way.
  */
 const discriminatingFixture = (): ResultRow[] => [
+  // Every row carries a DISTINCT report_year_id. The correlator stores the
+  // year, not the id, so identical years would make `winner()` match the
+  // wrong row and hide a dropped predicate — the very thing this fixture
+  // exists to catch.
   resultRow({
     result_id: CODE_ZERO_ID,
     result_official_code: 0,
+    report_year_id: 2020,
   }),
-  resultRow({ result_id: SNAPSHOT_ID, is_snapshot: true }),
+  resultRow({
+    result_id: SNAPSHOT_ID,
+    is_snapshot: true,
+    report_year_id: 2021,
+  }),
   resultRow({
     result_id: OTHER_PLATFORM_ID,
     platform_code: ReportingPlatformEnum.PRMS,
+    report_year_id: 2022,
   }),
-  resultRow({ result_id: INACTIVE_ID, is_active: false }),
-  resultRow({ result_id: LIVE_ID }),
+  resultRow({
+    result_id: INACTIVE_ID,
+    is_active: false,
+    report_year_id: 2023,
+  }),
+  resultRow({ result_id: LIVE_ID, report_year_id: LIVE_YEAR }),
 ];
 
 /**
@@ -106,6 +130,7 @@ class FakeResultsTable {
       return this.matching(sql, params).map((row) => ({
         // mysql2 returns BIGINT as a string. The service must coerce.
         result_id: String(row.result_id),
+        report_year_id: String(row.report_year_id),
       }));
     }
     if (/^\s*UPDATE\s+result_prms_sync_history\b/i.test(sql)) {
@@ -266,8 +291,13 @@ describe('DeliveryCorrelatorService', () => {
     expect(table.writes).toEqual([]);
   };
 
-  const winner = (resultId: number | null): ResultRow | undefined =>
-    table.rows.find((row) => row.result_id === resultId);
+  /**
+   * The correlator no longer returns the id, so the winning row is looked up
+   * by the YEAR it stored. Each candidate row in the fixture carries a
+   * distinct `report_year_id` precisely so this stays discriminating.
+   */
+  const winner = (resultYear: number | null): ResultRow | undefined =>
+    table.rows.find((row) => row.report_year_id === resultYear);
 
   describe('the discriminating fixture', () => {
     it('holds a live STAR row, a snapshot, an inactive row, and another platform, all on official code 1441061', () => {
@@ -310,7 +340,7 @@ describe('DeliveryCorrelatorService', () => {
       // First, on purpose. The id is looked up in the fixture, so a
       // snapshot id fails here on `is_snapshot` — the diff names the
       // wrong row. A later `resultId` check would hide that.
-      expect(winner(result.applied ? result.resultId : null)).toMatchObject({
+      expect(winner(result.applied ? result.resultYear : null)).toMatchObject({
         result_id: LIVE_ID,
         result_official_code: OFFICIAL,
         platform_code: ReportingPlatformEnum.STAR,
@@ -320,7 +350,7 @@ describe('DeliveryCorrelatorService', () => {
       expect(result).toMatchObject({
         applied: true,
         correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
-        resultId: LIVE_ID,
+        resultYear: LIVE_YEAR,
         officialCode: OFFICIAL,
         processingState: DeliveryProcessingState.PROCESSED,
       });
@@ -329,7 +359,7 @@ describe('DeliveryCorrelatorService', () => {
           id: DELIVERY_ROW_ID,
           set: {
             correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
-            result_id: LIVE_ID,
+            result_year: LIVE_YEAR,
             processing_state: DeliveryProcessingState.PROCESSED,
           },
         }),
@@ -362,11 +392,11 @@ describe('DeliveryCorrelatorService', () => {
       const result = await service.correlate(delivery());
 
       expect(result.applied).toBe(true);
-      expect(winner(result.applied ? result.resultId : null)).toMatchObject({
+      expect(winner(result.applied ? result.resultYear : null)).toMatchObject({
         result_id: LIVE_ID,
         platform_code: ReportingPlatformEnum.STAR,
       });
-      expect(result.applied ? result.resultId : null).not.toBe(
+      expect(result.applied ? result.resultYear : null).not.toBe(
         OTHER_PLATFORM_ID,
       );
     });
@@ -384,7 +414,7 @@ describe('DeliveryCorrelatorService', () => {
       ['01441061'],
       ['null'],
     ])(
-      '%j is UNKNOWN_REFERENCE, writes a null result_id, and issues no results query',
+      '%j is UNKNOWN_REFERENCE, writes a null result_year, and issues no results query',
       async (reference) => {
         const result = await service.correlate(
           delivery({ result_official_code: reference }),
@@ -393,18 +423,20 @@ describe('DeliveryCorrelatorService', () => {
         expect(result).toMatchObject({
           applied: true,
           correlationOutcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
-          resultId: null,
+          resultYear: null,
           officialCode: null,
           processingState: DeliveryProcessingState.PROCESSED,
         });
         expect(table.selects).toEqual([]);
         expect(table.updates[0]?.set).toEqual({
           correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
-          result_id: null,
+          result_year: null,
           processing_state: DeliveryProcessingState.PROCESSED,
         });
         // The live STAR row at official code 0 is the coerced-empty trap.
-        expect(result.applied ? result.resultId : null).not.toBe(CODE_ZERO_ID);
+        expect(result.applied ? result.resultYear : null).not.toBe(
+          CODE_ZERO_ID,
+        );
         expectNoResultsWrite();
       },
     );
@@ -417,7 +449,7 @@ describe('DeliveryCorrelatorService', () => {
       expect(result).toMatchObject({
         applied: true,
         correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
-        resultId: CODE_ZERO_ID,
+        resultYear: 2020,
         officialCode: 0,
       });
       expect(table.selects[0]?.params).toEqual([0]);
@@ -435,7 +467,7 @@ describe('DeliveryCorrelatorService', () => {
         expect(result).toMatchObject({
           applied: true,
           correlationOutcome: DeliveryCorrelationOutcome.NO_REFERENCE,
-          resultId: null,
+          resultYear: null,
           officialCode: null,
           processingState: DeliveryProcessingState.PROCESSED,
         });
@@ -456,7 +488,7 @@ describe('DeliveryCorrelatorService', () => {
 
       expect(result).toMatchObject({
         correlationOutcome: DeliveryCorrelationOutcome.NO_REFERENCE,
-        resultId: null,
+        resultYear: null,
       });
       expect(table.selects).toEqual([]);
     });
@@ -471,29 +503,34 @@ describe('DeliveryCorrelatorService', () => {
       expect(result).toMatchObject({
         applied: true,
         correlationOutcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
-        resultId: null,
+        resultYear: null,
         officialCode: null,
         processingState: DeliveryProcessingState.PROCESSED,
       });
       expect(table.selects).toHaveLength(1);
       expect(table.selects[0].params).toEqual([9999999]);
-      expect(table.updates[0]?.set.result_id).toBeNull();
+      expect(table.updates[0]?.set.result_year).toBeNull();
       expectNoResultsWrite();
     });
   });
 
   describe('AC.4 — more than one live match is resolved and warned', () => {
-    it('takes the first by result_id and warns with the reference and the match count', async () => {
+    it('takes the first by result_id ASC — proven by the YEAR it stores — and warns with the reference and the match count', async () => {
       // Inserted AHEAD of the lower id, so ignoring ORDER BY would
       // apply 50 and this assertion would fail.
-      table.rows.unshift(resultRow({ result_id: SECOND_LIVE_ID }));
+      table.rows.unshift(
+        resultRow({
+          result_id: SECOND_LIVE_ID,
+          report_year_id: SECOND_LIVE_YEAR,
+        }),
+      );
 
       const result = await service.correlate(delivery());
 
       expect(result).toMatchObject({
         applied: true,
         correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
-        resultId: LIVE_ID,
+        resultYear: LIVE_YEAR,
         officialCode: OFFICIAL,
         processingState: DeliveryProcessingState.PROCESSED,
       });
@@ -502,7 +539,7 @@ describe('DeliveryCorrelatorService', () => {
       expect(message).toMatch(/Ambiguous/);
       expect(message).toContain(`result_official_code=${OFFICIAL}`);
       expect(message).toContain('2 live rows');
-      expect(table.updates[0]?.set.result_id).toBe(LIVE_ID);
+      expect(table.updates[0]?.set.result_year).toBe(LIVE_YEAR);
       expectNoResultsWrite();
     });
   });
@@ -526,7 +563,7 @@ describe('DeliveryCorrelatorService', () => {
         expect(Object.keys(update.set).sort()).toEqual([
           'correlation_outcome',
           'processing_state',
-          'result_id',
+          'result_year',
         ]);
       }
     });

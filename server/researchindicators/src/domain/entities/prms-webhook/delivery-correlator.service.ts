@@ -15,10 +15,14 @@ import { DeliveryProcessingState } from './enum/delivery-processing-state.enum';
  * snapshot. `platform_code` is a literal from `ReportingPlatformEnum.STAR`
  * so dropping that predicate does not shift the bound official code.
  * `ORDER BY result_id ASC` is what "the first" means when more than one
- * live row matches (R-PWH-007 AC.4) — without it the engine picks.
+ * live row matches (R-PWH-007 AC.4) — without it the engine picks. The id
+ * is resolved here only to SELECT the row and to keep that ordering
+ * identical; it is never stored. `result_prms_sync_history` holds
+ * `report_year_id` instead, because overwriting a version deletes the id
+ * and the durable key is (`result_official_code`, `result_year`).
  */
 const LIVE_ROW_SQL = `
-SELECT result_id
+SELECT result_id, report_year_id
 FROM results
 WHERE platform_code = '${ReportingPlatformEnum.STAR}'
   AND result_official_code = ?
@@ -30,7 +34,7 @@ ORDER BY result_id ASC
 const APPLY_OUTCOME_SQL = `
 UPDATE result_prms_sync_history
 SET correlation_outcome = ?,
-    result_id = ?,
+    result_year = ?,
     processing_state = ?
 WHERE id = ?
 `;
@@ -52,7 +56,12 @@ export interface DeliveryCorrelationInput {
 export interface DeliveryCorrelationApplied {
   applied: true;
   correlationOutcome: DeliveryCorrelationOutcome;
-  resultId: number | null;
+  /**
+   * `results.report_year_id` of the live row, resolved here and stored on
+   * the history row. Replaces the former `resultId`: the id is deleted when
+   * a version is overwritten, the year is not.
+   */
+  resultYear: number | null;
   /** STAR official code when correlated; null on the stop branches. */
   officialCode: number | null;
   processingState: DeliveryProcessingState.PROCESSED;
@@ -147,10 +156,8 @@ export class DeliveryCorrelatorService {
       );
     }
 
-    const rows: Array<{ result_id: unknown }> = await this.dataSource.query(
-      LIVE_ROW_SQL,
-      [reference.code],
-    );
+    const rows: Array<{ result_id: unknown; report_year_id: unknown }> =
+      await this.dataSource.query(LIVE_ROW_SQL, [reference.code]);
     if (rows.length === 0) {
       return this.finish(
         delivery.id,
@@ -170,10 +177,19 @@ export class DeliveryCorrelatorService {
         `live result_id is not an integer: ${String(rows[0].result_id)}`,
       );
     }
+    // The id is validated because it is what LIVE_ROW_SQL orders by — a
+    // non-integer means the row we selected is not the row we think. It is
+    // not persisted; the year is.
+    const resultYear = Number(rows[0].report_year_id);
+    if (!Number.isInteger(resultYear)) {
+      throw new Error(
+        `live report_year_id is not an integer: ${String(rows[0].report_year_id)}`,
+      );
+    }
     return this.finish(
       delivery.id,
       DeliveryCorrelationOutcome.CORRELATED,
-      resultId,
+      resultYear,
       reference.code,
     );
   }
@@ -197,19 +213,19 @@ export class DeliveryCorrelatorService {
   private async finish(
     deliveryRowId: number,
     correlationOutcome: DeliveryCorrelationOutcome,
-    resultId: number | null,
+    resultYear: number | null,
     officialCode: number | null,
   ): Promise<DeliveryCorrelationApplied> {
     await this.dataSource.query(APPLY_OUTCOME_SQL, [
       correlationOutcome,
-      resultId,
+      resultYear,
       DeliveryProcessingState.PROCESSED,
       deliveryRowId,
     ]);
     return {
       applied: true,
       correlationOutcome,
-      resultId,
+      resultYear,
       officialCode,
       processingState: DeliveryProcessingState.PROCESSED,
     };

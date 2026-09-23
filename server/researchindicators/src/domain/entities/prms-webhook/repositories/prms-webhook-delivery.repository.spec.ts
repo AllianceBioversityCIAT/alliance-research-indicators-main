@@ -184,7 +184,6 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: OCCURRED_AT,
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
-        result_id: null,
         result_official_code: '1441061',
         result_year: null,
         prms_result_id: 9001,
@@ -485,7 +484,6 @@ describe('PrmsWebhookDeliveryRepository', () => {
     const outboundInput = (
       overrides: Partial<RecordOutboundPendingReviewInput> = {},
     ): RecordOutboundPendingReviewInput => ({
-      resultId: 1441061,
       userId: 7,
       occurredAt: OCCURRED_AT,
       environment: 'TEST',
@@ -524,7 +522,6 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: OCCURRED_AT,
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
-        result_id: 1441061,
         result_official_code: '1441061',
         result_year: 2026,
         prms_result_id: null,
@@ -564,7 +561,6 @@ describe('PrmsWebhookDeliveryRepository', () => {
         OCCURRED_AT,
         'TEST',
         DeliveryCorrelationOutcome.CORRELATED,
-        1441061,
         '1441061',
         2026,
         9199,
@@ -620,8 +616,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: new Date('2026-09-22T10:00:00.000Z'),
         environment: 'TEST',
         correlation_outcome: 'CORRELATED',
-        result_id: '1441061',
         result_official_code: '1441061',
+        result_year: '2026',
         prms_result_id: '9001',
         prms_result_code: '555',
         decision: 'APPROVE',
@@ -649,8 +645,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
         occurred_at: new Date('2026-09-22T10:05:00.000Z'),
         environment: 'TEST',
         correlation_outcome: 'UNKNOWN_REFERENCE',
-        result_id: null,
         result_official_code: 'STAR-does-not-exist',
+        result_year: null,
         prms_result_id: null,
         prms_result_code: null,
         decision: 'REJECT',
@@ -674,28 +670,32 @@ describe('PrmsWebhookDeliveryRepository', () => {
       },
     ];
 
-    it('by STAR result_id: filters on result_id, orders by occurred_at ascending, outside any transaction', async () => {
+    it('by the durable pair: filters on result_official_code AND result_year, orders by occurred_at ascending, outside any transaction', async () => {
       dataSourceQuery.mockResolvedValueOnce([rawRows[0]]);
 
-      const history = await repository.findHistoryByResultId(1441061);
+      const history = await repository.findHistoryByResultCodeAndYear(
+        '1441061',
+        2026,
+      );
 
       expect(transaction).not.toHaveBeenCalled();
       expect(dataSourceQuery).toHaveBeenCalledTimes(1);
       const sql = String(dataSourceQuery.mock.calls[0][0]);
       expect(sql).toMatch(/FROM\s+result_prms_sync_history/);
-      expect(sql).toMatch(/WHERE\s+result_id\s*=\s*\?/);
+      expect(sql).toMatch(/WHERE\s+result_official_code\s*=\s*\?/);
+      expect(sql).toMatch(/AND\s+result_year\s*=\s*\?/);
       expect(sql).toMatch(/ORDER\s+BY\s+occurred_at\s+ASC/);
       expect(sql).not.toMatch(/FOR UPDATE/);
       // Never filters on is_active: nothing in this spec flips it, and a
       // hidden filter would be a way to silently discard history.
       expect(sql).not.toMatch(/is_active\s*=/);
-      expect(dataSourceQuery.mock.calls[0][1]).toEqual([1441061]);
+      expect(dataSourceQuery.mock.calls[0][1]).toEqual(['1441061', 2026]);
 
       expect(history).toHaveLength(1);
       expect(history[0]).toMatchObject({
         id: 100,
         delivery_id: '4172',
-        result_id: 1441061,
+        result_year: 2026,
         prms_result_id: 9001,
         prms_result_code: 555,
         duplicate_of_id: null,
@@ -712,7 +712,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       });
     });
 
-    it('across all results: NO result_id filter, so uncorrelated (result_id IS NULL) rows come back too, in occurred_at order', async () => {
+    it('across all results: NO pair filter, so uncorrelated (result_year IS NULL) rows come back too, in occurred_at order', async () => {
       dataSourceQuery.mockResolvedValueOnce(rawRows);
 
       const history = await repository.findHistory();
@@ -725,11 +725,11 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(sql).not.toMatch(/FOR UPDATE/);
 
       expect(history).toHaveLength(2);
-      expect(history.map((row) => row.result_id)).toEqual([1441061, null]);
+      expect(history.map((row) => row.result_year)).toEqual([2026, null]);
       expect(history[1]).toMatchObject({
         id: 101,
         delivery_id: null,
-        result_id: null,
+        result_year: null,
         duplicate_of_id: 100,
         prms_result_id: null,
         raw_body: null,
@@ -741,7 +741,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
     it('both reads select the domain columns (including the seven Pivot columns) and leave the select:false audit columns out', async () => {
       dataSourceQuery.mockResolvedValue([]);
 
-      await repository.findHistoryByResultId(1);
+      await repository.findHistoryByResultCodeAndYear('1', 2026);
       await repository.findHistory();
 
       // Pinned first: a loop over zero calls asserts nothing (KZ-017).

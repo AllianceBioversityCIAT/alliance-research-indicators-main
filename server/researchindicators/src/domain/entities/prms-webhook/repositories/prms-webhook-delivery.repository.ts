@@ -39,7 +39,6 @@ const HISTORY_COLUMNS = [
   'occurred_at',
   'environment',
   'correlation_outcome',
-  'result_id',
   'result_official_code',
   'result_year',
   'prms_result_id',
@@ -97,7 +96,6 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   delivery.environment = row.environment as string;
   delivery.correlation_outcome =
     row.correlation_outcome as DeliveryCorrelationOutcome;
-  delivery.result_id = asNullableNumber(row.result_id);
   delivery.result_official_code =
     (row.result_official_code as string | null) ?? null;
   delivery.result_year = asNullableNumber(row.result_year);
@@ -173,7 +171,6 @@ export type RecordDeliveryResult =
  * structurally rather than trusting every caller to pass `null`.
  */
 export interface RecordOutboundPendingReviewInput {
-  resultId: number;
   userId: number | null;
   occurredAt: Date;
   environment: string;
@@ -272,22 +269,23 @@ export class PrmsWebhookDeliveryRepository {
     const insertResult = await manager.query(
       `
       INSERT INTO result_prms_sync_history
-        (delivery_id, occurred_at, environment, correlation_outcome, result_id,
+        (delivery_id, occurred_at, environment, correlation_outcome,
          result_official_code, result_year, prms_result_id, prms_result_code,
          decision, justification, decided_at, raw_body, raw_headers,
          processing_state, processing_error, duplicate_of_id, created_by,
          is_active, event_source, status, actor_user_id, reviewer_name,
          reviewer_role, science_program_code, changes)
-      VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
+      VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
               ?, NULL, NULL, NULL, NULL, NULL, NULL)
       `,
-      // 26 columns, 15 placeholders + 11 literals (result_id, result_year,
+      // 25 columns, 15 placeholders + 10 literals (result_year,
       // processing_error and created_by are NULL at insert; is_active is
       // TRUE; the six Pivot columns this ingest path never populates --
       // status, actor_user_id, reviewer_name, reviewer_role,
-      // science_program_code, changes -- are NULL). result_year is NULL
-      // because a PRMS delivery does not carry the reporting year; the
-      // outbound PENDING_REVIEW write is the path that fills it. Keep this
+      // science_program_code, changes -- are NULL). result_year is NULL AT
+      // INSERT because a PRMS delivery carries no reporting year; the
+      // correlator fills it when it resolves the live row, and the outbound
+      // PENDING_REVIEW write sets it directly. There is no result_id column. Keep this
       // list and the array below in lockstep -- a stray param shifts every
       // value one column right and MySQL reports it at the first type
       // mismatch, nowhere near the real mistake (the same warning sits on
@@ -325,27 +323,32 @@ export class PrmsWebhookDeliveryRepository {
 
   /**
    * History for one STAR result, in received order (R-PWH-005 AC.8).
+   * Keyed on the durable pair (`result_official_code`, `result_year`), not
+   * on an internal id: overwriting a version deletes the id and would take
+   * the history with it.
    * Plain read, no transaction, no lock, no `is_active` filter — nothing in
    * this spec flips that flag, and filtering on it would be a way to hide
    * history rows.
    */
-  async findHistoryByResultId(
-    resultId: number,
+  async findHistoryByResultCodeAndYear(
+    resultOfficialCode: string,
+    resultYear: number,
   ): Promise<PrmsWebhookDelivery[]> {
     const rows = await this.dataSource.query(
       `
       SELECT ${HISTORY_COLUMNS}
       FROM result_prms_sync_history
-      WHERE result_id = ?
+      WHERE result_official_code = ?
+        AND result_year = ?
       ORDER BY occurred_at ASC, id ASC
       `,
-      [resultId],
+      [resultOfficialCode, resultYear],
     );
     return (rows as RawDeliveryRow[]).map(toDelivery);
   }
 
   /**
-   * History across every result, uncorrelated rows (`result_id IS NULL`)
+   * History across every result, uncorrelated rows (`result_year IS NULL`)
    * included, in received order (R-PWH-005 AC.8). Deliberately no WHERE.
    */
   async findHistory(): Promise<PrmsWebhookDelivery[]> {
@@ -383,23 +386,22 @@ export class PrmsWebhookDeliveryRepository {
     await this.dataSource.query(
       `
       INSERT INTO result_prms_sync_history
-        (delivery_id, occurred_at, environment, correlation_outcome, result_id,
+        (delivery_id, occurred_at, environment, correlation_outcome,
          result_official_code, result_year, prms_result_id, prms_result_code,
          decision, justification, decided_at, raw_body, raw_headers,
          processing_state, processing_error, duplicate_of_id, created_by,
          is_active, event_source, status, actor_user_id, reviewer_name,
          reviewer_role, science_program_code, changes)
-      VALUES (NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
+      VALUES (NULL, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
               ?, ?, ?, NULL, NULL, NULL, NULL)
       `,
-      // 26 columns, 11 placeholders + 15 literals. Kept in lockstep with
+      // 25 columns, 10 placeholders + 15 literals. Kept in lockstep with
       // the column list for the same reason `recordInsideLock` flags —
       // a stray param shifts every value one column right.
       [
         input.occurredAt,
         input.environment,
         DeliveryCorrelationOutcome.CORRELATED,
-        input.resultId,
         input.resultOfficialCode,
         input.resultYear,
         input.prmsResultCode,

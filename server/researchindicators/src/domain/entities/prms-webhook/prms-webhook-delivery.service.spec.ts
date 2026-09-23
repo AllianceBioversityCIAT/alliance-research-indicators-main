@@ -40,7 +40,7 @@ const applied = (
 ): DeliveryCorrelationResult => ({
   applied: true,
   correlationOutcome,
-  resultId: officialCode === null ? null : 40,
+  resultYear: officialCode === null ? null : 2026,
   officialCode,
   processingState: DeliveryProcessingState.PROCESSED,
 });
