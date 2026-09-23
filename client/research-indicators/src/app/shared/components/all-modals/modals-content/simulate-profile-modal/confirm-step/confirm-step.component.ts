@@ -1,6 +1,5 @@
 // @akili-spec changes/profile-simulation — T-10, R-IMP-008, design §5 "Client start", §6, §12 D-imp-9/13/18
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { ApiService } from '@shared/services/api.service';
 import { ImpersonationService } from '@services/impersonation.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -17,13 +16,14 @@ const DEFAULT_START_ERROR = 'Could not start the simulation. Try again.';
  * real data" callout, then submits `POST /impersonation/start`.
  *
  * Design §5 "Client start" step 2 assigns the post-`201` side effects
- * (`impersonation.start`, then `configUser`/`navigate`/toast) to "the
+ * (`impersonation.start`, then `configUser`/content-reload/toast) to "the
  * calling component" — here, THIS component, since it is the one that
  * invokes the start call. `ImpersonationService` itself stays free of
  * `Router`/`WebsocketService`/`ActionsService` (D-imp-13); this component
  * is the caller that owns those side effects, in the fixed order asserted
  * by the spec: `impersonation.start` -> `closeModal` -> `configUser` ->
- * `navigate` -> toast.
+ * `bumpContentReload` -> toast. Reload remounts the current page's
+ * services in place (no full browser refresh, no forced `/home`).
  *
  * `Cancel` emits `back` rather than closing the modal itself, mirroring
  * `UserSearchStepComponent`'s `userSelected` pattern (T-09) — this
@@ -53,7 +53,6 @@ export class ConfirmStepComponent {
   private readonly cache = inject(CacheService);
   private readonly actions = inject(ActionsService);
   private readonly websocket = inject(WebsocketService);
-  private readonly router = inject(Router);
 
   readonly user = input.required<ImpersonationUserRow>();
   readonly back = output<void>();
@@ -97,7 +96,7 @@ export class ConfirmStepComponent {
         this.impersonation.start(res.data);
         this.allModals.closeModal('simulateProfile');
         this.websocket.configUser(target.first_name, target.sec_user_id);
-        this.router.navigate(['/home']);
+        this.cache.bumpContentReload();
         this.actions.showToast({
           severity: 'success',
           summary: 'Simulation started',
