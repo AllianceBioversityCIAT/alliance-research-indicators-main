@@ -24,6 +24,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { AppConfigService } from '../app-config/app-config.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
@@ -390,6 +391,11 @@ describe('ResultPrmsSyncController', () => {
         { getEnv: jest.fn() } as unknown as AppConfigService,
         { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
         { user_id: 7 } as unknown as CurrentUserUtil,
+        // T-11: this scenario is a gate refusal (pool_funding_alignment_green:
+        // false) and never reaches the outbound history write.
+        {
+          recordOutboundPendingReview: jest.fn(),
+        } as unknown as PrmsWebhookDeliveryRepository,
       );
 
       const passthrough = { canActivate: () => true };

@@ -39,6 +39,7 @@ describe('ResultPrmsSyncLogRepository', () => {
         {
           result_id: 42,
           result_official_code: 1001,
+          report_year_id: 2026,
           is_synced_to_prms: 0,
         },
       ])
@@ -53,6 +54,7 @@ describe('ResultPrmsSyncLogRepository', () => {
       attemptId: 99,
       attemptNumber: 3,
       resultOfficialCode: 1001,
+      resultYear: 2026,
     });
     expect(transactionQuery).toHaveBeenCalled();
     const lockSql = transactionQuery.mock.calls.map(

@@ -1,0 +1,67 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "capacity_sharing",
+      "data": {
+        "result_type_id": 3,
+        "result_level_id": 3,
+        "created_date": "2025-10-24T19:36:04Z",
+        "created_by": { "name": "Sara Jani", "email": "s.jani@cgiar.org" },
+        "submitted_by": {
+          "email": "mohammad.salem@codeobia.com",
+          "name": "Mohammad Salem",
+          "comment": "",
+          "submitted_date": "2025-11-24T14:28:02Z"
+        },
+        "lead_center": { "institution_id": 1279, "acronym": "ICARDA" },
+        "title": "Training workshop on climate-smart agriculture practices",
+        "description": "Comprehensive training program for extension agents on climate adaptation strategies and sustainable farming techniques",
+        "toc_mapping": {
+          "science_program_id": "SP01",
+          "aow_compose_code": "SP01-AOW05",
+          "result_title": "HLO20.AOW5.IO3 Assess performance",
+          "result_indicator_description": "Availability of MELIA Report on AoWs (performance data)",
+          "result_indicator_type_name": "Number of people trained"
+        },
+        "geo_focus": {
+          "scope_code": 4,
+          "scope_label": "National",
+          "countries": [{ "id": 788, "name": "Tunisia" }]
+        },
+        "contributing_center": [
+          {
+            "institution_id": 1279,
+            "acronym": "ICARDA"
+          }
+        ],
+        "contributing_partners": [
+          {
+            "name": "Partner Organization"
+          }
+        ],
+        "evidence": [
+          {
+            "link": "https://hdl.handle.net/20.500.1176/70003",
+            "description": "Training materials and participant feedback"
+          }
+        ],
+        "contributing_bilateral_projects": [
+          {
+            "grant_title": "D-200358-Enhancing Food Security and Climate Resilience in Morocco and Tunisia"
+          }
+        ],
+        "capacity_sharing": {
+          "number_people_trained": {
+            "women": 45,
+            "men": 78,
+            "non_binary": 2
+          },
+          "length_training": "Short-term",
+          "delivery_method": "Blended (in-person and virtual)"
+        }
+      }
+    }
+  ]
+}

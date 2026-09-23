@@ -66,7 +66,10 @@ import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-t
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
 import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
+import { PrmsWebhookCallbackModule } from '../entities/prms-webhook/prms-webhook-callback.module';
+import { PrmsWebhookModule } from '../entities/prms-webhook/prms-webhook.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
+import { PRMS_CALLBACK_PATH } from '../shared/utils/prms-callback.constants';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
@@ -432,6 +435,20 @@ const children: Routes = [
   {
     path: 'users',
     module: UsersModule,
+  },
+  {
+    // Top-level and disjoint from `prms-callback` (design.md DD-3, P-13) —
+    // neither prefix may be a glob-match of the other. This is the
+    // SYSTEM_ADMIN registration surface only.
+    path: 'prms-webhook',
+    module: PrmsWebhookModule,
+  },
+  {
+    // Public write. Own module: RouterModule stamps one MODULE_PATH per
+    // class, so this cannot share PrmsWebhookModule with the registration
+    // prefix (DD-3). Authenticated only by CallbackSecretGuard.
+    path: PRMS_CALLBACK_PATH,
+    module: PrmsWebhookCallbackModule,
   },
 ];
 

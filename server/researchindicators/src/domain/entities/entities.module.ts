@@ -93,6 +93,7 @@ import { ReportsModule } from './reports/reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
+import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
@@ -201,6 +202,7 @@ import { UsersModule } from './users/users.module';
     ResultReviewHistoryModule,
     BilateralModule,
     ResultPrmsSyncModule,
+    PrmsWebhookModule,
     BilateralProjectMappingModule,
     PiDelegatesModule,
     UsersModule,

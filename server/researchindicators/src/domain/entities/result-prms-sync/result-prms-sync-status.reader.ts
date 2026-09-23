@@ -4,6 +4,7 @@ import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outc
 import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
   PrmsSyncLastAttemptDto,
+  PrmsSyncLastDecisionDto,
   PrmsSyncState,
   PrmsSyncStatusDto,
 } from './dto/prms-sync.dto';
@@ -35,6 +36,43 @@ const RESULT_STATUS_SQL = `
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
+    `;
+
+/**
+ * T-11 amendment (owner-approved, 2026-09-23): `event_source = 'PRMS'` is
+ * REQUIRED. Without it, T-11's own outbound `PENDING_REVIEW` rows —
+ * `correlation_outcome = CORRELATED`, `duplicate_of_id IS NULL` (Pivot
+ * decision 2) — satisfy every other predicate here and would be read back
+ * as a PRMS verdict, breaking R-PWH-008 AC.3 (a result pushed ACCEPTED
+ * with no inbound decision must report `last_decision: null`). Do not
+ * widen beyond this one predicate — `findHistory` /
+ * `findHistoryByResultCodeAndYear` ordering and duplicate filtering belong
+ * to the UI spec, not here.
+ *
+ * Keyed on the durable pair (`result_official_code`, `result_year`) rather
+ * than an internal id, resolved through `results` exactly as the sync-log
+ * query above does: overwriting a version deletes the id permanently, and
+ * `result_prms_sync_history` carries no `result_id` column at all.
+ */
+const LAST_DECISION_SQL = `
+      SELECT
+        decision,
+        decided_at,
+        justification,
+        prms_result_code,
+        occurred_at
+      FROM result_prms_sync_history
+      WHERE result_official_code = (
+              SELECT result_official_code FROM results WHERE result_id = ?
+            )
+        AND result_year = (
+              SELECT report_year_id FROM results WHERE result_id = ?
+            )
+        AND correlation_outcome = 'CORRELATED'
+        AND duplicate_of_id IS NULL
+        AND event_source = 'PRMS'
+      ORDER BY decided_at DESC
+      LIMIT 1
     `;
 
 const asBoolean = (value: unknown): boolean =>
@@ -80,6 +118,25 @@ export function deriveSyncState(
   return 'failed';
 }
 
+export function mapLastDecision(
+  row: Record<string, unknown> | null | undefined,
+): PrmsSyncLastDecisionDto | null {
+  if (!row) {
+    return null;
+  }
+  return {
+    decision: typeof row.decision === 'string' ? row.decision : null,
+    decided_at:
+      row.decided_at == null ? null : (row.decided_at as Date | string),
+    justification:
+      typeof row.justification === 'string' ? row.justification : null,
+    prms_result_code:
+      row.prms_result_code == null ? null : Number(row.prms_result_code),
+    delivery_received_at:
+      row.occurred_at == null ? null : (row.occurred_at as Date | string),
+  };
+}
+
 @Injectable()
 export class ResultPrmsSyncStatusReader {
   constructor(private readonly dataSource: DataSource) {}
@@ -104,6 +161,15 @@ export class ResultPrmsSyncStatusReader {
     const lastAttempt = mapLastAttempt(
       attemptRows[0] as Record<string, unknown> | undefined,
     );
+    // Two placeholders: the official code and the year are each resolved
+    // through `results` by the same id, exactly as LAST_ATTEMPT_SQL does.
+    const decisionRows = await this.dataSource.query(LAST_DECISION_SQL, [
+      resultId,
+      resultId,
+    ]);
+    const lastDecision = mapLastDecision(
+      decisionRows[0] as Record<string, unknown> | undefined,
+    );
     const isSynced = asBoolean(resultRow.is_synced_to_prms);
     const prmsResultCode =
       resultRow.prms_result_code == null
@@ -115,6 +181,7 @@ export class ResultPrmsSyncStatusReader {
       is_synced_to_prms: isSynced,
       prms_result_code: prmsResultCode,
       last_attempt: lastAttempt,
+      last_decision: lastDecision,
     };
   }
 }

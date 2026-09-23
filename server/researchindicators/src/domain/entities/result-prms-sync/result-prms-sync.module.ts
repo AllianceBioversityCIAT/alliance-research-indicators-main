@@ -10,6 +10,7 @@ import { KnowledgeProductBuilder } from '../../tools/prms-normalizer/builders/kn
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PolicyChangeBuilder } from '../../tools/prms-normalizer/builders/policy-change.builder';
 import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalizer.module';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
 import { ResultPrmsSyncController } from './result-prms-sync.controller';
@@ -24,6 +25,12 @@ import { ResultPrmsSyncService } from './result-prms-sync.service';
     ResultPrmsSyncStatusReader,
     ResultPrmsSyncLogRepository,
     ResultPrmsSyncAggregateRepository,
+    // T-11: the outbound PENDING_REVIEW history write. Provided directly
+    // here (not via a PrmsWebhookModule import) — the repository's only
+    // dependency is the globally-provided DataSource, and importing the
+    // sibling feature module for one repository would be a wider coupling
+    // than the write needs.
+    PrmsWebhookDeliveryRepository,
     PayloadBuilder,
     CommonFieldsBuilder,
     CapacitySharingBuilder,

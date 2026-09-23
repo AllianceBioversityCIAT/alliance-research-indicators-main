@@ -60,6 +60,20 @@ export class AppConfig {
     return process.env.ARI_PRMS_NORMALIZER_HOST;
   }
 
+  // STAR's callback base (scheme + host + `/api`), with no path and no secret.
+  // Registration appends the callback path and `ARI_PRMS_WEBHOOK_SECRET`.
+  // Per-environment, never derived from ARI_PRMS_NORMALIZER_HOST or a request
+  // Host header (R-PWH-009 AC.1, AC.2 — K-005).
+  get ARI_PRMS_WEBHOOK_CALLBACK_URL(): string {
+    return process.env.ARI_PRMS_WEBHOOK_CALLBACK_URL;
+  }
+
+  // Shared path secret for the PRMS callback. Registration reads it here;
+  // CallbackSecretGuard keeps reading process.env directly.
+  get ARI_PRMS_WEBHOOK_SECRET(): string {
+    return process.env.ARI_PRMS_WEBHOOK_SECRET;
+  }
+
   //CLARISA user
   get ARI_CLARISA_USER(): string {
     return process.env.ARI_CLARISA_USER;
