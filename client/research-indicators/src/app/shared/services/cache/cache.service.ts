@@ -69,6 +69,17 @@ export class CacheService {
   searchAResultValue = signal('');
   isSidebarCollapsed = signal(localStorage.getItem('isSidebarCollapsed') !== 'false');
 
+  /**
+   * Bumped after profile-simulation start/end so `platform` remounts its
+   * `<router-outlet>` and the current page re-runs its loaders under the
+   * new identity — without `location.reload()` or forcing `/home`.
+   */
+  contentReloadKey = signal(0);
+
+  bumpContentReload(): void {
+    this.contentReloadKey.update(key => key + 1);
+  }
+
   setCurrentSectionHeaderName(name: string) {
     this.currentSectionHeaderName.set(name);
   }

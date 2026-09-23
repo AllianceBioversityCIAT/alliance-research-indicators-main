@@ -1,6 +1,5 @@
 // @akili-spec changes/profile-simulation
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, viewChild } from '@angular/core';
-import { Router } from '@angular/router';
 import { CacheService } from '@services/cache/cache.service';
 import { ImpersonationService } from '@services/impersonation.service';
 import { ActionsService } from '@services/actions.service';
@@ -30,7 +29,6 @@ export class SimulationBannerComponent {
   cache = inject(CacheService);
   impersonation = inject(ImpersonationService);
   actions = inject(ActionsService);
-  private readonly router = inject(Router);
   // Defensive: WebsocketService depends on ngx-socket-io's `Socket`, which is not
   // provided in every test/host environment (see PoolFundingAlignmentComponent for
   // the same precedent). `configUser` re-run on end is best-effort UX, never a
@@ -75,14 +73,15 @@ export class SimulationBannerComponent {
 
   /**
    * R-IMP-010 client end flow (design §5 "Client end"): best-effort end,
-   * re-run the socket identity, return to `/home`, and confirm with a toast.
+   * re-run the socket identity, remount the current page's loaders under the
+   * restored admin identity, and confirm with a toast.
    */
   async endSimulation(): Promise<void> {
     const { actor } = await this.impersonation.end('manual');
     if (actor && this.websocket) {
       await this.websocket.configUser(actor.first_name, actor.sec_user_id);
     }
-    await this.router.navigate(['/home']);
+    this.cache.bumpContentReload();
     this.actions.showToast({
       severity: 'success',
       summary: 'Simulation ended',

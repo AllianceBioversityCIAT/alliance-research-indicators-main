@@ -1,7 +1,6 @@
 // @akili-spec changes/profile-simulation
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { Router } from '@angular/router';
 import { SimulationBannerComponent } from './simulation-banner.component';
 import { CacheService } from '@services/cache/cache.service';
 import { ImpersonationService } from '@services/impersonation.service';
@@ -36,7 +35,11 @@ describe('SimulationBannerComponent', () => {
     user_role_list: []
   };
 
-  let mockCacheService: { dataCache: ReturnType<typeof signal>; hasSmallScreen: jest.Mock };
+  let mockCacheService: {
+    dataCache: ReturnType<typeof signal>;
+    hasSmallScreen: jest.Mock;
+    bumpContentReload: jest.Mock;
+  };
   let mockImpersonationService: {
     active: ReturnType<typeof signal>;
     session: ReturnType<typeof signal>;
@@ -45,14 +48,14 @@ describe('SimulationBannerComponent', () => {
   };
   let mockActionsService: { showToast: jest.Mock };
   let mockWebsocketService: { configUser: jest.Mock };
-  let mockRouter: { navigate: jest.Mock };
 
   beforeEach(async () => {
     callLog = [];
 
     mockCacheService = {
       dataCache: signal({ user: targetUser }),
-      hasSmallScreen: jest.fn(() => false)
+      hasSmallScreen: jest.fn(() => false),
+      bumpContentReload: jest.fn().mockImplementation(() => callLog.push('bumpContentReload'))
     };
 
     mockImpersonationService = {
@@ -75,21 +78,13 @@ describe('SimulationBannerComponent', () => {
       })
     };
 
-    mockRouter = {
-      navigate: jest.fn().mockImplementation(async () => {
-        callLog.push('navigate');
-        return true;
-      })
-    };
-
     await TestBed.configureTestingModule({
       imports: [SimulationBannerComponent],
       providers: [
         { provide: CacheService, useValue: mockCacheService },
         { provide: ImpersonationService, useValue: mockImpersonationService },
         { provide: ActionsService, useValue: mockActionsService },
-        { provide: WebsocketService, useValue: mockWebsocketService },
-        { provide: Router, useValue: mockRouter }
+        { provide: WebsocketService, useValue: mockWebsocketService }
       ]
     }).compileComponents();
 
@@ -161,16 +156,16 @@ describe('SimulationBannerComponent', () => {
     expect(endSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('End simulation runs end -> configUser -> navigate -> toast, in that order', async () => {
+  it('End simulation runs end -> configUser -> bumpContentReload -> toast, in that order', async () => {
     fixture.detectChanges();
     TestBed.flushEffects();
 
     await component.endSimulation();
 
-    expect(callLog).toEqual(['end', 'configUser', 'navigate', 'toast']);
+    expect(callLog).toEqual(['end', 'configUser', 'bumpContentReload', 'toast']);
     expect(mockImpersonationService.end).toHaveBeenCalledWith('manual');
     expect(mockWebsocketService.configUser).toHaveBeenCalledWith('Ana', 1);
-    expect(mockRouter.navigate).toHaveBeenCalledWith(['/home']);
+    expect(mockCacheService.bumpContentReload).toHaveBeenCalledTimes(1);
     expect(mockActionsService.showToast).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'Simulation ended',
