@@ -7,6 +7,7 @@
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
+- **Budget actuals, 2026-09-23 — the tripwire HAS fired, and was escalated, not absorbed:** **12 tasks** (Pivot added T-01b, T-11) · **≈ 3,710 LOC** est. (2,970 + ≈ 400 T-01b + ≈ 340 T-11) · **11 review rounds** (T-08 alone consumed 8 across its HALT and amendment; T-01b added 2, one per lens). The overrun is fully attributable to the owner-approved T-08 amendment and the owner-approved Pivot — no unapproved scope. The approved figure above is left unedited on purpose; this line is the actual.
 - **Family status warning:** the manifest row this child `Depends on` — [`../family.md`](../family.md) child 1, `sync-engine` — is **`pending`**, not `done`. Per the family-membership rule this **warns, it does not block**: the code this child extends is present on this branch (design P-3, P-5, P-8, all re-verified at `170da206`). The open risk is the one that already materialized once — see RB-1.
 - **Verified at:** `170da206` (the commands in §4 were run at this commit on 2026-09-22)
 - **Last updated:** 2026-09-23
@@ -593,11 +594,14 @@ graph TD
 ### T-11 — The outbound `PENDING_REVIEW` event  `[ ]`
 
 > **Created by the owner-approved Pivot of 2026-09-23.** Read the *Pivot Record* first, especially decisions **2, 3, 5 and 6**.
+>
+> ⚠️ **AMENDED 2026-09-23, owner-approved, after T-01b's dual-lens review.** Both Reviewers independently found that this task, as originally written, **introduces a break of R-PWH-008 AC.3**. `LAST_DECISION_SQL` filters `correlation_outcome = 'CORRELATED' AND duplicate_of_id IS NULL`; the outbound rows this task writes satisfy **both** (Pivot decision 2). A result pushed `ACCEPTED` with no inbound verdict would then report a `last_decision` object whose `decision`/`decided_at`/`justification` are all `null`, instead of reporting **no decision**. The reader guard is therefore **in scope for this task** — the task that causes the break owns the fix. See [`./execution.md`](./execution.md) → *T-01b* → ADVISORY.
 
 - **Requirements covered:** the UI history contract — the mock's *"First synchronization"* and *"Mapping re-synced after rejection"* rows
 - **Files touched:**
   - `src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository.ts` (+ spec) — **a new method, not a change to `recordDelivery`**
   - `src/domain/entities/result-prms-sync/result-prms-sync.service.ts` (+ spec) — **ONE guarded call**
+  - `src/domain/entities/result-prms-sync/result-prms-sync-status.reader.ts` (+ spec) — **added by the 2026-09-23 amendment**: `LAST_DECISION_SQL` gains `AND event_source = 'PRMS'`
 - **Description:** when a push settles `ACCEPTED`, write one `PENDING_REVIEW` row into the history table from STAR's own data. PRMS returns none of it.
 - **Implementation notes:**
   - **The write point is located**: immediately after `settleAttempt(...)` (~`:251`) and before the return, guarded on `interpreted.outcome === PrmsSyncOutcome.ACCEPTED`. Everything needed is already in scope: `resultId`, `userId`, `claim.attemptNumber`, `claim.resultOfficialCode`, `externalReference`, `interpreted.prmsResultCode`, `interpreted.prmsPhaseId`, `interpreted.requestId`, `environment`.
@@ -606,13 +610,14 @@ graph TD
   - **One row per successful attempt**, never one per result. A re-sync after rejection is its own entry.
   - **The write must NEVER fail the push.** Catch, log at `error` with the result code, continue. Failing a successful sync over a history row is strictly worse — the same discipline T-09 applies to the detached correlator.
   - **Do NOT route this through `recordDelivery`.** That method owns the `SELECT … FOR UPDATE` dedupe for PRMS's `delivery_id`, which an outbound row does not have; running it would take gap locks on the push's critical path and protect nothing. A plain `INSERT`.
+  - **Guard the reader in the same task (amendment).** Add `AND event_source = 'PRMS'` to `LAST_DECISION_SQL` in `result-prms-sync-status.reader.ts`. Without it this task's own rows are read back as PRMS verdicts. The Pivot's *Requirement impact* already states the rule — *"every existing query that means 'deliveries' must filter on it"* — and this is that query. Do **not** widen beyond this one predicate: `findHistory`/`findHistoryByResultId` ordering and duplicate filtering belong to the UI spec, not here.
   - ⚠️ **`result-prms-sync.service.ts` belongs to the sibling `sync-engine` (family child 1, status `pending`, in flight).** One guarded call is the whole change. If it needs more, **stop and report it.**
 - **Scope boundary — do NOT touch:** `result_prms_sync_log`'s schema or its write path, the dedupe transaction, the correlator, the callback edge, anything under `client/`.
 - **Verification:** `npm test -- --silent` · `npm run build` · `npx eslint <touched paths>` — never `npm run lint`
-- **Falsifier:** make the history insert throw → the assertion that `sync()` still returns its normal success payload reddens if the throw is allowed to propagate. Second: remove the `ACCEPTED` guard → the assertion that a `TRANSPORT_FAILED` push writes **no** history row reddens. Third: call it twice for one result → the assertion that **two** rows exist reddens if the write is deduped.
+- **Falsifier:** make the history insert throw → the assertion that `sync()` still returns its normal success payload reddens if the throw is allowed to propagate. Second: remove the `ACCEPTED` guard → the assertion that a `TRANSPORT_FAILED` push writes **no** history row reddens. Third: call it twice for one result → the assertion that **two** rows exist reddens if the write is deduped. **Fourth (amendment):** remove `AND event_source = 'PRMS'` from `LAST_DECISION_SQL` → the assertion that a result with a STAR-only history row returns `last_decision = null` reddens. **This falsifier must be observed red against the post-change code** — a green here with the guard removed means the test is asserting on the mock rather than on the emitted SQL (KZ-001).
 - **Red run:** each mutation independently, its own assertion observed failing, restored, green. Verbatim.
 - **Disqualifier:** **a test that asserts only that the repository method was *called* proves dispatch, not the row.** Assert the **arguments** — specifically that `decision`, `decided_at` and every `reviewer_*` field are `NULL`, and that `event_source` is `'STAR'` (KZ-001). And a red from a missing provider or DI failure is **not** a red for the non-propagation class — the failure must be on the behavioural assertion.
-- **Consumers:** `git grep -rn "settleAttempt\|result-prms-sync.service" -- src test`, re-run and recorded. The sync service's own spec is a **known** consumer that will need the new collaborator mocked.
+- **Consumers:** `git grep -rn "settleAttempt\|result-prms-sync.service" -- src test`, re-run and recorded. The sync service's own spec is a **known** consumer that will need the new collaborator mocked. **Amendment:** `result-prms-sync-status.reader.spec.ts` and any consumer of the `last_decision` field (`prms-sync.dto.ts`, and the hand-maintained client mirror named in T-07's P-15) — `git grep -rn "last_decision\|LAST_DECISION_SQL" -- src test`, re-run and recorded.
 - **Review:** `full` — it edits a sibling child's service, and a defect here can fail a successful push.
 - **Done criteria:**
   - [ ] A favourable push writes exactly **one** `PENDING_REVIEW` row with `event_source = 'STAR'`
@@ -621,8 +626,10 @@ graph TD
   - [ ] `decision`, `justification`, `decided_at`, `delivery_id`, `raw_body`, `raw_headers` and the `reviewer_*` fields are **`NULL`** — asserted on the arguments
   - [ ] A throw in the history write is logged at `error` and the push still succeeds
   - [ ] The dedupe transaction is **not** invoked on this path
-  - [ ] All three falsifiers **observed red**, then green
-- **Effort:** M · **Depends on:** **T-01b** · **Est. LOC:** ≈ 300 · **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
+  - [ ] **`LAST_DECISION_SQL` carries `AND event_source = 'PRMS'`**, asserted on the **emitted SQL text**, never on a mock's return value (KZ-001)
+  - [ ] **A result with a successful push and NO inbound verdict returns `last_decision = null`** — the R-PWH-008 AC.3 regression this task would otherwise introduce
+  - [ ] All **four** falsifiers **observed red**, then green
+- **Effort:** M · **Depends on:** **T-01b** (`[x]` 2026-09-23) · **Est. LOC:** ≈ 340 (≈ 300 + ≈ 40 for the amendment) · **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ## 4. Verification commands, pre-flighted
 
@@ -690,7 +697,7 @@ Append-only.
 
 The spec is complete when:
 
-- [ ] All 10 `T-NN` tasks are `done`
+- [ ] All **12** `T-NN` tasks are `done` *(count updated 2026-09-23: the owner-approved Pivot added T-01b and T-11; this line still read 10)*
 - [ ] **Someone has exercised the feature in the running product, BEFORE `/akili-validate` issues a verdict — not after** (KZ-007). Here that means at minimum: a registration round-trip against TEST, and a callback posted at the real endpoint with a valid secret. **A live delivery from PRMS itself remains out of reach until R-1 closes** — record what was and was not exercised; do not let the reachable half stand in for the whole.
 - [ ] Every requirement-level AC is checked, and **every scenario clause in §2 is owned by a task that closed it**
 - [ ] Global Jest coverage threshold (60 %) still green

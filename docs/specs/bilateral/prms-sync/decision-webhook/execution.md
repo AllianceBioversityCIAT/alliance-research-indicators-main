@@ -1470,3 +1470,46 @@ R-PWH-005 (population widens — see *Pivot Record* → *Requirement impact*) ·
 **Green and independently reproduced.** Unit 403/3577 · build exit 0 · eslint exit 0 · e2e 7/7 · migration applies and reverts cleanly from a confirmed-absent baseline · resolved schema matches the Pivot Record exactly · all rename axes swept to zero, including the index-name axis (KZ-005).
 
 **Scope this verification cannot reach (KZ-017):** the migration is applied **nowhere but the disposable TEST scratch schema** — nothing here speaks to Dev or PROD, where the table does not exist under either name. InnoDB locking is proven only on emitted SQL against a mocked `EntityManager`. The six inbound-relevant nullable columns (`status`, `reviewer_name`, `reviewer_role`, `science_program_code`, `changes`, `actor_user_id`) are proven to **store `NULL`**; no task in this spec yet populates them from a PRMS callback body, and T-11 covers only the **outbound** write.
+
+---
+
+## Task Amendment: T-11 — the reader guard is in scope
+
+**Date 2026-09-23 · raised by both T-01b Reviewers independently · approved by the owner at the T-01b continue gate**
+
+### Why
+
+T-11 as originally written **introduces a break of R-PWH-008 AC.3**. `LAST_DECISION_SQL` (`result-prms-sync-status.reader.ts:41-54`) selects on `correlation_outcome = 'CORRELATED' AND duplicate_of_id IS NULL`. Pivot decision 2 gives T-11's outbound rows **both** properties. Reachable sequence, no edge case required:
+
+1. A result is pushed and settles `ACCEPTED` → T-11 writes one `PENDING_REVIEW` row.
+2. PRMS has not yet returned a verdict → there is no inbound row.
+3. `GET /api/results/:result-code/prms-sync` → the only `CORRELATED`, non-duplicate row is **STAR's own**, so `mapLastDecision` returns `{decision: null, decided_at: null, prms_result_code: <set>, …}` where the contract requires **`null`**.
+
+The Pivot's own *Requirement impact* already stated the governing rule — *"every existing query that means 'deliveries' must filter on `event_source`"* — but no task owned that query.
+
+### Why it was not fixed in T-01b
+
+Correctly deferred. Adding a `WHERE` predicate is behaviour, and T-01b's scope boundary excludes *"any behaviour beyond the rename and the additions"*. Both Reviewers ruled the deferral right and the **recording** inadequate: the repository received an inline note, the reader received none, and T-11's task text named neither the file nor the criterion. A deferral recorded only in an advisory has no owner — the brief carries it or nobody does.
+
+### Why it is not a new task
+
+The fix belongs to the task that **causes** the break. Routing it to a new T-12 would leave the defect live in the window between the two, and routing it to the UI spec would ship a known requirement break to Dev. The owner chose the amendment at the T-01b continue gate; the alternatives (new task, or accept-and-log as RB-9) were presented and declined.
+
+### What changed in `tasks.md` § T-11
+
+| # | Change |
+|---|---|
+| 1 | Amendment banner naming the R-PWH-008 AC.3 break |
+| 2 | `result-prms-sync-status.reader.ts` (+ spec) added to **Files touched** |
+| 3 | Implementation note: add `AND event_source = 'PRMS'`, and **do not widen** beyond that one predicate |
+| 4 | **Falsifier 4**: remove the guard → a STAR-only result returning `last_decision = null` must redden; a green there means the test asserts on the mock, not the emitted SQL (KZ-001) |
+| 5 | **Consumers** extended: `git grep -rn "last_decision\|LAST_DECISION_SQL" -- src test` |
+| 6 | Two Done criteria added (guard asserted on emitted SQL; the STAR-only → `null` regression gate) |
+| 7 | Est. LOC ≈ 300 → **≈ 340** |
+
+**Scope is narrowed, not widened, everywhere else:** `findHistory` / `findHistoryByResultId` ordering and duplicate filtering stay out — they belong to the UI spec (OQ-5's sequel).
+
+### Correction closure (two-direction sweep)
+
+- **Forward:** the stale `All 10 \`T-NN\` tasks are \`done\`` line in `tasks.md` §7 — the Pivot added two tasks and never updated it. Now **12**.
+- **Backward:** `tasks.md` §5 budget. The tripwire **has fired** and is recorded as an actual (12 tasks · ≈ 3,710 LOC · 11 review rounds) beside the HITL-approved figure, which is deliberately left unedited. The overrun is fully attributable to the owner-approved T-08 amendment and the owner-approved Pivot.
