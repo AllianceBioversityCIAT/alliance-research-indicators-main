@@ -83,7 +83,7 @@ graph TD
     N -->|POST /api/prms-callback/:secret| CC[PrmsWebhookCallbackController]
     CC --> SG[CallbackSecretGuard]
     SG --> DS[PrmsWebhookDeliveryService]
-    DS -->|1. store + dedupe, one transaction| DB[(prms_webhook_delivery)]
+    DS -->|1. store + dedupe, one transaction| DB[(result_prms_sync_history)]
     DS -.->|2. ACK 2xx returns here| N
     DS -.->|3. detached, after response| CO[DeliveryCorrelator]
     CO -->|read only| R[(results)]
@@ -141,7 +141,32 @@ Sibling `*.spec.ts` for every unit above (root guide §4.1).
 
 ## 4. Data Model
 
-### `prms_webhook_delivery` — new, append-only
+### `result_prms_sync_history` — new, append-only
+
+> ⚠️ **AMENDED 2026-09-23 by an owner-approved Pivot.** This table was specified as `prms_webhook_delivery`, an **inbound delivery log**. It is now the **synchronization history**: it also records STAR's own successful pushes, which PRMS never sends. Full reasoning, the eight design decisions and the measured blast radius are in [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Implemented by **T-01b**; the outbound write is **T-11**.
+>
+> **Renames:** `prms_webhook_delivery` → `result_prms_sync_history` · `received_at` → `occurred_at`. **Nothing was removed** — 23 of T-01's 24 columns are untouched.
+>
+> **Seven columns added:**
+>
+> | Column | Type | Null | Notes |
+> |---|---|---|---|
+> | `event_source` | `varchar(10)` | **no** | `STAR` \| `PRMS` — which side generated the row. **The discriminator that keeps the two populations legible**; every query meaning *"deliveries"* must filter on it |
+> | `status` | `varchar(30)` | yes | `PENDING_REVIEW` \| `APPROVED` \| `REJECTED` — the timeline badge. Derivable, but **stored**: append-only, fixed at write time, and a future PRMS verdict the code cannot map still renders what was recorded |
+> | `actor_user_id` | `bigint` | yes | **Outbound only.** Our user → `sec_users`. An **id**, because this person exists in our system and a stored name would freeze on rename |
+> | `reviewer_name` | `varchar(255)` | yes | **Inbound only.** **Name only, no id** — a PRMS reviewer does not exist in our system. [WH]'s own vocabulary is *"Reviewer's reason"* |
+> | `reviewer_role` | `varchar(191)` | yes | *"SP02 Science Program reviewer"* — the label as sent, for display |
+> | `science_program_code` | `varchar(20)` | yes | *"SP02"*. **Deliberately separate from the role string**: the role is display, the code is data — filterable, joinable to CLARISA later without parsing prose |
+> | `changes` | `json` | yes | The *"See what changed"* payload. **JSON rather than a table** because PRMS has committed to no shape; inventing columns for data never seen is guessing a schema. Display-only today; extracting to a table later is a backfill from our own data, which is the cheap direction |
+>
+> **The three `NOT NULL` columns do NOT relax.** An outbound row is `correlation_outcome = CORRELATED` (a push knows its result), `processing_state = PROCESSED`, and carries its `environment`.
+>
+> **Ordering:** the timeline sorts by `COALESCE(decided_at, occurred_at)` — `decided_at` is when PRMS decided and drives the display; `occurred_at` is when we received it and is our audit. Outbound and `MALFORMED` rows have no `decided_at`.
+>
+> **Reads filter `duplicate_of_id IS NULL`** — every delivery is still recorded, but a repeat is not a timeline entry.
+
+**Original specification, below, remains accurate for every column it lists** — only the table name and `received_at` changed.
+
 
 | Column | Type | Null | Notes |
 |---|---|---|---|
@@ -164,7 +189,7 @@ Sibling `*.spec.ts` for every unit above (root guide §4.1).
 | `duplicate_of_id` | `bigint` | yes | The row this one repeats (R-PWH-006 AC.2). |
 | + `AuditableEntity` | | | Root-guide rule. `created_by` is **NULL** — a callback has no user. `is_active` defaults `TRUE` and **is never flipped by this spec** (append-only, R-PWH-005 AC.7). |
 
-**Indexes:** `idx_prms_webhook_delivery_delivery_id` (`delivery_id`) · `idx_prms_webhook_delivery_result` (`result_id`) · `idx_prms_webhook_delivery_received_at` (`received_at`).
+**Indexes:** `idx_result_prms_sync_history_delivery_id` (`delivery_id`) · `idx_result_prms_sync_history_result` (`result_id`) · `idx_result_prms_sync_history_occurred_at` (`occurred_at`). *(Renamed by the 2026-09-23 Pivot to follow the repo's `idx_<table>_<purpose>` convention — T-01b. Originally `idx_prms_webhook_delivery_*`, the third on `received_at`.)*
 
 **No FK on `result_id`** — an `UNKNOWN_REFERENCE` row must survive, and a result deleted later must not erase its own history. Integrity is the correlator's, not the schema's; stated rather than assumed.
 
@@ -218,7 +243,7 @@ Existing handler, existing guards. `data` gains `last_decision: { decision, deci
 |---|---|---|
 | 1 | ✅ | `CallbackSecretGuard`: timing-safe compare. Mismatch, missing, or secret unconfigured → `404`, **no row written** (R-PWH-004 AC.1, AC.6). |
 | 2 | ✅ | Parse the body leniently; classify shape violations as `MALFORMED`. Never throw. |
-| 3 | ✅ | **One transaction:** `SELECT id FROM prms_webhook_delivery WHERE delivery_id = ? AND duplicate_of_id IS NULL FOR UPDATE` → if a row exists, insert with `DUPLICATE` + `duplicate_of_id`; else insert with the classified outcome and `processing_state = RECEIVED`. Commit. |
+| 3 | ✅ | **One transaction:** `SELECT id FROM result_prms_sync_history WHERE delivery_id = ? AND duplicate_of_id IS NULL FOR UPDATE` → if a row exists, insert with `DUPLICATE` + `duplicate_of_id`; else insert with the classified outcome and `processing_state = RECEIVED`. Commit. |
 | 3b | ✅ | **On `ER_LOCK_DEADLOCK` (1213) or `ER_LOCK_WAIT_TIMEOUT` (1205), retry the transaction once**, then fail. Owned by `prms-webhook-delivery.repository.ts` (§3.1); gated by `R-PWH-006 AC.7` and **DC-12**. *(1205 and the owner added 2026-09-22 — FC2-3: this step named only 1213 while DD-5, AC.7 and DC-12 all required both.)* See DD-5: InnoDB gap locks are mutually compatible, so genuine simultaneity yields a deadlock — a delivery *never recorded* — not a double-apply. Without this branch the endpoint would violate R-PWH-005 (*every delivery is recorded*) and NFR-PWH-005. *(JD-7)* |
 | 4 | ✅ | **Return `2xx`.** The path redaction (DD-10 v2) happens transparently, upstream, inside the three global wrappers — the handler does nothing special. |
 | 5 | ❌ | Detached: correlate + apply + set `processing_state`. Never awaited. Every throw caught and logged (R-PWH-003 AC.4). |
@@ -329,7 +354,7 @@ Mock strategy: `PrmsNormalizerService` stubbed at the HTTP boundary for registra
 
 | # | Date | Decision | Rationale |
 |---|---|---|---|
-| **DD-1** | 2026-09-21 | **Do not extend `PrmsSyncOutcome`, and do not write verdicts into `result_prms_sync_log`.** The verdict's home is `prms_webhook_delivery`. | **This reverses `proposal.md` §9 MODIFIED**, on evidence found during exploration. **Re-verified 2026-09-22 against HEAD `170da206` after `sync-engine`'s FK-removal refactor (see the ground-truth-drift callout in §2): the decision is unaffected — see P-2, P-5.** `LAST_ATTEMPT_SQL` orders by `attempt_number DESC` (P-5); an inbound decision has no attempt number, so writing one there forces STAR to author a value it does not hold — family **P-1**, *what we do not have, we do not send* — and hijacks `last_attempt` for every consumer. The enum's own comment invites extension, but that comment is about the **column type** (VARCHAR, not MySQL `ENUM`), and that property is preserved: `correlation_outcome` and `decision` are VARCHAR too. **Walked all 8 enum members across the repository** before deciding. *(Count corrected at round 1, JD-6: the draft said "8 non-spec consumers" from `git grep -ln "PrmsSyncOutcome" -- src`, but one of those 8 is the declaration itself, the pattern missed four server files that use the member literals, and — decisively — it could not see **P-15**, a hand-maintained mirror of all 8 members in the **client** package. The conclusion is unchanged and now better supported: extending the enum would have required a hand-edit in a second package with no compiler linking the two.)* |
+| **DD-1** | 2026-09-21 | **Do not extend `PrmsSyncOutcome`, and do not write verdicts into `result_prms_sync_log`.** The verdict's home is `result_prms_sync_history` *(renamed to `result_prms_sync_history` by the 2026-09-23 Pivot — T-01b)*. | **This reverses `proposal.md` §9 MODIFIED**, on evidence found during exploration. **Re-verified 2026-09-22 against HEAD `170da206` after `sync-engine`'s FK-removal refactor (see the ground-truth-drift callout in §2): the decision is unaffected — see P-2, P-5.** `LAST_ATTEMPT_SQL` orders by `attempt_number DESC` (P-5); an inbound decision has no attempt number, so writing one there forces STAR to author a value it does not hold — family **P-1**, *what we do not have, we do not send* — and hijacks `last_attempt` for every consumer. The enum's own comment invites extension, but that comment is about the **column type** (VARCHAR, not MySQL `ENUM`), and that property is preserved: `correlation_outcome` and `decision` are VARCHAR too. **Walked all 8 enum members across the repository** before deciding. *(Count corrected at round 1, JD-6: the draft said "8 non-spec consumers" from `git grep -ln "PrmsSyncOutcome" -- src`, but one of those 8 is the declaration itself, the pattern missed four server files that use the member literals, and — decisively — it could not see **P-15**, a hand-maintained mirror of all 8 members in the **client** package. The conclusion is unchanged and now better supported: extending the enum would have required a hand-edit in a second package with no compiler linking the two.)* |
 | **DD-2** | 2026-09-21 | **Registration is an operated `SYSTEM_ADMIN` action.** Rejected: auto-register at boot. Rejected: a human `curl`. | Boot registration fails **silently**: local and Dev share the TEST key ([WH] §1 *one platform, one destination*), so any developer booting locally re-points Dev's callbacks at their machine and Dev's verdicts are lost with no error anywhere (**K-005**, R-2). `curl` works but leaves no record in the product, so nobody can answer *"where are our callbacks going right now?"* |
 | **DD-3** | 2026-09-21 | **The public callback and the admin registration live on disjoint top-level paths** (`prms-callback` vs `prms-webhook`), not on a shared prefix. | `main.routes.ts:413-417` records this exact failure: a route was moved out from under `/admin` because `/admin(.*)` *"would otherwise bypass auth on these admin-REST endpoints"* — **Pivot Record #1** (P-13). Disjoint **top-level** prefixes make the boundary structural instead of careful. Gate: R-PWH-004 AC.3 — subject to **P-17** (the current e2e harness cannot observe the middleware). **Declared deviation (JD-4):** `requirements.md` §9 originally specified `prms-webhook/registration` + `prms-webhook/callback/:secret` and called them *"disjoint below `prms-webhook/`"* — which is self-contradictory, since they shared that prefix. `requirements.md` §9 was amended in round 1 to match this design. |
 | **DD-4** | 2026-09-21 | **Store-then-acknowledge with a detached post-response step.** Rejected: RabbitMQ; rejected: inline correlation. | [WH] §5 is explicit — *"Return 2xx as soon as you have stored the payload."* A queue adds a cross-process contract for a step already idempotent by dedupe. **What this does not give:** crash-safety of the *application* step. The **history is never at risk** — it commits before the acknowledgement — and `processing_state` leaves an unprocessed row visible and re-processable. A sweeper is NG-4, stated, not assumed away. |

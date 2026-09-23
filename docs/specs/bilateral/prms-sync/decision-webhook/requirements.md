@@ -433,7 +433,7 @@ State only what differs from the inherited defaults (envelope, versioning, audit
 
 ## 8. Data Requirements
 
-- **New entity:** `prms_webhook_delivery` (append-only). Nullable STAR `result_id` — **the reason a new table exists at all** (C-4).
+- **New entity:** `result_prms_sync_history` (append-only) *(renamed to `result_prms_sync_history` by the 2026-09-23 Pivot — T-01b)*. Nullable STAR `result_id` — **the reason a new table exists at all** (C-4).
 - **Indexes:** on `delivery_id` (dedupe lookup), on the STAR `result_id` (per-result history), on `received_at` (global history order). Named per the `idx_<table>_<purpose>` convention.
 - **No column is added to `results`.** No column is added to `result_prms_sync_log`.
 - **Migration:** one, `<timestamp>-createPrmsWebhookDeliveryTable.ts`, append-only under `src/db/migrations/` (335 files at `e0c8c443`; the count lives in the folder, never in a document — K-015/KZ-005).

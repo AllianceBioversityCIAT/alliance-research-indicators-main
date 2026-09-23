@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **9 / 10 tasks closed** (T-01 – T-09, all `PASS` 2026-09-22). Remaining: **T-10** (rollout, docs and the two accepted risks) — the only task left, and it writes no `src/` file. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **9 / 12 tasks closed** (T-01 – T-09, all `PASS` 2026-09-22). **Scope changed 2026-09-23 by an owner-approved Pivot** — see [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Two tasks added: **T-01b** (rename + extend the history table) and **T-11** (the outbound `PENDING_REVIEW` event). Remaining order: **T-01b → T-11 → T-10**. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -114,6 +114,8 @@ graph TD
 ---
 
 ### T-01 — Schema: `prms_webhook_delivery` entity, enum, migration, migration spec  `[x]`
+
+> ⚠️ **Superseded in part by T-01b (2026-09-23).** This task shipped and passed against the spec as it stood: 24 columns, table `prms_webhook_delivery`. An owner-approved Pivot then widened the table's purpose from *inbound delivery log* to **synchronization history**, which renames the table and one column and adds seven more. **T-01's `PASS` stands** — it delivered what was asked. The new work is **T-01b**, not a rework of this one.
 
 - **Requirements covered:** R-PWH-005 (row shape, AC.5 column nullability) · R-PWH-006 AC.2 (`duplicate_of_id`) · R-PWH-009 AC.4 (`environment` column) · NFR-PWH-004 (`raw_body` whole)
 - **Design references:** §4 *Data Model* · §3.1 (composition rows for the entity, migration and migration spec) · DD-8 · P-2
@@ -300,6 +302,7 @@ graph TD
   - `src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository.ts` (+ spec)
 - **Description:** The one place that owns the transaction. A single `SELECT … FOR UPDATE` on `delivery_id`, then an insert — either as the classified outcome or as a `DUPLICATE` pointing at the row it repeats. Plus the two history reads R-PWH-005 AC.8 requires.
 - **Implementation notes:**
+  - ⚠️ *The table is renamed to `result_prms_sync_history` by the 2026-09-23 Pivot (T-01b); the SQL below is T-05's text as shipped.*
   - The transaction: `SELECT id FROM prms_webhook_delivery WHERE delivery_id = ? AND duplicate_of_id IS NULL FOR UPDATE` → row found ⇒ insert `DUPLICATE` + `duplicate_of_id`; no row ⇒ insert the classified outcome with `processing_state = RECEIVED`. Commit.
   - **Dedupe is by transaction, not by a unique index** (DD-5): a unique index on `delivery_id` would forbid the repeat row R-PWH-005 requires. *"Every delivery is recorded"* and *"one applied decision"* are **both** obligations.
   - **Step 3b — the retry.** On `ER_LOCK_DEADLOCK` (**1213**) **or** `ER_LOCK_WAIT_TIMEOUT` (**1205**), retry the transaction **once**, then fail loud. Both codes, not one. Rationale (DD-5): no isolation level is configured anywhere in this repo, so InnoDB runs REPEATABLE READ; an empty `FOR UPDATE` range read takes gap locks, gap locks are **mutually compatible**, and each insert then needs an insert-intention lock that waits on the other's gap. Genuine simultaneity therefore yields a **deadlock and a lost delivery**, not a double-apply — which would violate R-PWH-005 and NFR-PWH-005.
@@ -543,6 +546,83 @@ graph TD
 - **Effort:** S · **Depends on:** T-03, T-04, T-07 · **Est. LOC:** ≈ 60 (documentation only) · **Skills:** *(none — no code)*
 
 ---
+
+---
+
+### T-01b — Rename the table to `result_prms_sync_history`, rename `received_at`, add the seven history columns  `[ ]`
+
+> **Created by the owner-approved Pivot of 2026-09-23.** Read [`./execution.md`](./execution.md) → *Pivot Record: T-01* **in full** before starting — it carries the eight design decisions, the measured blast radius and the reasoning behind every column. This task does not restate them.
+
+- **Requirements covered:** R-PWH-005 (the table's population widens — see the Pivot's *Requirement impact*) · the UI history contract the owner supplied as a mock
+- **Files touched:**
+  - `src/db/migrations/1790086170692-createPrmsWebhookDeliveryTable.ts` — **EDIT IN PLACE, do NOT create a second migration.** It is applied nowhere but the disposable scratch schema, which is exactly why the rename is free today. The append-only rule protects **merged and applied** migrations; this one is neither
+  - `src/db/migration-specs/1790086170692-createPrmsWebhookDeliveryTable.spec.ts`
+  - `src/domain/entities/prms-webhook/entities/prms-webhook-delivery.entity.ts` (+ spec)
+  - **and the rename propagated across every file that names the table or the column** — measured at `HEAD 8ebc3117`: `git grep -rln "prms_webhook_delivery" -- src test` → **12 files**; `git grep -rln "received_at" -- src test` → **11 files**. Both sweeps must be re-run at the task's own start commit and recorded
+- **Description:** the table becomes the synchronization history. **Rename** `prms_webhook_delivery` → `result_prms_sync_history` and `received_at` → `occurred_at`; **add seven columns**; **remove nothing.**
+- **Implementation notes:**
+  - The seven columns, their types and the reasoning are in the Pivot Record's table. `event_source` is the only `NOT NULL` addition.
+  - **The three existing `NOT NULL` columns do NOT relax.** An outbound row is `correlation_outcome = CORRELATED` (a push knows its result), `processing_state = PROCESSED`, and has its `environment`. Anyone proposing to make them nullable has misread the Pivot.
+  - **Whether to rename the files and classes too** — `prms-webhook-delivery.entity.ts`, `PrmsWebhookDelivery`, `PrmsWebhookDeliveryRepository` — is **yours to judge and to state**. The table name is fixed; the symbol names are a readability call. Whatever you choose, be consistent and say why.
+  - Five closed tasks reference the renamed identifiers (**T-05, T-06, T-07, T-09, T-04**). None needs a behavioural change. Their specs assert on **literal SQL text**, so the specs move with the code — if a spec's assertion still passes after the rename, it was not asserting what it claimed.
+- **Scope boundary — do NOT touch:** `result_prms_sync_log`, the sync service (**that is T-11**), anything under `client/`, or any behaviour beyond the rename and the additions.
+- **Verification:**
+  - `npm test -- --silent` — the **whole** unit tier, not a scoped slice: this rename reaches five closed tasks
+  - `npm run build` (DC-5)
+  - `npm run migration:test:revert` then `migration:test:execute` then `migration:test:revert` — the scratch schema **already holds the old table**, so revert FIRST and confirm it is gone before executing, or the run is **inconclusive**
+  - `npx eslint <touched paths>` — never `npm run lint` (K-001)
+  - `npm run test:e2e -- test/prms-webhook.e2e-spec.ts` — T-04's suite names the table
+- **Falsifier:** rename the table in the migration but **not** in the entity → the metadata spec that resolves TypeORM's table name goes red. Second: add `event_source` as nullable → the assertion that it is `NOT NULL` reddens. Third: leave one of the twelve files on the old identifier → the build or a spec reddens; **if nothing reddens, that file's assertion was inert and you must say so.**
+- **Red run:** apply each mutation independently, observe its own assertion fail, restore, finish green. Paste every red verbatim.
+- **Disqualifier:** a metadata spec asserting on the **decorator options object** rather than TypeORM's resolved metadata proves the decorator was typed, not that the column was built (KZ-001). **And the migration gate is worthless if the scratch schema still holds the old table** — revert first and confirm absence.
+- **Consumers:** the two sweeps above, re-run and recorded. Note `git grep` **cannot see untracked files**.
+- **Review:** `full` — a schema rename touching five closed tasks, on a table whose migration is the spec's foundation.
+- **Done criteria:**
+  - [ ] Table is `result_prms_sync_history`; column is `occurred_at`; **nothing removed**
+  - [ ] All seven columns present with the Pivot's exact types; `event_source` `NOT NULL`, the rest nullable
+  - [ ] The three pre-existing `NOT NULL` columns are unchanged
+  - [ ] Migration applies **and** reverts cleanly, both outputs recorded, with the pre-execute absence confirmed
+  - [ ] **The three indexes are renamed too** — `idx_result_prms_sync_history_{delivery_id,result,occurred_at}`, following the repo's `idx_<table>_<purpose>` convention
+  - [ ] **Zero** references to `prms_webhook_delivery` or `received_at` remain in `src` or `test` — proven by a re-run sweep
+  - [ ] Full unit tier green; T-04's e2e suite green; build and eslint clean
+  - [ ] All three falsifiers **observed red**, then green
+- **Effort:** M · **Depends on:** — · **Est. LOC:** ≈ 400 · **Skills:** `nestjs-expert`
+
+---
+
+### T-11 — The outbound `PENDING_REVIEW` event  `[ ]`
+
+> **Created by the owner-approved Pivot of 2026-09-23.** Read the *Pivot Record* first, especially decisions **2, 3, 5 and 6**.
+
+- **Requirements covered:** the UI history contract — the mock's *"First synchronization"* and *"Mapping re-synced after rejection"* rows
+- **Files touched:**
+  - `src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository.ts` (+ spec) — **a new method, not a change to `recordDelivery`**
+  - `src/domain/entities/result-prms-sync/result-prms-sync.service.ts` (+ spec) — **ONE guarded call**
+- **Description:** when a push settles `ACCEPTED`, write one `PENDING_REVIEW` row into the history table from STAR's own data. PRMS returns none of it.
+- **Implementation notes:**
+  - **The write point is located**: immediately after `settleAttempt(...)` (~`:251`) and before the return, guarded on `interpreted.outcome === PrmsSyncOutcome.ACCEPTED`. Everything needed is already in scope: `resultId`, `userId`, `claim.attemptNumber`, `claim.resultOfficialCode`, `externalReference`, `interpreted.prmsResultCode`, `interpreted.prmsPhaseId`, `interpreted.requestId`, `environment`.
+  - Row shape: `event_source = 'STAR'`, `status = 'PENDING_REVIEW'`, `actor_user_id = userId`, `occurred_at = now`, `correlation_outcome = CORRELATED`, `processing_state = PROCESSED`, `result_id`, `external_reference`, `prms_result_code`. **`decision`, `justification`, `decided_at`, `delivery_id`, `raw_body`, `raw_headers`, and every `reviewer_*` field stay `NULL`** — an outbound event has none of them.
+  - **ONLY on a favourable push.** `AUTH_FAILED`, `TRANSPORT_FAILED`, `RETRYABLE`, `REFUSED_BY_STAR`, `UNKNOWN`, `IN_FLIGHT` write **nothing** here — the owner was explicit: *"para eso está la otra tabla de logs."*
+  - **One row per successful attempt**, never one per result. A re-sync after rejection is its own entry.
+  - **The write must NEVER fail the push.** Catch, log at `error` with the result code, continue. Failing a successful sync over a history row is strictly worse — the same discipline T-09 applies to the detached correlator.
+  - **Do NOT route this through `recordDelivery`.** That method owns the `SELECT … FOR UPDATE` dedupe for PRMS's `delivery_id`, which an outbound row does not have; running it would take gap locks on the push's critical path and protect nothing. A plain `INSERT`.
+  - ⚠️ **`result-prms-sync.service.ts` belongs to the sibling `sync-engine` (family child 1, status `pending`, in flight).** One guarded call is the whole change. If it needs more, **stop and report it.**
+- **Scope boundary — do NOT touch:** `result_prms_sync_log`'s schema or its write path, the dedupe transaction, the correlator, the callback edge, anything under `client/`.
+- **Verification:** `npm test -- --silent` · `npm run build` · `npx eslint <touched paths>` — never `npm run lint`
+- **Falsifier:** make the history insert throw → the assertion that `sync()` still returns its normal success payload reddens if the throw is allowed to propagate. Second: remove the `ACCEPTED` guard → the assertion that a `TRANSPORT_FAILED` push writes **no** history row reddens. Third: call it twice for one result → the assertion that **two** rows exist reddens if the write is deduped.
+- **Red run:** each mutation independently, its own assertion observed failing, restored, green. Verbatim.
+- **Disqualifier:** **a test that asserts only that the repository method was *called* proves dispatch, not the row.** Assert the **arguments** — specifically that `decision`, `decided_at` and every `reviewer_*` field are `NULL`, and that `event_source` is `'STAR'` (KZ-001). And a red from a missing provider or DI failure is **not** a red for the non-propagation class — the failure must be on the behavioural assertion.
+- **Consumers:** `git grep -rn "settleAttempt\|result-prms-sync.service" -- src test`, re-run and recorded. The sync service's own spec is a **known** consumer that will need the new collaborator mocked.
+- **Review:** `full` — it edits a sibling child's service, and a defect here can fail a successful push.
+- **Done criteria:**
+  - [ ] A favourable push writes exactly **one** `PENDING_REVIEW` row with `event_source = 'STAR'`
+  - [ ] Every unfavourable outcome writes **none** — one test per outcome value
+  - [ ] Two successful pushes for one result produce **two** rows
+  - [ ] `decision`, `justification`, `decided_at`, `delivery_id`, `raw_body`, `raw_headers` and the `reviewer_*` fields are **`NULL`** — asserted on the arguments
+  - [ ] A throw in the history write is logged at `error` and the push still succeeds
+  - [ ] The dedupe transaction is **not** invoked on this path
+  - [ ] All three falsifiers **observed red**, then green
+- **Effort:** M · **Depends on:** **T-01b** · **Est. LOC:** ≈ 300 · **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ## 4. Verification commands, pre-flighted
 

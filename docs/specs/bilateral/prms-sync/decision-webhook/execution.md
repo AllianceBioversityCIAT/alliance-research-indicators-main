@@ -1286,3 +1286,100 @@ R-PWH-004 AC.1, AC.2, AC.3, AC.5, AC.6, AC.8 · R-PWH-009 AC.5 (secret variable)
 #### Final verification result
 
 **PASS.** T-04's e2e suite 7/7 green on a **non-stubbing** harness, verified independently twice; unit tier **403 / 3,569** green; build exit 0; eslint clean; four falsifiers observed red including the exclusion swap breaking **both** AC.2 and AC.3 simultaneously; the guard's fail-open surface enumerated and closed on all four paths; Reviewer `PASS` on a security lens from an independent read-only context on a different model at the registry's tier.
+
+---
+
+## Pivot Record: T-01 — the table is a synchronization HISTORY, not a delivery log
+
+**Date 2026-09-23 · raised by the owner · approved by the owner · `/akili-execute` Error Handling & Pivot Protocol**
+
+### The blocker
+
+The owner supplied the UI mock this spec's history was always meant to feed (OQ-5's sequel, deliberately sequenced after this child). Reading it against the built schema surfaced a premise failure, not an implementation error:
+
+**The mock's timeline holds four rows from TWO different event classes.**
+
+| Mock row | Event class | Where it lives today |
+|---|---|---|
+| "First synchronization" · Mariana Acosta **(PI)** | **STAR's outbound push** | `result_prms_sync_log` |
+| "Mapping re-synced after rejection" · Mariana Acosta | **STAR's outbound push** | `result_prms_sync_log` |
+| "PRMS returned the mapping" · Lucía Fernández | **PRMS's inbound decision** | `prms_webhook_delivery` |
+| "PRMS approved the mapping" · Daniel Okoth | **PRMS's inbound decision** | `prms_webhook_delivery` |
+
+`prms_webhook_delivery` was designed on the premise *"every delivery PRMS sends us is recorded"* (**R-PWH-005**). A `Pending Review` row is **not a delivery** — PRMS never sends it. It is STAR's own event, written from STAR's own data at the moment a push succeeds.
+
+**Owner's decision, stated explicitly: one table, not two.** The history must be a single query.
+
+### What was considered, and rejected
+
+**Read the history as a UNION of the two tables.** The Leader's initial recommendation, and it was wrong for the owner's purpose. Every field is already present — `result_prms_sync_log.created_by` **is** populated (`result-prms-sync.service.ts:131` reads `currentUser.user_id`; the repository writes it on every insert), and `sec_users` carries `first_name` / `last_name`, so *"Mariana Acosta"* is reachable today. **The data exists; only the reader is missing.** The owner nonetheless chose one table, and that is a product decision about how this history is owned and read, not a data-availability question. Recorded as considered and declined.
+
+### The revised direction
+
+**The table becomes the synchronization history, and is renamed to say so.**
+
+| Change | Why now |
+|---|---|
+| `prms_webhook_delivery` → **`result_prms_sync_history`** | The migration is **not applied anywhere but the disposable scratch schema**, so the rename is free today and expensive after the first Dev apply. A name that lies about its contents is a defect this spec has already paid for twice |
+| `received_at` → **`occurred_at`** | An outbound push is not *received*. Same type, same `NOT NULL` |
+
+**The three `NOT NULL` columns survive without relaxing** — which was the Leader's main doubt when pricing this, and it resolved better than expected:
+
+- `correlation_outcome` = `CORRELATED` for an outbound row. **Honest**: a push knows exactly which result it is about.
+- `processing_state` = `PROCESSED`. The event is complete at write time.
+- `environment` — both directions have it.
+
+**Seven columns added, all nullable except the discriminator:**
+
+| Column | Type | For |
+|---|---|---|
+| `event_source` | `varchar(10) NOT NULL` | `'STAR'` \| `'PRMS'` — which side generated the row |
+| `status` | `varchar(30) NULL` | `'PENDING_REVIEW'` \| `'APPROVED'` \| `'REJECTED'` — the mock's badge |
+| `actor_user_id` | `bigint NULL` | **Outbound only.** Our user → `sec_users`. An **id**, because this person exists in our system and a stored name would freeze on rename |
+| `reviewer_name` | `varchar(255) NULL` | **Inbound only.** "Daniel Okoth". **Name only, no id** — this person does not exist in our system. The PRMS contract's own vocabulary is *"Reviewer's reason"*, so `reviewer_*` is consistent |
+| `reviewer_role` | `varchar(191) NULL` | "SP02 Science Program reviewer" — the label as sent, for display |
+| `science_program_code` | `varchar(20) NULL` | "SP02". **Deliberately separate from the role string**: the role is display, the code is data — filterable, and joinable to CLARISA later without parsing prose |
+| `changes` | `json NULL` | The mock's "See what changed" payload |
+
+**No column is removed.** Of the 24 columns T-01 shipped, 23 are untouched and one is renamed.
+
+### Design decisions taken with the owner, recorded here because they are not derivable from the schema
+
+1. **`decided_at` drives the timeline; `occurred_at` is our audit.** Ordering is `COALESCE(decided_at, occurred_at)` — outbound rows and `MALFORMED` rows have no `decided_at`. The owner's reasoning: *"en teoría apenas se acepte se debería mandar a nosotros, entonces si se demora mucho es un problema, pero de eso no hablaremos — eso es problema de PRMS."* The gap between the two columns remains **measurable** without being acted on, which is a side benefit worth keeping.
+2. **A row is written only on a FAVOURABLE push.** A failed push (`AUTH_FAILED`, `TRANSPORT_FAILED`, `RETRYABLE`, `REFUSED_BY_STAR`) writes **nothing** here — *"para eso está la otra tabla de logs que se encarga de registrar esos errores."*
+3. **One row per successful push attempt**, not per result. A re-sync after rejection is its own timeline entry, exactly as the mock shows.
+4. **Nothing updates; only new events are appended.** The badge on the 28 Aug row still reads `PENDING_REVIEW` after the 11 Sep approval, because this is a timeline of events, not a current-state view.
+5. **The history write must never fail the push.** If the push succeeded and the history insert throws, the error is caught and logged at `error` — failing a successful sync over a UI row would be strictly worse. Same discipline T-09 already applies to the detached correlator.
+6. **Outbound rows bypass the dedupe transaction.** T-05's `SELECT … FOR UPDATE` exists for PRMS's `delivery_id`, which an outbound row does not have. Running it would take gap locks on the push's critical path and protect nothing. A separate plain-`INSERT` method.
+7. **Duplicates are stored and filtered at read.** `duplicate_of_id IS NULL` — the requirement to record every delivery stands, and the UI stays clean. This is already T-07's behaviour. *(Leader default; surfaced to the owner and not contradicted.)*
+8. **`status` is stored rather than derived.** It is derivable from `event_source` + `decision`, but the table is append-only, the value is fixed at write time, the read stays a plain `SELECT`, and a future PRMS verdict the current code cannot map will still render what was recorded.
+
+### Blast radius — measured at `HEAD 8ebc3117`, not estimated
+
+```
+git grep -rln "prms_webhook_delivery" -- src test   ->  12 files
+git grep -rln "received_at"           -- src test   ->  11 files
+```
+
+The rename reaches **T-05's repository, T-06's correlator, T-07's reader, T-09's service and T-04's e2e suite** — five closed tasks. None needs a behavioural change; all need the identifier updated, and their specs assert on the literal SQL text, so the specs move with them.
+
+### Requirement impact
+
+**R-PWH-005's premise widens.** *"Every delivery PRMS sends is recorded"* remains true and unchanged. What is new is that the table also records STAR's own successful pushes — rows that are **not** deliveries. The requirement is not contradicted; its table now has a second, clearly discriminated population. **`event_source` is what keeps the two legible**, and every existing query that means *"deliveries"* must filter on it.
+
+### Branch state re-verified before planning — RB-1 did not fire
+
+The owner updated the branch mid-discussion (`8ebc3117`, merging `AC-1441-US5-Push-Results-into-the-PRMS`). The Leader re-checked rather than assuming: the merge brought **14 files, all under `client/research-indicators/`**. No server file moved, the sync service is unchanged since `c3f10b44`, and the migration is intact and still unapplied outside the scratch schema.
+
+### The write point, located
+
+`result-prms-sync.service.ts`, immediately after `settleAttempt(...)` (~`:251`) and before the return, conditional on `interpreted.outcome === PrmsSyncOutcome.ACCEPTED`. Everything a `Pending Review` row needs is already in scope there: `resultId`, `userId`, `claim.attemptNumber`, `claim.resultOfficialCode`, `externalReference`, `interpreted.prmsResultCode`, `interpreted.prmsPhaseId`, `interpreted.requestId`, `environment`.
+
+**This file belongs to the sibling `sync-engine` (family child 1, status `pending`).** The change is **one guarded call**, and it is the minimum that satisfies the owner's decision — the alternatives were a backfill that duplicates data, or an event bus that still requires the same single line.
+
+### Tasks
+
+- **T-01 is REOPENED as T-01b** — rename, column rename, seven additions, and the rename propagated across the twelve files.
+- **T-11 is NEW** — the outbound `PENDING_REVIEW` write.
+
+Both are recorded in `tasks.md`. **No work has been dispatched for either; this record precedes execution, as the protocol requires.**
