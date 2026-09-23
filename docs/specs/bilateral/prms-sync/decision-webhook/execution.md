@@ -1783,3 +1783,51 @@ Per `/akili-execute` Step 2.3 item 0, a task with an outstanding gap never reach
 **Documentation delivered and independently verified; the operational and human halves are blocked and recorded as such.** No test or build gate applies — this task produces no code.
 
 **Scope this verification cannot reach (KZ-017):** it proves what the three documents now say and that no code was touched. It proves **nothing** about the Dev database's migration state, the PRMS TEST host, or whether any human has been told anything — all three are the outstanding work above, and a green review here must never be read as covering them.
+
+---
+
+## T-10 follow-up — the migration pending-state check, UNBLOCKED and completed
+
+**2026-09-23, after the owner brought the CIAT VPN up.** Read-only throughout; no write of any kind was issued against the shared Dev database.
+
+The check recorded as **BLOCKED** in the rollout note above has now been executed. That BLOCKED record stands as an accurate account of the moment it was written; this section supersedes it with the measurement.
+
+### Command and K-014 discipline
+
+```
+npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts
+-> EXIT=0
+```
+
+**The error check ran before the count**, and it produced a false positive worth recording: `grep -icE "error|..."` returned **1**, matching line 274 — `[X] 321 AddedErrorMessageAiReport1781106535639`, a migration whose *name* contains "Error". Inspected before counting; not an error. This is the same discipline that caught the genuine `EXIT=127` earlier, working in the other direction: the check must be *read*, not just counted.
+
+Output ANSI-normalized (`sed $'s/\033\[[0-9;]*m//g'`) before any count, per K-014 — the typeorm passthrough emits escapes, and `grep '^\[ \]'` matches nothing against the raw stream.
+
+### Result
+
+| Measure | Value |
+|---|---|
+| Migrations applied on Dev | **336** |
+| **Pending** | **1** |
+| The pending one | **`CreatePrmsWebhookDeliveryTable1790086170692`** — this spec's own |
+
+### Table state on Dev (read-only `SELECT` over `information_schema`)
+
+| Table | Present? | Columns |
+|---|---|---|
+| `result_prms_sync_log` | **yes** | 18 (the sibling `sync-engine` child's outbound log) |
+| `prms_webhook_delivery` | **no** | — |
+| `result_prms_sync_history` | **no** | — |
+
+### What this settles
+
+1. **T-01b's rename was free, exactly as the Pivot priced it.** The migration is applied nowhere outside the disposable scratch schema, so Dev never experiences a rename at all: the first `migration:run` there will create the table directly as `result_prms_sync_history`. The Pivot's central premise — *"the rename is free today and expensive after the first Dev apply"* — is confirmed by measurement, not by argument.
+2. **K-015 observed live.** The migration has been merged and deployed as code for days and remains unapplied. The pipeline ships code only; applying this migration is a separate, human-decided step and is now the **first action of the rollout**.
+
+### Still blocked / still owed (unchanged by this measurement)
+
+- The **TEST registration round-trip** (`POST` then `GET /api/prms-webhook`) — not attempted; it requires a running server and is a write.
+- **OQ-1…OQ-6, OQ-D1, OQ-D2**, the **three comms**, and the **Security sign-off** — all human, all outstanding.
+- **DC-9** — unchanged and unchangeable from inside the CIAT network (C-15, C-16).
+
+**Scope this measurement cannot reach (KZ-017):** it proves what Dev's migration table and `information_schema` say right now, over a VPN session. It proves nothing about PROD, nothing about whether the migration *would* apply cleanly against Dev's data (it was not run), and nothing about the PRMS TEST host.
