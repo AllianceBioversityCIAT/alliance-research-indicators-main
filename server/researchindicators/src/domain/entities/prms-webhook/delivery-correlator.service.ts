@@ -46,7 +46,7 @@ export interface DeliveryCorrelationInput {
   id: number;
   /** Header `x-prms-delivery-id`. Null when PRMS omitted it. */
   delivery_id: string | null;
-  external_reference: string | null;
+  result_official_code: string | null;
 }
 
 export interface DeliveryCorrelationApplied {
@@ -81,12 +81,12 @@ const errorText = (error: unknown): string =>
  * the query (R-PWH-007 AC.2). Leading zeros are rejected because
  * `Number('01441061')` is `1441061`, a different code than the text.
  */
-const parseOfficialCode = (externalReference: string): number | null => {
-  if (!/^[0-9]+$/.test(externalReference)) {
+const parseOfficialCode = (resultOfficialCode: string): number | null => {
+  if (!/^[0-9]+$/.test(resultOfficialCode)) {
     return null;
   }
-  const code = Number(externalReference);
-  if (!Number.isSafeInteger(code) || String(code) !== externalReference) {
+  const code = Number(resultOfficialCode);
+  if (!Number.isSafeInteger(code) || String(code) !== resultOfficialCode) {
     return null;
   }
   return code;
@@ -129,7 +129,7 @@ export class DeliveryCorrelatorService {
   private async apply(
     delivery: DeliveryCorrelationInput,
   ): Promise<DeliveryCorrelationApplied> {
-    const reference = this.classifyReference(delivery.external_reference);
+    const reference = this.classifyReference(delivery.result_official_code);
     if (reference.kind === 'absent') {
       return this.finish(
         delivery.id,
@@ -161,7 +161,7 @@ export class DeliveryCorrelatorService {
     }
     if (rows.length > 1) {
       this.logger._warn(
-        `Ambiguous correlation for external_reference=${delivery.external_reference}: ${rows.length} live rows matched; applying the first`,
+        `Ambiguous correlation for result_official_code=${delivery.result_official_code}: ${rows.length} live rows matched; applying the first`,
       );
     }
     const resultId = Number(rows[0].result_id);
@@ -179,15 +179,15 @@ export class DeliveryCorrelatorService {
   }
 
   private classifyReference(
-    externalReference: string | null,
+    resultOfficialCode: string | null,
   ): ReferenceResolution {
-    if (externalReference == null) {
+    if (resultOfficialCode == null) {
       return { kind: 'absent' };
     }
-    if (typeof externalReference !== 'string') {
+    if (typeof resultOfficialCode !== 'string') {
       return { kind: 'invalid' };
     }
-    const code = parseOfficialCode(externalReference);
+    const code = parseOfficialCode(resultOfficialCode);
     if (code === null) {
       return { kind: 'invalid' };
     }

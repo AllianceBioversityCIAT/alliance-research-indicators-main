@@ -94,6 +94,7 @@ describe('ResultPrmsSyncService', () => {
         attemptId: 9,
         attemptNumber: 1,
         resultOfficialCode: 1001,
+        resultYear: 2026,
       }),
       settleIfInFlight: jest.fn().mockResolvedValue('settled'),
       insertRefusedByStar: jest.fn().mockResolvedValue({
@@ -168,6 +169,7 @@ describe('ResultPrmsSyncService', () => {
       attemptId: 9,
       attemptNumber: 1,
       resultOfficialCode: 1001,
+      resultYear: 2026,
     });
 
     const first = await service.sync(42);
@@ -568,7 +570,8 @@ describe('ResultPrmsSyncService', () => {
         userId: 7,
         occurredAt: expect.any(Date),
         environment: 'TEST',
-        externalReference: 'ARI-1001',
+        resultOfficialCode: 'ARI-1001',
+        resultYear: 2026,
         prmsResultCode: 9199,
       });
       expect(Object.keys(arg).sort()).toEqual(
@@ -577,7 +580,8 @@ describe('ResultPrmsSyncService', () => {
           'userId',
           'occurredAt',
           'environment',
-          'externalReference',
+          'resultOfficialCode',
+          'resultYear',
           'prmsResultCode',
         ].sort(),
       );

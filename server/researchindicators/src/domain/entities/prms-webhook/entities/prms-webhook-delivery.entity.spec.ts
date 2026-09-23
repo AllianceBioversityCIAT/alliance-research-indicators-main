@@ -96,11 +96,28 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(metadata.relations).toHaveLength(0);
   });
 
-  it('external_reference is varchar(191) NULL', () => {
-    const externalReference = column('external_reference');
-    expect(externalReference.type).toBe('varchar');
-    expect(externalReference.length).toBe('191');
-    expect(externalReference.isNullable).toBe(true);
+  it('result_official_code is varchar(191) NULL', () => {
+    const resultOfficialCode = column('result_official_code');
+    expect(resultOfficialCode.type).toBe('varchar');
+    expect(resultOfficialCode.length).toBe('191');
+    expect(resultOfficialCode.isNullable).toBe(true);
+  });
+
+  it('result_year is a resolved year column, nullable, and indexed with result_official_code', () => {
+    const resultYear = column('result_year');
+    expect(resultYear.type).toBe('year');
+    expect(resultYear.isNullable).toBe(true);
+    expect(resultYear.relationMetadata).toBeUndefined();
+    const index = metadata.indices.find(
+      (candidate) =>
+        candidate.name === 'idx_result_prms_sync_history_code_year',
+    );
+    expect(index).toBeDefined();
+    expect(index?.isUnique).toBe(false);
+    expect(index?.columns.map((indexed) => indexed.propertyName)).toEqual([
+      'result_official_code',
+      'result_year',
+    ]);
   });
 
   it('prms_result_id and prms_result_code are bigint NULL', () => {
@@ -214,7 +231,7 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(isActive.default).toBe(true);
   });
 
-  it('declares exactly the three non-unique indexes', () => {
+  it('declares exactly the four non-unique indexes', () => {
     const indexes = metadata.indices
       .map((index) => ({
         name: index.name,
@@ -223,6 +240,11 @@ describe('PrmsWebhookDelivery entity metadata', () => {
       }))
       .sort((left, right) => left.name.localeCompare(right.name));
     expect(indexes).toEqual([
+      {
+        name: 'idx_result_prms_sync_history_code_year',
+        unique: false,
+        columns: ['result_official_code', 'result_year'],
+      },
       {
         name: 'idx_result_prms_sync_history_delivery_id',
         unique: false,
@@ -251,7 +273,8 @@ describe('PrmsWebhookDelivery entity metadata', () => {
         'environment',
         'correlation_outcome',
         'result_id',
-        'external_reference',
+        'result_official_code',
+        'result_year',
         'prms_result_id',
         'prms_result_code',
         'decision',

@@ -57,6 +57,8 @@ export type ClaimDecision =
       attemptId: number;
       attemptNumber: number;
       resultOfficialCode: number;
+      /** `results.report_year_id`, read under the same lock as the code. */
+      resultYear: number;
     };
 
 export interface ClaimAttemptInput {
@@ -308,6 +310,7 @@ export class ResultPrmsSyncLogRepository {
       attemptId: Number(asOk(insertResult).insertId),
       attemptNumber,
       resultOfficialCode,
+      resultYear,
     };
   }
 

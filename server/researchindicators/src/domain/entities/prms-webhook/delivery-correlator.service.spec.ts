@@ -215,7 +215,7 @@ const delivery = (
 ): DeliveryCorrelationInput => ({
   id: DELIVERY_ROW_ID,
   delivery_id: DELIVERY_HEADER_ID,
-  external_reference: String(OFFICIAL),
+  result_official_code: String(OFFICIAL),
   ...overrides,
 });
 
@@ -387,7 +387,7 @@ describe('DeliveryCorrelatorService', () => {
       '%j is UNKNOWN_REFERENCE, writes a null result_id, and issues no results query',
       async (reference) => {
         const result = await service.correlate(
-          delivery({ external_reference: reference }),
+          delivery({ result_official_code: reference }),
         );
 
         expect(result).toMatchObject({
@@ -411,7 +411,7 @@ describe('DeliveryCorrelatorService', () => {
 
     it('the literal "0" is a real code and correlates to that row — it is not the empty-string coercion', async () => {
       const result = await service.correlate(
-        delivery({ external_reference: '0' }),
+        delivery({ result_official_code: '0' }),
       );
 
       expect(result).toMatchObject({
@@ -429,7 +429,7 @@ describe('DeliveryCorrelatorService', () => {
       '%j is NO_REFERENCE and issues no results query',
       async (reference) => {
         const result = await service.correlate(
-          delivery({ external_reference: reference }),
+          delivery({ result_official_code: reference }),
         );
 
         expect(result).toMatchObject({
@@ -447,10 +447,10 @@ describe('DeliveryCorrelatorService', () => {
       },
     );
 
-    it('a missing external_reference is NO_REFERENCE', async () => {
+    it('a missing result_official_code is NO_REFERENCE', async () => {
       const input = delivery();
-      delete (input as { external_reference?: string | null })
-        .external_reference;
+      delete (input as { result_official_code?: string | null })
+        .result_official_code;
 
       const result = await service.correlate(input);
 
@@ -465,7 +465,7 @@ describe('DeliveryCorrelatorService', () => {
   describe('no live row', () => {
     it('a well-formed code that matches nothing is UNKNOWN_REFERENCE and still not a 0-query', async () => {
       const result = await service.correlate(
-        delivery({ external_reference: '9999999' }),
+        delivery({ result_official_code: '9999999' }),
       );
 
       expect(result).toMatchObject({
@@ -500,7 +500,7 @@ describe('DeliveryCorrelatorService', () => {
       expect(warn).toHaveBeenCalledTimes(1);
       const message = String(warn.mock.calls[0][0]);
       expect(message).toMatch(/Ambiguous/);
-      expect(message).toContain(`external_reference=${OFFICIAL}`);
+      expect(message).toContain(`result_official_code=${OFFICIAL}`);
       expect(message).toContain('2 live rows');
       expect(table.updates[0]?.set.result_id).toBe(LIVE_ID);
       expectNoResultsWrite();
@@ -509,10 +509,10 @@ describe('DeliveryCorrelatorService', () => {
 
   describe('AC.3 — no branch writes results', () => {
     it('null, non-numeric, unknown, one match, and an ambiguous match never call save/update/insert/delete and never emit a write against results', async () => {
-      await service.correlate(delivery({ external_reference: null }));
-      await service.correlate(delivery({ external_reference: '' }));
-      await service.correlate(delivery({ external_reference: 'abc' }));
-      await service.correlate(delivery({ external_reference: '9999999' }));
+      await service.correlate(delivery({ result_official_code: null }));
+      await service.correlate(delivery({ result_official_code: '' }));
+      await service.correlate(delivery({ result_official_code: 'abc' }));
+      await service.correlate(delivery({ result_official_code: '9999999' }));
       await service.correlate(delivery());
       table.rows.unshift(resultRow({ result_id: SECOND_LIVE_ID }));
       await service.correlate(delivery());

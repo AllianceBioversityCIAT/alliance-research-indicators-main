@@ -51,7 +51,7 @@ type IngestCorrelationOutcome = Exclude<
 
 interface ClassifiedBody {
   correlationOutcome: IngestCorrelationOutcome;
-  externalReference: string | null;
+  resultOfficialCode: string | null;
   prmsResultId: number | null;
   prmsResultCode: number | null;
   decision: string | null;
@@ -64,7 +64,7 @@ interface DeliveryLogFields {
   deliveryId: string | null;
   environment: 'PROD' | 'TEST';
   correlationOutcome: DeliveryCorrelationOutcome;
-  externalReference: string | null;
+  resultOfficialCode: string | null;
   officialCode: number | null;
 }
 
@@ -81,7 +81,7 @@ const errorText = (error: unknown): string =>
 
 const emptyMalformed = (): ClassifiedBody => ({
   correlationOutcome: DeliveryCorrelationOutcome.MALFORMED,
-  externalReference: null,
+  resultOfficialCode: null,
   prmsResultId: null,
   prmsResultCode: null,
   decision: null,
@@ -120,7 +120,7 @@ const classifyBody = (body: unknown): ClassifiedBody => {
     data.ok;
 
   const parsed: Omit<ClassifiedBody, 'correlationOutcome' | 'decision'> = {
-    externalReference: reference.value,
+    resultOfficialCode: reference.value,
     prmsResultId: prmsResultId.value,
     prmsResultCode,
     justification: justification.value,
@@ -154,6 +154,11 @@ const classifyBody = (body: unknown): ClassifiedBody => {
 const readExternalReference = (
   body: Record<string, unknown>,
 ): { ok: boolean; value: string | null } => {
+  // `external_reference` is PRMS's OWN wire field ([WH] contract). It is
+  // deliberately NOT renamed alongside our column: we store the value in
+  // `result_official_code`, but PRMS keeps sending it under its own key.
+  // The value is not validated here — `parseOfficialCode` in the correlator
+  // decides whether it is a real official code, and may classify it invalid.
   if (!('external_reference' in body) || body.external_reference == null) {
     return { ok: true, value: null };
   }
@@ -268,7 +273,7 @@ export class PrmsWebhookDeliveryService {
       occurred_at: new Date(),
       environment,
       correlation_outcome: classified.correlationOutcome,
-      external_reference: classified.externalReference,
+      result_official_code: classified.resultOfficialCode,
       prms_result_id: classified.prmsResultId,
       prms_result_code: classified.prmsResultCode,
       decision: classified.decision,
@@ -284,7 +289,7 @@ export class PrmsWebhookDeliveryService {
       stored.kind === 'duplicate'
         ? DeliveryCorrelationOutcome.DUPLICATE
         : classified.correlationOutcome,
-      classified.externalReference,
+      classified.resultOfficialCode,
     );
 
     if (!this.shouldDetach(stored, classified.correlationOutcome)) {
@@ -295,7 +300,7 @@ export class PrmsWebhookDeliveryService {
     const correlation = this.beginCorrelation(
       stored.deliveryRowId,
       input.deliveryId,
-      classified.externalReference,
+      classified.resultOfficialCode,
       logFields,
     );
     if (correlation) {
@@ -328,7 +333,7 @@ export class PrmsWebhookDeliveryService {
   private beginCorrelation(
     deliveryRowId: number,
     deliveryId: string | null,
-    externalReference: string | null,
+    resultOfficialCode: string | null,
     logFields: DeliveryLogFields,
   ): Promise<DeliveryCorrelationResult> | null {
     try {
@@ -336,7 +341,7 @@ export class PrmsWebhookDeliveryService {
         this.correlator.correlate({
           id: deliveryRowId,
           delivery_id: deliveryId,
-          external_reference: externalReference,
+          result_official_code: resultOfficialCode,
         }),
       );
     } catch (error) {
@@ -390,13 +395,13 @@ export class PrmsWebhookDeliveryService {
     deliveryId: string | null,
     environment: 'PROD' | 'TEST',
     correlationOutcome: DeliveryCorrelationOutcome,
-    externalReference: string | null,
+    resultOfficialCode: string | null,
   ): DeliveryLogFields {
     return {
       deliveryId,
       environment,
       correlationOutcome,
-      externalReference,
+      resultOfficialCode,
       officialCode: null,
     };
   }
@@ -406,7 +411,7 @@ export class PrmsWebhookDeliveryService {
       `PRMS webhook delivery delivery_id=${fields.deliveryId ?? 'none'} ` +
         `environment=${fields.environment} ` +
         `correlation_outcome=${fields.correlationOutcome} ` +
-        `external_reference=${fields.externalReference ?? 'none'} ` +
+        `result_official_code=${fields.resultOfficialCode ?? 'none'} ` +
         `official_code=${fields.officialCode ?? 'none'}`,
     );
   }

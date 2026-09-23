@@ -260,6 +260,7 @@ export class ResultPrmsSyncService {
         externalReference,
         prmsResultCode: interpreted.prmsResultCode,
         resultOfficialCode: claim.resultOfficialCode,
+        resultYear: claim.resultYear,
       });
     }
 
@@ -292,6 +293,7 @@ export class ResultPrmsSyncService {
     externalReference: string | null;
     prmsResultCode: number | null;
     resultOfficialCode: number | null;
+    resultYear: number;
   }): Promise<void> {
     try {
       await this.outboundHistoryRepository.recordOutboundPendingReview({
@@ -299,7 +301,8 @@ export class ResultPrmsSyncService {
         userId: input.userId,
         occurredAt: new Date(),
         environment: input.environment,
-        externalReference: input.externalReference,
+        resultOfficialCode: input.externalReference,
+        resultYear: input.resultYear,
         prmsResultCode: input.prmsResultCode,
       });
     } catch (error) {

@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS \`result_prms_sync_history\` (
   \`environment\` varchar(20) NOT NULL,
   \`correlation_outcome\` varchar(40) NOT NULL,
   \`result_id\` bigint NULL,
-  \`external_reference\` varchar(191) NULL,
+  \`result_official_code\` varchar(191) NULL,
+  \`result_year\` year NULL,
   \`prms_result_id\` bigint NULL,
   \`prms_result_code\` bigint NULL,
   \`decision\` varchar(20) NULL,
@@ -68,7 +69,8 @@ CREATE TABLE IF NOT EXISTS \`result_prms_sync_history\` (
   PRIMARY KEY (\`id\`),
   INDEX \`idx_result_prms_sync_history_delivery_id\` (\`delivery_id\`),
   INDEX \`idx_result_prms_sync_history_result\` (\`result_id\`),
-  INDEX \`idx_result_prms_sync_history_occurred_at\` (\`occurred_at\`)
+  INDEX \`idx_result_prms_sync_history_occurred_at\` (\`occurred_at\`),
+  INDEX \`idx_result_prms_sync_history_code_year\` (\`result_official_code\`, \`result_year\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci
 `;
 

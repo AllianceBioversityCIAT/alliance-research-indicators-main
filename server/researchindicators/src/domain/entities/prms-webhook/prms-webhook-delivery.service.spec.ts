@@ -178,7 +178,7 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(correlate).toHaveBeenCalledWith({
         id: DELIVERY_ROW_ID,
         delivery_id: DELIVERY_HEADER_ID,
-        external_reference: OFFICIAL,
+        result_official_code: OFFICIAL,
       });
     }, 1000);
   });
@@ -277,7 +277,7 @@ describe('PrmsWebhookDeliveryService', () => {
     });
   });
 
-  describe('R-PWH-005 AC.4 — external_reference null or absent is NO_REFERENCE', () => {
+  describe('R-PWH-005 AC.4 — the inbound external_reference null or absent is NO_REFERENCE', () => {
     it('stores NO_REFERENCE and answers 2xx when external_reference is null', async () => {
       correlate.mockResolvedValue(
         applied(DeliveryCorrelationOutcome.NO_REFERENCE),
@@ -292,12 +292,12 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(stored.correlation_outcome).toBe(
         DeliveryCorrelationOutcome.NO_REFERENCE,
       );
-      expect(stored.external_reference).toBeNull();
+      expect(stored.result_official_code).toBeNull();
       expect(stored.decision).toBe('APPROVE');
       expect(correlate).toHaveBeenCalledWith({
         id: DELIVERY_ROW_ID,
         delivery_id: DELIVERY_HEADER_ID,
-        external_reference: null,
+        result_official_code: null,
       });
     });
 
@@ -310,7 +310,7 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(storedInput().correlation_outcome).toBe(
         DeliveryCorrelationOutcome.NO_REFERENCE,
       );
-      expect(storedInput().external_reference).toBeNull();
+      expect(storedInput().result_official_code).toBeNull();
     });
   });
 
@@ -456,7 +456,7 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(line).toContain(`delivery_id=${DELIVERY_HEADER_ID}`);
       expect(line).toContain('environment=TEST');
       expect(line).toContain('correlation_outcome=CORRELATED');
-      expect(line).toContain(`external_reference=${OFFICIAL}`);
+      expect(line).toContain(`result_official_code=${OFFICIAL}`);
       expect(line).toContain('official_code=1441061');
       expect(line).not.toContain('super-secret');
       expect(errorLines).toHaveLength(0);
@@ -498,7 +498,7 @@ describe('PrmsWebhookDeliveryService', () => {
       });
       expect(stored.raw_headers).toBe(headers);
       expect(stored.decided_at).toEqual(new Date(DECIDED_AT));
-      expect(stored.external_reference).toBe(OFFICIAL);
+      expect(stored.result_official_code).toBe(OFFICIAL);
     });
   });
 });

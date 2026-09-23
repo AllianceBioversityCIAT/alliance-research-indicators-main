@@ -40,7 +40,8 @@ const HISTORY_COLUMNS = [
   'environment',
   'correlation_outcome',
   'result_id',
-  'external_reference',
+  'result_official_code',
+  'result_year',
   'prms_result_id',
   'prms_result_code',
   'decision',
@@ -97,8 +98,9 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   delivery.correlation_outcome =
     row.correlation_outcome as DeliveryCorrelationOutcome;
   delivery.result_id = asNullableNumber(row.result_id);
-  delivery.external_reference =
-    (row.external_reference as string | null) ?? null;
+  delivery.result_official_code =
+    (row.result_official_code as string | null) ?? null;
+  delivery.result_year = asNullableNumber(row.result_year);
   delivery.prms_result_id = asNullableNumber(row.prms_result_id);
   delivery.prms_result_code = asNullableNumber(row.prms_result_code);
   delivery.decision = (row.decision as string | null) ?? null;
@@ -144,7 +146,7 @@ export interface RecordDeliveryInput {
     DeliveryCorrelationOutcome,
     DeliveryCorrelationOutcome.DUPLICATE
   >;
-  external_reference: string | null;
+  result_official_code: string | null;
   prms_result_id: number | null;
   prms_result_code: number | null;
   decision: string | null;
@@ -175,7 +177,13 @@ export interface RecordOutboundPendingReviewInput {
   userId: number | null;
   occurredAt: Date;
   environment: string;
-  externalReference: string | null;
+  resultOfficialCode: string | null;
+  /**
+   * `results.report_year_id`, already read by the claim. Paired with
+   * `resultOfficialCode`. Not nullable here: the claim always has the
+   * year it just wrote on the log.
+   */
+  resultYear: number;
   prmsResultCode: number | null;
 }
 
@@ -265,30 +273,32 @@ export class PrmsWebhookDeliveryRepository {
       `
       INSERT INTO result_prms_sync_history
         (delivery_id, occurred_at, environment, correlation_outcome, result_id,
-         external_reference, prms_result_id, prms_result_code, decision,
-         justification, decided_at, raw_body, raw_headers, processing_state,
-         processing_error, duplicate_of_id, created_by, is_active,
-         event_source, status, actor_user_id, reviewer_name, reviewer_role,
-         science_program_code, changes)
-      VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
+         result_official_code, result_year, prms_result_id, prms_result_code,
+         decision, justification, decided_at, raw_body, raw_headers,
+         processing_state, processing_error, duplicate_of_id, created_by,
+         is_active, event_source, status, actor_user_id, reviewer_name,
+         reviewer_role, science_program_code, changes)
+      VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
               ?, NULL, NULL, NULL, NULL, NULL, NULL)
       `,
-      // 25 columns, 15 placeholders + 10 literals (result_id, processing_error
-      // and created_by are NULL at insert; is_active is TRUE; the six
-      // Pivot columns this ingest path never populates -- status,
-      // actor_user_id, reviewer_name, reviewer_role, science_program_code,
-      // changes -- are NULL, T-11's outbound write is the only path that
-      // fills them). Keep this list and the array below in lockstep -- a
-      // stray param shifts every value one column right and MySQL reports
-      // it at the first type mismatch, nowhere near the real mistake (the
-      // same warning sits on the INSERT in `result-prms-sync-log.repository.ts`,
+      // 26 columns, 15 placeholders + 11 literals (result_id, result_year,
+      // processing_error and created_by are NULL at insert; is_active is
+      // TRUE; the six Pivot columns this ingest path never populates --
+      // status, actor_user_id, reviewer_name, reviewer_role,
+      // science_program_code, changes -- are NULL). result_year is NULL
+      // because a PRMS delivery does not carry the reporting year; the
+      // outbound PENDING_REVIEW write is the path that fills it. Keep this
+      // list and the array below in lockstep -- a stray param shifts every
+      // value one column right and MySQL reports it at the first type
+      // mismatch, nowhere near the real mistake (the same warning sits on
+      // the INSERT in `result-prms-sync-log.repository.ts`,
       // `claimInsideLock`).
       [
         input.delivery_id,
         input.occurred_at,
         input.environment,
         correlationOutcome,
-        input.external_reference,
+        input.result_official_code,
         input.prms_result_id,
         input.prms_result_code,
         input.decision,
@@ -374,15 +384,15 @@ export class PrmsWebhookDeliveryRepository {
       `
       INSERT INTO result_prms_sync_history
         (delivery_id, occurred_at, environment, correlation_outcome, result_id,
-         external_reference, prms_result_id, prms_result_code, decision,
-         justification, decided_at, raw_body, raw_headers, processing_state,
-         processing_error, duplicate_of_id, created_by, is_active,
-         event_source, status, actor_user_id, reviewer_name, reviewer_role,
-         science_program_code, changes)
-      VALUES (NULL, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
+         result_official_code, result_year, prms_result_id, prms_result_code,
+         decision, justification, decided_at, raw_body, raw_headers,
+         processing_state, processing_error, duplicate_of_id, created_by,
+         is_active, event_source, status, actor_user_id, reviewer_name,
+         reviewer_role, science_program_code, changes)
+      VALUES (NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
               ?, ?, ?, NULL, NULL, NULL, NULL)
       `,
-      // 25 columns, 10 placeholders + 15 literals. Kept in lockstep with
+      // 26 columns, 11 placeholders + 15 literals. Kept in lockstep with
       // the column list for the same reason `recordInsideLock` flags —
       // a stray param shifts every value one column right.
       [
@@ -390,7 +400,8 @@ export class PrmsWebhookDeliveryRepository {
         input.environment,
         DeliveryCorrelationOutcome.CORRELATED,
         input.resultId,
-        input.externalReference,
+        input.resultOfficialCode,
+        input.resultYear,
         input.prmsResultCode,
         DeliveryProcessingState.PROCESSED,
         EVENT_SOURCE_OUTBOUND,

@@ -15,7 +15,10 @@ import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome
  *
  * `result_id` is deliberately NOT a foreign key (P-2). An
  * UNKNOWN_REFERENCE row must survive, and deleting a result later must
- * not erase the history of what the hook sent.
+ * not erase the history of what the hook sent. The durable identity is
+ * the pair (`result_official_code`, `result_year`); `result_id` is only a
+ * convenience pointer. Inbound PRMS deliveries do not carry the year,
+ * so `result_year` stays NULL on that path.
  *
  * `delivery_id` is deliberately NOT unique (DD-5). A unique index would
  * forbid the repeat row R-PWH-005 requires.
@@ -24,6 +27,10 @@ import { DeliveryCorrelationOutcome } from '../enum/delivery-correlation-outcome
 @Index('idx_result_prms_sync_history_delivery_id', ['delivery_id'])
 @Index('idx_result_prms_sync_history_result', ['result_id'])
 @Index('idx_result_prms_sync_history_occurred_at', ['occurred_at'])
+@Index('idx_result_prms_sync_history_code_year', [
+  'result_official_code',
+  'result_year',
+])
 export class PrmsWebhookDelivery extends AuditableEntity {
   @PrimaryGeneratedColumn({
     type: 'bigint',
@@ -71,11 +78,24 @@ export class PrmsWebhookDelivery extends AuditableEntity {
 
   @Column({
     type: 'varchar',
-    name: 'external_reference',
+    name: 'result_official_code',
     length: 191,
     nullable: true,
   })
-  external_reference?: string | null;
+  result_official_code?: string | null;
+
+  /**
+   * Reporting year, paired with `result_official_code` (the official code).
+   * MySQL YEAR, nullable: an inbound delivery has no year, and a deleted
+   * result must leave a readable row. Same type as
+   * `result_prms_sync_log.result_year`.
+   */
+  @Column({
+    type: 'year',
+    name: 'result_year',
+    nullable: true,
+  })
+  result_year?: number | null;
 
   @Column({
     type: 'bigint',

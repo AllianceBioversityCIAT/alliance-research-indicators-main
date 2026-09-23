@@ -122,7 +122,7 @@ const delivery = (
   occurred_at: OCCURRED_AT,
   environment: 'TEST',
   correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
-  external_reference: '1441061',
+  result_official_code: '1441061',
   prms_result_id: 9001,
   prms_result_code: 555,
   decision: 'APPROVE',
@@ -185,7 +185,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
         result_id: null,
-        external_reference: '1441061',
+        result_official_code: '1441061',
+        result_year: null,
         prms_result_id: 9001,
         prms_result_code: 555,
         decision: 'APPROVE',
@@ -488,7 +489,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
       userId: 7,
       occurredAt: OCCURRED_AT,
       environment: 'TEST',
-      externalReference: '1441061',
+      resultOfficialCode: '1441061',
+      resultYear: 2026,
       prmsResultCode: 9199,
       ...overrides,
     });
@@ -523,7 +525,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
         environment: 'TEST',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
         result_id: 1441061,
-        external_reference: '1441061',
+        result_official_code: '1441061',
+        result_year: 2026,
         prms_result_id: null,
         prms_result_code: 9199,
         // The Disqualifier's named fields, proven NULL on the ACTUAL
@@ -563,6 +566,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         DeliveryCorrelationOutcome.CORRELATED,
         1441061,
         '1441061',
+        2026,
         9199,
         DeliveryProcessingState.PROCESSED,
         'STAR',
@@ -572,7 +576,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
     });
 
-    it('a NULL externalReference / prmsResultCode / userId is bound as NULL, not coerced', async () => {
+    it('a NULL resultOfficialCode / prmsResultCode / userId is bound as NULL, not coerced', async () => {
       dataSourceQuery.mockImplementationOnce((sql: string, params: unknown[]) =>
         table.execute(sql, params),
       );
@@ -580,14 +584,14 @@ describe('PrmsWebhookDeliveryRepository', () => {
       await repository.recordOutboundPendingReview(
         outboundInput({
           userId: null,
-          externalReference: null,
+          resultOfficialCode: null,
           prmsResultCode: null,
         }),
       );
 
       expect(table.rows[0]).toMatchObject({
         actor_user_id: null,
-        external_reference: null,
+        result_official_code: null,
         prms_result_code: null,
       });
     });
@@ -617,7 +621,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         environment: 'TEST',
         correlation_outcome: 'CORRELATED',
         result_id: '1441061',
-        external_reference: '1441061',
+        result_official_code: '1441061',
         prms_result_id: '9001',
         prms_result_code: '555',
         decision: 'APPROVE',
@@ -646,7 +650,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
         environment: 'TEST',
         correlation_outcome: 'UNKNOWN_REFERENCE',
         result_id: null,
-        external_reference: 'STAR-does-not-exist',
+        result_official_code: 'STAR-does-not-exist',
         prms_result_id: null,
         prms_result_code: null,
         decision: 'REJECT',
@@ -749,6 +753,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
           'occurred_at',
           'correlation_outcome',
           'result_id',
+          'result_year',
           'duplicate_of_id',
           'raw_body',
           'processing_state',

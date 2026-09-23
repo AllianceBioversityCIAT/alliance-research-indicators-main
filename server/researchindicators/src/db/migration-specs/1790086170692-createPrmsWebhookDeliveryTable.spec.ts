@@ -51,8 +51,9 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       );
       expect(createTableSql).toMatch(/`result_id`\s+bigint\s+NULL/i);
       expect(createTableSql).toMatch(
-        /`external_reference`\s+varchar\(191\)\s+NULL/i,
+        /`result_official_code`\s+varchar\(191\)\s+NULL/i,
       );
+      expect(createTableSql).toMatch(/`result_year`\s+year\s+NULL/i);
       expect(createTableSql).toMatch(/`prms_result_id`\s+bigint\s+NULL/i);
       expect(createTableSql).toMatch(/`prms_result_code`\s+bigint\s+NULL/i);
       expect(createTableSql).toMatch(/`decision`\s+varchar\(20\)\s+NULL/i);
@@ -100,7 +101,7 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       expect(createTableSql).toMatch(/`deleted_at`\s+timestamp\s+NULL/i);
     });
 
-    it('declares id as the sole primary key and the three non-unique indexes', () => {
+    it('declares id as the sole primary key and the four non-unique indexes', () => {
       expect(createTableSql).toMatch(/PRIMARY KEY\s*\(\s*`id`\s*\)/i);
       expect(createTableSql).toMatch(
         /INDEX\s+`idx_result_prms_sync_history_delivery_id`\s*\(\s*`delivery_id`\s*\)/i,
@@ -110,6 +111,9 @@ describe('CreatePrmsWebhookDeliveryTable1790086170692', () => {
       );
       expect(createTableSql).toMatch(
         /INDEX\s+`idx_result_prms_sync_history_occurred_at`\s*\(\s*`occurred_at`\s*\)/i,
+      );
+      expect(createTableSql).toMatch(
+        /INDEX\s+`idx_result_prms_sync_history_code_year`\s*\(\s*`result_official_code`\s*,\s*`result_year`\s*\)/i,
       );
     });
 
