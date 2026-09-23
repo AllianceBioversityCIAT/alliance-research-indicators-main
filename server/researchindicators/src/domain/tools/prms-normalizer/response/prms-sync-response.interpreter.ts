@@ -205,22 +205,63 @@ function readResultCode(row: Record<string, unknown>): number | null {
 }
 
 /**
- * PRMS reporting phase of the accepted row. PRMS sends the same value twice:
- * `version_id` at the top level and `obj_version.id` nested. `version_id` wins;
- * `obj_version.id` is the fallback when it is absent or unparseable.
+ * PRMS reporting phase of the accepted row.
+ *
+ * ## Where it actually lives (CORRECTED 2026-09-23)
+ *
+ * The phase is sent by the PRMS backend that the Normalizer forwards to, so it
+ * lands in the row's `externalApiResponse.response` -- NOT in `result`, which is
+ * the Normalizer's echo of what WE submitted plus the assigned `result_code`.
+ * Inside `response` PRMS sends the same value twice: `version_id` flat and
+ * `obj_version.id` nested; `version_id` wins and `obj_version.id` is the fallback.
+ *
  * `obj_version` also carries `phase_name` / `phase_year`, deliberately NOT stored
  * -- the year is already ours (MAPPABLE_LIVE_VERSION) and a second copy could drift.
+ *
+ * ## Why this was wrong before
+ *
+ * The original implementation read `result.version_id` / `result.obj_version.id`.
+ * Neither key exists there in ANY captured response: all five spike fixtures under
+ * `docs/specs/bilateral/prms-sync/sync-engine/spike/responses/` carry the phase at
+ * `externalApiResponse.response.version_id` and nothing at `result.version_id`.
+ * So `readPhaseId` returned null on every accepted sync since it was written, and
+ * `results.prms_phase_id` was NULL for 17 of 17 synced results while
+ * `prms_result_code` -- which genuinely does live at `result.result_code` -- stored
+ * fine. The unit tests missed it because they hand-built a `result` object with a
+ * `version_id` key instead of replaying a captured payload (KZ-017: the check was
+ * narrower than the claim, and green).
+ *
+ * `result.*` is kept as a trailing fallback: costless, and it keeps the reader
+ * working if PRMS ever hoists the field up to the echoed row.
  */
 function readPhaseId(row: Record<string, unknown>): number | null {
-  if (!isRecord(row.result)) {
+  const sources: unknown[] = [];
+
+  if (isRecord(row.externalApiResponse)) {
+    sources.push(row.externalApiResponse.response);
+  }
+  sources.push(row.result);
+
+  for (const source of sources) {
+    const phase = readPhaseFrom(source);
+    if (phase != null) {
+      return phase;
+    }
+  }
+  return null;
+}
+
+/** `version_id` first, nested `obj_version.id` second, within one container. */
+function readPhaseFrom(source: unknown): number | null {
+  if (!isRecord(source)) {
     return null;
   }
-  const direct = toFiniteNumber(row.result.version_id);
+  const direct = toFiniteNumber(source.version_id);
   if (direct != null) {
     return direct;
   }
-  if (isRecord(row.result.obj_version)) {
-    return toFiniteNumber(row.result.obj_version.id);
+  if (isRecord(source.obj_version)) {
+    return toFiniteNumber(source.obj_version.id);
   }
   return null;
 }
