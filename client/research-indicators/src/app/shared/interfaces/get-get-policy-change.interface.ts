@@ -7,4 +7,8 @@ export interface GetPolicyChange {
   innovation_dev_output?: [];
   innovation_development?: number;
   innovation_use?: number;
+  /** Required when policy_type_id === 3 (Program, Budget, or Investment). */
+  usd_amount?: number | null;
+  /** Confirmed | Estimated | Unknown — required when policy_type_id === 3. */
+  amount_status?: string | null;
 }

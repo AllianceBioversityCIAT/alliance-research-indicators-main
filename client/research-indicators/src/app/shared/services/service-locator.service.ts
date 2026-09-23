@@ -7,6 +7,7 @@ import { GetCountriesService } from './control-list/get-countries.service';
 import { GetClarisaLanguagesService } from './control-list/get-clarisa-languages.service';
 import { PolicyTypesService } from './short-control-list/policy-types.service';
 import { PolicyStagesService } from './short-control-list/policy-stages.service';
+import { PolicyAmountStatusService } from './short-control-list/policy-amount-status.service';
 import { CapSharingGendersService } from './short-control-list/cap-sharing-genders.service';
 import { CapSharingFormatsService } from './short-control-list/cap-sharing-formats.service';
 import { CapSharingTypesService } from './short-control-list/cap-sharing-types.service';
@@ -181,6 +182,8 @@ export class ServiceLocatorService {
         return this.getFromInjector(PolicyTypesService);
       case 'policyStages':
         return this.getFromInjector(PolicyStagesService);
+      case 'policyAmountStatus':
+        return this.getFromInjector(PolicyAmountStatusService);
       case 'geoFocus':
         return this.getFromInjector(GetGeoFocusService);
       case 'innResults':

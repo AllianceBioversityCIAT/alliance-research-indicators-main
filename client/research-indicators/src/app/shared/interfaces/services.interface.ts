@@ -26,6 +26,7 @@ export type ControlListServices =
   | 'expansionPotential'
   | 'policyTypes'
   | 'policyStages'
+  | 'policyAmountStatus'
   | 'geoFocus'
   | 'regions'
   | 'ipOwners'

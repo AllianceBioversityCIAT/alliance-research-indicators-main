@@ -238,6 +238,38 @@ describe('PolicyChangeComponent', () => {
     expect(setLoadingSpy).toHaveBeenCalledWith(false);
   });
 
+  it('shows USD Amount and Status fields only for Program/Budget/Investment (type 3)', () => {
+    component.body.set({ policy_type_id: 1 } as any);
+    expect(component.isProgramBudgetOrInvestment()).toBe(false);
+
+    component.body.set({ policy_type_id: 3 } as any);
+    expect(component.isProgramBudgetOrInvestment()).toBe(true);
+  });
+
+  it('clears amount fields when policy type changes away from type 3', () => {
+    component.body.set({
+      policy_type_id: 3,
+      usd_amount: 100,
+      amount_status: 'Confirmed'
+    } as any);
+
+    component.onPolicyTypeChange(1);
+
+    expect(component.body().usd_amount).toBeNull();
+    expect(component.body().amount_status).toBeNull();
+  });
+
+  it('blocks save when type 3 is selected without required amount fields', async () => {
+    component.body.set({ policy_type_id: 3 } as any);
+
+    await component.saveData();
+
+    expect(mockApiService.PATCH_PolicyChange).not.toHaveBeenCalled();
+    expect(mockActionsService.showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn', summary: 'Policy Change' })
+    );
+  });
+
   it('should test navigateTo function directly', async () => {
     // Test the navigateTo function by calling saveData with different page values
     mockApiService.PATCH_PolicyChange.mockResolvedValue({ successfulRequest: true });
