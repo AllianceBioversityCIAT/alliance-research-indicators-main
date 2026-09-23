@@ -3,7 +3,7 @@
 - **Module:** `bilateral/prms-sync` (server) — family child **5**
 - **Spec id:** `2026-09-decision-webhook`
 - **Depth:** **Full**
-- **Status:** `in-progress` — **11 / 12 tasks closed** (T-01 – T-09, all `PASS` 2026-09-22). **Scope changed 2026-09-23 by an owner-approved Pivot** — see [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Two tasks added: **T-01b** (rename + extend the history table) and **T-11** (the outbound `PENDING_REVIEW` event). Remaining order: **T-10** (documentation and operational steps only). **T-11 closed `PASS` 2026-09-23**, dual-lens, first attempt. **T-01b closed `PASS` 2026-09-23** on its first attempt, dual-lens (reliability + risk), evidence re-run `VERIFIED` by the Leader. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
+- **Status:** `in-progress` — **11 / 12 tasks closed · T-10 `[~]` (conformance `PASS`, rollout + human gates outstanding)** (T-01 – T-09, all `PASS` 2026-09-22). **Scope changed 2026-09-23 by an owner-approved Pivot** — see [`./execution.md`](./execution.md) → *Pivot Record: T-01*. Two tasks added: **T-01b** (rename + extend the history table) and **T-11** (the outbound `PENDING_REVIEW` event). All code tasks are closed. **T-10 ran 2026-09-23** (Cursor/Grok implemented, Claude reviewed): its documentation half landed and passed review, but four criteria are blocked on an unreachable Dev database and on human action, so it stays `[~]`. **T-11 closed `PASS` 2026-09-23**, dual-lens, first attempt. **T-01b closed `PASS` 2026-09-23** on its first attempt, dual-lens (reliability + risk), evidence re-run `VERIFIED` by the Leader. T-08 HALTed on three Reviewer `FAIL` verdicts, was AMENDED and reopened with owner approval (constraint **C-T08**, six falsifiers), and closed on the amended task's first attempt: **`PASS (degraded-pair)`** — 8 review rounds across its life. See [`./execution.md`](./execution.md).
 - **Owner:** Juan Cadavid / ARI
 - **Linked requirements:** [`./requirements.md`](./requirements.md) · **Linked design:** [`./design.md`](./design.md) · **Review:** [`./judgment.md`](./judgment.md)
 - **Budget (design §14 — a tripwire, not a cap):** **10 tasks · ≈ 2,970 LOC · 3 review rounds** — revised at Phase 3 on 2026-09-22 and **HITL-approved** at the Step 3.3 gate, up from the round-1 figure of 11 tasks / ≈ 2,600 LOC. See §5 *Budget reconciliation*. Exceeding it is information, and `/akili-execute` **stops and escalates** rather than absorbing it.
@@ -508,7 +508,7 @@ graph TD
 
 ---
 
-### T-10 — Rollout, registration runbook, and the two accepted risks  `[ ]`
+### T-10 — Rollout, registration runbook, and the two accepted risks  `[~]`
 
 - **Requirements covered:** NFR-PWH-004 (DC-8 escalation) · DC-9 (the human end-to-end gate) · requirements §12 OQ-1…OQ-6 · design §12 *Rollout*
 - **Design references:** §12 *Rollout* (all 6 steps) · §15 *Open Questions* · requirements §10 (DC-8, DC-9), §14 *Sign-off*

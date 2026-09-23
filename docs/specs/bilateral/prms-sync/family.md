@@ -9,7 +9,7 @@
 - **Family path:** `docs/specs/bilateral/prms-sync/`
 - **Parent spec / Feature:** `Bilateral / PRMS Sync`
 - **Date created:** `2026-08-21`
-- **Last updated:** `2026-09-21`
+- **Last updated:** `2026-09-23`
 - **Spec-family status:** `open` — **HOLD LIFTED 2026-09-14.** The 2026-09 PRMS Normalizer contract landed and resolves the hold reason: ingest is still `POST /ingest` with an `x-api-key`; the "hook" turned out to be *outbound decision webhooks*, not a replacement transport. `sync-engine` carries a revised proposal + a full [field homologation](sync-engine/homologation.md). Both 2026-09-14 gates are now discharged: the API key was found to be already present in both environments (OQ-F8), and the child-#5 question resolved in two steps — the *Innovation Use investment* child was **withdrawn** (OQ-F9), and a **different** child 5, `decision-webhook`, was **HITL-approved 2026-09-21** to consume the outbound decision-webhook contract this revision first identified.
 - **Owner / Squad:** Juan Cadavid / ARI
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) §4.1 (G1, G4), §5.1 (federation), §3.5 (PRMS as downstream consumer)
@@ -36,7 +36,9 @@ Split rationale: (1) the server integration is the contract everything else cons
 | 2 | `prms-sync/sync-button-ux` | Client: ~~wire the existing PRMS SYNC button~~ (done 2026-09-16, out of spec — see §1), loading + success/failure UX (done); **still owed:** confirm modal, synced badge, alignment lock refresh | `sync-engine` | `no` | `pending` | TBD |
 | 3 | `prms-sync/center-admin-resync` | Center Admin: sync status visibility + manual re-sync from the bilateral module for failed/pending results | `sync-engine` | `no` | `pending` | TBD |
 | 4 | `prms-sync/pi-sync-panel` | PI project-level control panel: per-result sync pipeline (pending alignment / ready / synced / failed / future PRMS verdict) | `sync-engine` | `no` | `pending` | TBD |
-| 5 | `prms-sync/decision-webhook` | Server: register STAR's callback destination with PRMS, receive the Science Program APPROVE/REJECT callback, deduplicate it on `x-prms-delivery-id`, and record **every** delivery in an append-only history built to be displayed | `sync-engine` | `yes` | `pending` | TBD |
+| 5 | `prms-sync/decision-webhook` | Server: register STAR's callback destination with PRMS, receive the Science Program APPROVE/REJECT callback, deduplicate it on `x-prms-delivery-id`, and record **every** delivery in an append-only history built to be displayed | `sync-engine` | `yes` | `active` | TBD |
+
+> **Child 5 status, 2026-09-23 (T-10).** The cell reads `active`, taken from the vocabulary in [`docs/specs/general-setup/family.md`](../../general-setup/family.md) (*Status Vocabulary*): `pending` (proposed, drafted, or waiting on a prerequisite), `active` (approved and in `/akili-execute`), `done` (implementation **and** `/akili-test` complete and verified), `blocked` (the child cannot proceed). `pending` is no longer true — code tasks T-01–T-09, T-01b and T-11 are closed. `done` would be false: `/akili-test` has not run, and the rollout has not happened (Dev migration state and the TEST registration round-trip are both blocked; PROD is blocked on OQ-6 / R-1). `blocked` would describe the rollout, not the spec, whose code is written. The path `prms-sync/decision-webhook` is unchanged.
 
 > `Parallel-safe: no` on 2–4 because all three touch the client package; root guide §4.3 forbids two concurrent tasks in one package. 2, 3, 4 are functionally independent of each other (any order after 1).
 

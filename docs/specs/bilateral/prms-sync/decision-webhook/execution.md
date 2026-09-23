@@ -1582,3 +1582,196 @@ The UI history contract (the mock's *"First synchronization"* / *"Mapping re-syn
 Commits `f3a5210f` and `97eb358c` were authored carrying a Claude co-author trailer, violating the owner's standing global rule (`~/.claude/CLAUDE.md` §Commits). Both were unpushed and have been rewritten **message-only** to `fc22a199` and `50ac1767`; content tree hashes verified identical. **No pushed commit was rewritten** — roughly 18 older commits on this branch carry the trailer from earlier sessions and are left untouched pending an owner decision, because that is shared history.
 
 A `PreToolUse` hook (`~/.claude/hooks/no-claude-coauthor.sh`) now blocks any history-writing or PR command carrying a Claude attribution. Proven able to fail per K-004, and **refined after it over-blocked its own documentation**: the first version matched the pattern anywhere in the command, so writing *this very section* was blocked. It now anchors on command position. Final battery: **9 cases, 4 blocking, 5 passing**, no over-block.
+
+---
+
+## Rollout note: T-10
+
+| Field | Value |
+|---|---|
+| Date | 2026-09-23 |
+| Start commit | `1f4ac0ff` (tree clean at dispatch) |
+| Implementer | Cursor / Grok (T2), via Orca orchestration |
+| Release date | **Not set.** This note records the rollout; it does not perform one. |
+| Rollout owner | Family owner **Juan Cadavid** / ARI (`family.md` *Owner / Squad*). The public host is a separate owner: whoever owns the AWS deployment (OQ-6 / requirements §14 DevOps). |
+| What this section is | The operational record T-10 could write without a running server and without the shared Dev database. It closes nothing that a human has to close. |
+
+**Order, and why it is not optional (K-015).** Migration first, code second. The CI/CD pipeline deploys **code only** — it does not apply database migrations. A merged migration can sit unapplied indefinitely with nothing in the deploy surfacing it. Applying `1790086170692-createPrmsWebhookDeliveryTable` against the shared Dev database is a **human-decided** step. Do not read a green deploy as evidence the table exists.
+
+### Backout
+
+1. Revert the code.
+2. Run the migration's `down`. In `1790086170692-createPrmsWebhookDeliveryTable.ts` that method is one statement: `DROP TABLE result_prms_sync_history`.
+
+Nothing else is touched. There is no `results` column to remove, no `result_prms_sync_log` column to remove, and no enum member to remove. The dropped table is `result_prms_sync_history` — the name after the owner-approved Pivot of 2026-09-23 (T-01b). It is not `prms_webhook_delivery`.
+
+### Migration pending-state — **BLOCKED**
+
+Not re-run in this task. The Leader measured it at `1f4ac0ff` on 2026-09-23 and the dispatch forbade starting the server, running Docker Compose, or reaching the shared Dev database by another route. Verbatim result, as recorded by that measurement:
+
+```
+npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts
+   -> EXIT=1, ETIMEDOUT, 'connect' syscall fatal — the shared Dev MySQL is NOT reachable from here
+```
+
+**No pending count is reported.** The command errored. Per K-014 and this task's Falsifier, a count taken over a failed command — including a count that reads zero — is inconclusive, not clean. The disposable scratch schema was not queried in its place: it is a different target and proves nothing about Dev.
+
+### TEST registration round-trip — **BLOCKED**
+
+`POST /api/prms-webhook` then `GET /api/prms-webhook` was not performed. The Leader's measurement at the same commit:
+
+```
+curl --max-time 5 http://localhost:3000/    -> 000, unreachable (no server running)
+```
+
+A running server needs the same unreachable Dev database. No response body exists to record. **K-016 still binds the next person who tries:** `app_config` is TTL-cached about 5 minutes, and re-saving restarts the window. Read the status the design names: `404` means `ARI_CLARISA_API_KEY` is missing or inactive (P-14, already closed); `503` means the row exists and `simple_value` is empty (that is what P-14b is open about).
+
+**P-14b outcome.** No new observation. `design.md` §2 row P-14b is left as the 2026-09-22 settlement: TEST half verified by a direct read (`is_active = 1`, `POPULATED len=47`, value never printed); PROD half still `UNVERIFIED`. This task did not edit that row, because editing it without a new measurement would invent one. The PROD half stays with OQ-6 / R-1.
+
+**T-04 substitution record.** None is owed. T-04 built the non-stubbing e2e harness; it did not substitute DD-11. Recorded in this file under *T-04*: the suite names `JwtMiddleware` nowhere, and AC.2 / AC.3 evidence counts.
+
+### PROD — **blocked on OQ-6 / R-1**
+
+Not attempted. Design **P-11** (measured 2026-09-21): no PROD hostname resolves (`dig` empty for `main-allianceindicators.ciat.cgiar.org` and `allianceindicators.ciat.cgiar.org`), and PRMS refuses private ranges at registration. **Named owner:** whoever owns the AWS deployment (requirements §12 OQ-6). Requirements §14 makes the DevOps sign-off **required** for this path. It has not been obtained.
+
+### DC-8 and DC-9 — **accepted risks, not closed**
+
+| Class | What it is | Owner | Why this run does not close it |
+|---|---|---|---|
+| **DC-8** | PII retained without a decision. `data` is the full enriched result document and may carry contributor names and emails. v1 stores it whole (NFR-PWH-004). | Product owner + whoever owns compliance (requirements §12 **OQ-3**; tasks.md RB-5). Parent: PRD OQ-7. | No automated gate exists. No product-owner answer to OQ-3 was given. There is no quote, so there is no evidence (KZ-002). |
+| **DC-9** | A live delivery from PRMS never arrives — wrong URL, unreachable host, or a refused registration. | Whoever owns the AWS deployment (requirements §10 DC-9; tasks.md RB-2). | **Cannot be closed from inside the CIAT network** (C-15, C-16). A green local suite is not a live delivery, and this note does not record one as the other. |
+
+### Open questions — **STILL OPEN**
+
+No question below was answered in this task. No answer was invented. OQ-5's sequencing sentence from 2026-09-22 is already in requirements §12; it decides *when* the UI row opens, not *who* reads the history, and it is not treated here as an answer.
+
+| # | Question | Named owner | State |
+|---|---|---|---|
+| **OQ-1** | Should the verdict become a lifecycle status? | Product owner | **STILL OPEN** |
+| **OQ-2** | Does REJECT reopen editing? | Product owner | **STILL OPEN** |
+| **OQ-3** | What may STAR retain from `data`? This is DC-8. | Product owner + whoever owns compliance | **STILL OPEN** — no quote |
+| **OQ-4** | May the callback populate `result.prms_result_code`? | Product owner + `sync-engine` owner | **STILL OPEN** |
+| **OQ-5** | Who may read the history, and at what grain? | Product owner | **STILL OPEN** (substance). Sequencing only was decided 2026-09-22. |
+| **OQ-6** | What is the PROD callback host? This is R-1. | Whoever owns the AWS deployment | **STILL OPEN** |
+| **OQ-D1** | Should a `DUPLICATE` row retain `raw_body` a second time? v1 retains it. | Product owner | **STILL OPEN** |
+| **OQ-D2** | Is a manual re-process endpoint wanted for `PROCESSING_FAILED`, or does the visible state suffice? | Engineering lead (requirements §14: **Juan Cadavid**) | **STILL OPEN** |
+
+### Comms — **NOT YET SENT**
+
+This task has no authority to send them.
+
+| Audience | What they must be told | Who must send it | State |
+|---|---|---|---|
+| PRMS technical team | The destination registered, per environment | Family owner **Juan Cadavid** / ARI | **NOT YET SENT** |
+| Family owner | Children **2, 3 and 4** gain `last_decision` | Family owner **Juan Cadavid** / ARI — he is both the named recipient in T-10's notes and the only named sender in this family. Design §12 step 6 still says "children 3 and 4"; the task notes say 2, 3 and 4. The discrepancy is recorded, not resolved. | **NOT YET SENT** |
+| Security | This is the application's first public unauthenticated **write** endpoint, plus a new credential | Family owner **Juan Cadavid** / ARI must request it. Requirements §14 names the Security review itself as **required**. | **NOT YET SENT** |
+
+**Security sign-off: REQUIRED and not obtained.** Requirements §14. Not requested by this task.
+
+### Constraints the risks log assigns to this note
+
+- **RB-7 (recorded, not fixed).** The registered callback URL's path must begin at `/api/prms-callback`. The redaction helper anchors the prefix immediately after the authority, so a gateway path in front of `/api/prms-callback` is logged whole, secret included. Not reachable in the current mount; reachable the moment an operator sets `ARI_PRMS_WEBHOOK_CALLBACK_URL` with a prefix. Reopening T-08 is an owner decision.
+- **RB-8 (recorded, not fixed).** `@UseGuards(CallbackSecretGuard)` has no unit-tier gate. Deleting that binding leaves `npm test` green while the only public unauthenticated write endpoint is open. T-04's e2e suite does assert the wrong-secret `404`, and that suite is a tier `npm test` never runs (P-10). Whether the one-line metadata assertion earns a follow-up is an owner decision.
+
+### Consumers sweep (KZ-013) — before the status edit
+
+`git grep -rn "decision-webhook" -- docs` at `1f4ac0ff`, **25 hits**, raw output checked for an error first (exit 0). None of the 25 is a path that the status-word edit moves. The folder `docs/specs/bilateral/prms-sync/decision-webhook/` stays where it is. Hits outside this spec folder:
+
+- `docs/specs/bilateral/prms-sync/family.md` — the manifest row, the mermaid node, and prose in the family-status paragraph, OQ-F1, OQ-F7
+- `docs/specs/bilateral/prms-sync/sync-engine/execution.md`, `proposal.md`, `requirements.md` — prose naming the child, not a relocated path
+
+**After the edit** the same command was re-run (exit 0): **28 hits**. Three lines are new: the sweep command quoted in this section, the child-5 status note in `family.md`, and the §9.1 row in `docs/trd/trd.md`. Every pre-existing hit is still present. The folder was not moved, and the path named in the before-sweep still resolves on disk. Line numbers inside `family.md` shifted by the note inserted under the manifest — the citations moved with the text, they did not break.
+
+### Scope this note cannot reach (KZ-017)
+
+- The migration check cannot see Dev, and it was not pointed at the scratch schema.
+- The registration check cannot see PRMS TEST or a `ServerResponseDto` from either handler. A `/swagger` page was not opened; a rendered page would not be evidence of a `200` anyway (KZ-002).
+- `git grep -- docs` cannot see `src/`, `test/`, `client/`, or untracked files.
+- P-11's DNS result is the 2026-09-21 measurement. This task did not re-resolve PROD hostnames.
+- No comm, no sign-off, and no open-question answer is evidenced here. Absence of a quote is absence of evidence.
+
+### Done criteria — left `[ ]` in `tasks.md`
+
+This spec's closed tasks keep their inner Done boxes unchecked; the Leader flips the task header after a Reviewer `PASS`. T-10's nine boxes are all still `[ ]`. What this note actually did:
+
+| Criterion | In this note | Checkbox |
+|---|---|---|
+| Migration pending-state checked, raw output recorded, ANSI-normalized before counting | **Not met.** Command errored. No count. | `[ ]` |
+| TEST registered and read back; P-14b written into the Premise Ledger | **Not met.** No server. Ledger row not edited. | `[ ]` |
+| PROD recorded as blocked on OQ-6 / R-1, with a named owner | **Met** (above) | `[ ]` until Reviewer PASS |
+| Backout written into `execution.md` | **Met** (above) | `[ ]` until Reviewer PASS |
+| All three comms sent; Security sign-off requested | **Not met.** Not sent, not requested. | `[ ]` |
+| OQ-1…OQ-6 and OQ-D1/OQ-D2 put to their owners, quoted or still open | **Recorded STILL OPEN, not put to the owners.** No human was asked. | `[ ]` |
+| DC-8 and DC-9 restated as accepted risks with human owners | **Met** (above). Neither closed. | `[ ]` until Reviewer PASS |
+| `docs/trd/trd.md` §9.1 carries the inbound-callback row | **Met** | `[ ]` until Reviewer PASS |
+| `family.md` child 5 `Status` updated | **Met** — `pending` → `active`, not `done` | `[ ]` until Reviewer PASS |
+
+---
+
+## T-10 — Rollout, registration runbook, and the two accepted risks
+
+| Field | Value |
+|---|---|
+| **Final status** | **`[~]` — conformance `PASS`, task NOT complete** (see *Why this is `[~]`* below) |
+| Date | 2026-09-23 |
+| Implementer attempts | **1** |
+| Implementer | **Cursor · `grok-4.7-high`** (T2), via Orca orchestration — Run `run_1f393f8398d7`, Task `task_4fab6a262f43`, Dispatch `ctx_3acd909f6625` |
+| Reviewer | `akili-reviewer` · **Claude Opus** (T3), lens-checklist mode (the task's `Review` field is `checklist`) |
+| `author ≠ auditor` | **holds** — different models, different hosts. No `REVIEW_WAIVED` owed |
+| runtime events | **none** |
+
+> **Routing.** First task executed under the owner's standing rule of 2026-09-23: **Cursor/Grok implements, Claude reviews.** The worker terminal was released on completion.
+
+### Environment pre-check (Step 2.1) — run by the Leader BEFORE dispatch
+
+| Check | Command | Result |
+|---|---|---|
+| Server | `curl --max-time 5 http://localhost:3000/` | **`000` — unreachable**, no server running |
+| Shared Dev MySQL | `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.config.ts` | **EXIT=1, `ETIMEDOUT`, `connect` syscall fatal** |
+
+**A K-014 instance was produced by the pre-check itself and is recorded because it is the lesson in miniature.** The first attempt wrapped the command in `timeout`, which does not exist on macOS: it returned `EXIT=127`, `command not found`. Had the Leader piped that into `grep '^\[ \]' | wc -l`, the answer would have been **zero pending migrations** — a confident green over a command that never ran. The error was checked before the count, which is the whole of K-014.
+
+**Consequence carried into the brief:** two of the nine Done criteria were *impossible to execute*, and the brief instructed the worker to record them BLOCKED with verbatim evidence and to tick nothing.
+
+### Attempt 1 — conformance `PASS`
+
+**Files changed (3, docs only, +126):** `docs/trd/trd.md` (§9.1 inbound-callback integration row) · `docs/specs/bilateral/prms-sync/family.md` (child 5 `pending` → `active`) · this file (the `## Rollout note: T-10` section above).
+
+**Evidence re-run — Leader-inline, non-author: `VERIFIED`**
+
+| Check | Result |
+|---|---|
+| Scope boundary | **0** files under `src/`, `test/`, `client/` ✓ |
+| `tasks.md` | **0** lines changed — no Done criterion ticked ✓ |
+| Consumers sweep `git grep -rn "decision-webhook" -- docs` | **28** hits, total checked **before** filtering (K-014) ✓ |
+| Cited `Status Vocabulary` | matches `docs/specs/general-setup/family.md` §Status Vocabulary **lines 41–44 exactly** ✓ |
+| TRD row's factual claims | all resolve: `prms-callback(.*)` exclusion at `src/app.module.ts:106`; `ARI_PRMS_WEBHOOK_SECRET` in `.env.example`; module at `domain/entities/prms-webhook/` ✓ |
+
+The last two rows were re-verified at the source by the Leader rather than accepted from the worker's report: a document future children of this family read as fact is exactly the artifact class KZ-007 warns about.
+
+**Reviewer verdict — `STATUS: PASS`.** Every blocked step names its command, attributes the measurement, and explicitly refuses a count over a failed command. `active` is correct against the vocabulary (`done` requires `/akili-test` complete and verified; it has not run). DC-8/DC-9 restated as accepted risks with the C-15/C-16 wording intact and neither closed. All eight open questions `STILL OPEN` with owners matching `requirements.md` §12 and `design.md` §15. Backout names `result_prms_sync_history` and explicitly disclaims the old name. K-015 stated explicitly.
+
+### Why this is `[~]` and not `[x]`
+
+**Conformance `PASS` is not completion.** All **nine** Done criteria remain `[ ]`, and the worker correctly ticked none. Four are outstanding, and **none can be closed by any agent**:
+
+| Outstanding | Blocked by | Owner |
+|---|---|---|
+| Migration pending-state check | shared Dev MySQL unreachable (`ETIMEDOUT`) | whoever restores Dev access |
+| TEST registration round-trip (`POST` then `GET /api/prms-webhook`) | needs a running server, which needs that same database | as above |
+| OQ-1…OQ-6, OQ-D1, OQ-D2 answered; **OQ-3 quoted** | no human answer exists | product owner / named owners |
+| Three comms sent + **Security sign-off obtained** (requirements §14, *required*) | nobody has sent them | Juan Cadavid / Security |
+
+Per `/akili-execute` Step 2.3 item 0, a task with an outstanding gap never reaches `[x]`, **even on a Reviewer `PASS`** — the Reviewer audits what was written, not what was omitted. The spec is **code-complete with the rollout pending**, which is an honest terminal state, not a half-finished one.
+
+### ADVISORY (recorded, never gating)
+
+- **`design.md` §12 step 6 is factually stale.** It says the comms reach *"children 3 and 4"*; the actual set is **2, 3 and 4** — children 2, 3 and 4 all gain `last_decision`. The worker recorded the discrepancy rather than silently resolving it, which was right. Per root `CLAUDE.md` §5 the wrong document should be fixed, so this is carried to the owner as a decision rather than left only in this log.
+- **DC-9 and OQ-6 name a *role*, not a person** ("whoever owns the AWS deployment"). Faithful to `requirements.md` §12/§14, which names nobody either — so a **spec gap, not a diff defect** — but neither is actionable until a human is named.
+- The two BLOCKED evidence blocks are fenced like a terminal transcript and headed *"Verbatim result"*, while their content is a summarized one-liner. Nothing is ticked on them and the prose hedges it, so it does not gate; relabelling them "Leader's recorded summary line, not raw stdout" would remove the ambiguity.
+
+### Final verification result
+
+**Documentation delivered and independently verified; the operational and human halves are blocked and recorded as such.** No test or build gate applies — this task produces no code.
+
+**Scope this verification cannot reach (KZ-017):** it proves what the three documents now say and that no code was touched. It proves **nothing** about the Dev database's migration state, the PRMS TEST host, or whether any human has been told anything — all three are the outstanding work above, and a green review here must never be read as covering them.
