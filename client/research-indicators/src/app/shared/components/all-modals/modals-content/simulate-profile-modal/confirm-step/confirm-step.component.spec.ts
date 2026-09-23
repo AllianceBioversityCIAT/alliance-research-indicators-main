@@ -1,6 +1,5 @@
 // @akili-spec changes/profile-simulation — T-10, R-IMP-008 (all clauses, AC.1)
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ConfirmStepComponent } from './confirm-step.component';
 import { ApiService } from '@shared/services/api.service';
@@ -87,7 +86,7 @@ describe('ConfirmStepComponent', () => {
   let impersonationStartMock: jest.Mock;
   let closeModalMock: jest.Mock;
   let configUserMock: jest.Mock;
-  let navigateMock: jest.Mock;
+  let bumpContentReloadMock: jest.Mock;
   let showToastMock: jest.Mock;
 
   beforeEach(async () => {
@@ -95,7 +94,7 @@ describe('ConfirmStepComponent', () => {
     impersonationStartMock = jest.fn();
     closeModalMock = jest.fn();
     configUserMock = jest.fn();
-    navigateMock = jest.fn().mockResolvedValue(true);
+    bumpContentReloadMock = jest.fn();
     showToastMock = jest.fn();
 
     await TestBed.configureTestingModule({
@@ -105,11 +104,13 @@ describe('ConfirmStepComponent', () => {
         { provide: ImpersonationService, useValue: { start: impersonationStartMock } },
         { provide: AllModalsService, useValue: { closeModal: closeModalMock } },
         { provide: WebsocketService, useValue: { configUser: configUserMock } },
-        { provide: Router, useValue: { navigate: navigateMock } },
         { provide: ActionsService, useValue: { showToast: showToastMock } },
         {
           provide: CacheService,
-          useValue: { dataCache: () => ({ user: { first_name: 'Ana', last_name: 'Sandoval', sec_user_id: 1, email: 'a.sandoval@cgiar.org' } }) }
+          useValue: {
+            dataCache: () => ({ user: { first_name: 'Ana', last_name: 'Sandoval', sec_user_id: 1, email: 'a.sandoval@cgiar.org' } }),
+            bumpContentReload: bumpContentReloadMock
+          }
         }
       ]
     }).compileComponents();
@@ -241,26 +242,23 @@ describe('ConfirmStepComponent', () => {
     );
   });
 
-  it('success path (design §5 "Client start" step 2) — runs impersonation.start -> closeModal -> configUser -> navigate -> toast, in that order', async () => {
+  it('success path (design §5 "Client start" step 2) — runs impersonation.start -> closeModal -> configUser -> bumpContentReload -> toast, in that order', async () => {
     const log: string[] = [];
     impersonationStartMock.mockImplementation(() => log.push('impersonation.start'));
     closeModalMock.mockImplementation(() => log.push('closeModal'));
     configUserMock.mockImplementation(() => log.push('configUser'));
-    navigateMock.mockImplementation(() => {
-      log.push('navigate');
-      return Promise.resolve(true);
-    });
+    bumpContentReloadMock.mockImplementation(() => log.push('bumpContentReload'));
     showToastMock.mockImplementation(() => log.push('toast'));
     startMock.mockResolvedValueOnce(mainResponse(startResponseData));
 
     fixture.detectChanges();
     await component.start();
 
-    expect(log).toEqual(['impersonation.start', 'closeModal', 'configUser', 'navigate', 'toast']);
+    expect(log).toEqual(['impersonation.start', 'closeModal', 'configUser', 'bumpContentReload', 'toast']);
     expect(impersonationStartMock).toHaveBeenCalledWith(startResponseData);
     expect(closeModalMock).toHaveBeenCalledWith('simulateProfile');
     expect(configUserMock).toHaveBeenCalledWith('Mariana', 1042);
-    expect(navigateMock).toHaveBeenCalledWith(['/home']);
+    expect(bumpContentReloadMock).toHaveBeenCalledTimes(1);
     expect(showToastMock).toHaveBeenCalledWith(
       expect.objectContaining({ severity: 'success', detail: expect.stringContaining('Mariana Rojas') })
     );

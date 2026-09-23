@@ -18,7 +18,10 @@
     <div [ngStyle]="{
         paddingLeft: hss ? (cache.isSidebarCollapsed() ? '64px' : '250px') : cache.isSidebarCollapsed() ? '64px' : '250px'
       }" [style.paddingTop.px]="cache.navbarHeight() + cache.headerHeight()">
-      <router-outlet></router-outlet>
+      <!-- Remount current page when profile simulation starts/ends (CacheService.bumpContentReload). -->
+      @for (_ of [cache.contentReloadKey()]; track _) {
+        <router-outlet></router-outlet>
+      }
     </div>
   </div>
 </div>

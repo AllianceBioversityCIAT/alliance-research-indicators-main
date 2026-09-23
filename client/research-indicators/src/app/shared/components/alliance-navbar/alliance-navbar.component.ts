@@ -179,7 +179,7 @@ export class AllianceNavbarComponent implements OnInit, AfterViewInit, OnDestroy
     if (actor && this.websocket) {
       await this.websocket.configUser(actor.first_name, actor.sec_user_id);
     }
-    await this.router.navigate(['/home']);
+    this.cache.bumpContentReload();
     this.actions.showToast({
       severity: 'success',
       summary: 'Simulation ended',

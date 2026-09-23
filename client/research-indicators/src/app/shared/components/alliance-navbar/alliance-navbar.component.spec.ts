@@ -73,7 +73,8 @@ describe('AllianceNavbarComponent', () => {
     navbarHeight: signal(0),
     windowHeight: signal(0),
     hasSmallScreen: jest.fn(() => true),
-    searchAResultValue: signal('')
+    searchAResultValue: signal(''),
+    bumpContentReload: jest.fn()
   };
 
   const mockDarkModeService = {
@@ -1785,7 +1786,7 @@ describe('AllianceNavbarComponent', () => {
       expect(findByText('button', 'Log out')).toBeDefined();
     });
 
-    it('the panel "End simulation" ends the session, re-runs configUser, navigates home and toasts', async () => {
+    it('the panel "End simulation" ends the session, re-runs configUser, remounts current page and toasts', async () => {
       mockImpersonationService.active.set(true);
       mockImpersonationService.end.mockResolvedValue({
         actor: {
@@ -1799,20 +1800,19 @@ describe('AllianceNavbarComponent', () => {
           user_role_list: []
         }
       });
-      jest.spyOn(component.router, 'navigate').mockResolvedValue(true);
       openDropdown();
 
       const endBtn = fixture.nativeElement.querySelector('.simulation-panel-end-btn') as HTMLButtonElement;
       expect(endBtn).not.toBeNull();
       endBtn.click();
-      // The endSimulation() chain (end -> configUser -> navigate -> toast) is four
+      // The endSimulation() chain (end -> configUser -> bumpContentReload -> toast) is four
       // real-Promise hops; a macrotask tick guarantees the whole microtask queue
       // drains before assertions run (a single whenStable() only flushes one hop).
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(mockImpersonationService.end).toHaveBeenCalledWith('manual');
       expect(mockWebsocketService.configUser).toHaveBeenCalledWith('Ana', 1);
-      expect(component.router.navigate).toHaveBeenCalledWith(['/home']);
+      expect(mockCacheService.bumpContentReload).toHaveBeenCalledTimes(1);
       expect(mockActionsService.showToast).toHaveBeenCalledWith({
         severity: 'success',
         summary: 'Simulation ended',
