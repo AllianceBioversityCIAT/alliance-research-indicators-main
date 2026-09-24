@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { CreateResultPolicyChangeDto } from './dto/create-result-policy-change.dto';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
@@ -182,8 +178,9 @@ export class ResultPolicyChangeService {
   }
 
   /**
-   * When type is Program/Budget/Investment (3), usd_amount and amount_status
-   * are required. Otherwise both are cleared to null.
+   * Type 3 stores a non-negative amount (0 is valid) and a known status.
+   * Missing or invalid values are stored as null so save never rejects them;
+   * the green check is what reports the section as incomplete.
    */
   private resolveAmountFields(dto: CreateResultPolicyChangeDto): {
     usd_amount: number | null;
@@ -198,25 +195,19 @@ export class ResultPolicyChangeService {
 
     const amount =
       dto.usd_amount === null || dto.usd_amount === undefined
-        ? NaN
+        ? null
         : Number(dto.usd_amount);
-
-    if (!Number.isFinite(amount) || amount < 0) {
-      throw new BadRequestException(
-        'USD Amount is required and must be a non-negative number when Policy Type is Program, Budget, or Investment',
-      );
-    }
-
     const status = dto.amount_status;
-    if (!status || !POLICY_AMOUNT_STATUS_VALUES.includes(String(status))) {
-      throw new BadRequestException(
-        `Amount Status is required and must be one of: ${POLICY_AMOUNT_STATUS_VALUES.join(', ')}`,
-      );
-    }
 
     return {
-      usd_amount: amount,
-      amount_status: status as PolicyAmountStatusEnum,
+      usd_amount:
+        amount !== null && Number.isFinite(amount) && amount >= 0
+          ? amount
+          : null,
+      amount_status:
+        status && POLICY_AMOUNT_STATUS_VALUES.includes(String(status))
+          ? (status as PolicyAmountStatusEnum)
+          : null,
     };
   }
 }

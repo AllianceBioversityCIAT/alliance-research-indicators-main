@@ -32,7 +32,7 @@
             <app-input
               type="number"
               [min]="0"
-              [isRequired]="true"
+              requiredMode="filled"
               label="USD Amount"
               placeholder="Enter amount in USD"
               [disabled]="!submission.isEditableStatus()"
@@ -42,6 +42,8 @@
           <div class="col-span-6">
             <app-radio-button
               [isRequired]="true"
+              direction="horizontal"
+              spaceX="gap-[35px]"
               label="Status"
               [signal]="body"
               [disabled]="!submission.isEditableStatus()"

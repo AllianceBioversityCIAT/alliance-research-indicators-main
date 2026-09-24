@@ -1,7 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsNumber, IsString, Min, ValidateIf } from 'class-validator';
 import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
-import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import { PolicyAmountStatusEnum } from '../enum/policy-amount-status.enum';
 
 export class CreateResultPolicyChangeDto {
@@ -54,30 +52,18 @@ export class CreateResultPolicyChangeDto {
   @ApiPropertyOptional({
     name: 'usd_amount',
     description:
-      'USD amount — required and non-negative when policy_type_id is Program, Budget, or Investment (3)',
-    example: 15000.5,
+      'USD amount for Program, Budget, or Investment. Zero is valid. Completeness is enforced by the green check, not by save.',
+    example: 0,
     type: Number,
   })
-  @ValidateIf(
-    (o: CreateResultPolicyChangeDto) =>
-      o.policy_type_id === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT,
-  )
-  @IsNumber()
-  @Min(0)
   public usd_amount?: number | null;
 
   @ApiPropertyOptional({
     name: 'amount_status',
     description:
-      'Amount status — required when policy_type_id is Program, Budget, or Investment (3)',
+      'Amount status for Program, Budget, or Investment. Completeness is enforced by the green check, not by save.',
     enum: PolicyAmountStatusEnum,
     example: PolicyAmountStatusEnum.ESTIMATED,
   })
-  @ValidateIf(
-    (o: CreateResultPolicyChangeDto) =>
-      o.policy_type_id === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT,
-  )
-  @IsEnum(PolicyAmountStatusEnum)
-  @IsString()
   public amount_status?: PolicyAmountStatusEnum | string | null;
 }
