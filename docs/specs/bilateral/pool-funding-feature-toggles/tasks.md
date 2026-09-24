@@ -22,7 +22,7 @@ guide §4.3); T-02 must land first because both consume it.
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | — |
 | Requirements | R-PFT-005 (row-exists scenario), R-PFT-003 |
