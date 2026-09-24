@@ -17,6 +17,7 @@ import { GetStrategicObjectivesService } from '@services/control-list/get-strate
 import { GetImpactOutcomesService } from '@services/control-list/get-impact-outcomes.service';
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
+import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { AllianceLeverCardComponent } from './components/alliance-lever-card/alliance-lever-card.component';
 
@@ -77,6 +78,19 @@ class PortfolioCatalogServiceMock {
   }
 }
 
+class GetLeverStrategicOutcomesServiceMock {
+  private readonly catalog = signal<unknown[]>([]);
+  list = this.catalog;
+  loading = signal(false);
+  isOpenSearch = jest.fn().mockReturnValue(false);
+  main = jest.fn().mockImplementation(async () => undefined);
+  getList = jest.fn().mockImplementation(() => this.catalog);
+  getLoading = jest.fn().mockImplementation(() => this.loading);
+  setCatalog(items: unknown[]) {
+    this.catalog.set(items);
+  }
+}
+
 class GetLeverSdgTargetsServiceMock {
   private readonly catalog = signal<unknown[]>([]);
   list = this.catalog;
@@ -108,6 +122,7 @@ describe('AllianceAlignmentComponent', () => {
   let getImpactOutcomesService: PortfolioCatalogServiceMock;
   let getSdgsService: PortfolioCatalogServiceMock;
   let getLeverSdgTargetsService: GetLeverSdgTargetsServiceMock;
+  let getLeverStrategicOutcomesService: GetLeverStrategicOutcomesServiceMock;
   let route: any;
 
   beforeEach(async () => {
@@ -122,6 +137,7 @@ describe('AllianceAlignmentComponent', () => {
     getImpactOutcomesService = new PortfolioCatalogServiceMock();
     getSdgsService = new PortfolioCatalogServiceMock();
     getLeverSdgTargetsService = new GetLeverSdgTargetsServiceMock();
+    getLeverStrategicOutcomesService = new GetLeverStrategicOutcomesServiceMock();
     getLeversService.setCatalog(defaultLeversCatalog);
     route = {
       snapshot: {
@@ -153,7 +169,8 @@ describe('AllianceAlignmentComponent', () => {
         { provide: GetStrategicObjectivesService, useValue: getStrategicObjectivesService },
         { provide: GetImpactOutcomesService, useValue: getImpactOutcomesService },
         { provide: GetSdgsService, useValue: getSdgsService },
-        { provide: GetLeverSdgTargetsService, useValue: getLeverSdgTargetsService }
+        { provide: GetLeverSdgTargetsService, useValue: getLeverSdgTargetsService },
+        { provide: GetLeverStrategicOutcomesService, useValue: getLeverStrategicOutcomesService }
       ]
     }).compileComponents();
 
@@ -1105,6 +1122,55 @@ describe('AllianceAlignmentComponent', () => {
       const lever = { lever_id: 3 };
       const signal = component.getLeverSignal(lever);
       expect(signal().result_lever_strategic_outcomes).toEqual([]);
+    });
+
+    it('binds saved outcomes and SDG targets on the catalog id and reuses the same signals after reload', async () => {
+      getLeverStrategicOutcomesService.setCatalog([
+        { id: 19, strategic_outcome: 'Outcome 19' },
+        { id: 28, strategic_outcome: 'Outcome 28' }
+      ]);
+      getLeverSdgTargetsService.setCatalog([
+        { id: 12, sdg_target_id: 12, sdg_target_code: '2.1', sdg_target: 'Target 12', select_label: '2.1 — Target 12' }
+      ]);
+      api.GET_Alignments.mockResolvedValue({
+        data: {
+          contracts: [],
+          result_sdgs: [],
+          primary_levers: [
+            {
+              lever_id: 6,
+              result_lever_id: 1,
+              result_id: 1,
+              lever_role_id: 1,
+              is_primary: true,
+              result_lever_strategic_outcomes: [
+                { id: 501, lever_strategic_outcome_id: 19 },
+                { id: 502, lever_strategic_outcome_id: 28 }
+              ],
+              result_lever_sdg_targets: [{ id: 900, sdg_target_id: 12 }]
+            }
+          ],
+          contributor_levers: []
+        }
+      });
+
+      await component.getData();
+
+      const loaded = component.body().primary_levers[0];
+      const outcomeSignal = component.getLeverSignal(loaded);
+      const sdgSignal = component.getLeverSdgSignal(loaded);
+      expect(outcomeSignal().result_lever_strategic_outcomes).toEqual([
+        { id: 19, lever_strategic_outcome_id: 19, strategic_outcome: 'Outcome 19' },
+        { id: 28, lever_strategic_outcome_id: 28, strategic_outcome: 'Outcome 28' }
+      ]);
+      expect(sdgSignal().result_lever_sdg_targets[0]).toEqual(
+        expect.objectContaining({ sdg_target_id: 12, select_label: '2.1 — Target 12' })
+      );
+
+      await component.getData();
+
+      expect(component.getLeverSignal(component.body().primary_levers[0])).toBe(outcomeSignal);
+      expect(component.getLeverSdgSignal(component.body().primary_levers[0])).toBe(sdgSignal);
     });
   });
 
