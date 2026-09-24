@@ -58,7 +58,7 @@ K-015 caveat (pipeline does not apply migrations) noted in `execution.md`.
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-01 |
 | Requirements | R-PFT-003 (all paths) |

@@ -71,3 +71,69 @@ than deleting it, because the same objection will occur to the next reader.
   Cursor id; the grok family there is `grok-4.7-{low,medium,high,xhigh}`. Terminal closed,
   replacement started with `--retry-of`.
 - **Attempt 2** (`ctx_5649b888f4a6`) — succeeded.
+
+---
+
+## T-02 — The fail-open parser → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Task | `task_39a2d15bd75a` |
+| Dispatch | `ctx_d63c94f223c9` (first attempt) |
+| Worker | Cursor · `grok-4.7-high` |
+| Verdict | **PASS** |
+
+### Files created (4, nothing wired)
+
+- `server/researchindicators/src/domain/shared/utils/feature-flag.util{,.spec}.ts`
+- `client/research-indicators/src/app/shared/utils/feature-flag.util{,.spec}.ts`
+
+The parser is deliberately **not** consumed anywhere yet — that is T-03 and T-04.
+
+### The implementation
+
+```ts
+return value?.trim().toLowerCase() !== 'false';
+```
+
+This satisfies D-2's structural requirement rather than merely its behavior: the enabled
+result **is** the inequality, so there is no `catch` and no default branch for a later reader
+to "clean up" into a fail-closed one. Optional chaining covers `null`/`undefined` without a
+guard clause.
+
+### Verification — falsifier executed by the reviewer on BOTH tiers
+
+| Check | Server | Client |
+| --- | --- | --- |
+| 12-row table green | 12/12 | 12/12 |
+| Falsifier (`!== 'false'` → `=== 'true'`) | **8 rows red** | **8 rows red** |
+| Rows that reddened | `undefined`, `null`, empty, whitespace, `maybe`, `0`, `no`, `off` | same |
+| Rows that stayed green | `FALSE`, ` false `, `false`, `true` | same |
+| Restored → green again | 12/12 | 12/12 |
+
+The 8/4 split is the arithmetic the inversion predicts, and it is what makes the fixture
+non-inert: `maybe` and `0` are the rows where the two implementations diverge. A table of only
+`'true'`/`'false'` would have stayed fully green under the mutation and proved nothing.
+
+| Gate | Result |
+| --- | --- |
+| `npx eslint` (server) | exit 0 |
+| `npx prettier --check` (all four) | clean |
+| `npx tsc -p tsconfig.spec.json --noEmit`, filtered to the new spec | no errors (new file, the easy case) |
+| Server suite | **390 suites / 3378 tests** (+12, exactly the new table) |
+| Client suite | **324 suites / 7342 tests** (+12, exactly the new table) |
+
+The `+12 / +12` deltas are recorded because they corroborate that the new tests actually
+joined their runners — a suite total that did not move would mean the file was collected by
+neither.
+
+### Reviewer check that closed an open concern
+
+The signature is `string | null | undefined`, and `value?.trim()` would throw on a non-string.
+Checked the contract rather than assuming: `ConfigurationByKeyResponse.simple_value` is typed
+`string | null`, and the column is `text`, so the signature is a superset of what can arrive.
+No gap.
+
+*(Unrelated observation, deliberately not acted on: that same interface declares
+`is_active?: boolean`, a field `app_config` does not have. Pre-existing and out of this
+spec's scope.)*
