@@ -27,6 +27,7 @@ export interface Portfolio2AlignmentCatalogs {
   strategicObjectives?: PortfolioConfigItem[];
   impactOutcomes?: PortfolioConfigItem[];
   sdgs?: GetSdgs[];
+  sdgTargets?: LeverSdgTargetOption[];
 }
 
 export interface Portfolio2AlignmentContractPayload {
@@ -333,9 +334,7 @@ export const normalizePortfolio2AlignmentGet = (
     'strategic_objective_id'
   ),
   impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id'),
-  result_sdg_targets: (data?.result_sdg_targets ?? [])
-    .map(target => ({ sdg_target_id: Number(target.sdg_target_id) }))
-    .filter(target => Number.isFinite(target.sdg_target_id) && target.sdg_target_id > 0)
+  result_sdg_targets: enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets)
 });
 
 export const buildPortfolio2AlignmentPatch = (

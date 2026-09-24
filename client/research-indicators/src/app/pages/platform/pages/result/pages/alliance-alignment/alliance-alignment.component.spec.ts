@@ -18,6 +18,7 @@ import { GetImpactOutcomesService } from '@services/control-list/get-impact-outc
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
 import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
+import { Portfolio2026SdgTargetsService } from '@services/control-list/portfolio-2026-sdg-targets.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { AllianceLeverCardComponent } from './components/alliance-lever-card/alliance-lever-card.component';
 
@@ -123,6 +124,7 @@ describe('AllianceAlignmentComponent', () => {
   let getSdgsService: PortfolioCatalogServiceMock;
   let getLeverSdgTargetsService: GetLeverSdgTargetsServiceMock;
   let getLeverStrategicOutcomesService: GetLeverStrategicOutcomesServiceMock;
+  let portfolio2026SdgTargets: PortfolioCatalogServiceMock;
   let route: any;
 
   beforeEach(async () => {
@@ -138,6 +140,7 @@ describe('AllianceAlignmentComponent', () => {
     getSdgsService = new PortfolioCatalogServiceMock();
     getLeverSdgTargetsService = new GetLeverSdgTargetsServiceMock();
     getLeverStrategicOutcomesService = new GetLeverStrategicOutcomesServiceMock();
+    portfolio2026SdgTargets = new PortfolioCatalogServiceMock();
     getLeversService.setCatalog(defaultLeversCatalog);
     route = {
       snapshot: {
@@ -170,7 +173,8 @@ describe('AllianceAlignmentComponent', () => {
         { provide: GetImpactOutcomesService, useValue: getImpactOutcomesService },
         { provide: GetSdgsService, useValue: getSdgsService },
         { provide: GetLeverSdgTargetsService, useValue: getLeverSdgTargetsService },
-        { provide: GetLeverStrategicOutcomesService, useValue: getLeverStrategicOutcomesService }
+        { provide: GetLeverStrategicOutcomesService, useValue: getLeverStrategicOutcomesService },
+        { provide: Portfolio2026SdgTargetsService, useValue: portfolio2026SdgTargets }
       ]
     }).compileComponents();
 
@@ -461,6 +465,37 @@ describe('AllianceAlignmentComponent', () => {
     await component.getData();
 
     expect(component.body().result_sdgs).toEqual([]);
+  });
+
+  it('labels portfolio 2026 SDG target rows from the catalog', async () => {
+    cache.metadata.set({ indicator_id: 5, portfolio_id: 2 });
+    portfolio2026SdgTargets.setCatalog([
+      {
+        id: 10,
+        sdg_target_id: 10,
+        sdg_target_code: '1.1',
+        sdg_target: 'Eradicate extreme poverty',
+        select_label: '1.1 — Eradicate extreme poverty'
+      }
+    ]);
+    api.GET_Alignments.mockResolvedValue({
+      data: {
+        contracts: [],
+        result_sdgs: [],
+        research_areas: [],
+        strategic_objectives: [],
+        impact_outcomes: [],
+        result_sdg_targets: [{ sdg_target_id: 10, result_id: 8579, result_lever_id: null }]
+      }
+    });
+
+    await component.getData();
+
+    expect(component.body().result_sdg_targets?.[0]).toMatchObject({
+      sdg_target_id: 10,
+      sdg_target_code: '1.1',
+      sdg_target: 'Eradicate extreme poverty'
+    });
   });
 
   it('should render SDG field for non-OICR indicators on portfolio 2', () => {

@@ -6,6 +6,7 @@ import { GetImpactOutcomesService } from '@services/control-list/get-impact-outc
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
 import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
+import { Portfolio2026SdgTargetsService } from '@services/control-list/portfolio-2026-sdg-targets.service';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../../../shared/services/api.service';
 import { MultiSelectModule } from 'primeng/multiselect';
@@ -66,6 +67,7 @@ export default class AllianceAlignmentComponent {
   getSdgsService = inject(GetSdgsService);
   getLeverSdgTargetsService = inject(GetLeverSdgTargetsService);
   getLeverStrategicOutcomesService = inject(GetLeverStrategicOutcomesService);
+  portfolio2026SdgTargets = inject(Portfolio2026SdgTargetsService);
   body: WritableSignal<GetAllianceAlignment> = signal({
     contracts: [],
     result_sdgs: [],
@@ -137,7 +139,7 @@ export default class AllianceAlignmentComponent {
       await Promise.all([
         this.getStrategicObjectivesService.main(portfolioParams),
         this.getImpactOutcomesService.main(portfolioParams),
-        ...(this.isOicrIndicator() ? [] : [this.getSdgsService.main()])
+        ...(this.isOicrIndicator() ? [this.portfolio2026SdgTargets.main()] : [this.getSdgsService.main()])
       ]);
 
       const normalized = normalizePortfolio2AlignmentGet(response.data, {
@@ -145,7 +147,8 @@ export default class AllianceAlignmentComponent {
         levers: this.getLeversService.getList(portfolioParams)(),
         strategicObjectives: this.getStrategicObjectivesService.getList(portfolioParams)(),
         impactOutcomes: this.getImpactOutcomesService.getList(portfolioParams)(),
-        sdgs: this.getSdgsService.list()
+        sdgs: this.getSdgsService.list(),
+        sdgTargets: this.portfolio2026SdgTargets.list()
       });
       this.body.set({
         ...normalized,
