@@ -80,6 +80,7 @@ const otherwiseEligibleKp = (): SyncGateSnapshot => ({
   },
   indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
   prms_policy_type_id: null,
+  prms_sync_button_enabled: true,
 });
 
 describe('KnowledgeProductBuilder', () => {

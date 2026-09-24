@@ -106,6 +106,7 @@ const eligibleFacts = (
   },
   indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
   prms_policy_type_id: null,
+  prms_sync_button_enabled: true,
 });
 
 function deferred<T = void>(): {

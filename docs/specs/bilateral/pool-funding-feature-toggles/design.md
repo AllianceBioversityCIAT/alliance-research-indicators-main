@@ -44,13 +44,21 @@ exceeds this — the work is deliberately shaped to fit one morning.
 ## 3. Premise Ledger
 
 **Counts:** 8 verified · 0 `UNVERIFIED` (0 High / 0 Low).
+
+> ⚠️ **P-1 was CORRECTED during T-03 review (2026-09-24).** It originally read *"there is **no**
+> `is_active` column"*, cited to `grep -c is_active` on `app-config.entity.ts` → `0`. That grep
+> is a textbook **KZ-017**: the entity subclass is a region that structurally **cannot** show
+> inherited columns, so the check was narrower than the claim it backed and returned a confident
+> green. `AppConfig extends AuditableEntity`, and the column is right there in `baseline.sql`.
+> The implementer's `AND is_active = TRUE` was correct and the spec was wrong. Design §6 is
+> unaffected — the new rows take the column's `DEFAULT 1`.
 **Blast-radius triggers:** `live-path` and `shared-state` and `consumer` **all fire** —
 this design changes a condition multiple template blocks read, and changes the
 behavior a named user action reaches.
 
 | # | Claim | Class | Citation (as run) | Verified at | If false |
 | --- | --- | --- | --- | --- | --- |
-| P-1 | `app_config` stores scalars as text in `simple_value`; there is **no** `is_active` column | `data-env` | `grep -n "name: '"` on `app-config.entity.ts` → `description, category, subcategory, field, simple_value, json_value`; `grep -c is_active` → **0** | `37d8f875` | The encoding decision D-2 changes. Impact **High** |
+| P-1 | `app_config` stores scalars as text in `simple_value`, **and carries the audit block including `is_active`** | `data-env` | `baseline.sql` → `CREATE TABLE app_config` declares `created_at, created_by, updated_at, updated_by, is_active tinyint NOT NULL DEFAULT '1', deleted_at, key, description, simple_value, json_value, category, subcategory, field`. `AppConfig extends AuditableEntity` (`app-config.entity.ts:6`), which declares `is_active` (`auditable.entity.ts:35`). Executed against Dev: `SELECT simple_value FROM app_config WHERE \`key\` = ? AND is_active = TRUE` runs clean | `b1cd1ece` | The encoding decision D-2 changes. Impact **High** |
 | P-2 | `app-config.util.ts` holds **no** cache — it queries the `DataSource` per call | `existence` | `grep -n "cache\|TTL\|Date.now"` on `shared/utils/app-config.util.ts` → only the constructor line matches | `37d8f875` | NFR-PFT-001 is false and a restart window must be documented. Impact **High** |
 | P-3 | `GET /api/configuration/:key` is excluded from `JwtMiddleware` (public) | `data-env` | `grep -n configuration server/.../src/app.module.ts` → `:78 path: 'configuration/:key'` inside the exclude list | `37d8f875` | The client read would need a token; D-4 changes. Impact **Low** |
 | P-4 | The server refusal ladder is an ordered **data list**, not scattered conditionals | `location` | `eligibility/sync-gate.ts:69` — `export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[]`, 7 entries, first-failure-wins, each carrying `persistsRow` | `37d8f875` | D-3 changes from "add one entry" to "add a branch". Impact **High** |

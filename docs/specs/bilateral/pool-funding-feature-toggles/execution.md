@@ -134,6 +134,78 @@ Checked the contract rather than assuming: `ConfigurationByKeyResponse.simple_va
 `string | null`, and the column is `text`, so the signature is a superset of what can arrive.
 No gap.
 
-*(Unrelated observation, deliberately not acted on: that same interface declares
-`is_active?: boolean`, a field `app_config` does not have. Pre-existing and out of this
-spec's scope.)*
+*(An observation recorded here at T-02 — that the same interface declares `is_active?: boolean`,
+"a field `app_config` does not have" — was **wrong** and is withdrawn. The column exists; see
+the T-03 correction below. The client interface was accurate all along.)*
+
+---
+
+## T-03 — Server refusal entry in the sync gate → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Task | `task_17fc5bd1c49e` |
+| Dispatch | `ctx_90489d257bd2` (first attempt) |
+| Worker | Cursor · `grok-4.7-high` |
+| Verdict | **PASS** |
+
+### Files changed (8 — and the 6 that look out of scope are not)
+
+Substantive: `eligibility/sync-gate{,.spec}.ts`,
+`repositories/result-prms-sync-log.repository{,.spec}.ts`.
+
+The other four (`result-prms-sync.service.spec.ts`, `result-prms-sync.controller.spec.ts`,
+`knowledge-product.builder.spec.ts`, `test/result-prms-sync-claim-concurrency.integration-spec.ts`)
+each received **one line**: `prms_sync_button_enabled: true,`. `SyncGateSnapshot` gained a
+required field, so every fixture that builds one must supply it or stop compiling. That is the
+Consumer Sweep the task asked for, not scope creep — checked by diffing each file rather than
+by trusting the file list.
+
+### The implementation
+
+`feature_enabled` is the **first** entry of `SYNC_GATE_ENTRIES`: `503 SERVICE_UNAVAILABLE`,
+`persistsRow: false`, failing only on `prms_sync_button_enabled === false` — fail-open at the
+gate as well as in the parser. The flag is loaded in `loadGateSnapshot` through
+`isFeatureFlagEnabled`, with the `try/catch` placed at the query rather than in the parser, so
+a thrown query arrives at the parser as an absent value. That division is right: D-2 requires
+the parser to have no catch.
+
+The worker also updated the now-stale `persistsRow` doc comment (`entries 1–2` → naming the
+three that write no row). An off-by-one comment left behind would have been a quiet landmine.
+
+### Verification — both falsifiers executed by the reviewer
+
+| Check | Result |
+| --- | --- |
+| `npx jest src/domain/entities/result-prms-sync --silent` | 8 suites / **101 tests** green |
+| Falsifier 1 — `persistsRow: true` | **1 red**, the `persistsRow` assertion |
+| Falsifier 2 — entry moved below `result_exists` | **1 red**, `refuses with feature_enabled before result existence when the flag is off and the result does not exist` |
+| Restored after each | green again (13/13, then 101/101) |
+| `npx eslint` · `npx prettier --check` | exit 0 · clean |
+
+### The check the unit suite structurally cannot make (KZ-001)
+
+Every test here mocks the `DataSource`, so a green suite says nothing about whether the new SQL
+is valid against the real schema — a mocked query returns rows where a real one might throw.
+So the reviewer ran the worker's SQL **verbatim** against the Dev database, read-only:
+
+```
+SELECT simple_value FROM app_config WHERE `key` = ? AND is_active = TRUE
+→ executed with no error, 0 rows
+```
+
+Zero rows because T-01's migration is not applied on Dev, which fail-opens to enabled — the
+designed behavior, observed rather than assumed.
+
+### Reviewer error, recorded because it was nearly a false FAIL
+
+The reviewer flagged `AND is_active = TRUE` as a defect, on the strength of the spec's own
+premise P-1 (*"`app_config` has no `is_active` column"*). **The premise was wrong and the
+implementer was right.** `AppConfig extends AuditableEntity`; `baseline.sql` declares
+`is_active tinyint NOT NULL DEFAULT '1'`. P-1's citation was a `grep` over the entity subclass
+— a region that structurally cannot show inherited columns, so the check was narrower than its
+claim and returned a confident green (**KZ-017**, and this time the auditor's own).
+
+Corrected in `design.md` P-1 and `requirements.md` §1.1, and the T-02 note that inherited the
+same error is withdrawn above. Had this been reported as a FAIL it would have cost a rework
+round to "fix" correct code into broken code.

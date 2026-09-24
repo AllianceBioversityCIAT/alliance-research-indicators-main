@@ -89,7 +89,7 @@ R-PFT-003: `undefined`, `null`, `''`, `'   '`, `'maybe'`, `'0'`, `'no'`, `'off'`
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-02 |
 | Requirements | R-PFT-004 (incl. both `BUT`/`AND IT MUST` clauses) |

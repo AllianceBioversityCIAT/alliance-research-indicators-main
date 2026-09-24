@@ -38,7 +38,7 @@ Funding on results that do not qualify for it.
 | --- | --- |
 | One client choke point decides all three surfaces — the `Optional` divider, the sidebar item, and the PRMS SYNC button | `shouldHidePoolFundingTab()` at `result-sidebar.component.ts:100`; the button's `@if (hasPoolFundingOption())` at `result-sidebar.component.html:143` reads the same filtered list built at `:68-83` |
 | The server already refuses ineligible syncs through an ordered data-driven ladder | `SYNC_GATE_ENTRIES` at `eligibility/sync-gate.ts:69` — 7 entries, first-failure-wins |
-| `app_config` stores values as text; there is no `is_active` column | `app-config.entity.ts` — columns `description`, `category`, `subcategory`, `field`, `simple_value`, `json_value`; `grep -c is_active` → **0** |
+| `app_config` stores values as text **and carries the audit block, `is_active` included** — so a read must filter on it | `baseline.sql` `CREATE TABLE app_config` declares `is_active tinyint NOT NULL DEFAULT '1'`; `AppConfig extends AuditableEntity`. *(Corrected 2026-09-24 — this row previously claimed there was no such column, on the strength of a grep over the entity subclass, which cannot show inherited columns. See `design.md` P-1.)* |
 | `GET /api/configuration/:key` is public (excluded from `JwtMiddleware`) | `app.module.ts:78` — `path: 'configuration/:key'` in the exclude list |
 | Server-side config reads are **not** cached | `app-config.util.ts` — no TTL, no memo; queries the `DataSource` per call. This is **not** the K-016 5-minute trap, which belongs to `MappingPhaseResolver` and `ClarisaProjectsService` only |
 
