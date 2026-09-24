@@ -18,11 +18,21 @@ export class ResultLeverSdgTarget extends AuditableEntity {
   })
   result_lever_sdg_target_id!: number;
 
+  /**
+   * Optional. Set for portfolio 2025 (lever-dependent). Null for portfolio 2026.
+   */
   @Column('bigint', {
     name: 'result_lever_id',
+    nullable: true,
+  })
+  result_lever_id?: number | null;
+
+  /** Always set. Identifies the result for both portfolios. */
+  @Column('bigint', {
+    name: 'result_id',
     nullable: false,
   })
-  result_lever_id!: number;
+  result_id!: number;
 
   @Column('bigint', {
     name: 'sdg_target_id',
