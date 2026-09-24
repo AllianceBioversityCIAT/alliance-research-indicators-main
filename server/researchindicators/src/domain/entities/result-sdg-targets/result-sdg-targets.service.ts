@@ -7,7 +7,7 @@ import {
 } from '../../shared/utils/current-user.util';
 import { ResultLeverSdgTarget } from '../result-lever-sdg-targets/entities/result-lever-sdg-target.entity';
 import { ClarisaSdgTarget } from '../../tools/clarisa/entities/clarisa-sdg-targets/entities/clarisa-sdg-target.entity';
-import { PORTFOLIO_2026_SDG_TARGET_CODE_SET } from './portfolio-2026-sdg-target-codes';
+import { Portfolio2026SdgTargetCatalogService } from './portfolio-2026-sdg-target-catalog.service';
 
 @Injectable()
 export class ResultSdgTargetsService extends BaseServiceSimple<
@@ -17,6 +17,7 @@ export class ResultSdgTargetsService extends BaseServiceSimple<
   constructor(
     private readonly dataSource: DataSource,
     currentUser: CurrentUserUtil,
+    private readonly portfolio2026Catalog: Portfolio2026SdgTargetCatalogService,
   ) {
     super(
       ResultLeverSdgTarget,
@@ -62,10 +63,9 @@ export class ResultSdgTargetsService extends BaseServiceSimple<
         ? []
         : await clarisaRepo.find({ where: { id: In(ids) } });
 
+    const allowedCodes = new Set(await this.portfolio2026Catalog.getCodes());
     const allowedIds = catalog
-      .filter((row) =>
-        PORTFOLIO_2026_SDG_TARGET_CODE_SET.has(String(row.sdg_target_code)),
-      )
+      .filter((row) => allowedCodes.has(String(row.sdg_target_code)))
       .map((row) => Number(row.id));
 
     const repo = (manager ?? this.dataSource).getRepository(
