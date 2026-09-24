@@ -298,3 +298,182 @@ reviewer opening that file needs to know where the two real lines are.
 *(Unrelated and pre-existing: `npm run build` prints template warnings for
 `PoolFundingAlignmentComponent` and `CreateOicrFormComponent`. Neither file was touched; the
 build exits 0.)*
+
+---
+
+## T-06 — Boolean toggle in the admin modal → **PASS (code), visual approval PENDING**
+
+| Field | Value |
+| --- | --- |
+| Task | `task_662fd49b9cd4` |
+| Dispatch | `ctx_2ddb90125825` (first attempt) — **retained**, not released |
+| Worker | Cursor · `grok-4.7-high` |
+| Verdict | **PASS** on every automated gate; **not committed** pending the owner seeing it |
+
+### Files changed (3, exactly the scope)
+
+`edit-environment-variable-modal.component.{ts,html,spec.ts}`.
+
+### The implementation
+
+A fourth arm in the existing chain, placed after the CLARISA arm and before the free-text
+`@else`. It mirrors the arm beside it: `POOL_FUNDING_FLAG_KEYS` next to `CLARISA_PHASE_CONFIG_KEY`,
+`isPoolFundingFlagKey()` next to `isClarisaPhaseKey()`.
+
+The control carries the contract itself:
+
+```html
+<p-toggleswitch [trueValue]="'true'" [falseValue]="'false'" ... />
+```
+
+so `ngModel` round-trips the canonical strings rather than booleans that something downstream
+would have to stringify. `onPoolFundingFlagChange` normalises defensively on top. The adjacent
+label reads `=== 'false' ? 'Disabled' : 'Enabled'`, which matches the parser's fail-open
+semantics: anything that is not exactly `false` displays as Enabled.
+
+Raw `p-toggleswitch` rather than a wrapped field is consistent with this modal, whose CLARISA
+arm already uses a raw `p-select`. Token classes only (`atc-primary-blue-600`, `atc-grey-600`);
+no hex in the new block.
+
+### Verification — falsifier executed by the reviewer
+
+| Check | Result |
+| --- | --- |
+| Modal suite | **19/19 green** |
+| Falsifier — new branch deleted so the key falls through to free text | **4 red**: both "renders the toggle and not a text input" and both "writes exactly true then false" |
+| Restored | 19/19 green |
+| Other arms intact | tests for the CLARISA key and `SOME_OTHER_KEY` still pass |
+| `npx prettier --check` | clean |
+| Spec type-check, filtered to the touched files | **empty** |
+| Client suite | **325 suites / 7356 tests** (see the flake note) |
+| Server suite | **390 suites / 3383 tests** |
+| `npm run build` | exit 0 |
+| `npm run lint -- --quiet` | All files pass linting |
+
+The assertions query the rendered DOM — `fixture.nativeElement.querySelector('[data-testid="pool-funding-flag-toggle"]')`,
+then down into PrimeNG's own `[data-pc-name="toggleswitch"]` — so they prove the control
+rendered, not that a predicate returned true.
+
+### Client suite flake, confirmed not a defect
+
+The first full client run reported **1 failed suite and 0 failed tests**, the repo's known
+runner flake. Re-ran: 325/325 suites, 7356/7356 tests, and the total is `7352 + 4`, exactly the
+new assertions. Recorded rather than silently re-run.
+
+### Formatting, same as T-04
+
+198 of the 216 changed lines in the template are Prettier normalising a file that was never
+Prettier-clean on `HEAD` (measured with `--stdin-filepath`). The file also gained its missing
+trailing newline.
+
+### Why this is not committed
+
+`no-commit-before-visual-approval`: this task adds a **new visual control**, and no gate in this
+repo can see it — jsdom renders no pixels and the admin screen was never opened in a browser.
+The worker said so plainly in its report. The code is verified; the appearance is not. The
+worker is **retained** so a rework goes back to the context that holds the investigation.
+
+---
+
+## T-05 — Full gates on both packages → **PASS**
+
+Run by the reviewer across T-03/T-04/T-06 rather than dispatched: the task changes no product
+code, and its `skip-eligible` claim is "both suites green and both type-check gates clean, with
+the numbers quoted".
+
+| Gate | Result |
+| --- | --- |
+| Server tests | 390 suites / **3383** |
+| Server lint (`npx eslint`, not `npm run lint`) | exit 0 |
+| Client tests | 325 suites / **7356** (clean re-run after the known flake) |
+| Client lint (`npm run lint -- --quiet`) | All files pass linting |
+| Client build | exit 0 |
+| Client spec type-check | project total **944**, no collapse; touched files compared as a normalized SET against `HEAD` — identical, no new errors |
+
+Suites were run **sequentially, never concurrently** — two full-suite runs at once have twice
+produced phantom failures in this repo.
+
+---
+
+## T-07 — Categorise the two flag rows → **PASS** (after one rework)
+
+| Field | Value |
+| --- | --- |
+| Task | `task_1846cb6cc68f` → rework `task_b3b5679b44c7` |
+| Dispatch | `ctx_b685d29a495f` (attempt 1) → `ctx_6f77d08c24dc` (attempt 2, same terminal) |
+| Worker | Cursor · `grok-4.7-high` |
+| Verdict | **PASS** |
+
+### Why this task exists — a design error, not an implementation error
+
+T-01 seeded the rows with `category` / `subcategory` / `field` `NULL`, because `design.md` §6
+said to. The spec was wrong: **all 16 pre-existing `app_config` rows carry a category and a
+subcategory**, and the admin screen *filters* by both, so the two new rows landed in the
+`UNCategorized` bucket. The owner hit it the moment they applied the migration.
+
+Root cause, and it is the **second instance of the same mistake in this spec**: the design
+reasoned from the `AppConfigCategory` enum (which declares only `EMAIL`) and treated it as the
+vocabulary. The enum is vestigial; the vocabulary lives in the data. P-1 failed the same way,
+reasoning from the entity subclass instead of the schema.
+
+### The values, and why
+
+| | `POOL_FUNDING.SECTION.ENABLED` | `POOL_FUNDING.PRMS_SYNC_BUTTON.ENABLED` |
+| --- | --- | --- |
+| `category` | `FRONT` | `FRONT` |
+| `subcategory` | `SECTIONS` | `SECTIONS` |
+| `field` | `NULL` | `NULL` |
+
+Owner's call, evaluated before being accepted. `FRONT` holds up: `config-front`'s own
+description defines the category as covering *"customizable settings and feature behavior"*, and
+two rows sharing a subcategory has precedent (`front-version-dev` / `front-version-prod` are both
+`FRONT` / `ENVIRONMENT`).
+
+`field` `NULL` was the owner's second correction and it is right on two independent grounds:
+`EnvAppConfigUtil` builds `where.field = …`, so `field` is the third coordinate of a composite
+lookup rather than a state; and the admin table renders eight columns, none of them `field`.
+`ENABLED` there would have been invisible dead data shaped like a status.
+
+**No new column was added to the admin table** — the owner ruled that out explicitly, and the
+observation that `field` is unrendered was an argument for leaving it `NULL`, never for
+displaying it.
+
+### A new migration, not an edit
+
+`1790258215513` was already applied to the owner's Dev database, so editing it in place would
+never have re-run there. `1790280318260` `UPDATE`s the two rows instead. *(Attempt 1's file was
+edited in place during rework rather than superseded, because it had never been committed.)*
+
+### Verification — re-run by the reviewer on a fresh scratch container
+
+```
+after up       FRONT / SECTIONS / <NULL> / true      (both rows)
+after revert   <NULL> / <NULL> / <NULL> / true       (both rows)
+after re-apply FRONT / SECTIONS / <NULL> / true      (both rows)
+```
+
+The falsifier is the middle line: `down()` clears the three columns and leaves `simple_value`
+`true`. A rollback that also wiped the value would have silently disabled nothing and looked
+identical in the category columns.
+
+| Gate | Result |
+| --- | --- |
+| Migration executed on a fresh container | `CategorisePoolFundingFeatureToggles1790280318260 ... executed successfully` |
+| `npx eslint` · `npx prettier --check` | exit 0 · clean |
+| Server suite | **390 suites / 3383 tests** |
+
+### Attempt history
+
+- **Attempt 1** (`ctx_b685d29a495f`) — reported `succeeded` with `POOL_FUNDING` / `SECTION` /
+  `PRMS_SYNC_BUTTON` / `ENABLED`. A mid-flight correction was sent to its inbox and **it
+  finished without applying it** — a worker's report is about the brief it started with, not the
+  mail that arrived during the run.
+- **Attempt 2** (`ctx_6f77d08c24dc`) — dispatched onto the **same terminal** so the worker kept
+  its container and its investigation, carrying the rejected values as explicit attempt history.
+  Succeeded.
+
+### Still owed
+
+`ARI` note for whoever applies this: migration `1790280318260` is committed but **not applied**
+anywhere. The owner applied `1790258215513` by hand; this one needs the same step, or the two
+rows stay uncategorised in that environment.

@@ -205,9 +205,33 @@ has no rows — which fail-open renders as today's behavior. The failure mode is
 | `description` | States that `false` hides the section and that `true` defers to the existing rules | States that `false` hides only the button |
 | `json_value` | `NULL` | `NULL` |
 
-`category` / `subcategory` / `field` are nullable and left `NULL`: the existing
-`AppConfigCategory` enum models email settings only, and inventing a category for two
-rows would extend a vocabulary this spec does not own.
+| `category` | `FRONT` | `FRONT` |
+| `subcategory` | `SECTIONS` | `SECTIONS` |
+| `field` | `NULL` | `NULL` |
+
+> ⚠️ **CORRECTED 2026-09-24 (T-07).** This block originally read *"`category` / `subcategory` /
+> `field` are nullable and left `NULL`: the existing `AppConfigCategory` enum models email
+> settings only, and inventing a category would extend a vocabulary this spec does not own."*
+> **Wrong, and wrong in the same way as P-1:** the enum is not the vocabulary. It is vestigial —
+> it declares only `EMAIL`, while the live table uses six categories (`API`, `BULK_UPLOAD`,
+> `EMAIL`, `FRONT`, `portfolio`, `Results`). **All 16 pre-existing rows carry a category and a
+> subcategory**, and the admin screen *filters* by both, so the two `NULL` rows landed in an
+> `UNCategorized` bucket. The owner hit this the moment the seed migration was applied.
+>
+> `FRONT` is the owner's call and it holds up: `config-front`'s own description defines the
+> category as *"Front-end application configuration used to manage customizable settings **and
+> feature behavior**"*, and two rows sharing a subcategory has precedent (`front-version-dev`
+> and `front-version-prod` are both `FRONT` / `ENVIRONMENT`).
+>
+> `field` stays `NULL`. It is **not** a state holder: `EnvAppConfigUtil` builds
+> `where.field = …`, making it the third coordinate of a composite lookup
+> (`category + subcategory + field`) used to locate the `EMAIL` settings. It is also not rendered
+> — the admin table's eight columns are `category`, `subcategory`, `key`, `description`, `value`,
+> `lastUpdated`, `updatedBy`, `actions`. Writing `ENABLED` there would be invisible dead data
+> that reads as a status. Every existing `FRONT` row has `field` `NULL`.
+>
+> Applied by migration `1790280318260`, **not** by editing the seed migration, which was already
+> applied to Dev.
 
 ---
 
