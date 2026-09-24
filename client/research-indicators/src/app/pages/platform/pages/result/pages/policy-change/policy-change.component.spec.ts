@@ -266,7 +266,7 @@ describe('PolicyChangeComponent', () => {
 
     expect(mockApiService.PATCH_PolicyChange).not.toHaveBeenCalled();
     expect(mockActionsService.showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: 'warn', summary: 'Policy Change' })
+      expect.objectContaining({ severity: 'warning', summary: 'Policy Change' })
     );
   });
 

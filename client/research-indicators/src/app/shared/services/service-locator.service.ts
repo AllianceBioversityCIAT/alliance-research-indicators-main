@@ -67,6 +67,7 @@ import { ImpactAreaScoresService } from './short-control-list/impact-area-scores
 import { ImpactAreasService } from './short-control-list/impact-areas.service';
 import { SourceFilterOptionsService } from './short-control-list/source-filter-options.service';
 import { GetClarisaSdgTargetsService } from './control-list/get-clarisa-sdg-targets.service';
+import { Portfolio2026SdgTargetsService } from './control-list/portfolio-2026-sdg-targets.service';
 
 @Injectable({
   providedIn: 'root'
@@ -266,6 +267,8 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetLeverSdgTargetsService);
       case 'clarisaSdgTargets':
         return this.getFromInjector(GetClarisaSdgTargetsService);
+      case 'portfolio2026SdgTargets':
+        return this.getFromInjector(Portfolio2026SdgTargetsService);
       case 'projectStatus':
         return this.getFromInjector(GetProjectStatusService);
       case 'fundingTypes':

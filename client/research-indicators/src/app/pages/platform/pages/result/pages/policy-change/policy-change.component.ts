@@ -114,7 +114,7 @@ export default class PolicyChangeComponent {
     if (this.submission.isEditableStatus()) {
       if (!this.amountFieldsValid()) {
         this.actions.showToast({
-          severity: 'warn',
+          severity: 'warning',
           summary: 'Policy Change',
           detail: 'USD Amount and Status are required when Policy Type is Program, Budget, or Investment'
         });

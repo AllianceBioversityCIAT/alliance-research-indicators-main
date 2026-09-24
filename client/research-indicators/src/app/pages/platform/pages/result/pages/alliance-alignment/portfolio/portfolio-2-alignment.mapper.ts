@@ -40,6 +40,7 @@ export interface Portfolio2AlignmentPatchBody {
   research_areas: { lever_id: string | number }[];
   strategic_objectives: { strategic_objective_id: number }[];
   impact_outcomes?: { impact_outcome_id: number }[];
+  result_sdg_targets?: { sdg_target_id: number }[];
 }
 
 const normalizeSdgs = (sdgs: GetSdgs[] | undefined): GetSdgs[] =>
@@ -331,13 +332,17 @@ export const normalizePortfolio2AlignmentGet = (
     catalogs.strategicObjectives,
     'strategic_objective_id'
   ),
-  impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id')
+  impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id'),
+  result_sdg_targets: (data?.result_sdg_targets ?? [])
+    .map(target => ({ sdg_target_id: Number(target.sdg_target_id) }))
+    .filter(target => Number.isFinite(target.sdg_target_id) && target.sdg_target_id > 0)
 });
 
 export const buildPortfolio2AlignmentPatch = (
   body: GetAllianceAlignment,
   includeImpactOutcomes: boolean,
-  includeResultSdgs = true
+  includeResultSdgs = true,
+  includeResultSdgTargets = false
 ): Portfolio2AlignmentPatchBody => {
   const payload: Portfolio2AlignmentPatchBody = {
     contracts: (body.contracts ?? [])
@@ -369,6 +374,12 @@ export const buildPortfolio2AlignmentPatch = (
         impact_outcome_id: Number((item as PortfolioConfigItem & { impact_outcome_id?: number }).impact_outcome_id ?? item.id)
       }))
       .filter(item => Number.isFinite(item.impact_outcome_id) && item.impact_outcome_id > 0);
+  }
+
+  if (includeResultSdgTargets) {
+    payload.result_sdg_targets = (body.result_sdg_targets ?? [])
+      .map(target => ({ sdg_target_id: Number(target.sdg_target_id) }))
+      .filter(target => Number.isFinite(target.sdg_target_id) && target.sdg_target_id > 0);
   }
 
   return payload;
