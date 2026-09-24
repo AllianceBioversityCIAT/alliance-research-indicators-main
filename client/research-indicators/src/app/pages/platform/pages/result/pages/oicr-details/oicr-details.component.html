@@ -57,8 +57,14 @@
             <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold pb-4">Actual count</span>
 
             @for (q of quantifications(); track $index) {
+            <!-- OICR signed-decimal extension (2026-09-24): min/max/maxFractionDigits/placeholder
+                 mirror the Innovation Use measures field — negatives and decimals enabled. -->
             <app-quantification-item [quantification]="q" [quantNumber]="$index + 1"
               [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"
+              [min]="oicrQuantificationMin"
+              [max]="oicrQuantificationMax"
+              [maxFractionDigits]="oicrQuantificationScale"
+              [placeholder]="oicrQuantificationPlaceholder"
               (update)="updateQuantification($index, $event)" (delete)="removeQuantification($index)">
             </app-quantification-item>
             }
@@ -78,8 +84,13 @@
             <span class="text-[#1689CA] text-[16px] leading-[17px] font-semibold py-4">Extrapolated estimates</span>
 
             @for (est of extrapolatedEstimates(); track $index) {
+            <!-- OICR signed-decimal extension (2026-09-24): same bounds as Actual count above. -->
             <app-quantification-item [quantification]="est" [quantNumber]="$index + 1"
               [headerLabel]="'EXTRAPOLATED ESTIMATES'" [disabled]="cache.isExternalResult() || !submission.isEditableStatus()"
+              [min]="oicrQuantificationMin"
+              [max]="oicrQuantificationMax"
+              [maxFractionDigits]="oicrQuantificationScale"
+              [placeholder]="oicrQuantificationPlaceholder"
               (update)="updateExtrapolatedEstimate($index, $event)"
               (delete)="removeExtrapolatedEstimate($index)">
             </app-quantification-item>
