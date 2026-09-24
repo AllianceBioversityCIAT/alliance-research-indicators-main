@@ -135,7 +135,10 @@ describe('ResultAlignmentOperationsService', () => {
         {
           result_lever_id: 100,
           lever_id: 'L1',
-          result_lever_strategic_outcomes: [{ lever_strategic_outcome_id: 1 }],
+          result_lever_strategic_outcomes: [
+            { id: 1, lever_strategic_outcome_id: 1, strategic_outcome: 'SO1' },
+            { id: 2, lever_strategic_outcome_id: 2, strategic_outcome: 'SO2' },
+          ],
           result_lever_sdg_targets: [{ sdg_target_id: 10 }],
         },
       ];
@@ -177,7 +180,13 @@ describe('ResultAlignmentOperationsService', () => {
         ['is_primary', 'custom_lever_name'],
         { is_primary: false },
       );
-      expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalled();
+      expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalledWith(
+        100,
+        [{ lever_strategic_outcome_id: 1 }, { lever_strategic_outcome_id: 2 }],
+        'lever_strategic_outcome_id',
+        undefined,
+        manager,
+      );
       expect(resultLeverSdgTargetsService.create).toHaveBeenCalledWith(
         100,
         [{ sdg_target_id: 10, result_id: resultId }],

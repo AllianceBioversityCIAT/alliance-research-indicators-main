@@ -753,6 +753,11 @@ export default class AllianceAlignmentComponent {
     return Number(lever.lever_id) === OTHER_LEVER_ID;
   }
 
+  /**
+   * Save payload is only the catalog key. The multiselect `id` is that same catalog id,
+   * and the junction table also uses `id` as its primary key. Forwarding it makes the
+   * server update an existing junction row instead of inserting one per outcome.
+   */
   private normalizeOutcome(value: unknown): LeverStrategicOutcome {
     if (typeof value === 'number') {
       return { lever_strategic_outcome_id: value };
@@ -760,7 +765,7 @@ export default class AllianceAlignmentComponent {
     if (value && typeof value === 'object') {
       const obj = value as Partial<LeverStrategicOutcome> & { id?: number };
       const idFromObject = obj.lever_strategic_outcome_id ?? obj.id;
-      return { ...(obj as LeverStrategicOutcome), lever_strategic_outcome_id: idFromObject as number };
+      return { lever_strategic_outcome_id: Number(idFromObject) };
     }
     return { lever_strategic_outcome_id: 0 };
   }
@@ -777,6 +782,9 @@ export default class AllianceAlignmentComponent {
       } else if (typeof raw === 'number' || (raw && typeof raw === 'object')) {
         normalized = [this.normalizeOutcome(raw)];
       }
+      normalized = normalized.filter(
+        outcome => Number.isFinite(outcome.lever_strategic_outcome_id) && outcome.lever_strategic_outcome_id > 0
+      );
       next = { ...next, result_lever_strategic_outcomes: normalized };
     }
 

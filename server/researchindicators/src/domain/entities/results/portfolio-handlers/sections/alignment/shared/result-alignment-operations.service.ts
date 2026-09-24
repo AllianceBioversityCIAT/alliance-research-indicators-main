@@ -181,7 +181,7 @@ export class ResultAlignmentOperationsService {
       for (const lever of emergedLever) {
         await this.resultLeverStrategicOutcomeService.create(
           lever.result_lever_id,
-          lever?.result_lever_strategic_outcomes ?? [],
+          this.strategicOutcomesToSave(lever?.result_lever_strategic_outcomes),
           'lever_strategic_outcome_id',
           undefined,
           entityManager,
@@ -253,7 +253,7 @@ export class ResultAlignmentOperationsService {
 
     primaryLevers.forEach((lever) => {
       lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
-        (so) => so.result_lever_id === lever.result_lever_id,
+        (so) => Number(so.result_lever_id) === Number(lever.result_lever_id),
       );
     });
 
@@ -265,5 +265,36 @@ export class ResultAlignmentOperationsService {
       contributor_levers: levers?.filter((el) => !el.is_primary),
       result_sdgs,
     };
+  }
+
+  /**
+   * Persist only the catalog key. `id` on the payload is the catalog id, and the
+   * junction row uses the same column name as its primary key. Passing it through
+   * updates an existing row instead of inserting one outcome per selection.
+   */
+  private strategicOutcomesToSave(
+    outcomes:
+      | { id?: number; lever_strategic_outcome_id?: number }[]
+      | undefined,
+  ): { lever_strategic_outcome_id: number }[] {
+    const seen = new Set<number>();
+    const saved: { lever_strategic_outcome_id: number }[] = [];
+
+    for (const outcome of outcomes ?? []) {
+      const leverStrategicOutcomeId = Number(
+        outcome?.lever_strategic_outcome_id ?? outcome?.id,
+      );
+      if (
+        !Number.isFinite(leverStrategicOutcomeId) ||
+        leverStrategicOutcomeId <= 0 ||
+        seen.has(leverStrategicOutcomeId)
+      ) {
+        continue;
+      }
+      seen.add(leverStrategicOutcomeId);
+      saved.push({ lever_strategic_outcome_id: leverStrategicOutcomeId });
+    }
+
+    return saved;
   }
 }
