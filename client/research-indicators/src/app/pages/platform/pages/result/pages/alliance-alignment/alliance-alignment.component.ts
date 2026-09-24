@@ -205,9 +205,10 @@ export default class AllianceAlignmentComponent {
       result_sdgs: this.isOicrIndicator() ? [] : legacyRootSdgs,
       primary_levers: this.applyCustomNamesToLevers(primary_levers),
       contributor_levers: this.applyCustomNamesToLevers(contributor_levers),
-      research_areas: response.data.research_areas || [],
-      strategic_objectives: response.data.strategic_objectives || [],
-      impact_outcomes: response.data.impact_outcomes || []
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     });
   }
 
@@ -372,7 +373,11 @@ export default class AllianceAlignmentComponent {
       ...this.body(),
       primary_levers,
       contributor_levers,
-      result_sdgs
+      result_sdgs,
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     };
 
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
