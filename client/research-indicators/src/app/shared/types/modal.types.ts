@@ -10,4 +10,6 @@ export type ModalName =
   | 'editEnvironmentVariable'
   | 'editPrompt'
   | 'projectGroundingSetup'
-  | 'portfolioManagement';
+  | 'portfolioManagement'
+  | 'portfolio2025LeverSdgs'
+  | 'portfolio2026SdgTargets';

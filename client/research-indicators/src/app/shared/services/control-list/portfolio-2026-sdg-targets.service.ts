@@ -24,11 +24,19 @@ export class Portfolio2026SdgTargetsService {
   async main() {
     this.loading.set(true);
     try {
-      const res = await this.api.GET_ClarisaSdgTargets();
+      const [res, config] = await Promise.all([
+        this.api.GET_ClarisaSdgTargets(),
+        this.api.GET_Portfolio2026SdgTargets().catch(() => null)
+      ]);
       const rows = Array.isArray(res?.data) ? res.data : [];
+      const configured = config?.data?.codes;
+      const useConfigured = Array.isArray(configured);
+      const allowed = new Set(useConfigured ? configured.map(code => String(code)) : []);
       this.list.set(
         rows
-          .filter(row => isPortfolio2026SdgTargetCode(row.sdg_target_code))
+          .filter(row =>
+            useConfigured ? allowed.has(String(row.sdg_target_code)) : isPortfolio2026SdgTargetCode(row.sdg_target_code)
+          )
           .map(row => this.mapRow(row))
           .sort((a, b) => a.sdg_target_code.localeCompare(b.sdg_target_code, undefined, { numeric: true }))
       );

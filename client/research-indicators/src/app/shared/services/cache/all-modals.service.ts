@@ -155,6 +155,14 @@ export class AllModalsService {
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
+    },
+    portfolio2025LeverSdgs: {
+      isOpen: false,
+      title: 'Portfolio 2025 SDG targets'
+    },
+    portfolio2026SdgTargets: {
+      isOpen: false,
+      title: 'Portfolio 2026 SDG targets'
     }
   });
 
@@ -274,7 +282,9 @@ export class AllModalsService {
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
       editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
-      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false }
+      portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
+      portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
+      portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);
