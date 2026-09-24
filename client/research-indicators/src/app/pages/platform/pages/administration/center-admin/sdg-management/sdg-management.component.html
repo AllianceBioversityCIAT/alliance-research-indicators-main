@@ -25,10 +25,10 @@
         } @else {
         <div class="w-full min-w-0 pb-2 px-2 flex flex-col gap-8">
           <section class="flex w-full min-w-0 flex-col gap-3">
-            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">Portfolio 2025</h2>
-            <p class="text-sm text-[#4C5158]">SDG targets linked to each portfolio 2025 lever.</p>
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(leverPortfolioId) }}</h2>
+            <p class="text-sm text-[#4C5158]">SDG targets linked to each lever in this portfolio.</p>
             @if (portfolio2025Levers().length === 0) {
-            <p class="text-sm text-[#4C5158]">No portfolio 2025 levers are available.</p>
+            <p class="text-sm text-[#4C5158]">No levers are available for this portfolio.</p>
             } @else {
             <div class="flex w-full min-w-0 flex-col gap-3">
               @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
@@ -89,8 +89,8 @@
           </section>
 
           <section class="flex w-full min-w-0 flex-col gap-3">
-            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">Portfolio 2026</h2>
-            <p class="text-sm text-[#4C5158]">General SDG target list for 2026 OICRs. It does not depend on Research Areas.</p>
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(sdgListPortfolioId) }}</h2>
+            <p class="text-sm text-[#4C5158]">General SDG target list for OICRs in this portfolio. It does not depend on Research Areas.</p>
             <div class="overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
               <table class="w-full text-left text-[14px] text-[#4C5158]">
                 <thead class="bg-[#F7F8FA] text-[13px] font-[600] text-[#14314F]">
@@ -114,7 +114,7 @@
                   </tr>
                   } @empty {
                   <tr>
-                    <td class="px-4 py-3" colspan="2">No 2026 SDG targets are available.</td>
+                    <td class="px-4 py-3" colspan="2">No SDG targets are available.</td>
                   </tr>
                   }
                 </tbody>
@@ -172,7 +172,7 @@
 
 <app-modal modalName="portfolio2026SdgTargets">
   <div class="w-[min(760px,80vw)] px-10 py-8">
-    <p class="mb-4 text-sm text-[#4C5158]">Select the SDG targets offered on portfolio 2026 OICRs. The full Clarisa list is available.</p>
+    <p class="mb-4 text-sm text-[#4C5158]">Select the SDG targets offered on OICRs in this portfolio. The full Clarisa list is available.</p>
     <app-multiselect class="block w-full min-w-0" label="SDG target(s)" [signal]="portfolio2026EditSignal"
       optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
       signalOptionValue="result_lever_sdg_targets" [disabled]="savingPortfolio2026()" [removeCondition]="allowRemoveSdg"

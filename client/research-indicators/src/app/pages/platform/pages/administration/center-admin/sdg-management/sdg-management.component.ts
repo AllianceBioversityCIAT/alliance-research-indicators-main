@@ -15,7 +15,8 @@ import { ModalComponent } from '@shared/components/modal/modal.component';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { environment } from '@envs/environment';
-import { isPortfolio2025LeverName, isPortfolio2026SdgTargetCode } from '@shared/constants/portfolio-2026-sdg-targets';
+import { isPortfolio2026SdgTargetCode } from '@shared/constants/portfolio-2026-sdg-targets';
+import { Portfolio } from '@shared/interfaces/portfolio.interface';
 
 interface SdgLeverSignalValue {
   result_lever_sdgs: GetSdgs[];
@@ -37,6 +38,7 @@ export default class SdgManagementComponent implements OnInit {
   readonly loading = signal(true);
   readonly loadError = signal(false);
   readonly levers = signal<GetLevers[]>([]);
+  readonly portfolios = signal<Portfolio[]>([]);
   readonly clarisaSdgTargets = signal<LeverSdgTargetApi[]>([]);
   readonly portfolio2026Targets = signal<LeverSdgTargetApi[]>([]);
   readonly savingLeverId = signal<number | null>(null);
@@ -66,8 +68,22 @@ export default class SdgManagementComponent implements OnInit {
     return Number(lever.lever_id ?? lever.id);
   }
 
+  /** Seeded portfolios.id. The reporting year is resolved from each portfolio's start_year and end_year. */
+  readonly leverPortfolioId = 1;
+  readonly sdgListPortfolioId = 2;
+
   portfolio2025Levers(): GetLevers[] {
-    return this.levers().filter(lever => isPortfolio2025LeverName(lever.short_name));
+    return this.levers().filter(lever => Number(lever.portfolio_id) === this.leverPortfolioId);
+  }
+
+  portfolioLabel(portfolioId: number): string {
+    const portfolio = this.portfolios().find(item => Number(item.id ?? item.portfolio_id) === portfolioId);
+    const name = portfolio?.name?.trim();
+    const start = Number(portfolio?.start_year);
+    const end = Number(portfolio?.end_year);
+    const range = Number.isFinite(start) && Number.isFinite(end) ? `${start}–${end}` : '';
+    if (name && range) return `${name} (${range})`;
+    return name || range || 'Portfolio';
   }
 
   leverImageSrc(lever: GetLevers): string {
@@ -189,6 +205,10 @@ export default class SdgManagementComponent implements OnInit {
       const leversRes = await this.api.GET_Levers();
       const list = leversRes?.data ?? [];
       this.levers.set([...list].sort((a, b) => (a.short_name || '').localeCompare(b.short_name || '')));
+      if (typeof this.api.GET_Portfolios === 'function') {
+        const portfoliosRes = await this.api.GET_Portfolios().catch(() => null);
+        this.portfolios.set(Array.isArray(portfoliosRes?.data) ? portfoliosRes.data : []);
+      }
 
       for (const l of this.levers()) {
         this.ensureSdgSignalForLeverId(this.leverNumericId(l));
@@ -253,7 +273,7 @@ export default class SdgManagementComponent implements OnInit {
       ...modals,
       portfolio2025LeverSdgs: {
         ...modals.portfolio2025LeverSdgs,
-        title: leverName || 'Portfolio 2025 SDG targets',
+        title: leverName || 'SDG targets',
         cancelText: 'Cancel',
         confirmText: 'Save',
         confirmAction: () => {
@@ -304,7 +324,7 @@ export default class SdgManagementComponent implements OnInit {
       ...modals,
       portfolio2026SdgTargets: {
         ...modals.portfolio2026SdgTargets,
-        title: 'Portfolio 2026 SDG targets',
+        title: 'SDG targets',
         cancelText: 'Cancel',
         confirmText: 'Save',
         confirmAction: () => {
@@ -331,7 +351,7 @@ export default class SdgManagementComponent implements OnInit {
       this.saveSuccess.set(true);
       await this.load();
     } catch {
-      this.saveError.set('Failed to save the portfolio 2026 SDG targets. Please try again.');
+      this.saveError.set('Failed to save the SDG targets. Please try again.');
     } finally {
       this.savingPortfolio2026.set(false);
     }

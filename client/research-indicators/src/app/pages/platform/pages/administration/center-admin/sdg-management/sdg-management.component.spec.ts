@@ -497,8 +497,8 @@ describe('SdgManagementComponent', () => {
   it('lists portfolio 2025 lever targets in a table and saves the modal selection', async () => {
     await configureBed();
     const f = TestBed.createComponent(SdgManagementComponent);
-    const lever = baseLever({ short_name: 'Lever 1', other_names: 'Climate' });
-    mockGetLevers.mockResolvedValue({ data: [lever, baseLever({ id: 8, short_name: 'Research area' })] });
+    const lever = baseLever({ short_name: 'Lever 1', other_names: 'Climate', portfolio_id: 1 });
+    mockGetLevers.mockResolvedValue({ data: [lever, baseLever({ id: 8, short_name: 'Research area', portfolio_id: 2 })] });
     mockGetMappings.mockResolvedValue({
       data: [
         { id: 10, lever_id: 1, sdg_target_id: 12 },

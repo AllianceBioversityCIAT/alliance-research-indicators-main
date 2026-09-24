@@ -251,6 +251,39 @@ describe('portfolio-2-alignment.mapper', () => {
     expect(normalized.impact_outcomes).toEqual([]);
   });
 
+  it('copies catalog code and text onto portfolio 2026 SDG target rows', () => {
+    const normalized = normalizePortfolio2AlignmentGet(
+      {
+        result_sdg_targets: [
+          {
+            result_lever_sdg_target_id: 106,
+            result_lever_id: null,
+            result_id: 8579,
+            sdg_target_id: 10
+          } as never
+        ]
+      },
+      {
+        sdgTargets: [
+          {
+            id: 10,
+            sdg_target_id: 10,
+            sdg_target_code: '1.1',
+            sdg_target: 'Eradicate extreme poverty',
+            select_label: '1.1 — Eradicate extreme poverty'
+          }
+        ]
+      }
+    );
+
+    expect(normalized.result_sdg_targets[0]).toMatchObject({
+      sdg_target_id: 10,
+      sdg_target_code: '1.1',
+      sdg_target: 'Eradicate extreme poverty',
+      select_label: '1.1 — Eradicate extreme poverty'
+    });
+  });
+
   it('uses contract_id as agreement_id when catalog match is unavailable', () => {
     const enriched = enrichPortfolio2Contracts(
       [
