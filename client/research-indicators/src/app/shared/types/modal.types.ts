@@ -15,4 +15,6 @@ export type ModalName =
   | 'simulateProfile'
   | 'assignPiDelegate'
   | 'piDelegateHistory'
-  | 'poolFundingHelp';
+  | 'poolFundingHelp'
+  | 'portfolio2025LeverSdgs'
+  | 'portfolio2026SdgTargets';

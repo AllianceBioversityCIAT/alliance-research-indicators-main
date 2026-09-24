@@ -5,6 +5,7 @@ import { GetStrategicObjectivesService } from '@services/control-list/get-strate
 import { GetImpactOutcomesService } from '@services/control-list/get-impact-outcomes.service';
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
+import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../../../shared/services/api.service';
 import { MultiSelectModule } from 'primeng/multiselect';
@@ -81,6 +82,7 @@ export default class AllianceAlignmentComponent {
   getImpactOutcomesService = inject(GetImpactOutcomesService);
   getSdgsService = inject(GetSdgsService);
   getLeverSdgTargetsService = inject(GetLeverSdgTargetsService);
+  getLeverStrategicOutcomesService = inject(GetLeverStrategicOutcomesService);
   body: WritableSignal<GetAllianceAlignment> = signal({
     contracts: [],
     result_sdgs: [],
@@ -139,9 +141,6 @@ export default class AllianceAlignmentComponent {
   }
 
   async getData() {
-    this.leverOutcomeSignals.clear();
-    this.leverSdgSignals.clear();
-
     const portfolioParams = this.leverServiceParams();
     const contractParams = this.contractServiceParams();
 
@@ -186,12 +185,18 @@ export default class AllianceAlignmentComponent {
     ];
 
     if (leverIdsFromResponse.length) {
-      await Promise.all(leverIdsFromResponse.map(leverId => this.getLeverSdgTargetsService.main(leverId)));
+      await Promise.all(
+        leverIdsFromResponse.flatMap(leverId => [
+          this.getLeverSdgTargetsService.main(leverId),
+          this.getLeverStrategicOutcomesService.main(leverId)
+        ])
+      );
     }
 
     const mapLevers = (levers: Lever[] | undefined): Lever[] =>
       (levers ?? []).map(lever => ({
         ...lever,
+        result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
         result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
         result_lever_sdg_targets: enrichAlignmentSdgTargets(
           (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
@@ -231,18 +236,68 @@ export default class AllianceAlignmentComponent {
   }
 
   private populateLeverChildSignals(levers: Lever[]) {
+    const activeIds = new Set(levers.map(lever => String(lever.lever_id)));
+    for (const leverId of this.leverOutcomeSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverOutcomeSignals.delete(leverId);
+    }
+    for (const leverId of this.leverSdgSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverSdgSignals.delete(leverId);
+    }
+
     for (const lever of levers) {
-      this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: lever.result_lever_strategic_outcomes ?? [] }));
-      this.leverSdgSignals.set(
-        lever.lever_id,
-        signal({
-          result_lever_sdgs: lever.result_lever_sdgs ?? [],
-          result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
-        })
-      );
+      const outcomes = lever.result_lever_strategic_outcomes ?? [];
+      const sdgState = {
+        result_lever_sdgs: lever.result_lever_sdgs ?? [],
+        result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
+      };
+      const existingOutcomes = this.leverOutcomeSignals.get(lever.lever_id);
+      if (existingOutcomes) {
+        existingOutcomes.set({ result_lever_strategic_outcomes: outcomes });
+      } else {
+        this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: outcomes }));
+      }
+
+      const existingSdgs = this.leverSdgSignals.get(lever.lever_id);
+      if (existingSdgs) {
+        existingSdgs.set(sdgState);
+      } else {
+        this.leverSdgSignals.set(lever.lever_id, signal(sdgState));
+      }
     }
 
     this.syncLeverCustomNameSignals(levers);
+  }
+
+  /**
+   * Saved rows use the junction primary key as `id` and the catalog key as `lever_strategic_outcome_id`.
+   * The multiselect optionValue is the catalog `id`, so the junction id never matches an option:
+   * the closed control can show a count while the rows stay blank and the field stays required.
+   */
+  private strategicOutcomesForSignal(lever: Lever): LeverStrategicOutcome[] {
+    const raw = lever.result_lever_strategic_outcomes as unknown;
+    const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+    const catalog = this.getLeverStrategicOutcomesService.getList(lever.lever_id)();
+
+    return list.flatMap((value): LeverStrategicOutcome[] => {
+      const normalized = this.normalizeOutcome(value);
+      const outcomeId = Number(normalized.lever_strategic_outcome_id);
+      if (!Number.isFinite(outcomeId) || outcomeId <= 0) return [];
+
+      const saved =
+        value && typeof value === 'object'
+          ? (value as LeverStrategicOutcome & { lever_strategic_outcome?: LeverStrategicOutcome })
+          : undefined;
+      const match = catalog.find(item => Number(item.id ?? item.lever_strategic_outcome_id) === outcomeId);
+      const strategic_outcome = saved?.strategic_outcome ?? saved?.lever_strategic_outcome?.strategic_outcome ?? match?.strategic_outcome;
+
+      return [
+        {
+          id: outcomeId,
+          lever_strategic_outcome_id: outcomeId,
+          strategic_outcome
+        }
+      ];
+    });
   }
 
   private syncLeverCustomNameSignals(levers: Lever[]): void {

@@ -210,6 +210,14 @@ export class AllModalsService {
       isOpen: false,
       title: 'About Pool Funding & Theory of Change alignment',
       isWide: true
+    },
+    portfolio2025LeverSdgs: {
+      isOpen: false,
+      title: 'Portfolio 2025 SDG targets'
+    },
+    portfolio2026SdgTargets: {
+      isOpen: false,
+      title: 'Portfolio 2026 SDG targets'
     }
   });
 
@@ -334,7 +342,9 @@ export class AllModalsService {
       assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false },
       piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false },
       // isWide stays true: it is this modal's layout, not a per-opening state.
-      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false }
+      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false },
+      portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
+      portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false }
     });
 
     this.setSubmitResultOrigin(null);
