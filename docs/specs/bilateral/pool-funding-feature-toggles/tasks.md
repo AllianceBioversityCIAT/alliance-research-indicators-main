@@ -161,7 +161,7 @@ button asserted, not just the computed signal.
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-03, T-04 |
 | Requirements | all |
@@ -200,7 +200,7 @@ unchanged from baseline.
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | S |
 | Depends on | T-01 |
 | Requirements | R-PFT-005 |

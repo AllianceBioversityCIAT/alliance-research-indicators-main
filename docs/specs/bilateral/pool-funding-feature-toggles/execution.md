@@ -301,14 +301,14 @@ build exits 0.)*
 
 ---
 
-## T-06 — Boolean toggle in the admin modal → **PASS (code), visual approval PENDING**
+## T-06 — Boolean toggle in the admin modal → **PASS**
 
 | Field | Value |
 | --- | --- |
 | Task | `task_662fd49b9cd4` |
-| Dispatch | `ctx_2ddb90125825` (first attempt) — **retained**, not released |
+| Dispatch | `ctx_2ddb90125825` (first attempt) |
 | Worker | Cursor · `grok-4.7-high` |
-| Verdict | **PASS** on every automated gate; **not committed** pending the owner seeing it |
+| Verdict | **PASS** — every automated gate, plus the owner's visual confirmation on 2026-09-24 (*"el toggle lo veo bien"*) |
 
 ### Files changed (3, exactly the scope)
 
@@ -368,10 +368,13 @@ trailing newline.
 
 ### Why this is not committed
 
+### Why it was held back, and what released it
+
 `no-commit-before-visual-approval`: this task adds a **new visual control**, and no gate in this
 repo can see it — jsdom renders no pixels and the admin screen was never opened in a browser.
-The worker said so plainly in its report. The code is verified; the appearance is not. The
-worker is **retained** so a rework goes back to the context that holds the investigation.
+The worker said so plainly in its report. So the code sat verified-but-uncommitted, and its
+worker stayed retained, until the owner opened the screen and confirmed it on 2026-09-24. Only
+then was it committed.
 
 ---
 
