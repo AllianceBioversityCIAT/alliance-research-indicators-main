@@ -133,7 +133,7 @@
 
         @if (isOicrIndicator()) {
         <app-multiselect label="SDG Targets" [signal]="body"
-          textSpan="Select the SDG targets for this result. This list is the same for every 2026 OICR and does not depend on Research Areas."
+          textSpan="Select the SDG targets for this result. This list is the same for every OICR in this portfolio and does not depend on Research Areas."
           optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
           signalOptionValue="result_sdg_targets" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
           [disabledSelectedScroll]="true" serviceName="portfolio2026SdgTargets"
