@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypeHomologation } from '../../../tools/open-search/prms/homologation/policy-type.homologation';
+import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
+import { isFeatureFlagEnabled } from '../../../shared/utils/feature-flag.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -98,6 +100,30 @@ export class ResultPrmsSyncLogRepository {
 
   constructor(private readonly dataSource: DataSource) {}
 
+  /**
+   * R-PFT-003: a missing row, a non-`false` value, or a failed read is enabled.
+   * The parser has no catch; the catch lives here so a thrown query still
+   * reaches it as an absent value.
+   */
+  private async loadPrmsSyncButtonEnabled(): Promise<boolean> {
+    try {
+      const rows: { simple_value?: string | null }[] =
+        await this.dataSource.query(
+          `
+          SELECT simple_value
+          FROM app_config
+          WHERE \`key\` = ?
+            AND is_active = TRUE
+          `,
+          [AppConfigKey.POOL_FUNDING_PRMS_SYNC_BUTTON_ENABLED],
+        );
+      const value = Array.isArray(rows) ? rows[0]?.simple_value : undefined;
+      return isFeatureFlagEnabled(value);
+    } catch {
+      return isFeatureFlagEnabled(undefined);
+    }
+  }
+
   async loadGateSnapshot(resultId: number): Promise<PrmsSyncGateFacts> {
     const missing: PrmsSyncGateFacts = {
       exists: false,
@@ -109,6 +135,7 @@ export class ResultPrmsSyncLogRepository {
       primary_contract: null,
       indicator_id: null,
       prms_policy_type_id: null,
+      prms_sync_button_enabled: false,
     };
 
     const rows = await this.dataSource.query(
@@ -138,6 +165,9 @@ export class ResultPrmsSyncLogRepository {
       [resultId],
     );
 
+    const prmsSyncButtonEnabled = await this.loadPrmsSyncButtonEnabled();
+    missing.prms_sync_button_enabled = prmsSyncButtonEnabled;
+
     const row = rows[0];
     if (!row) {
       return missing;
@@ -166,6 +196,7 @@ export class ResultPrmsSyncLogRepository {
       prms_policy_type_id: starToPrmsPolicyTypeId(
         row.policy_type_id == null ? null : Number(row.policy_type_id),
       ),
+      prms_sync_button_enabled: prmsSyncButtonEnabled,
     };
   }
 

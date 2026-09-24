@@ -17,6 +17,7 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
 import { BilateralService } from '@shared/services/bilateral.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import {
   isHomeEntryFromUrl,
@@ -63,6 +64,7 @@ export class ResultSidebarComponent {
   roles = inject(RolesService);
   currentResultService = inject(CurrentResultService);
   bilateralService = inject(BilateralService);
+  poolFundingFlags = inject(PoolFundingFlagsService);
   private readonly publishedOicrStatusId = 14;
 
   allOptionsWithGreenChecks = computed(() => {
@@ -82,10 +84,11 @@ export class ResultSidebarComponent {
       }));
   });
 
-  // Two gates, both server-computed, applied at ONE point so the `OPTIONAL`
-  // divider, the Pool funding alignment item and the PRMS SYNC button cannot
-  // disagree with each other (the button reads `hasPoolFundingOption()`, which
-  // derives from this same filter).
+  // Three gates, applied at ONE point so the `OPTIONAL` divider, the Pool
+  // funding alignment item and the PRMS SYNC button cannot disagree with each
+  // other (the button reads `hasPoolFundingOption()`, which derives from this
+  // same filter). The section flag can only subtract: `true` leaves the
+  // existing rules in charge.
   //
   //  1. CONTRACT — `alignment.eligible` is the server's
   //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
@@ -97,12 +100,13 @@ export class ResultSidebarComponent {
   //     window); it is the constant in toc-level-rules.util.ts, and the server
   //     resolves the comparison for us. Compared with `=== true` on purpose: a
   //     server that omits the field leaves the section VISIBLE, matching today.
+  //  3. SECTION FLAG — hidden when the flag resolves to disabled. OR-ed with
+  //     the rules above; never a replacement of them.
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
-    if (meta?.indicator_id === 5) return true;
-    if (!alignment || alignment.eligible === false) return true;
-    return alignment.version_locked === true;
+    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || alignment.eligible === false || alignment.version_locked === true;
+    return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
   }
 
   /** Optional sections (AR.3) — excluded from the progress counter and from submit gating. */
@@ -213,9 +217,7 @@ export class ResultSidebarComponent {
         // `class`.
         const detail = rejections.length
           ? 'This result was not synchronized. PRMS reported:' +
-            `<ul class="alert-detail-list">${rejections
-              .map(message => `<li>${this.escapeHtml(message)}</li>`)
-              .join('')}</ul>`
+            `<ul class="alert-detail-list">${rejections.map(message => `<li>${this.escapeHtml(message)}</li>`).join('')}</ul>`
           : 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.';
 
         this.actions.showGlobalAlert({
@@ -292,8 +294,7 @@ export class ResultSidebarComponent {
    * dropped so a body carrying the same text twice does not repeat it on screen.
    */
   private collectPrmsMessages(parsed: unknown): string[] {
-    const asList = (value: unknown): unknown[] =>
-      Array.isArray(value) ? value : value == null ? [] : [value];
+    const asList = (value: unknown): unknown[] => (Array.isArray(value) ? value : value == null ? [] : [value]);
 
     const root = parsed as {
       response?: { message?: unknown };
@@ -302,15 +303,9 @@ export class ResultSidebarComponent {
     };
 
     const fromDetailed = (entry: unknown): unknown[] =>
-      asList((entry as { detailedErrors?: unknown })?.detailedErrors).map(
-        detail => (detail as { message?: unknown })?.message
-      );
+      asList((entry as { detailedErrors?: unknown })?.detailedErrors).map(detail => (detail as { message?: unknown })?.message);
 
-    const candidates = [
-      ...asList(root?.response?.message),
-      ...fromDetailed(root),
-      ...asList(root?.rejected).flatMap(fromDetailed)
-    ];
+    const candidates = [...asList(root?.response?.message), ...fromDetailed(root), ...asList(root?.rejected).flatMap(fromDetailed)];
 
     const seen = new Set<string>();
     return candidates
@@ -325,11 +320,7 @@ export class ResultSidebarComponent {
   /** Escapes before the modal renders it: `detail` goes through [innerHTML], and
    * these strings come from an external system. */
   private escapeHtml(value: string): string {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
   showOicrStatusDropdown = computed(() => {

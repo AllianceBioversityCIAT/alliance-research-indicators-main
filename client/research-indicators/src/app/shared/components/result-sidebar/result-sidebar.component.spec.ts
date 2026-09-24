@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResultSidebarComponent } from './result-sidebar.component';
 import { ActivatedRoute, Router, NavigationEnd, ParamMap } from '@angular/router';
-import { computed, signal } from '@angular/core';
+import { computed, signal, WritableSignal } from '@angular/core';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { CacheService } from '@shared/services/cache/cache.service';
@@ -15,6 +15,7 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
 import { BilateralService } from '@shared/services/bilateral.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
 
 describe('ResultSidebarComponent', () => {
@@ -31,6 +32,8 @@ describe('ResultSidebarComponent', () => {
   let rolesService: Partial<RolesService>;
   let currentResultService: Partial<CurrentResultService>;
   let bilateralService: Partial<BilateralService>;
+  let sectionEnabled: WritableSignal<boolean>;
+  let prmsSyncButtonEnabled: WritableSignal<boolean>;
 
   beforeEach(async () => {
     cacheService = {
@@ -117,6 +120,9 @@ describe('ResultSidebarComponent', () => {
       getAlignment: jest.fn().mockResolvedValue(null)
     };
 
+    sectionEnabled = signal(true);
+    prmsSyncButtonEnabled = signal(true);
+
     await TestBed.configureTestingModule({
       imports: [HttpClientTestingModule, RouterTestingModule, ResultSidebarComponent],
       providers: [
@@ -130,7 +136,11 @@ describe('ResultSidebarComponent', () => {
         { provide: ActivatedRoute, useValue: route },
         { provide: RolesService, useValue: rolesService },
         { provide: CurrentResultService, useValue: currentResultService },
-        { provide: BilateralService, useValue: bilateralService }
+        { provide: BilateralService, useValue: bilateralService },
+        {
+          provide: PoolFundingFlagsService,
+          useValue: { sectionEnabled, prmsSyncButtonEnabled, load: jest.fn().mockResolvedValue(undefined) }
+        }
       ]
     }).compileComponents();
 
@@ -872,8 +882,7 @@ describe('ResultSidebarComponent', () => {
 
     it('shows the failure MODAL with friendly copy, never the technical reason', async () => {
       enablePrmsSyncButton();
-      const technical =
-        "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'";
+      const technical = "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'";
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
         successfulRequest: false,
         errorDetail: { errors: technical }
@@ -884,8 +893,7 @@ describe('ResultSidebarComponent', () => {
       expect(actionsService.showGlobalAlert).toHaveBeenCalledWith({
         severity: 'error',
         summary: 'Could not synchronize with PRMS',
-        detail:
-          'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+        detail: 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
         hasNoCancelButton: true,
         generalButton: true,
         confirmCallback: { label: 'Continue' }
@@ -910,11 +918,54 @@ describe('ResultSidebarComponent', () => {
         errorDetail: { data: { failure_reason: failureReason } }
       });
     };
-    const REJECTED_ENTRY = JSON.stringify({"type": "innovation_use", "index": 0, "errors": ["/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"], "detailedErrors": [{"path": "/innovation_use/current_innovation_use_numbers", "params": {"missingProperty": "innov_use_to_be_determined"}, "keyword": "required", "message": "must have required property 'innov_use_to_be_determined'", "fullMessage": "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"}], "external_reference": "19996"});
-    const FULL_BODY = JSON.stringify({"ok": false, "error": "validation_failed", "message": "Every result was rejected. See 'rejected'.", "rejected": [{"type": "innovation_use", "index": 0, "errors": ["/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"], "detailedErrors": [{"path": "/innovation_use/current_innovation_use_numbers", "params": {"missingProperty": "innov_use_to_be_determined"}, "keyword": "required", "message": "must have required property 'innov_use_to_be_determined'", "fullMessage": "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"}], "external_reference": "19996"}], "requestId": "Root=1-6ab2b650", "acceptedCount": 0, "rejectedCount": 1});
+    const REJECTED_ENTRY = JSON.stringify({
+      type: 'innovation_use',
+      index: 0,
+      errors: [
+        "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+      ],
+      detailedErrors: [
+        {
+          path: '/innovation_use/current_innovation_use_numbers',
+          params: { missingProperty: 'innov_use_to_be_determined' },
+          keyword: 'required',
+          message: "must have required property 'innov_use_to_be_determined'",
+          fullMessage:
+            "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+        }
+      ],
+      external_reference: '19996'
+    });
+    const FULL_BODY = JSON.stringify({
+      ok: false,
+      error: 'validation_failed',
+      message: "Every result was rejected. See 'rejected'.",
+      rejected: [
+        {
+          type: 'innovation_use',
+          index: 0,
+          errors: [
+            "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+          ],
+          detailedErrors: [
+            {
+              path: '/innovation_use/current_innovation_use_numbers',
+              params: { missingProperty: 'innov_use_to_be_determined' },
+              keyword: 'required',
+              message: "must have required property 'innov_use_to_be_determined'",
+              fullMessage:
+                "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+            }
+          ],
+          external_reference: '19996'
+        }
+      ],
+      requestId: 'Root=1-6ab2b650',
+      acceptedCount: 0,
+      rejectedCount: 1
+    });
 
-    const alertDetail = () =>
-      ((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0] as { detail: string }).detail;
+    const alertDetail = () => ((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0] as { detail: string }).detail;
 
     it('shows a single PRMS message in the modal', async () => {
       failWith(
@@ -928,9 +979,7 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('shows EVERY message when PRMS returns several', async () => {
-      failWith(
-        'HTTP 400: Bad Request - {"response":{"message":["first problem","second problem","third problem"]}}'
-      );
+      failWith('HTTP 400: Bad Request - {"response":{"message":["first problem","second problem","third problem"]}}');
 
       await component.onPrmsSync();
 
@@ -948,9 +997,7 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('ESCAPES the message -- it is data from an external system, rendered via innerHTML', async () => {
-      failWith(
-        'HTTP 400: Bad Request - {"response":{"message":["<img src=x onerror=alert(1)>"]}}'
-      );
+      failWith('HTTP 400: Bad Request - {"response":{"message":["<img src=x onerror=alert(1)>"]}}');
 
       await component.onPrmsSync();
 
@@ -968,9 +1015,7 @@ describe('ResultSidebarComponent', () => {
       await component.onPrmsSync();
 
       expect(alertDetail()).toContain('PRMS reported');
-      expect(alertDetail()).toContain(
-        "must have required property 'innov_use_to_be_determined'"
-      );
+      expect(alertDetail()).toContain("must have required property 'innov_use_to_be_determined'");
     });
 
     it('reads detailedErrors[].message when only the REJECTED ENTRY arrives', async () => {
@@ -980,9 +1025,7 @@ describe('ResultSidebarComponent', () => {
 
       await component.onPrmsSync();
 
-      expect(alertDetail()).toContain(
-        "must have required property 'innov_use_to_be_determined'"
-      );
+      expect(alertDetail()).toContain("must have required property 'innov_use_to_be_determined'");
     });
 
     it('renders a real <ul>, not bullet characters -- .alert is text-align: center', async () => {
@@ -1002,9 +1045,7 @@ describe('ResultSidebarComponent', () => {
     });
 
     it('does not repeat a message that appears in more than one place', async () => {
-      failWith(
-        'HTTP 400: Bad Request - {"response":{"message":["duplicated"]},"detailedErrors":[{"message":"duplicated"}]}'
-      );
+      failWith('HTTP 400: Bad Request - {"response":{"message":["duplicated"]},"detailedErrors":[{"message":"duplicated"}]}');
 
       await component.onPrmsSync();
 
@@ -2327,6 +2368,121 @@ describe('ResultSidebarComponent', () => {
       await (component as any).handlePostponeOrRejectRedirect();
 
       expect(currentResultService.openEditRequestdOicrsModal).toHaveBeenCalledWith(1, 11, 12345, 'project');
+    });
+  });
+
+  describe('pool funding feature flags (R-PFT-001/002/003)', () => {
+    const qualifying: AlignmentResponse = {
+      result_code: 'RES-001',
+      eligible: true,
+      has_pool_funding_alignment_eligible: true,
+      has_contribution: null,
+      selected_levers: [],
+      is_synced_to_prms: false,
+      is_read_only: false,
+      prms_result_code: 54321
+    };
+
+    const nonQualifying: AlignmentResponse = {
+      ...qualifying,
+      eligible: false,
+      has_pool_funding_alignment_eligible: false,
+      prms_result_code: null
+    };
+
+    const alignment = () => bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>;
+
+    function sectionItem(): Element | null {
+      const host: HTMLElement = fixture.nativeElement;
+      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('Pool funding alignment')) ?? null;
+    }
+
+    function syncButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+    }
+
+    it('row 1 — flags on and the result qualifies: section and button are shown', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+    });
+
+    it('row 2 — section flag off hides the section and the button', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(false);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+      expect(syncButton()).toBeNull();
+    });
+
+    it('row 3 — button flag off hides only the button and keeps the result-code caption', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(syncButton()).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(false);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')?.textContent).toContain('54321');
+    });
+
+    it('row 4 — flag on does not override a non-qualifying contract', () => {
+      expect(syncButton()).toBeNull();
+      expect(sectionItem()).toBeNull();
+
+      alignment().set(nonQualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).toBeNull();
+      expect(syncButton()).toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).toBeNull();
+      expect(syncButton()).toBeNull();
+    });
+
+    it('row 5 — a failed read leaves both flags enabled, so a qualifying result stays shown', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
     });
   });
 });

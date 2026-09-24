@@ -1,4 +1,5 @@
 import { DataSource, EntityManager } from 'typeorm';
+import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import {
@@ -408,6 +409,59 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(snapshot.prms_policy_type_id).toBe(1);
     expect(snapshot.exists).toBe(true);
     expect(snapshot.pool_funding_alignment_green).toBe(true);
+    expect(snapshot.prms_sync_button_enabled).toBe(true);
+  });
+
+  describe('PRMS sync button flag on the gate snapshot', () => {
+    const resultRow = {
+      result_id: 42,
+      result_official_code: 1001,
+      is_synced_to_prms: 0,
+      result_status_id: 6,
+      indicator_id: 4,
+      alignment_green: 1,
+      agreement_id: 'C-POOL-001',
+      is_pool_funding_contributor: 1,
+      policy_type_id: null,
+    };
+
+    const flagCall = () =>
+      query.mock.calls.find((call) =>
+        String(call[0]).includes('FROM app_config'),
+      );
+
+    it('stores disabled only when simple_value is the exact disable string', async () => {
+      query
+        .mockResolvedValueOnce([resultRow])
+        .mockResolvedValueOnce([{ simple_value: 'false' }]);
+
+      const snapshot = await repository.loadGateSnapshot(42);
+
+      expect(snapshot.prms_sync_button_enabled).toBe(false);
+      expect(flagCall()?.[1]).toEqual([
+        AppConfigKey.POOL_FUNDING_PRMS_SYNC_BUTTON_ENABLED,
+      ]);
+    });
+
+    it('stays enabled when the row is missing, and still reports a missing result', async () => {
+      query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      const snapshot = await repository.loadGateSnapshot(42);
+
+      expect(snapshot.exists).toBe(false);
+      expect(snapshot.prms_sync_button_enabled).toBe(true);
+    });
+
+    it('stays enabled when the config read throws', async () => {
+      query
+        .mockResolvedValueOnce([resultRow])
+        .mockRejectedValueOnce(new Error('config unread'));
+
+      const snapshot = await repository.loadGateSnapshot(42);
+
+      expect(snapshot.exists).toBe(true);
+      expect(snapshot.prms_sync_button_enabled).toBe(true);
+    });
   });
 
   /**
