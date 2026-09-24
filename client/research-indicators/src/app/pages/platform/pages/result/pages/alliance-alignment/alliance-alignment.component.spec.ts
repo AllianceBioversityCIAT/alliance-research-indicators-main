@@ -883,7 +883,7 @@ describe('AllianceAlignmentComponent', () => {
 
       expect(api.PATCH_Alignments).toHaveBeenCalled();
       const callArgs = api.PATCH_Alignments.mock.calls[0];
-      expect(callArgs[1].primary_levers[0].result_lever_strategic_outcomes[0]).toEqual({ id: 15, lever_strategic_outcome_id: 15 });
+      expect(callArgs[1].primary_levers[0].result_lever_strategic_outcomes[0]).toEqual({ lever_strategic_outcome_id: 15 });
     });
 
     it('should normalize outcomes when value is invalid', async () => {
@@ -905,7 +905,7 @@ describe('AllianceAlignmentComponent', () => {
 
       expect(api.PATCH_Alignments).toHaveBeenCalled();
       const callArgs = api.PATCH_Alignments.mock.calls[0];
-      expect(callArgs[1].primary_levers[0].result_lever_strategic_outcomes[0]).toEqual({ lever_strategic_outcome_id: 0 });
+      expect(callArgs[1].primary_levers[0].result_lever_strategic_outcomes).toEqual([]);
     });
 
     it('should handle array of outcomes', async () => {
