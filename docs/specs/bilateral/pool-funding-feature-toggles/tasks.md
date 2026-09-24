@@ -121,7 +121,7 @@ when the flag is off.
 
 | Field | Value |
 | --- | --- |
-| Status | `[ ]` |
+| Status | `[x]` |
 | Size | M |
 | Depends on | T-02 |
 | Requirements | R-PFT-001, R-PFT-002, R-PFT-003, NFR-PFT-002 |

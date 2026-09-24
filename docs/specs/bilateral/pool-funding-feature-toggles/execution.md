@@ -209,3 +209,92 @@ claim and returned a confident green (**KZ-017**, and this time the auditor's ow
 Corrected in `design.md` P-1 and `requirements.md` §1.1, and the T-02 note that inherited the
 same error is withdrawn above. Had this been reported as a FAIL it would have cost a rework
 round to "fix" correct code into broken code.
+
+---
+
+## T-04 — Client flags service and the sidebar choke point → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Task | `task_af3b50cb85ae` |
+| Dispatch | `ctx_0489108328fa` (first attempt) |
+| Worker | Cursor · `grok-4.7-high` |
+| Verdict | **PASS** |
+
+### Files changed (10 — four of which look out of scope and are not)
+
+Substantive: `pool-funding-flags.service{,.spec}.ts` (new),
+`result-sidebar.component.{ts,html,spec.ts}`.
+
+`app.config.ts` and `cognito.service.ts` (plus the `login`/`auth`/`cognito` specs that mock
+them) were flagged by the reviewer as scope creep, then cleared: the precedent this task was
+told to copy, `DateFormatConfigService`, is initialised in **exactly** those two places —
+`app.config.ts:53-55` (app initializer) and `cognito.service.ts:95` (after login). Wiring the
+new service anywhere else would have been the deviation.
+
+### The implementation
+
+```ts
+const hiddenByExistingRules =
+  meta?.indicator_id === 5 || !alignment || alignment.eligible === false || alignment.version_locked === true;
+return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
+```
+
+OR-ed for hiding is AND-ed for showing: the flag subtracts and never adds (R-PFT-001). In the
+template the button's `@if (poolFundingFlags.prmsSyncButtonEnabled())` nests **inside**
+`@if (hasPoolFundingOption())`, so "section off also hides the button" falls out of the
+existing choke point with no second gate (NFR-PFT-002 intact), and the `PRMS code` caption sits
+outside the button's `@if`, so it survives when only the button is hidden (R-PFT-002's `BUT`).
+
+The service copies the precedent faithfully: single-flight `loadPromise`, signals initialised
+to `true`, `.catch(() => true)`. Fail-open both **before** a read resolves and **on** a failed
+read.
+
+### Verification — override falsifier executed by the reviewer
+
+| Check | Result |
+| --- | --- |
+| Targeted suites (sidebar + new service) | **152 tests green** |
+| **Override falsifier** (`flag on ⇒ visible`, ignoring the existing rules) | **8 assertions red** |
+| Which reddened | the OICR-indicator case, `eligible=false`, `version_locked=true`, the combined-gates case, the loading-state case, the button+divider case, and both byte-identical path-list guards |
+| Restored | 147/147 green |
+| Full client suite | **325 suites / 7352 tests** |
+| Full server suite | **390 suites / 3383 tests** |
+| `npm run build` (client) | **exit 0** — `strictTemplates` sees the modified HTML |
+| `npx prettier --check` (all six) | clean |
+
+The override falsifier is stronger than the task required. It was supposed to redden the
+matrix's row 4; it reddened **eight** assertions, because the pre-existing suite already pins
+each existing rule independently. Those tests were guarding this property before the flag
+existed.
+
+### Spec type-check — compared as a SET, not a total
+
+`result-sidebar.component.spec.ts` carries pre-existing errors, so an empty grep was
+unreachable. The reviewer swapped in `HEAD`'s copy of that one file, re-ran, and compared the
+normalized sets:
+
+```
+before: 11× TS18048 currentMetadata · 3× TS18048 route.snapshot ·
+         3× TS2322 null→number · 1× TS2322 null→string · 1× TS2739 Mock→WritableSignal
+after:  identical, same counts
+```
+
+**No new errors.** The other four touched spec files and the new service spec produce **zero**.
+Project total 944, consistent with the historical band — no parse-abort collapse.
+
+### Recorded for the PR reviewer: 273 of 275 changed HTML lines are whitespace
+
+`result-sidebar.component.html` shows a 275-line diff for a ~2-line feature change, and
+`result-sidebar.component.ts` 61 lines for one. Measured rather than assumed: formatting
+`HEAD`'s copy with the repo's own Prettier (via `--stdin-filepath`, so the repo config
+resolves) changes **273** lines in the HTML and 43 in the TS. Both files were simply never
+Prettier-clean on `HEAD`, and the delivered files are.
+
+Kept rather than reverted: husky's `lint-staged` would reformat them on commit anyway, so
+reverting would produce a diff that cannot survive its own commit hook. Flagged here because a
+reviewer opening that file needs to know where the two real lines are.
+
+*(Unrelated and pre-existing: `npm run build` prints template warnings for
+`PoolFundingAlignmentComponent` and `CreateOicrFormComponent`. Neither file was touched; the
+build exits 0.)*
