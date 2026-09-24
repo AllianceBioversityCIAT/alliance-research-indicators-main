@@ -372,7 +372,8 @@ export default class AllianceAlignmentComponent {
     const dataToSend = buildPortfolio2AlignmentPatch(
       this.body(),
       this.isOicrIndicator() || this.isPolicyChangeIndicator() || this.isInnovationUseIndicator(),
-      !this.isOicrIndicator()
+      !this.isOicrIndicator(),
+      this.isOicrIndicator()
     );
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
   }

@@ -10,6 +10,8 @@ import {
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { ApiService } from '@shared/services/api.service';
 import { environment } from '@envs/environment';
+import { isPortfolio2025LeverName, isPortfolio2026SdgTargetCode } from '@shared/constants/portfolio-2026-sdg-targets';
+import { LeverSdgTargetApi } from '@shared/interfaces/lever-sdg-target.interface';
 
 interface SdgLeverSignalValue {
   result_lever_sdgs: GetSdgs[];
@@ -30,6 +32,7 @@ export default class SdgManagementComponent implements OnInit {
   readonly loading = signal(true);
   readonly loadError = signal(false);
   readonly levers = signal<GetLevers[]>([]);
+  readonly portfolio2026Targets = signal<LeverSdgTargetApi[]>([]);
   readonly savingLeverId = signal<number | null>(null);
   readonly saveError = signal<string | null>(null);
   readonly saveSuccess = signal(false);
@@ -47,6 +50,10 @@ export default class SdgManagementComponent implements OnInit {
 
   leverNumericId(lever: GetLevers): number {
     return Number(lever.lever_id ?? lever.id);
+  }
+
+  portfolio2025Levers(): GetLevers[] {
+    return this.levers().filter(lever => isPortfolio2025LeverName(lever.short_name));
   }
 
   leverImageSrc(lever: GetLevers): string {
@@ -157,6 +164,18 @@ export default class SdgManagementComponent implements OnInit {
 
       const mappingRows = await this.fetchMappingRows();
       this.applyMappingsToSignals(mappingRows);
+
+      if (typeof this.api.GET_ClarisaSdgTargets === 'function') {
+        const clarisa = await this.api.GET_ClarisaSdgTargets().catch(() => null);
+        const rows = Array.isArray(clarisa?.data) ? clarisa.data : [];
+        this.portfolio2026Targets.set(
+          rows
+            .filter(row => isPortfolio2026SdgTargetCode(row.sdg_target_code))
+            .sort((a, b) =>
+              String(a.sdg_target_code).localeCompare(String(b.sdg_target_code), undefined, { numeric: true })
+            )
+        );
+      }
     } catch {
       this.loadError.set(true);
     } finally {

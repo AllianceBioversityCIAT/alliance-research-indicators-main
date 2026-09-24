@@ -20,13 +20,16 @@
         <p class="text-sm text-[#4C5158]">Loading levers…</p>
         } @else if (loadError()) {
         <p class="text-sm text-[#B00020]">We could not load levers or existing SDG links. Please refresh the page.</p>
-        } @else if (levers().length === 0) {
+        } @else if (levers().length === 0 && portfolio2026Targets().length === 0) {
         <p class="text-sm text-[#4C5158]">No levers are available.</p>
         } @else {
-        <div class="w-full min-w-0 pb-2 px-2">
-
-          <div class="flex w-full min-w-0 flex-col gap-4">
-            @for (lever of levers(); track leverNumericId(lever)) {
+        <div class="w-full min-w-0 pb-2 px-2 flex flex-col gap-8">
+          <section class="flex w-full min-w-0 flex-col gap-4">
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">Portfolio 2025</h2>
+            @if (portfolio2025Levers().length === 0) {
+            <p class="text-sm text-[#4C5158]">No portfolio 2025 levers are available.</p>
+            } @else {
+            @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
             <div class="sdg-lever-card flex min-h-0 min-w-0 flex-col rounded-lg border border-[#E0E4E8] bg-[#E8EBED]">
               <button type="button"
                 class="sdg-lever-header flex w-full min-w-0 items-center gap-2.5 bg-[#F7F8FA] px-4 py-2.5 text-left cursor-pointer"
@@ -102,7 +105,35 @@
               }
             </div>
             }
-          </div>
+            }
+          </section>
+
+          <section class="flex w-full min-w-0 flex-col gap-3">
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">Portfolio 2026</h2>
+            <p class="text-sm text-[#4C5158]">General SDG target list for 2026 OICRs. It does not depend on Research Areas.</p>
+            <div class="overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
+              <table class="w-full text-left text-[14px] text-[#4C5158]">
+                <thead class="bg-[#F7F8FA] text-[13px] font-[600] text-[#14314F]">
+                  <tr>
+                    <th class="px-4 py-2">Code</th>
+                    <th class="px-4 py-2">SDG target</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (target of portfolio2026Targets(); track target.id) {
+                  <tr class="border-t border-[#EEF1F3]">
+                    <td class="px-4 py-2 font-[600]">{{ target.sdg_target_code }}</td>
+                    <td class="px-4 py-2">{{ target.sdg_target }}</td>
+                  </tr>
+                  } @empty {
+                  <tr>
+                    <td class="px-4 py-3" colspan="2">No 2026 SDG targets are available.</td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
         }
       </div>

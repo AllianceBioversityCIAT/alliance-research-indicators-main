@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { CreateResultPolicyChangeDto } from './dto/create-result-policy-change.dto';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
@@ -19,6 +23,11 @@ import { PolicyStagesService } from '../policy-stages/policy-stages.service';
 import { PolicyStage } from '../policy-stages/entities/policy-stage.entity';
 import { PolicyTypesService } from '../policy-types/policy-types.service';
 import { PolicyType } from '../policy-types/entities/policy-type.entity';
+import { PolicyTypesEnum } from '../policy-types/enum/policy-types.enum';
+import {
+  POLICY_AMOUNT_STATUS_VALUES,
+  PolicyAmountStatusEnum,
+} from './enum/policy-amount-status.enum';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -86,6 +95,10 @@ export class ResultPolicyChangeService {
     result_id: number,
     createResultPolicyChangeDto: CreateResultPolicyChangeDto,
   ) {
+    const { usd_amount, amount_status } = this.resolveAmountFields(
+      createResultPolicyChangeDto,
+    );
+
     const innoSave: Partial<LinkResult>[] = [];
     if (createResultPolicyChangeDto?.innovation_development)
       innoSave.push({
@@ -118,6 +131,8 @@ export class ResultPolicyChangeService {
         policy_type_id: createResultPolicyChangeDto?.policy_type_id,
         policy_stage_id: createResultPolicyChangeDto?.policy_stage_id,
         evidence_stage: createResultPolicyChangeDto?.evidence_stage,
+        usd_amount,
+        amount_status,
         ...this.currentUser.audit(SetAuditEnum.BOTH),
       });
 
@@ -158,6 +173,50 @@ export class ResultPolicyChangeService {
       implementing_organization: institutions,
       innovation_development: innoDev?.other_result_id,
       innovation_use: innoUse?.other_result_id,
+      usd_amount:
+        policyChange?.usd_amount == null
+          ? null
+          : Number(policyChange.usd_amount),
+      amount_status: policyChange?.amount_status ?? null,
+    };
+  }
+
+  /**
+   * When type is Program/Budget/Investment (3), usd_amount and amount_status
+   * are required. Otherwise both are cleared to null.
+   */
+  private resolveAmountFields(dto: CreateResultPolicyChangeDto): {
+    usd_amount: number | null;
+    amount_status: string | null;
+  } {
+    const isProgramBudgetInvestment =
+      dto?.policy_type_id === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT;
+
+    if (!isProgramBudgetInvestment) {
+      return { usd_amount: null, amount_status: null };
+    }
+
+    const amount =
+      dto.usd_amount === null || dto.usd_amount === undefined
+        ? NaN
+        : Number(dto.usd_amount);
+
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new BadRequestException(
+        'USD Amount is required and must be a non-negative number when Policy Type is Program, Budget, or Investment',
+      );
+    }
+
+    const status = dto.amount_status;
+    if (!status || !POLICY_AMOUNT_STATUS_VALUES.includes(String(status))) {
+      throw new BadRequestException(
+        `Amount Status is required and must be one of: ${POLICY_AMOUNT_STATUS_VALUES.join(', ')}`,
+      );
+    }
+
+    return {
+      usd_amount: amount,
+      amount_status: status as PolicyAmountStatusEnum,
     };
   }
 }

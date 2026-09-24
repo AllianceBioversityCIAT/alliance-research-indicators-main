@@ -150,7 +150,14 @@ describe('ResultAlignmentOperationsService', () => {
         { is_primary: false },
       );
       expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalled();
-      expect(resultLeverSdgTargetsService.create).toHaveBeenCalled();
+      expect(resultLeverSdgTargetsService.create).toHaveBeenCalledWith(
+        100,
+        [{ sdg_target_id: 10, result_id: resultId }],
+        'sdg_target_id',
+        undefined,
+        manager,
+        ['result_id'],
+      );
       expect(resultSdgsService.create).toHaveBeenCalledWith(
         resultId,
         alignmentData.result_sdgs,

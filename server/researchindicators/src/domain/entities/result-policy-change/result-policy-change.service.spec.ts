@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultPolicyChangeService } from './result-policy-change.service';
 import { LinkResultsService } from '../link-results/link-results.service';
@@ -158,6 +158,71 @@ describe('ResultPolicyChangeService', () => {
 
       expect(mockLinkResultsService.create).toHaveBeenCalled();
       expect(mockResultInstitutionsService.create).toHaveBeenCalled();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          usd_amount: null,
+          amount_status: null,
+        }),
+      );
+    });
+
+    it('should persist usd_amount and amount_status when policy_type_id is 3', async () => {
+      mockTransaction.mockImplementation(async (cb) => {
+        const mockManager = {
+          getRepository: jest.fn().mockReturnValue({ update: mockUpdate }),
+        };
+        return cb(mockManager);
+      });
+      mockLinkResultsService.create.mockResolvedValue(undefined);
+      mockResultInstitutionsService.create.mockResolvedValue(undefined);
+      mockUpdate.mockResolvedValue({ affected: 1 });
+      mockUpdateDataUtil.updateLastUpdatedDate.mockResolvedValue(undefined);
+
+      await service.update(10, {
+        innovation_development: null,
+        innovation_use: null,
+        implementing_organization: [],
+        policy_type_id: 3,
+        policy_stage_id: 2,
+        evidence_stage: 'ev',
+        usd_amount: 1200,
+        amount_status: 'Estimated',
+      });
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          usd_amount: 1200,
+          amount_status: 'Estimated',
+        }),
+      );
+    });
+
+    it('should reject type 3 without usd_amount', async () => {
+      await expect(
+        service.update(10, {
+          implementing_organization: [],
+          policy_type_id: 3,
+          policy_stage_id: 2,
+          evidence_stage: 'ev',
+          amount_status: 'Confirmed',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should reject type 3 with invalid amount_status', async () => {
+      await expect(
+        service.update(10, {
+          implementing_organization: [],
+          policy_type_id: 3,
+          policy_stage_id: 2,
+          evidence_stage: 'ev',
+          usd_amount: 10,
+          amount_status: 'Maybe',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -166,9 +231,11 @@ describe('ResultPolicyChangeService', () => {
     it('should return policy change dto combining mainRepo and services data', async () => {
       mockFindOne.mockResolvedValue({
         result_id: 10,
-        policy_type_id: 1,
+        policy_type_id: 3,
         policy_stage_id: 2,
         evidence_stage: 'stage',
+        usd_amount: '1500.00',
+        amount_status: 'Confirmed',
       });
       mockResultInstitutionsService.findInstitutionsByRoleResult.mockResolvedValue(
         [],
@@ -189,6 +256,8 @@ describe('ResultPolicyChangeService', () => {
       expect(result.evidence_stage).toBe('stage');
       expect(result.innovation_development).toBe(5);
       expect(result.innovation_use).toBe(6);
+      expect(result.usd_amount).toBe(1500);
+      expect(result.amount_status).toBe('Confirmed');
     });
 
     it('should return undefined innovation links when no link results match', async () => {

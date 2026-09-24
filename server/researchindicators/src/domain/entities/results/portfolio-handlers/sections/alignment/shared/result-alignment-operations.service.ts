@@ -101,10 +101,14 @@ export class ResultAlignmentOperationsService {
       for (const lever of emergedLever) {
         await this.resultLeverSdgTargetsService.create(
           lever.result_lever_id,
-          lever?.result_lever_sdg_targets ?? [],
+          (lever?.result_lever_sdg_targets ?? []).map((target) => ({
+            ...target,
+            result_id: resultId,
+          })),
           'sdg_target_id',
           undefined,
           entityManager,
+          ['result_id'],
         );
       }
 
