@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ResultPolicyChangeService } from './result-policy-change.service';
 import { LinkResultsService } from '../link-results/link-results.service';
@@ -199,30 +199,41 @@ describe('ResultPolicyChangeService', () => {
       );
     });
 
-    it('should reject type 3 without usd_amount', async () => {
-      await expect(
-        service.update(10, {
-          implementing_organization: [],
-          policy_type_id: 3,
-          policy_stage_id: 2,
-          evidence_stage: 'ev',
-          amount_status: 'Confirmed',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-      expect(mockTransaction).not.toHaveBeenCalled();
+    it('should persist zero and store a missing status as null', async () => {
+      await service.update(10, {
+        implementing_organization: [],
+        policy_type_id: 3,
+        policy_stage_id: 2,
+        evidence_stage: 'ev',
+        usd_amount: 0,
+      } as any);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          usd_amount: 0,
+          amount_status: null,
+        }),
+      );
     });
 
-    it('should reject type 3 with invalid amount_status', async () => {
-      await expect(
-        service.update(10, {
-          implementing_organization: [],
-          policy_type_id: 3,
-          policy_stage_id: 2,
-          evidence_stage: 'ev',
+    it('should store an invalid amount status as null without rejecting the save', async () => {
+      await service.update(10, {
+        implementing_organization: [],
+        policy_type_id: 3,
+        policy_stage_id: 2,
+        evidence_stage: 'ev',
+        usd_amount: 10,
+        amount_status: 'Maybe',
+      } as any);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
           usd_amount: 10,
-          amount_status: 'Maybe',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
+          amount_status: null,
+        }),
+      );
     });
   });
 

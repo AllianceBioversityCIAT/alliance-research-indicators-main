@@ -259,15 +259,35 @@ describe('PolicyChangeComponent', () => {
     expect(component.body().amount_status).toBeNull();
   });
 
-  it('blocks save when type 3 is selected without required amount fields', async () => {
-    component.body.set({ policy_type_id: 3 } as any);
+  it('initializes a missing USD amount to zero for Program/Budget/Investment', async () => {
+    mockApiService.GET_PolicyChange.mockResolvedValue({
+      data: { policy_type_id: 3, usd_amount: null, amount_status: null }
+    });
+
+    await component.getData();
+
+    expect(component.body().usd_amount).toBe(0);
+  });
+
+  it('keeps a saved zero amount', async () => {
+    mockApiService.GET_PolicyChange.mockResolvedValue({
+      data: { policy_type_id: 3, usd_amount: 0, amount_status: 'Confirmed' }
+    });
+
+    await component.getData();
+
+    expect(component.body().usd_amount).toBe(0);
+  });
+
+  it('saves type 3 without a warning when status is still empty', async () => {
+    component.body.set({ policy_type_id: 3, usd_amount: 0 } as any);
+    mockApiService.PATCH_PolicyChange.mockResolvedValue({ successfulRequest: true });
+    mockApiService.GET_PolicyChange.mockResolvedValue({ data: { policy_type_id: 3, usd_amount: 0 } });
 
     await component.saveData();
 
-    expect(mockApiService.PATCH_PolicyChange).not.toHaveBeenCalled();
-    expect(mockActionsService.showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: 'warning', summary: 'Policy Change' })
-    );
+    expect(mockApiService.PATCH_PolicyChange).toHaveBeenCalled();
+    expect(mockActionsService.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
   });
 
   it('should test navigateTo function directly', async () => {

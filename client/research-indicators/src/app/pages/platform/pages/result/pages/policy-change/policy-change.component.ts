@@ -79,7 +79,9 @@ export default class PolicyChangeComponent {
         usd_amount: null,
         amount_status: null
       }));
+      return;
     }
+    this.initializeAmount();
   }
 
   async getData() {
@@ -87,16 +89,16 @@ export default class PolicyChangeComponent {
     const response = await this.api.GET_PolicyChange(this.cache.getCurrentNumericResultId());
     response.data.loaded = true;
     this.body.set(response.data);
+    this.initializeAmount();
     this.loading.set(false);
   }
 
-  private amountFieldsValid(): boolean {
-    if (!this.isProgramBudgetOrInvestment()) return true;
-    const amount = this.body().usd_amount;
-    const status = this.body().amount_status;
-    const amountOk = amount !== null && amount !== undefined && Number(amount) >= 0 && Number.isFinite(Number(amount));
-    const statusOk = status === 'Confirmed' || status === 'Estimated' || status === 'Unknown';
-    return amountOk && statusOk;
+  /** Zero is a saved value. Only a missing amount starts at 0. */
+  private initializeAmount(): void {
+    if (!this.isProgramBudgetOrInvestment()) return;
+    if (this.body().usd_amount === null || this.body().usd_amount === undefined) {
+      this.body.update(current => ({ ...current, usd_amount: 0 }));
+    }
   }
 
   async saveData(page?: 'next' | 'back') {
@@ -112,16 +114,6 @@ export default class PolicyChangeComponent {
     };
 
     if (this.submission.isEditableStatus()) {
-      if (!this.amountFieldsValid()) {
-        this.actions.showToast({
-          severity: 'warning',
-          summary: 'Policy Change',
-          detail: 'USD Amount and Status are required when Policy Type is Program, Budget, or Investment'
-        });
-        this.loading.set(false);
-        return;
-      }
-
       const response = await this.api.PATCH_PolicyChange(this.cache.getCurrentNumericResultId(), this.body());
       if (response.successfulRequest) {
         this.actions.showToast({ severity: 'success', summary: 'Policy Change', detail: 'Data saved successfully' });
