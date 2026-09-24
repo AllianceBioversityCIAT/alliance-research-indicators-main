@@ -13,15 +13,15 @@ export class Portfolio2026SdgTargetsService {
     return false;
   }
 
-  getList(_params?: unknown) {
+  getList() {
     return this.list;
   }
 
-  getLoading(_params?: unknown) {
+  getLoading() {
     return this.loading;
   }
 
-  async main(_params?: unknown) {
+  async main() {
     this.loading.set(true);
     try {
       const res = await this.api.GET_ClarisaSdgTargets();
