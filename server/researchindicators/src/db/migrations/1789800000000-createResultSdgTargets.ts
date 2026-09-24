@@ -24,9 +24,11 @@ export class CreateResultSdgTargets1789800000000 implements MigrationInterface {
       LEFT JOIN \`result_levers\` rl ON rl.result_lever_id = rlst.result_lever_id
       WHERE rlst.result_id IS NULL AND rl.result_lever_id IS NULL
     `);
+    /**
     await queryRunner.query(
       `ALTER TABLE \`result_lever_sdg_targets\` MODIFY \`result_id\` bigint NOT NULL`,
     );
+     */
     await queryRunner.query(
       `ALTER TABLE \`result_lever_sdg_targets\` ADD CONSTRAINT \`FK_result_lever_sdg_targets_result\` FOREIGN KEY (\`result_id\`) REFERENCES \`results\`(\`result_id\`) ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
