@@ -12,6 +12,11 @@ export interface PrmsSyncHistoryEvent {
   actor_name_short: string | null;
   reviewer_name: string | null;
   reviewer_role: string | null;
+  /**
+   * Field-level diff from PRMS. Null on every delivery today, and PRMS has
+   * committed to no shape — render whatever keys arrive.
+   */
+  changes?: unknown;
 }
 
 export interface PrmsSyncHistoryResponse {

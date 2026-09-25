@@ -173,11 +173,23 @@ export class ResultSidebarComponent {
   readonly prmsHistoryOpen = signal(false);
   private prmsHistoryFetchGen = 0;
 
-  readonly showPrmsSyncCard = computed(() => this.prmsHistoryPhase() === 'loaded' && (this.prmsHistory()?.events.length ?? 0) > 0);
+  /**
+   * `prms_result_code` here is the history payload's copy of `results.prms_result_code`
+   * (Q1), not a code stored on a history row. Null means the metadata write failed:
+   * hide the card rather than render it without a code.
+   */
+  readonly showPrmsSyncCard = computed(() => {
+    const history = this.prmsHistory();
+    return this.prmsHistoryPhase() === 'loaded' && (history?.events.length ?? 0) > 0 && history?.prms_result_code != null;
+  });
 
-  readonly showLegacyPrmsCode = computed(
-    () => this.prmsHistoryPhase() !== 'loading' && !this.showPrmsSyncCard() && this.prmsResultCode() != null
-  );
+  readonly showLegacyPrmsCode = computed(() => {
+    if (this.prmsHistoryPhase() === 'loading' || this.showPrmsSyncCard() || this.prmsResultCode() == null) return false;
+    const history = this.prmsHistory();
+    const loadedWithEventsButNoResultsCode =
+      this.prmsHistoryPhase() === 'loaded' && (history?.events.length ?? 0) > 0 && history?.prms_result_code == null;
+    return !loadedWithEventsButNoResultsCode;
+  });
 
   @ViewChild(PrmsSyncCardComponent) prmsSyncCard?: PrmsSyncCardComponent;
 

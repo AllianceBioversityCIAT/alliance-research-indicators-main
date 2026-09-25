@@ -2526,6 +2526,19 @@ describe('ResultSidebarComponent', () => {
       };
     }
 
+    it('renders nothing when events exist but results.prms_result_code is null, and leaves PRMS SYNC', async () => {
+      (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue(historyPayload({ events: [starEvent], prms_result_code: null, sync_count: 1 }));
+      setAlignment(panelAlignment);
+      await component.fetchPrmsSyncHistory(123);
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('loaded');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).not.toBeNull();
+    });
+
     it('renders the card and hides the legacy line when events exist', async () => {
       (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue(historyPayload({ events: [starEvent] }));
       setAlignment(panelAlignment);

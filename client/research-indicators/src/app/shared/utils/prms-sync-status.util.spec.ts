@@ -1,6 +1,6 @@
 import { PrmsSyncHistoryEvent } from '@shared/interfaces/prms-sync-history.interface';
 import {
-  deriveHeadline,
+  deriveSyncVerb,
   formatSyncDayMonth,
   formatSyncStatus,
   formatSyncTimestamp,
@@ -60,7 +60,7 @@ describe('formatSyncStatus', () => {
   });
 });
 
-describe('deriveHeadline', () => {
+describe('deriveSyncVerb', () => {
   const chronological = [
     event({ id: 1, event_source: 'STAR', status: 'PENDING_REVIEW', actor_name: 'Mariana Acosta', occurred_at: '2026-08-28T09:12:00.000Z' }),
     event({
@@ -82,12 +82,12 @@ describe('deriveHeadline', () => {
     event({ id: 5, event_source: 'STAR', status: 'PENDING_REVIEW', actor_name: 'Manuel Almanzar', occurred_at: '2026-09-07T11:00:00.000Z' })
   ];
 
-  it('covers all five headline branches', () => {
-    expect(deriveHeadline(chronological[0], chronological)).toBe('First synchronization');
-    expect(deriveHeadline(chronological[1], chronological)).toBe('PRMS returned the mapping');
-    expect(deriveHeadline(chronological[2], chronological)).toBe('Mapping re-synced after rejection');
-    expect(deriveHeadline(chronological[3], chronological)).toBe('PRMS approved the mapping');
-    expect(deriveHeadline(chronological[4], chronological)).toBe('Mapping re-synced');
+  it('covers all five verb branches', () => {
+    expect(deriveSyncVerb(chronological[0], chronological)).toBe('synchronized the result for the first time');
+    expect(deriveSyncVerb(chronological[1], chronological)).toBe('returned the mapping');
+    expect(deriveSyncVerb(chronological[2], chronological)).toBe('re-synchronized the result after a rejection');
+    expect(deriveSyncVerb(chronological[3], chronological)).toBe('approved the mapping');
+    expect(deriveSyncVerb(chronological[4], chronological)).toBe('re-synchronized the result');
   });
 });
 

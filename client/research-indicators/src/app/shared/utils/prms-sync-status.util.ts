@@ -43,28 +43,29 @@ export function formatSyncStatus(event: Pick<PrmsSyncHistoryEvent, 'event_source
 }
 
 /**
- * `chronologicalEvents` is oldest-first (the reverse of the server's display order).
+ * Verb that follows the actor's name. `chronologicalEvents` is oldest-first
+ * (the reverse of the modal's display order). One function, five branches.
  */
-export function deriveHeadline(
+export function deriveSyncVerb(
   event: Pick<PrmsSyncHistoryEvent, 'id' | 'event_source' | 'decision'>,
   chronologicalEvents: PrmsSyncHistoryEvent[]
 ): string {
   if (event.event_source === 'PRMS') {
-    if (isApprove(event.decision)) return 'PRMS approved the mapping';
-    if (isReject(event.decision)) return 'PRMS returned the mapping';
-    return 'Synchronized with PRMS';
+    if (isApprove(event.decision)) return 'approved the mapping';
+    if (isReject(event.decision)) return 'returned the mapping';
+    return '';
   }
 
   const index = chronologicalEvents.findIndex(row => row.id === event.id);
   const earlier = index > 0 ? chronologicalEvents.slice(0, index) : [];
   const hasEarlierStar = earlier.some(row => row.event_source === 'STAR');
-  if (!hasEarlierStar) return 'First synchronization';
+  if (!hasEarlierStar) return 'synchronized the result for the first time';
 
-  const previous = chronologicalEvents[index - 1];
+  const previous = index > 0 ? chronologicalEvents[index - 1] : undefined;
   if (previous?.event_source === 'PRMS' && isReject(previous.decision)) {
-    return 'Mapping re-synced after rejection';
+    return 're-synchronized the result after a rejection';
   }
-  return 'Mapping re-synced';
+  return 're-synchronized the result';
 }
 
 /**
