@@ -5,6 +5,7 @@ import { ApiService } from '@services/api.service';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from './clarity.service';
 import { DateFormatConfigService } from './date-format-config.service';
+import { PoolFundingFlagsService } from './pool-funding-flags.service';
 import { ValidateCacheService } from './validate-cache.service';
 import { environment } from '../../../environments/environment';
 import { DataCache } from '@interfaces/cache.interface';
@@ -20,6 +21,7 @@ export class CognitoService {
   actions = inject(ActionsService);
   clarity = inject(ClarityService);
   private readonly dateFormatConfig = inject(DateFormatConfigService);
+  private readonly poolFundingFlags = inject(PoolFundingFlagsService);
   private readonly validateCache = inject(ValidateCacheService);
 
   private readonly loginReturnUrlKey = 'loginReturnUrl';
@@ -91,6 +93,7 @@ export class CognitoService {
 
     if (parsed.access_token) {
       void this.dateFormatConfig.loadConfig();
+      void this.poolFundingFlags.load();
       void this.validateCache.validateVersions();
     }
   }

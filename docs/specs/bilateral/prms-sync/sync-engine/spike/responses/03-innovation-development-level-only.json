@@ -1,0 +1,63 @@
+{
+    "ok": false,
+    "message": "Processed with 1 failed during processing",
+    "processed": 1,
+    "successful": 0,
+    "failed": 1,
+    "rejectedCount": 0,
+    "rejected": [],
+    "results": [
+        {
+            "success": false,
+            "error": "HTTP 400: Bad Request - {\"response\":{\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"error\":\"Bad Request\",\"statusCode\":400},\"statusCode\":400,\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"timestamp\":\"2026-09-14T20:02:02.642Z\",\"path\":\"/api/bilateral/create\"}",
+            "externalSuccess": false,
+            "externalError": "HTTP 400: Bad Request - {\"response\":{\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"error\":\"Bad Request\",\"statusCode\":400},\"statusCode\":400,\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"timestamp\":\"2026-09-14T20:02:02.642Z\",\"path\":\"/api/bilateral/create\"}",
+            "externalApiResponse": {
+                "response": {
+                    "message": "Unsupported innovation typology name \"Technology\".",
+                    "error": "Bad Request",
+                    "statusCode": 400
+                },
+                "statusCode": 400,
+                "message": "Unsupported innovation typology name \"Technology\".",
+                "timestamp": "2026-09-14T20:02:02.642Z",
+                "path": "/api/bilateral/create"
+            },
+            "resultId": "prms.result-management.api:innovation_development:dataset.ingest.requested:auto-d762cfa64ef49342",
+            "resultType": "innovation_development",
+            "external_reference": "ARI-SPIKE-20260914-03",
+            "errorDetails": {
+                "message": "HTTP 400: Bad Request - {\"response\":{\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"error\":\"Bad Request\",\"statusCode\":400},\"statusCode\":400,\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"timestamp\":\"2026-09-14T20:02:02.642Z\",\"path\":\"/api/bilateral/create\"}",
+                "externalError": "HTTP 400: Bad Request - {\"response\":{\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"error\":\"Bad Request\",\"statusCode\":400},\"statusCode\":400,\"message\":\"Unsupported innovation typology name \\\"Technology\\\".\",\"timestamp\":\"2026-09-14T20:02:02.642Z\",\"path\":\"/api/bilateral/create\"}",
+                "externalApiResponse": {
+                    "response": {
+                        "message": "Unsupported innovation typology name \"Technology\".",
+                        "error": "Bad Request",
+                        "statusCode": 400
+                    },
+                    "statusCode": 400,
+                    "message": "Unsupported innovation typology name \"Technology\".",
+                    "timestamp": "2026-09-14T20:02:02.642Z",
+                    "path": "/api/bilateral/create"
+                }
+            }
+        }
+    ],
+    "processingTimeMs": 1193,
+    "logs": {
+        "total": 5,
+        "byLevel": {
+            "INFO": 3,
+            "WARN": 0,
+            "ERROR": 2,
+            "SUCCESS": 0
+        }
+    },
+    "requestId": "Root=1-6aa852b9-3fe9d93047debe46758a3a33",
+    "offload": {
+        "bucket": "prms-results-bucket",
+        "key": "ingest-full/1789416121496-571b8cf5764c7b588b478c30ecaa4e9e.json"
+    },
+    "correlationId": "50a0b4d2-b72d-4b31-b7fb-7ad40543d6b1",
+    "timestamp": "2026-09-14T20:02:02.687Z"
+}
