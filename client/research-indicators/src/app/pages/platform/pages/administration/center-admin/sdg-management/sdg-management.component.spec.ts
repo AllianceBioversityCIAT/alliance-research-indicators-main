@@ -186,9 +186,9 @@ describe('SdgManagementComponent', () => {
     expect(c.sdgSignalFor(notLoadedLever)).toBe(newSig);
     expect(c.sdgSignalFor(second)).toBe(c.sdgSignalFor(second));
     expect(c.sdgSignalFor(first)).toBe(c.sdgSignalFor(first));
-    c.toggleRow(first);
+    c.selectLever(second);
     f.detectChanges();
-    expect(c.isExpanded(first)).toBe(true);
+    expect(c.selectedLeverId()).toBe(c.leverNumericId(second));
     const multiselectDe = f.debugElement.query(By.css('app-multiselect'));
     const multiselect = multiselectDe?.componentInstance as MultiselectStubComponent;
     if (multiselect) {
@@ -201,9 +201,9 @@ describe('SdgManagementComponent', () => {
       multiselect.rowsCtx = { sdg_target_code: '1.2', sdg_target: 'y', clarisa_sdg: { icon: 'i' } };
     }
     f.detectChanges();
-    c.toggleRow(first);
+    c.selectLever(first);
     f.detectChanges();
-    c.toggleRow(first);
+    c.selectLever(first);
     f.detectChanges();
     if (multiselect) {
       multiselect.selectedCtx = [1, 2];
@@ -359,7 +359,7 @@ describe('SdgManagementComponent', () => {
     const sig = m.get(1);
     if (!sig) throw new Error('expected signal');
     sig.set({ result_lever_sdgs: [], result_lever_sdg_targets: [{ sdg_target_id: Number.NaN }, { sdg_target_id: 2 }] });
-    c.toggleRow(baseLever());
+    c.selectLever(baseLever());
     f.detectChanges();
     await c.saveForLever(c.levers()[0]!);
     await f.whenStable();
@@ -494,7 +494,21 @@ describe('SdgManagementComponent', () => {
     expect(modals.closeModal).toHaveBeenCalledWith('portfolio2026SdgTargets');
   });
 
-  it('lists portfolio 2025 lever targets in a table and saves the modal selection', async () => {
+  it('selects a lever of the portfolio and falls back to the first one', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    const a = baseLever({ id: 1, lever_id: 1, short_name: 'A', portfolio_id: 1 });
+    const b = baseLever({ id: 2, lever_id: 2, short_name: 'B', portfolio_id: 1 });
+    c.levers.set([a, b]);
+    expect(c.isSelected(a)).toBe(true);
+    c.selectLever(b);
+    expect(c.isSelected(b)).toBe(true);
+    expect(c.isSelected(a)).toBe(false);
+    c.levers.set([a]);
+    expect(c.selectedLever()).toBe(a);
+  });
+
+  it('lists portfolio 2025 lever targets as a list and saves the modal selection', async () => {
     await configureBed();
     const f = TestBed.createComponent(SdgManagementComponent);
     const lever = baseLever({ short_name: 'Lever 1', other_names: 'Climate', portfolio_id: 1 });
@@ -508,7 +522,12 @@ describe('SdgManagementComponent', () => {
     mockGetClarisa.mockResolvedValue({
       data: [
         { id: 40, sdg_target_code: '2.2', sdg_target: 'Target 2.2' },
-        { id: 12, sdg_target_code: '1.1', sdg_target: 'Target 1.1' },
+        {
+          id: 12,
+          sdg_target_code: '1.1',
+          sdg_target: 'Target 1.1',
+          clarisa_sdg: { id: 1, short_name: 'SDG 1', icon: 'sdg-1.png' }
+        },
         { id: 7, sdg_target_code: '9.9', sdg_target: 'Other' }
       ]
     });
@@ -518,14 +537,26 @@ describe('SdgManagementComponent', () => {
     await delayMs(0);
     f.detectChanges();
 
+    // Both portfolio groups start collapsed: only their headers are visible.
+    expect(f.nativeElement.textContent).toContain('Levers');
+    expect(f.nativeElement.textContent).toContain('1 lever');
+    expect(f.nativeElement.textContent).not.toContain('Lever 1');
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(0);
+
+    f.componentInstance.toggleLeversGroup();
+    f.detectChanges();
     expect(f.nativeElement.textContent).toContain('Lever 1');
-    expect(f.nativeElement.textContent).toContain(': Climate');
+    expect(f.nativeElement.textContent).toContain('Climate');
     expect(f.nativeElement.textContent).toContain('2 targets');
     expect(f.nativeElement.textContent).not.toContain('Research area');
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(1);
-    f.componentInstance.toggleRow(lever);
+    // The first lever is selected by default, so its targets show without another click.
+    expect(f.componentInstance.isSelected(lever)).toBe(true);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(1);
+    expect(f.nativeElement.querySelector('.sdg-target-list img')?.getAttribute('src')).toBe('sdg-1.png');
+
+    f.componentInstance.toggleSdgList();
     f.detectChanges();
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(2);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(2);
     expect(f.nativeElement.textContent).toContain('1.1');
     expect(f.nativeElement.textContent).toContain('2.2');
 
@@ -546,5 +577,29 @@ describe('SdgManagementComponent', () => {
       leverSdgTargetList: [expect.objectContaining({ id: 10, lever_id: 1, sdg_target_id: 12 })]
     });
     expect(modals.closeModal).toHaveBeenCalledWith('portfolio2025LeverSdgs');
+  });
+
+  it('orders portfolio sections most recent first', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    c.portfolios.set([
+      { id: 1, name: 'Portfolio 1', description: '', start_year: 2010, end_year: 2025 },
+      { id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }
+    ]);
+    expect(c.portfolioSections()).toEqual([2, 1]);
+
+    c.portfolios.set([
+      { id: 1, name: 'Portfolio 1', description: '', start_year: 2027, end_year: 2032 },
+      { id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }
+    ]);
+    expect(c.portfolioSections()).toEqual([1, 2]);
+  });
+
+  it('labels a portfolio by its year range without the portfolio number', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    c.portfolios.set([{ id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }]);
+    expect(c.portfolioLabel(2)).toBe('Portfolio (2026–2030)');
+    expect(c.portfolioLabel(1)).toBe('Portfolio');
   });
 });

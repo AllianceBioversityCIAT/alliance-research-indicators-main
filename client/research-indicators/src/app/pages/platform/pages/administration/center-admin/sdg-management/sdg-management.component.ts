@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, WritableSignal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, WritableSignal } from '@angular/core';
 import { GetLevers } from '@shared/interfaces/get-levers.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import {
@@ -52,7 +52,9 @@ export default class SdgManagementComponent implements OnInit {
   });
   readonly saveError = signal<string | null>(null);
   readonly saveSuccess = signal(false);
-  readonly expanded = signal<Record<number, boolean>>({});
+  readonly selectedLeverId = signal<number | null>(null);
+  readonly leversGroupExpanded = signal(false);
+  readonly sdgListExpanded = signal(false);
 
   private readonly leverSdgSignals = new Map<number, WritableSignal<SdgLeverSignalValue>>();
   private readonly mappingIdByPair = new Map<string, number>();
@@ -76,14 +78,39 @@ export default class SdgManagementComponent implements OnInit {
     return this.levers().filter(lever => Number(lever.portfolio_id) === this.leverPortfolioId);
   }
 
+  private portfolioById(portfolioId: number): Portfolio | undefined {
+    return this.portfolios().find(item => Number(item.id ?? item.portfolio_id) === portfolioId);
+  }
+
+  /** Both portfolio sections, most recent first (latest start year, then latest end year). */
+  readonly portfolioSections = computed<number[]>(() => {
+    const yearsOf = (id: number) => {
+      const portfolio = this.portfolioById(id);
+      const start = Number(portfolio?.start_year);
+      const end = Number(portfolio?.end_year);
+      return { start: Number.isFinite(start) ? start : -Infinity, end: Number.isFinite(end) ? end : -Infinity };
+    };
+    return [this.leverPortfolioId, this.sdgListPortfolioId].sort((a, b) => {
+      const ya = yearsOf(a);
+      const yb = yearsOf(b);
+      return yb.start - ya.start || yb.end - ya.end;
+    });
+  });
+
   portfolioLabel(portfolioId: number): string {
-    const portfolio = this.portfolios().find(item => Number(item.id ?? item.portfolio_id) === portfolioId);
-    const name = portfolio?.name?.trim();
+    const portfolio = this.portfolioById(portfolioId);
     const start = Number(portfolio?.start_year);
     const end = Number(portfolio?.end_year);
-    const range = Number.isFinite(start) && Number.isFinite(end) ? `${start}–${end}` : '';
-    if (name && range) return `${name} (${range})`;
-    return name || range || 'Portfolio';
+    const hasRange = portfolio != null && Number.isFinite(start) && Number.isFinite(end);
+    return hasRange ? `Portfolio (${start}–${end})` : 'Portfolio';
+  }
+
+  toggleLeversGroup(): void {
+    this.leversGroupExpanded.update(open => !open);
+  }
+
+  toggleSdgList(): void {
+    this.sdgListExpanded.update(open => !open);
   }
 
   leverImageSrc(lever: GetLevers): string {
@@ -94,13 +121,20 @@ export default class SdgManagementComponent implements OnInit {
     return environment.s3Folder + normalized;
   }
 
-  isExpanded(lever: GetLevers): boolean {
-    return this.expanded()[this.leverNumericId(lever)] ?? false;
+  /** Lever whose targets fill the detail panel; defaults to the first lever of the portfolio. */
+  readonly selectedLever = computed<GetLevers | null>(() => {
+    const levers = this.portfolio2025Levers();
+    const id = this.selectedLeverId();
+    return levers.find(lever => this.leverNumericId(lever) === id) ?? levers[0] ?? null;
+  });
+
+  isSelected(lever: GetLevers): boolean {
+    const selected = this.selectedLever();
+    return selected != null && this.leverNumericId(selected) === this.leverNumericId(lever);
   }
 
-  toggleRow(lever: GetLevers): void {
-    const id = this.leverNumericId(lever);
-    this.expanded.update(p => ({ ...p, [id]: !p[id] }));
+  selectLever(lever: GetLevers): void {
+    this.selectedLeverId.set(this.leverNumericId(lever));
   }
 
   sdgSignalFor(lever: GetLevers): WritableSignal<SdgLeverSignalValue> {
@@ -265,6 +299,7 @@ export default class SdgManagementComponent implements OnInit {
         sdg_target_id: target.id,
         sdg_target: target.sdg_target,
         sdg_target_code: target.sdg_target_code,
+        clarisa_sdg: target.clarisa_sdg,
         select_label: [target.sdg_target_code, target.sdg_target].filter(Boolean).join(' — ')
       }))
     });
@@ -317,6 +352,7 @@ export default class SdgManagementComponent implements OnInit {
         sdg_target_id: target.id,
         sdg_target: target.sdg_target,
         sdg_target_code: target.sdg_target_code,
+        clarisa_sdg: target.clarisa_sdg,
         select_label: [target.sdg_target_code, target.sdg_target].filter(Boolean).join(' — ')
       }))
     });
