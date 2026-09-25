@@ -1,7 +1,10 @@
 import { NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
-import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
+import {
+  PrmsSyncHistoryReader,
+  mapHistoryEvent,
+} from './prms-sync-history.reader';
 
 /**
  * Six kinds named by T-01, plus one discriminator the (d) mutation needs.
@@ -239,12 +242,14 @@ describe('PrmsSyncHistoryReader', () => {
     expect(head.event_source).toBe('PRMS');
     expect(head.decision).toBe('APPROVE');
     expect(head.actor_name).toBeNull();
+    expect(head.actor_name_short).toBeNull();
     expect(head.reviewer_name).toBe('Carmen Reviewer');
     expect(head.reviewer_role).toBe('PI');
     expect(head.justification).toBe('  looks good\n');
 
     const star = history.events.find((event) => event.id === 102);
     expect(star?.actor_name).toBe('Bea Bravo');
+    expect(star?.actor_name_short).toBe('Bea Bravo');
     expect(star?.reviewer_name).toBeNull();
 
     expect(history.events.map((event) => event.id)).not.toContain(105);
@@ -324,6 +329,59 @@ describe('PrmsSyncHistoryReader', () => {
     expect(message).not.toMatch(/SELECT/i);
     expect(message).not.toContain('Carmen');
     spy.mockRestore();
+  });
+
+  it('title-cases a STAR actor name taken from uppercase sec_users columns', () => {
+    const mapped = mapHistoryEvent({
+      id: 1,
+      event_source: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      occurred_at: '2026-01-10T08:00:00.000Z',
+      decided_at: null,
+      justification: null,
+      reviewer_name: null,
+      reviewer_role: null,
+      first_name: 'DAVID FELIPE',
+      last_name: 'CASAÑAS HERNANDEZ',
+    });
+
+    expect(mapped.actor_name).toBe('David Felipe Casañas Hernandez');
+    expect(mapped.actor_name_short).toBe('David Casañas');
+  });
+
+  it('builds the short name from the first token of each sec_users column', () => {
+    const oneGivenThreeSurnames = mapHistoryEvent({
+      id: 2,
+      event_source: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      occurred_at: '2026-01-10T08:00:00.000Z',
+      decided_at: null,
+      justification: null,
+      reviewer_name: null,
+      reviewer_role: null,
+      first_name: 'ANA',
+      last_name: 'LOPEZ GARCIA MARTINEZ',
+    });
+    expect(oneGivenThreeSurnames.actor_name).toBe('Ana Lopez Garcia Martinez');
+    expect(oneGivenThreeSurnames.actor_name_short).toBe('Ana Lopez');
+
+    const twoGivenOneSurname = mapHistoryEvent({
+      id: 3,
+      event_source: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      occurred_at: '2026-01-10T08:00:00.000Z',
+      decided_at: null,
+      justification: null,
+      reviewer_name: null,
+      reviewer_role: null,
+      first_name: 'MARIA FERNANDA',
+      last_name: 'RUIZ',
+    });
+    expect(twoGivenOneSurname.actor_name).toBe('Maria Fernanda Ruiz');
+    expect(twoGivenOneSurname.actor_name_short).toBe('Maria Ruiz');
   });
 });
 

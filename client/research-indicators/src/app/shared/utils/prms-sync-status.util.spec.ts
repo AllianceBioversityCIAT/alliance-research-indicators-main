@@ -1,5 +1,12 @@
 import { PrmsSyncHistoryEvent } from '@shared/interfaces/prms-sync-history.interface';
-import { deriveHeadline, formatSyncStatus, formatSyncTimestamp, resolveActorName } from './prms-sync-status.util';
+import {
+  deriveHeadline,
+  formatSyncDayMonth,
+  formatSyncStatus,
+  formatSyncTimestamp,
+  presentActorName,
+  resolveActorName
+} from './prms-sync-status.util';
 
 function event(partial: Partial<PrmsSyncHistoryEvent> & Pick<PrmsSyncHistoryEvent, 'id' | 'event_source'>): PrmsSyncHistoryEvent {
   return {
@@ -9,6 +16,7 @@ function event(partial: Partial<PrmsSyncHistoryEvent> & Pick<PrmsSyncHistoryEven
     decided_at: null,
     justification: null,
     actor_name: null,
+    actor_name_short: null,
     reviewer_name: null,
     reviewer_role: null,
     ...partial
@@ -80,6 +88,44 @@ describe('deriveHeadline', () => {
     expect(deriveHeadline(chronological[2], chronological)).toBe('Mapping re-synced after rejection');
     expect(deriveHeadline(chronological[3], chronological)).toBe('PRMS approved the mapping');
     expect(deriveHeadline(chronological[4], chronological)).toBe('Mapping re-synced');
+  });
+});
+
+describe('presentActorName', () => {
+  it('uses actor_name_short for STAR and does not split actor_name', () => {
+    expect(
+      presentActorName(
+        event({
+          id: 1,
+          event_source: 'STAR',
+          actor_name: 'Ana Lopez Garcia Martinez',
+          actor_name_short: 'Ana Lopez'
+        })
+      )
+    ).toEqual({ short: 'Ana Lopez', full: 'Ana Lopez Garcia Martinez' });
+  });
+
+  it('uses a PRMS reviewer name unchanged for both short and full', () => {
+    expect(
+      presentActorName(
+        event({
+          id: 2,
+          event_source: 'PRMS',
+          reviewer_name: 'Cristian Gamboa',
+          actor_name: null,
+          actor_name_short: null
+        })
+      )
+    ).toEqual({ short: 'Cristian Gamboa', full: 'Cristian Gamboa' });
+  });
+});
+
+describe('formatSyncDayMonth', () => {
+  it('formats as DD MMM using the local calendar parts', () => {
+    const iso = '2026-09-11T10:05:00.000Z';
+    const date = new Date(iso);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    expect(formatSyncDayMonth(iso)).toBe(`${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]}`);
   });
 });
 

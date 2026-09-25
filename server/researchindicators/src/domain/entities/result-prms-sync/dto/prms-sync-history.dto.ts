@@ -35,6 +35,14 @@ export class PrmsSyncHistoryEventDto {
   @ApiProperty({
     type: String,
     nullable: true,
+    description:
+      'First token of sec_users.first_name plus the first token of sec_users.last_name, Title-Cased. Null on PRMS rows.',
+  })
+  actor_name_short: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
     description: 'PRMS reviewer name, verbatim. Null on STAR rows.',
   })
   reviewer_name: string | null;

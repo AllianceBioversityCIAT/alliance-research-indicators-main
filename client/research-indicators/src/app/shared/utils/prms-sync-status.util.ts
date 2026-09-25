@@ -7,14 +7,19 @@ export interface SyncStatusLabel {
   tone: SyncStatusTone;
 }
 
-export interface SyncCardTitle {
-  title: string;
-  tone: 'success' | 'warning';
-}
-
 const PENDING: SyncStatusLabel = { label: 'Pending Review', tone: 'warning' };
 const APPROVED: SyncStatusLabel = { label: 'Approved', tone: 'success' };
 const REJECTED: SyncStatusLabel = { label: 'Rejected', tone: 'danger' };
+
+/**
+ * Sidebar palette, resolved to tokens that match those hex values:
+ * pending #E69F00, approved #7CB580, rejected #CF0808.
+ */
+export const SYNC_TAG_COLOR: Record<SyncStatusTone, string> = {
+  warning: 'var(--ac-warning-1)',
+  success: 'var(--ac-green-300)',
+  danger: 'var(--ac-red-1)'
+};
 
 function isApprove(value: string | null): boolean {
   return value === 'APPROVE' || value === 'APPROVED';
@@ -35,16 +40,6 @@ export function formatSyncStatus(event: Pick<PrmsSyncHistoryEvent, 'event_source
   if (isApprove(raw)) return APPROVED;
   if (isReject(raw)) return REJECTED;
   return PENDING;
-}
-
-export function deriveCardTitle(event: Pick<PrmsSyncHistoryEvent, 'event_source' | 'decision'>): SyncCardTitle {
-  if (event.event_source === 'PRMS' && isApprove(event.decision)) {
-    return { title: 'Approved by PRMS', tone: 'success' };
-  }
-  if (event.event_source === 'PRMS' && isReject(event.decision)) {
-    return { title: 'Returned by PRMS', tone: 'warning' };
-  }
-  return { title: 'Synchronized with PRMS', tone: 'success' };
 }
 
 /**
@@ -72,6 +67,26 @@ export function deriveHeadline(
   return 'Mapping re-synced';
 }
 
+/**
+ * STAR short form is `actor_name_short`, built on the server from the first
+ * token of each sec_users column. PRMS `reviewer_name` has no first/last
+ * split, so it is used unchanged for both the visible name and the title.
+ */
+export function presentActorName(
+  event: Pick<PrmsSyncHistoryEvent, 'event_source' | 'actor_name' | 'actor_name_short' | 'reviewer_name'>
+): { short: string; full: string } | null {
+  if (event.event_source === 'PRMS') {
+    const name = event.reviewer_name?.trim() ?? '';
+    return name.length > 0 ? { short: name, full: name } : null;
+  }
+  const full = event.actor_name?.trim() ?? '';
+  const short = event.actor_name_short?.trim() ?? '';
+  if (!full || !short) {
+    return null;
+  }
+  return { short, full };
+}
+
 /** STAR → actor_name; PRMS → reviewer_name. Empty and null are unresolved. */
 export function resolveActorName(event: Pick<PrmsSyncHistoryEvent, 'event_source' | 'actor_name' | 'reviewer_name'>): string | null {
   const raw = event.event_source === 'STAR' ? event.actor_name : event.reviewer_name;
@@ -80,6 +95,14 @@ export function resolveActorName(event: Pick<PrmsSyncHistoryEvent, 'event_source
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** `DD MMM` in the viewer's local zone. The sidebar actor line has no year. */
+export function formatSyncDayMonth(iso: string): string {
+  const date = new Date(iso);
+  const dd = String(date.getDate()).padStart(2, '0');
+  const month = MONTHS[date.getMonth()] ?? '';
+  return `${dd} ${month}`;
+}
 
 /** `DD MMM YYYY, HH:mm` in the viewer's local zone. */
 export function formatSyncTimestamp(iso: string): string {

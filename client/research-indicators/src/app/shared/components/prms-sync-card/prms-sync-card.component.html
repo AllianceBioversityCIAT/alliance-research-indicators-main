@@ -1,57 +1,63 @@
-@if (latest(); as event) {
+@if (latest()) {
   <section
-    class="prms-sync-card"
-    [class.prms-sync-card--success]="title().tone === 'success'"
-    [class.prms-sync-card--warning]="title().tone === 'warning'"
+    class="prms-sync-section"
+    [class.prms-sync-section--neutral]="boxModifier() === 'neutral'"
+    [class.prms-sync-section--approved]="boxModifier() === 'approved'"
+    [class.prms-sync-section--rejected]="boxModifier() === 'rejected'"
     data-testid="prms-sync-card"
-    [attr.data-tone]="title().tone"
     aria-label="PRMS synchronization status">
-    <header class="prms-sync-card__header">
-      <div class="prms-sync-card__title">
-        <i
-          class="pi"
-          [class.pi-check]="title().tone === 'success'"
-          [class.pi-exclamation-triangle]="title().tone === 'warning'"
-          aria-hidden="true"></i>
-        <h3 data-testid="prms-sync-title">{{ title().title }}</h3>
-      </div>
-      @if (showBadge()) {
-        <span class="prms-sync-card__badge" data-testid="prms-sync-badge">Sync #{{ history().sync_count }}</span>
+    <span class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200]" data-testid="prms-sync-eyebrow">
+      PRMS sync
+      @if (showSyncCount()) {
+        <span class="!font-[200] !font-[space_grotesk]"> #{{ history().sync_count }}</span>
       }
-    </header>
+    </span>
 
-    <div class="prms-sync-card__status">
-      <span class="prms-sync-card__status-label">PRMS</span>
-      <span class="prms-sync-card__pill" [attr.data-tone]="pill().tone" data-testid="prms-sync-pill">{{ pill().label }}</span>
-    </div>
+    <app-custom-tag
+      class="prms-sync-section__tag"
+      data-testid="prms-sync-status"
+      [statusName]="status().label"
+      [statusColor]="tagColor()"
+      [statusBorder]="tagColor()"></app-custom-tag>
 
-    @if (actorName(); as name) {
-      <p class="prms-sync-card__actor" data-testid="prms-sync-actor">by {{ name }}</p>
-    }
-
-    @if (showPrmsId()) {
-      <p class="prms-sync-card__id" data-testid="prms-sync-id">
-        PRMS ID: <strong>{{ history().prms_result_code }}</strong>
+    @if (actor(); as line) {
+      <p class="prms-sync-section__actor atc-grey-700" data-testid="prms-sync-actor" [attr.title]="line.full">
+        by {{ line.short }} · {{ line.when }}
       </p>
     }
 
-    @if (deepLink(); as href) {
-      <a class="prms-sync-card__open" data-testid="prms-sync-open" [href]="href" target="_blank" rel="noopener noreferrer">
-        <i class="pi pi-external-link" aria-hidden="true"></i>
-        Open Result in PRMS
+    @if (showCode()) {
+      <p class="prms-sync-section__code atc-grey-700" data-testid="prms-sync-code">
+        <span>PRMS code: </span
+        ><span class="prms-sync-section__code-value atc-grey-900" style="font-variant-numeric: tabular-nums">{{ history().prms_result_code }}</span>
+      </p>
+    }
+
+    <div class="prms-sync-section__actions">
+      @if (deepLink(); as href) {
+        <a class="prms-sync-section__link atc-light-blue-400" data-testid="prms-sync-open" [href]="href" target="_blank" rel="noopener noreferrer">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            <polyline points="15 3 21 3 21 9" />
+            <line x1="10" y1="14" x2="21" y2="3" />
+          </svg>
+          Open result in PRMS
+        </a>
+      }
+      <a #historyLink class="prms-sync-section__link atc-light-blue-400" data-testid="prms-sync-history-link" href="#" (click)="openHistory($event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        View full sync history
       </a>
-    }
-
-    <button #historyLink type="button" class="prms-sync-card__history" data-testid="prms-sync-history-link" (click)="openHistory()">
-      <i class="pi pi-clock" aria-hidden="true"></i>
-      View full sync history
-    </button>
-
-    @if (showAdvisory()) {
-      <p class="prms-sync-card__advisory" data-testid="prms-sync-advisory" role="note">
-        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
-        <span>Science Program updated this mapping</span>
-      </p>
-    }
+    </div>
   </section>
 }

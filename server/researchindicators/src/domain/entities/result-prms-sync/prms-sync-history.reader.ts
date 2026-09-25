@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { formatPersonName } from '../../shared/utils/name-format.util';
 import { PRMS_SYNC_HTTP_DESCRIPTIONS } from './dto/prms-sync.dto';
 import {
   PrmsSyncHistoryDto,
@@ -66,12 +67,44 @@ const asNullableString = (value: unknown): string | null =>
  * STAR rows take the joined sec_users name. A PRMS row returns null even
  * when actor_user_id (and therefore the join) is populated (R-SSP-001 AC.9).
  */
+const firstToken = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const token = value
+    .trim()
+    .split(/\s+/)
+    .find((part) => part.length > 0);
+  return token ?? null;
+};
+
 const actorName = (row: Record<string, unknown>): string | null => {
   if (row.event_source !== 'STAR') {
     return null;
   }
-  const first = typeof row.first_name === 'string' ? row.first_name.trim() : '';
-  const last = typeof row.last_name === 'string' ? row.last_name.trim() : '';
+  const first = formatPersonName(
+    typeof row.first_name === 'string' ? row.first_name : null,
+  );
+  const last = formatPersonName(
+    typeof row.last_name === 'string' ? row.last_name : null,
+  );
+  if (!first || !last) {
+    return null;
+  }
+  return `${first} ${last}`;
+};
+
+/**
+ * The seam between given name and surname is the column boundary, not a
+ * guess over the joined string. One first name plus three surnames must
+ * still yield the first token of each column.
+ */
+const actorNameShort = (row: Record<string, unknown>): string | null => {
+  if (row.event_source !== 'STAR') {
+    return null;
+  }
+  const first = formatPersonName(firstToken(row.first_name));
+  const last = formatPersonName(firstToken(row.last_name));
   if (!first || !last) {
     return null;
   }
@@ -98,6 +131,7 @@ export function mapHistoryEvent(
     decided_at: asTimestamp(row.decided_at),
     justification: asNullableString(row.justification),
     actor_name: actorName(row),
+    actor_name_short: actorNameShort(row),
     reviewer_name: reviewerName(row),
     reviewer_role: asNullableString(row.reviewer_role),
   };

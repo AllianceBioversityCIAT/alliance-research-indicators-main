@@ -12,6 +12,7 @@ function event(partial: Partial<PrmsSyncHistoryEvent> & Pick<PrmsSyncHistoryEven
     decided_at: null,
     justification: null,
     actor_name: null,
+    actor_name_short: null,
     reviewer_name: null,
     reviewer_role: null,
     ...partial

@@ -2504,6 +2504,7 @@ describe('ResultSidebarComponent', () => {
       decided_at: null,
       justification: null,
       actor_name: 'Manuel Almanzar',
+      actor_name_short: 'Manuel Almanzar',
       reviewer_name: null,
       reviewer_role: null
     };
@@ -2533,7 +2534,8 @@ describe('ResultSidebarComponent', () => {
 
       expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).not.toBeNull();
       expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
-      expect(fixture.nativeElement.textContent).not.toContain('PRMS code');
+      const code = fixture.nativeElement.querySelector('[data-testid="prms-sync-code"]') as HTMLElement;
+      expect(code.textContent?.replace(/\s+/g, ' ').trim()).toBe('PRMS code: 54321');
     });
 
     it('renders the legacy line when history is empty and a PRMS code exists', async () => {

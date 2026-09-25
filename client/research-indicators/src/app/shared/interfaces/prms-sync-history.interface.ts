@@ -9,6 +9,7 @@ export interface PrmsSyncHistoryEvent {
   decided_at: string | null;
   justification: string | null;
   actor_name: string | null;
+  actor_name_short: string | null;
   reviewer_name: string | null;
   reviewer_role: string | null;
 }
