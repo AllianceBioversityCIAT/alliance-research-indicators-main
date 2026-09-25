@@ -1179,8 +1179,38 @@ describe('MultiselectComponent', () => {
         getLoading: jest.fn().mockReturnValue(loadSig)
       };
       (component as any).bindServiceSignals();
-      expect(component.optionsSig).toBe(listSig);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([{ id: 1, name: 'A' }]);
+      expect(component.optionsSig).not.toBe(listSig);
       expect(component.loadingSig).toBe(loadSig);
+
+      listSig.set([{ id: 2, name: 'B' }]);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([{ id: 2, name: 'B' }]);
+    });
+
+    it('follows a replaced parent signal so selected rows and required state stay in sync', () => {
+      mockUtilsService.getNestedProperty.mockImplementation((obj: any, path: string) => obj?.[path]);
+      component.optionValue = 'id';
+      component.signalOptionValue = 'result_lever_strategic_outcomes';
+      component.isRequired = true;
+      const first = signal({ result_lever_strategic_outcomes: [] as { id: number; strategic_outcome: string }[] });
+      component.signal = first;
+      component.ngOnChanges({ signal: { currentValue: first } } as any);
+      expect(component.selectedOptions()).toHaveLength(0);
+      expect(component.isInvalid()).toBe(true);
+
+      const second = signal({
+        result_lever_strategic_outcomes: [
+          { id: 19, strategic_outcome: 'Outcome 19' },
+          { id: 28, strategic_outcome: 'Outcome 28' }
+        ]
+      });
+      component.signal = second;
+      component.ngOnChanges({ signal: { currentValue: second } } as any);
+      expect(component.selectedOptions()).toHaveLength(2);
+      expect(component.isInvalid()).toBe(false);
+      expect(component.selectedOptions()[0].strategic_outcome).toBe('Outcome 19');
     });
 
     it('should sync service.list into optionsSig via effect (service.list branch)', () => {

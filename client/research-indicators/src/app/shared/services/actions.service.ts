@@ -12,6 +12,7 @@ import { CreateResultResponse } from '@shared/components/all-modals/modals-conte
 import { ServiceLocatorService } from './service-locator.service';
 import { ErrorDetailLike } from '@shared/interfaces/error-detail-like.interface';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
+import { ImpersonationService } from './impersonation.service';
 
 export interface HandleBadRequestOptions {
   onOpenExistingResult?: (platformCode: string, resultOfficialCode: string) => void;
@@ -25,6 +26,9 @@ export class ActionsService {
   router = inject(Router);
   api = inject(ApiService);
   serviceLocator = inject(ServiceLocatorService);
+  // @akili-spec changes/profile-simulation
+  /** R-IMP-010: `ActionsService` depends on `ImpersonationService` — one direction, no DI cycle (D-imp-13). */
+  impersonation = inject(ImpersonationService);
   toastMessage = signal<ToastMessage>({ severity: 'info', summary: '', detail: '' });
   saveCurrentSectionValue = signal(false);
   globalAlertsStatus = signal<GlobalAlert[]>([]);
@@ -198,6 +202,11 @@ export class ActionsService {
   }
 
   async logOut() {
+    // R-IMP-010 AC.2: end an active simulation before clearing `data` (3 s cap inside `end()`).
+    if (this.impersonation.active()) {
+      await this.impersonation.end('logout');
+    }
+
     // Clear localStorage
     localStorage.removeItem('data');
     localStorage.removeItem('isSidebarCollapsed');
@@ -291,6 +300,9 @@ export class ActionsService {
       const userRoles = loginResponse.data.user?.user_role_list ?? [];
       const preferredRole = userRoles.find(role => role.role_id === 1) || userRoles.find(role => role.role_id === 9) || userRoles[0];
       loginResponse.data.user.roleName = preferredRole?.role?.name ?? '';
+      // T-07 review forward pointer: a stale `impersonation` key from a crashed session must
+      // never leak another admin's snapshot into a fresh login.
+      localStorage.removeItem('impersonation');
       localStorage.setItem('data', JSON.stringify({ ...loginResponse.data, exp }));
     }
   }

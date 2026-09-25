@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { AppComponent } from './app.component';
 import { WebsocketService } from './shared/sockets/websocket.service';
 import { CacheService } from '@services/cache/cache.service';
+import { ImpersonationService } from '@services/impersonation.service';
 import { RouterTestingModule } from '@angular/router/testing';
 import { NO_ERRORS_SCHEMA, signal } from '@angular/core';
 import { Socket } from 'ngx-socket-io';
@@ -11,6 +12,7 @@ import { Router, NavigationStart } from '@angular/router';
 
 describe('AppComponent', () => {
   let mockActionsService: Partial<ActionsService>;
+  let mockImpersonationService: { restore: jest.Mock };
   let router: Router;
 
   beforeEach(async () => {
@@ -33,6 +35,10 @@ describe('AppComponent', () => {
       isTokenExpired: jest.fn()
     };
 
+    mockImpersonationService = {
+      restore: jest.fn().mockResolvedValue(undefined)
+    };
+
     await TestBed.configureTestingModule({
       imports: [RouterTestingModule, AppComponent],
       schemas: [NO_ERRORS_SCHEMA],
@@ -40,7 +46,8 @@ describe('AppComponent', () => {
         { provide: WebsocketService, useValue: mockWebsocketService },
         { provide: CacheService, useValue: mockCacheService },
         { provide: Socket, useValue: mockSocket },
-        { provide: ActionsService, useValue: mockActionsService }
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: ImpersonationService, useValue: mockImpersonationService }
       ]
     }).compileComponents();
 
@@ -115,6 +122,55 @@ describe('AppComponent', () => {
     Object.defineProperty(window, 'location', {
       value: { ...window.location, reload: undefined },
       writable: true
+    });
+  });
+
+  // Design §5 "Client restore" — bootstrap calls `impersonation.restore()` when the stored
+  // key exists, without blocking rendering.
+  describe('impersonation restore at bootstrap (design §5 "Client restore")', () => {
+    afterEach(() => {
+      localStorage.removeItem('impersonation');
+    });
+
+    it('calls impersonation.restore() when localStorage["impersonation"] exists', () => {
+      localStorage.setItem('impersonation', JSON.stringify({ session: { session_id: 's1' }, actor: {} }));
+
+      const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance;
+
+      expect(app).toBeTruthy();
+      expect(mockImpersonationService.restore).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call impersonation.restore() when no stored key exists', () => {
+      localStorage.removeItem('impersonation');
+
+      const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance;
+
+      expect(app).toBeTruthy();
+      expect(mockImpersonationService.restore).not.toHaveBeenCalled();
+    });
+
+    // Leader-adopted item 3: a rejected restore() must not surface as an unhandled
+    // promise rejection — it is caught and logged.
+    it('logs (does not throw) when impersonation.restore() rejects', async () => {
+      localStorage.setItem('impersonation', JSON.stringify({ session: { session_id: 's1' }, actor: {} }));
+      mockImpersonationService.restore.mockRejectedValueOnce(new Error('restore failed'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const fixture = TestBed.createComponent(AppComponent);
+      const app = fixture.componentInstance;
+      expect(app).toBeTruthy();
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to restore impersonation session'),
+        expect.any(Error)
+      );
+      consoleErrorSpy.mockRestore();
     });
   });
 });

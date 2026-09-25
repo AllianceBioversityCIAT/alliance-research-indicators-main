@@ -192,6 +192,32 @@ export class AllModalsService {
     piDelegateHistory: {
       isOpen: false,
       title: 'Delegation History'
+    },
+    // @akili-spec changes/profile-simulation — R-IMP-007, D-imp-9. Cancel
+    // only at the wrapper level: `Select` / `Start simulation` live inside
+    // the hosted steps (SimulateProfileModalComponent), not the footer.
+    simulateProfile: {
+      isOpen: false,
+      title: 'Simulate another profile',
+      cancelText: 'Cancel',
+      cancelAction: () => this.toggleModal('simulateProfile')
+    },
+    portfolio2025LeverSdgs: {
+      isOpen: false,
+      title: 'Portfolio 2025 SDG targets'
+    },
+    portfolio2026SdgTargets: {
+      isOpen: false,
+      title: 'Portfolio 2026 SDG targets'
+    },
+    // Read-only help for the Pool Funding Alignment section. No confirm/cancel:
+    // app-modal renders its footer only when one of those actions is registered,
+    // so this opens as a plain informational panel with the shared header, close
+    // affordance, focus trap and Escape handling.
+    poolFundingHelp: {
+      isOpen: false,
+      title: 'About Pool Funding & Theory of Change alignment',
+      isWide: true
     }
   });
 
@@ -313,7 +339,12 @@ export class AllModalsService {
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
       assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false },
-      piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false }
+      piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false },
+      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false },
+      portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
+      portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false },
+      // isWide stays true: it is this modal's layout, not a per-opening state.
+      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false }
     });
 
     this.setSubmitResultOrigin(null);

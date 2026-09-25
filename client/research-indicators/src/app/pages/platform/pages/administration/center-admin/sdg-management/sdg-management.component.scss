@@ -1,4 +1,8 @@
 :host {
+  // Shared by the selected lever tab and its detail panel so both read as one surface.
+  --sdg-selected-surface: color-mix(in srgb, var(--ac-primary-blue-300) 8%, var(--ac-white-1));
+  --sdg-selected-border: color-mix(in srgb, var(--ac-primary-blue-300) 30%, var(--ac-white-1));
+
   display: block;
   width: 100%;
   min-width: 0;
@@ -9,20 +13,112 @@
   box-sizing: border-box;
 }
 
-.sdg-lever-card {
-  min-width: 0;
-}
-
-.sdg-lever-chevron {
-  font-size: 10px;
-  line-height: 1;
-  width: 0.7rem;
-  min-width: 0.7rem;
-  text-align: center;
-}
-
 .sdg-lever-header:focus-visible {
   outline: 2px solid #20488733;
-  outline-offset: 0;
+  outline-offset: 2px;
   border-radius: 2px;
+}
+
+.sdg-levers-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 420px) minmax(0, 1fr);
+
+  @media (max-width: 900px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sdg-lever-nav {
+  display: flex;
+  flex-direction: column;
+  background: var(--ac-white-1);
+  border-right: 1px solid var(--sdg-selected-border);
+
+  @media (max-width: 900px) {
+    border-right: 0;
+    border-bottom: 1px solid var(--ac-grey-200);
+  }
+}
+
+.sdg-lever-detail {
+  background: var(--sdg-selected-surface);
+}
+
+.sdg-lever-item {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 12px 13px;
+  border: 1px solid transparent;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--ac-grey-100);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ac-primary-blue-200);
+    outline-offset: 1px;
+  }
+
+  // The selected lever becomes a tab that runs into the detail panel: it covers the nav's
+  // right border (1px) and shares the panel's tint, so the lever
+  // and its SDG targets read as one continuous surface.
+  &.is-active {
+    z-index: 1;
+    width: calc(100% + 1px);
+    margin-right: -1px;
+    border-color: var(--sdg-selected-border);
+    border-right-color: var(--sdg-selected-surface);
+    border-left-color: var(--ac-primary-blue-300);
+    background: var(--sdg-selected-surface);
+
+    @media (max-width: 900px) {
+      width: 100%;
+      margin-right: 0;
+      border-right-color: transparent;
+    }
+  }
+}
+
+.sdg-lever-item__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--ac-primary-blue-600);
+}
+
+.sdg-lever-item__subtitle {
+  overflow: hidden;
+  font-family: 'Barlow', sans-serif;
+  font-size: 13px;
+  line-height: 17px;
+  color: var(--ac-grey-700);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sdg-lever-item__count {
+  flex-shrink: 0;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--ac-grey-200);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--ac-grey-800);
+
+  .is-active & {
+    background: var(--ac-primary-blue-300);
+    color: var(--ac-white-1);
+  }
 }

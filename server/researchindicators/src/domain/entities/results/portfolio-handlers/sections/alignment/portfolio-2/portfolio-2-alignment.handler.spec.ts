@@ -14,6 +14,7 @@ import { ResultStrategicObjectiveRolesEnum } from '../../../../../result-strateg
 import { ResultImpactOutcomeRolesEnum } from '../../../../../result-impact-outcomes/enum/result-impact-outcome-roles.enum';
 import { IndicatorsEnum } from '../../../../../indicators/enum/indicators.enum';
 import { DataSource } from 'typeorm';
+import { ResultSdgTargetsService } from '../../../../../result-sdg-targets/result-sdg-targets.service';
 
 describe('Portfolio2AlignmentHandler', () => {
   let handler: Portfolio2AlignmentHandler;
@@ -63,6 +64,10 @@ describe('Portfolio2AlignmentHandler', () => {
       resultImpactOutcomesService as unknown as ResultImpactOutcomesService,
       strategicObjectivesService as unknown as StrategicObjectivesService,
       clarisaLeversService as unknown as ClarisaLeversService,
+      {
+        replaceForResult: jest.fn().mockResolvedValue([]),
+        findByResult: jest.fn().mockResolvedValue([]),
+      } as unknown as ResultSdgTargetsService,
     );
   });
 

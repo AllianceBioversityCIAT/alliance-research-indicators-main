@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
+import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 
 /**
  * T-07 attempt 2 (DD-15, tasks.md trap 4, KZ-001).
@@ -50,6 +51,22 @@ describe('EntitiesModule — result-innovation-use registration (DD-15)', () => 
     const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
 
     expect(imports).toContain(ResultInnovationUseModule);
+  });
+});
+
+/**
+ * T-13 (child guide §4). A route node in `main.routes.ts` is not a
+ * registration — `RouterModule.register()` stamps MODULE_PATH and looks
+ * the module up in modulesContainer, returning silently when it is
+ * absent. Every handler then 404s with no boot error. This assertion is
+ * the falsifiable module-graph gate; a mocked-provider controller spec
+ * stays green through a missing import and is therefore not the gate.
+ */
+describe('EntitiesModule — result-prms-sync registration (T-13)', () => {
+  it('lists ResultPrmsSyncModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(ResultPrmsSyncModule);
   });
 });
 

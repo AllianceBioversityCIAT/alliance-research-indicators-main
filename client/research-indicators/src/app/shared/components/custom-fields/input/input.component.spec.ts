@@ -832,6 +832,71 @@ describe('InputComponent', () => {
       });
     });
   });
+
+  // Bug: typing '-' into an EMPTY Number field froze the browser tab (Innovation Use → OTHER
+  // QUANTITATIVE MEASURES, the only call site with min < 0). The arrow buttons were unaffected
+  // because `spin()` only ever emits a finished number.
+  describe('half-typed negative number ("-") must never reach the model', () => {
+    it('recognizes the transient "-" only when the field is a number field', () => {
+      component.type = 'number';
+      expect(component.isIncompleteNumericInput('-')).toBe(true);
+
+      // On a text field '-' is an ordinary character and must pass straight through.
+      component.type = 'text';
+      expect(component.isIncompleteNumericInput('-')).toBe(false);
+    });
+
+    it('recognizes NaN, and lets every real numeric value through', () => {
+      component.type = 'number';
+      expect(component.isIncompleteNumericInput(NaN)).toBe(true);
+      expect(component.isIncompleteNumericInput(Number('-'))).toBe(true);
+
+      expect(component.isIncompleteNumericInput(-5)).toBe(false);
+      expect(component.isIncompleteNumericInput(0)).toBe(false);
+      expect(component.isIncompleteNumericInput(-0.5)).toBe(false);
+      // Clearing the field emits null — it must still reach the model, or the value is unclearable.
+      expect(component.isIncompleteNumericInput(null)).toBe(false);
+      expect(component.isIncompleteNumericInput(undefined)).toBe(false);
+      expect(component.isIncompleteNumericInput('')).toBe(false);
+    });
+
+    it('setValue swallows "-" — neither body nor the bound signal is written', () => {
+      component.type = 'number';
+      component.body.set({ value: null });
+
+      component.setValue('-');
+
+      expect(component.body().value).toBe(null);
+      expect(utilsService.setNestedPropertyWithReduceSignal).not.toHaveBeenCalled();
+    });
+
+    it('setValue still propagates the finished negative number typed after the "-"', () => {
+      component.type = 'number';
+
+      component.setValue('-');
+      component.setValue(-5);
+
+      expect(component.body().value).toBe(-5);
+      expect(utilsService.setNestedPropertyWithReduceSignal).toHaveBeenCalledWith(component.signal, 'testField', -5);
+    });
+
+    it('the onChange sync comparison converges on NaN — "!==" would loop the effect forever', () => {
+      // This is the freeze itself: the effect writes `body` whenever it differs from the external
+      // value AND reads `body`, so a comparison that is never satisfied re-schedules it endlessly.
+      // `NaN !== NaN` is always true; `Object.is(NaN, NaN)` is true, so the effect settles.
+      expect(component.externalValueDiffers(NaN, NaN)).toBe(false);
+
+      expect(component.externalValueDiffers(null, null)).toBe(false);
+      expect(component.externalValueDiffers(-5, -5)).toBe(false);
+      expect(component.externalValueDiffers('a', 'a')).toBe(false);
+      expect(component.externalValueDiffers(5, '5')).toBe(true);
+      expect(component.externalValueDiffers(null, -5)).toBe(true);
+    });
+
+    // NOTE: this is asserted on the predicate, NOT by driving the effect with a NaN. Under the old
+    // `!==` the effect loop is synchronous and unbounded, so a live reproduction does not fail — it
+    // hangs the whole Jest worker with no timeout, since a blocked event loop never fires one.
+  });
 });
 
 // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode asterisk)

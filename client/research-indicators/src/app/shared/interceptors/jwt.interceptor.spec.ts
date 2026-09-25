@@ -4,10 +4,12 @@ import { of, throwError } from 'rxjs';
 import { jWtInterceptor } from './jwt.interceptor';
 import { CacheService } from '@services/cache/cache.service';
 import { ActionsService } from '@services/actions.service';
+import { ImpersonationService } from '@services/impersonation.service';
 import { environment } from '@envs/environment';
 
 jest.mock('@services/cache/cache.service');
 jest.mock('@services/actions.service');
+jest.mock('@services/impersonation.service');
 
 const mainApiUrl = 'https://main.api/';
 const textMiningUrl = 'https://textmining.api/';
@@ -17,6 +19,7 @@ const fileManagerUrl = 'https://filemanager.api/';
 describe('jWtInterceptor', () => {
   let mockCacheService: any;
   let mockActionsService: any;
+  let mockImpersonationService: any;
   let mockHandler: jest.MockedFunction<HttpHandlerFn>;
   let envBackup: any;
 
@@ -49,10 +52,15 @@ describe('jWtInterceptor', () => {
       updateLocalStorage: jest.fn(),
       logOut: jest.fn()
     };
+    mockImpersonationService = {
+      active: jest.fn().mockReturnValue(false),
+      sessionId: jest.fn().mockReturnValue(null)
+    };
     TestBed.configureTestingModule({
       providers: [
         { provide: CacheService, useValue: mockCacheService },
-        { provide: ActionsService, useValue: mockActionsService }
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: ImpersonationService, useValue: mockImpersonationService }
       ]
     });
     mockHandler = jest.fn().mockReturnValue(of({ ok: true }));
@@ -235,6 +243,131 @@ describe('jWtInterceptor', () => {
       const calledReq = mockHandler.mock.calls[0][0];
       expect((calledReq.body as FormData).get('token')).toBe('');
       done();
+    });
+  });
+
+  // R-IMP-009/D-imp-12 — marker-gated impersonation header (T-08).
+  describe('impersonation header (R-IMP-009, D-imp-12)', () => {
+    it('should add X-Impersonation-Session on a plain main-API request while a simulation is active', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-123');
+      const req = new HttpRequest('GET', mainApiUrl + 'data');
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.get('X-Impersonation-Session')).toBe('sess-123');
+        expect(calledReq.headers.get('Authorization')).toBe('Bearer token123');
+        done();
+      });
+    });
+
+    it('should NOT add the header when no simulation is active', done => {
+      mockImpersonationService.active.mockReturnValue(false);
+      const req = new HttpRequest('GET', mainApiUrl + 'data');
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        done();
+      });
+    });
+
+    it('should keep the header on the request retried after a mocked 401 + refresh (J-10)', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-retry');
+      mockHandler.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 401 })));
+      mockActionsService.api.refreshToken.mockResolvedValueOnce({ successfulRequest: true, data: { access_token: 'newtoken' } });
+      const req = new HttpRequest('GET', mainApiUrl + 'data');
+      interceptor(req, mockHandler).subscribe(() => {
+        // Second `next(...)` call is the retry — assert the header survived it.
+        const retryReq = mockHandler.mock.calls[1][0];
+        expect(retryReq.headers.get('X-Impersonation-Session')).toBe('sess-retry');
+        expect(retryReq.headers.get('Authorization')).toBe('Bearer newtoken');
+        done();
+      });
+    });
+
+    it('should strip the X-Ari-Auth-Call marker and add NO impersonation header on a marked request, even when the target host is the ARI main API (mainApiUrl === managementApiUrl locally — disqualifies a host-based implementation)', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-should-not-leak');
+      const headers = new HttpHeaders().set('X-Ari-Auth-Call', '1');
+      const req = new HttpRequest('GET', mainApiUrl + 'current-user', { headers });
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Ari-Auth-Call')).toBe(false);
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        // Authorization flow stays unchanged for the marked call.
+        expect(calledReq.headers.get('Authorization')).toBe('Bearer token123');
+        done();
+      });
+    });
+
+    it('should strip the marker on a refresh-token request without attaching any impersonation header', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-refresh');
+      const headers = new HttpHeaders().set('X-Ari-Auth-Call', '1');
+      const req = new HttpRequest('GET', mainApiUrl + 'refresh-token', { headers });
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Ari-Auth-Call')).toBe(false);
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        done();
+      });
+    });
+
+    it('should NOT add the impersonation header on fileManagerDomain requests even while active', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-fm');
+      const req = new HttpRequest('GET', fileManagerUrl + 'file');
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        done();
+      });
+    });
+
+    it('should NOT add the impersonation header on textMiningDomain requests even while active', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-tm');
+      const formData = new FormData();
+      const req = new HttpRequest('POST', textMiningUrl + 'analyze', formData);
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        done();
+      });
+    });
+
+    it('should NOT add the impersonation header on documentOverviewDomain requests even while active', done => {
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-do');
+      const req = new HttpRequest('GET', documentOverviewUrl + 'api/document-overview', { bucket_name: 'ai-services-ibd' });
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        done();
+      });
+    });
+
+    // Reviewer FAIL (attempt 1): the marker was only stripped inside the four-host `if`
+    // branch, so a marked call resolving to `managementApiUrl` when it differs from
+    // `mainApiUrl` (login / current-user in any deployed environment) matched none of
+    // the four hosts, fell through to `return next(req)`, and leaked the marker
+    // cross-origin to ROAR. This test is the one attempt 1 could not express: it needs
+    // `managementApiUrl !== mainApiUrl`, which every other test in this file runs at
+    // `mainApiUrl` (the equal-hosts case) and therefore cannot expose.
+    it('should strip the marker and add NO impersonation header on a marked request to managementApiUrl when managementApiUrl !== mainApiUrl (deployed-environment leak)', done => {
+      const managementApiUrl = 'https://roar.example/management-api/';
+      environment.managementApiUrl = managementApiUrl;
+      mockImpersonationService.active.mockReturnValue(true);
+      mockImpersonationService.sessionId.mockReturnValue('sess-should-not-leak-mgmt');
+      const headers = new HttpHeaders().set('X-Ari-Auth-Call', '1');
+      const req = new HttpRequest('GET', managementApiUrl + 'authorization/users/current', { headers });
+      interceptor(req, mockHandler).subscribe(() => {
+        const calledReq = mockHandler.mock.calls[0][0];
+        expect(calledReq.headers.has('X-Ari-Auth-Call')).toBe(false);
+        expect(calledReq.headers.has('X-Impersonation-Session')).toBe(false);
+        environment.managementApiUrl = mainApiUrl;
+        done();
+      });
     });
   });
 });

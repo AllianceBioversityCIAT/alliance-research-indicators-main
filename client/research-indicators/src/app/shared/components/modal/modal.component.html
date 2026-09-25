@@ -27,7 +27,7 @@
 
       @if (getConfig().cancelAction || getConfig().confirmAction) {
       <div
-        class="flex space-x-5 {{modalName === 'submitResult' ? 'mt-6  mb-8' : 'mt-12  mb-10'}} {{modalName === 'addContactPerson' || modalName === 'portfolioManagement' ? 'justify-end' : ''}} m-12">
+        class="flex space-x-5 {{modalName === 'submitResult' ? 'mt-6  mb-8' : 'mt-12  mb-10'}} {{modalName === 'addContactPerson' || modalName === 'portfolioManagement' || modalName === 'portfolio2025LeverSdgs' || modalName === 'portfolio2026SdgTargets' ? 'justify-end' : ''}} m-12">
         @if (getConfig().cancelAction) {
         <button
           class="border-[1.5px] text-[15px] font-medium border-[#035BA9] text-[#035BA9] px-5 py-2 rounded-[14px] cursor-pointer disabled:cursor-not-allowed"

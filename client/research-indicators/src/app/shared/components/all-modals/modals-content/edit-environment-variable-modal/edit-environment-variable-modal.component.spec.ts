@@ -4,7 +4,7 @@ import { signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
-import { EditEnvironmentVariableModalComponent, CLARISA_PHASE_CONFIG_KEY } from './edit-environment-variable-modal.component';
+import { EditEnvironmentVariableModalComponent, CLARISA_PHASE_CONFIG_KEY, POOL_FUNDING_FLAG_KEYS } from './edit-environment-variable-modal.component';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { VariableConfigurationJsonRowComponent } from '@pages/platform/pages/administration/configuration/variable-configuration/components/variable-configuration-json-row/variable-configuration-json-row.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -22,7 +22,7 @@ describe('EditEnvironmentVariableModalComponent', () => {
   let editingUsesJson: jest.Mock;
   let getPhases: jest.Mock;
   let canEdit: boolean;
-  let isOpen: boolean;
+  let modalOpen: ReturnType<typeof signal<boolean>>;
   let editingItem: ReturnType<typeof signal<AppConfigListItem | null>>;
   let editForm: ReturnType<typeof signal<UpdateAppConfigDto>>;
 
@@ -40,10 +40,7 @@ describe('EditEnvironmentVariableModalComponent', () => {
     };
   }
 
-  function phasesResponse(
-    data: ClarisaProjectPhasesResponse,
-    successfulRequest = true
-  ): MainResponse<ClarisaProjectPhasesResponse> {
+  function phasesResponse(data: ClarisaProjectPhasesResponse, successfulRequest = true): MainResponse<ClarisaProjectPhasesResponse> {
     return {
       data,
       status: successfulRequest ? 200 : 500,
@@ -60,7 +57,7 @@ describe('EditEnvironmentVariableModalComponent', () => {
     editingUsesJson = jest.fn().mockReturnValue(false);
     getPhases = jest.fn().mockResolvedValue(phasesResponse({ phases: [], phaseAbsentCount: 0 }));
     canEdit = true;
-    isOpen = true;
+    modalOpen = signal(true);
     editingItem = signal<AppConfigListItem | null>(null);
     editForm = signal<UpdateAppConfigDto>({});
 
@@ -71,7 +68,7 @@ describe('EditEnvironmentVariableModalComponent', () => {
         {
           provide: AllModalsService,
           useValue: {
-            isModalOpen: jest.fn().mockImplementation(() => ({ isOpen }))
+            isModalOpen: jest.fn().mockImplementation(() => ({ isOpen: modalOpen() }))
           }
         },
         {
@@ -132,6 +129,16 @@ describe('EditEnvironmentVariableModalComponent', () => {
       .some(de => (de.componentInstance as InputComponent).optionValue === 'simple_value');
   }
 
+  function poolFundingToggle(): HTMLElement | null {
+    return fixture.nativeElement.querySelector('[data-testid="pool-funding-flag-toggle"]');
+  }
+
+  function clickPoolFundingToggle(): void {
+    const root = poolFundingToggle()?.querySelector('[data-pc-name="toggleswitch"]') as HTMLElement | null;
+    root?.click();
+    fixture.detectChanges();
+  }
+
   // ── Pre-existing behaviour (unchanged) ─────────────────────────────────────
 
   it('should create', () => {
@@ -168,6 +175,7 @@ describe('EditEnvironmentVariableModalComponent', () => {
 
     expect(phaseSelectDebugElement()).toBeTruthy();
     expect(simpleValueInputExists()).toBe(false);
+    expect(poolFundingToggle()).toBeNull();
   });
 
   // ── BUT NOT: any other key's control changes ───────────────────────────────
@@ -179,6 +187,41 @@ describe('EditEnvironmentVariableModalComponent', () => {
 
     expect(simpleValueInputExists()).toBe(true);
     expect(phaseSelectDebugElement()).toBeUndefined();
+    expect(poolFundingToggle()).toBeNull();
+  });
+
+  // ── R-PFT-005: boolean toggle replaces the text input for the two flags ──
+
+  it.each(POOL_FUNDING_FLAG_KEYS)('renders the pool-funding toggle and not a text input when editing %s', async key => {
+    modalOpen.set(false);
+    fixture.detectChanges();
+    expect(poolFundingToggle()).toBeNull();
+
+    modalOpen.set(true);
+    open(row({ key, simple_value: 'true' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(poolFundingToggle()).toBeTruthy();
+    expect(simpleValueInputExists()).toBe(false);
+    expect(phaseSelectDebugElement()).toBeUndefined();
+  });
+
+  it.each(POOL_FUNDING_FLAG_KEYS)('writes exactly true then false into simple_value when toggling %s', async key => {
+    modalOpen.set(false);
+    fixture.detectChanges();
+    expect(poolFundingToggle()).toBeNull();
+
+    modalOpen.set(true);
+    open(row({ key, simple_value: 'true' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    clickPoolFundingToggle();
+    expect(editForm().simple_value).toBe('false');
+
+    clickPoolFundingToggle();
+    expect(editForm().simple_value).toBe('true');
   });
 
   // ── BUT NOT: the structured-JSON branch is disturbed ───────────────────────

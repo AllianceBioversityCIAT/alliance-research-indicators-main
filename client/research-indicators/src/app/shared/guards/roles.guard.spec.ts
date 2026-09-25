@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { CanMatchFn, Router, UrlTree } from '@angular/router';
 import { rolesGuard } from './roles.guard';
 import { CacheService } from '@services/cache/cache.service';
+import { ImpersonationService } from '@services/impersonation.service';
 import { cacheServiceMock } from 'src/app/testing/mock-services.mock';
 
 const mockUrlTree = {} as UrlTree;
@@ -20,18 +21,22 @@ jest.mock('@angular/core', () => ({
 
 describe('rolesGuard', () => {
   let mockCacheService: jest.Mocked<CacheService>;
+  let mockImpersonationService: { restoring: jest.Mock };
   let mockRoute: any;
   let injectMock: jest.MockedFunction<any>;
 
   beforeEach(() => {
     mockCacheService = { ...cacheServiceMock } as jest.Mocked<CacheService>;
     mockCacheService.isLoggedIn.set(false);
+    // Default: not restoring (T-08 — sync behavior for every pre-existing test stays unchanged).
+    mockImpersonationService = { restoring: jest.fn().mockReturnValue(false) };
 
     // Get the mocked inject function
     const { inject } = require('@angular/core');
     injectMock = inject as jest.MockedFunction<any>;
     injectMock.mockImplementation((token: unknown) => {
       if (token === Router) return mockRouter;
+      if (token === ImpersonationService) return mockImpersonationService;
       return mockCacheService;
     });
   });
@@ -215,6 +220,54 @@ describe('rolesGuard', () => {
       expect(typeof rolesGuard).toBe('function');
       const canMatchFn: CanMatchFn = rolesGuard;
       expect(canMatchFn).toBeDefined();
+    });
+  });
+
+  // Design §5 "Client restore" — the guard waits for `impersonation.restoring()` to settle
+  // before deciding, so no route resolves against a half-restored identity.
+  describe('impersonation restore wait (design §5 "Client restore")', () => {
+    beforeEach(() => {
+      mockRoute = { data: { isLoggedIn: true } };
+    });
+
+    it('returns a Promise and awaits until restoring() settles before deciding', async () => {
+      let callCount = 0;
+      mockImpersonationService.restoring.mockImplementation(() => {
+        callCount++;
+        // true on the first two reads, then settles.
+        return callCount <= 2;
+      });
+      mockCacheService.isLoggedIn.set(true);
+
+      const result = rolesGuard(mockRoute, []);
+      expect(result).toBeInstanceOf(Promise);
+
+      const resolved = await result;
+      expect(resolved).toBe(true);
+      expect(mockImpersonationService.restoring.mock.calls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('still produces the correct UrlTree redirect once restoring settles', async () => {
+      let callCount = 0;
+      mockImpersonationService.restoring.mockImplementation(() => {
+        callCount++;
+        return callCount === 1;
+      });
+      mockCacheService.isLoggedIn.set(false);
+      mockRouter.url = '/projects';
+
+      const result = await rolesGuard(mockRoute, []);
+      expect(result).toBe(mockUrlTree);
+      expect(mockRouter.createUrlTree).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/projects' } });
+    });
+
+    it('decides synchronously (no Promise) when restoring() is already false', () => {
+      mockImpersonationService.restoring.mockReturnValue(false);
+      mockCacheService.isLoggedIn.set(true);
+
+      const result = rolesGuard(mockRoute, []);
+      expect(result).not.toBeInstanceOf(Promise);
+      expect(result).toBe(true);
     });
   });
 });

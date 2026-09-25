@@ -683,6 +683,17 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call POST_PrmsSync without v1 on results/:resultCode/prms-sync', () => {
+      (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.POST_PrmsSync(123);
+
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('results/123/prms-sync', {}, { useResultInterceptor: true });
+      const calledUrl = (mockToPromiseService.post as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain('v1/');
+      expect(calledUrl).toBe('results/123/prms-sync');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });
@@ -2371,13 +2382,17 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
     currentResultIsLoading: ReturnType<typeof signal<boolean>>;
     greenChecks: ReturnType<typeof signal<GreenChecks>>;
     getCurrentNumericResultId: () => number;
+    skipResultVersionParam: ReturnType<typeof signal<boolean>>;
   };
 
   beforeEach(() => {
     cacheServiceStub = {
       currentResultIsLoading: signal(false),
       greenChecks: signal<GreenChecks>({}),
-      getCurrentNumericResultId: () => 123
+      getCurrentNumericResultId: () => 123,
+      // Down outside the create-result flow, which is what these outgoing-URL
+      // expectations describe.
+      skipResultVersionParam: signal(false)
     };
 
     TestBed.configureTestingModule({
@@ -2529,7 +2544,10 @@ function configurePoolFundingHttp(routerUrl: string, queryParams: Record<string,
         useValue: {
           currentResultIsLoading: signal(false),
           greenChecks: signal<GreenChecks>({}),
-          getCurrentNumericResultId: () => 19941
+          getCurrentNumericResultId: () => 19941,
+          // Down outside the create-result flow; these cases describe ordinary
+          // versioned browsing, where the year must still travel.
+          skipResultVersionParam: signal(false)
         }
       },
       { provide: ControlListCacheService, useValue: {} },
