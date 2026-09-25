@@ -38,9 +38,16 @@ export class CacheService {
   showSectionHeaderActions = signal(false);
   lastResultId = signal<number | null>(null);
   lastVersionParam = signal<string | null>(null);
+  // Raised ONLY by the create-result flow, for the span between "a result was
+  // created" and "the router finished moving to it". In that window the URL
+  // still points at the result the user was standing on, and `resultInterceptor`
+  // reads `version` straight off `router.url` — so every request for the new
+  // result would carry a `reportYear` of a result it does not belong to, and a
+  // brand-new result has no versions at all. Nothing else sets this.
+  skipResultVersionParam = signal(false);
   versionsList = signal<TransformResultCodeResponse[]>([]);
   liveVersionData = signal<TransformResultCodeResponse | null>(null);
-  allGreenChecksAreTrue = computed(() => Object.values(this.greenChecks()).every(check => check));
+  allGreenChecksAreTrue = computed(() => Boolean(this.greenChecks()?.completness));
   isMyResult = computed(() => Number(this.currentMetadata().created_by) === Number(this.dataCache().user.sec_user_id));
 
   loadingCurrentResult = signal(false);

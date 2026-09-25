@@ -208,6 +208,24 @@ describe('ToPromiseService', () => {
     expect(setSpy).toHaveBeenCalledWith({ test: 1 });
   });
 
+  // A failed green-checks request used to store `undefined`, and the sidebar read
+  // it as an object: "Cannot read properties of undefined (reading
+  // 'general_information')" blanked the section list and the completed counter.
+  it.each([
+    ['a failed request with no data', { successfulRequest: false } as unknown],
+    ['an explicitly undefined data', { data: undefined } as unknown],
+    ['a null response', null as unknown]
+  ])('updateGreenChecks stores {} for %s, never a non-object', async (_label, response) => {
+    const setSpy = jest.spyOn(service.cacheService.greenChecks, 'set');
+    jest.spyOn(service, 'getGreenChecks').mockResolvedValue(response as never);
+
+    await service.updateGreenChecks();
+
+    // ★ discriminating: the old code passed `response.data` straight through.
+    expect(setSpy).toHaveBeenCalledWith({});
+    expect(service.cacheService.greenChecks()).toEqual({});
+  });
+
   it('get sets noAuthInterceptor header', async () => {
     httpClientMock.get = jest.fn().mockReturnValue(of({ data: { foo: 'bar' } }));
     await service.get('/test-url', { noAuthInterceptor: true });

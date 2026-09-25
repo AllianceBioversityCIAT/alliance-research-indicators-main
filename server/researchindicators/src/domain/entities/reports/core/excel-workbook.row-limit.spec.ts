@@ -1,6 +1,7 @@
 import { PayloadTooLargeException } from '@nestjs/common';
 import {
   EXCEL_RESERVED_ROWS_WITH_PRESENTATION,
+  EXCEL_RESERVED_ROWS_WITH_PRESENTATION_AND_NOTICE,
   EXCEL_RESERVED_ROWS_WITHOUT_PRESENTATION,
   EXCEL_WORKSHEET_ROW_LIMIT,
   maxDataRowsForExcelSheet,
@@ -13,6 +14,13 @@ describe('excel-workbook.row-limit', () => {
     expect(
       EXCEL_WORKSHEET_ROW_LIMIT - EXCEL_RESERVED_ROWS_WITH_PRESENTATION,
     ).toBe(maxDataRowsForExcelSheet(true));
+  });
+
+  it('reserves five rows when the presentation renders a warning notice', () => {
+    expect(
+      EXCEL_WORKSHEET_ROW_LIMIT -
+        EXCEL_RESERVED_ROWS_WITH_PRESENTATION_AND_NOTICE,
+    ).toBe(maxDataRowsForExcelSheet(true, true));
   });
 
   it('reserves one row when the sheet has no presentation', () => {

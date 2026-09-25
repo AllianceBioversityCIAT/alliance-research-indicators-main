@@ -83,13 +83,16 @@ describe('CreateResultFormComponent', () => {
     } as Partial<AllModalsService> 
 
     cacheServiceMock = {
-      currentResultId: signal<number | null>(null)
+      currentResultId: signal<number | null>(null),
+      skipResultVersionParam: signal(false)
     } as Partial<CacheService>
 
     createResultManagementServiceMock = {
       presetFromProjectResultsTable: jest.fn().mockReturnValue(false),
       contractId: jest.fn().mockReturnValue(null),
+      carriedContractId: jest.fn().mockReturnValue(null),
       setContractId: jest.fn(),
+      setCarriedContractId: jest.fn(),
       setResultTitle: jest.fn(),
       setYear: jest.fn(),
       setModalTitle: jest.fn(),
@@ -175,6 +178,43 @@ describe('CreateResultFormComponent', () => {
     expect(component.isDisabled).toBe(false);
   });
 
+  it('goToAiAssistant should hand the selected project to the AI step before navigating', () => {
+    component.onContractIdChange('A1048');
+
+    component.goToAiAssistant();
+
+    expect(createResultManagementServiceMock.setCarriedContractId).toHaveBeenCalledWith('A1048');
+    expect(createResultManagementServiceMock.resultPageStep()).toBe(1);
+  });
+
+  it('goToAiAssistant should carry null when no project is selected, so the AI step stays empty', () => {
+    component.goToAiAssistant();
+
+    expect(createResultManagementServiceMock.setCarriedContractId).toHaveBeenCalledWith(null);
+    expect(createResultManagementServiceMock.resultPageStep()).toBe(1);
+  });
+
+  it('should restore the carried project when returning from the AI step with no table preset', () => {
+    createResultManagementServiceMock.carriedContractId = jest.fn().mockReturnValue('A1065');
+
+    const returning = TestBed.createComponent(CreateResultFormComponent);
+    returning.detectChanges();
+
+    expect(returning.componentInstance.contractId).toBe('A1065');
+    expect(returning.componentInstance.body().contract_id).toBe('A1065');
+  });
+
+  it('should keep the project-results table preset winning over a carried project', () => {
+    createResultManagementServiceMock.presetFromProjectResultsTable = jest.fn().mockReturnValue(true);
+    createResultManagementServiceMock.contractId = jest.fn().mockReturnValue('A1048');
+    createResultManagementServiceMock.carriedContractId = jest.fn().mockReturnValue('A1065');
+
+    const preset = TestBed.createComponent(CreateResultFormComponent);
+    preset.detectChanges();
+
+    expect(preset.componentInstance.body().contract_id).toBe('A1048');
+  });
+
   it('onContractIdChange should update contractId and body', () => {
     component.onContractIdChange(123);
     expect(component.contractId).toBe(123);
@@ -234,6 +274,42 @@ describe('CreateResultFormComponent', () => {
     expect(cacheServiceMock.currentResultId()).toBe(999);
     expect(navigateSpy).toHaveBeenCalledWith(['result', 'STAR-999'], { replaceUrl: true });
     expect(allModalsServiceMock.closeModal).toHaveBeenCalledWith('createResult');
+  });
+
+  // The `version` of the result the user was standing on must not reach the
+  // result that was just created: it has no versions, and every request behind
+  // `X-Use-Year` would carry that year until the router finishes moving.
+  it('successRequest holds back the version param until the navigation settles', async () => {
+    jest.spyOn(router, 'navigate').mockResolvedValue(true as any);
+    const result = { data: { result_official_code: '999' } } as any;
+
+    component.successRequest(result, true);
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
+  });
+
+  it('successRequest clears the version hold when the navigation is rejected', async () => {
+    jest.spyOn(router, 'navigate').mockRejectedValue(new Error('nav failed'));
+    const result = { data: { result_official_code: '999' } } as any;
+
+    component.successRequest(result, true);
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
+  });
+
+  it('successRequest never raises the version hold for a non-STAR result', () => {
+    jest.spyOn(router, 'navigate').mockResolvedValue(true as any);
+    const result = { data: { result_official_code: '123', platform_code: 'TIP' } } as any;
+
+    component.successRequest(result, true);
+
+    expect(cacheServiceMock.skipResultVersionParam!()).toBe(false);
   });
 
   it('successRequest with openresult true and non-STAR platform should open result info modal', () => {

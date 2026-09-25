@@ -6,6 +6,7 @@ import { ApiService } from '@services/api.service';
 import { ActionsService } from '@services/actions.service';
 import { ClarityService } from './clarity.service';
 import { DateFormatConfigService } from './date-format-config.service';
+import { PoolFundingFlagsService } from './pool-funding-flags.service';
 import { ValidateCacheService } from './validate-cache.service';
 import { environment } from '../../../environments/environment';
 import { DataCache } from '@interfaces/cache.interface';
@@ -50,6 +51,10 @@ const dateFormatConfigMock = {
   loadConfig: jest.fn().mockResolvedValue(null)
 };
 
+const poolFundingFlagsMock = {
+  load: jest.fn().mockResolvedValue(undefined)
+};
+
 const validateCacheMock = {
   validateVersions: jest.fn().mockResolvedValue(undefined)
 };
@@ -74,6 +79,7 @@ describe('CognitoService', () => {
         { provide: ActionsService, useValue: actionsMock },
         { provide: ClarityService, useValue: clarityMock },
         { provide: DateFormatConfigService, useValue: dateFormatConfigMock },
+        { provide: PoolFundingFlagsService, useValue: poolFundingFlagsMock },
         { provide: ValidateCacheService, useValue: validateCacheMock }
       ]
     });
@@ -453,9 +459,7 @@ describe('CognitoService', () => {
 
   describe('updateCacheService', () => {
     it('should update cache with localStorage data when data exists', () => {
-      const getItemSpy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValue(
-        JSON.stringify({ user: 'test', access_token: 'test-token' })
-      );
+      const getItemSpy = jest.spyOn(Storage.prototype, 'getItem').mockReturnValue(JSON.stringify({ user: 'test', access_token: 'test-token' }));
 
       service.updateCacheService();
 
@@ -465,6 +469,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).toHaveBeenCalled();
 
       getItemSpy.mockRestore();
@@ -481,6 +486,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -497,6 +503,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -513,6 +520,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -534,6 +542,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -556,6 +565,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -572,6 +582,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -588,6 +599,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -609,6 +621,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;
@@ -635,6 +648,7 @@ describe('CognitoService', () => {
       expect(cache.isValidatingToken.set).toHaveBeenCalledWith(false);
       expect(clarity.updateUserInfo).toHaveBeenCalled();
       expect(dateFormatConfigMock.loadConfig).not.toHaveBeenCalled();
+      expect(poolFundingFlagsMock.load).not.toHaveBeenCalled();
       expect(validateCacheMock.validateVersions).not.toHaveBeenCalled();
 
       localStorage.getItem = originalGetItem;

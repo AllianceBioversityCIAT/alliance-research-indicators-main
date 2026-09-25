@@ -52,6 +52,7 @@ import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { GetCurrentUser } from '../interfaces/get-current-user.interfce';
 import { PatchSubmitResult, PatchSubmitResultLatest } from '../interfaces/patch_submit-result.interface';
+import { PrmsSyncResponse } from '../interfaces/prms-sync.interface';
 import { GetClarisaInstitutionsTypes } from '@shared/interfaces/get-clarisa-institutions-types.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PatchIpOwner } from '@shared/interfaces/patch-ip-owners';
@@ -820,14 +821,14 @@ export class ApiService {
   }
 
   GET_PoolFundingAlignment = (resultCode: string): Promise<MainResponse<AlignmentResponse>> => {
-    return this.TP.get(this.bilateralPath(resultCode), {});
+    return this.TP.get(this.bilateralPath(resultCode), { useResultInterceptor: true });
   };
 
   // Per-result SP picker source — scoped to the result's mapped CLARISA project.
   // Replaces the catalog-wide GET_SciencePrograms as the picker source (the catalog
   // method stays for display-only contexts). No query params; scoping is server-side.
   GET_PoolFundingSciencePrograms = (resultCode: string): Promise<MainResponse<PoolFundingSciencePrograms>> => {
-    return this.TP.get(this.bilateralPath(resultCode, '/science-programs'), {});
+    return this.TP.get(this.bilateralPath(resultCode, '/science-programs'), { useResultInterceptor: true });
   };
 
   // Result-scoped ToC catalog (SP → level → ToC result → indicator), sourced live
@@ -836,14 +837,14 @@ export class ApiService {
   // changed here). Read-only; no query params today.
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 (T-BIL-TM2-02)
   GET_PoolFundingHlosIndicators = (resultCode: string): Promise<MainResponse<BilateralTocCatalogResponse>> => {
-    return this.TP.get(this.bilateralPath(resultCode, '/hlos-indicators'), {});
+    return this.TP.get(this.bilateralPath(resultCode, '/hlos-indicators'), { useResultInterceptor: true });
   };
 
   PATCH_PoolFundingAlignment = (
     resultCode: string,
     body: UpdatePoolFundingAlignmentDto
   ): Promise<MainResponse<AlignmentResponse>> => {
-    return this.TP.patch(this.bilateralPath(resultCode), body, {});
+    return this.TP.patch(this.bilateralPath(resultCode), body, { useResultInterceptor: true });
   };
 
   // Center Admin — Bilateral Project Mappings CRUD.
@@ -1066,6 +1067,11 @@ export class ApiService {
     const url = () => `results/status/workflow/change-status/${resultCode}/to-status/${status}`;
     const requestBody: PatchSubmitResultLatest = body ? { ...body, submission_comment: comment ?? '' } : { submission_comment: comment ?? '' };
     return this.TP.post(url(), requestBody, { useResultInterceptor: true });
+  };
+
+  POST_PrmsSync = (resultCode: number): Promise<MainResponse<PrmsSyncResponse>> => {
+    const url = () => `results/${resultCode}/prms-sync`;
+    return this.TP.post(url(), {}, { useResultInterceptor: true });
   };
 
   GET_ReviewStatuses = () => {

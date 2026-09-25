@@ -76,7 +76,16 @@
       </div>
     </div>
     @if (errors?.['aligns_with_toc']; as msg) {
-      <small role="alert" aria-live="polite" class="sp-toc-block__error" [attr.data-testid]="'sp-toc-error-aligns-' + spCode()">{{ msg }}</small>
+      <!-- Shared validation-message recipe (custom-fields/input, multiselect,
+           radio-button, textarea): amber, warning glyph, message in its own
+           span. Red is reserved here for things that FAILED, not for input
+           the user still has to complete. -->
+      <small role="alert" aria-live="polite"
+             class="sp-toc-block__error mt-1 flex items-center gap-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]"
+             [attr.data-testid]="'sp-toc-error-aligns-' + spCode()">
+        <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+        <span>{{ msg }}</span>
+      </small>
     }
   </fieldset>
 
@@ -413,7 +422,16 @@
           </div>
 
           @if (errors?.['quantitative_contribution']; as msg) {
-            <small role="alert" aria-live="polite" class="sp-toc-block__error text-xs text-red-600 font-medium" [attr.data-testid]="'sp-toc-error-contribution-' + spCode()">{{ msg }}</small>
+            <!-- Shared validation-message recipe (custom-fields/input, multiselect,
+                 radio-button, textarea): amber, warning glyph, message in its own
+                 span. Red is reserved here for things that FAILED, not for input
+                 the user still has to complete. -->
+            <small role="alert" aria-live="polite"
+                   class="sp-toc-block__error mt-1 flex items-center gap-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]"
+                   [attr.data-testid]="'sp-toc-error-contribution-' + spCode()">
+              <i class="material-symbols-rounded !text-base" aria-hidden="true">warning</i>
+              <span>{{ msg }}</span>
+            </small>
           }
         </div>
       }

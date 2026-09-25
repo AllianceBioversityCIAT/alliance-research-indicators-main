@@ -50,6 +50,11 @@ export class AppConfig {
     return process.env.ARI_CLARISA_HOST;
   }
 
+  // PRMS Normalizer host
+  get ARI_PRMS_NORMALIZER_HOST(): string {
+    return process.env.ARI_PRMS_NORMALIZER_HOST;
+  }
+
   //CLARISA user
   get ARI_CLARISA_USER(): string {
     return process.env.ARI_CLARISA_USER;

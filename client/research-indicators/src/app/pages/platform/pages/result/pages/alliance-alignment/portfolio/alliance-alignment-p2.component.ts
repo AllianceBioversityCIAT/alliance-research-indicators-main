@@ -7,10 +7,11 @@ import { SubmissionService } from '@shared/services/submission.service';
 import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 
 @Component({
   selector: 'app-alliance-alignment-p2',
-  imports: [MultiselectComponent, DatePipe, TooltipModule],
+  imports: [MultiselectComponent, DatePipe, TooltipModule, CustomTagComponent],
   templateUrl: './alliance-alignment-p2.component.html'
 })
 export class AllianceAlignmentP2Component {
@@ -30,7 +31,7 @@ export class AllianceAlignmentP2Component {
 
   shouldShowImpactOutcomes(): boolean {
     const indicatorId = Number(this.cache.currentMetadata()?.indicator_id);
-    return indicatorId === 4 || indicatorId === 5;
+    return [4, 5, 6].includes(indicatorId);
   }
 
   isOicrIndicator(): boolean {

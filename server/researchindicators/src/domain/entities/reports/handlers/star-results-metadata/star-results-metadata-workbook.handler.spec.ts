@@ -137,6 +137,11 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(raw?.presentation?.bannerSubtitle).toBe(
       'This file contains the results generated from the selected filters in STAR.',
     );
+    expect(raw?.presentation?.bannerNotice?.text).toBe(
+      'Note: The Innovation Development section (readiness level, innovation nature, ' +
+        'innovation type, and related fields) and the Innovation Use section are not yet ' +
+        'included in this export — these sections are coming soon.',
+    );
   });
 
   it('includes cellDataType on raw sheet columns for year and date fields', async () => {
@@ -205,7 +210,8 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const yearCol =
       raw.columns.findIndex((c) => c.key === 'reporting_year') + 1;
     const dateCol = raw.columns.findIndex((c) => c.key === 'creation_date') + 1;
-    const dataRow = ws!.getRow(5);
+    // Rows 1–3 banner/subtitle/notice, row 4 groups, row 5 headers, row 6 first data.
+    const dataRow = ws!.getRow(6);
     expect(dataRow.getCell(yearCol).value).toBe(2024);
     expect(dataRow.getCell(yearCol).numFmt).toBe('0');
     const dateCell = dataRow.getCell(dateCol);
@@ -255,7 +261,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf as never);
     const col = raw.columns.findIndex((c) => c.key === 'public_link') + 1;
-    const cell = wb.getWorksheet('Raw')!.getRow(5).getCell(col);
+    const cell = wb.getWorksheet('Raw')!.getRow(6).getCell(col);
     expect(cell.value).toEqual(
       expect.objectContaining({
         hyperlink: 'https://example.org/star-result',

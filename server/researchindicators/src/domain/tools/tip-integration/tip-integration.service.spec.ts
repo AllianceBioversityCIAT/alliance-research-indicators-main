@@ -398,6 +398,31 @@ describe('TipIntegrationService', () => {
       );
     });
 
+    it('should skip Case Study publications when staging TIP records', async () => {
+      const page = {
+        data: [
+          { id: 1, name: 'Journal Article', type: ['Journal Article'] },
+          { id: 2, name: 'Case Study', type: ['Case Study'] },
+          { id: 3, name: 'Mixed', type: ['Report', ' case study '] },
+          { id: 4, name: 'No type' },
+        ],
+        data_count: 4,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      const stagedCodes = mockStagingRepo.save.mock.calls.map(
+        ([record]) => record.code,
+      );
+      expect(stagedCodes).toEqual([1, 4]);
+    });
+
     it('should throw BadRequestException and clean temporal data when TIP API request fails', async () => {
       jest
         .spyOn(service as any, 'getRequest')

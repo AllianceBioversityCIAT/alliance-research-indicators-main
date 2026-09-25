@@ -42,6 +42,7 @@ class CacheServiceMock {
 class ActionsServiceMock {
   showToast = jest.fn();
   saveCurrentSection = jest.fn();
+  showGlobalAlert = jest.fn();
 }
 class RouterMock {
   navigate = jest.fn();
@@ -312,8 +313,87 @@ describe('AllianceAlignmentComponent', () => {
     );
   });
 
+  it('should load and save portfolio 2 alignment with portfolio-specific payload for Innovation Use', async () => {
+    cache.metadata.set({ indicator_id: 6, portfolio_id: 2 });
+    getContractsService.setCatalog([
+      {
+        agreement_id: 'abc',
+        description: 'Project ABC',
+        contract_id: 'abc',
+        select_label: 'abc - Project ABC',
+        project_lead_description: 'Lead',
+        start_date: '2024-01-01',
+        endDateGlobal: '2025-01-01'
+      }
+    ]);
+    api.GET_Alignments.mockResolvedValue({
+      data: {
+        contracts: [{ contract_id: 'abc', is_primary: true }],
+        result_sdgs: [{ clarisa_sdg_id: 2, id: 2 }],
+        research_areas: [{ lever_id: '42', full_name: 'Area 42' }],
+        strategic_objectives: [{ strategic_objective_id: 3, name: 'SO 3' }],
+        impact_outcomes: [{ impact_outcome_id: 5, name: 'IO 5' }],
+        primary_levers: [{ lever_id: 1 }],
+        contributor_levers: [{ lever_id: 2 }]
+      }
+    });
+
+    await component.getData();
+
+    expect(getContractsService.main).toHaveBeenCalled();
+    expect(api.GET_Alignments).toHaveBeenCalledWith(1, { portfolioId: 2, return: true });
+    expect(component.body().primary_levers).toEqual([]);
+    expect(component.body().contributor_levers).toEqual([]);
+    expect(component.body().contracts[0].agreement_id).toBe('abc');
+    expect(component.body().contracts[0].description).toBe('Project ABC');
+    expect(component.body().contracts[0].select_label).toBe('abc - Project ABC');
+    expect(component.body().research_areas[0].lever_id).toBe(42);
+    expect(component.body().strategic_objectives[0].id).toBe(3);
+
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    component.body.update(current => ({
+      ...current,
+      contracts: [{ contract_id: 'abc', is_primary: true } as never],
+      research_areas: [{ lever_id: 10, id: 10 } as never],
+      strategic_objectives: [{ id: 1, name: 'SO 1' }],
+      impact_outcomes: [{ id: 5, name: 'IO 5' }]
+    }));
+
+    await component.saveData();
+
+    expect(api.PATCH_Alignments).toHaveBeenCalledWith(
+      1,
+      {
+        contracts: [{ contract_id: 'abc', is_primary: true }],
+        result_sdgs: [{ clarisa_sdg_id: 2 }],
+        research_areas: [{ lever_id: '10' }],
+        strategic_objectives: [{ strategic_objective_id: 1 }],
+        impact_outcomes: [{ impact_outcome_id: 5 }]
+      },
+      { portfolioId: 2, return: true }
+    );
+  });
+
   it('should send empty impact_outcomes for portfolio 2 when indicator is not OICR or Policy Change', async () => {
     cache.metadata.set({ indicator_id: 1, portfolio_id: 2 });
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    component.body.set({
+      contracts: [],
+      result_sdgs: [{ id: 3, clarisa_sdg_id: 3 } as never],
+      primary_levers: [],
+      contributor_levers: [],
+      strategic_objectives: [],
+      impact_outcomes: [{ id: 5, name: 'IO 5' }]
+    });
+
+    await component.saveData();
+
+    expect(api.PATCH_Alignments.mock.calls[0][1].impact_outcomes).toBeUndefined();
+    expect(api.PATCH_Alignments.mock.calls[0][1].result_sdgs).toEqual([{ clarisa_sdg_id: 3 }]);
+  });
+
+  it('should send empty impact_outcomes for portfolio 2 when indicator is Innovation Development', async () => {
+    cache.metadata.set({ indicator_id: 2, portfolio_id: 2 });
     api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
     component.body.set({
       contracts: [],
@@ -482,6 +562,69 @@ describe('AllianceAlignmentComponent', () => {
     expect(text).toContain('Contributing projects');
   });
 
+  // --- Pool Funding sidebar visibility refresh -------------------------------
+  // The primary CONTRACT is edited HERE, and it gates the sidebar's Pool Funding
+  // block through the server-computed `eligible`. Nothing else re-fetches the
+  // alignment on a section save, so without this call the block keeps its
+  // pre-save visibility until a full page reload.
+
+  const arrangeAlignmentBody = () => {
+    api.GET_Alignments.mockResolvedValue({ data: { contracts: [{ id: 1 }] } });
+    component.body.set({
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: []
+    } as any);
+  };
+
+  it('re-reads the pool funding alignment after a successful save, so the sidebar re-evaluates visibility', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    arrangeAlignmentBody();
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).toHaveBeenCalled();
+  });
+
+  it('does NOT re-read the pool funding alignment when the PATCH failed', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: false });
+    arrangeAlignmentBody();
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).not.toHaveBeenCalled();
+  });
+
+  // The user-reported symptom: change the Primary to a project that does NOT
+  // contribute, save, and Pool Funding Alignment stays in the sidebar until a
+  // manual page reload. The refresh is what removes it, so it must survive a
+  // failing re-read of the section itself.
+  it('re-reads the alignment even when getData() fails, so the sidebar never keeps a stale section', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    arrangeAlignmentBody();
+    api.GET_Alignments.mockRejectedValue(new Error('re-read failed'));
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData().catch(() => undefined);
+
+    // ★ discriminating: with the previous sequential `await getData()` this never
+    //   ran — the rejection skipped it and the section kept its old visibility.
+    expect(getAlignment).toHaveBeenCalled();
+  });
+
+  it('still completes the save when the alignment refresh throws', async () => {
+    api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
+    arrangeAlignmentBody();
+    jest.spyOn(component.bilateralService, 'getAlignment').mockRejectedValue(new Error('network'));
+
+    // A refresh failure must not reject the save -- the PATCH already committed.
+    await expect(component.saveData()).resolves.toBeUndefined();
+    expect(component.loading()).toBe(false);
+  });
+
   it('should call PATCH_Alignments and show toast on saveData', async () => {
     api.PATCH_Alignments.mockResolvedValue({ successfulRequest: true });
     api.GET_Alignments.mockResolvedValue({ data: { contracts: [{ id: 1 }] } });
@@ -644,6 +787,158 @@ describe('AllianceAlignmentComponent', () => {
     expect(updatedContracts.find(c => c.contract_id === '1')?.is_primary).toBe(true);
     expect(updatedContracts.find(c => c.contract_id === '2')?.is_primary).toBe(false);
     expect(actions.saveCurrentSection).toHaveBeenCalled();
+  });
+
+  // @sdd-spec docs/specs/bilateral — Pool Funding notice on the Primary contract
+  describe('pool-funding contract asks before becoming Primary', () => {
+    const POOL = {
+      is_primary: false,
+      is_active: true,
+      result_contract_id: 1,
+      result_id: 1,
+      contract_id: '1',
+      contract_role_id: 1,
+      agreement_id: 'A1048',
+      is_pool_funding_contributor: true
+    };
+    const PLAIN = {
+      is_primary: false,
+      is_active: true,
+      result_contract_id: 2,
+      result_id: 1,
+      contract_id: '2',
+      contract_role_id: 1,
+      agreement_id: 'A2000',
+      is_pool_funding_contributor: false
+    };
+
+    function seed(contracts: unknown[]) {
+      component.body.set({
+        contracts,
+        result_sdgs: [],
+        primary_levers: [],
+        contributor_levers: []
+      } as never);
+    }
+
+    it('does NOT change anything until the user confirms (enable path)', () => {
+      seed([POOL, PLAIN]);
+
+      component.markAsPrimary(POOL, 'contract');
+
+      expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      // ★ discriminating: the whole point is that the change is announced BEFORE
+      //   it happens. Applying it and then warning would also call the alert.
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(false);
+      expect(actions.saveCurrentSection).not.toHaveBeenCalled();
+    });
+
+    it('names the project and the section it enables', () => {
+      seed([POOL]);
+
+      component.markAsPrimary(POOL, 'contract');
+
+      const alert = actions.showGlobalAlert.mock.calls[0][0];
+      expect(alert.detail).toContain('A1048');
+      expect(alert.detail).toContain('Pool Funding Alignment');
+      expect(alert.detail).toContain('PRMS');
+      expect(alert.confirmCallback.label).toBe('Continue');
+      expect(alert.cancelCallback.label).toBe('Cancel');
+    });
+
+    it('applies and saves once Continue is pressed', () => {
+      seed([POOL, PLAIN]);
+      component.markAsPrimary(POOL, 'contract');
+
+      actions.showGlobalAlert.mock.calls[0][0].confirmCallback.event();
+
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(true);
+      expect(component.body().contracts.find(c => c.contract_id === '2')?.is_primary).toBe(false);
+      expect(actions.saveCurrentSection).toHaveBeenCalled();
+    });
+
+    it('a contract that does NOT contribute changes straight away (negative discriminator)', () => {
+      seed([POOL, PLAIN]);
+
+      component.markAsPrimary(PLAIN, 'contract');
+
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+      expect(component.body().contracts.find(c => c.contract_id === '2')?.is_primary).toBe(true);
+      expect(actions.saveCurrentSection).toHaveBeenCalled();
+    });
+
+    // ── Losing the section is as surprising as gaining it ────────────────────
+    //
+    // This block replaces an earlier test that asserted un-setting a pool-funding
+    // Primary warns about NOTHING, on the reasoning that it "enables nothing".
+    // It disables something, which the user only found out after saving.
+
+    it('switching to a project that does NOT contribute warns before the section goes away', () => {
+      seed([{ ...POOL, is_primary: true }, PLAIN]);
+
+      component.markAsPrimary(PLAIN, 'contract');
+
+      expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      const alert = actions.showGlobalAlert.mock.calls[0][0];
+      expect(alert.summary).toContain('disabled');
+      expect(alert.detail).toContain('A2000');
+      expect(alert.detail).toContain('does not contribute to Pool Funding');
+      expect(alert.detail).toContain('PRMS');
+
+      // ★ discriminating: nothing moves until Continue.
+      expect(component.body().contracts.find(c => c.contract_id === '2')?.is_primary).toBe(false);
+      expect(actions.saveCurrentSection).not.toHaveBeenCalled();
+
+      alert.confirmCallback.event();
+      expect(component.body().contracts.find(c => c.contract_id === '2')?.is_primary).toBe(true);
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(false);
+      expect(actions.saveCurrentSection).toHaveBeenCalled();
+    });
+
+    it('clearing the Primary altogether warns too — same consequence', () => {
+      seed([{ ...POOL, is_primary: true }]);
+
+      component.markAsPrimary({ ...POOL, is_primary: true }, 'contract');
+
+      expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      expect(actions.showGlobalAlert.mock.calls[0][0].detail).toContain('Clearing it disables');
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(true);
+    });
+
+    it('swapping one pool-funding project for another does NOT warn — the section stays', () => {
+      const POOL_B = { ...POOL, contract_id: '3', agreement_id: 'A3000' };
+      seed([{ ...POOL, is_primary: true }, POOL_B]);
+
+      component.markAsPrimary(POOL_B, 'contract');
+
+      // ★ discriminating: a rule written on "is the new one pool-funding" alone
+      //   would warn here, for a change that alters nothing about the section.
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+      expect(component.body().contracts.find(c => c.contract_id === '3')?.is_primary).toBe(true);
+    });
+
+    it('swapping between two NON-contributing projects does not warn either', () => {
+      const PLAIN_B = { ...PLAIN, contract_id: '4', agreement_id: 'A4000' };
+      seed([{ ...PLAIN, is_primary: true }, PLAIN_B]);
+
+      component.markAsPrimary(PLAIN_B, 'contract');
+
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    });
+
+    it('levers and SDGs are untouched by the rule', () => {
+      component.body.set({
+        contracts: [],
+        result_sdgs: [{ sdg_id: 9, is_primary: false }],
+        primary_levers: [{ is_primary: false, lever_id: 1, result_lever_strategic_outcomes: [] }],
+        contributor_levers: []
+      } as never);
+
+      component.markAsPrimary({ is_primary: false, lever_id: 1 }, 'lever');
+      component.markAsPrimary({ is_primary: false, sdg_id: 9 }, 'sdg');
+
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+    });
   });
 
   it('should call markAsPrimary for lever', () => {

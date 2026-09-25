@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
 import { WebsocketService } from '@sockets/websocket.service';
+import { AllModalsService } from '@services/cache/all-modals.service';
 
 import PoolFundingAlignmentComponent from './pool-funding-alignment.component';
 import { SpTocAlignmentBlockComponent } from './components/sp-toc-alignment-block/sp-toc-alignment-block.component';
@@ -13,6 +14,7 @@ import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
 import { SubmissionService } from '@shared/services/submission.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import {
   AlignmentResponse,
   BilateralTocCatalogResponse,
@@ -87,6 +89,8 @@ describe('PoolFundingAlignmentComponent', () => {
   let socketEvents$: Subject<unknown>;
   let listenMock: jest.Mock;
   let trackEventMock: jest.Mock;
+  let versionChangeCallbacks: Array<(version: string | null) => void>;
+  let isEditableStatus: ReturnType<typeof signal<boolean>>;
 
   const codes = (form: { selected_sps: { official_code: string }[] }) => form.selected_sps.map(sp => sp.official_code);
   const sp = (official_code: string) => ({ official_code });
@@ -126,6 +130,8 @@ describe('PoolFundingAlignmentComponent', () => {
     socketEvents$ = new Subject<unknown>();
     listenMock = jest.fn().mockReturnValue(socketEvents$.asObservable());
     trackEventMock = jest.fn();
+    versionChangeCallbacks = [];
+    isEditableStatus = signal(true);
 
     const bilateralServiceMock = {
       currentAlignment,
@@ -177,9 +183,19 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActivatedRoute, useValue: routeMock },
         { provide: Router, useValue: { navigate: routerNavigate } },
         { provide: ActionsService, useValue: { showToast: showToastMock, showGlobalAlert: showGlobalAlertMock } },
-        { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+        { provide: SubmissionService, useValue: { isEditableStatus } },
         { provide: WebsocketService, useValue: { listen: listenMock } },
-        { provide: ClarityService, useValue: { trackEvent: trackEventMock } }
+        { provide: ClarityService, useValue: { trackEvent: trackEventMock } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => {
+              versionChangeCallbacks.push(cb);
+              cb(null);
+            })
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -293,7 +309,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -352,7 +375,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         // The poisoned record: truthy, but no `listen` function on it.
         { provide: WebsocketService, useValue: {} },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -650,7 +680,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: ActivatedRoute, useValue: route },
           { provide: Router, useValue: { navigate } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
-          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } }
+          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -726,7 +763,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
           { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-          { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+          { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -1986,6 +2030,19 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  describe('Save override on a version (R-PFV-005)', () => {
+    const saveButton = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Save'));
+
+    it('with is_read_only true the override is false even on a version — Save absent', () => {
+      isEditableStatus.set(false);
+      editable.set(true);
+      currentAlignment.set({ ...baseAlignment, is_read_only: true });
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+    });
+  });
+
   describe('read-only DOM (banners + badge + Save visibility) — regression', () => {
     it('renders synced badge + synced banner when is_read_only && is_synced_to_prms; Save absent', () => {
       currentAlignment.set({ ...baseAlignment, is_read_only: true, is_synced_to_prms: true });
@@ -2772,7 +2829,8 @@ describe('PoolFundingAlignmentComponent', () => {
       expect(bannerLink.textContent).toContain('Learn more & view workflow');
     });
 
-    it('toggles showHelpModal signal when help button or banner link is clicked', () => {
+    it('both triggers open the help panel', () => {
+      const modals = TestBed.inject(AllModalsService);
       fixture.detectChanges();
       expect(component.showHelpModal()).toBe(false);
 
@@ -2780,12 +2838,205 @@ describe('PoolFundingAlignmentComponent', () => {
       helpBtn.click();
       expect(component.showHelpModal()).toBe(true);
 
-      component.showHelpModal.set(false);
+      // Closed the way the shell closes it, not by poking a local signal — the
+      // open state lives in AllModalsService now.
+      modals.closeModal('poolFundingHelp');
+      expect(component.showHelpModal()).toBe(false);
+
       const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
       bannerLink.click();
       expect(component.showHelpModal()).toBe(true);
     });
+
+    it('registers a title with the shared service so the shell can render it', () => {
+      const config = TestBed.inject(AllModalsService).isModalOpen('poolFundingHelp');
+      expect(config.title).toContain('Pool Funding');
+    });
+
+    // It used to be a bare <p-dialog>, which is why it did not look like any
+    // other modal in the app.
+    it('renders through the shared app-modal shell, not a bare p-dialog', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      expect(template).toContain('<app-modal modalName="poolFundingHelp"');
+      // ★ discriminating: the old shell is gone, header and footer included.
+      expect(template).not.toContain('<p-dialog');
+      expect(template).not.toContain('#footer');
+    });
+
+    it('carries no colour token that colors.scss does not define', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const helpPanel = template.slice(template.indexOf('<app-modal modalName="poolFundingHelp"'));
+
+      // ★ discriminating: these four are still used elsewhere in this file but are
+      //   NOT in colors.scss, so every rule using them rendered with no colour.
+      for (const phantom of [
+        'var(--ac-primary-blue-50)',
+        'var(--ac-primary-blue-800)',
+        'var(--ac-primary-blue-900)',
+        'var(--ac-grey-50)'
+      ]) {
+        expect(helpPanel).not.toContain(phantom);
+      }
+    });
   });
+
+  describe('version change refetch (R-PFV-004)', () => {
+    const liveAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: false,
+      selected_science_programs: []
+    };
+    const versionAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: true,
+      selected_science_programs: [{ code: 'SP06', name: 'Climate action', role: 'PRIMARY' }]
+    };
+
+    it('refetches on version change, again on return to live, and does not serve the previous payload', async () => {
+      fixture.detectChanges();
+      expect(versionChangeCallbacks).toHaveLength(1);
+      getAlignmentMock.mockClear();
+
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(versionAlignment);
+      versionChangeCallbacks[0]('2026');
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(true);
+      expect(codes(component.formData())).toEqual(['SP06']);
+      expect(component.formData().primary_sp_code).toBe('SP06');
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral — section-opening banner matches GEOGRAPHIC SCOPE
+  describe('info banner follows the Geographic Scope recipe', () => {
+    it('uses the shared banner shape, not a rounded blue card', () => {
+      const banner = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"]'
+      ) as HTMLElement;
+      expect(banner).toBeTruthy();
+
+      // Geographic Scope: grey ground, 5px light-blue left rule, square corners.
+      expect(banner.className).toContain('bg-[color:var(--ac-grey-100)]');
+      expect(banner.className).toContain('border-l-[5px]');
+      expect(banner.className).toContain('border-l-[color:var(--ac-light-blue-500)]');
+      expect(banner.className).toContain('mb-[30px]');
+
+      // ★ discriminating: the old design was a rounded primary-blue card.
+      expect(banner.className).not.toContain('rounded-r-[8px]');
+      expect(banner.className).not.toContain('bg-[var(--ac-primary-blue-50)]');
+    });
+
+    it('sets the copy in Barlow 14/17 grey-700, like the reference section', () => {
+      const text = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"] h3'
+      ) as HTMLElement;
+
+      expect(text.className).toContain("font-['Barlow']");
+      expect(text.className).toContain('text-[14px]');
+      expect(text.className).toContain('leading-[17px]');
+      expect(text.className).toContain('text-[color:var(--ac-grey-700)]');
+      // ★ discriminating: it used to be text-xs with a relaxed leading.
+      expect(text.className).not.toContain('text-xs');
+    });
+
+    it('keeps the 20px gap under the section title that every other section has', () => {
+      const title = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-title"]'
+      ) as HTMLElement;
+      // title → .pf-alignment-section-heading → the flex row that owns the gap
+      const titleRow = title.closest('.pf-alignment-section-heading')?.parentElement as HTMLElement;
+
+      // .section-title carries margin-bottom: 20px, which `m-0` removes here.
+      expect(title.className).toContain('m-0');
+      expect(titleRow.className).toContain('mb-5');
+    });
+  });
+
+
+  // The section used to spell its validation messages in red, while every shared
+  // field component (input, multiselect, radio-button, textarea) spells them amber
+  // with a warning glyph. Red now means "something failed", not "you still have
+  // to fill this in".
+  describe('validation messages use the shared amber recipe', () => {
+    const VALIDATION_TESTIDS = [
+      'pf-alignment-error-has_contribution',
+      'pf-alignment-error-sp_codes',
+      'pf-alignment-sp-required',
+      'pf-alignment-primary-required'
+    ];
+
+    it.each(VALIDATION_TESTIDS)('%s is amber, never red', testid => {
+      // Read from the template source: these render behind several signals, and
+      // this test is about the treatment they carry, not about when they appear.
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      const block = template.slice(
+        template.lastIndexOf('<small', template.indexOf(testid)),
+        template.indexOf('</small>', template.indexOf(testid))
+      );
+
+      expect(block).toContain('text-[var(--ac-warning-1)]');
+      // ★ discriminating: every one of these carried text-red-700 before.
+      expect(block).not.toContain('text-red-700');
+    });
+
+    it.each(VALIDATION_TESTIDS)('%s carries the warning glyph in its own row', testid => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const start = template.lastIndexOf('<small', template.indexOf(testid));
+      const block = template.slice(start, template.indexOf('</small>', start));
+
+      expect(block).toContain('material-symbols-rounded');
+      expect(block).toContain('warning');
+      expect(block).toContain('<span>');
+    });
+
+    it('leaves the FAILURE banners red — they report a break, not a missing answer', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      for (const testid of [
+        'pf-alignment-load-failed',
+        'pf-alignment-hlo-catalog-error',
+        'pf-alignment-error-global'
+      ]) {
+        const start = template.lastIndexOf('<', template.indexOf(testid) - 200);
+        const block = template.slice(start, template.indexOf(testid) + 200);
+        expect(block).toContain('red');
+      }
+    });
+  });
+
 });
-
-
