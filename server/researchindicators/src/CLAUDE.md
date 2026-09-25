@@ -101,7 +101,24 @@ Naming:
 2. **Service** method in `<module>.service.ts` — populate audit fields, respect status workflow, throw Nest HTTP exceptions for failures.
 3. **Controller** handler in `<module>.controller.ts`:
    - Decorate with `@ApiTags`, `@ApiBearerAuth`, `@ApiOperation`, and per-param `@ApiQuery` / `@ApiBody`.
-   - `@Roles(...)` + `RolesGuard` **only where the endpoint genuinely has a role rule.** ⚠️ **Result *section* controllers do NOT use `@Roles`** — section access is JWT + `ResultStatusGuard`, and adding roles makes your section the only one with an access rule the STAR client does not mirror (an AC-Role-Correctness hazard, not hardening). Verified by grep 2026-08-20: of the 15 controllers carrying `RESULT_CODE`, **zero** declare `@Roles`; the only `@Roles` under `entities/results/` are on `results.controller.ts`, the aggregate controller, not on a section. Precedent: `docs/specs/archive/2026-08-20-innovation-use--details-api/` **DD-5**.
+   - `@Roles(...)` + `RolesGuard` **only where the endpoint genuinely has a role rule.** ⚠️ **Most result *section* controllers do NOT use `@Roles`** — section access is JWT + `ResultStatusGuard`, and adding roles to one of those makes your section the only one with an access rule the STAR client does not mirror (an AC-Role-Correctness hazard, not hardening). Grep 2026-08-20: of the 15 controllers **that import the `RESULT_CODE` constant**, zero declare `@Roles`; the only `@Roles` under `entities/results/` are on `results.controller.ts`, the aggregate controller. Precedent: `docs/specs/archive/2026-08-20-innovation-use--details-api/` **DD-5**.
+
+   > **⚠️ CORRECTED 2026-09-14 — the generalization above was too broad, and it misled a spec.** The grep's population is *"files importing the literal `RESULT_CODE`"*, which is **narrower than the claim it was made to support**. `bilateral.controller.ts` is genuinely result-scoped — `main.routes.ts` mounts it at `` `${RESULT_CODE}/pool-funding-alignment` `` and it reads `resultsUtil.resultCode` from that prefix — yet it never imports the constant, so it is invisible to that grep. It declares `@Roles(CONTRIBUTOR, CENTER_ADMIN, SYSTEM_ADMIN)` + `@ResultOwner()` + `@UseGuards(RolesGuard, ResultOwnerGuard)` on all four of its mutations (`:230-236`, `:271-277`, `:309-315`, `:346-352`) plus class-level `RolesGuard` (`:52`).
+   >
+   > **What is established, and what is not.** *Established:* `ResultStatusGuard` **rejects `APPROVED`
+   > outright** (`result-status.guard.ts:50-66` allows only `DRAFT`/`REVISED`/`SCIENCE_EDITION`/`KM_CURATION`,
+   > bypassing only `SYSTEM_ADMIN`/`TECHNICAL_SUPPORT`/`CENTER_ADMIN`), so any endpoint that acts on an
+   > Approved result **cannot** use it — that follows from the guard's own code, not from a sample.
+   >
+   > *Not established:* what such an endpoint should use **instead**. `bilateral.controller.ts` is the
+   > **only** controller in the tree that uses `ResultOwnerGuard` (`grep -rl ResultOwnerGuard --include="*.controller.ts" src/` → 1 file, re-verified 2026-09-14). It is therefore **the only current
+   > precedent, n = 1** — not a validated rule. Treat it as the default to follow *and to re-verify*: the
+   > dichotomy "read-mostly section vs. write-on-Approved" has **not** been checked against the eleven
+   > other controllers that use `ResultStatusGuard`. **Promote this to a rule only after a second
+   > write-on-Approved endpoint corroborates it** — stating it as settled from one instance is the same
+   > evidentiary error this block was written to correct.
+   >
+   > **Route-scoping is not visible to a grep for the constant — check `main.routes.ts` for the mount point, not the controller for the import.** Found by a Judgment Day dual review of `docs/specs/bilateral/prms-sync/sync-engine` (JD-1/JD-4), which had inherited the over-broad claim from this guide. A textbook **KZ-017**: a check narrower than its claim, returning a confident green.
    - For result mutations, add `@UseGuards(ResultStatusGuard)` and use the `RESULT_CODE` path token + `@GetResultVersion()`.
    - Return the service promise wrapped in `ResponseUtils.format({ description, status, data })`.
 4. **Route registration — two steps, and the second is the one people miss.** If it is a new sub-resource path, add a node under `domain/routes/main.routes.ts` **and** register the module in the module-graph file that instantiates it. If it is a new endpoint on an existing controller, no route change is needed.

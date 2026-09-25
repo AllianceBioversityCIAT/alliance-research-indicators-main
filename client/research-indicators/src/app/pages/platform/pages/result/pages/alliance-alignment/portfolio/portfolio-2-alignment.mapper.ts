@@ -285,6 +285,21 @@ export const enrichPortfolio2Contracts = (
         description,
         contract_id: catalogMatch.contract_id ?? agreementId,
         is_primary: Boolean(flattened.is_primary),
+        // Pinned AFTER the spreads on purpose -- `flattened` would otherwise win and it
+        // carries the WRONG value. The two sources disagree BY DESIGN:
+        //   * the catalog (GET agresso/contracts/find-contracts) selects the EFFECTIVE
+        //     predicate `effectivePoolFundingContributorSql` -- the raw column OR an
+        //     active row in `bilateral_project_mapping`;
+        //   * the alignment payload arrives through the TypeORM `agresso_contract`
+        //     relation, i.e. the RAW `agresso_contracts.is_pool_funding_contributor`
+        //     column (`default: false`), with no bilateral-mapping term at all.
+        // A contract that contributes VIA ITS BILATERAL MAPPING -- the normal case, e.g.
+        // D514 -- is therefore `true` in the catalog and `false` in the alignment
+        // payload, and the plain spread order silently kept the false one. The catalog
+        // is the authority (it is also what the dropdown itself renders); the raw value
+        // is the fallback only when the catalog carries none.
+        is_pool_funding_contributor:
+          catalogMatch.is_pool_funding_contributor ?? flattened.is_pool_funding_contributor,
         select_label: catalogMatch.select_label ?? (description ? `${agreementId} - ${description}` : agreementId),
         levers: normalizeContractLevers({ ...catalogMatch, ...flattened })
       } as GetAllianceAlignment['contracts'][number];

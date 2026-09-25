@@ -66,6 +66,7 @@ import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-t
 import { ResultSdgTargetsModule } from '../entities/result-sdg-targets/result-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
@@ -83,6 +84,10 @@ const ResultsChildren: Routes = [
   {
     path: `${RESULT_CODE}/pool-funding-alignment`,
     module: BilateralModule,
+  },
+  {
+    path: `${RESULT_CODE}/prms-sync`,
+    module: ResultPrmsSyncModule,
   },
   {
     path: 'intellectual-property',

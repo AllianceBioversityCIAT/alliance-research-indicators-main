@@ -21,6 +21,13 @@
                   [class]="getContractStatusClasses(item?.contract_status)">
                   {{ item?.contract_status }}
                 </button>
+                <!-- Same tag / tokens / copy as the projects table, the project card and the
+                     Create Result dropdown. shrink-0 keeps a long title from squeezing it out. -->
+                @if (item?.is_pool_funding_contributor) {
+                <app-custom-tag class="inline-flex align-middle shrink-0" statusId="pool-funding"
+                  statusName="Contributing to Pool Funding" [tiny]="true"
+                  data-testid="alignment-option-pool-funding-tag"></app-custom-tag>
+                }
                 Principal investigator <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
                 <span class="text-[#345B8F]">{{ item?.project_lead_description }}</span>
                 <span class="text-[#B9C0C5]">|</span>
@@ -44,8 +51,17 @@
           </ng-template>
           <ng-template #rows let-contract>
             <div class="flex-col flex w-full">
-              <div class="text-[15px] text-[#4C5158] font-[600]">{{ contract.agreement_id }} - {{
-                contract.description }}</div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-[15px] text-[#4C5158] font-[600]">{{ contract.agreement_id }} - {{
+                  contract.description }}</span>
+                <!-- Shown on the SELECTED cards too: this is where the Primary project is
+                     picked, and the Primary contract is what gates the Pool Funding section. -->
+                @if (contract.is_pool_funding_contributor) {
+                <app-custom-tag class="inline-flex align-middle shrink-0" statusId="pool-funding"
+                  statusName="Contributing to Pool Funding" [tiny]="true"
+                  data-testid="alignment-selected-pool-funding-tag"></app-custom-tag>
+                }
+              </div>
 
               <div class="flex justify-between pt-2 xl:pt-0">
                 <div class="flex gap-x-5 justify-between">

@@ -52,6 +52,7 @@ import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { GetCurrentUser } from '../interfaces/get-current-user.interfce';
 import { PatchSubmitResult, PatchSubmitResultLatest } from '../interfaces/patch_submit-result.interface';
+import { PrmsSyncResponse } from '../interfaces/prms-sync.interface';
 import { GetClarisaInstitutionsTypes } from '@shared/interfaces/get-clarisa-institutions-types.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PatchIpOwner } from '@shared/interfaces/patch-ip-owners';
@@ -1074,6 +1075,11 @@ export class ApiService {
     const url = () => `results/status/workflow/change-status/${resultCode}/to-status/${status}`;
     const requestBody: PatchSubmitResultLatest = body ? { ...body, submission_comment: comment ?? '' } : { submission_comment: comment ?? '' };
     return this.TP.post(url(), requestBody, { useResultInterceptor: true });
+  };
+
+  POST_PrmsSync = (resultCode: number): Promise<MainResponse<PrmsSyncResponse>> => {
+    const url = () => `results/${resultCode}/prms-sync`;
+    return this.TP.post(url(), {}, { useResultInterceptor: true });
   };
 
   GET_ReviewStatuses = () => {

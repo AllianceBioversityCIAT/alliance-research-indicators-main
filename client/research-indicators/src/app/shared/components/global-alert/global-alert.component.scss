@@ -49,6 +49,28 @@
       font-size: 16px !important;
       font-weight: 400;
 
+      // `.alert` is text-align: center, which is right for the one-line copy but
+      // wrong for a list: centred items never line their markers up. ONLY the
+      // list goes left; the intro line above it stays centred.
+      // ::ng-deep is required, not decorative: `detail` is rendered through
+      // [innerHTML], and Angular stamps its `_ngcontent-*` attribute only on
+      // elements that come from the template -- injected DOM never gets it, so a
+      // normally-scoped rule silently does not match. Without it the list lost
+      // both its alignment AND its markers, because Tailwind's preflight resets
+      // `ul { list-style: none }` and nothing was overriding it.
+      // Still contained: the selector is anchored inside `.alert .detail`, so it
+      // cannot reach any list elsewhere in the app.
+      ::ng-deep .alert-detail-list {
+        margin: 16px 0 0;
+        padding-left: 22px;
+        text-align: left;
+        list-style: disc;
+
+        li + li {
+          margin-top: 10px;
+        }
+      }
+
       @media (max-width: 1024px) {
         font-size: 1rem;
       }

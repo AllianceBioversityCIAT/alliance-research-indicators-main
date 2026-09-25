@@ -1,0 +1,41 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "innovation_development",
+      "data": {
+        "external_reference": "ARI-SPIKE-20260914-03",
+        "keep_editing": false,
+        "created_date": "2026-09-14T12:00:00.000Z",
+        "created_by": { "email": "ari-spike-tester@cgiar.org", "name": "ARI Spike Tester" },
+        "submitted_by": {
+          "email": "ari-spike-tester@cgiar.org",
+          "name": "ARI Spike Tester",
+          "submitted_date": "2026-09-14T12:00:00.000Z",
+          "comment": "ARI sync-engine T-01 TEST-environment contract spike. Synthetic data, not a real result."
+        },
+        "lead_contact_person": { "email": "ari-spike-tester@cgiar.org", "name": "ARI Spike Tester" },
+        "lead_center": {
+          "institution_id": 46,
+          "acronym": "ABC RH - CIAT (Alliance)",
+          "name": "Alliance of Bioversity and CIAT - Regional Hub"
+        },
+        "title": "ARI SPIKE 03 - synthetic innovation development result (do not process)",
+        "description": "Synthetic payload generated for the PRMS Normalizer TEST-environment contract spike (ARI sync-engine T-01, call 03: innovation_development, OQ-2 variant B - level-only shape per inno_dev.json example). Not a real result.",
+        "geo_focus": { "scope_code": 1, "scope_label": "Global" },
+        "contributing_bilateral_projects": [
+          {
+            "grant_title": "D-000000-ARI SPIKE Contract Title Test",
+            "is_lead": true
+          }
+        ],
+        "toc_mapping": { "science_program_id": "SP01" },
+        "innovation_development": {
+          "innovation_typology": { "name": "Technology" },
+          "innovation_readiness_level": { "level": 3 }
+        }
+      }
+    }
+  ]
+}

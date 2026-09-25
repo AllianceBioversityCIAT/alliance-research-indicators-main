@@ -12,4 +12,5 @@ export type ModalName =
   | 'projectGroundingSetup'
   | 'portfolioManagement'
   | 'portfolio2025LeverSdgs'
-  | 'portfolio2026SdgTargets';
+  | 'portfolio2026SdgTargets'
+  | 'poolFundingHelp';
