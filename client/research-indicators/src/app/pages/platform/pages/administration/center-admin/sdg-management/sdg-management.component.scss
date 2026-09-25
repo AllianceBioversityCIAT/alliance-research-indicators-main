@@ -122,3 +122,11 @@
     color: var(--ac-white-1);
   }
 }
+
+// SDG target modals: the navbar (z-index 1001) sits above the modal overlay, so
+// a long selection must not grow the modal into it — cap the selected list to
+// the viewport and let it scroll.
+.sdg-modal-body ::ng-deep .selected-items.show-scroll {
+  max-height: min(380px, calc(100vh - 420px));
+  min-height: 160px;
+}
