@@ -166,6 +166,17 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
       `Agresso staff reconciliation summary: ${JSON.stringify(summary)}`,
     );
 
+    // `candidateSample` is capped at 50 and the candidate set is larger than that, so the summary
+    // alone cannot answer the question increment 1 exists to answer: WHO would be retired. This
+    // emits the full set on its own line, for a human to read before increment 2 is allowed to
+    // write anything. Measurement only — nothing here acts on the list.
+    const allCandidates = measurement.candidates ?? [];
+    if (allCandidates.length > 0) {
+      this._logger.log(
+        `Agresso staff deactivation candidates (FULL, dry-run, count=${allCandidates.length}): ${JSON.stringify(allCandidates)}`,
+      );
+    }
+
     return summary;
   }
 }

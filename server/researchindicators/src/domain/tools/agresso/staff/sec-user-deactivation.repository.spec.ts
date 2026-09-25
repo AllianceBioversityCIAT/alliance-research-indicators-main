@@ -21,20 +21,43 @@ describe('SecUserDeactivationRepository', () => {
   });
 
   describe('resolveExternalStatusId', () => {
-    it('returns a null id and matchCount 2 when two active names match External', async () => {
+    // REGRESSION — the live Dev defect (2026-09-25). The external row is named
+    // `External Accepted`, not `External`, so the previous name lookup matched nothing and every
+    // run aborted on C-4 before the measurement could be taken. Selection is by id: the name is
+    // free to be anything.
+    it('resolves the external row by id even though its name is not the bare word External', async () => {
       querySpy.mockResolvedValueOnce([
-        { user_status_id: 4, name: 'External' },
-        { user_status_id: 9, name: 'external' },
+        { user_status_id: 1, name: 'Accepted' },
+        { user_status_id: 2, name: 'Pending' },
+        { user_status_id: 3, name: 'Rejected' },
+        { user_status_id: 4, name: 'External Accepted' },
+      ]);
+
+      await expect(repository.resolveExternalStatusId()).resolves.toEqual({
+        statusId: 4,
+        matchCount: 1,
+      });
+    });
+
+    it('returns a null id and matchCount 0 when no active row carries the external id', async () => {
+      querySpy.mockResolvedValueOnce([
+        { user_status_id: 1, name: 'Accepted' },
+        { user_status_id: 2, name: 'Pending' },
       ]);
 
       await expect(repository.resolveExternalStatusId()).resolves.toEqual({
         statusId: null,
-        matchCount: 2,
+        matchCount: 0,
       });
     });
 
-    it('returns a null id and matchCount 0 when no name matches External', async () => {
-      querySpy.mockResolvedValueOnce([{ user_status_id: 1, name: 'Internal' }]);
+    // A name alone must NOT resolve: an environment that renamed some other row to `External`
+    // would otherwise shield the wrong cohort silently.
+    it('does not resolve a row merely because its name reads External', async () => {
+      querySpy.mockResolvedValueOnce([
+        { user_status_id: 9, name: 'External' },
+        { user_status_id: 1, name: 'Accepted' },
+      ]);
 
       await expect(repository.resolveExternalStatusId()).resolves.toEqual({
         statusId: null,
@@ -44,24 +67,13 @@ describe('SecUserDeactivationRepository', () => {
 
     it('returns exactly one matching id after Number coercion', async () => {
       querySpy.mockResolvedValueOnce([
-        { user_status_id: '42', name: 'External' },
+        { user_status_id: '4', name: 'External Accepted' },
       ]);
 
       const result = await repository.resolveExternalStatusId();
 
-      expect(result).toEqual({ statusId: 42, matchCount: 1 });
+      expect(result).toEqual({ statusId: 4, matchCount: 1 });
       expect(typeof result.statusId).toBe('number');
-    });
-
-    it('matches External case- and whitespace-insensitively', async () => {
-      querySpy.mockResolvedValueOnce([
-        { user_status_id: 7, name: '  EXTERNAL ' },
-      ]);
-
-      await expect(repository.resolveExternalStatusId()).resolves.toEqual({
-        statusId: 7,
-        matchCount: 1,
-      });
     });
 
     it('emits both active and non-deleted predicates in the status SQL', async () => {
