@@ -494,7 +494,7 @@ describe('SdgManagementComponent', () => {
     expect(modals.closeModal).toHaveBeenCalledWith('portfolio2026SdgTargets');
   });
 
-  it('lists portfolio 2025 lever targets in a table and saves the modal selection', async () => {
+  it('lists portfolio 2025 lever targets as a list and saves the modal selection', async () => {
     await configureBed();
     const f = TestBed.createComponent(SdgManagementComponent);
     const lever = baseLever({ short_name: 'Lever 1', other_names: 'Climate', portfolio_id: 1 });
@@ -508,7 +508,12 @@ describe('SdgManagementComponent', () => {
     mockGetClarisa.mockResolvedValue({
       data: [
         { id: 40, sdg_target_code: '2.2', sdg_target: 'Target 2.2' },
-        { id: 12, sdg_target_code: '1.1', sdg_target: 'Target 1.1' },
+        {
+          id: 12,
+          sdg_target_code: '1.1',
+          sdg_target: 'Target 1.1',
+          clarisa_sdg: { id: 1, short_name: 'SDG 1', icon: 'sdg-1.png' }
+        },
         { id: 7, sdg_target_code: '9.9', sdg_target: 'Other' }
       ]
     });
@@ -522,7 +527,7 @@ describe('SdgManagementComponent', () => {
     expect(f.nativeElement.textContent).toContain('Levers');
     expect(f.nativeElement.textContent).toContain('1 lever');
     expect(f.nativeElement.textContent).not.toContain('Lever 1');
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(0);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(0);
 
     f.componentInstance.toggleLeversGroup();
     f.detectChanges();
@@ -530,15 +535,16 @@ describe('SdgManagementComponent', () => {
     expect(f.nativeElement.textContent).toContain(': Climate');
     expect(f.nativeElement.textContent).toContain('2 targets');
     expect(f.nativeElement.textContent).not.toContain('Research area');
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(0);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(0);
 
     f.componentInstance.toggleRow(lever);
     f.detectChanges();
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(1);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(1);
+    expect(f.nativeElement.querySelector('.sdg-target-list img')?.getAttribute('src')).toBe('sdg-1.png');
 
     f.componentInstance.toggleSdgList();
     f.detectChanges();
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(2);
+    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(2);
     expect(f.nativeElement.textContent).toContain('1.1');
     expect(f.nativeElement.textContent).toContain('2.2');
 

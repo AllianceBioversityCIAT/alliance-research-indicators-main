@@ -292,6 +292,7 @@ export default class SdgManagementComponent implements OnInit {
         sdg_target_id: target.id,
         sdg_target: target.sdg_target,
         sdg_target_code: target.sdg_target_code,
+        clarisa_sdg: target.clarisa_sdg,
         select_label: [target.sdg_target_code, target.sdg_target].filter(Boolean).join(' — ')
       }))
     });
@@ -344,6 +345,7 @@ export default class SdgManagementComponent implements OnInit {
         sdg_target_id: target.id,
         sdg_target: target.sdg_target,
         sdg_target_code: target.sdg_target_code,
+        clarisa_sdg: target.clarisa_sdg,
         select_label: [target.sdg_target_code, target.sdg_target].filter(Boolean).join(' — ')
       }))
     });

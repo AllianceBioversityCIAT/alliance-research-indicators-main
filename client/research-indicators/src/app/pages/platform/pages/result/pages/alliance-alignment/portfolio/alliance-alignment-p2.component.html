@@ -163,16 +163,28 @@
             }
           </ng-template>
           <ng-template #item let-item>
-            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
-              <span class="font-[600]">{{ item?.sdg_target_code }}</span>
-              <span class="font-normal"> - {{ item?.sdg_target }}</span>
-            </p>
+            <div class="flex w-full min-w-0 items-center gap-3">
+              @if (item?.clarisa_sdg?.icon) {
+              <img [src]="item.clarisa_sdg.icon" [alt]="item.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+                class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+              }
+              <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+                <span class="font-[600]">{{ item?.sdg_target_code }}</span>
+                <span class="font-normal"> - {{ item?.sdg_target }}</span>
+              </p>
+            </div>
           </ng-template>
           <ng-template #rows let-tgt>
-            <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
-              <span class="font-[600]">{{ tgt?.sdg_target_code }}</span>
-              <span class="font-normal"> - {{ tgt?.sdg_target }}</span>
-            </p>
+            <div class="flex w-full min-w-0 items-center gap-3">
+              @if (tgt?.clarisa_sdg?.icon) {
+              <img [src]="tgt.clarisa_sdg.icon" [alt]="tgt.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+                class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+              }
+              <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+                <span class="font-[600]">{{ tgt?.sdg_target_code }}</span>
+                <span class="font-normal"> - {{ tgt?.sdg_target }}</span>
+              </p>
+            </div>
           </ng-template>
         </app-multiselect>
         }
