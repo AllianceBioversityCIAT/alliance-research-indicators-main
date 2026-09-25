@@ -433,6 +433,8 @@ const children: Routes = [
   {
     path: 'users',
     module: UsersModule,
+  },
+  {
     path: 'impersonation',
     module: ImpersonationModule,
   },
