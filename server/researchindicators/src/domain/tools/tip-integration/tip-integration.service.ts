@@ -109,6 +109,15 @@ export class TipIntegrationService extends BaseApi {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  // Case Study publications are out of scope for ARI, so they never reach staging
+  private isCaseStudy(product: TipKnowledgeProductDto): boolean {
+    return (
+      product?.type?.some(
+        (type) => type?.trim()?.toLowerCase() === 'case study',
+      ) ?? false
+    );
+  }
+
   private async saveTemporalData(year: number, executionCode: string) {
     let pendingData = true;
     let offset = 0;
@@ -136,7 +145,10 @@ export class TipIntegrationService extends BaseApi {
           );
         });
 
-      response?.data?.forEach(async (item) => {
+      const itemsToStage =
+        response?.data?.filter((item) => !this.isCaseStudy(item)) ?? [];
+
+      itemsToStage.forEach(async (item) => {
         await this.dataSource
           .getRepository(SyncStagingRecordsEntity)
           .save({
