@@ -6,9 +6,13 @@ import { ResultLeversService } from '../../../../../result-levers/result-levers.
 import { ResultLeverStrategicOutcomeService } from '../../../../../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultLeverSdgTargetsService } from '../../../../../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { ResultSdgsService } from '../../../../../result-sdgs/result-sdgs.service';
+import { ResultStrategicObjectivesService } from '../../../../../result-strategic-objectives/result-strategic-objectives.service';
+import { ResultImpactOutcomesService } from '../../../../../result-impact-outcomes/result-impact-outcomes.service';
+import { ResultSdgTargetsService } from '../../../../../result-sdg-targets/result-sdg-targets.service';
 import { UpdateDataUtil } from '../../../../../../shared/utils/update-data.util';
 import { ContractRolesEnum } from '../../../../../result-contracts/enum/contract-roles.enum';
 import { LeverRolesEnum } from '../../../../../lever-roles/enum/lever-roles.enum';
+import { PortfolioIdEnum } from '../../../enum/portfolio-id.enum';
 
 describe('ResultAlignmentOperationsService', () => {
   let service: ResultAlignmentOperationsService;
@@ -32,6 +36,15 @@ describe('ResultAlignmentOperationsService', () => {
   >;
   let resultSdgsService: jest.Mocked<
     Pick<ResultSdgsService, 'create' | 'find'>
+  >;
+  let resultStrategicObjectivesService: jest.Mocked<
+    Pick<ResultStrategicObjectivesService, 'create'>
+  >;
+  let resultImpactOutcomesService: jest.Mocked<
+    Pick<ResultImpactOutcomesService, 'create'>
+  >;
+  let resultSdgTargetsService: jest.Mocked<
+    Pick<ResultSdgTargetsService, 'replaceForResult'>
   >;
   let updateDataUtil: jest.Mocked<
     Pick<UpdateDataUtil, 'updateLastUpdatedDate'>
@@ -57,6 +70,9 @@ describe('ResultAlignmentOperationsService', () => {
       findByMultiplesResultLeverIds: jest.fn(),
     };
     resultSdgsService = { create: jest.fn(), find: jest.fn() };
+    resultStrategicObjectivesService = { create: jest.fn() };
+    resultImpactOutcomesService = { create: jest.fn() };
+    resultSdgTargetsService = { replaceForResult: jest.fn() };
     updateDataUtil = { updateLastUpdatedDate: jest.fn() };
     dataSource = {
       transaction: jest.fn(async (callback) => callback(manager)),
@@ -77,6 +93,18 @@ describe('ResultAlignmentOperationsService', () => {
           useValue: resultLeverSdgTargetsService,
         },
         { provide: ResultSdgsService, useValue: resultSdgsService },
+        {
+          provide: ResultStrategicObjectivesService,
+          useValue: resultStrategicObjectivesService,
+        },
+        {
+          provide: ResultImpactOutcomesService,
+          useValue: resultImpactOutcomesService,
+        },
+        {
+          provide: ResultSdgTargetsService,
+          useValue: resultSdgTargetsService,
+        },
         { provide: UpdateDataUtil, useValue: updateDataUtil },
       ],
     }).compile();
@@ -107,7 +135,10 @@ describe('ResultAlignmentOperationsService', () => {
         {
           result_lever_id: 100,
           lever_id: 'L1',
-          result_lever_strategic_outcomes: [{ lever_strategic_outcome_id: 1 }],
+          result_lever_strategic_outcomes: [
+            { id: 1, lever_strategic_outcome_id: 1, strategic_outcome: 'SO1' },
+            { id: 2, lever_strategic_outcome_id: 2, strategic_outcome: 'SO2' },
+          ],
           result_lever_sdg_targets: [{ sdg_target_id: 10 }],
         },
       ];
@@ -149,8 +180,21 @@ describe('ResultAlignmentOperationsService', () => {
         ['is_primary', 'custom_lever_name'],
         { is_primary: false },
       );
-      expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalled();
-      expect(resultLeverSdgTargetsService.create).toHaveBeenCalled();
+      expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalledWith(
+        100,
+        [{ lever_strategic_outcome_id: 1 }, { lever_strategic_outcome_id: 2 }],
+        'lever_strategic_outcome_id',
+        undefined,
+        manager,
+      );
+      expect(resultLeverSdgTargetsService.create).toHaveBeenCalledWith(
+        100,
+        [{ sdg_target_id: 10, result_id: resultId }],
+        'sdg_target_id',
+        undefined,
+        manager,
+        ['result_id'],
+      );
       expect(resultSdgsService.create).toHaveBeenCalledWith(
         resultId,
         alignmentData.result_sdgs,
@@ -254,6 +298,85 @@ describe('ResultAlignmentOperationsService', () => {
         sdgTargets[1],
       ]);
       expect(result.result_sdgs).toEqual([{ clarisa_sdg_id: 3 }]);
+    });
+  });
+
+  describe('clearFieldsHiddenByPortfolio', () => {
+    it('clears research areas and 2026 targets when the result moves to portfolio 2025', async () => {
+      resultLeversService.create.mockResolvedValue([] as any);
+      resultStrategicObjectivesService.create.mockResolvedValue([] as any);
+      resultImpactOutcomesService.create.mockResolvedValue([] as any);
+      resultSdgTargetsService.replaceForResult.mockResolvedValue([] as any);
+
+      await service.clearFieldsHiddenByPortfolio(
+        resultId,
+        PortfolioIdEnum.PORTFOLIO_1,
+        manager as any,
+      );
+
+      expect(resultLeversService.create).toHaveBeenCalledWith(
+        resultId,
+        [],
+        'lever_id',
+        LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+        manager,
+      );
+      expect(resultStrategicObjectivesService.create).toHaveBeenCalledWith(
+        resultId,
+        [],
+        'strategic_objective_id',
+        1,
+        manager,
+      );
+      expect(resultImpactOutcomesService.create).toHaveBeenCalledWith(
+        resultId,
+        [],
+        'impact_outcome_id',
+        1,
+        manager,
+      );
+      expect(resultSdgTargetsService.replaceForResult).toHaveBeenCalledWith(
+        resultId,
+        [],
+        manager,
+      );
+    });
+
+    it('clears 2025 levers and their targets when the result moves to portfolio 2026', async () => {
+      resultLeversService.find.mockResolvedValue([
+        { result_lever_id: 100 },
+      ] as any);
+      resultLeversService.create.mockResolvedValue([] as any);
+      resultLeverStrategicOutcomeService.create.mockResolvedValue([] as any);
+      resultLeverSdgTargetsService.create.mockResolvedValue([] as any);
+
+      await service.clearFieldsHiddenByPortfolio(
+        resultId,
+        PortfolioIdEnum.PORTFOLIO_2,
+        manager as any,
+      );
+
+      expect(resultLeverStrategicOutcomeService.create).toHaveBeenCalledWith(
+        100,
+        [],
+        'lever_strategic_outcome_id',
+        undefined,
+        manager,
+      );
+      expect(resultLeverSdgTargetsService.create).toHaveBeenCalledWith(
+        100,
+        [],
+        'sdg_target_id',
+        undefined,
+        manager,
+      );
+      expect(resultLeversService.create).toHaveBeenCalledWith(
+        resultId,
+        [],
+        'lever_id',
+        LeverRolesEnum.ALIGNMENT,
+        manager,
+      );
     });
   });
 });

@@ -11,4 +11,6 @@ export type ModalName =
   | 'editPrompt'
   | 'projectGroundingSetup'
   | 'portfolioManagement'
+  | 'portfolio2025LeverSdgs'
+  | 'portfolio2026SdgTargets'
   | 'poolFundingHelp';

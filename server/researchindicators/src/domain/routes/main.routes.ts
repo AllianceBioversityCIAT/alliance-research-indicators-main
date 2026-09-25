@@ -63,6 +63,7 @@ import { LinkResultsModule } from '../entities/link-results/link-results.module'
 import { ResultStatusTransitionsModule } from '../entities/result-status-transitions/result-status-transitions.module';
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
+import { ResultSdgTargetsModule } from '../entities/result-sdg-targets/result-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
 import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
@@ -340,6 +341,10 @@ const children: Routes = [
   {
     path: 'lever-sdg-targets',
     module: LeverSdgTargetsModule,
+  },
+  {
+    path: 'portfolio-2026-sdg-targets',
+    module: ResultSdgTargetsModule,
   },
   {
     path: 'tags',

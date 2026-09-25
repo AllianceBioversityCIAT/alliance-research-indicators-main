@@ -230,6 +230,14 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
+  GET_Portfolio2026SdgTargets = (): Promise<MainResponse<{ codes: string[] }>> => {
+    return this.TP.get('portfolio-2026-sdg-targets', {});
+  };
+
+  PATCH_Portfolio2026SdgTargets = (body: { sdg_target_ids: number[] }): Promise<MainResponse<{ codes: string[] }>> => {
+    return this.TP.patch('portfolio-2026-sdg-targets', body, {});
+  };
+
   GET_InstitutionsTypes = (): Promise<MainResponse<GetClarisaInstitutionsTypes[]>> => {
     const url = () => `tools/clarisa/institutions-types`;
     return this.TP.get(url(), {});
