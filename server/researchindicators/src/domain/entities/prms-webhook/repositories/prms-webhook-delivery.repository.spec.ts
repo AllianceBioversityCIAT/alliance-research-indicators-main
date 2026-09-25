@@ -130,6 +130,8 @@ const delivery = (
   decided_at: DECIDED_AT,
   raw_body: { result_id: 9001, decision: 'APPROVE' },
   raw_headers: { 'x-prms-delivery-id': '4172' },
+  status: 'APPROVED',
+  reviewer_name: 'Cristian Gamboa',
   ...overrides,
 });
 
@@ -202,16 +204,31 @@ describe('PrmsWebhookDeliveryRepository', () => {
         created_by: null,
         is_active: true,
         // The Pivot's discriminator: every row this method writes is an
-        // inbound PRMS delivery. The other six Pivot columns are NULL —
-        // T-11's outbound write is the only path that fills them.
+        // inbound PRMS delivery. `status` and `reviewer_name` come from
+        // the callback body; the other four Pivot columns stay NULL —
+        // `actor_user_id` is outbound-only and PRMS sends neither
+        // `reviewer_role`, `science_program_code` nor `changes`.
         event_source: 'PRMS',
-        status: null,
+        status: 'APPROVED',
         actor_user_id: null,
-        reviewer_name: null,
+        reviewer_name: 'Cristian Gamboa',
         reviewer_role: null,
         science_program_code: null,
         changes: null,
       });
+    });
+
+    it('writes a NULL status and a NULL reviewer_name when the caller resolved neither', async () => {
+      await repository.recordDelivery(
+        delivery({ status: null, reviewer_name: null }),
+      );
+
+      expect(table.rows[0].status).toBeNull();
+      expect(table.rows[0].reviewer_name).toBeNull();
+      // The neighbouring Pivot columns must not absorb the shift.
+      expect(table.rows[0].event_source).toBe('PRMS');
+      expect(table.rows[0].actor_user_id).toBeNull();
+      expect(table.rows[0].reviewer_role).toBeNull();
     });
 
     it('binds the INSERT with the EXACT parameter list, one placeholder per bound value', async () => {
@@ -238,6 +255,8 @@ describe('PrmsWebhookDeliveryRepository', () => {
         DeliveryProcessingState.RECEIVED,
         null,
         'PRMS',
+        'APPROVED',
+        'Cristian Gamboa',
       ]);
       expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
     });

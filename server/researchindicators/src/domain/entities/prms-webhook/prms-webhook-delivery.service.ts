@@ -58,6 +58,13 @@ interface ClassifiedBody {
   justification: string | null;
   decidedAt: Date | null;
   rawBody: Record<string, unknown> | null;
+  reviewerName: string | null;
+  /**
+   * The timeline badge, fixed at write time (entity doc on `status`).
+   * Derived from `decision`, so a MALFORMED row -- whose decision is
+   * null -- carries no status either.
+   */
+  status: string | null;
 }
 
 interface DeliveryLogFields {
@@ -70,11 +77,52 @@ interface DeliveryLogFields {
 
 const VERBATIM_DECISIONS = new Set(['APPROVE', 'REJECT']);
 
+/**
+ * `decision` (PRMS's present-tense verb) -> `status` (our past-tense
+ * badge). The entity stores the badge rather than deriving it on read
+ * because the table is append-only: the value is fixed at write time.
+ */
+const DECISION_STATUS: Readonly<Record<string, string>> = {
+  APPROVE: 'APPROVED',
+  REJECT: 'REJECTED',
+};
+
+/** `result_prms_sync_history.reviewer_name` is `varchar(255)`. */
+const REVIEWER_NAME_MAX_LENGTH = 255;
+
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const asSafeInteger = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
+/**
+ * PRMS is NOT consistent about the type of its own numeric fields: the
+ * live 2026-09-24 callback sends `result_id` as the number `11873` and
+ * `data.result_code` as the STRING `"9405"`. A canonical base-10 integer
+ * string denotes the same value, so it is accepted; nothing else is
+ * coerced -- `Number('')` is `0`, `Number('1e3')` is `1000`, and neither
+ * may reach a BIGINT column.
+ */
+const asSafeInteger = (value: unknown): number | null => {
+  if (typeof value === 'number') {
+    return Number.isSafeInteger(value) ? value : null;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const text = value.trim();
+  if (!/^-?[0-9]+$/.test(text)) {
+    return null;
+  }
+  const parsed = Number(text);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+};
+
+const asNonEmptyString = (value: unknown): string | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const text = value.trim();
+  return text === '' ? null : text;
+};
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -88,6 +136,8 @@ const emptyMalformed = (): ClassifiedBody => ({
   justification: null,
   decidedAt: null,
   rawBody: null,
+  reviewerName: null,
+  status: null,
 });
 
 /**
@@ -110,6 +160,7 @@ const classifyBody = (body: unknown): ClassifiedBody => {
   const prmsResultId = readPrmsResultId(body);
   const data = readData(body);
   const prmsResultCode = data.ok ? readResultCode(data.value) : null;
+  const reviewerName = readReviewerName(body);
 
   const shapeOk =
     reference.ok &&
@@ -119,13 +170,17 @@ const classifyBody = (body: unknown): ClassifiedBody => {
     prmsResultId.ok &&
     data.ok;
 
-  const parsed: Omit<ClassifiedBody, 'correlationOutcome' | 'decision'> = {
+  const parsed: Omit<
+    ClassifiedBody,
+    'correlationOutcome' | 'decision' | 'status'
+  > = {
     resultOfficialCode: reference.value,
     prmsResultId: prmsResultId.value,
     prmsResultCode,
     justification: justification.value,
     decidedAt: decidedAt.value,
     rawBody: body,
+    reviewerName,
   };
 
   if (!shapeOk) {
@@ -133,6 +188,7 @@ const classifyBody = (body: unknown): ClassifiedBody => {
       ...parsed,
       correlationOutcome: DeliveryCorrelationOutcome.MALFORMED,
       decision: null,
+      status: null,
     };
   }
 
@@ -141,6 +197,7 @@ const classifyBody = (body: unknown): ClassifiedBody => {
       ...parsed,
       correlationOutcome: DeliveryCorrelationOutcome.NO_REFERENCE,
       decision: decision.value,
+      status: statusFor(decision.value),
     };
   }
 
@@ -148,8 +205,17 @@ const classifyBody = (body: unknown): ClassifiedBody => {
     ...parsed,
     correlationOutcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
     decision: decision.value,
+    status: statusFor(decision.value),
   };
 };
+
+/**
+ * Never widens the vocabulary: only a decision that already passed
+ * `readDecision` verbatim maps to a badge, so an unrecognised verb keeps
+ * the row's status null rather than inventing a third state.
+ */
+const statusFor = (decision: string | null): string | null =>
+  decision === null ? null : (DECISION_STATUS[decision] ?? null);
 
 const readExternalReference = (
   body: Record<string, unknown>,
@@ -242,6 +308,36 @@ const readResultCode = (
 };
 
 /**
+ * Top-level `reviewed_by` only. `data.reviewed_by` is PRMS's own user id
+ * (`612`) and is deliberately not read: `reviewer_name` stores a NAME and
+ * no id, because a PRMS reviewer does not exist in our system (design
+ * §4). Best-effort and never a shape violation -- a delivery with no
+ * reviewer block is still a valid delivery, so this reader has no `ok`
+ * flag and cannot make a body MALFORMED.
+ */
+const readReviewerName = (body: Record<string, unknown>): string | null => {
+  const reviewer = body.reviewed_by;
+  const direct = asNonEmptyString(reviewer);
+  if (direct !== null) {
+    return direct.slice(0, REVIEWER_NAME_MAX_LENGTH);
+  }
+  if (!isPlainObject(reviewer)) {
+    return null;
+  }
+  const composed = [
+    asNonEmptyString(reviewer.first_name),
+    asNonEmptyString(reviewer.last_name),
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' ');
+  const name =
+    asNonEmptyString(composed) ??
+    asNonEmptyString(reviewer.full_name) ??
+    asNonEmptyString(reviewer.name);
+  return name === null ? null : name.slice(0, REVIEWER_NAME_MAX_LENGTH);
+};
+
+/**
  * Store-then-acknowledge (DD-4, DC-6). Steps that run before the `2xx`:
  * classify, stamp the environment, await the repository transaction.
  * The correlator is started afterwards and is not awaited.
@@ -281,6 +377,8 @@ export class PrmsWebhookDeliveryService {
       decided_at: classified.decidedAt,
       raw_body: classified.rawBody,
       raw_headers: input.rawHeaders,
+      status: classified.status,
+      reviewer_name: classified.reviewerName,
     });
 
     const logFields = this.logFields(
