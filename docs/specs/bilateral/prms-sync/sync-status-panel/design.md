@@ -33,7 +33,7 @@ The load-bearing discovery is in §11 **P-3**: **16 of the 19 results that displ
 
 - The `changes` payload and the `See what changed` button — deferred by the owner.
 - A cross-result history feed, pagination, filtering.
-- Backfilling `prms_phase_id` (see D-2 — raised, not decided here).
+- Backfilling `prms_phase_id` — **raised and decided against, 2026-09-25** (D-2). The hidden button is the intended signal that the write failed.
 - Any change to the push path, `is_synced_to_prms`, or the alignment 409 gate.
 - Any change to `result_prms_sync_history`'s schema.
 
