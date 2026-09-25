@@ -106,7 +106,10 @@ describe('ResultsService', () => {
   let mockGreenChecksService: { findByResultId: jest.Mock };
   let mockGreenCheckRepository: { createSnapshot: jest.Mock };
   let mockResultAlignmentOperationsService: jest.Mocked<
-    Pick<ResultAlignmentOperationsService, 'save' | 'find'>
+    Pick<
+      ResultAlignmentOperationsService,
+      'save' | 'find' | 'clearFieldsHiddenByPortfolio'
+    >
   >;
   let mockPortfoliosService: jest.Mocked<
     Pick<PortfoliosService, 'findOne' | 'findByYear'>
@@ -306,6 +309,7 @@ describe('ResultsService', () => {
     mockResultAlignmentOperationsService = {
       save: jest.fn(),
       find: jest.fn(),
+      clearFieldsHiddenByPortfolio: jest.fn(),
     };
 
     mockPortfoliosService = {
@@ -1988,6 +1992,39 @@ describe('ResultsService', () => {
           is_snapshot: false,
         },
       });
+    });
+
+    it('clears alignment fields hidden by the destination portfolio when the reporting year changes portfolio', async () => {
+      const resultId = 1;
+      const updateGeneralInfoDto = {
+        title: 'Updated Result Title',
+        description: 'Updated description',
+        year: 2025,
+        keywords: ['keyword1'],
+        main_contact_person: { user_id: 1 } as any,
+      };
+
+      mockRepository.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ result_id: resultId, report_year_id: 2026 });
+      mockRepository.update.mockResolvedValue(undefined);
+      mockResultKeywordsService.transformData.mockReturnValue([
+        { keyword: 'keyword1' },
+      ] as any);
+      mockResultKeywordsService.create.mockResolvedValue([] as any);
+      mockResultUsersService.create.mockResolvedValue(undefined);
+      mockOpenSearchResultApi.uploadSingleToOpenSearch.mockResolvedValue(
+        undefined,
+      );
+      mockPortfoliosService.findByYear
+        .mockResolvedValueOnce({ id: 2 } as any)
+        .mockResolvedValueOnce({ id: 1 } as any);
+
+      await service.updateGeneralInfo(resultId, updateGeneralInfoDto);
+
+      expect(
+        mockResultAlignmentOperationsService.clearFieldsHiddenByPortfolio,
+      ).toHaveBeenCalledWith(resultId, 1, mockEntityManager);
     });
 
     it('should handle error when repository update fails', async () => {

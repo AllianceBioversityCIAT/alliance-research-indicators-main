@@ -165,6 +165,14 @@ export class AllModalsService {
       cancelText: 'Cancel',
       cancelAction: () => this.toggleModal('simulateProfile')
     },
+    portfolio2025LeverSdgs: {
+      isOpen: false,
+      title: 'Portfolio 2025 SDG targets'
+    },
+    portfolio2026SdgTargets: {
+      isOpen: false,
+      title: 'Portfolio 2026 SDG targets'
+    },
     // Read-only help for the Pool Funding Alignment section. No confirm/cancel:
     // app-modal renders its footer only when one of those actions is registered,
     // so this opens as a plain informational panel with the shared header, close
@@ -294,6 +302,8 @@ export class AllModalsService {
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
       simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false },
+      portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
+      portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false },
       // isWide stays true: it is this modal's layout, not a per-opening state.
       poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false }
     });
