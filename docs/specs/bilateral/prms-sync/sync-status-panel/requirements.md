@@ -35,6 +35,26 @@ When a result is pushed to PRMS the sidebar today renders one line — `PRMS cod
 
 ---
 
+## 2.1 Post-implementation amendments (2026-09-25)
+
+The visual design was reworked with the owner after the first build. These clauses below are **superseded**; everything not listed still holds. Design rationale: `design.md` **D-11 … D-14**.
+
+| Clause | Superseded by |
+|---|---|
+| **R-SSP-002** AC.1 | The card no longer has a title, a circular badge or a filled button. It renders eyebrow (`PRMS sync #N`) · `app-custom-tag` · `by <name> · <date>` · `PRMS code: <n>` · two text links. |
+| **R-SSP-002** render condition | Adds `AND prms_result_code != null` (**D-13**). A history row with no code in `results` renders **nothing** — that absence is the signal. |
+| **R-SSP-003** (whole requirement) | **Withdrawn.** There is no state title. The tag names the state and the container's tint alerts on `APPROVE`/`REJECT` only (**D-11**). |
+| **R-SSP-004** AC presentation | The counter moved from a circular badge into the eyebrow. The counting rule is unchanged. |
+| **R-SSP-005** | The pill is `app-custom-tag`, not a bespoke pill. Labels unchanged. |
+| **R-SSP-006** | Display is first-name + first-surname, resolved **server-side** from `sec_users`' two columns (the client-side split guessed wrong for 566 of 1943 users); full name in `title`. A date is appended. |
+| **R-SSP-007** | Label reads `PRMS code:` — one number, one name. |
+| **R-SSP-008** (whole requirement) | **Withdrawn** with the advisory box; it repeated the pill verbatim. This also closes **OQ-1**, whose copy contradicted its own trigger. |
+| **R-SSP-009** AC.4 | Headlines are `<name> <verb>`, not the §6.4 table (**D-12**). |
+| **R-SSP-009** AC.6 | Was *"must NOT render `See what changed`"*. Now: renders **only** when `changes` is non-empty (**D-14**). |
+| **OQ-3** | **Closed.** The modal sub-header says *"N events"*; only the `STAR` rows are synchronizations. |
+| **OQ-4** | **Closed.** No `(PI)` suffix — the role is not in the table and is not resolved. |
+
+
 ## 3. Functional requirements
 
 ### R-SSP-001 — Per-result synchronization history read endpoint
