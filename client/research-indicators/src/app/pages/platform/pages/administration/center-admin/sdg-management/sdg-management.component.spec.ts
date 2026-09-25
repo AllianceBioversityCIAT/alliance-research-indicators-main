@@ -186,9 +186,9 @@ describe('SdgManagementComponent', () => {
     expect(c.sdgSignalFor(notLoadedLever)).toBe(newSig);
     expect(c.sdgSignalFor(second)).toBe(c.sdgSignalFor(second));
     expect(c.sdgSignalFor(first)).toBe(c.sdgSignalFor(first));
-    c.toggleRow(first);
+    c.selectLever(second);
     f.detectChanges();
-    expect(c.isExpanded(first)).toBe(true);
+    expect(c.selectedLeverId()).toBe(c.leverNumericId(second));
     const multiselectDe = f.debugElement.query(By.css('app-multiselect'));
     const multiselect = multiselectDe?.componentInstance as MultiselectStubComponent;
     if (multiselect) {
@@ -201,9 +201,9 @@ describe('SdgManagementComponent', () => {
       multiselect.rowsCtx = { sdg_target_code: '1.2', sdg_target: 'y', clarisa_sdg: { icon: 'i' } };
     }
     f.detectChanges();
-    c.toggleRow(first);
+    c.selectLever(first);
     f.detectChanges();
-    c.toggleRow(first);
+    c.selectLever(first);
     f.detectChanges();
     if (multiselect) {
       multiselect.selectedCtx = [1, 2];
@@ -359,7 +359,7 @@ describe('SdgManagementComponent', () => {
     const sig = m.get(1);
     if (!sig) throw new Error('expected signal');
     sig.set({ result_lever_sdgs: [], result_lever_sdg_targets: [{ sdg_target_id: Number.NaN }, { sdg_target_id: 2 }] });
-    c.toggleRow(baseLever());
+    c.selectLever(baseLever());
     f.detectChanges();
     await c.saveForLever(c.levers()[0]!);
     await f.whenStable();
@@ -494,6 +494,20 @@ describe('SdgManagementComponent', () => {
     expect(modals.closeModal).toHaveBeenCalledWith('portfolio2026SdgTargets');
   });
 
+  it('selects a lever of the portfolio and falls back to the first one', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    const a = baseLever({ id: 1, lever_id: 1, short_name: 'A', portfolio_id: 1 });
+    const b = baseLever({ id: 2, lever_id: 2, short_name: 'B', portfolio_id: 1 });
+    c.levers.set([a, b]);
+    expect(c.isSelected(a)).toBe(true);
+    c.selectLever(b);
+    expect(c.isSelected(b)).toBe(true);
+    expect(c.isSelected(a)).toBe(false);
+    c.levers.set([a]);
+    expect(c.selectedLever()).toBe(a);
+  });
+
   it('lists portfolio 2025 lever targets as a list and saves the modal selection', async () => {
     await configureBed();
     const f = TestBed.createComponent(SdgManagementComponent);
@@ -532,13 +546,11 @@ describe('SdgManagementComponent', () => {
     f.componentInstance.toggleLeversGroup();
     f.detectChanges();
     expect(f.nativeElement.textContent).toContain('Lever 1');
-    expect(f.nativeElement.textContent).toContain(': Climate');
+    expect(f.nativeElement.textContent).toContain('Climate');
     expect(f.nativeElement.textContent).toContain('2 targets');
     expect(f.nativeElement.textContent).not.toContain('Research area');
-    expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(0);
-
-    f.componentInstance.toggleRow(lever);
-    f.detectChanges();
+    // The first lever is selected by default, so its targets show without another click.
+    expect(f.componentInstance.isSelected(lever)).toBe(true);
     expect(f.nativeElement.querySelectorAll('.sdg-target-list')).toHaveLength(1);
     expect(f.nativeElement.querySelector('.sdg-target-list img')?.getAttribute('src')).toBe('sdg-1.png');
 

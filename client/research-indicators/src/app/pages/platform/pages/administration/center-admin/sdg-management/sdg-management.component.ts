@@ -52,7 +52,7 @@ export default class SdgManagementComponent implements OnInit {
   });
   readonly saveError = signal<string | null>(null);
   readonly saveSuccess = signal(false);
-  readonly expanded = signal<Record<number, boolean>>({});
+  readonly selectedLeverId = signal<number | null>(null);
   readonly leversGroupExpanded = signal(false);
   readonly sdgListExpanded = signal(false);
 
@@ -121,13 +121,20 @@ export default class SdgManagementComponent implements OnInit {
     return environment.s3Folder + normalized;
   }
 
-  isExpanded(lever: GetLevers): boolean {
-    return this.expanded()[this.leverNumericId(lever)] ?? false;
+  /** Lever whose targets fill the detail panel; defaults to the first lever of the portfolio. */
+  readonly selectedLever = computed<GetLevers | null>(() => {
+    const levers = this.portfolio2025Levers();
+    const id = this.selectedLeverId();
+    return levers.find(lever => this.leverNumericId(lever) === id) ?? levers[0] ?? null;
+  });
+
+  isSelected(lever: GetLevers): boolean {
+    const selected = this.selectedLever();
+    return selected != null && this.leverNumericId(selected) === this.leverNumericId(lever);
   }
 
-  toggleRow(lever: GetLevers): void {
-    const id = this.leverNumericId(lever);
-    this.expanded.update(p => ({ ...p, [id]: !p[id] }));
+  selectLever(lever: GetLevers): void {
+    this.selectedLeverId.set(this.leverNumericId(lever));
   }
 
   sdgSignalFor(lever: GetLevers): WritableSignal<SdgLeverSignalValue> {

@@ -44,38 +44,53 @@
                 </span>
               </button>
               @if (leversGroupExpanded()) {
-              <div class="flex w-full min-w-0 flex-col gap-2 border-t border-[#EEF1F3] bg-[#F7F8FA] p-3">
-                @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
-                @let targets = targetsForLever(lever);
-                <div class="min-w-0 overflow-hidden rounded-md border border-[#E0E4E8] bg-white">
-                  <div class="flex min-w-0 items-center gap-2.5 px-4 py-2.5">
-                    <button type="button"
-                      class="sdg-lever-header flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
-                      (click)="toggleRow(lever)" [attr.aria-expanded]="isExpanded(lever)">
-                      <i class="pi shrink-0 !text-[9px] !leading-none !text-[#8D9299] {{ isExpanded(lever) ? 'pi-chevron-up' : 'pi-chevron-down' }}"
-                        aria-hidden="true"></i>
+              <div class="sdg-levers-layout border-t border-[#EEF1F3]">
+                <ul class="sdg-lever-nav m-0 list-none p-0" aria-label="Levers">
+                  @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
+                  @let count = targetsForLever(lever).length;
+                  <li>
+                    <button type="button" class="sdg-lever-item" [class.is-active]="isSelected(lever)"
+                      [attr.aria-current]="isSelected(lever) ? 'true' : null" (click)="selectLever(lever)">
                       @if (leverImageSrc(lever)) {
-                      <img [src]="leverImageSrc(lever)" [alt]="lever.short_name || 'Lever icon'"
-                        class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]" />
+                      <img [src]="leverImageSrc(lever)" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover" />
                       }
-                      <span class="min-w-0 flex-1 truncate font-[550] text-[15px] leading-[18px] text-[#4C5158]">
-                        {{ lever.short_name }}
+                      <span class="flex min-w-0 flex-1 flex-col">
+                        <span class="sdg-lever-item__title">{{ lever.short_name }}</span>
                         @if (lever.other_names) {
-                        <span class="font-['Barlow'] font-normal">: {{ lever.other_names }}</span>
+                        <span class="sdg-lever-item__subtitle">{{ lever.other_names }}</span>
                         }
                       </span>
-                      <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
-                        {{ targets.length }} target{{ targets.length === 1 ? '' : 's' }}
-                      </span>
+                      <span class="sdg-lever-item__count">{{ count }} SDG target{{ count === 1 ? '' : 's' }}</span>
                     </button>
+                  </li>
+                  }
+                </ul>
+
+                @if (selectedLever(); as lever) {
+                @let targets = targetsForLever(lever);
+                <div class="sdg-lever-detail min-w-0 p-5">
+                  <div class="flex min-w-0 items-center gap-4 pb-4">
+                    @if (leverImageSrc(lever)) {
+                    <img [src]="leverImageSrc(lever)" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    }
+                    <div class="min-w-0 flex-1">
+                      <h3 class="m-0 text-[15px] font-[600] leading-[18px] text-[#14314F]">
+                        {{ lever.short_name }}
+                        @if (lever.other_names) {
+                        <span class="font-['Barlow'] font-normal text-[#4C5158]">: {{ lever.other_names }}</span>
+                        }
+                      </h3>
+                      <p class="m-0 pt-0.5 text-[13px] text-[#777C83]">
+                        {{ targets.length }} SDG target{{ targets.length === 1 ? '' : 's' }} linked
+                      </p>
+                    </div>
                     <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
                       styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
                       (onClick)="openPortfolio2025Editor(lever)" />
                   </div>
-                  @if (isExpanded(lever)) {
-                  <ul class="sdg-target-list m-0 list-none p-0 text-[14px] text-[#4C5158]">
+                  <ul class="sdg-target-list m-0 list-none overflow-hidden rounded-md border border-[#E0E4E8] bg-white p-0 text-[14px] text-[#4C5158]">
                     @for (target of targets; track target.id) {
-                    <li class="flex min-w-0 items-center gap-4 border-t border-[#EEF1F3] px-6 py-3.5">
+                    <li class="flex min-w-0 items-center gap-4 border-t border-[#EEF1F3] px-5 py-3.5 first:border-t-0">
                       @if (target.clarisa_sdg?.icon) {
                       <img [src]="target.clarisa_sdg?.icon" [alt]="target.clarisa_sdg?.short_name || 'SDG'" loading="lazy"
                         class="h-[34px] w-[34px] shrink-0 rounded-[3px] object-contain" />
@@ -85,10 +100,9 @@
                       </p>
                     </li>
                     } @empty {
-                    <li class="border-t border-[#EEF1F3] px-6 py-3.5">No SDG targets</li>
+                    <li class="px-5 py-3.5 text-[#777C83]">No SDG targets linked to this lever yet.</li>
                     }
                   </ul>
-                  }
                 </div>
                 }
               </div>
