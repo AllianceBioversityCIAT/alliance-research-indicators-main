@@ -501,4 +501,124 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(stored.result_official_code).toBe(OFFICIAL);
     });
   });
+
+  // The live PRMS callback observed on 2026-09-24 sends `data.result_code`
+  // as a STRING while `result_id` is a number. Under the previous
+  // number-only reader `prms_result_code` was silently stored as NULL —
+  // the row looked well-formed and the code was simply gone.
+  describe('numeric fields PRMS sends as strings', () => {
+    it('stores data.result_code when PRMS sends it as the string "9405"', async () => {
+      await service.accept(
+        request(wellFormedBody({ data: { result_code: '9405' } })),
+      );
+
+      const stored = storedInput();
+      expect(stored.prms_result_code).toBe(9405);
+      expect(stored.correlation_outcome).not.toBe(
+        DeliveryCorrelationOutcome.MALFORMED,
+      );
+    });
+
+    it('stores result_id when PRMS sends it as a string, and does not call the row MALFORMED', async () => {
+      await service.accept(request(wellFormedBody({ result_id: '11873' })));
+
+      const stored = storedInput();
+      expect(stored.prms_result_id).toBe(11873);
+      expect(stored.correlation_outcome).toBe(
+        DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+      );
+    });
+
+    it('does not coerce a non-canonical numeric string: result_code "" / "1e3" / "abc" stay null', async () => {
+      for (const raw of ['', '1e3', 'abc', '  ']) {
+        recordDelivery.mockClear();
+        await service.accept(
+          request(wellFormedBody({ data: { result_code: raw } })),
+        );
+        expect(storedInput().prms_result_code).toBeNull();
+      }
+    });
+  });
+
+  describe('reviewer_name — the inbound reviewer, name only (design §4)', () => {
+    it('composes first_name + last_name from the top-level reviewed_by block', async () => {
+      await service.accept(
+        request(
+          wellFormedBody({
+            reviewed_by: {
+              id: 612,
+              email: 'C.Gamboa@cgiar.org',
+              last_name: 'Gamboa',
+              first_name: 'Cristian',
+            },
+          }),
+        ),
+      );
+
+      expect(storedInput().reviewer_name).toBe('Cristian Gamboa');
+    });
+
+    it('stores null when the callback carries no reviewer block', async () => {
+      await service.accept(request(wellFormedBody()));
+
+      expect(storedInput().reviewer_name).toBeNull();
+    });
+
+    it("ignores data.reviewed_by, which is PRMS's user id and not a name", async () => {
+      await service.accept(
+        request(
+          wellFormedBody({ data: { result_code: 5521, reviewed_by: 612 } }),
+        ),
+      );
+
+      expect(storedInput().reviewer_name).toBeNull();
+    });
+
+    it('never turns an unusable reviewer block into a shape violation', async () => {
+      await service.accept(request(wellFormedBody({ reviewed_by: 612 })));
+
+      const stored = storedInput();
+      expect(stored.reviewer_name).toBeNull();
+      expect(stored.correlation_outcome).toBe(
+        DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+      );
+    });
+
+    it('truncates to the varchar(255) the column actually is', async () => {
+      await service.accept(
+        request(
+          wellFormedBody({
+            reviewed_by: { first_name: 'x'.repeat(400), last_name: 'y' },
+          }),
+        ),
+      );
+
+      expect(storedInput().reviewer_name).toHaveLength(255);
+    });
+  });
+
+  describe('status — the timeline badge, fixed at write time', () => {
+    it('APPROVE becomes APPROVED', async () => {
+      await service.accept(request(wellFormedBody()));
+
+      expect(storedInput().status).toBe('APPROVED');
+    });
+
+    it('REJECT becomes REJECTED', async () => {
+      await service.accept(request(wellFormedBody({ decision: 'REJECT' })));
+
+      expect(storedInput().status).toBe('REJECTED');
+    });
+
+    it('a MALFORMED row has no decision, so it gets no badge', async () => {
+      await service.accept(request(wellFormedBody({ decision: 'approve' })));
+
+      const stored = storedInput();
+      expect(stored.correlation_outcome).toBe(
+        DeliveryCorrelationOutcome.MALFORMED,
+      );
+      expect(stored.decision).toBeNull();
+      expect(stored.status).toBeNull();
+    });
+  });
 });

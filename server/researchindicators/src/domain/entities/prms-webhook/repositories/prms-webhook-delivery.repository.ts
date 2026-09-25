@@ -152,6 +152,18 @@ export interface RecordDeliveryInput {
   decided_at: Date | null;
   raw_body: Record<string, unknown> | null;
   raw_headers: Record<string, unknown> | null;
+  /**
+   * `'APPROVED'` | `'REJECTED'` | null — the timeline badge the caller
+   * derived from `decision`. Null on a MALFORMED body, which has no
+   * decision to derive it from.
+   */
+  status: string | null;
+  /**
+   * The PRMS reviewer's name as sent. A NAME and no id — that person does
+   * not exist in our system (design §4). Null when the callback carried
+   * no reviewer block.
+   */
+  reviewer_name: string | null;
 }
 
 export type RecordDeliveryResult =
@@ -276,13 +288,16 @@ export class PrmsWebhookDeliveryRepository {
          is_active, event_source, status, actor_user_id, reviewer_name,
          reviewer_role, science_program_code, changes)
       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
-              ?, NULL, NULL, NULL, NULL, NULL, NULL)
+              ?, ?, NULL, ?, NULL, NULL, NULL)
       `,
-      // 25 columns, 15 placeholders + 10 literals (result_year,
+      // 25 columns, 17 placeholders + 8 literals (result_year,
       // processing_error and created_by are NULL at insert; is_active is
-      // TRUE; the six Pivot columns this ingest path never populates --
-      // status, actor_user_id, reviewer_name, reviewer_role,
-      // science_program_code, changes -- are NULL). result_year is NULL AT
+      // TRUE; the four Pivot columns this ingest path still cannot
+      // populate -- actor_user_id (outbound only), reviewer_role and
+      // science_program_code (absent from the live PRMS callback) and
+      // changes (PRMS has committed to no shape) -- are NULL).
+      // `status` and `reviewer_name` ARE bound: the 2026-09-24 callback
+      // carries `decision` and a `reviewed_by` block. result_year is NULL AT
       // INSERT because a PRMS delivery carries no reporting year; the
       // correlator fills it when it resolves the live row, and the outbound
       // PENDING_REVIEW write sets it directly. There is no result_id column. Keep this
@@ -311,6 +326,8 @@ export class PrmsWebhookDeliveryRepository {
         // says so -- so the literal is fixed here, not threaded through
         // RecordDeliveryInput. T-11's own write path is a separate method.
         EVENT_SOURCE_INBOUND,
+        input.status,
+        input.reviewer_name,
       ],
     );
     const deliveryRowId = Number(asOk(insertResult).insertId);
