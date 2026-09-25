@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AppConfig } from './app-config.util';
 
@@ -170,5 +171,69 @@ describe('AppConfig', () => {
     } as unknown as DataSource;
     const cfg = new AppConfig(ds);
     await expect(cfg.DB_SUPPORT_EMAIL()).resolves.toBeUndefined();
+  });
+
+  describe('IMPERSONATION_TTL_MINUTES', () => {
+    it('returns the default 240 when ARI_IMPERSONATION_TTL_MINUTES is unset', () => {
+      delete process.env.ARI_IMPERSONATION_TTL_MINUTES;
+      const cfg = new AppConfig(dataSource);
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(240);
+    });
+
+    it('returns the configured integer within [1, 1440]', () => {
+      process.env.ARI_IMPERSONATION_TTL_MINUTES = '60';
+      const cfg = new AppConfig(dataSource);
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(60);
+    });
+
+    it('falls back to 240 and warns when the value is garbage (non-numeric)', () => {
+      process.env.ARI_IMPERSONATION_TTL_MINUTES = 'not-a-number';
+      const cfg = new AppConfig(dataSource);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(240);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid ARI_IMPERSONATION_TTL_MINUTES'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('falls back to 240 and warns when the value is out of range (max 1440)', () => {
+      process.env.ARI_IMPERSONATION_TTL_MINUTES = '99999';
+      const cfg = new AppConfig(dataSource);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(240);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('falls back to 240 and warns when the value is a non-integer float', () => {
+      process.env.ARI_IMPERSONATION_TTL_MINUTES = '10.5';
+      const cfg = new AppConfig(dataSource);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(240);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('falls back to 240 and warns when the value is below the min (0)', () => {
+      process.env.ARI_IMPERSONATION_TTL_MINUTES = '0';
+      const cfg = new AppConfig(dataSource);
+      const warnSpy = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+
+      expect(cfg.IMPERSONATION_TTL_MINUTES).toBe(240);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
   });
 });

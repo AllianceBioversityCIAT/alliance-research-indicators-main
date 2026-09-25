@@ -57,6 +57,7 @@ const ALLOWED_LEVELS_BY_RESULT_TYPE: Partial<
   capacity_sharing: ['OUTPUT'],
   innovation_dev: ['OUTPUT'],
   policy_change: ['OUTCOME', 'EOI'],
+  innovation_use: ['OUTCOME'],
 };
 
 /**

@@ -5,11 +5,15 @@ import { GetStrategicObjectivesService } from '@services/control-list/get-strate
 import { GetImpactOutcomesService } from '@services/control-list/get-impact-outcomes.service';
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
+import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
+import { Portfolio2026SdgTargetsService } from '@services/control-list/portfolio-2026-sdg-targets.service';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../../../shared/services/api.service';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { CacheService } from '../../../../../../shared/services/cache/cache.service';
 import { ActionsService } from '../../../../../../shared/services/actions.service';
+import { BilateralService } from '@shared/services/bilateral.service';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { MultiselectComponent } from '../../../../../../shared/components/custom-fields/multiselect/multiselect.component';
 import { GetAllianceAlignment } from '../../../../../../shared/interfaces/get-alliance-alignment.interface';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -40,6 +44,20 @@ import {
 const OTHER_LEVER_ID = 9;
 const PORTFOLIO_P2_ID = 2;
 
+/**
+ * The subset of a contract / lever / SDG row that the Primary toggle needs.
+ * `agreement_id` and `is_pool_funding_contributor` exist on contract rows only —
+ * both optional, so lever and SDG callers keep passing what they always passed.
+ */
+export interface PrimaryCandidate {
+  is_primary: boolean;
+  contract_id?: string | number;
+  lever_id?: string | number;
+  sdg_id?: number;
+  agreement_id?: string;
+  is_pool_funding_contributor?: boolean;
+}
+
 @Component({
   selector: 'app-alliance-alignment',
   imports: [
@@ -52,7 +70,8 @@ const PORTFOLIO_P2_ID = 2;
     TooltipModule,
     AllianceLeverCardComponent,
     InputComponent,
-    AllianceAlignmentP2Component
+    AllianceAlignmentP2Component,
+    CustomTagComponent
   ],
   templateUrl: './alliance-alignment.component.html'
 })
@@ -64,6 +83,8 @@ export default class AllianceAlignmentComponent {
   getImpactOutcomesService = inject(GetImpactOutcomesService);
   getSdgsService = inject(GetSdgsService);
   getLeverSdgTargetsService = inject(GetLeverSdgTargetsService);
+  getLeverStrategicOutcomesService = inject(GetLeverStrategicOutcomesService);
+  portfolio2026SdgTargets = inject(Portfolio2026SdgTargetsService);
   body: WritableSignal<GetAllianceAlignment> = signal({
     contracts: [],
     result_sdgs: [],
@@ -76,6 +97,7 @@ export default class AllianceAlignmentComponent {
   apiService = inject(ApiService);
   cache = inject(CacheService);
   actions = inject(ActionsService);
+  bilateralService = inject(BilateralService);
   router = inject(Router);
   loading = signal(false);
   submission = inject(SubmissionService);
@@ -121,9 +143,6 @@ export default class AllianceAlignmentComponent {
   }
 
   async getData() {
-    this.leverOutcomeSignals.clear();
-    this.leverSdgSignals.clear();
-
     const portfolioParams = this.leverServiceParams();
     const contractParams = this.contractServiceParams();
 
@@ -138,7 +157,7 @@ export default class AllianceAlignmentComponent {
       await Promise.all([
         this.getStrategicObjectivesService.main(portfolioParams),
         this.getImpactOutcomesService.main(portfolioParams),
-        ...(this.isOicrIndicator() ? [] : [this.getSdgsService.main()])
+        ...(this.isOicrIndicator() ? [this.portfolio2026SdgTargets.main()] : [this.getSdgsService.main()])
       ]);
 
       const normalized = normalizePortfolio2AlignmentGet(response.data, {
@@ -146,7 +165,8 @@ export default class AllianceAlignmentComponent {
         levers: this.getLeversService.getList(portfolioParams)(),
         strategicObjectives: this.getStrategicObjectivesService.getList(portfolioParams)(),
         impactOutcomes: this.getImpactOutcomesService.getList(portfolioParams)(),
-        sdgs: this.getSdgsService.list()
+        sdgs: this.getSdgsService.list(),
+        sdgTargets: this.portfolio2026SdgTargets.list()
       });
       this.body.set({
         ...normalized,
@@ -168,12 +188,18 @@ export default class AllianceAlignmentComponent {
     ];
 
     if (leverIdsFromResponse.length) {
-      await Promise.all(leverIdsFromResponse.map(leverId => this.getLeverSdgTargetsService.main(leverId)));
+      await Promise.all(
+        leverIdsFromResponse.flatMap(leverId => [
+          this.getLeverSdgTargetsService.main(leverId),
+          this.getLeverStrategicOutcomesService.main(leverId)
+        ])
+      );
     }
 
     const mapLevers = (levers: Lever[] | undefined): Lever[] =>
       (levers ?? []).map(lever => ({
         ...lever,
+        result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
         result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
         result_lever_sdg_targets: enrichAlignmentSdgTargets(
           (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
@@ -205,25 +231,76 @@ export default class AllianceAlignmentComponent {
       result_sdgs: this.isOicrIndicator() ? [] : legacyRootSdgs,
       primary_levers: this.applyCustomNamesToLevers(primary_levers),
       contributor_levers: this.applyCustomNamesToLevers(contributor_levers),
-      research_areas: response.data.research_areas || [],
-      strategic_objectives: response.data.strategic_objectives || [],
-      impact_outcomes: response.data.impact_outcomes || []
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     });
   }
 
   private populateLeverChildSignals(levers: Lever[]) {
+    const activeIds = new Set(levers.map(lever => String(lever.lever_id)));
+    for (const leverId of this.leverOutcomeSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverOutcomeSignals.delete(leverId);
+    }
+    for (const leverId of this.leverSdgSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverSdgSignals.delete(leverId);
+    }
+
     for (const lever of levers) {
-      this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: lever.result_lever_strategic_outcomes ?? [] }));
-      this.leverSdgSignals.set(
-        lever.lever_id,
-        signal({
-          result_lever_sdgs: lever.result_lever_sdgs ?? [],
-          result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
-        })
-      );
+      const outcomes = lever.result_lever_strategic_outcomes ?? [];
+      const sdgState = {
+        result_lever_sdgs: lever.result_lever_sdgs ?? [],
+        result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
+      };
+      const existingOutcomes = this.leverOutcomeSignals.get(lever.lever_id);
+      if (existingOutcomes) {
+        existingOutcomes.set({ result_lever_strategic_outcomes: outcomes });
+      } else {
+        this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: outcomes }));
+      }
+
+      const existingSdgs = this.leverSdgSignals.get(lever.lever_id);
+      if (existingSdgs) {
+        existingSdgs.set(sdgState);
+      } else {
+        this.leverSdgSignals.set(lever.lever_id, signal(sdgState));
+      }
     }
 
     this.syncLeverCustomNameSignals(levers);
+  }
+
+  /**
+   * Saved rows use the junction primary key as `id` and the catalog key as `lever_strategic_outcome_id`.
+   * The multiselect optionValue is the catalog `id`, so the junction id never matches an option:
+   * the closed control can show a count while the rows stay blank and the field stays required.
+   */
+  private strategicOutcomesForSignal(lever: Lever): LeverStrategicOutcome[] {
+    const raw = lever.result_lever_strategic_outcomes as unknown;
+    const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+    const catalog = this.getLeverStrategicOutcomesService.getList(lever.lever_id)();
+
+    return list.flatMap((value): LeverStrategicOutcome[] => {
+      const normalized = this.normalizeOutcome(value);
+      const outcomeId = Number(normalized.lever_strategic_outcome_id);
+      if (!Number.isFinite(outcomeId) || outcomeId <= 0) return [];
+
+      const saved =
+        value && typeof value === 'object'
+          ? (value as LeverStrategicOutcome & { lever_strategic_outcome?: LeverStrategicOutcome })
+          : undefined;
+      const match = catalog.find(item => Number(item.id ?? item.lever_strategic_outcome_id) === outcomeId);
+      const strategic_outcome = saved?.strategic_outcome ?? saved?.lever_strategic_outcome?.strategic_outcome ?? match?.strategic_outcome;
+
+      return [
+        {
+          id: outcomeId,
+          lever_strategic_outcome_id: outcomeId,
+          strategic_outcome
+        }
+      ];
+    });
   }
 
   private syncLeverCustomNameSignals(levers: Lever[]): void {
@@ -354,7 +431,8 @@ export default class AllianceAlignmentComponent {
     const dataToSend = buildPortfolio2AlignmentPatch(
       this.body(),
       this.isOicrIndicator() || this.isPolicyChangeIndicator() || this.isInnovationUseIndicator(),
-      !this.isOicrIndicator()
+      !this.isOicrIndicator(),
+      this.isOicrIndicator()
     );
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
   }
@@ -371,7 +449,11 @@ export default class AllianceAlignmentComponent {
       ...this.body(),
       primary_levers,
       contributor_levers,
-      result_sdgs
+      result_sdgs,
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     };
 
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
@@ -389,7 +471,46 @@ export default class AllianceAlignmentComponent {
       detail: 'Data saved successfully'
     });
 
-    await this.getData();
+    // getData() is in a try/finally so the visibility refresh below runs even when
+    // the re-read fails: the PATCH already succeeded, so the sidebar is showing a
+    // state the server no longer has, and leaving it stale is the worse outcome.
+    try {
+      await this.getData();
+    } finally {
+      await this.refreshPoolFundingVisibility();
+    }
+
+    // The sidebar's Pool Funding block (OPTIONAL divider + item + PRMS SYNC) is
+    // gated on `alignment.eligible` (the primary CONTRACT, edited here) and
+    // `alignment.version_locked` (the reporting YEAR, edited in General
+    // Information). Both are SERVER-computed and reach the sidebar only through
+    // `BilateralService.currentAlignment`, which nothing refreshes on a section
+    // save -- `result.component.ts` memoizes its fetch on `code + URL version`,
+    // and neither changes when the contract is edited here. Without this re-fetch
+    // the block keeps its pre-save visibility until a full page reload
+    // (user-reported). Runs only after the PATCH succeeded (the early `return`
+    // above covers the failure path) — in the `finally` beside getData().
+  }
+
+  /**
+   * Re-reads the pool funding alignment so the sidebar re-evaluates whether the
+   * Pool Funding block stays visible. Never throws into the caller: the save
+   * already succeeded, and a failed refresh must leave the stale-but-harmless
+   * previous visibility rather than surface a false save error.
+   */
+  private async refreshPoolFundingVisibility(): Promise<void> {
+    try {
+      // The ROUTE code, falling back to the numeric id — the same pair every other
+      // caller uses (result.component.ts, result-sidebar.onPrmsSync). The numeric
+      // id alone still resolves to STAR, so this is not a behaviour change; it
+      // keeps one call site from being the odd one out when a code-shaped param
+      // starts mattering.
+      const resultCode =
+        this.route.snapshot.paramMap.get('id') ?? String(this.cache.currentResultId());
+      await this.bilateralService.getAlignment(resultCode);
+    } catch {
+      // Intentionally swallowed -- see doc comment.
+    }
   }
 
   private buildResultSdgsFromLevers(levers: Lever[], resultId: number) {
@@ -414,10 +535,119 @@ export default class AllianceAlignmentComponent {
     }));
   }
 
-  markAsPrimary(
-    item: { is_primary: boolean; contract_id?: string | number; lever_id?: string | number; sdg_id?: number },
+  // @sdd-spec docs/specs/bilateral — Pool Funding notice on the Primary contract
+  /**
+   * Whether a pool-funding contract is the Primary one RIGHT NOW. That is the
+   * single condition the optional Pool Funding Alignment section hangs on.
+   */
+  private hasPoolFundingPrimary(): boolean {
+    return (this.body().contracts ?? []).some(contract => {
+      const row = contract as PrimaryCandidate;
+      return row.is_primary === true && row.is_pool_funding_contributor === true;
+    });
+  }
+
+  /**
+   * What clicking Primary on `item` does to the Pool Funding Alignment section.
+   *
+   * applyPrimary toggles the clicked contract and clears every other, so the NEXT
+   * state has a pool-funding Primary exactly when the click is turning ON a
+   * contract that contributes. Comparing that with the current state gives the
+   * three transitions that matter:
+   *
+   *   'enable'  — none → one. An optional section the user never asked for appears.
+   *   'disable' — one → none. That section, and the Science Program alignment
+   *               inside it, stops applying. This covers BOTH switching to a
+   *               contract that does not contribute AND clearing the Primary
+   *               altogether: the consequence is identical.
+   *   null      — no change worth interrupting for, including swapping one
+   *               pool-funding contract for another.
+   *
+   * (An earlier version warned only on 'enable', reasoning that un-setting
+   * "enables nothing". True, but it DISABLES something, which is just as
+   * surprising to discover after the fact.)
+   */
+  private poolFundingSectionTransition(
+    item: PrimaryCandidate,
     type: 'contract' | 'lever' | 'sdg'
-  ) {
+  ): 'enable' | 'disable' | null {
+    if (type !== 'contract') return null;
+
+    const willHave = !item.is_primary && item.is_pool_funding_contributor === true;
+    const hasNow = this.hasPoolFundingPrimary();
+
+    if (!hasNow && willHave) return 'enable';
+    if (hasNow && !willHave) return 'disable';
+    return null;
+  }
+
+  markAsPrimary(item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') {
+    const transition = this.poolFundingSectionTransition(item, type);
+    if (transition) {
+      this.confirmPoolFundingPrimary(item, type, transition);
+      return;
+    }
+    this.applyPrimary(item, type);
+  }
+
+  /**
+   * One informative confirm before the change lands, the same treatment the
+   * reporting-year change gets in General Information
+   * (showReportingYearChangeWarning): Continue applies it, Cancel leaves
+   * everything untouched.
+   */
+  private confirmPoolFundingPrimary(
+    item: PrimaryCandidate,
+    type: 'contract' | 'lever' | 'sdg',
+    transition: 'enable' | 'disable'
+  ): void {
+    const label = item.agreement_id ? `<strong>${item.agreement_id}</strong>` : 'This project';
+
+    // Clearing the Primary has no incoming project to name, so the lead sentence
+    // differs even though the consequence is the same.
+    const isClearing = item.is_primary === true;
+
+    const body =
+      transition === 'enable'
+        ? `<div>${label} contributes to Pool Funding.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>Making it the Primary project enables the optional <strong>Pool Funding Alignment</strong> ` +
+          `section, where you align this result with a Science Program and its contribution to the ` +
+          `Theory of Change so it can later be synced to PRMS.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>The section appears in the sidebar once the change is saved.</div>`
+        : (isClearing
+            ? `<div>The current Primary project contributes to Pool Funding.</div>` +
+              `<div>&nbsp;</div>` +
+              `<div>Clearing it disables the optional <strong>Pool Funding Alignment</strong> section.</div>`
+            : `<div>${label} does not contribute to Pool Funding.</div>` +
+              `<div>&nbsp;</div>` +
+              `<div>Making it the Primary project disables the optional ` +
+              `<strong>Pool Funding Alignment</strong> section.</div>`) +
+          `<div>&nbsp;</div>` +
+          `<div>This result will no longer be aligned with a Science Program, and it will not be ` +
+          `available to sync to PRMS.</div>` +
+          `<div>&nbsp;</div>` +
+          `<div>The section disappears from the sidebar once the change is saved.</div>`;
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: transition === 'enable' ? 'Pool Funding contribution' : 'Pool Funding Alignment will be disabled',
+      detail: `<div class="alert-detail-left">${body}</div>`,
+      confirmCallback: {
+        label: 'Continue',
+        event: () => {
+          this.applyPrimary(item, type);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel'
+      },
+      buttonColor: '#035BA9'
+    });
+  }
+
+  private applyPrimary(item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') {
     this.body.update(current => {
       if (type === 'contract') {
         const contracts = current.contracts.map(contract => {
@@ -453,10 +683,8 @@ export default class AllianceAlignmentComponent {
     this.actions.saveCurrentSection();
   }
 
-  markAsPrimaryHandler = (
-    item: { is_primary: boolean; contract_id?: string | number; lever_id?: string | number; sdg_id?: number },
-    type: 'contract' | 'lever' | 'sdg'
-  ) => this.markAsPrimary(item, type);
+  markAsPrimaryHandler = (item: PrimaryCandidate, type: 'contract' | 'lever' | 'sdg') =>
+    this.markAsPrimary(item, type);
 
   removePrimaryLever(lever: Lever) {
     if (!this.submission.isEditableStatus()) return;
@@ -528,6 +756,11 @@ export default class AllianceAlignmentComponent {
     return Number(lever.lever_id) === OTHER_LEVER_ID;
   }
 
+  /**
+   * Save payload is only the catalog key. The multiselect `id` is that same catalog id,
+   * and the junction table also uses `id` as its primary key. Forwarding it makes the
+   * server update an existing junction row instead of inserting one per outcome.
+   */
   private normalizeOutcome(value: unknown): LeverStrategicOutcome {
     if (typeof value === 'number') {
       return { lever_strategic_outcome_id: value };
@@ -535,7 +768,7 @@ export default class AllianceAlignmentComponent {
     if (value && typeof value === 'object') {
       const obj = value as Partial<LeverStrategicOutcome> & { id?: number };
       const idFromObject = obj.lever_strategic_outcome_id ?? obj.id;
-      return { ...(obj as LeverStrategicOutcome), lever_strategic_outcome_id: idFromObject as number };
+      return { lever_strategic_outcome_id: Number(idFromObject) };
     }
     return { lever_strategic_outcome_id: 0 };
   }
@@ -552,6 +785,9 @@ export default class AllianceAlignmentComponent {
       } else if (typeof raw === 'number' || (raw && typeof raw === 'object')) {
         normalized = [this.normalizeOutcome(raw)];
       }
+      normalized = normalized.filter(
+        outcome => Number.isFinite(outcome.lever_strategic_outcome_id) && outcome.lever_strategic_outcome_id > 0
+      );
       next = { ...next, result_lever_strategic_outcomes: normalized };
     }
 

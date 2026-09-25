@@ -208,6 +208,24 @@ describe('ToPromiseService', () => {
     expect(setSpy).toHaveBeenCalledWith({ test: 1 });
   });
 
+  // A failed green-checks request used to store `undefined`, and the sidebar read
+  // it as an object: "Cannot read properties of undefined (reading
+  // 'general_information')" blanked the section list and the completed counter.
+  it.each([
+    ['a failed request with no data', { successfulRequest: false } as unknown],
+    ['an explicitly undefined data', { data: undefined } as unknown],
+    ['a null response', null as unknown]
+  ])('updateGreenChecks stores {} for %s, never a non-object', async (_label, response) => {
+    const setSpy = jest.spyOn(service.cacheService.greenChecks, 'set');
+    jest.spyOn(service, 'getGreenChecks').mockResolvedValue(response as never);
+
+    await service.updateGreenChecks();
+
+    // ★ discriminating: the old code passed `response.data` straight through.
+    expect(setSpy).toHaveBeenCalledWith({});
+    expect(service.cacheService.greenChecks()).toEqual({});
+  });
+
   it('get sets noAuthInterceptor header', async () => {
     httpClientMock.get = jest.fn().mockReturnValue(of({ data: { foo: 'bar' } }));
     await service.get('/test-url', { noAuthInterceptor: true });
@@ -349,6 +367,24 @@ describe('ToPromiseService', () => {
       const error = new Error('Blob fetch failed');
       httpClientMock.get = jest.fn().mockReturnValue(throwError(() => error));
       await expect(service.getBlob('/test-url')).rejects.toThrow('Blob fetch failed');
+    });
+
+    // Leader-adopted item 4 (reviewer-named latent leak): getBlob must also apply the
+    // X-Ari-Auth-Call marker on isAuth:true calls, same as get/post/put/patch/delete.
+    it('should set the X-Ari-Auth-Call marker header when isAuth is true', async () => {
+      const mockBlob = new Blob(['test'], { type: 'application/pdf' });
+      httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
+      await service.getBlob('/test-url', { isAuth: true });
+      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
+      expect(headers.get('X-Ari-Auth-Call')).toBe('1');
+    });
+
+    it('should NOT set the X-Ari-Auth-Call marker header when isAuth is falsy', async () => {
+      const mockBlob = new Blob(['test'], { type: 'application/pdf' });
+      httpClientMock.get = jest.fn().mockReturnValue(of(mockBlob));
+      await service.getBlob('/test-url');
+      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
+      expect(headers.has('X-Ari-Auth-Call')).toBe(false);
     });
   });
 });

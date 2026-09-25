@@ -20,92 +20,224 @@
         <p class="text-sm text-[#4C5158]">Loading levers…</p>
         } @else if (loadError()) {
         <p class="text-sm text-[#B00020]">We could not load levers or existing SDG links. Please refresh the page.</p>
-        } @else if (levers().length === 0) {
+        } @else if (levers().length === 0 && portfolio2026Targets().length === 0) {
         <p class="text-sm text-[#4C5158]">No levers are available.</p>
         } @else {
-        <div class="w-full min-w-0 pb-2 px-2">
-
-          <div class="flex w-full min-w-0 flex-col gap-4">
-            @for (lever of levers(); track leverNumericId(lever)) {
-            <div class="sdg-lever-card flex min-h-0 min-w-0 flex-col rounded-lg border border-[#E0E4E8] bg-[#E8EBED]">
+        <div class="w-full min-w-0 pb-2 px-2 flex flex-col gap-8">
+          @for (portfolioId of portfolioSections(); track portfolioId) {
+          @if (portfolioId === leverPortfolioId) {
+          <section class="flex w-full min-w-0 flex-col gap-3">
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(leverPortfolioId) }}</h2>
+            <p class="text-sm text-[#4C5158]">SDG targets linked to each lever in this portfolio.</p>
+            @if (portfolio2025Levers().length === 0) {
+            <p class="text-sm text-[#4C5158]">No levers are available for this portfolio.</p>
+            } @else {
+            <div class="min-w-0 overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
               <button type="button"
-                class="sdg-lever-header flex w-full min-w-0 items-center gap-2.5 bg-[#F7F8FA] px-4 py-2.5 text-left cursor-pointer"
-                [class.rounded-t-lg]="isExpanded(lever)" [class.rounded-lg]="!isExpanded(lever)"
-                (click)="toggleRow(lever)" [attr.aria-expanded]="isExpanded(lever)">
-                <i class="sdg-lever-chevron pi shrink-0 text-[#1e4a7a] {{ isExpanded(lever) ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                class="sdg-lever-header flex w-full min-w-0 items-center gap-2.5 px-4 py-3 text-left cursor-pointer"
+                (click)="toggleLeversGroup()" [attr.aria-expanded]="leversGroupExpanded()">
+                <i class="pi shrink-0 !text-[10px] !leading-none !text-[#8D9299] {{ leversGroupExpanded() ? 'pi-chevron-up' : 'pi-chevron-down' }}"
                   aria-hidden="true"></i>
-                @if (leverImageSrc(lever)) {
-                <img [src]="leverImageSrc(lever)" [alt]="lever.short_name || 'Lever icon'"
-                  class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]" />
-                }
-                <span
-                  class="min-w-0 flex-1 text-left text-[14px] font-[600] leading-[1.35] tracking-wide text-[#14314F]">
-                  {{ lever.short_name }}{{ lever.other_names ? ' - ' + lever.other_names : '' }}
+                <span class="min-w-0 flex-1 truncate text-[15px] font-[600] leading-[18px] text-[#14314F]">Levers</span>
+                <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
+                  {{ portfolio2025Levers().length }} lever{{ portfolio2025Levers().length === 1 ? '' : 's' }}
                 </span>
               </button>
-
-              @if (isExpanded(lever)) {
-              <div class="min-h-0 min-w-0 border-t border-[#EEF1F3] bg-white p-6 rounded-b-lg">
-                <app-multiselect class="block w-full min-w-0" label="SDG target(s)" [signal]="sdgSignalFor(lever)"
-                  optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
-                  signalOptionValue="result_lever_sdg_targets" [disabled]="false" [removeCondition]="allowRemoveSdg"
-                  [columnsOnXl]="true" [selectedItemsSurfaceColor]="selectedItemsSurfaceColor" [isRequired]="false"
-                  serviceName="clarisaSdgTargets" filterBy="sdg_target_code,sdg_target,select_label"
-                  [enableVirtualScroll]="false" [scrollHeight]="'200px'" placeholder="Select the SDG targets">
-                  <ng-template #selectedItems let-value>
-                    @if (value?.length > 0) {
-                    <div class="flex items-center gap-2">
-                      <span>{{ value?.length }} target{{ value?.length === 1 ? '' : 's' }} selected</span>
-                    </div>
-                    }
-                  </ng-template>
-                  <ng-template #item let-item>
-                    <div class="flex w-full min-w-0 items-center gap-3">
-                      @if (item?.clarisa_sdg?.icon) {
-                      <img [src]="item.clarisa_sdg.icon" [alt]="item.clarisa_sdg.short_name || 'SDG'" loading="lazy"
-                        class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+              @if (leversGroupExpanded()) {
+              <div class="sdg-levers-layout border-t border-[#EEF1F3]">
+                <ul class="sdg-lever-nav m-0 list-none p-0" aria-label="Levers">
+                  @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
+                  @let count = targetsForLever(lever).length;
+                  <li>
+                    <button type="button" class="sdg-lever-item" [class.is-active]="isSelected(lever)"
+                      [attr.aria-current]="isSelected(lever) ? 'true' : null" (click)="selectLever(lever)">
+                      @if (leverImageSrc(lever)) {
+                      <img [src]="leverImageSrc(lever)" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover" />
                       }
-                      <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
-                        <span class="font-[600]">{{ item?.sdg_target_code }}</span><span class="font-normal"> -
-                          {{ item?.sdg_target }}</span>
+                      <span class="flex min-w-0 flex-1 flex-col">
+                        <span class="sdg-lever-item__title">{{ lever.short_name }}</span>
+                        @if (lever.other_names) {
+                        <span class="sdg-lever-item__subtitle">{{ lever.other_names }}</span>
+                        }
+                      </span>
+                      <span class="sdg-lever-item__count">{{ count }} SDG target{{ count === 1 ? '' : 's' }}</span>
+                    </button>
+                  </li>
+                  }
+                </ul>
+
+                @if (selectedLever(); as lever) {
+                @let targets = targetsForLever(lever);
+                <div class="sdg-lever-detail min-w-0 p-5">
+                  <div class="flex min-w-0 items-center gap-4 pb-4">
+                    @if (leverImageSrc(lever)) {
+                    <img [src]="leverImageSrc(lever)" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover" />
+                    }
+                    <div class="min-w-0 flex-1">
+                      <h3 class="m-0 text-[15px] font-[600] leading-[18px] text-[#14314F]">
+                        {{ lever.short_name }}
+                        @if (lever.other_names) {
+                        <span class="font-['Barlow'] font-normal text-[#4C5158]">: {{ lever.other_names }}</span>
+                        }
+                      </h3>
+                      <p class="m-0 pt-0.5 text-[13px] text-[#777C83]">
+                        {{ targets.length }} SDG target{{ targets.length === 1 ? '' : 's' }} linked
                       </p>
                     </div>
-                  </ng-template>
-                  <ng-template #rows let-tgt>
-                    <div class="flex w-full min-w-0 items-center gap-3">
-                      @if (tgt?.clarisa_sdg?.icon) {
-                      <img [src]="tgt.clarisa_sdg.icon" [alt]="tgt.clarisa_sdg.short_name || 'SDG'" loading="lazy"
-                        class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+                    <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
+                      styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+                      (onClick)="openPortfolio2025Editor(lever)" />
+                  </div>
+                  <ul class="sdg-target-list m-0 list-none overflow-hidden rounded-md border border-[#E0E4E8] bg-white p-0 text-[14px] text-[#4C5158]">
+                    @for (target of targets; track target.id) {
+                    <li class="flex min-w-0 items-center gap-4 border-t border-[#EEF1F3] px-5 py-3.5 first:border-t-0">
+                      @if (target.clarisa_sdg?.icon) {
+                      <img [src]="target.clarisa_sdg?.icon" [alt]="target.clarisa_sdg?.short_name || 'SDG'" loading="lazy"
+                        class="h-[34px] w-[34px] shrink-0 rounded-[3px] object-contain" />
                       }
-                      <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
-                        <span class="font-[600]">{{ tgt?.sdg_target_code }}</span><span class="font-normal"> - {{
-                          tgt?.sdg_target }}</span>
+                      <p class="m-0 min-w-0 flex-1 leading-[20px]">
+                        <span class="font-[600]">{{ target.sdg_target_code }}</span> - {{ target.sdg_target }}
                       </p>
-                    </div>
-                  </ng-template>
-                </app-multiselect>
-
-                <div class="mt-6 flex justify-end ">
-                  <button type="button" (click)="saveForLever(lever)"
-                    [disabled]="loading() || loadError() || savingLeverId() !== null"
-                    class="inline-flex cursor-pointer items-center gap-2 rounded-[13px] bg-[#509C55] px-5 py-2 text-[15px] text-white disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
-                    @if (savingLeverId() === leverNumericId(lever)) {
-                    <i class="pi pi-spinner pi-spin !text-[12px]" aria-hidden="true"></i>
-                    <span>Saving…</span>
-                    } @else {
-                    <i class="pi pi-save -scale-x-100 !text-[12px]" aria-hidden="true"></i>
-                    <span>Save</span>
+                    </li>
+                    } @empty {
+                    <li class="px-5 py-3.5 text-[#777C83]">No SDG targets linked to this lever yet.</li>
                     }
-                  </button>
+                  </ul>
                 </div>
+                }
               </div>
               }
             </div>
             }
-          </div>
+          </section>
+          } @else {
+          <section class="flex w-full min-w-0 flex-col gap-3">
+            <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(sdgListPortfolioId) }}</h2>
+            <p class="text-sm text-[#4C5158]">General SDG target list for OICRs in this portfolio. It does not depend on Research Areas.</p>
+            <div class="min-w-0 overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
+              <div class="flex min-w-0 items-center gap-2.5 px-4 py-3">
+                <button type="button"
+                  class="sdg-lever-header flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                  (click)="toggleSdgList()" [attr.aria-expanded]="sdgListExpanded()">
+                  <i class="pi shrink-0 !text-[10px] !leading-none !text-[#8D9299] {{ sdgListExpanded() ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                    aria-hidden="true"></i>
+                  <span class="min-w-0 flex-1 truncate text-[15px] font-[600] leading-[18px] text-[#14314F]">SDG targets</span>
+                  <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
+                    {{ portfolio2026Targets().length }} target{{ portfolio2026Targets().length === 1 ? '' : 's' }}
+                  </span>
+                </button>
+                <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
+                  styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+                  (onClick)="openPortfolio2026Editor()" />
+              </div>
+              @if (sdgListExpanded()) {
+              <ul class="sdg-target-list m-0 list-none p-0 text-[14px] text-[#4C5158]">
+                @for (target of portfolio2026Targets(); track target.id) {
+                <li class="flex min-w-0 items-center gap-4 border-t border-[#EEF1F3] px-6 py-3.5">
+                  @if (target.clarisa_sdg?.icon) {
+                  <img [src]="target.clarisa_sdg?.icon" [alt]="target.clarisa_sdg?.short_name || 'SDG'" loading="lazy"
+                    class="h-[34px] w-[34px] shrink-0 rounded-[3px] object-contain" />
+                  }
+                  <p class="m-0 min-w-0 flex-1 leading-[20px]">
+                    <span class="font-[600]">{{ target.sdg_target_code }}</span> - {{ target.sdg_target }}
+                  </p>
+                </li>
+                } @empty {
+                <li class="border-t border-[#EEF1F3] px-6 py-3.5">No SDG targets are available.</li>
+                }
+              </ul>
+              }
+            </div>
+          </section>
+          }
+          }
         </div>
         }
       </div>
     </div>
   </div>
 </div>
+
+<app-modal modalName="portfolio2025LeverSdgs">
+  <div class="w-[min(760px,80vw)] px-10 py-8">
+    <p class="mb-4 text-sm text-[#4C5158]">Select the SDG targets for this lever. The full Clarisa list is available.</p>
+    <app-multiselect class="block w-full min-w-0" label="SDG target(s)" [signal]="portfolio2025EditSignal"
+      optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
+      signalOptionValue="result_lever_sdg_targets" [disabled]="savingLeverId() !== null" [removeCondition]="allowRemoveSdg"
+      [columnsOnXl]="false" [selectedItemsSurfaceColor]="selectedItemsSurfaceColor" [isRequired]="false"
+      serviceName="clarisaSdgTargets" filterBy="sdg_target_code,sdg_target,select_label" [enableVirtualScroll]="false"
+      [scrollHeight]="'200px'" placeholder="Select the SDG targets">
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+        <div class="flex items-center gap-2">
+          <span>{{ value?.length }} target{{ value?.length === 1 ? '' : 's' }} selected</span>
+        </div>
+        }
+      </ng-template>
+      <ng-template #item let-item>
+        <div class="flex w-full min-w-0 items-center gap-3">
+          @if (item?.clarisa_sdg?.icon) {
+          <img [src]="item.clarisa_sdg.icon" [alt]="item.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+            class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+          }
+          <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+            <span class="font-[600]">{{ item?.sdg_target_code }}</span><span class="font-normal"> - {{ item?.sdg_target }}</span>
+          </p>
+        </div>
+      </ng-template>
+      <ng-template #rows let-tgt>
+        <div class="flex w-full min-w-0 items-center gap-3">
+          @if (tgt?.clarisa_sdg?.icon) {
+          <img [src]="tgt.clarisa_sdg.icon" [alt]="tgt.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+            class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+          }
+          <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+            <span class="font-[600]">{{ tgt?.sdg_target_code }}</span><span class="font-normal"> - {{ tgt?.sdg_target }}</span>
+          </p>
+        </div>
+      </ng-template>
+    </app-multiselect>
+  </div>
+</app-modal>
+
+<app-modal modalName="portfolio2026SdgTargets">
+  <div class="w-[min(760px,80vw)] px-10 py-8">
+    <p class="mb-4 text-sm text-[#4C5158]">Select the SDG targets offered on OICRs in this portfolio. The full Clarisa list is available.</p>
+    <app-multiselect class="block w-full min-w-0" label="SDG target(s)" [signal]="portfolio2026EditSignal"
+      optionLabel="select_label" optionLabel2="sdg_target" optionValue="sdg_target_id"
+      signalOptionValue="result_lever_sdg_targets" [disabled]="savingPortfolio2026()" [removeCondition]="allowRemoveSdg"
+      [columnsOnXl]="false" [selectedItemsSurfaceColor]="selectedItemsSurfaceColor" [isRequired]="false"
+      serviceName="clarisaSdgTargets" filterBy="sdg_target_code,sdg_target,select_label" [enableVirtualScroll]="false"
+      [scrollHeight]="'200px'" placeholder="Select the SDG targets">
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+        <div class="flex items-center gap-2">
+          <span>{{ value?.length }} target{{ value?.length === 1 ? '' : 's' }} selected</span>
+        </div>
+        }
+      </ng-template>
+      <ng-template #item let-item>
+        <div class="flex w-full min-w-0 items-center gap-3">
+          @if (item?.clarisa_sdg?.icon) {
+          <img [src]="item.clarisa_sdg.icon" [alt]="item.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+            class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+          }
+          <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+            <span class="font-[600]">{{ item?.sdg_target_code }}</span><span class="font-normal"> - {{ item?.sdg_target }}</span>
+          </p>
+        </div>
+      </ng-template>
+      <ng-template #rows let-tgt>
+        <div class="flex w-full min-w-0 items-center gap-3">
+          @if (tgt?.clarisa_sdg?.icon) {
+          <img [src]="tgt.clarisa_sdg.icon" [alt]="tgt.clarisa_sdg.short_name || 'SDG'" loading="lazy"
+            class="h-[35px] w-[35px] shrink-0 rounded-[3px] object-contain" />
+          }
+          <p class="m-0 min-w-0 flex-1 text-left text-[14px] leading-[18px] text-[#4C5158]">
+            <span class="font-[600]">{{ tgt?.sdg_target_code }}</span><span class="font-normal"> - {{ tgt?.sdg_target }}</span>
+          </p>
+        </div>
+      </ng-template>
+    </app-multiselect>
+  </div>
+</app-modal>

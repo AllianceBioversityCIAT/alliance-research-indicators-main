@@ -5,7 +5,9 @@ import { CacheService } from './cache/cache.service';
 import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { environment } from '../../../environments/environment';
-import { HttpParams, provideHttpClient } from '@angular/common/http';
+import { HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { resultInterceptor } from '@shared/interceptors/result.interceptor';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
@@ -281,7 +283,7 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingAlignment(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', { useResultInterceptor: true });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingAlignment', () => {
@@ -290,7 +292,7 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingAlignment(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', { useResultInterceptor: true });
     });
 
     it('should URL-encode the (post-strip) resultCode for GET_PoolFundingAlignment', () => {
@@ -301,7 +303,7 @@ describe('ApiService', () => {
 
       expect(mockToPromiseService.get).toHaveBeenCalledWith(
         `v1/results/${encodeURIComponent(resultCode)}/pool-funding-alignment`,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -311,7 +313,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingSciencePrograms(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {
+        useResultInterceptor: true
+      });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingSciencePrograms', () => {
@@ -320,7 +324,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingSciencePrograms(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {
+        useResultInterceptor: true
+      });
     });
 
     it('should call GET_PoolFundingHlosIndicators with the per-result /hlos-indicators suffix and numeric code', () => {
@@ -329,7 +335,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingHlosIndicators(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {
+        useResultInterceptor: true
+      });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingHlosIndicators', () => {
@@ -338,7 +346,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingHlosIndicators(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {
+        useResultInterceptor: true
+      });
     });
 
     it('should resolve the MainResponse<BilateralTocCatalogResponse> envelope for GET_PoolFundingHlosIndicators', async () => {
@@ -649,6 +659,17 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call POST_PrmsSync without v1 on results/:resultCode/prms-sync', () => {
+      (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.POST_PrmsSync(123);
+
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('results/123/prms-sync', {}, { useResultInterceptor: true });
+      const calledUrl = (mockToPromiseService.post as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain('v1/');
+      expect(calledUrl).toBe('results/123/prms-sync');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });
@@ -699,7 +720,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -713,7 +734,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -727,7 +748,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
   });
@@ -2310,13 +2331,17 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
     currentResultIsLoading: ReturnType<typeof signal<boolean>>;
     greenChecks: ReturnType<typeof signal<GreenChecks>>;
     getCurrentNumericResultId: () => number;
+    skipResultVersionParam: ReturnType<typeof signal<boolean>>;
   };
 
   beforeEach(() => {
     cacheServiceStub = {
       currentResultIsLoading: signal(false),
       greenChecks: signal<GreenChecks>({}),
-      getCurrentNumericResultId: () => 123
+      getCurrentNumericResultId: () => 123,
+      // Down outside the create-result flow, which is what these outgoing-URL
+      // expectations describe.
+      skipResultVersionParam: signal(false)
     };
 
     TestBed.configureTestingModule({
@@ -2414,3 +2439,124 @@ describe('ApiService — Innovation Use Details methods (HttpTestingController)'
     expect(response.successfulRequest).toBe(true);
   });
 });
+
+const POOL_FUNDING_RESULT_CODE = '19941';
+const POOL_FUNDING_PATCH_BODY = { has_contribution: false };
+const POOL_FUNDING_CALLS: Array<{
+  name: string;
+  method: 'GET' | 'PATCH';
+  path: string;
+  call: (service: ApiService) => Promise<unknown>;
+}> = [
+  {
+    name: 'GET_PoolFundingAlignment',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment`,
+    call: service => service.GET_PoolFundingAlignment(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'GET_PoolFundingSciencePrograms',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment/science-programs`,
+    call: service => service.GET_PoolFundingSciencePrograms(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'GET_PoolFundingHlosIndicators',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment/hlos-indicators`,
+    call: service => service.GET_PoolFundingHlosIndicators(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'PATCH_PoolFundingAlignment',
+    method: 'PATCH',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment`,
+    call: service => service.PATCH_PoolFundingAlignment(POOL_FUNDING_RESULT_CODE, POOL_FUNDING_PATCH_BODY)
+  }
+];
+
+function configurePoolFundingHttp(routerUrl: string, queryParams: Record<string, string>) {
+  TestBed.configureTestingModule({
+    providers: [
+      ApiService,
+      ToPromiseService,
+      provideHttpClient(withInterceptors([resultInterceptor])),
+      provideHttpClientTesting(),
+      {
+        provide: Router,
+        useValue: {
+          url: routerUrl,
+          parseUrl: () => ({ queryParams })
+        }
+      },
+      {
+        provide: CacheService,
+        useValue: {
+          currentResultIsLoading: signal(false),
+          greenChecks: signal<GreenChecks>({}),
+          getCurrentNumericResultId: () => 19941,
+          // Down outside the create-result flow; these cases describe ordinary
+          // versioned browsing, where the year must still travel.
+          skipResultVersionParam: signal(false)
+        }
+      },
+      { provide: ControlListCacheService, useValue: {} },
+      {
+        provide: SignalEndpointService,
+        useValue: {
+          createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+        }
+      }
+    ]
+  });
+}
+
+describe('ApiService — pool funding outgoing URLs (HttpTestingController, R-PFV-004)', () => {
+  let service: ApiService;
+  let httpMock: HttpTestingController;
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  describe('under a router URL carrying ?version=2026', () => {
+    beforeEach(() => {
+      configurePoolFundingHttp('/result/19941/pool-funding-alignment?version=2026', { version: '2026' });
+      service = TestBed.inject(ApiService);
+      httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    it.each(POOL_FUNDING_CALLS)('$name arrives with reportYear=2026 and reportingPlatforms=STAR', async ({ call, method, path }) => {
+      const expectedUrl = `${environment.mainApiUrl}${path}?reportYear=2026&reportingPlatforms=STAR`;
+      const promise = call(service);
+
+      const req = httpMock.expectOne(incoming => incoming.method === method && incoming.url.startsWith(`${environment.mainApiUrl}${path}`));
+      expect(req.request.method).toBe(method);
+      expect(req.request.url).toBe(expectedUrl);
+
+      req.flush({ data: {} });
+      await promise;
+    });
+  });
+
+  describe('with no ?version', () => {
+    beforeEach(() => {
+      configurePoolFundingHttp('/result/19941/pool-funding-alignment', {});
+      service = TestBed.inject(ApiService);
+      httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    it.each(POOL_FUNDING_CALLS)('$name arrives with reportingPlatforms=STAR and no reportYear', async ({ call, method, path }) => {
+      const expectedUrl = `${environment.mainApiUrl}${path}?reportingPlatforms=STAR`;
+      const promise = call(service);
+
+      const req = httpMock.expectOne(incoming => incoming.method === method && incoming.url.startsWith(`${environment.mainApiUrl}${path}`));
+      expect(req.request.method).toBe(method);
+      expect(req.request.url).not.toContain('reportYear');
+      expect(req.request.url).toBe(expectedUrl);
+
+      req.flush({ data: {} });
+      await promise;
+    });
+  });
+});
+

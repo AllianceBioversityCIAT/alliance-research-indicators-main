@@ -17,6 +17,7 @@ import { resultInterceptor } from '@shared/interceptors/result.interceptor';
 import { CacheService } from '@services/cache/cache.service';
 import { ValidateCacheService } from '@shared/services/validate-cache.service';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { applyLocalAuthBypass } from '@shared/auth/local-auth-bypass';
 
 export const appConfig: ApplicationConfig = {
@@ -50,7 +51,8 @@ export const appConfig: ApplicationConfig = {
       const validateCacheService = inject(ValidateCacheService);
       void validateCacheService.validateVersions();
       const dateFormatConfigService = inject(DateFormatConfigService);
-      return dateFormatConfigService.loadConfig();
+      const poolFundingFlags = inject(PoolFundingFlagsService);
+      return Promise.all([dateFormatConfigService.loadConfig(), poolFundingFlags.load()]);
     }),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),

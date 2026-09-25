@@ -27,6 +27,9 @@ describe('AllianceAlignmentP2Component', () => {
             @if (shouldShowImpactOutcomes()) {
               <span>Impact Outcomes</span>
             }
+            @if (isOicrIndicator()) {
+              <span>SDG Targets</span>
+            }
             @if (!isOicrIndicator()) {
               <span>Contribution to SDG</span>
             }
@@ -46,6 +49,7 @@ describe('AllianceAlignmentP2Component', () => {
     expect(text).toContain('Research Areas');
     expect(text).toContain('Strategic Objectives');
     expect(text).toContain('Impact Outcomes');
+    expect(text).toContain('SDG Targets');
   });
 
   it('should render impact outcomes for Policy Change and Investments', () => {
@@ -76,6 +80,7 @@ describe('AllianceAlignmentP2Component', () => {
     fixture.detectChanges();
     expect(component.isOicrIndicator()).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
+    expect(fixture.nativeElement.textContent).toContain('SDG Targets');
     expect(fixture.nativeElement.textContent).not.toContain('Contribution to SDG');
   });
 

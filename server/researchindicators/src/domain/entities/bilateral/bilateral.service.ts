@@ -647,6 +647,13 @@ export class BilateralService {
       selected_levers: selectedLevers,
       selected_science_programs: selectedSciencePrograms,
       is_synced_to_prms: isSyncedToPrms,
+      // Surfaced so the sidebar can show the PRMS code beside the sync button
+      // without a second round trip: `prms_result_code` already lives on
+      // `results` and the alignment context already selects from that row.
+      prms_result_code:
+        context.prms_result_code == null
+          ? null
+          : Number(context.prms_result_code),
       is_read_only: isPrmsSourced || isSyncedToPrms,
       // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
       // Same Number(...) comparison as the hlos-indicators read (D-V2-7);

@@ -493,9 +493,22 @@ export default class InnovationUseDetailsComponent {
    * hazard). `null`/`undefined` stay `null` — never coerced to `0` (DD-2's null contract) — and `0`
    * itself is a value, never treated as absent.
    */
+  /**
+   * `null`/`undefined` stay `null` (DD-2's null contract) and `0` is a value, never absent. A value
+   * that does NOT coerce to a finite number also becomes `null` rather than `NaN`: `Number('-')` is
+   * `NaN`, and a `NaN` here is re-emitted straight back through the card's `update` output, where
+   * `NaN !== NaN` used to spin `app-input`'s sync effect forever and hang the tab. The read side
+   * must not be the layer that manufactures it.
+   */
+  private toFiniteNumberOrNull(raw: number | string | undefined | null): number | null {
+    if (raw === undefined || raw === null || raw === '') return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   quantificationsView = computed<QuantificationItemData[]>(() =>
     this.body().quantifications.map(row => ({
-      number: row.quantification_number === undefined || row.quantification_number === null ? null : Number(row.quantification_number),
+      number: this.toFiniteNumberOrNull(row.quantification_number),
       unit: row.unit ?? '',
       comments: row.description ?? ''
     }))

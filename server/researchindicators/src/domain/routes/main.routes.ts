@@ -63,13 +63,16 @@ import { LinkResultsModule } from '../entities/link-results/link-results.module'
 import { ResultStatusTransitionsModule } from '../entities/result-status-transitions/result-status-transitions.module';
 import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/result-status-workflow.module';
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
+import { ResultSdgTargetsModule } from '../entities/result-sdg-targets/result-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
+import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
 
 const capSharingChildren: Routes = [
   {
@@ -82,6 +85,10 @@ const ResultsChildren: Routes = [
   {
     path: `${RESULT_CODE}/pool-funding-alignment`,
     module: BilateralModule,
+  },
+  {
+    path: `${RESULT_CODE}/prms-sync`,
+    module: ResultPrmsSyncModule,
   },
   {
     path: 'intellectual-property',
@@ -337,6 +344,10 @@ const children: Routes = [
     module: LeverSdgTargetsModule,
   },
   {
+    path: 'portfolio-2026-sdg-targets',
+    module: ResultSdgTargetsModule,
+  },
+  {
     path: 'tags',
     module: TagsModule,
   },
@@ -412,6 +423,10 @@ const children: Routes = [
     // SYSTEM_ADMIN) on the controller. See execution.md Pivot Record #1.
     path: 'bilateral-project-mappings',
     module: BilateralProjectMappingModule,
+  },
+  {
+    path: 'impersonation',
+    module: ImpersonationModule,
   },
 ];
 

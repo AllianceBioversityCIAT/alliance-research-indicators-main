@@ -92,6 +92,7 @@ import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-l
 import { ReportsModule } from './reports/reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
@@ -99,6 +100,7 @@ import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
 import { AiReportsModule } from './ai-reports/ai-reports.module';
+import { ImpersonationModule } from './impersonation/impersonation.module';
 
 @Module({
   imports: [
@@ -195,6 +197,7 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
     ReportsModule,
     ResultReviewHistoryModule,
     BilateralModule,
+    ResultPrmsSyncModule,
     BilateralProjectMappingModule,
     PortfoliosModule,
     StrategicObjectivesModule,
@@ -202,6 +205,7 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
     ResultImpactOutcomesModule,
     ResultStrategicObjectivesModule,
     AiReportsModule,
+    ImpersonationModule,
   ],
   exports: [
     AgressoContractModule,
@@ -210,6 +214,7 @@ import { AiReportsModule } from './ai-reports/ai-reports.module';
     ResultReviewHistoryModule,
     BilateralModule,
     BilateralProjectMappingModule,
+    ImpersonationModule,
   ],
 })
 export class EntitiesModule {}

@@ -274,6 +274,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           },
         ],
         is_synced_to_prms: false,
+        // Null until the result syncs; the field is ALWAYS present on the response.
+        prms_result_code: null,
         is_read_only: false,
         // T-07 (R-BIL-096): both fields ALWAYS present on the response.
         version_locked: false,

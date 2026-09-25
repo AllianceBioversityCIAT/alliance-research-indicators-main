@@ -224,6 +224,18 @@ export class AlignmentResponse {
   @ApiProperty({ type: Boolean })
   is_synced_to_prms: boolean;
 
+  // Code PRMS assigns on a successful ingest, read straight off
+  // `results.prms_result_code` (the alignment context already selects that row).
+  // Null until the result has synced, so consumers must treat null as "not yet".
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 12345,
+    description:
+      'PRMS-assigned result code, or null when the result has not been synced.',
+  })
+  prms_result_code: number | null;
+
   // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.2 / R-BIL-071
   // Union of two gates:
   //   1. PRMS-sourced (`platform_code === 'PRMS'`) — PRMS owns the data, STAR is read-only.
