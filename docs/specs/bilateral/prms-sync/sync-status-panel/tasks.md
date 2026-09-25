@@ -278,8 +278,8 @@ Closure is at **scenario and clause** granularity, not requirement ID.
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
 | RB-1 | 2026-09-25 | The `PRMS` card states cannot be exercised with real data until `decision-webhook` is deployed (its TEST registration and R-1/OQ-6 are open). | T-09 records them **blocked**, not ticked. The `STAR` states ship and work. | Product owner | open |
-| RB-2 | 2026-09-25 | D-2 hides the PRMS button for 17 of 19 already-synced results, with no backfill source. | OQ-D2 — owner decides: accept, backfill task, or ask PRMS whether `?phase=` is optional. | Product owner | open |
-| RB-3 | 2026-09-25 | R-SSP-002 AC.3 as written contradicts D-1's fallback. | OQ-D1 — narrow the AC before T-08 starts. | Product owner | open |
+| RB-2 | 2026-09-25 | D-2 hides the PRMS button for 17 of 19 already-synced results. | **CLOSED same day — accepted by the owner as intended behaviour.** The absent button is the signal that the `prms_phase_id` write failed. A viable `phase = 36` backfill was declined for that reason. Not a blocker; do not "fix" it. | Product owner | **closed** |
+| RB-3 | 2026-09-25 | R-SSP-002 AC.3 as written contradicts D-1's fallback. | **CLOSED 2026-09-25** — AC narrowed to "while the card is rendering". | Product owner | **closed** |
 
 ---
 
