@@ -90,7 +90,7 @@ When a result is pushed to PRMS the sidebar today renders one line — `PRMS cod
 
 - [ ] AC.1 — GIVEN `events[0]` exists, WHEN the sidebar renders, THEN the card shows title, sync badge, status pill, actor line, PRMS ID, the PRMS button and the history link.
 - [ ] AC.2 — GIVEN `events` is empty, THEN no card renders AND no empty shell, skeleton or placeholder text is shown.
-- [ ] AC.3 — BUT it must NOT render the string `PRMS code` anywhere in the sidebar once the card ships.
+- [ ] AC.3 — BUT it must NOT render the string `PRMS code` **while the card is rendering**. *(Narrowed 2026-09-25, closing **OQ-D1**: `design.md` **D-1** keeps that line as the fallback for the **16 of 19** results that have a PRMS code and no history row. The original "anywhere in the sidebar" wording contradicted the fallback and would have failed T-08 for doing the right thing.)*
 - [ ] AC.4 — AND IT MUST leave the `PRMS SYNC` button's markup, tooltip and disabled rule unchanged.
 
 ---
