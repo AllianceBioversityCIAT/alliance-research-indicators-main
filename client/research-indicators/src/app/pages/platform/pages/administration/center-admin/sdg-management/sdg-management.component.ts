@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { ButtonModule } from 'primeng/button';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal, WritableSignal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal, WritableSignal } from '@angular/core';
 import { GetLevers } from '@shared/interfaces/get-levers.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import {
@@ -53,6 +53,8 @@ export default class SdgManagementComponent implements OnInit {
   readonly saveError = signal<string | null>(null);
   readonly saveSuccess = signal(false);
   readonly expanded = signal<Record<number, boolean>>({});
+  readonly leversGroupExpanded = signal(false);
+  readonly sdgListExpanded = signal(false);
 
   private readonly leverSdgSignals = new Map<number, WritableSignal<SdgLeverSignalValue>>();
   private readonly mappingIdByPair = new Map<string, number>();
@@ -76,14 +78,39 @@ export default class SdgManagementComponent implements OnInit {
     return this.levers().filter(lever => Number(lever.portfolio_id) === this.leverPortfolioId);
   }
 
+  private portfolioById(portfolioId: number): Portfolio | undefined {
+    return this.portfolios().find(item => Number(item.id ?? item.portfolio_id) === portfolioId);
+  }
+
+  /** Both portfolio sections, most recent first (latest start year, then latest end year). */
+  readonly portfolioSections = computed<number[]>(() => {
+    const yearsOf = (id: number) => {
+      const portfolio = this.portfolioById(id);
+      const start = Number(portfolio?.start_year);
+      const end = Number(portfolio?.end_year);
+      return { start: Number.isFinite(start) ? start : -Infinity, end: Number.isFinite(end) ? end : -Infinity };
+    };
+    return [this.leverPortfolioId, this.sdgListPortfolioId].sort((a, b) => {
+      const ya = yearsOf(a);
+      const yb = yearsOf(b);
+      return yb.start - ya.start || yb.end - ya.end;
+    });
+  });
+
   portfolioLabel(portfolioId: number): string {
-    const portfolio = this.portfolios().find(item => Number(item.id ?? item.portfolio_id) === portfolioId);
-    const name = portfolio?.name?.trim();
+    const portfolio = this.portfolioById(portfolioId);
     const start = Number(portfolio?.start_year);
     const end = Number(portfolio?.end_year);
-    const range = Number.isFinite(start) && Number.isFinite(end) ? `${start}–${end}` : '';
-    if (name && range) return `${name} (${range})`;
-    return name || range || 'Portfolio';
+    const hasRange = portfolio != null && Number.isFinite(start) && Number.isFinite(end);
+    return hasRange ? `Portfolio (${start}–${end})` : 'Portfolio';
+  }
+
+  toggleLeversGroup(): void {
+    this.leversGroupExpanded.update(open => !open);
+  }
+
+  toggleSdgList(): void {
+    this.sdgListExpanded.update(open => !open);
   }
 
   leverImageSrc(lever: GetLevers): string {

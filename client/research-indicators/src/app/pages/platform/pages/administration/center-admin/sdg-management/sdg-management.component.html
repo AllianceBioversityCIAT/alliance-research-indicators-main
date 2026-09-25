@@ -24,103 +24,131 @@
         <p class="text-sm text-[#4C5158]">No levers are available.</p>
         } @else {
         <div class="w-full min-w-0 pb-2 px-2 flex flex-col gap-8">
+          @for (portfolioId of portfolioSections(); track portfolioId) {
+          @if (portfolioId === leverPortfolioId) {
           <section class="flex w-full min-w-0 flex-col gap-3">
             <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(leverPortfolioId) }}</h2>
             <p class="text-sm text-[#4C5158]">SDG targets linked to each lever in this portfolio.</p>
             @if (portfolio2025Levers().length === 0) {
             <p class="text-sm text-[#4C5158]">No levers are available for this portfolio.</p>
             } @else {
-            <div class="flex w-full min-w-0 flex-col gap-3">
-              @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
-              @let targets = targetsForLever(lever);
-              <div class="min-w-0 overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
-                <div class="flex min-w-0 items-center gap-2.5 bg-[#F7F8FA] px-4 py-2.5">
-                  <button type="button"
-                    class="sdg-lever-header flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
-                    (click)="toggleRow(lever)" [attr.aria-expanded]="isExpanded(lever)">
-                    <i class="pi shrink-0 !text-[9px] !leading-none !text-[#8D9299] {{ isExpanded(lever) ? 'pi-chevron-up' : 'pi-chevron-down' }}"
-                      aria-hidden="true"></i>
-                    @if (leverImageSrc(lever)) {
-                    <img [src]="leverImageSrc(lever)" [alt]="lever.short_name || 'Lever icon'"
-                      class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]" />
-                    }
-                    <span class="min-w-0 flex-1 truncate font-[550] text-[15px] leading-[18px] text-[#4C5158]">
-                      {{ lever.short_name }}
-                      @if (lever.other_names) {
-                      <span class="font-['Barlow'] font-normal">: {{ lever.other_names }}</span>
+            <div class="min-w-0 overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
+              <button type="button"
+                class="sdg-lever-header flex w-full min-w-0 items-center gap-2.5 px-4 py-3 text-left cursor-pointer"
+                (click)="toggleLeversGroup()" [attr.aria-expanded]="leversGroupExpanded()">
+                <i class="pi shrink-0 !text-[10px] !leading-none !text-[#8D9299] {{ leversGroupExpanded() ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                  aria-hidden="true"></i>
+                <span class="min-w-0 flex-1 truncate text-[15px] font-[600] leading-[18px] text-[#14314F]">Levers</span>
+                <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
+                  {{ portfolio2025Levers().length }} lever{{ portfolio2025Levers().length === 1 ? '' : 's' }}
+                </span>
+              </button>
+              @if (leversGroupExpanded()) {
+              <div class="flex w-full min-w-0 flex-col gap-2 border-t border-[#EEF1F3] bg-[#F7F8FA] p-3">
+                @for (lever of portfolio2025Levers(); track leverNumericId(lever)) {
+                @let targets = targetsForLever(lever);
+                <div class="min-w-0 overflow-hidden rounded-md border border-[#E0E4E8] bg-white">
+                  <div class="flex min-w-0 items-center gap-2.5 px-4 py-2.5">
+                    <button type="button"
+                      class="sdg-lever-header flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                      (click)="toggleRow(lever)" [attr.aria-expanded]="isExpanded(lever)">
+                      <i class="pi shrink-0 !text-[9px] !leading-none !text-[#8D9299] {{ isExpanded(lever) ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                        aria-hidden="true"></i>
+                      @if (leverImageSrc(lever)) {
+                      <img [src]="leverImageSrc(lever)" [alt]="lever.short_name || 'Lever icon'"
+                        class="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/[0.06]" />
                       }
-                    </span>
-                    <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
-                      {{ targets.length }} target{{ targets.length === 1 ? '' : 's' }}
-                    </span>
-                  </button>
-                  <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
-                    styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
-                    (onClick)="openPortfolio2025Editor(lever)" />
+                      <span class="min-w-0 flex-1 truncate font-[550] text-[15px] leading-[18px] text-[#4C5158]">
+                        {{ lever.short_name }}
+                        @if (lever.other_names) {
+                        <span class="font-['Barlow'] font-normal">: {{ lever.other_names }}</span>
+                        }
+                      </span>
+                      <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
+                        {{ targets.length }} target{{ targets.length === 1 ? '' : 's' }}
+                      </span>
+                    </button>
+                    <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
+                      styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+                      (onClick)="openPortfolio2025Editor(lever)" />
+                  </div>
+                  @if (isExpanded(lever)) {
+                  <table class="w-full table-fixed text-left text-[14px] text-[#4C5158]">
+                    <thead class="text-[13px] font-[600] text-[#14314F]">
+                      <tr class="border-t border-[#EEF1F3]">
+                        <th class="w-[88px] px-4 py-2">Code</th>
+                        <th class="px-4 py-2">SDG target</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @if (targets.length === 0) {
+                      <tr class="border-t border-[#EEF1F3]">
+                        <td class="px-4 py-2" colspan="2">No SDG targets</td>
+                      </tr>
+                      } @else {
+                      @for (target of targets; track target.id) {
+                      <tr class="border-t border-[#EEF1F3]">
+                        <td class="px-4 py-2 align-top font-[600]">{{ target.sdg_target_code }}</td>
+                        <td class="px-4 py-2">{{ target.sdg_target }}</td>
+                      </tr>
+                      }
+                      }
+                    </tbody>
+                  </table>
+                  }
                 </div>
-                @if (isExpanded(lever)) {
-                <table class="w-full table-fixed text-left text-[14px] text-[#4C5158]">
-                  <thead class="text-[13px] font-[600] text-[#14314F]">
-                    <tr class="border-t border-[#EEF1F3]">
-                      <th class="w-[88px] px-4 py-2">Code</th>
-                      <th class="px-4 py-2">SDG target</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @if (targets.length === 0) {
-                    <tr class="border-t border-[#EEF1F3]">
-                      <td class="px-4 py-2" colspan="2">No SDG targets</td>
-                    </tr>
-                    } @else {
-                    @for (target of targets; track target.id) {
-                    <tr class="border-t border-[#EEF1F3]">
-                      <td class="px-4 py-2 align-top font-[600]">{{ target.sdg_target_code }}</td>
-                      <td class="px-4 py-2">{{ target.sdg_target }}</td>
-                    </tr>
-                    }
-                    }
-                  </tbody>
-                </table>
                 }
               </div>
               }
             </div>
             }
           </section>
-
+          } @else {
           <section class="flex w-full min-w-0 flex-col gap-3">
             <h2 class="font-['Inter'] text-[15px] font-bold leading-[18px] text-[#112F5C]">{{ portfolioLabel(sdgListPortfolioId) }}</h2>
             <p class="text-sm text-[#4C5158]">General SDG target list for OICRs in this portfolio. It does not depend on Research Areas.</p>
-            <div class="overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
-              <table class="w-full text-left text-[14px] text-[#4C5158]">
+            <div class="min-w-0 overflow-hidden rounded-lg border border-[#E0E4E8] bg-white">
+              <div class="flex min-w-0 items-center gap-2.5 px-4 py-3">
+                <button type="button"
+                  class="sdg-lever-header flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+                  (click)="toggleSdgList()" [attr.aria-expanded]="sdgListExpanded()">
+                  <i class="pi shrink-0 !text-[10px] !leading-none !text-[#8D9299] {{ sdgListExpanded() ? 'pi-chevron-up' : 'pi-chevron-down' }}"
+                    aria-hidden="true"></i>
+                  <span class="min-w-0 flex-1 truncate text-[15px] font-[600] leading-[18px] text-[#14314F]">SDG targets</span>
+                  <span class="shrink-0 text-[13px] font-normal text-[#4C5158]">
+                    {{ portfolio2026Targets().length }} target{{ portfolio2026Targets().length === 1 ? '' : 's' }}
+                  </span>
+                </button>
+                <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
+                  styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
+                  (onClick)="openPortfolio2026Editor()" />
+              </div>
+              @if (sdgListExpanded()) {
+              <table class="w-full table-fixed text-left text-[14px] text-[#4C5158]">
                 <thead class="bg-[#F7F8FA] text-[13px] font-[600] text-[#14314F]">
-                  <tr>
-                    <th class="px-4 py-2">Code</th>
-                    <th class="px-4 py-2">
-                      <div class="flex items-center justify-between gap-3">
-                        <span>SDG target</span>
-                        <p-button label="Edit" icon="pi pi-pencil !text-[12px]" severity="info" size="small"
-                          styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '95px' }"
-                          (onClick)="openPortfolio2026Editor()" />
-                      </div>
-                    </th>
+                  <tr class="border-t border-[#EEF1F3]">
+                    <th class="w-[88px] px-4 py-2">Code</th>
+                    <th class="px-4 py-2">SDG target</th>
                   </tr>
                 </thead>
                 <tbody>
                   @for (target of portfolio2026Targets(); track target.id) {
                   <tr class="border-t border-[#EEF1F3]">
-                    <td class="px-4 py-2 font-[600]">{{ target.sdg_target_code }}</td>
+                    <td class="px-4 py-2 align-top font-[600]">{{ target.sdg_target_code }}</td>
                     <td class="px-4 py-2">{{ target.sdg_target }}</td>
                   </tr>
                   } @empty {
-                  <tr>
+                  <tr class="border-t border-[#EEF1F3]">
                     <td class="px-4 py-3" colspan="2">No SDG targets are available.</td>
                   </tr>
                   }
                 </tbody>
               </table>
+              }
             </div>
           </section>
+          }
+          }
         </div>
         }
       </div>

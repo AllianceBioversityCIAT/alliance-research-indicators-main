@@ -518,12 +518,25 @@ describe('SdgManagementComponent', () => {
     await delayMs(0);
     f.detectChanges();
 
+    // Both portfolio groups start collapsed: only their headers are visible.
+    expect(f.nativeElement.textContent).toContain('Levers');
+    expect(f.nativeElement.textContent).toContain('1 lever');
+    expect(f.nativeElement.textContent).not.toContain('Lever 1');
+    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(0);
+
+    f.componentInstance.toggleLeversGroup();
+    f.detectChanges();
     expect(f.nativeElement.textContent).toContain('Lever 1');
     expect(f.nativeElement.textContent).toContain(': Climate');
     expect(f.nativeElement.textContent).toContain('2 targets');
     expect(f.nativeElement.textContent).not.toContain('Research area');
-    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(1);
+    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(0);
+
     f.componentInstance.toggleRow(lever);
+    f.detectChanges();
+    expect(f.nativeElement.querySelectorAll('table')).toHaveLength(1);
+
+    f.componentInstance.toggleSdgList();
     f.detectChanges();
     expect(f.nativeElement.querySelectorAll('table')).toHaveLength(2);
     expect(f.nativeElement.textContent).toContain('1.1');
@@ -546,5 +559,29 @@ describe('SdgManagementComponent', () => {
       leverSdgTargetList: [expect.objectContaining({ id: 10, lever_id: 1, sdg_target_id: 12 })]
     });
     expect(modals.closeModal).toHaveBeenCalledWith('portfolio2025LeverSdgs');
+  });
+
+  it('orders portfolio sections most recent first', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    c.portfolios.set([
+      { id: 1, name: 'Portfolio 1', description: '', start_year: 2010, end_year: 2025 },
+      { id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }
+    ]);
+    expect(c.portfolioSections()).toEqual([2, 1]);
+
+    c.portfolios.set([
+      { id: 1, name: 'Portfolio 1', description: '', start_year: 2027, end_year: 2032 },
+      { id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }
+    ]);
+    expect(c.portfolioSections()).toEqual([1, 2]);
+  });
+
+  it('labels a portfolio by its year range without the portfolio number', async () => {
+    await configureBed();
+    const c = TestBed.createComponent(SdgManagementComponent).componentInstance;
+    c.portfolios.set([{ id: 2, name: 'Portfolio 2', description: '', start_year: 2026, end_year: 2030 }]);
+    expect(c.portfolioLabel(2)).toBe('Portfolio (2026–2030)');
+    expect(c.portfolioLabel(1)).toBe('Portfolio');
   });
 });
