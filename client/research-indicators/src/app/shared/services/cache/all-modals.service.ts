@@ -345,6 +345,7 @@ export class AllModalsService {
       poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false },
       portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
       portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false }
+      // isWide stays true: it is this modal's layout, not a per-opening state.
     });
 
     this.setSubmitResultOrigin(null);

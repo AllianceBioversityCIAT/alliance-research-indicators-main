@@ -21,18 +21,6 @@ function isUnauthenticatedAccessToAppRoot(router: Router): boolean {
  * Angular's async boundaries, and a plain signal read has no such
  * requirement.
  */
-function waitForRestoreToSettle(impersonation: ImpersonationService): Promise<void> {
-  return new Promise<void>(resolve => {
-    const check = () => {
-      if (!impersonation.restoring()) {
-        resolve();
-        return;
-      }
-      setTimeout(check, 0);
-    };
-    check();
-  });
-}
 
 /**
  * Whether the requested URL actually names a page behind this guard.
@@ -60,6 +48,28 @@ function isDeclaredUnder(route: Route, segments: UrlSegment[]): boolean {
     }
     // `:param` and `**` children accept any first segment.
     return childFirstSegment === '**' || childFirstSegment.startsWith(':') || childFirstSegment === requestedFirstSegment;
+  });
+}
+
+/**
+ * // @akili-spec changes/profile-simulation
+ * Design §5 "Client restore" — polls `impersonation.restoring()` until it
+ * settles. Deliberately NOT built on `toObservable`/`effect` (RxJS interop):
+ * those require an injection context at the moment the internal `inject()`
+ * runs, which a route-match-time guard cannot reliably guarantee across
+ * Angular's async boundaries, and a plain signal read has no such
+ * requirement.
+ */
+function waitForRestoreToSettle(impersonation: ImpersonationService): Promise<void> {
+  return new Promise<void>(resolve => {
+    const check = () => {
+      if (!impersonation.restoring()) {
+        resolve();
+        return;
+      }
+      setTimeout(check, 0);
+    };
+    check();
   });
 }
 

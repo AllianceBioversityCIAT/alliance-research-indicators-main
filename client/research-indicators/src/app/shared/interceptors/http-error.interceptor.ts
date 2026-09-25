@@ -97,6 +97,7 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           return throwError(() => error);
         }
 
+        
         const isAiFormalizeError = error.status === 502 && req.url.includes('results/ai/formalize');
 
         const isPoolFundingTagValidationError = error.status === 400 && req.url.includes('/pool-funding-tag');

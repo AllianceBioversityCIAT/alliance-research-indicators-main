@@ -29,9 +29,9 @@ import { PiDelegateHistoryComponent } from '@platform/pages/my-pi-delegates/hist
     SelectLinkedResultsModalComponent,
     EditEnvironmentVariableModalComponent,
     SimulateProfileModalComponent,
-    EditPromptModalComponent,
     AssignPiDelegateComponent,
-    PiDelegateHistoryComponent
+    PiDelegateHistoryComponent,
+    EditPromptModalComponent
   ],
   templateUrl: './all-modals.component.html'
 })
