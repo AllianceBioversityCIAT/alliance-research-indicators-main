@@ -39,6 +39,7 @@ const eligible = (
   },
   indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
   prms_policy_type_id: null,
+  prms_sync_button_enabled: true,
   ...overrides,
 });
 
@@ -100,6 +101,33 @@ describe('evaluateSyncGate', () => {
 
     expect(decision.entryId).toBe('pool_funding_contributor');
     expect(decision.description).toContain('C-NOT-POOL-77');
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('refuses with 503 and persistsRow false when the PRMS sync button flag is off', () => {
+    const decision = attemptSend(
+      eligible({ prms_sync_button_enabled: false }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('feature_enabled');
+    expect(decision.httpStatus).toBe(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(decision.description).toMatch(/PRMS sync/i);
+    expect(decision.description).toMatch(/administrative pause/i);
+    expect(decision.persistsRow).toBe(false);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('refuses with feature_enabled before result existence when the flag is off and the result does not exist', () => {
+    const decision = attemptSend(
+      eligible({ prms_sync_button_enabled: false, exists: false }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('feature_enabled');
+    expect(decision.httpStatus).toBe(HttpStatus.SERVICE_UNAVAILABLE);
     expect(transport.ingest).not.toHaveBeenCalled();
   });
 

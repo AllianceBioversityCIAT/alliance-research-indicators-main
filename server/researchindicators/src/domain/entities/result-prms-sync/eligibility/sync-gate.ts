@@ -19,9 +19,15 @@ export interface SyncGateSnapshot {
   indicator_id: number | null;
   /** Resolved PRMS `policy_type.id`. Null when the result is not a policy change. */
   prms_policy_type_id: number | null;
+  /**
+   * PRMS-sync-button flag (R-PFT-004). `false` only when app_config stores the
+   * exact disable string; a missing or unreadable row is enabled (R-PFT-003).
+   */
+  prms_sync_button_enabled: boolean;
 }
 
 export type SyncGateEntryId =
+  | 'feature_enabled'
   | 'result_exists'
   | 'not_already_synced'
   | 'approved'
@@ -35,7 +41,11 @@ export interface SyncGateEntry {
   httpStatus: number;
   description: string | ((snapshot: SyncGateSnapshot) => string);
   fails: (snapshot: SyncGateSnapshot) => boolean;
-  /** JD-3: entries 1–2 write no log row; entries 3–8 write REFUSED_BY_STAR. */
+  /**
+   * JD-3: a refusal that is not a verdict about the result writes no log row
+   * (feature_enabled, result_exists, not_already_synced). Later entries write
+   * REFUSED_BY_STAR.
+   */
   persistsRow: boolean;
 }
 
@@ -69,6 +79,14 @@ const contractDescription = (snapshot: SyncGateSnapshot): string => {
  * (QA-5 / family R-F6).
  */
 export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
+  {
+    id: 'feature_enabled',
+    httpStatus: HttpStatus.SERVICE_UNAVAILABLE,
+    description:
+      'PRMS sync is disabled as an administrative pause and is temporarily unavailable',
+    fails: (snapshot) => snapshot.prms_sync_button_enabled === false,
+    persistsRow: false,
+  },
   {
     id: 'result_exists',
     httpStatus: HttpStatus.NOT_FOUND,

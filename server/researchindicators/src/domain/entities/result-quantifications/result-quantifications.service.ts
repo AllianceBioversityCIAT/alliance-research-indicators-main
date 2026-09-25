@@ -41,6 +41,10 @@ export class ResultQuantificationsService extends BaseServiceSimple<
 
   /**
    * @sdd-spec docs/specs/changes/measure-number-signed-decimal — T-03 / DD-13, R-MSD-011
+   * OICR signed-decimal extension (2026-09-24): roles 1 (ACTUAL_COUNT) and
+   * 2 (EXTRAPOLATE_ESTIMATES) are now validated by the same signed-scaled
+   * rule as role 3 (INNOVATION_USE), enabling negative values and up to 4
+   * decimal places for the OICR Quantification fields.
    *
    * Per-role rule map, keyed on the `dataRole` PARAMETER — never on a
    * `quantification_role_id` found on the payload. `update-oicr.dto.ts`
@@ -51,14 +55,11 @@ export class ResultQuantificationsService extends BaseServiceSimple<
    * attached by `upsertByCompositeKeys`/`create` from their own call-site
    * argument, which the client cannot reach.
    *
-   * Default entry (roles 1, 2, and any future role): non-negative integer.
-   * This is a restoration of the fraction axis only — `result_quantifications
-   * .quantification_number` was `bigint`, which is signed, so refusing a
-   * negative here is a genuine tightening (DD-8's correction, RK-14), not a
-   * restoration of "today's effective behaviour".
+   * Roles 1, 2, 3 (ACTUAL_COUNT, EXTRAPOLATE_ESTIMATES, INNOVATION_USE):
+   * signed, at most 4 decimal places, within DD-14's derived bound.
    *
-   * Role 3 (Innovation Use): signed, at most 4 decimal places, within
-   * DD-14's derived bound.
+   * Default entry (any future role): non-negative integer (conservative
+   * fallback preserving the original tightening from DD-8/RK-14).
    *
    * Null contract (R-MSD-011 AC.6): `null`/`undefined` are accepted and
    * skipped by EVERY entry, including the default — `quantification_number`
@@ -79,7 +80,11 @@ export class ResultQuantificationsService extends BaseServiceSimple<
         continue;
       }
 
-      if (dataRole === QuantificationRolesEnum.INNOVATION_USE) {
+      if (
+        dataRole === QuantificationRolesEnum.INNOVATION_USE ||
+        dataRole === QuantificationRolesEnum.ACTUAL_COUNT ||
+        dataRole === QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES
+      ) {
         this.validateSignedScaledQuantification(value);
       } else {
         this.validateNonNegativeIntegerQuantification(value);

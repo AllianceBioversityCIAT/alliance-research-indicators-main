@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { Socket } from 'ngx-socket-io';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { ValidateCacheService } from '@shared/services/validate-cache.service';
 import AuthComponent from './auth.component';
 
@@ -35,7 +36,8 @@ describe('AuthComponent', () => {
           }
         },
         { provide: ValidateCacheService, useValue: { validateVersions: jest.fn().mockResolvedValue(undefined) } },
-        { provide: DateFormatConfigService, useValue: { loadConfig: jest.fn().mockResolvedValue(null) } }
+        { provide: DateFormatConfigService, useValue: { loadConfig: jest.fn().mockResolvedValue(null) } },
+        { provide: PoolFundingFlagsService, useValue: { load: jest.fn().mockResolvedValue(undefined) } }
       ]
     }).compileComponents();
 

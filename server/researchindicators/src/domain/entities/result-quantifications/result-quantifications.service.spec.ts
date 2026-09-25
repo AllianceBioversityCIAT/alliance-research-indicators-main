@@ -155,27 +155,31 @@ describe('ResultQuantificationsService', () => {
       expect(result[0].quantification_number).toBe(-12.75);
     });
 
+    // OICR signed-decimal extension (2026-09-24): roles 1 (ACTUAL_COUNT) and
+    // 2 (EXTRAPOLATE_ESTIMATES) now share the same signed-scaled rule as
+    // INNOVATION_USE, so negative values and decimals are accepted.
     it.each([
       ['ACTUAL_COUNT', QuantificationRolesEnum.ACTUAL_COUNT],
       ['EXTRAPOLATE_ESTIMATES', QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES],
     ])(
-      'rejects the same signed decimal for role %s with 400',
+      'accepts a signed decimal for role %s (OICR signed-decimal extension)',
       async (_label, role) => {
-        await expect(
-          service.upsertByCompositeKeys(
-            10,
-            [
-              {
-                quantification_number: -12.75,
-                unit: 'ha',
-                description: 'test',
-              },
-            ],
-            ['quantification_number', 'unit', 'description'],
-            role,
-          ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-        expect(mockSave).not.toHaveBeenCalled();
+        const result = await service.upsertByCompositeKeys(
+          10,
+          [
+            {
+              quantification_number: -12.75,
+              unit: 'ha',
+              description: 'test',
+            },
+          ],
+          ['quantification_number', 'unit', 'description'],
+          role,
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result[0].quantification_number).toBe(-12.75);
+        expect(mockSave).toHaveBeenCalled();
       },
     );
 
@@ -198,24 +202,27 @@ describe('ResultQuantificationsService', () => {
       },
     );
 
-    it('rejects a negative integer for the default role (new sign-axis tightening, RK-14)', async () => {
+    // The non-negative-integer guard still protects any future/unknown role
+    // that does not appear in the known signed-decimal set.
+    // Role 99 simulates that case (RK-14).
+    it('rejects a negative integer for an unknown/future role (default rule, RK-14)', async () => {
       await expect(
         service.upsertByCompositeKeys(
           10,
           [{ quantification_number: -1, unit: 'ha', description: 'test' }],
           ['quantification_number', 'unit', 'description'],
-          QuantificationRolesEnum.ACTUAL_COUNT,
+          99 as QuantificationRolesEnum,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects a fractional value for the default role', async () => {
+    it('rejects a fractional value for an unknown/future role (default rule)', async () => {
       await expect(
         service.upsertByCompositeKeys(
           10,
           [{ quantification_number: 2.5, unit: 'ha', description: 'test' }],
           ['quantification_number', 'unit', 'description'],
-          QuantificationRolesEnum.EXTRAPOLATE_ESTIMATES,
+          99 as QuantificationRolesEnum,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
@@ -295,13 +302,15 @@ describe('ResultQuantificationsService', () => {
       },
     );
 
+    // M-01 updated (2026-09-24): ACTUAL_COUNT (1) now shares the signed-decimal
+    // rule, so the payload-keying guard is demonstrated with an unknown role
+    // (99). The `dataRole` PARAMETER still governs the rule — never the
+    // `quantification_role_id` field on the row itself.
     it('selects the rule from the dataRole PARAMETER, never from a quantification_role_id on the payload (M-01)', async () => {
-      // Simulates an OICR-shaped call: the real call site passes
-      // dataRole = ACTUAL_COUNT (1), but the row itself — typed as the
-      // full entity, per DD-13's own warning about `update-oicr.dto.ts` —
-      // carries a client-supplied quantification_role_id of 3. If the map
-      // were payload-keyed, this would buy the permissive role-3 rule and
-      // -12.75 would be accepted; it must still be rejected as role 1.
+      // An unknown/future role (99) uses the conservative non-negative-integer
+      // rule. The row carries quantification_role_id = INNOVATION_USE (3). If
+      // the map were payload-keyed, -12.75 would slip through as role 3; it
+      // must still be rejected because dataRole = 99.
       await expect(
         service.upsertByCompositeKeys(
           10,
@@ -314,7 +323,7 @@ describe('ResultQuantificationsService', () => {
             },
           ],
           ['quantification_number', 'unit', 'description'],
-          QuantificationRolesEnum.ACTUAL_COUNT,
+          99 as QuantificationRolesEnum,
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(mockSave).not.toHaveBeenCalled();

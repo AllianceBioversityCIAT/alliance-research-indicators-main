@@ -155,10 +155,40 @@ export class InputComponent {
     return false;
   }
 
+  /**
+   * PrimeNG's `p-inputNumber` emits the bare string `'-'` while a negative number is still being
+   * typed. It is only reachable when `min < 0` (PrimeNG's own `allowMinusSign()` — every other
+   * call site in this repo keeps the default `min = 0`, where the minus key is swallowed outright),
+   * which is why it surfaced first on Innovation Use's OTHER QUANTITATIVE MEASURES card.
+   *
+   * `'-'` is not a value: it round-trips to `NaN` through `Number()` (both in the consumer's own
+   * adapters and in PrimeNG's `writeValue`, which does `value ? Number(value) : value`). Letting it
+   * reach the model is what froze the browser tab — see `externalValueDiffers` below. Swallowing it
+   * here is inert for the arrow buttons (they emit finished numbers) and leaves the character in the
+   * DOM input, so the user can carry on typing `-5`.
+   */
+  isIncompleteNumericInput(value: unknown): boolean {
+    if (this.type !== 'number') return false;
+    if (typeof value === 'number') return Number.isNaN(value);
+    if (typeof value === 'string' && value !== '') return !Number.isFinite(Number(value));
+    return false;
+  }
+
+  /**
+   * NaN-safe difference check for the `onChange` effect. `!==` is NOT usable here: `NaN !== NaN` is
+   * always `true`, so a single NaN in the model made the effect write `body` on every run, and
+   * writing a signal the effect itself reads re-schedules it — an unbounded synchronous loop that
+   * hung the tab with no error. `Object.is` converges on NaN and is otherwise identical to `!==`
+   * except for `0`/`-0`, which settles after one extra pass.
+   */
+  externalValueDiffers(current: InputValueType, external: unknown): boolean {
+    return !Object.is(current, external);
+  }
+
   onChange = effect(
     () => {
       const externalValue = this.utils.getNestedProperty(this.signal(), this.optionValue);
-      if (this.body().value !== externalValue) {
+      if (this.externalValueDiffers(this.body().value, externalValue)) {
         this.body.set({ value: externalValue });
       }
     },
@@ -252,6 +282,9 @@ export class InputComponent {
   }
 
   setValue(value: any) {
+    // A half-typed negative ('-') is not a value — never propagate it to the bound model.
+    if (this.isIncompleteNumericInput(value)) return;
+
     if (this.onlyLowerCase) value = value.toLowerCase();
 
     if (this.maxWords && typeof value === 'string') {
