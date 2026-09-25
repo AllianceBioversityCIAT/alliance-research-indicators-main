@@ -176,7 +176,7 @@ export class ResultSidebarComponent {
   readonly showPrmsSyncCard = computed(() => this.prmsHistoryPhase() === 'loaded' && (this.prmsHistory()?.events.length ?? 0) > 0);
 
   readonly showLegacyPrmsCode = computed(
-    () => this.prmsHistoryPhase() === 'loaded' && (this.prmsHistory()?.events.length ?? 0) === 0 && this.prmsResultCode() != null
+    () => this.prmsHistoryPhase() !== 'loading' && !this.showPrmsSyncCard() && this.prmsResultCode() != null
   );
 
   @ViewChild(PrmsSyncCardComponent) prmsSyncCard?: PrmsSyncCardComponent;

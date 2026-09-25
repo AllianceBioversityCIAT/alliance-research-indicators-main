@@ -2562,9 +2562,25 @@ describe('ResultSidebarComponent', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).toBeNull();
     });
 
-    it('renders neither card nor legacy line when the request fails, and keeps PRMS SYNC', async () => {
-      (apiService.GET_PrmsSyncHistory as jest.Mock).mockRejectedValue(new Error('HTTP 500 stack trace should not render'));
+    it('keeps the legacy PRMS code when the history request fails and a code is already known', async () => {
+      (apiService.GET_PrmsSyncHistory as jest.Mock).mockRejectedValue(new Error('HTTP 404 history is not deployed'));
       setAlignment(panelAlignment);
+      await component.fetchPrmsSyncHistory(123);
+      fixture.detectChanges();
+
+      expect(component.prmsHistoryPhase()).toBe('failed');
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-history-loading"]')).toBeNull();
+      const line = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+      expect(line).not.toBeNull();
+      expect(line.textContent.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+      expect(fixture.nativeElement.textContent).not.toContain('HTTP 404');
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]')).not.toBeNull();
+    });
+
+    it('renders neither card nor legacy line when the request fails and no PRMS code is known, and keeps PRMS SYNC', async () => {
+      (apiService.GET_PrmsSyncHistory as jest.Mock).mockRejectedValue(new Error('HTTP 500 stack trace should not render'));
+      setAlignment({ ...panelAlignment, prms_result_code: null });
       await component.fetchPrmsSyncHistory(123);
       fixture.detectChanges();
 
