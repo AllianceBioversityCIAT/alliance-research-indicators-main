@@ -24,17 +24,17 @@ export class CreatePiDelegates1787600000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       `CREATE TABLE \`pi_delegates\` (` +
-        `\`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), ` +
-        `\`created_by\` bigint NULL, ` +
-        `\`updated_at\` timestamp(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), ` +
-        `\`updated_by\` bigint NULL, ` +
-        `\`is_active\` tinyint NOT NULL DEFAULT 1, ` +
-        `\`deleted_at\` timestamp NULL, ` +
-        `\`pi_delegate_id\` bigint NOT NULL AUTO_INCREMENT, ` +
-        `\`project_id\` varchar(36) NOT NULL, ` +
-        `\`delegate_user_id\` bigint NOT NULL, ` +
-        `PRIMARY KEY (\`pi_delegate_id\`)` +
-        `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`,
+      `\`created_at\` timestamp(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), ` +
+      `\`created_by\` bigint NULL, ` +
+      `\`updated_at\` timestamp(6) NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), ` +
+      `\`updated_by\` bigint NULL, ` +
+      `\`is_active\` tinyint NOT NULL DEFAULT 1, ` +
+      `\`deleted_at\` timestamp NULL, ` +
+      `\`pi_delegate_id\` bigint NOT NULL AUTO_INCREMENT, ` +
+      `\`project_id\` varchar(36) NOT NULL, ` +
+      `\`delegate_user_id\` bigint NOT NULL, ` +
+      `PRIMARY KEY (\`pi_delegate_id\`)` +
+      `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci`,
     );
     await queryRunner.query(
       `ALTER TABLE \`pi_delegates\` ADD CONSTRAINT \`FK_pi_delegates_project_id\` FOREIGN KEY (\`project_id\`) REFERENCES \`agresso_contracts\`(\`agreement_id\`) ON DELETE RESTRICT ON UPDATE NO ACTION`,

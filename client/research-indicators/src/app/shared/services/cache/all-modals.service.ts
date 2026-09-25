@@ -185,6 +185,14 @@ export class AllModalsService {
       isOpen: false,
       title: 'Portfolio management'
     },
+    assignPiDelegate: {
+      isOpen: false,
+      title: 'Assign / Edit PI Delegate'
+    },
+    piDelegateHistory: {
+      isOpen: false,
+      title: 'Delegation History'
+    },
     // @akili-spec changes/profile-simulation — R-IMP-007, D-imp-9. Cancel
     // only at the wrapper level: `Select` / `Start simulation` live inside
     // the hosted steps (SimulateProfileModalComponent), not the footer.
@@ -194,13 +202,9 @@ export class AllModalsService {
       cancelText: 'Cancel',
       cancelAction: () => this.toggleModal('simulateProfile')
     },
-    assignPiDelegate: {
+    portfolio2025LeverSdgs: {
       isOpen: false,
       title: 'Assign / Edit PI Delegate'
-    },
-    piDelegateHistory: {
-      isOpen: false,
-      title: 'Delegation History'
     },
     // Read-only help for the Pool Funding Alignment section. No confirm/cancel:
     // app-modal renders its footer only when one of those actions is registered,
@@ -210,10 +214,6 @@ export class AllModalsService {
       isOpen: false,
       title: 'About Pool Funding & Theory of Change alignment',
       isWide: true
-    },
-    portfolio2025LeverSdgs: {
-      isOpen: false,
-      title: 'Portfolio 2025 SDG targets'
     },
     portfolio2026SdgTargets: {
       isOpen: false,

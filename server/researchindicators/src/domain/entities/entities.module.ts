@@ -101,9 +101,9 @@ import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
 import { ResultStrategicObjectivesModule } from './result-strategic-objectives/result-strategic-objectives.module';
 import { AiReportsModule } from './ai-reports/ai-reports.module';
-import { ImpersonationModule } from './impersonation/impersonation.module';
 import { PiDelegatesModule } from './pi-delegates/pi-delegates.module';
 import { UsersModule } from './users/users.module';
+import { ImpersonationModule } from './impersonation/impersonation.module';
 
 @Module({
   imports: [

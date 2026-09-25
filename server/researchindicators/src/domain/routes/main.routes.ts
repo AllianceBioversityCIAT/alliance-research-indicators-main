@@ -75,9 +75,9 @@ import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
-import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
 import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
 import { UsersModule } from '../entities/users/users.module';
+import { ImpersonationModule } from '../entities/impersonation/impersonation.module';
 
 const capSharingChildren: Routes = [
   {
