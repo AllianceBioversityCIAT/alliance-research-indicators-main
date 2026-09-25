@@ -1,0 +1,57 @@
+@if (latest(); as event) {
+  <section
+    class="prms-sync-card"
+    [class.prms-sync-card--success]="title().tone === 'success'"
+    [class.prms-sync-card--warning]="title().tone === 'warning'"
+    data-testid="prms-sync-card"
+    [attr.data-tone]="title().tone"
+    aria-label="PRMS synchronization status">
+    <header class="prms-sync-card__header">
+      <div class="prms-sync-card__title">
+        <i
+          class="pi"
+          [class.pi-check]="title().tone === 'success'"
+          [class.pi-exclamation-triangle]="title().tone === 'warning'"
+          aria-hidden="true"></i>
+        <h3 data-testid="prms-sync-title">{{ title().title }}</h3>
+      </div>
+      @if (showBadge()) {
+        <span class="prms-sync-card__badge" data-testid="prms-sync-badge">Sync #{{ history().sync_count }}</span>
+      }
+    </header>
+
+    <div class="prms-sync-card__status">
+      <span class="prms-sync-card__status-label">PRMS</span>
+      <span class="prms-sync-card__pill" [attr.data-tone]="pill().tone" data-testid="prms-sync-pill">{{ pill().label }}</span>
+    </div>
+
+    @if (actorName(); as name) {
+      <p class="prms-sync-card__actor" data-testid="prms-sync-actor">by {{ name }}</p>
+    }
+
+    @if (showPrmsId()) {
+      <p class="prms-sync-card__id" data-testid="prms-sync-id">
+        PRMS ID: <strong>{{ history().prms_result_code }}</strong>
+      </p>
+    }
+
+    @if (deepLink(); as href) {
+      <a class="prms-sync-card__open" data-testid="prms-sync-open" [href]="href" target="_blank" rel="noopener noreferrer">
+        <i class="pi pi-external-link" aria-hidden="true"></i>
+        Open Result in PRMS
+      </a>
+    }
+
+    <button #historyLink type="button" class="prms-sync-card__history" data-testid="prms-sync-history-link" (click)="openHistory()">
+      <i class="pi pi-clock" aria-hidden="true"></i>
+      View full sync history
+    </button>
+
+    @if (showAdvisory()) {
+      <p class="prms-sync-card__advisory" data-testid="prms-sync-advisory" role="note">
+        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+        <span>Science Program updated this mapping</span>
+      </p>
+    }
+  </section>
+}

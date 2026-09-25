@@ -1,0 +1,47 @@
+<p-dialog
+  [visible]="visible()"
+  (visibleChange)="onVisibleChange($event)"
+  [modal]="true"
+  [dismissableMask]="true"
+  [closeOnEscape]="false"
+  [draggable]="false"
+  [style]="{ width: '36rem', maxWidth: '94vw' }"
+  styleClass="prms-history-dialog"
+  header="SYNCHRONIZATION HISTORY"
+  appendTo="body"
+  data-testid="prms-history-dialog">
+  <p class="prms-history__sub" data-testid="prms-history-subheader">{{ subHeader() }}</p>
+
+  <ol class="prms-history__list">
+    @for (entry of entries(); track entry.id) {
+      <li class="prms-history__entry" data-testid="prms-history-entry">
+        <span class="prms-history__dot" [attr.data-tone]="pill(entry).tone" aria-hidden="true"></span>
+        <div class="prms-history__body">
+          <div class="prms-history__meta">
+            <span class="prms-history__pill" [attr.data-tone]="pill(entry).tone" data-testid="prms-history-pill">{{ pill(entry).label }}</span>
+            <time [attr.datetime]="entry.decided_at ?? entry.occurred_at" data-testid="prms-history-time">{{ timestamp(entry) }}</time>
+          </div>
+          <h3 data-testid="prms-history-headline">{{ headline(entry) }}</h3>
+          @if (subline(entry); as line) {
+            <p class="prms-history__subline" data-testid="prms-history-subline">{{ line }}</p>
+          }
+          @if (hasComment(entry)) {
+            <div class="prms-history__comment" data-testid="prms-history-comment">
+              <p class="prms-history__comment-label">
+                REVIEWER COMMENT
+                @if (commentName(entry); as name) {
+                  · {{ name }}
+                }
+              </p>
+              <p class="prms-history__comment-body">{{ entry.justification }}</p>
+            </div>
+          }
+        </div>
+      </li>
+    }
+  </ol>
+
+  <div class="prms-history__footer">
+    <button type="button" class="prms-history__close" data-testid="prms-history-close" (click)="close()">Close</button>
+  </div>
+</p-dialog>
