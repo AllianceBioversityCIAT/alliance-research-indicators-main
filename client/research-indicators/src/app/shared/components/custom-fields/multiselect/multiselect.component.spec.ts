@@ -1705,4 +1705,58 @@ describe('MultiselectComponent', () => {
       expect(realComponent.selectedOptions().length).toBe(2);
     });
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('singleSelection', () => {
+    it('is off by default, and off means the selection is untouched', () => {
+      expect(component.singleSelection).toBe(false);
+
+      component.setValue([1, 2, 3]);
+
+      expect(component.body().value).toEqual([1, 2, 3]);
+    });
+
+    it('keeps only the option the user just added — picking a second REPLACES the first', () => {
+      component.singleSelection = true;
+
+      component.setValue([1]);
+      expect(component.body().value).toEqual([1]);
+
+      // PrimeNG hands over the accumulated array; 2 is the new one.
+      component.setValue([1, 2]);
+      expect(component.body().value).toEqual([2]);
+    });
+
+    it('falls back to the last id when nothing is new (a value set from outside)', () => {
+      component.singleSelection = true;
+
+      component.setValue([7, 8]);
+
+      expect(component.body().value).toEqual([8]);
+    });
+
+    it('allows clearing to empty', () => {
+      component.singleSelection = true;
+      component.setValue([1]);
+
+      component.setValue([]);
+
+      expect(component.body().value).toEqual([]);
+    });
+
+    it('writes only the surviving option into the bound signal', () => {
+      component.singleSelection = true;
+      component.signal = signal({ picked: [] });
+      component.signalOptionValue = 'picked';
+      component.optionValue = 'id';
+
+      component.setValue([1]);
+      component.setValue([1, 2]);
+
+      // ★ discriminating: capping `body` but not the signal would leave the form
+      //   state holding two people while the field shows one.
+      expect(component.signal().picked.map((item: { id: number }) => item.id)).toEqual([2]);
+    });
+  });
+
 });

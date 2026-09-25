@@ -1,0 +1,330 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05) -->
+<!-- R-UI-002: By-project enriched table -->
+<!-- R-UI-008: Per-delegate "X" revoke -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues (icon+text). -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+
+<div class="by-project">
+
+  <!-- ── Table card: toolbar + table + paginator + summary ──────────── -->
+  <div class="by-project__table-wrapper">
+
+    <!-- Summary line — top of the card, above the search -->
+    <div class="by-project__summary flex flex-wrap items-center gap-2 px-4 pt-3 pb-1 font-['Barlow'] text-[13px] leading-[1.5]"
+      aria-label="PI Delegates summary">
+      <span class="by-project__summary-left atc-grey-600 text-[12px] italic">
+        @if (service.isAdminView()) {
+        Every project on the platform is listed — Role shows your own involvement on each one
+        } @else {
+        Only projects where you are the Principal Investigator or a PI Delegate are listed
+        }
+      </span>
+    </div>
+
+    <!-- Role quick filters — one per header counter, so a number and the rows
+         behind it always agree.
+         No underline: it read as a tab strip, and these are filters on the table
+         below, not a change of view. The selected one is marked by a blue-tinted
+         surface plus a heavier weight, so the state survives without colour. -->
+    <div class="by-project__role-filters flex w-full flex-wrap gap-2 px-4 pt-2 pb-1" role="group"
+      aria-label="Filter projects by your role">
+      @for (option of roleFilterOptions; track option.value) {
+      <button type="button"
+        class="by-project__role-filter inline-flex min-w-[58px] cursor-pointer items-center justify-center rounded-lg border-0 px-2.5 py-1 font-['Barlow'] text-[13px] transition-colors hover:opacity-80"
+        [class]="roleTerm() === option.value
+          ? 'bg-[color:var(--ac-light-blue-50)] atc-grey-800 font-semibold'
+          : 'bg-[color:var(--ac-grey-100)] atc-grey-700 font-medium'"
+        [attr.aria-pressed]="roleTerm() === option.value" [attr.aria-label]="'Show ' + option.label"
+        (click)="selectRoleFilter(option.value)">
+        {{ option.label }}
+      </button>
+      }
+    </div>
+
+    <!-- Per-table toolbar: the shared search control (search only) -->
+    <div class="by-project__toolbar flex flex-wrap items-center gap-3 border-b border-[color:var(--ac-grey-200)] px-4 pb-3 pt-1">
+      <app-search-export-controls
+        class="w-fit max-w-full"
+        [showApply]="false"
+        [showClear]="true"
+        [searchValue]="searchTerm()"
+        searchPlaceholder="Find a project by code, title or delegate"
+        (searchChange)="searchTerm.set($event)"
+        (clear)="clearFilters()"
+      ></app-search-export-controls>
+    </div>
+
+    <p-table
+      [value]="filteredRows()"
+      [loading]="service.loading()"
+      [scrollable]="true"
+      [paginator]="true"
+      [rows]="10"
+      [rowsPerPageOptions]="[5, 10, 25, 50]"
+      [showCurrentPageReport]="true"
+      [tableStyle]="{ 'min-width': '100%' }"
+      paginatorStyleClass="justify-end! border-t border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] px-3 py-2"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} projects"
+      styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
+      aria-label="PI Delegates by project"
+    >
+      <!-- Header -->
+      <ng-template pTemplate="header">
+        <tr>
+          <th scope="col" class="by-project__th by-project__th--project atc-primary-blue-600"
+            pSortableColumn="project_name">
+            <div class="by-project__th-inner">Project <p-sortIcon field="project_name"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="role">
+            <div class="by-project__th-inner">Role <p-sortIcon field="role"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="status">
+            <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="is_pool_funding_contributor">
+            <div class="by-project__th-inner">Pool funding <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">
+            <div class="by-project__th-inner">PI Delegates</div>
+          </th>
+          <th scope="col" class="by-project__th atc-primary-blue-600">
+            <div class="by-project__th-inner by-project__th-inner--centered">Actions</div>
+          </th>
+        </tr>
+      </ng-template>
+
+      <!-- Body -->
+      <ng-template pTemplate="body" let-project>
+        <tr class="by-project__row" [class.by-project__row--no-delegate]="project.delegates.length === 0">
+
+          <!-- Project — "CODE - Title" on top, labelled dates underneath (the
+               same label → value treatment the Assign modal uses). A project
+               with no end date simply omits that pair. -->
+          <td class="by-project__td by-project__td--project">
+            <div class="by-project__project">
+              <!-- Only this cell navigates; the row itself stays inert so the
+                   chips and their revoke buttons keep working. -->
+              <a class="by-project__project__name by-project__project__link"
+                [routerLink]="['/project-detail', project.project_code]"
+                [attr.aria-label]="'Open ' + project.project_code + ' project detail'">
+                <span class="by-project__project__code">{{ project.project_code }}</span>
+                - {{ project.project_name || '—' }}
+              </a>
+              @if (project.pi_name || project.start_date || project.end_date) {
+                <span class="by-project__project__meta atc-grey-600">
+                  @if (project.pi_name) {
+                    <span class="by-project__project__label">Principal investigator</span>
+                    <i class="pi pi-arrow-right by-project__project__arrow" aria-hidden="true"></i>
+                    <span class="by-project__project__date">{{ project.pi_name }}</span>
+                    @if (project.start_date || project.end_date) {
+                      <span class="by-project__project__sep">|</span>
+                    }
+                  }
+                  @if (project.start_date) {
+                    <span class="by-project__project__label">Start date</span>
+                    <i class="pi pi-arrow-right by-project__project__arrow" aria-hidden="true"></i>
+                    <span class="by-project__project__date">{{ formatDate(project.start_date) }}</span>
+                  }
+                  @if (project.end_date) {
+                    @if (project.start_date) {
+                      <span class="by-project__project__sep">|</span>
+                    }
+                    <span class="by-project__project__label">End date</span>
+                    <i class="pi pi-arrow-right by-project__project__arrow" aria-hidden="true"></i>
+                    <span class="by-project__project__date">{{ formatDate(project.end_date) }}</span>
+                  }
+                </span>
+              }
+            </div>
+          </td>
+
+          <!-- My role — PI or delegate: this table lists both, and the two are
+               managed differently, so the row says which one applies. -->
+          <td class="by-project__td by-project__td--role">
+            <span class="by-project__role" [class.by-project__role--none]="project.hasNoRole"
+              [class]="project.hasNoRole ? 'atc-grey-600 italic' : ''"
+              [attr.aria-label]="roleDescription(project)"
+              [attr.title]="roleDescription(project)">{{ project.role }}</span>
+          </td>
+
+          <!-- Status — shared status tag, same colours as the My Projects table -->
+          <td class="by-project__td by-project__td--status">
+            @if (project.status) {
+              <app-custom-tag
+                [statusId]="statusDisplay(project).statusId"
+                [statusName]="statusDisplay(project).statusName"
+              ></app-custom-tag>
+            } @else {
+              <span class="atc-grey-500">—</span>
+            }
+          </td>
+
+          <!-- Pool funding — plain Yes / No in the row's own typography -->
+          <td class="by-project__td by-project__td--pool">
+            <!-- Same tag as the My Projects table (my-projects.component.html) — one
+                 platform, one way of saying a project contributes to pool funding.
+                 Like there, a project that does not contribute shows nothing. -->
+            @if (project.is_pool_funding_contributor) {
+            <div class="by-project__pool-tag flex w-fit items-center" data-testid="pool-funding-tag">
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding"
+                [tiny]="true"></app-custom-tag>
+            </div>
+            }
+          </td>
+
+          <!-- Delegates cell — chips or no-delegate cue (R-UI-002 AC.2/AC.3) -->
+          <td class="by-project__td by-project__td--delegates">
+            @if (project.delegates.length === 0) {
+              <!-- No-delegate: same chip shape as a delegate chip, in the amber
+                   warning palette used by the modal's inactive-user notice.
+                   Icon + text keep it a non-colour cue (R-UI-002 AC.3 /
+                   NFR-UI-002); there is nothing to revoke, so there is no X. -->
+              <span
+                class="by-project__chip by-project__chip--warning"
+                aria-label="No PI Delegate assigned"
+                data-testid="no-delegate-cue"
+              >
+                <i class="pi pi-exclamation-triangle by-project__chip__icon" aria-hidden="true"></i>
+                <span class="by-project__chip__name">No PI Delegate assigned</span>
+              </span>
+            } @else {
+              <div class="by-project__chips" role="list" [attr.aria-label]="'Delegates for ' + project.project_code">
+                <!-- Beyond MAX_VISIBLE_DELEGATES the cell would dominate the row,
+                     so the rest move behind a "+N more" popover. -->
+                @for (delegate of visibleDelegates(project); track delegate.delegate_user_id) {
+                  <span
+                    class="by-project__chip"
+                    [class.by-project__chip--inactive]="delegate.is_active === false"
+                    role="listitem"
+                    [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
+                  >
+                    @if (delegate.is_active === false) {
+                      <!-- Same marker the status tags use: the exclamation circle
+                           turned 180°, with the reason on hover. -->
+                      <i class="pi pi-exclamation-circle by-project__chip__inactive-icon"
+                        style="transform: rotate(180deg)" pTooltip="This user is no longer active"
+                        tooltipPosition="top" aria-label="This user is no longer active"></i>
+                    }
+                    <span class="by-project__chip__info">
+                      <span class="by-project__chip__name">{{ delegate.name }}</span>
+                      <span class="by-project__chip__email">{{ delegate.email }}</span>
+                    </span>
+                    <!-- Per-delegate "X" revoke (R-UI-008) -->
+                    <button
+                      type="button"
+                      class="by-project__chip__remove"
+                      [attr.aria-label]="'Revoke ' + delegate.name + ' from ' + project.project_code"
+                      pTooltip="Revoke delegate"
+                      tooltipPosition="top"
+                      (click)="onRevokeDelegate(project, delegate)"
+                      (keydown.enter)="onRevokeDelegate(project, delegate)"
+                    >
+                      <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
+                    </button>
+                  </span>
+                }
+
+                @if (hiddenDelegateCount(project) > 0) {
+                  <button type="button" class="by-project__more" (click)="morePopover.toggle($event)"
+                    [attr.aria-label]="hiddenDelegateCount(project) + ' more delegates'">
+                    +{{ hiddenDelegateCount(project) }} more
+                  </button>
+
+                  <p-popover #morePopover [baseZIndex]="10000" styleClass="by-project__more-panel">
+                    <div class="by-project__more-title">PI Delegates</div>
+                    <div class="by-project__more-list">
+                      @for (delegate of project.delegates; track delegate.delegate_user_id) {
+                        <span
+                          class="by-project__chip by-project__chip--block"
+                          [class.by-project__chip--inactive]="delegate.is_active === false"
+                          role="listitem"
+                          [attr.aria-label]="delegate.name + (delegate.is_active === false ? ' (inactive)' : '') + ' (' + delegate.email + ')'"
+                        >
+                          @if (delegate.is_active === false) {
+                            <!-- Same marker the status tags use: the exclamation circle
+                                 turned 180°, with the reason on hover. -->
+                            <i class="pi pi-exclamation-circle by-project__chip__inactive-icon"
+                              style="transform: rotate(180deg)" pTooltip="This user is no longer active"
+                              tooltipPosition="top" aria-label="This user is no longer active"></i>
+                          }
+                          <span class="by-project__chip__info">
+                            <span class="by-project__chip__name">{{ delegate.name }}</span>
+                            <span class="by-project__chip__email">{{ delegate.email }}</span>
+                          </span>
+                          <!-- Per-delegate "X" revoke (R-UI-008) -->
+                          <button
+                            type="button"
+                            class="by-project__chip__remove"
+                            [attr.aria-label]="'Revoke ' + delegate.name + ' from ' + project.project_code"
+                            pTooltip="Revoke delegate"
+                            tooltipPosition="top"
+                            (click)="onRevokeDelegate(project, delegate)"
+                            (keydown.enter)="onRevokeDelegate(project, delegate)"
+                          >
+                            <i class="pi pi-times !text-[9px]" aria-hidden="true"></i>
+                          </button>
+                        </span>
+                      }
+                    </div>
+                  </p-popover>
+                }
+              </div>
+            }
+          </td>
+
+          <!-- Actions — history + "Assign people" text button -->
+          <td class="by-project__td by-project__td--actions">
+            <div class="by-project__actions">
+              <button
+                type="button"
+                class="by-project__history-btn"
+                pTooltip="Delegation history"
+                tooltipPosition="top"
+                [attr.aria-label]="'Delegation history for ' + project.project_code"
+                (click)="onHistory(project)"
+                (keydown.enter)="onHistory(project)"
+              >
+                <i class="pi pi-history" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="by-project__assign-btn"
+                [attr.aria-label]="'Assign delegate to ' + project.project_code"
+                pTooltip="Assign people"
+                tooltipPosition="top"
+                (click)="onAssign(project)"
+                (keydown.enter)="onAssign(project)"
+              >
+                <i class="pi pi-user-plus" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+
+        </tr>
+      </ng-template>
+
+      <!-- Empty state -->
+      <ng-template pTemplate="emptymessage">
+        <tr>
+          <td colspan="6" class="by-project__empty" role="status">
+            <div class="by-project__empty-inner">
+              <i class="pi pi-inbox by-project__empty__icon atc-grey-500" aria-hidden="true"></i>
+              <p class="by-project__empty__text atc-grey-700">No projects match your search.</p>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-table>
+
+  </div>
+
+  <!-- ── Error state (NFR-UI-003) ──────────────────────────────────── -->
+  @if (service.error()) {
+    <div class="by-project__error" role="alert">
+      <i class="pi pi-exclamation-circle by-project__error__icon atc-red-1" aria-hidden="true"></i>
+      <span class="atc-red-1">{{ service.error() }}</span>
+    </div>
+  }
+
+</div>

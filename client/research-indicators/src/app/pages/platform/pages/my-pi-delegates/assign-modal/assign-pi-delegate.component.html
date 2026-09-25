@@ -1,0 +1,303 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-07) -->
+<!-- R-UI-005: Two searchable app-multiselects (People × Projects). -->
+<!-- The People picker no longer excludes the signed-in user (was R-UI-005 AC.3):
+     you may delegate to yourself on any project you are not the PI of. The PI of a
+     selected project is greyed out by [optionsDisabled], which covers the one case
+     the API rejects — for you and for everyone else alike. -->
+<!-- R-UI-005 AC.4: Accept gating handled by disabledConfirmIf (wired in all-modals.html). -->
+<!-- R-UI-006: Pre-load from context seeds both pickers (SYNC guard). -->
+<!-- R-UI-007: Delta confirm + success toast / error state handled in .ts. -->
+<!-- NFR-UI-001: STAR tokens only — no hex literals. -->
+<!-- Layout is Tailwind only; the component has no stylesheet. -->
+<!-- Fixed width: the modal must not resize when the selections change. -->
+<!-- CHANGE 1: Projects picker disabled when source=byProject (project is pre-fixed). -->
+<!-- CHANGE 2: Inactive-delegate amber warning when pre-loaded chips are inactive. -->
+<!-- CHANGE 3: People picker disabled when source=byPerson (person is pre-fixed). -->
+
+<div class="assign-pi-delegate flex w-[720px] max-w-[88vw] flex-col gap-6 px-10 pb-8 pt-6">
+
+  <!-- ── Modal notice ───────────────────────────────────────────────────── -->
+  <!-- One banner, two lines: what the pre-loaded selection means, and (only
+       while the People picker is editable) which PI cannot be a delegate. -->
+  @let showPreloadNote = getSelectedPeopleList().length > 0 || getSelectedProjectsList().length > 0;
+  @let showPiNote = piDisabledPeople().length > 0 && !peopleDisabled();
+  @if (showPreloadNote || showPiNote) {
+    <div
+      class="assign-pi-delegate__notice flex items-start gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-200)] px-3"
+      role="status" aria-live="polite">
+      <i class="pi pi-info-circle mt-[15px] shrink-0 !text-[18px] text-[color:var(--ac-light-blue-500)]"
+        aria-hidden="true"></i>
+      <div class="my-[15px] flex flex-col gap-1 text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
+        @if (showPreloadNote) {
+          <span>Pre-loaded selections reflect the current delegate assignments.</span>
+        }
+        @if (showPiNote) {
+          <span class="assign-pi-delegate__pi-hint">
+            <strong class="font-semibold">{{ piDisabledNames() }}</strong>
+            {{ piDisabledPeople().length === 1 ? 'is the Principal Investigator' : 'are Principal Investigators' }}
+            of a selected project, so they cannot be assigned as PI Delegate there.
+          </span>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ── Inactive-delegate warning (CHANGE 2) ──────────────────────────── -->
+  <!-- Amber box naming any pre-loaded delegates whose is_active === false. -->
+  @if (inactiveSelectedPeople().length > 0) {
+    <!-- Same amber notice design as the project-dashboard chart cards. -->
+    <div
+      class="assign-pi-delegate__inactive-warning flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+      role="alert" aria-live="assertive">
+      <i class="pi pi-exclamation-triangle assign-pi-delegate__inactive-warning-icon !text-[14px] shrink-0 pt-px text-[color:var(--ac-warning-fg)]/80"
+        aria-hidden="true"></i>
+      <p
+        class="assign-pi-delegate__inactive-warning-text m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+        @if (inactiveSelectedPeople().length === 1) {
+          <strong class="font-semibold">{{ inactiveSelectedPeople()[0].name }}</strong> is inactive in STAR.
+          They will not be able to review results until their account is reactivated.
+          The role can still be granted and will take effect once they are active again.
+        } @else {
+          <strong class="font-semibold">{{ inactiveNames() }}</strong> are inactive in STAR.
+          They will not be able to review results until their accounts are reactivated.
+          The role can still be granted and will take effect once they are active again.
+        }
+      </p>
+    </div>
+  }
+
+  <!-- ── "Assign New Delegate" intro ───────────────────────────────────── -->
+  <!-- @akili-spec docs/specs/changes/my-pi-delegates-admin-scope -->
+  @if (isNewDelegateMode()) {
+    <div
+      class="assign-pi-delegate__new-note flex items-start gap-3 border-l-[5px] border-l-[color:var(--ac-light-blue-500)] bg-[color:var(--ac-grey-200)] px-3"
+      role="status">
+      <i class="pi pi-user-plus mt-[15px] shrink-0 !text-[16px] text-[color:var(--ac-light-blue-500)]"
+        aria-hidden="true"></i>
+      <div
+        class="my-[15px] text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[color:var(--ac-grey-700)]">
+        Pick one person and the projects they should be a delegate on. This only
+        <strong class="font-semibold">adds</strong> delegations — nothing they already have is revoked.
+      </div>
+    </div>
+  }
+
+  <!-- ── People picker ─────────────────────────────────────────────────── -->
+  <!-- serviceName='piDelegatePeople' → active users from GET /api/users/active (T-UI-08). -->
+  <!-- CHANGE 3: disabled when source=byPerson — only the projects can be changed. -->
+  <div class="flex flex-col gap-1.5">
+    <app-multiselect
+      [signal]="peopleSignal"
+      signalOptionValue="selected_people"
+      serviceName="piDelegatePeople"
+      optionValue="delegate_user_id"
+      optionLabel="name"
+      filterBy="name,email,carnet"
+      label="People"
+      [description]="peopleDescription()"
+      placeholder="Select people to assign as delegates"
+      [optionsDisabled]="piDisabledPeople"
+      [isRequired]="true"
+      [clearFilterOnClose]="true"
+      [itemHeight]="58"
+      selectedItemsSurfaceColor="var(--ac-white-1)"
+      [disabled]="peopleDisabled()"
+      [singleSelection]="isNewDelegateMode()"
+    >
+      <!-- Option row: name on top, details below as label → value — the same
+           layout the Projects picker uses. -->
+      <ng-template #item let-person>
+        <div class="flex min-w-0 flex-col gap-1.5 py-0.5">
+          <p class="m-0 font-['Barlow'] text-[14px] font-semibold text-[color:var(--ac-grey-800)]">
+            {{ person?.name }}
+            @if (isProjectPi(person)) {
+              <!-- Says WHY the option is greyed out, right where the user looks. -->
+              <span class="assign-pi-delegate__pi-tag font-normal text-[color:var(--ac-grey-600)]">
+                (Principal Investigator)
+              </span>
+            }
+          </p>
+          <p class="m-0 flex flex-wrap items-center gap-x-2 font-['Barlow'] text-[11px] text-[color:var(--ac-grey-700)]">
+            <span>Email</span>
+            <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+            <span class="text-[color:var(--ac-primary-blue-300)]">{{ person?.email }}</span>
+            @if (person?.carnet) {
+              <span class="text-[color:var(--ac-grey-400)]">|</span>
+              <span>Carnet</span>
+              <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+              <span class="text-[color:var(--ac-primary-blue-300)]">{{ person?.carnet }}</span>
+            }
+          </p>
+        </div>
+      </ng-template>
+
+      <!-- Collapsed field label — the name itself once exactly one is picked,
+           which is the whole selection in single-selection mode. -->
+      <ng-template #selectedItems let-value>
+        @if (value?.length === 1) {
+          <span>{{ getSelectedPeopleList()[0]?.name }}</span>
+        } @else if (value?.length > 1) {
+          <span>{{ value.length }} people selected</span>
+        }
+      </ng-template>
+
+      <!-- Selected row rendered under the field -->
+      <ng-template #rows let-person>
+        <div class="flex w-full min-w-0 flex-col">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-['Barlow'] text-[15px] font-semibold text-[color:var(--ac-grey-800)]">
+              {{ person?.name }}
+            </span>
+            @if (person?.is_active === false) {
+              <span
+                class="rounded border border-[color:var(--ac-red-1)] px-1.5 text-[9px] font-bold uppercase leading-[1.4] tracking-[0.06em] text-[color:var(--ac-red-1)]">
+                Inactive
+              </span>
+            }
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 xl:pt-0.5">
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Email</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ person?.email }}
+              </span>
+            </div>
+
+            @if (person?.carnet) {
+              <div class="flex items-center">
+                <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Carnet</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+                <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                  {{ person?.carnet }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </ng-template>
+
+    </app-multiselect>
+  </div>
+
+  <!-- ── Projects picker ─────────────────────────────────────────────────── -->
+  <!-- serviceName='piDelegateProjects' → projects from byProjectCache (the page table) (T-UI-08). -->
+  <!-- CHANGE 1: When source=byProject the picker is disabled — the project is pre-fixed. -->
+  <div class="flex flex-col gap-1.5">
+    <app-multiselect
+      [signal]="projectsSignal"
+      signalOptionValue="selected_projects"
+      serviceName="piDelegateProjects"
+      optionValue="project_code"
+      optionLabel="project_name"
+      filterBy="project_code,project_name"
+      label="Projects"
+      [description]="projectsDescription()"
+      placeholder="Select projects to assign delegates to"
+      [isRequired]="true"
+      [clearFilterOnClose]="true"
+      [itemHeight]="66"
+      selectedItemsSurfaceColor="var(--ac-white-1)"
+      [disabled]="projectsDisabled()"
+    >
+      <!-- Option row inside the dropdown -->
+      <ng-template #item let-project>
+        <div class="flex min-w-0 flex-col gap-1.5 py-0.5" [pTooltip]="project?.project_name ?? ''">
+          <p class="m-0 line-clamp-1 font-['Barlow'] text-[14px] text-[color:var(--ac-grey-800)]">
+            <b>{{ project?.project_code }} -</b> {{ project?.project_name }}
+          </p>
+          <p class="m-0 flex flex-wrap items-center gap-x-2 font-['Barlow'] text-[11px] text-[color:var(--ac-grey-700)]">
+            @if (project?.status) {
+              <app-custom-tag [statusId]="statusDisplay(project).statusId" [statusName]="statusDisplay(project).statusName"
+                [tiny]="true"></app-custom-tag>
+            }
+            <span>Start date</span>
+            <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+            <span class="text-[color:var(--ac-primary-blue-300)]">{{ formatDate(project?.start_date) }}</span>
+            @if (project?.end_date) {
+              <span class="text-[color:var(--ac-grey-400)]">|</span>
+              <span>End date</span>
+              <i class="pi pi-arrow-right !text-[7px] text-[color:var(--ac-grey-700)]"></i>
+              <span class="text-[color:var(--ac-primary-blue-300)]">{{ formatDate(project?.end_date) }}</span>
+            }
+          </p>
+        </div>
+      </ng-template>
+
+      <!-- Collapsed field label -->
+      <ng-template #selectedItems let-value>
+        @if (value?.length > 0) {
+          <span>{{ value.length }} {{ value.length === 1 ? 'project' : 'projects' }} selected</span>
+        }
+      </ng-template>
+
+      <!-- Selected row rendered under the field -->
+      <ng-template #rows let-project>
+        <div class="flex w-full min-w-0 flex-col">
+          <div class="font-['Barlow'] text-[15px] font-semibold text-[color:var(--ac-grey-800)]">
+            {{ project?.project_code }} - {{ project?.project_name }}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-5 gap-y-1 pt-2 xl:pt-0.5">
+            @if (project?.status) {
+              <div class="flex items-center">
+                <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Status</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+                <app-custom-tag [statusId]="statusDisplay(project).statusId"
+                  [statusName]="statusDisplay(project).statusName" [tiny]="true"></app-custom-tag>
+              </div>
+            }
+
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Start date</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ formatDate(project?.start_date) }}
+              </span>
+            </div>
+
+            @if (project?.end_date) {
+              <div class="flex items-center">
+                <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">End date</span>
+                <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+                <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                  {{ formatDate(project?.end_date) }}
+                </span>
+              </div>
+            }
+
+            <div class="flex items-center">
+              <span class="font-['Space_Grotesk'] text-[13px] leading-4 text-[color:var(--ac-grey-700)]">Current delegates</span>
+              <i class="pi pi-arrow-right !text-[8px] px-2 text-[color:var(--ac-grey-600)]"></i>
+              <span class="font-['Space_Grotesk'] text-[13px] leading-[18px] text-[color:var(--ac-primary-blue-300)]">
+                {{ project?.delegate_count ?? 0 }}
+              </span>
+            </div>
+          </div>
+
+          @if (project?.is_pool_funding_contributor) {
+            <div class="flex items-center pt-1">
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding" [tiny]="true"></app-custom-tag>
+            </div>
+          }
+        </div>
+      </ng-template>
+    </app-multiselect>
+  </div>
+
+  <!-- Footer lives INSIDE the scrollable content — the same arrangement the
+       Edit environment variable modal uses, so the buttons scroll with the
+       form instead of floating over it. -->
+  <div class="flex justify-end gap-[14px] pt-5 pb-2">
+    <button type="button" (click)="onCancel()"
+      class="cursor-pointer rounded-[14px] border-[1.5px] border-[#035BA9] px-5 py-2 text-[15px] font-medium text-[#035BA9]">
+      Cancel
+    </button>
+    <button type="button" (click)="onConfirm()" [disabled]="disabledConfirmIf()"
+      class="flex cursor-pointer items-center gap-2 rounded-[14px] bg-[#035BA9] px-5 py-2 text-[15px] text-white disabled:cursor-not-allowed disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
+      Accept
+    </button>
+  </div>
+
+</div>

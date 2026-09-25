@@ -1,0 +1,802 @@
+// @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-06)
+//
+// Spec contract:
+//   1. byPersonCache sourcing (R-UI-003 / R-UI-010)
+//   2. Reactive update after byPersonCache change (KZ-015)
+//   3. Row X → confirm → revokePair (R-UI-008)
+//   4. Search via searchQuery input
+//   5. Assign output
+//   6. Inactive person → red name + "INACTIVE" badge + red chip markers; active → none (discriminator)
+//      KZ-015 transition: active→inactive when byPersonCache changes.
+//
+// K-020: --coverage=false for single-file runs.
+
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { ByPersonComponent } from './by-person.component';
+import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
+import { ActionsService } from '@services/actions.service';
+import { signal } from '@angular/core';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import type { DelegateProjects } from '@interfaces/pi-delegates.interface';
+import type { GlobalAlert } from '@interfaces/global-alert.interface';
+
+// ─── Test data ────────────────────────────────────────────────────────────────
+
+const ALICE: DelegateProjects = {
+  delegate_user_id: 1,
+  name: 'Alice Example',
+  email: 'alice@test.org',
+  is_active: true,
+  projects: [
+    { project_code: 'PRJ-A', project_name: 'Alpha Research' },
+    { project_code: 'PRJ-B', project_name: 'Beta Study' }
+  ]
+};
+
+const BOB: DelegateProjects = {
+  delegate_user_id: 2,
+  name: 'Bob Sample',
+  email: 'bob@test.org',
+  is_active: true,
+  projects: [
+    { project_code: 'PRJ-B', project_name: 'Beta Study' }
+  ]
+};
+
+const CAROL_INACTIVE: DelegateProjects = {
+  delegate_user_id: 3,
+  name: 'Carol Gone',
+  email: 'carol@test.org',
+  is_active: false,
+  projects: [
+    { project_code: 'PRJ-C', project_name: 'Carol Project' }
+  ]
+};
+
+// ─── Service stubs ────────────────────────────────────────────────────────────
+
+function buildServiceStub(people: DelegateProjects[] = []) {
+  return {
+    byProjectCache: signal([]),
+    byPersonCache: signal(people),
+    loading: signal(false),
+    error: signal<string | null>(null),
+    revokePair: jest.fn().mockResolvedValue(undefined),
+    revokeDelegate: jest.fn().mockResolvedValue(undefined),
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    isAdminView: signal(false)
+  };
+}
+
+function buildActionsStub() {
+  return { showGlobalAlert: jest.fn() };
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function acceptConfirm(actionsStub: { showGlobalAlert: jest.Mock }): void {
+  const call = actionsStub.showGlobalAlert.mock.calls[0];
+  const alert = call?.[0] as GlobalAlert | undefined;
+  alert?.confirmCallback?.event?.();
+}
+
+function dismissConfirm(actionsStub: { showGlobalAlert: jest.Mock }): boolean {
+  const call = actionsStub.showGlobalAlert.mock.calls[0];
+  const alert = call?.[0] as GlobalAlert | undefined;
+  alert?.cancelCallback?.event?.();
+  return !!alert?.cancelCallback;
+}
+
+// ─── Test suite ───────────────────────────────────────────────────────────────
+
+describe('ByPersonComponent', () => {
+  let fixture: ComponentFixture<ByPersonComponent>;
+  let component: ByPersonComponent;
+  let serviceStub: ReturnType<typeof buildServiceStub>;
+  let actionsStub: ReturnType<typeof buildActionsStub>;
+
+  async function createComponent(people: DelegateProjects[] = []) {
+    serviceStub = buildServiceStub(people);
+    actionsStub = buildActionsStub();
+
+    await TestBed.configureTestingModule({
+      imports: [ByPersonComponent, NoopAnimationsModule],
+      providers: [
+        { provide: PiDelegatesClientService, useValue: serviceStub },
+        { provide: ActionsService, useValue: actionsStub }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ByPersonComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  // ── 1. byPersonCache sourcing ─────────────────────────────────────────
+
+  describe('byPersonCache — person row derivation', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB]);
+    });
+
+    it('renders a row for Alice', () => {
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Alice Example');
+      expect(text).toContain('alice@test.org');
+    });
+
+    it('renders a row for Bob', () => {
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('Bob Sample');
+    });
+
+    it('shows Alice with BOTH her managed projects', () => {
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      const aliceRow = rows.find(r =>
+        (r.nativeElement as HTMLElement).textContent?.includes('Alice Example')
+      );
+      expect(aliceRow).toBeTruthy();
+      const rowText = (aliceRow!.nativeElement as HTMLElement).textContent ?? '';
+      expect(rowText).toContain('PRJ-A');
+      expect(rowText).toContain('PRJ-B');
+    });
+
+    it('Alice appears only ONCE', () => {
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      const aliceRows = rows.filter(r =>
+        (r.nativeElement as HTMLElement).textContent?.includes('Alice Example')
+      );
+      expect(aliceRows.length).toBe(1);
+    });
+
+    it('negative: a person NOT in byPersonCache does not appear', () => {
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).not.toContain('Carol Unmanaged');
+    });
+
+    it('null name/email coalesced to empty string (no "null" literal in DOM)', () => {
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).not.toContain('null');
+    });
+  });
+
+  // ── 2. Inactive person indicator (red name + badge + red chips) ─────────────
+
+  describe('inactive person rendering (is_active === false)', () => {
+    it('INACTIVE: marks the row (K-015 transition: active→inactive)', async () => {
+      // Arrange: start with an active person — no inactive markers
+      await createComponent([ALICE]);
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeNull();
+
+      // Act: switch to an inactive person (K-015 transition)
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Assert: the row carries the inactive treatment (wash + red accent bar)
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeTruthy();
+    });
+
+    it('the Person cell shows the name only, in bold — no avatar, no INACTIVE badge', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      const cell = fixture.nativeElement.querySelector('.by-person__td--person') as HTMLElement;
+      expect(cell.textContent?.trim()).toBe('Carol Gone');
+      const name = cell.querySelector('.by-person__person__name') as HTMLElement;
+      expect(name.classList.contains('font-semibold')).toBe(true);
+      expect(fixture.debugElement.query(By.css('.by-person__avatar'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
+    });
+
+    it('INACTIVE: the Status column carries the word, not a badge in the Person cell', async () => {
+      await createComponent([ALICE]);
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
+
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      // Still no badge in the Person cell …
+      expect(fixture.debugElement.query(By.css('.by-person__person__inactive-badge'))).toBeNull();
+      // … the status tag is where "Inactive" is stated (NFR-UI-002 text cue)
+      const tag = fixture.debugElement.query(By.css('.by-person__status-tag div'));
+      expect((tag.nativeElement as HTMLElement).textContent?.trim()).toBe('Inactive');
+    });
+
+    it('INACTIVE: the name is plain text — never painted red (K-015 transition)', async () => {
+      await createComponent([ALICE]);
+
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const name = fixture.debugElement.query(By.css('.by-person__person__name'));
+      expect((name.nativeElement as HTMLElement).classList.contains('atc-red-1')).toBe(false);
+    });
+
+    it('INACTIVE: the project chips stay neutral — the person is inactive, not the project', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeTruthy();
+      expect(fixture.debugElement.query(By.css('.by-person__chip--inactive'))).toBeNull();
+      const chip = fixture.debugElement.query(By.css('.by-person__chip')).nativeElement as HTMLElement;
+      expect(chip.querySelector('.pi-info-circle')).not.toBeNull();
+      expect(chip.querySelector('.pi-exclamation-circle')).toBeNull();
+    });
+
+    it('ACTIVE person renders no inactive markers at all (negative discriminator)', async () => {
+      await createComponent([ALICE]);
+      expect(fixture.debugElement.query(By.css('.by-person__row--inactive'))).toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__chip--inactive'))).toBeNull();
+    });
+  });
+
+  // ── 3. Reactive update — KZ-015 transition ────────────────────────────
+
+  describe('reactive update after byPersonCache change', () => {
+    it('updates the By-person view when byPersonCache is updated (post-revoke refetch)', async () => {
+      await createComponent([ALICE, BOB]);
+
+      let aliceRowText = (fixture.debugElement.queryAll(By.css('.by-person__row'))
+        .find(r => (r.nativeElement as HTMLElement).textContent?.includes('Alice Example'))
+        ?.nativeElement as HTMLElement | undefined)?.textContent ?? '';
+      expect(aliceRowText).toContain('PRJ-A');
+      expect(aliceRowText).toContain('PRJ-B');
+
+      const aliceAfterRevoke: DelegateProjects = {
+        ...ALICE,
+        projects: [{ project_code: 'PRJ-B', project_name: 'Beta Study' }]
+      };
+      serviceStub.byPersonCache.set([aliceAfterRevoke, BOB]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      aliceRowText = (fixture.debugElement.queryAll(By.css('.by-person__row'))
+        .find(r => (r.nativeElement as HTMLElement).textContent?.includes('Alice Example'))
+        ?.nativeElement as HTMLElement | undefined)?.textContent ?? '';
+      expect(aliceRowText).toContain('PRJ-B');
+      expect(aliceRowText).not.toContain('PRJ-A');
+    });
+  });
+
+  // ── 4. Row X → revoke (R-UI-008) ─────────────────────────────────────
+
+  describe('revoke project chip', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB]);
+    });
+
+    it('calls showGlobalAlert when a project X is clicked', () => {
+      const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
+      expect(xBtns.length).toBeGreaterThanOrEqual(1);
+      (xBtns[0].nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(actionsStub.showGlobalAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirmation uses the same block layout as the assign dialog', () => {
+      const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
+      (xBtns[0].nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('class="alert-detail-left"');
+      expect(alert.detail).toContain(
+        '<div>The following changes will be made in project <strong>PRJ-A</strong> — Alpha Research</div><div>&nbsp;</div>'
+      );
+      expect(alert.detail).toContain('<div><strong>Removed:</strong> Alice Example</div>');
+    });
+
+    it('calls revokePair with the EXACT (project_code, delegate_user_id) pair on confirm', fakeAsync(() => {
+      const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
+      (xBtns[0].nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      acceptConfirm(actionsStub);
+      tick();
+
+      expect(serviceStub.revokePair).toHaveBeenCalledTimes(1);
+      const [projectCode, delegateId] = serviceStub.revokePair.mock.calls[0] as [string, number];
+      expect(delegateId).toBe(1);
+      expect(['PRJ-A', 'PRJ-B']).toContain(projectCode);
+    }));
+
+    it('does NOT call revokePair when confirmation is dismissed', fakeAsync(() => {
+      const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
+      (xBtns[0].nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      const hasCancelCallback = dismissConfirm(actionsStub);
+      tick();
+
+      expect(hasCancelCallback).toBe(true);
+      expect(serviceStub.revokePair).not.toHaveBeenCalled();
+    }));
+
+    it('revoking from one project does NOT call revokePair twice (pair isolation — R-UI-008)', fakeAsync(() => {
+      const xBtns = fixture.debugElement.queryAll(By.css('.by-person__chip__remove'));
+      (xBtns[0].nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      acceptConfirm(actionsStub);
+      tick();
+
+      expect(serviceStub.revokePair).toHaveBeenCalledTimes(1);
+      const [projectCode] = serviceStub.revokePair.mock.calls[0] as [string, number];
+      expect(['PRJ-A', 'PRJ-B']).toContain(projectCode);
+    }));
+  });
+
+  // ── 5. Search via searchQuery input ───────────────────────────────────
+
+  describe('search filtering via input', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB]);
+    });
+
+    it('shows all person rows when searchQuery input is empty', () => {
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(2);
+    });
+
+    it('filters by person name when searchQuery input is set', () => {
+      fixture.componentRef.setInput('searchQuery', 'alice');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(1);
+      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('Alice Example');
+    });
+
+    it('filters by project code', () => {
+      fixture.componentRef.setInput('searchQuery', 'PRJ-A');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(1);
+      expect((rows[0].nativeElement as HTMLElement).textContent).toContain('Alice Example');
+    });
+
+    it('"PRJ-B" matches BOTH Alice and Bob (both on PRJ-B)', () => {
+      fixture.componentRef.setInput('searchQuery', 'PRJ-B');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(2);
+    });
+
+    it('returns no rows for a non-matching query (negative discriminator)', () => {
+      fixture.componentRef.setInput('searchQuery', 'zzznomatch');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(0);
+    });
+
+    it('person-only search ("alice") matches (not only-project search — discriminator)', () => {
+      fixture.componentRef.setInput('searchQuery', 'alice');
+      fixture.detectChanges();
+
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBe(1);
+    });
+  });
+
+  // ── 6. Assign output ─────────────────────────────────────────────────
+
+  describe('assign button', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('emits assignRequested with the delegateUserId when Assign is clicked', () => {
+      const emitted: { delegateUserId: number }[] = [];
+      component.assignRequested.subscribe((v: { delegateUserId: number }) => emitted.push(v));
+
+      const btn = fixture.debugElement.query(By.css('.by-person__assign-btn'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(emitted.length).toBe(1);
+      expect(emitted[0].delegateUserId).toBe(1);
+    });
+  });
+
+  // ── 7. Empty state ───────────────────────────────────────────────────
+
+  describe('empty state', () => {
+    beforeEach(async () => {
+      await createComponent([]);
+    });
+
+    it('shows an empty message when there are no person rows', () => {
+      const text = fixture.nativeElement.textContent as string;
+      expect(text).toContain('No PI delegates found');
+    });
+  });
+
+  // ── 8. Real p-table (KZ-001) ─────────────────────────────────────────
+
+  describe('p-table renders', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('renders the p-table header columns (Person, Email, User status, Managed projects, Actions)', () => {
+      const headers = fixture.debugElement.queryAll(By.css('th'));
+      const headerTexts = headers.map(h => (h.nativeElement as HTMLElement).textContent?.trim());
+      expect(headerTexts).toContain('Person');
+      expect(headerTexts).toContain('Email');
+      expect(headerTexts).toContain('User status');
+      expect(headerTexts).toContain('Managed projects');
+    });
+
+    it('renders body rows', () => {
+      const rows = fixture.debugElement.queryAll(By.css('.by-person__row'));
+      expect(rows.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // ── 9. Email column ───────────────────────────────────────────────────
+
+  describe('Email column', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('renders row.email in the Email td cell', () => {
+      const emailCells = fixture.debugElement.queryAll(By.css('.by-person__td--email'));
+      expect(emailCells.length).toBeGreaterThanOrEqual(1);
+      const cellText = (emailCells[0].nativeElement as HTMLElement).textContent?.trim() ?? '';
+      expect(cellText).toContain('alice@test.org');
+    });
+
+    it('renders the .by-person__email span with the email value', () => {
+      const emailSpan = fixture.debugElement.query(By.css('.by-person__email'));
+      expect(emailSpan).toBeTruthy();
+      expect((emailSpan.nativeElement as HTMLElement).textContent?.trim()).toBe('alice@test.org');
+    });
+  });
+
+  // ── 10. Status tag (Active / Inactive) — KZ-015 discriminating ───────
+
+  describe('Status tag', () => {
+    function tag(): HTMLElement {
+      return fixture.debugElement.query(By.css('.by-person__status-tag div')).nativeElement as HTMLElement;
+    }
+
+    // jsdom's cssstyle drops var() values, so the colours are asserted on the
+    // tag component's inputs rather than on the rendered inline style.
+    function tagInputs(): { statusBorder?: string; statusColor?: string } {
+      return fixture.debugElement.query(By.css('app-custom-tag')).componentInstance as {
+        statusBorder?: string;
+        statusColor?: string;
+      };
+    }
+
+    it('ACTIVE: shows an "Active" tag for is_active:true (KZ-015: start active)', async () => {
+      await createComponent([ALICE]); // ALICE has is_active: true
+      expect(tag().textContent?.trim()).toBe('Active');
+      expect(tagInputs().statusBorder).toBe('var(--ac-primary-blue-200)');
+      expect(tagInputs().statusColor).toBe('var(--ac-primary-blue-400)');
+    });
+
+    it('INACTIVE: shows a red "Inactive" tag (KZ-015 transition: active → inactive)', async () => {
+      // Arrange: start with the active person
+      await createComponent([ALICE]);
+      expect(tag().textContent?.trim()).toBe('Active');
+
+      // Act: switch to the inactive person
+      serviceStub.byPersonCache.set([CAROL_INACTIVE]);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(tag().textContent?.trim()).toBe('Inactive');
+      expect(tagInputs().statusBorder).toBe('var(--ac-red-1)');
+      expect(tagInputs().statusColor).toBe('var(--ac-red-1)');
+    });
+
+    it('uses the same tag component as the By project table, not the old pill', async () => {
+      await createComponent([ALICE]);
+      expect(fixture.debugElement.query(By.css('app-custom-tag'))).toBeTruthy();
+      expect(fixture.debugElement.query(By.css('.by-person__status-pill'))).toBeNull();
+    });
+  });
+
+  // ── 11. History button — emits historyRequested ──────────────────────
+
+  describe('history button', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE]);
+    });
+
+    it('renders a history icon button in the Actions cell', () => {
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      expect(btn).toBeTruthy();
+    });
+
+    it('emits historyRequested with delegateUserId + name when history button is clicked', () => {
+      const emitted: { delegateUserId: number; name: string | null }[] = [];
+      component.historyRequested.subscribe((v: { delegateUserId: number; name: string | null }) =>
+        emitted.push(v)
+      );
+
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      // KZ-014: must carry the delegate's id and name
+      expect(emitted.length).toBe(1);
+      expect(emitted[0].delegateUserId).toBe(1);
+      expect(emitted[0].name).toBe('Alice Example');
+    });
+
+    it('history button does NOT emit assignRequested (discriminator)', () => {
+      const assignEmitted: unknown[] = [];
+      component.assignRequested.subscribe((v: unknown) => assignEmitted.push(v));
+
+      const btn = fixture.debugElement.query(By.css('.by-person__history-btn'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      // KZ-014: clicking history must NOT trigger assignRequested
+      expect(assignEmitted.length).toBe(0);
+    });
+  });
+  // ── 7. In-card search, paginator and summary ──────────────────────────
+
+  describe('in-card search box', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB, CAROL_INACTIVE]);
+    });
+
+    it('renders the shared search control INSIDE the table card, not in the page shell', () => {
+      const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
+      expect(card.querySelector('app-search-export-controls')).not.toBeNull();
+      // Table-local filtering: Clear Filters yes, Apply Filters no (no sidebar)
+      expect(card.textContent).not.toContain('Apply Filters');
+      expect(card.textContent).toContain('Clear Filters');
+    });
+
+    it('Clear Filters resets the search term', () => {
+      component.searchTerm.set('carol');
+      fixture.detectChanges();
+      expect(component.filteredRows().length).toBe(1);
+
+      component.clearFilters();
+      fixture.detectChanges();
+
+      expect(component.searchTerm()).toBe('');
+      expect(component.filteredRows().length).toBe(3);
+    });
+
+    it('searching through the shared control filters the rows', () => {
+      expect(component.filteredRows().length).toBe(3);
+
+      const input = fixture.debugElement.query(By.css('app-search-export-controls input'));
+      (input.nativeElement as HTMLInputElement).value = 'carol';
+      // Enter submits immediately; the (input) path is the same emitter, debounced.
+      input.triggerEventHandler('keydown.enter', { target: input.nativeElement });
+      fixture.detectChanges();
+
+      expect(component.filteredRows().length).toBe(1);
+      expect(component.filteredRows()[0].name).toBe('Carol Gone');
+    });
+
+  });
+
+  describe('paginator', () => {
+    function manyPeople(count: number): DelegateProjects[] {
+      return Array.from({ length: count }, (_, i) => ({
+        delegate_user_id: i + 1,
+        name: `Person ${i}`,
+        email: `person${i}@test.org`,
+        is_active: true,
+        projects: [{ project_code: `PRJ-${i}`, project_name: `Project ${i}` }]
+      }));
+    }
+
+    it('renders a paginator inside the table card and caps the page at 10 rows', async () => {
+      await createComponent(manyPeople(12));
+
+      const card = fixture.nativeElement.querySelector('.by-person__table-wrapper');
+      expect(card.querySelector('.p-paginator')).not.toBeNull();
+      expect(component.filteredRows().length).toBe(12);
+      expect(card.querySelectorAll('tr.by-person__row').length).toBe(10);
+    });
+  });
+
+  describe('summary line', () => {
+    it('shows only the PI note — no counts, no inactive warning', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      const summary = fixture.nativeElement.querySelector('.by-person__summary') as HTMLElement;
+      const text = summary.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+      expect(text).toBe('Only projects where you are the Principal Investigator or a PI Delegate are listed');
+      expect(text).not.toContain('inactive');
+      expect(fixture.nativeElement.querySelector('.by-person__summary-right')).toBeNull();
+    });
+  });
+  // ── 8. Sortable columns (platform table convention) ───────────────────
+
+  describe('column sorting', () => {
+    beforeEach(async () => {
+      await createComponent([ALICE, BOB, CAROL_INACTIVE]);
+    });
+
+    it('renders a sort icon on Person, Email and Status', () => {
+      const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
+      expect(sortable.length).toBe(3);
+    });
+
+    it('sorts the rendered rows when the Person header is clicked', () => {
+      const firstName = () =>
+        (fixture.nativeElement.querySelector('.by-person__person__name') as HTMLElement).textContent?.trim();
+      expect(firstName()).toBe('Alice Example');
+
+      const personHeader = fixture.debugElement.queryAll(By.css('th[pSortableColumn]'))[0];
+      personHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Alice Example'); // ascending
+
+      personHeader.nativeElement.click();
+      fixture.detectChanges();
+      expect(firstName()).toBe('Carol Gone'); // descending
+    });
+  });
+  // ── Managed projects: code chip + tooltip with the project name ────────────
+
+  describe('project chips', () => {
+    it('shows the code only, with the project name in the info icon tooltip', async () => {
+      await createComponent([ALICE]); // PRJ-A "Alpha Research", PRJ-B "Beta Study"
+
+      const chip = fixture.debugElement.query(By.css('.by-person__chip'));
+      const chipText = (chip.nativeElement as HTMLElement).textContent?.trim() ?? '';
+      expect(chipText).toContain('PRJ-A');
+      expect(chipText).not.toContain('Alpha Research');
+
+      const icon = chip.query(By.css('.by-person__chip__icon'));
+      expect(icon).toBeTruthy();
+      expect((icon.nativeElement as HTMLElement).getAttribute('aria-label')).toBe('Alpha Research');
+    });
+  });
+  // ── Actions depend on the account state ────────────────────────────────────
+
+  describe('row actions', () => {
+    it('an ACTIVE person offers history + assign projects', async () => {
+      await createComponent([ALICE]);
+
+      expect(fixture.debugElement.query(By.css('.by-person__history-btn'))).toBeTruthy();
+      const assign = fixture.debugElement.query(By.css('.by-person__assign-btn'));
+      expect(assign.nativeElement.querySelector('.pi-user-plus')).not.toBeNull();
+      expect(fixture.debugElement.query(By.css('.by-person__assign-btn--danger'))).toBeNull();
+    });
+
+    it('an INACTIVE person offers history + remove delegate instead of assigning', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      expect(fixture.debugElement.query(By.css('.by-person__history-btn'))).toBeTruthy();
+      const remove = fixture.debugElement.query(By.css('.by-person__assign-btn--danger'));
+      expect(remove).toBeTruthy();
+      expect(remove.nativeElement.querySelector('.pi-user-minus')).not.toBeNull();
+      // assigning projects to someone who cannot review is not offered.
+      // Scoped to the ROW: the toolbar's "Assign New Delegate" button uses the
+      // same icon and is not what this rule is about.
+      const rowActions = fixture.debugElement.query(By.css('.by-person__actions'));
+      expect(rowActions.nativeElement.querySelector('.pi-user-plus')).toBeNull();
+    });
+
+    it('remove delegate asks for confirmation and revokes every project on confirm', async () => {
+      await createComponent([CAROL_INACTIVE]); // PRJ-C
+
+      const btn = fixture.debugElement.query(By.css('.by-person__assign-btn--danger'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(actionsStub.showGlobalAlert).toHaveBeenCalledTimes(1);
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('Carol Gone');
+
+      alert.confirmCallback?.event?.();
+      expect(serviceStub.revokeDelegate).toHaveBeenCalledWith(3, ['PRJ-C']);
+    });
+
+    it('dismissing the confirmation revokes nothing (negative discriminator)', async () => {
+      await createComponent([CAROL_INACTIVE]);
+
+      const btn = fixture.debugElement.query(By.css('.by-person__assign-btn--danger'));
+      (btn.nativeElement as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      dismissConfirm(actionsStub);
+      expect(serviceStub.revokeDelegate).not.toHaveBeenCalled();
+    });
+  });
+  // ── Column alignment + chip parity with the By project table ───────────────
+
+  describe('column layout', () => {
+    // jsdom does not apply the component stylesheet, so these assert the hooks
+    // the centring rules hang off — the rendering itself is checked visually.
+    it('marks the Actions header as centred and wraps the buttons in the actions box', async () => {
+      await createComponent([ALICE]);
+
+      const header = fixture.nativeElement.querySelector('.by-person__th-inner--centered') as HTMLElement;
+      expect(header.textContent?.trim()).toBe('Actions');
+
+      const actions = fixture.nativeElement.querySelector('.by-person__actions') as HTMLElement;
+      expect(actions.querySelectorAll('button').length).toBe(2);
+    });
+
+    it('gives the status tag its own host class so the cell can centre it', async () => {
+      await createComponent([ALICE]);
+
+      const tagHost = fixture.nativeElement.querySelector('app-custom-tag.by-person__status-tag');
+      expect(tagHost).not.toBeNull();
+    });
+  });
+  // ── Toolbar layout ─────────────────────────────────────────────────────────
+
+  describe('toolbar layout', () => {
+    it('draws no rule under the summary line and keeps Clear Filters beside the search', async () => {
+      await createComponent([ALICE]);
+
+      const summary = fixture.nativeElement.querySelector('.by-person__summary') as HTMLElement;
+      expect(summary.className).not.toContain('border-b');
+
+      // the shared control is not stretched, so its two groups sit together
+      const control = fixture.nativeElement.querySelector('app-search-export-controls') as HTMLElement;
+      expect(control.className).not.toContain('flex-1');
+      expect(control.className).toContain('w-fit');
+    });
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('summary line', () => {
+    it('stops claiming the list is filtered to the caller once it is not', async () => {
+      await createComponent([]);
+      const summaryText = () =>
+        (fixture.nativeElement.querySelector('.by-person__summary-left') as HTMLElement).textContent ?? '';
+
+      expect(summaryText()).toContain('Only projects where you are');
+
+      serviceStub.isAdminView.set(true);
+      fixture.detectChanges();
+
+      expect(summaryText()).not.toContain('Only projects where you are');
+      expect(summaryText()).toContain('Every PI Delegate on the platform');
+    });
+  });
+
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('Assign New Delegate button', () => {
+    it('sits in the toolbar and emits with no payload — the modal asks for both sides', async () => {
+      await createComponent([]);
+      const emitted: number[] = [];
+      component.assignNewRequested.subscribe(() => emitted.push(1));
+
+      const button = fixture.debugElement.query(By.css('.by-person__assign-new'));
+      expect(button).toBeTruthy();
+      expect((button.nativeElement as HTMLElement).textContent?.trim()).toContain('Assign New Delegate');
+
+      button.nativeElement.click();
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('is offered on an EMPTY table — reaching a person who is not a delegate yet is the point', async () => {
+      await createComponent([]);
+
+      expect(fixture.debugElement.query(By.css('.by-person__assign-new'))).toBeTruthy();
+    });
+  });
+
+});

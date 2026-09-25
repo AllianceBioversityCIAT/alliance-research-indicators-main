@@ -8,6 +8,16 @@ import { CacheService } from '@services/cache/cache.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { RolesService } from '@services/cache/roles.service';
 import { ActionsService } from '@services/actions.service';
+import { ApiService } from '@services/api.service';
+
+// The sidebar asks a boolean endpoint whether to show My PI Delegates.
+class MockApiService {
+  hasAccess = true;
+  GET_PiDelegateAccess = jest.fn(async () => ({
+    successfulRequest: true,
+    data: { has_access: this.hasAccess }
+  }));
+}
 
 describe('AllianceSidebarComponent', () => {
   let component: AllianceSidebarComponent;
@@ -19,14 +29,18 @@ describe('AllianceSidebarComponent', () => {
       isSidebarCollapsed: jest.fn().mockReturnValue(false),
       // D-imp-14: the template binds the sidebar's marginTop to this measured signal.
       navbarHeight: jest.fn().mockReturnValue(70),
-      toggleSidebar: jest.fn()
+      toggleSidebar: jest.fn(),
+      // the sidebar reads the signed-in user to ask about PI-delegate access
+      dataCache: jest.fn().mockReturnValue({ user: { sec_user_id: 99 } })
     } as unknown as CacheService;
     const mockAllModalsService = {
       openModal: jest.fn()
     } as unknown as AllModalsService;
     const mockRolesService = {
       canAccessCenterAdmin: jest.fn().mockReturnValue(false),
-      canAccessAppConfiguration: jest.fn().mockReturnValue(false)
+      canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+      // Admins ask the access endpoint with scope='all' — see the scope test below.
+      isAdmin: jest.fn().mockReturnValue(false)
     } as unknown as RolesService;
     const mockActionsService = {
       logOut: jest.fn()
@@ -45,7 +59,8 @@ describe('AllianceSidebarComponent', () => {
         { provide: CacheService, useValue: mockCacheService },
         { provide: AllModalsService, useValue: mockAllModalsService },
         { provide: RolesService, useValue: mockRolesService },
-        { provide: ActionsService, useValue: mockActionsService }
+        { provide: ActionsService, useValue: mockActionsService },
+        { provide: ApiService, useClass: MockApiService }
       ]
     }).compileComponents();
 
@@ -168,6 +183,101 @@ describe('AllianceSidebarComponent', () => {
     expect(visible[0].label).toBe('Visible');
   });
 
+  // ─── Module visibility: the section only exists for PIs and delegates ────────
+
+  it('renders the PI section when the user manages at least one project', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.canSeePiDelegates()).toBe(true);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PRINCIPAL INVESTIGATOR');
+    expect(fixture.nativeElement.querySelector('a[href="/my-pi-delegates"]')).not.toBeNull();
+  });
+
+  it('hides the whole PI section when the user manages none (negative discriminator)', async () => {
+    (TestBed.inject(ApiService) as unknown as MockApiService).hasAccess = false;
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.componentInstance.canSeePiDelegates()).toBe(false);
+    const text = (f.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('PRINCIPAL INVESTIGATOR');
+    expect(f.nativeElement.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
+  });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  it('asks with scope=all for an admin, and without a scope otherwise', async () => {
+    const api = TestBed.inject(ApiService) as unknown as MockApiService;
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(api.GET_PiDelegateAccess).toHaveBeenCalledWith(99, undefined);
+
+    api.GET_PiDelegateAccess.mockClear();
+    (
+      TestBed.inject(RolesService) as unknown as { isAdmin: jest.Mock }
+    ).isAdmin.mockReturnValue(true);
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+
+    expect(api.GET_PiDelegateAccess).toHaveBeenCalledWith(99, 'all');
+  });
+
+  it('keeps the section hidden when the check fails', async () => {
+    const api = TestBed.inject(ApiService) as unknown as MockApiService;
+    api.GET_PiDelegateAccess.mockRejectedValueOnce(new Error('network'));
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.componentInstance.canSeePiDelegates()).toBe(false);
+  });
+
+  // ─── T-UI-03: My PI Delegates as a direct (non-collapsible) option (R-UI-001) ──
+  it('should expose My PI Delegates as a flat option (no collapsible parent group)', () => {
+    const options = component.piOptions();
+    expect(options).toHaveLength(1);
+    expect(options[0].label).toBe('My PI Delegates');
+    expect(options[0].link).toBe('/my-pi-delegates');
+    expect((component as unknown as { piGroups?: unknown }).piGroups).toBeUndefined();
+  });
+
+  it('should not render a Principal Investigator toggle button in the sidebar', () => {
+    fixture.detectChanges();
+    const labels = (fixture.nativeElement as HTMLElement).querySelectorAll('.admin-parent .sidebar-option-label');
+    expect(Array.from(labels).some(el => el.textContent?.trim() === 'Principal Investigator')).toBe(false);
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/my-pi-delegates"]');
+    expect(link).toBeTruthy();
+  });
+
+  it('should still expose the center-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    const centerAdmin = component.administrationGroups().find(g => g.id === 'center-admin');
+    expect(centerAdmin).toBeTruthy();
+    expect(centerAdmin?.children.length).toBeGreaterThan(0);
+  });
+
+  it('should still expose the system-admin group when access is granted (no existing group removed)', () => {
+    const roles = TestBed.inject(RolesService) as unknown as {
+      canAccessCenterAdmin: jest.Mock;
+      canAccessAppConfiguration: jest.Mock;
+    };
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+    const sysAdmin = component.administrationGroups().find(g => g.id === 'system-admin');
+    expect(sysAdmin).toBeTruthy();
+    expect(sysAdmin?.label).toBe('System admin');
+  });
+
   it('should include portfolio management in center admin navigation', () => {
     const roles = TestBed.inject(RolesService) as { canAccessCenterAdmin: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
@@ -249,7 +359,7 @@ describe('AllianceSidebarComponent', () => {
     expect(group?.s3Image).toBe('icons/graph.svg');
 
     const button = fixture.nativeElement.querySelector(
-      'button.admin-parent--collapsed'
+      'button.admin-parent--collapsed[aria-label="System admin"]'
     ) as HTMLButtonElement | null;
     const img = button?.querySelector('img') as HTMLImageElement | null;
     expect(img).toBeTruthy();
@@ -270,6 +380,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
     isSidebarCollapsed: jest.Mock;
     navbarHeight: jest.Mock;
     toggleSidebar: jest.Mock;
+    dataCache: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -281,7 +392,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
       isSidebarCollapsed: jest.fn().mockReturnValue(true),
       // D-imp-14: template binds the sidebar marginTop to this measured signal.
       navbarHeight: jest.fn().mockReturnValue(70),
-      toggleSidebar: jest.fn()
+      toggleSidebar: jest.fn(),
+      dataCache: jest.fn().mockReturnValue({ user: { sec_user_id: 99 } })
     };
     const routerMock = {
       events: routerEventsSubject.asObservable(),
@@ -297,6 +409,7 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
     await TestBed.configureTestingModule({
       imports: [AllianceSidebarComponent],
       providers: [
+        { provide: ApiService, useClass: MockApiService },
         { provide: Router, useValue: routerMock },
         {
           provide: ActivatedRoute,
@@ -311,7 +424,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
           provide: RolesService,
           useValue: {
             canAccessCenterAdmin: jest.fn().mockReturnValue(true),
-            canAccessAppConfiguration: jest.fn().mockReturnValue(false)
+            canAccessAppConfiguration: jest.fn().mockReturnValue(false),
+            isAdmin: jest.fn().mockReturnValue(false)
           }
         },
         { provide: ActionsService, useValue: { logOut: jest.fn() } }

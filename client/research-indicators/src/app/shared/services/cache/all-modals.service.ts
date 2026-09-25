@@ -58,6 +58,35 @@ export class AllModalsService {
   refreshLinkedResults?: () => Promise<void> | void;
   setRefreshLinkedResults = (fn: (() => Promise<void> | void) | undefined) => (this.refreshLinkedResults = fn);
   syncSelectedResults = signal<Result[]>([]);
+
+  // ─── Assign PI Delegate modal context (T-UI-07) ─────────────────────────────
+  /**
+   * The open-context for the Assign/Edit modal.
+   * 'byProject' → the modal was opened from the By-project tab; projectCode is set.
+   * 'byPerson'  → the modal was opened from the By-person tab; delegateUserId is set.
+   */
+  assignPiDelegateContext = signal<
+    | { source: 'byProject'; projectCode: string }
+    | { source: 'byPerson'; delegateUserId: number }
+    // 'newDelegate' → the "Assign New Delegate" button on the By-person tab.
+    // Nothing is pre-selected, the person is picked one at a time, and Save only
+    // ADDS — see AssignPiDelegateComponent.isAddOnlyMode.
+    // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+    | { source: 'newDelegate' }
+    | null
+  >(null);
+
+  // ─── PI Delegate History modal context ───────────────────────────────────────
+  /**
+   * The open-context for the Delegation History (read-only) modal.
+   * 'byProject' → opened from the By-project tab; projectCode + projectName are set.
+   * 'byPerson'  → opened from the By-person tab; delegateUserId + name are set.
+   */
+  piDelegateHistoryContext = signal<
+    | { source: 'byProject'; projectCode: string; projectName: string | null }
+    | { source: 'byPerson'; delegateUserId: number; name: string | null }
+    | null
+  >(null);
   setResultInformationEntryContext(context: 'results-center' | null): void {
     this.resultInformationEntryContext.set(context);
     this.modalConfig.update(modals => ({
@@ -155,6 +184,14 @@ export class AllModalsService {
     portfolioManagement: {
       isOpen: false,
       title: 'Portfolio management'
+    },
+    assignPiDelegate: {
+      isOpen: false,
+      title: 'Assign / Edit PI Delegate'
+    },
+    piDelegateHistory: {
+      isOpen: false,
+      title: 'Delegation History'
     },
     // @akili-spec changes/profile-simulation — R-IMP-007, D-imp-9. Cancel
     // only at the wrapper level: `Select` / `Start simulation` live inside
@@ -301,6 +338,8 @@ export class AllModalsService {
       editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
+      assignPiDelegate: { ...this.modalConfig().assignPiDelegate, isOpen: false, isWide: false },
+      piDelegateHistory: { ...this.modalConfig().piDelegateHistory, isOpen: false, isWide: false },
       simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false },
       portfolio2025LeverSdgs: { ...this.modalConfig().portfolio2025LeverSdgs, isOpen: false, isWide: false },
       portfolio2026SdgTargets: { ...this.modalConfig().portfolio2026SdgTargets, isOpen: false, isWide: false },

@@ -67,6 +67,13 @@ import { ImpactAreaScoresService } from './short-control-list/impact-area-scores
 import { ImpactAreasService } from './short-control-list/impact-areas.service';
 import { SourceFilterOptionsService } from './short-control-list/source-filter-options.service';
 import { GetClarisaSdgTargetsService } from './control-list/get-clarisa-sdg-targets.service';
+// T-UI-08: PI Delegates picker stubs — single swap point (DD-UI-STUB / DD-UI-E).
+// TODO(user endpoint): when real endpoints exist, replace these two imports with
+// the real service classes and update the switch cases below — no other file changes needed.
+import {
+  PiDelegatePeoplePickerStubService,
+  PiDelegateProjectsPickerStubService
+} from '@platform/pages/my-pi-delegates/services/pi-delegate-picker-stub.service';
 import { Portfolio2026SdgTargetsService } from './control-list/portfolio-2026-sdg-targets.service';
 
 @Injectable({
@@ -277,6 +284,12 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetAllianceStaffByGroupService);
       case 'sourceFilterOptions':
         return this.getFromInjector(SourceFilterOptionsService);
+      // T-UI-08: PI Delegates picker stubs.
+      // TODO(user endpoint): swap these two cases to the real service classes when endpoints exist.
+      case 'piDelegatePeople':
+        return this.getFromInjector(PiDelegatePeoplePickerStubService);
+      case 'piDelegateProjects':
+        return this.getFromInjector(PiDelegateProjectsPickerStubService);
       default:
         console.warn(`Service ${serviceName} not found`);
         return null;
