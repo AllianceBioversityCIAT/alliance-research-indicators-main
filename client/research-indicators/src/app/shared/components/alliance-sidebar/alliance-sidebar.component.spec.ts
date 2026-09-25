@@ -185,7 +185,18 @@ describe('AllianceSidebarComponent', () => {
 
   // ─── Module visibility: the section only exists for PIs and delegates ────────
 
+  it('keeps the PI section hidden while hidePiDelegates is on, even for a PI', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(component.canSeePiDelegates()).toBe(true);
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('PRINCIPAL INVESTIGATOR');
+  });
+
   it('renders the PI section when the user manages at least one project', async () => {
+    (component as { hidePiDelegates: boolean }).hidePiDelegates = false;
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -252,6 +263,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('should not render a Principal Investigator toggle button in the sidebar', () => {
+    (component as { hidePiDelegates: boolean }).hidePiDelegates = false;
     fixture.detectChanges();
     const labels = (fixture.nativeElement as HTMLElement).querySelectorAll('.admin-parent .sidebar-option-label');
     expect(Array.from(labels).some(el => el.textContent?.trim() === 'Principal Investigator')).toBe(false);

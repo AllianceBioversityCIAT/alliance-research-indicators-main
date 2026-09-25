@@ -44,6 +44,8 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
    * Answered by a boolean endpoint so no page pays for the enriched list.
    */
   readonly canSeePiDelegates = signal(false);
+  // Temporarily hidden from the sidebar; flip to false to show it again.
+  readonly hidePiDelegates = true;
   private readonly router = inject(Router);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
   private readonly renderer = inject(Renderer2);
