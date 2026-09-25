@@ -34,6 +34,62 @@ describe('portfolio-2-alignment.mapper', () => {
     expect(flattened.project_lead_description).toBe('PI Name');
   });
 
+  // --- Effective pool-funding flag ------------------------------------------
+  // Regression: the catalog carries the EFFECTIVE value (raw column OR an active
+  // bilateral_project_mapping) while the alignment payload carries only the RAW
+  // `agresso_contracts.is_pool_funding_contributor` column. A contract that
+  // contributes via its bilateral mapping is true in one and false in the other,
+  // and the plain `{...catalogMatch, ...flattened}` order kept the false one --
+  // which is why the tag never rendered on the selected project cards.
+
+  const alignmentRow = (poolFunding: boolean | undefined) =>
+    ({
+      contract_id: 'uuid-1',
+      is_primary: true,
+      is_active: true,
+      result_contract_id: 1,
+      result_id: 1,
+      contract_role_id: 1,
+      agresso_contract: {
+        agreement_id: 'D514',
+        description: 'WB-IDA',
+        ...(poolFunding === undefined ? {} : { is_pool_funding_contributor: poolFunding })
+      }
+    }) as never;
+
+  const catalogRow = (poolFunding: boolean | undefined) =>
+    ({
+      agreement_id: 'D514',
+      description: 'WB-IDA',
+      contract_id: 'D514',
+      select_label: 'D514 - WB-IDA',
+      ...(poolFunding === undefined ? {} : { is_pool_funding_contributor: poolFunding })
+    }) as never;
+
+  it('keeps the catalog pool-funding flag when the alignment payload says false', () => {
+    const [enriched] = enrichPortfolio2Contracts([alignmentRow(false)], [catalogRow(true)]);
+
+    expect((enriched as { is_pool_funding_contributor?: boolean }).is_pool_funding_contributor).toBe(true);
+  });
+
+  it('keeps the catalog pool-funding flag when the alignment payload omits it', () => {
+    const [enriched] = enrichPortfolio2Contracts([alignmentRow(undefined)], [catalogRow(true)]);
+
+    expect((enriched as { is_pool_funding_contributor?: boolean }).is_pool_funding_contributor).toBe(true);
+  });
+
+  it('does not invent a pool-funding flag when the catalog says false', () => {
+    const [enriched] = enrichPortfolio2Contracts([alignmentRow(false)], [catalogRow(false)]);
+
+    expect((enriched as { is_pool_funding_contributor?: boolean }).is_pool_funding_contributor).toBe(false);
+  });
+
+  it('falls back to the alignment value when the catalog carries none', () => {
+    const [enriched] = enrichPortfolio2Contracts([alignmentRow(true)], [catalogRow(undefined)]);
+
+    expect((enriched as { is_pool_funding_contributor?: boolean }).is_pool_funding_contributor).toBe(true);
+  });
+
   it('enriches contracts from catalog and normalizes levers', () => {
     const enriched = enrichPortfolio2Contracts(
       [

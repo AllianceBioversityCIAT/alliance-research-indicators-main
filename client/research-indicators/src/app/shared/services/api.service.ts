@@ -58,6 +58,7 @@ import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { GetCurrentUser } from '../interfaces/get-current-user.interfce';
 import { PatchSubmitResult, PatchSubmitResultLatest } from '../interfaces/patch_submit-result.interface';
+import { PrmsSyncResponse } from '../interfaces/prms-sync.interface';
 import { GetClarisaInstitutionsTypes } from '@shared/interfaces/get-clarisa-institutions-types.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PatchIpOwner } from '@shared/interfaces/patch-ip-owners';
@@ -70,6 +71,8 @@ import { AskForHelp } from '../components/all-modals/modals-content/ask-for-help
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { HttpParams } from '@angular/common/http';
 import { GetInnovationDetails } from '@shared/interfaces/get-innovation-details.interface';
+import { GetInnovationUseDetails } from '@shared/interfaces/get-innovation-use-details.interface';
+import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels.interface';
 import { InnovationCharacteristic, InnovationLevel, InnovationType } from '@shared/interfaces/get-innovation.interface';
 import { ActorType } from '@shared/interfaces/get-actor-types.interface';
 import { ClarisaInstitutionsSubTypes } from '@shared/interfaces/get-clarisa-institutions-subtypes.interface';
@@ -597,6 +600,26 @@ export class ApiService {
     return this.TP.patch(url(), body, { useResultInterceptor: true });
   };
 
+  GET_InnovationUseDetails = (resultCode: number): Promise<MainResponse<GetInnovationUseDetails>> => {
+    const url = () => `results/innovation-use/${resultCode}`;
+    return this.TP.get(url(), { loadingTrigger: true, useResultInterceptor: true });
+  };
+
+  GET_InnovationDevCard = (resultCode: number): Promise<MainResponse<unknown>> => {
+    const url = () => `results/innovation-use/innovation-dev-card/${resultCode}`;
+    return this.TP.get(url(), { useResultInterceptor: true });
+  };
+
+  PATCH_InnovationUseDetails = <T>(resultCode: number, body: T): Promise<MainResponse<GetInnovationUseDetails>> => {
+    const url = () => `results/innovation-use/${resultCode}`;
+    return this.TP.patch(url(), body, { useResultInterceptor: true });
+  };
+
+  GET_InnovationUseLevels = (): Promise<MainResponse<InnovationUseLevel[]>> => {
+    const url = () => `tools/clarisa/innovation-use-levels`;
+    return this.TP.get(url(), {});
+  };
+
   GET_ResultEvidences = (resultId: number): Promise<MainResponse<PatchResultEvidences>> => {
     const url = () => `results/evidences/principal/${resultId}`;
     return this.TP.get(url(), { loadingTrigger: true, useResultInterceptor: true });
@@ -804,14 +827,14 @@ export class ApiService {
   }
 
   GET_PoolFundingAlignment = (resultCode: string): Promise<MainResponse<AlignmentResponse>> => {
-    return this.TP.get(this.bilateralPath(resultCode), {});
+    return this.TP.get(this.bilateralPath(resultCode), { useResultInterceptor: true });
   };
 
   // Per-result SP picker source — scoped to the result's mapped CLARISA project.
   // Replaces the catalog-wide GET_SciencePrograms as the picker source (the catalog
   // method stays for display-only contexts). No query params; scoping is server-side.
   GET_PoolFundingSciencePrograms = (resultCode: string): Promise<MainResponse<PoolFundingSciencePrograms>> => {
-    return this.TP.get(this.bilateralPath(resultCode, '/science-programs'), {});
+    return this.TP.get(this.bilateralPath(resultCode, '/science-programs'), { useResultInterceptor: true });
   };
 
   // Result-scoped ToC catalog (SP → level → ToC result → indicator), sourced live
@@ -820,14 +843,14 @@ export class ApiService {
   // changed here). Read-only; no query params today.
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 (T-BIL-TM2-02)
   GET_PoolFundingHlosIndicators = (resultCode: string): Promise<MainResponse<BilateralTocCatalogResponse>> => {
-    return this.TP.get(this.bilateralPath(resultCode, '/hlos-indicators'), {});
+    return this.TP.get(this.bilateralPath(resultCode, '/hlos-indicators'), { useResultInterceptor: true });
   };
 
   PATCH_PoolFundingAlignment = (
     resultCode: string,
     body: UpdatePoolFundingAlignmentDto
   ): Promise<MainResponse<AlignmentResponse>> => {
-    return this.TP.patch(this.bilateralPath(resultCode), body, {});
+    return this.TP.patch(this.bilateralPath(resultCode), body, { useResultInterceptor: true });
   };
 
   // Center Admin — Bilateral Project Mappings CRUD.
@@ -1050,6 +1073,11 @@ export class ApiService {
     const url = () => `results/status/workflow/change-status/${resultCode}/to-status/${status}`;
     const requestBody: PatchSubmitResultLatest = body ? { ...body, submission_comment: comment ?? '' } : { submission_comment: comment ?? '' };
     return this.TP.post(url(), requestBody, { useResultInterceptor: true });
+  };
+
+  POST_PrmsSync = (resultCode: number): Promise<MainResponse<PrmsSyncResponse>> => {
+    const url = () => `results/${resultCode}/prms-sync`;
+    return this.TP.post(url(), {}, { useResultInterceptor: true });
   };
 
   GET_ReviewStatuses = () => {

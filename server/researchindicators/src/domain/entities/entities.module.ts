@@ -45,6 +45,7 @@ import { ResultCapSharingIpModule } from './result-cap-sharing-ip/result-cap-sha
 import { IntellectualPropertyOwnersModule } from './intellectual-property-owners/intellectual-property-owners.module';
 import { ReportingFeedbackModule } from './reporting-feedback/reporting-feedback.module';
 import { ResultInnovationDevModule } from './result-innovation-dev/result-innovation-dev.module';
+import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 import { InnovationDevAnticipatedUsersModule } from './innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 import { ResultActorsModule } from './result-actors/result-actors.module';
 import { ActorRolesModule } from './actor-roles/actor-roles.module';
@@ -91,6 +92,7 @@ import { ResultLeverSdgTargetsModule } from './result-lever-sdg-targets/result-l
 import { ReportsModule } from './reports/reports.module';
 import { ResultReviewHistoryModule } from './result-review-history/result-review-history.module';
 import { BilateralModule } from './bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
@@ -148,6 +150,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     IntellectualPropertyOwnersModule,
     ReportingFeedbackModule,
     ResultInnovationDevModule,
+    ResultInnovationUseModule,
     InnovationDevAnticipatedUsersModule,
     ResultActorsModule,
     ActorRolesModule,
@@ -194,6 +197,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     ReportsModule,
     ResultReviewHistoryModule,
     BilateralModule,
+    ResultPrmsSyncModule,
     BilateralProjectMappingModule,
     PortfoliosModule,
     StrategicObjectivesModule,

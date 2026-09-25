@@ -4,7 +4,6 @@ import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { GeoScopeCardComponent } from '../geo-scope-card/geo-scope-card.component';
 import { ProjectDashboardCardComponent } from '../project-dashboard-card/project-dashboard-card.component';
-import { GetTopContributorsContractsService } from '@services/get-top-contributors-contracts.service';
 import { GetTopMainContactPersonsService } from '@services/get-top-main-contact-persons.service';
 import { GetTopPartnersService } from '@services/get-top-partners.service';
 import { GetTopPrimaryLeversService } from '@services/get-top-primary-levers.service';
@@ -50,13 +49,7 @@ interface ProjectStatusChartItem {
   selector: 'app-project-dashboard',
   standalone: true,
   imports: [ButtonModule, ProjectDashboardCardComponent, GeoScopeCardComponent, ResultsCenterTableComponent, DatePipe, ModalComponent],
-  providers: [
-    GetTopContributorsContractsService,
-    GetTopMainContactPersonsService,
-    GetTopPartnersService,
-    GetTopPrimaryLeversService,
-    GetGeoScopeService
-  ],
+  providers: [GetTopMainContactPersonsService, GetTopPartnersService, GetTopPrimaryLeversService, GetGeoScopeService],
   templateUrl: './project-dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -146,26 +139,10 @@ export class ProjectDashboardComponent {
     return Math.max(...items.map(item => item.value), 0);
   });
 
-  readonly topContributors = inject(GetTopContributorsContractsService);
   readonly topMainContactPersons = inject(GetTopMainContactPersonsService);
   readonly topPartners = inject(GetTopPartnersService);
   readonly topPrimaryLevers = inject(GetTopPrimaryLeversService);
   private readonly geoScope = inject(GetGeoScopeService);
-
-  readonly contributorItems = computed(() =>
-    this.topContributors
-      .list()
-      .map((item, index) => ({
-        id: item.contract_code ?? item.contract_id ?? String(index),
-        label: formatContributorLabel(item),
-        count: Number(item.results_count ?? item.count ?? 0)
-      }))
-      .sort((first, second) => second.count - first.count)
-  );
-
-  readonly contributorsEmpty = computed(
-    () => !this.topContributors.loading() && !this.topContributors.loadError() && this.topContributors.list().length === 0
-  );
 
   readonly mainContactPersonItems = computed(() =>
     this.topMainContactPersons
@@ -217,7 +194,6 @@ export class ProjectDashboardComponent {
       if (contractId) {
         void this.loadProject(contractId);
         void this.loadProjectResultsByStatus(contractId);
-        this.topContributors.main(contractId, 4);
         this.topMainContactPersons.main(contractId, 4);
         this.topPartners.main(contractId, 4);
         this.topPrimaryLevers.main(contractId, 4);
@@ -600,15 +576,6 @@ function formatLeverDisplayLabel(shortName: string, fullName: string): string {
 function formatMainContactPersonName(item: ProjectDashboardRankedItem): string | undefined {
   const firstLastName = [item.first_name, item.last_name].filter(Boolean).join(' ').trim();
   return item.name ?? item.full_name ?? item.contact_person_name ?? item.label ?? (firstLastName || undefined);
-}
-
-function formatContributorLabel(item: ProjectDashboardRankedItem): string {
-  const contractId = item.contract_id ?? item.contract_code;
-  const label = item.contract_description ?? item.project_name;
-  if (contractId && label) {
-    return `${contractId} - ${label}`;
-  }
-  return label ?? contractId ?? '—';
 }
 
 function formatPartnerLabel(item: ProjectDashboardRankedItem): string {

@@ -40,13 +40,22 @@ export class InputComponent {
   @Input() disabled = false;
   @Input() maxLength?: number;
   @Input() maxWords?: number;
+  // @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough)
+  @Input() maxFractionDigits?: number;
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode, DD-1/DD-2)
+  // Opt-in, defaults to 'off' (byte-identical behavior for every existing call site, R-IUR-013).
+  // When active, requiredMode OWNS THE VERDICT OUTRIGHT and bypasses the legacy isRequired /
+  // validateEmpty emptiness branches below — left additive, isRequired && !value would still
+  // redden a deliberate 0 and re-create DC-2 inside the fix (DD-1's precedence paragraph).
+  @Input() requiredMode: 'off' | 'filled' | 'positive' | 'nonzero' = 'off';
 
   body = signal<{ value: InputValueType }>({ value: null });
   firstTime = signal(true);
   MAX_SAFE_INTEGER = 18;
   MAX_SAFE_TEXT = 40000;
   showMaxReachedMessage = signal(false);
-  max = Number.MAX_SAFE_INTEGER;
+  // @akili-spec docs/specs/changes/measure-number-signed-decimal (T-09 — max promoted to @Input, default unchanged)
+  @Input() max = Number.MAX_SAFE_INTEGER;
 
   @HostListener('paste', ['$event'])
   onPaste(event: ClipboardEvent): void {
@@ -146,10 +155,40 @@ export class InputComponent {
     return false;
   }
 
+  /**
+   * PrimeNG's `p-inputNumber` emits the bare string `'-'` while a negative number is still being
+   * typed. It is only reachable when `min < 0` (PrimeNG's own `allowMinusSign()` — every other
+   * call site in this repo keeps the default `min = 0`, where the minus key is swallowed outright),
+   * which is why it surfaced first on Innovation Use's OTHER QUANTITATIVE MEASURES card.
+   *
+   * `'-'` is not a value: it round-trips to `NaN` through `Number()` (both in the consumer's own
+   * adapters and in PrimeNG's `writeValue`, which does `value ? Number(value) : value`). Letting it
+   * reach the model is what froze the browser tab — see `externalValueDiffers` below. Swallowing it
+   * here is inert for the arrow buttons (they emit finished numbers) and leaves the character in the
+   * DOM input, so the user can carry on typing `-5`.
+   */
+  isIncompleteNumericInput(value: unknown): boolean {
+    if (this.type !== 'number') return false;
+    if (typeof value === 'number') return Number.isNaN(value);
+    if (typeof value === 'string' && value !== '') return !Number.isFinite(Number(value));
+    return false;
+  }
+
+  /**
+   * NaN-safe difference check for the `onChange` effect. `!==` is NOT usable here: `NaN !== NaN` is
+   * always `true`, so a single NaN in the model made the effect write `body` on every run, and
+   * writing a signal the effect itself reads re-schedules it — an unbounded synchronous loop that
+   * hung the tab with no error. `Object.is` converges on NaN and is otherwise identical to `!==`
+   * except for `0`/`-0`, which settles after one extra pass.
+   */
+  externalValueDiffers(current: InputValueType, external: unknown): boolean {
+    return !Object.is(current, external);
+  }
+
   onChange = effect(
     () => {
       const externalValue = this.utils.getNestedProperty(this.signal(), this.optionValue);
-      if (this.body().value !== externalValue) {
+      if (this.externalValueDiffers(this.body().value, externalValue)) {
         this.body.set({ value: externalValue });
       }
     },
@@ -172,12 +211,44 @@ export class InputComponent {
     { allowSignalWrites: true }
   );
 
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode, DD-1/DD-2)
+  // 'filled' trims string values (whitespace-only is empty, §3.3) but keeps numeric `0` filled:
+  // `String(0).trim() === '0'`, so a deliberate 0 is never read as empty (R-IUR-004's `AND IT MUST`).
+  isFilled(value: InputValueType): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    return true;
+  }
+
+  // @akili-spec docs/specs/changes/innovation-use-required-fields (T-01 — requiredMode, DD-1/DD-2)
+  // The single source of truth for every active requiredMode's verdict — called identically from
+  // isInvalid() (source: body()) and inputValid() (source: getNestedProperty(signal())), which
+  // intentionally disagree on source (see the two call sites) exactly as the pre-existing pair did.
+  evaluateRequiredMode(value: InputValueType): { valid: boolean; class: string; message: string } {
+    if (!this.isFilled(value)) {
+      return { valid: false, class: 'ng-invalid ng-dirty', message: 'This field is required' };
+    }
+    if (this.requiredMode === 'positive' && !(Number(value) > 0)) {
+      return { valid: false, class: 'ng-invalid ng-dirty', message: 'Must be greater than 0' };
+    }
+    if (this.requiredMode === 'nonzero' && Number(value) === 0) {
+      return { valid: false, class: 'ng-invalid ng-dirty', message: 'Must be different from 0' };
+    }
+    return { valid: true, class: '', message: '' };
+  }
+
   isInvalid = computed(() => {
+    if (this.requiredMode !== 'off') {
+      return !this.evaluateRequiredMode(this.body()?.value ?? null).valid;
+    }
     return this.isRequired && !this.body()?.value;
   });
 
   inputValid = computed(() => {
     const value = this.utils.getNestedProperty(this.signal(), this.optionValue);
+    if (this.requiredMode !== 'off') {
+      return this.evaluateRequiredMode(value);
+    }
     if (this.isRequired && (!value || value.length === 0)) {
       return { valid: false, class: 'ng-invalid ng-dirty', message: 'This field is required' };
     }
@@ -211,6 +282,9 @@ export class InputComponent {
   }
 
   setValue(value: any) {
+    // A half-typed negative ('-') is not a value — never propagate it to the bound model.
+    if (this.isIncompleteNumericInput(value)) return;
+
     if (this.onlyLowerCase) value = value.toLowerCase();
 
     if (this.maxWords && typeof value === 'string') {

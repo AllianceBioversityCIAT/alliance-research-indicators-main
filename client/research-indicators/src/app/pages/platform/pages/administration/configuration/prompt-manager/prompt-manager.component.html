@@ -1,0 +1,131 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <div class="prompt-manager mb-10 flex w-full min-w-0 flex-col gap-[18px] rounded-[10px] bg-white p-[30px]">
+        <div class="flex flex-col gap-[2px]">
+          <h1 class="font-['Barlow'] text-[17px] font-bold leading-normal text-[#112F5C] m-0">Prompt Manager</h1>
+          <p class="font-['Barlow'] text-[14px] leading-[1.2] text-[#777C83] m-0">
+            Review and edit the prompts used by the AI features across the platform.
+          </p>
+        </div>
+
+        <div class="flex items-start gap-2 border-l-[5px] border-[#074B86] bg-[#F4F7F9] px-4 py-3">
+          <i class="pi pi-info-circle mt-[3px] shrink-0 text-[15px] text-[#074B86] rotate-180" aria-hidden="true"></i>
+          <p class="m-0 font-['Barlow'] text-[13px] leading-normal text-[#777C83]">
+            <span class="font-semibold text-[#777C83]">Advanced settings:</span>
+            Any change you save is applied
+            immediately and affects the responses generated for every user, so an incomplete, malformed or
+            over-restrictive prompt can degrade or break the functionality that depends on it. Keep the required
+            placeholders exactly as they are, do not remove the expected output format, and review your changes
+            carefully before saving. If you are not familiar with how these prompts are used, please refrain from
+            editing them.
+          </p>
+        </div>
+
+        <div class="flex flex-col mb-3">
+          @if (service.loadError()) {
+          <p class="px-5 py-6 text-sm text-[#B00020] bg-white border border-[#E8EBED]">
+            We could not load the prompts. Please refresh the page.
+          </p>
+          } @else {
+          @if (service.loading()) {
+          <app-custom-progress-bar></app-custom-progress-bar>
+          }
+          <div class="w-full border border-[#E8EBED]">
+            <p-table [value]="service.items()" [loading]="service.loading()" [scrollable]="true"
+              [tableStyle]="tableStyle()"
+              styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows prompt-manager-table">
+              <ng-template pTemplate="header">
+                <tr>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="name"
+                    [style]="fixedColumnStyle(columnWidths.name)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Name
+                      <p-sortIcon field="name"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" [style]="descriptionColumnStyle()">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Description
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="updated_at"
+                    [style]="fixedColumnStyle(columnWidths.lastModified)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Last modified
+                      <p-sortIcon field="updated_at"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="!text-[#112F5C]" scope="col" pSortableColumn="updated_by"
+                    [style]="fixedColumnStyle(columnWidths.updatedBy)">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Updated by
+                      <p-sortIcon field="updated_by"></p-sortIcon>
+                    </div>
+                  </th>
+                  <th class="prompt-manager-actions-col !text-[#112F5C]" scope="col"
+                    [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center font-[500] leading-tight text-[14px] text-center">
+                      Actions
+                    </div>
+                  </th>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-row>
+                <tr class="hover:surface-ground transition-colors duration-150 text-[14px] text-[#4C5158]">
+                  <td [style]="fixedColumnStyle(columnWidths.name)">
+                    <div class="w-full min-w-0 overflow-hidden line-clamp-2 font-[500] text-[#112F5C]"
+                      [appTruncatedTooltip]="row.name" tooltipPosition="top">{{ row.name }}</div>
+                  </td>
+                  <td class="break-words" [style]="descriptionColumnStyle()">
+                    <div class="w-full min-w-0 overflow-hidden line-clamp-2"
+                      [appTruncatedTooltip]="row.description || '—'" tooltipPosition="top">
+                      {{ row.description || '—' }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.lastModified)">
+                    <div class="w-full min-w-0 overflow-hidden truncate"
+                      [appTruncatedTooltip]="formatUpdatedAt(row.updated_at)" tooltipPosition="top">
+                      {{ formatUpdatedAt(row.updated_at) }}
+                    </div>
+                  </td>
+                  <td [style]="fixedColumnStyle(columnWidths.updatedBy)">
+                    <div class="w-full min-w-0 overflow-hidden truncate"
+                      [appTruncatedTooltip]="row.updated_by || '—'" tooltipPosition="top">
+                      {{ row.updated_by || '—' }}
+                    </div>
+                  </td>
+                  <td class="prompt-manager-actions-col" [style]="fixedColumnStyle(columnWidths.actions)">
+                    <div class="flex items-center justify-center">
+                      <button type="button" (click)="openEdit(row)" aria-label="Edit prompt" pTooltip="Edit prompt"
+                        tooltipPosition="top"
+                        class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[#D9E1EB] p-[2px] hover:bg-[#D9E1EB] transition-colors duration-150">
+                        <i class="pi pi-pencil !text-[12px] text-[#035BA9]"></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+              <ng-template pTemplate="emptymessage">
+                <tr>
+                  <td colspan="5" class="text-center p-8">
+                    <div class="flex flex-col items-center gap-2">
+                      <div class="w-16 h-16 flex items-center justify-center rounded-xl bg-blue-50">
+                        <i class="pi pi-inbox text-3xl text-blue-500"></i>
+                      </div>
+                      <h2 class="text-900 font-semibold m-0">No prompts found</h2>
+                      <p class="text-600 text-center m-0 max-w-[30rem] leading-relaxed">
+                        There are currently no prompts to display.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              </ng-template>
+            </p-table>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

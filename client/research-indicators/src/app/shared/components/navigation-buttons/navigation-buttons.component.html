@@ -17,7 +17,7 @@
         }
       </div>
 
-      @if (submission.isEditableStatus()) {
+      @if (submission.isEditableStatus() || showSave) {
       <button type="button" [disabled]="disableSave" (click)="save.emit()"
         class="flex cursor-pointer items-center gap-2 bg-[#509C55] text-[#FFFFFF] px-5 py-2 rounded-[13px] text-[15px] disabled:cursor-default disabled:bg-[#E8EBED] disabled:text-[#A2A9AF]">
         <i class="pi pi-save !text-[12px] -scale-x-100"></i> Save

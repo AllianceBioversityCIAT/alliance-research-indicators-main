@@ -5,16 +5,18 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
-import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { WebsocketService } from '@sockets/websocket.service';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
+import { ModalComponent } from '@shared/components/modal/modal.component';
+import { AllModalsService } from '@services/cache/all-modals.service';
 import { SpTocAlignmentBlockComponent } from './components/sp-toc-alignment-block/sp-toc-alignment-block.component';
 import {
   AlignmentChangedEvent,
@@ -66,8 +68,8 @@ interface ReadOnlyTocSummary {
     FormsModule,
     RadioButtonModule,
     TooltipModule,
-    DialogModule,
     SkeletonModule,
+    ModalComponent,
     FormHeaderComponent,
     NavigationButtonsComponent,
     CustomTagComponent,
@@ -79,7 +81,21 @@ interface ReadOnlyTocSummary {
 })
 export default class PoolFundingAlignmentComponent {
   readonly bilateralService = inject(BilateralService);
-  readonly showHelpModal = signal<boolean>(false);
+  private readonly allModalsService = inject(AllModalsService);
+
+  /**
+   * Help panel open state. It lives in AllModalsService like every other modal —
+   * the local signal it used to be could not drive app-modal, which reads its
+   * own config. Kept as a read-only view so callers (and tests) keep one name
+   * for "is the help open".
+   */
+  readonly showHelpModal = computed<boolean>(
+    () => this.allModalsService.isModalOpen('poolFundingHelp')?.isOpen ?? false
+  );
+
+  openHelpModal(): void {
+    this.allModalsService.openModal('poolFundingHelp');
+  }
   private readonly cache = inject(CacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -104,6 +120,7 @@ export default class PoolFundingAlignmentComponent {
     try { return inject(ClarityService); } catch { return null; }
   })();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly versionWatcher = inject(VersionWatcherService);
 
   readonly loadFailed = signal(false);
   readonly inlineErrors = signal<Record<string, string> | null>(null);
@@ -476,12 +493,29 @@ export default class PoolFundingAlignmentComponent {
   });
 
   constructor() {
+    this.versionWatcher.onVersionChange(() => {
+      this.loadAlignment();
+    });
+
+    this.websocketService
+      ?.listen('result.pool-funding-alignment.changed')
+      .pipe(
+        filter((evt): evt is AlignmentChangedEvent =>
+          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
+        ),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => this.handleRemoteChange());
+  }
+
+  private loadAlignment(): void {
     const resultCode = this.resultCode();
     void this.bilateralService.getAlignment(resultCode).then(alignment => {
       if (!alignment) {
         this.loadFailed.set(true);
         return;
       }
+      this.loadFailed.set(false);
       if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
@@ -500,16 +534,6 @@ export default class PoolFundingAlignmentComponent {
         is_read_only: alignment.is_read_only
       });
     });
-
-    this.websocketService
-      ?.listen('result.pool-funding-alignment.changed')
-      .pipe(
-        filter((evt): evt is AlignmentChangedEvent =>
-          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
-        ),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe(() => this.handleRemoteChange());
   }
 
   handleRemoteChange(): void {

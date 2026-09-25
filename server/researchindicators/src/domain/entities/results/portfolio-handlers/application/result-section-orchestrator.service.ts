@@ -9,6 +9,10 @@ import { TrueFalseEnum } from '../../../../shared/enum/queries.enum';
 import { Result } from '../../entities/result.entity';
 import { Portfolio } from '../../../portfolios/entities/portfolio.entity';
 import { ResultsUtil } from '../../../../shared/utils/results.util';
+import {
+  LeversSaveReport,
+  StrategicObjectivesSaveReport,
+} from '../sections/alignment/alignment-section-handler.interface';
 
 /**
  * Single delegation point from ResultsService / controller to alignment handlers.
@@ -77,5 +81,49 @@ export class ResultSectionOrchestratorService {
     }
 
     return undefined;
+  }
+
+  /**
+   * Explicit-portfolio entry point for non-HTTP callers (e.g. the AI
+   * formalizer) that have no request-scoped portfolio/result state to read.
+   *
+   * Deliberately does not call `resolvePortfolioId()` and does not read
+   * `portfolioUtil.portfolio` or `resultsUtil.result` — both getters throw
+   * when unset, which is exactly the state a formalize request is in
+   * (design.md DD-3). The portfolio is supplied explicitly so it cannot
+   * leak between items in the same batch (R-RES-008).
+   *
+   * Passes no `EntityManager`: this step runs in its own transaction like
+   * every other write in `formalizeResult` (design.md DD-8).
+   */
+  async saveStrategicObjectivesForPortfolio(
+    resultId: number,
+    portfolioId: PortfolioIdEnum,
+    ids: number[],
+  ): Promise<StrategicObjectivesSaveReport> {
+    const handler = this.alignmentRegistry.get(portfolioId);
+    return handler.saveStrategicObjectives(resultId, ids);
+  }
+
+  /**
+   * Explicit-portfolio entry point for non-HTTP callers (e.g. the AI
+   * formalizer) that have no request-scoped portfolio/result state to read.
+   *
+   * Deliberately does not call `resolvePortfolioId()` and does not read
+   * `portfolioUtil.portfolio` or `resultsUtil.result` — both getters throw
+   * when unset, which is exactly the state a formalize request is in
+   * (design.md DD-3). The portfolio is supplied explicitly so it cannot
+   * leak between items in the same batch (R-RES-009).
+   *
+   * Passes no `EntityManager`: this step runs in its own transaction like
+   * every other write in `formalizeResult` (design.md DD-8).
+   */
+  async saveLeversForPortfolio(
+    resultId: number,
+    portfolioId: PortfolioIdEnum,
+    ids: number[],
+  ): Promise<LeversSaveReport> {
+    const handler = this.alignmentRegistry.get(portfolioId);
+    return handler.saveLevers(resultId, ids);
   }
 }

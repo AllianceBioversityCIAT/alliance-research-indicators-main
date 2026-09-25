@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResultSidebarComponent } from './result-sidebar.component';
 import { ActivatedRoute, Router, NavigationEnd, ParamMap } from '@angular/router';
-import { computed, signal } from '@angular/core';
+import { computed, signal, WritableSignal } from '@angular/core';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { CacheService } from '@shared/services/cache/cache.service';
@@ -15,6 +15,7 @@ import { RolesService } from '@shared/services/cache/roles.service';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
 import { BilateralService } from '@shared/services/bilateral.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { AlignmentResponse } from '@interfaces/bilateral/pool-funding-alignment.interface';
 
 describe('ResultSidebarComponent', () => {
@@ -31,6 +32,8 @@ describe('ResultSidebarComponent', () => {
   let rolesService: Partial<RolesService>;
   let currentResultService: Partial<CurrentResultService>;
   let bilateralService: Partial<BilateralService>;
+  let sectionEnabled: WritableSignal<boolean>;
+  let prmsSyncButtonEnabled: WritableSignal<boolean>;
 
   beforeEach(async () => {
     cacheService = {
@@ -64,7 +67,8 @@ describe('ResultSidebarComponent', () => {
     };
 
     apiService = {
-      PATCH_SubmitResult: jest.fn().mockResolvedValue({ successfulRequest: true })
+      PATCH_SubmitResult: jest.fn().mockResolvedValue({ successfulRequest: true }),
+      POST_PrmsSync: jest.fn().mockResolvedValue({ successfulRequest: true })
     };
 
     allModalsService = {
@@ -112,8 +116,12 @@ describe('ResultSidebarComponent', () => {
     };
 
     bilateralService = {
-      currentAlignment: signal<AlignmentResponse | null>(null)
+      currentAlignment: signal<AlignmentResponse | null>(null),
+      getAlignment: jest.fn().mockResolvedValue(null)
     };
+
+    sectionEnabled = signal(true);
+    prmsSyncButtonEnabled = signal(true);
 
     await TestBed.configureTestingModule({
       imports: [HttpClientTestingModule, RouterTestingModule, ResultSidebarComponent],
@@ -128,7 +136,11 @@ describe('ResultSidebarComponent', () => {
         { provide: ActivatedRoute, useValue: route },
         { provide: RolesService, useValue: rolesService },
         { provide: CurrentResultService, useValue: currentResultService },
-        { provide: BilateralService, useValue: bilateralService }
+        { provide: BilateralService, useValue: bilateralService },
+        {
+          provide: PoolFundingFlagsService,
+          useValue: { sectionEnabled, prmsSyncButtonEnabled, load: jest.fn().mockResolvedValue(undefined) }
+        }
       ]
     }).compileComponents();
 
@@ -284,6 +296,21 @@ describe('ResultSidebarComponent', () => {
       expect(innovationOption?.indicator_id).toBe(2);
     });
 
+    // The crash reported from Alliance Alignment: greenChecks momentarily held
+    // `undefined` and the sidebar's computed indexed into it.
+    it('survives greenChecks being undefined instead of blanking the sidebar', () => {
+      cacheService.greenChecks?.set(undefined as unknown as GreenChecks);
+
+      // ★ discriminating: without the `?? {}` these three throw
+      //   "Cannot read properties of undefined (reading 'general_information')".
+      expect(() => component.allOptionsWithGreenChecks()).not.toThrow();
+      expect(() => component.getCompletedCount()).not.toThrow();
+      expect(() => component.getTotalCount()).not.toThrow();
+
+      expect(component.getCompletedCount()).toBe(0);
+      expect(component.allOptionsWithGreenChecks().length).toBeGreaterThan(0);
+    });
+
     it('should handle null/undefined greenChecks', () => {
       cacheService.greenChecks?.set({} as GreenChecks);
 
@@ -305,6 +332,38 @@ describe('ResultSidebarComponent', () => {
         is_read_only: false
       };
 
+      // --- PRMS code line under the sync button --------------------------------
+
+      it('shows the PRMS code under the sync button once PRMS has assigned one', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          prms_result_code: 54321
+        });
+        fixture.detectChanges();
+
+        const line = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]');
+        expect(line).not.toBeNull();
+        expect(line.textContent.replace(/\s+/g, ' ').trim()).toBe('PRMS code #54321');
+      });
+
+      it('renders nothing when the result has not been synced (prms_result_code null)', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          prms_result_code: null
+        });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+      });
+
+      it('renders nothing when the server omits prms_result_code entirely', () => {
+        // An older server must not produce an empty "PRMS code #" label.
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).toBeNull();
+      });
+
       it('hides the Pool Funding alignment tab when currentAlignment is null (loading state — AC-01.3)', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(null);
 
@@ -325,6 +384,73 @@ describe('ResultSidebarComponent', () => {
         const poolFundingOption = options.find(o => o.path === 'pool-funding-alignment');
 
         expect(poolFundingOption).toBeUndefined();
+      });
+
+      // --- Live-version (year) gate -------------------------------------------
+      // The reporting year is NOT a configurable parameter: the server resolves
+      // `report_year_id !== MAPPABLE_LIVE_VERSION` and ships the answer as
+      // `version_locked` on the alignment payload. These assert the sidebar
+      // consumes it ALONGSIDE the pre-existing contract gate, never instead of it.
+
+      it('hides the Pool Funding alignment tab when version_locked=true, even though eligible=true', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: true
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeUndefined();
+      });
+
+      it('hides the PRMS SYNC button and the OPTIONAL divider when version_locked=true', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: true
+        });
+        fixture.detectChanges();
+
+        // All three surfaces the user listed derive from the same filter, so this
+        // proves the gate reaches the button and the divider, not just the item.
+        expect(component.hasPoolFundingOption()).toBe(false);
+        expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+      });
+
+      it('shows the Pool Funding alignment tab when eligible=true and version_locked=false', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          version_locked: false
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeDefined();
+        expect(component.hasPoolFundingOption()).toBe(true);
+      });
+
+      it('FAILS OPEN: keeps the tab visible when the server omits version_locked entirely', () => {
+        // An older server that does not send the field must not hide Pool Funding
+        // for every result — the `=== true` comparison in the gate guarantees this.
+        const withoutField = { ...eligibleAlignment };
+        delete (withoutField as Partial<AlignmentResponse>).version_locked;
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(withoutField);
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeDefined();
+      });
+
+      it('hides the tab when version_locked=true AND eligible=false (both gates agree)', () => {
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+          ...eligibleAlignment,
+          eligible: false,
+          has_pool_funding_alignment_eligible: false,
+          version_locked: true
+        });
+
+        const options = component.allOptionsWithGreenChecks();
+
+        expect(options.find(o => o.path === 'pool-funding-alignment')).toBeUndefined();
       });
 
       it('hides the Pool Funding alignment tab when the result indicator is OICR (indicator_id === 5)', () => {
@@ -407,9 +533,7 @@ describe('ResultSidebarComponent', () => {
         } as GreenChecks);
         cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: 1 });
 
-        const visibleRequired = component
-          .allOptionsWithGreenChecks()
-          .filter(o => !o.hide && o.path !== 'pool-funding-alignment');
+        const visibleRequired = component.allOptionsWithGreenChecks().filter(o => !o.hide && o.path !== 'pool-funding-alignment');
 
         expect(component.getTotalCount()).toBe(visibleRequired.length);
         expect(component.getCompletedCount()).toBe(1);
@@ -432,6 +556,91 @@ describe('ResultSidebarComponent', () => {
           expect(typeof option.greenCheck).toBe('boolean');
         }
       });
+    });
+  });
+
+  // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+  describe('IUP details reachability (T-10)', () => {
+    const pathsFor = (indicatorId: number): string[] => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: indicatorId });
+      return component.allOptionsWithGreenChecks().map(o => o.path);
+    };
+
+    // c3 (R-IUP-001 AC.3) — asserted as the full path list, not a spot check (Disqualifier).
+    it('c3 — indicator 1 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(1)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'capacity-sharing',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+    });
+
+    it('c3 — indicator 2 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(2)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'innovation-details',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+    });
+
+    it('c3 — indicator 4 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(4)).toEqual(['general-information', 'alliance-alignment', 'policy-change', 'partners', 'geographic-scope', 'evidence']);
+    });
+
+    it('c3 — indicator 5 yields the byte-identical pre-change path list', () => {
+      expect(pathsFor(5)).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'oicr-details',
+        'partners',
+        'geographic-scope',
+        'links-to-result',
+        'evidence'
+      ]);
+    });
+
+    // c1/c2 (R-IUP-001 AC.1/AC.2)
+    it('c1/c2 — indicator 6 yields the seven Innovation Use paths in order, and getTotalCount() is 7', () => {
+      const paths = pathsFor(6);
+      expect(paths).toEqual([
+        'general-information',
+        'alliance-alignment',
+        'innovation-use-details',
+        'partners',
+        'geographic-scope',
+        'evidence',
+        'ip-rights'
+      ]);
+      expect(component.getTotalCount()).toBe(7);
+    });
+
+    it('c1 — indicator 6 excludes every other-indicator detail path', () => {
+      const paths = pathsFor(6);
+      expect(paths).not.toContain('innovation-details');
+      expect(paths).not.toContain('capacity-sharing');
+      expect(paths).not.toContain('policy-change');
+      expect(paths).not.toContain('oicr-details');
+      expect(paths).not.toContain('links-to-result');
+    });
+
+    // c4 — the two new keys resolve and drive the rendered tick (assert on the observable
+    // `greenCheck` output the template reads, not on the raw signal — KZ-001).
+    it('c4 — the detail row tick reads greenChecks().innovation_use and the indicator-6 IP rights row reads greenChecks().ip_rights', () => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), indicator_id: 6 });
+      cacheService.greenChecks?.set({ innovation_use: 1, ip_rights: 1 } as GreenChecks);
+      const options = component.allOptionsWithGreenChecks();
+      const detailRow = options.find(o => o.path === 'innovation-use-details');
+      const ipRightsRow = options.find(o => o.path === 'ip-rights');
+      expect(detailRow?.greenCheck).toBe(true);
+      expect(ipRightsRow?.greenCheck).toBe(true);
     });
   });
 
@@ -524,8 +733,11 @@ describe('ResultSidebarComponent', () => {
       expect(button?.disabled).toBe(true);
     });
 
-    it('enables the PRMS SYNC button when result is approved (status_id === 6) AND pool_funding_alignment has green check', () => {
-      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+    it('enables the PRMS SYNC button when approved AND green-checked AND the result contributes (has_contribution true)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true
+      });
       cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
       cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
       fixture.detectChanges();
@@ -535,12 +747,405 @@ describe('ResultSidebarComponent', () => {
       expect(button?.disabled).toBe(false);
     });
 
+    it('disables PRMS SYNC when the result answered "No" to the Science Program question — nothing to sync', () => {
+      // "No" is a COMPLETE answer, so pool_funding_alignment is green: the gate
+      // cannot be completeness alone.
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: false
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+      expect(component.prmsSyncTooltip()).toContain('nothing to sync to PRMS');
+    });
+
+    it('disables PRMS SYNC while the Science Program question is unanswered (has_contribution null)', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+      // the generic reason, not the "No" one
+      expect(component.prmsSyncTooltip()).toContain('once the result is approved');
+    });
+
     it('does not render the PRMS SYNC button when Pool Funding Alignment is hidden (e.g. OICR or ineligible)', () => {
       (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(null);
       fixture.detectChanges();
 
       const button = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
       expect(button).toBeNull();
+    });
+
+    const enablePrmsSyncButton = () => {
+      // has_contribution must be true: a complete "No" answer is green-checked but
+      // has nothing to send to PRMS, so completeness alone no longer enables the button.
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+    };
+
+    it('calls POST_PrmsSync exactly once when the enabled button is clicked', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(false);
+      button?.click();
+      await fixture.whenStable();
+
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(1);
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledWith(123);
+    });
+
+    it('does not call POST_PrmsSync when the button is disabled', async () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 1 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(false);
+      await component.onPrmsSync();
+
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+    });
+
+    it('does not fire a second request when clicked again while a sync is in flight', async () => {
+      enablePrmsSyncButton();
+      let resolveSync: (value: unknown) => void = () => undefined;
+      (apiService.POST_PrmsSync as jest.Mock).mockImplementation(
+        () =>
+          new Promise(resolve => {
+            resolveSync = resolve;
+          })
+      );
+
+      const firstClick = component.onPrmsSync();
+      fixture.detectChanges();
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(1);
+
+      resolveSync({ successfulRequest: true });
+      await firstClick;
+    });
+
+    it('refreshes metadata and shows the success MODAL after a successful sync', async () => {
+      // Was a green toast. A successful push is terminal -- the result becomes
+      // read-only in STAR -- so it must not scroll away unseen.
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+
+      await component.onPrmsSync();
+
+      expect(metadataService.update).toHaveBeenCalledWith(123);
+      expect(actionsService.showGlobalAlert).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Successfully synchronized with PRMS',
+        detail: 'This result was successfully synchronized.<br>You can now access it in PRMS.',
+        hasNoCancelButton: true,
+        generalButton: true,
+        confirmCallback: { label: 'Continue' }
+      });
+      // The toast path is GONE on success, not merely accompanied by a modal.
+      expect(actionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    it('shows the failure MODAL with friendly copy, never the technical reason', async () => {
+      enablePrmsSyncButton();
+      const technical = "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'";
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: technical }
+      });
+
+      await component.onPrmsSync();
+
+      expect(actionsService.showGlobalAlert).toHaveBeenCalledWith({
+        severity: 'error',
+        summary: 'Could not synchronize with PRMS',
+        detail: 'This result was not synchronized.<br>Please try again. If the problem continues, contact support.',
+        hasNoCancelButton: true,
+        generalButton: true,
+        confirmCallback: { label: 'Continue' }
+      });
+      // The guard that matters: the developer-facing string must NOT leak into the
+      // copy the user reads. Asserting the exact object above is not enough --
+      // this states the negative directly.
+      const alertArg = JSON.stringify((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0]);
+      expect(alertArg).not.toContain('innov_use_to_be_determined');
+      expect(actionsService.showToast).not.toHaveBeenCalled();
+    });
+
+    // --- PRMS's own validation messages reach the modal (2026-09-22) ----------
+    // They are written for the reporter ("Provide a publicly accessible link
+    // (CGSpace, DOI or a public site) instead"), unlike STAR's internal build
+    // errors, so they are shown verbatim.
+
+    const failWith = (failureReason: unknown) => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { data: { failure_reason: failureReason } }
+      });
+    };
+    const REJECTED_ENTRY = JSON.stringify({
+      type: 'innovation_use',
+      index: 0,
+      errors: [
+        "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+      ],
+      detailedErrors: [
+        {
+          path: '/innovation_use/current_innovation_use_numbers',
+          params: { missingProperty: 'innov_use_to_be_determined' },
+          keyword: 'required',
+          message: "must have required property 'innov_use_to_be_determined'",
+          fullMessage:
+            "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+        }
+      ],
+      external_reference: '19996'
+    });
+    const FULL_BODY = JSON.stringify({
+      ok: false,
+      error: 'validation_failed',
+      message: "Every result was rejected. See 'rejected'.",
+      rejected: [
+        {
+          type: 'innovation_use',
+          index: 0,
+          errors: [
+            "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+          ],
+          detailedErrors: [
+            {
+              path: '/innovation_use/current_innovation_use_numbers',
+              params: { missingProperty: 'innov_use_to_be_determined' },
+              keyword: 'required',
+              message: "must have required property 'innov_use_to_be_determined'",
+              fullMessage:
+                "/innovation_use/current_innovation_use_numbers must have required property 'innov_use_to_be_determined'. Missing required property: innov_use_to_be_determined"
+            }
+          ],
+          external_reference: '19996'
+        }
+      ],
+      requestId: 'Root=1-6ab2b650',
+      acceptedCount: 0,
+      rejectedCount: 1
+    });
+
+    const alertDetail = () => ((actionsService.showGlobalAlert as jest.Mock).mock.calls[0][0] as { detail: string }).detail;
+
+    it('shows a single PRMS message in the modal', async () => {
+      failWith(
+        'HTTP 400: Bad Request - {"response":{"message":["data.evidence.0.Links to file storage platforms are not accepted as evidence."],"statusCode":400}}'
+      );
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('PRMS reported');
+      expect(alertDetail()).toContain('Links to file storage platforms are not accepted as evidence.');
+    });
+
+    it('shows EVERY message when PRMS returns several', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":["first problem","second problem","third problem"]}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('first problem');
+      expect(alertDetail()).toContain('second problem');
+      expect(alertDetail()).toContain('third problem');
+    });
+
+    it('accepts a message that is a plain string, not an array', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":"just one, unwrapped"}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('just one, unwrapped');
+    });
+
+    it('ESCAPES the message -- it is data from an external system, rendered via innerHTML', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":["<img src=x onerror=alert(1)>"]}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('&lt;img src=x onerror=alert(1)&gt;');
+      expect(alertDetail()).not.toContain('<img');
+    });
+
+    // PRMS does not normalise its error bodies. This second shape -- verbatim from
+    // a 2026-09-22 rejection -- carries the text under
+    // `rejected[].detailedErrors[].message` instead of `response.message`.
+
+    it('reads detailedErrors[].message when the WHOLE validation_failed body arrives', async () => {
+      failWith(`HTTP 422: Unprocessable Entity - ${FULL_BODY}`);
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('PRMS reported');
+      expect(alertDetail()).toContain("must have required property 'innov_use_to_be_determined'");
+    });
+
+    it('reads detailedErrors[].message when only the REJECTED ENTRY arrives', async () => {
+      // The server stores JSON.stringify(chosen) when the rejected entry carries
+      // no plain string reason, so the log can hold the entry on its own.
+      failWith(`HTTP 422: Unprocessable Entity - ${REJECTED_ENTRY}`);
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain("must have required property 'innov_use_to_be_determined'");
+    });
+
+    it('renders a real <ul>, not bullet characters -- .alert is text-align: center', async () => {
+      // Hand-made bullets joined by <br> centre line by line inside the alert and
+      // never line their markers up. A <ul> carrying the alignment class does.
+      failWith('HTTP 400: Bad Request - {"response":{"message":["one","two"]}}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('<ul class="alert-detail-list">');
+      expect(alertDetail()).toContain('<li>one</li>');
+      expect(alertDetail()).toContain('<li>two</li>');
+      // The class matters: Angular's [innerHTML] sanitizer strips `style`, so an
+      // inline text-align would silently not survive.
+      expect(alertDetail()).not.toContain('style=');
+      expect(alertDetail()).not.toContain('•');
+    });
+
+    it('does not repeat a message that appears in more than one place', async () => {
+      failWith('HTTP 400: Bad Request - {"response":{"message":["duplicated"]},"detailedErrors":[{"message":"duplicated"}]}');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail().split('duplicated').length - 1).toBe(1);
+    });
+
+    it('falls back to the generic copy when the reason carries no PRMS messages', async () => {
+      failWith('Result is ineligible, gated, or the payload is incomplete');
+
+      await component.onPrmsSync();
+
+      expect(alertDetail()).toContain('Please try again');
+      expect(alertDetail()).not.toContain('PRMS reported');
+    });
+
+    it('falls back when the reason is unparseable JSON, without throwing', async () => {
+      failWith('HTTP 400: Bad Request - {this is not json');
+
+      await expect(component.onPrmsSync()).resolves.toBeUndefined();
+      expect(alertDetail()).toContain('Please try again');
+    });
+
+    it('still surfaces the server failure message -- to the console, not to the user', async () => {
+      // This test used to assert the server message reached the TOAST. The UI now
+      // shows friendly copy, but the original guarantee it protected -- that the
+      // server's reason is never silently discarded -- is kept, just relocated.
+      // (It is also persisted server-side in result_prms_sync_log.failure_reason.)
+      enablePrmsSyncButton();
+      const serverMessage = 'Result is ineligible, gated, or the payload is incomplete';
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: serverMessage }
+      });
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      await component.onPrmsSync();
+
+      expect(metadataService.update).not.toHaveBeenCalled();
+      expect(consoleError).toHaveBeenCalledWith('PRMS sync failed:', serverMessage);
+
+      consoleError.mockRestore();
+    });
+
+    it('disables the PRMS SYNC button when the result is already synced to PRMS', () => {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true,
+        is_synced_to_prms: true
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      expect(component.canSyncPrms()).toBe(true);
+      expect(component.prmsAlreadySynced()).toBe(true);
+      expect(component.prmsSyncTooltip()).toBe('This result has already been synced to PRMS.');
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
+    });
+
+    it('does not call POST_PrmsSync when the result is already synced to PRMS', async () => {
+      // has_contribution true on purpose: this must be blocked by "already synced",
+      // not by ineligibility, or it would pass for the wrong reason.
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
+        ...eligibleAlignment,
+        has_contribution: true,
+        is_synced_to_prms: true
+      });
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as any);
+      fixture.detectChanges();
+
+      await component.onPrmsSync();
+
+      expect(apiService.POST_PrmsSync).not.toHaveBeenCalled();
+    });
+
+    it('keeps the PRMS SYNC button enabled and re-clickable after a failed sync', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({
+        successfulRequest: false,
+        errorDetail: { errors: 'PRMS rejected the result' }
+      });
+
+      await component.onPrmsSync();
+      fixture.detectChanges();
+
+      expect(component.prmsAlreadySynced()).toBe(false);
+      expect(bilateralService.getAlignment).not.toHaveBeenCalled();
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(false);
+
+      await component.onPrmsSync();
+      expect(apiService.POST_PrmsSync).toHaveBeenCalledTimes(2);
+    });
+
+    it('refreshes alignment after a successful sync and then disables the button', async () => {
+      enablePrmsSyncButton();
+      (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      (metadataService.update as jest.Mock).mockResolvedValue(undefined);
+      (bilateralService.getAlignment as jest.Mock).mockImplementation(async () => {
+        const synced = { ...eligibleAlignment, has_contribution: true, is_synced_to_prms: true };
+        (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(synced);
+        return synced;
+      });
+
+      await component.onPrmsSync();
+      fixture.detectChanges();
+
+      expect(bilateralService.getAlignment).toHaveBeenCalledWith('123');
+      expect(component.prmsAlreadySynced()).toBe(true);
+      const button: HTMLButtonElement | null = fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+      expect(button?.disabled).toBe(true);
     });
   });
 
@@ -1748,6 +2353,121 @@ describe('ResultSidebarComponent', () => {
       await (component as any).handlePostponeOrRejectRedirect();
 
       expect(currentResultService.openEditRequestdOicrsModal).toHaveBeenCalledWith(1, 11, 12345, 'project');
+    });
+  });
+
+  describe('pool funding feature flags (R-PFT-001/002/003)', () => {
+    const qualifying: AlignmentResponse = {
+      result_code: 'RES-001',
+      eligible: true,
+      has_pool_funding_alignment_eligible: true,
+      has_contribution: null,
+      selected_levers: [],
+      is_synced_to_prms: false,
+      is_read_only: false,
+      prms_result_code: 54321
+    };
+
+    const nonQualifying: AlignmentResponse = {
+      ...qualifying,
+      eligible: false,
+      has_pool_funding_alignment_eligible: false,
+      prms_result_code: null
+    };
+
+    const alignment = () => bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>;
+
+    function sectionItem(): Element | null {
+      const host: HTMLElement = fixture.nativeElement;
+      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('Pool funding alignment')) ?? null;
+    }
+
+    function syncButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+    }
+
+    it('row 1 — flags on and the result qualifies: section and button are shown', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+    });
+
+    it('row 2 — section flag off hides the section and the button', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(false);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+      expect(syncButton()).toBeNull();
+    });
+
+    it('row 3 — button flag off hides only the button and keeps the result-code caption', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(syncButton()).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(false);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="sidebar-prms-result-code"]')?.textContent).toContain('54321');
+    });
+
+    it('row 4 — flag on does not override a non-qualifying contract', () => {
+      expect(syncButton()).toBeNull();
+      expect(sectionItem()).toBeNull();
+
+      alignment().set(nonQualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).toBeNull();
+      expect(syncButton()).toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).toBeNull();
+      expect(syncButton()).toBeNull();
+    });
+
+    it('row 5 — a failed read leaves both flags enabled, so a qualifying result stays shown', () => {
+      expect(syncButton()).toBeNull();
+
+      alignment().set(qualifying);
+      fixture.detectChanges();
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
+
+      sectionEnabled.set(true);
+      prmsSyncButtonEnabled.set(true);
+      fixture.detectChanges();
+
+      expect(sectionItem()).not.toBeNull();
+      expect(syncButton()).not.toBeNull();
     });
   });
 });

@@ -185,8 +185,15 @@ describe('SubmissionService', () => {
     expect(service.isSubmitted()).toBe(false);
   });
 
-  it('meetsStatusChangeValidationRequirements true when all green checks are true', () => {
-    cacheMock.greenChecks.mockReturnValue({ a: true, b: true });
+  it('meetsStatusChangeValidationRequirements true when the backend reports completness', () => {
+    cacheMock.greenChecks.mockReturnValue({ a: true, b: true, completness: 1 });
+    expect(service.meetsStatusChangeValidationRequirements()).toBe(true);
+  });
+
+  it('meetsStatusChangeValidationRequirements ignores an incomplete OPTIONAL section (pool funding)', () => {
+    // Regression pin: pool_funding_alignment is VISUAL_ONLY server-side and must
+    // never gate Submit. `completness` already excludes it.
+    cacheMock.greenChecks.mockReturnValue({ general_information: 1, pool_funding_alignment: 0, completness: 1 });
     expect(service.meetsStatusChangeValidationRequirements()).toBe(true);
   });
 
@@ -202,7 +209,7 @@ describe('SubmissionService', () => {
 
   it('canSubmitResult true when all conditions met', () => {
     cacheMock.allGreenChecksAreTrue.mockReturnValue(true);
-    cacheMock.greenChecks.mockReturnValue({ a: 1 });
+    cacheMock.greenChecks.mockReturnValue({ a: 1, completness: 1 });
     cacheMock.isMyResult.mockReturnValue(true);
     cacheMock.currentMetadata.mockReturnValue({ is_principal_investigator: false });
     expect(service.canSubmitResult()).toBe(true);
@@ -210,7 +217,7 @@ describe('SubmissionService', () => {
 
   it('canSubmitResult true when principal investigator', () => {
     cacheMock.allGreenChecksAreTrue.mockReturnValue(true);
-    cacheMock.greenChecks.mockReturnValue({ a: 1 });
+    cacheMock.greenChecks.mockReturnValue({ a: 1, completness: 1 });
     cacheMock.isMyResult.mockReturnValue(false);
     cacheMock.currentMetadata.mockReturnValue({ is_principal_investigator: true });
     expect(service.canSubmitResult()).toBe(true);
@@ -244,7 +251,7 @@ describe('SubmissionService', () => {
 
   it('canSubmitResult false when not my result and not principal investigator', () => {
     cacheMock.allGreenChecksAreTrue.mockReturnValue(true);
-    cacheMock.greenChecks.mockReturnValue({ a: 1 });
+    cacheMock.greenChecks.mockReturnValue({ a: 1, completness: 1 });
     cacheMock.isMyResult.mockReturnValue(false);
     cacheMock.currentMetadata.mockReturnValue({ is_principal_investigator: false });
     expect(service.canSubmitResult()).toBe(false);

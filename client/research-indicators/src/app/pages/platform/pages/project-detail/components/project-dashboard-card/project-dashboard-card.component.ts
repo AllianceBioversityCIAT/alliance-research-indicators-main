@@ -43,6 +43,7 @@ export class ProjectDashboardCardComponent {
   readonly errorMessage = input('We could not load this data. Please try again.');
   readonly emptyMessage = input('No data available for this project yet.');
   readonly iconClass = input('pi pi-chart-bar');
+  readonly notice = input('');
   readonly retry = output<void>();
 
   readonly maxCount = computed(() => {

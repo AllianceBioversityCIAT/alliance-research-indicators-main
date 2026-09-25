@@ -1,10 +1,12 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { platformFromResultCodeOrNull } from '@shared/utils/platform-code.util';
 
 export const resultInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
+  const cache = inject(CacheService);
   const shouldUseYear = req.headers.has('X-Use-Year');
 
   if (!shouldUseYear) {
@@ -13,7 +15,9 @@ export const resultInterceptor: HttpInterceptorFn = (req, next) => {
 
   
   const headers = req.headers.delete('X-Use-Year');
-  const year = getYearFromUrl(router);
+  // `skipResultVersionParam` is raised only while the create-result flow is
+  // moving the router to the freshly created result. See CacheService.
+  const year = cache.skipResultVersionParam() ? null : getYearFromUrl(router);
   
   // Check if platform is provided via header, otherwise get from URL
   const platformFromHeader = req.headers.get('X-Platform');

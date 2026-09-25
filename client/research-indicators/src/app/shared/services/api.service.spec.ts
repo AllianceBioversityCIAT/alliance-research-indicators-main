@@ -5,7 +5,12 @@ import { CacheService } from './cache/cache.service';
 import { ControlListCacheService } from './control-list-cache.service';
 import { SignalEndpointService } from './signal-endpoint.service';
 import { environment } from '../../../environments/environment';
-import { HttpParams } from '@angular/common/http';
+import { HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { resultInterceptor } from '@shared/interceptors/result.interceptor';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
+import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 
 describe('ApiService', () => {
   let service: ApiService;
@@ -278,7 +283,7 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingAlignment(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', { useResultInterceptor: true });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingAlignment', () => {
@@ -287,7 +292,7 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingAlignment(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', { useResultInterceptor: true });
     });
 
     it('should URL-encode the (post-strip) resultCode for GET_PoolFundingAlignment', () => {
@@ -298,7 +303,7 @@ describe('ApiService', () => {
 
       expect(mockToPromiseService.get).toHaveBeenCalledWith(
         `v1/results/${encodeURIComponent(resultCode)}/pool-funding-alignment`,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -308,7 +313,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingSciencePrograms(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {
+        useResultInterceptor: true
+      });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingSciencePrograms', () => {
@@ -317,7 +324,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingSciencePrograms(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/science-programs', {
+        useResultInterceptor: true
+      });
     });
 
     it('should call GET_PoolFundingHlosIndicators with the per-result /hlos-indicators suffix and numeric code', () => {
@@ -326,7 +335,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingHlosIndicators(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {
+        useResultInterceptor: true
+      });
     });
 
     it('should strip the STAR- prefix from the resultCode for GET_PoolFundingHlosIndicators', () => {
@@ -335,7 +346,9 @@ describe('ApiService', () => {
 
       service.GET_PoolFundingHlosIndicators(resultCode);
 
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {});
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment/hlos-indicators', {
+        useResultInterceptor: true
+      });
     });
 
     it('should resolve the MainResponse<BilateralTocCatalogResponse> envelope for GET_PoolFundingHlosIndicators', async () => {
@@ -646,6 +659,17 @@ describe('ApiService', () => {
       );
     });
 
+    it('should call POST_PrmsSync without v1 on results/:resultCode/prms-sync', () => {
+      (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.POST_PrmsSync(123);
+
+      expect(mockToPromiseService.post).toHaveBeenCalledWith('results/123/prms-sync', {}, { useResultInterceptor: true });
+      const calledUrl = (mockToPromiseService.post as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain('v1/');
+      expect(calledUrl).toBe('results/123/prms-sync');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });
@@ -696,7 +720,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -710,7 +734,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
 
@@ -724,7 +748,7 @@ describe('ApiService', () => {
       expect(mockToPromiseService.patch).toHaveBeenCalledWith(
         'v1/results/19792/pool-funding-alignment',
         body,
-        {}
+        { useResultInterceptor: true }
       );
     });
   });
@@ -1052,6 +1076,15 @@ describe('ApiService', () => {
         loadingTrigger: true,
         useResultInterceptor: true
       });
+    });
+
+    it('should call GET_InnovationDevCard', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+      service.GET_InnovationDevCard(123);
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(
+        'results/innovation-use/innovation-dev-card/123',
+        { useResultInterceptor: true }
+      );
     });
 
     it('should call GET_InnovationDetails', () => {
@@ -2286,3 +2319,244 @@ describe('ApiService', () => {
     });
   });
 });
+
+// T-01 c1/c2 — these three Innovation Use methods are asserted through HttpTestingController against a real
+// ApiService + real ToPromiseService, never against a mocked ApiService (KZ-001 disqualifier, design.md §10.2).
+// This proves the exact verb, path, and header/side-effect config each method builds — not merely that a method
+// on a double was invoked.
+describe('ApiService — Innovation Use Details methods (HttpTestingController)', () => {
+  let service: ApiService;
+  let httpMock: HttpTestingController;
+  let cacheServiceStub: {
+    currentResultIsLoading: ReturnType<typeof signal<boolean>>;
+    greenChecks: ReturnType<typeof signal<GreenChecks>>;
+    getCurrentNumericResultId: () => number;
+    skipResultVersionParam: ReturnType<typeof signal<boolean>>;
+  };
+
+  beforeEach(() => {
+    cacheServiceStub = {
+      currentResultIsLoading: signal(false),
+      greenChecks: signal<GreenChecks>({}),
+      getCurrentNumericResultId: () => 123,
+      // Down outside the create-result flow, which is what these outgoing-URL
+      // expectations describe.
+      skipResultVersionParam: signal(false)
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        ToPromiseService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: CacheService, useValue: cacheServiceStub },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+          }
+        }
+      ]
+    });
+
+    service = TestBed.inject(ApiService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('GET_InnovationUseDetails hits GET results/innovation-use/:resultCode with loadingTrigger + useResultInterceptor', async () => {
+    const resultCode = 456;
+    const promise = service.GET_InnovationUseDetails(resultCode);
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}results/innovation-use/${resultCode}`);
+    expect(req.request.method).toBe('GET');
+    // useResultInterceptor -> the 'X-Use-Year' header
+    expect(req.request.headers.get('X-Use-Year')).toBe('true');
+    // loadingTrigger fires synchronously, before the response arrives
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(true);
+    expect(cacheServiceStub.greenChecks()).toEqual({});
+
+    req.flush({ data: { innovation_use_level_id: 7, actors: [], organizations: [], quantifications: [] } });
+
+    // loadingTrigger's finalize() is the ONLY mechanism that fires ToPromiseService.updateGreenChecks() —
+    // this second GET is the evidence that it did.
+    const greenChecksReq = httpMock.expectOne(`${environment.mainApiUrl}results/green-checks/123`);
+    expect(greenChecksReq.request.method).toBe('GET');
+    greenChecksReq.flush({ data: { innovation_use: 1 } });
+
+    const response = await promise;
+    expect(response.data.innovation_use_level_id).toBe(7);
+    expect(response.successfulRequest).toBe(true);
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+    expect(cacheServiceStub.greenChecks()).toEqual({ innovation_use: 1 });
+  });
+
+  it('PATCH_InnovationUseDetails hits PATCH results/innovation-use/:resultCode with useResultInterceptor and no loadingTrigger effect', async () => {
+    const resultCode = 456;
+    const body = { innovation_use_level_id: 7 };
+    const promise = service.PATCH_InnovationUseDetails(resultCode, body);
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}results/innovation-use/${resultCode}`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.headers.get('X-Use-Year')).toBe('true');
+    expect(req.request.body).toEqual(body);
+    // no loadingTrigger on the PATCH
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+
+    req.flush({ data: { innovation_use_level_id: 7 } });
+
+    // omitting loadingTrigger means no follow-up green-checks GET is ever issued by this call
+    httpMock.expectNone(`${environment.mainApiUrl}results/green-checks/123`);
+
+    const response = await promise;
+    expect(response.data.innovation_use_level_id).toBe(7);
+    expect(response.successfulRequest).toBe(true);
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+  });
+
+  it('GET_InnovationUseLevels hits GET tools/clarisa/innovation-use-levels with the default config (neither header nor loadingTrigger)', async () => {
+    const promise = service.GET_InnovationUseLevels();
+
+    const req = httpMock.expectOne(`${environment.mainApiUrl}tools/clarisa/innovation-use-levels`);
+    expect(req.request.method).toBe('GET');
+    // a catalog is not result-scoped: no X-Use-Year header
+    expect(req.request.headers.get('X-Use-Year')).toBeNull();
+    // no loadingTrigger effect
+    expect(cacheServiceStub.currentResultIsLoading()).toBe(false);
+
+    req.flush({ data: [{ id: 1, level: 0, name: 'No use', definition: 'Innovation is not used.' }] });
+
+    // no loadingTrigger means no follow-up green-checks GET
+    httpMock.expectNone(`${environment.mainApiUrl}results/green-checks/123`);
+
+    const response = await promise;
+    expect(response.data).toHaveLength(1);
+    expect(response.successfulRequest).toBe(true);
+  });
+});
+
+const POOL_FUNDING_RESULT_CODE = '19941';
+const POOL_FUNDING_PATCH_BODY = { has_contribution: false };
+const POOL_FUNDING_CALLS: Array<{
+  name: string;
+  method: 'GET' | 'PATCH';
+  path: string;
+  call: (service: ApiService) => Promise<unknown>;
+}> = [
+  {
+    name: 'GET_PoolFundingAlignment',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment`,
+    call: service => service.GET_PoolFundingAlignment(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'GET_PoolFundingSciencePrograms',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment/science-programs`,
+    call: service => service.GET_PoolFundingSciencePrograms(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'GET_PoolFundingHlosIndicators',
+    method: 'GET',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment/hlos-indicators`,
+    call: service => service.GET_PoolFundingHlosIndicators(POOL_FUNDING_RESULT_CODE)
+  },
+  {
+    name: 'PATCH_PoolFundingAlignment',
+    method: 'PATCH',
+    path: `v1/results/${POOL_FUNDING_RESULT_CODE}/pool-funding-alignment`,
+    call: service => service.PATCH_PoolFundingAlignment(POOL_FUNDING_RESULT_CODE, POOL_FUNDING_PATCH_BODY)
+  }
+];
+
+function configurePoolFundingHttp(routerUrl: string, queryParams: Record<string, string>) {
+  TestBed.configureTestingModule({
+    providers: [
+      ApiService,
+      ToPromiseService,
+      provideHttpClient(withInterceptors([resultInterceptor])),
+      provideHttpClientTesting(),
+      {
+        provide: Router,
+        useValue: {
+          url: routerUrl,
+          parseUrl: () => ({ queryParams })
+        }
+      },
+      {
+        provide: CacheService,
+        useValue: {
+          currentResultIsLoading: signal(false),
+          greenChecks: signal<GreenChecks>({}),
+          getCurrentNumericResultId: () => 19941,
+          // Down outside the create-result flow; these cases describe ordinary
+          // versioned browsing, where the year must still travel.
+          skipResultVersionParam: signal(false)
+        }
+      },
+      { provide: ControlListCacheService, useValue: {} },
+      {
+        provide: SignalEndpointService,
+        useValue: {
+          createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+        }
+      }
+    ]
+  });
+}
+
+describe('ApiService — pool funding outgoing URLs (HttpTestingController, R-PFV-004)', () => {
+  let service: ApiService;
+  let httpMock: HttpTestingController;
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  describe('under a router URL carrying ?version=2026', () => {
+    beforeEach(() => {
+      configurePoolFundingHttp('/result/19941/pool-funding-alignment?version=2026', { version: '2026' });
+      service = TestBed.inject(ApiService);
+      httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    it.each(POOL_FUNDING_CALLS)('$name arrives with reportYear=2026 and reportingPlatforms=STAR', async ({ call, method, path }) => {
+      const expectedUrl = `${environment.mainApiUrl}${path}?reportYear=2026&reportingPlatforms=STAR`;
+      const promise = call(service);
+
+      const req = httpMock.expectOne(incoming => incoming.method === method && incoming.url.startsWith(`${environment.mainApiUrl}${path}`));
+      expect(req.request.method).toBe(method);
+      expect(req.request.url).toBe(expectedUrl);
+
+      req.flush({ data: {} });
+      await promise;
+    });
+  });
+
+  describe('with no ?version', () => {
+    beforeEach(() => {
+      configurePoolFundingHttp('/result/19941/pool-funding-alignment', {});
+      service = TestBed.inject(ApiService);
+      httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    it.each(POOL_FUNDING_CALLS)('$name arrives with reportingPlatforms=STAR and no reportYear', async ({ call, method, path }) => {
+      const expectedUrl = `${environment.mainApiUrl}${path}?reportingPlatforms=STAR`;
+      const promise = call(service);
+
+      const req = httpMock.expectOne(incoming => incoming.method === method && incoming.url.startsWith(`${environment.mainApiUrl}${path}`));
+      expect(req.request.method).toBe(method);
+      expect(req.request.url).not.toContain('reportYear');
+      expect(req.request.url).toBe(expectedUrl);
+
+      req.flush({ data: {} });
+      await promise;
+    });
+  });
+});
+

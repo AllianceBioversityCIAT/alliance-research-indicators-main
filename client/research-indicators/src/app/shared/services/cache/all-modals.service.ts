@@ -143,6 +143,10 @@ export class AllModalsService {
       isOpen: false,
       title: 'Environment variables'
     },
+    editPrompt: {
+      isOpen: false,
+      title: 'Prompt Manager'
+    },
     projectGroundingSetup: {
       isOpen: false,
       title: 'Grounding & Setup',
@@ -160,6 +164,15 @@ export class AllModalsService {
       title: 'Simulate another profile',
       cancelText: 'Cancel',
       cancelAction: () => this.toggleModal('simulateProfile')
+    },
+    // Read-only help for the Pool Funding Alignment section. No confirm/cancel:
+    // app-modal renders its footer only when one of those actions is registered,
+    // so this opens as a plain informational panel with the shared header, close
+    // affordance, focus trap and Escape handling.
+    poolFundingHelp: {
+      isOpen: false,
+      title: 'About Pool Funding & Theory of Change alignment',
+      isWide: true
     }
   });
 
@@ -277,9 +290,12 @@ export class AllModalsService {
       addContactPerson: { ...this.modalConfig().addContactPerson, isOpen: false, isWide: false },
       selectLinkedResults: { ...this.modalConfig().selectLinkedResults, isOpen: false, isWide: false },
       editEnvironmentVariable: { ...this.modalConfig().editEnvironmentVariable, isOpen: false, isWide: false },
+      editPrompt: { ...this.modalConfig().editPrompt, isOpen: false, isWide: false },
       projectGroundingSetup: { ...this.modalConfig().projectGroundingSetup, isOpen: false, isWide: false },
       portfolioManagement: { ...this.modalConfig().portfolioManagement, isOpen: false, isWide: false },
-      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false }
+      simulateProfile: { ...this.modalConfig().simulateProfile, isOpen: false, isWide: false },
+      // isWide stays true: it is this modal's layout, not a per-opening state.
+      poolFundingHelp: { ...this.modalConfig().poolFundingHelp, isOpen: false }
     });
 
     this.setSubmitResultOrigin(null);

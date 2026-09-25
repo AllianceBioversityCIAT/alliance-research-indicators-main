@@ -33,6 +33,7 @@ import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/resu
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
+import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
 import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
 import { ResultActorsModule } from '../entities/result-actors/result-actors.module';
 import { ActorRolesModule } from '../entities/actor-roles/actor-roles.module';
@@ -64,6 +65,7 @@ import { ResultStatusWorkflowModule } from '../entities/result-status-workflow/r
 import { LeverSdgTargetsModule } from '../entities/lever-sdg-targets/lever-sdg-targets.module';
 import { ReportsModule } from '../entities/reports/reports.module';
 import { BilateralModule } from '../entities/bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
@@ -82,6 +84,10 @@ const ResultsChildren: Routes = [
   {
     path: `${RESULT_CODE}/pool-funding-alignment`,
     module: BilateralModule,
+  },
+  {
+    path: `${RESULT_CODE}/prms-sync`,
+    module: ResultPrmsSyncModule,
   },
   {
     path: 'intellectual-property',
@@ -114,6 +120,10 @@ const ResultsChildren: Routes = [
         module: InnovationDevAnticipatedUsersModule,
       },
     ],
+  },
+  {
+    path: 'innovation-use',
+    module: ResultInnovationUseModule,
   },
   {
     path: 'evidences',

@@ -148,6 +148,12 @@ export const routes: Routes = [
             loadComponent: () => import('@platform/pages/result/pages/innovation-details/innovation-details.component'),
             data: createResultData()
           },
+          // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+          {
+            path: 'innovation-use-details',
+            loadComponent: () => import('@platform/pages/result/pages/innovation-use-details/innovation-use-details.component'),
+            data: createResultData()
+          },
           {
             path: 'geographic-scope',
             loadComponent: () => import('@platform/pages/result/pages/geographic-scope/geographic-scope.component'),
@@ -307,6 +313,16 @@ export const routes: Routes = [
         canMatch: [centerAdminGuard],
         data: {
           title: 'Portfolio Management',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'administration/configuration/prompt-manager',
+        loadComponent: () =>
+          import('@platform/pages/administration/configuration/prompt-manager/prompt-manager.component').then(m => m.default),
+        canMatch: [appConfigurationGuard],
+        data: {
+          title: 'Prompt Manager',
           isLoggedIn: true
         }
       },

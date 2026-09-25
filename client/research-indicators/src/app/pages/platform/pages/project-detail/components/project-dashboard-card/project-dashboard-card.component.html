@@ -12,6 +12,14 @@
     </div>
   </header>
 
+  @if (notice()) {
+  <div role="note"
+    class="mb-4 flex items-start gap-2 border-solid border-l-[4px] border-l-[#E69F00] bg-[#fff8e6] px-3 py-2.5">
+    <i class="pi pi-exclamation-triangle !text-[14px] shrink-0 text-[#8a4b08]/80 pt-px" aria-hidden="true"></i>
+    <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[#8a4b08]/80">{{ notice() }}</p>
+  </div>
+  }
+
   <div class="flex min-h-0 flex-1 flex-col">
     @if (loading()) {
     <div class="flex flex-1 flex-col items-center justify-center gap-2.5 px-3 py-6 text-center">

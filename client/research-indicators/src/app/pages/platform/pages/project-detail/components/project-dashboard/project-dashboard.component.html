@@ -1,13 +1,5 @@
 <section class="block flex w-full flex-col gap-6 p-1">
-  <div class="flex items-center gap-3 border-l-[5px] border-l-[#074b86] bg-[#fafafa] px-3 py-3">
-    <i class="pi pi-info-circle text-[#074b86] !text-[18px]" aria-hidden="true"></i>
-    <p class="m-0 text-left font-['Barlow'] text-[14px] font-normal leading-[17px] text-[#777c83]">
-      The figures shown in this dashboard are based on results reported in the STAR platform. Some metrics rely on metadata that is currently
-      available for STAR results. Results imported from TIP, PRMS, and AICCRA are not yet enriched with the same metadata, so the level of detail
-      displayed in certain dashboard visualizations may vary depending on the source platform. We are actively working to make information from these
-      additional systems available with the same level of detail and consistency.
-    </p>
-  </div>
+
 
   @if (canAccessGroundingSetup() || showExecutiveOverview()) {
     <section class="overflow-hidden rounded-xl border border-[#e8ebed] bg-white shadow-xs">
@@ -241,10 +233,11 @@
     <div class="flex min-w-0 flex-col gap-5 lg:h-full lg:self-stretch">
       <!-- Results by indicator -->
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-stretch">
-        <div class="flex flex-1">
+        <div class="flex flex-1 lg:col-span-2">
           <app-project-dashboard-card
             title="Top partner institution"
             description="Partner institutions most frequently linked to results on this primary project."
+            notice="This chart currently shows STAR, PRMS, and AICCRA data only. TIP data will be added soon."
             class="h-full w-full"
             iconClass="pi pi-building"
             [compact]="true"
@@ -255,23 +248,6 @@
             [items]="partnerItems()"
             layout="rows-partners"
             (retry)="topPartners.update()">
-          </app-project-dashboard-card>
-        </div>
-
-        <div class="flex flex-1">
-          <app-project-dashboard-card
-            title="Top primary levers"
-            description="Primary levers most frequently linked to results on this project."
-            class="h-full w-full"
-            iconClass="pi pi-sliders-h"
-            [compact]="true"
-            [loading]="topPrimaryLevers.loading()"
-            [error]="topPrimaryLevers.loadError()"
-            [empty]="leversEmpty()"
-            emptyMessage="No primary levers were found for this project."
-            [items]="leverItems()"
-            layout="rows-stacked-lever"
-            (retry)="topPrimaryLevers.update()">
           </app-project-dashboard-card>
         </div>
 
@@ -293,21 +269,20 @@
           </app-project-dashboard-card>
         </div>
 
-        <div class="flex lg:flex-1 [&>*]:w-full">
+        <div class="flex flex-1">
           <app-project-dashboard-card
-            title="Top contributing projects"
-            description="Top projects contributing to results where this project is the primary project."
+            title="Top primary levers"
+            description="Primary levers most frequently linked to results on this project."
             class="h-full w-full"
-            iconClass="pi pi-briefcase"
+            iconClass="pi pi-sliders-h"
             [compact]="true"
-            [loading]="topContributors.loading()"
-            [error]="topContributors.loadError()"
-            [empty]="contributorsEmpty()"
-            emptyMessage="No contributor projects were found."
-            [items]="contributorItems()"
+            [loading]="topPrimaryLevers.loading()"
+            [error]="topPrimaryLevers.loadError()"
+            [empty]="leversEmpty()"
+            emptyMessage="No primary levers were found for this project."
+            [items]="leverItems()"
             layout="rows-stacked-lever"
-            [itemHeightPx]="43"
-            (retry)="topContributors.update()">
+            (retry)="topPrimaryLevers.update()">
           </app-project-dashboard-card>
         </div>
       </div>

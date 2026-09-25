@@ -588,11 +588,9 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should not show toast when 400 comes from /pool-funding-tag (bilateral inline-error path)', done => {
-    const poolFundingTagRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag',
-      { is_pool_funding_contributor: true }
-    );
+    const poolFundingTagRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag', {
+      is_pool_funding_contributor: true
+    });
     const errorResponse = new HttpErrorResponse({
       error: { description: 'This contract is not bilateral. Only bilateral contracts can carry the Pool Funding tag.', errors: null },
       status: 400,
@@ -615,11 +613,9 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should still show toast for non-400 errors from /pool-funding-tag', done => {
-    const poolFundingTagRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag',
-      { is_pool_funding_contributor: true }
-    );
+    const poolFundingTagRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag', {
+      is_pool_funding_contributor: true
+    });
     const errorResponse = new HttpErrorResponse({
       error: { errors: 'Server exploded' },
       status: 500,
@@ -647,12 +643,49 @@ describe('httpErrorInterceptor', () => {
     });
   });
 
-  it('should not show toast when 400 comes from /pool-funding-alignment (bilateral inline-error path)', done => {
-    const poolFundingAlignmentRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/results/RES-001/pool-funding-alignment',
-      { has_contribution: true, lever_codes: [] }
+  // --- PRMS sync owns its own error UX (2026-09-18) --------------------------
+  // result-sidebar shows a friendly modal for every PRMS sync failure. Without
+  // these suppressions the interceptor stacked a second, technical toast on top.
+
+  const prmsSyncFailure = (status: number, body: unknown, done: jest.DoneCallback) => {
+    const request = new HttpRequest('POST', 'http://test.com/api/results/19998/prms-sync', {});
+    const errorResponse = new HttpErrorResponse({ error: body, status, statusText: 'Error' });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(request, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: error => {
+        expect(error).toBe(errorResponse);
+        // Still TRACKED -- suppressing the toast must not suppress the reporting.
+        expect(mockApiService.saveErrors).toHaveBeenCalled();
+        expect(mockActionsService.showToast).not.toHaveBeenCalled();
+        done();
+      }
+    });
+  };
+
+  it('should not show toast when /prms-sync is refused with 422', done => {
+    prmsSyncFailure(
+      422,
+      { description: "Missing mandatory field 'actors'", errors: null },
+      done
     );
+  });
+
+  it('should not show toast when /prms-sync fails with 503 (transport, no errors key)', done => {
+    // Status is deliberately NOT part of the suppression: narrowing it to 422
+    // would let the transport failures leak a toast back on top of the modal.
+    prmsSyncFailure(503, { description: 'Service Unavailable' }, done);
+  });
+
+  it('should not show toast when 400 comes from /pool-funding-alignment (bilateral inline-error path)', done => {
+    const poolFundingAlignmentRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/results/RES-001/pool-funding-alignment', {
+      has_contribution: true,
+      lever_codes: []
+    });
     const errorResponse = new HttpErrorResponse({
       error: { description: 'At least one lever is required when has_contribution=true.', errors: null },
       status: 400,
@@ -675,11 +708,10 @@ describe('httpErrorInterceptor', () => {
   });
 
   it('should still show toast for non-400 errors from /pool-funding-alignment', done => {
-    const poolFundingAlignmentRequest = new HttpRequest(
-      'PATCH',
-      'http://test.com/api/v1/results/RES-001/pool-funding-alignment',
-      { has_contribution: true, lever_codes: ['L1'] }
-    );
+    const poolFundingAlignmentRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/results/RES-001/pool-funding-alignment', {
+      has_contribution: true,
+      lever_codes: ['L1']
+    });
     const errorResponse = new HttpErrorResponse({
       error: { errors: 'Server exploded' },
       status: 500,
