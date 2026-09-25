@@ -1,11 +1,62 @@
 # HANDOFF — Agresso / Staff Deactivation
 
-> **Paused 2026-09-16 by priority change.** Written to be picked up cold, by someone (or some model)
-> with none of this session's context.
+> **Paused 2026-09-16 by priority change. RESUMED 2026-09-25.** Written to be picked up cold, by
+> someone (or some model) with none of this session's context.
+
+---
+
+> ## ⚠️ SUPERSEDED IN PART — read [`MEASUREMENT-2026-09-25.md`](./MEASUREMENT-2026-09-25.md) first
+>
+> **Increment 1 HAS now been run** (Dev, 2026-09-25). §1's "never been run" and §6's blank table are
+> history, kept as the record of the state this file was written in. What the run settled:
+>
+> - **146 candidates** against an **activePopulation of 1985** — the C-3 ceiling (99) is breached at 7.36%, as §11 of the design predicted.
+> - **`D-3` / `RB-2` / `JS-1` are CLOSED: `EX-1` shields nobody.** Zero of 1985 active users carry `status_id = 4`, so the external exclusion is structurally inert, not merely unused. Increment 2 cannot rely on it.
+> - The run first aborted on `C-4` because the live row is named **`External Accepted`**, not `External`. Fixed by selecting on the id — **uncommitted**, per the barrier below.
+> - The 146 are four distinct cohorts, not one. **3 of them are active platform users who are not Agresso staff**, and 91 sit behind an Agresso-side question STAR cannot answer.
+>
+> **STANDING BARRIER (user ruling 2026-09-25): no commit on this work until it is validated with
+> real data that the right users are deactivated and no wrong ones are.** The list is with BI.
+>
+> `D-1` is **fixed — the deletion was approved 2026-09-25.** `D-2` (the ceiling) is informed but not
+> decided; `design.md` §25 handles it with a raise-then-restore pair.
+>
+> ---
+>
+> ### 🔖 WHERE THIS STANDS — updated 2026-09-25, end of session
+>
+> **`/akili-specify` is mid-flight. Phases 1 and 2 are DONE and user-approved. Phase 3 is next.**
+>
+> | Phase | State |
+> | --- | --- |
+> | 1 — `requirements.md` | ✅ Approved. Increment 2 is **Part II, §14–§23** |
+> | 2 — `design.md` | ✅ Approved. Increment 2 is **Part II, §17–§27** |
+> | Judgment Day | ✅ Ran. **Both judges REJECT** (`gemini-3.1-pro-high` + `gpt-5.6-terra`, neither Claude). 9 of 10 findings fixed; **re-judgment NOT run by user ruling**, so the fixes are unaudited. See `judgment.md` → *Round 2* |
+> | 3 — `tasks.md` | ⬜ **NOT STARTED — this is the next action** |
+>
+> **Resume with:**
+> ```
+> /akili-specify docs/specs/changes/agresso-staff-deactivation
+> ```
+> and tell it: *Phases 1 and 2 are complete and approved — go straight to Phase 3 (`tasks.md`) for
+> increment 2 only (Part II). Do not rewrite `requirements.md` or `design.md`.*
+>
+> **Five things a cold session must not re-derive:**
+>
+> 1. **🚫 NO COMMITS.** Standing user barrier: nothing is committed until it is validated with real data that the right users are deactivated and no wrong ones are. Everything below lives in the working tree only.
+> 2. **Increment 2 numbers from `R-AGD-008`.** Increment 1 owns `001…005` with *different meanings* and 39 live citations. `006`/`007` are **retired unused**. Never reuse them.
+> 3. **Budget is 6 tasks / ~1,150 LOC / 6 rounds** (`design.md` §24), re-counted after §17 found the draft was sized against an empty tree. It is **not** the draft's 10 / ~2,200.
+> 4. **`P-9` is the open High-impact premise** and no command in this repo can settle it — it is BI's call on the 2026-08-24 block. `P-11` is the other High row.
+> 5. **Uncommitted code changes already exist** for the `C-4` id fix: `sec-user-deactivation.repository.ts`, its spec, and `agresso-staff-tools.service.ts`. Green: 396 suites / 3,514 tests, mutation probe observed red.
+>
+> Read [`MEASUREMENT-2026-09-25.md`](./MEASUREMENT-2026-09-25.md) before anything else — it carries
+> the measured numbers and the three traps that produced a wrong answer first.
 
 ---
 
 ## 1. Start here
+
+> **Historical as of 2026-09-25 — the run described here has happened.** See the banner above.
 
 **Increment 1 is code-complete, committed, green — and has NEVER BEEN RUN.**
 
@@ -78,6 +129,12 @@ in the destructive branch.
 
 **Do not run a fresh Judgment Day on increment 1.** It is reviewed, and its findings are closed.
 
+> ⚠️ **The counters above are increment 1's and are now HISTORY.** Increment 2 ran its own round on
+> 2026-09-25: **both judges REJECT**, 10 findings merged, 9 applied, **re-judgment declined by the
+> user**. Its live counters are **1 fix round used of 2, 0 scoped re-judgments used of 2**, and the
+> transaction state is `escalated` — the REJECT was never retracted and **no judge has seen the
+> fixes**. Full ledger: `judgment.md` → *Round 2 — Increment 2 (Part II)*.
+
 ---
 
 ## 4. Resuming — in order
@@ -132,22 +189,42 @@ exclusion rules and three preconditions, each with a counter, a precedence and a
 
 ---
 
-## 6. Measurements — TO BE FILLED ON THE FIRST RUN
+## 6. Measurements — FILLED 2026-09-25 (first run)
+
+Full record, classification of the 146 and the traps hit while measuring:
+[`MEASUREMENT-2026-09-25.md`](./MEASUREMENT-2026-09-25.md).
 
 ```
-Date:                     ____________
+Date:                     2026-09-25
 Environment:              Dev
-deactivationCandidates:   ____________
-activePopulation:         ____________
-excludedExternal:         ____________   <-- if 0 with known externals, EX-1 discriminates nothing
-excludedSystemAdmin:      ____________
-excludedAmbiguous:        ____________
-excludedUnmatchable:      ____________
-shieldedBySkip:           ____________
-distinctCarnets:          ____________
-totalElements:            ____________
-deactivationAbortReason:  ____________   <-- absent on a healthy run
+deactivationCandidates:   146
+activePopulation:         1985
+excludedExternal:         0        <-- a REAL 0. EX-1 discriminates nothing: see M-1 below
+excludedSystemAdmin:      0
+excludedAmbiguous:        0
+excludedUnmatchable:      3
+shieldedBySkip:           []
+distinctCarnets:          2001
+totalElements:            2001
+deactivationAbortReason:  (absent — the pass completed)
 ```
+
+> **M-1 — the trap that makes this table readable.** A `C-4` abort returns the **empty report**:
+> `checkAborts` runs before candidates are computed, so `deactivationCandidates: 0` and
+> `excludedExternal: 0` on an aborted run are not measurements at all. The first trigger on
+> 2026-09-25 produced exactly that and was nearly read as "nobody to deactivate". **The
+> discriminator is `deactivationAbortReason` — absent above, so these figures are real.**
+
+Derived, and consistent — the counts reconcile without a remainder:
+
+```
+1985 active − 1835 matched                          = 150
+− 140 (d.gaviria's twin, shielded by the same key)  = 149
+− 3 excludedUnmatchable                             = 146   ✓
+```
+
+**C-3:** `max(0.05 × 1985, 10)` = **99**; 146 candidates = **7.36%** → ceiling breached, as
+`design.md` §11 step 3 said it would be on the first run. `D-2` is now informed but not decided.
 
 ---
 
@@ -185,6 +262,11 @@ measurement code, which is the check that mattered most.
 
 ## 9. One-line status
 
-**Increment 1: done, green, committed, unpushed, and unrun. Increment 2: not started, fully
-specified in the `.bak` drafts, undated — and until it ships, a departed employee keeps their
-account, their roles and their machine credentials.**
+> **Updated 2026-09-25.** Previous wording, now history: *"Increment 1: done, green, committed,
+> unpushed, and unrun."*
+
+**Increment 1: RUN (Dev, 2026-09-25) — 146 candidates of 1985 active, ceiling breached, `EX-1`
+proven to shield nobody. Its `C-4` fix is green but UNCOMMITTED under a standing no-commit barrier
+while BI verifies the list. Increment 2: not started, fully specified in the `.bak` drafts,
+undated — and until it ships, a departed employee keeps their account, their roles and their machine
+credentials.**

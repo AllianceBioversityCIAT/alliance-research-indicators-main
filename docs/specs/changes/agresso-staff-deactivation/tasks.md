@@ -219,3 +219,270 @@ A worker may run `npx prettier --write` on its own files; the Leader verifies. N
 - [x] Zero-delta fixture observed **red** under the injected-write mutation, then green
 - [x] Coverage thresholds still green (60% server floor)
 - [x] Increment 2 has a date
+
+---
+
+# PART II — Increment 2: The Write
+
+> **Added 2026-09-25.** Part I above is the shipped measurement increment; its `T-01…T-05` are `done`
+> and unchanged. Increment 2 starts at **`T-06`** — the same no-reuse rule the requirement IDs follow.
+>
+> 🚫 **NO COMMITS** until the standing barrier lifts (validated with real data that the right users
+> are deactivated and no wrong ones are).
+
+## 7. Execution arrangement — increment 2
+
+| Role | Host | Model |
+| --- | --- | --- |
+| Leader | Claude Code | `opus` (T1) — plans, adjudicates, re-measures. **Writes no production code** |
+| Implementer | Codex (`codex exec`) | `gpt-5.6-terra`, effort `medium`. *(Smoke-tested live 2026-09-25 — the `402 deactivated_workspace` recorded in `CLAUDE.md` for 2026-09-15 no longer applies)* |
+| Reviewer | Antigravity (`agy`) | `gemini-3.1-pro-high` — **never `*-flash`**, and never the Implementer's model |
+
+`T-06` is the exception: it is **already implemented in the working tree** by the Leader, so its
+Reviewer must be Antigravity and the author≠auditor separation holds on the model axis.
+
+## 8. Dependency graph — increment 2
+
+```
+T-06 (external status by id)  ── independent, already implemented
+T-07 (config + migration)  ──▶  T-09 (apply orchestration)
+T-08 (three write statements) ─▶  T-09
+                                   │
+                                   ├─▶ T-10 (summary fields)
+                                   └─▶ T-11 (fixture tier)  ◀── needs T-10 for its assertions
+```
+
+`T-07` and `T-08` are parallel-safe with each other (different files, no shared symbol). Everything
+else is sequential. **Both are in the server package, so per root `CLAUDE.md` §4.3 they may not be
+run as two concurrent full-suite measurements** — workers verify their own scope; the Leader
+re-measures the full suite after each reports.
+
+## 9. Task list — increment 2
+
+### T-06 — Resolve the external status by id, not by name
+
+- **Status:** `implemented (uncommitted) — awaiting Reviewer`
+- **Size:** XS · **Depends on:** none · **Review:** `full` — it reverts shipped behavior in a destructive-adjacent path
+- **Requirements:** `R-AGD-012` (AC.1–AC.4) · **Design:** §21.1, `DD-D13`, §23
+- **Skills:** `nestjs-expert`
+
+**Scope:** `sec-user-deactivation.repository.ts` — `EXTERNAL_STATUS_ID = 4`, selection by id,
+`C-4` abort retained for the absent-row case. Plus its spec.
+
+**Falsifier:** revert the filter to `row.name.trim().toLowerCase() === 'external'`.
+**Red run:** ✅ **already observed** — 3 tests red under that mutation, then restored and green.
+**Disqualifier:** a test that passes with a fixture whose external row is *named* `External` proves
+nothing about id selection — AC.3 exists to catch exactly that, and must itself be seen red.
+**Consumers:** `sec-user-deactivation.service.ts` (sole caller of `resolveExternalStatusId`); no
+other file references it. Sweep: `grep -rn resolveExternalStatusId --include="*.ts" src test` → 3
+hits, all inside this module.
+
+**Done:**
+- [ ] Reviewer PASS from Antigravity on the existing diff
+- [ ] AC.3's inverse test (a row named `External` at another id does **not** resolve) observed red under a mutation that selects by name
+
+---
+
+### T-07 — Config: four keys, typed enum, resolver with the failure asymmetry, and the seed migration
+
+- **Status:** `not-started`
+- **Size:** M · **Depends on:** none · **Review:** `full` — a wrong failure direction here disables the only volume defence
+- **Requirements:** `R-AGD-011` (AC.1–AC.4) · **Design:** §21
+- **Skills:** `nestjs-expert`, `error-handling-patterns`
+
+**Scope:** four `AppConfigKey` entries · `dto/deactivation-config.dto.ts` · a resolver reading via
+`dataSource.getRepository(AppConfig)` · migration `<ts>-seedStaffDeactivationConfig.ts` following
+`1786738949211-seedClarisaMappingPhase.ts` in shape.
+
+> ⚠️ **`AppConfigService` must not be imported.** It takes `CurrentUserUtil` (`Scope.REQUEST`) —
+> verified at `app-config.service.ts:23` — and the scope bubbles to the fire-and-forget controller.
+> The shape to copy is `mapping-phase.resolver.ts`, comment block *"SINGLETON-SCOPED BY DESIGN"*.
+
+**Falsifier:** flip **one** key's failure direction — make `DRY_RUN` fail loud, or
+`CEILING_FRACTION` fail safe. Each flip must redden a test that names that key. A single test
+asserting "config resolves" cannot distinguish the four.
+**Red run:** required per key, four separate reds, each on the behavioral assertion.
+**Disqualifier:** a migration test that only asserts the four `INSERT`s are *present* proves
+presence, not effect (`up`/`down` must be **executed** against the scratch schema). If
+`migration:test:bootstrap` has already run on the container, **do not re-run it** — it is not
+idempotent (`FP-49`); recover via `compose:test:down` → `up` → `bootstrap`.
+**Consumers:** `AppConfigKey` is read by 10 files (5 migrations, `pdf-viewer.service.ts`,
+`mapping-phase.resolver.ts` + spec, `prms-normalizer.service.ts`). Sweep as run:
+`grep -rln AppConfigKey --include="*.ts" src test`. **Adding enum members is additive** — no
+consumer pins the member list; confirm that before merging rather than assuming it.
+
+**Done:**
+- [ ] All four keys resolve, each failure direction asserted **separately** and each seen red
+- [ ] Migration `up()` then `down()` executed against the scratch schema; `down()` deletes exactly four rows
+- [ ] Re-running `up()` updates rather than duplicating (`ON DUPLICATE KEY UPDATE`)
+- [ ] `grep -rn "AppConfigService" src/domain/tools/agresso/staff/` → **zero hits**
+- [ ] Reviewer PASS
+
+---
+
+### T-08 — The three destructive statements
+
+- **Status:** `not-started`
+- **Size:** M · **Depends on:** none · **Parallel-safe with T-07** (different files)
+- **Review:** `full` — this is the only task in the spec that can destroy access
+- **Requirements:** `R-AGD-008` (AC.3–AC.5), `NFR-AGD-006`, `NFR-AGD-007` · **Design:** §19, §19.2, §19.3
+- **Skills:** `nestjs-expert`
+
+**Scope:** three methods on `sec-user-deactivation.repository.ts`, each taking `manager`, each
+chunked at `CHUNK = 50` with ids sorted ascending, each carrying `AND is_active = 1`.
+`app_secrets` via `manager.getRepository(AppSecret)` — **never** `AppSecretRepository`.
+
+**Falsifier — one per statement, three separate reds (`JG-2`):**
+1. Drop the `app_secrets` write → a test naming `app_secrets` reddens.
+2. Drop the `sec_user_roles` write → a test naming `sec_user_roles` reddens.
+3. Drop `AND is_active = 1` from any statement → a test asserting an already-inactive row is **not** rewritten and does **not** inflate the count reddens.
+
+**Red run:** all three observed, individually. **A falsification note covering `sec_users` alone
+does not discharge this task** — that is the exact shape `JG-2` was raised against.
+**Disqualifier:** a unit test over a mocked query builder **cannot represent SQL operator
+precedence**. Any `WHERE` combining `OR` and `AND` must be asserted against **generated SQL or a
+real database**, never against a call sequence (`KZ-001`). Chunk-count assertions over a set smaller
+than `CHUNK` are inert — use **120** ids, not 40 (`JR2-6`).
+**Consumers:** none yet — the methods are new and `apply()` (T-09) is their first caller.
+Sweep: `grep -rn "deactivateSecUsers\|deactivateSecUserRoles\|deactivateAppSecrets" src test` → 0
+hits before this task.
+
+**Done:**
+- [ ] Three falsifiers observed red, one per table
+- [ ] Sorted-id chunking asserted over **≥ 3 chunks**
+- [ ] `grep -rn "AppSecretRepository" src/domain/tools/agresso/staff/` → **zero hits**
+- [ ] `updated_by` behavior matches `DD-D12` (left NULL, and a test states so rather than asserting `updated_at`, which the engine writes regardless)
+- [ ] Reviewer PASS
+
+---
+
+### T-09 — `apply()`: gate order, C-3, dry-run, and no catch inside the callback
+
+- **Status:** `not-started`
+- **Size:** M · **Depends on:** `T-07`, `T-08` · **Review:** `full`
+- **Requirements:** `R-AGD-008` (AC.1, AC.2, AC.6), `R-AGD-009`, `R-AGD-010` · **Design:** §18, §18.1, §19.1, §19.4, §20.1
+- **Skills:** `nestjs-expert`, `systematic-debugging`
+
+**Scope:** a new `apply(measurement, config)` on `sec-user-deactivation.service.ts`. Gate order per
+§20.1: resolve config → evaluate C-3 → dry-run branch returns **before any transaction** → live
+branch enforces C-3 → transaction.
+
+> ⚠️ **`DD-D11`: the transaction callback contains no `try`/`catch` and returns a plain value.**
+> The sibling's `applyCreateAndGrant` returns from **inside** its own callback
+> (`sec-user-reconciler.service.ts:325`) — that is the shape an implementer reading the neighbouring
+> file will copy, and it is the one this task forbids. Error handling lives outside
+> `dataSource.transaction(...)`.
+
+**Falsifier:**
+1. Move the C-3 enforcement **before** the dry-run branch → the test asserting a dry run reports a breach instead of aborting reddens.
+2. Add a `try`/`catch` inside the callback → the test asserting zero committed rows after a second-chunk failure reddens.
+3. Open the transaction in dry-run → the `DataSource` spy assertion reddens.
+
+**Red run:** three, each on the behavioral assertion, not on setup.
+**Disqualifier:** asserting a zero row-delta does **not** prove no transaction was opened — that is
+the weaker claim `DD-D10` exists to avoid. **Assert on the `DataSource`** (`transaction` never
+called). A `catch`-detection test that greps the source is a presence-assertion and proves nothing
+about runtime behavior; the behavioral proof is the second-chunk rollback.
+**Consumers:** `agresso-staff-tools.service.ts` (T-10 wires it). No other caller.
+
+**Done:**
+- [ ] Gate order asserted: dry-run over a ceiling-breaching set reports and does **not** abort; the same input live **aborts and writes nothing**
+- [ ] `DataSource.transaction` proven **never called** in dry-run
+- [ ] Second-chunk failure leaves all three tables byte-identical, over a set of **120**
+- [ ] `grep -n "catch" ` over the callback body → zero hits **and** the behavioral rollback test green
+- [ ] Reviewer PASS
+
+---
+
+### T-10 — Summary fields and wiring
+
+- **Status:** `not-started`
+- **Size:** S · **Depends on:** `T-09` · **Review:** `checklist` — additive fields on an existing DTO
+- **Requirements:** `R-AGD-013` (AC.1–AC.4) · **Design:** §18, §19.4
+- **Skills:** `nestjs-expert`
+
+**Scope:** six fields on `sec-user-reconciliation-summary.dto.ts` (`ceiling`, `ceilingBreached`,
+`deactivated`, `rolesDeactivated`, `secretsDeactivated`; `dryRun` already exists as
+`deactivationDryRun`) and the stage-5b wiring in `agresso-staff-tools.service.ts`.
+
+**Falsifier:** report one combined `deactivated` count instead of three → the test asserting the
+three counts differ when the three tables change by different amounts reddens. *(A user with two
+role rows and one secret gives `1 / 2 / 1` — identical counts would hide a cascade bug.)*
+**Red run:** required, on a fixture whose three counts are **deliberately unequal**.
+**Disqualifier:** a fixture where all three counts coincide cannot discriminate a combined counter
+from three separate ones — that fixture is inert.
+**Consumers — sweep as run** (`grep -rln "deactivationCandidates\|activePopulation\|deactivationDryRun\|excludedExternal" --include="*.ts" src test`): `sec-user-deactivation.service.ts`,
+`agresso-staff-tools.service.ts`, `sec-user-reconciler.service.spec.ts`,
+`sec-user-deactivation.service.spec.ts`, `agresso-staff-tools.service.spec.ts`, and the DTO itself.
+**Six files, three of them specs that pin summary shape** — all six are part of this task's
+verification.
+
+**Done:**
+- [ ] Three counts asserted separately on a fixture where they differ
+- [ ] `abortReason` **absent**, not null, on success (AC.3) — asserted with `toHaveProperty` negation, not `toBeUndefined` on a spread object
+- [ ] All three consumer specs pass unmodified, or their modification is justified in `execution.md`
+- [ ] Reviewer PASS
+
+---
+
+### T-11 — Fixture tier: the cascade, the rollback, and the dry run, against a real database
+
+- **Status:** `not-started`
+- **Size:** L · **Depends on:** `T-10` · **Review:** `full`
+- **Requirements:** `R-AGD-008` AC.1/AC.2, `R-AGD-009` AC.1/AC.4 · **Design:** §19, §20.1 · Defect classes `D-10`…`D-14`
+- **Skills:** `nestjs-expert`, `tdd`
+
+**Scope:** `test/fixtures/agresso-staff-deactivation.fixture-spec.ts` against the scratch MySQL.
+
+> ⚠️ **Naming trap:** the file **must** end in `.fixture-spec.ts`. Named `.spec.ts` it is collected
+> by **neither** `npm test` nor `npm run test:fixtures` — a silent zero-tests pass (`FP-46`/`FP-49`
+> neighbourhood).
+> ⚠️ **No DDL against the shared scratch schema** (`FP-51`). Use `CREATE TEMPORARY TABLE` if a
+> different column type is needed.
+> ⚠️ Reserve a `result_official_code` band only if this fixture touches `results` — it should not.
+
+**Falsifier:** remove any one of the three writes and re-run → the corresponding table's assertion
+reddens against the real database.
+**Red run:** required for all three, plus the rollback case and the dry-run case.
+**Disqualifier:** **`npm test` is not evidence for anything in this task** — it runs with
+`rootDir: "src"` and never collects `test/fixtures/` (`KZ-017`). Only `npm run test:fixtures`
+counts. A green from the wrong runner is a zero-tests pass wearing a green badge.
+**Consumers:** none — new file.
+
+**Done:**
+- [ ] All three tables asserted after one live run, on real rows
+- [ ] Second-chunk failure over **120** accounts leaves all three byte-identical
+- [ ] Dry run changes **zero** rows and opens **no** transaction
+- [ ] Every falsifier observed red via `npm run test:fixtures`, never via `npm test`
+- [ ] Reviewer PASS
+
+---
+
+## 10. Testing expectations — increment 2
+
+| Tier | Command | What it can and cannot prove |
+| --- | --- | --- |
+| Unit | `npm test -- --silent` | Logic, gate order, config directions. **No database claim** (`rootDir: src`) |
+| Fixture | `npm run test:fixtures` | The only tier that evidences any §19 claim |
+| Lint | `npx eslint src test` — **bare** | `npm run lint` carries `--fix` and mutates (`K-001`) |
+| Types | `npx tsc --noEmit` | Catches what the runner erases |
+
+## 11. PR strategy
+
+~1,150 LOC exceeds the ~400-LOC single-PR threshold. **Three PRs**, each independently reviewable:
+
+| PR | Tasks | Boundary |
+| --- | --- | --- |
+| 1 | `T-06`, `T-07` | Config + the id fix. **Contains the migration** — reviewers should check `down()` first |
+| 2 | `T-08`, `T-09` | The write path. The destructive half; review this one cold and slowly |
+| 3 | `T-10`, `T-11` | Reporting + the real-database proof |
+
+## 12. Done definition — increment 2
+
+- [ ] `T-06` … `T-11` all `done` on a Reviewer PASS, each gate re-measured by the Leader rather than relayed
+- [ ] **`DO-1` applied and verified**: the eight accounts carry `status_id = 4`, and a dry run reports `excludedExternal = 8`, **not 0** — the only evidence anywhere that `EX-1` is live (`D-15`)
+- [ ] **BI has ruled on the 17 remaining `2026-08-24` accounts** (`P-9`, `OQ-D4`) — blocks rollout step 5, not the build
+- [ ] Every scenario and every `BUT` / `AND IT MUST` clause in `R-AGD-008`…`R-AGD-013` owned and green
+- [ ] `npm test -- --silent`, `npm run test:fixtures`, `npx eslint src test`, `npx tsc --noEmit` all green; coverage ≥ 60% **reported, not assumed**
+- [ ] Actuals compared against the §24 budget (6 tasks / ~1,150 LOC / 6 rounds); **any overrun escalated, not absorbed**
+- [ ] The no-commit barrier explicitly lifted by the user before anything is committed

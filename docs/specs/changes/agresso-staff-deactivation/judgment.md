@@ -198,3 +198,80 @@ reading the replacement rather than diffing what the replaced machinery *measure
 `JD-3` is the more valuable finding: a defect class the parent's three passes and two judges never
 reached, because every prior form was organised by pipeline stage and this one is a predicate/key
 mismatch. Both judges found it independently, from source, within the same round.
+
+---
+
+# Round 2 — Increment 2 (Part II), 2026-09-25
+
+**Target:** `requirements.md` §14–§22 · `design.md` §17–§27. Part I out of scope.
+**Protocol:** blind dual review, two judges, parallel, identical prompt, neither aware of the other.
+**author ≠ auditor across model families** — the design was authored by Claude Opus 5; neither judge is Claude.
+
+| Judge | Host | Model | Verdict |
+| --- | --- | --- | --- |
+| A | Antigravity | `gemini-3.1-pro-high` | **REJECT** — 2 SEVERE · 3 WARNING · 1 SUGGESTION |
+| B | Codex | `gpt-5.6-terra` | **REJECT** — 1 SEVERE · 3 WARNING · 1 SUGGESTION |
+
+## Premise Ledger — attacked at source by both, independently
+
+**P-1 … P-8: CONFIRMED by both judges**, each re-running or re-reading the citation itself. P-7's
+counts were re-derived independently by both (25 `.transaction(` sites; the single isolation hit is a
+comment). **P-9: `NOT_RE_RUN` by both**, each stating the correct reason — business legitimacy of
+eight human accounts is structurally unreachable by code search (`D-15`).
+
+The ledger survived the attack. No citation failed to reproduce.
+
+## Merged findings
+
+Severity below is the **Leader's merge**, not either judge's label. Every row marked *verified by
+Leader* was re-checked against the source before being accepted — agent findings are not taken at
+face value.
+
+| # | Finding | Raised by | Status |
+| --- | --- | --- | --- |
+| **JR2-1** | `MEASUREMENT` §3's four cohorts read as a partition of the 146 but leave **19 carnet-less `@cgiar.org` accounts classified by nothing** (11+3+22 = 36 of 55) | A (SEVERE) | **CONFIRMED — verified by Leader.** The 19 enumerated |
+| **JR2-2** | The dry-run a human approves is **not bound to the set the live run writes** — separate invocations, fresh fetch, no hash/window/equality gate. Missing ledger row | B (SEVERE) | **CONFIRMED — verified by Leader.** Real design gap |
+| **JR2-3** | §19's *"credentials die first … so a failure can never leave the account off with a live credential"* attributes to **statement order** an atomicity the **transaction boundary** already provides | A (SEVERE) | **CONFIRMED — verified by Leader.** False causal claim; order still earns its place for lock consistency (§19.2) |
+| **JR2-4** | The 2026-08-24 block remainder is **17, not 14** (22 − 5 exempt) | A (WARNING) | **CONFIRMED — verified by Leader** |
+| **JR2-5** | `requirements.md:707` says **22** transaction sites; `design.md` §19.2 says **25** and explains the drift — self-contradiction between this spec's own documents | B (WARNING) | **CONFIRMED — verified by Leader.** A forward-sweep failure (`K-003`) in the authoring pass |
+| **JR2-6** | The rollback scenario specifies **40 accounts failing on the second chunk**; `CHUNK = 50`, so 40 accounts produce **one** chunk. The falsifier cannot fire | B (WARNING) | **CONFIRMED — verified by Leader.** An inert fixture in the spec text |
+| **JR2-7** | `JD-8` is **restated as accepted risk, not discharged** — "operational discipline" is not an acceptance criterion | **BOTH** (B WARNING, A SUGGESTION) | **DUAL-CONFIRMED** |
+| **JR2-8** | The **163** `UNUSABLE_EMAIL` figure appears in requirements and design but **not in `MEASUREMENT`**, so no reader can corroborate it | **BOTH** (B SUGGESTION, A WARNING) | **DUAL-CONFIRMED.** *(A's derivation of 166 conflates skips with the 3 payload collisions; the figure 163 is correct — the record is what is missing)* |
+| **JR2-9** | The sibling's `applyCreateAndGrant` **returns from inside its own transaction callback** — the sole in-repo precedent justifying `DD-D11`/`JS-2` — and carries **no Premise Ledger row** | A (missing premise) | **CONFIRMED — verified by Leader** at `sec-user-reconciler.service.ts:325` |
+| **JR2-10** | Budget `≈400` implementation LOC is inflated; the work is "~50 lines" | A (WARNING) | **DISPUTED by Leader.** A's estimate ignores chunking, id validation, driver coercion and this repo's comment density. Recorded, not accepted |
+
+**Protocol note.** Neither SEVERE was raised by both judges, so none is auto-fix eligible under the
+two-judge gate. Six single-judge findings were nonetheless **independently verified by the Leader
+against source**, because arithmetic and a self-contradiction are matters of fact, not of judgment.
+`JR2-10` is the one finding the Leader disputes, and it is recorded rather than silently dropped.
+
+## Correction round 1 — applied 2026-09-25, **re-judgment NOT run** (user ruling: "fix only")
+
+Nine of the ten merged findings applied. `JR2-10` disputed and left unapplied, with its reason on the
+record. **The user elected "Fix only" over "Fix and re-judge", so round 2 was not run** — the lineage
+keeps **1 fix round and 1 scoped re-judgment** unspent. These fixes are therefore **unaudited**: no
+judge has seen them, and nothing here claims otherwise.
+
+| # | Applied as |
+| --- | --- |
+| JR2-1 | `MEASUREMENT` §3 — the cohorts no longer read as a partition; **group ⑤ added and enumerated** (19 ids), plus a fourth question for BI. The 19 are institutional, `Accepted`, carnet-less and login-less — larger than groups ① and ② combined |
+| JR2-2 | `design.md` §18 claim retracted in place; **new §19.4** with the bounds/non-bounds table; **`DD-D15`** accepts the divergence rather than preventing it, and says so; **`P-11`** added to the ledger; rollout residual assigned to the operator |
+| JR2-3 | The false causal claim corrected in **both** documents — atomicity is the transaction boundary's, the order buys lock consistency (§19.2) and nothing else |
+| JR2-4 | 14 → **17** in `design.md` §22 and `OQ-D4` |
+| JR2-5 | `requirements.md:707` 22 → **25**, with the drift reason inline |
+| JR2-6 | Rollback scenario 40 → **120 accounts**, which at `CHUNK = 50` is three chunks, so the second-chunk falsifier can actually fire |
+| JR2-7 | `JD-8` relabelled **NOT DISCHARGED** in both documents, with a named owner and the in-flight guard deferred to its own spec |
+| JR2-8 | `skippedUnusableEmail 163` added to `MEASUREMENT` §1, with the judge's `166` arithmetic corrected (163 skips + 3 collisions) |
+| JR2-9 | **`P-10`** added — the sibling's in-callback return, verified at `sec-user-reconciler.service.ts:325` |
+| JR2-10 | **NOT APPLIED — disputed.** The `~50 lines` estimate ignores chunking, id validation, driver coercion and this repo's comment density |
+
+**Correction Closure run in both directions.** Forward: every superseded value (`22 transaction
+sites`, `14 further`, `set of 40 accounts`, `die first and the account last`, `same set the live run
+retires`) greps to zero outside its own retraction note. Backward: no document cites a corrected
+section. Premise Ledger count line re-checked against its rows — **11 declared, 11 present**.
+
+**Part I verified byte-identical in both documents after every edit**, and the increment-1 citation
+counts are unchanged.
+
+**TRANSACTION STATE: `escalated`** — REJECT stands unretracted. Two judges rejected; the fixes were
+applied without re-judgment by explicit user ruling, so no judge has cleared them.
