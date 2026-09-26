@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Control lists</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Barlow,sans-serif;color:#4C5158;background:#f5f5f5}
+a{color:#035BA9}a:hover{color:#074B86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1120px; position: relative; display: flex; flex-direction: column; background: #f5f5f5; font-family: Barlow, sans-serif; color: #4C5158; overflow: hidden">
+
+<header style="height: 64px; flex-shrink: 0; background: #173F6F; display: flex; align-items: center; padding: 0 28px; gap: 36px; box-sizing: border-box">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #ffffff">STAR</div>
+<nav aria-label="Main" style="display: flex; gap: 30px; flex-grow: 1">
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Home</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Projects</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Center</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Dashboard</a>
+</nav>
+<a href="#" style="color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid #7C9CB9; border-radius: 9px; padding: 6px 14px">+ Create Result</a>
+<label for="nav-search" style="position: absolute; left: -9999px">Search results</label>
+<input id="nav-search" type="search" placeholder="Search a result" style="width: 240px; height: 30px; border-radius: 8px; border: 0; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div aria-label="Account" style="width: 32px; height: 32px; border-radius: 50%; background: #345B8F; color: #ffffff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center">HT</div>
+</header>
+
+<div style="display: flex; flex-grow: 1; min-height: 0">
+
+<aside style="width: 250px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #E8EBED; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">RESOURCES</div>
+<a href="#" style="font-size: 14px; color: #153C71; text-decoration: none; padding: 8px 0">About Indicators</a>
+<div style="height: 1px; background: #E8EBED; margin: 8px 0"></div>
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">ADMINISTRATION</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 10px 0 4px">
+<span>Center admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+</div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bulk upload</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">SDG Management</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
+<a href="PortfolioManagement.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Portfolio Management</a>
+<div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
+<a href="ControlledLists.dc.html" aria-current="page" style="font-size: 13px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 6px 8px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="OrgStructure.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="Main.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
+<span>System admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Control lists</h1>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 820px; line-height: 1.25">Manage the controlled vocabularies of the selected portfolio, grouped by category. They feed the Organizational Structure, the Strategy Framework and the KPI forms. Values in use cannot be deleted; deactivate them instead.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center">
+<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
+<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
+<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
+<option disabled="disabled">Portfolio 1 · 2010–2025 (not configured)</option>
+</select>
+<button type="button" onClick="{{newCategory}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">+ New category</button>
+</div>
+</div>
+
+<div style="display: flex; gap: 16px; flex-grow: 1; min-height: 0">
+
+<nav aria-label="Categories and lists" style="width: 300px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto">
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="2">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 6px 6px">
+<button type="button" onClick="{{c.toggle}}" aria-expanded="{{c.open}}" style="display: flex; align-items: center; gap: 6px; border: 0; background: transparent; padding: 0; cursor: pointer; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 700; color: #112F5C; text-align: left">
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({{c.rot}}deg)" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>{{c.name}}</button>
+<div style="display: flex; gap: 4px">
+<button type="button" onClick="{{c.edit}}" aria-label="{{c.editLabel}}" title="Edit category" style="width: 24px; height: 24px; border: 0; border-radius: 7px; background: #F4F7F9; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button>
+<button type="button" onClick="{{c.addList}}" aria-label="{{c.addLabel}}" title="Add list" style="width: 24px; height: 24px; border: 0; border-radius: 7px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</div>
+</div>
+<sc-if value="{{c.open}}" hint-placeholder-val="{{true}}">
+<sc-for list="{{c.lists}}" as="l" hint-placeholder-count="3">
+<button type="button" onClick="{{l.pick}}" aria-current="{{l.current}}" style="display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; border-radius: 8px; padding: 8px 10px 8px 24px; background: {{l.bg}}; color: #112F5C; font-family: Barlow, sans-serif; font-size: 13.5px; font-weight: {{l.weight}}; cursor: pointer; text-align: left">
+<span>{{l.name}}</span><span style="font-size: 12px; color: #6B7079; font-weight: 400">{{l.n}}</span>
+</button>
+</sc-for>
+<sc-if value="{{c.empty}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12px; color: #6B7079; padding: 4px 10px 4px 24px">No lists yet</span>
+</sc-if>
+</sc-if>
+</sc-for>
+</nav>
+
+<section aria-label="List values" style="flex-grow: 1; min-width: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<div style="padding: 14px 18px; border-bottom: 1px solid #E8EBED; display: flex; justify-content: space-between; align-items: flex-start; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">{{cur.catCaps}}</span>
+<h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #112F5C">{{cur.name}}</h2>
+<span style="font-size: 12.5px; color: #4C5158">{{cur.desc}}</span>
+<div style="display: flex; gap: 14px; font-size: 12px; color: #6B7079; flex-wrap: wrap">
+<span>System key: <strong style="color: #153C71">{{cur.key}}</strong></span>
+<span>Used by: <strong style="color: #153C71">{{cur.usedBy}}</strong></span>
+</div>
+</div>
+<div style="display: flex; gap: 8px; flex-shrink: 0">
+<button type="button" onClick="{{editList}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Edit list</button>
+<sc-if value="{{cur.canDelete}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{deleteList}}" style="height: 28px; border: 1px solid #F2B8C0; background: #ffffff; color: #B00020; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Delete list</button>
+</sc-if>
+</div>
+</div>
+
+<div style="padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
+<div style="display: flex; gap: 10px; align-items: center">
+<label for="val-search" style="position: absolute; left: -9999px">Find a value</label>
+<input id="val-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find a value by code, name or description" style="width: 340px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<span role="status" style="font-size: 12.5px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 4px 10px">{{toast}}</span>
+</sc-if>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{exportXls}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Export .xlsx</button>
+<button type="button" onClick="{{newValue}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ Add value</button>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 0 18px; border: 1px solid #E8EBED; border-radius: 6px">
+<table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
+<thead>
+<tr>
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="7">
+<th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
+<sc-if value="{{h.sortable}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 12px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
+</sc-if>
+<sc-if value="{{h.fixed}}" hint-placeholder-val="{{false}}">
+<div style="padding: 9px 12px; font-size: 13px; font-weight: 600; color: #112F5C; text-align: center">{{h.label}}</div>
+</sc-if>
+</th>
+</sc-for>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{t.rows}}" as="r" hint-placeholder-count="7">
+<tr>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; overflow: hidden"><span style="font-size: 12px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{r.code}}</span></td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{r.color}}; font-weight: 600">{{r.value}}</td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6B7079">{{r.desc}}</td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2">{{r.order}}</td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; color: {{r.useColor}}">{{r.inUseLabel}}</td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2"><span style="font-size: 11.5px; font-weight: 600; color: {{r.activeFg}}; background: {{r.activeBg}}; border-radius: 6px; padding: 2px 8px">{{r.activeLabel}}</span></td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #EEF0F2">
+<div style="display: flex; justify-content: center; gap: 6px">
+<button type="button" onClick="{{r.edit}}" aria-label="{{r.editLabel}}" title="Edit" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button>
+<button type="button" onClick="{{r.del}}" aria-label="{{r.delLabel}}" title="Delete" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #FBE3E6; color: #B00020; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg></button>
+</div>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<sc-if value="{{t.empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 40px; text-align: center; font-size: 13px; color: #6B7079">No values match. Add one with “+ Add value”.</div>
+</sc-if>
+</div>
+
+<div style="padding: 10px 18px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px">
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="page-size" style="color: #6B7079">Rows per page</label>
+<select id="page-size" value="{{t.size}}" onChange="{{t.setSize}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 6px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option>
+</select>
+<span style="color: #6B7079; margin-left: 8px">{{t.range}}</span>
+</div>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{t.pages}}" as="p" hint-placeholder-count="1">
+<button type="button" onClick="{{p.go}}" aria-label="{{p.aria}}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid #D1D6DA; background: {{p.bg}}; color: {{p.fg}}; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer">{{p.n}}</button>
+</sc-for>
+</div>
+</div>
+</section>
+
+</div>
+</main>
+</div>
+
+<sc-if value="{{hasModal}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
+<div role="dialog" aria-modal="true" aria-labelledby="m-title" style="width: 600px; background: #ffffff; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<div style="padding: 18px 26px 12px; border-bottom: 1px solid #E8EBED">
+<h2 id="m-title" style="margin: 0; font-size: 17px; color: #112F5C">{{m.title}}</h2>
+<span style="font-size: 12.5px; color: #6B7079">{{m.sub}}</span>
+</div>
+<div style="padding: 18px 26px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px">
+<sc-for list="{{m.fields}}" as="f" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span {{f.span}}">
+<sc-if value="{{f.isCheck}}" hint-placeholder-val="{{false}}">
+<label style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #112F5C; font-weight: 600; padding-top: 22px"><input type="checkbox" checked="{{f.checked}}" onChange="{{f.toggle}}">{{f.label}}</label>
+</sc-if>
+<sc-if value="{{f.notCheck}}" hint-placeholder-val="{{true}}">
+<label for="{{f.id}}" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.label}}</label>
+</sc-if>
+<sc-if value="{{f.isText}}" hint-placeholder-val="{{true}}">
+<input id="{{f.id}}" type="{{f.inputType}}" value="{{f.value}}" onChange="{{f.onChange}}" disabled="{{f.disabled}}" placeholder="{{f.placeholder}}" style="height: 32px; border: 1px solid {{f.border}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; box-sizing: border-box; background: {{f.bg}}">
+</sc-if>
+<sc-if value="{{f.isArea}}" hint-placeholder-val="{{false}}">
+<textarea id="{{f.id}}" rows="3" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.placeholder}}" style="border: 1px solid #B9C0C5; border-radius: 8px; padding: 8px 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; resize: vertical"></textarea>
+</sc-if>
+<sc-if value="{{f.isSelect}}" hint-placeholder-val="{{false}}">
+<select id="{{f.id}}" value="{{f.value}}" onChange="{{f.onChange}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
+<sc-for list="{{f.options}}" as="o" hint-placeholder-count="2"><option value="{{o.v}}">{{o.l}}</option></sc-for>
+</select>
+</sc-if>
+<sc-if value="{{f.hasError}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.error}}</span></sc-if>
+<sc-if value="{{f.hasHint}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #6B7079">{{f.hint}}</span></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="padding: 12px 26px 18px; display: flex; justify-content: flex-end; gap: 8px">
+<button type="button" onClick="{{closeModal}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{saveModal}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{hasConfirm}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
+<div role="dialog" aria-modal="true" aria-labelledby="del-title" style="width: 460px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<h2 id="del-title" style="margin: 0; font-size: 17px; color: #112F5C">{{c.title}}</h2>
+<p style="margin: 0; font-size: 13.5px; color: #4C5158; line-height: 1.45">{{c.body}}</p>
+<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px">
+<button type="button" onClick="{{closeConfirm}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{c.closeLabel}}</button>
+<sc-if value="{{c.canDelete}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{doDelete}}" style="height: 30px; border: 0; background: #B00020; color: #ffffff; border-radius: 9px; padding: 0 16px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Delete</button>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+const SEED = [
+  { id: 'kpi', name: 'Key Performance Indicators (KPIs)', desc: 'Values offered in the KPI forms of the Institutional Indicators module.', lists: [
+    { id: 'uom', key: 'kpi.unit_of_measure', name: 'Unit of measure', usedBy: 'KPI form › Unit of measure', prefix: 'UOM', desc: 'How a KPI value is expressed.', values: ['Percentage (%)', 'Count', 'Days', 'Score (0-100)', 'USD', 'Ratio', 'Yes/No'] },
+    { id: 'dir', key: 'kpi.direction', name: 'Direction', usedBy: 'KPI form › Direction', prefix: 'DIR', desc: 'Whether a higher, lower or stable value is the goal.', values: ['Increase', 'Decrease', 'Maintain within range'] },
+    { id: 'freq', key: 'kpi.measurement_frequency', name: 'Measurement frequency', usedBy: 'KPI form › Measurement frequency', prefix: 'FRQ', desc: 'How often a KPI is measured.', values: ['Monthly', 'Quarterly', 'Semi-annual', 'Annual'] },
+    { id: 'klv', key: 'kpi.level', name: 'KPI level', usedBy: 'KPI form › KPI level', prefix: 'KLV', desc: 'Strategic, tactical or operational scope of a KPI.', values: ['Strategic', 'Tactical', 'Operational'] },
+    { id: 'kty', key: 'kpi.type', name: 'KPI type', usedBy: 'KPI form › KPI type', prefix: 'KTY', desc: 'Institutional KPIs are shared; customized KPIs belong to one unit.', values: ['Institutional', 'Customized'] }
+  ] },
+  { id: 'org', name: 'Organizational structure', desc: 'Values used to build the organizational structure.', lists: [
+    { id: 'lvl', key: 'org.level', name: 'Organizational levels', usedBy: 'Organizational Structure › Level', prefix: 'L', desc: 'The four levels of the Alliance organizational structure. Level 3 is optional.',
+      rows: [['L1', 'Division', 'Top level (e.g. Research, Global Support, Regional)', 3], ['L2', 'Department', 'Departments and regions', 19], ['L3', 'Office', 'Optional grouping inside a department (e.g. HR Operations)', 1], ['L4', 'Unit', 'Operational units', 94]] }
+  ] }
+];
+const FILE = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+function seed() {
+  let k = 0;
+  return SEED.map(c => ({ id: c.id, name: c.name, desc: c.desc, lists: c.lists.map(l => ({ id: l.id, key: l.key, name: l.name, usedBy: l.usedBy, prefix: l.prefix, desc: l.desc, system: true,
+    values: l.rows ? l.rows.map((r, i) => ({ id: 'v' + (k++), code: r[0], value: r[1], desc: r[2], order: i + 1, active: true, inUse: r[3] }))
+      : l.values.map((v, i) => ({ id: 'v' + (k++), code: l.prefix + '-' + String(i + 1).padStart(2, '0'), value: v, desc: '', order: i + 1, active: true, inUse: 0 })) })) }));
+}
+function cmp(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' });
+}
+const COLS = [
+  { k: 'code', label: 'Code', w: 110 }, { k: 'value', label: 'Value', w: 220 }, { k: 'desc', label: 'Description', w: 340 },
+  { k: 'order', label: 'Order', w: 80 }, { k: 'inUse', label: 'In use', w: 100 }, { k: 'active', label: 'Active', w: 90 }, { k: '_a', label: 'Actions', w: 96, fixed: true }
+];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cats: seed(), cur: 'uom', open: { kpi: true, org: true }, sort: 'code', dir: 1, size: 10, page: 0, q: '', modal: null, confirm: null, toast: '', seq: 1 };
+  }
+  find(listId) { for (const c of this.state.cats) for (const l of c.lists) if (l.id === listId) return { cat: c, list: l }; return null; }
+  mutateList(listId, fn) { return this.state.cats.map(c => Object.assign({}, c, { lists: c.lists.map(l => l.id === listId ? fn(Object.assign({}, l)) : l) })); }
+  openModal(type, mode, id, extra) {
+    const s = this.state; const cur = this.find(s.cur);
+    let d = {};
+    if (type === 'value') {
+      const v = mode === 'edit' ? cur.list.values.find(x => x.id === id) : null;
+      const n = cur.list.values.length + 1;
+      d = v ? { code: v.code, value: v.value, desc: v.desc, order: String(v.order), active: v.active } : { code: cur.list.prefix + (cur.list.prefix === 'L' ? n : '-' + String(n).padStart(2, '0')), value: '', desc: '', order: String(n), active: true };
+    } else if (type === 'list') {
+      const l = mode === 'edit' ? cur.list : null;
+      d = l ? { name: l.name, key: l.key, desc: l.desc, cat: cur.cat.id } : { name: '', key: '', desc: '', cat: extra };
+    } else {
+      const c = mode === 'edit' ? s.cats.find(x => x.id === id) : null;
+      d = c ? { name: c.name, desc: c.desc } : { name: '', desc: '' };
+    }
+    this.setState({ modal: { type: type, mode: mode, id: id, d: d, errors: {} }, toast: '' });
+  }
+  setD(k, v) { const m = this.state.modal; const d = Object.assign({}, m.d); d[k] = v; this.setState({ modal: Object.assign({}, m, { d: d, errors: {} }) }); }
+  saveModal() {
+    const s = this.state; const m = s.modal; const d = m.d; const errors = {};
+    const cur = this.find(s.cur);
+    if (m.type === 'value') {
+      if (!String(d.code).trim()) errors.code = 'Required';
+      if (!String(d.value).trim()) errors.value = 'Required';
+      const others = cur.list.values.filter(v => v.id !== m.id);
+      if (!errors.code && others.some(v => v.code.toLowerCase() === d.code.trim().toLowerCase())) errors.code = 'This code already exists in the list';
+      if (!errors.value && others.some(v => v.value.toLowerCase() === d.value.trim().toLowerCase())) errors.value = 'This value already exists in the list';
+      if (Object.keys(errors).length) { this.setState({ modal: Object.assign({}, m, { errors: errors }) }); return; }
+      const rec = { code: d.code.trim(), value: d.value.trim(), desc: d.desc, order: Number(d.order) || 0, active: !!d.active };
+      const cats = this.mutateList(s.cur, l => { l.values = m.mode === 'edit' ? l.values.map(v => v.id === m.id ? Object.assign({}, v, rec) : v) : l.values.concat([Object.assign({ id: 'n' + s.seq, inUse: 0 }, rec)]); return l; });
+      this.setState({ cats: cats, modal: null, seq: s.seq + 1, toast: '“' + rec.value + '” ' + (m.mode === 'edit' ? 'saved.' : 'added.') });
+    } else if (m.type === 'list') {
+      if (!String(d.name).trim()) errors.name = 'Required';
+      if (m.mode === 'create' && !/^[a-z0-9_.]+$/.test(String(d.key))) errors.key = 'Use lower case, digits, “_” or “.” (e.g. kpi.data_source)';
+      if (Object.keys(errors).length) { this.setState({ modal: Object.assign({}, m, { errors: errors }) }); return; }
+      let cats;
+      if (m.mode === 'edit') {
+        const moving = d.cat !== cur.cat.id;
+        const updated = Object.assign({}, cur.list, { name: d.name.trim(), desc: d.desc });
+        cats = s.cats.map(c => {
+          let lists = c.lists.filter(l => !(moving && l.id === s.cur)).map(l => l.id === s.cur ? updated : l);
+          if (moving && c.id === d.cat) lists = lists.concat([updated]);
+          return Object.assign({}, c, { lists: lists });
+        });
+        this.setState({ cats: cats, modal: null, toast: 'List saved.' });
+      } else {
+        const id = 'L' + s.seq;
+        const nl = { id: id, key: d.key, name: d.name.trim(), desc: d.desc, usedBy: 'Not linked to a form yet', prefix: 'VAL', system: false, values: [] };
+        cats = s.cats.map(c => c.id === d.cat ? Object.assign({}, c, { lists: c.lists.concat([nl]) }) : c);
+        this.setState({ cats: cats, cur: id, modal: null, seq: s.seq + 1, page: 0, toast: 'List “' + nl.name + '” created.' });
+      }
+    } else {
+      if (!String(d.name).trim()) { this.setState({ modal: Object.assign({}, m, { errors: { name: 'Required' } }) }); return; }
+      if (m.mode === 'edit') this.setState({ cats: s.cats.map(c => c.id === m.id ? Object.assign({}, c, { name: d.name.trim(), desc: d.desc }) : c), modal: null, toast: 'Category saved.' });
+      else { const id = 'C' + s.seq; const o = Object.assign({}, s.open); o[id] = true; this.setState({ cats: s.cats.concat([{ id: id, name: d.name.trim(), desc: d.desc, lists: [] }]), open: o, modal: null, seq: s.seq + 1, toast: 'Category “' + d.name.trim() + '” created.' }); }
+    }
+  }
+  modalView() {
+    const s = this.state; const m = s.modal; if (!m) return null;
+    const cur = this.find(s.cur);
+    const F = (k, label, o) => {
+      const opt = o || {}; const err = m.errors[k] || '';
+      return { id: 'm-' + k, label: label + (opt.req ? ' *' : ''), span: opt.span || 2, isText: !opt.area && !opt.check && !opt.select, isArea: !!opt.area, isCheck: !!opt.check, notCheck: !opt.check, isSelect: !!opt.select,
+        inputType: opt.number ? 'number' : 'text', value: m.d[k] == null ? '' : String(m.d[k]), checked: !!m.d[k], disabled: !!opt.disabled, bg: opt.disabled ? '#F4F7F9' : '#ffffff',
+        placeholder: opt.ph || '', options: opt.select || [], error: err, hasError: !!err, border: err ? '#B00020' : '#B9C0C5', hint: opt.hint || '', hasHint: !!opt.hint && !err,
+        onChange: (e) => this.setD(k, e.target.value), toggle: () => this.setD(k, !m.d[k]) };
+    };
+    if (m.type === 'value') return { title: m.mode === 'edit' ? 'Edit value' : 'Add value', sub: cur.cat.name + ' › ' + cur.list.name,
+      fields: [F('code', 'Code', { req: true, span: 1, hint: 'Unique in the list; editable.' }), F('order', 'Display order', { span: 1, number: true }), F('value', 'Value', { req: true, ph: 'e.g. Hours' }), F('desc', 'Description', { area: true, ph: 'Optional' }), F('active', 'Active — offered in forms', { check: true })] };
+    if (m.type === 'list') return { title: m.mode === 'edit' ? 'Edit list' : 'New list', sub: m.mode === 'edit' ? cur.list.name : 'A new list can be linked to a form field by the development team.',
+      fields: [F('name', 'List name', { req: true }), F('key', 'System key', { req: true, disabled: m.mode === 'edit', span: 1, hint: m.mode === 'edit' ? 'Fixed once created — code reads the list by this key.' : 'Fixed once created.' }), F('cat', 'Category', { span: 1, select: s.cats.map(c => ({ v: c.id, l: c.name })) }), F('desc', 'Description', { area: true })] };
+    return { title: m.mode === 'edit' ? 'Edit category' : 'New category', sub: 'Categories group lists by the part of the system that uses them.', fields: [F('name', 'Category name', { req: true }), F('desc', 'Description', { area: true })] };
+  }
+  renderVals() {
+    const s = this.state;
+    const cur = this.find(s.cur) || { cat: s.cats[0], list: s.cats[0].lists[0] };
+    const q = s.q.trim().toLowerCase();
+    let all = cur.list.values.filter(v => !q || (v.code + ' ' + v.value + ' ' + v.desc).toLowerCase().indexOf(q) >= 0);
+    all = all.slice().sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
+    const pc = Math.max(1, Math.ceil(all.length / s.size));
+    const page = Math.min(s.page, pc - 1);
+    const start = page * s.size;
+    const rows = all.slice(start, start + s.size).map(v => ({
+      code: v.code, value: v.value, desc: v.desc || '—', order: v.order, inUseLabel: v.inUse ? v.inUse + ' records' : '0', useColor: v.inUse ? '#153C71' : '#6B7079',
+      color: v.active ? '#112F5C' : '#6B7079', activeLabel: v.active ? 'Yes' : 'No', activeFg: v.active ? '#1F4E24' : '#4C5158', activeBg: v.active ? '#D3E7D5' : '#E8EBED',
+      editLabel: 'Edit ' + v.value, delLabel: 'Delete ' + v.value,
+      edit: () => this.openModal('value', 'edit', v.id), del: () => this.setState({ confirm: { kind: 'value', id: v.id } })
+    }));
+    const pages = []; for (let i = 0; i < pc; i++) pages.push({ n: i + 1, aria: 'Page ' + (i + 1), bg: i === page ? '#035BA9' : '#ffffff', fg: i === page ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) });
+    const headers = COLS.map(c => {
+      const on = s.sort === c.k;
+      return { label: c.label, w: c.w, sortable: !c.fixed, fixed: !!c.fixed, icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none',
+        sort: () => this.setState({ sort: c.k, dir: on ? -s.dir : 1, page: 0 }) };
+    });
+    let c = { title: '', body: '', closeLabel: 'Cancel', canDelete: false };
+    if (s.confirm) {
+      if (s.confirm.kind === 'value') {
+        const v = cur.list.values.find(x => x.id === s.confirm.id);
+        if (v && v.inUse) c = { title: 'Cannot delete “' + v.value + '”', body: 'It is used by ' + v.inUse + ' records. Edit it and untick “Active” instead: it stops appearing in new forms and stays on existing records.', closeLabel: 'Close', canDelete: false };
+        else if (v) c = { title: 'Delete “' + v.value + '”?', body: 'It is not used anywhere, so it will be removed from ' + cur.list.name + ' permanently.', closeLabel: 'Cancel', canDelete: true };
+      } else c = { title: 'Delete list “' + cur.list.name + '”?', body: cur.list.values.length ? 'Remove its ' + cur.list.values.length + ' values first.' : 'The list is empty and not linked to any form.', closeLabel: cur.list.values.length ? 'Close' : 'Cancel', canDelete: !cur.list.values.length };
+    }
+    return {
+      cats: s.cats.map(cat => ({ name: cat.name, open: !!s.open[cat.id], rot: s.open[cat.id] ? 90 : 0, empty: cat.lists.length === 0, editLabel: 'Edit category ' + cat.name, addLabel: 'Add a list to ' + cat.name,
+        toggle: () => { const o = Object.assign({}, this.state.open); o[cat.id] = !o[cat.id]; this.setState({ open: o }); },
+        edit: () => this.openModal('category', 'edit', cat.id), addList: () => this.openModal('list', 'create', null, cat.id),
+        lists: cat.lists.map(l => ({ name: l.name, n: l.values.length, bg: l.id === s.cur ? '#E3ECF6' : 'transparent', weight: l.id === s.cur ? 700 : 500, current: l.id === s.cur ? 'page' : 'false',
+          pick: () => this.setState({ cur: l.id, page: 0, q: '', toast: '' }) })) })),
+      cur: { catCaps: cur.cat.name.toUpperCase(), name: cur.list.name, desc: cur.list.desc, key: cur.list.key, usedBy: cur.list.usedBy, canDelete: !cur.list.system },
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value, page: 0 }),
+      t: { headers: headers, rows: rows, empty: all.length === 0, pages: pages, size: String(s.size), range: all.length ? (start + 1) + '–' + Math.min(start + s.size, all.length) + ' of ' + all.length : '0 values',
+        setSize: (e) => this.setState({ size: Number(e.target.value), page: 0 }) },
+      hasToast: !!s.toast, toast: s.toast,
+      exportXls: () => this.setState({ toast: 'Exported ' + all.length + ' values to control-list_' + FILE(cur.list.name) + '.xlsx' }),
+      newValue: () => this.openModal('value', 'create'), editList: () => this.openModal('list', 'edit'), newCategory: () => this.openModal('category', 'create'),
+      deleteList: () => this.setState({ confirm: { kind: 'list' } }),
+      hasModal: !!s.modal, m: this.modalView() || { title: '', sub: '', fields: [] },
+      closeModal: () => this.setState({ modal: null }), saveModal: () => this.saveModal(),
+      hasConfirm: !!s.confirm, c: c, closeConfirm: () => this.setState({ confirm: null }),
+      doDelete: () => {
+        if (s.confirm.kind === 'value') { const v = cur.list.values.find(x => x.id === s.confirm.id); this.setState({ cats: this.mutateList(s.cur, l => { l.values = l.values.filter(x => x.id !== s.confirm.id); return l; }), confirm: null, toast: '“' + v.value + '” deleted.' }); }
+        else { const first = s.cats[0].lists[0].id; this.setState({ cats: s.cats.map(ct => Object.assign({}, ct, { lists: ct.lists.filter(l => l.id !== s.cur) })), cur: first, confirm: null, toast: 'List deleted.' }); }
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

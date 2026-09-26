@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Portfolio management</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Barlow,sans-serif;color:#4C5158;background:#f5f5f5}
+a{color:#035BA9}a:hover{color:#074B86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1120px; position: relative; display: flex; flex-direction: column; background: #f5f5f5; font-family: Barlow, sans-serif; color: #4C5158; overflow: hidden">
+
+<header style="height: 64px; flex-shrink: 0; background: #173F6F; display: flex; align-items: center; padding: 0 28px; gap: 36px; box-sizing: border-box">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #ffffff">STAR</div>
+<nav aria-label="Main" style="display: flex; gap: 30px; flex-grow: 1">
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Home</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Projects</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Center</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Dashboard</a>
+</nav>
+<a href="#" style="color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid #7C9CB9; border-radius: 9px; padding: 6px 14px">+ Create Result</a>
+<label for="nav-search" style="position: absolute; left: -9999px">Search results</label>
+<input id="nav-search" type="search" placeholder="Search a result" style="width: 240px; height: 30px; border-radius: 8px; border: 0; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div aria-label="Account" style="width: 32px; height: 32px; border-radius: 50%; background: #345B8F; color: #ffffff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center">HT</div>
+</header>
+
+<div style="display: flex; flex-grow: 1; min-height: 0">
+
+<aside style="width: 250px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #E8EBED; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">RESOURCES</div>
+<a href="#" style="font-size: 14px; color: #153C71; text-decoration: none; padding: 8px 0">About Indicators</a>
+<div style="height: 1px; background: #E8EBED; margin: 8px 0"></div>
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">ADMINISTRATION</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 10px 0 4px">
+<span>Center admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+</div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bulk upload</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">SDG Management</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
+<a href="PortfolioManagement.dc.html" aria-current="page" style="font-size: 13.5px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 7px 10px; background: #F4F7F9; border-radius: 8px">Portfolio Management</a>
+<div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
+<a href="ControlledLists.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="OrgStructure.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="Main.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
+<span>System admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Portfolio management</h1>
+<p style="margin: 0; max-width: 760px; font-size: 14px; color: #777C83; line-height: 1.2">Create and maintain the portfolios used to support the Alliance strategy periods and their related system adjustments.</p>
+</div>
+<div style="display: flex; flex-direction: column; background: #ffffff">
+<div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px">
+<label for="pf-search" style="position: absolute; left: -9999px">Search portfolios</label>
+<input id="pf-search" type="search" placeholder="Find a portfolio by name, description or dates" style="width: 400px; height: 27px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; color: #6B7280; box-sizing: border-box">
+<button type="button" style="height: 27px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ Create portfolio</button>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #E8EBED">
+<thead><tr style="color: #112F5C; font-weight: 500">
+<th scope="col" style="text-align: left; padding: 10px 14px; border: 1px solid #E8EBED; width: 220px; font-weight: 500">Portfolio name ↕</th>
+<th scope="col" style="text-align: left; padding: 10px 14px; border: 1px solid #E8EBED; font-weight: 500">Portfolio description</th>
+<th scope="col" style="text-align: left; padding: 10px 14px; border: 1px solid #E8EBED; width: 130px; font-weight: 500">Start date ↕</th>
+<th scope="col" style="text-align: left; padding: 10px 14px; border: 1px solid #E8EBED; width: 130px; font-weight: 500">End date ↕</th>
+<th scope="col" style="text-align: center; padding: 10px 14px; border: 1px solid #E8EBED; width: 100px; font-weight: 500">Actions</th>
+</tr></thead>
+<tbody style="color: #4C5158">
+<tr><td style="padding: 10px 14px; border: 1px solid #E8EBED">Portfolio 1</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">Description 1</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">2010</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">2025</td><td style="padding: 6px 14px; border: 1px solid #E8EBED"><div style="display: flex; justify-content: center"><button type="button" aria-label="Edit portfolio" title="Edit portfolio" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button></div></td></tr>
+<tr><td style="padding: 10px 14px; border: 1px solid #E8EBED">Portfolio 2</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">Description 2</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">2026</td><td style="padding: 10px 14px; border: 1px solid #E8EBED">2030</td><td style="padding: 6px 14px; border: 1px solid #E8EBED"><div style="display: flex; justify-content: center"><button type="button" aria-label="Edit portfolio" title="Edit portfolio" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button></div></td></tr>
+</tbody>
+</table>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Organizational structure</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Barlow,sans-serif;color:#4C5158;background:#f5f5f5}
+a{color:#035BA9}a:hover{color:#074B86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1120px; position: relative; display: flex; flex-direction: column; background: #f5f5f5; font-family: Barlow, sans-serif; color: #4C5158; overflow: hidden">
+
+<header style="height: 64px; flex-shrink: 0; background: #173F6F; display: flex; align-items: center; padding: 0 28px; gap: 36px; box-sizing: border-box">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #ffffff">STAR</div>
+<nav aria-label="Main" style="display: flex; gap: 30px; flex-grow: 1">
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Home</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Projects</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Center</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Dashboard</a>
+</nav>
+<a href="#" style="color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid #7C9CB9; border-radius: 9px; padding: 6px 14px">+ Create Result</a>
+<label for="nav-search" style="position: absolute; left: -9999px">Search results</label>
+<input id="nav-search" type="search" placeholder="Search a result" style="width: 240px; height: 30px; border-radius: 8px; border: 0; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div aria-label="Account" style="width: 32px; height: 32px; border-radius: 50%; background: #345B8F; color: #ffffff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center">HT</div>
+</header>
+
+<div style="display: flex; flex-grow: 1; min-height: 0">
+
+<aside style="width: 250px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #E8EBED; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">RESOURCES</div>
+<a href="#" style="font-size: 14px; color: #153C71; text-decoration: none; padding: 8px 0">About Indicators</a>
+<div style="height: 1px; background: #E8EBED; margin: 8px 0"></div>
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">ADMINISTRATION</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 10px 0 4px">
+<span>Center admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+</div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bulk upload</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">SDG Management</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
+<a href="PortfolioManagement.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Portfolio Management</a>
+<div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
+<a href="ControlledLists.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="OrgStructure.dc.html" aria-current="page" style="font-size: 13px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 6px 8px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="Main.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
+<span>System admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Organizational structure</h1>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 780px; line-height: 1.25">Level 1 Division › Level 2 Department › Level 3 Office (optional) › Level 4 Unit. Every entry keeps a permanent ID, so linked data follows it through renames and moves; changes take effect from a date and stay in its history.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center">
+<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
+<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
+<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
+<option disabled="disabled">Portfolio 1 · 2010–2025 (not configured)</option>
+</select>
+</div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 8px 12px">
+<div style="display: flex; gap: 14px; align-items: center">
+<div role="group" aria-label="View" style="display: flex; background: #F4F7F9; border-radius: 9px; padding: 3px; gap: 3px">
+<button type="button" onClick="{{showTree}}" aria-pressed="{{isTree}}" style="height: 26px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{treeBg}}; color: {{treeFg}}">Tree</button>
+<button type="button" onClick="{{showTable}}" aria-pressed="{{isTable}}" style="height: 26px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{tableBg}}; color: {{tableFg}}">Table</button>
+</div>
+<label for="asof" style="font-size: 12.5px; color: #112F5C; font-weight: 600">Structure as of</label>
+<input id="asof" type="date" value="{{asOf}}" onChange="{{onAsOf}}" min="2026-01-01" max="2030-12-31" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px">
+<sc-if value="{{notToday}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{toToday}}" style="height: 26px; border: 0; background: transparent; color: #035BA9; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer; text-decoration: underline">Back to today</button>
+</sc-if>
+<label style="display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #4C5158"><input type="checkbox" onChange="{{toggleFlagged}}" checked="{{onlyFlagged}}">Only KPI-managing entries</label>
+<label style="display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #4C5158"><input type="checkbox" onChange="{{toggleClosed}}" checked="{{showClosed}}">Show closed</label>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{exportXls}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Export .xlsx</button>
+<button type="button" onClick="{{addDivision}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ Level 1 Division</button>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{counts}}" as="k" hint-placeholder-count="5">
+<div style="background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 8px 14px"><div style="font-size: 12px; color: #6B7079">{{k.label}}</div><div style="font-size: 20px; font-weight: 700; color: #112F5C">{{k.n}}</div></div>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 16px; flex-grow: 1; min-height: 0">
+
+<section aria-label="Organizational entries" style="flex-grow: 1; min-width: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="margin: 10px 12px 0; font-size: 12.5px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 7px 12px; line-height: 1.4">{{toast}}</div>
+</sc-if>
+
+<sc-if value="{{isTree}}" hint-placeholder-val="{{true}}">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 160px 56px 40px; font-size: 13px; font-weight: 600; color: #112F5C; background: #F4F7F9; border-bottom: 1px solid #E8EBED; margin-top: 10px">
+<div style="padding: 9px 14px">Name</div><div style="padding: 9px 8px">Code</div><div style="padding: 9px 8px">Level</div><div style="padding: 9px 8px">Responsible director</div><div style="padding: 9px 8px">KPIs</div><div></div>
+</div>
+<div style="flex-grow: 1; overflow-y: auto">
+<sc-for list="{{tree}}" as="r" hint-placeholder-count="18">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 160px 56px 40px; align-items: center; min-height: 34px; border-bottom: 1px solid #EEF0F2; background: {{r.bg}}; font-size: 13px">
+<div style="display: flex; align-items: center; gap: 6px; padding-left: {{r.pad}}px; min-width: 0">
+<sc-if value="{{r.hasKids}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{r.toggle}}" aria-label="{{r.toggleLabel}}" aria-expanded="{{r.open}}" style="width: 22px; height: 22px; border: 0; background: transparent; color: #112F5C; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({{r.rot}}deg)" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+</sc-if>
+<sc-if value="{{r.noKids}}" hint-placeholder-val="{{false}}"><span style="width: 22px; flex-shrink: 0"></span></sc-if>
+<button type="button" onClick="{{r.pick}}" style="border: 0; background: transparent; padding: 6px 0; cursor: pointer; text-align: left; font-family: Barlow, sans-serif; font-size: 13px; color: {{r.color}}; font-weight: {{r.weight}}; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</button>
+<sc-if value="{{r.hasAcr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; font-weight: 600; color: #153C71; flex-shrink: 0">{{r.acr}}</span></sc-if>
+<sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #6B7079; flex-shrink: 0">{{r.count}}</span></sc-if>
+<sc-if value="{{r.closed}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 1px 6px; flex-shrink: 0">Closed</span></sc-if>
+<sc-if value="{{r.changed}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #153C71; background: #EAF1F8; border-radius: 5px; padding: 1px 6px; flex-shrink: 0">{{r.changedLabel}}</span></sc-if>
+</div>
+<div style="padding: 0 8px; font-size: 12px; color: #035BA9; font-weight: 600">{{r.code}}</div>
+<div style="padding: 0 8px; color: #4C5158; font-size: 12.5px">{{r.levelLabel}}</div>
+<div style="padding: 0 8px; color: #4C5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dir}}</div>
+<div style="padding: 0 8px"><sc-if value="{{r.flag}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; font-weight: 600; color: #1F4E24; background: #D3E7D5; border-radius: 6px; padding: 2px 7px">Yes</span></sc-if></div>
+<div style="padding: 0 4px"><sc-if value="{{r.canAdd}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{r.add}}" aria-label="{{r.addLabel}}" title="{{r.addLabel}}" style="width: 24px; height: 24px; border: 0; border-radius: 7px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+</sc-if></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{isTable}}" hint-placeholder-val="{{false}}">
+<div style="padding: 10px 12px 0">
+<label for="org-search" style="position: absolute; left: -9999px">Find an entry</label>
+<input id="org-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name, acronym, parent or director" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 10px 12px 0; border: 1px solid #E8EBED; border-radius: 6px">
+<table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
+<thead><tr>
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="8">
+<th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
+<button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 10px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
+</th>
+</sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{t.rows}}" as="r" hint-placeholder-count="10">
+<tr style="background: {{r.bg}}">
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2"><button type="button" onClick="{{r.pick}}" style="border: 0; background: #EAF1F8; color: #035BA9; font-family: Barlow, sans-serif; font-size: 12px; font-weight: 700; border-radius: 5px; padding: 1px 6px; cursor: pointer">{{r.code}}</button></td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.levelLabel}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #112F5C; font-weight: 600">{{r.name}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.acr}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.parentName}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dir}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2">{{r.flagLabel}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">{{r.from}}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="padding: 8px 12px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px">
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="page-size" style="color: #6B7079">Rows per page</label>
+<select id="page-size" value="{{t.size}}" onChange="{{t.setSize}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 6px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option>
+</select>
+<span style="color: #6B7079; margin-left: 8px">{{t.range}}</span>
+</div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 420px">
+<sc-for list="{{t.pages}}" as="p" hint-placeholder-count="3">
+<button type="button" onClick="{{p.go}}" aria-label="{{p.aria}}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid #D1D6DA; background: {{p.bg}}; color: {{p.fg}}; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer">{{p.n}}</button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</section>
+
+<section aria-label="Entry form" style="width: 430px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<sc-if value="{{hasForm}}" hint-placeholder-val="{{true}}">
+<div style="padding: 14px 18px 0; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; gap: 8px; align-items: center">
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{p.code}}</span></sc-if>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">{{p.levelCaps}}</span>
+</div>
+<h2 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">{{p.title}}</h2>
+<span style="font-size: 12.5px; color: #6B7079">{{p.path}}</span>
+<div role="tablist" aria-label="Entry sections" style="display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid #E8EBED">
+<button type="button" role="tab" aria-selected="{{onDetails}}" onClick="{{tabDetails}}" style="border: 0; background: transparent; padding: 8px 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; color: #112F5C; font-weight: {{detailsW}}; border-bottom: 3px solid {{detailsLine}}">Details</button>
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">
+<button type="button" role="tab" aria-selected="{{onHistory}}" onClick="{{tabHistory}}" style="border: 0; background: transparent; padding: 8px 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; color: #112F5C; font-weight: {{historyW}}; border-bottom: 3px solid {{historyLine}}">History ({{p.histCount}})</button>
+<button type="button" role="tab" aria-selected="{{onLinked}}" onClick="{{tabLinked}}" style="border: 0; background: transparent; padding: 8px 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; color: #112F5C; font-weight: {{linkedW}}; border-bottom: 3px solid {{linkedLine}}">Linked data</button>
+</sc-if>
+</div>
+</div>
+
+<div style="flex-grow: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 12px">
+<sc-if value="{{onDetails}}" hint-placeholder-val="{{true}}">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px">
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-code" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Code *</label>
+<input id="o-code" type="text" value="{{f.code}}" onChange="{{on.code}}" style="height: 32px; border: 1px solid {{f.codeBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<sc-if value="{{f.hasCodeErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.codeErr}}</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-level" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Level *</label>
+<select id="o-level" value="{{f.level}}" onChange="{{on.level}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
+<sc-for list="{{levels}}" as="l" hint-placeholder-count="4"><option value="{{l.v}}">{{l.l}}</option></sc-for>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
+<label for="o-name" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Name *</label>
+<input id="o-name" type="text" value="{{f.name}}" onChange="{{on.name}}" placeholder="Write the full name" style="height: 32px; border: 1px solid {{f.nameBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<sc-if value="{{f.hasNameErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">Required</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-acr" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Acronym</label>
+<input id="o-acr" type="text" value="{{f.acr}}" onChange="{{on.acr}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-parent" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.parentLabel}}</label>
+<select id="o-parent" value="{{f.parent}}" onChange="{{on.parent}}" disabled="{{f.parentDisabled}}" style="height: 32px; border: 1px solid {{f.parentBorder}}; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: {{f.parentBg}}">
+<option value="">{{f.parentEmpty}}</option>
+<sc-for list="{{f.parents}}" as="p" hint-placeholder-count="5"><option value="{{p.v}}">{{p.l}}</option></sc-for>
+</select>
+<sc-if value="{{f.hasParentErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.parentErr}}</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-dir" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Responsible director</label>
+<input id="o-dir" type="text" value="{{f.dir}}" onChange="{{on.dir}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="o-mail" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Director email</label>
+<input id="o-mail" type="email" value="{{f.email}}" onChange="{{on.email}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+</div>
+</div>
+<label style="display: flex; gap: 10px; align-items: flex-start; border: 1px solid #E8EBED; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #112F5C; cursor: pointer">
+<input type="checkbox" checked="{{f.flag}}" onChange="{{on.flag}}" style="margin-top: 2px">
+<span><strong>Manages institutional KPIs</strong> · Portfolio 2<br><span style="font-size: 12px; color: #6B7079">Offered as owner unit in the Strategy Framework and as reporting owner for KPIs.</span></span>
+</label>
+<sc-if value="{{f.showChange}}" hint-placeholder-val="{{false}}">
+<fieldset style="border: 1px solid #B0C4DD; background: #F4F8FC; border-radius: 8px; padding: 10px 12px; margin: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 12.5px; font-weight: 700; color: #112F5C; padding: 0 4px">How should this change be saved?</legend>
+<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #112F5C; cursor: pointer"><input type="radio" name="chg" checked="{{f.isChange}}" onChange="{{on.modeChange}}" style="margin-top: 2px"><span><strong>Organizational change</strong> — keep the old version in the history.<br><span style="font-size: 12px; color: #6B7079">{{f.changeHint}}</span></span></label>
+<sc-if value="{{f.isChange}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 8px; padding-left: 24px"><label for="o-eff" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Effective from *</label><input id="o-eff" type="date" value="{{f.eff}}" onChange="{{on.eff}}" min="{{f.effMin}}" style="height: 30px; border: 1px solid {{f.effBorder}}; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px"></div>
+<label style="display: flex; gap: 8px; align-items: flex-start; padding-left: 24px; font-size: 12.5px; color: #112F5C; cursor: pointer"><input type="checkbox" checked="{{f.backdate}}" onChange="{{on.backdate}}" style="margin-top: 2px"><span>Back-date — allow a date before the current version (from {{f.curFrom}})</span></label>
+<sc-if value="{{f.backdate}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B4A00; background: #FFF6E5; border: 1px solid #F0C877; border-radius: 8px; padding: 6px 10px; margin-left: 24px; line-height: 1.4">Reports for periods from that date will be recalculated with the new values.</span></sc-if>
+<sc-if value="{{f.hasEffErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600; padding-left: 24px">{{f.effErr}}</span></sc-if>
+</sc-if>
+<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #112F5C; cursor: pointer"><input type="radio" name="chg" checked="{{f.isCorrection}}" onChange="{{on.modeCorrection}}" style="margin-top: 2px"><span><strong>Correction</strong> — fix a typo or mistake; no history entry.</span></label>
+</fieldset>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{onHistory}}" hint-placeholder-val="{{false}}">
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0">
+<sc-for list="{{history}}" as="h" hint-placeholder-count="2">
+<li style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F2">
+<span style="width: 84px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #112F5C">{{h.date}}</span>
+<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
+<span style="font-size: 13px; color: #112F5C; font-weight: 600">{{h.title}}</span>
+<sc-for list="{{h.lines}}" as="x" hint-placeholder-count="1"><span style="font-size: 12.5px; color: #4C5158">{{x.t}}</span></sc-for>
+</div>
+</li>
+</sc-for>
+</ol>
+<p style="margin: 0; font-size: 12px; color: #6B7079; line-height: 1.4">Reports filtered to a date before a change use the version valid on that date. Use “Structure as of” to see the tree on any date.</p>
+</sc-if>
+
+<sc-if value="{{onLinked}}" hint-placeholder-val="{{false}}">
+<div style="font-size: 12.5px; color: #153C71; background: #F4F8FC; border: 1px solid #B0C4DD; border-radius: 8px; padding: 9px 12px; line-height: 1.45">Records link to the permanent ID <strong>{{p.pid}}</strong>, never to the name or the parent. When the entry is renamed or moved, its records follow it; from the effective date they count under the new parent.</div>
+<div style="display: flex; flex-direction: column; border: 1px solid #E8EBED; border-radius: 8px">
+<sc-for list="{{linked}}" as="l" hint-placeholder-count="5">
+<div style="display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #EEF0F2; font-size: 13px"><span style="color: #112F5C; font-weight: 600">{{l.label}}</span><span style="color: {{l.color}}; text-align: right">{{l.value}}</span></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="padding: 12px 18px; border-top: 1px solid #E8EBED; display: flex; justify-content: space-between; align-items: center">
+<div style="display: flex; gap: 6px">
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{askDelete}}" style="height: 30px; border: 1px solid #F2B8C0; background: #ffffff; color: #B00020; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Delete</button>
+<button type="button" onClick="{{askClose}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{p.closeLabel}}</button>
+</sc-if>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{cancel}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{save}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{noForm}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 40px; text-align: center">
+<h2 style="margin: 0; font-size: 16px; color: #112F5C">Select an entry to edit it</h2>
+<p style="margin: 0; font-size: 13px; color: #6B7079">Or use the + buttons in the tree to add an entry under its parent.</p>
+</div>
+</sc-if>
+</section>
+
+</div>
+</main>
+</div>
+
+<sc-if value="{{hasConfirm}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="width: 500px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<h2 id="dlg-title" style="margin: 0; font-size: 17px; color: #112F5C">{{c.title}}</h2>
+<p style="margin: 0; font-size: 13.5px; color: #4C5158; line-height: 1.45">{{c.body}}</p>
+<sc-if value="{{c.isClose}}" hint-placeholder-val="{{false}}">
+<div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px 12px; align-items: center">
+<label for="c-date" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Closed from *</label>
+<input id="c-date" type="date" value="{{c.date}}" onChange="{{c.onDate}}" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px">
+<label for="c-succ" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Successor (optional)</label>
+<select id="c-succ" value="{{c.succ}}" onChange="{{c.onSucc}}" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<option value="">None</option>
+<sc-for list="{{c.options}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for>
+</select>
+</div>
+<span style="font-size: 12px; color: #6B7079; line-height: 1.4">Use a successor for merges: from the closing date, records linked to this entry roll up to the successor. The records themselves are not changed.</span>
+</sc-if>
+<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px">
+<button type="button" onClick="{{closeConfirm}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{c.closeLabel}}</button>
+<sc-if value="{{c.canAct}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{c.act}}" style="height: 30px; border: 0; background: {{c.actBg}}; color: #ffffff; border-radius: 9px; padding: 0 16px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">{{c.actLabel}}</button>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+const TODAY = '2026-09-26';
+const START = '2026-01-01';
+const LEVELS = { L1: 'Level 1 · Division', L2: 'Level 2 · Department', L3: 'Level 3 · Office', L4: 'Level 4 · Unit' };
+const SHORT = { L1: 'Division', L2: 'Department', L3: 'Office', L4: 'Unit' };
+const ALLOWED = { L1: [], L2: ['L1'], L3: ['L2'], L4: ['L2', 'L3'] };
+function U(names) { return names.map(n => ({ name: n, level: 'L4' })); }
+const TREE = [
+  { id: 'research', name: 'Research', level: 'L1', kids: [
+    { name: 'Office of the Associate Director General, Research Strategy and Innovation', acr: 'ADG Research', level: 'L2', dir: 'Marcela Quintero', email: 'm.quintero@cgiar.org', flag: true, kids: U(['Impact SF', 'Gender']) },
+    { name: 'Digital Inclusion', level: 'L2', kids: U(['Inclusive Design and User Research', 'Digital Solution Development', 'Digital Transformation of Agri-food System', 'Data Driven Sustainability']) },
+    { name: 'Food Environment and Consumer Behaviour', level: 'L2', kids: U(['Food Environment and Consumer Behaviour']) },
+    { name: 'Policy, Inclusion and Socio-Economic Analyses for Impact and Learning', level: 'L2', kids: U(['Data Management and Open Science', 'MELP - Monitoring, Evaluation, Learning and Performance', 'Foresight and Applied Economics for Impact', 'Gender and Social Inclusion']) },
+    { name: 'Office for Program Delivery (OPD)', acr: 'OPD', level: 'L2', kids: U(['Science Editing Unit', 'Lever Program Management Officers (PMO)', 'Grants Management Unit (GMU)']) },
+    { name: 'Office for Program Development and Strategy', level: 'L2', kids: U(['Office for Program Development and Strategy']) },
+    { name: 'Climate Action', level: 'L2', kids: U(['Achieving Net-Zero', 'Climate Security and Migration', 'Climate Services for Agriculture', 'Climate Readiness']) },
+    { name: 'Multifunctional Landscape', acr: 'MFL', level: 'L2', kids: U(['Low Emissions Landscapes', 'Soils and Water Management', 'Ecosystem Services and Environmental Impact', 'Biodiversity and Restoration for Livelihoods and Resilience', 'MFL Laboratories']) },
+    { name: 'Biodiversity for Food and Agriculture', level: 'L2', kids: U(['Agrobiodiversity in Production System', 'Plant Genetic Resources & seed Policies', 'Forest Genetic Resources for Resilient Landscape', 'Cacao of Excellence']) },
+    { name: 'Crops for Nutrition and Health', level: 'L2', kids: U(['Bean', 'Genebank', 'Cassava', 'Biotechnology', 'Tropical Forages', 'Banana', 'Rice', 'Rice - Flar']) }
+  ] },
+  { id: 'global', name: 'Global Support', level: 'L1', kids: [
+    { name: 'Office of the Director General', acr: 'ODG', level: 'L2', kids: [
+      { name: 'Legal Office', acr: 'Legal', level: 'L4', dir: 'Mauricio Muñoz', email: 'E.Munoz@cgiar.org', flag: true },
+      { name: 'Ethics Unit', acr: 'Ethics', level: 'L4', dir: 'Franck Erick Kalla', email: 'f.noukam@cgiar.org', flag: true },
+      { name: 'Internal Audit Unit', level: 'L4' }] },
+    { id: 'pod', name: 'People and Organizational Development', acr: 'POD', level: 'L2', dir: 'Riveros, Vanessa', email: 'V.Riveros@cgiar.org', flag: true, kids: U(['Culture Performance and Engagement', 'Total Rewards', 'Wellbeing, Health and Safety', 'Organizational Development and Strategy']).concat([
+      { id: 'hrops', name: 'HR Operations', level: 'L3', kids: U(['Global Specialized Services', 'HR Operations Africa', 'HR Operations Americas', 'HR Operations Asia', 'HR Operations Europe']) }]) },
+    { id: 'bof', name: 'Business Operations and Finance', acr: 'BOF', level: 'L2', dir: 'Victor Guardia', email: 'V.Guardia@cgiar.org', flag: true, kids: U(['Finance Quality Assurance', 'Global Treasury', 'Project Financial Analysis and Support – PLANS', 'Accounting Services', 'Financial Planning and Analysis FP&A', 'Security Management', 'Regional Operations and Finance Africa', 'Regional Operations and Finance Asia', 'Regional Operations and Finance Americas', 'Regional Operations and Finance Europe']) },
+    { name: 'Strategic Partnerships, Engagement and Communications', acr: 'SPEC', level: 'L2', dir: 'Stephanie Speck', email: 'S.Speck@cgiar.org', flag: true, kids: U(['Partnerships and Stakeholder Engagement', 'Proposal and Pipeline Management', 'Business Development and Diversification', 'Global Communications', 'Digital & Internal Comms', 'Publications, Brand & Graphic Design']) },
+    { name: 'Technology Integration', acr: 'DT', level: 'L2', dir: 'David Abreu', email: 'd.abreu@cgiar.org', flag: true, kids: U(['IT System Integration', 'IT Operations and Service Desk', 'Integration and Capacity Development', 'IT Network Infrastructure & Security', 'Innovation and Business Development']) }
+  ] },
+  { id: 'regional', name: 'Regional', level: 'L1', kids: [
+    { name: 'Africa', acr: 'Africa', level: 'L2', dir: 'Wanjiru Kamau-Rutenberg', email: 'W.KamauR@cgiar.org', flag: true, kids: U(['Managing Director Office Africa', 'Africa Partnerships', 'Regional Operations and Finance Africa', 'HR Operations Africa', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Asia', acr: 'Asia', level: 'L2', dir: 'Stephan Weise', email: 's.weise@cgiar.org', flag: true, kids: U(['Managing Director Office Asia', 'Asia Partnerships', 'Regional Operations and Finance Asia', 'HR Operations Asia', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Americas', acr: 'Americas', level: 'L2', dir: 'Maya Rajasekharan', email: 'M.Rajasekharan@cgiar.org', flag: true, kids: U(['Managing Director Office Americas', 'Americas Partnerships', 'Security', 'Bogota Office', 'Regional Operations and Finance Americas', 'HR Operations Americas', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Europe', acr: 'Europe', level: 'L2', dir: 'Juan Lucas Restrepo', email: 'J.L.Restrepo@cgiar.org', flag: true, kids: U(['Europe Partnerships', 'Regional Operations and Finance Europe', 'HR Operations Europe', 'Regional Communications', 'Regional IT Operations and Service Desk']) }
+  ] }
+];
+const DIMS = { 'ADG Research': 'DIM-1.1, DIM-1.2, DIM-1.3', BOF: 'DIM-1.1, DIM-1.2', DT: 'DIM-1.1, DIM-1.4', POD: 'DIM-1.1', SPEC: 'DIM-1.1, DIM-1.2, DIM-1.3', Legal: 'DIM-1.1', Africa: 'DIM-1.2', Asia: 'DIM-1.2', Americas: 'DIM-1.2', Europe: 'DIM-1.2' };
+const VKEYS = ['name', 'acr', 'parent', 'dir', 'email', 'level'];
+function pad(n) { return String(n).padStart(3, '0'); }
+function cmp(a, b) { return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' }); }
+
+function seed() {
+  const E = {}; const ids = []; let k = 1;
+  (function walk(list, parent) {
+    list.forEach(n => {
+      const id = n.id || ('e' + k);
+      E[id] = { id: id, pid: 'OU-' + pad(k), code: 'ORG-' + pad(k), flag: !!n.flag, closed: '', succ: '', versions: [{ from: START, name: n.name, acr: n.acr || '', parent: parent, dir: n.dir || '', email: n.email || '', level: n.level }] };
+      k++; ids.push(id);
+      if (n.kids) walk(n.kids, id);
+    });
+  })(TREE, '');
+  return { E: E, ids: ids, next: k };
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const s = seed();
+    this.state = { E: s.E, ids: s.ids, next: s.next, asOf: TODAY, view: 'tree', open: { global: true, pod: true, hrops: true }, sel: 'bof', mode: 'edit', createParent: '',
+      draft: {}, chg: 'change', eff: TODAY, backdate: false, errors: {}, tab: 'details', dlg: null, toast: '', onlyFlagged: false, showClosed: false, q: '', sort: 'code', dir: 1, size: 25, page: 0 };
+  }
+  ver(e, d) { let v = null; e.versions.forEach(x => { if (x.from <= d) v = x; }); return v; }
+  alive(e, d) { return !!this.ver(e, d) && (!e.closed || e.closed > d); }
+  shown(e, d) { if (!this.ver(e, d)) return false; if (!this.state.showClosed && !this.alive(e, d)) return false; if (this.state.onlyFlagged) { const has = (x) => x.flag || this.kidsOf(x.id, d).some(has); return has(e); } return true; }
+  kidsOf(id, d) { return this.state.ids.map(i => this.state.E[i]).filter(x => { const v = this.ver(x, d); return v && v.parent === id && (this.state.showClosed || this.alive(x, d)); }).sort((a, b) => cmp(a.code, b.code)); }
+  units(id, d) { return this.kidsOf(id, d).reduce((a, x) => a + (this.kidsOf(x.id, d).length ? this.units(x.id, d) : 1), 0); }
+  path(id, d) { const out = []; let e = this.state.E[id]; while (e) { const v = this.ver(e, d) || e.versions[0]; out.unshift(v.acr || v.name); e = this.state.E[v.parent]; } return out.join(' › '); }
+  base() {
+    const s = this.state;
+    if (s.mode === 'create') {
+      const p = s.E[s.createParent]; const pv = p ? this.ver(p, s.asOf) : null;
+      const lvl = !pv ? 'L1' : (pv.level === 'L1' ? 'L2' : 'L4');
+      return { code: 'ORG-' + pad(s.next), name: '', acr: '', parent: s.createParent, dir: '', email: '', level: lvl, flag: false };
+    }
+    const e = s.E[s.sel]; if (!e) return null;
+    const v = this.ver(e, s.asOf) || e.versions[0];
+    return Object.assign({ code: e.code, flag: e.flag }, v);
+  }
+  val(k) { const d = this.state.draft; if (d[k] !== undefined) return d[k]; const b = this.base(); return b ? b[k] : ''; }
+  set(k, v) { const d = Object.assign({}, this.state.draft); d[k] = v; this.setState({ draft: d, errors: {}, toast: '' }); }
+  pick(id) { this.setState({ sel: id, mode: 'edit', draft: {}, errors: {}, chg: 'change', eff: this.state.asOf, backdate: false, tab: 'details', toast: '' }); }
+  startCreate(pid) { const o = Object.assign({}, this.state.open); if (pid) o[pid] = true; this.setState({ mode: 'create', createParent: pid, draft: {}, errors: {}, tab: 'details', toast: '', open: o }); }
+  changedKeys() { const b = this.base(); if (!b) return []; return VKEYS.filter(k => this.state.draft[k] !== undefined && this.state.draft[k] !== b[k]); }
+  linkedCount(e) { const v = e.versions[e.versions.length - 1]; return DIMS[v.acr] ? 1 : 0; }
+  save() {
+    const s = this.state; const b = this.base(); const v = Object.assign({}, b, s.draft); const errors = {};
+    if (!String(v.code).trim()) errors.code = 'Required';
+    else if (s.ids.some(id => id !== (s.mode === 'edit' ? s.sel : '') && s.E[id].code.toUpperCase() === String(v.code).trim().toUpperCase())) errors.code = 'This code is already used';
+    if (!String(v.name).trim()) errors.name = 'Required';
+    const need = ALLOWED[v.level];
+    const pv = v.parent ? this.ver(s.E[v.parent], s.asOf) : null;
+    if (need.length && !v.parent) errors.parent = 'Select a parent';
+    else if (need.length && pv && need.indexOf(pv.level) < 0) errors.parent = SHORT[v.level] + ' must sit under a ' + need.map(l => SHORT[l]).join(' or ');
+    else if (!need.length && v.parent) errors.parent = 'A Division has no parent';
+    const changed = this.changedKeys();
+    const e0 = s.mode === 'edit' ? s.E[s.sel] : null;
+    const curV = e0 ? this.ver(e0, s.asOf) : null;
+    if (e0 && changed.length && s.chg === 'change' && (!s.eff || (!s.backdate && s.eff <= curV.from) || s.eff < START)) errors.eff = s.backdate ? 'Pick a date from ' + START : 'Pick a date after ' + curV.from + ', or tick Back-date';
+    if (Object.keys(errors).length) { this.setState({ errors: errors }); return; }
+    const E = Object.assign({}, s.E);
+    const rec = { name: v.name.trim(), acr: v.acr, parent: v.parent, dir: v.dir, email: v.email, level: v.level };
+    if (s.mode === 'create') {
+      const id = 'n' + s.next;
+      E[id] = { id: id, pid: 'OU-' + pad(s.next), code: v.code.trim(), flag: !!v.flag, closed: '', succ: '', versions: [Object.assign({ from: s.asOf }, rec)] };
+      const o = Object.assign({}, s.open); if (v.parent) o[v.parent] = true;
+      this.setState({ E: E, ids: s.ids.concat([id]), next: s.next + 1, sel: id, mode: 'edit', draft: {}, open: o, toast: '“' + rec.name + '” created from ' + s.asOf + '.' });
+      return;
+    }
+    const e = Object.assign({}, e0, { code: v.code.trim(), flag: !!v.flag });
+    let msg = 'Changes to “' + rec.name + '” saved.';
+    if (changed.length) {
+      if (s.chg === 'correction') {
+        e.versions = e0.versions.map(x => x === curV ? Object.assign({}, x, rec) : x);
+        msg = 'Correction saved on the version valid since ' + curV.from + ' — no history entry.';
+      } else {
+        const delta = {}; changed.forEach(k => { delta[k] = rec[k]; });
+        const baseV = this.ver(e0, s.eff) || e0.versions[0];
+        e.versions = e0.versions.filter(x => x.from !== s.eff).map(x => x.from > s.eff ? Object.assign({}, x, delta) : x)
+          .concat([Object.assign({}, baseV, delta, { from: s.eff })]).sort((a, b) => cmp(a.from, b.from));
+        if (changed.indexOf('parent') >= 0) msg = '“' + rec.name + '” moves from ' + this.path(curV.parent, s.asOf) + ' to ' + this.path(rec.parent, s.asOf) + ' from ' + s.eff + '. Its linked records follow it and count under the new parent from that date; reports before that date keep the old parent.';
+        else msg = 'New version of “' + rec.name + '” valid from ' + s.eff + '. The previous version stays in the history.';
+      }
+    }
+    E[s.sel] = e;
+    this.setState({ E: E, draft: {}, errors: {}, chg: 'change', toast: msg });
+  }
+  historyOf(e) {
+    const out = [];
+    e.versions.forEach((v, i) => {
+      if (i === 0) { out.push({ date: v.from, title: 'Created as ' + SHORT[v.level], lines: [{ t: '“' + v.name + '”' + (v.parent ? ' under ' + this.path(v.parent, v.from) : '') }] }); return; }
+      const p = e.versions[i - 1]; const lines = [];
+      if (p.name !== v.name) lines.push({ t: 'Renamed: “' + p.name + '” → “' + v.name + '”' });
+      if (p.acr !== v.acr) lines.push({ t: 'Acronym: ' + (p.acr || '—') + ' → ' + (v.acr || '—') });
+      if (p.parent !== v.parent) lines.push({ t: 'Moved: ' + this.path(p.parent, p.from) + ' → ' + this.path(v.parent, v.from) });
+      if (p.level !== v.level) lines.push({ t: 'Level: ' + SHORT[p.level] + ' → ' + SHORT[v.level] });
+      if (p.dir !== v.dir || p.email !== v.email) lines.push({ t: 'Director: ' + (p.dir || '—') + ' → ' + (v.dir || '—') });
+      out.push({ date: v.from, title: 'Organizational change', lines: lines.length ? lines : [{ t: 'No field changed' }] });
+    });
+    if (e.closed) out.push({ date: e.closed, title: 'Closed', lines: [{ t: e.succ ? 'Successor: ' + this.path(e.succ, e.closed) : 'No successor' }] });
+    return out.reverse();
+  }
+  renderVals() {
+    const s = this.state; const d = s.asOf;
+    const tree = [];
+    const walk = (pid, level) => this.kidsOf(pid, d).filter(e => this.shown(e, d)).forEach(e => {
+      const v = this.ver(e, d); const kids = this.kidsOf(e.id, d).filter(x => this.shown(x, d)); const open = !!s.open[e.id];
+      const sel = s.mode === 'edit' && s.sel === e.id; const later = e.versions.some(x => x.from > d); const changedAt = e.versions.length > 1 && v.from > START && v.from <= d;
+      tree.push({ name: v.name, acr: v.acr, hasAcr: !!v.acr && v.acr !== v.name, code: e.code, levelLabel: SHORT[v.level], dir: v.dir, flag: e.flag,
+        hasKids: kids.length > 0, noKids: kids.length === 0, open: open, rot: open ? 90 : 0, pad: 10 + level * 22,
+        bg: sel ? '#E3ECF6' : (level === 0 ? '#FAFBFC' : '#ffffff'), weight: level === 0 || sel ? 700 : 400, color: this.alive(e, d) ? '#112F5C' : '#6B7079',
+        hasCount: kids.length > 0, count: this.units(e.id, d) + ' units', closed: !this.alive(e, d),
+        changed: later || changedAt, changedLabel: later ? 'Change scheduled' : 'Changed ' + v.from,
+        canAdd: v.level !== 'L4' && this.alive(e, d), addLabel: 'Add an entry under ' + v.name, add: () => this.startCreate(e.id),
+        toggleLabel: (open ? 'Collapse ' : 'Expand ') + v.name, toggle: () => { const o = Object.assign({}, this.state.open); o[e.id] = !o[e.id]; this.setState({ open: o }); }, pick: () => this.pick(e.id) });
+      if (kids.length && open) walk(e.id, level + 1);
+    });
+    walk('', 0);
+
+    const q = s.q.trim().toLowerCase();
+    let flat = s.ids.map(i => s.E[i]).filter(e => this.shown(e, d)).map(e => { const v = this.ver(e, d); const pe = s.E[v.parent]; const pv = pe ? this.ver(pe, d) : null;
+      return { id: e.id, code: e.code, level: v.level, levelLabel: LEVELS[v.level], name: v.name, acr: v.acr, parentName: pv ? pv.name : '—', dir: v.dir, flag: e.flag ? 'Yes' : 'No', flagLabel: e.flag ? 'Yes' : '—', from: v.from }; })
+      .filter(r => !q || (r.code + ' ' + r.name + ' ' + r.acr + ' ' + r.parentName + ' ' + r.dir).toLowerCase().indexOf(q) >= 0);
+    flat.sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
+    const pc = Math.max(1, Math.ceil(flat.length / s.size)); const page = Math.min(s.page, pc - 1); const start = page * s.size;
+    const COLS = [['code', 'Code', 100], ['level', 'Level', 150], ['name', 'Name', 260], ['acr', 'Acronym', 100], ['parentName', 'Parent', 220], ['dir', 'Director', 170], ['flag', 'KPIs', 70], ['from', 'Version from', 120]];
+    const t = { headers: COLS.map(c => { const on = s.sort === c[0]; return { label: c[1], w: c[2], icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none', sort: () => this.setState({ sort: c[0], dir: on ? -s.dir : 1, page: 0 }) }; }),
+      rows: flat.slice(start, start + s.size).map(r => Object.assign({}, r, { bg: s.mode === 'edit' && s.sel === r.id ? '#E3ECF6' : '#ffffff', pick: () => this.pick(r.id) })),
+      pages: Array.from({ length: pc }, (x, i) => ({ n: i + 1, aria: 'Page ' + (i + 1), bg: i === page ? '#035BA9' : '#ffffff', fg: i === page ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) })),
+      size: String(s.size), range: flat.length ? (start + 1) + '–' + Math.min(start + s.size, flat.length) + ' of ' + flat.length + ' entries' : '0 entries', setSize: (ev) => this.setState({ size: Number(ev.target.value), page: 0 }) };
+
+    const b = this.base(); const hasForm = !!b; const e = s.mode === 'edit' ? s.E[s.sel] : null; const curV = e ? this.ver(e, d) : null;
+    const lvl = this.val('level'); const need = ALLOWED[lvl] || [];
+    const parents = s.ids.map(i => s.E[i]).filter(x => x.id !== s.sel && this.alive(x, d) && need.indexOf(this.ver(x, d).level) >= 0).sort((a, c) => cmp(this.path(a.id, d), this.path(c.id, d))).map(x => ({ v: x.id, l: this.path(x.id, d) }));
+    const changed = this.changedKeys();
+    const moving = changed.indexOf('parent') >= 0;
+    const f = hasForm ? { code: this.val('code'), level: lvl, name: this.val('name'), acr: this.val('acr'), parent: this.val('parent'), dir: this.val('dir'), email: this.val('email'), flag: !!this.val('flag'),
+      parents: parents, parentLabel: need.length ? 'Parent *' : 'Parent', parentEmpty: need.length ? 'Select a ' + need.map(l => SHORT[l]).join(' or ') : 'None — Divisions are top level', parentDisabled: !need.length, parentBg: need.length ? '#ffffff' : '#F4F7F9',
+      codeErr: s.errors.code || '', hasCodeErr: !!s.errors.code, codeBorder: s.errors.code ? '#B00020' : '#B9C0C5', hasNameErr: !!s.errors.name, nameBorder: s.errors.name ? '#B00020' : '#B9C0C5',
+      parentErr: s.errors.parent || '', hasParentErr: !!s.errors.parent, parentBorder: s.errors.parent ? '#B00020' : '#B9C0C5',
+      showChange: s.mode === 'edit' && changed.length > 0, isChange: s.chg === 'change', isCorrection: s.chg === 'correction',
+      changeHint: moving ? 'Records linked to this entry will count under the new parent from this date.' : 'Reports before this date keep showing the previous values.',
+      eff: s.eff, effMin: s.backdate ? START : (curV ? curV.from : START), backdate: !!s.backdate, curFrom: curV ? curV.from : START, effErr: s.errors.eff || '', hasEffErr: !!s.errors.eff, effBorder: s.errors.eff ? '#B00020' : '#B9C0C5' } : {};
+    const linked = e ? [
+      { label: 'Child entries (today)', value: String(this.kidsOf(e.id, d).length), color: '#4C5158' },
+      { label: 'Dimensions (owner unit)', value: DIMS[curV ? curV.acr : ''] || 'None', color: DIMS[curV ? curV.acr : ''] ? '#153C71' : '#6B7079' },
+      { label: 'Institutional Objectives (owner unit)', value: 'None', color: '#6B7079' },
+      { label: 'KPIs and results', value: 'Shown once the mapping modules exist', color: '#6B7079' }
+    ] : [];
+    const tabStyle = (k) => s.tab === k;
+    let c = { title: '', body: '', closeLabel: 'Cancel', canAct: false, isClose: false, act: null, actLabel: '', actBg: '#B00020' };
+    if (s.dlg && e) {
+      const v = this.ver(e, d); const kids = this.kidsOf(e.id, d).length; const linkedN = DIMS[v.acr] ? 1 : 0;
+      if (s.dlg.kind === 'delete') {
+        if (kids || linkedN) c = { title: 'Cannot delete “' + v.name + '”', body: (kids ? 'It has ' + kids + ' child entries. ' : '') + (linkedN ? 'Data is linked to it (owner of ' + DIMS[v.acr] + '). ' : '') + 'Entries with associated information cannot be deleted. Close it instead: it stays on historical records.', closeLabel: 'Close', canAct: false, isClose: false };
+        else c = { title: 'Delete “' + v.name + '”?', body: 'It has no children and no associated information, so it can be removed permanently.', closeLabel: 'Cancel', canAct: true, isClose: false, actLabel: 'Delete', actBg: '#B00020',
+          act: () => { const ids = s.ids.filter(i => i !== s.sel); this.setState({ ids: ids, sel: null, dlg: null, toast: '“' + v.name + '” deleted.' }); } };
+      } else if (e.closed) {
+        c = { title: 'Reopen “' + v.name + '”?', body: 'It was closed from ' + e.closed + '. Reopening removes the closing date.', closeLabel: 'Cancel', canAct: true, isClose: false, actLabel: 'Reopen', actBg: '#035BA9',
+          act: () => { const E = Object.assign({}, s.E); E[s.sel] = Object.assign({}, e, { closed: '', succ: '' }); this.setState({ E: E, dlg: null, toast: '“' + v.name + '” reopened.' }); } };
+      } else if (kids) {
+        c = { title: 'Cannot close “' + v.name + '” yet', body: 'It still has ' + kids + ' active child entries. Move them to another parent or close them first.', closeLabel: 'Close', canAct: false, isClose: false };
+      } else {
+        const opts = s.ids.map(i => s.E[i]).filter(x => x.id !== e.id && this.alive(x, d) && this.ver(x, d).level === v.level).map(x => ({ v: x.id, l: this.path(x.id, d) }));
+        c = { title: 'Close “' + v.name + '”', body: 'From the closing date it no longer appears in new selections. Records already linked keep pointing to it.', closeLabel: 'Cancel', canAct: true, isClose: true, actLabel: 'Close entry', actBg: '#035BA9',
+          date: s.dlg.date, succ: s.dlg.succ, options: opts,
+          onDate: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { date: ev.target.value }) }), onSucc: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { succ: ev.target.value }) }),
+          act: () => { const E = Object.assign({}, s.E); E[s.sel] = Object.assign({}, e, { closed: s.dlg.date, succ: s.dlg.succ }); this.setState({ E: E, dlg: null, toast: '“' + v.name + '” closed from ' + s.dlg.date + (s.dlg.succ ? '; its records roll up to ' + this.path(s.dlg.succ, d) + ' from that date.' : '.') }); } };
+      }
+    }
+    const allAlive = s.ids.map(i => s.E[i]).filter(x => this.alive(x, d)).map(x => ({ e: x, v: this.ver(x, d) }));
+    return {
+      tree: tree, t: t, q: s.q, onQ: (ev) => this.setState({ q: ev.target.value, page: 0 }),
+      isTree: s.view === 'tree', isTable: s.view === 'table',
+      treeBg: s.view === 'tree' ? '#ffffff' : 'transparent', treeFg: s.view === 'tree' ? '#112F5C' : '#6B7079', tableBg: s.view === 'table' ? '#ffffff' : 'transparent', tableFg: s.view === 'table' ? '#112F5C' : '#6B7079',
+      showTree: () => this.setState({ view: 'tree' }), showTable: () => this.setState({ view: 'table' }),
+      asOf: d, notToday: d !== TODAY, onAsOf: (ev) => this.setState({ asOf: ev.target.value || TODAY, draft: {}, eff: ev.target.value || TODAY }), toToday: () => this.setState({ asOf: TODAY, eff: TODAY }),
+      onlyFlagged: s.onlyFlagged, showClosed: s.showClosed, toggleFlagged: () => this.setState({ onlyFlagged: !s.onlyFlagged }), toggleClosed: () => this.setState({ showClosed: !s.showClosed }),
+      exportXls: () => this.setState({ toast: 'Exported ' + allAlive.length + ' entries (structure as of ' + d + ') to organizational-structure_' + d + '.xlsx' }),
+      addDivision: () => this.startCreate(''),
+      counts: [
+        { label: 'Level 1 · Divisions', n: allAlive.filter(x => x.v.level === 'L1').length },
+        { label: 'Level 2 · Departments', n: allAlive.filter(x => x.v.level === 'L2').length },
+        { label: 'Level 3 · Offices', n: allAlive.filter(x => x.v.level === 'L3').length },
+        { label: 'Level 4 · Units', n: allAlive.filter(x => x.v.level === 'L4').length },
+        { label: 'Manage institutional KPIs', n: allAlive.filter(x => x.e.flag).length }
+      ],
+      levels: Object.keys(LEVELS).map(k => ({ v: k, l: LEVELS[k] })),
+      hasForm: hasForm, noForm: !hasForm, isEdit: s.mode === 'edit',
+      p: { code: e ? e.code : '', pid: e ? e.pid : '', levelCaps: (LEVELS[lvl] || '').toUpperCase(), title: s.mode === 'create' ? 'New entry' : (curV ? curV.name : ''),
+        path: s.mode === 'create' ? (s.createParent ? 'Under ' + this.path(s.createParent, d) : 'Top level') : (curV && curV.parent ? this.path(curV.parent, d) : 'Top level'),
+        histCount: e ? this.historyOf(e).length : 0, closeLabel: e && e.closed ? 'Reopen' : 'Close entry' },
+      onDetails: tabStyle('details') || s.mode === 'create', onHistory: tabStyle('history') && s.mode === 'edit', onLinked: tabStyle('linked') && s.mode === 'edit',
+      detailsW: tabStyle('details') ? 700 : 400, historyW: tabStyle('history') ? 700 : 400, linkedW: tabStyle('linked') ? 700 : 400,
+      detailsLine: tabStyle('details') ? '#00B6FF' : 'transparent', historyLine: tabStyle('history') ? '#00B6FF' : 'transparent', linkedLine: tabStyle('linked') ? '#00B6FF' : 'transparent',
+      tabDetails: () => this.setState({ tab: 'details' }), tabHistory: () => this.setState({ tab: 'history' }), tabLinked: () => this.setState({ tab: 'linked' }),
+      history: e ? this.historyOf(e) : [], linked: linked,
+      f: f,
+      on: { code: (ev) => this.set('code', ev.target.value), level: (ev) => this.set('level', ev.target.value), name: (ev) => this.set('name', ev.target.value), acr: (ev) => this.set('acr', ev.target.value),
+        parent: (ev) => this.set('parent', ev.target.value), dir: (ev) => this.set('dir', ev.target.value), email: (ev) => this.set('email', ev.target.value), flag: () => this.set('flag', !this.val('flag')),
+        eff: (ev) => this.setState({ eff: ev.target.value, errors: {} }), backdate: () => this.setState({ backdate: !this.state.backdate, errors: {} }), modeChange: () => this.setState({ chg: 'change' }), modeCorrection: () => this.setState({ chg: 'correction', errors: {} }) },
+      hasToast: !!s.toast, toast: s.toast,
+      save: () => this.save(), cancel: () => this.setState({ mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      askDelete: () => this.setState({ dlg: { kind: 'delete' } }), askClose: () => this.setState({ dlg: { kind: 'close', date: d, succ: '' } }),
+      hasConfirm: !!s.dlg, c: c, closeConfirm: () => this.setState({ dlg: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

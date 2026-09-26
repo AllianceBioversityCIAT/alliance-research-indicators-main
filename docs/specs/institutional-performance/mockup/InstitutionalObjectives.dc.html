@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Institutional Objectives management</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Barlow,sans-serif;color:#4C5158;background:#f5f5f5}
+a{color:#035BA9}a:hover{color:#074B86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1120px; position: relative; display: flex; flex-direction: column; background: #f5f5f5; font-family: Barlow, sans-serif; color: #4C5158; overflow: hidden">
+
+<header style="height: 64px; flex-shrink: 0; background: #173F6F; display: flex; align-items: center; padding: 0 28px; gap: 36px; box-sizing: border-box">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #ffffff">STAR</div>
+<nav aria-label="Main" style="display: flex; gap: 30px; flex-grow: 1">
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Home</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Projects</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Center</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Dashboard</a>
+</nav>
+<a href="#" style="color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid #7C9CB9; border-radius: 9px; padding: 6px 14px">+ Create Result</a>
+<label for="nav-search" style="position: absolute; left: -9999px">Search results</label>
+<input id="nav-search" type="search" placeholder="Search a result" style="width: 240px; height: 30px; border-radius: 8px; border: 0; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div aria-label="Account" style="width: 32px; height: 32px; border-radius: 50%; background: #345B8F; color: #ffffff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center">HT</div>
+</header>
+
+<div style="display: flex; flex-grow: 1; min-height: 0">
+
+<aside style="width: 250px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #E8EBED; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">RESOURCES</div>
+<a href="#" style="font-size: 14px; color: #153C71; text-decoration: none; padding: 8px 0">About Indicators</a>
+<div style="height: 1px; background: #E8EBED; margin: 8px 0"></div>
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">ADMINISTRATION</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 10px 0 4px">
+<span>Center admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+</div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bulk upload</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">SDG Management</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
+<a href="PortfolioManagement.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Portfolio Management</a>
+<div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
+<a href="ControlledLists.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="OrgStructure.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="Main.dc.html" aria-current="page" style="font-size: 13px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 6px 8px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
+<span>System admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Strategy framework</h1>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 760px; line-height: 1.25">Add, edit and delete the strategy hierarchy (Impact Outcomes, Strategic Objectives, Enablers), the monitoring hierarchy (Performance Areas, Dimensions, Indicators) and the annual Institutional Objectives of the selected portfolio.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center">
+<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
+<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
+<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
+<option disabled="disabled">Portfolio 1 · 2010–2025 (not configured)</option>
+</select>
+</div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #D1D6DA">
+<nav aria-label="Configuration sections" style="display: flex; gap: 4px">
+<a href="Main.dc.html" style="font-size: 14px; color: #6B7079; text-decoration: none; padding: 9px 14px">Framework</a>
+<a href="InstitutionalObjectives.dc.html" aria-current="page" style="font-size: 14px; font-weight: 600; color: #112F5C; text-decoration: none; padding: 9px 14px; border-bottom: 3px solid #00B6FF">Institutional Objectives</a>
+</nav>
+<div style="display: flex; gap: 8px; padding-bottom: 8px; align-items: center">
+<label for="year" style="font-size: 12px; color: #6B7079">Year</label>
+<select id="year" value="{{year}}" onChange="{{pickYear}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
+<sc-for list="{{years}}" as="y" hint-placeholder-count="5">
+<option value="{{y.v}}">{{y.l}}</option>
+</sc-for>
+</select>
+<button type="button" onClick="{{carry}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{carryLabel}}</button>
+<button type="button" onClick="{{startCreate}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ Add objective</button>
+</div>
+</div>
+
+<div style="display: flex; gap: 16px; flex-grow: 1; min-height: 0">
+
+<section aria-label="Institutional Objectives" style="flex-grow: 1; min-width: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<div style="padding: 12px 16px; display: flex; gap: 10px; align-items: center">
+<label for="iob-search" style="position: absolute; left: -9999px">Find an objective</label>
+<input id="iob-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find an objective by code, statement or owner unit" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<button type="button" onClick="{{exportXls}}" style="margin-left: auto; height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Export .xlsx</button>
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 0 16px; border: 1px solid #E8EBED; border-radius: 6px">
+<table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
+<thead><tr>
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="5">
+<th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
+<sc-if value="{{h.sortable}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 10px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
+</sc-if>
+<sc-if value="{{h.fixed}}" hint-placeholder-val="{{false}}"><div style="padding: 9px 10px; font-size: 13px; font-weight: 600; color: #112F5C; text-align: center">{{h.label}}</div></sc-if>
+</th>
+</sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+<tr style="background: {{r.bg}}">
+<td style="padding: 9px 10px; border-bottom: 1px solid #EEF0F2; vertical-align: top"><span style="font-size: 12px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{r.code}}</span></td>
+<td style="padding: 9px 10px; border-bottom: 1px solid #EEF0F2; vertical-align: top"><div style="font-size: 13px; color: #4C5158; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{r.text}}</div></td>
+<td style="padding: 9px 10px; border-bottom: 1px solid #EEF0F2; vertical-align: top; font-size: 12.5px; color: {{r.ownerColor}}">{{r.owner}}</td>
+<td style="padding: 9px 10px; border-bottom: 1px solid #EEF0F2; vertical-align: top"><div style="display: flex; flex-wrap: wrap; gap: 4px">
+<sc-for list="{{r.inds}}" as="c" hint-placeholder-count="1"><span style="font-size: 11.5px; color: #153C71; background: #F4F7F9; border: 1px solid #D1D6DA; border-radius: 10px; padding: 1px 8px">{{c.t}}</span></sc-for>
+</div></td>
+<td style="padding: 6px 8px; border-bottom: 1px solid #EEF0F2; vertical-align: top">
+<div style="display: flex; justify-content: center; gap: 6px">
+<button type="button" onClick="{{r.edit}}" aria-label="{{r.editLabel}}" title="Edit" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button>
+<button type="button" onClick="{{r.del}}" aria-label="{{r.delLabel}}" title="Delete" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #FBE3E6; color: #B00020; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg></button>
+</div>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 48px 20px; text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center">
+<h2 style="margin: 0; font-size: 15px; color: #112F5C">{{emptyTitle}}</h2>
+<p style="margin: 0; font-size: 13px; color: #6B7079">Add objectives one by one, or carry forward the previous year’s set and edit it.</p>
+</div>
+</sc-if>
+</div>
+<div style="padding: 10px 16px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px">
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="page-size" style="color: #6B7079">Rows per page</label>
+<select id="page-size" value="{{sizeStr}}" onChange="{{setSize}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 6px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option>
+</select>
+<span style="color: #6B7079; margin-left: 8px">{{rangeLabel}}</span>
+</div>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{pages}}" as="p" hint-placeholder-count="3">
+<button type="button" onClick="{{p.go}}" aria-label="{{p.aria}}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid #D1D6DA; background: {{p.bg}}; color: {{p.fg}}; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer">{{p.n}}</button>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section aria-label="Objective form" style="width: 420px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<sc-if value="{{hasForm}}" hint-placeholder-val="{{true}}">
+<div style="padding: 14px 18px; border-bottom: 1px solid #E8EBED; display: flex; flex-direction: column; gap: 4px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">INSTITUTIONAL OBJECTIVE</span>
+<h2 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">{{formTitle}}</h2>
+</div>
+<div style="flex-grow: 1; overflow-y: auto; padding: 14px 18px; display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="font-size: 13px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 8px 12px">{{toast}}</div>
+</sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px">
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="f-code" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Code *</label>
+<input id="f-code" type="text" value="{{f.code}}" onChange="{{on.code}}" style="height: 32px; border: 1px solid {{f.codeBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<sc-if value="{{f.hasCodeErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.codeErr}}</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="f-year" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Year *</label>
+<select id="f-year" value="{{f.year}}" onChange="{{on.year}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
+<sc-for list="{{yearOpts}}" as="y" hint-placeholder-count="5"><option value="{{y}}">{{y}}</option></sc-for>
+</select>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
+<label for="f-text" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Statement *</label>
+<textarea id="f-text" rows="5" value="{{f.text}}" onChange="{{on.text}}" placeholder="Write the objective statement" style="border: 1px solid {{f.textBorder}}; border-radius: 8px; padding: 8px 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; line-height: 1.4; resize: vertical"></textarea>
+<sc-if value="{{f.hasTextErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">Required</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
+<label for="f-owner" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Owner unit</label>
+<select id="f-owner" value="{{f.owner}}" onChange="{{on.owner}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
+<option value="">Not assigned</option>
+<sc-for list="{{owners}}" as="o" hint-placeholder-count="5"><option value="{{o}}">{{o}}</option></sc-for>
+</select>
+<span style="font-size: 11.5px; color: #6B7079">Units flagged “Manages institutional KPIs” in the organizational structure.</span>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: baseline">
+<span style="font-size: 12.5px; font-weight: 600; color: #112F5C">Linked indicators</span>
+<span style="font-size: 11.5px; color: #6B7079">{{f.linkedCount}} selected</span>
+</div>
+<div style="max-height: 300px; overflow-y: auto; border: 1px solid #B9C0C5; border-radius: 8px; padding: 4px 0">
+<sc-for list="{{indList}}" as="g" hint-placeholder-count="4">
+<sc-if value="{{g.isHead}}" hint-placeholder-val="{{false}}">
+<div style="font-size: 11px; font-weight: 700; color: #6B7079; padding: 8px 12px 4px; letter-spacing: 0.5px">{{g.label}}</div>
+</sc-if>
+<sc-if value="{{g.isItem}}" hint-placeholder-val="{{true}}">
+<label style="display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: #4C5158; padding: 4px 12px; background: {{g.bg}}; cursor: pointer">
+<input type="checkbox" checked="{{g.checked}}" onChange="{{g.toggle}}" style="margin: 0"><strong style="color: #035BA9; font-weight: 600">{{g.code}}</strong>{{g.name}}</label>
+</sc-if>
+</sc-for>
+</div>
+</div>
+</div>
+<div style="padding: 12px 18px; border-top: 1px solid #E8EBED; display: flex; justify-content: space-between; align-items: center">
+<div>
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{askDeleteSel}}" style="height: 30px; border: 1px solid #F2B8C0; background: #ffffff; color: #B00020; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Delete</button>
+</sc-if>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{cancel}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{save}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{noForm}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 40px; text-align: center">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="font-size: 13px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 8px 12px">{{toast}}</div>
+</sc-if>
+<h2 style="margin: 0; font-size: 16px; color: #112F5C">Select an objective to edit it</h2>
+<p style="margin: 0; font-size: 13px; color: #6B7079">Or add a new one with “+ Add objective”.</p>
+</div>
+</sc-if>
+</section>
+
+</div>
+</main>
+</div>
+
+<sc-if value="{{hasConfirm}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
+<div role="dialog" aria-modal="true" aria-labelledby="del-title" style="width: 460px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<h2 id="del-title" style="margin: 0; font-size: 17px; color: #112F5C">{{confirmTitle}}</h2>
+<p style="margin: 0; font-size: 13.5px; color: #4C5158; line-height: 1.45">This permanently removes the objective and its links to indicators. KPIs linked to it in the Institutional Indicators module must be re-linked first.</p>
+<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px">
+<button type="button" onClick="{{closeConfirm}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{doDelete}}" style="height: 30px; border: 0; background: #B00020; color: #ffffff; border-radius: 9px; padding: 0 16px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Delete</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+const OWNERS = ['ADG Research', 'BOF', 'DT', 'Ethics', 'Legal', 'POD', 'SPEC', 'Africa', 'Americas', 'Asia', 'Europe'];
+const YEARS = ['2026', '2027', '2028', '2029', '2030'];
+const TEXT = [
+  'Optimize core processes through digital redesign, systems integration, and standardized workflows that support robust planning and delivery of research projects, strengthen workforce and financial resource management, reduce operational bottlenecks, ensure data integrity, and enable agile, evidence‑based decision‑making across the organization.',
+  'Deliver high-quality, user-centered services through rigorous performance standards and continuous improvement to ensure responsive support, timely resolution, and a reliable service experience across the organization.',
+  'Develop and consolidate a harmonized global insurance framework that integrates regions and establishes regionally tailored structures across Africa, Asia, and Europe, enabling optimized risk transfer, enhanced service delivery to operations, cost efficiency, and informed strategic decision-making at the organizational level.',
+  'Develop a robust and well‑governed research project pipeline, design and deliver high‑quality competitive proposals, and diversify sustainable funding streams that expand the Alliance’s research, innovation, and policy engagement impact.',
+  'Collaboratively secure and diversify sustainable funding streams that expand the Alliance’s research, innovation, and policy engagement footprint.',
+  'Strengthen indirect cost recovery, forecasting reliability, to optimize workforce and financial resources use and evidence-based management of financial reserves.',
+  'Position the Alliance as a globally, regionally, and nationally influential thought leader shaping food systems, climate, biodiversity, and agricultural policy.',
+  'Strengthen institutional trust in data by promoting fit-for-purpose governance, quality standards, and stewardship practices that improve the consistency, accuracy, usability, and value of organizational data for decision-making.',
+  'Enable a coherent and proactive digital and data ecosystem that delivers high‑quality, accurate, and accessible data for institutional decision‑making, while ensuring early and proactive technology engagement to support scalable and sustainable digital solutions across research and operations.',
+  'Strengthen financial data quality, consistency, and accessibility by delivering standardized financial views and dashboards that support institutional-level decision-making.',
+  'Strengthen the institutional policy framework by identifying, prioritizing, and addressing policy gaps that may affect governance, accountability, and consistent decision-making.',
+  'Ensure that Alliance’s Host Country Agreements (HCA) are up-to-date and effectively implemented across jurisdictions, enabling the organization to operate in full legal compliance while minimizing regulatory risk and safeguarding institutional privileges and immunities.',
+  'Support the integration of research and various organizational functions to enhance the efficiency, effectiveness, and impact of our work in the regions.',
+  'Provide legal oversight and strategic guidance for the organization’s Sustainability Policy and ESG Plan, ensuring full alignment with applicable regulatory frameworks, strengthening governance and accountability, and enabling the effective implementation and accurate ESG report to the Board of Trustees.',
+  'Strengthen governance, accountability, and donor confidence through the timely implementation of internal, external, and donor audit recommendations related to BOF responsibilities.',
+  'Enhance institutional governance and control by strengthening financial policy compliance, delegation of authority discipline, and timely closure of financial commitments.',
+  'Ensure that the organization’s operations are fully compliant with applicable local laws and regulations across all jurisdictions, through timely and strategic legal guidance to leadership to support informed decision-making and strengthen relationships with governmental authorities.',
+  'Strengthen risk management practices by assessing strategic level and high-valued projects.',
+  'Strengthen the organization’s ethical risk management by promoting staff awareness and adherence to standards of conduct and ethics policies, ensuring timely identification and reporting of ethical concerns, and enabling prompt and appropriate corrective actions.',
+  'Advance cross‑cutting collaboration across the Alliance by improving stakeholder alignment in processes and services, reinforcing a cohesive institutional identity through evidence‑based communication, and co‑creating digital initiatives across research, regional, and support functions.',
+  'Contributing to internal cross-team collaboration by strengthening knowledge exchange, peer learning, and collaboration across Research Areas, enabling scientists and teams to share expertise, co-develop ideas, and deliver more integrated research outcomes.',
+  'Design and implement a comprehensive and inclusive leadership development framework that embeds the Alliance’s cultural values and cultivates purpose-driven, collaborative, and adaptable leaders.',
+  'Enhancing staff well-being and effectiveness, and promoting occupational health and safety culture within the organization.',
+  'Ensuring the Alliance’s scientific excellence by delivering high-quality research and accessible data, fostering impactful innovations, strengthening and sharing capacity with partners, and synthesizing achievements for learning.',
+  'Steward a world-class network of strategic partnerships at both global and regional levels to deliver co-created solutions that foster trust and long-term impact.',
+  'Contributing to food and land systems change by collaborating with partners for the cocreation of demand-driven, science based, innovations; informing policy through science-based evidence; and enabling the scaling of solutions.',
+  'Position the Alliance as a globally, regionally, and nationally influential thought leader shaping food systems, climate, biodiversity, and agricultural policy.',
+  'Implement regional roadmaps for the implementation of the Alliance Strategy in the regions.'
+];
+const LINKS = [['1.1.1'], ['1.1.2'], ['1.1.2'], ['1.2.1'], ['1.2.1'], ['1.2.2', '1.2.3'], ['1.3.1'], ['1.4.1'], ['1.4.2'], ['1.5.1'], ['1.5.2'], ['1.5.2'], ['1.5.3'], ['1.5.4'], ['1.6.1'], ['1.6.2'], ['1.6.2'], ['1.6.3'], ['1.6.4'], ['2.1.1'], ['2.1.1'], ['2.1.2'], ['2.1.3'], ['3.1.1', '3.1.2', '3.1.3', '3.3.1'], ['4.1.1'], ['4.2.1', '4.2.2'], ['4.3.1'], ['4.4.1', '4.4.2']];
+const INDS = [
+  ['PA-1 › DIM-1.1 Operational efficiency and agility', [['1.1.1', 'Process efficiency'], ['1.1.2', 'Service delivery']]],
+  ['PA-1 › DIM-1.2 Financial health', [['1.2.1', 'Revenue strength'], ['1.2.2', 'Stability and resilience'], ['1.2.3', 'Execution and control']]],
+  ['PA-1 › DIM-1.3 Partnerships', [['1.3.1', 'Strategic visibility and influence']]],
+  ['PA-1 › DIM-1.4 Digital and data enablement', [['1.4.1', 'Data governance'], ['1.4.2', 'Digital ecosystems']]],
+  ['PA-1 › DIM-1.5 Governance', [['1.5.1', 'Decision-making and effectiveness'], ['1.5.2', 'Governance system'], ['1.5.3', 'Organizational performance and agility'], ['1.5.4', 'Transparency and sustainability']]],
+  ['PA-1 › DIM-1.6 Combined assurance', [['1.6.1', 'Audit and oversight'], ['1.6.2', 'Compliance'], ['1.6.3', 'Risk management'], ['1.6.4', 'Ethics and integrity']]],
+  ['PA-2 › DIM-2.1 People and culture', [['2.1.1', 'Cross-cutting collaboration'], ['2.1.2', 'Inclusive leadership development'], ['2.1.3', 'Trust and psychological safety']]],
+  ['PA-3 › DIM-3.1 Knowledge products', [['3.1.1', 'Scientific output and quality'], ['3.1.2', 'Research synthesis and visibility'], ['3.1.3', 'Scientific relevance']]],
+  ['PA-3 › DIM-3.2 Capacity sharing for development', [['3.2.1', 'Capacity sharing for development']]],
+  ['PA-3 › DIM-3.3 Innovation development', [['3.3.1', 'Innovation development']]],
+  ['PA-4 › DIM-4.1 Innovation use', [['4.1.1', 'Uptake of innovations for system change']]],
+  ['PA-4 › DIM-4.2 Impact case reports', [['4.2.1', 'Demonstrated research impact'], ['4.2.2', 'Documented outcome and behavioral change']]],
+  ['PA-4 › DIM-4.3 Policy advocacy', [['4.3.1', 'Policy change']]],
+  ['PA-4 › DIM-4.4 Innovate for impact', [['4.4.1', 'Strategic partnerships for innovation scaling'], ['4.4.2', 'Transition of innovations to market']]]
+];
+function cmp(a, b) { if (typeof a === 'number' && typeof b === 'number') return a - b; return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' }); }
+const COLS = [['code', 'Code', 100], ['text', 'Statement', 420], ['owner', 'Owner unit', 130], ['inds', 'Linked indicators', 220], ['_a', 'Actions', 90]];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const items = TEXT.map((t, i) => ({ id: 'o' + (i + 1), code: 'IOB-' + (i + 1), year: '2026', text: t, owner: '', inds: LINKS[i].map(k => 'IND-' + k) }));
+    this.state = { items: items, year: '2026', page: 0, sel: 'o6', mode: 'edit', draft: {}, errors: {}, confirm: null, toast: '', seq: 1, sort: 'code', dir: 1, size: 10, q: '' };
+  }
+  yearItems() { return this.state.items.filter(x => x.year === this.state.year); }
+  base() {
+    const s = this.state;
+    if (s.mode === 'create') return { code: 'IOB-' + (this.yearItems().length + 1), year: s.year, text: '', owner: '', inds: [] };
+    return s.items.find(x => x.id === s.sel) || null;
+  }
+  val(k) { const d = this.state.draft; if (d[k] !== undefined) return d[k]; const b = this.base(); return b ? b[k] : ''; }
+  set(k, v) { const d = Object.assign({}, this.state.draft); d[k] = v; const e = Object.assign({}, this.state.errors); e[k] = ''; this.setState({ draft: d, errors: e, toast: '' }); }
+  save() {
+    const s = this.state;
+    const v = Object.assign({}, this.base(), s.draft);
+    const errors = {};
+    if (!String(v.code).trim()) errors.code = 'Required';
+    if (!String(v.text).trim()) errors.text = 'Required';
+    if (!errors.code && s.items.some(x => x.id !== (s.mode === 'edit' ? s.sel : '') && x.year === v.year && x.code.toUpperCase() === String(v.code).trim().toUpperCase())) errors.code = 'Code already used in ' + v.year;
+    if (Object.keys(errors).length) { this.setState({ errors: errors }); return; }
+    if (s.mode === 'create') {
+      const id = 'new' + s.seq;
+      this.setState({ items: s.items.concat([Object.assign({}, v, { id: id })]), sel: id, mode: 'edit', draft: {}, errors: {}, seq: s.seq + 1, year: v.year, toast: v.code + ' created.' });
+    } else {
+      this.setState({ items: s.items.map(x => x.id === s.sel ? Object.assign({}, v, { id: x.id }) : x), draft: {}, errors: {}, year: v.year, toast: 'Changes to ' + v.code + ' saved.' });
+    }
+  }
+  renderVals() {
+    const s = this.state;
+    const PAGE = s.size;
+    const q = s.q.trim().toLowerCase();
+    const list = this.yearItems().filter(x => !q || (x.code + ' ' + x.text + ' ' + x.owner + ' ' + x.inds.join(' ')).toLowerCase().indexOf(q) >= 0)
+      .map(x => Object.assign({}, x, { _inds: x.inds.join(',') })).sort((a, b) => cmp(s.sort === 'inds' ? a._inds : a[s.sort], s.sort === 'inds' ? b._inds : b[s.sort]) * s.dir);
+    const start = Math.min(s.page, Math.max(0, Math.ceil(list.length / PAGE) - 1)) * PAGE;
+    const rows = list.slice(start, start + PAGE).map(r => ({
+      code: r.code, text: r.text, owner: r.owner || 'Not assigned', ownerColor: r.owner ? '#4C5158' : '#6B7079',
+      inds: r.inds.map(t => ({ t: t })), bg: s.mode === 'edit' && s.sel === r.id ? '#E3ECF6' : '#ffffff',
+      editLabel: 'Edit ' + r.code, delLabel: 'Delete ' + r.code,
+      edit: () => this.setState({ sel: r.id, mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      del: () => this.setState({ sel: r.id, mode: 'edit', confirm: r.id, draft: {}, errors: {} })
+    }));
+    const pc = Math.max(1, Math.ceil(list.length / PAGE));
+    const pages = [];
+    for (let i = 0; i < pc; i++) pages.push({ n: i + 1, aria: 'Page ' + (i + 1), bg: i * PAGE === start ? '#035BA9' : '#ffffff', fg: i * PAGE === start ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) });
+    const b = this.base();
+    const hasForm = !!b;
+    const linked = hasForm ? (this.val('inds') || []) : [];
+    const indList = [];
+    INDS.forEach(g => {
+      indList.push({ isHead: true, isItem: false, label: g[0] });
+      g[1].forEach(i => {
+        const code = 'IND-' + i[0];
+        const on = linked.indexOf(code) >= 0;
+        indList.push({ isHead: false, isItem: true, code: code, name: i[1], checked: on, bg: on ? '#EAF1F8' : 'transparent',
+          toggle: () => { const cur = (this.val('inds') || []).slice(); const k = cur.indexOf(code); if (k >= 0) cur.splice(k, 1); else cur.push(code); this.set('inds', cur); } });
+      });
+    });
+    const nextYear = String(Number(s.year) + 1);
+    const hasNext = s.items.some(x => x.year === nextYear);
+    const confirmItem = s.confirm ? s.items.find(x => x.id === s.confirm) : null;
+    const nextCount = s.items.filter(x => x.year === nextYear).length;
+    return {
+      t: { headers: COLS.map(c => { const on = s.sort === c[0]; return { label: c[1], w: c[2], sortable: c[0] !== '_a', fixed: c[0] === '_a', icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none', sort: () => this.setState({ sort: c[0], dir: on ? -s.dir : 1, page: 0 }) }; }) },
+      sizeStr: String(s.size), setSize: (e) => this.setState({ size: Number(e.target.value), page: 0 }),
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value, page: 0 }),
+      exportXls: () => this.setState({ toast: 'Exported ' + list.length + ' objectives (' + s.year + ') to institutional-objectives_' + s.year + '.xlsx' }),
+      rows: rows, pages: pages, empty: list.length === 0, emptyTitle: 'No Institutional Objectives for ' + s.year + ' yet',
+      rangeLabel: list.length ? (start + 1) + '–' + Math.min(start + PAGE, list.length) + ' of ' + list.length + ' objectives · ' + s.year : '0 objectives · ' + s.year,
+      year: s.year,
+      years: YEARS.map(y => { const n = s.items.filter(x => x.year === y).length; return { v: y, l: y + ' · ' + n + ' objectives' }; }),
+      yearOpts: YEARS,
+      owners: OWNERS,
+      pickYear: (e) => this.setState({ year: e.target.value, page: 0, sel: null, mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      carryLabel: 'Carry forward to ' + nextYear,
+      carry: () => {
+        if (hasNext || list.length === 0 || Number(nextYear) > 2030) { this.setState({ toast: hasNext ? nextYear + ' already has ' + nextCount + ' objectives.' : 'Nothing to carry forward.' }); return; }
+        let seq = s.seq;
+        const copies = list.map(x => Object.assign({}, x, { id: 'c' + (seq++), year: nextYear }));
+        this.setState({ items: s.items.concat(copies), seq: seq, year: nextYear, page: 0, sel: copies[0].id, mode: 'edit', draft: {}, toast: copies.length + ' objectives copied to ' + nextYear + '. Edit the statements as needed; ' + s.year + ' is unchanged.' });
+      },
+      startCreate: () => this.setState({ mode: 'create', draft: {}, errors: {}, toast: '' }),
+      hasForm: hasForm, noForm: !hasForm, isEdit: s.mode === 'edit',
+      formTitle: s.mode === 'create' ? 'New objective · ' + s.year : (b ? b.code + ' · ' + b.year : ''),
+      f: hasForm ? { code: this.val('code'), year: this.val('year'), text: this.val('text'), owner: this.val('owner'), linkedCount: linked.length,
+        codeErr: s.errors.code || '', hasCodeErr: !!s.errors.code, codeBorder: s.errors.code ? '#B00020' : '#B9C0C5',
+        hasTextErr: !!s.errors.text, textBorder: s.errors.text ? '#B00020' : '#B9C0C5' } : {},
+      on: { code: (e) => this.set('code', e.target.value), year: (e) => this.set('year', e.target.value), text: (e) => this.set('text', e.target.value), owner: (e) => this.set('owner', e.target.value) },
+      indList: indList,
+      hasToast: !!s.toast, toast: s.toast,
+      save: () => this.save(),
+      cancel: () => this.setState({ mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      askDeleteSel: () => this.setState({ confirm: s.sel }),
+      hasConfirm: !!confirmItem,
+      confirmTitle: confirmItem ? 'Delete ' + confirmItem.code + ' (' + confirmItem.year + ')?' : '',
+      closeConfirm: () => this.setState({ confirm: null }),
+      doDelete: () => {
+        const it = confirmItem;
+        this.setState({ items: s.items.filter(x => x.id !== s.confirm), confirm: null, sel: null, draft: {}, toast: it.code + ' deleted.' });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

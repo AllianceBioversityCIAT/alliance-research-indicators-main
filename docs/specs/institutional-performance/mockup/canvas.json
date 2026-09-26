@@ -1,0 +1,80 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "ControlledLists.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "1 · Control Lists",
+      "w": 1440,
+      "x": 0,
+      "y": 0
+    },
+    "OrgStructure.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "2 · Organizational Structure (versioned)",
+      "w": 1440,
+      "x": 1520,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "3 · Strategy Framework — Framework (tree / table)",
+      "w": 1440,
+      "x": 0,
+      "y": 1240
+    },
+    "InstitutionalObjectives.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "4 · Strategy Framework — Institutional Objectives",
+      "w": 1440,
+      "x": 1520,
+      "y": 1240
+    },
+    "PortfolioManagement.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "0 · Portfolio Management (existing page, unchanged)",
+      "w": 1440,
+      "x": -1520,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-25T15:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "heading": {
+      "kind": "title1",
+      "maxW": 4480,
+      "text": "Idea 1 — Control Lists · Organizational Structure · Strategy Framework (Center admin)",
+      "w": 240,
+      "x": -1520,
+      "y": -300
+    },
+    "try-org": {
+      "x": 3040,
+      "y": 0,
+      "w": 340,
+      "text": "Try the versioning (artboard 2, Play):\n1. Open BOF › Global Treasury.\n2. Change Parent to POD.\n3. Keep “Organizational change”, set Effective from 2026-10-01, Save.\n4. Set “Structure as of” to 2026-10-02 — it now sits under POD.\n5. Open its History tab.\nDelete is blocked on BOF (children + linked dimensions).",
+      "fill": "blue"
+    }
+  },
+  "order": [
+    "PortfolioManagement.dc.html",
+    "ControlledLists.dc.html",
+    "OrgStructure.dc.html",
+    "Main.dc.html",
+    "InstitutionalObjectives.dc.html"
+  ],
+  "pages": [],
+  "title": "STAR Strategy Configuration"
+}

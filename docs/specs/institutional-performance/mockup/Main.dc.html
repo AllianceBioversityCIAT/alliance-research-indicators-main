@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Strategy framework management</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Barlow,sans-serif;color:#4C5158;background:#f5f5f5}
+a{color:#035BA9}a:hover{color:#074B86}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1120px; position: relative; display: flex; flex-direction: column; background: #f5f5f5; font-family: Barlow, sans-serif; color: #4C5158; overflow: hidden">
+
+<header style="height: 64px; flex-shrink: 0; background: #173F6F; display: flex; align-items: center; padding: 0 28px; gap: 36px; box-sizing: border-box">
+<div style="font-size: 26px; font-weight: 700; letter-spacing: 4px; color: #ffffff">STAR</div>
+<nav aria-label="Main" style="display: flex; gap: 30px; flex-grow: 1">
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Home</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Projects</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Center</a>
+<a href="#" style="color: #ffffff; font-size: 14px; text-decoration: none">Results Dashboard</a>
+</nav>
+<a href="#" style="color: #ffffff; font-size: 13px; font-weight: 600; text-decoration: none; border: 1px solid #7C9CB9; border-radius: 9px; padding: 6px 14px">+ Create Result</a>
+<label for="nav-search" style="position: absolute; left: -9999px">Search results</label>
+<input id="nav-search" type="search" placeholder="Search a result" style="width: 240px; height: 30px; border-radius: 8px; border: 0; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div aria-label="Account" style="width: 32px; height: 32px; border-radius: 50%; background: #345B8F; color: #ffffff; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center">HT</div>
+</header>
+
+<div style="display: flex; flex-grow: 1; min-height: 0">
+
+<aside style="width: 250px; flex-shrink: 0; background: #ffffff; border-right: 1px solid #E8EBED; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">RESOURCES</div>
+<a href="#" style="font-size: 14px; color: #153C71; text-decoration: none; padding: 8px 0">About Indicators</a>
+<div style="height: 1px; background: #E8EBED; margin: 8px 0"></div>
+<div style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 4.5px; color: #8D9299; font-weight: 300">ADMINISTRATION</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 10px 0 4px">
+<span>Center admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
+</div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bulk upload</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">SDG Management</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
+<a href="PortfolioManagement.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Portfolio Management</a>
+<div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
+<a href="ControlledLists.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="OrgStructure.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
+<a href="Main.dc.html" aria-current="page" style="font-size: 13px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 6px 8px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
+</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
+<span>System admin</span>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+</div>
+</aside>
+
+<main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Strategy framework</h1>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 760px; line-height: 1.25">Add, edit and delete the strategy hierarchy (Impact Outcomes, Strategic Objectives, Enablers), the monitoring hierarchy (Performance Areas, Dimensions, Indicators) and the annual Institutional Objectives of the selected portfolio.</p>
+</div>
+<div style="display: flex; gap: 10px; align-items: center">
+<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
+<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
+<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
+<option disabled="disabled">Portfolio 1 · 2010–2025 (not configured)</option>
+</select>
+</div>
+</div>
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #D1D6DA">
+<nav aria-label="Configuration sections" style="display: flex; gap: 4px">
+<a href="Main.dc.html" aria-current="page" style="font-size: 14px; font-weight: 600; color: #112F5C; text-decoration: none; padding: 9px 14px; border-bottom: 3px solid #00B6FF">Framework</a>
+<a href="InstitutionalObjectives.dc.html" style="font-size: 14px; color: #6B7079; text-decoration: none; padding: 9px 14px">Institutional Objectives</a>
+</nav>
+<div style="display: flex; gap: 8px; padding-bottom: 8px; align-items: center">
+<div role="group" aria-label="View" style="display: flex; background: #F4F7F9; border-radius: 9px; padding: 3px; gap: 3px">
+<button type="button" onClick="{{showTree}}" aria-pressed="{{isTree}}" style="height: 24px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{treeBg}}; color: {{treeFg}}">Tree</button>
+<button type="button" onClick="{{showTable}}" aria-pressed="{{isTable}}" style="height: 24px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{tableBg}}; color: {{tableFg}}">Table</button>
+</div>
+<button type="button" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Copy to new portfolio</button>
+<button type="button" onClick="{{exportXls}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Export .xlsx</button>
+</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{counts}}" as="k" hint-placeholder-count="6">
+<div style="background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px">
+<div style="font-size: 12px; color: #6B7079">{{k.label}}</div>
+<div style="display: flex; align-items: baseline; gap: 6px"><span style="font-size: 22px; font-weight: 700; color: #112F5C">{{k.n}}</span><span style="font-size: 11px; color: #6B7079">{{k.code}}</span></div>
+</div>
+</sc-for>
+</div>
+
+<div style="display: flex; gap: 16px; flex-grow: 1; min-height: 0">
+
+<sc-if value="{{isTree}}" hint-placeholder-val="{{true}}">
+<section aria-label="Framework tree" style="width: 540px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<div style="padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #E8EBED">
+<div role="group" aria-label="Hierarchy" style="display: flex; background: #F4F7F9; border-radius: 9px; padding: 3px; gap: 3px">
+<button type="button" onClick="{{showStrategy}}" aria-pressed="{{isStrategy}}" style="flex-grow: 1; height: 30px; border: 0; border-radius: 7px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; background: {{stratBg}}; color: {{stratFg}}; font-weight: 600">Strategy · IO → SO, EN</button>
+<button type="button" onClick="{{showMonitoring}}" aria-pressed="{{isMonitoring}}" style="flex-grow: 1; height: 30px; border: 0; border-radius: 7px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; background: {{monBg}}; color: {{monFg}}; font-weight: 600">Performance monitoring · PA → DIM → IND</button>
+</div>
+<div style="display: flex; gap: 8px">
+<label for="tree-search" style="position: absolute; left: -9999px">Find an element</label>
+<input id="tree-search" type="search" placeholder="Find by code or name" style="flex-grow: 1; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<sc-if value="{{isMonitoring}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{addPa}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 8px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 12px; font-weight: 600; cursor: pointer">+ Performance Area</button>
+</sc-if>
+</div>
+</div>
+<div style="flex-grow: 1; overflow-y: auto; padding: 6px 8px 10px">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="14">
+<sc-if value="{{r.isGroup}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 8px 6px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">{{r.title}}</span>
+<button type="button" onClick="{{r.add}}" style="height: 24px; border: 0; background: #D9E1EB; color: #035BA9; border-radius: 7px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer">{{r.addLabel}}</button>
+</div>
+</sc-if>
+<sc-if value="{{r.isItem}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; gap: 6px; min-height: 34px; border-radius: 8px; padding-left: {{r.pad}}px; padding-right: 6px; background: {{r.bg}}">
+<sc-if value="{{r.hasKids}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{r.toggle}}" aria-label="{{r.toggleLabel}}" aria-expanded="{{r.open}}" style="width: 22px; height: 22px; border: 0; background: transparent; color: #112F5C; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0">
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({{r.rot}}deg)" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+</button>
+</sc-if>
+<sc-if value="{{r.noKids}}" hint-placeholder-val="{{false}}">
+<span style="width: 22px; flex-shrink: 0"></span>
+</sc-if>
+<button type="button" onClick="{{r.pick}}" style="flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; cursor: pointer; text-align: left; padding: 6px 0; font-family: Barlow, sans-serif">
+<span style="flex-shrink: 0; font-size: 11.5px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{r.code}}</span>
+<span style="font-size: 13.5px; color: #112F5C; font-weight: {{r.weight}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.title}}</span>
+</button>
+<span style="flex-shrink: 0; font-size: 11.5px; color: #6B7079">{{r.meta}}</span>
+<sc-if value="{{r.canAdd}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{r.add}}" aria-label="{{r.addLabel}}" title="{{r.addLabel}}" style="width: 24px; height: 24px; flex-shrink: 0; border: 0; border-radius: 7px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0">
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+</button>
+</sc-if>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isTable}}" hint-placeholder-val="{{false}}">
+<section aria-label="Framework table" style="flex-grow: 1; min-width: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<div style="padding: 12px 14px 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap">
+<div role="group" aria-label="Level" style="display: flex; gap: 4px; flex-wrap: wrap">
+<sc-for list="{{kinds}}" as="k" hint-placeholder-count="6">
+<button type="button" onClick="{{k.go}}" aria-pressed="{{k.on}}" style="height: 28px; border-radius: 14px; border: 1px solid {{k.border}}; background: {{k.bg}}; color: {{k.fg}}; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer">{{k.label}} · {{k.n}}</button>
+</sc-for>
+</div>
+<button type="button" onClick="{{addOfKind}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 8px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer">{{addOfKindLabel}}</button>
+</div>
+<div style="padding: 10px 14px 0">
+<label for="tbl-search" style="position: absolute; left: -9999px">Find an element</label>
+<input id="tbl-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name or parent" style="width: 340px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+</div>
+<div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 10px 14px 0; border: 1px solid #E8EBED; border-radius: 6px">
+<table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
+<thead><tr>
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="5">
+<th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
+<sc-if value="{{h.sortable}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 10px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
+</sc-if>
+<sc-if value="{{h.fixed}}" hint-placeholder-val="{{false}}"><div style="padding: 9px 10px; font-size: 13px; font-weight: 600; color: #112F5C; text-align: center">{{h.label}}</div></sc-if>
+</th>
+</sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{t.rows}}" as="r" hint-placeholder-count="10">
+<tr style="background: {{r.bg}}">
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2"><span style="font-size: 12px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{r.code}}</span></td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #112F5C; font-weight: 600">{{r.title}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.parent}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6B7079">{{r.desc}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2">{{r.kids}}</td>
+<td style="padding: 5px 8px; border-bottom: 1px solid #EEF0F2">
+<div style="display: flex; justify-content: center; gap: 6px">
+<button type="button" onClick="{{r.edit}}" aria-label="{{r.editLabel}}" title="Edit" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg></button>
+<button type="button" onClick="{{r.del}}" aria-label="{{r.delLabel}}" title="Delete" style="width: 27px; height: 27px; border: 0; border-radius: 8px; background: #FBE3E6; color: #B00020; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path></svg></button>
+</div>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="padding: 8px 14px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px">
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="page-size" style="color: #6B7079">Rows per page</label>
+<select id="page-size" value="{{t.size}}" onChange="{{t.setSize}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 6px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<option value="10">10</option><option value="25">25</option><option value="50">50</option><option value="100">100</option>
+</select>
+<span style="color: #6B7079; margin-left: 8px">{{t.range}}</span>
+</div>
+<div style="display: flex; gap: 6px">
+<sc-for list="{{t.pages}}" as="p" hint-placeholder-count="2">
+<button type="button" onClick="{{p.go}}" aria-label="{{p.aria}}" style="width: 28px; height: 28px; border-radius: 7px; border: 1px solid #D1D6DA; background: {{p.bg}}; color: {{p.fg}}; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer">{{p.n}}</button>
+</sc-for>
+</div>
+</div>
+</section>
+</sc-if>
+
+<section aria-label="Element form" style="flex: {{formFlex}}; min-width: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<sc-if value="{{hasForm}}" hint-placeholder-val="{{true}}">
+<div style="padding: 16px 22px 14px; border-bottom: 1px solid #E8EBED; display: flex; flex-direction: column; gap: 6px">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">{{p.caps}}</span>
+<div style="display: flex; align-items: center; gap: 10px">
+<sc-if value="{{p.hasCode}}" hint-placeholder-val="{{true}}">
+<span style="font-size: 14px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 2px 8px">{{p.code}}</span>
+</sc-if>
+<h2 style="margin: 0; font-size: 19px; font-weight: 700; color: #112F5C">{{p.title}}</h2>
+</div>
+<sc-if value="{{p.hasSub}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12.5px; color: #6B7079">{{p.sub}}</span>
+</sc-if>
+</div>
+<div style="flex-grow: 1; overflow-y: auto; padding: 16px 22px; display: flex; flex-direction: column; gap: 14px">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="font-size: 13px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 8px 12px">{{toast}}</div>
+</sc-if>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px">
+<sc-for list="{{fields}}" as="f" hint-placeholder-count="5">
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span {{f.span}}">
+<label for="{{f.id}}" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.label}}</label>
+<sc-if value="{{f.isText}}" hint-placeholder-val="{{true}}">
+<input id="{{f.id}}" type="text" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.placeholder}}" style="height: 32px; border: 1px solid {{f.border}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; box-sizing: border-box">
+</sc-if>
+<sc-if value="{{f.isArea}}" hint-placeholder-val="{{false}}">
+<textarea id="{{f.id}}" rows="3" value="{{f.value}}" onChange="{{f.onChange}}" placeholder="{{f.placeholder}}" style="border: 1px solid {{f.border}}; border-radius: 8px; padding: 8px 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; line-height: 1.35; resize: vertical"></textarea>
+</sc-if>
+<sc-if value="{{f.isSelect}}" hint-placeholder-val="{{false}}">
+<select id="{{f.id}}" value="{{f.value}}" onChange="{{f.onChange}}" style="height: 32px; border: 1px solid {{f.border}}; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; background: #ffffff">
+<sc-for list="{{f.options}}" as="o" hint-placeholder-count="3">
+<option value="{{o.value}}">{{o.label}}</option>
+</sc-for>
+</select>
+</sc-if>
+<sc-if value="{{f.isMulti}}" hint-placeholder-val="{{false}}">
+<div id="{{f.id}}" style="display: flex; flex-wrap: wrap; gap: 6px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 8px 10px">
+<sc-for list="{{f.multi}}" as="m" hint-placeholder-count="4">
+<label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #153C71; background: {{m.bg}}; border: 1px solid {{m.border}}; border-radius: 12px; padding: 2px 10px 2px 6px; cursor: pointer">
+<input type="checkbox" checked="{{m.checked}}" onChange="{{m.toggle}}" style="margin: 0">{{m.label}}</label>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{f.isCalc}}" hint-placeholder-val="{{false}}">
+<div id="{{f.id}}" style="min-height: 32px; box-sizing: border-box; border: 1px solid #E8EBED; background: #F4F7F9; border-radius: 8px; padding: 7px 10px; font-size: 13px; color: #4C5158">{{f.value}}</div>
+</sc-if>
+<sc-if value="{{f.hasError}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.error}}</span>
+</sc-if>
+<sc-if value="{{f.hasHint}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 11.5px; color: #6B7079">{{f.hint}}</span>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="padding: 12px 22px; border-top: 1px solid #E8EBED; display: flex; justify-content: space-between; align-items: center">
+<div>
+<sc-if value="{{p.canDelete}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{askDelete}}" style="height: 30px; border: 1px solid #F2B8C0; background: #ffffff; color: #B00020; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Delete</button>
+</sc-if>
+</div>
+<div style="display: flex; gap: 8px">
+<button type="button" onClick="{{cancel}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
+<button type="button" onClick="{{save}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{noForm}}" hint-placeholder-val="{{false}}">
+<div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 40px; text-align: center">
+<sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
+<div role="status" style="font-size: 13px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 8px 12px">{{toast}}</div>
+</sc-if>
+<h2 style="margin: 0; font-size: 16px; color: #112F5C">Select an element to edit it</h2>
+<p style="margin: 0; font-size: 13px; color: #6B7079; max-width: 360px">Or use the + buttons in the tree to add a new element under its parent.</p>
+</div>
+</sc-if>
+</section>
+
+</div>
+</main>
+</div>
+
+<sc-if value="{{hasConfirm}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
+<div role="dialog" aria-modal="true" aria-labelledby="del-title" style="width: 460px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<h2 id="del-title" style="margin: 0; font-size: 17px; color: #112F5C">{{c.title}}</h2>
+<p style="margin: 0; font-size: 13.5px; color: #4C5158; line-height: 1.45">{{c.body}}</p>
+<div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px">
+<button type="button" onClick="{{closeConfirm}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{c.closeLabel}}</button>
+<sc-if value="{{c.canDelete}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{doDelete}}" style="height: 30px; border: 0; background: #B00020; color: #ffffff; border-radius: 9px; padding: 0 16px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Delete</button>
+</sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+const OWNERS = ['ADG Research', 'BOF', 'DT', 'Ethics', 'Legal', 'POD', 'SPEC', 'Africa', 'Americas', 'Asia', 'Europe'];
+const KIND = {
+  io: { label: 'Impact Outcome', caps: 'IMPACT OUTCOME · WHAT WE WANT TO ACHIEVE', child: 'so', parentKind: null, prefix: 'IO-' },
+  so: { label: 'Strategic Objective', caps: 'STRATEGIC OBJECTIVE · WHAT WE DO', child: null, parentKind: 'io', prefix: 'SO-' },
+  en: { label: 'Enabler', caps: 'ENABLER · HOW WE DO IT', child: null, parentKind: null, prefix: 'EN-' },
+  pa: { label: 'Performance Area', caps: 'PERFORMANCE AREA · MONITORING LEVEL 1', child: 'dim', parentKind: null, prefix: 'PA-' },
+  dim: { label: 'Dimension', caps: 'DIMENSION · MONITORING LEVEL 2', child: 'ind', parentKind: 'pa', prefix: 'DIM-' },
+  ind: { label: 'Indicator', caps: 'INDICATOR · MONITORING LEVEL 3 — KPIs HANG FROM HERE', child: null, parentKind: 'dim', prefix: 'IND-' }
+};
+const CODE_HINT = 'Proposed automatically. Must be unique within the portfolio.';
+const SCHEMA = {
+  io: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: 'title', label: 'Title', type: 'text', req: true },
+    { k: 'tag', label: 'Short hint / tagline', type: 'text' },
+    { k: 'desc', label: 'Elaborated outcome', type: 'area' }
+  ],
+  so: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: 'parent', label: 'Primary Impact Outcome', type: 'select', req: true, span: 1, from: 'io' },
+    { k: 'title', label: 'Title', type: 'text', req: true },
+    { k: 'tag', label: 'Short hint / tagline', type: 'text' },
+    { k: 'desc', label: 'Guidance', type: 'area' },
+    { k: 'sys', label: 'Short description for systems (1–2 lines)', type: 'text' },
+    { k: 'ios', label: 'Other contributing Impact Outcomes', type: 'multi', from: 'io', excludeParent: true }
+  ],
+  en: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: 'pa', label: 'Related Performance Area', type: 'select', span: 1, from: 'pa' },
+    { k: 'title', label: 'Title', type: 'text', req: true },
+    { k: 'tag', label: 'Short hint / tagline', type: 'text' },
+    { k: 'desc', label: 'Full description', type: 'area' },
+    { k: 'why', label: 'Rationale / why it matters', type: 'area' }
+  ],
+  pa: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: '_ens', label: 'Related Enablers', type: 'calc', span: 1, hint: 'Set on each Enabler.' },
+    { k: 'title', label: 'Name', type: 'text', req: true },
+    { k: 'desc', label: 'Definition', type: 'area' },
+    { k: '_counts', label: 'Dimensions · Indicators', type: 'calc', span: 1, hint: 'Calculated, never typed.' }
+  ],
+  dim: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: 'parent', label: 'Performance Area', type: 'select', req: true, span: 1, from: 'pa' },
+    { k: 'title', label: 'Name', type: 'text', req: true },
+    { k: 'desc', label: 'Description', type: 'area' },
+    { k: 'owners', label: 'Owner units', type: 'multi', owners: true, hint: 'Units flagged “Manages institutional KPIs” in the organizational structure.' }
+  ],
+  ind: [
+    { k: 'code', label: 'Code', type: 'text', req: true, span: 1, hint: CODE_HINT },
+    { k: 'parent', label: 'Dimension', type: 'select', req: true, span: 1, from: 'dim' },
+    { k: 'title', label: 'Name', type: 'text', req: true },
+    { k: 'desc', label: 'Description / definition', type: 'area' },
+    { k: '_pa', label: 'Performance Area (derived from the Dimension)', type: 'calc', span: 2 }
+  ]
+};
+
+function cmp(a, b) { if (typeof a === 'number' && typeof b === 'number') return a - b; return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' }); }
+const IND_IOB = { 'IND-1.1.1': ['IOB-1'], 'IND-1.1.2': ['IOB-2', 'IOB-3'], 'IND-1.2.1': ['IOB-4', 'IOB-5'], 'IND-1.2.2': ['IOB-6'], 'IND-1.2.3': ['IOB-6'], 'IND-1.3.1': ['IOB-7'], 'IND-1.4.1': ['IOB-8'], 'IND-1.4.2': ['IOB-9'], 'IND-1.5.1': ['IOB-10'], 'IND-1.5.2': ['IOB-11', 'IOB-12'], 'IND-1.5.3': ['IOB-13'], 'IND-1.5.4': ['IOB-14'], 'IND-1.6.1': ['IOB-15'], 'IND-1.6.2': ['IOB-16', 'IOB-17'], 'IND-1.6.3': ['IOB-18'], 'IND-1.6.4': ['IOB-19'], 'IND-2.1.1': ['IOB-20', 'IOB-21'], 'IND-2.1.2': ['IOB-22'], 'IND-2.1.3': ['IOB-23'], 'IND-3.1.1': ['IOB-24'], 'IND-3.1.2': ['IOB-24'], 'IND-3.1.3': ['IOB-24'], 'IND-3.3.1': ['IOB-24'], 'IND-4.1.1': ['IOB-25'], 'IND-4.2.1': ['IOB-26'], 'IND-4.2.2': ['IOB-26'], 'IND-4.3.1': ['IOB-27'], 'IND-4.4.1': ['IOB-28'], 'IND-4.4.2': ['IOB-28'] };
+const STAR_ALIGN = { 'IO-1': 1, 'IO-2': 1, 'IO-3': 1, 'IO-4': 1, 'IO-5': 1, 'SO-1': 1, 'SO-2': 1, 'SO-3': 1, 'SO-4': 1, 'SO-5': 1 };
+const SEED = [
+  ['io', 'IO-1', 'Unleashed Agrobiodiversity for Climate, Food, and Nature', '', { tag: 'Strengthened resilience through diversified crops and next-generation breeding.', desc: 'Genebanks, breeding programs, farming communities, and public and private seed sectors work together to safeguard, improve, and deploy agrobiodiversity at scale.' }],
+  ['io', 'IO-2', 'Future-Proofed Farms and Landscapes', '', { tag: 'Scaled climate resilience, nature-positive solutions, and digital innovation.', desc: 'Farmers, communities and their supporting institutions and organizations collaboratively innovate to transform farms and landscapes into equitable, climate-resilient, and environmentally friendly systems.' }],
+  ['io', 'IO-3', 'Inclusive Food Economies', '', { tag: 'Fair and resilient markets that reduce inequality.', desc: 'Producers, processors, traders, and buyers are able to leverage inclusive markets, finance, and infrastructure, enabling innovation and entrepreneurship, providing secure livelihood opportunities, and boosting prosperity.' }],
+  ['io', 'IO-4', 'Healthy Diets for All', '', { tag: 'Nutritious and sustainable diets made more accessible.', desc: 'People, including vulnerable and marginalized groups, can access and consume healthy, safe, sustainable diets, even in times of shocks and crises.' }],
+  ['io', 'IO-5', 'Leveraged Financing and Investment for Impact', '', { tag: 'Mobilized public and private investment to scale transformation.', desc: 'Scientific discovery, innovation and finance operate as a continuous system. Farmers, enterprises and investors adopt science-based solutions at scale.' }],
+  ['so', 'SO-1', 'Bank on agrobiodiversity', 'IO-1', { tag: 'Safeguard and promote diverse crops for resilience and nutrition.', desc: '…by safeguarding, improving, and promoting the equitable use of agrobiodiversity including opportunity crops.' }],
+  ['so', 'SO-2', 'Make farms and landscapes thrive', 'IO-2', { tag: 'Restore and manage systems for resilient and sustainable benefits.', desc: '…by restoring and managing diverse crop, tree and livestock systems so landscapes are resilient, resource-efficient, and deliver equitable social, economic and nutritional benefits.' }],
+  ['so', 'SO-3', 'Unlock climate action', 'IO-2', { tag: 'Build resilience and reduce emissions across food and land systems.', desc: '…by building climate resilience and reducing emissions in farms, landscapes and food systems.' }],
+  ['so', 'SO-4', 'Enable healthy food choices', 'IO-4', { tag: 'Improve access, availability, and demand for healthy diets.', desc: '…by raising consumer awareness on the benefits of healthy diets, and transforming food environments to increase the availability, accessibility, quality, desirability and convenience of a healthy diet for all.' }],
+  ['so', 'SO-5', 'Boost inclusion and prosperity', 'IO-3', { tag: 'Strengthen livelihoods and empower marginalized groups.', desc: '…by enhancing the livelihoods of women, youth, indigenous people and marginalized groups and their power in the governance of food and land systems.' }],
+  ['en', 'EN-1', 'Rewire knowledge and data', '', { pa: 'PA-3', tag: 'Connect data and knowledge for informed, inclusive decisions.', desc: '…by connecting data streams and knowledge communities to enable timely decisions about food and land systems that are scientifically sound, inclusive, ethical and targeted.' }],
+  ['en', 'EN-2', 'Innovate for impact', '', { pa: 'PA-4', tag: 'Link science and investment to deliver measurable change.', desc: '…by catalyzing and connecting science-based innovation and investment that deliver measurable change for food and land systems.' }],
+  ['en', 'EN-3', 'Enable system change', '', { pa: 'PA-4', tag: 'Align partners, policies, and finance for transformation at scale.', desc: '…by engaging diverse partners to co-develop and apply evidence that informs and aligns policies, finance, and institutional frameworks.' }],
+  ['en', 'EN-4', 'Embody institutional excellence', '', { pa: 'PA-1', tag: 'Operate as an agile, high-performing, fit-for-purpose organization.', desc: '…by ensuring a fit-for-purpose, digitally enabled organization that is effective, efficient and agile in mobilizing resources and delivering high-quality services.' }],
+  ['en', 'EN-5', 'Cultivate a culture for change', '', { pa: 'PA-2', tag: 'Foster collaboration, learning, and shared ownership.', desc: '…by advancing an inclusive culture that inspires collaboration, excellence, and co-ownership to deliver our mission.' }],
+  ['pa', 'PA-1', 'Institutional Excellence', '', { desc: 'It focuses on how well the organization functions as a whole, including efficient processes, strong governance, and a positive external reputation.' }],
+  ['pa', 'PA-2', 'Culture for Change', '', { desc: 'Advancing an inclusive culture that inspires collaboration, excellence, and co-ownership to deliver our mission.' }],
+  ['pa', 'PA-3', 'Scientific Excellence', '', { desc: 'The extent to which the Alliance produces rigorous, credible, relevant, and influential research and knowledge that advances scientific understanding.' }],
+  ['pa', 'PA-4', 'Enable System Change', '', { desc: 'Engaging diverse partners to co-develop and apply evidence that informs and aligns policies, finance, and institutional frameworks.' }],
+  ['dim', 'DIM-1.1', 'Operational efficiency and agility', 'PA-1', { owners: ['BOF', 'DT', 'POD', 'ADG Research', 'SPEC', 'Legal'], desc: 'Redesigned operating model, end-to-end processes, streamlined project management lifecycle, and responsiveness to our mission.' }],
+  ['dim', 'DIM-1.2', 'Financial health', 'PA-1', { owners: ['BOF', 'SPEC', 'ADG Research', 'Africa', 'Americas', 'Asia', 'Europe'], desc: 'Diversified revenue sources and strengthened financial models that sustain research portfolios, with competitive benchmarking and transparent value-for-money mechanisms.' }],
+  ['dim', 'DIM-1.3', 'Partnerships', 'PA-1', { owners: ['SPEC', 'ADG Research'], desc: 'Fit-for-Partnering: effective partnering at all levels made part of the fabric of the organization.' }],
+  ['dim', 'DIM-1.4', 'Digital and data enablement', 'PA-1', { owners: ['DT'], desc: 'AI deployed, ERP platforms integrated, including real-time dashboards to optimize decision-making.' }],
+  ['dim', 'DIM-1.5', 'Governance', 'PA-1', { desc: 'High-level oversight, structural agility, and operational stewardship.' }],
+  ['dim', 'DIM-1.6', 'Combined assurance', 'PA-1', { desc: 'Risk integration, internal controls, and multi-layered compliance posture.' }],
+  ['dim', 'DIM-2.1', 'People and culture', 'PA-2', {}],
+  ['dim', 'DIM-3.1', 'Knowledge products', 'PA-3', { desc: 'Finalized intellectual outputs (e.g., articles, briefs, databases, software) stored in CGSpace and aligned with FAIR data principles.' }],
+  ['dim', 'DIM-3.2', 'Capacity sharing for development', 'PA-3', { desc: 'Activities that build knowledge, skills, and institutional capacity among individuals and partners.' }],
+  ['dim', 'DIM-3.3', 'Innovation development', 'PA-3', { desc: 'Development of new or improved products, technologies, or institutional arrangements validated for potential impact at scale.' }],
+  ['dim', 'DIM-4.1', 'Innovation use', 'PA-4', { desc: 'Extent to which validated innovations are being used by target users under real conditions.' }],
+  ['dim', 'DIM-4.2', 'Impact case reports', 'PA-4', { desc: 'Evidence-based reports documenting changes or impacts resulting from Alliance research and innovations.' }],
+  ['dim', 'DIM-4.3', 'Policy advocacy', 'PA-4', { desc: 'Research translated into actionable evidence and compelling narratives for policy engagement.' }],
+  ['dim', 'DIM-4.4', 'Innovate for impact', 'PA-4', { desc: 'Advance science-based solutions that transform food and land systems by linking research to investment.' }],
+  ['ind', 'IND-1.1.1', 'Process efficiency', 'DIM-1.1', { desc: 'Redesigned, digitalized and improved end-to-end processes with a resulting improvement in efficiency and decreasing administrative workload.' }],
+  ['ind', 'IND-1.1.2', 'Service delivery', 'DIM-1.1', { desc: 'Service delivery time, compliance with Service Level Agreements, staff satisfaction with service delivery.' }],
+  ['ind', 'IND-1.2.1', 'Revenue strength', 'DIM-1.2', { desc: 'Ability of the organization to secure, diversify, and sustain funding from donors and other sources.' }],
+  ['ind', 'IND-1.2.2', 'Stability and resilience', 'DIM-1.2', { desc: 'The organization’s ability to maintain a sound and predictable financial position over time.' }],
+  ['ind', 'IND-1.2.3', 'Execution and control', 'DIM-1.2', { desc: 'The degree to which the organization effectively converts financial resources into planned outcomes through disciplined budget management, strong internal controls, accurate forecasting, and timely performance monitoring.' }],
+  ['ind', 'IND-1.3.1', 'Strategic visibility and influence', 'DIM-1.3', {}],
+  ['ind', 'IND-1.4.1', 'Data governance', 'DIM-1.4', {}],
+  ['ind', 'IND-1.4.2', 'Digital ecosystems', 'DIM-1.4', {}],
+  ['ind', 'IND-1.5.1', 'Decision-making and effectiveness', 'DIM-1.5', { desc: 'Consistency with which leadership uses standardized financial datasets and reporting to drive evidence-based decisions.' }],
+  ['ind', 'IND-1.5.2', 'Governance system', 'DIM-1.5', { desc: 'An appropriate and up-to-date set of policies, procedures, and guidance documents.' }],
+  ['ind', 'IND-1.5.3', 'Organizational performance and agility', 'DIM-1.5', { desc: 'Continuously adapt structures and staffing models to align with evolving research portfolios, regional strategies, and donor landscapes.' }],
+  ['ind', 'IND-1.5.4', 'Transparency and sustainability', 'DIM-1.5', { desc: 'Integrate ESG principles into all business and research operations.' }],
+  ['ind', 'IND-1.6.1', 'Audit and oversight', 'DIM-1.6', { desc: 'Responsiveness to internal and external reviews by tracking the timely closure of audit findings.' }],
+  ['ind', 'IND-1.6.2', 'Compliance', 'DIM-1.6', { desc: 'Adherence to internal financial controls, host-country labor and tax laws, and regional research reporting mandates.' }],
+  ['ind', 'IND-1.6.3', 'Risk management', 'DIM-1.6', { desc: 'Sound financial management and a strong internal control environment.' }],
+  ['ind', 'IND-1.6.4', 'Ethics and integrity', 'DIM-1.6', { desc: 'Staff engagement with organizational values and the health of reporting channels.' }],
+  ['ind', 'IND-2.1.1', 'Cross-cutting collaboration', 'DIM-2.1', { desc: 'Cross-cutting collaboration to solve systemic organizational challenges.' }],
+  ['ind', 'IND-2.1.2', 'Inclusive leadership development', 'DIM-2.1', { desc: 'Train managers in role-modelling, unconscious bias, change leadership, and values-based recognition.' }],
+  ['ind', 'IND-2.1.3', 'Trust and psychological safety', 'DIM-2.1', { desc: 'Foster open communication, a speak-up culture, and transparent internal dialogue mechanisms.' }],
+  ['ind', 'IND-3.1.1', 'Scientific output and quality', 'DIM-3.1', { desc: 'Volume, collaboration, accessibility, and quality management of scientific outputs.' }],
+  ['ind', 'IND-3.1.2', 'Research synthesis and visibility', 'DIM-3.1', { desc: 'Production of flagship research reports that synthesize scientific evidence.' }],
+  ['ind', 'IND-3.1.3', 'Scientific relevance', 'DIM-3.1', { desc: 'Extent to which research projects maintain timely and effective technical delivery.' }],
+  ['ind', 'IND-3.2.1', 'Capacity sharing for development', 'DIM-3.2', { desc: 'Activities that build knowledge, skills, and institutional capacity among individuals and partners.' }],
+  ['ind', 'IND-3.3.1', 'Innovation development', 'DIM-3.3', { desc: 'Development of new or improved products, technologies, or institutional arrangements validated for potential impact at scale.' }],
+  ['ind', 'IND-4.1.1', 'Uptake of innovations for system change', 'DIM-4.1', {}],
+  ['ind', 'IND-4.2.1', 'Demonstrated research impact', 'DIM-4.2', { desc: 'Documented broader effects of research on policies, investments, innovations, systems, or other outcomes.' }],
+  ['ind', 'IND-4.2.2', 'Documented outcome and behavioral change', 'DIM-4.2', { desc: 'Documented changes in the behaviors, practices, decisions, or actions of stakeholders linked to the use of research.' }],
+  ['ind', 'IND-4.3.1', 'Policy change', 'DIM-4.3', { desc: 'Legal instruments, programs, or strategies modified or enacted with evidence of Alliance research contribution.' }],
+  ['ind', 'IND-4.4.1', 'Strategic partnerships for innovation scaling', 'DIM-4.4', { desc: 'Partnering for the co-creation of demand-driven, science-based innovations and enabling the scaling of solutions.' }],
+  ['ind', 'IND-4.4.2', 'Transition of innovations to market', 'DIM-4.4', {}]
+];
+
+function seedState() {
+  const nodes = {}; const ids = [];
+  SEED.forEach(s => {
+    nodes[s[1]] = { id: s[1], kind: s[0], v: Object.assign({ code: s[1], title: s[2], parent: s[3], tag: '', desc: '', sys: '', why: '', pa: '', ios: [], owners: [] }, s[4]) };
+    ids.push(s[1]);
+  });
+  return { nodes: nodes, ids: ids };
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const s = seedState();
+    this.state = { nodes: s.nodes, ids: s.ids, view: 'monitoring', open: { 'PA-1': true, 'DIM-1.2': true, 'IO-1': true, 'IO-2': true },
+      sel: 'IND-1.2.3', mode: 'edit', createKind: null, createParent: '', draft: {}, errors: {}, confirm: false, toast: '', seq: 1,
+      view: 'tree', tkind: 'ind', q: '', sort: 'code', dir: 1, size: 10, page: 0 };
+  }
+  list(kind) { return this.state.ids.map(id => this.state.nodes[id]).filter(n => n.kind === kind).sort((a, b) => cmp(a.v.code, b.v.code)); }
+  kids(id) { return this.state.ids.map(i => this.state.nodes[i]).filter(n => n.v.parent === id).sort((a, b) => cmp(a.v.code, b.v.code)); }
+  label(n) { return n ? n.v.code + ' · ' + n.v.title : ''; }
+  proposeCode(kind, parentId) {
+    const pre = KIND[kind].prefix;
+    const p = parentId ? this.state.nodes[parentId] : null;
+    if (p) {
+      const base = p.v.code.replace(/^[A-Z]+-/, '');
+      const n = this.kids(parentId).filter(k => k.kind === kind).length + 1;
+      return kind === 'so' ? pre + (this.list('so').length + 1) : pre + base + '.' + n;
+    }
+    return pre + (this.list(kind).length + 1);
+  }
+  startCreate(kind, parentId) {
+    const o = Object.assign({}, this.state.open);
+    if (parentId) o[parentId] = true;
+    this.setState({ mode: 'create', createKind: kind, createParent: parentId || '', draft: {}, errors: {}, toast: '', open: o });
+  }
+  base() {
+    const s = this.state;
+    if (s.mode === 'create') return { code: this.proposeCode(s.createKind, s.createParent), title: '', parent: s.createParent, tag: '', desc: '', sys: '', why: '', pa: '', ios: [], owners: [] };
+    return s.nodes[s.sel] ? s.nodes[s.sel].v : null;
+  }
+  value(k) { const d = this.state.draft; if (d[k] !== undefined) return d[k]; const b = this.base(); return b ? b[k] : ''; }
+  setField(k, val) {
+    const d = Object.assign({}, this.state.draft); d[k] = val;
+    const e = Object.assign({}, this.state.errors); e[k] = '';
+    this.setState({ draft: d, errors: e, toast: '' });
+  }
+  toggleMulti(k, val) {
+    const cur = (this.value(k) || []).slice();
+    const i = cur.indexOf(val);
+    if (i >= 0) cur.splice(i, 1); else cur.push(val);
+    this.setField(k, cur);
+  }
+  save() {
+    const s = this.state;
+    const kind = s.mode === 'create' ? s.createKind : s.nodes[s.sel].kind;
+    const vals = Object.assign({}, this.base(), s.draft);
+    const errors = {};
+    SCHEMA[kind].forEach(fd => { if (fd.req && !String(vals[fd.k] || '').trim()) errors[fd.k] = 'Required'; });
+    const clash = s.ids.some(id => id !== s.sel && s.nodes[id].v.code.trim().toUpperCase() === String(vals.code).trim().toUpperCase());
+    if (!errors.code && (s.mode === 'create' ? s.ids.some(id => s.nodes[id].v.code.trim().toUpperCase() === String(vals.code).trim().toUpperCase()) : clash)) errors.code = 'This code is already used in Portfolio 2';
+    if (Object.keys(errors).length) { this.setState({ errors: errors }); return; }
+    const nodes = Object.assign({}, s.nodes);
+    if (s.mode === 'create') {
+      const id = 'new-' + s.seq;
+      nodes[id] = { id: id, kind: kind, v: vals };
+      const o = Object.assign({}, s.open); if (vals.parent) o[vals.parent] = true;
+      this.setState({ nodes: nodes, ids: s.ids.concat([id]), sel: id, mode: 'edit', draft: {}, errors: {}, open: o, seq: s.seq + 1, toast: KIND[kind].label + ' ' + vals.code + ' created.' });
+    } else {
+      nodes[s.sel] = Object.assign({}, nodes[s.sel], { v: vals });
+      this.setState({ nodes: nodes, draft: {}, errors: {}, toast: 'Changes to ' + vals.code + ' saved.' });
+    }
+  }
+  cancel() { this.setState({ mode: 'edit', createKind: null, draft: {}, errors: {}, toast: '' }); }
+  doDelete() {
+    const s = this.state;
+    const n = s.nodes[s.sel];
+    const nodes = {};
+    s.ids.filter(id => id !== s.sel).forEach(id => {
+      const x = s.nodes[id];
+      const v = Object.assign({}, x.v);
+      if (v.pa === s.sel) v.pa = '';
+      if (v.ios && v.ios.indexOf(s.sel) >= 0) v.ios = v.ios.filter(i => i !== s.sel);
+      nodes[id] = Object.assign({}, x, { v: v });
+    });
+    this.setState({ nodes: nodes, ids: s.ids.filter(id => id !== s.sel), sel: null, confirm: false, draft: {}, errors: {}, toast: KIND[n.kind].label + ' ' + n.v.code + ' deleted.' });
+  }
+  row(n, level, withKids, meta) {
+    const s = this.state;
+    const kids = withKids ? this.kids(n.id) : [];
+    const open = !!s.open[n.id];
+    const selected = s.mode === 'edit' && s.sel === n.id;
+    const childKind = KIND[n.kind].child;
+    return { isGroup: false, isItem: true, code: n.v.code, title: n.v.title, meta: meta, hasKids: kids.length > 0, noKids: kids.length === 0, open: open,
+      pad: 6 + level * 22, bg: selected ? '#E3ECF6' : 'transparent', weight: selected ? 700 : (level === 0 ? 600 : 400), rot: open ? 90 : 0,
+      canAdd: !!childKind, addLabel: childKind ? 'Add ' + KIND[childKind].label + ' to ' + n.v.code : '',
+      add: () => this.startCreate(childKind, n.id),
+      toggleLabel: (open ? 'Collapse ' : 'Expand ') + n.v.code,
+      toggle: () => { const o = Object.assign({}, this.state.open); o[n.id] = !o[n.id]; this.setState({ open: o }); },
+      pick: () => this.setState({ sel: n.id, mode: 'edit', draft: {}, errors: {}, toast: '' }) };
+  }
+  renderVals() {
+    const s = this.state;
+    const mon = s.view === 'monitoring';
+    const rows = [];
+    if (mon) {
+      this.list('pa').forEach(p => {
+        const dims = this.kids(p.id);
+        const ni = dims.reduce((a, d) => a + this.kids(d.id).length, 0);
+        rows.push(this.row(p, 0, true, dims.length + ' dim · ' + ni + ' ind'));
+        if (s.open[p.id]) dims.forEach(d => {
+          const inds = this.kids(d.id);
+          rows.push(this.row(d, 1, true, inds.length + ' ind'));
+          if (s.open[d.id]) inds.forEach(i => rows.push(this.row(i, 2, false, '')));
+        });
+      });
+    } else {
+      rows.push({ isGroup: true, isItem: false, title: 'IMPACT OUTCOMES · WHAT WE WANT TO ACHIEVE', addLabel: '+ Impact Outcome', add: () => this.startCreate('io', '') });
+      this.list('io').forEach(io => {
+        const kids = this.kids(io.id);
+        rows.push(this.row(io, 0, true, kids.length + ' SO'));
+        if (s.open[io.id]) kids.forEach(x => rows.push(this.row(x, 1, false, 'primary')));
+      });
+      rows.push({ isGroup: true, isItem: false, title: 'ENABLERS · HOW WE DO IT', addLabel: '+ Enabler', add: () => this.startCreate('en', '') });
+      this.list('en').forEach(e => { const pa = s.nodes[e.v.pa]; rows.push(this.row(e, 0, false, pa ? '→ ' + pa.v.code : 'no PA')); });
+    }
+
+    const b = this.base();
+    const hasForm = !!b && (s.mode === 'create' || !!s.nodes[s.sel]);
+    let fields = []; let p = {};
+    if (hasForm) {
+      const kind = s.mode === 'create' ? s.createKind : s.nodes[s.sel].kind;
+      const cur = s.mode === 'edit' ? s.nodes[s.sel] : null;
+      fields = SCHEMA[kind].map(fd => {
+        const err = s.errors[fd.k] || '';
+        const f = { id: 'f-' + fd.k, label: fd.label + (fd.req ? ' *' : ''), span: fd.span || 2, isText: fd.type === 'text', isArea: fd.type === 'area', isSelect: fd.type === 'select', isMulti: fd.type === 'multi', isCalc: fd.type === 'calc',
+          value: '', placeholder: fd.type === 'area' ? 'Write the ' + fd.label.toLowerCase() : '', options: [], multi: [], error: err, hasError: !!err, border: err ? '#B00020' : '#B9C0C5', hint: fd.hint || '', hasHint: !!fd.hint && !err,
+          onChange: (e) => this.setField(fd.k, e.target.value) };
+        if (fd.type === 'text' || fd.type === 'area') f.value = this.value(fd.k) || '';
+        if (fd.type === 'select') {
+          f.value = this.value(fd.k) || '';
+          f.options = [{ value: '', label: fd.req ? 'Select the ' + fd.label.toLowerCase() : 'None' }].concat(this.list(fd.from).map(x => ({ value: x.id, label: this.label(x) })));
+        }
+        if (fd.type === 'multi') {
+          const sel = this.value(fd.k) || [];
+          const parent = this.value('parent');
+          const opts = fd.owners ? OWNERS.map(o => ({ v: o, l: o })) : this.list(fd.from).filter(x => !(fd.excludeParent && x.id === parent)).map(x => ({ v: x.id, l: x.v.code }));
+          f.multi = opts.map(o => { const on = sel.indexOf(o.v) >= 0; return { label: o.l, checked: on, bg: on ? '#EAF1F8' : '#ffffff', border: on ? '#7C9CB9' : '#D1D6DA', toggle: () => this.toggleMulti(fd.k, o.v) }; });
+        }
+        if (fd.k === '_ens') { const ens = cur ? this.list('en').filter(e => e.v.pa === cur.id).map(e => e.v.code) : []; f.value = ens.length ? ens.join(', ') : 'None'; }
+        if (fd.k === '_counts') { const dims = cur ? this.kids(cur.id) : []; f.value = dims.length + ' dimensions · ' + dims.reduce((a, d) => a + this.kids(d.id).length, 0) + ' indicators'; }
+        if (fd.k === '_pa') { const d = s.nodes[this.value('parent')]; const pa = d ? s.nodes[d.v.parent] : null; f.value = pa ? this.label(pa) : 'Select a Dimension first'; }
+        return f;
+      });
+      if (s.mode === 'create') {
+        const par = s.nodes[s.createParent];
+        p = { caps: KIND[kind].caps, hasCode: false, code: '', title: 'New ' + KIND[kind].label, hasSub: !!par, sub: par ? 'Under ' + this.label(par) : '', canDelete: false };
+      } else {
+        p = { caps: KIND[kind].caps, hasCode: true, code: cur.v.code, title: cur.v.title, hasSub: false, sub: '', canDelete: true };
+      }
+    }
+
+    let c = { title: '', body: '', closeLabel: 'Cancel', canDelete: false };
+    if (s.confirm && s.nodes[s.sel]) {
+      const n = s.nodes[s.sel];
+      const kids = this.kids(n.id);
+      const lbl = KIND[n.kind].label;
+      if (kids.length) {
+        c = { title: 'Cannot delete ' + n.v.code, body: 'This ' + lbl + ' has ' + kids.length + ' ' + (kids.length === 1 ? 'child element' : 'child elements') + ' (' + kids.map(k => k.v.code).join(', ') + '). Delete them or move them to another parent first.', closeLabel: 'Close', canDelete: false };
+      } else {
+        const reasons = [];
+        if (n.kind === 'pa') { const ens = this.list('en').filter(e => e.v.pa === n.id); if (ens.length) reasons.push('Enablers ' + ens.map(e => e.v.code).join(', ') + ' point to it'); }
+        if (n.kind === 'io') { const sos = this.list('so').filter(x => (x.v.ios || []).indexOf(n.id) >= 0); if (sos.length) reasons.push(sos.map(x => x.v.code).join(', ') + ' list it as a contributing outcome'); }
+        if (n.kind === 'ind' && IND_IOB[n.id]) reasons.push('Institutional Objectives ' + IND_IOB[n.id].join(', ') + ' are linked to it');
+        if (STAR_ALIGN[n.id]) reasons.push('results are aligned to it in the Alliance alignment section');
+        if (reasons.length) c = { title: 'Cannot delete ' + n.v.code, body: 'This ' + lbl.toLowerCase() + ' has associated information: ' + reasons.join('; ') + '. Items with associated information cannot be deleted — remove those links first.', closeLabel: 'Close', canDelete: false };
+        else c = { title: 'Delete ' + n.v.code + ' · ' + n.v.title + '?', body: 'It has no children and no associated information, so it will be removed from Portfolio 2 permanently.', closeLabel: 'Cancel', canDelete: true };
+      }
+    }
+
+    const tk = s.tkind;
+    const q = s.q.trim().toLowerCase();
+    const parentLabel = (n) => { if (n.kind === 'en') { const pa = s.nodes[n.v.pa]; return pa ? this.label(pa) : '—'; } const pr = s.nodes[n.v.parent]; return pr ? this.label(pr) : '—'; };
+    let flat = this.list(tk).map(n => ({ id: n.id, code: n.v.code, title: n.v.title, parent: parentLabel(n), desc: n.v.tag || n.v.desc || '—', kids: KIND[tk].child ? this.kids(n.id).length : (tk === 'ind' ? (IND_IOB[n.id] || []).length : 0) }))
+      .filter(r => !q || (r.code + ' ' + r.title + ' ' + r.parent).toLowerCase().indexOf(q) >= 0);
+    flat.sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
+    const pc = Math.max(1, Math.ceil(flat.length / s.size)); const pg = Math.min(s.page, pc - 1); const st = pg * s.size;
+    const parentHead = { io: 'Parent', so: 'Primary Impact Outcome', en: 'Related Performance Area', pa: 'Parent', dim: 'Performance Area', ind: 'Dimension' }[tk];
+    const kidsHead = { io: '# SO', so: '—', en: '—', pa: '# DIM', dim: '# IND', ind: '# IOB' }[tk];
+    const COLS = [['code', 'Code', 110], ['title', 'Name', 260], ['parent', parentHead, 240], ['desc', 'Tagline / description', 320], ['kids', kidsHead, 80], ['_a', 'Actions', 90]];
+    const t = {
+      headers: COLS.map(cl => { const on = s.sort === cl[0]; return { label: cl[1], w: cl[2], sortable: cl[0] !== '_a', fixed: cl[0] === '_a', icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none', sort: () => this.setState({ sort: cl[0], dir: on ? -s.dir : 1, page: 0 }) }; }),
+      rows: flat.slice(st, st + s.size).map(r => ({ code: r.code, title: r.title, parent: r.parent, desc: r.desc, kids: r.kids, bg: s.mode === 'edit' && s.sel === r.id ? '#E3ECF6' : '#ffffff',
+        editLabel: 'Edit ' + r.code, delLabel: 'Delete ' + r.code,
+        edit: () => this.setState({ sel: r.id, mode: 'edit', draft: {}, errors: {}, toast: '' }), del: () => this.setState({ sel: r.id, mode: 'edit', draft: {}, errors: {}, confirm: true }) })),
+      pages: Array.from({ length: pc }, (x, i) => ({ n: i + 1, aria: 'Page ' + (i + 1), bg: i === pg ? '#035BA9' : '#ffffff', fg: i === pg ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) })),
+      size: String(s.size), range: flat.length ? (st + 1) + '–' + Math.min(st + s.size, flat.length) + ' of ' + flat.length : '0 elements',
+      setSize: (e) => this.setState({ size: Number(e.target.value), page: 0 })
+    };
+    const tree = s.view === 'tree';
+
+    return {
+      t: t, q: s.q, onQ: (e) => this.setState({ q: e.target.value, page: 0 }),
+      kinds: ['io', 'so', 'en', 'pa', 'dim', 'ind'].map(k => ({ label: KIND[k].label + 's', n: this.list(k).length, on: tk === k, bg: tk === k ? '#112F5C' : '#ffffff', fg: tk === k ? '#ffffff' : '#112F5C', border: tk === k ? '#112F5C' : '#B9C0C5', go: () => this.setState({ tkind: k, page: 0, sort: 'code', dir: 1 }) })),
+      addOfKindLabel: '+ ' + KIND[tk].label,
+      addOfKind: () => { const pk = KIND[tk].parentKind; const first = pk ? this.list(pk)[0] : null; this.startCreate(tk, first ? first.id : ''); },
+      isTree: tree, isTable: !tree, formFlex: tree ? '1 1 0' : '0 0 460px',
+      treeBg: tree ? '#ffffff' : 'transparent', treeFg: tree ? '#112F5C' : '#6B7079', tableBg: tree ? 'transparent' : '#ffffff', tableFg: tree ? '#6B7079' : '#112F5C',
+      showTree: () => this.setState({ view: 'tree' }), showTable: () => this.setState({ view: 'table' }),
+      exportXls: () => this.setState({ toast: 'Exported the framework (' + s.ids.length + ' elements, one sheet per level) to strategy-framework_portfolio-2.xlsx' }),
+      rows: rows, fields: fields, p: p, c: c,
+      hasForm: hasForm, noForm: !hasForm,
+      hasToast: !!s.toast, toast: s.toast,
+      hasConfirm: !!s.confirm,
+      isStrategy: !mon, isMonitoring: mon,
+      stratBg: mon ? 'transparent' : '#ffffff', stratFg: mon ? '#6B7079' : '#112F5C',
+      monBg: mon ? '#ffffff' : 'transparent', monFg: mon ? '#112F5C' : '#6B7079',
+      showStrategy: () => this.setState({ view: 'strategy', sel: this.state.nodes['SO-3'] ? 'SO-3' : null, mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      showMonitoring: () => this.setState({ view: 'monitoring', sel: this.state.nodes['IND-1.2.3'] ? 'IND-1.2.3' : null, mode: 'edit', draft: {}, errors: {}, toast: '' }),
+      addPa: () => this.startCreate('pa', ''),
+      save: () => this.save(),
+      cancel: () => this.cancel(),
+      askDelete: () => this.setState({ confirm: true }),
+      closeConfirm: () => this.setState({ confirm: false }),
+      doDelete: () => this.doDelete(),
+      counts: [
+        { label: 'Impact Outcomes', n: this.list('io').length, code: 'IO-#' },
+        { label: 'Strategic Objectives', n: this.list('so').length, code: 'SO-#' },
+        { label: 'Enablers', n: this.list('en').length, code: 'EN-#' },
+        { label: 'Performance Areas', n: this.list('pa').length, code: 'PA-#' },
+        { label: 'Dimensions', n: this.list('dim').length, code: 'DIM-#.#' },
+        { label: 'Indicators', n: this.list('ind').length, code: 'IND-#.#.#' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
