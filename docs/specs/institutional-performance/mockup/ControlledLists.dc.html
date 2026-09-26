@@ -68,7 +68,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
 <select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
 <option>Portfolio 2 · Alliance Strategy 2026–2030</option>
-<option disabled="disabled">Portfolio 1 · 2010–2025 (not configured)</option>
+<option>Portfolio 1 · 2010–2025 (not configured)</option>
 </select>
 <button type="button" onClick="{{newCategory}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">+ New category</button>
 </div>
@@ -106,7 +106,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #112F5C">{{cur.name}}</h2>
 <span style="font-size: 12.5px; color: #4C5158">{{cur.desc}}</span>
 <div style="display: flex; gap: 14px; font-size: 12px; color: #6B7079; flex-wrap: wrap">
-<span>System key: <strong style="color: #153C71">{{cur.key}}</strong></span>
+<span>Reference: <strong style="color: #153C71">P2 · {{cur.key}}</strong></span>
 <span>Used by: <strong style="color: #153C71">{{cur.usedBy}}</strong></span>
 </div>
 </div>
@@ -356,7 +356,7 @@ class Component extends DCLogic {
     if (m.type === 'value') return { title: m.mode === 'edit' ? 'Edit value' : 'Add value', sub: cur.cat.name + ' › ' + cur.list.name,
       fields: [F('code', 'Code', { req: true, span: 1, hint: 'Unique in the list; editable.' }), F('order', 'Display order', { span: 1, number: true }), F('value', 'Value', { req: true, ph: 'e.g. Hours' }), F('desc', 'Description', { area: true, ph: 'Optional' }), F('active', 'Active — offered in forms', { check: true })] };
     if (m.type === 'list') return { title: m.mode === 'edit' ? 'Edit list' : 'New list', sub: m.mode === 'edit' ? cur.list.name : 'A new list can be linked to a form field by the development team.',
-      fields: [F('name', 'List name', { req: true }), F('key', 'System key', { req: true, disabled: m.mode === 'edit', span: 1, hint: m.mode === 'edit' ? 'Fixed once created — code reads the list by this key.' : 'Fixed once created.' }), F('cat', 'Category', { span: 1, select: s.cats.map(c => ({ v: c.id, l: c.name })) }), F('desc', 'Description', { area: true })] };
+      fields: [F('name', 'List name', { req: true }), F('key', 'System key', { req: true, disabled: m.mode === 'edit', span: 1, hint: m.mode === 'edit' ? 'Fixed once created. No portfolio in the key — it is shown as P2 · key.' : 'Fixed once created. Do not add the portfolio; it is stored separately.' }), F('cat', 'Category', { span: 1, select: s.cats.map(c => ({ v: c.id, l: c.name })) }), F('desc', 'Description', { area: true })] };
     return { title: m.mode === 'edit' ? 'Edit category' : 'New category', sub: 'Categories group lists by the part of the system that uses them.', fields: [F('name', 'Category name', { req: true }), F('desc', 'Description', { area: true })] };
   }
   renderVals() {

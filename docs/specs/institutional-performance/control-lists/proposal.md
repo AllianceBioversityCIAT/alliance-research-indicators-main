@@ -12,7 +12,7 @@
 | **Approval Mode** | `gated` |
 | **Parent Spec** | `docs/specs/institutional-performance` (`family.md`, child 1 of 5) |
 | **Status** | draft — awaiting approval |
-| **Last updated** | 2026-09-26 |
+| **Last updated** | 2026-09-26 (key naming decided: portfolio kept out of the key) |
 | **Branch** | `institutional-kpis` (from `staging`) |
 | **JPD idea** | [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258) |
 | **Depends on** | none |
@@ -45,7 +45,7 @@ Stop hard-coding vocabularies. The KPI forms (Idea 2) and the organizational str
 | Element | Fields (* required) | Rules |
 | --- | --- | --- |
 | Category | Name*, Description | Seed: *Key Performance Indicators (KPIs)*, *Organizational structure* |
-| List | Name*, System key* (fixed once created, `[a-z0-9_.]`), Category, Description; *Used by* (read-only) | System lists cannot be deleted; a custom list can be deleted when empty |
+| List | Name*, System key* (fixed once created, `[a-z0-9_.]`, **no portfolio or year segment**), Category, Description; *Used by* (read-only) | Unique per portfolio, so `org.level` exists once in each portfolio; the UI shows the qualified reference `P2 · org.level` (computed, not stored). System lists cannot be deleted; a custom list can be deleted when empty |
 | Value | Code* (unique in list), Value* (unique in list), Description, Display order, Active | In-use count shown; a value in use cannot be deleted |
 
 Seed data (F-8):
