@@ -266,7 +266,7 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 
 | Measure | Estimate |
 | --- | --- |
-| Tasks | 9 (4 server, 5 client — including one manual HITL check) |
+| Tasks | 10 (4 server, 6 client — including one manual HITL check). Re-sized at `tasks.md` (was 9): the client page split into plumbing (T-08) and page (T-09) to keep each task one session |
 | LOC (incl. tests) | ~2,100 (server ~950, client ~1,150) |
 | Review rounds | ≤ 2 per task; ≤ 14 in total |
 
