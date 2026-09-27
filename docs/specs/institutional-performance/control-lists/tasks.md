@@ -7,6 +7,7 @@
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — APPROVED)
 - **Branch:** `institutional-kpis`
+- **Jira:** epic [AC-1773](https://cgiarmel.atlassian.net/browse/AC-1773) · stories AC-1774 (US1) · AC-1775 (US2) · AC-1776 (US3) · AC-1777 (US4) · AC-1778 (US5) · AC-1779 (US6). Mark each Done when its task finishes.
 - **Last updated:** 2026-09-27
 
 > **Legend for verification fields.** *Falsifier* = the concrete input or mutation that must turn the gate red. *Red run* = what must be observed failing, and on which assertion. *Disqualifier* = what makes a green reading worthless. *Consumers* = existing files that pin a symbol this task changes (from the Premise Ledger + a test-file grep). An absent value reads `n/a` or `none`, never blank.
@@ -42,6 +43,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-01 — Migration: create the three tables and seed Portfolio 2
 
+- **Jira:** [AC-1780](https://cgiarmel.atlassian.net/browse/AC-1780) (story [AC-1774](https://cgiarmel.atlassian.net/browse/AC-1774))
 - **Status:** todo · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-CTL-010 (all ACs + *Seed is idempotent*), R-CTL-002/003/004 uniqueness at DB level, NFR-CTL-003
 - **Design refs:** §3 Data model, D-CTL-5, D-CTL-8, P-4, P-6
@@ -68,6 +70,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-02 — Usage registry (in-use counts and *Used by*)
 
+- **Jira:** [AC-1781](https://cgiarmel.atlassian.net/browse/AC-1781) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
 - **Status:** todo · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-CTL-005 (mechanism, AC.3), R-CTL-003 *Used by*
 - **Design refs:** §5.5, D-CTL-3, D-CTL-12, P-10
@@ -86,6 +89,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-03 — Service, DTOs and repositories: all business rules
 
+- **Jira:** [AC-1782](https://cgiarmel.atlassian.net/browse/AC-1782) (story [AC-1775](https://cgiarmel.atlassian.net/browse/AC-1775))
 - **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-CTL-001 (isolation, cross-portfolio write → 400), R-CTL-002, R-CTL-003 (immutable key, system list, same key in two portfolios, custom list lifecycle, `usedBy`), R-CTL-004 (uniqueness, code proposal, deactivate), R-CTL-005 (block when in use), R-CTL-006 (ordered read, `activeOnly`, unknown key)
 - **Design refs:** §5 rules 1–8, D-CTL-4, D-CTL-5, D-CTL-11, D-CTL-13, P-14
@@ -121,6 +125,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-04 — Controller, roles, Swagger, module registration and integration test
 
+- **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1777](https://cgiarmel.atlassian.net/browse/AC-1777))
 - **Status:** todo · **Size:** M · **Dependencies:** T-03
 - **Requirements covered:** R-CTL-007 (server: denied and allowed roles), R-CTL-001 AC.1–2 (end to end), R-CTL-006 (open to authenticated users), R-CTL-010 AC.1 (through the API), NFR-CTL-002, NFR-CTL-005
 - **Design refs:** §4 (A1–A13), §8, D-CTL-7, P-5
@@ -159,6 +164,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-05 — Client utils: natural comparator and xlsx export
 
+- **Jira:** [AC-1784](https://cgiarmel.atlassian.net/browse/AC-1784) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
 - **Status:** todo · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-CTL-009 *Natural sort*, *Export respects filter and sort*
 - **Design refs:** §6.3, D-CTL-6, P-3; judgment J-5 (CommonJS)
@@ -187,6 +193,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-06 — Shared `DataTable` component (table standard F-7)
 
+- **Jira:** [AC-1785](https://cgiarmel.atlassian.net/browse/AC-1785) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
 - **Status:** todo · **Size:** M · **Dependencies:** T-05
 - **Requirements covered:** R-CTL-009 (all ACs), NFR-CTL-004 (`aria-sort`), R-CTL-008 empty/loading states for tables
 - **Design refs:** §6.3, §6.4 tokens, judgment J-7
@@ -218,6 +225,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-07 — Sidebar: one nested level under a Center admin child
 
+- **Jira:** [AC-1786](https://cgiarmel.atlassian.net/browse/AC-1786) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
 - **Status:** todo · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-CTL-008 *Menu placement* (incl. **BUT it must NOT** change existing items), AC.1 (expanded and collapsed)
 - **Design refs:** §6.1, D-CTL-9, P-8, P-9, P-12; judgment J-6
@@ -251,6 +259,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-08 — Client plumbing: ApiService methods, types, modal registration, route
 
+- **Jira:** [AC-1787](https://cgiarmel.atlassian.net/browse/AC-1787) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
 - **Status:** todo · **Size:** S · **Dependencies:** T-04
 - **Requirements covered:** R-CTL-007 client (`canMatch: [centerAdminGuard]`), R-CTL-008 (route), data contracts for R-CTL-001…006
 - **Design refs:** §2.1 client table, §4, P-2, P-11
@@ -281,6 +290,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-09 — Control Lists page
 
+- **Jira:** [AC-1788](https://cgiarmel.atlassian.net/browse/AC-1788) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
 - **Status:** todo · **Size:** L · **Dependencies:** T-06, T-07, T-08
 - **Requirements covered:** R-CTL-001 client (default portfolio; every portfolio selectable, *not configured* label and empty state — J-2), R-CTL-002/003/004 UI flows, R-CTL-003 qualified reference `P<id> · <key>` and *Used by*, R-CTL-005 blocked-delete message, R-CTL-008 layout and four UI states, NFR-CTL-004 (modal focus, `aria-label`)
 - **Design refs:** §6.2, §6.4, D-CTL-2, D-CTL-10, D-CTL-12; mockup `../mockup/ControlledLists.dc.html`
@@ -321,6 +331,7 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 ### T-10 — HITL: real-browser check and rollout premise
 
+- **Jira:** [AC-1789](https://cgiarmel.atlassian.net/browse/AC-1789) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
 - **Status:** todo · **Size:** S · **Dependencies:** T-09, PR 1 deployed to Dev
 - **Requirements covered:** R-CTL-009 AC.2 (resize persistence — the substitute gate from requirements §10), R-CTL-008 visual fidelity and *Menu placement* in a real browser, the P-13 rollout premise
 - **Design refs:** §10 Manual row, §11 Rollout, P-13, judgment J-7
