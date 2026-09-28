@@ -7,34 +7,51 @@ import {
   PoolFundingMappingDiffService,
 } from './pool-funding-mapping-diff.service';
 
-// KZ-017 — this fake filters AND-predicates and refuses OR. It does not
-// run MySQL, so operator precedence stays unproven. Dates compare by
-// instant. A dropped `created_at <= ?` changes which push is paired.
+// KZ-001 — assertions are on the SQL text and the parameter arrays.
+// KZ-017 — this fake filters the predicates it understands. It does not
+// run MySQL, so joins, collation, and boolean storage stay unproven.
+// A dropped `is_snapshot = TRUE` returns the live row, which has no ToC.
 
 const CODE = '19949';
 const YEAR = 2026;
 const HISTORY_ID = 77;
-const T_OLDEST = new Date('2026-09-01T00:00:00.000Z');
-const T_EARLIER = new Date('2026-09-05T00:00:00.000Z');
-const T_REJECTED = new Date('2026-09-08T00:00:00.000Z');
-const T_DECISION = new Date('2026-09-10T00:00:00.000Z');
-const T_LATER = new Date('2026-09-20T00:00:00.000Z');
-const T_OCCURRED_AFTER = new Date('2026-09-25T00:00:00.000Z');
+const LIVE_ID = 10;
+const VERSION_ID = 20;
 
-interface LogRow {
-  id: number;
-  external_reference: string;
-  result_year: number;
-  outcome: string;
-  created_at: Date;
-  request_payload: unknown;
+interface ResultRow {
+  result_id: number;
+  result_official_code: string;
+  report_year_id: number;
+  is_snapshot: boolean;
+  is_active: boolean;
+}
+
+interface TocRow {
+  result_id: number;
+  sp_code: string;
+  level: string | null;
+  toc_result_id: number | null;
+  toc_result_title: string | null;
+  indicator_description: string | null;
+  quantitative_contribution: string | null;
+  unit_messurament: string | null;
+  target_value: string | null;
+  target_year: number | null;
+  is_active: boolean;
+}
+
+interface SpRow {
+  result_id: number;
+  sp_code: string;
+  sp_role: string;
+  is_active: boolean;
+  alignment_active: boolean;
 }
 
 interface HistoryRow {
   id: number;
   result_official_code: string | null;
-  decided_at: Date | null;
-  occurred_at: Date | null;
+  result_year: number | null;
   raw_body: unknown;
 }
 
@@ -43,21 +60,11 @@ interface RecordedQuery {
   params: unknown[];
 }
 
-const sentPayload = (
-  toc: Record<string, unknown>,
-  contributing?: Record<string, unknown>[],
-): Record<string, unknown> => {
-  const data: Record<string, unknown> = { toc_mapping: toc };
-  if (contributing) {
-    data.contributing_programs = contributing;
-  }
-  return { results: [{ data }] };
-};
-
 const callbackBody = (
   entries: Record<string, unknown>[],
+  extra: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
-  data: { obj_results_toc_result: entries },
+  data: { ...extra, obj_results_toc_result: entries },
 });
 
 const primary = (
@@ -75,34 +82,73 @@ const contributingEntry = (officialCode: string): Record<string, unknown> => ({
   toc_mappings: [],
 });
 
-const logRow = (overrides: Partial<LogRow> = {}): LogRow => ({
-  id: 1,
-  external_reference: CODE,
-  result_year: YEAR,
-  outcome: 'ACCEPTED',
-  created_at: T_EARLIER,
-  request_payload: sentPayload({
-    science_program_id: 'SP06',
-    result_title: 'Same title',
-    toc_result_id: 7290,
-  }),
-  ...overrides,
-});
+const decoy = {
+  obj_result_level: { name: 'Outcome' },
+  result_level_id: 4,
+};
 
 const historyRow = (overrides: Partial<HistoryRow> = {}): HistoryRow => ({
   id: HISTORY_ID,
   result_official_code: CODE,
-  decided_at: T_DECISION,
-  occurred_at: T_DECISION,
+  result_year: YEAR,
   raw_body: callbackBody([
-    primary([{ title: 'Same title', toc_result_id: 7290 }]),
+    primary([
+      {
+        title: 'Same title',
+        toc_result_id: 7290,
+        level: 'Intermediate Outcome',
+      },
+    ]),
   ]),
   ...overrides,
 });
 
-class FakePairingTables {
+const liveResult = (): ResultRow => ({
+  result_id: LIVE_ID,
+  result_official_code: CODE,
+  report_year_id: YEAR,
+  is_snapshot: false,
+  is_active: true,
+});
+
+const versionResult = (overrides: Partial<ResultRow> = {}): ResultRow => ({
+  result_id: VERSION_ID,
+  result_official_code: CODE,
+  report_year_id: YEAR,
+  is_snapshot: true,
+  is_active: true,
+  ...overrides,
+});
+
+const versionToc = (overrides: Partial<TocRow> = {}): TocRow => ({
+  result_id: VERSION_ID,
+  sp_code: 'SP06',
+  level: 'Intermediate Outcome',
+  toc_result_id: 7290,
+  toc_result_title: 'Same title',
+  indicator_description: null,
+  quantitative_contribution: null,
+  unit_messurament: null,
+  target_value: null,
+  target_year: null,
+  is_active: true,
+  ...overrides,
+});
+
+const versionSp = (overrides: Partial<SpRow> = {}): SpRow => ({
+  result_id: VERSION_ID,
+  sp_code: 'SP06',
+  sp_role: 'PRIMARY',
+  is_active: true,
+  alignment_active: true,
+  ...overrides,
+});
+
+class FakeVersionDb {
   history: HistoryRow[] = [];
-  logs: LogRow[] = [];
+  results: ResultRow[] = [liveResult(), versionResult()];
+  tocs: TocRow[] = [versionToc()];
+  sps: SpRow[] = [versionSp()];
   queries: RecordedQuery[] = [];
 
   readonly query = jest.fn((sql: string, params: unknown[] = []) =>
@@ -111,134 +157,129 @@ class FakePairingTables {
 
   async execute(sql: string, params: unknown[] = []): Promise<unknown> {
     this.queries.push({ sql, params });
+    if (/\bFROM\s+result_prms_sync_log\b/i.test(sql)) {
+      throw new Error(
+        `diff must not read the sent payload\n${normalizeSql(sql)}`,
+      );
+    }
     if (
       /^\s*SELECT\b/i.test(sql) &&
       /\bFROM\s+result_prms_sync_history\b/i.test(sql)
     ) {
       return this.selectHistory(sql, params);
     }
+    if (/^\s*SELECT\b/i.test(sql) && /\bFROM\s+results\b/i.test(sql)) {
+      return this.selectResults(sql, params);
+    }
     if (
       /^\s*SELECT\b/i.test(sql) &&
-      /\bFROM\s+result_prms_sync_log\b/i.test(sql)
+      /\bFROM\s+result_pool_funding_toc_alignment\b/i.test(sql)
     ) {
-      return this.selectLogs(sql, params);
+      return this.selectToc(sql, params);
+    }
+    if (
+      /^\s*SELECT\b/i.test(sql) &&
+      /\bresult_pool_funding_alignment_sp\b/i.test(sql)
+    ) {
+      return this.selectSp(sql, params);
     }
     if (/^\s*UPDATE\s+result_prms_sync_history\b/i.test(sql)) {
       return { affectedRows: 1 };
     }
-    throw new Error(`FakePairingTables: unsupported SQL\n${sql}`);
+    throw new Error(`FakeVersionDb: unsupported SQL\n${sql}`);
   }
 
   private selectHistory(sql: string, params: unknown[]): HistoryRow[] {
-    const id = this.boundId(sql, params);
-    return this.history
-      .filter((row) => row.id === id)
-      .map((row) => ({
-        ...row,
-      }));
-  }
-
-  private boundId(sql: string, params: unknown[]): unknown {
     if (!/\bWHERE\s+id\s*=\s*\?/i.test(sql)) {
-      throw new Error(
-        `FakePairingTables: history SELECT without id = ?\n${sql}`,
-      );
+      throw new Error(`FakeVersionDb: history SELECT without id = ?\n${sql}`);
     }
     if (params.length !== 1) {
       throw new Error(
-        `FakePairingTables: history SELECT expected 1 param, got ${params.length}`,
+        `FakeVersionDb: history SELECT expected 1 param, got ${params.length}`,
       );
     }
-    return params[0];
+    return this.history.filter((row) => row.id === params[0]);
   }
 
-  private selectLogs(
+  private selectResults(
     sql: string,
     params: unknown[],
-  ): Array<{ request_payload: unknown }> {
-    const whereMatch = /WHERE\s+([\s\S]+?)(?:\bORDER\s+BY\b|\bLIMIT\b|$)/i.exec(
-      sql,
-    );
-    if (!whereMatch) {
-      throw new Error(`FakePairingTables: log SELECT without WHERE\n${sql}`);
-    }
-    const where = whereMatch[1];
-    if (/\bOR\b/i.test(where)) {
-      throw new Error(
-        'FakePairingTables refuses OR — SQL precedence is unmodeled (KZ-017)',
-      );
-    }
-    const parts = where
-      .split(/\bAND\b/i)
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0);
-    let paramIndex = 0;
-    const checks: Array<(row: LogRow) => boolean> = [];
-    for (const part of parts) {
-      const comparison = /^(\w+)\s*(<=|=)\s*(.+)$/i.exec(part);
-      if (!comparison) {
-        throw new Error(
-          `FakePairingTables: unparsed predicate "${part}"\n${sql}`,
-        );
-      }
-      const column = comparison[1] as keyof LogRow;
-      const operator = comparison[2];
-      const raw = comparison[3].trim();
-      let expected: unknown;
-      if (raw === '?') {
-        expected = params[paramIndex++];
-      } else if (/^'(.*)'$/.test(raw)) {
-        expected = /^'(.*)'$/.exec(raw)?.[1];
-      } else {
-        throw new Error(`FakePairingTables: unsupported literal ${raw}`);
-      }
-      checks.push((row) => this.matches(row, column, operator, expected));
-    }
-    if (paramIndex !== params.length) {
-      throw new Error(
-        `FakePairingTables: ${paramIndex} placeholders vs ${params.length} params`,
-      );
-    }
-    let matched = this.logs.filter((row) =>
-      checks.every((check) => check(row)),
-    );
-    if (/ORDER\s+BY\s+created_at\s+DESC,\s*id\s+DESC/i.test(sql)) {
-      matched = [...matched].sort((a, b) => {
-        const byTime = b.created_at.getTime() - a.created_at.getTime();
-        return byTime !== 0 ? byTime : b.id - a.id;
-      });
-    }
-    if (/\bLIMIT\s+1\b/i.test(sql)) {
-      matched = matched.slice(0, 1);
-    }
-    return matched.map((row) => ({ request_payload: row.request_payload }));
+  ): Array<{ result_id: number }> {
+    const wantsSnapshot = /is_snapshot\s*=\s*TRUE\b/i.test(sql);
+    const wantsLive = /is_snapshot\s*=\s*FALSE\b/i.test(sql);
+    const wantsActive = /is_active\s*=\s*TRUE\b/i.test(sql);
+    const code = params[0];
+    const year = params[1];
+    return this.results
+      .filter((row) => {
+        if (row.result_official_code !== code || row.report_year_id !== year) {
+          return false;
+        }
+        if (wantsActive && !row.is_active) {
+          return false;
+        }
+        if (wantsSnapshot) {
+          return row.is_snapshot;
+        }
+        if (wantsLive) {
+          return !row.is_snapshot;
+        }
+        return true;
+      })
+      .map((row) => ({ result_id: row.result_id }));
   }
 
-  private matches(
-    row: LogRow,
-    column: keyof LogRow,
-    operator: string,
-    expected: unknown,
-  ): boolean {
-    const actual = row[column];
-    if (operator === '<=') {
-      const left = actual instanceof Date ? actual.getTime() : Number.NaN;
-      const right =
-        expected instanceof Date
-          ? expected.getTime()
-          : new Date(String(expected)).getTime();
-      return left <= right;
-    }
-    if (actual instanceof Date && expected instanceof Date) {
-      return actual.getTime() === expected.getTime();
-    }
-    return actual === expected;
+  private selectToc(
+    sql: string,
+    params: unknown[],
+  ): Array<Record<string, unknown>> {
+    const requireActive = /is_active\s*=\s*TRUE\b/i.test(sql);
+    const resultId = params[0];
+    return this.tocs
+      .filter(
+        (row) =>
+          row.result_id === resultId && (!requireActive || row.is_active),
+      )
+      .map((row) => ({
+        sp_code: row.sp_code,
+        level: row.level,
+        toc_result_id: row.toc_result_id,
+        toc_result_title: row.toc_result_title,
+        indicator_description: row.indicator_description,
+        quantitative_contribution: row.quantitative_contribution,
+        unit_messurament: row.unit_messurament,
+        target_value: row.target_value,
+        target_year: row.target_year,
+      }));
+  }
+
+  private selectSp(
+    sql: string,
+    params: unknown[],
+  ): Array<Record<string, unknown>> {
+    const requireSpActive = /sp\.is_active\s*=\s*TRUE\b/i.test(sql);
+    const requireAlignmentActive = /a\.is_active\s*=\s*TRUE\b/i.test(sql);
+    const resultId = params[0];
+    return this.sps
+      .filter((row) => {
+        if (row.result_id !== resultId) {
+          return false;
+        }
+        if (requireSpActive && !row.is_active) {
+          return false;
+        }
+        if (requireAlignmentActive && !row.alignment_active) {
+          return false;
+        }
+        return true;
+      })
+      .map((row) => ({ sp_code: row.sp_code, sp_role: row.sp_role }));
   }
 }
 
 const normalizeSql = (sql: string): string => sql.replace(/\s+/g, ' ').trim();
 
-const changesUpdate = (table: FakePairingTables): RecordedQuery => {
+const changesUpdate = (table: FakeVersionDb): RecordedQuery => {
   const updates = table.queries.filter((query) =>
     /^\s*UPDATE\s+result_prms_sync_history\b/i.test(query.sql),
   );
@@ -246,7 +287,7 @@ const changesUpdate = (table: FakePairingTables): RecordedQuery => {
   return updates[0];
 };
 
-const parsedChanges = (table: FakePairingTables): PoolFundingChanges => {
+const parsedChanges = (table: FakeVersionDb): PoolFundingChanges => {
   const update = changesUpdate(table);
   expect(normalizeSql(update.sql)).toBe(
     'UPDATE result_prms_sync_history SET changes = ? WHERE id = ?',
@@ -257,14 +298,20 @@ const parsedChanges = (table: FakePairingTables): PoolFundingChanges => {
   return JSON.parse(update.params[0] as string) as PoolFundingChanges;
 };
 
+const queryFor = (table: FakeVersionDb, pattern: RegExp): RecordedQuery => {
+  const found = table.queries.find((query) => pattern.test(query.sql));
+  expect(found).toBeDefined();
+  return found as RecordedQuery;
+};
+
 describe('PoolFundingMappingDiffService', () => {
-  let table: FakePairingTables;
+  let table: FakeVersionDb;
   let service: PoolFundingMappingDiffService;
   let warn: jest.SpyInstance;
   let errorLog: jest.SpyInstance;
 
   beforeEach(() => {
-    table = new FakePairingTables();
+    table = new FakeVersionDb();
     warn = jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
@@ -284,6 +331,16 @@ describe('PoolFundingMappingDiffService', () => {
   const record = (): Promise<void> =>
     service.record({ historyId: HISTORY_ID, resultYear: YEAR });
 
+  const arm = (
+    historyOverrides: Partial<HistoryRow> = {},
+    tocOverrides: Partial<TocRow> = {},
+    extraSps: SpRow[] = [],
+  ): void => {
+    table.history = [historyRow(historyOverrides)];
+    table.tocs = [versionToc(tocOverrides)];
+    table.sps = [versionSp(), ...extraSps];
+  };
+
   it('is provided by PrmsWebhookCallbackModule', () => {
     const providers: unknown[] = Reflect.getMetadata(
       'providers',
@@ -292,150 +349,268 @@ describe('PoolFundingMappingDiffService', () => {
     expect(providers).toContain(PoolFundingMappingDiffService);
   });
 
-  describe('(a) a changed title emits one key', () => {
-    it('writes only Theory of Change result', async () => {
-      table.logs = [
-        logRow({
-          request_payload: sentPayload({
-            science_program_id: 'SP06',
-            result_title: 'Old title',
-            toc_result_id: 7290,
-          }),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([{ title: 'New title', toc_result_id: 7290 }]),
+  describe('version resolution', () => {
+    it('reads the snapshot ToC when the live row has none', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary([
+            {
+              title: 'Callback title',
+              toc_result_id: 7290,
+              level: 'Intermediate Outcome',
+            },
           ]),
+        ]),
+      });
+      table.tocs = [versionToc({ toc_result_title: 'Version title' })];
+
+      await record();
+
+      const snapshot = queryFor(table, /\bFROM\s+results\b/i);
+      expect(normalizeSql(snapshot.sql)).toBe(
+        'SELECT result_id FROM results WHERE result_official_code = ? AND report_year_id = ? AND is_snapshot = TRUE AND is_active = TRUE',
+      );
+      expect(snapshot.params).toEqual([CODE, YEAR]);
+      const toc = queryFor(
+        table,
+        /\bFROM\s+result_pool_funding_toc_alignment\b/i,
+      );
+      expect(normalizeSql(toc.sql)).toBe(
+        'SELECT sp_code, level, toc_result_id, toc_result_title, indicator_description, quantitative_contribution FROM result_pool_funding_toc_alignment WHERE result_id = ? AND is_active = TRUE',
+      );
+      expect(toc.params).toEqual([VERSION_ID]);
+      const sps = queryFor(table, /\bresult_pool_funding_alignment_sp\b/i);
+      expect(normalizeSql(sps.sql)).toBe(
+        'SELECT sp.sp_code, sp.sp_role FROM result_pool_funding_alignment_sp sp INNER JOIN result_pool_funding_alignment a ON a.id = sp.alignment_id WHERE a.result_id = ? AND a.is_active = TRUE AND sp.is_active = TRUE',
+      );
+      expect(sps.params).toEqual([VERSION_ID]);
+      expect(parsedChanges(table)).toEqual({
+        'Theory of Change result': {
+          before: 'Version title',
+          after: 'Callback title',
+        },
+      });
+      expect(
+        table.queries.some((query) =>
+          /\bFROM\s+result_prms_sync_log\b/i.test(query.sql),
+        ),
+      ).toBe(false);
+    });
+
+    it('writes {} and logs when two active snapshots share the pair', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary([
+            {
+              title: 'Callback title',
+              toc_result_id: 7290,
+              level: 'Intermediate Outcome',
+            },
+          ]),
+        ]),
+      });
+      table.results = [
+        liveResult(),
+        versionResult(),
+        versionResult({ result_id: VERSION_ID + 1 }),
+      ];
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({});
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('2 active snapshots');
+      expect(String(warn.mock.calls[0][0])).toContain(CODE);
+      expect(String(warn.mock.calls[0][0])).toContain(String(YEAR));
+      expect(
+        table.queries.some((query) =>
+          /\bresult_pool_funding_toc_alignment\b/i.test(query.sql),
+        ),
+      ).toBe(false);
+    });
+
+    it('writes {} and logs when the version has no ToC row', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary(
+            [
+              {
+                title: 'Callback title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+              },
+            ],
+            'SP99',
+          ),
+        ]),
+      });
+      table.tocs = [];
+      table.sps = [versionSp()];
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({});
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        `no active ToC row for result_id=${VERSION_ID}`,
+      );
+    });
+  });
+
+  describe('level', () => {
+    it('emits the nested toc_mappings level when it differs from the version', async () => {
+      arm(
+        {
+          raw_body: callbackBody(
+            [
+              primary([
+                {
+                  title: 'Same title',
+                  toc_result_id: 7290,
+                  level: 'Intermediate Outcome',
+                },
+              ]),
+            ],
+            decoy,
+          ),
+        },
+        { level: 'Output' },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({
+        'Theory of Change level': {
+          before: 'Output',
+          after: 'Intermediate Outcome',
+        },
+      });
+    });
+
+    it('omits level when the nested value matches and ignores obj_result_level', async () => {
+      arm({
+        raw_body: callbackBody(
+          [
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+              },
+            ]),
+          ],
+          decoy,
+        ),
+      });
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({});
+      expect(parsedChanges(table)['Theory of Change level']).toBeUndefined();
+    });
+  });
+
+  describe('callback paths PRMS does not send', () => {
+    it('emits the marker when our value is set, distinct from a real change', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary([
+            {
+              title: 'New title',
+              toc_result_id: 7290,
+              level: 'Intermediate Outcome',
+              unit_messurament: 't/ha',
+              target_value: '100',
+              target_year: 2030,
+            },
+          ]),
+        ]),
+      });
+      table.tocs = [
+        versionToc({
+          toc_result_title: 'Old title',
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '12.50',
+          unit_messurament: 't/ha',
+          target_value: '100',
+          target_year: 2030,
         }),
       ];
 
       await record();
 
       const changes = parsedChanges(table);
-      expect(changes).toEqual({
-        'Theory of Change result': { before: 'Old title', after: 'New title' },
+      expect(changes['Theory of Change result']).toEqual({
+        before: 'Old title',
+        after: 'New title',
       });
-      expect(changesUpdate(table).params).toEqual([
-        JSON.stringify(changes),
-        HISTORY_ID,
-      ]);
-      expect(warn).not.toHaveBeenCalled();
+      expect(changes.Indicator).toEqual({
+        before: 'Stored indicator',
+        after: 'Not provided by PRMS',
+      });
+      expect(changes['Quantitative contribution']).toEqual({
+        before: '12.50',
+        after: 'Not provided by PRMS',
+      });
+      expect(changes['Unit of measurement']).toBeUndefined();
+      expect(changes.Target).toBeUndefined();
     });
-  });
 
-  describe('(b) nothing changed writes {}', () => {
-    it('omits equal fields and the unobservable indicator description', async () => {
-      table.logs = [
-        logRow({
-          request_payload: sentPayload(
-            {
-              science_program_id: 'SP06',
-              result_title: 'Same title',
-              toc_result_id: 7290,
-              result_indicator_description: 'sent but not observable',
-            },
-            [{ science_program_id: 'SP02' }],
-          ),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([
-              {
-                title: 'Same title',
-                toc_result_id: 7290,
-                level: 'Outcome',
-              },
-            ]),
-            contributingEntry('SP02'),
-          ]),
-        }),
-      ];
+    it('emits nothing for an absent path when our value is null', async () => {
+      arm();
 
       await record();
 
-      expect(changesUpdate(table).params).toEqual(['{}', HISTORY_ID]);
-      expect(parsedChanges(table)).toEqual({});
+      const changes = parsedChanges(table);
+      expect(changes).toEqual({});
+      expect(changes.Indicator).toBeUndefined();
+      expect(changes['Quantitative contribution']).toBeUndefined();
+      expect(changes['Unit of measurement']).toBeUndefined();
+      expect(changes.Target).toBeUndefined();
     });
   });
 
-  describe('(c) a blank we sent and PRMS filled', () => {
-    it('records before null when toc_result_id was omitted', async () => {
-      table.logs = [
-        logRow({
-          request_payload: sentPayload({
-            science_program_id: 'SP06',
-            result_title: 'Same title',
-          }),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([{ title: 'Same title', toc_result_id: 7290 }]),
-          ]),
-        }),
-      ];
-
-      await record();
-
-      expect(parsedChanges(table)).toEqual({
-        'Theory of Change result ID': { before: null, after: '7290' },
-      });
-    });
-  });
-
-  describe('(d) duplicated toc_mappings collapse to one', () => {
-    it('emits one id change, not two copies of the same mapping', async () => {
-      const mapping = { title: 'Kept', toc_result_id: 7290, level: 'Output' };
-      table.logs = [
-        logRow({
-          request_payload: sentPayload({
-            science_program_id: 'SP06',
-            result_title: 'Kept',
-          }),
-        }),
-      ];
-      table.history = [
-        historyRow({
+  describe('duplicated toc_mappings', () => {
+    it('collapses the repeated mapping to one id', async () => {
+      const mapping = {
+        title: 'Same title',
+        toc_result_id: 7290,
+        level: 'Intermediate Outcome',
+      };
+      arm(
+        {
           raw_body: callbackBody([primary([mapping, { ...mapping }])]),
-        }),
-      ];
+        },
+        { toc_result_id: 1 },
+      );
 
       await record();
 
       expect(parsedChanges(table)).toEqual({
-        'Theory of Change result ID': { before: null, after: '7290' },
+        'Theory of Change result ID': { before: '1', after: '7290' },
       });
     });
   });
 
-  describe('(e) contributing programs are a set', () => {
-    it('treats a reorder as no change and does not count the primary', async () => {
-      table.logs = [
-        logRow({
-          request_payload: sentPayload(
+  describe('contributing programs', () => {
+    const contributingSp = (code: string): SpRow =>
+      versionSp({ sp_code: code, sp_role: 'CONTRIBUTING' });
+
+    it('treats a reorder as no change', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary([
             {
-              science_program_id: 'SP06',
-              result_title: 'Same title',
+              title: 'Same title',
               toc_result_id: 7290,
+              level: 'Intermediate Outcome',
             },
-            [{ science_program_id: 'SP03' }, { science_program_id: 'SP02' }],
-          ),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([{ title: 'Same title', toc_result_id: 7290 }]),
-            contributingEntry('SP02'),
-            contributingEntry('SP03'),
           ]),
-        }),
-      ];
+          contributingEntry('SP02'),
+          contributingEntry('SP03'),
+        ]),
+      });
+      table.sps = [versionSp(), contributingSp('SP03'), contributingSp('SP02')];
 
       await record();
 
@@ -443,27 +618,20 @@ describe('PoolFundingMappingDiffService', () => {
     });
 
     it('emits a sorted pair when membership differs', async () => {
-      table.logs = [
-        logRow({
-          request_payload: sentPayload(
+      arm({
+        raw_body: callbackBody([
+          primary([
             {
-              science_program_id: 'SP06',
-              result_title: 'Same title',
+              title: 'Same title',
               toc_result_id: 7290,
+              level: 'Intermediate Outcome',
             },
-            [{ science_program_id: 'SP02' }],
-          ),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([{ title: 'Same title', toc_result_id: 7290 }]),
-            contributingEntry('SP04'),
-            contributingEntry('SP02'),
           ]),
-        }),
-      ];
+          contributingEntry('SP04'),
+          contributingEntry('SP02'),
+        ]),
+      });
+      table.sps = [versionSp(), contributingSp('SP02')];
 
       await record();
 
@@ -476,134 +644,28 @@ describe('PoolFundingMappingDiffService', () => {
     });
   });
 
-  describe('(f) no matching ACCEPTED push', () => {
-    it('writes {} and logs one line', async () => {
-      table.logs = [
-        logRow({
-          id: 9,
-          outcome: 'REJECTED_BY_PRMS',
-          created_at: T_EARLIER,
-          request_payload: sentPayload({
-            science_program_id: 'SP06',
-            result_title: 'Rejected title',
-          }),
-        }),
-      ];
-      table.history = [
-        historyRow({
-          raw_body: callbackBody([
-            primary([{ title: 'From PRMS', toc_result_id: 7290 }]),
-          ]),
-        }),
-      ];
-
-      await record();
-
-      expect(changesUpdate(table).params).toEqual(['{}', HISTORY_ID]);
-      expect(parsedChanges(table)).toEqual({});
-      expect(warn).toHaveBeenCalledTimes(1);
-      expect(String(warn.mock.calls[0][0])).toContain(
-        `external_reference=${CODE}`,
-      );
-      expect(String(warn.mock.calls[0][0])).toContain(`result_year=${YEAR}`);
-      expect(String(warn.mock.calls[0][0])).toContain('ACCEPTED');
-      expect(errorLog).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('(g) the decision pairs with the earlier ACCEPTED push', () => {
-    const bracketedPushes = (): LogRow[] => [
-      logRow({
-        id: 1,
-        created_at: T_OLDEST,
-        request_payload: sentPayload({
-          science_program_id: 'SP06',
-          result_title: 'Oldest title',
-          toc_result_id: 1,
-        }),
-      }),
-      logRow({
-        id: 2,
-        created_at: T_EARLIER,
-        request_payload: sentPayload({
-          science_program_id: 'SP06',
-          result_title: 'Earlier title',
-          toc_result_id: 2,
-        }),
-      }),
-      logRow({
-        id: 3,
-        created_at: T_REJECTED,
-        outcome: 'REJECTED_BY_PRMS',
-        request_payload: sentPayload({
-          science_program_id: 'SP06',
-          result_title: 'Rejected title',
-        }),
-      }),
-      logRow({
-        id: 4,
-        created_at: T_LATER,
-        request_payload: sentPayload({
-          science_program_id: 'SP06',
-          result_title: 'Later title',
-          toc_result_id: 4,
-        }),
-      }),
-    ];
-
-    it('uses decided_at as the cutoff, not a later occurred_at', async () => {
-      table.logs = bracketedPushes();
-      table.history = [
-        historyRow({
-          decided_at: T_DECISION,
-          occurred_at: T_OCCURRED_AFTER,
-          raw_body: callbackBody([
-            primary([{ title: 'From PRMS', toc_result_id: 9 }]),
-          ]),
-        }),
-      ];
-
-      await record();
-
-      const logSelect = table.queries.find((query) =>
-        /\bFROM\s+result_prms_sync_log\b/i.test(query.sql),
-      );
-      expect(logSelect).toBeDefined();
-      const sql = normalizeSql(logSelect?.sql ?? '');
-      expect(sql).toContain('external_reference = ?');
-      expect(sql).toContain('result_year = ?');
-      expect(sql).toContain("outcome = 'ACCEPTED'");
-      expect(sql).toContain('created_at <= ?');
-      expect(sql).toContain('ORDER BY created_at DESC, id DESC');
-      expect(sql).toContain('LIMIT 1');
-      expect(logSelect?.params).toEqual([CODE, YEAR, T_DECISION]);
-      expect(parsedChanges(table)['Theory of Change result']).toEqual({
-        before: 'Earlier title',
-        after: 'From PRMS',
+  describe('Science Program', () => {
+    it('emits the primary code when the version and the callback differ', async () => {
+      arm({
+        raw_body: callbackBody([
+          primary(
+            [
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+              },
+            ],
+            'SP07',
+          ),
+        ]),
       });
-    });
-
-    it('falls back to occurred_at when decided_at is null', async () => {
-      table.logs = bracketedPushes();
-      table.history = [
-        historyRow({
-          decided_at: null,
-          occurred_at: T_DECISION,
-          raw_body: callbackBody([
-            primary([{ title: 'From PRMS', toc_result_id: 9 }]),
-          ]),
-        }),
-      ];
 
       await record();
 
-      const logSelect = table.queries.find((query) =>
-        /\bFROM\s+result_prms_sync_log\b/i.test(query.sql),
-      );
-      expect(logSelect?.params).toEqual([CODE, YEAR, T_DECISION]);
-      expect(parsedChanges(table)['Theory of Change result']?.before).toBe(
-        'Earlier title',
-      );
+      expect(parsedChanges(table)).toEqual({
+        'Science Program': { before: 'SP06', after: 'SP07' },
+      });
     });
   });
 

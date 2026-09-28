@@ -10,6 +10,9 @@ import { PrmsWebhookCallbackModule } from './prms-webhook-callback.module';
 // indexes, and collation are unproven here.
 
 const RESULT_ID = 40;
+const VERSION_RESULT_ID = 88;
+const CODE = '19949';
+const YEAR = 2026;
 const HISTORY_ID = 100;
 const ALIGNMENT_ID = 9;
 const TOC_ID = 70;
@@ -83,11 +86,35 @@ const primaryCallback = (
   },
 });
 
+interface SnapshotRow {
+  result_id: number;
+  result_official_code: string;
+  report_year_id: number;
+  is_snapshot: boolean;
+  is_active: boolean;
+}
+
 class FakeApplyDb {
   history: Record<string, unknown> | null = null;
   alignmentId: number | null = ALIGNMENT_ID;
   sps: Array<Record<string, unknown>> = [];
   tocs: Array<Record<string, unknown>> = [];
+  snapshots: SnapshotRow[] = [
+    {
+      result_id: RESULT_ID,
+      result_official_code: CODE,
+      report_year_id: YEAR,
+      is_snapshot: false,
+      is_active: true,
+    },
+    {
+      result_id: VERSION_RESULT_ID,
+      result_official_code: CODE,
+      report_year_id: YEAR,
+      is_snapshot: true,
+      is_active: true,
+    },
+  ];
   queries: RecordedQuery[] = [];
   committed: RecordedQuery[] = [];
   failInsert = false;
@@ -114,8 +141,8 @@ class FakeApplyDb {
     params: unknown[],
     buffer: RecordedQuery[] | null,
   ): Promise<unknown> {
-    if (touchesResults(sql)) {
-      throw new Error(`results table must not be touched: ${flat(sql)}`);
+    if (/^\s*(UPDATE|INSERT)\b/i.test(sql) && touchesResults(sql)) {
+      throw new Error(`results table must not be written: ${flat(sql)}`);
     }
     this.queries.push({ sql, params });
     if (buffer && this.failInsert && /^\s*INSERT\b/i.test(sql)) {
@@ -124,6 +151,9 @@ class FakeApplyDb {
     if (buffer && isWrite({ sql, params })) {
       buffer.push({ sql, params });
     }
+    if (/\bFROM\s+results\b/i.test(sql)) {
+      return this.selectSnapshots(sql, params);
+    }
     if (/result_prms_sync_history/i.test(sql)) {
       return this.history ? [this.history] : [];
     }
@@ -131,12 +161,46 @@ class FakeApplyDb {
       return this.sps;
     }
     if (/result_pool_funding_toc_alignment/i.test(sql)) {
+      if (/^\s*SELECT\b/i.test(sql) && params[0] !== VERSION_RESULT_ID) {
+        return [];
+      }
       return this.tocs;
     }
     if (/result_pool_funding_alignment\b/i.test(sql)) {
+      if (/^\s*SELECT\b/i.test(sql) && params[0] !== VERSION_RESULT_ID) {
+        return [];
+      }
       return this.alignmentId === null ? [] : [{ id: this.alignmentId }];
     }
     throw new Error(`unexpected sql: ${flat(sql)}`);
+  }
+
+  private selectSnapshots(
+    sql: string,
+    params: unknown[],
+  ): Array<{ result_id: number }> {
+    const wantsSnapshot = /is_snapshot\s*=\s*TRUE\b/i.test(sql);
+    const wantsLive = /is_snapshot\s*=\s*FALSE\b/i.test(sql);
+    const wantsActive = /is_active\s*=\s*TRUE\b/i.test(sql);
+    const code = params[0];
+    const year = params[1];
+    return this.snapshots
+      .filter((row) => {
+        if (row.result_official_code !== code || row.report_year_id !== year) {
+          return false;
+        }
+        if (wantsActive && !row.is_active) {
+          return false;
+        }
+        if (wantsSnapshot) {
+          return row.is_snapshot;
+        }
+        if (wantsLive) {
+          return !row.is_snapshot;
+        }
+        return true;
+      })
+      .map((row) => ({ result_id: row.result_id }));
   }
 }
 
@@ -208,6 +272,8 @@ describe('PoolFundingMappingApplyService', () => {
     db.history = {
       decision: 'APPROVE',
       correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+      result_official_code: CODE,
+      result_year: YEAR,
       changes: titleChange(),
       raw_body: null,
       ...overrides,
@@ -241,7 +307,7 @@ describe('PoolFundingMappingApplyService', () => {
       expect(writes()).toHaveLength(2);
       expectSql(writes()[0], DEACTIVATE_TOC_SQL, [TOC_ID]);
       expectSql(writes()[1], INSERT_TOC_SQL, [
-        RESULT_ID,
+        VERSION_RESULT_ID,
         'SP06',
         INHERITED.aligns_with_toc,
         INHERITED.level,
@@ -259,7 +325,26 @@ describe('PoolFundingMappingApplyService', () => {
       expect(
         writes().some((query) => query.params.includes(OTHER_TOC_ID)),
       ).toBe(false);
-      expect(db.queries.some((query) => touchesResults(query.sql))).toBe(false);
+      const snapshot = db.queries.find((query) =>
+        /\bFROM\s+results\b/i.test(query.sql),
+      );
+      expect(snapshot).toBeDefined();
+      expect(flat(snapshot?.sql ?? '')).toContain('is_snapshot = TRUE');
+      expect(flat(snapshot?.sql ?? '')).toContain('is_active = TRUE');
+      expect(snapshot?.params).toEqual([CODE, YEAR]);
+      const alignment = db.queries.find(
+        (query) =>
+          /^\s*SELECT\b/i.test(query.sql) &&
+          /\bFROM\s+result_pool_funding_alignment\b/i.test(query.sql),
+      );
+      expect(alignment?.params).toEqual([VERSION_RESULT_ID]);
+      expect(
+        db.queries.some(
+          (query) =>
+            /^\s*(UPDATE|INSERT)\b/i.test(query.sql) &&
+            touchesResults(query.sql),
+        ),
+      ).toBe(false);
     });
   });
 
@@ -309,6 +394,8 @@ describe('PoolFundingMappingApplyService', () => {
       db.history = {
         decision: 'APPROVE',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        result_official_code: CODE,
+        result_year: YEAR,
         changes: {
           'Science Program': { before: 'SP01', after: 'SP02' },
         },
@@ -338,7 +425,7 @@ describe('PoolFundingMappingApplyService', () => {
       expect(flat(writes()[1].sql)).toContain('NULL');
       expectSql(writes()[2], DEACTIVATE_TOC_SQL, [TOC_ID]);
       expectSql(writes()[3], INSERT_TOC_SQL, [
-        RESULT_ID,
+        VERSION_RESULT_ID,
         'SP02',
         INHERITED.aligns_with_toc,
         INHERITED.level,
@@ -374,6 +461,8 @@ describe('PoolFundingMappingApplyService', () => {
       db.history = {
         decision: 'APPROVE',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        result_official_code: CODE,
+        result_year: YEAR,
         changes: {
           'Contributing Science Programs': {
             before: ['SP-A', 'SP-B'],
@@ -464,6 +553,81 @@ describe('PoolFundingMappingApplyService', () => {
 
       expect(writes()).toEqual([]);
       expect(db.transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fields PRMS does not send', () => {
+    it('writes nothing when the payload is only the not-provided marker', async () => {
+      armTitleCase({
+        changes: {
+          Indicator: {
+            before: 'Stored indicator',
+            after: 'Not provided by PRMS',
+          },
+          'Quantitative contribution': {
+            before: '12.50',
+            after: 'Not provided by PRMS',
+          },
+        },
+      });
+
+      await apply();
+
+      expect(writes()).toEqual([]);
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(
+        db.queries.some((query) =>
+          query.params.includes('Not provided by PRMS'),
+        ),
+      ).toBe(false);
+    });
+
+    it('writes nothing when changes is empty because our values were null', async () => {
+      armTitleCase({ changes: {} });
+
+      await apply();
+
+      expect(writes()).toEqual([]);
+      expect(db.transaction).not.toHaveBeenCalled();
+    });
+
+    it('applies a real change and leaves the marker out of the write', async () => {
+      armTitleCase({
+        changes: {
+          ...titleChange(),
+          Indicator: {
+            before: 'Stored indicator',
+            after: 'Not provided by PRMS',
+          },
+        },
+      });
+
+      await apply();
+
+      expect(writes()).toHaveLength(2);
+      expect(writes()[1].params).toContain('New title');
+      expect(writes()[1].params).toContain(INHERITED.indicator_description);
+      expect(writes()[1].params).not.toContain('Not provided by PRMS');
+    });
+  });
+
+  describe('two active snapshots', () => {
+    it('writes nothing and logs', async () => {
+      armTitleCase();
+      db.snapshots.push({
+        result_id: VERSION_RESULT_ID + 1,
+        result_official_code: CODE,
+        report_year_id: YEAR,
+        is_snapshot: true,
+        is_active: true,
+      });
+
+      await apply();
+
+      expect(writes()).toEqual([]);
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('2 active snapshots');
     });
   });
 

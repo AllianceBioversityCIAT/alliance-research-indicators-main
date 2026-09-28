@@ -10,20 +10,25 @@ import {
   SCIENCE_PROGRAM,
   TOC_RESULT,
   TOC_RESULT_ID,
+  applicableChanges,
   readCallbackPrimary,
+  resolveActiveSnapshot,
 } from './pool-funding-mapping-diff.service';
 
 /**
- * Applies an approved pool-funding diff onto the live result's own rows.
+ * Applies an approved pool-funding diff onto the version's own rows.
  *
- * A changed value is never updated in place: the active row is deactivated
- * and a new row is inserted. Runs after the diff, post-acknowledgement, and
- * must not throw — the 2xx is already gone, and correlation_outcome plus
- * processing_state stay as the correlator left them.
+ * The version is the active snapshot for (result_official_code, result_year)
+ * on the history row — the same row the diff compared. A changed value is
+ * never updated in place: the active row is deactivated and a new row is
+ * inserted. Runs after the diff, post-acknowledgement, and must not throw —
+ * the 2xx is already gone, and correlation_outcome plus processing_state
+ * stay as the correlator left them.
  */
 
 const HISTORY_SQL = `
-SELECT decision, changes, correlation_outcome, raw_body
+SELECT decision, changes, correlation_outcome, raw_body,
+       result_official_code, result_year
 FROM result_prms_sync_history
 WHERE id = ?
 `;
@@ -87,7 +92,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, TRUE)
 export interface PoolFundingApplyInput {
   /** `result_prms_sync_history.id` of the decision row. */
   historyId: number;
-  /** Live `results.result_id` already resolved by DeliveryCorrelatorService. */
+  /**
+   * Live `results.result_id` from DeliveryCorrelatorService. The write
+   * target is the active snapshot resolved from the history row.
+   */
   resultId: number;
 }
 
@@ -158,6 +166,17 @@ const integerId = (value: unknown): number | null => {
 };
 
 const cell = (value: unknown): unknown => (value === undefined ? null : value);
+
+const scalar = (value: unknown): string | null => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? null : trimmed;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return null;
+};
 
 /**
  * INHERITED FROM THE PREVIOUS ROW AND NOT CONFIRMED BY PRMS.
@@ -390,17 +409,46 @@ export class PoolFundingMappingApplyService {
     if (row.decision !== 'APPROVE') {
       return;
     }
-    const changes = parseChanges(row.changes);
-    if (!changes || Object.keys(changes).length === 0) {
+    const stored = parseChanges(row.changes);
+    if (!stored) {
+      return;
+    }
+    const changes = applicableChanges(stored);
+    if (Object.keys(changes).length === 0) {
       return;
     }
     if (row.correlation_outcome !== DeliveryCorrelationOutcome.CORRELATED) {
       return;
     }
 
+    const officialCode = scalar(row.result_official_code);
+    const reportYearId = integerId(row.result_year);
+    if (officialCode === null || reportYearId === null) {
+      this.logger._warn(
+        `Pool-funding apply has no result_official_code or result_year on history id=${input.historyId}; nothing written`,
+      );
+      return;
+    }
+    const snapshot = await resolveActiveSnapshot(
+      (sql, params) => this.dataSource.query(sql, params),
+      officialCode,
+      reportYearId,
+    );
+    if (snapshot.ok === false) {
+      this.logger._warn(
+        `Pool-funding apply ${snapshot.reason}; nothing written`,
+      );
+      return;
+    }
+
     await this.dataSource.transaction(async (manager) => {
-      const current = await this.loadActive(manager, input.resultId);
-      const writes = this.plan(input, changes, row.raw_body, current);
+      const current = await this.loadActive(manager, snapshot.resultId);
+      const writes = this.plan(
+        { historyId: input.historyId, resultId: snapshot.resultId },
+        changes,
+        row.raw_body,
+        current,
+      );
       for (const write of writes) {
         await manager.query(write.sql, write.params);
       }
