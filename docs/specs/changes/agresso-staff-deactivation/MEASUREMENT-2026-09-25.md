@@ -75,7 +75,7 @@ Creation half on the same run, confirming idempotence (`NFR-AGS-001`): `staffFet
 − 3 excludedUnmatchable                             = 146   ✓ as reported
 ```
 
-**C-3 ceiling:** `max(0.05 × 1985, 10)` = **99**. With 146 candidates the ceiling is breached at
+**C-3 ceiling:** `max(0.05 × 1985, 10)` = **99.25** (unrounded — see `design.md` §20.2). With 146 candidates the ceiling is breached at
 **7.36%**, exactly as `design.md` §11 step 3 predicted. In dry-run this reports; with dry-run off it
 would abort and write nothing.
 
@@ -215,6 +215,6 @@ figure above comes from the Dev run itself.
 ## 6. What this does NOT settle
 
 - **`D-1` — increment 2's date.** Still unset. `RB-1` stands: until it ships, a departed employee keeps their account, roles and machine credentials.
-- **`D-2` — the C-3 ceiling.** Now informed, not decided: `0.05` yields 99 against 146 candidates. Either the first cleanup raises the ceiling for one run (and `design.md` §11 step 6 restores it), or it runs in batches. Whether `0.05` is right for steady state is still open.
+- **`D-2` — the C-3 ceiling.** Now informed, not decided: `0.05` yields 99.25 against 146 candidates. Either the first cleanup raises the ceiling for one run (and `design.md` §11 step 6 restores it), or it runs in batches. Whether `0.05` is right for steady state is still open.
 - **What replaces `EX-1`.** `D-3` is closed as a finding, not as a design. Increment 2 needs a shield for legitimate non-Agresso users, or a human-reviewed allowlist, before it writes anything.
 - **The `?status=active` ambiguity.** Unresolvable inside STAR; needs Agresso.

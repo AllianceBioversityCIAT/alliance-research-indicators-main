@@ -959,12 +959,17 @@ describe('SecUserReconcilerService', () => {
           'skippedCarnetTooLong',
           'skippedUnusableEmail',
           'staffFetched',
-          // changes/agresso-staff-deactivation increment 1 — MEASUREMENT fields. They are defaulted
-          // by the DTO, so they are present on every summary including this spec's. Listed here
-          // rather than loosening the assertion: exhaustiveness is the property that makes this
-          // test worth having, and a missing field is a failure mode made invisible forever.
+          // changes/agresso-staff-deactivation — fields defaulted on the DTO, so they are present
+          // on every summary including this spec's. Listed here rather than loosening the
+          // assertion: exhaustiveness is the property that makes this test worth having, and a
+          // missing field is a failure mode made invisible forever. Increment 2 (T-10) adds
+          // `ceiling`, `ceilingBreached`, `deactivated`, `rolesDeactivated`, `secretsDeactivated`.
+          // `deactivationAbortReason` stays off this list: it is absent on a clean run.
           'activePopulation',
           'candidateSample',
+          'ceiling',
+          'ceilingBreached',
+          'deactivated',
           'deactivationCandidates',
           'deactivationDryRun',
           'distinctCarnets',
@@ -972,6 +977,8 @@ describe('SecUserReconcilerService', () => {
           'excludedExternal',
           'excludedSystemAdmin',
           'excludedUnmatchable',
+          'rolesDeactivated',
+          'secretsDeactivated',
           'shieldedBySkip',
           'totalElements',
         ].sort(),

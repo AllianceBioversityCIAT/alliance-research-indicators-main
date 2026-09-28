@@ -427,7 +427,7 @@ about runtime behavior; the behavioral proof is the second-chunk rollback.
 
 ### T-10 — Summary fields and wiring
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** S · **Depends on:** `T-09` · **Review:** `checklist` — additive fields on an existing DTO
 - **Requirements:** `R-AGD-013` (AC.1–AC.4) · **Design:** §18, §19.4
 - **Skills:** `nestjs-expert`
@@ -449,10 +449,10 @@ from three separate ones — that fixture is inert.
 verification.
 
 **Done:**
-- [ ] Three counts asserted separately on a fixture where they differ
-- [ ] `abortReason` **absent**, not null, on success (AC.3) — asserted with `toHaveProperty` negation, not `toBeUndefined` on a spread object
-- [ ] All three consumer specs pass unmodified, or their modification is justified in `execution.md`
-- [ ] Reviewer PASS
+- [x] Three counts asserted separately on a fixture where they differ
+- [x] `abortReason` **absent**, not null, on success (AC.3) — asserted with `toHaveProperty` negation, not `toBeUndefined` on a spread object
+- [x] All three consumer specs pass unmodified, or their modification is justified in `execution.md`
+- [x] Reviewer PASS
 
 ---
 

@@ -10,6 +10,7 @@ import { allianceStaffMapper } from '../mappers/alliance-staff.mapper';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
 import { FetchReport } from './dto/fetch-report.dto';
 import { SecUserDeactivationService } from './sec-user-deactivation.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
 /** Agresso's page size for the employees endpoint. */
 const PAGE_SIZE = 1000;
@@ -21,6 +22,7 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     http: HttpService,
     private readonly reconciler: SecUserReconcilerService,
     private readonly deactivation: SecUserDeactivationService,
+    private readonly configResolver: StaffDeactivationConfigResolver,
   ) {
     super(
       dataSource,
@@ -133,10 +135,8 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
       allStaff.length,
     );
 
-    // Stage 5 — changes/agresso-staff-deactivation, increment 1. READ-ONLY: this computes who
-    // WOULD be retired and reports it. It runs after create/grant so the snapshot it measures is
-    // the one reconciliation already decided against, and it writes nothing, so its position in
-    // the pipeline cannot affect any other stage.
+    // Stage 5 — changes/agresso-staff-deactivation. The measurement stays read-only and runs
+    // after create/grant so the snapshot is the one reconciliation already decided against.
     const measurement = await this.deactivation.measure(
       allStaff,
       reconciliation,
@@ -144,7 +144,13 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
       fetchReport,
     );
 
-    summary.deactivationDryRun = true;
+    // Stage 5b — apply() consumes that measurement (design §18). It does not re-read
+    // app_config, so the caller resolves config and passes it. measure() already resolved
+    // its own copy for C-4; this read is the one the write is gated on.
+    const config = await this.configResolver.resolve();
+    const applied = await this.deactivation.apply(measurement, config);
+
+    summary.deactivationDryRun = applied.dryRun;
     summary.activePopulation = measurement.activePopulation;
     summary.deactivationCandidates = measurement.candidates?.length ?? 0;
     summary.candidateSample = (measurement.candidates ?? []).slice(0, 50);
@@ -155,25 +161,38 @@ export class AgressoStaffToolsService extends BaseControlListSave<AgressoToolsHt
     summary.shieldedBySkip = measurement.shieldedBySkip;
     summary.distinctCarnets = measurement.distinctCarnets;
     summary.totalElements = measurement.totalElements;
-    if (measurement.abortReason) {
-      summary.deactivationAbortReason = measurement.abortReason;
-      summary.abortDetail = measurement.abortDetail;
+    summary.ceiling = applied.ceiling;
+    summary.ceilingBreached = applied.ceilingBreached;
+    // Three counts, copied separately. A combined `deactivated` would report 1 / 1 / 1
+    // for an account that had two role rows and one secret.
+    summary.deactivated = applied.deactivated;
+    summary.rolesDeactivated = applied.rolesDeactivated;
+    summary.secretsDeactivated = applied.secretsDeactivated;
+    // Assign only when present. `= applied.abortReason` on success would leave the key
+    // on the object with value undefined, and AC.3 requires it absent, not null.
+    if (applied.abortReason) {
+      summary.deactivationAbortReason = applied.abortReason;
+      summary.abortDetail = applied.abortDetail;
     }
 
     // NFR-AGS-003. The controller does not await this service (RSK-4), so the caller already holds
     // a 200 and this line is the only place a human can learn what the run did.
-    this._logger.log(
-      `Agresso staff reconciliation summary: ${JSON.stringify(summary)}`,
-    );
+    // R-AGD-013: an abort summary is logged at error; a success summary stays at log.
+    const summaryLine = `Agresso staff reconciliation summary: ${JSON.stringify(summary)}`;
+    if (summary.deactivationAbortReason) {
+      this._logger.error(summaryLine);
+    } else {
+      this._logger.log(summaryLine);
+    }
 
-    // `candidateSample` is capped at 50 and the candidate set is larger than that, so the summary
-    // alone cannot answer the question increment 1 exists to answer: WHO would be retired. This
-    // emits the full set on its own line, for a human to read before increment 2 is allowed to
-    // write anything. Measurement only — nothing here acts on the list.
-    const allCandidates = measurement.candidates ?? [];
+    // `candidateSample` is capped at 50. The full id list is logged on its own line so a dry
+    // run and the later live run can be compared after the fact (design §19.4). Within this
+    // invocation the list is the set apply() consumed.
+    const allCandidates = applied.candidates ?? [];
     if (allCandidates.length > 0) {
+      const mode = applied.dryRun ? 'dry-run' : 'live';
       this._logger.log(
-        `Agresso staff deactivation candidates (FULL, dry-run, count=${allCandidates.length}): ${JSON.stringify(allCandidates)}`,
+        `Agresso staff deactivation candidates (FULL, ${mode}, count=${allCandidates.length}): ${JSON.stringify(allCandidates)}`,
       );
     }
 

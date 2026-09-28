@@ -802,3 +802,131 @@ satisfy `tsc` is the forbidden fix.** This is the same forward-pointer mechanism
 - `tsc` typechecks the fixture but never executes it.
 
 **Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**
+
+---
+
+## T-10 — Summary fields and wiring · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1 · `runtime events: none`
+- **Requirements covered:** `R-AGD-013` AC.1–AC.4 · **Design:** §18 (stage 5b), §19.4
+- **Implementer:** Cursor `grok-4.7-xhigh` (Orca `ctx_af8674b0b03a`) · **Reviewer:** Claude `opus`, fresh read-only context
+- **Files changed:** DTO, `agresso-staff-tools.service.ts` + spec, `sec-user-reconciler.service.spec.ts` — **+275 / −42**
+
+**Why a full Reviewer ran on a `Review: checklist` task.** The Review-intensity predicate is evaluated
+against the **report**, not the plan. T-10 fails condition 3 — its `Consumers` field is not `none`, it
+names six files — and overrides (b) *shared contract / response shape* and (c) *derived evidence a
+later gate consumes* both apply. The `checklist` label was a claim to be proved, and it was not earned.
+
+### Attempt 1 — the falsifier, and why its fixture is not inert
+
+Collapsing all three summary fields onto `applied.deactivated` reddened
+`copies three unequal counts and omits the abort key on success` at
+`expect(summary.rolesDeactivated).toBe(writes.rolesDeactivated)` — **Expected 2, Received 1**.
+
+The fixture is `deactivated: 1 / rolesDeactivated: 2 / secretsDeactivated: 1`, carrying a guard —
+`new Set(Object.values(writes)).size > 1` — so an inert `1/1/1` fixture **cannot** be substituted
+later. The Implementer stated plainly that `secretsDeactivated` is also `1`, so **an assertion on
+that field alone would have stayed green** under the mutation: the role count is the sole
+discriminator. Naming the weak spot rather than letting it pass unremarked is the behaviour `KZ-001`
+exists to produce.
+
+### Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`
+
+| Gate | Reported | Leader measured |
+| --- | --- | --- |
+| `npm test -- --silent` | 397 / 3549 | **397 suites / 3549 tests** (+3 over 3546) |
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
+| `npx eslint src test` (bare) | exit 0 | **exit 0** |
+| Consumer sweep | six files, none under `test/` | **six files, none under `test/`** — re-run by the Leader |
+| `git diff --stat` | +275 / −42 | **+275 / −42** |
+
+### Reviewer — `STATUS: PASS`, four named checks ruled independently
+
+1. **Neither consumer spec was loosened — one was tightened.** In
+   `sec-user-reconciler.service.spec.ts` the assertion itself is untouched
+   (`expect(Object.keys(summary).sort()).toEqual([...].sort())`); only array **members** were added,
+   which extends an exhaustiveness test. The pre-existing `M-5` guard
+   `expect('abortReason' in summary).toBe(false)` survives verbatim. **Omitting
+   `deactivationAbortReason` from the list is correct, not a relaxation** — and the Reviewer proved
+   why rather than asserting it: `tsconfig.json` sets `"target": "ES2021"`, so
+   `useDefineForClassFields` defaults **false** and a declared-only optional field is never emitted
+   onto the instance. The key is genuinely absent, which **is** AC.3's property. In
+   `agresso-staff-tools.service.spec.ts` the `measure` stub's nine values carry over byte-identical
+   and every other hunk is a pure append; **no pre-existing `expect` was deleted, reordered or
+   weakened.**
+2. **No rounding was introduced.** `summary.ceiling = applied.ceiling` is a verbatim copy and
+   `apply()` is mocked in every T-10 test, so the `ceiling: 99` fixture asserts **pass-through, not
+   computation**. T-10 cannot introduce or assume a rounding. It did, however, reproduce a **doc
+   error** — see the correction below.
+3. **The union widening is clean.** `deactivationAbortReason?: DeactivationApplyAbortReason` matches
+   `DeactivationApplyResult.abortReason` exactly. The assignment is a bare
+   `summary.deactivationAbortReason = applied.abortReason` inside `if (applied.abortReason)` — **no
+   `as`, no remap, no narrowing filter** — and the conditional is what keeps the key absent rather
+   than present-undefined. The `JS-4` doc-comment is preserved and extended; the sibling
+   `abortReason?: 'GRANT_ASSERTION'` is untouched. **Not merged.**
+4. **The falsifier discriminates on the real object.** `cloneAllAgressoStaff()` returns the DTO
+   instance itself (`agresso-staff-tools.service.ts:199`), so `not.toHaveProperty` runs against the
+   real return value, **not a spread that could hide a present-undefined key**.
+
+**No regression on the increment-1 path:** `apply()` forwards `measurement.abortReason` (`:160-165`),
+so `C-1`/`C-2`/`C-4` still reach the summary.
+
+### Correction closed during this task — the C-3 ceiling was wrong in SIX places
+
+The Reviewer surfaced a genuine inconsistency: `design.md` §20.2's prose computed
+`max(0.05 × 1985, 10)` as **99**, while `T-09` implements `R-AGD-010`'s formula verbatim — **it carries
+no rounding operator** — and therefore computes and **reports 99.25**.
+
+**The gate's behaviour is identical either way**: a candidate set is an integer and `146` exceeds both.
+But **the `ceiling` field is reported in the summary**, T-10 exposes it, and a reader trusting the old
+figure would infer a `Math.floor` that does not exist — adding one would introduce an operation the
+requirement never specifies (the `T-09` Reviewer's ruling).
+
+**Two-direction sweep, per `K-003`/`KZ-005`:**
+
+| Document | Site |
+| --- | --- |
+| `design.md` §20.2 | the computation itself — **now the figure's one home** |
+| `requirements.md` | the `R-AGD-010` scenario's *"giving a ceiling of 99"* |
+| `MEASUREMENT-2026-09-25.md` | ×2 — the measured C-3 ceiling and the `D-2` decision note |
+| `HANDOFF.md` | ×2 — the cold-start summary **and a second site at `:226`** |
+
+**The re-grep is what earned its keep.** The first pass corrected **five** sites; the mandated
+confirmation pass found a **sixth** (`HANDOFF.md:226`) that the first sweep had missed. A sweep that
+had stopped at "I edited every site I found" would have left the contradiction alive in the one
+document a cold session reads first. Re-grep after the correction returns clean.
+
+Every other site now **points at §20.2** instead of restating the number — `KZ-005`'s actual remedy is
+fewer sites, not better sweeps.
+
+**Housekeeping:** the Implementer wrote `T-10-implementer-report.md` into the spec folder. It was not
+in scope and would have become a seventh site restating these figures, so its substance is recorded
+here and the file was removed. Its verbatim content is preserved in the session scratchpad.
+
+### ADVISORY (recorded, never gates, never becomes a task)
+
+1. **Reliability** — both the `C-3` and `WRITE_FAILED` fixtures are **internally impossible**:
+   `deactivationCount: 2` against `ceiling: 99` with `ceilingBreached: true`, and
+   `activePopulation: 1985 → ceiling 99` where T-09 would return `99.25`. Harmless, because the copy
+   is verbatim and `apply()` is mocked — but a later reader may infer a rounding that does not exist.
+2. **Readability** — the DTO now imports a type from the service (DTO ← service). `import type` is
+   erased so there is no runtime cycle; relocating `DeactivationApplyAbortReason` into `dto/` is worth
+   it if a third consumer appears.
+3. **Risk** — two `configResolver.resolve()` calls per invocation (one in `measure()`, one at stage
+   5b). Already named in T-09 advisory 2. **Per `K-016`, a config change is invisible behind any TTL
+   cache — the rollout steps must state the window.**
+
+**Leader adjudication.** None reworked, none minted as a task. Advisory 1's *doc* half **was** actioned
+— as the correction above, because a wrong number in four documents is a factual defect, not a style
+opinion. Advisory 3 is carried to the rollout section rather than to a task.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+- `apply()` is **mocked in every T-10 test**. The three counts are mock values, not SQL row deltas —
+  nothing here proves the cascade actually wrote anything.
+- `npm run test:fixtures` was not run; `npm test` (`rootDir: "src"`) collects no fixture tier.
+- The `useDefineForClassFields` reasoning that makes `deactivationAbortReason` genuinely absent is a
+  **compiler-configuration** property. It holds while `"target": "ES2021"` holds and is asserted
+  nowhere as a test.
+
+**Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**

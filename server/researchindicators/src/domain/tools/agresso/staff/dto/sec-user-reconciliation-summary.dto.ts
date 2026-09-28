@@ -1,4 +1,5 @@
 // @akili-spec changes/agresso-staff-sec-users-sync (T-07 — per-run summary, NFR-AGS-003)
+import type { DeactivationApplyAbortReason } from '../sec-user-deactivation.service';
 
 /** One payload email collision, naming both carnets so a flapping pair is visible (DD-14, M-4). */
 export interface PayloadEmailCollisionReport {
@@ -82,11 +83,14 @@ export class SecUserReconciliationSummaryDto {
   abortReason?: 'GRANT_ASSERTION';
 
   // ---- changes/agresso-staff-deactivation, increment 1 (T-05) ------------------------------
-  // MEASUREMENT ONLY. Nothing below is written anywhere; these are the numbers a human reads
-  // before increment 2 is designed, and `deactivationCandidates` is a count of accounts that
-  // WOULD be retired, not of accounts that were.
+  // MEASUREMENT. `deactivationCandidates` counts accounts that WOULD be retired. The write
+  // counts are the increment-2 fields further down, not these.
 
-  /** Always `true` in increment 1 — there is no write path to disable. */
+  /**
+   * The `dryRun` field from `R-AGD-013`. It already existed under this name.
+   * The class default is `true` (the seeded safe direction). Stage 5b overwrites
+   * it with the resolved config, so a live run reports `false`.
+   */
   deactivationDryRun = true;
   /** Active `sec_users` rows at read time, BEFORE any exclusion. */
   activePopulation = 0;
@@ -101,12 +105,30 @@ export class SecUserReconciliationSummaryDto {
   distinctCarnets = 0;
   totalElements = 0;
 
+  // ---- changes/agresso-staff-deactivation, increment 2 (T-10, R-AGD-013) -------------------
+  // What the write did. Three counts, never one: an account with two role rows and one secret
+  // is `1 / 2 / 1`. Collapsing them into `deactivated` hides a cascade that missed a table.
+
+  /** Null when the ceiling keys did not resolve. */
+  ceiling: number | null = null;
+  ceilingBreached = false;
+  /** `sec_users` rows this run switched off. */
+  deactivated = 0;
+  /** `sec_user_roles` rows this run switched off. */
+  rolesDeactivated = 0;
+  /** `app_secrets` rows this run switched off. */
+  secretsDeactivated = 0;
+
   /**
    * Deliberately NOT the `abortReason` above. That field belongs to the create+grant savepoint and
    * is set independently; one field cannot carry two outcomes, and reusing it would make a sibling
    * rollback read as an aborted measurement (Judgment Day JS-4).
+   *
+   * Widened to `DeactivationApplyAbortReason` so `C-3` and `WRITE_FAILED` survive stage 5b.
+   * Dropping either token to fit the increment-1 union would hide the outcome this increment
+   * exists to report. Absent — not null — when the run did not abort.
    */
-  deactivationAbortReason?: 'C-1' | 'C-2' | 'C-4';
+  deactivationAbortReason?: DeactivationApplyAbortReason;
   /** The operand the abort names: page number, duplicated carnets, or status match count. */
   abortDetail?: Record<string, unknown>;
 }

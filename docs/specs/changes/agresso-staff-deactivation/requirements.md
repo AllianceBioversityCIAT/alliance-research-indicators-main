@@ -597,7 +597,7 @@ deliberately **excluded** from the eight.
 #### Scenario: The first live run breaches the ceiling — measured, not anticipated
 
 - GIVEN the 2026-09-25 Dev measurement: 146 candidates against `activePopulation = 1985`
-- AND `ceilingFraction = 0.05`, `absoluteFloor = 10`, giving a ceiling of 99
+- AND `ceilingFraction = 0.05`, `absoluteFloor = 10`, giving a ceiling of **99.25** (unrounded — see `design.md` §20.2)
 - WHEN the sync runs with dry-run **enabled**
 - THEN the summary reports `ceilingBreached = true` and all 146
 - AND IT MUST NOT abort, because measuring the set is the run's entire purpose

@@ -4,36 +4,67 @@ import { DataSource } from 'typeorm';
 import { AgressoStaffToolsService } from './agresso-staff-tools.service';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
 import { SecUserDeactivationService } from './sec-user-deactivation.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 
 describe('AgressoStaffToolsService', () => {
   let service: AgressoStaffToolsService;
   let mockConnection: { getRaw: jest.Mock };
   let reconciler: SecUserReconcilerService;
+  let deactivation: { measure: jest.Mock; apply: jest.Mock };
+  let configResolver: { resolve: jest.Mock };
 
   beforeEach(async () => {
     mockConnection = { getRaw: jest.fn() };
+    deactivation = {
+      measure: jest.fn().mockResolvedValue({
+        totalElements: 0,
+        distinctCarnets: 0,
+        activePopulation: 0,
+        candidates: [],
+        excludedExternal: 0,
+        excludedSystemAdmin: 0,
+        excludedAmbiguous: 0,
+        excludedUnmatchable: 0,
+        shieldedBySkip: [],
+      }),
+      apply: jest.fn().mockResolvedValue({
+        dryRun: true,
+        ceiling: 10,
+        ceilingBreached: false,
+        candidates: [],
+        deactivationCount: 0,
+        activePopulation: 0,
+        deactivated: 0,
+        rolesDeactivated: 0,
+        secretsDeactivated: 0,
+      }),
+    };
+    configResolver = {
+      resolve: jest.fn().mockResolvedValue({
+        config: {
+          dryRun: true,
+          ceilingFraction: 0.05,
+          absoluteFloor: 10,
+          externalStatusId: 4,
+        },
+        failures: [],
+      }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         {
-          // changes/agresso-staff-deactivation increment 1. Stubbed here for the same reason the
-          // reconciler is: this suite covers the fetch pipeline, and the measurement's own
-          // behaviour is covered exhaustively in sec-user-deactivation.service.spec.ts.
+          // changes/agresso-staff-deactivation. Stubbed here for the same reason the
+          // reconciler is: this suite covers the fetch pipeline and the stage-5b copy
+          // onto the summary. measure()/apply() behaviour lives in
+          // sec-user-deactivation.service.spec.ts.
           provide: SecUserDeactivationService,
-          useValue: {
-            measure: jest.fn().mockResolvedValue({
-              totalElements: 0,
-              distinctCarnets: 0,
-              activePopulation: 0,
-              candidates: [],
-              excludedExternal: 0,
-              excludedSystemAdmin: 0,
-              excludedAmbiguous: 0,
-              excludedUnmatchable: 0,
-              shieldedBySkip: [],
-            }),
-          },
+          useValue: deactivation,
+        },
+        {
+          provide: StaffDeactivationConfigResolver,
+          useValue: configResolver,
         },
         AgressoStaffToolsService,
         { provide: HttpService, useValue: { get: jest.fn() } },
@@ -329,6 +360,160 @@ describe('AgressoStaffToolsService', () => {
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining('"staffFetched":1'),
       );
+    });
+  });
+
+  // @akili-spec changes/agresso-staff-deactivation (T-10, R-AGD-013)
+  describe('T-10 — summary write fields (R-AGD-013)', () => {
+    const resolution = {
+      config: {
+        dryRun: false,
+        ceilingFraction: 0.05,
+        absoluteFloor: 10,
+        externalStatusId: 4,
+      },
+      failures: [],
+    };
+
+    beforeEach(() => {
+      mockConnection.getRaw.mockResolvedValue({ totalElements: 1000 });
+      jest.spyOn(service as any, 'base').mockResolvedValue([]);
+      configResolver.resolve.mockResolvedValue(resolution);
+    });
+
+    it('copies three unequal counts and omits the abort key on success (AC.1, AC.3)', async () => {
+      // One account, two role rows, one secret → 1 / 2 / 1. A fixture whose three
+      // counts coincide cannot tell a combined counter from three separate ones.
+      const writes = {
+        deactivated: 1,
+        rolesDeactivated: 2,
+        secretsDeactivated: 1,
+      };
+      expect(new Set(Object.values(writes)).size).toBeGreaterThan(1);
+
+      deactivation.measure.mockResolvedValue({
+        totalElements: 1,
+        distinctCarnets: 1,
+        activePopulation: 10,
+        candidates: [7],
+        excludedExternal: 0,
+        excludedSystemAdmin: 0,
+        excludedAmbiguous: 0,
+        excludedUnmatchable: 0,
+        shieldedBySkip: [],
+      });
+      deactivation.apply.mockResolvedValue({
+        dryRun: false,
+        ceiling: 10,
+        ceilingBreached: false,
+        candidates: [7],
+        deactivationCount: 1,
+        activePopulation: 10,
+        ...writes,
+      });
+
+      const summary = await service.cloneAllAgressoStaff();
+
+      expect(deactivation.apply).toHaveBeenCalledTimes(1);
+      expect(deactivation.apply).toHaveBeenCalledWith(
+        expect.objectContaining({ candidates: [7], activePopulation: 10 }),
+        resolution,
+      );
+      expect(summary.deactivated).toBe(writes.deactivated);
+      expect(summary.rolesDeactivated).toBe(writes.rolesDeactivated);
+      expect(summary.secretsDeactivated).toBe(writes.secretsDeactivated);
+      expect(
+        summary.deactivated === summary.rolesDeactivated &&
+          summary.rolesDeactivated === summary.secretsDeactivated,
+      ).toBe(false);
+      expect(summary.deactivationDryRun).toBe(false);
+      expect(summary.ceiling).toBe(10);
+      expect(summary.ceilingBreached).toBe(false);
+      // AC.3. `toBeUndefined` would pass for a key that is present and undefined.
+      // `not.toHaveProperty` fails in that case. The sibling `abortReason` stays
+      // unset too — JS-4 forbids folding the write outcome into that field.
+      expect(summary).not.toHaveProperty('deactivationAbortReason');
+      expect(summary).not.toHaveProperty('abortReason');
+    });
+
+    it('logs a C-3 abort at error with ceiling and zero writes, distinct from an empty success (AC.2, AC.4)', async () => {
+      deactivation.apply.mockResolvedValue({
+        dryRun: false,
+        ceiling: 10,
+        ceilingBreached: false,
+        candidates: [],
+        deactivationCount: 0,
+        activePopulation: 10,
+        deactivated: 0,
+        rolesDeactivated: 0,
+        secretsDeactivated: 0,
+      });
+
+      const healthy = await service.cloneAllAgressoStaff();
+
+      expect(healthy.deactivated).toBe(0);
+      expect(healthy).not.toHaveProperty('deactivationAbortReason');
+
+      deactivation.apply.mockResolvedValue({
+        dryRun: false,
+        ceiling: 99,
+        ceilingBreached: true,
+        candidates: [1, 2],
+        deactivationCount: 2,
+        activePopulation: 1985,
+        deactivated: 0,
+        rolesDeactivated: 0,
+        secretsDeactivated: 0,
+        abortReason: 'C-3',
+        abortDetail: { ceiling: 99, deactivationCount: 2 },
+      });
+      const errorSpy = jest.spyOn(service['_logger'], 'error');
+      const logSpy = jest.spyOn(service['_logger'], 'log');
+
+      const aborted = await service.cloneAllAgressoStaff();
+
+      expect(aborted.deactivated).toBe(0);
+      expect(aborted.rolesDeactivated).toBe(0);
+      expect(aborted.secretsDeactivated).toBe(0);
+      expect(aborted.ceiling).toBe(99);
+      expect(aborted.ceilingBreached).toBe(true);
+      expect(aborted.deactivationAbortReason).toBe('C-3');
+      expect(aborted.abortDetail).toEqual({
+        ceiling: 99,
+        deactivationCount: 2,
+      });
+      expect(aborted).not.toHaveProperty('abortReason');
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('"deactivationAbortReason":"C-3"'),
+      );
+      expect(
+        logSpy.mock.calls.some((call) =>
+          String(call[0]).startsWith('Agresso staff reconciliation summary:'),
+        ),
+      ).toBe(false);
+    });
+
+    it('copies WRITE_FAILED onto deactivationAbortReason without remapping it', async () => {
+      deactivation.apply.mockResolvedValue({
+        dryRun: false,
+        ceiling: 10,
+        ceilingBreached: false,
+        candidates: [7],
+        deactivationCount: 1,
+        activePopulation: 10,
+        deactivated: 0,
+        rolesDeactivated: 0,
+        secretsDeactivated: 0,
+        abortReason: 'WRITE_FAILED',
+        abortDetail: { message: 'second chunk' },
+      });
+
+      const summary = await service.cloneAllAgressoStaff();
+
+      expect(summary.deactivationAbortReason).toBe('WRITE_FAILED');
+      expect(summary.abortDetail).toEqual({ message: 'second chunk' });
+      expect(summary.deactivated).toBe(0);
+      expect(summary).not.toHaveProperty('abortReason');
     });
   });
 });

@@ -10,7 +10,7 @@
 > **Increment 1 HAS now been run** (Dev, 2026-09-25). §1's "never been run" and §6's blank table are
 > history, kept as the record of the state this file was written in. What the run settled:
 >
-> - **146 candidates** against an **activePopulation of 1985** — the C-3 ceiling (99) is breached at 7.36%, as §11 of the design predicted.
+> - **146 candidates** against an **activePopulation of 1985** — the C-3 ceiling (99.25 — see `design.md` §20.2) is breached at 7.36%, as §11 of the design predicted.
 > - **`D-3` / `RB-2` / `JS-1` are CLOSED: `EX-1` shields nobody.** Zero of 1985 active users carry `status_id = 4`, so the external exclusion is structurally inert, not merely unused. Increment 2 cannot rely on it.
 > - The run first aborted on `C-4` because the live row is named **`External Accepted`**, not `External`. Fixed by selecting on the id — **uncommitted**, per the barrier below.
 > - The 146 are four distinct cohorts, not one. **3 of them are active platform users who are not Agresso staff**, and 91 sit behind an Agresso-side question STAR cannot answer.
@@ -223,7 +223,7 @@ Derived, and consistent — the counts reconcile without a remainder:
 − 3 excludedUnmatchable                             = 146   ✓
 ```
 
-**C-3:** `max(0.05 × 1985, 10)` = **99**; 146 candidates = **7.36%** → ceiling breached, as
+**C-3:** `max(0.05 × 1985, 10)` = **99.25** (unrounded — see `design.md` §20.2); 146 candidates = **7.36%** → ceiling breached, as
 `design.md` §11 step 3 said it would be on the first run. `D-2` is now informed but not decided.
 
 ---

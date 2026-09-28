@@ -532,8 +532,16 @@ weaker claim a `transaction`-then-rollback design would force.
 
 ### 20.2 The measured first run
 
-`max(0.05 × 1985, 10)` = **99** against **146** candidates = 7.36%. The first live run aborts on C-3
-by construction. `design.md` §11's rollout handles this with an explicit raise-then-restore pair; the
+`max(0.05 × 1985, 10)` = **99.25** against **146** candidates = 7.36%. The first live run aborts on
+C-3 by construction.
+
+> **Corrected 2026-09-28.** This read `= **99**` in four documents and five places. The formula in
+> `R-AGD-010` carries **no rounding operator**, and `T-09` implements it verbatim: `apply()` computes
+> and **reports** `99.25`. The gate's behaviour is identical either way — a candidate set is an
+> integer, and `146` exceeds both — but the **reported `ceiling` field** is `99.25`, and a reader who
+> trusted the old figure would infer a `Math.floor` that does not exist. Adding one would introduce
+> an operation the requirement never specifies (`T-09` Reviewer ruling). **This section is the
+> figure's one home** (`KZ-005`); every other site now points here rather than restating it. `design.md` §11's rollout handles this with an explicit raise-then-restore pair; the
 restore is a numbered step, not a reminder, because `F-5` recorded the opposite and a forgotten
 restore disables the only volume defence invisibly and indefinitely.
 
