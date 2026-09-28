@@ -224,7 +224,7 @@ families**, not merely across two instances of one.
 | --- | --- | --- |
 | **Leader** — plan, decompose, select skills/effort, adjudicate, write the audit trail | Claude Code | `opus` (T1) |
 | **Implementer — server** | **Codex** (`codex exec`) | **`gpt-5.6-terra`**, effort `medium` — *"balanced agentic coding model for everyday work"*. **Not `gpt-6-astra`**, which is the *"most capable model for complex, demanding work"*. ⚠️ Valid slugs come from `~/.codex/models_cache.json`, **never** from asking the model what it is — see the trap below |
-| **Implementer — client** | **Cursor** (`cursor-agent -p`) | `cursor-grok-4.6-*` |
+| **Implementer — client** | **Cursor** (`cursor-agent -p`) | `grok-4.7-*` — re-probed 2026-09-28, the 4.7 family is live (`grok-4.7-{low,medium,high,xhigh}`, each with a `-fast` variant) alongside the older `cursor-grok-4.6-*`. Effort is baked into the slug, so `--model grok-4.7-xhigh` is the whole selection. **Re-probe with `cursor-agent models` before planning a dispatch** — this catalog has drifted before |
 | **Reviewer** — read-only spec-conformance audit | **Antigravity** (`agy`) | **`gemini-3.1-pro-high`** — the *thinking* tier, **never `*-flash`** |
 
 Tester follows the Implementer's lane and must differ from the model that wrote the code under test.
