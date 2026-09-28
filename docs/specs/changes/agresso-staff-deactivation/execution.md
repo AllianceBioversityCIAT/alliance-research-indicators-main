@@ -225,3 +225,108 @@ way. **Size increment 2 by counting its rules and statements, not by scaling a s
 | RB-1 | **The problem is not solved.** Departed staff still keep accounts, roles and credentials. Increment 2 needs a date |
 | RB-2 | `JS-1` — C-4 proves a row named external exists, not that external accounts carry that id. The first Dev run's `excludedExternal` is the measurement that settles it |
 | RB-4 | **5 Innovation Use fixture suites fail, and it is NOT this increment's doing — measured, not asserted.** All five die on `Nest cannot create the ResultPolicyChangeModule instance. The module at index [0] of the "imports" array is undefined` — a circular-import symptom inside the results domain. The worker reported it as pre-existing; the Leader **verified** it by checking `src/` back out at `eee1bc5c` (the commit before any work on this spec) and reproducing the identical failure. This increment's changed files are confined to `domain/tools/agresso/staff/`. **Worth its own bugfix spec** — five fixture suites have been red on `dev` and nothing surfaced it |
+
+---
+
+# PART II — Increment 2: The Write
+
+- **Started:** 2026-09-28
+- **Budget (tasks.md §12 / design §24):** 6 tasks · ~1,150 LOC · 6 review rounds
+- **Status:** in progress
+
+| Role | Host | Model |
+| --- | --- | --- |
+| Leader | Claude Code | `opus` (T1) — plans, adjudicates, re-measures the full suite. Writes no production code |
+| Implementer | Codex (`codex exec`) | `gpt-5.6-terra`, effort `medium` |
+| Reviewer | Antigravity (`agy`) | `gemini-3.1-pro-high` — never `*-flash`, never the Implementer's model |
+
+## Host pre-flight — 2026-09-28 (before planning against any of them)
+
+| Host | Probe | Result |
+| --- | --- | --- |
+| Antigravity | `agy --version`, then `agy models` | **1.2.11**; 14 slugs returned, `gemini-3.1-pro-high` present. List matches the 2026-09-09 re-probe — **no drift this cycle** |
+| Codex | `codex --version` | **codex-cli 0.154.0**. ⚠️ **Not yet smoke-tested with a live request** — `login status` cannot see a billing state (the `402 deactivated_workspace` class). Probe before dispatching T-07 |
+| Cursor | `cursor-agent --version` | **2026.09.26-dd393fe** |
+| Scratch MySQL | `docker ps` | ❌ **Docker daemon not running** — `dial unix /Users/pelitos/.docker/run/docker.sock: connect: no such file or directory`. **Blocks T-07** (`up()`/`down()` executed against the scratch schema) and **T-11** (the whole fixture tier). Does not block T-06, T-08, T-09, T-10 at the unit tier |
+
+---
+
+## T-06 — Resolve the external status by id, not by name · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1 (pre-existing; implemented 2026-09-25 by the Leader of the prior session, committed as `de338e97`)
+- **Requirements covered:** `R-AGD-012` AC.1–AC.4 · **Design:** §21.1, `DD-D13`, §23
+- **Files changed:** `sec-user-deactivation.repository.ts`, `sec-user-deactivation.repository.spec.ts`, `agresso-staff-tools.service.ts` (+58 / −20)
+
+### Attempt 1 — the existing diff (`de338e97`)
+
+`runtime events: none`
+
+**What this task owed on entry.** T-06's code was already in the tree and committed; its two open
+Done items were a Reviewer PASS from Antigravity and *AC.3's inverse test observed red under a
+mutation that selects by name*. The commit message asserted "3 tests reddened, observed" but never
+named **which** three — and the task's own Disqualifier is precisely that a test passing on a
+fixture named `External` proves nothing. An unnamed aggregate is not evidence for a specific
+member (`KZ-014`), so the falsifier was re-executed rather than relayed.
+
+**Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`.**
+
+| Gate | Command | Result |
+| --- | --- | --- |
+| Target spec, baseline | `npx jest --testPathPattern sec-user-deactivation.repository.spec` | **16 passed, 16 total** |
+| **AC.3 falsifier** | production filter reverted to `row.name.trim().toLowerCase() === 'external'`, same spec re-run | **RED — observed** (below) |
+| Restore | filter restored, spec re-run; `git status --porcelain` | **16/16 green**, working tree **clean** |
+| Full unit suite | `npm test -- --silent` | **396 suites / 3514 tests passed** |
+| Types | `npx tsc --noEmit` | exit 0, no output |
+| Lint | `npx eslint src test` — bare, no `--fix` (`K-001`) | exit 0. 1 warning, **pre-existing**, in `test/results-ai-formalize-bulk.e2e-spec.ts`, outside this diff |
+
+Mutation output, verbatim — the third line is the one the Done item names:
+
+```
+✕ resolves the external row by id even though its name is not the bare word External (3 ms)
+✓ returns a null id and matchCount 0 when no active row carries the external id
+✕ does not resolve a row merely because its name reads External
+✕ returns exactly one matching id after Number coercion (1 ms)
+Tests:       3 failed, 13 passed, 16 total
+```
+
+**What this re-run cannot reach (`KZ-017`).** `npm test` runs with `rootDir: "src"` and collects
+neither `test/` nor `test/fixtures/`. Nothing here is evidence about a real `user_status` table —
+every assertion above is over a mocked `query` spy. That the live Dev row is `{4, 'External Accepted'}`
+is a 2026-09-25 measurement recorded in `MEASUREMENT-2026-09-25.md`, not something this task re-proves.
+`C-4`'s behavior against a real renumbered `user_status` remains unevidenced at every tier.
+
+**Reviewer — Antigravity `gemini-3.1-pro-high`, effort `high`. `STATUS: PASS`.**
+
+> The diff successfully fulfills the scope of T-06 by migrating the external status resolution from
+> a brittle name lookup to the stable `user_status_id`. The updated test suite cleanly asserts all
+> criteria from AC.1–AC.4, proving that name-only matches are rejected and string coercion functions
+> correctly. The hardcoded `EXTERNAL_STATUS_ID = 4` conforms exactly to the task instructions; while
+> this leaves a temporary gap against `R-AGD-012`'s dynamic `app_config` requirement, that gap is
+> structurally necessary given the explicit allocation of the config integration to T-07 and
+> introduces no functional risk.
+
+`author ≠ auditor` holds on **both** axes: the author was Claude `opus`, the auditor Antigravity
+`gemini-3.1-pro-high` — the registry's T3 tier for that host, not a degraded pair.
+
+**ADVISORY (4R lens — recorded, never gates, never becomes a task):**
+
+> *Readability / Scope* — the diff includes a change in `agresso-staff-tools.service.ts` to log the
+> full candidate set. Strictly outside T-06's declared file scope, but benign, correctly typed
+> against `DeactivationMeasurement.candidates`, and it satisfies the measurement-reconstruction
+> requirement in `design.md` §19.4.
+
+**Leader adjudication of the advisory.** The out-of-scope hunk is real and the Reviewer is right to
+name it. It is **not** reworked: the lines are already committed and shipped in `de338e97`, they
+carry the measurement the task's own commit message justifies, and reverting them would remove the
+only path by which the 146-candidate id list is readable (`candidateSample` caps at 50). Recorded
+and closed here per *Advisory Never Becomes A Task*.
+
+**Decisions made:** none. No execute-time edit to `requirements.md` or `design.md` was needed.
+
+**Issues encountered:** the `R-AGD-012` / T-06 boundary — the requirement says the id SHALL be read
+from `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID`, while T-06 ships a module constant. This was named
+to the Reviewer as a sourced fact rather than waved away, and the Reviewer judged it structurally
+necessary because `design.md` §21 allocates that key to **T-07**. **The gap is therefore open until
+T-07 lands**, and T-07 must replace the constant, not merely add the key beside it.
+
+**Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**

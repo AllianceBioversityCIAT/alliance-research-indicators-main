@@ -261,7 +261,7 @@ re-measures the full suite after each reports.
 
 ### T-06 — Resolve the external status by id, not by name
 
-- **Status:** `implemented (uncommitted) — awaiting Reviewer`
+- **Status:** `done` — Reviewer PASS (Antigravity `gemini-3.1-pro-high`) 2026-09-28, committed `de338e97`
 - **Size:** XS · **Depends on:** none · **Review:** `full` — it reverts shipped behavior in a destructive-adjacent path
 - **Requirements:** `R-AGD-012` (AC.1–AC.4) · **Design:** §21.1, `DD-D13`, §23
 - **Skills:** `nestjs-expert`
@@ -278,8 +278,8 @@ other file references it. Sweep: `grep -rn resolveExternalStatusId --include="*.
 hits, all inside this module.
 
 **Done:**
-- [ ] Reviewer PASS from Antigravity on the existing diff
-- [ ] AC.3's inverse test (a row named `External` at another id does **not** resolve) observed red under a mutation that selects by name
+- [x] Reviewer PASS from Antigravity on the existing diff
+- [x] AC.3's inverse test (a row named `External` at another id does **not** resolve) observed red under a mutation that selects by name
 
 ---
 
