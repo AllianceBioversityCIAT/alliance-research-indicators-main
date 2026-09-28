@@ -1,4 +1,5 @@
-import { Component, inject, Input, computed, Signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, inject, Input, computed, Signal, ViewChild, ElementRef, AfterViewChecked, OnInit, OnDestroy } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { AllModalsService } from '@services/cache/all-modals.service';
 import { ModalName } from '@ts-types/modal.types';
@@ -22,8 +23,10 @@ import { CreateResultManagementService } from '@shared/components/all-modals/mod
     ])
   ]
 })
-export class ModalComponent implements AfterViewChecked {
+export class ModalComponent implements OnInit, AfterViewChecked, OnDestroy {
   allModalsService = inject(AllModalsService);
+  private readonly hostEl = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
   createResultManagementService = inject(CreateResultManagementService);
   @Input() modalName!: ModalName;
   @Input() disabledConfirmIf: Signal<boolean> = computed(() => false);
@@ -33,6 +36,18 @@ export class ModalComponent implements AfterViewChecked {
 
   @ViewChild('modalRoot') modalRoot!: ElementRef<HTMLDivElement>;
   private wasOpen = false;
+
+  // A modal declared inside a page sits in the platform grid's stacking context
+  // (z-index 1), below the navbar (z-index 1001), so its overlay could not cover
+  // the header. Re-parenting the host to <body> puts every modal on the same
+  // layer as the ones hosted by <app-all-modals>.
+  ngOnInit(): void {
+    this.document.body.appendChild(this.hostEl.nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.hostEl.nativeElement.remove();
+  }
 
   showModal() {
     return this.allModalsService.isModalOpen(this.modalName);
