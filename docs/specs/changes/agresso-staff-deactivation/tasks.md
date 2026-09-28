@@ -496,7 +496,7 @@ T-11 inherits them as an unverified presence-level claim and must run them, not 
 
 ### T-12 — Close the two validation findings: who must NOT be touched
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** XS · **Depends on:** `T-11` · **Review:** `full` — both clauses guard the irreversible direction
 - **Requirements:** `R-AGD-008` AC.3 and its `AND IT MUST` (`RSK-6`) clause · **Design:** §19, §19.3
 - **Skills:** `nestjs-expert`
@@ -529,10 +529,10 @@ pass whether or not the shield works.
 **Consumers:** none — fixture-only.
 
 **Done:**
-- [ ] A shielded user's **active** secret survives a live run, asserted on a real row
-- [ ] A deactivated secret makes `validation()` reject, asserted through the real service
-- [ ] Both falsifiers observed red via `npm run test:fixtures`, never via `npm test`
-- [ ] Reviewer PASS
+- [x] A shielded user's **active** secret survives a live run, asserted on a real row
+- [x] A deactivated secret makes `validation()` reject, asserted through the real service
+- [x] Both falsifiers observed red via `npm run test:fixtures`, never via `npm test`
+- [x] Reviewer PASS
 
 ---
 

@@ -1,6 +1,13 @@
-// @akili-spec changes/agresso-staff-deactivation (T-05 measurement; T-11 apply writes)
+// @akili-spec changes/agresso-staff-deactivation (T-05 measurement; T-11 apply writes; T-12 non-candidates)
+import * as bcrypt from 'bcrypt';
 import { dataSource } from '../../src/db/config/mysql/orm.test.config';
+import { AppSecretsService } from '../../src/domain/entities/app-secrets/app-secrets.service';
+import { AppSecretRepository } from '../../src/domain/entities/app-secrets/repositories/app-secret.repository';
 import { AppConfigKey } from '../../src/domain/entities/app-config/enum/app-config-key.enum';
+import { SecUser } from '../../src/domain/complementary-entities/secondary/user/dto/sec-user.dto';
+import { SecRolesEnum } from '../../src/domain/shared/enum/sec_role.enum';
+import { AppConfig } from '../../src/domain/shared/utils/app-config.util';
+import { CurrentUserUtil } from '../../src/domain/shared/utils/current-user.util';
 import { AgressoStaffRawDto } from '../../src/domain/tools/agresso/staff/dto/agresso-staff-raw.dto';
 import { DeactivationConfigResolution } from '../../src/domain/tools/agresso/staff/dto/deactivation-config.dto';
 import { FetchReport } from '../../src/domain/tools/agresso/staff/dto/fetch-report.dto';
@@ -48,6 +55,12 @@ describe('Agresso staff deactivation — fixture tier', () => {
   const LIVE_ACTIVE_B = 9_062_002;
   const LIVE_ALREADY_INACTIVE = 9_062_003;
   const LIVE_USER_IDS = [LIVE_ACTIVE_A, LIVE_ACTIVE_B, LIVE_ALREADY_INACTIVE];
+  // EX-2. Not a member of LIVE_USER_IDS: those three are candidates by construction.
+  const SHIELDED_ADMIN = 9_062_004;
+  const OWNED_ADMIN_ROLE_NAME = 'T12_SYSTEM_ADMIN';
+  const RETIRED_CLIENT_ID = 'T12-AGD-uuid-retired';
+  const SURVIVING_CLIENT_ID = 'T12-AGD-uuid-shielded';
+  const SECRET_PLAINTEXT = 't12-live-secret';
   const ROLLBACK_COUNT = 120;
   const ROLLBACK_FIRST_ID = 9_063_001;
 
@@ -63,7 +76,7 @@ describe('Agresso staff deactivation — fixture tier', () => {
   }
 
   function t11UserIds(): number[] {
-    return [...LIVE_USER_IDS, ...rollbackUserIds()];
+    return [...LIVE_USER_IDS, SHIELDED_ADMIN, ...rollbackUserIds()];
   }
 
   function placeholders(count: number): string {
@@ -75,8 +88,9 @@ describe('Agresso staff deactivation — fixture tier', () => {
     await dataSource.query(
       `DELETE FROM app_secrets
         WHERE app_secret_key = ?
+           OR app_secret_uuid IN (?, ?)
            OR responsible_user_id IN (${placeholders(ownedIds.length)})`,
-      [SECRET_KEY, ...ownedIds],
+      [SECRET_KEY, RETIRED_CLIENT_ID, SURVIVING_CLIENT_ID, ...ownedIds],
     );
     await dataSource.query(
       `DELETE FROM sec_user_roles
@@ -92,8 +106,10 @@ describe('Agresso staff deactivation — fixture tier', () => {
       [CANDIDATE_ID, ...ownedIds],
     );
     await dataSource.query(
-      `DELETE FROM sec_roles WHERE sec_role_id IN (?, ?)`,
-      [ROLE_ID, T11_ROLE_ID],
+      `DELETE FROM sec_roles
+        WHERE sec_role_id IN (?, ?)
+           OR (sec_role_id = ? AND name = ?)`,
+      [ROLE_ID, T11_ROLE_ID, SecRolesEnum.SYSTEM_ADMIN, OWNED_ADMIN_ROLE_NAME],
     );
     await dataSource.query(
       `DELETE FROM sec_role_focus WHERE sec_role_focus_id IN (?, ?)`,
@@ -401,6 +417,79 @@ describe('Agresso staff deactivation — fixture tier', () => {
     };
   }
 
+  async function ensureOwnedSystemAdminRole(): Promise<void> {
+    await dataSource.query(
+      `INSERT INTO sec_roles (sec_role_id, name, focus_id)
+       SELECT ?, ?, ?
+         FROM DUAL
+        WHERE NOT EXISTS (
+          SELECT 1 FROM sec_roles WHERE sec_role_id = ?
+        )`,
+      [
+        SecRolesEnum.SYSTEM_ADMIN,
+        OWNED_ADMIN_ROLE_NAME,
+        T11_ROLE_FOCUS_ID,
+        SecRolesEnum.SYSTEM_ADMIN,
+      ],
+    );
+  }
+
+  async function insertClientSecret(
+    userId: number,
+    clientId: string,
+    active: number,
+  ): Promise<void> {
+    await dataSource.query(
+      `INSERT INTO app_secrets
+         (app_secret_key, app_secret_uuid, responsible_user_id, is_active)
+       VALUES (?, ?, ?, ?)`,
+      [bcrypt.hashSync(SECRET_PLAINTEXT, 4), clientId, userId, active],
+    );
+  }
+
+  async function secretIsActive(clientId: string): Promise<number | null> {
+    const rows: { is_active: number }[] = await dataSource.query(
+      `SELECT is_active FROM app_secrets WHERE app_secret_uuid = ?`,
+      [clientId],
+    );
+    if (rows.length !== 1) {
+      return null;
+    }
+    return Number(rows[0].is_active);
+  }
+
+  async function loadOwnedSecUsers(ids: number[]): Promise<SecUser[]> {
+    const wanted = new Set(ids);
+    const rows = await reconcilerRepository.findAllSecUsers();
+    return rows.filter((user) => wanted.has(Number(user.sec_user_id)));
+  }
+
+  function realAppSecretsService(): AppSecretsService {
+    const appConfig = new AppConfig(dataSource);
+    const currentUser = new CurrentUserUtil({} as never);
+    return new AppSecretsService(
+      dataSource,
+      appConfig,
+      new AppSecretRepository(dataSource.manager, appConfig, currentUser),
+    );
+  }
+
+  async function assertOwnedTeardown(): Promise<void> {
+    await cleanOwnedRows();
+    const [users] = await dataSource.query(
+      `SELECT COUNT(*) AS row_count FROM sec_users WHERE sec_user_id = ?`,
+      [SHIELDED_ADMIN],
+    );
+    const secrets: { app_secret_uuid: string }[] = await dataSource.query(
+      `SELECT app_secret_uuid
+         FROM app_secrets
+        WHERE app_secret_uuid IN (?, ?)`,
+      [RETIRED_CLIENT_ID, SURVIVING_CLIENT_ID],
+    );
+    expect(Number(users.row_count)).toBe(0);
+    expect(secrets).toEqual([]);
+  }
+
   async function activeSums(
     userIds: number[],
     runner: {
@@ -688,5 +777,112 @@ describe('Agresso staff deactivation — fixture tier', () => {
     } finally {
       transaction.mockRestore();
     }
+  });
+
+  it('leaves an active SYSTEM_ADMIN secret on and keeps that id out of the computed candidate set', async () => {
+    await seedT11Catalog();
+    await ensureOwnedSystemAdminRole();
+    await dataSource.query(
+      `INSERT INTO user_status (user_status_id, name, is_active, deleted_at)
+       VALUES (?, 'External', 1, NULL)`,
+      [EXTERNAL_STATUS_ID],
+    );
+    await insertUsers([
+      { id: SHIELDED_ADMIN, active: 1 },
+      { id: LIVE_ACTIVE_A, active: 1 },
+    ]);
+    // EX-2 reads this row. An inactive role is an ex-admin and is not a shield.
+    await dataSource.query(
+      `INSERT INTO sec_user_roles (user_id, role_id, is_active)
+       VALUES (?, ?, 1)`,
+      [SHIELDED_ADMIN, SecRolesEnum.SYSTEM_ADMIN],
+    );
+    await insertClientSecret(SHIELDED_ADMIN, SURVIVING_CLIENT_ID, 1);
+    await insertSecrets([{ userId: LIVE_ACTIVE_A, active: 1, suffix: 'on' }]);
+
+    const secUsers = await loadOwnedSecUsers([SHIELDED_ADMIN, LIVE_ACTIVE_A]);
+    expect(secUsers.map((user) => Number(user.sec_user_id)).sort()).toEqual([
+      LIVE_ACTIVE_A,
+      SHIELDED_ADMIN,
+    ]);
+
+    const payload: AgressoStaffRawDto[] = [
+      {
+        resourceId: 'T12HERE',
+        firstName: 'Still',
+        lastName: 'Employed',
+        email: 'still.employed@t12-payload.test',
+        center: 'Alliance',
+        status: 'Active',
+      },
+    ];
+    const reconciliation: ReconciliationResult = {
+      allSecUsers: secUsers,
+      skipped: [],
+      collapsed: [],
+      create: [],
+      refresh: [],
+      reactivate: [],
+    };
+    const fetchReport: FetchReport = {
+      totalElements: 1,
+      pageRowCounts: [1],
+      distinctCarnets: 1,
+      duplicatedCarnets: [],
+    };
+    const restoreConfig = await pinExternalStatusConfig(EXTERNAL_STATUS_ID);
+    try {
+      const measurement = await service.measure(
+        payload,
+        reconciliation,
+        secUsers,
+        fetchReport,
+      );
+      expect(measurement.abortReason).toBeUndefined();
+      expect(measurement.candidates).toEqual(
+        expect.arrayContaining([LIVE_ACTIVE_A]),
+      );
+
+      const result = await service.apply(measurement, configFor(false));
+      expect(result.abortReason).toBeUndefined();
+
+      // AC.3. This is the assertion the shield-removal falsifier reddens.
+      expect(await secretIsActive(SURVIVING_CLIENT_ID)).toBe(1);
+      expect(measurement.candidates).not.toContain(SHIELDED_ADMIN);
+      expect(measurement.excludedSystemAdmin).toBe(1);
+      expect(await secretIsActive(`T11-AGD-uuid-${LIVE_ACTIVE_A}-on`)).toBe(0);
+    } finally {
+      await restoreConfig();
+    }
+
+    await assertOwnedTeardown();
+  });
+
+  it('makes validation() reject a secret the cascade deactivated', async () => {
+    await seedT11Catalog();
+    await insertUsers([
+      { id: LIVE_ACTIVE_A, active: 1 },
+      { id: SHIELDED_ADMIN, active: 1 },
+    ]);
+    await insertClientSecret(LIVE_ACTIVE_A, RETIRED_CLIENT_ID, 1);
+    await insertClientSecret(SHIELDED_ADMIN, SURVIVING_CLIENT_ID, 1);
+
+    const result = await service.apply(
+      measurementFor([LIVE_ACTIVE_A]),
+      configFor(false),
+    );
+    expect(result.abortReason).toBeUndefined();
+    expect(await secretIsActive(RETIRED_CLIENT_ID)).toBe(0);
+    expect(await secretIsActive(SURVIVING_CLIENT_ID)).toBe(1);
+
+    const rejected = await realAppSecretsService().validation(
+      RETIRED_CLIENT_ID,
+      SECRET_PLAINTEXT,
+      'https://t12-agd.test',
+    );
+    expect(rejected.isValid).toBe(false);
+    expect(rejected.user).toBeNull();
+
+    await assertOwnedTeardown();
   });
 });

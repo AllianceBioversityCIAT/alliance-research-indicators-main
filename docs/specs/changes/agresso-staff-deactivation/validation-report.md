@@ -4,6 +4,11 @@
 
 **WARN — archive-ready for the BUILD, NOT clear for ROLLOUT.**
 
+> **Updated 2026-09-28 after remediation.** **WARN-2 and WARN-3 are CLOSED** by `T-12`
+> (Reviewer PASS, fixture 7/7, no production change). The clause count is now **40 / 40 covered**.
+> `WARN-1` (`RB-4`) and `WARN-4` (evidence form) stand, both accepted. **The three rollout blockers
+> are unchanged** — they are the reason this is not a clean PASS.
+
 No `FAIL`. Three clause-level `WARN`s, all cheap to close, none blocking archive. **The rollout is
 blocked by human steps that no amount of code can discharge**, and those are the reason this is not
 a clean PASS.
@@ -11,8 +16,8 @@ a clean PASS.
 | | |
 | --- | --- |
 | Clauses audited | **40** — 25 `AC`, 9 `AND IT MUST`, 6 `BUT`, across `R-AGD-008`…`R-AGD-013` |
-| Clean | **37** |
-| `WARN` | **3** (2 evidence gaps, 1 non-CI-repeatable evidence) |
+| Clean | **40** (was 37; WARN-2 and WARN-3 closed by `T-12`) |
+| `WARN` | **2 remaining** — `WARN-1` `RB-4`, `WARN-4` evidence form. Both accepted |
 | `FAIL` | **0** |
 | `BLOCKED` (rollout, not build) | **3** — `DO-1`, `P-9`/BI, migration application |
 
@@ -98,14 +103,21 @@ three findings are expanded.
 
 | Requirement | AC | `AND IT MUST` | `BUT` | Clean | Finding |
 | --- | --- | --- | --- | --- | --- |
-| `R-AGD-008` | 6 | 4 | 2 | 10 / 12 | **WARN-2, WARN-3** |
+| `R-AGD-008` | 6 | 4 | 2 | **12 / 12** | WARN-2, WARN-3 — **CLOSED by `T-12`** |
 | `R-AGD-009` | 4 | 2 | 1 | 7 / 7 | — |
 | `R-AGD-010` | 3 | 1 | 1 | 5 / 5 | — |
 | `R-AGD-011` | 4 | 0 | 0 | 4 / 4 | WARN-4 (evidence form) |
 | `R-AGD-012` | 4 | 1 | 1 | 6 / 6 | — |
 | `R-AGD-013` | 4 | 1 | 1 | 6 / 6 | — |
 
-### WARN-2 — `R-AGD-008` AC.3 has no behavioural test
+### WARN-2 — `R-AGD-008` AC.3 has no behavioural test · **CLOSED 2026-09-28 by `T-12`**
+
+> **Closed.** `leaves an active SYSTEM_ADMIN secret on and keeps that id out of the computed
+> candidate set` — `SHIELDED_ADMIN` (9062004), shielded by `EX-2`, keeps `is_active = 1` on a real
+> row after a live `apply()`, is absent from `measurement.candidates`, and `excludedSystemAdmin === 1`.
+> A **control candidate** whose secret must go to `0` makes the assertion non-vacuous: the Reviewer
+> verified it cannot pass on a no-op run. Falsifier observed red. Original finding below, kept as the
+> record.
 
 > *"`app_secrets` rows whose `responsible_user_id` is a shielded, excluded or matched user are
 > untouched."*
@@ -126,7 +138,14 @@ the AC that protects everyone the run is *not* supposed to touch.
 **Remediation (small):** seed a fourth user who is shielded by `EX-1`/`EX-2`, give them an active
 `app_secrets` row, and assert it is still `is_active = 1` after the live run.
 
-### WARN-3 — `R-AGD-008`'s `RSK-6` clause is satisfied by construction, not by test
+### WARN-3 — `R-AGD-008`'s `RSK-6` clause is satisfied by construction, not by test · **CLOSED 2026-09-28 by `T-12`**
+
+> **Closed.** `makes validation() reject a secret the cascade deactivated` — the **real**
+> `AppSecretsService` (real repository, real `AppConfig`, live `DataSource`, real `bcrypt` hash)
+> returns `{ isValid: false, user: null }` after the cascade. The falsifier repoints the lookup at a
+> still-active row holding **the same plaintext** and gets `isValid: true`, which isolates
+> `is_active` as the cause — **it proves the join**, not bcrypt and not a missing row. Original
+> finding below, kept as the record.
 
 > *"AND IT MUST close the live auth path in which `validation()` returns `isValid = true` with
 > `user = null` (`RSK-6`) for that credential."*
@@ -260,22 +279,31 @@ archive.
 
 | # | Finding | Severity | Effort | Owner |
 | --- | --- | --- | --- | --- |
-| WARN-2 | `R-AGD-008` AC.3 — seed a shielded user with an active secret, assert it survives | Low risk, real gap | ~15 lines in the fixture | Follow-up task |
-| WARN-3 | `R-AGD-008` `RSK-6` — one test joining a deactivated secret to `validation()` rejection | Low | ~15 lines | Follow-up task |
+| WARN-2 | ✅ **CLOSED by `T-12`** — Reviewer PASS 2026-09-28 | — | Done | — |
+| WARN-3 | ✅ **CLOSED by `T-12`** — Reviewer PASS 2026-09-28 | — | Done | — |
 | WARN-4 | `R-AGD-011` AC.1/AC.2 — evidence is one-time manual | Form, not substance | Optional; no seed migration in this repo has a spec | Accept as-is |
 | WARN-1 | `RB-4` — 5 pre-existing `innovation-use` fixture suites red | Blocks using `test:fixtures` **as a gate** | Its own bugfix spec | Separate spec |
 
-**Recommendation on WARN-2 and WARN-3:** both are ~15 lines and both cover *who must NOT be touched*
-— the direction of error that is unrecoverable here. Worth closing **before** the live run, and both
-fit in one small follow-up task.
+**WARN-2 and WARN-3 were closed before the live run**, as recommended, in a single fixture-only task
+(`T-12`, +201/−5, no production change). Both covered *who must NOT be touched* — the unrecoverable
+direction.
+
+**One residue, recorded rather than swept:** `T-12`'s AC.3 falsifier stopped at the first failing
+assertion, so `not.toContain(SHIELDED_ADMIN)` and `excludedSystemAdmin === 1` were never observed red
+**on their own**. Reaching them needs a reorder or a split — a code edit, not a measurement, so it was
+not closed the way T-11's three predicate reds were. A `KZ-014` residue on a green test, disclosed by
+the Implementer and recorded here.
 
 ---
 
 ## 12. Archive Readiness
 
-### The build — **READY, with WARNs accepted or scheduled**
+### The build — **READY**
 
-All tasks `[x]`, no `FAIL`, drift documented, evidence traceable.
+All **seven** tasks `[x]` (T-06…T-11 plus the remediation task `T-12`), no `FAIL`, **40 / 40 clauses
+covered**, drift documented, evidence traceable. The two remaining WARNs are accepted:
+`WARN-1` (`RB-4`, pre-existing and not this spec's) and `WARN-4` (evidence form, consistent with this
+repo's actual practice for seed migrations).
 
 ### The rollout — **NOT CLEAR. Three human blockers.**
 

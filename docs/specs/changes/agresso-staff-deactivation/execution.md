@@ -1171,3 +1171,116 @@ rework round was consumed.**
 
 **Next command:** `/akili-validate` — it owns the 40-clause mapping §12 leaves open. **Nothing here
 may deactivate anyone until `DO-1` is applied and a dry run reports `excludedExternal = 8`.**
+
+---
+
+## T-12 — Close the two validation findings: who must NOT be touched · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1
+- **Origin:** `validation-report.md` **WARN-2** and **WARN-3**, user-approved at the validation gate
+- **Requirements:** `R-AGD-008` AC.3 and its `AND IT MUST` (`RSK-6`) clause
+- **Implementer:** Cursor `grok-4.7-xhigh` · **Reviewer:** Claude `opus`, fresh read-only context
+- **Files changed:** `test/fixtures/agresso-staff-deactivation.fixture-spec.ts` only — **+201 / −5**. **No production change.**
+
+`runtime events: spawn failure ×3 (Orca transport) → provider timeout ×1 → rung 3 (resume-by-message)`
+
+### The runtime story, because the recovery is the lesson
+
+**Orca's dispatch transport stopped delivering after five successful dispatches this session.** Three
+consecutive `worker-start` calls produced a terminal and an `input_accepted` state with a **zero-byte
+buffer**; the third resolved to `failed / process_exited`. A direct `cursor-agent -p` run then wrote
+~19 lines before dying on `read ETIMEDOUT`, and a short probe afterwards failed the same way —
+Cursor was genuinely down, not merely slow.
+
+**Two corrections the Leader owes the record:**
+
+1. **`input_accepted` is not proof of delivery.** Orca reported the state as accepted while nothing
+   had landed. `leader.md`'s *"a send that returned is not a send that was received"* now has a second
+   concrete instance, on a different host than the one it was written for.
+2. **An empty terminal buffer is NOT proof of non-delivery in this build.** The Leader used it as
+   one and was wrong: `worker-read` returned `session_not_reported` with an empty buffer for the T-11
+   worker that **succeeded**. At least one dispatch may have been abandoned while working. The
+   reliable signal was the *task/dispatch state*, not the buffer.
+
+**What actually recovered it — rung 3, resume-by-message.** A later probe to Cursor came back not
+with the probe's answer but with **T-12 context**: *"Los dos falsificadores … todavía no se han visto
+en rojo. Siguiente paso: escribir esas dos pruebas."* The session had survived the timeout and the
+partial work was in the tree. Resuming with `--continue` cost one message; restarting would have
+discarded both and paid for another long run against a host that had just proven unstable.
+
+**No attempt was consumed.** Every one of these is a runtime event, and the accounting rule is that
+only a Reviewer `FAIL` or an Implementer-reported verification failure consumes an attempt.
+
+> **Provenance, disclosed rather than inferred.** T-12 ran via `cursor-agent -p` driven directly by
+> the Leader, **outside Orca's `Run → Task → Dispatch` provenance**. The model, the brief and the
+> review gate are unchanged, and the Reviewer was told. Describing this run as orchestrated would be
+> a fabrication.
+
+### What the two tests prove
+
+| Finding | Test | Proof |
+| --- | --- | --- |
+| **WARN-2** (`AC.3`) | `leaves an active SYSTEM_ADMIN secret on and keeps that id out of the computed candidate set` | `SHIELDED_ADMIN` (9062004), shielded by `EX-2`, keeps `is_active = 1` on a real row after a live `apply()`; absent from `measurement.candidates`; `excludedSystemAdmin === 1`; service logged *"Account 9062004 spared from deactivation: SYSTEM_ADMIN"* |
+| **WARN-3** (`RSK-6`) | `makes validation() reject a secret the cascade deactivated` | The **real** `AppSecretsService` — real `AppSecretRepository`, real `AppConfig`, live `DataSource`, real `bcrypt` hash — returns `{ isValid: false, user: null }` after the cascade |
+
+**The anti-vacuity guard is the part that matters.** The AC.3 test carries a **control candidate**
+whose own secret must go to `0`. Without it, *"the shielded secret survived"* would pass just as well
+if `apply()` did nothing at all — the classic way a survival assertion becomes worthless. The
+Reviewer verified the guard rather than accepting it: `secretIsActive` returns `null` when
+`rows.length !== 1`, so a **missing** row fails instead of passing, and `abortReason` is asserted
+undefined, so an empty set or a `C-4` abort reddens too. **The test cannot pass on a no-op run.**
+
+### Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`
+
+| Gate | Result |
+| --- | --- |
+| `npm run test:fixtures --testPathPattern=agresso-staff-deactivation` | **PASS · 7 / 7** (was 5/5; +2) |
+| `npx tsc --noEmit` · `npx eslint src test` (bare) | exit 0 · exit 0 |
+| `npm test -- --silent` | 397 / 3549 — **regression only, not fixture evidence** |
+| `git diff --name-only` | **one file**, the fixture. No production file changed |
+
+**Shared-schema check, queried live after the run** — zero leftovers for `sec_users` 9062004, its
+roles, both `T12-AGD-*` secrets and the `T12_SYSTEM_ADMIN` role, **and the real `SYSTEM_ADMIN` row
+(`sec_role_id = 1`) still present.** That last one was the Leader's own concern on reading the diff:
+the teardown targets the real role id, guarded only by a name.
+
+### Reviewer — `STATUS: PASS`, five named checks ruled independently
+
+1. **Anti-vacuity holds** — grounded, see above.
+2. **`validation()` is the real service.** `realAppSecretsService()` matches the production
+   constructor exactly; `validation()` resolves through `dataSource.getRepository(AppSecret)`, so the
+   `where: { app_secret_uuid, is_active: true }` filter runs against the live row. **Nothing on the
+   exercised path is stubbed** (`KZ-001` satisfied).
+3. **Both falsifiers discriminate.** The `RSK-6` mutation repoints the lookup at a still-active row
+   holding **the same plaintext**, returning `isValid: true` — which isolates `is_active` as the
+   cause of rejection rather than bcrypt or a missing row. **It is the join**, which is exactly what
+   was missing.
+4. **The `sec_roles` guard is structural, not incidental.** `ensureOwnedSystemAdminRole` inserts only
+   `WHERE NOT EXISTS (sec_role_id = 1)`, and the teardown's `OR (sec_role_id = ? AND name = ?)` is a
+   **single WHERE clause, not control flow** — a mid-test abort cannot widen it. The Reviewer tried to
+   construct a reaching sequence and could not.
+5. **Teardown is structural.** New ids enter `cleanOwnedRows` via `t11UserIds()`, an explicit
+   `app_secret_uuid IN (?, ?)` predicate and the named role clause; `beforeEach` **and** `afterAll`
+   both call it, so cleanup survives a failed assertion. DML only — no DDL (`FP-51`).
+
+### ADVISORY (recorded, never gates, never becomes a task)
+
+1. **Reliability — a `KZ-014` residue, disclosed by the Implementer.** The AC.3 falsifier stopped at
+   the secret assertion, so `not.toContain(SHIELDED_ADMIN)` and `excludedSystemAdmin === 1` were
+   **never observed red on their own**. Jest halts at the first failure. Reaching them needs a
+   reorder or a split — a code edit, not a measurement, so the Leader did **not** close it the way
+   the three T-11 predicate reds were closed. **Recorded as a known limit of this evidence.**
+2. **Risk** — the `sec_roles` delete is guarded by a name string. Stronger form: have
+   `ensureOwnedSystemAdminRole` report whether it created the row, and delete only then.
+3. **Readability** — in the `RSK-6` test, `SHIELDED_ADMIN` carries no shield; it is merely absent from
+   that `apply()`'s id list. The constant name asserts a property that test does not establish.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+- Advisory 1 above: two of the AC.3 assertions are green-only, never individually reddened.
+- The `RSK-6` test proves rejection for **one** credential shape on **one** driver. It says nothing
+  about `RSK-6` itself, which remains an explicit non-goal (`NG-5`, `OQ-D6`) owed its own spec.
+- Still unreached by every tier: the HTTP path, seeded `app_config` driving a live write, and lock
+  ordering under concurrency.
+
+**Final verification result:** green on the only tier that can evidence these claims. **Task closed `[x]`.**
