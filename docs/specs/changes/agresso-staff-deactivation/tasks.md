@@ -292,7 +292,21 @@ hits, all inside this module.
 
 **Scope:** four `AppConfigKey` entries · `dto/deactivation-config.dto.ts` · a resolver reading via
 `dataSource.getRepository(AppConfig)` · migration `<ts>-seedStaffDeactivationConfig.ts` following
-`1786738949211-seedClarisaMappingPhase.ts` in shape.
+`1786738949211-seedClarisaMappingPhase.ts` in shape · **the C-4 wiring (added 2026-09-28, see below).**
+
+> **Scope widened 2026-09-28, user-approved at the `/akili-execute` continue gate.** `R-AGD-012`
+> requires C-4 to read the external id **from** `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID`, but no
+> task in this list connected the key to the code: `T-06` shipped the module constant
+> `EXTERNAL_STATUS_ID = 4`, this task only created the key and the resolver, and `T-09` resolves
+> config for `apply()` — while C-4 runs inside `measure()`, which executes first. As written, the key
+> would have been seeded and never read, leaving `R-AGD-012` unmet at spec close.
+>
+> **Fifth deliverable:** `resolveExternalStatusId` must take the id resolved from that key instead of
+> reading the module constant, and `measure()`'s C-4 path must supply it. The mechanism is the
+> Implementer's call; the outcome is not. `EXTERNAL_STATUS_ID` may remain **only** as the resolver's
+> documented default for the key's absence — it may not remain the runtime source. C-4's existing
+> abort behavior (anything other than exactly one matching row aborts, in dry-run too) is preserved
+> unchanged.
 
 > ⚠️ **`AppConfigService` must not be imported.** It takes `CurrentUserUtil` (`Scope.REQUEST`) —
 > verified at `app-config.service.ts:23` — and the scope bubbles to the fire-and-forget controller.
@@ -301,6 +315,10 @@ hits, all inside this module.
 **Falsifier:** flip **one** key's failure direction — make `DRY_RUN` fail loud, or
 `CEILING_FRACTION` fail safe. Each flip must redden a test that names that key. A single test
 asserting "config resolves" cannot distinguish the four.
+**Falsifier (C-4 wiring, added 2026-09-28):** point `resolveExternalStatusId` back at the module
+constant while the configured key holds a *different* id → a test asserting that the configured id
+is the one selected reddens. A test whose fixture configures `4` — the constant's own value — is
+**inert**: it passes either way and proves nothing about where the id came from.
 **Red run:** required per key, four separate reds, each on the behavioral assertion.
 **Disqualifier:** a migration test that only asserts the four `INSERT`s are *present* proves
 presence, not effect (`up`/`down` must be **executed** against the scratch schema). If
@@ -316,6 +334,8 @@ consumer pins the member list; confirm that before merging rather than assuming 
 - [ ] Migration `up()` then `down()` executed against the scratch schema; `down()` deletes exactly four rows
 - [ ] Re-running `up()` updates rather than duplicating (`ON DUPLICATE KEY UPDATE`)
 - [ ] `grep -rn "AppConfigService" src/domain/tools/agresso/staff/` → **zero hits**
+- [ ] **C-4 reads the configured id, not the constant** — asserted with a fixture whose configured id is **not** `4`, and the falsifier above seen red
+- [ ] **C-4's abort is unchanged** — a configured id matching no active row still aborts with `abortReason = C-4`, in dry-run too (`R-AGD-012` AC.2 and its Scenario)
 - [ ] Reviewer PASS
 
 ---
