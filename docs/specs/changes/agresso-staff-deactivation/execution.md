@@ -330,3 +330,148 @@ necessary because `design.md` §21 allocates that key to **T-07**. **The gap is 
 T-07 lands**, and T-07 must replace the constant, not merely add the key beside it.
 
 **Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**
+
+---
+
+## T-08 — The three destructive statements · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1
+- **Requirements covered:** `R-AGD-008` AC.3–AC.5, `NFR-AGD-006`, `NFR-AGD-007` · **Design:** §19, §19.2, §19.3
+- **Files changed:** `sec-user-deactivation.repository.ts` (+79), `sec-user-deactivation.repository.spec.ts` (+314) — **+389 / −4**
+
+### Execution-arrangement deviation — recorded, not silent
+
+`tasks.md` §7 names **Codex `gpt-5.6-terra`** as increment 2's Implementer and **Antigravity
+`gemini-3.1-pro-high`** as its Reviewer. **User ruling 2026-09-28 (*"utiliza grok de cursor para
+ejecutar las actividades y tu solo revisas"*) replaces both:**
+
+| Role | Planned in §7 | Actually used | `author ≠ auditor` |
+| --- | --- | --- | --- |
+| Implementer | Codex `gpt-5.6-terra` | **Cursor `grok-4.7-xhigh`** | — |
+| Reviewer | Antigravity `gemini-3.1-pro-high` | **Claude `opus`**, fresh read-only context (`akili-reviewer`) | **Holds** — different model family *and* different context |
+
+Codex was never dispatched, so its `402 deactivated_workspace` risk was never retested this session.
+`grok-4.7-xhigh` was chosen over the registry's `cursor-grok-4.6-*` because the 4.7 family is live
+(re-probed 2026-09-28) and T-08 is the spec's only data-loss surface, where the effort dial mandates
+the top rung and the tier-vs-effort rule forbids forcing `max` onto a cheaper tier. **The registry
+was corrected in the same session** (`ae3a3b38`) rather than left stale.
+
+The Reviewer being Claude is **not** a `REVIEW_WAIVED (inline)` case: the audit ran in a separate
+read-only context that did not supervise the work, so no property of the gate was lost.
+
+### Attempt 1 — Grok `grok-4.7-xhigh` (Cursor, via Orca `run_9a5ef8079b60` / `ctx_06decd851213`)
+
+`runtime events: none`
+
+**Falsifiers — three separate reds, one per table (`JG-2` satisfied).** The Implementer observed all
+three and reported verbatim jest output for each. **The Leader re-executed the third independently**,
+because it is the subtlest and the one guarding against a silently-inflated count:
+
+Leader's own run, `AND is_active = 1` removed from the `sec_user_roles` UPDATE:
+
+```
+✕ does not rewrite an already-inactive row and does not inflate the count (3 ms)
+Tests:       1 failed, 25 passed, 26 total
+```
+
+Restored; 26/26 green; `git diff --stat` back to +389 / −4. Falsifiers 1 (`app_secrets`) and 2
+(`sec_user_roles`) stand on the Implementer's verbatim output and were **not** re-executed by the
+Leader — stated here rather than implied, per `KZ-014`.
+
+**Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`. Every figure matched.**
+
+| Gate | Implementer reported | Leader measured |
+| --- | --- | --- |
+| `npx jest …repository.spec.ts --silent --no-coverage` | 26 passed, 26 total | **26 / 26** |
+| `npm test -- --silent` | 396 suites / 3524 tests | **396 / 3524** |
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
+| `npx eslint src test` (bare, `K-001`) | exit 0, 1 pre-existing warning | **exit 0**, same warning, outside the diff |
+| `grep -rn "AppSecretRepository" src/domain/tools/agresso/staff/` | zero hits | **zero hits** (grep exit 1) |
+| `git diff --stat` | +389 / −4 | **+389 / −4** |
+
+**Done checks.** All four met: three falsifiers red individually · chunking asserted over **120 ids
+across 3 chunks** (not the inert sub-`CHUNK` set `JR2-6` warns about) · zero `AppSecretRepository`
+hits · `updated_by` per `DD-D12`.
+
+**The `KZ-001` disqualifier was cleared on its own terms.** The task forbids proving a `WHERE` on a
+call sequence. The tests assert **generated SQL text**: the `app_secrets` case captures real TypeORM
+output through a metadata-only `DataSource` with an intercepted `QueryRunner.query`. The Reviewer
+confirmed none of the three `WHERE` clauses mixes `OR` with `AND`, and that the harness actively
+guards against one appearing (`!/\bOR\b/i.test(sql)`).
+
+**Reviewer — Claude `opus`, fresh read-only context. `STATUS: PASS`.**
+
+> All three destructive statements conform to `R-AGD-008` (Details table, AC.3–AC.5), `NFR-AGD-006`
+> and `NFR-AGD-007`: `app_secrets` goes through `manager.getRepository(AppSecret)` (never
+> `AppSecretRepository`), all three carry the active-row predicate, ids are deduplicated/sorted
+> ascending and chunked at `CHUNK = 50` over a 120-id set spanning 3 chunks, counts come from driver
+> affected-rows rather than `userIds.length`, no transaction is opened here, and
+> `alliance_user_staff` is untouched.
+
+### Decision — the `DD-D12` ambiguity, escalated to the Reviewer rather than settled by the Leader
+
+The Implementer surfaced a genuine ambiguity: design §19.3 says *"`updated_by` is left NULL and that
+is recorded"*, but **omitting the column from the `SET` clause does not NULL a row that already
+carries a value** — it preserves it. The Leader's provisional reading (omission conforms, because
+§19.3's rationale is about not inventing a synthetic actor) was **passed to the Reviewer as a named
+conformance check with an explicit instruction not to defer to it.**
+
+**The Reviewer ruled independently, and on a stronger citation than the Leader had:**
+
+> Omission conforms; an explicit `SET updated_by = NULL` would be the violation. `requirements.md`
+> §18 states *"**No schema change.** Three tables written (`is_active` only)"*. `SET updated_by = NULL`
+> writes a second column and breaches that line. `NFR-AGD-007` frames the decision as a binary —
+> *"between leaving `updated_by` NULL and introducing a system actor id"* — and "leaving" is the
+> absence of a write, not a write of NULL. Verified at the source: `updated_by` in
+> `src/domain/shared/global-dto/auditable.entity.ts:28` is a plain `@Column` with no listener and no
+> TypeORM auto-stamp.
+
+**No spec edit was made.** §19.3's wording is loose but not wrong, and the Reviewer's citation chain
+(`requirements.md` §18 + `NFR-AGD-007` + the entity source) resolves it without amendment. Recorded
+here so the next reader does not re-litigate it.
+
+The Reviewer also ruled the Implementer's other five assumptions **legitimate scope boundaries, not
+violations** — notably that cross-table write order belongs to `apply()` (T-09), which the task's own
+Scope and Consumers fields already assign there.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+Both the Implementer and the Reviewer declared this, and the declarations agree:
+
+- `npm test` runs with `rootDir: "src"`. It collects neither `test/fixtures/`, `test/*.e2e-spec.ts`
+  nor `test/*.integration-spec.ts`. **`npm run test:fixtures` could not run at all — the Docker
+  daemon is down and the scratch MySQL cannot start.** Nothing in this task is a database claim.
+- `idsRewrittenByStatement` is a **simulator** that reads the predicate off SQL text by regex. It
+  cannot show that MySQL's `affectedRows` counts matched-vs-changed rows the way **AC.4's "do not
+  inflate the counts"** assumes, nor that `In()` + boolean `true` binds to `tinyint(1)` at the wire.
+- Rollback, second-chunk failure, dry-run and shield membership (`R-AGD-008` AC.1, AC.2, AC.6) are
+  **not** proven here. These three methods write exactly the ids handed to them; the shield set is
+  the caller's.
+- Cross-table lock order was not executed as one transaction. `JD-8` remains the accepted risk.
+
+> **Carried forward to T-11:** the Reviewer's instruction that **T-11 must carry `AC.4` explicitly
+> rather than inherit it as proven.** T-08's count assertions are simulator-grade; only the fixture
+> tier can settle matched-vs-changed. This pointer must be copied into T-11's Implementer brief — a
+> forward pointer is carried by the brief or by nobody.
+
+### ADVISORY (4R lens — recorded, never gates, never becomes a task)
+
+1. **Risk — a safety guard lost its case-insensitive flag.** The no-write source guard went from
+   `/\b(?:UPDATE|INSERT|DELETE)\b/i` to `/\b(?:INSERT|DELETE)\b/`
+   (`sec-user-deactivation.repository.spec.ts:186`). **Dropping `UPDATE` is mandatory** — T-08 exists
+   to add UPDATEs. **Dropping `/i` is not**, and nothing in the task asked for it: a future lowercase
+   `delete from …` in this file now passes the guard silently.
+2. **Reliability** — `idsRewrittenByStatement` is a regex simulator; see the `KZ-017` block above.
+3. **Readability** — `affectedRowsForRawSql` and `affectedRowsForAppSecretsSql` are byte-identical
+   one-line delegations to the same helper.
+
+**Leader adjudication of advisory 1.** Not reworked inside this task, and **not converted into a new
+task** — both are forbidden. It is also not obviously mere style: it is a weakening of a safety gate,
+on a line **this diff itself edited**, in the one task of the spec that can destroy access. The
+Reviewer weighed it and chose not to gate on it, and that verdict stands. **Referred to the user at
+the continue gate as an explicit decision** rather than actioned unilaterally in either direction.
+
+**Issues encountered:** none blocking. Docker unavailability is recorded above as a scope limit, not
+an issue with this diff.
+
+**Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**

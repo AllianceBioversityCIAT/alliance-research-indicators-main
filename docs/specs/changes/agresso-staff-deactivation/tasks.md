@@ -322,7 +322,7 @@ consumer pins the member list; confirm that before merging rather than assuming 
 
 ### T-08 — The three destructive statements
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** M · **Depends on:** none · **Parallel-safe with T-07** (different files)
 - **Review:** `full` — this is the only task in the spec that can destroy access
 - **Requirements:** `R-AGD-008` (AC.3–AC.5), `NFR-AGD-006`, `NFR-AGD-007` · **Design:** §19, §19.2, §19.3
@@ -348,11 +348,11 @@ Sweep: `grep -rn "deactivateSecUsers\|deactivateSecUserRoles\|deactivateAppSecre
 hits before this task.
 
 **Done:**
-- [ ] Three falsifiers observed red, one per table
-- [ ] Sorted-id chunking asserted over **≥ 3 chunks**
-- [ ] `grep -rn "AppSecretRepository" src/domain/tools/agresso/staff/` → **zero hits**
-- [ ] `updated_by` behavior matches `DD-D12` (left NULL, and a test states so rather than asserting `updated_at`, which the engine writes regardless)
-- [ ] Reviewer PASS
+- [x] Three falsifiers observed red, one per table
+- [x] Sorted-id chunking asserted over **≥ 3 chunks**
+- [x] `grep -rn "AppSecretRepository" src/domain/tools/agresso/staff/` → **zero hits**
+- [x] `updated_by` behavior matches `DD-D12` (left NULL, and a test states so rather than asserting `updated_at`, which the engine writes regardless)
+- [x] Reviewer PASS
 
 ---
 

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AppSecret } from '../../../entities/app-secrets/entities/app-secret.entity';
 import { CHUNK } from './sec-user-reconciler.repository';
 
 interface ExternalStatusRow {
@@ -105,6 +106,73 @@ export class SecUserDeactivationRepository extends Repository<SecUser> {
     return Array.from(userIds);
   }
 
+  /**
+   * One table each. `apply` runs them inside a single transaction, in the order
+   * app_secrets → sec_user_roles → sec_users. These methods do not open one.
+   *
+   * `AND is_active = 1` keeps an already-inactive row out of the write and out of
+   * the returned count. The count is the driver's affected-row total, not
+   * `userIds.length`.
+   *
+   * DD-D12: `updated_by` is left NULL. This job has no actor, and a synthetic
+   * sec_users id would itself be a deactivation candidate. `updated_at` is not
+   * part of the contract — the engine writes it on UPDATE.
+   */
+  async deactivateAppSecrets(
+    manager: EntityManager,
+    userIds: number[],
+  ): Promise<number> {
+    const ids = this.sortedUniqueIds(userIds);
+    let affected = 0;
+    for (const idsChunk of this.chunk(ids, CHUNK)) {
+      const result = await manager.getRepository(AppSecret).update(
+        {
+          responsible_user_id: In(idsChunk),
+          is_active: true,
+        },
+        { is_active: false },
+      );
+      affected += Number(result.affected ?? 0);
+    }
+    return affected;
+  }
+
+  async deactivateSecUserRoles(
+    manager: EntityManager,
+    userIds: number[],
+  ): Promise<number> {
+    const ids = this.sortedUniqueIds(userIds);
+    let affected = 0;
+    for (const idsChunk of this.chunk(ids, CHUNK)) {
+      const result: { affectedRows?: number } = await manager.query(
+        `UPDATE sec_user_roles SET is_active = 0
+          WHERE user_id IN (${idsChunk.map(() => '?').join(', ')})
+            AND is_active = 1`,
+        idsChunk,
+      );
+      affected += Number(result?.affectedRows ?? 0);
+    }
+    return affected;
+  }
+
+  async deactivateSecUsers(
+    manager: EntityManager,
+    userIds: number[],
+  ): Promise<number> {
+    const ids = this.sortedUniqueIds(userIds);
+    let affected = 0;
+    for (const idsChunk of this.chunk(ids, CHUNK)) {
+      const result: { affectedRows?: number } = await manager.query(
+        `UPDATE sec_users SET is_active = 0
+          WHERE sec_user_id IN (${idsChunk.map(() => '?').join(', ')})
+            AND is_active = 1`,
+        idsChunk,
+      );
+      affected += Number(result?.affectedRows ?? 0);
+    }
+    return affected;
+  }
+
   private assertNumericIds(ids: number[]): void {
     const invalid = ids.filter(
       (id) => typeof id !== 'number' || !Number.isInteger(id) || id <= 0,
@@ -114,6 +182,15 @@ export class SecUserDeactivationRepository extends Repository<SecUser> {
         `SecUserDeactivationRepository: expected positive integer user ids, got: ${invalid.join(', ')}`,
       );
     }
+  }
+
+  private sortedUniqueIds(ids: number[]): number[] {
+    if (!ids?.length) {
+      return [];
+    }
+    const uniqueIds = Array.from(new Set(ids));
+    this.assertNumericIds(uniqueIds);
+    return uniqueIds.sort((left, right) => left - right);
   }
 
   private chunk<T>(items: T[], size: number): T[][] {
