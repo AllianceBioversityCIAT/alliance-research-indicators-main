@@ -6,6 +6,7 @@ import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import { AppSecretHostList } from '../../../entities/app-secret-host-list/entities/app-secret-host-list.entity';
 import { AppSecret } from '../../../entities/app-secrets/entities/app-secret.entity';
 import { AgressoStaffModule } from './agresso-staff-tools.module';
+import { EXTERNAL_STATUS_ID } from './dto/deactivation-config.dto';
 import { SecUserDeactivationRepository } from './sec-user-deactivation.repository';
 import { CHUNK } from './sec-user-reconciler.repository';
 
@@ -51,7 +52,7 @@ describe('SecUserDeactivationRepository', () => {
         { user_status_id: 4, name: 'External Accepted' },
       ]);
 
-      await expect(repository.resolveExternalStatusId()).resolves.toEqual({
+      await expect(repository.resolveExternalStatusId(4)).resolves.toEqual({
         statusId: 4,
         matchCount: 1,
       });
@@ -63,7 +64,7 @@ describe('SecUserDeactivationRepository', () => {
         { user_status_id: 2, name: 'Pending' },
       ]);
 
-      await expect(repository.resolveExternalStatusId()).resolves.toEqual({
+      await expect(repository.resolveExternalStatusId(4)).resolves.toEqual({
         statusId: null,
         matchCount: 0,
       });
@@ -77,9 +78,28 @@ describe('SecUserDeactivationRepository', () => {
         { user_status_id: 1, name: 'Accepted' },
       ]);
 
-      await expect(repository.resolveExternalStatusId()).resolves.toEqual({
+      await expect(repository.resolveExternalStatusId(4)).resolves.toEqual({
         statusId: null,
         matchCount: 0,
+      });
+    });
+
+    // The configured id is the selector. A fixture that asks for 4 cannot tell a
+    // parameter from the seed constant — 9 is not that constant.
+    it('selects the supplied ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID when it is not 4', async () => {
+      const configuredId = 9;
+      expect(configuredId).not.toBe(EXTERNAL_STATUS_ID);
+
+      querySpy.mockResolvedValueOnce([
+        { user_status_id: 4, name: 'External Accepted' },
+        { user_status_id: configuredId, name: 'Partner' },
+      ]);
+
+      await expect(
+        repository.resolveExternalStatusId(configuredId),
+      ).resolves.toEqual({
+        statusId: configuredId,
+        matchCount: 1,
       });
     });
 
@@ -88,14 +108,14 @@ describe('SecUserDeactivationRepository', () => {
         { user_status_id: '4', name: 'External Accepted' },
       ]);
 
-      const result = await repository.resolveExternalStatusId();
+      const result = await repository.resolveExternalStatusId(4);
 
       expect(result).toEqual({ statusId: 4, matchCount: 1 });
       expect(typeof result.statusId).toBe('number');
     });
 
     it('emits both active and non-deleted predicates in the status SQL', async () => {
-      await repository.resolveExternalStatusId();
+      await repository.resolveExternalStatusId(4);
 
       const [sql, params] = querySpy.mock.calls[0];
       expect(sql).toMatch(/from\s+user_status/i);

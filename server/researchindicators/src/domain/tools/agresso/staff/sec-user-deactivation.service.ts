@@ -7,12 +7,15 @@
 // yields a wrong REPORT, which a human reads, rather than a wrong RETIREMENT, which nothing undoes.
 import { Injectable } from '@nestjs/common';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AppConfigKey } from '../../../entities/app-config/enum/app-config-key.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
+import { DeactivationConfigResolution } from './dto/deactivation-config.dto';
 import { FetchReport } from './dto/fetch-report.dto';
 import { normalizeEmail, shieldKeyFor } from './email-key.util';
 import { SecUserDeactivationRepository } from './sec-user-deactivation.repository';
 import { ReconciliationResult } from './sec-user-reconciler.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
 export type DeactivationAbortReason = 'C-1' | 'C-2' | 'C-4';
 
@@ -50,7 +53,10 @@ export class SecUserDeactivationService {
     name: SecUserDeactivationService.name,
   });
 
-  constructor(private readonly repository: SecUserDeactivationRepository) {}
+  constructor(
+    private readonly repository: SecUserDeactivationRepository,
+    private readonly configResolver: StaffDeactivationConfigResolver,
+  ) {}
 
   /**
    * Computes the deactivation set and reports it. Never throws: the controller does not await the
@@ -88,19 +94,23 @@ export class SecUserDeactivationService {
     secUsers: SecUser[],
     fetchReport: FetchReport,
   ): Promise<DeactivationMeasurement> {
+    const resolution = await this.configResolver.resolve();
     const activePopulation = secUsers.filter((u) => u.is_active).length;
     const base = { ...this.emptyReport(fetchReport), activePopulation };
 
     // ---- Preconditions. An untrustworthy payload produces NO candidate set, only counts. -------
-    const abort = await this.checkPreconditions(fetchReport);
+    const abort = await this.checkPreconditions(fetchReport, resolution);
     if (abort) {
       this.logger._error(
         `Deactivation aborted: ${abort.abortReason} ${JSON.stringify(abort.abortDetail)}`,
       );
       return { ...base, ...abort };
     }
-    const externalStatusId = (await this.repository.resolveExternalStatusId())
-      .statusId as number;
+    const externalStatusId = (
+      await this.repository.resolveExternalStatusId(
+        resolution.config.externalStatusId,
+      )
+    ).statusId as number;
 
     // ---- Shields, built from the RAW payload, before validation and before the collapse. -------
     // Neither step can remove a shield because neither has run yet when this is computed.
@@ -172,6 +182,7 @@ export class SecUserDeactivationService {
   /** C-1, C-2 and C-4. Returns the abort, or `null` when the payload can be trusted. */
   private async checkPreconditions(
     fetchReport: FetchReport,
+    resolution: DeactivationConfigResolution,
   ): Promise<Pick<
     DeactivationMeasurement,
     'abortReason' | 'abortDetail'
@@ -210,7 +221,23 @@ export class SecUserDeactivationService {
       };
     }
 
-    const external = await this.repository.resolveExternalStatusId();
+    const externalConfigFailed = resolution.failures.some(
+      (failure) =>
+        failure.key === AppConfigKey.ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID,
+    );
+    if (externalConfigFailed || resolution.config.externalStatusId == null) {
+      return {
+        abortReason: 'C-4',
+        abortDetail: {
+          externalStatusMatches: 0,
+          configKey: AppConfigKey.ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID,
+        },
+      };
+    }
+
+    const external = await this.repository.resolveExternalStatusId(
+      resolution.config.externalStatusId,
+    );
     if (external.matchCount !== 1) {
       return {
         abortReason: 'C-4',

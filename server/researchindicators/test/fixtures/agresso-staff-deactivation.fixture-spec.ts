@@ -1,11 +1,13 @@
 // @akili-spec changes/agresso-staff-deactivation (T-05 — NFR-AGD-002 fixture gate)
 import { dataSource } from '../../src/db/config/mysql/orm.test.config';
+import { AppConfigKey } from '../../src/domain/entities/app-config/enum/app-config-key.enum';
 import { AgressoStaffRawDto } from '../../src/domain/tools/agresso/staff/dto/agresso-staff-raw.dto';
 import { FetchReport } from '../../src/domain/tools/agresso/staff/dto/fetch-report.dto';
 import { SecUserDeactivationRepository } from '../../src/domain/tools/agresso/staff/sec-user-deactivation.repository';
 import { SecUserDeactivationService } from '../../src/domain/tools/agresso/staff/sec-user-deactivation.service';
 import { ReconciliationResult } from '../../src/domain/tools/agresso/staff/sec-user-reconciler.service';
 import { SecUserReconcilerRepository } from '../../src/domain/tools/agresso/staff/sec-user-reconciler.repository';
+import { StaffDeactivationConfigResolver } from '../../src/domain/tools/agresso/staff/staff-deactivation-config.resolver';
 
 interface TableState {
   rowCount: number;
@@ -68,6 +70,32 @@ describe('Agresso staff deactivation — fixture tier', () => {
     };
   }
 
+  async function pinExternalStatusConfig(
+    id: number,
+  ): Promise<() => Promise<void>> {
+    const key = AppConfigKey.ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID;
+    const existing: { simple_value: string | null }[] = await dataSource.query(
+      'SELECT simple_value FROM app_config WHERE `key` = ?',
+      [key],
+    );
+    await dataSource.query(
+      `INSERT INTO app_config (\`key\`, simple_value, description, category, subcategory)
+       VALUES (?, ?, 'T-05 fixture external status id', 'API', 'STAFF')
+       ON DUPLICATE KEY UPDATE simple_value = VALUES(simple_value)`,
+      [key, String(id)],
+    );
+    return async () => {
+      if (existing.length === 0) {
+        await dataSource.query('DELETE FROM app_config WHERE `key` = ?', [key]);
+        return;
+      }
+      await dataSource.query(
+        'UPDATE app_config SET simple_value = ? WHERE `key` = ?',
+        [existing[0].simple_value, key],
+      );
+    };
+  }
+
   async function ownedState(): Promise<OwnedState> {
     return {
       secUsers: await tableState(
@@ -96,7 +124,10 @@ describe('Agresso staff deactivation — fixture tier', () => {
       await dataSource.initialize();
     }
     repository = new SecUserDeactivationRepository(dataSource.manager);
-    service = new SecUserDeactivationService(repository);
+    service = new SecUserDeactivationService(
+      repository,
+      new StaffDeactivationConfigResolver(dataSource),
+    );
     reconcilerRepository = new SecUserReconcilerRepository(dataSource.manager);
   });
 
@@ -117,7 +148,9 @@ describe('Agresso staff deactivation — fixture tier', () => {
     );
 
     // Real MySQL must resolve exactly one active, non-deleted row named External.
-    expect(await repository.resolveExternalStatusId()).toEqual({
+    expect(
+      await repository.resolveExternalStatusId(EXTERNAL_STATUS_ID),
+    ).toEqual({
       statusId: EXTERNAL_STATUS_ID,
       matchCount: 1,
     });
@@ -129,7 +162,9 @@ describe('Agresso staff deactivation — fixture tier', () => {
     );
 
     // A second, soft-deleted External must be filtered by SQL, not counted and not abort the run.
-    expect(await repository.resolveExternalStatusId()).toEqual({
+    expect(
+      await repository.resolveExternalStatusId(EXTERNAL_STATUS_ID),
+    ).toEqual({
       statusId: EXTERNAL_STATUS_ID,
       matchCount: 1,
     });
@@ -187,25 +222,30 @@ describe('Agresso staff deactivation — fixture tier', () => {
       distinctCarnets: 1,
       duplicatedCarnets: [],
     };
-    const before = await ownedState();
+    const restoreConfig = await pinExternalStatusConfig(EXTERNAL_STATUS_ID);
+    try {
+      const before = await ownedState();
 
-    const measurement = await service.measure(
-      payload,
-      reconciliation,
-      secUsers,
-      fetchReport,
-    );
+      const measurement = await service.measure(
+        payload,
+        reconciliation,
+        secUsers,
+        fetchReport,
+      );
 
-    // This assertion MUST precede the zero-delta checks: an empty set would make them vacuous.
-    expect(measurement.candidates).toContain(CANDIDATE_ID);
-    expect(measurement.candidates?.length ?? 0).toBeGreaterThan(0);
+      // This assertion MUST precede the zero-delta checks: an empty set would make them vacuous.
+      expect(measurement.candidates).toContain(CANDIDATE_ID);
+      expect(measurement.candidates?.length ?? 0).toBeGreaterThan(0);
 
-    const after = await ownedState();
-    expect(after.secUsers.rowCount).toBe(before.secUsers.rowCount);
-    expect(after.secUsers.activeSum).toBe(before.secUsers.activeSum);
-    expect(after.secUserRoles.rowCount).toBe(before.secUserRoles.rowCount);
-    expect(after.secUserRoles.activeSum).toBe(before.secUserRoles.activeSum);
-    expect(after.appSecrets.rowCount).toBe(before.appSecrets.rowCount);
-    expect(after.appSecrets.activeSum).toBe(before.appSecrets.activeSum);
+      const after = await ownedState();
+      expect(after.secUsers.rowCount).toBe(before.secUsers.rowCount);
+      expect(after.secUsers.activeSum).toBe(before.secUsers.activeSum);
+      expect(after.secUserRoles.rowCount).toBe(before.secUserRoles.rowCount);
+      expect(after.secUserRoles.activeSum).toBe(before.secUserRoles.activeSum);
+      expect(after.appSecrets.rowCount).toBe(before.appSecrets.rowCount);
+      expect(after.appSecrets.activeSum).toBe(before.appSecrets.activeSum);
+    } finally {
+      await restoreConfig();
+    }
   });
 });

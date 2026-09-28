@@ -9,21 +9,6 @@ interface ExternalStatusRow {
   name: string;
 }
 
-/**
- * `user_status.user_status_id` of the external cohort.
- *
- * WHY AN ID AND NOT A NAME. This resolution was written as a name lookup for `'external'`
- * (`W-1`), on the grounds that the original literal `4` was unverifiable — `user_status` has no
- * seed, no migration and no enum anywhere in this repository. The reasoning was sound and the
- * chosen value was wrong: the live row is named **`External Accepted`**, so the lookup matched
- * nothing and every run aborted on `C-4` before the measurement could be taken (Dev, 2026-09-25).
- *
- * The id is the stable selector — a rename cannot move it — and the `C-4` abort still fires when
- * the row is absent, so an environment that numbers `user_status` differently refuses to run
- * rather than silently shielding the wrong cohort.
- */
-export const EXTERNAL_STATUS_ID = 4;
-
 interface SystemAdminRoleRow {
   user_id: number;
   role_id: number;
@@ -36,7 +21,22 @@ export class SecUserDeactivationRepository extends Repository<SecUser> {
     super(SecUser, entityManager);
   }
 
-  async resolveExternalStatusId(): Promise<{
+  /**
+   * Selects the external cohort by the id the caller resolved from
+   * `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID`.
+   *
+   * WHY AN ID AND NOT A NAME. This resolution was written as a name lookup for `'external'`
+   * (`W-1`), on the grounds that the original literal `4` was unverifiable — `user_status` has no
+   * seed, no migration and no enum anywhere in this repository. The reasoning was sound and the
+   * chosen value was wrong: the live row is named **`External Accepted`**, so the lookup matched
+   * nothing and every run aborted on `C-4` before the measurement could be taken (Dev, 2026-09-25).
+   *
+   * The id is the stable selector — a rename cannot move it — and the `C-4` abort still fires when
+   * the row is absent, so an environment that numbers `user_status` differently refuses to run
+   * rather than silently shielding the wrong cohort. This method does not read a module constant:
+   * the configured id is the only comparison.
+   */
+  async resolveExternalStatusId(externalStatusId: number): Promise<{
     statusId: number | null;
     matchCount: number;
   }> {
@@ -52,7 +52,7 @@ export class SecUserDeactivationRepository extends Repository<SecUser> {
         ...row,
         user_status_id: Number(row.user_status_id),
       }))
-      .filter((row) => row.user_status_id === EXTERNAL_STATUS_ID);
+      .filter((row) => row.user_status_id === externalStatusId);
 
     return {
       statusId: matches.length === 1 ? matches[0].user_status_id : null,

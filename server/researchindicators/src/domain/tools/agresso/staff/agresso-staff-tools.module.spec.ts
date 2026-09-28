@@ -3,6 +3,7 @@ import { AgressoStaffModule } from './agresso-staff-tools.module';
 import { AgressoStaffToolsService } from './agresso-staff-tools.service';
 import { SecUserReconcilerRepository } from './sec-user-reconciler.repository';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
 describe('AgressoStaffModule registration', () => {
   // CORRECTED AFTER REVIEW. An earlier version of this comment claimed the SILENT-404 failure
@@ -20,5 +21,6 @@ describe('AgressoStaffModule registration', () => {
     // T-07 wires the reconciler into the sync; without these two it cannot be constructed.
     expect(providers).toContain(SecUserReconcilerService);
     expect(providers).toContain(SecUserReconcilerRepository);
+    expect(providers).toContain(StaffDeactivationConfigResolver);
   });
 });

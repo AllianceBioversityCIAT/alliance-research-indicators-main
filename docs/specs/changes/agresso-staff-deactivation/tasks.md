@@ -275,7 +275,10 @@ re-measures the full suite after each reports.
 nothing about id selection — AC.3 exists to catch exactly that, and must itself be seen red.
 **Consumers:** `sec-user-deactivation.service.ts` (sole caller of `resolveExternalStatusId`); no
 other file references it. Sweep: `grep -rn resolveExternalStatusId --include="*.ts" src test` → 3
-hits, all inside this module.
+hits, all inside this module. ⚠️ **Corrected 2026-09-28 (`KZ-017`): that sweep was narrower than its
+claim.** It missed `test/fixtures/agresso-staff-deactivation.fixture-spec.ts`, which constructs
+`SecUserDeactivationService` directly and therefore rides on this method's signature — T-07 had to
+repair it. The miss was in the sweep, not in T-06's diff.
 
 **Done:**
 - [x] Reviewer PASS from Antigravity on the existing diff
@@ -285,7 +288,7 @@ hits, all inside this module.
 
 ### T-07 — Config: four keys, typed enum, resolver with the failure asymmetry, and the seed migration
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** M · **Depends on:** none · **Review:** `full` — a wrong failure direction here disables the only volume defence
 - **Requirements:** `R-AGD-011` (AC.1–AC.4) · **Design:** §21
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
@@ -303,10 +306,18 @@ hits, all inside this module.
 >
 > **Fifth deliverable:** `resolveExternalStatusId` must take the id resolved from that key instead of
 > reading the module constant, and `measure()`'s C-4 path must supply it. The mechanism is the
-> Implementer's call; the outcome is not. `EXTERNAL_STATUS_ID` may remain **only** as the resolver's
-> documented default for the key's absence — it may not remain the runtime source. C-4's existing
-> abort behavior (anything other than exactly one matching row aborts, in dry-run too) is preserved
-> unchanged.
+> Implementer's call; the outcome is not. `EXTERNAL_STATUS_ID` may survive **only** as the value the
+> migration seeds — it may not remain the runtime source. C-4's existing abort behavior (anything
+> other than exactly one matching row aborts, in dry-run too) is preserved unchanged.
+>
+> **Correction, 2026-09-28 — the Leader's own error, fixed before the Reviewer saw the task.** This
+> clause first read *"`EXTERNAL_STATUS_ID` may remain only as the resolver's documented default for
+> the key's absence"*. That contradicts `R-AGD-011`, whose table marks
+> `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID` **"→ abort C-4 (loud)"**: an unreadable key must fail
+> loudly, and a silent fall-back to `4` is precisely the failure direction the key's whole falsifier
+> exists to catch. The Implementer read the requirement over the Leader's looser phrasing and
+> implemented fail-loud, which is correct. The wording is repaired here so the task text and
+> `R-AGD-011` cannot be read against each other later.
 
 > ⚠️ **`AppConfigService` must not be imported.** It takes `CurrentUserUtil` (`Scope.REQUEST`) —
 > verified at `app-config.service.ts:23` — and the scope bubbles to the fire-and-forget controller.
@@ -330,13 +341,13 @@ idempotent (`FP-49`); recover via `compose:test:down` → `up` → `bootstrap`.
 consumer pins the member list; confirm that before merging rather than assuming it.
 
 **Done:**
-- [ ] All four keys resolve, each failure direction asserted **separately** and each seen red
-- [ ] Migration `up()` then `down()` executed against the scratch schema; `down()` deletes exactly four rows
-- [ ] Re-running `up()` updates rather than duplicating (`ON DUPLICATE KEY UPDATE`)
-- [ ] `grep -rn "AppConfigService" src/domain/tools/agresso/staff/` → **zero hits**
-- [ ] **C-4 reads the configured id, not the constant** — asserted with a fixture whose configured id is **not** `4`, and the falsifier above seen red
-- [ ] **C-4's abort is unchanged** — a configured id matching no active row still aborts with `abortReason = C-4`, in dry-run too (`R-AGD-012` AC.2 and its Scenario)
-- [ ] Reviewer PASS
+- [x] All four keys resolve, each failure direction asserted **separately** and each seen red
+- [x] Migration `up()` then `down()` executed against the scratch schema; `down()` deletes exactly four rows
+- [x] Re-running `up()` updates rather than duplicating (`ON DUPLICATE KEY UPDATE`)
+- [x] `grep -rn "AppConfigService" src/domain/tools/agresso/staff/` → **zero hits**
+- [x] **C-4 reads the configured id, not the constant** — asserted with a fixture whose configured id is **not** `4`, and the falsifier above seen red
+- [x] **C-4's abort is unchanged** — a configured id matching no active row still aborts with `abortReason = C-4`, in dry-run too (`R-AGD-012` AC.2 and its Scenario)
+- [x] Reviewer PASS
 
 ---
 
@@ -467,7 +478,12 @@ reddens against the real database.
 **Disqualifier:** **`npm test` is not evidence for anything in this task** — it runs with
 `rootDir: "src"` and never collects `test/fixtures/` (`KZ-017`). Only `npm run test:fixtures`
 counts. A green from the wrong runner is a zero-tests pass wearing a green badge.
-**Consumers:** none — new file.
+**Consumers:** none. ⚠️ **Corrected 2026-09-28 — the fixture is NOT a new file.**
+`test/fixtures/agresso-staff-deactivation.fixture-spec.ts` was created by **T-05** (increment 1) and
+**edited by T-07**, which added a `StaffDeactivationConfigResolver` constructor argument and a
+`pinExternalStatusConfig` helper. T-11 extends an existing file; it does not create one. **Those
+T-07 edits have never been executed** — `npm run test:fixtures` has not run in this increment — so
+T-11 inherits them as an unverified presence-level claim and must run them, not assume them.
 
 **Done:**
 - [ ] All three tables asserted after one live run, on real rows

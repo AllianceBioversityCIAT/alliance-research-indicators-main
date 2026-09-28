@@ -496,3 +496,163 @@ guard without creating a false positive.
 an issue with this diff.
 
 **Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**
+
+---
+
+## T-07 — Config: four keys, typed enum, resolver, seed migration, and the C-4 wiring · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1
+- **Requirements covered:** `R-AGD-011` (AC.1–AC.4), `R-AGD-012` (AC.1–AC.4, closing the gap below) · **Design:** §21, §21.1
+- **Implementer:** Cursor `grok-4.7-xhigh` · **Reviewer:** Claude `opus`, fresh read-only context
+- **Files changed:** 8 modified (**+277 / −50**) + **4 new** — `staff-deactivation-config.resolver.ts` (+ spec), `dto/deactivation-config.dto.ts`, `1790602688746-seedStaffDeactivationConfig.ts`
+
+### Scope widening — the gap this task was grown to close
+
+**`R-AGD-012` would have been unmet at spec close with every task marked done.** It requires C-4 to
+resolve the external `user_status` id **from** `ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID`, but no
+task connected the key to any code: `T-06` shipped the module constant, `T-07` only created the key
+and the resolver, and `T-09` resolves config for `apply()` — while C-4 runs inside `measure()`, which
+executes first. The key would have been seeded and never read.
+
+**How it surfaced, because the mechanism is the point.** The `T-06` entry above recorded a forward
+pointer — *"T-07 must replace the constant, not merely add the key beside it"*. The Leader **re-read
+that pointer at the moment of composing T-07's brief**, which is the only thing that makes a forward
+pointer work: one filed two tasks ago is carried by the brief or by nobody. Raised at the continue
+gate and widened on the **user's ruling** (2026-09-28), never absorbed silently — growing an approved
+task is the user's call. Recorded in `tasks.md` §9 T-07 and committed as `fd5a72ee`.
+
+### Execute-time spec edits made during this task
+
+| File + section | Edit | Reason |
+| --- | --- | --- |
+| `tasks.md` §9 `T-07` Scope | Added the fifth deliverable (C-4 wiring) + its falsifier + 2 Done items | The user-approved widening above |
+| `tasks.md` §9 `T-07` Scope note | **Corrected the Leader's own wording** — see below | It contradicted `R-AGD-011` |
+| `tasks.md` §9 `T-11` Consumers | `none — new file` → the fixture is **not** new | Factually wrong; found by the Reviewer |
+| `tasks.md` §9 `T-06` Consumers | Annotated the sweep as narrower than its claim (`KZ-017`) | It missed the fixture; found by the Reviewer |
+
+**The Leader wrote a defect into the task text, and the Implementer caught it.** The widening first
+read *"`EXTERNAL_STATUS_ID` may remain **only** as the resolver's documented default for the key's
+absence"*. `R-AGD-011`'s table marks that key **"abort C-4 — fails loud"**, and the requirement adds
+*"a missing external-status id must never become 'shield nobody'"* — so a documented default is
+exactly the failure direction the key's own falsifier exists to catch. **The Implementer read the
+requirement over the Leader's phrasing and implemented fail-loud, which is correct.** The task text
+was repaired before the Reviewer saw it, and the Reviewer was told to verify the *behavior* rather
+than accept either account.
+
+### Attempt 1 — Grok `grok-4.7-xhigh` (Orca `ctx_4c29bb2f8811`)
+
+`runtime events: none`
+
+**Five falsifiers, five separate reds**, each with verbatim jest output naming the test:
+
+| Falsifier | Mutation | Red test |
+| --- | --- | --- |
+| `DRY_RUN` | unreadable branch returns `false` | `DRY_RUN unresolvable fails safe to enabled` |
+| `CEILING_FRACTION` | silently returns `0.05` | `CEILING_FRACTION unresolvable aborts C-3` |
+| `ABSOLUTE_FLOOR` | silently returns `10` | `ABSOLUTE_FLOOR unresolvable aborts C-3` |
+| `EXTERNAL_STATUS_ID` | silently returns `4` | `EXTERNAL_STATUS_ID unresolvable aborts C-4` |
+| **C-4 wiring** | filter on the constant, not the argument | `measure selects configured …EXTERNAL_STATUS_ID when it is not 4` |
+
+**The inert-fixture trap was avoided.** The wiring test configures id **`9`**, not `4`. A fixture
+configuring the constant's own value passes whether or not the wiring exists — the task named that
+trap explicitly and the Implementer respected it. The red output shows candidate `980` (status 9)
+where `981` (status 4) was expected, so the two cohorts genuinely swap.
+
+**Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`. Every figure matched.**
+
+| Gate | Implementer reported | Leader measured |
+| --- | --- | --- |
+| `npm test -- --silent` | 397 suites / 3534 tests | **397 / 3534** (was 396 / 3524 before this task) |
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
+| `npx eslint src test` (bare, `K-001`) | exit 0, 1 pre-existing warning | **exit 0**, same warning, outside the diff |
+| `grep -rn "AppConfigService" src/domain/tools/agresso/staff/` | zero hits | **zero hits** (grep exit 1) |
+| `git diff --stat` | +277 / −50 over 8 files | **+277 / −50** |
+
+**Migration evidence — the Leader queried the scratch schema directly rather than relaying it:**
+
+```
+ARI_CLARISA_PROJECTS_PHASE                  2026
+ARI_STAFF_DEACTIVATION_ABSOLUTE_FLOOR       10
+ARI_STAFF_DEACTIVATION_CEILING_FRACTION     0.05
+ARI_STAFF_DEACTIVATION_DRY_RUN              true
+ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID   4
+POOL_FUNDING.PRMS_SYNC_BUTTON.ENABLED       true
+POOL_FUNDING.SECTION.ENABLED                true
+```
+
+`up()` → 7 rows / 4 staff keys · `down()` → 3 rows / 0 staff keys, **exactly four deleted** with the
+three pre-existing keys untouched · `up()` re-applied. **Environment prepared by the Leader, once:**
+the container was created fresh this session and `migration:test:bootstrap` was run a single time
+(`FP-49` — it is not idempotent), and the brief told the Implementer not to re-run it.
+
+**Reviewer — Claude `opus`, fresh read-only context. `STATUS: PASS`,** with all five escalated checks
+verified independently rather than accepted:
+
+1. **Fail-loud is real, not asserted.** `readLoud()` pushes a failure and returns `null`; no seed
+   substitution anywhere. `sec-user-deactivation.service.ts:224-235` aborts C-4 **before** touching
+   the repository, and `export const EXTERNAL_STATUS_ID` was **deleted from the repository file** —
+   it survives only in the DTO, consumed by the migration and by specs.
+2. **The fixture change is a forced consumer repair, not T-11 creep.** `tsconfig.json` has no
+   `include` and excludes only `node_modules`/`dist`/`vite.config.ts`, so `tsc --noEmit` compiles
+   `test/` and the signature change made the fixture non-compiling. `pinExternalStatusConfig` is
+   equally forced: the fixture's own `EXTERNAL_STATUS_ID = 9_050_511` is not what the migration seeds,
+   so without the pin the pre-existing `measure()` assertion would abort C-4. State restored in a
+   `finally`.
+3. **The re-run `up()` discharges AC.2.** The criterion is a property of the **statement**, not of
+   TypeORM's ledger; deleting the `migrations` row is the only way to reach a second execution, it
+   was disclosed plainly, and the Leader's own post-state query shows **four** staff rows, not eight.
+   `app_config` has `PRIMARY KEY (key)`, so `ON DUPLICATE KEY UPDATE` has a key to collide on.
+4. **`'API'` / `'STAFF'` conform.** `category` is a free taxonomy here (`seedClarisaMappingPhase` =
+   `API`/`CLARISA`; `categorisePoolFundingFeatureToggles` = `FRONT`/`SECTIONS`), `API` marking
+   backend-consumed config. No spec decision was owed.
+5. **Additivity verified by sweep, not accepted.** Zero `Object.values`/`Object.keys(AppConfigKey)`,
+   zero `switch` over it, zero exhaustive mapped type outside this diff. Every consumer names one
+   member. Adding four is additive — which also settles the task text's stale "10 files" against the
+   Implementer's measured **25**.
+
+The Reviewer also ruled the `Not Done / Assumptions` list free of conformance violations: keeping
+C-3 out of `measure()` is **correct, not deferred**, because `R-AGD-010`'s scenario requires dry-run
+*not* to abort on ceiling.
+
+### ADVISORY (4R lens — recorded, never gates, never becomes a task)
+
+1. **Risk, reachable today — `CEILING_FRACTION` has no upper bound.** `parsePositive` accepts any
+   finite `> 0`, exactly as `R-AGD-011` specifies. But `5` typed instead of `0.05` yields a ceiling of
+   **five times the active population**, silently disarming the volume defence — reachable by one
+   admin typo in the `/admin` config UI. **In spec today**; the Reviewer suggests an upper bound
+   (`<= 1`) when **T-09** consumes it.
+2. **Reliability** — the fixture repair was never executed. `npm run test:fixtures` did not run and
+   `npm test` (`rootDir: "src"`) structurally cannot collect it. Type-correct and logically sound,
+   but a **presence-level claim** until T-11 runs that tier.
+3. **Coverage** — `npm run test:cov` was not among this task's gates and the 60% floor is reported
+   nowhere for it. T-07's Done list does not require it; **§12's close definition does.**
+
+**Leader adjudication.** None is reworked and none becomes a task. Advisory 1 is a genuine hazard but
+it is **what the requirement says**, so changing it is a spec decision, not an execution one — carried
+to the user and to T-09's gate rather than actioned here. Advisories 2 and 3 are carried as
+verification debt below.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+- `npm test` runs with `rootDir: "src"`: no `test/fixtures/`, no e2e, no integration tier.
+  **`npm run test:fixtures` was not run at all**, so the fixture repair is unexecuted.
+- Resolver unit tests mock `getRepository(AppConfig).find` and never see the SQL TypeORM emits. The
+  scratch run proves the **migration's** INSERT/DELETE, not the **resolver's** SELECT.
+- `resolveExternalStatusId` tests assert an in-memory filter over a mocked `query` result; MySQL's
+  evaluation of `is_active = 1 AND deleted_at IS NULL` is unproven at every tier.
+- The second `up()` was reached by deleting the migration's ledger row — the runner executing `up()`
+  again, **not** a second call through an already-applied history.
+- The `AppConfigService` grep is source text; it cannot see a name built at runtime.
+- The migration runner printed *"377 migrations are already loaded in the database. 339 migrations
+  were found in the source code."* The 38-record gap was **not enumerated** by anyone. It did not stop
+  this migration, and it is a property of the scratch ledger, not of this diff — but it is unexplained
+  and recorded here rather than dropped.
+
+> **Carried forward, to be copied into the briefs that own them:**
+> - **T-09:** the `CEILING_FRACTION` upper-bound question (advisory 1) arrives at T-09's gate.
+> - **T-11:** must **execute** the T-07 fixture repair, not inherit it; and must carry `AC.4`
+>   explicitly rather than inherit it as proven (carried from T-08).
+> - **Spec close (§12):** `npm run test:cov` and the 60% floor are **reported nowhere yet**.
+
+**Final verification result:** green on every tier that can reach this change, plus executed
+migration evidence against a real MySQL. **Task closed `[x]`.**

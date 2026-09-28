@@ -1,11 +1,15 @@
 // @akili-spec changes/agresso-staff-deactivation (T-04)
 import { Test } from '@nestjs/testing';
+import { EntityManager } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
+import { AppConfigKey } from '../../../entities/app-config/enum/app-config-key.enum';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
+import { DeactivationConfigResolution } from './dto/deactivation-config.dto';
 import { FetchReport } from './dto/fetch-report.dto';
 import { SecUserDeactivationRepository } from './sec-user-deactivation.repository';
 import { SecUserDeactivationService } from './sec-user-deactivation.service';
 import { ReconciliationResult } from './sec-user-reconciler.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
 const EXTERNAL_STATUS_ID = 3;
 
@@ -45,9 +49,55 @@ const fetch = (over: Partial<FetchReport> = {}): FetchReport => ({
   ...over,
 });
 
+const resolvedConfig = (
+  over: Partial<DeactivationConfigResolution['config']> = {},
+): DeactivationConfigResolution => ({
+  config: {
+    dryRun: true,
+    ceilingFraction: 0.05,
+    absoluteFloor: 10,
+    externalStatusId: EXTERNAL_STATUS_ID,
+    ...over,
+  },
+  failures: [],
+});
+
+async function serviceOverRealRepository(
+  externalStatusId: number,
+  statusRows: { user_status_id: number; name: string }[],
+): Promise<{ service: SecUserDeactivationService }> {
+  const repository = new SecUserDeactivationRepository({} as EntityManager);
+  jest.spyOn(repository, 'query').mockImplementation(async (sql: string) => {
+    if (/from\s+user_status/i.test(sql)) {
+      return statusRows;
+    }
+    return [];
+  });
+
+  const moduleRef = await Test.createTestingModule({
+    providers: [
+      SecUserDeactivationService,
+      { provide: SecUserDeactivationRepository, useValue: repository },
+      {
+        provide: StaffDeactivationConfigResolver,
+        useValue: {
+          resolve: jest
+            .fn()
+            .mockResolvedValue(
+              resolvedConfig({ externalStatusId, dryRun: true }),
+            ),
+        },
+      },
+    ],
+  }).compile();
+
+  return { service: moduleRef.get(SecUserDeactivationService) };
+}
+
 describe('SecUserDeactivationService', () => {
   let service: SecUserDeactivationService;
   let repo: jest.Mocked<SecUserDeactivationRepository>;
+  let configResolver: { resolve: jest.Mock };
 
   beforeEach(async () => {
     repo = {
@@ -57,15 +107,23 @@ describe('SecUserDeactivationService', () => {
       countActivePopulation: jest.fn().mockResolvedValue(0),
       findActiveSystemAdminUserIds: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<SecUserDeactivationRepository>;
+    configResolver = {
+      resolve: jest.fn().mockResolvedValue(resolvedConfig()),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         SecUserDeactivationService,
         { provide: SecUserDeactivationRepository, useValue: repo },
+        { provide: StaffDeactivationConfigResolver, useValue: configResolver },
       ],
     }).compile();
 
     service = moduleRef.get(SecUserDeactivationService);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   const run = (
@@ -370,6 +428,80 @@ describe('SecUserDeactivationService', () => {
       expect(result.abortDetail).toMatchObject({
         externalStatusMatches: matchCount,
       });
+      expect(result.candidates).toBeUndefined();
+    });
+
+    it('aborts C-4 when ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID is unresolvable instead of using 4', async () => {
+      configResolver.resolve.mockResolvedValue({
+        config: {
+          dryRun: true,
+          ceilingFraction: 0.05,
+          absoluteFloor: 10,
+          externalStatusId: null,
+        },
+        failures: [
+          {
+            key: AppConfigKey.ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID,
+            abortReason: 'C-4',
+          },
+        ],
+      });
+      repo.resolveExternalStatusId.mockResolvedValue({
+        statusId: 4,
+        matchCount: 1,
+      });
+
+      const result = await run(
+        [member('A1', 'a@cgiar.org')],
+        [user({ sec_user_id: 946, email: 'b@cgiar.org', status_id: 4 })],
+      );
+
+      expect(result.abortReason).toBe('C-4');
+      expect(result.candidates).toBeUndefined();
+    });
+
+    it('measure selects configured ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID when it is not 4', async () => {
+      const configuredId = 9;
+      expect(configuredId).not.toBe(4);
+      const { service: wired } = await serviceOverRealRepository(configuredId, [
+        { user_status_id: 4, name: 'External Accepted' },
+        { user_status_id: configuredId, name: 'Partner' },
+      ]);
+
+      const result = await wired.measure(
+        [member('A1', 'present@cgiar.org')],
+        reconciliation(),
+        [
+          user({
+            sec_user_id: 980,
+            email: 'partner@ext.org',
+            status_id: configuredId,
+          }),
+          user({ sec_user_id: 981, email: 'legacy@cgiar.org', status_id: 4 }),
+        ],
+        fetch({ totalElements: 1, distinctCarnets: 1, pageRowCounts: [1] }),
+      );
+
+      expect(result.abortReason).toBeUndefined();
+      expect(result.excludedExternal).toBe(1);
+      expect(result.candidates).toEqual([981]);
+    });
+
+    it('aborts C-4 in dry-run when ARI_STAFF_DEACTIVATION_EXTERNAL_STATUS_ID matches no active row', async () => {
+      const configuredId = 9;
+      expect(configuredId).not.toBe(4);
+      const { service: wired } = await serviceOverRealRepository(configuredId, [
+        { user_status_id: 4, name: 'External Accepted' },
+      ]);
+
+      const result = await wired.measure(
+        [member('A1', 'present@cgiar.org')],
+        reconciliation(),
+        [user({ sec_user_id: 982, email: 'legacy@cgiar.org', status_id: 4 })],
+        fetch({ totalElements: 1, distinctCarnets: 1, pageRowCounts: [1] }),
+      );
+
+      expect(result.abortReason).toBe('C-4');
       expect(result.candidates).toBeUndefined();
     });
   });

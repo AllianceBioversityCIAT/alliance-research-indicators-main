@@ -6,6 +6,7 @@ import { SecUserReconcilerRepository } from './sec-user-reconciler.repository';
 import { SecUserReconcilerService } from './sec-user-reconciler.service';
 import { SecUserDeactivationRepository } from './sec-user-deactivation.repository';
 import { SecUserDeactivationService } from './sec-user-deactivation.service';
+import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
 @Module({
   controllers: [AgressoStaffToolsController],
@@ -15,6 +16,7 @@ import { SecUserDeactivationService } from './sec-user-deactivation.service';
     SecUserReconcilerService,
     SecUserDeactivationRepository,
     SecUserDeactivationService,
+    StaffDeactivationConfigResolver,
   ],
   exports: [
     AgressoStaffToolsService,
