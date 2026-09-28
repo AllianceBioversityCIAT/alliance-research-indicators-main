@@ -214,12 +214,12 @@ Rendered as `by <name>`.
 **Details:**
 
 - The card shows `PRMS ID: <prms_result_code>`. The label reads *PRMS ID*; the value is `prms_result_code` — one number, the same one the link uses (owner decision, 2026-09-25).
-- The button reads `Open Result in PRMS`, carries an external-link icon, and opens `<prmsUrl>/reports/result-details/<prms_result_code>?phase=<prms_phase_id>` in a new tab.
+- The button reads `Open Result in PRMS`, carries an external-link icon, and opens `<prmsUrl>/result/result-detail/<prms_result_code>/general-information?phase=<prms_phase_id>` in a new tab. *(Corrected 2026-09-28 — the original path pattern, taken from the owner's first-draft example, resolved to PRMS's PDF export route instead of the application; the owner supplied the corrected pattern after seeing the button open the wrong destination.)*
 - `prmsUrl` comes from `environment.prmsUrl` — `https://reporting.cgiar.org` in prod, `https://prtest.ciat.cgiar.org` in dev (`environments/environment.ts:31`, `environment.dev.ts:33`). It is **never** hardcoded.
 
 **Acceptance criteria:**
 
-- [ ] AC.1 — GIVEN `prms_result_code = 452` and `prms_phase_id = 6`, THEN the href is `<prmsUrl>/reports/result-details/452?phase=6`.
+- [ ] AC.1 — GIVEN `prms_result_code = 452` and `prms_phase_id = 6`, THEN the href is `<prmsUrl>/result/result-detail/452/general-information?phase=6`.
 - [ ] AC.2 — The link opens in a new tab with `rel="noopener noreferrer"` (precedent: `version-selector.component.ts:244-256`).
 - [ ] AC.3 — BUT it must NOT render the button when `prms_result_code` is null **or** `prms_phase_id` is null — a link missing `?phase=` lands on a PRMS error page, which is worse than no link.
 - [ ] AC.4 — AND IT MUST take the host from `environment.prmsUrl`; a test that asserts the literal `reporting.cgiar.org` fails in the dev environment and is therefore not an acceptable gate.

@@ -47,7 +47,7 @@ export class PrmsSyncCardComponent {
   readonly deepLink = computed(() => {
     const { prms_result_code: code, prms_phase_id: phase } = this.history();
     if (code == null || phase == null) return null;
-    return `${environment.prmsUrl}/reports/result-details/${code}?phase=${phase}`;
+    return `${environment.prmsUrl}/result/result-detail/${code}/general-information?phase=${phase}`;
   });
 
   focusHistoryLink(): void {

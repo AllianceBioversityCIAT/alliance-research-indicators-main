@@ -177,7 +177,7 @@ Computed over the array **in chronological order** (reverse of display order), s
 
 ```
 enabled  = prms_result_code != null && prms_phase_id != null
-href     = `${environment.prmsUrl}/reports/result-details/${prms_result_code}?phase=${prms_phase_id}`
+href     = `${environment.prmsUrl}/result/result-detail/${prms_result_code}/general-information?phase=${prms_phase_id}`
 target   = _blank, rel="noopener noreferrer"
 ```
 

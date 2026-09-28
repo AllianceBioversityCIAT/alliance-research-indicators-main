@@ -127,7 +127,7 @@ describe('PrmsSyncCardComponent', () => {
       expect(open.tagName).toBe('A');
       expect(open.querySelector('svg')).not.toBeNull();
       expect(open.textContent).toContain('Open result in PRMS');
-      expect(open.getAttribute('href')).toBe('https://prtest.example.test/reports/result-details/452?phase=6');
+      expect(open.getAttribute('href')).toBe('https://prtest.example.test/result/result-detail/452/general-information?phase=6');
       expect(open.getAttribute('target')).toBe('_blank');
       expect(open.getAttribute('rel')).toBe('noopener noreferrer');
 
