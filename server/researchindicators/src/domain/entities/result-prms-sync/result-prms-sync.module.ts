@@ -13,6 +13,7 @@ import { PrmsNormalizerModule } from '../../tools/prms-normalizer/prms-normalize
 import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
+import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncController } from './result-prms-sync.controller';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import { ResultPrmsSyncService } from './result-prms-sync.service';
@@ -23,6 +24,7 @@ import { ResultPrmsSyncService } from './result-prms-sync.service';
   providers: [
     ResultPrmsSyncService,
     ResultPrmsSyncStatusReader,
+    PrmsSyncHistoryReader,
     ResultPrmsSyncLogRepository,
     ResultPrmsSyncAggregateRepository,
     // T-11: the outbound PENDING_REVIEW history write. Provided directly

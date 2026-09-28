@@ -1,0 +1,132 @@
+<p-dialog
+  [visible]="visible()"
+  (visibleChange)="onVisibleChange($event)"
+  [modal]="true"
+  [dismissableMask]="true"
+  [closeOnEscape]="false"
+  [draggable]="false"
+  [style]="{ width: '36rem', maxWidth: '94vw' }"
+  styleClass="prms-history-dialog"
+  appendTo="body"
+  data-testid="prms-history-dialog">
+  <ng-template #header>
+    @if (changesEvent()) {
+      <button type="button" class="prms-history__back atc-light-blue-400" data-testid="prms-history-back" (click)="closeChanges()">
+        ← Synchronization history
+      </button>
+    } @else {
+      <div class="prms-history__heading">
+        <span
+          id="prms-history-title"
+          class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200]"
+          data-testid="prms-history-title">
+          Synchronization history
+        </span>
+        <p class="prms-history__sub" data-testid="prms-history-subheader">{{ subHeader() }}</p>
+      </div>
+    }
+  </ng-template>
+
+  @if (changesEvent(); as detail) {
+    <div data-testid="prms-history-changes">
+      <span
+        id="prms-history-changes-title"
+        class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200]"
+        data-testid="prms-history-changes-title">
+        What changed in PRMS
+      </span>
+      <p class="prms-history__changes-meta atc-grey-800" data-testid="prms-history-changes-meta">
+        @if (actorName(detail); as name) {
+          <b>{{ name }}</b> ·
+        }
+        {{ timestamp(detail) }} · {{ statusLabel(detail) }}
+      </p>
+      <p class="prms-history__note atc-grey-600" data-testid="prms-history-changes-note">Reviewers can only edit mapping fields.</p>
+      @if (changeRows().length === 0) {
+        <div class="prms-history__empty" data-testid="prms-history-changes-empty">
+          <h3>No field-level detail</h3>
+          <p>PRMS recorded the decision but sent no list of changes. The reviewer's comment is on the history entry.</p>
+        </div>
+      } @else {
+        <div class="prms-history__table-wrap" data-testid="prms-history-changes-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Field</th>
+                <th scope="col">Before</th>
+                <th scope="col">After</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of changeRows(); track row.field) {
+                <tr data-testid="prms-history-change-row">
+                  <td>{{ row.field }}</td>
+                  <td class="prms-history__before line-through atc-grey-600">{{ row.before }}</td>
+                  <td class="prms-history__after">{{ row.after }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+  } @else {
+    <ol class="prms-history__list">
+      @for (entry of entries(); track entry.id) {
+        <li class="prms-history__row" data-testid="prms-history-entry">
+          <div
+            class="prms-history__avatar"
+            [class.abc-green-300]="entry.event_source === 'STAR'"
+            [class.abc-grey-800]="entry.event_source === 'PRMS'"
+            data-testid="prms-history-avatar"
+            [attr.data-source]="entry.event_source"
+            aria-hidden="true">
+            <span class="prms-history__initials atc-white-1">{{ initials(entry) }}</span>
+          </div>
+          <div class="prms-history__body">
+            <p class="prms-history__sentence atc-grey-900" data-testid="prms-history-sentence">
+              @if (actorName(entry); as name) {
+                <b>{{ name }}</b
+                >&nbsp;
+              }
+              {{ verb(entry) }}
+            </p>
+            <div class="prms-history__status" data-testid="prms-history-status-row">
+              <app-custom-tag
+                data-testid="prms-history-status"
+                [statusName]="statusLabel(entry)"
+                [statusColor]="tagColor(entry)"
+                [statusBorder]="tagColor(entry)"></app-custom-tag>
+              @if (reviewerRole(entry); as role) {
+                <span class="prms-history__role atc-grey-600" data-testid="prms-history-role">{{ role }}</span>
+              }
+            </div>
+            @if (hasComment(entry)) {
+              <p class="prms-history__comment atc-grey-800" data-testid="prms-history-comment">
+                <span class="font-bold">Comment:</span> {{ entry.justification }}
+              </p>
+            }
+            <time class="prms-history__date atc-grey-700" [attr.datetime]="entry.decided_at ?? entry.occurred_at" data-testid="prms-history-time">
+              {{ timestamp(entry) }}
+            </time>
+            @if (showChangesLink(entry)) {
+              <button
+                type="button"
+                class="prms-history__changes-link atc-light-blue-400"
+                data-testid="prms-history-changes-link"
+                (click)="openChanges(entry)">
+                See what changed
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ol>
+  }
+
+  <div class="prms-history__footer">
+    <button type="button" class="prms-history__close atc-light-blue-400 bg-transparent" data-testid="prms-history-close" (click)="close()">
+      Close
+    </button>
+  </div>
+</p-dialog>

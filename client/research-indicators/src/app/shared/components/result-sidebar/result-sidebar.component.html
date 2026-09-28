@@ -193,7 +193,23 @@
           <i class="pi pi-sync !text-[12px]" aria-hidden="true"></i>
         </button>
       }
-      @if (prmsResultCode() !== null) {
+      @if (prmsHistoryPhase() === 'loading') {
+        <div
+          class="mt-2 flex items-center justify-center gap-2 text-[13px] atc-grey-600"
+          data-testid="prms-sync-history-loading"
+          role="status"
+          aria-live="polite">
+          <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+          <span>Loading synchronization status</span>
+        </div>
+      } @else if (showPrmsSyncCard()) {
+        <app-prms-sync-card #prmsCard [history]="prmsHistory()!" (viewHistory)="prmsHistoryOpen.set(true)" />
+        <app-prms-sync-history-modal
+          [visible]="prmsHistoryOpen()"
+          [history]="prmsHistory()!"
+          [returnFocusTo]="prmsCard.historyButton()?.nativeElement ?? null"
+          (visibleChange)="onPrmsHistoryVisible($event)" />
+      } @else if (showLegacyPrmsCode()) {
         <span
           class="text-[#a9adb2] text-[13px] !font-[space_grotesk] tracking-[2.5px] !font-[200] mt-2 text-center"
           data-testid="sidebar-prms-result-code">
