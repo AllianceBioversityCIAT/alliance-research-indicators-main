@@ -1,13 +1,18 @@
-// @akili-spec changes/agresso-staff-deactivation (T-04)
+// @akili-spec changes/agresso-staff-deactivation (T-04, T-09)
 import { Test } from '@nestjs/testing';
-import { EntityManager } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AppConfigKey } from '../../../entities/app-config/enum/app-config-key.enum';
+import { AppSecret } from '../../../entities/app-secrets/entities/app-secret.entity';
 import { AgressoStaffRawDto } from './dto/agresso-staff-raw.dto';
 import { DeactivationConfigResolution } from './dto/deactivation-config.dto';
 import { FetchReport } from './dto/fetch-report.dto';
 import { SecUserDeactivationRepository } from './sec-user-deactivation.repository';
-import { SecUserDeactivationService } from './sec-user-deactivation.service';
+import {
+  DeactivationMeasurement,
+  SecUserDeactivationService,
+} from './sec-user-deactivation.service';
+import { CHUNK } from './sec-user-reconciler.repository';
 import { ReconciliationResult } from './sec-user-reconciler.service';
 import { StaffDeactivationConfigResolver } from './staff-deactivation-config.resolver';
 
@@ -88,6 +93,7 @@ async function serviceOverRealRepository(
             ),
         },
       },
+      { provide: DataSource, useValue: { transaction: jest.fn() } },
     ],
   }).compile();
 
@@ -116,6 +122,7 @@ describe('SecUserDeactivationService', () => {
         SecUserDeactivationService,
         { provide: SecUserDeactivationRepository, useValue: repo },
         { provide: StaffDeactivationConfigResolver, useValue: configResolver },
+        { provide: DataSource, useValue: { transaction: jest.fn() } },
       ],
     }).compile();
 
@@ -532,5 +539,405 @@ describe('SecUserDeactivationService', () => {
       expect(result.activePopulation).toBe(3);
       expect(result.candidates).toEqual([962]);
     });
+  });
+});
+
+/**
+ * In-memory stand-in for the three tables. The real repository issues the
+ * writes; this manager applies them. A transaction that throws restores the
+ * snapshot, which is what TypeORM does when the callback rejects. A catch
+ * inside the callback resolves the transaction, so the writes stay.
+ */
+interface FlagRow {
+  id: number;
+  is_active: boolean;
+}
+
+interface TableWorld {
+  sec_users: FlagRow[];
+  sec_user_roles: FlagRow[];
+  app_secrets: FlagRow[];
+}
+
+function flagRows(ids: number[], isActive = true): FlagRow[] {
+  return ids.map((id) => ({ id, is_active: isActive }));
+}
+
+function deactivateRows(rows: FlagRow[], ids: number[]): number {
+  const wanted = new Set(ids);
+  let affected = 0;
+  for (const row of rows) {
+    if (wanted.has(row.id) && row.is_active) {
+      row.is_active = false;
+      affected += 1;
+    }
+  }
+  return affected;
+}
+
+function worldFor(
+  candidateIds: number[],
+  extras: { secretsForFirst?: number } = {},
+): TableWorld {
+  const outsider: FlagRow = { id: 9000, is_active: true };
+  const secrets = flagRows(candidateIds);
+  const extra = extras.secretsForFirst ?? 0;
+  for (let i = 0; i < extra; i += 1) {
+    secrets.push({ id: candidateIds[0], is_active: true });
+  }
+  return {
+    sec_users: [...flagRows(candidateIds), { ...outsider }],
+    sec_user_roles: [...flagRows(candidateIds), { ...outsider }],
+    app_secrets: [...secrets, { ...outsider }],
+  };
+}
+
+function transactionalWorld(
+  world: TableWorld,
+  options?: { failRolesOnChunk?: number },
+): { transaction: jest.Mock; statements: string[] } {
+  const statements: string[] = [];
+  let rolesChunks = 0;
+  const manager = {
+    getRepository(entity: unknown) {
+      if (entity !== AppSecret) {
+        throw new Error(`apply opened an unexpected repository: ${entity}`);
+      }
+      return {
+        update: async (
+          criteria: {
+            responsible_user_id: { value: number[] };
+            is_active: boolean;
+          },
+          partial: { is_active: boolean },
+        ) => {
+          statements.push('app_secrets');
+          const ids = criteria.responsible_user_id.value;
+          let affected = 0;
+          for (const row of world.app_secrets) {
+            if (ids.includes(row.id) && row.is_active === criteria.is_active) {
+              row.is_active = partial.is_active;
+              affected += 1;
+            }
+          }
+          return { affected };
+        },
+      };
+    },
+    query: async (sql: string, params: number[] = []) => {
+      if (/update\s+sec_user_roles\b/i.test(sql)) {
+        rolesChunks += 1;
+        if (options?.failRolesOnChunk === rolesChunks) {
+          throw new Error('sec_user_roles second chunk failed');
+        }
+        statements.push('sec_user_roles');
+        return { affectedRows: deactivateRows(world.sec_user_roles, params) };
+      }
+      if (/update\s+sec_users\b/i.test(sql)) {
+        statements.push('sec_users');
+        return { affectedRows: deactivateRows(world.sec_users, params) };
+      }
+      throw new Error(`apply issued unexpected SQL: ${sql}`);
+    },
+  };
+
+  return {
+    statements,
+    transaction: jest.fn(async (callback) => {
+      const snapshot = JSON.stringify(world);
+      try {
+        return await callback(manager);
+      } catch (error) {
+        const restored = JSON.parse(snapshot) as TableWorld;
+        world.sec_users = restored.sec_users;
+        world.sec_user_roles = restored.sec_user_roles;
+        world.app_secrets = restored.app_secrets;
+        throw error;
+      }
+    }),
+  };
+}
+
+function applyService(
+  repository: SecUserDeactivationRepository,
+  dataSource: { transaction: jest.Mock },
+): SecUserDeactivationService {
+  return new SecUserDeactivationService(
+    repository,
+    { resolve: jest.fn() } as unknown as StaffDeactivationConfigResolver,
+    dataSource as unknown as DataSource,
+  );
+}
+
+function mockWriteRepository(): SecUserDeactivationRepository {
+  return {
+    deactivateAppSecrets: jest.fn().mockResolvedValue(1),
+    deactivateSecUserRoles: jest.fn().mockResolvedValue(2),
+    deactivateSecUsers: jest.fn().mockResolvedValue(3),
+  } as unknown as SecUserDeactivationRepository;
+}
+
+function measurementOf(
+  candidates: number[] | undefined,
+  activePopulation: number,
+  abortReason?: DeactivationMeasurement['abortReason'],
+): DeactivationMeasurement {
+  return {
+    totalElements: 1,
+    distinctCarnets: 1,
+    activePopulation,
+    candidates,
+    excludedExternal: 0,
+    excludedSystemAdmin: 0,
+    excludedAmbiguous: 0,
+    excludedUnmatchable: 0,
+    shieldedBySkip: [],
+    ...(abortReason ? { abortReason, abortDetail: { from: 'measure' } } : {}),
+  };
+}
+
+/** 146 candidates against the 2026-09-25 population. Ceiling is max(0.05 × 1985, 10). */
+const MEASURED_POPULATION = 1985;
+const MEASURED_CANDIDATES = Array.from(
+  { length: 146 },
+  (_, index) => index + 1,
+);
+
+describe('SecUserDeactivationService.apply (T-09)', () => {
+  const ceilingConfig = (
+    dryRun: boolean,
+    over: Partial<DeactivationConfigResolution['config']> = {},
+  ) =>
+    resolvedConfig({
+      dryRun,
+      ceilingFraction: 0.05,
+      absoluteFloor: 10,
+      ...over,
+    });
+
+  it('a dry run reports a ceiling breach instead of aborting; the same input live aborts and writes nothing', async () => {
+    const dataSource = { transaction: jest.fn() };
+    const service = applyService(mockWriteRepository(), dataSource);
+    const measured = measurementOf(MEASURED_CANDIDATES, MEASURED_POPULATION);
+    const ceiling = Math.max(0.05 * MEASURED_POPULATION, 10);
+
+    const dry = await service.apply(measured, ceilingConfig(true));
+
+    expect(dry.ceilingBreached).toBe(true);
+    expect(dry.candidates).toBe(measured.candidates);
+    expect(dry.deactivationCount).toBe(146);
+    expect(dry.activePopulation).toBe(MEASURED_POPULATION);
+    expect(dry.ceiling).toBe(ceiling);
+    expect(dry.dryRun).toBe(true);
+    expect(dry).not.toHaveProperty('abortReason');
+
+    dataSource.transaction.mockClear();
+    const live = await service.apply(measured, ceilingConfig(false));
+
+    expect(live.abortReason).toBe('C-3');
+    expect(live.ceilingBreached).toBe(true);
+    expect(live.deactivationCount).toBe(146);
+    expect(live.activePopulation).toBe(MEASURED_POPULATION);
+    expect(live.ceiling).toBe(ceiling);
+    expect(live.candidates).toEqual(MEASURED_CANDIDATES);
+    expect(live.deactivated).toBe(0);
+    expect(live.rolesDeactivated).toBe(0);
+    expect(live.secretsDeactivated).toBe(0);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not call DataSource.transaction in dry-run', async () => {
+    const dataSource = { transaction: jest.fn() };
+    const service = applyService(mockWriteRepository(), dataSource);
+
+    await service.apply(
+      measurementOf(MEASURED_CANDIDATES, MEASURED_POPULATION),
+      ceilingConfig(true),
+    );
+
+    // DD-D10: a zero row-delta would also be true of a transaction that
+    // rolled back. The proof is that the DataSource was never asked.
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('a second-chunk failure over 120 leaves all three tables byte-identical', async () => {
+    const ids = Array.from({ length: 120 }, (_, index) => index + 1);
+    expect(CHUNK).toBe(50);
+    expect(Math.ceil(ids.length / CHUNK)).toBe(3);
+
+    const world = worldFor(ids);
+    const before = JSON.parse(JSON.stringify(world)) as TableWorld;
+    const dataSource = transactionalWorld(world, { failRolesOnChunk: 2 });
+    const service = applyService(
+      new SecUserDeactivationRepository({} as EntityManager),
+      dataSource,
+    );
+
+    const result = await service.apply(
+      measurementOf(ids, MEASURED_POPULATION),
+      ceilingConfig(false, { absoluteFloor: 200 }),
+    );
+
+    expect(world).toEqual(before);
+    expect(result.abortReason).toBe('WRITE_FAILED');
+    expect(result.deactivated).toBe(0);
+    expect(result.rolesDeactivated).toBe(0);
+    expect(result.secretsDeactivated).toBe(0);
+    expect(result.abortDetail).toEqual({
+      message: 'sec_user_roles second chunk failed',
+    });
+  });
+
+  it('a live run under the ceiling switches off all three tables and reports three counts', async () => {
+    const ids = [11, 22, 33];
+    const world = worldFor(ids, { secretsForFirst: 1 });
+    const dataSource = transactionalWorld(world);
+    const service = applyService(
+      new SecUserDeactivationRepository({} as EntityManager),
+      dataSource,
+    );
+
+    const result = await service.apply(
+      measurementOf(ids, MEASURED_POPULATION),
+      ceilingConfig(false),
+    );
+
+    expect(result).not.toHaveProperty('abortReason');
+    expect(result.secretsDeactivated).toBe(4);
+    expect(result.rolesDeactivated).toBe(3);
+    expect(result.deactivated).toBe(3);
+    expect(dataSource.statements).toEqual([
+      'app_secrets',
+      'sec_user_roles',
+      'sec_users',
+    ]);
+    for (const id of ids) {
+      expect(world.sec_users.find((row) => row.id === id)?.is_active).toBe(
+        false,
+      );
+      expect(world.sec_user_roles.find((row) => row.id === id)?.is_active).toBe(
+        false,
+      );
+    }
+    expect(
+      world.app_secrets.filter((row) => row.id === 11 && row.is_active),
+    ).toHaveLength(0);
+    expect(world.sec_users.find((row) => row.id === 9000)?.is_active).toBe(
+      true,
+    );
+    expect(world.sec_user_roles.find((row) => row.id === 9000)?.is_active).toBe(
+      true,
+    );
+    expect(world.app_secrets.find((row) => row.id === 9000)?.is_active).toBe(
+      true,
+    );
+  });
+
+  it('treats a set equal to the ceiling as allowed and the next id as a breach', async () => {
+    const dataSource = {
+      transaction: jest.fn(async (callback) => callback({})),
+    };
+    const service = applyService(mockWriteRepository(), dataSource);
+    const population = 100;
+    const ceiling = Math.max(0.05 * population, 10);
+    expect(ceiling).toBe(10);
+
+    const atCeiling = await service.apply(
+      measurementOf(
+        Array.from({ length: 10 }, (_, index) => index + 1),
+        population,
+      ),
+      ceilingConfig(false),
+    );
+    expect(atCeiling).not.toHaveProperty('abortReason');
+    expect(atCeiling.ceilingBreached).toBe(false);
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+
+    dataSource.transaction.mockClear();
+    const overCeiling = await service.apply(
+      measurementOf(
+        Array.from({ length: 11 }, (_, index) => index + 1),
+        population,
+      ),
+      ceilingConfig(false),
+    );
+    expect(overCeiling.abortReason).toBe('C-3');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('applies a ceiling fraction above 1, which has no upper bound', async () => {
+    const dataSource = {
+      transaction: jest.fn(async (callback) => callback({})),
+    };
+    const service = applyService(mockWriteRepository(), dataSource);
+    const population = 10;
+    const fraction = 5;
+    const setSize = 11;
+
+    const result = await service.apply(
+      measurementOf(
+        Array.from({ length: setSize }, (_, index) => index + 1),
+        population,
+      ),
+      ceilingConfig(false, { ceilingFraction: fraction, absoluteFloor: 10 }),
+    );
+
+    expect(result.ceiling).toBe(Math.max(fraction * population, 10));
+    expect(result.ceiling).toBeGreaterThan(setSize);
+    expect(result).not.toHaveProperty('abortReason');
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['CEILING_FRACTION', { ceilingFraction: null }],
+    ['CEILING_FRACTION', { ceilingFraction: 0 }],
+    ['ABSOLUTE_FLOOR', { absoluteFloor: null }],
+    ['ABSOLUTE_FLOOR', { absoluteFloor: 0 }],
+  ] as const)(
+    'an unusable %s (%j) aborts a live run with C-3 and opens no transaction',
+    async (_key, over) => {
+      const dataSource = { transaction: jest.fn() };
+      const service = applyService(mockWriteRepository(), dataSource);
+
+      const result = await service.apply(
+        measurementOf([1, 2, 3], MEASURED_POPULATION),
+        ceilingConfig(false, over),
+      );
+
+      expect(result.abortReason).toBe('C-3');
+      expect(result.ceiling).toBeNull();
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a dry run over an unusable ceiling reports the breach and does not abort', async () => {
+    const dataSource = { transaction: jest.fn() };
+    const service = applyService(mockWriteRepository(), dataSource);
+    const measured = measurementOf(MEASURED_CANDIDATES, MEASURED_POPULATION);
+
+    const result = await service.apply(
+      measured,
+      ceilingConfig(true, { ceilingFraction: null }),
+    );
+
+    expect(result.ceilingBreached).toBe(true);
+    expect(result.ceiling).toBeNull();
+    expect(result.candidates).toBe(measured.candidates);
+    expect(result).not.toHaveProperty('abortReason');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not open a transaction when the measurement already aborted', async () => {
+    const dataSource = { transaction: jest.fn() };
+    const service = applyService(mockWriteRepository(), dataSource);
+
+    const result = await service.apply(
+      measurementOf(undefined, MEASURED_POPULATION, 'C-1'),
+      ceilingConfig(false),
+    );
+
+    expect(result.abortReason).toBe('C-1');
+    expect(result.candidates).toEqual([]);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 });

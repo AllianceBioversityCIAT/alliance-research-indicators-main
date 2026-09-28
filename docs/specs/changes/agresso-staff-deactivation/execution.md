@@ -700,3 +700,105 @@ Global floor is 60%; jest exited 0 with no threshold failure. This increment's o
 **Scope limit (`KZ-017`):** `test:cov` runs the same `rootDir: "src"` config as `npm test`. It
 measures **no** fixture, e2e or integration tier, so these percentages say nothing about the fixture
 repair T-07 forced. That remains T-11's to execute.
+
+---
+
+## T-09 — `apply()`: gate order, C-3, dry-run, and no catch inside the callback · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1 · `runtime events: none`
+- **Requirements covered:** `R-AGD-008` AC.1/AC.2/AC.6, `R-AGD-009`, `R-AGD-010` · **Design:** §18, §18.1, §19.1, §19.4, §20.1
+- **Implementer:** Cursor `grok-4.7-xhigh` (Orca `ctx_1798e6d9d2ed`) · **Reviewer:** Claude `opus`, fresh read-only context
+- **Files changed:** `sec-user-deactivation.service.ts` (+205), its spec (+413), fixture (+1) — **+610 / −9**
+
+### Attempt 1 — three falsifiers, three separate reds
+
+| Falsifier | Mutation | Red assertion |
+| --- | --- | --- |
+| a. Gate order | C-3 enforcement moved **before** the dry-run return | `expect(dry).not.toHaveProperty('abortReason')` — received `"C-3"` |
+| b. `DD-D11` | `try`/`catch` added **inside** the transaction callback | `expect(world).toEqual(before)` — 170-row diff |
+| c. `DD-D10` | transaction opened in the dry-run branch | `expect(jest.fn()).not.toHaveBeenCalled()` |
+
+**Falsifier (b) is the one worth reading.** The red is not a setup failure: **role id 51 — the start of
+chunk 2 — stayed active while ids 1–50 and every `app_secrets` row went inactive.** That is a
+genuine committed partial cascade, which is precisely what a `catch` inside the callback produces and
+precisely the outcome this spec exists to prevent. `CHUNK === 50` and `120 / 50 === 3` sit above the
+failing assertion and passed, so the harness itself was intact.
+
+### Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`
+
+| Gate | Reported | Leader measured |
+| --- | --- | --- |
+| `npm test -- --silent` | 397 / 3546 | **397 suites / 3546 tests** (+12 over the 3534 baseline) |
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
+| `npx eslint src test` (bare) | exit 0 | **exit 0**, 1 pre-existing warning outside the diff |
+| `git diff --stat` | +610 / −9 | **+610 / −9** |
+
+**A Leader measurement error, corrected — recorded because the correction is the point (`K-014`).**
+The Leader's first check for a `catch` inside the callback used an over-greedy `awk` range
+(`/dataSource\.transaction\(/,/^    \}\);/`) and appeared to find one. It had captured the
+**enclosing** `catch`. Direct inspection settles it: `try` opens at `:212`, `dataSource.transaction(`
+at `:214`, the callback body runs `:214–230` with **zero** `catch`, and the `catch` sits at `:231`
+outside the transaction call, wrapping it — exactly `DD-D11`. Write order inside the callback is
+`deactivateAppSecrets → deactivateSecUserRoles → deactivateSecUsers`: credentials die first. The
+Reviewer was told of the error and asked to verify independently; it did, and confirmed.
+
+### Reviewer — Claude `opus`, fresh read-only context. `STATUS: PASS`, six escalated checks all ruled independently
+
+1. **`WRITE_FAILED` conforms.** No spec text closes the abort-token set: `R-AGD-010`'s *"C-3 joins the
+   C-1/C-2/C-4 family; it does not replace or renumber them"* governs **precondition numbering**, not
+   the `abortReason` channel. `R-AGD-008`'s scenario demands *"report the failure with counts, not a
+   bare stack trace"* and `R-AGD-013` AC.2/AC.4 demand an abort be distinguishable from an empty run.
+   **Reusing `C-3` would repeat exactly the conflation `JS-4` records.** No consumer breaks today —
+   `agresso-staff-tools.service.ts:159` assigns `measurement.abortReason`, not the apply result.
+2. **`ceiling = 99.25` conforms.** The normative formula is `R-AGD-010` Details —
+   `size <= max(ceilingFraction × activePopulation, absoluteFloor)` — **with no rounding operator**.
+   §20.2's "99" is narrative arithmetic and its load-bearing claim (the first live run aborts on C-3
+   by construction) holds identically at 99.25. **Adding `Math.floor` would introduce an unspecified
+   operation.**
+3. **Config as an argument satisfies §20.1.** The invariant §20.1 protects is *resolve-before-evaluate*,
+   which a pre-resolved parameter makes **structural** rather than branch-dependent. §18's stage-5b
+   listing places the resolve in the caller, and `tasks.md` gives that wiring to T-10.
+4. **The unusable-ceiling path conforms.** `evaluateCeiling` returns `ceilingBreached: true` on `null`,
+   `NaN`, `<= 0` or a loud C-3 failure, so **a missing ceiling never becomes "no ceiling"**
+   (`R-AGD-010` AC.3). The safety-critical direction — unusable config on a **live** run — aborts and
+   opens no transaction. Dry-run suppression is `R-AGD-010`'s own rule.
+5. **The fixture one-liner is a forced consumer repair**, not a T-11 incursion: the third constructor
+   parameter makes every existing construction site a compile error, and the change adds no assertion
+   and no behavior.
+6. **The rollback proof discharges the Done item at T-09's tier.** The harness is not a
+   presence-assertion — it **discriminates the defect the item targets**, proven by the observed red.
+   Propagation out of the callback is real; only the rollback itself is modeled, and rollback is
+   InnoDB's property, not this code's. T-11 owns the real tier.
+
+### ADVISORY (recorded, never gates, never becomes a task)
+
+1. **Risk — T-10 will hit a compile error, and the tempting fix is the wrong one.**
+   `sec-user-reconciliation-summary.dto.ts:109` declares
+   `deactivationAbortReason?: 'C-1' | 'C-2' | 'C-4'`, which **cannot hold `'C-3'` or `'WRITE_FAILED'`**.
+   `apply()` returns `DeactivationApplyAbortReason = DeactivationAbortReason | 'C-3' | 'WRITE_FAILED'`.
+   T-10's scope names six fields and **does not name this union**. **Leader verified this directly at
+   the source rather than relaying it.**
+2. **Reliability** — `measure()` resolves config at `:290` and discards it, so T-10 resolves a second
+   time. Harmless today (disjoint keys: `externalStatusId` vs `dryRun`/ceiling), but returning the
+   resolution from `measure()` would make one run one read.
+3. **Readability** — the `APPLY_TX_CALLBACK_START/END` markers are a grep aid; worth keeping, since
+   the `DD-D11` invariant has no other machine-checkable anchor.
+
+**Leader adjudication.** None reworked, none minted as a task. **Advisory 1 is carried into T-10's
+brief as a named, sourced fact** — not as added scope: T-10 already owns "the stage-5b wiring", and
+wiring that cannot compile is not wiring. The brief will say explicitly that **dropping the token to
+satisfy `tsc` is the forbidden fix.** This is the same forward-pointer mechanism that caught the
+`R-AGD-012` gap at T-07: a pointer is carried by the brief or by nobody.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+- **The rollback is modeled, not executed.** The byte-identical claim is over in-memory tables a fake
+  manager mutates; the fake restores its snapshot only when the callback rejects. **It is not InnoDB
+  and it is not a MySQL rollback.** `npm run test:fixtures` was not run — T-11 owns it.
+- The `catch` grep is scoped to the marked callback; it cannot see a `catch` added inside a function
+  the callback calls. The writes are inline there, and falsifier (b) is the runtime check.
+- No test can prove the *absence* of a `CEILING_FRACTION` upper bound someone adds later, beyond the
+  test asserting a fraction of `5` still opens a transaction.
+- `tsc` typechecks the fixture but never executes it.
+
+**Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**

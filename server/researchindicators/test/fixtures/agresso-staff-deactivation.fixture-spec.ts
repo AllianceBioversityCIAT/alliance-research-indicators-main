@@ -127,6 +127,7 @@ describe('Agresso staff deactivation — fixture tier', () => {
     service = new SecUserDeactivationService(
       repository,
       new StaffDeactivationConfigResolver(dataSource),
+      dataSource,
     );
     reconcilerRepository = new SecUserReconcilerRepository(dataSource.manager);
   });

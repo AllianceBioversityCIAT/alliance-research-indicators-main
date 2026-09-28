@@ -389,7 +389,7 @@ hits before this task.
 
 ### T-09 — `apply()`: gate order, C-3, dry-run, and no catch inside the callback
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** M · **Depends on:** `T-07`, `T-08` · **Review:** `full`
 - **Requirements:** `R-AGD-008` (AC.1, AC.2, AC.6), `R-AGD-009`, `R-AGD-010` · **Design:** §18, §18.1, §19.1, §19.4, §20.1
 - **Skills:** `nestjs-expert`, `systematic-debugging`
@@ -417,11 +417,11 @@ about runtime behavior; the behavioral proof is the second-chunk rollback.
 **Consumers:** `agresso-staff-tools.service.ts` (T-10 wires it). No other caller.
 
 **Done:**
-- [ ] Gate order asserted: dry-run over a ceiling-breaching set reports and does **not** abort; the same input live **aborts and writes nothing**
-- [ ] `DataSource.transaction` proven **never called** in dry-run
-- [ ] Second-chunk failure leaves all three tables byte-identical, over a set of **120**
-- [ ] `grep -n "catch" ` over the callback body → zero hits **and** the behavioral rollback test green
-- [ ] Reviewer PASS
+- [x] Gate order asserted: dry-run over a ceiling-breaching set reports and does **not** abort; the same input live **aborts and writes nothing**
+- [x] `DataSource.transaction` proven **never called** in dry-run
+- [x] Second-chunk failure leaves all three tables byte-identical, over a set of **120**
+- [x] `grep -n "catch" ` over the callback body → zero hits **and** the behavioral rollback test green
+- [x] Reviewer PASS
 
 ---
 

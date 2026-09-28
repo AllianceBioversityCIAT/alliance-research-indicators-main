@@ -1,11 +1,17 @@
-// @akili-spec changes/agresso-staff-deactivation (T-04 — shields, exclusions, preconditions)
+// @akili-spec changes/agresso-staff-deactivation (T-04 measurement, T-09 apply)
 //
-// READ-ONLY BY CONSTRUCTION. This increment measures the deactivation set and reports it; it does
-// not retire anything. There is no transaction here and no write statement anywhere beneath it —
-// not a guarded write, not one that rolls back. That is what makes this increment safe to run
-// against real data while the numbers it produces are still unverified: every way it can be wrong
-// yields a wrong REPORT, which a human reads, rather than a wrong RETIREMENT, which nothing undoes.
+// `measure()` is read-only. It computes the deactivation set and never writes, so a wrong
+// measurement is a wrong report. `apply()` is the write. It consumes that measurement rather
+// than recomputing one (design.md §18).
+//
+// Gate order is §20.1: interpret the resolved config, evaluate C-3, and on dry-run return
+// before any transaction. C-3 is enforced only on the live branch, after that return.
+// DD-D11: the transaction callback has no try/catch and returns a plain value. The catch
+// sits outside `dataSource.transaction` — a catch inside the callback would commit the
+// chunks that already succeeded (JS-2). The sibling's `applyCreateAndGrant` returns from
+// inside its own callback; that shape is not copied here.
 import { Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { AppConfigKey } from '../../../entities/app-config/enum/app-config-key.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -47,6 +53,36 @@ export interface DeactivationMeasurement {
   abortDetail?: Record<string, unknown>;
 }
 
+/**
+ * Why `apply` did not write. `C-1`/`C-2`/`C-4` are carried from the measurement.
+ * `C-3` is this method's ceiling. `WRITE_FAILED` is a rolled-back transaction:
+ * the counts below it are what committed, which is nothing.
+ */
+export type DeactivationApplyAbortReason =
+  | DeactivationAbortReason
+  | 'C-3'
+  | 'WRITE_FAILED';
+
+export interface DeactivationWriteCounts {
+  deactivated: number;
+  rolesDeactivated: number;
+  secretsDeactivated: number;
+}
+
+export interface DeactivationApplyResult extends DeactivationWriteCounts {
+  dryRun: boolean;
+  /** Null when the ceiling keys did not resolve. */
+  ceiling: number | null;
+  ceilingBreached: boolean;
+  /** The measurement's candidate ids — the set a dry run reports in full. */
+  candidates: number[];
+  deactivationCount: number;
+  activePopulation: number;
+  /** Absent on success and on a dry-run report. Present only when nothing was written because the run stopped. */
+  abortReason?: DeactivationApplyAbortReason;
+  abortDetail?: Record<string, unknown>;
+}
+
 @Injectable()
 export class SecUserDeactivationService {
   private readonly logger = new LoggerUtil({
@@ -56,6 +92,7 @@ export class SecUserDeactivationService {
   constructor(
     private readonly repository: SecUserDeactivationRepository,
     private readonly configResolver: StaffDeactivationConfigResolver,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -86,6 +123,162 @@ export class SecUserDeactivationService {
         abortDetail: { unexpectedError: (error as Error)?.message },
       };
     }
+  }
+
+  /**
+   * Retires `measurement.candidates`, or reports why it did not.
+   *
+   * Config is the caller's already-resolved read (T-07). This method does not
+   * re-read `app_config`. C-4 is not re-checked here: it already ran inside
+   * `measure()`, and a second copy would be a second rule.
+   *
+   * Never throws, for the same reason `measure()` does not (W-5). A write
+   * failure is reported after the transaction has rolled back.
+   */
+  async apply(
+    measurement: DeactivationMeasurement,
+    config: DeactivationConfigResolution,
+  ): Promise<DeactivationApplyResult> {
+    const dryRun = config.config.dryRun;
+    const ids = measurement.candidates;
+
+    // An aborted measurement has no set. Do not invent one and do not write.
+    if (measurement.abortReason != null || ids == null) {
+      if (measurement.abortReason) {
+        this.logger._error(
+          `Deactivation apply skipped: ${measurement.abortReason} ${JSON.stringify(measurement.abortDetail ?? {})}`,
+        );
+      }
+      return {
+        ...this.zeroWrites(),
+        dryRun,
+        ceiling: null,
+        ceilingBreached: false,
+        candidates: ids ?? [],
+        deactivationCount: ids?.length ?? 0,
+        activePopulation: measurement.activePopulation,
+        ...(measurement.abortReason
+          ? {
+              abortReason: measurement.abortReason,
+              abortDetail: measurement.abortDetail,
+            }
+          : {}),
+      };
+    }
+
+    // Evaluate C-3 before the dry-run branch. Enforce it only after (§20.1).
+    const evaluation = this.evaluateCeiling(
+      config,
+      measurement.activePopulation,
+      ids.length,
+    );
+    const report: DeactivationApplyResult = {
+      ...this.zeroWrites(),
+      dryRun,
+      ceiling: evaluation.ceiling,
+      ceilingBreached: evaluation.ceilingBreached,
+      candidates: ids,
+      deactivationCount: ids.length,
+      activePopulation: measurement.activePopulation,
+    };
+
+    if (dryRun) {
+      this.logger._log(
+        `Deactivation apply dry-run: count=${ids.length} ceiling=${evaluation.ceiling} breached=${evaluation.ceilingBreached}`,
+      );
+      return report;
+    }
+
+    if (evaluation.ceilingUnusable || evaluation.ceilingBreached) {
+      const abortDetail = evaluation.ceilingUnusable
+        ? {
+            ceilingFraction: config.config.ceilingFraction,
+            absoluteFloor: config.config.absoluteFloor,
+            failures: config.failures.filter(
+              (failure) => failure.abortReason === 'C-3',
+            ),
+          }
+        : {
+            deactivationCount: ids.length,
+            activePopulation: measurement.activePopulation,
+            ceiling: evaluation.ceiling,
+          };
+      this.logger._error(
+        `Deactivation aborted: C-3 ${JSON.stringify(abortDetail)}`,
+      );
+      return { ...report, abortReason: 'C-3', abortDetail };
+    }
+
+    try {
+      // APPLY_TX_CALLBACK_START
+      const written = await this.dataSource.transaction(async (manager) => {
+        const secretsDeactivated = await this.repository.deactivateAppSecrets(
+          manager,
+          ids,
+        );
+        const rolesDeactivated = await this.repository.deactivateSecUserRoles(
+          manager,
+          ids,
+        );
+        const deactivated = await this.repository.deactivateSecUsers(
+          manager,
+          ids,
+        );
+        return { deactivated, rolesDeactivated, secretsDeactivated };
+      });
+      // APPLY_TX_CALLBACK_END
+      return { ...report, ...written };
+    } catch (error) {
+      const message = (error as Error)?.message;
+      this.logger._error(`Deactivation write rolled back: ${message}`);
+      return {
+        ...report,
+        abortReason: 'WRITE_FAILED',
+        abortDetail: { message },
+      };
+    }
+  }
+
+  /**
+   * `size <= max(fraction × activePopulation, floor)`. A loud-key failure, a
+   * null, or a value `<= 0` cannot be evaluated and is treated as breached so
+   * a missing ceiling never becomes "no ceiling" (`R-AGD-010` AC.3). No upper
+   * bound: `R-AGD-011` accepts any finite fraction `> 0`.
+   */
+  private evaluateCeiling(
+    config: DeactivationConfigResolution,
+    activePopulation: number,
+    setSize: number,
+  ): {
+    ceiling: number | null;
+    ceilingBreached: boolean;
+    ceilingUnusable: boolean;
+  } {
+    const { ceilingFraction, absoluteFloor } = config.config;
+    const loudFailure = config.failures.some(
+      (failure) => failure.abortReason === 'C-3',
+    );
+    const ceilingUnusable =
+      loudFailure ||
+      ceilingFraction == null ||
+      absoluteFloor == null ||
+      !(ceilingFraction > 0) ||
+      !(absoluteFloor > 0);
+
+    if (ceilingUnusable) {
+      return { ceiling: null, ceilingBreached: true, ceilingUnusable: true };
+    }
+
+    const ceiling = Math.max(ceilingFraction * activePopulation, absoluteFloor);
+    return {
+      ceiling,
+      ceilingBreached: setSize > ceiling,
+      ceilingUnusable: false,
+    };
+  }
+
+  private zeroWrites(): DeactivationWriteCounts {
+    return { deactivated: 0, rolesDeactivated: 0, secretsDeactivated: 0 };
   }
 
   private async measureOrThrow(
