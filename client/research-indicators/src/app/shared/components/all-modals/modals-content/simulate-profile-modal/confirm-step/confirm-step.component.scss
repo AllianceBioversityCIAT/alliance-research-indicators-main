@@ -1,0 +1,4 @@
+// @akili-spec changes/profile-simulation — T-10
+// No component-scoped rules needed: layout, tokens and the callout's
+// `color-mix` values are expressed via utility classes / inline `style`
+// bindings in the template (root CLAUDE.md §4.2 — no hex literals).

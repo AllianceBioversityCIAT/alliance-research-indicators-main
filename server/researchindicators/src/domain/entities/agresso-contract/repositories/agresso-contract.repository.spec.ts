@@ -671,16 +671,54 @@ describe('AgressoContractRepository', () => {
       const main = mainSql();
       const count = countSql();
 
-      // Row-visibility clause survives, unchanged, in both queries.
+      // Row-visibility clause survives in both queries — creator, PI, or an
+      // active PI Delegate of the contract.
       expect(main).toContain(
-        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1')",
+        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1'",
       );
       expect(count).toContain(
-        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1')",
+        "AND (r.created_by = 456 OR ac.projectLeadId = 'CARNET-1'",
       );
       // The counting subqueries must carry no user reference whatsoever.
       expect(main).not.toContain('r_ord.created_by');
       expect(main).not.toMatch(/AND\s+r\.created_by\s*=/);
+    });
+
+    // @akili-spec docs/specs/changes/my-pi-delegates — a PI Delegate manages the
+    // project like its PI, so My Projects must list it for them as well.
+    it('includes contracts the user is an active PI Delegate of', async () => {
+      const user = { sec_user_id: 456 } as any;
+      mockQueryBySql({
+        carnet: [{ carnet: 'CARNET-1' }],
+        count: [{ total: 1 }],
+        main: [],
+      });
+
+      await repository.getContracts({}, user, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      for (const sql of [mainSql(), countSql()]) {
+        const normalised = sql.replace(/\s+/g, ' ');
+        // EXISTS, not a JOIN: the contract row count must stay untouched.
+        expect(normalised).toContain(
+          'OR EXISTS ( SELECT 1 FROM pi_delegates pd WHERE pd.project_id = ac.agreement_id AND pd.delegate_user_id = 456 AND pd.is_active = TRUE )',
+        );
+        expect(normalised).not.toContain('JOIN pi_delegates');
+      }
+    });
+
+    it('omits the PI Delegate clause when there is no user', async () => {
+      mockQueryBySql({ count: [{ total: 1 }], main: [] });
+
+      await repository.getContracts({}, undefined, undefined, undefined, {
+        page: 1,
+        limit: 10,
+      });
+
+      expect(mainSql()).not.toContain('pi_delegates');
+      expect(countSql()).not.toContain('pi_delegates');
     });
 
     // TS-2 (@akili-spec docs/specs/bugfix/my-projects-result-count-scope)

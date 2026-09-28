@@ -1,8 +1,13 @@
 @let hss = this.cache.hasSmallScreen();
+<!-- @akili-spec changes/profile-simulation — D-imp-14: this fixed header's top offset
+     must track the MEASURED navbar height (navbar + simulation banner when active),
+     not a hardcoded mt-[70px]/[50px] that ignores the banner and lets it overlap the
+     page filters. Padding still switches on small screen. -->
 <div [ngStyle]="{
     paddingLeft: cache.isSidebarCollapsed() ? '97px' : '282px'
   }"
-  class="section-header w-full pl-8  left-0  {{ hss ? 'p-[10px] mt-[50px]' : 'p-[0px] mt-[70px]' }} calc(100% - 65px) !z-10 "
+  [style.marginTop.px]="cache.navbarHeight()"
+  class="section-header w-full pl-8  left-0  {{ hss ? 'p-[10px]' : 'p-[0px]' }} calc(100% - 65px) !z-10 "
   id="section-sidebar">
   <div class="flex gap-7">
     @if (breadcrumb().length > 0) {

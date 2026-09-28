@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "title": "1 · Account menu (System Admin)", "x": 0, "y": 0, "w": 1440, "h": 620 },
+    { "file": "SearchUser.dc.html", "title": "2 · Search user", "x": 1560, "y": 0, "w": 1440, "h": 720 },
+    { "file": "Confirm.dc.html", "title": "3 · Confirm simulation", "x": 0, "y": 880, "w": 1440, "h": 620 },
+    { "file": "ActiveSimulation.dc.html", "title": "4 · Simulation active", "x": 1560, "y": 880, "w": 1440, "h": 620 }
+  ],
+  "annotations": [
+    { "id": "flow-note", "x": 0, "y": -170, "w": 640, "text": "PARI-242 · Profile simulation flow, left→right, top→bottom.\n1 New entry in the account dropdown (System Admin only).\n2 Search by email/name; admins and inactive accounts are not selectable.\n3 Explicit confirmation warning that actions write real data + audit.\n4 Persistent orange banner (--ac-orange-1) above the navbar, avatar swaps to the simulated user, End simulation always one click away." }
+  ],
+  "launch": { "view": "canvas" }
+}

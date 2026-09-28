@@ -1179,8 +1179,38 @@ describe('MultiselectComponent', () => {
         getLoading: jest.fn().mockReturnValue(loadSig)
       };
       (component as any).bindServiceSignals();
-      expect(component.optionsSig).toBe(listSig);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([{ id: 1, name: 'A' }]);
+      expect(component.optionsSig).not.toBe(listSig);
       expect(component.loadingSig).toBe(loadSig);
+
+      listSig.set([{ id: 2, name: 'B' }]);
+      TestBed.flushEffects();
+      expect(component.optionsSig()).toEqual([{ id: 2, name: 'B' }]);
+    });
+
+    it('follows a replaced parent signal so selected rows and required state stay in sync', () => {
+      mockUtilsService.getNestedProperty.mockImplementation((obj: any, path: string) => obj?.[path]);
+      component.optionValue = 'id';
+      component.signalOptionValue = 'result_lever_strategic_outcomes';
+      component.isRequired = true;
+      const first = signal({ result_lever_strategic_outcomes: [] as { id: number; strategic_outcome: string }[] });
+      component.signal = first;
+      component.ngOnChanges({ signal: { currentValue: first } } as any);
+      expect(component.selectedOptions()).toHaveLength(0);
+      expect(component.isInvalid()).toBe(true);
+
+      const second = signal({
+        result_lever_strategic_outcomes: [
+          { id: 19, strategic_outcome: 'Outcome 19' },
+          { id: 28, strategic_outcome: 'Outcome 28' }
+        ]
+      });
+      component.signal = second;
+      component.ngOnChanges({ signal: { currentValue: second } } as any);
+      expect(component.selectedOptions()).toHaveLength(2);
+      expect(component.isInvalid()).toBe(false);
+      expect(component.selectedOptions()[0].strategic_outcome).toBe('Outcome 19');
     });
 
     it('should sync service.list into optionsSig via effect (service.list branch)', () => {
@@ -1675,4 +1705,58 @@ describe('MultiselectComponent', () => {
       expect(realComponent.selectedOptions().length).toBe(2);
     });
   });
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
+  describe('singleSelection', () => {
+    it('is off by default, and off means the selection is untouched', () => {
+      expect(component.singleSelection).toBe(false);
+
+      component.setValue([1, 2, 3]);
+
+      expect(component.body().value).toEqual([1, 2, 3]);
+    });
+
+    it('keeps only the option the user just added — picking a second REPLACES the first', () => {
+      component.singleSelection = true;
+
+      component.setValue([1]);
+      expect(component.body().value).toEqual([1]);
+
+      // PrimeNG hands over the accumulated array; 2 is the new one.
+      component.setValue([1, 2]);
+      expect(component.body().value).toEqual([2]);
+    });
+
+    it('falls back to the last id when nothing is new (a value set from outside)', () => {
+      component.singleSelection = true;
+
+      component.setValue([7, 8]);
+
+      expect(component.body().value).toEqual([8]);
+    });
+
+    it('allows clearing to empty', () => {
+      component.singleSelection = true;
+      component.setValue([1]);
+
+      component.setValue([]);
+
+      expect(component.body().value).toEqual([]);
+    });
+
+    it('writes only the surviving option into the bound signal', () => {
+      component.singleSelection = true;
+      component.signal = signal({ picked: [] });
+      component.signalOptionValue = 'picked';
+      component.optionValue = 'id';
+
+      component.setValue([1]);
+      component.setValue([1, 2]);
+
+      // ★ discriminating: capping `body` but not the signal would leave the form
+      //   state holding two people while the field shows one.
+      expect(component.signal().picked.map((item: { id: number }) => item.id)).toEqual([2]);
+    });
+  });
+
 });

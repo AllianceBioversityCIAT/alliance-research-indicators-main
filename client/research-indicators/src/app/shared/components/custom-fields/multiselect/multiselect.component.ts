@@ -82,6 +82,12 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() disabled = false;
   @Input() filterBy = '';
   @Input() optionsDisabled: WritableSignal<any[]> = signal([]);
+  /**
+   * Clears the dropdown's search box every time the panel closes, so reopening
+   * the picker (or the modal that hosts it) always starts from the full list.
+   * Off by default — other screens rely on the filter surviving a panel close.
+   */
+  @Input() clearFilterOnClose = false;
   @Input() set isRequired(value: boolean) {
     this._isRequired.set(value);
   }
@@ -104,6 +110,19 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() dark = false;
   @Input() optionFilter: (item: any) => boolean = () => true;
   @Input() hideRemoveIcon = false;
+  /**
+   * Caps the selection at ONE option: picking a second one REPLACES the first
+   * instead of adding to it.
+   *
+   * The control stays a `p-multiSelect`, so the option template, the filter,
+   * `optionFilter` and `optionsDisabled` all keep working and only the meaning
+   * of a click changes. PrimeNG's own `selectionLimit` was deliberately not used:
+   * it disables every remaining option once the cap is reached, so changing your
+   * mind would mean deselecting first.
+   *
+   * Off by default — every existing caller is unaffected.
+   */
+  @Input() singleSelection = false;
   @Input() selectedItemsSurfaceColor = '';
   selectEvent = output<any>();
   environment = environment;
@@ -112,6 +131,12 @@ export class MultiselectComponent implements OnInit, OnChanges {
   private readonly inFlightLoadByKey = new Map<string, Promise<void>>();
   optionsSig: WritableSignal<any[]> = signal<any[]>([]);
   loadingSig: WritableSignal<boolean> = signal<boolean>(false);
+  /**
+   * Parent screens replace the WritableSignal instance on reload (new signal() in a Map).
+   * Computeds and effects only re-track the signal they read, so a replaced input stayed empty
+   * while PrimeNG still showed the previous id list — required stayed on and rows never rendered.
+   */
+  private readonly signalInputRevision = signal(0);
 
   body: WritableSignal<any> = signal({ value: null });
 
@@ -174,7 +199,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
   });
 
   selectedOptions = computed(() => {
-    const items = this.utils.getNestedProperty(this.signal(), this.signalOptionValue);
+    const items = this.utils.getNestedProperty(this.readParentModel(), this.signalOptionValue);
     const normalized = Array.isArray(items) ? items : [];
     return normalized.map((item: any) => ({
       ...item,
@@ -186,7 +211,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
   onChange = effect(
     () => {
       const hasNoLabelList = this.utils
-        .getNestedProperty(this.signal(), this.signalOptionValue)
+        .getNestedProperty(this.readParentModel(), this.signalOptionValue)
         ?.filter((item: any) => !Object.hasOwn(item, this.optionLabel));
       if (!this.currentResultIsLoading() && this.optionsSig()?.length && this.firstLoad() && hasNoLabelList?.length) {
         this.signal.update((current: any) => {
@@ -206,7 +231,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
         this.firstLoad.set(false);
         /* istanbul ignore next */
       } else if (
-        this.utils.getNestedProperty(this.signal(), this.signalOptionValue)?.length &&
+        this.utils.getNestedProperty(this.readParentModel(), this.signalOptionValue)?.length &&
         !this.currentResultIsLoading() &&
         this.optionsSig()?.length &&
         this.firstLoad()
@@ -229,7 +254,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
 
   syncBodyWithSignal = effect(
     () => {
-      const signalValue = this.utils.getNestedProperty(this.signal(), this.signalOptionValue);
+      const signalValue = this.utils.getNestedProperty(this.readParentModel(), this.signalOptionValue);
 
       if (Array.isArray(signalValue) && signalValue.length > 0) {
         const bodyValue = signalValue.map((item: any) => item[this.optionValue]);
@@ -256,6 +281,9 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['signal']) {
+      this.signalInputRevision.update(revision => revision + 1);
+    }
     if (changes['serviceName'] || changes['serviceParams']) {
       this.service = this.serviceLocator.getService(this.serviceName);
       this.bindServiceSignals();
@@ -270,8 +298,10 @@ export class MultiselectComponent implements OnInit, OnChanges {
     if (this.service?.getList && this.service?.getLoading) {
       const listSig = this.service.getList(this.serviceParams as any);
       const loadingSig = this.service.getLoading(this.serviceParams as any);
-      if (listSig) this.optionsSig = listSig;
       if (loadingSig) this.loadingSig = loadingSig;
+      if (listSig) {
+        this.watchOptionList(listSig);
+      }
       return;
     }
 
@@ -282,18 +312,27 @@ export class MultiselectComponent implements OnInit, OnChanges {
     // `service.list` breaks `availableOptions` when that computed already
     // subscribed to the initial empty signal (e.g. field effects run first).
     if (this.service?.list) {
-      const sourceList = this.service.list as () => unknown[];
-      this.listSyncEffect = runInInjectionContext(this.injector, () =>
-        effect(
-          () => {
-            const next = sourceList();
-            this.optionsSig.set(Array.isArray(next) ? next : []);
-          },
-          { allowSignalWrites: true }
-        )
-      );
-      this.destroyRef.onDestroy(() => this.listSyncEffect?.destroy());
+      this.watchOptionList(this.service.list as () => unknown[]);
     }
+  }
+
+  /** Keep the component-owned options signal. Replacing it leaves effects subscribed to the original empty list. */
+  private watchOptionList(sourceList: () => unknown) {
+    this.listSyncEffect = runInInjectionContext(this.injector, () =>
+      effect(
+        () => {
+          const next = sourceList();
+          this.optionsSig.set(Array.isArray(next) ? next : []);
+        },
+        { allowSignalWrites: true }
+      )
+    );
+    this.destroyRef.onDestroy(() => this.listSyncEffect?.destroy());
+  }
+
+  private readParentModel(): any {
+    this.signalInputRevision();
+    return this.signal();
   }
 
   virtualScrollEstimateSize(): number {
@@ -401,13 +440,16 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   setValue(event: number[]) {
-    this.body.set({ value: event });
+    // Only the single-selection path normalises `event`; the default path stores
+    // whatever it was handed, exactly as before.
+    const effective = this.singleSelection ? this.keepOnlyLatest(Array.isArray(event) ? event : []) : event;
+    this.body.set({ value: effective });
     let nextState: any;
 
     this.signal.update((current: any) => {
       const attr = this.optionValue;
       const prevItems = this.utils.getNestedProperty(current, this.signalOptionValue) ?? [];
-      const eventIds = Array.isArray(event) ? event : [];
+      const eventIds = Array.isArray(effective) ? effective : [];
       const optionsList = this.optionsSig() ?? [];
 
       const nextItems = eventIds.map((id: number) => {
@@ -427,13 +469,26 @@ export class MultiselectComponent implements OnInit, OnChanges {
     queueMicrotask(() => this.selectEvent.emit(nextState));
   }
 
+  /**
+   * Single-selection reducer: of the ids PrimeNG just handed us, keep the one
+   * the user has only now added — which is what "replace" means from their side.
+   * Falls back to the last id when nothing is new, e.g. the first click or a
+   * value set from outside.
+   */
+  private keepOnlyLatest(incoming: number[]): number[] {
+    if (incoming.length <= 1) return incoming;
+    const previous: number[] = Array.isArray(this.body()?.value) ? this.body().value : [];
+    const added = incoming.filter(id => !previous.includes(id));
+    return [added.length ? added[added.length - 1] : incoming[incoming.length - 1]];
+  }
+
   objectArrayToIdArray(array: any[], attribute: string) {
     return array?.map((item: any) => item[attribute]);
   }
 
   setBodyFromSignal(): void {
     this.body.set({
-      value: this.utils.getNestedProperty(this.signal(), this.signalOptionValue)?.map((item: any) => item[this.optionValue])
+      value: this.utils.getNestedProperty(this.readParentModel(), this.signalOptionValue)?.map((item: any) => item[this.optionValue])
     });
   }
 
@@ -461,10 +516,21 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   onMultiselectPanelHide(): void {
+    if (this.clearFilterOnClose) {
+      this.clearSearchFilter();
+    }
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
     this.clearMultiselectPanelMaxWidth();
+  }
+
+  /** Empties the dropdown's search box (PrimeNG keeps it between openings). */
+  clearSearchFilter(): void {
+    this.primeMultiSelect?.resetFilter?.();
+    if (this.service?.isOpenSearch?.()) {
+      this.onFilter({ filter: '' });
+    }
   }
 
   private applyMultiselectPanelMaxWidth(): void {

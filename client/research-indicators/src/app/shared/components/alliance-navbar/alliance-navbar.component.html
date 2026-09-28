@@ -1,4 +1,7 @@
 @let hss = this.cache.hasSmallScreen();
+<!-- @akili-spec changes/profile-simulation — D-imp-14: banner rendered above #navbar, INSIDE this host, so the
+     ResizeObserver observing the host element (ts ngAfterViewInit) measures navbar + banner as one height. -->
+<app-simulation-banner></app-simulation-banner>
 <div id="navbar" #navbar class="navbar bg-[#173F6F]">
   <div class="logo flex min-w-0 shrink flex-wrap items-center gap-1 sm:gap-2" routerLink="/">
     <img [src]="'STAR.png' | s3ImageUrl" alt="" class="flex-shrink-0 {{ hss ? 'h-[40px]' : 'h-[60px]' }}" />
@@ -58,7 +61,7 @@
       </a>
       <div dropdown-button (keydown.enter)="this.showDropdown = !this.showDropdown"
         (click)="this.showDropdown = !this.showDropdown">
-        <p-avatar [label]="this.actions.getInitials()"
+        <p-avatar [label]="this.actions.getInitials()" [class.simulation-ring]="this.impersonation.active()"
           styleClass="!rounded-xl cursor-pointer font-[600] flex pb-[1px]"></p-avatar>
       </div>
     </div>
@@ -68,7 +71,8 @@
 @if (this.showDropdown) {
 <div #dropdownRef class="fixed top-12 right-12 z-[9999] w-[290px] rounded-xl bg-white py-3 shadow-xl">
   <div class="mb-3 flex items-center justify-between px-4">
-    <span class="text-[11px] font-semibold tracking-[2px] font-[space_grotesk] text-[#8D9299] uppercase">Account</span>
+    <span class="text-[11px] font-semibold tracking-[2px] font-[space_grotesk] text-[#8D9299] uppercase">Account{{
+      this.impersonation.active() ? ' · Simulated' : '' }}</span>
     <button type="button"
       class="flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[#8D9299] transition-colors hover:bg-gray-100"
       (click)="this.showDropdown = false">
@@ -77,7 +81,8 @@
   </div>
 
   <div class="mb-4 flex items-center gap-3 px-4">
-    <p-avatar [label]="this.actions.getInitials()" class="!rounded-xl" size="large"></p-avatar>
+    <p-avatar [label]="this.actions.getInitials()" [class.simulation-ring]="this.impersonation.active()"
+      class="!rounded-xl" size="large"></p-avatar>
     <div class="flex flex-col">
       <span class="text-[14px] font-medium text-[#112F5C]">{{ this.cache.dataCache().user.first_name }} {{
         this.cache.dataCache().user.last_name }}</span>
@@ -92,9 +97,39 @@
       this.cache.dataCache().user.roleName }}</span>
   </div>
 
+  @if (this.impersonation.active()) {
+  <div class="simulated-note atc-grey-800 mx-4 mb-3 rounded-lg px-2.5 py-2 text-[12px]">
+    Simulated by <strong class="font-semibold">{{ this.impersonation.actor()?.first_name }} {{
+      this.impersonation.actor()?.last_name }}</strong> (System Admin)
+  </div>
+  }
+
   <div class="mb-3 border-t border-[#E4E4E7]"></div>
 
-  <div class="px-4">
+  <div class="flex flex-col gap-2 px-4">
+    @if (this.roles.isSystemAdmin() && !this.impersonation.active()) {
+    <button type="button"
+      class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--ac-primary-blue-400)] bg-white px-4 py-1.5 text-[13px] font-[450] atc-primary-blue-400"
+      (click)="this.openSimulateProfile()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="9" cy="8" r="3.5"></circle>
+        <path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path>
+        <path d="M16 8h5M18.5 5.5v5"></path>
+      </svg>
+      Simulate another profile
+    </button>
+    }
+    @if (this.impersonation.active()) {
+    <button type="button" class="simulation-panel-end-btn flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg abc-orange-2 atc-white-1 px-4 py-1.5 text-[13px] font-[500]"
+      (click)="this.endSimulation()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"></path>
+      </svg>
+      End simulation
+    </button>
+    }
     <button type="button"
       class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#cf0808] px-4 py-1.5 text-[13px] font-[450] text-[#cf0808] disabled:cursor-not-allowed disabled:opacity-50"
       [disabled]="this.cache.isValidatingToken()" (click)="this.actions.logOut()">
@@ -103,7 +138,7 @@
       } @else {
       <i class="pi pi-sign-out !text-[13px]"></i>
       }
-      Log out
+      {{ this.impersonation.active() ? 'Log out (ends simulation)' : 'Log out' }}
     </button>
   </div>
 </div>

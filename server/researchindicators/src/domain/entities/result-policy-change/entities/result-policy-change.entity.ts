@@ -38,6 +38,23 @@ export class ResultPolicyChange extends AuditableEntity {
   })
   evidence_stage?: string;
 
+  /** Required when policy_type_id = 3 (Program, Budget, or Investment). */
+  @Column('decimal', {
+    name: 'usd_amount',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
+  usd_amount?: number | null;
+
+  /** Confirmed | Estimated | Unknown — required when policy_type_id = 3. */
+  @Column('varchar', {
+    name: 'amount_status',
+    length: 20,
+    nullable: true,
+  })
+  amount_status?: string | null;
+
   @ManyToOne(() => Result, (result) => result.results_policy_change)
   @JoinColumn({ name: 'result_id' })
   result!: Result;

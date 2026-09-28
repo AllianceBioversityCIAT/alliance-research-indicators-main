@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ModuleRef, REQUEST } from '@nestjs/core';
 import { BadRequestException } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { ResultOicrService } from './result-oicr.service';
@@ -228,7 +229,6 @@ describe('ResultOicrService', () => {
           useValue: mockResultInitiativesService,
         },
         { provide: ResultLeversService, useValue: mockResultLeversService },
-        { provide: ResultsService, useValue: mockResultsService },
         { provide: MessageMicroservice, useValue: mockMessageMicroservice },
         { provide: AppConfig, useValue: mockAppConfig },
         { provide: TemplateService, useValue: mockTemplateService },
@@ -261,10 +261,17 @@ describe('ResultOicrService', () => {
           provide: StatusWorkflowFunctionHandlerService,
           useValue: mockStatusWorkflowFunctionHandlerService,
         },
+        { provide: REQUEST, useValue: {} },
+        {
+          provide: ModuleRef,
+          useValue: {
+            resolve: jest.fn(() => Promise.resolve(mockResultsService)),
+          },
+        },
       ],
     }).compile();
 
-    service = module.get<ResultOicrService>(ResultOicrService);
+    service = await module.resolve<ResultOicrService>(ResultOicrService);
   });
 
   afterEach(() => {
@@ -300,6 +307,27 @@ describe('ResultOicrService', () => {
         updated_by: 1,
       });
       expect(result).toEqual(savedResultOicr);
+    });
+  });
+
+  describe('getResultsService', () => {
+    // Regression: constructor-injecting ResultsService (request-scoped, in a forwardRef cycle
+    // with this service) yielded an empty placeholder on the real AppModule, so OICR creation
+    // failed with "Cannot read properties of undefined (reading 'findOne')".
+    it('resolves ResultsService for the current request instead of injecting it', async () => {
+      const moduleRef = (service as unknown as { moduleRef: ModuleRef })
+        .moduleRef;
+
+      const resolved = await (
+        service as unknown as { getResultsService: () => Promise<unknown> }
+      ).getResultsService();
+
+      expect(resolved).toBe(mockResultsService);
+      expect(moduleRef.resolve).toHaveBeenCalledWith(
+        ResultsService,
+        expect.anything(),
+        { strict: false },
+      );
     });
   });
 

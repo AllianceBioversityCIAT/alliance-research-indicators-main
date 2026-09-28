@@ -19,6 +19,11 @@ import { PolicyStagesService } from '../policy-stages/policy-stages.service';
 import { PolicyStage } from '../policy-stages/entities/policy-stage.entity';
 import { PolicyTypesService } from '../policy-types/policy-types.service';
 import { PolicyType } from '../policy-types/entities/policy-type.entity';
+import { PolicyTypesEnum } from '../policy-types/enum/policy-types.enum';
+import {
+  POLICY_AMOUNT_STATUS_VALUES,
+  PolicyAmountStatusEnum,
+} from './enum/policy-amount-status.enum';
 
 @Injectable()
 export class ResultPolicyChangeService {
@@ -86,6 +91,10 @@ export class ResultPolicyChangeService {
     result_id: number,
     createResultPolicyChangeDto: CreateResultPolicyChangeDto,
   ) {
+    const { usd_amount, amount_status } = this.resolveAmountFields(
+      createResultPolicyChangeDto,
+    );
+
     const innoSave: Partial<LinkResult>[] = [];
     if (createResultPolicyChangeDto?.innovation_development)
       innoSave.push({
@@ -118,6 +127,8 @@ export class ResultPolicyChangeService {
         policy_type_id: createResultPolicyChangeDto?.policy_type_id,
         policy_stage_id: createResultPolicyChangeDto?.policy_stage_id,
         evidence_stage: createResultPolicyChangeDto?.evidence_stage,
+        usd_amount,
+        amount_status,
         ...this.currentUser.audit(SetAuditEnum.BOTH),
       });
 
@@ -158,6 +169,45 @@ export class ResultPolicyChangeService {
       implementing_organization: institutions,
       innovation_development: innoDev?.other_result_id,
       innovation_use: innoUse?.other_result_id,
+      usd_amount:
+        policyChange?.usd_amount == null
+          ? null
+          : Number(policyChange.usd_amount),
+      amount_status: policyChange?.amount_status ?? null,
+    };
+  }
+
+  /**
+   * Type 3 stores a non-negative amount (0 is valid) and a known status.
+   * Missing or invalid values are stored as null so save never rejects them;
+   * the green check is what reports the section as incomplete.
+   */
+  private resolveAmountFields(dto: CreateResultPolicyChangeDto): {
+    usd_amount: number | null;
+    amount_status: string | null;
+  } {
+    const isProgramBudgetInvestment =
+      dto?.policy_type_id === PolicyTypesEnum.PROGRAM_BUDGET_OR_INVESTMENT;
+
+    if (!isProgramBudgetInvestment) {
+      return { usd_amount: null, amount_status: null };
+    }
+
+    const amount =
+      dto.usd_amount === null || dto.usd_amount === undefined
+        ? null
+        : Number(dto.usd_amount);
+    const status = dto.amount_status;
+
+    return {
+      usd_amount:
+        amount !== null && Number.isFinite(amount) && amount >= 0
+          ? amount
+          : null,
+      amount_status:
+        status && POLICY_AMOUNT_STATUS_VALUES.includes(String(status))
+          ? (status as PolicyAmountStatusEnum)
+          : null,
     };
   }
 }

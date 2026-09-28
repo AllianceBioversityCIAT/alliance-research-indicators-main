@@ -84,5 +84,14 @@ describe('SearchExportControlsComponent', () => {
     component.onEnter({ target: input } as unknown as Event);
     expect(spy).toHaveBeenCalledWith('query on enter');
   });
-});
+  it('hides the Apply Filters button when showApply is false (default keeps it)', () => {
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Apply Filters');
 
+    component.showApply = false;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Apply Filters');
+    expect(fixture.nativeElement.textContent).toContain('Clear Filters');
+  });
+});

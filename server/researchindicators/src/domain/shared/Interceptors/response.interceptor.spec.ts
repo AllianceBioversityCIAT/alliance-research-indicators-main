@@ -11,6 +11,9 @@ jest.mock('../utils/env.utils', () => ({
 
 describe('ResponseInterceptor', () => {
   const interceptor = new ResponseInterceptor();
+  let verboseSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
 
   const nestContextStub = {
     getHandler: () => function handler() {},
@@ -18,22 +21,34 @@ describe('ResponseInterceptor', () => {
   };
 
   beforeAll(() => {
-    jest
+    verboseSpy = jest
       .spyOn(LoggerUtil.prototype, '_verbose')
       .mockImplementation(() => undefined);
-    jest
+    warnSpy = jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
-    jest
+    errorSpy = jest
       .spyOn(LoggerUtil.prototype, '_error')
       .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    verboseSpy.mockClear();
+    warnSpy.mockClear();
+    errorSpy.mockClear();
   });
 
   afterAll(() => {
     jest.restoreAllMocks();
   });
 
-  function httpContext(url = '/r') {
+  // Dual-shape on purpose: AC-1675's DC-11 redaction tests pass a URL string
+  // (`httpContext(callbackUrl)`) while profile-simulation's attribution tests
+  // pass request overrides (`httpContext({ actor: … })`). Both call styles are
+  // live in this file; collapsing to either one breaks the other's cases.
+  function httpContext(arg: string | Record<string, unknown> = '/r') {
+    const url = typeof arg === 'string' ? arg : '/r';
+    const requestOverrides = typeof arg === 'string' ? {} : arg;
     const statusFn = jest.fn();
     return {
       context: {
@@ -46,6 +61,7 @@ describe('ResponseInterceptor', () => {
             method: 'POST',
             socket: { remoteAddress: '::1' },
             user: { sec_user_id: 9 },
+            ...requestOverrides,
           }),
         }),
       } as any,
@@ -71,6 +87,41 @@ describe('ResponseInterceptor', () => {
     expect(out.description).toBe('OK');
     expect(out.data).toEqual({ a: 1 });
     expect(out.path).toBe('/r');
+  });
+
+  // @akili-spec changes/profile-simulation — R-IMP-005/NFR-IMP-004 log
+  // attribution.
+  it('logs actorId + impersonationSessionId when req.actor is present (failing input: req.actor set, status 409)', async () => {
+    const { context } = httpContext({
+      actor: { sec_user_id: 900 },
+      impersonation: { session_id: 'sess-1' },
+    });
+    const payload = { status: HttpStatus.CONFLICT, description: 'Conflict' };
+    const next = { handle: () => of(payload) };
+    await lastValueFrom(interceptor.intercept(context, next));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 9,
+        actorId: 900,
+        impersonationSessionId: 'sess-1',
+      }),
+    );
+  });
+
+  it('logs undefined actorId/impersonationSessionId when req.actor is absent (failing input: no req.actor, status 409)', async () => {
+    const { context } = httpContext();
+    const payload = { status: HttpStatus.CONFLICT, description: 'Conflict' };
+    const next = { handle: () => of(payload) };
+    await lastValueFrom(interceptor.intercept(context, next));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: 9,
+        actorId: undefined,
+        impersonationSessionId: undefined,
+      }),
+    );
   });
 
   it('returns rpc payload unchanged inside map branch', async () => {

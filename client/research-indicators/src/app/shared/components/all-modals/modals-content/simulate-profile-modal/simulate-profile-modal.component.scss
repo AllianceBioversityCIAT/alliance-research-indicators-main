@@ -1,0 +1,6 @@
+// @akili-spec changes/profile-simulation — T-09
+// No component-scoped rules needed yet: layout and tokens are expressed via
+// utility classes in the template (root CLAUDE.md §4.2). Kept as an empty
+// stylesheet (rather than dropping `styleUrl`) so T-10's confirm-step work
+// has a conventional place to add scoped rules without touching this file's
+// TS/HTML.

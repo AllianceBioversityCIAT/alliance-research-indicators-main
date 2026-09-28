@@ -428,6 +428,21 @@ export class AgressoContractRepository
       );
     }
 
+    // @akili-spec docs/specs/changes/my-pi-delegates — a PI Delegate manages the
+    // project exactly as its PI does, so My Projects must list it for them too.
+    // EXISTS (not a JOIN) so the contract row count is unaffected.
+    const piDelegateScopeSql = (userId: number) => ` OR EXISTS (
+            SELECT 1 FROM pi_delegates pd
+            WHERE pd.project_id = ac.agreement_id
+              AND pd.delegate_user_id = ${userId}
+              AND pd.is_active = TRUE
+          )`;
+
+    const userScopeSql = (userId?: number, carnet?: string | null) =>
+      userId
+        ? `AND (r.created_by = ${userId} OR ac.projectLeadId = '${carnet}'${piDelegateScopeSql(userId)})`
+        : '';
+
     const userContracts = (userId?: number) =>
       userId
         ? `
@@ -448,7 +463,7 @@ export class AgressoContractRepository
         IF(ac.departmentId LIKE 'L%', SUBSTRING(ac.departmentId, 2), NULL))
         ${userContracts(user?.sec_user_id)}
     WHERE 1=1
-    ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
+    ${userScopeSql(user?.sec_user_id, userCarnet)}
     ${validFilter(queryConditions, `AND (${queryConditions})`)}
     ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter.contract_code}'`)}
     ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter.project_name}%'`)}
@@ -531,7 +546,7 @@ export class AgressoContractRepository
         ${userContracts(user?.sec_user_id)}
         WHERE 1=1
         ${filter?.exclude_pooled_funding ? `AND pfc.id IS NULL` : ''}
-        ${user?.sec_user_id ? `AND (r.created_by = ${user.sec_user_id} OR ac.projectLeadId = '${userCarnet}')` : ''}
+        ${userScopeSql(user?.sec_user_id, userCarnet)}
         ${validFilter(queryConditions, `AND (${queryConditions})`)}
         ${validFilter(filter?.contract_code, `AND ac.agreement_id = '${filter?.contract_code}'`)}
         ${validFilter(filter?.project_name, `AND ac.projectDescription LIKE '%${filter?.project_name}%'`)}

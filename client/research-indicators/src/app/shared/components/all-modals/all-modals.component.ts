@@ -10,7 +10,11 @@ import { ResultInformationModalComponent } from './modals-content/result-informa
 import { AddContactPersonModalComponent } from './modals-content/add-contact-person-modal/add-contact-person-modal.component';
 import { SelectLinkedResultsModalComponent } from './modals-content/select-linked-results-modal/select-linked-results-modal.component';
 import { EditEnvironmentVariableModalComponent } from './modals-content/edit-environment-variable-modal/edit-environment-variable-modal.component';
+// @akili-spec changes/profile-simulation — T-09
+import { SimulateProfileModalComponent } from './modals-content/simulate-profile-modal/simulate-profile-modal.component';
 import { EditPromptModalComponent } from './modals-content/edit-prompt-modal/edit-prompt-modal.component';
+import { AssignPiDelegateComponent } from '@platform/pages/my-pi-delegates/assign-modal/assign-pi-delegate.component';
+import { PiDelegateHistoryComponent } from '@platform/pages/my-pi-delegates/history/pi-delegate-history.component';
 
 @Component({
   selector: 'app-all-modals',
@@ -24,6 +28,10 @@ import { EditPromptModalComponent } from './modals-content/edit-prompt-modal/edi
     AddContactPersonModalComponent,
     SelectLinkedResultsModalComponent,
     EditEnvironmentVariableModalComponent,
+    EditPromptModalComponent,
+    AssignPiDelegateComponent,
+    PiDelegateHistoryComponent,
+    SimulateProfileModalComponent,
     EditPromptModalComponent
   ],
   templateUrl: './all-modals.component.html'

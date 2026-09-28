@@ -42,7 +42,7 @@ describe('ClarisaSdgTargetsController', () => {
 
     const result = await controller.findAll();
 
-    expect(mockFindAll).toHaveBeenCalledWith();
+    expect(mockFindAll).toHaveBeenCalledWith({ clarisa_sdg: true });
     expect(ResponseUtils.format).toHaveBeenCalledWith({
       data: rows,
       description: 'SDG Targets found',

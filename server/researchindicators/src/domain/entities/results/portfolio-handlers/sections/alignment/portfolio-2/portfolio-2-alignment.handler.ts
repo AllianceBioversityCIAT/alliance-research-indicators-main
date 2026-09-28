@@ -21,6 +21,7 @@ import { ResultImpactOutcomeRolesEnum } from '../../../../../result-impact-outco
 import { DataSource } from 'typeorm';
 import { IndicatorsEnum } from '../../../../../indicators/enum/indicators.enum';
 import { ResultLever } from '../../../../../result-levers/entities/result-lever.entity';
+import { ResultSdgTargetsService } from '../../../../../result-sdg-targets/result-sdg-targets.service';
 
 /**
  * Portfolio 2 (2026–2030) — test handler.
@@ -39,6 +40,7 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     private readonly resultImpactOutcomesService: ResultImpactOutcomesService,
     private readonly strategicObjectivesService: StrategicObjectivesService,
     private readonly clarisaLeversService: ClarisaLeversService,
+    private readonly resultSdgTargetsService: ResultSdgTargetsService,
   ) {}
 
   async save(
@@ -91,6 +93,15 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
     );
 
     responseData.research_areas = researchAreas;
+
+    if (context.result?.indicator_id === IndicatorsEnum.OICR) {
+      responseData.result_sdg_targets =
+        await this.resultSdgTargetsService.replaceForResult(
+          context.resultId,
+          payload.result_sdg_targets,
+          context.manager,
+        );
+    }
 
     const strategicObjectives =
       await this.resultStrategicObjectivesService.create(
@@ -247,6 +258,12 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
       LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
     );
     responseData.research_areas = researchAreas;
+
+    if (context.result?.indicator_id === IndicatorsEnum.OICR) {
+      responseData.result_sdg_targets =
+        await this.resultSdgTargetsService.findByResult(context.resultId);
+    }
+
     const strategicObjectives =
       await this.resultStrategicObjectivesService.find(
         context.resultId,

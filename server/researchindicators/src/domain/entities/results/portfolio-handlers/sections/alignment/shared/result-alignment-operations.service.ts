@@ -8,6 +8,12 @@ import { LeverRolesEnum } from '../../../../../lever-roles/enum/lever-roles.enum
 import { ResultLeverStrategicOutcomeService } from '../../../../../result-lever-strategic-outcome/result-lever-strategic-outcome.service';
 import { ResultLeverSdgTargetsService } from '../../../../../result-lever-sdg-targets/result-lever-sdg-targets.service';
 import { ResultSdgsService } from '../../../../../result-sdgs/result-sdgs.service';
+import { ResultStrategicObjectivesService } from '../../../../../result-strategic-objectives/result-strategic-objectives.service';
+import { ResultImpactOutcomesService } from '../../../../../result-impact-outcomes/result-impact-outcomes.service';
+import { ResultSdgTargetsService } from '../../../../../result-sdg-targets/result-sdg-targets.service';
+import { ResultStrategicObjectiveRolesEnum } from '../../../../../result-strategic-objectives/enum/result-strategic-objective-roles.enum';
+import { ResultImpactOutcomeRolesEnum } from '../../../../../result-impact-outcomes/enum/result-impact-outcome-roles.enum';
+import { PortfolioIdEnum } from '../../../enum/portfolio-id.enum';
 import { UpdateDataUtil } from '../../../../../../shared/utils/update-data.util';
 import { filterByUniqueKeyWithPriority } from '../../../../../../shared/utils/array.util';
 import { ResultLever } from '../../../../../result-levers/entities/result-lever.entity';
@@ -21,8 +27,92 @@ export class ResultAlignmentOperationsService {
     private readonly resultLeverStrategicOutcomeService: ResultLeverStrategicOutcomeService,
     private readonly resultLeverSdgTargetsService: ResultLeverSdgTargetsService,
     private readonly resultSdgsService: ResultSdgsService,
+    private readonly resultStrategicObjectivesService: ResultStrategicObjectivesService,
+    private readonly resultImpactOutcomesService: ResultImpactOutcomesService,
+    private readonly resultSdgTargetsService: ResultSdgTargetsService,
     private readonly updateDataUtil: UpdateDataUtil,
   ) {}
+
+  /**
+   * Drops alignment rows that the destination portfolio does not show.
+   * Portfolio 2025 hides research areas, strategic objectives, impact outcomes
+   * and the result-level SDG target list. Portfolio 2026 hides primary and
+   * contributing levers, including their lever SDG targets and outcomes.
+   */
+  async clearFieldsHiddenByPortfolio(
+    resultId: number,
+    portfolioId: number,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (portfolioId === PortfolioIdEnum.PORTFOLIO_1) {
+      await this.clearPortfolio2026Fields(resultId, manager);
+      return;
+    }
+    if (portfolioId === PortfolioIdEnum.PORTFOLIO_2) {
+      await this.clearPortfolio2025Fields(resultId, manager);
+    }
+  }
+
+  private async clearPortfolio2026Fields(
+    resultId: number,
+    manager?: EntityManager,
+  ): Promise<void> {
+    await this.resultLeversService.create(
+      resultId,
+      [],
+      'lever_id',
+      LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+      manager,
+    );
+    await this.resultStrategicObjectivesService.create(
+      resultId,
+      [],
+      'strategic_objective_id',
+      ResultStrategicObjectiveRolesEnum.ALIGNMENT,
+      manager,
+    );
+    await this.resultImpactOutcomesService.create(
+      resultId,
+      [],
+      'impact_outcome_id',
+      ResultImpactOutcomeRolesEnum.ALIGNMENT,
+      manager,
+    );
+    await this.resultSdgTargetsService.replaceForResult(resultId, [], manager);
+  }
+
+  private async clearPortfolio2025Fields(
+    resultId: number,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const levers = await this.resultLeversService.find(
+      resultId,
+      LeverRolesEnum.ALIGNMENT,
+    );
+    for (const lever of levers) {
+      await this.resultLeverStrategicOutcomeService.create(
+        lever.result_lever_id,
+        [],
+        'lever_strategic_outcome_id',
+        undefined,
+        manager,
+      );
+      await this.resultLeverSdgTargetsService.create(
+        lever.result_lever_id,
+        [],
+        'sdg_target_id',
+        undefined,
+        manager,
+      );
+    }
+    await this.resultLeversService.create(
+      resultId,
+      [],
+      'lever_id',
+      LeverRolesEnum.ALIGNMENT,
+      manager,
+    );
+  }
 
   async save(
     resultId: number,
@@ -91,7 +181,7 @@ export class ResultAlignmentOperationsService {
       for (const lever of emergedLever) {
         await this.resultLeverStrategicOutcomeService.create(
           lever.result_lever_id,
-          lever?.result_lever_strategic_outcomes ?? [],
+          this.strategicOutcomesToSave(lever?.result_lever_strategic_outcomes),
           'lever_strategic_outcome_id',
           undefined,
           entityManager,
@@ -101,10 +191,14 @@ export class ResultAlignmentOperationsService {
       for (const lever of emergedLever) {
         await this.resultLeverSdgTargetsService.create(
           lever.result_lever_id,
-          lever?.result_lever_sdg_targets ?? [],
+          (lever?.result_lever_sdg_targets ?? []).map((target) => ({
+            ...target,
+            result_id: resultId,
+          })),
           'sdg_target_id',
           undefined,
           entityManager,
+          ['result_id'],
         );
       }
 
@@ -159,7 +253,7 @@ export class ResultAlignmentOperationsService {
 
     primaryLevers.forEach((lever) => {
       lever.result_lever_strategic_outcomes = strategicOutcomes.filter(
-        (so) => so.result_lever_id === lever.result_lever_id,
+        (so) => Number(so.result_lever_id) === Number(lever.result_lever_id),
       );
     });
 
@@ -171,5 +265,36 @@ export class ResultAlignmentOperationsService {
       contributor_levers: levers?.filter((el) => !el.is_primary),
       result_sdgs,
     };
+  }
+
+  /**
+   * Persist only the catalog key. `id` on the payload is the catalog id, and the
+   * junction row uses the same column name as its primary key. Passing it through
+   * updates an existing row instead of inserting one outcome per selection.
+   */
+  private strategicOutcomesToSave(
+    outcomes:
+      | { id?: number; lever_strategic_outcome_id?: number }[]
+      | undefined,
+  ): { lever_strategic_outcome_id: number }[] {
+    const seen = new Set<number>();
+    const saved: { lever_strategic_outcome_id: number }[] = [];
+
+    for (const outcome of outcomes ?? []) {
+      const leverStrategicOutcomeId = Number(
+        outcome?.lever_strategic_outcome_id ?? outcome?.id,
+      );
+      if (
+        !Number.isFinite(leverStrategicOutcomeId) ||
+        leverStrategicOutcomeId <= 0 ||
+        seen.has(leverStrategicOutcomeId)
+      ) {
+        continue;
+      }
+      seen.add(leverStrategicOutcomeId);
+      saved.push({ lever_strategic_outcome_id: leverStrategicOutcomeId });
+    }
+
+    return saved;
   }
 }

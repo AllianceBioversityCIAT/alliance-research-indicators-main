@@ -600,6 +600,41 @@ export class ResultsService {
     return result;
   }
 
+  private async clearAlignmentWhenPortfolioChanges(
+    resultId: number,
+    previousYear: number | null | undefined,
+    nextYear: number | null | undefined,
+    manager: EntityManager,
+  ): Promise<void> {
+    const fromYear = Number(previousYear);
+    const toYear = Number(nextYear);
+    if (
+      !Number.isFinite(fromYear) ||
+      !Number.isFinite(toYear) ||
+      fromYear === toYear
+    ) {
+      return;
+    }
+
+    const [previousPortfolio, nextPortfolio] = await Promise.all([
+      this._portfolioService.findByYear(fromYear),
+      this._portfolioService.findByYear(toYear),
+    ]);
+    if (
+      !previousPortfolio?.id ||
+      !nextPortfolio?.id ||
+      previousPortfolio.id === nextPortfolio.id
+    ) {
+      return;
+    }
+
+    await this._alignmentOperations.clearFieldsHiddenByPortfolio(
+      resultId,
+      nextPortfolio.id,
+      manager,
+    );
+  }
+
   async updateGeneralInfo(
     result_id: number,
     generalInformation: UpdateGeneralInformation,
@@ -624,6 +659,20 @@ export class ResultsService {
           'The name of the result is already registered',
         );
       }
+
+      const currentResult = await manager
+        .getRepository(this.mainRepo.target)
+        .findOne({
+          select: { result_id: true, report_year_id: true },
+          where: { result_id },
+        });
+      await this.clearAlignmentWhenPortfolioChanges(
+        result_id,
+        currentResult?.report_year_id,
+        generalInformation.year,
+        manager,
+      );
+
       await manager.getRepository(this.mainRepo.target).update(result_id, {
         title: generalInformation.title,
         description: generalInformation.description,

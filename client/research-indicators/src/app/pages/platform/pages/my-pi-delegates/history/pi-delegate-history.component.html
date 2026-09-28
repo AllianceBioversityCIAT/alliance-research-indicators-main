@@ -1,0 +1,103 @@
+<!-- Delegation History — read-only modal inner content. -->
+<!-- NFR-UI-001: STAR tokens only (atc-*, abc-*, var(--ac-*)) — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues: badge uses icon + text, not colour-only. -->
+<!-- NFR-UI-003: Loading / empty / error states. -->
+<!-- Typography mirrors the two tables: Barlow 14px / grey-800 for body text,
+     Space Grotesk / primary-blue-300 for dates, 600 for names, 700 for codes. -->
+<!-- Fixed width: the modal must not resize as entries load or change. -->
+
+<div class="pi-dh flex w-[860px] max-w-[88vw] flex-col gap-4 px-10 pb-8 pt-6">
+
+  <!-- ── Content heading: "CODE - Project name" (the modal header stays the
+       plain module name), or the person's name when opened from By person. ── -->
+  @if (contentCode || contentName) {
+  <h2 class="pi-dh__title atc-primary-blue-600 m-0 font-['Barlow'] text-[16px] font-semibold leading-[20px]">
+    @if (contentCode) {
+    <span class="pi-dh__title__code font-bold">{{ contentCode }}</span>
+    }
+    @if (contentCode && contentName) {<span> - </span>}
+    @if (contentName) {<span class="pi-dh__title__name">{{ contentName }}</span>}
+  </h2>
+  }
+
+  <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────────── -->
+  @if (loading()) {
+  <div class="pi-dh__state--loading flex items-center gap-2 py-6 font-['Barlow'] text-[14px]" role="status"
+    aria-live="polite">
+    <i class="pi pi-spin pi-spinner atc-primary-blue-400 !text-[20px]" aria-hidden="true"></i>
+    <span class="atc-grey-800">Loading delegation history…</span>
+  </div>
+  }
+
+  <!-- ── Error state (NFR-UI-003) ───────────────────────────────────────── -->
+  @else if (error()) {
+  <div class="pi-dh__state--error flex items-center gap-2 py-6 font-['Barlow'] text-[14px]" role="alert">
+    <i class="pi pi-exclamation-circle atc-red-1 !text-[20px]" aria-hidden="true"></i>
+    <span class="atc-red-1">{{ error() }}</span>
+  </div>
+  }
+
+  <!-- ── Empty state (NFR-UI-003) ───────────────────────────────────────── -->
+  @else if (entries().length === 0) {
+  <div class="pi-dh__state--empty flex flex-col items-center gap-2 py-10 text-center font-['Barlow'] text-[14px]"
+    role="status">
+    <i class="pi pi-inbox atc-grey-500 !text-[32px]" aria-hidden="true"></i>
+    <span class="atc-grey-700">No history yet.</span>
+  </div>
+  }
+
+  <!-- ── Entry list ─────────────────────────────────────────────────────── -->
+  @else {
+  <ul class="m-0 flex max-h-[55vh] list-none flex-col gap-2 overflow-y-auto p-0" aria-label="Delegation history entries">
+    @for (entry of entries(); track entry.pi_delegate_history_id) {
+    <li
+      class="pi-dh__entry flex items-start gap-3 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] px-4 py-3">
+
+      <!-- Avatar circle with actor initials -->
+      <div class="pi-dh__avatar flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+        [ngClass]="avatarVariant(entry.actor.name)"
+        [attr.aria-label]="'Action by ' + (entry.actor.name ?? 'Unknown')">
+        <span class="font-['Barlow'] text-[11px] font-bold uppercase leading-none" aria-hidden="true">{{
+          getInitials(entry.actor.name) }}</span>
+      </div>
+
+      <!-- Entry body -->
+      <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+
+        <!-- Sentence: who did what, to whom, on which project. The project name
+             is deliberately absent — the heading above already carries it, and
+             repeating it on every row buried the part that changes. -->
+        <p class="pi-dh__sentence atc-grey-800 m-0 break-words font-['Barlow'] text-[14px] leading-[18px]">
+          <span class="pi-dh__actor font-semibold">{{ entry.actor.name ?? 'Unknown' }}</span>
+          <span class="atc-grey-600">
+            {{ entry.action === 'assign' ? ' has granted the PI Delegate role to ' : ' has revoked the PI Delegate role of ' }}
+          </span>
+          <span class="pi-dh__delegate font-semibold">{{ entry.delegate.name ?? 'Unknown' }}</span>
+          <span class="atc-grey-600"> on project </span>
+          <span class="pi-dh__code font-bold">{{ entry.project.project_code }}</span>
+        </p>
+
+        <!-- Status row — the same <app-custom-tag> the tables use, so a granted
+             or revoked entry reads like every other status in the product. -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <app-custom-tag
+            class="pi-dh__badge"
+            [class.pi-dh__badge--granted]="entry.action === 'assign'"
+            [class.pi-dh__badge--revoked]="entry.action !== 'assign'"
+            [statusName]="entry.action === 'assign' ? 'PI Delegate granted' : 'PI Delegate revoked'"
+            [statusBorder]="entry.action === 'assign' ? 'var(--ac-green-300)' : 'var(--ac-red-1)'"
+            [statusColor]="entry.action === 'assign' ? 'var(--ac-green-600)' : 'var(--ac-red-1)'"
+            [tiny]="true"
+          ></app-custom-tag>
+
+          <span class="pi-dh__timestamp atc-primary-blue-300 whitespace-nowrap font-['Space_Grotesk'] text-[12px]"
+            [attr.aria-label]="'Date: ' + formatDate(entry.created_at)">{{ formatDate(entry.created_at) }}</span>
+        </div>
+
+      </div>
+    </li>
+    }
+  </ul>
+  }
+
+</div>

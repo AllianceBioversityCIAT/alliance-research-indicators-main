@@ -1,9 +1,6 @@
-import {
-  BadRequestException,
-  Injectable,
-  Inject,
-  forwardRef,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Inject } from '@nestjs/common';
+import { ContextIdFactory, ModuleRef, REQUEST } from '@nestjs/core';
+import { Request } from 'express';
 import { DataSource, EntityManager, Not, Repository } from 'typeorm';
 import { ResultOicr } from './entities/result-oicr.entity';
 import { StepOneOicrDto } from './dto/step-one-oicr.dto';
@@ -72,8 +69,6 @@ export class ResultOicrService {
     private readonly linkResultService: LinkResultsService,
     private readonly updateDataUtil: UpdateDataUtil,
     private readonly resultLeversService: ResultLeversService,
-    @Inject(forwardRef(() => ResultsService))
-    private readonly resultService: ResultsService,
     private readonly messageMicroservice: MessageMicroservice,
     private readonly appConfig: AppConfig,
     private readonly templateService: TemplateService,
@@ -84,7 +79,25 @@ export class ResultOicrService {
     private readonly resultImpactAreasService: ResultImpactAreasService,
     private readonly resultImpactAreaGlobalTargetsService: ResultImpactAreaGlobalTargetsService,
     private readonly resultStatusWorkflowHandler: StatusWorkflowFunctionHandlerService,
+    private readonly moduleRef: ModuleRef,
+    @Inject(REQUEST) private readonly request: Request,
   ) {}
+
+  /**
+   * ResultsService is request-scoped (through ResultsUtil) and sits in a forwardRef cycle with
+   * this service. Constructor-injecting it hands this service an empty placeholder: probed on
+   * the real AppModule, the injected instance had no own properties, so the first
+   * `this.mainRepo.findOne` inside `createResult` threw "Cannot read properties of undefined
+   * (reading 'findOne')" and OICR creation failed. Resolving it for the current request returns
+   * the fully constructed instance of that same request.
+   */
+  private getResultsService(): Promise<ResultsService> {
+    return this.moduleRef.resolve(
+      ResultsService,
+      ContextIdFactory.getByRequest(this.request),
+      { strict: false },
+    );
+  }
 
   async create(resultId: number, manager: EntityManager) {
     const entityManager: Repository<ResultOicr> = selectManager(
@@ -108,7 +121,8 @@ export class ResultOicrService {
 
     let result: Result;
     if (!resultId) {
-      result = await this.resultService.createResult(
+      const resultService = await this.getResultsService();
+      result = await resultService.createResult(
         data.base_information,
         platform_code,
         {
@@ -356,7 +370,8 @@ export class ResultOicrService {
   ) {
     await this.stepOneOicr(data?.step_one, resultId, manager, isNew);
     await this.stepTwoOicr(data?.step_two, resultId, manager);
-    await this.resultService.saveGeoLocation(resultId, data?.step_three);
+    const resultService = await this.getResultsService();
+    await resultService.saveGeoLocation(resultId, data?.step_three);
     const tempGeneralComment =
       typeof data?.step_four?.general_comment == 'string'
         ? data.step_four.general_comment
@@ -384,7 +399,7 @@ export class ResultOicrService {
       case 2:
         return this.stepTwoOicr(data, resultId);
       case 3:
-        return this.resultService.saveGeoLocation(resultId, data);
+        return (await this.getResultsService()).saveGeoLocation(resultId, data);
       case 4:
         return this.mainRepo.update(resultId, {
           general_comment: data.general_comment,
@@ -489,8 +504,9 @@ export class ResultOicrService {
   async findModal(resultId: number): Promise<CreateResultOicrDto> {
     const stepOne = await this.findStepOneIoicr(resultId);
     const stepTwo = await this.findStepTwoOicr(resultId);
-    const stepThree = await this.resultService.findGeoLocation(resultId);
-    const baseInformation = await this.resultService.findBaseInfo(resultId);
+    const resultService = await this.getResultsService();
+    const stepThree = await resultService.findGeoLocation(resultId);
+    const baseInformation = await resultService.findBaseInfo(resultId);
     const { general_comment: stepFour, cgspace_link } = await this.mainRepo
       .findOne({
         where: {

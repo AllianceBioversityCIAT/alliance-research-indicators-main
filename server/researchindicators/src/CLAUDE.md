@@ -123,9 +123,9 @@ Naming:
    - Return the service promise wrapped in `ResponseUtils.format({ description, status, data })`.
 4. **Route registration — two steps, and the second is the one people miss.** If it is a new sub-resource path, add a node under `domain/routes/main.routes.ts` **and** register the module in the module-graph file that instantiates it. If it is a new endpoint on an existing controller, no route change is needed.
 
-   > **A route node is NOT a registration.** `RouterModule.register()` stamps a `MODULE_PATH` prefix onto a module constructor, looks the module up in `modulesContainer`, and **returns silently when it is not there**. There is no boot error and no warning — every handler on the module just returns **`404`**. The module-graph file is `domain/entities/entities.module.ts` for entity modules and `domain/tools/clarisa/clarisa.module.ts` for CLARISA control lists; a tool module goes in its own tool module.
+   > **A route node is NOT a registration (Kaizen KZ-017).** `RouterModule.register()` stamps a `MODULE_PATH` prefix onto a module constructor, looks the module up in `modulesContainer`, and **returns silently when it is not there**. There is no boot error and no warning — every handler on the module just returns **`404`**. The module-graph file is `domain/entities/entities.module.ts` for entity modules and `domain/tools/clarisa/clarisa.module.ts` for CLARISA control lists; a tool module goes in its own tool module. A module present in `main.routes.ts` but absent from the module graph returns **404 in production** and still passes `build` + unit + `lint`.
    >
-   > **Mocked-provider unit specs cannot catch this, and neither can a spec asserting the shape of the `route` array.** The falsifiable assertion is over the module graph: `expect(Reflect.getMetadata('imports', EntitiesModule)).toContain(YourModule)`. See `domain/tools/clarisa/clarisa.module.spec.ts` and `domain/entities/entities.module.spec.ts` for the two shapes — plain membership when the module has a single incoming edge, a transitive reachability walk when it has several.
+   > **Mocked-provider unit specs cannot catch this, and neither can a spec asserting the shape of the `route` array.** The falsifiable assertion is over the module graph: `expect(Reflect.getMetadata('imports', EntitiesModule)).toContain(YourModule)`. See `domain/tools/clarisa/clarisa.module.spec.ts` and `domain/entities/entities.module.spec.ts` for the two shapes — plain membership when the module has a single incoming edge, a transitive reachability walk when it has several. **Verify HTTP reachability by booting the app / an e2e request, never by grepping the route table.**
    >
    > This shipped twice in one spec (2026-08-19, `docs/specs/innovation-use/details-api` — DD-15), each time with a full green suite over four `404` endpoints.
 5. **Tests** — extend `<module>.controller.spec.ts` + `<module>.service.spec.ts`. Add an e2e case under `test/` if it is a new public route.
@@ -143,6 +143,47 @@ Naming:
 - `ResultStatusGuard` (`domain/shared/guards/result-status.guard.ts`) gates mutations on the result lifecycle.
 
 Do NOT invent a new auth path. If a new partner type needs access, extend `app_secrets` / `app_secret_host_list` and document it in the relevant module spec.
+
+### PI Delegates — two audiences, one set of endpoints
+
+`domain/entities/pi-delegates/` serves **two** audiences from the same handlers, and the
+difference is a query parameter, never a second route:
+
+| Caller | `scope` | What comes back |
+| --- | --- | --- |
+| PI or active delegate | omitted (`managed`) | Only the projects that user manages |
+| `SYSTEM_ADMIN` or `CENTER_ADMIN` | `all` | Every contract and every active delegation, platform-wide |
+
+`scope=all` is accepted on `GET /pi-delegates/by-user/{projects,people,access}` and on the
+`delegate_user_id` branch of `GET /pi-delegates/history`. It **ignores `user_id`** and is gated
+by `PiDelegatesService.assertAdminScope()` — a non-admin asking for it gets **403**, so the
+parameter can never widen an ordinary user's result set.
+
+Three rules if you touch this module:
+
+- **`isPlatformAdmin()` is the single admin predicate.** `SYSTEM_ADMIN` *and* `CENTER_ADMIN`
+  both administer delegations everywhere, including through `assertCanManageProject()`, so a
+  Center Admin can assign or revoke on a project they neither lead nor delegate on. Add a role
+  to the set there, not at each call site.
+- **Every scoped read is a PAIR of repository methods** — `findProjectSummariesByIds` /
+  `findAllProjectSummaries`, and so on — differing only in the `WHERE` clause. The projection
+  lives in one shared `const` (`PROJECT_SUMMARY_SELECT`, `PROJECT_DELEGATES_SELECT`,
+  `DELEGATES_WITH_PROJECT_SELECT`, `HISTORY_SELECT`). **Do not inline the SQL back into one
+  half**: a column added to only one of them passes every mocked test and silently changes what
+  one audience sees. `pi-delegates.repository.spec.ts` asserts the two halves project the same
+  columns.
+- **The `all` variants pass no bind parameters and take no id list.** An `IN (?)` over the whole
+  contracts table is worse than no `WHERE` at all, and the empty-array guard that protects the
+  managed path has no meaning here — guard on the scope instead.
+- **Pool funding is `effectivePoolFundingContributorSql('ac')`, never `ac.is_pool_funding_contributor`.**
+  A contract also counts as a contributor when it has an active `bilateral_project_mapping` row, so
+  reading the column alone makes a table answer **No** for projects My Projects tags as
+  *Contributing to Pool Funding*. This module shipped exactly that drift — the util's own docstring
+  claims "the agresso-contract and results repositories reuse this fragment", and PI Delegates was
+  a third reader that did not. **Any new query projecting that field is a fourth.**
+
+`@Roles(...)` is deliberately absent from this controller: authorization is per project, decided
+in the service. Adding the decorator would lock out the PIs and delegates the module exists for.
 
 ---
 

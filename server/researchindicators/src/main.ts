@@ -17,7 +17,10 @@ const logger: LoggerUtil = new LoggerUtil({
 
 async function httpservice() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  app.enableCors();
+  // @akili-spec changes/profile-simulation
+  // `X-Impersonation-Error` must be readable by the browser (default CORS
+  // exposes no custom headers) so `httpErrorInterceptor` can react to it.
+  app.enableCors({ exposedHeaders: ['X-Impersonation-Error'] });
   app.use(
     helmet({
       contentSecurityPolicy: {

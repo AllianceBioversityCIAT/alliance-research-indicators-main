@@ -4,7 +4,7 @@ import { RolesService } from './roles.service';
 import { CacheService } from './cache.service';
 import { CreateResultManagementService } from '../../components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 
-type TestUserRole = { role_id: number; role?: { focus_id?: number; sec_role_id?: number | null } };
+type TestUserRole = { role_id: number; role?: { focus_id?: number | null; sec_role_id?: number | null } };
 
 describe('RolesService', () => {
   let service: RolesService;
@@ -125,6 +125,28 @@ describe('RolesService', () => {
   it('canAccessCenterAdmin should evaluate non-super-admin entries when first entry is not a match', () => {
     userRoleList.set([{ role_id: 2 }, { role_id: 9, role: { focus_id: 1, sec_role_id: 9 } }]);
     expect(service.canAccessCenterAdmin()).toBe(true);
+  });
+
+  it('simulated Contributor (user_role_list only role_id 3, full role shape) should have isSystemAdmin() false and canAccessCenterAdmin() false', () => {
+    // R-IMP-009 AC.2 (T-12): target-shaped user swapped in via impersonation, carrying the full role
+    // sub-object (as TargetProfileDto does) even though none of its fields grant admin/center-admin access.
+    userRoleList.set([{ role_id: 3, role: { focus_id: 3, sec_role_id: 3 } }]);
+    expect(service.isSystemAdmin()).toBe(false);
+    expect(service.canAccessCenterAdmin()).toBe(false);
+  });
+
+  it('simulated Center Admin (role_id 9, role.focus_id 1, role.sec_role_id 9) should have canAccessCenterAdmin() true', () => {
+    // R-IMP-009 AC.2 (T-12): simulated Center Admin target must keep center-admin access post-swap.
+    userRoleList.set([{ role_id: 9, role: { focus_id: 1, sec_role_id: 9 } }]);
+    expect(service.canAccessCenterAdmin()).toBe(true);
+  });
+
+  it('Center Admin whose role.focus_id is null should have canAccessCenterAdmin() false', () => {
+    // T-12 failing-input discriminator. `sec_roles.focus_id` is `NOT NULL` on dev (T-01 DESCRIBE,
+    // design.md §4 OQ-5), so real data can never produce this shape — this is a fabricated DTO
+    // guarding against the input shape rather than a case exercised by production data.
+    userRoleList.set([{ role_id: 9, role: { focus_id: null, sec_role_id: 9 } }]);
+    expect(service.canAccessCenterAdmin()).toBe(false);
   });
 
   it('canEditOicr should be true when not editing (regardless of admin)', () => {

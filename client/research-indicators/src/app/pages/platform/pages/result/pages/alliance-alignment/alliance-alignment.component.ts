@@ -5,6 +5,8 @@ import { GetStrategicObjectivesService } from '@services/control-list/get-strate
 import { GetImpactOutcomesService } from '@services/control-list/get-impact-outcomes.service';
 import { GetSdgsService } from '@services/control-list/get-sdgs.service';
 import { GetLeverSdgTargetsService } from '@services/control-list/get-lever-sdg-targets.service';
+import { GetLeverStrategicOutcomesService } from '@services/control-list/get-lever-strategic-outcomes.service';
+import { Portfolio2026SdgTargetsService } from '@services/control-list/portfolio-2026-sdg-targets.service';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../../../../../shared/services/api.service';
 import { MultiSelectModule } from 'primeng/multiselect';
@@ -81,6 +83,8 @@ export default class AllianceAlignmentComponent {
   getImpactOutcomesService = inject(GetImpactOutcomesService);
   getSdgsService = inject(GetSdgsService);
   getLeverSdgTargetsService = inject(GetLeverSdgTargetsService);
+  getLeverStrategicOutcomesService = inject(GetLeverStrategicOutcomesService);
+  portfolio2026SdgTargets = inject(Portfolio2026SdgTargetsService);
   body: WritableSignal<GetAllianceAlignment> = signal({
     contracts: [],
     result_sdgs: [],
@@ -139,9 +143,6 @@ export default class AllianceAlignmentComponent {
   }
 
   async getData() {
-    this.leverOutcomeSignals.clear();
-    this.leverSdgSignals.clear();
-
     const portfolioParams = this.leverServiceParams();
     const contractParams = this.contractServiceParams();
 
@@ -156,7 +157,7 @@ export default class AllianceAlignmentComponent {
       await Promise.all([
         this.getStrategicObjectivesService.main(portfolioParams),
         this.getImpactOutcomesService.main(portfolioParams),
-        ...(this.isOicrIndicator() ? [] : [this.getSdgsService.main()])
+        ...(this.isOicrIndicator() ? [this.portfolio2026SdgTargets.main()] : [this.getSdgsService.main()])
       ]);
 
       const normalized = normalizePortfolio2AlignmentGet(response.data, {
@@ -164,7 +165,8 @@ export default class AllianceAlignmentComponent {
         levers: this.getLeversService.getList(portfolioParams)(),
         strategicObjectives: this.getStrategicObjectivesService.getList(portfolioParams)(),
         impactOutcomes: this.getImpactOutcomesService.getList(portfolioParams)(),
-        sdgs: this.getSdgsService.list()
+        sdgs: this.getSdgsService.list(),
+        sdgTargets: this.portfolio2026SdgTargets.list()
       });
       this.body.set({
         ...normalized,
@@ -186,12 +188,18 @@ export default class AllianceAlignmentComponent {
     ];
 
     if (leverIdsFromResponse.length) {
-      await Promise.all(leverIdsFromResponse.map(leverId => this.getLeverSdgTargetsService.main(leverId)));
+      await Promise.all(
+        leverIdsFromResponse.flatMap(leverId => [
+          this.getLeverSdgTargetsService.main(leverId),
+          this.getLeverStrategicOutcomesService.main(leverId)
+        ])
+      );
     }
 
     const mapLevers = (levers: Lever[] | undefined): Lever[] =>
       (levers ?? []).map(lever => ({
         ...lever,
+        result_lever_strategic_outcomes: this.strategicOutcomesForSignal(lever),
         result_lever_sdgs: enrichResultSdgs(lever.result_lever_sdgs, sdgsCatalog),
         result_lever_sdg_targets: enrichAlignmentSdgTargets(
           (lever as Lever & { result_lever_sdg_targets?: unknown }).result_lever_sdg_targets,
@@ -223,25 +231,76 @@ export default class AllianceAlignmentComponent {
       result_sdgs: this.isOicrIndicator() ? [] : legacyRootSdgs,
       primary_levers: this.applyCustomNamesToLevers(primary_levers),
       contributor_levers: this.applyCustomNamesToLevers(contributor_levers),
-      research_areas: response.data.research_areas || [],
-      strategic_objectives: response.data.strategic_objectives || [],
-      impact_outcomes: response.data.impact_outcomes || []
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     });
   }
 
   private populateLeverChildSignals(levers: Lever[]) {
+    const activeIds = new Set(levers.map(lever => String(lever.lever_id)));
+    for (const leverId of this.leverOutcomeSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverOutcomeSignals.delete(leverId);
+    }
+    for (const leverId of this.leverSdgSignals.keys()) {
+      if (!activeIds.has(String(leverId))) this.leverSdgSignals.delete(leverId);
+    }
+
     for (const lever of levers) {
-      this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: lever.result_lever_strategic_outcomes ?? [] }));
-      this.leverSdgSignals.set(
-        lever.lever_id,
-        signal({
-          result_lever_sdgs: lever.result_lever_sdgs ?? [],
-          result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
-        })
-      );
+      const outcomes = lever.result_lever_strategic_outcomes ?? [];
+      const sdgState = {
+        result_lever_sdgs: lever.result_lever_sdgs ?? [],
+        result_lever_sdg_targets: lever.result_lever_sdg_targets ?? []
+      };
+      const existingOutcomes = this.leverOutcomeSignals.get(lever.lever_id);
+      if (existingOutcomes) {
+        existingOutcomes.set({ result_lever_strategic_outcomes: outcomes });
+      } else {
+        this.leverOutcomeSignals.set(lever.lever_id, signal({ result_lever_strategic_outcomes: outcomes }));
+      }
+
+      const existingSdgs = this.leverSdgSignals.get(lever.lever_id);
+      if (existingSdgs) {
+        existingSdgs.set(sdgState);
+      } else {
+        this.leverSdgSignals.set(lever.lever_id, signal(sdgState));
+      }
     }
 
     this.syncLeverCustomNameSignals(levers);
+  }
+
+  /**
+   * Saved rows use the junction primary key as `id` and the catalog key as `lever_strategic_outcome_id`.
+   * The multiselect optionValue is the catalog `id`, so the junction id never matches an option:
+   * the closed control can show a count while the rows stay blank and the field stays required.
+   */
+  private strategicOutcomesForSignal(lever: Lever): LeverStrategicOutcome[] {
+    const raw = lever.result_lever_strategic_outcomes as unknown;
+    const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw];
+    const catalog = this.getLeverStrategicOutcomesService.getList(lever.lever_id)();
+
+    return list.flatMap((value): LeverStrategicOutcome[] => {
+      const normalized = this.normalizeOutcome(value);
+      const outcomeId = Number(normalized.lever_strategic_outcome_id);
+      if (!Number.isFinite(outcomeId) || outcomeId <= 0) return [];
+
+      const saved =
+        value && typeof value === 'object'
+          ? (value as LeverStrategicOutcome & { lever_strategic_outcome?: LeverStrategicOutcome })
+          : undefined;
+      const match = catalog.find(item => Number(item.id ?? item.lever_strategic_outcome_id) === outcomeId);
+      const strategic_outcome = saved?.strategic_outcome ?? saved?.lever_strategic_outcome?.strategic_outcome ?? match?.strategic_outcome;
+
+      return [
+        {
+          id: outcomeId,
+          lever_strategic_outcome_id: outcomeId,
+          strategic_outcome
+        }
+      ];
+    });
   }
 
   private syncLeverCustomNameSignals(levers: Lever[]): void {
@@ -372,7 +431,8 @@ export default class AllianceAlignmentComponent {
     const dataToSend = buildPortfolio2AlignmentPatch(
       this.body(),
       this.isOicrIndicator() || this.isPolicyChangeIndicator() || this.isInnovationUseIndicator(),
-      !this.isOicrIndicator()
+      !this.isOicrIndicator(),
+      this.isOicrIndicator()
     );
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
   }
@@ -389,7 +449,11 @@ export default class AllianceAlignmentComponent {
       ...this.body(),
       primary_levers,
       contributor_levers,
-      result_sdgs
+      result_sdgs,
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: [],
+      result_sdg_targets: []
     };
 
     await this.patchAlignmentAndReload(numericResultId, dataToSend);
@@ -692,6 +756,11 @@ export default class AllianceAlignmentComponent {
     return Number(lever.lever_id) === OTHER_LEVER_ID;
   }
 
+  /**
+   * Save payload is only the catalog key. The multiselect `id` is that same catalog id,
+   * and the junction table also uses `id` as its primary key. Forwarding it makes the
+   * server update an existing junction row instead of inserting one per outcome.
+   */
   private normalizeOutcome(value: unknown): LeverStrategicOutcome {
     if (typeof value === 'number') {
       return { lever_strategic_outcome_id: value };
@@ -699,7 +768,7 @@ export default class AllianceAlignmentComponent {
     if (value && typeof value === 'object') {
       const obj = value as Partial<LeverStrategicOutcome> & { id?: number };
       const idFromObject = obj.lever_strategic_outcome_id ?? obj.id;
-      return { ...(obj as LeverStrategicOutcome), lever_strategic_outcome_id: idFromObject as number };
+      return { lever_strategic_outcome_id: Number(idFromObject) };
     }
     return { lever_strategic_outcome_id: 0 };
   }
@@ -716,6 +785,9 @@ export default class AllianceAlignmentComponent {
       } else if (typeof raw === 'number' || (raw && typeof raw === 'object')) {
         normalized = [this.normalizeOutcome(raw)];
       }
+      normalized = normalized.filter(
+        outcome => Number.isFinite(outcome.lever_strategic_outcome_id) && outcome.lever_strategic_outcome_id > 0
+      );
       next = { ...next, result_lever_strategic_outcomes: normalized };
     }
 
