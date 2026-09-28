@@ -529,6 +529,31 @@ describe('AssignPiDelegateComponent', () => {
         .toEqual([1, 2]);
     }));
 
+    it('closes the Assign modal as soon as Save is clicked, before the request resolves', fakeAsync(() => {
+      piService.byProjectCache.set([buildProject('P1', [])]);
+      modalService.openModal('assignPiDelegate');
+      component.peopleSignal.set({ selected_people: [] });
+      component.projectsSignal.set({
+        selected_projects: [{ project_code: 'P1', project_name: 'Project P1' }]
+      });
+      fixture.detectChanges();
+
+      component.onConfirm();
+      expect(modalService.isModalOpen('assignPiDelegate').isOpen).toBe(true);
+      const closeSpy = jest.spyOn(modalService, 'closeModal');
+
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      actionsService.showGlobalAlertCalls[0].confirmCallback?.event?.();
+      // No flush yet: the request is still pending.
+      expect(modalService.isModalOpen('assignPiDelegate').isOpen).toBe(false);
+      // Instant: a fade-out would show the form already emptied by clearState().
+      expect(closeSpy).toHaveBeenCalledWith('assignPiDelegate', { instant: true });
+
+      flush();
+      tick();
+      expect(piService.assignCalls.length).toBe(1);
+    }));
+
     it('sends an empty delegates array when no people are selected (revoke-all case)', fakeAsync(() => {
       piService.byProjectCache.set([buildProject('P1', [])]);
       component.peopleSignal.set({ selected_people: [] });
@@ -544,7 +569,7 @@ describe('AssignPiDelegateComponent', () => {
       flush();
       tick();
 
-      expect(piService.assignCalls.length).toBe(1);
+      expect(piService.assignCalls).toHaveLength(1);
       expect(piService.assignCalls[0][0].delegates).toHaveLength(0);
     }));
   });

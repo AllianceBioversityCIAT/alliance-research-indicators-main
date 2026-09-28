@@ -1,4 +1,4 @@
-import { Component, inject, Input, computed, Signal, ViewChild, ElementRef, AfterViewChecked, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, Input, computed, Signal, ViewChild, ElementRef, AfterViewChecked, OnInit, OnDestroy, HostBinding } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 import { trigger, state, style, transition, animate } from '@angular/animations';
 import { AllModalsService } from '@services/cache/all-modals.service';
@@ -33,6 +33,13 @@ export class ModalComponent implements OnInit, AfterViewChecked, OnDestroy {
   @Input() clearModal: () => void = () => {
     /* no-op */
   };
+
+  // closeModal(name, { instant: true }) removes the modal without its ~1s
+  // fade/scale-out, e.g. when a confirmation alert on top closes at the same time.
+  @HostBinding('@.disabled') get animationsDisabled(): boolean {
+    const config = this.getConfig();
+    return !config.isOpen && !!config.skipCloseAnimation;
+  }
 
   @ViewChild('modalRoot') modalRoot!: ElementRef<HTMLDivElement>;
   private wasOpen = false;
