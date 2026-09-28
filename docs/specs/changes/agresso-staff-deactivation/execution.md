@@ -930,3 +930,161 @@ opinion. Advisory 3 is carried to the rollout section rather than to a task.
   nowhere as a test.
 
 **Final verification result:** green on every tier that can reach this change. **Task closed `[x]`.**
+
+---
+
+## T-11 — Fixture tier: the cascade, the rollback, and the dry run, against a real database · **PASS**
+
+- **Date:** 2026-09-28 · **Implementer attempts:** 1
+- **Requirements covered:** `R-AGD-008` AC.1/AC.2/**AC.4**, `R-AGD-009` AC.1/AC.4 · **Design:** §19, §20.1, `D-10`…`D-14`
+- **Implementer:** Cursor `grok-4.7-xhigh` · **Reviewer:** Claude `opus`, fresh read-only context
+- **Files changed:** `test/fixtures/agresso-staff-deactivation.fixture-spec.ts` only — **+459 / −19**
+
+`runtime events: spawn failure ×1 → rung 1 (retry once immediately)`
+
+**The first dispatch failed at `dispatch_input`.** The terminal was created and the buffer was
+**empty** — the prompt never landed. Verified before retrying rather than assumed: `worker-show`
+reported `failed`, `terminal read` returned an empty buffer. That is a genuine spawn failure, not the
+`dispatch_input` false-negative recorded for Antigravity. Recovered at **rung 1** of the Implementer
+ladder (retry once immediately) as `ctx_9dbfa13ad3cd`; the dead worker was released. **A runtime
+event consumes no attempt** — this task still stands at one attempt.
+
+### The four debts this task existed to settle
+
+Every earlier task declared what it could not reach. They all landed here, and all four were
+discharged with **executed** evidence rather than restated:
+
+| Debt | From | How it was settled |
+| --- | --- | --- |
+| `AC.4` — matched vs changed rows | T-08 | Live driver probe + per-table deltas |
+| Rollback on **InnoDB**, not a fake | T-09 | Two-connection proof over 120 |
+| T-07/T-09 fixture edits never executed | T-07 | Collected and run by `test:fixtures` |
+| Three counts were **mock values** | T-10 | Tied to real `SUM(is_active)` deltas |
+
+### `AC.4` — the finding, and why it matters beyond this spec
+
+The Implementer probed the **live driver** rather than reasoning about it:
+
+```
+{"affectedRows":1,"changedRows":0,"info":"Rows matched: 1  Changed: 0  Warnings: 0"}
+```
+
+**mysql2's default flags make `affectedRows` count matches, not changes.** The repository derives its
+counts from `affected` (`sec-user-deactivation.repository.ts:153`, `:171`) — so without
+`AND is_active = 1`, re-running over an already-inactive account would report it as newly
+deactivated. That is the exact hazard `AC.4` names, and it was **hypothetical at every other tier**.
+
+### The rollback — a real InnoDB rollback, and the design that proves it
+
+120 accounts (`9063001`–`9063120`), `CHUNK = 50`, three chunks, with the second `sec_user_roles`
+`UPDATE` throwing **after** the first chunk's real `UPDATE` returned.
+
+Read **inside the open transaction**, before the throw:
+
+```
+{ users: 120, roles: 70, secrets: 0 }
+```
+
+All three secret chunks had run; 50 of 120 roles had flipped; the `sec_users` write had not started.
+**The partial state existed in the engine.** Read again afterwards **on a different pooled
+connection**, `apply()` having returned `WRITE_FAILED`: every column of all 120 rows in all three
+tables byte-identical to the pre-image, `updated_at` included.
+
+The two-connection design is what makes this proof rather than assertion — it distinguishes
+**rolled back** from **never written**, which a single connection cannot. The Reviewer added the
+point that seals it: `updated_at` is a **proven-sensitive** discriminator here, because the live-run
+test in the same file observes it *moving* on a real write. Its equality is not an untested
+assumption.
+
+### Evidence re-run — Leader-inline, non-author. Result: `VERIFIED`
+
+| Gate | Result |
+| --- | --- |
+| `npm run test:fixtures` | **`PASS test/fixtures/agresso-staff-deactivation.fixture-spec.ts`** · 5/5 |
+| `npx tsc --noEmit` | exit 0 (`tsconfig.json` does not exclude `test/`, so the fixture compiled) |
+| `npx eslint src test` (bare) | exit 0; 1 pre-existing warning outside the diff |
+| `npm test -- --silent` | 397 / 3549 — **regression check only, NOT fixture evidence** (`rootDir: "src"`) |
+| `git diff --name-only` | exactly one file |
+
+**The runner was proven able to go red before being trusted (`K-004`):** breaking
+`expect(result.deactivated).toBe(2)` to `toBe(99)` produced `Expected: 99 / Received: 2`, exit 1;
+restored to 5/5. A runner nobody has seen fail is not a gate.
+
+**Live scratch database queried by the Leader after the run** — the check that could only be made
+against the real thing, on a **shared** schema: **zero leftover rows** across `sec_users`,
+`sec_user_roles` and `app_secrets`, and the four config keys back at their seeded values
+(`DRY_RUN=true`, `CEILING_FRACTION=0.05`, `ABSOLUTE_FLOOR=10`, `EXTERNAL_STATUS_ID=4`).
+
+### An evidence gap the Reviewer found, and the Leader closed on the spot
+
+The Reviewer noted that the `AC.4` **predicate** falsifier had been observed red for `sec_users`
+**only**, and that roles/secrets "would redden" — reasoning the assertions existed and the seeded
+shapes made it inevitable. **`KZ-014` forbids exactly that move: if the red has not been seen, it may
+not be asserted.** The Leader executed both missing mutations rather than accepting the inference:
+
+| Table | Mutation | Observed |
+| --- | --- | --- |
+| `sec_users` | `AND is_active = 1` dropped | `Expected: 2 / Received: 3` *(Implementer)* |
+| `sec_user_roles` | `AND is_active = 1` dropped | **`Expected: 2 / Received: 4`** *(Leader)* |
+| `app_secrets` | `is_active: true` dropped from the `where` | **red** *(Leader)* |
+
+Production restored, fixture green 5/5, tree clean. All three predicates are now **proven**, not
+three-quarters proven.
+
+### Reviewer — `STATUS: PASS`, five named checks ruled independently
+
+1. **All four debts discharged with executed evidence.** `expect(CHUNK).toBe(50)` and
+   `expect(Math.ceil(120/50)).toBe(3)` **pin the three-chunk premise to the production constant**, so
+   the test cannot silently decay if `CHUNK` changes. The throw travels through the real
+   `this.dataSource.transaction`.
+2. **The `AC.4` chain closes.** The counts derive from `affectedRows`, not `changedRows`, in
+   production code — "the match/change gap is live in production, not hypothetical".
+3. **The rollback is genuine.** See above.
+4. **`FP-51` confirmed.** The only DDL is `CREATE TEMPORARY TABLE t11_found_rows_probe` /
+   `DROP TEMPORARY TABLE IF EXISTS`, inside a dedicated query runner released in `finally`. Nothing
+   touches a shared table.
+5. **Cleanliness is structural, not incidental** — the distinction that matters on a shared schema.
+   `beforeEach(cleanOwnedRows)` **and** `afterAll(cleanOwnedRows)` both run, Jest executes `afterAll`
+   after a failing test, and `cleanOwnedRows` deletes every T-11 id explicitly in FK-safe order.
+   **A mid-test failure self-heals.**
+
+### ADVISORY (recorded, never gates, never becomes a task)
+
+1. **Reliability** — the AC.4 predicate falsifier was observed for `sec_users` only.
+   **Closed by the Leader during this task; see the table above.**
+2. **Readability** — the rollback test monkeypatches `manager.query` and never restores it. The
+   Reviewer **tried and could not construct a leak**: TypeORM builds a fresh `EntityManager` per
+   `transaction()` call, so the patched object is unreachable afterwards. Safe today, but it rests on
+   a TypeORM internal; one comment would stop a maintainer removing the wrapper.
+3. **Risk — the fixture tier exits 1.** `RB-4`'s five pre-existing `innovation-use/*` suites mean
+   there is **no CI gate that can distinguish a regression in this fixture from the known five**.
+   Either gate on `--testPathPattern=agresso-staff-deactivation`, or clear `RB-4`, before
+   `test:fixtures` is treated as a **gate** rather than as **evidence**.
+4. **Scope (`KZ-017`), carried forward** — `apply()` is called directly, so the HTTP path
+   `GET /api/agresso/staff/clone/execute` and **`app_config`-driven config resolution on the live
+   branch** are unexercised at this tier. The tests inject `ceilingFraction: 1`,
+   `absoluteFloor: 1_000_000` to keep C-3 from firing — legitimate isolation, but **no fixture
+   evidence covers seeded-config plus a live write together.**
+
+**Leader adjudication.** Advisory 1 was closed by measurement. Advisories 2–4 are recorded and carried
+to the spec close; none is reworked and none becomes a task. **Advisory 4 is the one to carry into
+rollout**: the only end-to-end proof of seeded config driving a live write is rollout step 4 itself.
+
+### `RB-4` re-confirmed, not assumed
+
+`npm run test:fixtures` exits **1** overall: 5 failed / 19 passed / 24 suites. **All five are
+`test/fixtures/innovation-use/*`**, dying on `Nest cannot create the ResultPolicyChangeModule
+instance. The module at index [0] of the "imports" array is undefined`. Increment 1's Leader verified
+this at `eee1bc5c` — before any work on this spec. **Re-confirmed today by the Leader**: the failure
+message is identical, and this diff touches exactly one file, not under `innovation-use/`. Still
+worth its own bugfix spec.
+
+### What this task's verification structurally cannot reach (`KZ-017`)
+
+- The **HTTP path** and the **fire-and-forget controller** are unexercised — `apply()` was called directly.
+- **Seeded `app_config` driving a live write** is unproven: the live tests inject config objects.
+- Lock ordering under **concurrency** is untested; `JD-8` remains the accepted risk.
+- Nothing here touches the **real Dev database** or the 146 measured candidates.
+
+**Final verification result:** green on the only tier that can evidence these claims, against a real
+MySQL. **Task closed `[x]`.**

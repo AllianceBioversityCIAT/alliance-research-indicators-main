@@ -458,7 +458,7 @@ verification.
 
 ### T-11 — Fixture tier: the cascade, the rollback, and the dry run, against a real database
 
-- **Status:** `not-started`
+- **Status:** `done` — Reviewer PASS (Claude `opus`, fresh read-only context) 2026-09-28. Implementer: Cursor `grok-4.7-xhigh`
 - **Size:** L · **Depends on:** `T-10` · **Review:** `full`
 - **Requirements:** `R-AGD-008` AC.1/AC.2, `R-AGD-009` AC.1/AC.4 · **Design:** §19, §20.1 · Defect classes `D-10`…`D-14`
 - **Skills:** `nestjs-expert`, `tdd`
@@ -486,11 +486,11 @@ T-07 edits have never been executed** — `npm run test:fixtures` has not run in
 T-11 inherits them as an unverified presence-level claim and must run them, not assume them.
 
 **Done:**
-- [ ] All three tables asserted after one live run, on real rows
-- [ ] Second-chunk failure over **120** accounts leaves all three byte-identical
-- [ ] Dry run changes **zero** rows and opens **no** transaction
-- [ ] Every falsifier observed red via `npm run test:fixtures`, never via `npm test`
-- [ ] Reviewer PASS
+- [x] All three tables asserted after one live run, on real rows
+- [x] Second-chunk failure over **120** accounts leaves all three byte-identical
+- [x] Dry run changes **zero** rows and opens **no** transaction
+- [x] Every falsifier observed red via `npm run test:fixtures`, never via `npm test`
+- [x] Reviewer PASS
 
 ---
 
