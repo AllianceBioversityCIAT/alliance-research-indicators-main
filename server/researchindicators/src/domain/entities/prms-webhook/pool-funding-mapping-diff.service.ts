@@ -11,10 +11,10 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
  * nothing; `null` is left only when this service never wrote.
  */
 
-const SCIENCE_PROGRAM = 'Science Program';
-const TOC_RESULT = 'Theory of Change result';
-const TOC_RESULT_ID = 'Theory of Change result ID';
-const CONTRIBUTING_PROGRAMS = 'Contributing Science Programs';
+export const SCIENCE_PROGRAM = 'Science Program';
+export const TOC_RESULT = 'Theory of Change result';
+export const TOC_RESULT_ID = 'Theory of Change result ID';
+export const CONTRIBUTING_PROGRAMS = 'Contributing Science Programs';
 
 const HISTORY_ROW_SQL = `
 SELECT result_official_code, decided_at, occurred_at, raw_body
@@ -194,37 +194,68 @@ const readSent = (payload: unknown): SentMapping => {
   };
 };
 
-const readReceived = (rawBody: unknown): ReceivedMapping => {
+export interface CallbackTocMapping {
+  title: string | null;
+  tocResultId: string | null;
+}
+
+/**
+ * The callback's primary programme and its toc_mappings, after the same
+ * duplicate-object collapse the diff uses. A repeated mapping stays one.
+ * Null title or id is kept: absence of a scalar is not absence of a mapping.
+ */
+export interface CallbackPrimary {
+  spCode: string | null;
+  mappings: CallbackTocMapping[];
+}
+
+const callbackEntries = (rawBody: unknown): Record<string, unknown>[] => {
   const root = asRecord(rawBody);
   const data = asRecord(root?.data);
-  const entries = Array.isArray(data?.obj_results_toc_result)
-    ? data.obj_results_toc_result.flatMap((item) => {
-        const record = asRecord(item);
-        return record ? [record] : [];
-      })
-    : [];
-  const primary = entries.find((entry) => isPrimaryRole(entry));
-  const mappings = dedupeTocMappings(
-    Array.isArray(primary?.toc_mappings) ? primary.toc_mappings : [],
-  );
-  const titles: string[] = [];
-  const tocResultIds: string[] = [];
-  for (const mapping of mappings) {
-    const title = scalar(mapping.title);
-    const id = scalar(mapping.toc_result_id);
-    if (title !== null) {
-      titles.push(title);
-    }
-    if (id !== null) {
-      tocResultIds.push(id);
-    }
+  if (!Array.isArray(data?.obj_results_toc_result)) {
+    return [];
   }
+  return data.obj_results_toc_result.flatMap((item) => {
+    const record = asRecord(item);
+    return record ? [record] : [];
+  });
+};
+
+export const readCallbackPrimary = (rawBody: unknown): CallbackPrimary => {
+  const primary = callbackEntries(rawBody).find((entry) =>
+    isPrimaryRole(entry),
+  );
+  if (!primary) {
+    return { spCode: null, mappings: [] };
+  }
+  const mappings = dedupeTocMappings(
+    Array.isArray(primary.toc_mappings) ? primary.toc_mappings : [],
+  ).map((mapping) => ({
+    title: scalar(mapping.title),
+    tocResultId: scalar(mapping.toc_result_id),
+  }));
+  return {
+    spCode: scalar(primary.official_code),
+    mappings,
+  };
+};
+
+const readReceived = (rawBody: unknown): ReceivedMapping => {
+  const entries = callbackEntries(rawBody);
+  const primary = entries.find((entry) => isPrimaryRole(entry));
+  const callback = readCallbackPrimary(rawBody);
+  const titles = callback.mappings.flatMap((mapping) =>
+    mapping.title === null ? [] : [mapping.title],
+  );
+  const tocResultIds = callback.mappings.flatMap((mapping) =>
+    mapping.tocResultId === null ? [] : [mapping.tocResultId],
+  );
   const contributingProgramIds = entries
     .filter((entry) => entry !== primary)
     .map((entry) => scalar(entry.official_code))
     .filter((code): code is string => code !== null);
   return {
-    scienceProgramId: primary ? scalar(primary.official_code) : null,
+    scienceProgramId: callback.spCode,
     titles,
     tocResultIds,
     contributingProgramIds,
