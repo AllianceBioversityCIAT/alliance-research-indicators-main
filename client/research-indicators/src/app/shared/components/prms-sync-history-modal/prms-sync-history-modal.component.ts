@@ -98,8 +98,14 @@ export class PrmsSyncHistoryModalComponent {
     return event.justification != null && event.justification !== '';
   }
 
+  /**
+   * Approvals only (owner decision, 2026-09-28). A rejection sends the
+   * mapping back rather than editing it, and on approval the changes are
+   * also applied to our own pool-funding rows — so this link opens what we
+   * adopted, not merely what PRMS looked at.
+   */
   showChangesLink(event: PrmsSyncHistoryEvent): boolean {
-    return event.event_source === 'PRMS' && hasFieldChanges(event.changes);
+    return event.event_source === 'PRMS' && event.decision === 'APPROVE' && hasFieldChanges(event.changes);
   }
 
   @HostListener('document:keydown.escape')
