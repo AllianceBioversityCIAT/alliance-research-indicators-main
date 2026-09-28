@@ -9,7 +9,10 @@
   height: 100vh;
   background-color: rgb(97, 102, 109, 0.7);
   backdrop-filter: blur(10px);
-  z-index: 1000;
+  // Above every app-modal (1000, resultInformation 1100): alerts are raised from
+  // inside modals, and modals live at the end of <body>, so DOM order no longer
+  // puts the alert on top.
+  z-index: 1200;
   animation: fade-in 0.2s ease-out;
 
   .alert {
