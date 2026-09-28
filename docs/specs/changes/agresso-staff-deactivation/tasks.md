@@ -494,6 +494,48 @@ T-11 inherits them as an unverified presence-level claim and must run them, not 
 
 ---
 
+### T-12 — Close the two validation findings: who must NOT be touched
+
+- **Status:** `not-started`
+- **Size:** XS · **Depends on:** `T-11` · **Review:** `full` — both clauses guard the irreversible direction
+- **Requirements:** `R-AGD-008` AC.3 and its `AND IT MUST` (`RSK-6`) clause · **Design:** §19, §19.3
+- **Skills:** `nestjs-expert`
+- **Origin:** **`validation-report.md` WARN-2 and WARN-3, 2026-09-28.** Minted from validation
+  findings — not from an execution advisory, which may never become a task — and approved by the
+  user at the validation gate.
+
+**Why these two together.** Both cover *who the run must NOT touch*, which is the direction of error
+this spec cannot recover from: `app_secrets` is never re-armed by any automatic path.
+
+**Scope — `test/fixtures/agresso-staff-deactivation.fixture-spec.ts` only. No production change.**
+
+1. **AC.3** — seed a **fourth** user who is **shielded or excluded** (e.g. an active `SYSTEM_ADMIN`,
+   `EX-2`), give them an **active** `app_secrets` row, and assert it is still `is_active = 1` after
+   the live run. Today all three seeded users are candidates (`LIVE_USER_IDS`), so nothing proves a
+   non-candidate's credential survives.
+2. **`RSK-6`** — assert the **join**, not the two halves: deactivate a secret through the cascade,
+   then call `AppSecretsService.validation()` with that `clientId` and assert it **rejects**. Both
+   halves are already verified separately at source (the cascade sets `is_active = 0`;
+   `app-secrets.service.ts:78` filters `is_active: true`) — what is missing is the link.
+
+**Falsifier:**
+1. Remove the shield so the fourth user becomes a candidate → the AC.3 assertion reddens (its secret goes inactive).
+2. Point `validation()`'s lookup at a secret that is still active → the `RSK-6` assertion reddens.
+
+**Red run:** both required, each observed separately via `npm run test:fixtures`.
+**Disqualifier:** a **mocked** `validation()` proves nothing about the join (`KZ-001`) — it must run
+against the real row. An AC.3 fixture whose fourth user is *also* a candidate is **inert**: it would
+pass whether or not the shield works.
+**Consumers:** none — fixture-only.
+
+**Done:**
+- [ ] A shielded user's **active** secret survives a live run, asserted on a real row
+- [ ] A deactivated secret makes `validation()` reject, asserted through the real service
+- [ ] Both falsifiers observed red via `npm run test:fixtures`, never via `npm test`
+- [ ] Reviewer PASS
+
+---
+
 ## 10. Testing expectations — increment 2
 
 | Tier | Command | What it can and cannot prove |
