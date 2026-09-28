@@ -3,6 +3,8 @@ import { Injectable, Module, OnModuleInit } from '@nestjs/common';
 import { DeliveryCorrelatorService } from './delivery-correlator.service';
 import { CallbackSecretGuard } from './guards/callback-secret.guard';
 import { installLenientPrmsCallbackJsonParser } from './lenient-callback-json';
+import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
+import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.service';
 import { PrmsWebhookCallbackController } from './prms-webhook-callback.controller';
 import { PrmsWebhookDeliveryService } from './prms-webhook-delivery.service';
 import { PrmsWebhookDeliveryRepository } from './repositories/prms-webhook-delivery.repository';
@@ -37,6 +39,8 @@ export class PrmsCallbackLenientJson implements OnModuleInit {
     CallbackSecretGuard,
     PrmsWebhookDeliveryService,
     PrmsWebhookDeliveryRepository,
+    PoolFundingMappingDiffService,
+    PoolFundingMappingApplyService,
     DeliveryCorrelatorService,
     PrmsCallbackLenientJson,
   ],

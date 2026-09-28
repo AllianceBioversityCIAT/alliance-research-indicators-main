@@ -232,7 +232,8 @@ export class PrmsWebhookDelivery extends AuditableEntity {
 
   /**
    * The "See what changed" payload. JSON rather than a table because
-   * PRMS has committed to no shape. Display-only today.
+   * PRMS has committed to no shape. On APPROVE, PoolFundingMappingApplyService
+   * also applies the four observable fields to the live pool-funding rows.
    */
   @Column({
     type: 'json',

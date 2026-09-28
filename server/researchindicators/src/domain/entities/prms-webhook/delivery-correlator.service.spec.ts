@@ -7,6 +7,8 @@ import {
 } from './delivery-correlator.service';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { DeliveryProcessingState } from './enum/delivery-processing-state.enum';
+import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
+import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.service';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-06.
 //
@@ -255,6 +257,8 @@ describe('DeliveryCorrelatorService', () => {
   let service: DeliveryCorrelatorService;
   let warn: jest.SpyInstance;
   let errorLog: jest.SpyInstance;
+  let poolFundingDiff: { record: jest.Mock };
+  let poolFundingApply: { apply: jest.Mock };
 
   beforeEach(() => {
     table = new FakeResultsTable();
@@ -269,7 +273,13 @@ describe('DeliveryCorrelatorService', () => {
       query: table.query,
       getRepository: jest.fn(() => resultsWriter),
     } as unknown as DataSource;
-    service = new DeliveryCorrelatorService(dataSource);
+    poolFundingDiff = { record: jest.fn().mockResolvedValue(undefined) };
+    poolFundingApply = { apply: jest.fn().mockResolvedValue(undefined) };
+    service = new DeliveryCorrelatorService(
+      dataSource,
+      poolFundingDiff as unknown as PoolFundingMappingDiffService,
+      poolFundingApply as unknown as PoolFundingMappingApplyService,
+    );
     warn = jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
@@ -619,6 +629,84 @@ describe('DeliveryCorrelatorService', () => {
       expect(messages).toContain(`delivery_id=${DELIVERY_HEADER_ID}`);
       expect(messages).toContain(`id=${DELIVERY_ROW_ID}`);
       expectNoResultsWrite();
+    });
+
+    it('records the pool-funding diff only after a correlated finish, then applies it, and neither failure leaves the outcome', async () => {
+      const order: string[] = [];
+      poolFundingDiff.record.mockImplementation(async () => {
+        order.push('diff');
+        expect(table.updates).toEqual([
+          expect.objectContaining({
+            id: DELIVERY_ROW_ID,
+            set: {
+              correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+              result_year: LIVE_YEAR,
+              processing_state: DeliveryProcessingState.PROCESSED,
+            },
+          }),
+        ]);
+      });
+      poolFundingApply.apply.mockImplementation(async () => {
+        order.push('apply');
+      });
+
+      const correlated = await service.correlate(delivery());
+
+      expect(correlated).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
+        resultYear: LIVE_YEAR,
+        processingState: DeliveryProcessingState.PROCESSED,
+      });
+      expect(order).toEqual(['diff', 'apply']);
+      expect(poolFundingDiff.record).toHaveBeenCalledTimes(1);
+      expect(poolFundingDiff.record).toHaveBeenCalledWith({
+        historyId: DELIVERY_ROW_ID,
+        resultYear: LIVE_YEAR,
+      });
+      expect(poolFundingApply.apply).toHaveBeenCalledTimes(1);
+      expect(poolFundingApply.apply).toHaveBeenCalledWith({
+        historyId: DELIVERY_ROW_ID,
+        resultId: LIVE_ID,
+      });
+
+      poolFundingDiff.record.mockReset();
+      poolFundingApply.apply.mockReset();
+      await service.correlate(delivery({ result_official_code: null }));
+      await service.correlate(delivery({ result_official_code: 'abc' }));
+      await service.correlate(delivery({ result_official_code: '9999999' }));
+      expect(poolFundingDiff.record).not.toHaveBeenCalled();
+      expect(poolFundingApply.apply).not.toHaveBeenCalled();
+
+      poolFundingDiff.record.mockRejectedValue(new Error('diff blew up'));
+      const stillCorrelated = await service.correlate(delivery());
+      expect(stillCorrelated).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
+        resultYear: LIVE_YEAR,
+        processingState: DeliveryProcessingState.PROCESSED,
+      });
+      expect(
+        table.updates.map((update) => update.set.processing_state),
+      ).not.toContain(DeliveryProcessingState.PROCESSING_FAILED);
+      expect(String(errorLog.mock.calls.at(-1)?.[0])).toContain('diff blew up');
+
+      poolFundingDiff.record.mockReset();
+      poolFundingDiff.record.mockResolvedValue(undefined);
+      poolFundingApply.apply.mockRejectedValue(new Error('apply blew up'));
+      const stillApplied = await service.correlate(delivery());
+      expect(stillApplied).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
+        resultYear: LIVE_YEAR,
+        processingState: DeliveryProcessingState.PROCESSED,
+      });
+      expect(
+        table.updates.map((update) => update.set.processing_state),
+      ).not.toContain(DeliveryProcessingState.PROCESSING_FAILED);
+      expect(String(errorLog.mock.calls.at(-1)?.[0])).toContain(
+        'apply blew up',
+      );
     });
 
     it('a null delivery_id is still named by the row id in the error line', async () => {

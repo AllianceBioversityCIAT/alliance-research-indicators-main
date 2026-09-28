@@ -4,6 +4,8 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { DeliveryProcessingState } from './enum/delivery-processing-state.enum';
+import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
+import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.service';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-06 /
 // R-PWH-007 · R-PWH-005 AC.1, AC.2 · R-PWH-008 AC.5 · R-PWH-003 AC.4 ·
@@ -107,7 +109,11 @@ export class DeliveryCorrelatorService {
     name: DeliveryCorrelatorService.name,
   });
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly poolFundingDiff: PoolFundingMappingDiffService,
+    private readonly poolFundingApply: PoolFundingMappingApplyService,
+  ) {}
 
   /**
    * Post-acknowledgement step (design §6.3 step 5, §6.4). Never throws:
@@ -186,12 +192,43 @@ export class DeliveryCorrelatorService {
         `live report_year_id is not an integer: ${String(rows[0].report_year_id)}`,
       );
     }
-    return this.finish(
+    const applied = await this.finish(
       delivery.id,
       DeliveryCorrelationOutcome.CORRELATED,
       resultYear,
       reference.code,
     );
+    // result_year is on the row only after finish(). The diff must not
+    // escape this method: correlate()'s catch would mark PROCESSING_FAILED.
+    await this.recordPoolFundingDiff(delivery.id, resultYear);
+    await this.applyApprovedPoolFunding(delivery.id, resultId);
+    return applied;
+  }
+
+  private async recordPoolFundingDiff(
+    historyId: number,
+    resultYear: number,
+  ): Promise<void> {
+    try {
+      await this.poolFundingDiff.record({ historyId, resultYear });
+    } catch (error) {
+      this.logger._error(
+        `Pool-funding diff failed after correlation for id=${historyId}: ${errorText(error)}`,
+      );
+    }
+  }
+
+  private async applyApprovedPoolFunding(
+    historyId: number,
+    resultId: number,
+  ): Promise<void> {
+    try {
+      await this.poolFundingApply.apply({ historyId, resultId });
+    } catch (error) {
+      this.logger._error(
+        `Pool-funding apply failed after correlation for id=${historyId}: ${errorText(error)}`,
+      );
+    }
   }
 
   private classifyReference(

@@ -337,6 +337,28 @@ describe('PrmsSyncHistoryModalComponent', () => {
     expect(document.body.querySelector('[data-testid="prms-history-back"]')).toBeNull();
   });
 
+  // Owner decision 2026-09-28: approvals only. A rejection sends the mapping
+  // back instead of editing it, so there is nothing adopted to show.
+  it('does not offer the changes link on a REJECT even when changes are present', () => {
+    fixture.componentRef.setInput(
+      'history',
+      history([
+        event({
+          id: 9,
+          event_source: 'PRMS',
+          decision: 'REJECT',
+          reviewer_name: 'Lucia Fernandez',
+          occurred_at: '2026-09-02T16:48:00.000Z',
+          decided_at: '2026-09-02T16:48:00.000Z',
+          changes: { alpha_field: { before: 'old', after: 'new' } }
+        })
+      ])
+    );
+    open();
+
+    expect(document.body.querySelector('[data-testid="prms-history-changes-link"]')).toBeNull();
+  });
+
   it('renders the empty state when the changes screen is open for a null payload', () => {
     open();
     expect(document.body.querySelector('[data-testid="prms-history-changes-link"]')).toBeNull();
