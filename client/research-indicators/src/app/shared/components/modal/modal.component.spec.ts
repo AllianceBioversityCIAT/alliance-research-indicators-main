@@ -79,6 +79,14 @@ describe('ModalComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('re-parents its host to <body> so the overlay stacks above the navbar, and removes it on destroy', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.parentElement).toBe(document.body);
+
+    fixture.destroy();
+    expect(document.body.contains(host)).toBe(false);
+  });
+
   it('showModal should delegate to allModalsService.isModalOpen', () => {
     allModalsServiceMock.isModalOpen.mockReturnValue({ isOpen: true, title: 'Test' });
     expect(component.showModal()).toEqual({ isOpen: true, title: 'Test' });
