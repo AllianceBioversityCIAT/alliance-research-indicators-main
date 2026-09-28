@@ -19,6 +19,8 @@ interface ModalConfig {
   confirmAction?: () => void;
   disabledConfirmAction?: () => boolean;
   isWide?: boolean;
+  /** Set by closeModal(name, { instant: true }): the modal leaves without its fade-out. */
+  skipCloseAnimation?: boolean;
 }
 
 @Injectable({
@@ -280,14 +282,15 @@ export class AllModalsService {
     }));
   }
 
-  closeModal(modalName: ModalName): void {
+  closeModal(modalName: ModalName, options?: { instant?: boolean }): void {
     this.modalConfig.update(modals => {
       const next = {
         ...modals,
         [modalName]: {
           ...modals[modalName],
           isOpen: false,
-          isWide: false
+          isWide: false,
+          skipCloseAnimation: options?.instant ?? false
         }
       };
       if (modalName === 'resultInformation') {
