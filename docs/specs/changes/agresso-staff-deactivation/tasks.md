@@ -515,10 +515,10 @@ T-11 inherits them as an unverified presence-level claim and must run them, not 
 
 ## 12. Done definition — increment 2
 
-- [ ] `T-06` … `T-11` all `done` on a Reviewer PASS, each gate re-measured by the Leader rather than relayed
-- [ ] **`DO-1` applied and verified**: the eight accounts carry `status_id = 4`, and a dry run reports `excludedExternal = 8`, **not 0** — the only evidence anywhere that `EX-1` is live (`D-15`)
-- [ ] **BI has ruled on the 17 remaining `2026-08-24` accounts** (`P-9`, `OQ-D4`) — blocks rollout step 5, not the build
-- [ ] Every scenario and every `BUT` / `AND IT MUST` clause in `R-AGD-008`…`R-AGD-013` owned and green
-- [ ] `npm test -- --silent`, `npm run test:fixtures`, `npx eslint src test`, `npx tsc --noEmit` all green; coverage ≥ 60% **reported, not assumed**
-- [ ] Actuals compared against the §24 budget (6 tasks / ~1,150 LOC / 6 rounds); **any overrun escalated, not absorbed**
-- [ ] The no-commit barrier explicitly lifted by the user before anything is committed
+- [x] `T-06` … `T-11` all `done` on a Reviewer PASS, each gate re-measured by the Leader rather than relayed — **six tasks, six first-attempt PASSes, zero rework rounds**
+- [ ] **`DO-1` applied and verified**: the eight accounts carry `status_id = 4`, and a dry run reports `excludedExternal = 8`, **not 0** — the only evidence anywhere that `EX-1` is live (`D-15`) · **HUMAN STEP, NOT DONE. Blocks the rollout, not the build.**
+- [ ] **BI has ruled on the 17 remaining `2026-08-24` accounts** (`P-9`, `OQ-D4`) — blocks rollout step 5, not the build · **NOT DONE. `P-9` remains `UNVERIFIED`, Impact High.**
+- [ ] Every scenario and every `BUT` / `AND IT MUST` clause in `R-AGD-008`…`R-AGD-013` owned and green · **NOT VERIFIED — deliberately left unchecked.** The six requirements carry **40 clauses** (25 `AC`, 9 `AND IT MUST`, 6 `BUT`), counted 2026-09-28. **Nobody has mapped them clause-by-clause to a test**: each Reviewer audited one task's diff against the sections that task cited, which is not the same claim. Marking this from six green tasks would be `KZ-002` recurrence 6 exactly — a Leader's finalize write asserting an aggregate nobody measured, and the finalize write is the one claim in the pipeline no Reviewer audits. **Owner: `/akili-validate`.**
+- [~] `npm test -- --silent`, `npx eslint src test`, `npx tsc --noEmit` green; coverage **90.7% stmts / 77.75% branch / 87.16% funcs / 90.34% lines** against a 60% floor — **reported, not assumed**. ⚠️ **`npm run test:fixtures` exits 1**: this spec's fixture **PASSES**, but `RB-4`'s five pre-existing `innovation-use/*` suites fail on a `ResultPolicyChangeModule` circular import, verified at `eee1bc5c` before this spec began and re-confirmed 2026-09-28. **Until `RB-4` clears, `test:fixtures` is evidence, not a gate** — no CI check can tell a regression here from the known five.
+- [x] Actuals compared against the §24 budget (6 tasks / ~1,150 LOC / 6 rounds); **any overrun escalated, not absorbed** — **tripwire fired at the T-07 gate, escalated to the user, re-baselined in `design.md` §24.1.** Cause recorded: the ratio was right (1.8× vs 1.9×) and the *count* priced a four-item enumeration as though the orchestrator were free.
+- [x] The no-commit barrier explicitly lifted by the user before anything is committed — lifted 2026-09-25 on BI's approval; **nothing has been pushed** (`push-requires-explicit-permission`)

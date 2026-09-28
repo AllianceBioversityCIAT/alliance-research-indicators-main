@@ -1088,3 +1088,86 @@ worth its own bugfix spec.
 
 **Final verification result:** green on the only tier that can evidence these claims, against a real
 MySQL. **Task closed `[x]`.**
+
+---
+
+# Increment 2 — close
+
+**All six tasks `[x]` on a Reviewer PASS. Six tasks, six first-attempt PASSes, zero rework rounds.**
+
+| Task | Implementer | Reviewer | Attempts | Runtime events |
+| --- | --- | --- | --- | --- |
+| T-06 | Claude `opus` (prior session) | **Antigravity `gemini-3.1-pro-high`** | 1 | none |
+| T-07 | Cursor `grok-4.7-xhigh` | Claude `opus` | 1 | none |
+| T-08 | Cursor `grok-4.7-xhigh` | Claude `opus` | 1 | none |
+| T-09 | Cursor `grok-4.7-xhigh` | Claude `opus` | 1 | none |
+| T-10 | Cursor `grok-4.7-xhigh` | Claude `opus` | 1 | none |
+| T-11 | Cursor `grok-4.7-xhigh` | Claude `opus` | 1 | **spawn failure ×1 → rung 1** |
+
+`author ≠ auditor` held on every task, on both the context and the model-family axis. No
+`REVIEW_WAIVED` and no `REVIEW_SKIPPED` record exists for this increment — every task closed on a
+genuine Reviewer `PASS`.
+
+## Budget — final
+
+| Metric | §24 budget | **Actual** | Delta |
+| --- | --- | --- | --- |
+| Tasks | 6 | **6** | on |
+| Implementation | ~400 | **637** | **+59%** |
+| Tests | ~750 | **1,781** | **+137%** |
+| Total LOC | ~1,150 | **2,418** | **+110%** |
+| Test : impl ratio | 1.9× | **2.8×** | +47% |
+| Review rounds | 6 | **6** | on |
+
+**Escalated at the T-07 gate and re-baselined in `design.md` §24.1** rather than absorbed. The final
+figures refine the mid-flight diagnosis: the **count** under-priced the enumeration (implementation
++59%), and the **ratio** — right at the 3-task mark (1.8×) — finished at 2.8×, driven by the tasks
+that came after: `JG-2`'s one-falsifier-per-table rule, T-09's 120-account rollback harness, and
+T-11's real-database tier. **Rounds and tasks landed exactly on budget; only volume overran, and no
+rework round was consumed.**
+
+## What is proven, and at which tier
+
+| Claim | Proven | Where |
+| --- | --- | --- |
+| Three-table cascade writes | ✅ | T-11, **real MySQL**, queried rows |
+| Rollback leaves all three tables byte-identical | ✅ | T-11, **InnoDB**, 120 rows, two connections |
+| `AC.4` — an inactive row does not inflate counts | ✅ | T-11, **live driver probe** + 3 predicate falsifiers |
+| Dry run writes nothing and opens **no transaction** | ✅ | T-09 (`DataSource` spy) + T-11 (real DB) |
+| Gate order: dry-run reports, live aborts | ✅ | T-09 |
+| No `catch` inside the transaction callback (`DD-D11`) | ✅ | T-09, behavioural, not a grep |
+| Four config keys, each failure direction | ✅ | T-07, four separate reds |
+| Migration `up`/`down`/re-`up` | ✅ | T-07, **executed** against the scratch schema |
+| C-4 reads the **configured** id, not the constant | ✅ | T-07 |
+| Summary reports three **separate** counts | ✅ | T-10 |
+| **HTTP path / fire-and-forget controller** | ❌ | unexercised at every tier |
+| **Seeded `app_config` driving a live write** | ❌ | tests inject config objects — **rollout step 4 is the only proof** |
+| **Lock ordering under concurrency** | ❌ | `JD-8`, accepted risk |
+| **`EX-1` shields anyone** | ❌ | `D-15` — zero active users carry status 4 today |
+
+## Open at increment close
+
+| # | Item | Blocks |
+| --- | --- | --- |
+| **DO-1** | Eight accounts must carry `status_id = 4`; a dry run must then report `excludedExternal = **8**, not 0`. **Today it is 0 and `EX-1` shields nobody.** A live run with that field still 0 retires all eight | **Rollout. Human step.** |
+| **P-9** | `UNVERIFIED`, **Impact High** — that those eight are the *complete* set of legitimate non-payroll users. 17 further `@cgiar.org` carnet-less accounts in the `2026-08-24` block are unconfirmed. **A wrong answer is not recoverable: `app_secrets` is never re-armed by any automatic path** | Rollout step 5. **BI.** |
+| **Migration** | `1790602688746-seedStaffDeactivationConfig` is **not applied by the pipeline** (`K-015`). A merged migration can sit unapplied indefinitely with nothing surfacing it | Rollout step 2. **Human.** |
+| **40 clauses** | 25 `AC` + 9 `AND IT MUST` + 6 `BUT` across `R-AGD-008`…`R-AGD-013`, **never mapped clause-by-clause to a test**. §12's item is deliberately left unchecked | `/akili-validate` |
+| **RB-4** | Five `innovation-use/*` fixture suites red since before this spec (`ResultPolicyChangeModule` circular import). **Until cleared, `test:fixtures` is evidence, not a gate** | Its own bugfix spec |
+| **`CEILING_FRACTION`** | No upper bound. `5` instead of `0.05` yields a ceiling of 5× the population, silently disarming the volume defence. **In spec today** — changing it is a spec decision | Product |
+| **Ceiling restore** | Rollout step 6 raises the ceiling and **step 7 restores it**. A numbered step, not a reminder — `F-5` records the opposite, and a forgotten restore disables the only volume defence invisibly and indefinitely | Rollout |
+
+## Corrections closed during this increment
+
+| What | Sites | How found |
+| --- | --- | --- |
+| **`R-AGD-012` had no consumer** — the config key would have been seeded and never read, with all six tasks `[x]` | 1 task widened | A **forward pointer** recorded at T-06 and **re-read when composing T-07's brief** |
+| **The C-3 ceiling was `99`, not `99.25`** | **6 sites, 4 documents** | T-10 Reviewer; the **mandated re-grep** found the 6th, in `HANDOFF.md` |
+| **The Leader wrote a fail-safe into a fail-loud requirement** | 1 task text | **The Implementer read `R-AGD-011` over the Leader's phrasing** |
+| **T-11's `Consumers: none — new file`** was wrong twice over | 1 | T-07 Reviewer |
+| **T-06's sweep was narrower than its claim** (`KZ-017`) | 1 | T-07 Reviewer |
+| **The no-write guard lost its `/i` flag** | 1 | T-08 Reviewer (advisory); user ruled to fix |
+| **`AC.4` predicate red seen for 1 of 3 tables** | 2 falsifiers executed | T-11 Reviewer; **Leader executed rather than inferred** |
+
+**Next command:** `/akili-validate` — it owns the 40-clause mapping §12 leaves open. **Nothing here
+may deactivate anyone until `DO-1` is applied and a dry run reports `excludedExternal = 8`.**
