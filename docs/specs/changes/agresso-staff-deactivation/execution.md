@@ -656,3 +656,47 @@ verification debt below.
 
 **Final verification result:** green on every tier that can reach this change, plus executed
 migration evidence against a real MySQL. **Task closed `[x]`.**
+
+---
+
+## Budget tripwire — fired at the T-07 gate, escalated, re-baselined
+
+**Measured with 3 of 6 tasks closed**, `git diff --numstat de338e97~1 HEAD -- server/researchindicators/{src,test}`:
+
+| Metric | Budget (§24, **all six tasks**) | Actual (**three tasks**) |
+| --- | --- | --- |
+| Implementation | ~400 | **381** |
+| Tests | ~750 | **700** |
+| Ratio | 1.9× | **1.8×** |
+| Review rounds | 6 | **3**, zero rework |
+
+Per commit: `de338e97` +58 (T-06) · `f8a2aa51` +389 (T-08) · `b7425b47` +1 (guard fix) · `644d7dfa` +654 (T-07).
+
+**The cause is recorded in `design.md` §24.1** rather than restated here (`KZ-005` — a measured figure
+gets one home). In one line: the ratio was right and the *count* priced a four-item enumeration as
+though the orchestrator — its largest item, still unbuilt — were free.
+
+**Escalated to the user at the continue gate, not absorbed.** The user elected to continue with the
+budget re-baselined. The overrun is volume, not defects.
+
+## Coverage — reported, not assumed (§12 close item)
+
+`npm run test:cov -- --silent`, run at the T-07 gate with no worker active:
+
+```
+All files    | % Stmts 90.7 | % Branch 77.75 | % Funcs 87.16 | % Lines 90.34
+Test Suites: 397 passed, 397 total
+Tests:       3534 passed, 3534 total
+```
+
+Global floor is 60%; jest exited 0 with no threshold failure. This increment's own files:
+
+| File | Stmts | Branch | Funcs | Lines |
+| --- | --- | --- | --- | --- |
+| `sec-user-deactivation.repository.ts` | 100 | 77.77 | 100 | 100 |
+| `sec-user-deactivation.service.ts` | 97.05 | 86.11 | 100 | 97.91 |
+| `staff-deactivation-config.resolver.ts` | 96.36 | 78.94 | 88.88 | 96.07 |
+
+**Scope limit (`KZ-017`):** `test:cov` runs the same `rootDir: "src"` config as `npm test`. It
+measures **no** fixture, e2e or integration tier, so these percentages say nothing about the fixture
+repair T-07 forced. That remains T-11's to execute.

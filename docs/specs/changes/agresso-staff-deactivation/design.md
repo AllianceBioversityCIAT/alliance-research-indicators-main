@@ -642,6 +642,43 @@ driven by irreversibility, not size. Confirmed, not revised.
 > instead of by count. This budget is counted; if it trips anyway, the Leader escalates rather than
 > absorbing, and the cause is recorded against this basis.
 
+### 24.1 Re-baselined 2026-09-28 — the tripwire fired again, and the cause is NOT the ratio
+
+**Measured at the T-07 continue gate, with 3 of 6 tasks closed** (`git diff --numstat de338e97~1 HEAD
+-- server/researchindicators/{src,test}`, splitting `*spec.ts` from the rest):
+
+| Metric | Budgeted, **all six tasks** | Actual, **three tasks** | Verdict |
+| --- | --- | --- | --- |
+| Implementation | ~400 | **381** | 95% of the whole budget, spent on half the tasks |
+| Tests | ~750 | **700** | 93% of the whole budget |
+| Test : impl ratio | 1.9× | **1.8×** | **The ratio was right** |
+| Tasks | 6 | 3 | — |
+| Review rounds | 6 | **3** | On track; **zero rework** — every task passed first attempt |
+
+**The estimate was not wrong in shape. It was wrong in coverage, and that is a different defect.**
+§24's basis enumerated *"three `UPDATE` statements, an orchestrator with two gates, a four-key config
+resolver and one data-only migration"* and priced the lot at ~400 implementation lines. Three of those
+four items are now built and cost **381** — and **the orchestrator, the single largest item on that
+list, has not been started.** Neither has T-10's reporting nor T-11's fixture tier, which is `L`.
+
+So the failure mode differs from increment 1's. Increment 1 sized by **scaling a sibling** and the
+*ratio* survived while the *base* collapsed. Increment 2 counted its rules honestly and the ratio
+survived again — but the count **priced a four-item enumeration as though the largest item were free.**
+Projection for the remaining three tasks: T-09 ≈ 250–350, T-10 ≈ 100, T-11 ≈ 300–400, for a total
+near **1,750–1,950 — a 50–70% overrun.**
+
+**Part of the delta is authorised scope, and must not be laundered into the estimate's defence.**
+T-07's C-4 wiring was added mid-flight by user ruling on 2026-09-28 and was never in the original
+count. It explains a slice of T-07's 654 lines. It does not explain the rest.
+
+**Escalated to the user at the T-07 continue gate, per the warning directly above, and the user
+elected to continue with the budget re-baselined rather than to stop or descope.** The overrun is one
+of **volume, not of defects**: three tasks, three first-attempt PASSes, no rework rounds consumed.
+
+**The lesson for the next estimate** — and the one worth carrying upstream — is that a counted basis
+must price **each enumerated item**, not the enumeration. Both increments produced a correct test
+ratio and a wrong total, by two different routes; the ratio is evidently the easy half.
+
 ---
 
 ## 25. Rollout — increment 2
