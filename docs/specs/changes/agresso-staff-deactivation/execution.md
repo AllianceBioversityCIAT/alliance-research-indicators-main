@@ -465,11 +465,32 @@ Both the Implementer and the Reviewer declared this, and the declarations agree:
 3. **Readability** — `affectedRowsForRawSql` and `affectedRowsForAppSecretsSql` are byte-identical
    one-line delegations to the same helper.
 
-**Leader adjudication of advisory 1.** Not reworked inside this task, and **not converted into a new
-task** — both are forbidden. It is also not obviously mere style: it is a weakening of a safety gate,
-on a line **this diff itself edited**, in the one task of the spec that can destroy access. The
-Reviewer weighed it and chose not to gate on it, and that verdict stands. **Referred to the user at
-the continue gate as an explicit decision** rather than actioned unilaterally in either direction.
+**Leader adjudication of advisory 1 — referred to the user, and the user ruled.** It was not
+reworked inside this task and not converted into a new task; both are forbidden. It was also not
+mere style: a weakening of a safety gate, on a line **this diff itself edited**, in the one task of
+the spec that can destroy access. The Reviewer weighed it and chose not to gate, and that verdict
+stands — T-08 closed on a genuine PASS. **The user was asked at the continue gate and elected to
+restore the flag**, applied as a separate follow-up commit rather than reopening T-08.
+
+**The advisory was correct, and the proof is a discrimination test, not an opinion.** A lowercase
+`delete from sec_users where 1=1` was injected into the production source and the guard run both
+ways:
+
+```
+A) guard WITH /i, lowercase write injected
+   ✕ opens no transaction and does not write alliance_user_staff (2 ms)
+   Tests: 1 failed, 25 skipped, 26 total
+
+B) same injection, guard WITHOUT /i (the state T-08 shipped)
+   ✓ opens no transaction and does not write alliance_user_staff (2 ms)
+   Tests: 25 skipped, 1 passed, 26 total
+```
+
+Case B is the finding: the shipped guard **passed green over an injected lowercase write**. Both
+files restored; 26/26 green, then `npm test -- --silent` 396 suites / 3524 tests, `npx eslint src test`
+exit 0. Checked before applying that the production file contains no lowercase `insert`/`delete`
+that `/i` would newly match (`grep -nEi '\b(insert|delete)\b'` → no hits), so the flag tightens the
+guard without creating a false positive.
 
 **Issues encountered:** none blocking. Docker unavailability is recorded above as a scope limit, not
 an issue with this diff.

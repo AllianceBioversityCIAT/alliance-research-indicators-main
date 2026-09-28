@@ -183,7 +183,7 @@ describe('SecUserDeactivationRepository', () => {
     );
 
     expect(source).not.toMatch(/\.transaction\s*\(/);
-    expect(source).not.toMatch(/\b(?:INSERT|DELETE)\b/);
+    expect(source).not.toMatch(/\b(?:INSERT|DELETE)\b/i);
     expect(source).not.toMatch(/alliance_user_staff/);
   });
 
