@@ -120,10 +120,16 @@ const versionResult = (overrides: Partial<ResultRow> = {}): ResultRow => ({
   ...overrides,
 });
 
+// `result_pool_funding_toc_alignment.level` is `varchar(10)` and only ever
+// holds the lambda-toc category CODE (`OUTPUT` / `OUTCOME` / `EOI`). The label
+// the user reads ("Intermediate Outcome") is a client-side rendering of that
+// code, and does not fit the column. A fixture carrying the label hid a real
+// production defect: PRMS sends the LABEL, so the raw code compared unequal
+// against it and the history modal reported a level change on every callback.
 const versionToc = (overrides: Partial<TocRow> = {}): TocRow => ({
   result_id: VERSION_ID,
   sp_code: 'SP06',
-  level: 'Intermediate Outcome',
+  level: 'OUTCOME',
   toc_result_id: 7290,
   toc_result_title: 'Same title',
   indicator_description: null,
@@ -458,50 +464,83 @@ describe('PoolFundingMappingDiffService', () => {
   });
 
   describe('level', () => {
-    it('emits the nested toc_mappings level when it differs from the version', async () => {
+    const callbackLevel = (level: string) =>
+      callbackBody(
+        [primary([{ title: 'Same title', toc_result_id: 7290, level }])],
+        decoy,
+      );
+
+    // The production defect (observed 2026-09-29, result approved by a PRMS
+    // reviewer who never touched the level): our column holds `OUTCOME`, PRMS
+    // returns `Intermediate Outcome`, and a strict string compare called that
+    // a change.
+    it('treats the PRMS label as equal to the code it renders', async () => {
       arm(
-        {
-          raw_body: callbackBody(
-            [
-              primary([
-                {
-                  title: 'Same title',
-                  toc_result_id: 7290,
-                  level: 'Intermediate Outcome',
-                },
-              ]),
-            ],
-            decoy,
-          ),
-        },
-        { level: 'Output' },
+        { raw_body: callbackLevel('Intermediate Outcome') },
+        { level: 'OUTCOME' },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)['Theory of Change level']).toBeUndefined();
+    });
+
+    it.each([
+      ['OUTPUT', 'High Level Output'],
+      ['OUTCOME', 'Intermediate Outcome'],
+      ['EOI', '2030 Outcome'],
+    ])('treats %s and "%s" as the same level', async (code, label) => {
+      arm({ raw_body: callbackLevel(label) }, { level: code });
+
+      await record();
+
+      expect(parsedChanges(table)['Theory of Change level']).toBeUndefined();
+    });
+
+    it('accepts a bare PRMS spelling of the same level', async () => {
+      arm({ raw_body: callbackLevel('Outcome') }, { level: 'OUTCOME' });
+
+      await record();
+
+      expect(parsedChanges(table)['Theory of Change level']).toBeUndefined();
+    });
+
+    // A real level change still has to surface -- and it renders in the
+    // vocabulary the user sees in the form, not the stored code.
+    it('emits a real level change with the stored code rendered as its label', async () => {
+      arm(
+        { raw_body: callbackLevel('Intermediate Outcome') },
+        { level: 'OUTPUT' },
       );
 
       await record();
 
       expect(parsedChanges(table)).toEqual({
         'Theory of Change level': {
-          before: 'Output',
+          before: 'High Level Output',
           after: 'Intermediate Outcome',
         },
       });
     });
 
-    it('omits level when the nested value matches and ignores obj_result_level', async () => {
-      arm({
-        raw_body: callbackBody(
-          [
-            primary([
-              {
-                title: 'Same title',
-                toc_result_id: 7290,
-                level: 'Intermediate Outcome',
-              },
-            ]),
-          ],
-          decoy,
-        ),
+    // Conservative fallback: a token neither vocabulary knows is compared
+    // literally, so an unrecognised PRMS spelling shows a diff rather than
+    // being silently swallowed as "equal".
+    it('compares an unknown PRMS value literally', async () => {
+      arm({ raw_body: callbackLevel('Impact') }, { level: 'OUTCOME' });
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({
+        'Theory of Change level': {
+          before: 'Intermediate Outcome',
+          after: 'Impact',
+        },
       });
+    });
+
+    it('omits level when the nested value matches and ignores obj_result_level', async () => {
+      arm({ raw_body: callbackLevel('Intermediate Outcome') });
 
       await record();
 
