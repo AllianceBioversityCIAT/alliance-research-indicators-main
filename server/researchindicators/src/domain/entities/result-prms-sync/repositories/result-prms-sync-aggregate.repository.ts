@@ -14,6 +14,19 @@ import {
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
 
+/**
+ * MySQL `decimal` columns arrive as strings through mysql2 (`"12.00"`), and
+ * `Number('')` / `Number(null)` are both `0` -- a value PRMS would read as a
+ * real contribution of zero. Only a finite parse of a non-empty value counts.
+ */
+const asDecimal = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 const asStaff = (row: {
   email?: string | null;
   first_name?: string | null;
@@ -208,6 +221,7 @@ export class ResultPrmsSyncAggregateRepository {
           toc.toc_result_id,
           toc.toc_result_title,
           toc.indicator_description,
+          toc.quantitative_contribution,
           toc.aligns_with_toc
         FROM result_pool_funding_alignment a
         INNER JOIN result_pool_funding_alignment_sp sp
@@ -449,6 +463,7 @@ export class ResultPrmsSyncAggregateRepository {
           toc_result_id: number | null;
           toc_result_title: string | null;
           indicator_description: string | null;
+          quantitative_contribution: unknown;
           aligns_with_toc: unknown;
         }) => ({
           sp_code: row.sp_code,
@@ -460,6 +475,10 @@ export class ResultPrmsSyncAggregateRepository {
             row.toc_result_id == null ? null : Number(row.toc_result_id),
           toc_result_title: row.toc_result_title ?? null,
           indicator_description: row.indicator_description ?? null,
+          // `decimal(18,2)` reaches us as the string `"12.00"`; the payload
+          // contract is a number. `Number('')` is 0, so an empty string is
+          // treated as absent rather than as a zero contribution.
+          quantitative_contribution: asDecimal(row.quantitative_contribution),
           aligns_with_toc:
             row.aligns_with_toc == null ? null : asBoolean(row.aligns_with_toc),
         }),

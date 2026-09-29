@@ -92,6 +92,7 @@ const baseAggregate = (
       toc_result_id: 6339,
       toc_result_title: 'Primary ToC result for SP01',
       indicator_description: 'Primary indicator description for SP01',
+      quantitative_contribution: null,
       aligns_with_toc: true,
     },
   ],
@@ -230,6 +231,7 @@ describe('CommonFieldsBuilder', () => {
                 toc_result_id: null,
                 toc_result_title: null,
                 indicator_description: null,
+                quantitative_contribution: null,
                 aligns_with_toc: false,
               },
               {
@@ -238,6 +240,7 @@ describe('CommonFieldsBuilder', () => {
                 toc_result_id: 6401,
                 toc_result_title: 'Contributing ToC for SP03',
                 indicator_description: 'Contributing indicator for SP03',
+                quantitative_contribution: null,
                 aligns_with_toc: true,
               },
             ],
@@ -336,6 +339,7 @@ describe('CommonFieldsBuilder', () => {
                 toc_result_id: 6518,
                 toc_result_title: 'Policy ToC result',
                 indicator_description: 'Policy indicator description',
+                quantitative_contribution: null,
                 aligns_with_toc: true,
               },
             ],
@@ -487,6 +491,7 @@ describe('CommonFieldsBuilder', () => {
                 toc_result_id: null,
                 toc_result_title: null,
                 indicator_description: null,
+                quantitative_contribution: null,
                 aligns_with_toc: false,
               },
             ],
@@ -659,6 +664,7 @@ describe('CommonFieldsBuilder', () => {
             toc_result_id: null,
             toc_result_title: null,
             indicator_description: null,
+            quantitative_contribution: null,
             aligns_with_toc: null,
           },
         ],
@@ -683,6 +689,7 @@ describe('CommonFieldsBuilder', () => {
               toc_result_id: null,
               toc_result_title: null,
               indicator_description: null,
+              quantitative_contribution: null,
               aligns_with_toc: false,
             },
           ],
@@ -691,6 +698,81 @@ describe('CommonFieldsBuilder', () => {
 
       expect(payload.toc_mapping).toEqual({ science_program_id: 'SP09' });
       expect(payload).not.toHaveProperty('contributing_programs');
+    });
+
+    // 2026-09-29: PRMS enabled STAR to send the SP's numeric contribution to
+    // the ToC indicator. It is the same value the decision callback returns as
+    // `toc_mappings[].indicators[].target_contribution`, so sending it closes
+    // the round trip the pool-funding diff reads.
+    it('sends the primary SP quantitative contribution as target_contribution', () => {
+      const payload = builder.build(
+        baseAggregate({
+          science_programs: [
+            {
+              sp_code: 'SP01',
+              sp_role: 'PRIMARY',
+              toc_result_id: 6339,
+              toc_result_title: 'Primary ToC result for SP01',
+              indicator_description: 'Primary indicator description for SP01',
+              quantitative_contribution: 12,
+              aligns_with_toc: true,
+            },
+          ],
+        }),
+      );
+
+      expect(payload.toc_mapping).toMatchObject({ target_contribution: 12 });
+      expect(
+        typeof (payload.toc_mapping as Record<string, unknown>)
+          .target_contribution,
+      ).toBe('number');
+    });
+
+    // Zero is a contribution the SP actually reported; only an absent value is
+    // absent. A truthiness guard would drop it, the way `toc_result_title` is
+    // guarded -- which is correct for prose and wrong for a number.
+    it('sends target_contribution when the contribution is zero', () => {
+      const payload = builder.build(
+        baseAggregate({
+          science_programs: [
+            {
+              sp_code: 'SP01',
+              sp_role: 'PRIMARY',
+              toc_result_id: 6339,
+              toc_result_title: null,
+              indicator_description: null,
+              quantitative_contribution: 0,
+              aligns_with_toc: true,
+            },
+          ],
+        }),
+      );
+
+      expect(payload.toc_mapping).toEqual({
+        science_program_id: 'SP01',
+        toc_result_id: 6339,
+        target_contribution: 0,
+      });
+    });
+
+    it('omits target_contribution when the SP has no quantitative contribution', () => {
+      const payload = builder.build(
+        baseAggregate({
+          science_programs: [
+            {
+              sp_code: 'SP01',
+              sp_role: 'PRIMARY',
+              toc_result_id: null,
+              toc_result_title: null,
+              indicator_description: null,
+              quantitative_contribution: null,
+              aligns_with_toc: true,
+            },
+          ],
+        }),
+      );
+
+      expect(payload.toc_mapping).not.toHaveProperty('target_contribution');
     });
   });
 

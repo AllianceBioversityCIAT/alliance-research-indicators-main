@@ -223,6 +223,15 @@ const buildTocMapping = (
   if (primary.indicator_description) {
     toc.result_indicator_description = primary.indicator_description;
   }
+  // 2026-09-29: PRMS enabled STAR to send the SP's numeric contribution to the
+  // ToC indicator. It is the outbound half of the value the decision callback
+  // returns as `toc_mappings[].indicators[].target_contribution`, which the
+  // pool-funding diff already reads. Explicit `!= null` rather than the
+  // truthiness guard the prose fields use: `0` is a contribution the SP
+  // reported, not an absent one.
+  if (primary.quantitative_contribution != null) {
+    toc.target_contribution = primary.quantitative_contribution;
+  }
   return toc;
 };
 
