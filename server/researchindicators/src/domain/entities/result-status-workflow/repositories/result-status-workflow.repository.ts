@@ -191,8 +191,23 @@ export class ResultStatusWorkflowRepository extends Repository<ResultStatusWorkf
           and su.sec_user_id = ?
           limit 1;
     `;
-    const result = await this.dataSource.query(query, [resultId, userId]);
-    return result?.length > 0;
+    const piResult = await this.dataSource.query(query, [resultId, userId]);
+    if (piResult?.length > 0) return true;
+
+    // @akili-spec docs/specs/changes/my-pi-delegates — T-07
+    const delegateQuery = `
+      select 1 from result_contracts rc
+        inner join agresso_contracts ac on ac.agreement_id = rc.contract_id
+        inner join pi_delegates pd on pd.project_id = ac.agreement_id
+      where rc.result_id = ? and rc.is_primary = true and rc.is_active = true
+        and pd.delegate_user_id = ? and pd.is_active = true
+      limit 1;
+    `;
+    const delegateResult = await this.dataSource.query(delegateQuery, [
+      resultId,
+      userId,
+    ]);
+    return delegateResult?.length > 0;
   }
 
   async getDataForSubmissionResult(

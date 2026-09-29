@@ -1,6 +1,15 @@
 import { Injectable, WritableSignal, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
+import {
+  ActiveUser,
+  DelegateProjects,
+  PiDelegateHistoryEntry,
+  PiDelegateScope,
+  piDelegateScopeParam,
+  ProjectDelegates
+} from '../interfaces/pi-delegates.interface';
 import { GetViewComponents, Indicator, IndicatorTypes } from '../interfaces/api.interface';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 import {
@@ -1249,6 +1258,132 @@ export class ApiService {
   POST_feedback = (body: InteractionFeedbackPayload) => {
     const url = () => `interactions`;
     return this.TP.post(url(), body, { isAuth: environment.feedbackUrl });
+  };
+
+  // ─── PI Delegates — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01) ──────────
+  //
+  // `scope` (@akili-spec docs/specs/changes/my-pi-delegates-admin-scope): omitted for a
+  // PI or delegate, 'all' for a System/Center Admin. The endpoints are the same either
+  // way — only the breadth of what comes back changes, and the server refuses 'all' for
+  // anyone who is not an admin.
+
+  /**
+   * GET /api/pi-delegates?projectId=<id>
+   * Returns one project enriched with its active delegates.
+   */
+  GET_PIDelegatesByProject = (projectId: string): Promise<MainResponse<ProjectDelegates>> => {
+    const url = () => `pi-delegates?projectId=${encodeURIComponent(projectId)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
+   * GET /api/pi-delegates/by-delegate?delegate_user_id=<id>
+   * Returns one person enriched with the active projects they are delegated for.
+   * NOTE: delegate_user_id is a QUERY param — not a path param.
+   */
+  GET_PIDelegatesByDelegate = (delegateUserId: number): Promise<MainResponse<DelegateProjects>> => {
+    const url = () => `pi-delegates/by-delegate?delegate_user_id=${encodeURIComponent(delegateUserId)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
+   * GET /api/pi-delegates/by-user/projects?user_id=<id>[&scope=all]
+   * Returns all ProjectDelegates[] for the projects the user manages (PI or delegate),
+   * or — with scope 'all' — every project on the platform (admins only; 403 otherwise).
+   * @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01 / by-user endpoints)
+   * @akili-spec docs/specs/changes/my-pi-delegates-admin-scope (admin scope)
+   */
+  GET_PIDelegatesByUserProjects = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<ProjectDelegates[]>> => {
+    const url = () => `pi-delegates/by-user/projects?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
+   * GET /api/pi-delegates/by-user/access?user_id=<id>[&scope=all]
+   *
+   * Cheap yes/no: does this user manage any project (as PI or active delegate)?
+   * Used to hide the whole My PI Delegates module for users with neither role.
+   * With scope 'all' the answer is yes for any admin, since they administer every project.
+   */
+  GET_PiDelegateAccess = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<{ has_access: boolean }>> => {
+    const url = () => `pi-delegates/by-user/access?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
+   * GET /api/pi-delegates/by-user/people?user_id=<id>[&scope=all]
+   * Returns distinct DelegateProjects[] across all projects the user manages,
+   * or — with scope 'all' — every delegate on the platform (admins only; 403 otherwise).
+   * @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01 / by-user endpoints)
+   * @akili-spec docs/specs/changes/my-pi-delegates-admin-scope (admin scope)
+   */
+  GET_PIDelegatesByUserPeople = (userId: number, scope?: PiDelegateScope): Promise<MainResponse<DelegateProjects[]>> => {
+    const url = () => `pi-delegates/by-user/people?user_id=${encodeURIComponent(userId)}${piDelegateScopeParam(scope)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /**
+   * POST /api/pi-delegates
+   * Sync-assigns delegates per project. Each project_id receives the full desired
+   * delegate list; anyone active but not in the sent list is revoked by the backend.
+   */
+  POST_PIDelegates = (body: {
+    assignments: {
+      project_id: string;
+      delegates: ({ delegate_user_id: number } | { email: string; first_name: string; last_name: string })[];
+    }[];
+  }): Promise<MainResponse<unknown>> => {
+    const url = () => `pi-delegates`;
+    return this.TP.post(url(), body, {});
+  };
+
+  /**
+   * DELETE /api/pi-delegates  (body-carrying DELETE)
+   * Accepts either:
+   *   Shape A — { project_ids?: string[]; delegate_user_ids?: number[] }
+   *   Shape B — { pi_delegate_ids?: number[] }
+   *
+   * ToPromiseService.delete does not accept a body, so this delegates to
+   * HttpClient directly (same pattern as ToPromiseService.getBlob).
+   */
+  DELETE_PIDelegates = (
+    body: { project_ids?: string[]; delegate_user_ids?: number[] } | { pi_delegate_ids?: number[] }
+  ): Promise<MainResponse<unknown>> => {
+    const url = this.TP.getEnv(undefined) + `pi-delegates`;
+    return firstValueFrom(
+      this.TP.http.delete<MainResponse<unknown>>(url, { body })
+    );
+  };
+
+  /**
+   * GET /api/pi-delegates/history?project_id=<code>  OR  ?delegate_user_id=<id>
+   * Exactly one parameter must be provided.
+   * Returns delegation history entries NEWEST-FIRST.
+   */
+  GET_PIDelegatesHistory = (
+    params: { project_id?: string; delegate_user_id?: number; scope?: PiDelegateScope }
+  ): Promise<MainResponse<PiDelegateHistoryEntry[]>> => {
+    let qs: string;
+    if (params.project_id !== undefined) {
+      qs = `project_id=${encodeURIComponent(params.project_id)}`;
+    } else {
+      qs = `delegate_user_id=${encodeURIComponent(params.delegate_user_id!)}`;
+    }
+    const url = () => `pi-delegates/history?${qs}${piDelegateScopeParam(params.scope)}`;
+    return this.TP.get(url(), {});
+  };
+
+  // ─── Users — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-08) ────────
+
+  /**
+   * GET /api/users/active?search=<optional>
+   * Returns active users (Accepted + is_active) for the People picker.
+   * Appends the ?search query parameter only when a non-empty string is supplied.
+   */
+  GET_ActiveUsers = (search?: string): Promise<MainResponse<ActiveUser[]>> => {
+    const qs = search && search.length > 0 ? `?search=${encodeURIComponent(search)}` : '';
+    const url = () => `users/active${qs}`;
+    return this.TP.get(url(), {});
   };
 
   GET_LeverStrategicOutcomes = (leverId: number): Promise<MainResponse<LeverStrategicOutcome[]>> => {

@@ -1,0 +1,230 @@
+# Tasks — PI Delegates (v2 · relational, backend-only)
+
+- **Module:** my-pi-delegates (server only)
+- **Spec id:** 2026-09-my-pi-delegates · **Status:** not-started
+- **Supersedes:** v1 (role + frontend) — withdrawn
+- **Linked:** ./requirements.md · ./design.md · ./proposal.md
+- **Last updated:** 2026-09-09
+
+> **Single PR** (~9 tasks, ~700 LOC). **No role, no frontend.** Correctness-critical: modifies the system-wide PI-determination path.
+
+## 1. Dependency graph
+```mermaid
+graph TD
+  T01[T-01 Migration: pi_delegates + unique-active] --> T02[T-02 Entity + module]
+  T02 --> T03[T-03 DTOs]
+  T02 --> T04[T-04 Repository: insert/soft-delete + find-or-create sec_user (tx)]
+  T03 --> T05[T-05 Service: CRUD + project auth (PI/delegate/SYSTEM_ADMIN)]
+  T04 --> T05
+  T05 --> T06[T-06 Controller + Swagger + route reg]
+  T02 --> T07[T-07 Extend isPi() delegate fallback]
+  T02 --> T08[T-08 Extend queryPrincipalInvestigator() delegate fallback]
+  T06 --> T09[T-09 Tests: unit + e2e + existing isPi green]
+  T07 --> T09
+  T08 --> T09
+```
+
+## 2. Requirement → task coverage
+| Requirement / clause | Task(s) |
+| --- | --- |
+| R-PID-001 (table, no role) / R-PID-006 (unique active) | T-01, T-02 |
+| R-PID-002 (`isPi` PI-or-delegate; PI unchanged; no cross-project) | T-07, T-09 |
+| R-PID-003 (metadata flag; frontend-free) | T-08, T-09 |
+| R-PID-004 (CRUD) | T-05, T-06 |
+| R-PID-005 (find-or-create sec_user, transactional) | T-04, T-09 |
+| R-PID-007 (auth: PI/delegate/SYSTEM_ADMIN) | T-05, T-09 |
+| NFR-PID-001 (no role/frontend) | all + T-09 git-diff check |
+| NFR-PID-002 (PI behavior-preserving) | T-07, T-08, T-09 |
+| NFR-PID-003 (transactional) | T-04, T-09 |
+
+## 3. Tasks
+
+### T-01 — Migration: `pi_delegates` + unique-active  ✅ [x] PASS 2026-09-10 (DB-apply = human step)
+- **Covers:** R-PID-001, R-PID-006
+- **Files:** `db/migrations/<ts>-createPiDelegates.ts`
+- **Desc:** Create `pi_delegates` (`project_id` FK agresso ON DELETE RESTRICT; `pi_user_id`, `delegate_user_id` FK `sec_users`; AuditableEntity; `active_delegate_key varchar(80)` STORED generated `IF(is_active=1, CONCAT(project_id,':',delegate_user_id), NULL)` + UNIQUE). **No role seed, no roles-table change.**
+- **Done:** [ ] applies forward + reverts clean; [ ] two revoked rows for same (project,delegate) coexist, second active rejected; [ ] no `user_roles`/`SecRolesEnum` touched.
+- **Effort:** M · **Skills:** nestjs-expert
+
+### T-02 — Entity + module + route registration  ✅ [x] PASS 2026-09-10 (attempt 2)
+- **Covers:** R-PID-001
+- **Files:** `entities/pi-delegates/{entities/pi-delegate.entity.ts, pi-delegates.module.ts}`, `routes/main.routes.ts`
+- **Done:** [ ] `PiDelegate extends AuditableEntity` with the 3 FKs; [ ] module registered at `pi-delegates`.
+- **Dep:** T-01 · **Effort:** S · **Skills:** nestjs-expert
+
+### T-03 — DTOs  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-004, R-PID-005
+- **Files:** `entities/pi-delegates/dto/*`
+- **Desc:** `CreatePiDelegateDto {project_id, delegate: (sec_user_id | {email, first_name, last_name})}`, revoke/verify DTOs; `class-validator` + `@ApiProperty`.
+- **Done:** [ ] invalid/empty payloads → 400.
+- **Dep:** T-02 · **Effort:** S · **Skills:** api-design-principles
+
+### T-04 — Repository: insert/soft-delete + find-or-create sec_user (transactional)  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-005, NFR-PID-003
+- **Files:** `entities/pi-delegates/repositories/pi-delegates.repository.ts`
+- **Desc:** In one transaction: `findUserByEmailOrCarnet`; if absent `createUserInSecUsers` (reuse `result.repository.ts` mechanism); then insert `pi_delegates`. Soft-delete on revoke.
+- **Disqualifies:** the rollback test must inject a failure **after** sec_user create and assert **both** are absent — a test that only checks the happy path can't prove atomicity.
+- **Done:** [ ] existing delegate reused; [ ] absent delegate created then associated; [ ] injected failure → nothing committed.
+- **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert, error-handling-patterns
+
+### T-05 — Service: CRUD + project authorization  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-004, R-PID-007
+- **Files:** `entities/pi-delegates/pi-delegates.service.ts`
+- **Desc:** `create/list/verify/update/revoke`. **Auth:** allow if `SYSTEM_ADMIN` (existing bypass) or caller is PI/active-delegate of `project_id` (reuse the PI join, project-scoped, unioned with `pi_delegates`). No new role/permission.
+- **Named red input (K-012):** a caller who is neither PI, delegate, nor admin of the project → 403.
+- **Done:** [ ] non-authorized caller → 403; [ ] SYSTEM_ADMIN allowed; [ ] PI/delegate of project allowed.
+- **Dep:** T-03, T-04 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-06 — Controller + Swagger + route  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-004
+- **Files:** `entities/pi-delegates/pi-delegates.controller.ts`
+- **Desc:** `POST /pi-delegates`, `GET /pi-delegates?projectId`, `GET /pi-delegates/verify`, `PATCH`/`DELETE`; `@ApiTags`, `@ApiBearerAuth`, `ServerResponseDto`.
+- **Done:** [ ] all endpoints in `/swagger`.
+- **Dep:** T-05 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
+
+### T-07 — Extend `isPi()` with a delegate fallback  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-002, NFR-PID-002
+- **Files:** `result-status-workflow/repositories/result-status-workflow.repository.ts`
+- **Desc:** Keep the existing PI query **byte-for-byte**. After it, only when it returns no rows, run the delegate query (result→primary project→`pi_delegates` by `delegate_user_id`). `return existingPiRows>0 || delegateRows>0`.
+- **Named red input (K-012):** delegate of project A + a result whose primary project is B → must be false (no cross-project leak).
+- **Done:** [ ] PI → true, `pi_delegates` NOT queried; [ ] delegate of the result's project → true; [ ] neither → false; [ ] delegate of another project → false; [ ] existing `isPi` tests unchanged & green.
+- **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert, systematic-debugging
+
+### T-08 — Extend `queryPrincipalInvestigator()` with a delegate fallback  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-003, NFR-PID-002
+- **Files:** `shared/const/gloabl-queries.const.ts`
+- **Desc:** Add a `LEFT JOIN pi_delegates` (by project + `delegate_user_id` + active); `is_principal = (name-match matched) OR (delegate row present)`. Real-PI result unchanged.
+- **Done:** [ ] metadata `is_principal_investigator` true for a delegate; [ ] true & unchanged for a real PI; [ ] false for neither; [ ] **`git diff --stat client/` empty** (no frontend change — NFR-PID-001).
+- **Dep:** T-02 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-09 — Tests: unit + e2e + existing suite green  ✅ [x] PASS 2026-09-10 (+ surfaced/fixed P0 module-wiring bug)
+- **Covers:** R-PID-002/003/005/006/007, NFR-PID-001/002/003
+- **Files:** `pi-delegates.service.spec.ts`, `result-status-workflow.repository.spec.ts` (extend), `test/pi-delegates.e2e-spec.ts`
+- **Desc (the 12 scenarios):** PI→true; delegate→true; neither→false; PI without delegates unchanged; delegate exists in sec_users; delegate absent → created first; association created; duplicate rejected; revoke → isPi false; delegate of other project → false; error during sec_user/association; **existing `isPi` tests still pass**. Plus metadata-flag PI/delegate/neither, and auth allowed/denied.
+- **Disqualifies (KZ-004):** vary a discriminating field per delegate/project so per-project scoping is provable, not a batch-wide pass. Assert on persisted rows / query results, not mock call order (KZ-001).
+- **Done:** [ ] `npm test -- --silent` green incl. the pre-existing `isPi` spec; [ ] `git diff --stat client/` empty.
+- **Dep:** T-06, T-07, T-08 · **Effort:** M · **Skills:** nestjs-expert, tdd
+
+## 4. Estimated LOC & PR strategy
+~9 tasks · ~700 LOC · **1 PR** (the two query edits ship with the table + CRUD + tests as one cohesive backend change). First task: **T-01**.
+
+## 5. Risks & blockers
+| # | Risk | Mitigation | Status |
+| --- | --- | --- | --- |
+| RB-1 | Modifying `isPi`/metadata gates results across the system | Existing query untouched; fallback only when PI false; full test matrix + existing suite green | open |
+| RB-2 | Migration must be **applied** to shared Dev DB (a merge does not) — K-015 | Human apply step in T-01 done-check | open |
+| RB-3 | The two PI functions resolve PI differently (projectLeadId vs name-match) | Delegate lookup identical; each keeps its own result→project resolution | open |
+
+## 6. Done definition
+- [x] T-01…T-09 done (all 9 tasks Reviewer-PASS; code complete, committed).
+- [x] PI / delegate / neither verified for **both** `isPi` and the metadata flag *at the unit/control-flow level*; existing `isPi` tests green (10/10) + full unit suite 2718/2718. **[~] the SQL-semantic behavioral proof (cross-project false, metadata delegate→true) is written as e2e but deferred to the DB migration-apply.**
+- [x] Create provisions absent sec_user first, transactional (atomicity verified by review + unit control-flow); **[~] duplicate-rejected + rollback-no-orphan proven at the DB level are deferred to the e2e/migration-apply.**
+- [x] **No role created, no roles-table change, `git diff --stat client/` empty.**
+- [x] `/swagger` documents the CRUD (controller wired + route now reachable — P0 wiring bug fixed). **[~] migration applies+reverts and is applied to the target DB — HUMAN STEP (K-015), still pending.**
+- [ ] OQ-B (project-keyed) and OQ-D (provisioning identity) confirmed with Product — **still open.**
+
+**Post-implementation status:** all code merged on branch; unit-verified. Two gates remain, both human/infra: (1) apply the migration to the shared DB (K-015) — this also un-defers the e2e behavioral suite; (2) Product sign-off on OQ-B/OQ-D.
+
+---
+
+## 7. Amendment v3 — bulk (many×many) tasks (2026-09-10, Product-confirmed)
+
+> After v2 shipped, Product confirmed the CRUD must be **bulk** (POST = per-project sync, DELETE = independent bulk revoke) + a **PI-exclusion** rule (a PI can't be a delegate of their own project). See `requirements.md §11` / `design.md §10`. Entity/migration/`isPi`/metadata from v2 are reused unchanged.
+
+### T-10 — Bulk DTOs  ✅ [x] PASS 2026-09-10 (attempt 2)
+- **Covers:** R-PID-009 AC.1, R-PID-010 AC.1, R-PID-008
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts`, `dto/bulk-revoke-pi-delegates.dto.ts` (+ reuse/extract `DelegateInputDto` from the v2 create DTO)
+- **Desc:** `BulkAssignPiDelegatesDto {project_ids[], delegates[]}` (delegate union reused, optional `carnet`); `BulkRevokePiDelegatesDto` = `{pi_delegate_ids[]}` XOR `{project_ids[], delegate_user_ids[]}` with a cross-field "exactly one shape" guard.
+- **Done:** [ ] empty arrays / both-revoke-shapes / neither → 400.
+- **Dep:** T-03 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
+
+### T-11 — Repository: PI-only check + bulk/sync data methods  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-008, R-PID-009 AC.2/AC.5
+- **Files:** `repositories/pi-delegates.repository.ts` (extend)
+- **Desc:** `isPiOfProject(projectId, userId)` (PI-only half of the auth join); `listActiveDelegateUserIds(projectId, manager)`; `bulkCreate`/`bulkSoftDelete` through a tx manager (reuse sec_user provisioning).
+- **Named red input (K-012):** delegate who IS the PI of the project → `isPiOfProject` true.
+- **Done:** [ ] PI→true, non-PI→false; [ ] active ids listed correctly for the diff.
+- **Dep:** T-04 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-12 — Service: bulk assign (sync) + bulk revoke + PI-exclusion  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-008, R-PID-009, R-PID-010, NFR-PID-003
+- **Files:** `pi-delegates.service.ts` (replace single create/revoke with `assign`/`bulkRevoke`)
+- **Desc:** `assign(dto)` — one transaction: auth per project (fail-fast) → resolve/provision delegates → PI-exclusion per pair (fail-fast) → per-project reconcile (create desired\current, revoke current\desired, keep ∩) → per-project summary. `bulkRevoke(dto)` — auth per row's project → soft-delete, no sync.
+- **Named red input (K-012):** (a) caller not authorized on ANY project → 403, nothing applied; (b) any delegate is PI of its project → 400, nothing applied.
+- **Disqualifies:** the sync test must prove **revocation of a missing delegate** (Mateo case) AND that an unrelated project is untouched (KZ-004: distinct projects).
+- **Done:** [ ] sync creates+revokes+keeps correctly; [ ] fail-fast atomic on auth/PI-exclusion; [ ] bulkRevoke soft-deletes only named pairs.
+- **Dep:** T-10, T-11, T-05 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
+### T-13 — Controller: bulk POST/DELETE + Swagger  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-009, R-PID-010
+- **Files:** `pi-delegates.controller.ts` (change POST/DELETE to bulk; keep list/verify)
+- **Desc:** `POST /` body `BulkAssignPiDelegatesDto` → `assign`; `DELETE /` body `BulkRevokePiDelegatesDto` → `bulkRevoke`. Keep `@UsePipes(ValidationPipe)`, NO `@Roles`. Full Swagger with bulk examples.
+- **Done:** [ ] endpoints in `/swagger` with bulk payloads; [ ] no `@Roles`.
+- **Dep:** T-12 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
+
+### T-14 — Tests: bulk sync + revoke + PI-exclusion  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-008/009/010, NFR-PID-003
+- **Files:** `pi-delegates.service.spec.ts` (extend), `test/pi-delegates.e2e-spec.ts` (extend)
+- **Desc:** sync creates/revokes/keeps; the Mateo-revoke; fail-fast atomicity on auth-denied and on PI-exclusion; provision-once-reuse-across-projects; bulkRevoke by ids and by pairs; cross-project isolation (KZ-004).
+- **Disqualifies (KZ-001):** assert on persisted rows / returned summary, not mock call order.
+- **Done:** [ ] `npm test -- --silent` green; [ ] `git diff --stat client/` empty.
+- **Dep:** T-13 · **Effort:** M · **Skills:** nestjs-expert, tdd
+
+**v3 first task:** T-10.
+
+---
+
+## 8. Amendment v4 — per-project assignment + history (2026-09-10, Product-confirmed)
+
+> Product refined bulk after v3: POST becomes per-project (`assignments: [{project_id, delegates}]`, empty delegates = revoke-all), and every assign/revoke is logged in a new append-only `pi_delegate_history` table. `pi_delegates` unchanged. See `requirements.md §12` / `design.md §11`.
+
+### T-15 — Migration: `pi_delegate_history` table  ✅ [x] PASS 2026-09-10 (applied local)
+- **Covers:** R-PID-012
+- **Files:** `db/migrations/<ts>-createPiDelegateHistory.ts`
+- **Desc:** append-only `pi_delegate_history` (PK, `pi_delegate_id` bigint no-FK, `project_id` varchar(36), `pi_user_id`, `delegate_user_id`, `action` varchar(10), AuditableEntity). **`DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci`** (same as pi_delegates). No unique, no generated column.
+- **Done:** [ ] builds + placeholder-safe; [ ] local apply to alliancereportingdb (Leader will apply after PASS).
+- **Effort:** M · **Skills:** nestjs-expert
+
+### T-16 — Entity + module: `PiDelegateHistory`  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-012
+- **Files:** `entities/pi-delegates/entities/pi-delegate-history.entity.ts`, `enum/pi-delegate-history-action.enum.ts`, register in `pi-delegates.module.ts` (TypeOrmModule.forFeature)
+- **Done:** [ ] `PiDelegateHistory extends AuditableEntity`; enum `assign`/`revoke`; registered.
+- **Dep:** T-15 · **Effort:** S · **Skills:** nestjs-expert
+
+### T-17 — DTO reshape: `assignments[]`  ✅ [x] PASS 2026-09-10 (with T-19/T-20)
+- **Covers:** R-PID-011
+- **Files:** `dto/bulk-assign-pi-delegates.dto.ts`
+- **Desc:** replace `{project_ids[], delegates[]}` with `{ assignments: ProjectAssignmentDto[] }`; `ProjectAssignmentDto {project_id, delegates: DelegateInputDto[]}`. `assignments` `@ArrayNotEmpty`; inner `delegates` `@IsArray` only (**no @ArrayNotEmpty** — empty = revoke-all).
+- **Done:** [ ] empty `assignments` → 400; [ ] empty inner `delegates` ALLOWED.
+- **Dep:** T-10 · **Effort:** S · **Skills:** api-design-principles, nestjs-expert
+
+### T-18 — Repository: history write  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-012
+- **Files:** `repositories/pi-delegates.repository.ts` (or a history repo)
+- **Desc:** `recordHistory({pi_delegate_id, project_id, pi_user_id, delegate_user_id, action}, actorId, manager)` inserts one `pi_delegate_history` row via the passed manager. Ensure `insertDelegate`/soft-delete paths expose the ids the service needs.
+- **Done:** [ ] one row inserted per call via manager; action assign/revoke.
+- **Dep:** T-16 · **Effort:** M · **Skills:** nestjs-expert
+
+### T-19 — Service: per-project sync + history writes  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-011, R-PID-012, R-PID-013
+- **Files:** `pi-delegates.service.ts`
+- **Desc:** `assign` iterates `dto.assignments`; resolve/dedupe delegates ONCE across all assignments; per assignment sync to its OWN list (empty → revoke all); write `recordHistory('assign')` per create and `recordHistory('revoke')` per revoke in the same tx. `bulkRevoke` writes `recordHistory('revoke')` per revoked row.
+- **Named red input (K-012):** empty `delegates` for a project → all its active delegates revoked + a revoke-history row each.
+- **Disqualifies:** a rolled-back assign/revoke leaves NO history row (same tx).
+- **Done:** [ ] per-project sync correct; [ ] history row per movement; [ ] atomic.
+- **Dep:** T-17, T-18 · **Effort:** XHIGH · **Skills:** nestjs-expert, error-handling-patterns
+
+### T-20 — Controller: Swagger for `assignments`  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-011
+- **Files:** `pi-delegates.controller.ts`
+- **Desc:** POST `@Body() BulkAssignPiDelegatesDto` (new shape); update `@ApiBody` examples (per-project lists + an empty-delegates "revoke all" example). Keep ValidationPipe, no @Roles.
+- **Done:** [ ] `/swagger` shows the new payload + examples.
+- **Dep:** T-19 · **Effort:** S · **Skills:** nestjs-expert, api-design-principles
+
+### T-21 — Tests: per-project sync + history  ✅ [x] PASS 2026-09-10
+- **Covers:** R-PID-011/012/013
+- **Files:** `pi-delegates.service.spec.ts` (extend/adapt), `test/pi-delegates.e2e-spec.ts`
+- **Desc:** per-project sync (distinct lists per project); empty delegates → revoke all; history row written per assign + per revoke (assert the recordHistory call args); rolled-back tx → no history; revoke-by-pair records revoke history. KZ-001 (assert values/args), KZ-004 (distinct ids).
+- **Done:** [ ] `npm test -- --silent` green; [ ] `git diff --stat client/` empty.
+- **Dep:** T-20 · **Effort:** M · **Skills:** nestjs-expert, tdd
+
+**v4 first task:** T-15.

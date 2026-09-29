@@ -82,6 +82,12 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() disabled = false;
   @Input() filterBy = '';
   @Input() optionsDisabled: WritableSignal<any[]> = signal([]);
+  /**
+   * Clears the dropdown's search box every time the panel closes, so reopening
+   * the picker (or the modal that hosts it) always starts from the full list.
+   * Off by default — other screens rely on the filter surviving a panel close.
+   */
+  @Input() clearFilterOnClose = false;
   @Input() set isRequired(value: boolean) {
     this._isRequired.set(value);
   }
@@ -104,6 +110,19 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() dark = false;
   @Input() optionFilter: (item: any) => boolean = () => true;
   @Input() hideRemoveIcon = false;
+  /**
+   * Caps the selection at ONE option: picking a second one REPLACES the first
+   * instead of adding to it.
+   *
+   * The control stays a `p-multiSelect`, so the option template, the filter,
+   * `optionFilter` and `optionsDisabled` all keep working and only the meaning
+   * of a click changes. PrimeNG's own `selectionLimit` was deliberately not used:
+   * it disables every remaining option once the cap is reached, so changing your
+   * mind would mean deselecting first.
+   *
+   * Off by default — every existing caller is unaffected.
+   */
+  @Input() singleSelection = false;
   @Input() selectedItemsSurfaceColor = '';
   selectEvent = output<any>();
   environment = environment;
@@ -421,13 +440,16 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   setValue(event: number[]) {
-    this.body.set({ value: event });
+    // Only the single-selection path normalises `event`; the default path stores
+    // whatever it was handed, exactly as before.
+    const effective = this.singleSelection ? this.keepOnlyLatest(Array.isArray(event) ? event : []) : event;
+    this.body.set({ value: effective });
     let nextState: any;
 
     this.signal.update((current: any) => {
       const attr = this.optionValue;
       const prevItems = this.utils.getNestedProperty(current, this.signalOptionValue) ?? [];
-      const eventIds = Array.isArray(event) ? event : [];
+      const eventIds = Array.isArray(effective) ? effective : [];
       const optionsList = this.optionsSig() ?? [];
 
       const nextItems = eventIds.map((id: number) => {
@@ -445,6 +467,19 @@ export class MultiselectComponent implements OnInit, OnChanges {
     });
 
     queueMicrotask(() => this.selectEvent.emit(nextState));
+  }
+
+  /**
+   * Single-selection reducer: of the ids PrimeNG just handed us, keep the one
+   * the user has only now added — which is what "replace" means from their side.
+   * Falls back to the last id when nothing is new, e.g. the first click or a
+   * value set from outside.
+   */
+  private keepOnlyLatest(incoming: number[]): number[] {
+    if (incoming.length <= 1) return incoming;
+    const previous: number[] = Array.isArray(this.body()?.value) ? this.body().value : [];
+    const added = incoming.filter(id => !previous.includes(id));
+    return [added.length ? added[added.length - 1] : incoming[incoming.length - 1]];
   }
 
   objectArrayToIdArray(array: any[], attribute: string) {
@@ -481,10 +516,21 @@ export class MultiselectComponent implements OnInit, OnChanges {
   }
 
   onMultiselectPanelHide(): void {
+    if (this.clearFilterOnClose) {
+      this.clearSearchFilter();
+    }
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
     this.clearMultiselectPanelMaxWidth();
+  }
+
+  /** Empties the dropdown's search box (PrimeNG keeps it between openings). */
+  clearSearchFilter(): void {
+    this.primeMultiSelect?.resetFilter?.();
+    if (this.service?.isOpenSearch?.()) {
+      this.onFilter({ filter: '' });
+    }
   }
 
   private applyMultiselectPanelMaxWidth(): void {

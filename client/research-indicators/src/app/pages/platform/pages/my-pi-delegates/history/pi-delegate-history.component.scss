@@ -1,0 +1,32 @@
+// Delegation History — the only styles the Tailwind template cannot express:
+// the five avatar palettes, picked from the actor's initials.
+// NFR-UI-001: STAR tokens only — no hex literals.
+
+.pi-dh {
+  &__avatar {
+    &--c0 {
+      background-color: color-mix(in srgb, var(--ac-primary-blue-300) 20%, var(--ac-white-1));
+      color: var(--ac-primary-blue-600);
+    }
+
+    &--c1 {
+      background-color: color-mix(in srgb, var(--ac-green-400) 20%, var(--ac-white-1));
+      color: var(--ac-green-600);
+    }
+
+    &--c2 {
+      background-color: color-mix(in srgb, var(--ac-light-blue-300) 20%, var(--ac-white-1));
+      color: var(--ac-light-blue-500);
+    }
+
+    &--c3 {
+      background-color: color-mix(in srgb, var(--ac-orange-1) 20%, var(--ac-white-1));
+      color: color-mix(in srgb, var(--ac-orange-1) 70%, var(--ac-grey-900));
+    }
+
+    &--c4 {
+      background-color: color-mix(in srgb, var(--ac-grey-700) 16%, var(--ac-white-1));
+      color: var(--ac-grey-800);
+    }
+  }
+}

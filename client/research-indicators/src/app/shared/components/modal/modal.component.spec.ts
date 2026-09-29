@@ -79,6 +79,29 @@ describe('ModalComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('disables animations only for a closed modal flagged skipCloseAnimation', () => {
+    const configWith = (createResult: object) =>
+      allModalsServiceMock.modalConfig.mockReturnValue({ ...defaultConfig, createResult } as any);
+
+    configWith({ isOpen: false, title: 'Test', skipCloseAnimation: true });
+    expect(component.animationsDisabled).toBe(true);
+
+    configWith({ isOpen: false, title: 'Test', skipCloseAnimation: false });
+    expect(component.animationsDisabled).toBe(false);
+
+    // Re-opening after an instant close must still animate in.
+    configWith({ isOpen: true, title: 'Test', skipCloseAnimation: true });
+    expect(component.animationsDisabled).toBe(false);
+  });
+
+  it('re-parents its host to <body> so the overlay stacks above the navbar, and removes it on destroy', () => {
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.parentElement).toBe(document.body);
+
+    fixture.destroy();
+    expect(document.body.contains(host)).toBe(false);
+  });
+
   it('showModal should delegate to allModalsService.isModalOpen', () => {
     allModalsServiceMock.isModalOpen.mockReturnValue({ isOpen: true, title: 'Test' });
     expect(component.showModal()).toEqual({ isOpen: true, title: 'Test' });
