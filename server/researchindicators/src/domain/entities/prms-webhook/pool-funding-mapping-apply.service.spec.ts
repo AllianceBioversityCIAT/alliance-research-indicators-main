@@ -1,5 +1,7 @@
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
 import { PrmsWebhookCallbackModule } from './prms-webhook-callback.module';
@@ -29,6 +31,54 @@ const INHERITED = {
   target_value: 'inherited-target',
   target_year: 2031,
 };
+
+// The live 2026-09-29 shape: PRMS names the indicator by its UUID, which is a
+// different identifier space from our numeric indicator_id. Only the lambda-toc
+// catalog bridges the two.
+const INDICATOR_UUID = '63e85c28-e0c2-4f85-b365-82cd0145ed8f';
+const CATALOG_INDICATOR_ID = 10999;
+
+const catalogResult = (): TocResult =>
+  ({
+    toc_result_id: 7169,
+    title: 'New title',
+    official_code: 'SP06',
+    indicators: [
+      {
+        indicator_id: CATALOG_INDICATOR_ID,
+        toc_result_indicator_id: INDICATOR_UUID,
+        indicator_description: 'Landscapes with an active plan',
+        unit_messurament: 'Landscapes',
+        targets: [
+          { target_value: '12', target_date: '2025' },
+          { target_value: '40', target_date: '2026' },
+        ],
+      },
+    ],
+  }) as unknown as TocResult;
+
+class FakeTocCatalog {
+  results: TocResult[] = [catalogResult()];
+  error: Error | null = null;
+  readonly getTocResults = jest.fn(async () => {
+    if (this.error) {
+      throw this.error;
+    }
+    return this.results;
+  });
+}
+
+const UPDATE_TOC_INDICATOR_SQL = `
+UPDATE result_pool_funding_toc_alignment
+SET indicator_id = ?,
+    indicator_description = ?,
+    quantitative_contribution = ?,
+    unit_messurament = ?,
+    target_value = ?,
+    target_year = ?
+WHERE id = ?
+  AND is_active = TRUE
+`;
 
 const DEACTIVATE_TOC_SQL = `
 UPDATE result_pool_funding_toc_alignment
@@ -237,6 +287,7 @@ describe('PoolFundingMappingApplyService', () => {
   let service: PoolFundingMappingApplyService;
   let warn: jest.SpyInstance;
   let errorLog: jest.SpyInstance;
+  let catalog: FakeTocCatalog;
 
   beforeEach(() => {
     db = new FakeApplyDb();
@@ -246,7 +297,11 @@ describe('PoolFundingMappingApplyService', () => {
     errorLog = jest
       .spyOn(LoggerUtil.prototype, '_error')
       .mockImplementation(() => undefined);
-    service = new PoolFundingMappingApplyService(db as unknown as DataSource);
+    catalog = new FakeTocCatalog();
+    service = new PoolFundingMappingApplyService(
+      db as unknown as DataSource,
+      catalog as unknown as TocIntegrationService,
+    );
   });
 
   afterEach(() => {
@@ -289,6 +344,149 @@ describe('PoolFundingMappingApplyService', () => {
       }),
     ];
   };
+
+  // --- Indicator adopted from the callback (2026-09-29) -------------------
+  //
+  // Owner's rule: the reviewer's own value has to win, because once a result
+  // is pushed the reporter can no longer edit the indicator. Inheriting the
+  // previous indicator across a ToC-result move left result 20017 pointing at
+  // indicator 10842 of ToC result 7188 while the row said 7169 -- a value the
+  // form could not even render.
+  const armIndicatorCase = (
+    mapping: Record<string, unknown> = {},
+    overrides: Record<string, unknown> = {},
+  ): void => {
+    db.history = {
+      decision: 'APPROVE',
+      correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+      result_official_code: CODE,
+      result_year: YEAR,
+      changes: {
+        ...titleChange(),
+        'Theory of Change result ID': { before: '7290', after: '7169' },
+      },
+      raw_body: primaryCallback('SP06', [
+        {
+          title: 'New title',
+          toc_result_id: 7169,
+          level: 'Intermediate Outcome',
+          indicators: [
+            {
+              toc_results_indicator_id: INDICATOR_UUID,
+              indicator_description: 'Landscapes with an active plan',
+              target_contribution: 55,
+            },
+            {
+              toc_results_indicator_id: INDICATOR_UUID,
+              indicator_description: 'N/A',
+              target_contribution: 55,
+            },
+          ],
+          ...mapping,
+        },
+      ]),
+      ...overrides,
+    };
+    db.sps = [primarySp()];
+    db.tocs = [tocRow()];
+  };
+
+  it('writes the callback indicator, not the inherited one, when the ToC result moves', async () => {
+    armIndicatorCase();
+
+    await apply();
+
+    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME');
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect(inserted).toBeDefined();
+    expectSql(inserted as RecordedQuery, INSERT_TOC_SQL, [
+      VERSION_RESULT_ID,
+      'SP06',
+      INHERITED.aligns_with_toc,
+      INHERITED.level,
+      7169,
+      CATALOG_INDICATOR_ID,
+      '55',
+      'New title',
+      'Landscapes with an active plan',
+      'Landscapes',
+      '40',
+      2026,
+    ]);
+  });
+
+  it('updates the active row in place when only the indicator changed', async () => {
+    armIndicatorCase(
+      { title: 'Old title', toc_result_id: 7290 },
+      {
+        changes: {
+          Indicator: {
+            before: 'inherited-indicator',
+            after: 'Landscapes with an active plan',
+          },
+        },
+      },
+    );
+    catalog.results = [
+      { ...catalogResult(), toc_result_id: 7290 } as unknown as TocResult,
+    ];
+
+    await apply();
+
+    expect(writes()).toHaveLength(1);
+    expectSql(writes()[0], UPDATE_TOC_INDICATOR_SQL, [
+      CATALOG_INDICATOR_ID,
+      'Landscapes with an active plan',
+      '55',
+      'Landscapes',
+      '40',
+      2026,
+      TOC_ID,
+    ]);
+  });
+
+  it('leaves the indicator alone when the callback entry is the N/A filler', async () => {
+    armIndicatorCase({
+      indicators: [
+        {
+          toc_results_indicator_id: INDICATOR_UUID,
+          indicator_description: 'N/A',
+        },
+      ],
+    });
+
+    await apply();
+
+    expect(catalog.getTocResults).not.toHaveBeenCalled();
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect((inserted as RecordedQuery).params[5]).toBe(INHERITED.indicator_id);
+    expect((inserted as RecordedQuery).params[8]).toBe(
+      INHERITED.indicator_description,
+    );
+  });
+
+  it('keeps the inherited indicator and logs when the catalog cannot resolve the UUID', async () => {
+    armIndicatorCase();
+    catalog.results = [];
+
+    await apply();
+
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect((inserted as RecordedQuery).params[5]).toBe(INHERITED.indicator_id);
+    expect(warn).toHaveBeenCalled();
+    expect(String(warn.mock.calls[0][0])).toContain(String(HISTORY_ID));
+  });
+
+  it('keeps the inherited indicator when the catalog call throws', async () => {
+    armIndicatorCase();
+    catalog.error = new Error('lambda-toc down');
+
+    await apply();
+
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect((inserted as RecordedQuery).params[5]).toBe(INHERITED.indicator_id);
+    expect(warn).toHaveBeenCalled();
+  });
 
   it('is provided by PrmsWebhookCallbackModule', () => {
     const providers: unknown[] = Reflect.getMetadata(

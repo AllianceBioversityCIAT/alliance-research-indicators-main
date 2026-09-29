@@ -353,9 +353,24 @@ const isPrimaryRole = (entry: Record<string, unknown>): boolean => {
   return role !== null && role.startsWith('Primary');
 };
 
+/**
+ * The mapping's usable indicator, read with the same first-entry rule the
+ * diff uses. `tocResultIndicatorId` is PRMS's UUID for the ToC indicator --
+ * a different identifier space from our numeric `indicator_id`, which only
+ * the lambda-toc catalog can bridge.
+ */
+export interface CallbackIndicator {
+  tocResultIndicatorId: string | null;
+  description: string | null;
+  targetContribution: string | null;
+}
+
 export interface CallbackTocMapping {
   title: string | null;
   tocResultId: string | null;
+  /** PRMS's label, e.g. `Intermediate Outcome`. Canonicalise with `tocLevelCode`. */
+  level: string | null;
+  indicator: CallbackIndicator | null;
 }
 
 /**
@@ -392,6 +407,8 @@ export const readCallbackPrimary = (rawBody: unknown): CallbackPrimary => {
   ).map((mapping) => ({
     title: scalar(mapping.title),
     tocResultId: scalar(mapping.toc_result_id),
+    level: scalar(mapping.level),
+    indicator: callbackIndicator(mapping),
   }));
   return {
     spCode: scalar(primary.official_code),
@@ -510,42 +527,60 @@ type IndicatorFieldResolution =
   | { kind: 'ambiguous' };
 
 /**
+ * PRMS pads `toc_mappings[].indicators[]` with filler entries whose
+ * description is literally `N/A` (observed on the APPROVE of result 20017,
+ * 2026-09-29: the real indicator, then a copy of it described as `N/A`,
+ * both carrying the same `toc_results_indicator_id`).
+ */
+const PLACEHOLDER_INDICATOR = 'N/A';
+
+const isPlaceholderIndicator = (entry: Record<string, unknown>): boolean => {
+  const description = scalar(entry.indicator_description);
+  return (
+    description === null || description.toUpperCase() === PLACEHOLDER_INDICATOR
+  );
+};
+
+/**
  * `toc_mappings[].indicators[]`, added to the callback 2026-09-29.
- * Owner's rule (2026-09-29): exactly one entry is a determinate value; a
- * mapping whose `indicators` key is present but holds zero or several
- * entries is ambiguous and must not be guessed at — the field is skipped
- * for the whole delivery, never averaged or defaulted to the first one. A
- * mapping with no `indicators` key at all (every callback before
- * 2026-09-29) is the ORIGINAL absence this field's "Not provided by PRMS"
- * branch exists for, and stays distinct from ambiguity: 'ambiguous' wins
- * over 'unprovided' when a delivery mixes both, because an anomaly PRMS
- * actually sent is a stronger signal than a mapping that predates the
- * capability.
+ *
+ * Owner's rule, revised the same day once the first live APPROVE showed
+ * what PRMS actually sends: read the FIRST entry and nothing else. If its
+ * description is the `N/A` filler the field is omitted; otherwise the first
+ * entry IS the value. Later entries are never consulted, so their shape
+ * cannot turn a determinate first entry into an ambiguous one — the earlier
+ * "exactly one entry or nothing" rule suppressed a perfectly readable
+ * indicator on every padded list.
+ *
+ * A mapping with no `indicators` key at all (every callback before
+ * 2026-09-29) is the ORIGINAL absence the "Not provided by PRMS" branch
+ * exists for, and stays distinct: a skip wins over 'unprovided' when a
+ * delivery mixes both, because something PRMS actually sent is a stronger
+ * signal than a mapping that predates the capability.
  */
 const resolveIndicatorField = (
   mappings: Record<string, unknown>[],
   key: 'indicator_description' | 'target_contribution',
 ): IndicatorFieldResolution => {
-  let sawAmbiguous = false;
+  let sawSkip = false;
   let sawAbsent = false;
   const values: string[] = [];
   for (const mapping of mappings) {
-    const raw = mapping.indicators;
-    if (raw === undefined) {
+    const entry = firstIndicator(mapping);
+    if (entry === 'absent') {
       sawAbsent = true;
       continue;
     }
-    if (!Array.isArray(raw) || raw.length !== 1) {
-      sawAmbiguous = true;
+    if (entry === null) {
+      sawSkip = true;
       continue;
     }
-    const entry = asRecord(raw[0]);
-    const value = entry ? scalar(entry[key]) : null;
+    const value = scalar(entry[key]);
     if (value !== null) {
       values.push(value);
     }
   }
-  if (sawAmbiguous) {
+  if (sawSkip) {
     return { kind: 'ambiguous' };
   }
   if (values.length > 0) {
@@ -553,6 +588,46 @@ const resolveIndicatorField = (
   }
   return sawAbsent ? { kind: 'unprovided' } : { kind: 'value', value: null };
 };
+
+/**
+ * The mapping's usable indicator: `'absent'` when the key is not there at
+ * all, `null` when it is there but unreadable (not a list, empty, or a
+ * filler first entry), otherwise the first entry.
+ */
+const firstIndicator = (
+  mapping: Record<string, unknown>,
+): Record<string, unknown> | null | 'absent' => {
+  const raw = mapping.indicators;
+  if (raw === undefined) {
+    return 'absent';
+  }
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return null;
+  }
+  const entry = asRecord(raw[0]);
+  if (!entry || isPlaceholderIndicator(entry)) {
+    return null;
+  }
+  return entry;
+};
+
+const callbackIndicator = (
+  mapping: Record<string, unknown>,
+): CallbackIndicator | null => {
+  const entry = firstIndicator(mapping);
+  if (entry === 'absent' || entry === null) {
+    return null;
+  }
+  return {
+    tocResultIndicatorId: scalar(entry.toc_results_indicator_id),
+    description: scalar(entry.indicator_description),
+    targetContribution: scalar(entry.target_contribution),
+  };
+};
+
+/** PRMS's level label (or our own code) as the lambda-toc category code. */
+export const tocLevelCode = (value: string | null): TocLevelCode | null =>
+  value === null ? null : levelCode(value);
 
 /** One value stays a scalar. Two copies stay a list, so a repeated mapping is visible until dedupe. */
 const collapse = (values: string[]): PoolFundingChangeValue => {
@@ -807,7 +882,7 @@ export class PoolFundingMappingDiffService {
       callback.quantitativeContribution.kind === 'ambiguous'
     ) {
       this.logger._warn(
-        `Pool-funding diff found a toc_mappings entry with zero or several indicators[] for result_id=${snapshot.resultId}; Indicator/Quantitative contribution left out for this delivery`,
+        `Pool-funding diff found a toc_mappings entry whose indicators[] has no usable first entry for result_id=${snapshot.resultId}; Indicator/Quantitative contribution left out for this delivery`,
       );
     }
 

@@ -677,18 +677,98 @@ describe('PoolFundingMappingDiffService', () => {
       expect(parsedChanges(table)).toEqual({});
     });
 
+    // Owner's rule, revised 2026-09-29 after the live APPROVE on result
+    // 20017: PRMS pads indicators[] with a filler entry whose description is
+    // "N/A". Read the FIRST entry and nothing else -- if it is filler, the
+    // field is omitted; otherwise it is the value. The later entries are not
+    // consulted at all, so their shape cannot make a determinate first entry
+    // ambiguous.
+    it('reads the first entry and ignores the "N/A" filler PRMS pads the list with', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+                indicators: [
+                  {
+                    indicator_description: 'Landscapes with an active plan',
+                    target_contribution: 55,
+                    toc_results_indicator_id:
+                      '63e85c28-e0c2-4f85-b365-82cd0145ed8f',
+                  },
+                  {
+                    indicator_description: 'N/A',
+                    target_contribution: 55,
+                    toc_results_indicator_id:
+                      '63e85c28-e0c2-4f85-b365-82cd0145ed8f',
+                  },
+                ],
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({
+        Indicator: {
+          before: 'Stored indicator',
+          after: 'Landscapes with an active plan',
+        },
+        'Quantitative contribution': { before: '35.00', after: '55' },
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('reads the first entry even when later entries carry different values', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+                indicators: [
+                  { indicator_description: 'A', target_contribution: 1 },
+                  { indicator_description: 'B', target_contribution: 2 },
+                ],
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({
+        Indicator: { before: 'Stored indicator', after: 'A' },
+        'Quantitative contribution': { before: '35.00', after: '1' },
+      });
+    });
+
+    // Single-entry cases on purpose: a "first entry wins" rule that forgot the
+    // filler check would emit a change whose after value is the literal "N/A".
     it.each([
-      ['zero entries', []],
-      [
-        'two entries',
-        [
-          { indicator_description: 'A', target_contribution: 1 },
-          { indicator_description: 'B', target_contribution: 2 },
-        ],
-      ],
+      ['an exact "N/A"', 'N/A', 1],
+      ['a lowercase "n/a"', 'n/a', 1],
+      ['a padded "N/A "', ' N/A ', 1],
+      ['"N/A" ahead of a real one', 'N/A', 2],
     ])(
-      'skips both fields and logs, never guessing, when indicators has %s',
-      async (_label, indicators) => {
+      'omits both fields, without guessing a later entry, when the first entry is %s',
+      async (_label, description, count) => {
         arm(
           {
             raw_body: callbackBody([
@@ -697,7 +777,20 @@ describe('PoolFundingMappingDiffService', () => {
                   title: 'Same title',
                   toc_result_id: 7290,
                   level: 'Intermediate Outcome',
-                  indicators,
+                  indicators: [
+                    {
+                      indicator_description: description,
+                      target_contribution: 9,
+                    },
+                    ...(count === 2
+                      ? [
+                          {
+                            indicator_description: 'Real one',
+                            target_contribution: 7,
+                          },
+                        ]
+                      : []),
+                  ],
                 },
               ]),
             ]),
@@ -711,17 +804,41 @@ describe('PoolFundingMappingDiffService', () => {
         await record();
 
         const changes = parsedChanges(table);
-        // Falsifier: an implementation that defaults to indicators[0] on
-        // the two-entry case would emit Indicator: {before, after: 'A'} —
-        // this assertion catches that the same way toBeUndefined() below
-        // catches a fall-through to "Not provided by PRMS".
         expect(changes.Indicator).toBeUndefined();
         expect(changes['Quantitative contribution']).toBeUndefined();
         expect(warn).toHaveBeenCalledTimes(1);
         expect(String(warn.mock.calls[0][0])).toContain('indicators[]');
-        expect(String(warn.mock.calls[0][0])).toContain(String(VERSION_ID));
       },
     );
+
+    it('omits both fields and logs when indicators is present but empty', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+                indicators: [],
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      const changes = parsedChanges(table);
+      expect(changes.Indicator).toBeUndefined();
+      expect(changes['Quantitative contribution']).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(String(VERSION_ID));
+    });
 
     it('still reports "Not provided by PRMS" when the mapping has no indicators key at all (the pre-2026-09-29 shape)', async () => {
       arm(
