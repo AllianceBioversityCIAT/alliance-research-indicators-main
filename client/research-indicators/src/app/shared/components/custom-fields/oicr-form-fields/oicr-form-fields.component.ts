@@ -5,7 +5,8 @@ import { SelectComponent } from '../select/select.component';
 import { TextareaComponent } from '../textarea/textarea.component';
 import { InputComponent } from '../input/input.component';
 import { OICR_HELPER_TEXTS } from '@shared/constants/oicr-helper-texts.constants';
-import { OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { ExistingOicrSource, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { OicrResultsService } from '@shared/services/short-control-list/oicr-results.service';
 import { FastResponseData } from '@shared/interfaces/fast-response.interface';
 import { PROMPT_OICR_DETAILS } from '@shared/constants/result-ai.constants';
 import { ApiService } from '@shared/services/api.service';
@@ -15,6 +16,7 @@ import { ActionsService } from '@shared/services/actions.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { CreateResultManagementService } from '../../all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { normalizeStepThree } from '@shared/utils/geographic-scope.util';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 
 type OicrFormBody = OicrCreation | PatchOicr;
 
@@ -29,7 +31,7 @@ function isPatchOicr(body: OicrFormBody): body is PatchOicr {
 @Component({
   selector: 'app-oicr-form-fields',
   standalone: true,
-  imports: [CommonModule, SelectComponent, TextareaComponent, InputComponent, TooltipModule],
+  imports: [CommonModule, SelectComponent, TextareaComponent, InputComponent, TooltipModule, CustomTagComponent],
   templateUrl: './oicr-form-fields.component.html'
 })
 export class OicrFormFieldsComponent {
@@ -63,6 +65,7 @@ export class OicrFormFieldsComponent {
   aiError = signal('');
   rolesService = inject(RolesService);
   createResultManagementService = inject(CreateResultManagementService);
+  private readonly oicrResultsService = inject(OicrResultsService);
   private aiTimeoutId: number | null = null;
 
   taggingHelperText = OICR_HELPER_TEXTS.taggingHelperText;
@@ -90,12 +93,22 @@ export class OicrFormFieldsComponent {
   }
 
   onSelectOicr(external_oicr_id: number) {
-    this.getOicrMetadata(external_oicr_id);
+    // The list mixes TEMP_external_oicrs rows and OICRs from results: keep which
+    // table the id belongs to next to it (link_result.source).
+    const source: ExistingOicrSource =
+      this.oicrResultsService.list().find(oicr => oicr.id === external_oicr_id)?.source ?? 'external';
+    const sourcePath = this.oicrOptionValue.body.replace(/external_oicr_id$/, 'source');
+    this.body.update(current => {
+      const next = { ...current };
+      this.utils.setNestedPropertyWithReduce(next, sourcePath, source);
+      return next;
+    });
+    this.getOicrMetadata(external_oicr_id, source);
   }
 
-  async getOicrMetadata(externalOicrId: number) {
+  async getOicrMetadata(externalOicrId: number, source?: ExistingOicrSource) {
     this.createResultManagementService.autofillinOicr.set(true);
-    const response = await this.api.GET_OICRMetadata(externalOicrId);
+    const response = await this.api.GET_OICRMetadata(externalOicrId, source);
     if (!response.successfulRequest) return;
     // Pre-fill OICR form fields with metadata
     const stepThree = normalizeStepThree(response.data.step_three);

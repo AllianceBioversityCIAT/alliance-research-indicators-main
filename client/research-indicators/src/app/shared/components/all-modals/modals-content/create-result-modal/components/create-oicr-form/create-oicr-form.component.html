@@ -214,85 +214,91 @@
     <div id="contributors" class="flex-col flex gap-[20px] bg-white border-[#E8EBED] border-1 rounded-[15px] p-6">
       <p class="text-[15px] font-[800] text-[#112F5C]">CONTRIBUTORS</p>
 
+      @let stepTwoDisabled = !canEditOicr || isStatusLocked();
+      @let stepTwoLabels = this.stepTwoLabels();
+
+      <!-- One option / selected-row rendering for both pickers. Research Areas
+           (Portfolio 2) have no short name or icon; Portfolio 1 levers do. -->
+      <ng-template #stepTwoOption let-item>
+        <div class="flex items-center gap-2 text-[#4C5158]">
+          @if (item?.short_name) {
+          <span class="font-[600]">
+            {{ item?.short_name }}: <span class="font-['Barlow'] font-normal">{{ item?.other_names }}</span></span>
+          } @else {
+          <span class="font-['Barlow'] font-normal">{{ item?.full_name }}</span>
+          }
+        </div>
+      </ng-template>
+
+      <ng-template #stepTwoRow let-lever>
+        <div class="flex w-full min-w-0 flex-col gap-3">
+          <div
+            class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
+            @if (lever?.icon) {
+            <img [src]="lever.icon" [alt]="lever.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
+            }
+            <span class="text-[15px] text-[#4C5158] font-[600]">
+              @if (lever?.short_name) {
+              {{ lever?.short_name }}: <span class="font-['Barlow'] font-normal">{{ lever?.other_names }}</span>
+              } @else {
+              {{ lever?.full_name }}
+              }
+            </span>
+          </div>
+          @if (isOtherLever(lever)) {
+          <!-- Nested under the selected option, not a sibling field of the picker. -->
+          <div class="border-l-2 border-[var(--ac-grey-200)] pl-4" [class]="lever?.icon ? 'ml-[43px]' : 'ml-1'">
+            <app-input label="Name of the team or area creating the result"
+              [signal]="getLeverCustomNameSignal(lever)" optionValue="custom_lever_name" [isRequired]="true"
+              [disabled]="stepTwoDisabled" placeholder="Write the team or area name"></app-input>
+          </div>
+          }
+        </div>
+      </ng-template>
+
       <div class="grid gap-[10px]">
         <div class="flex flex-col pt-2">
-          <app-multiselect label="Primary Levers"
-            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+          <app-multiselect [label]="stepTwoLabels.primary" [disabled]="stepTwoDisabled"
             [signal]="createResultManagementService.createOicrBody" optionValue="lever_id"
-            [textSpan]="'Levers selected'" signalOptionValue="step_two.primary_lever" [isRequired]="true"
+            [textSpan]="stepTwoLabels.selected" signalOptionValue="step_two.primary_lever" [isRequired]="true"
             scrollHeight="260px" serviceName="levers" [serviceParams]="leverServiceParams()"
-            [optionsDisabled]="primaryOptionsDisabled" placeholder="Select the levers">
+            [optionsDisabled]="primaryOptionsDisabled" [placeholder]="stepTwoLabels.placeholder">
             <ng-template #selectedItems let-value>
               @if (value?.length > 0) {
               <div class="flex items-center gap-2">
-                <span>{{ value?.length }} Lever{{ value?.length === 1 ? '' : 's' }} selected </span>
+                <span>{{ value?.length }} {{ value?.length === 1 ? stepTwoLabels.singular : stepTwoLabels.plural }}
+                  selected</span>
               </div>
               }
             </ng-template>
             <ng-template #item let-item>
-              <div class="flex items-center gap-2 text-[##4C5158]">
-                <span class="font-[600]">
-                  {{ item?.short_name }}: <span class="font-['Barlow'] font-normal">{{ item?.other_names
-                    }}</span></span>
-              </div>
+              <ng-container *ngTemplateOutlet="stepTwoOption; context: { $implicit: item }"></ng-container>
             </ng-template>
             <ng-template #rows let-lever>
-              <div class="flex w-full min-w-0 flex-col gap-3">
-                <div
-                  class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
-                  <img [src]="lever.icon" [alt]="lever.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
-                  <span class="text-[15px] text-[#4C5158] font-[600]">
-                    {{ lever?.short_name }}: <span class="font-['Barlow'] font-normal">{{ lever?.other_names
-                      }}</span></span>
-                </div>
-                @if (isOtherLever(lever)) {
-                <app-input label="Name of the team or area creating the result"
-                  [signal]="getLeverCustomNameSignal(lever)" optionValue="custom_lever_name" [isRequired]="true"
-                  [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
-                  placeholder="Write the team or area name"></app-input>
-                }
-              </div>
+              <ng-container *ngTemplateOutlet="stepTwoRow; context: { $implicit: lever }"></ng-container>
             </ng-template>
           </app-multiselect>
         </div>
 
         <div class="flex flex-col pt-4">
-          <app-multiselect label="Contributing Levers"
-            [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
+          <app-multiselect [label]="stepTwoLabels.contributing" [disabled]="stepTwoDisabled"
             [signal]="createResultManagementService.createOicrBody" optionValue="lever_id"
-            signalOptionValue="step_two.contributor_lever" [textSpan]="'Levers selected'" scrollHeight="260px"
+            signalOptionValue="step_two.contributor_lever" [textSpan]="stepTwoLabels.selected" scrollHeight="260px"
             serviceName="levers" [serviceParams]="leverServiceParams()" [optionsDisabled]="optionsDisabled"
-            placeholder="Select the levers">
+            [placeholder]="stepTwoLabels.placeholder">
             <ng-template #selectedItems let-value>
               @if (value?.length > 0) {
               <div class="flex items-center gap-2">
-                <span>{{ value?.length }} Lever{{ value?.length === 1 ? '' : 's' }} selected </span>
+                <span>{{ value?.length }} {{ value?.length === 1 ? stepTwoLabels.singular : stepTwoLabels.plural }}
+                  selected</span>
               </div>
               }
             </ng-template>
             <ng-template #item let-item>
-              <div class="flex items-center gap-2">
-                <span class="font-[600] text-[##4C5158]">
-                  {{ item?.short_name }}: <span class="font-['Barlow'] font-normal">{{ item?.other_names
-                    }}</span></span>
-              </div>
+              <ng-container *ngTemplateOutlet="stepTwoOption; context: { $implicit: item }"></ng-container>
             </ng-template>
             <ng-template #rows let-lever>
-              <div class="flex w-full min-w-0 flex-col gap-3">
-                <div
-                  class="flex items-center pt-1 xl:pt-0.5 text-[13px] leading-[18px] text-[#4C5158] gap-x-1 font-['Barlow'] font-[600]">
-                  <img [src]="lever.icon" [alt]="lever.short_name" class="w-[35px] h-[35px] mr-2 rounded-[3px]" />
-                  <span class="text-[15px] text-[#4C5158] font-[600]">
-                    {{ lever?.short_name }}: <span class="font-['Barlow'] font-normal">{{ lever?.other_names
-                      }}</span></span>
-                </div>
-                @if (isOtherLever(lever)) {
-                <app-input label="Name of the team or area creating the result"
-                  [signal]="getLeverCustomNameSignal(lever)" optionValue="custom_lever_name" [isRequired]="true"
-                  [disabled]="!canEditOicr || this.createResultManagementService.statusId() === 10 || this.createResultManagementService.statusId() === 12 || this.createResultManagementService.statusId() === 14 || this.createResultManagementService.statusId() === 13 || this.createResultManagementService.statusId() === 15 || this.createResultManagementService.statusId() === 11"
-                  placeholder="Write the team or area name"></app-input>
-                }
-              </div>
+              <ng-container *ngTemplateOutlet="stepTwoRow; context: { $implicit: lever }"></ng-container>
             </ng-template>
           </app-multiselect>
         </div>
