@@ -9,7 +9,7 @@
 | Approval Mode | `gated` |
 | Leader | Claude (Opus 5.5) · Implementer wrapper `akili-implementer` · Reviewer wrapper `akili-reviewer` |
 | Jira | epic AC-1773 — mark each sub-task / story Done when it closes (AC workflow has no direct Open → Done) |
-| Status | **paused before T-01** — scratch schema cannot apply existing migrations (see Run 2); awaiting the dev team |
+| Status | **ready to start T-01** — scratch schema loaded from a current `stardb` dump (Run 3) |
 
 ## Task Execution History
 
@@ -48,3 +48,19 @@
   1. What charset/collation does Dev's `agresso_contracts.agreement_id` have today?
   2. Was `1787600000000-createPiDelegates.ts` edited after it had been applied anywhere?
   3. Should `baseline.sql` be refreshed?
+
+### 2026-09-29 — Run 3: scratch schema loaded from a current database dump; blocker cleared
+
+- **Source (user-provided):** `~/Downloads/stardb-20260928_23_40_01.sql`, 52 MB. `mysqldump` 8.0.42 against server 8.4.8; host header `roardb…us-east-1.rds.amazonaws.com`, database `stardb`.
+- **Contains real data:** 214 `INSERT` statements, including `sec_users`, `results` and `agresso_contracts`, with 16 `@cgiar.org` addresses. For that reason:
+  - it is loaded **only into the local disposable scratch container** (`127.0.0.1:3307`);
+  - `src/db/baseline/baseline.sql` (schema-only by rule) is **not** replaced;
+  - the dump is never committed or copied into the repo.
+- **Load:** the container was recreated, and the dump was piped with `DEFINER=` clauses stripped (the same mechanical fix as the baseline README), in 8.4 s with no errors. Result: 219 tables and views, 365 `migrations` rows, 14,601 `results`.
+- **Confirms the Run 2 hypothesis:** in this dump, `agresso_contracts` and `pi_delegates` are both `utf8mb4 / utf8mb4_0900_ai_ci`, so the committed baseline was stale.
+- **Pending migrations:** `npm run migration:test:execute` → `No migrations are pending`.
+- **Still for the dev team:**
+  - `1787600000000-createPiDelegates.ts` was edited after merge (`027bc60f`), against root `CLAUDE.md` §4.1;
+  - the committed `baseline.sql` (2026-08-14) is stale and should be refreshed as a separate change.
+  Neither is in this spec's scope.
+- **MySQL version note:** the scratch image is `mysql:8.0` (8.0.46); the source server is 8.4.8. The load succeeded on 8.0. The image is left unchanged (`docker-compose.test.yml` is a shared file).
