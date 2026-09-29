@@ -119,6 +119,21 @@ const reviewerName = (row: Record<string, unknown>): string | null => {
   return asNullableString(row.reviewer_name);
 };
 
+/**
+ * `result_prms_sync_history.changes`, written by
+ * `PoolFundingMappingDiffService`. Cast direct, no `JSON.parse` — mysql2
+ * already hands back a parsed object for a JSON column, the same
+ * convention `PrmsWebhookDeliveryRepository` uses for `raw_body`
+ * (`prms-webhook-delivery.repository.ts:107`). `EVENTS_SQL`'s `h.*`
+ * already selects the column; this was the one line missing between the
+ * database and the wire — the diff computed and persisted correctly, the
+ * response just never carried it.
+ */
+const asChanges = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
 export function mapHistoryEvent(
   row: Record<string, unknown>,
 ): PrmsSyncHistoryEventDto {
@@ -134,6 +149,7 @@ export function mapHistoryEvent(
     actor_name_short: actorNameShort(row),
     reviewer_name: reviewerName(row),
     reviewer_role: asNullableString(row.reviewer_role),
+    changes: asChanges(row.changes),
   };
 }
 

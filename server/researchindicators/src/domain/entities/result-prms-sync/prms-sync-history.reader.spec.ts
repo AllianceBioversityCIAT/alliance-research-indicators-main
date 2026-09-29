@@ -42,6 +42,7 @@ type FixtureRow = {
   is_active: boolean;
   result_official_code: number;
   result_year: number;
+  changes: Record<string, unknown> | null;
 };
 
 const FIXTURE: FixtureRow[] = [
@@ -61,6 +62,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: null,
   },
   {
     id: 102,
@@ -78,6 +80,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: null,
   },
   {
     id: 103,
@@ -95,6 +98,9 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: {
+      'Theory of Change level': { before: 'EOI', after: '2030 Outcome' },
+    },
   },
   {
     id: 104,
@@ -112,6 +118,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: null,
   },
   {
     id: 105,
@@ -129,6 +136,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: null,
   },
   {
     id: 106,
@@ -146,6 +154,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: false,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    changes: null,
   },
   {
     id: 107,
@@ -163,6 +172,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: FOREIGN_YEAR,
+    changes: null,
   },
 ];
 
@@ -246,11 +256,21 @@ describe('PrmsSyncHistoryReader', () => {
     expect(head.reviewer_name).toBe('Carmen Reviewer');
     expect(head.reviewer_role).toBe('PI');
     expect(head.justification).toBe('  looks good\n');
+    // Regression: `changes` was computed and persisted by
+    // PoolFundingMappingDiffService but mapHistoryEvent never copied it
+    // onto the wire DTO, so the client's "See what changed" link never
+    // appeared no matter what the diff found. Red before this line was
+    // added to the reader; the assertion is on the actual object the diff
+    // wrote, not a fixture invented for the test.
+    expect(head.changes).toEqual({
+      'Theory of Change level': { before: 'EOI', after: '2030 Outcome' },
+    });
 
     const star = history.events.find((event) => event.id === 102);
     expect(star?.actor_name).toBe('Bea Bravo');
     expect(star?.actor_name_short).toBe('Bea Bravo');
     expect(star?.reviewer_name).toBeNull();
+    expect(star?.changes).toBeNull();
 
     expect(history.events.map((event) => event.id)).not.toContain(105);
     expect(history.events.map((event) => event.id)).not.toContain(106);

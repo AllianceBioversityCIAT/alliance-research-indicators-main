@@ -49,6 +49,19 @@ export class PrmsSyncHistoryEventDto {
 
   @ApiProperty({ type: String, nullable: true })
   reviewer_role: string | null;
+
+  @ApiProperty({
+    type: Object,
+    nullable: true,
+    description:
+      'Field-level diff computed by PoolFundingMappingDiffService: ' +
+      '{ "<label>": { before, after } }. `{}` means the diff ran and found ' +
+      'nothing to report; `null` means it has not run on this row (rows ' +
+      'from before that service shipped, or non-CORRELATED / non-PRMS ' +
+      'events). The client renders the "See what changed" link only when ' +
+      'this is a non-empty object.',
+  })
+  changes: Record<string, unknown> | null;
 }
 
 export class PrmsSyncHistoryDto {
