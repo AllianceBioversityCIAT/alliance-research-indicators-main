@@ -8,6 +8,7 @@ import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.servi
 import { PrmsWebhookCallbackController } from './prms-webhook-callback.controller';
 import { PrmsWebhookDeliveryService } from './prms-webhook-delivery.service';
 import { PrmsWebhookDeliveryRepository } from './repositories/prms-webhook-delivery.repository';
+import { TocIntegrationModule } from '../../tools/toc-integration/toc-integration.module';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/decision-webhook — T-04.
 // Own module, not a second controller on PrmsWebhookModule.
@@ -34,6 +35,9 @@ export class PrmsCallbackLenientJson implements OnModuleInit {
 }
 
 @Module({
+  // PoolFundingMappingApplyService needs the ToC catalog to turn PRMS's
+  // indicator UUID into the numeric indicator_id our rows store.
+  imports: [TocIntegrationModule],
   controllers: [PrmsWebhookCallbackController],
   providers: [
     CallbackSecretGuard,

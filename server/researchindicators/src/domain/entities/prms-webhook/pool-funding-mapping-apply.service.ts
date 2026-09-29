@@ -13,7 +13,14 @@ import {
   applicableChanges,
   readCallbackPrimary,
   resolveActiveSnapshot,
+  tocLevelCode,
 } from './pool-funding-mapping-diff.service';
+import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import {
+  TocIndicator,
+  TocResult,
+} from '../../tools/toc-integration/dto/toc-integration.types';
+import { MAPPABLE_LIVE_VERSION } from '../bilateral/utils/toc-level-rules.util';
 
 /**
  * Applies an approved pool-funding diff onto the version's own rows.
@@ -75,6 +82,20 @@ VALUES (?, ?, ?, NULL, TRUE)
 const DEACTIVATE_TOC_SQL = `
 UPDATE result_pool_funding_toc_alignment
 SET is_active = FALSE
+WHERE id = ?
+  AND is_active = TRUE
+`;
+
+// The ToC result did not move, only the indicator under it. Deactivate+insert
+// would version a row for a change that fits in place.
+const UPDATE_TOC_INDICATOR_SQL = `
+UPDATE result_pool_funding_toc_alignment
+SET indicator_id = ?,
+    indicator_description = ?,
+    quantitative_contribution = ?,
+    unit_messurament = ?,
+    target_value = ?,
+    target_year = ?
 WHERE id = ?
   AND is_active = TRUE
 `;
@@ -183,6 +204,56 @@ const scalar = (value: unknown): string | null => {
  * The callback does not carry these eight columns. They are copied from the
  * row being deactivated and must not be defaulted, blanked, or recomputed.
  */
+/**
+ * The callback's indicator, once the lambda-toc catalog has bridged PRMS's
+ * `toc_results_indicator_id` (a UUID) to our numeric `indicator_id`. Without
+ * that bridge the client cannot render the value at all: its dropdown binds
+ * the numeric id and looks it up inside the SELECTED ToC result.
+ */
+interface ResolvedIndicator {
+  indicatorId: number;
+  description: string | null;
+  unitMeasurement: string | null;
+  targetValue: string | null;
+  targetYear: number;
+  quantitativeContribution: string | null;
+}
+
+/**
+ * The reviewer's indicator replaces the inherited one. Owner's rule,
+ * 2026-09-29: a reporter cannot edit this field after the push, so a value
+ * PRMS sent must win over one carried across from the previous ToC result --
+ * which, after a ToC-result move, no longer exists under the new result.
+ * `quantitative_contribution` only yields when PRMS actually sent one.
+ */
+const withResolvedIndicator = (
+  inherited: InheritedToc,
+  resolved: ResolvedIndicator | null,
+): InheritedToc =>
+  resolved === null
+    ? inherited
+    : {
+        ...inherited,
+        indicator_id: resolved.indicatorId,
+        indicator_description: resolved.description,
+        quantitative_contribution:
+          resolved.quantitativeContribution ??
+          inherited.quantitative_contribution,
+        unit_messurament: resolved.unitMeasurement,
+        target_value: resolved.targetValue,
+        target_year: resolved.targetYear,
+      };
+
+/**
+ * Mirrors `BilateralService.resolveLiveTargetValue` (R-BIL-090 AC.3): the
+ * `targets[]` entry for the live version wins, else null. Written here rather
+ * than shared so the webhook path does not pull in the bilateral service.
+ */
+const liveTargetValue = (indicator: TocIndicator): string | null =>
+  (indicator.targets ?? []).find(
+    (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+  )?.target_value ?? null;
+
 const inheritedFrom = (row: TocRow): InheritedToc => ({
   aligns_with_toc: cell(row.aligns_with_toc),
   level: cell(row.level),
@@ -378,7 +449,10 @@ export class PoolFundingMappingApplyService {
     name: PoolFundingMappingApplyService.name,
   });
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly tocIntegration: TocIntegrationService,
+  ) {}
 
   /**
    * Never throws. A failure here must not rewrite correlation_outcome or
@@ -441,6 +515,13 @@ export class PoolFundingMappingApplyService {
       return;
     }
 
+    // Resolved OUTSIDE the transaction: it reaches lambda-toc over HTTP, and
+    // a network round trip does not belong inside an open write transaction.
+    const resolvedIndicator = await this.resolveIndicator(
+      input.historyId,
+      row.raw_body,
+    );
+
     await this.dataSource.transaction(async (manager) => {
       const current = await this.loadActive(manager, snapshot.resultId);
       const writes = this.plan(
@@ -448,6 +529,7 @@ export class PoolFundingMappingApplyService {
         changes,
         row.raw_body,
         current,
+        resolvedIndicator,
       );
       for (const write of writes) {
         await manager.query(write.sql, write.params);
@@ -491,11 +573,106 @@ export class PoolFundingMappingApplyService {
     };
   }
 
+  /**
+   * PRMS names the indicator by `toc_results_indicator_id`, a UUID. Our
+   * `indicator_id` is the lambda-toc numeric id, and the client's dropdown
+   * binds that number and resolves it INSIDE the selected ToC result -- so a
+   * numeric id carried over from a different ToC result renders as an empty
+   * field, which is exactly what result 20017 showed. Only the catalog bridges
+   * the two spaces, so an unreachable or unmatched catalog means we write
+   * nothing rather than a number we cannot vouch for.
+   */
+  private async resolveIndicator(
+    historyId: number,
+    rawBody: unknown,
+  ): Promise<ResolvedIndicator | null> {
+    const callback = readCallbackPrimary(rawBody);
+    if (callback.mappings.length !== 1) {
+      return null;
+    }
+    const mapping = callback.mappings[0];
+    const indicator = mapping.indicator;
+    // No usable entry: the diff already logged why, and the previous value
+    // stays. Not a skip -- there is nothing PRMS asked us to write.
+    if (indicator === null) {
+      return null;
+    }
+    const sp = callback.spCode;
+    const level = tocLevelCode(mapping.level);
+    const tocResultId = integerId(mapping.tocResultId);
+    if (sp === null || level === null || tocResultId === null) {
+      this.logger._warn(
+        `Pool-funding apply cannot resolve the callback indicator for history id=${historyId}: sp=${sp ?? 'none'} level=${mapping.level ?? 'none'} toc_result_id=${mapping.tocResultId ?? 'none'}; the stored indicator is left in place`,
+      );
+      return null;
+    }
+
+    let results: TocResult[];
+    try {
+      results = await this.tocIntegration.getTocResults(sp, level);
+    } catch (error) {
+      this.logger._warn(
+        `Pool-funding apply could not read the ToC catalog for history id=${historyId} (${sp}/${level}): ${errorText(error)}; the stored indicator is left in place`,
+      );
+      return null;
+    }
+
+    const tocResult = results.find(
+      (entry) => entry.toc_result_id === tocResultId,
+    );
+    const match = tocResult
+      ? this.matchIndicator(
+          tocResult,
+          indicator.tocResultIndicatorId,
+          indicator.description,
+        )
+      : undefined;
+    if (!match) {
+      this.logger._warn(
+        `Pool-funding apply found no catalog indicator for history id=${historyId} (${sp}/${level} toc_result_id=${tocResultId} toc_results_indicator_id=${indicator.tocResultIndicatorId ?? 'none'}); the stored indicator is left in place`,
+      );
+      return null;
+    }
+    return {
+      indicatorId: match.indicator_id,
+      description: match.indicator_description ?? indicator.description,
+      unitMeasurement: match.unit_messurament ?? null,
+      targetValue: liveTargetValue(match),
+      targetYear: MAPPABLE_LIVE_VERSION,
+      quantitativeContribution: indicator.targetContribution,
+    };
+  }
+
+  /**
+   * The UUID is the identity; the description is a last resort for a catalog
+   * that has not caught up with PRMS's id, and it has to be an exact match.
+   */
+  private matchIndicator(
+    tocResult: TocResult,
+    uuid: string | null,
+    description: string | null,
+  ): TocIndicator | undefined {
+    const indicators = tocResult.indicators ?? [];
+    const byId =
+      uuid === null
+        ? undefined
+        : indicators.find((entry) => entry.toc_result_indicator_id === uuid);
+    if (byId) {
+      return byId;
+    }
+    return description === null
+      ? undefined
+      : indicators.find(
+          (entry) => entry.indicator_description?.trim() === description,
+        );
+  }
+
   private plan(
     input: PoolFundingApplyInput,
     changes: PoolFundingChanges,
     rawBody: unknown,
     current: { alignmentId: number | null; sps: SpRow[]; tocs: TocRow[] },
+    resolved: ResolvedIndicator | null,
   ): PlannedWrite[] {
     const writes: PlannedWrite[] = [];
     const primary = this.onlyPrimary(input, current.sps);
@@ -517,9 +694,22 @@ export class PoolFundingMappingApplyService {
         primary === 'ambiguous' ? null : primary,
         current.tocs,
         writes,
+        resolved,
       );
     } else if (primary !== 'ambiguous') {
-      this.planTocFields(input, changes, primary, current.tocs, writes);
+      this.planTocFields(
+        input,
+        changes,
+        primary,
+        current.tocs,
+        writes,
+        resolved,
+      );
+      // The row was not rewritten, so an indicator-only edit still needs a
+      // home. Guarded on the insert so a rewritten row is never touched twice.
+      if (!writes.some((write) => write.sql === INSERT_TOC_SQL)) {
+        this.planIndicatorOnly(input, primary, current.tocs, writes, resolved);
+      }
     }
     this.planContributing(
       input,
@@ -601,6 +791,7 @@ export class PoolFundingMappingApplyService {
     previousPrimary: SpRow | null,
     tocs: TocRow[],
     writes: PlannedWrite[],
+    resolved: ResolvedIndicator | null,
   ): void {
     if (!previousPrimary) {
       this.skip(input, 'primary changed but there is no previous PRIMARY row');
@@ -645,7 +836,7 @@ export class PoolFundingMappingApplyService {
       );
       return;
     }
-    const inherited = inheritedFrom(source);
+    const inherited = withResolvedIndicator(inheritedFrom(source), resolved);
     const existing = tocs.find((row) => row.sp_code === newSpCode) ?? null;
     const alreadyApplied =
       existing !== null &&
@@ -681,6 +872,7 @@ export class PoolFundingMappingApplyService {
     primary: SpRow | null,
     tocs: TocRow[],
     writes: PlannedWrite[],
+    resolved: ResolvedIndicator | null,
   ): void {
     const titleChange = readChange(changes, TOC_RESULT);
     const idChange = readChange(changes, TOC_RESULT_ID);
@@ -745,7 +937,7 @@ export class PoolFundingMappingApplyService {
       return;
     }
 
-    const inherited = inheritedFrom(source);
+    const inherited = withResolvedIndicator(inheritedFrom(source), resolved);
     writes.push({ sql: DEACTIVATE_TOC_SQL, params: [source.id] });
     writes.push({
       sql: INSERT_TOC_SQL,
@@ -756,6 +948,53 @@ export class PoolFundingMappingApplyService {
         nextTitle,
         inherited,
       ),
+    });
+  }
+
+  /**
+   * The ToC result stayed put and PRMS named an indicator that differs from
+   * ours. Updating in place keeps the row's identity; the deactivate+insert
+   * path exists for a ToC result that actually moved.
+   */
+  private planIndicatorOnly(
+    input: PoolFundingApplyInput,
+    primary: SpRow | null,
+    tocs: TocRow[],
+    writes: PlannedWrite[],
+    resolved: ResolvedIndicator | null,
+  ): void {
+    if (resolved === null || !primary) {
+      return;
+    }
+    const source = this.tocForSp(input, tocs, primary.sp_code);
+    if (!source) {
+      return;
+    }
+    const next = withResolvedIndicator(inheritedFrom(source), resolved);
+    const unchanged =
+      sameCell(source.indicator_id, next.indicator_id) &&
+      sameCell(source.indicator_description, next.indicator_description) &&
+      sameCell(
+        source.quantitative_contribution,
+        next.quantitative_contribution,
+      ) &&
+      sameCell(source.unit_messurament, next.unit_messurament) &&
+      sameCell(source.target_value, next.target_value) &&
+      sameCell(source.target_year, next.target_year);
+    if (unchanged) {
+      return;
+    }
+    writes.push({
+      sql: UPDATE_TOC_INDICATOR_SQL,
+      params: [
+        next.indicator_id,
+        next.indicator_description,
+        next.quantitative_contribution,
+        next.unit_messurament,
+        next.target_value,
+        next.target_year,
+        source.id,
+      ],
     });
   }
 
