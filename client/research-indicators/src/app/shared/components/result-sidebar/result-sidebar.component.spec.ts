@@ -822,6 +822,29 @@ describe('ResultSidebarComponent', () => {
       fixture.detectChanges();
     };
 
+    // 2026-09-29: the push is a round trip to PRMS and can take seconds. Without
+    // a moving affordance the disabled grey button reads as "nothing happened".
+    // The arrows themselves spin -- `pi-sync` is kept, `pi-spin` is added -- so
+    // the icon never swaps out from under the user mid-request.
+    it('spins the sync arrows while the push is in flight', () => {
+      enablePrmsSyncButton();
+
+      const icon = () => fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"] i');
+      expect(icon()?.classList.contains('pi-sync')).toBe(true);
+      expect(icon()?.classList.contains('pi-spin')).toBe(false);
+
+      component.prmsSyncInFlight.set(true);
+      fixture.detectChanges();
+
+      expect(icon()?.classList.contains('pi-sync')).toBe(true);
+      expect(icon()?.classList.contains('pi-spin')).toBe(true);
+
+      component.prmsSyncInFlight.set(false);
+      fixture.detectChanges();
+
+      expect(icon()?.classList.contains('pi-spin')).toBe(false);
+    });
+
     it('calls POST_PrmsSync exactly once when the enabled button is clicked', async () => {
       enablePrmsSyncButton();
       (apiService.POST_PrmsSync as jest.Mock).mockResolvedValue({ successfulRequest: true });

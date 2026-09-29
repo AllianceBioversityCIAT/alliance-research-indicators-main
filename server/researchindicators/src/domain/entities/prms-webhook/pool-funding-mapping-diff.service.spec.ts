@@ -570,6 +570,154 @@ describe('PoolFundingMappingDiffService', () => {
     });
   });
 
+  // Added to the callback 2026-09-29 under toc_mappings[].indicators[].
+  // Real shape observed the same day: target_contribution is a NUMBER
+  // (1), not a string — scalar() must still stringify it.
+  describe('indicators[] (added 2026-09-29)', () => {
+    it('emits a real diff for Indicator and Quantitative contribution from the one indicators entry', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+                indicators: [
+                  {
+                    indicator_description: 'PRMS indicator text',
+                    target_contribution: 1,
+                  },
+                ],
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({
+        Indicator: { before: 'Stored indicator', after: 'PRMS indicator text' },
+        'Quantitative contribution': { before: '35.00', after: '1' },
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('omits both fields, unchanged, and no marker, when the callback repeats our own values', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+                indicators: [
+                  {
+                    indicator_description: 'Stored indicator',
+                    target_contribution: '35.00',
+                  },
+                ],
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      expect(parsedChanges(table)).toEqual({});
+    });
+
+    it.each([
+      ['zero entries', []],
+      [
+        'two entries',
+        [
+          { indicator_description: 'A', target_contribution: 1 },
+          { indicator_description: 'B', target_contribution: 2 },
+        ],
+      ],
+    ])(
+      'skips both fields and logs, never guessing, when indicators has %s',
+      async (_label, indicators) => {
+        arm(
+          {
+            raw_body: callbackBody([
+              primary([
+                {
+                  title: 'Same title',
+                  toc_result_id: 7290,
+                  level: 'Intermediate Outcome',
+                  indicators,
+                },
+              ]),
+            ]),
+          },
+          {
+            indicator_description: 'Stored indicator',
+            quantitative_contribution: '35.00',
+          },
+        );
+
+        await record();
+
+        const changes = parsedChanges(table);
+        // Falsifier: an implementation that defaults to indicators[0] on
+        // the two-entry case would emit Indicator: {before, after: 'A'} —
+        // this assertion catches that the same way toBeUndefined() below
+        // catches a fall-through to "Not provided by PRMS".
+        expect(changes.Indicator).toBeUndefined();
+        expect(changes['Quantitative contribution']).toBeUndefined();
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain('indicators[]');
+        expect(String(warn.mock.calls[0][0])).toContain(String(VERSION_ID));
+      },
+    );
+
+    it('still reports "Not provided by PRMS" when the mapping has no indicators key at all (the pre-2026-09-29 shape)', async () => {
+      arm(
+        {
+          raw_body: callbackBody([
+            primary([
+              {
+                title: 'Same title',
+                toc_result_id: 7290,
+                level: 'Intermediate Outcome',
+              },
+            ]),
+          ]),
+        },
+        {
+          indicator_description: 'Stored indicator',
+          quantitative_contribution: '35.00',
+        },
+      );
+
+      await record();
+
+      const changes = parsedChanges(table);
+      expect(changes.Indicator).toEqual({
+        before: 'Stored indicator',
+        after: 'Not provided by PRMS',
+      });
+      expect(changes['Quantitative contribution']).toEqual({
+        before: '35.00',
+        after: 'Not provided by PRMS',
+      });
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
   describe('duplicated toc_mappings', () => {
     it('collapses the repeated mapping to one id', async () => {
       const mapping = {

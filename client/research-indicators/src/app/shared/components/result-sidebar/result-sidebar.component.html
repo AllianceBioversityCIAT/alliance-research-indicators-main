@@ -187,10 +187,15 @@
           [pTooltip]="prmsSyncTooltip()"
           tooltipPosition="bottom"
           [disabled]="!canSyncPrms() || prmsSyncInFlight() || prmsAlreadySynced()"
+          [attr.aria-busy]="prmsSyncInFlight() ? 'true' : null"
           (click)="onPrmsSync()"
           data-testid="sidebar-prms-sync-button">
           PRMS SYNC
-          <i class="pi pi-sync !text-[12px]" aria-hidden="true"></i>
+          <!-- The push is a round trip to PRMS and can take seconds. `pi-sync`
+               stays and `pi-spin` is added on top, so the arrows the user just
+               clicked are the thing that turns -- the icon never swaps out
+               mid-request. `prefers-reduced-motion` is handled by primeicons. -->
+          <i class="pi pi-sync !text-[12px]" [class.pi-spin]="prmsSyncInFlight()" aria-hidden="true"></i>
         </button>
       }
       @if (prmsHistoryPhase() === 'loading') {

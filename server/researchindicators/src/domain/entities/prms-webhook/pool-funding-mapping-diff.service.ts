@@ -11,9 +11,23 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
  * result_prms_sync_history.raw_body.
  *
  * The pair identifies one snapshot. Zero or several active snapshots are
- * skipped. A callback path PRMS does not send is recorded, when we already
- * hold a value, as after = "Not provided by PRMS". That entry is
- * informational. `applicableChanges` drops it, and apply does not write it.
+ * skipped. When we already hold a value and PRMS's callback gives us
+ * nothing determinate for it, the entry is recorded as
+ * after = "Not provided by PRMS". That entry is informational.
+ * `applicableChanges` drops any entry whose `after` is that sentinel, and
+ * apply never writes one.
+ *
+ * Indicator and Quantitative contribution are resolved from
+ * `toc_mappings[].indicators[]`, added to the callback 2026-09-29 — until
+ * then every mapping had no `indicators` key at all (2026-09-24/28
+ * deliveries), which is why the "Not provided by PRMS" branch exists.
+ * PRMS's own array can still be empty or hold more than one entry on any
+ * given delivery; that is NOT the same as never sending the field, and it
+ * is not treated as "not provided" either — per the owner (2026-09-29),
+ * an ambiguous count means the field is skipped for THIS delivery only
+ * (no key at all in `changes`), logged, and never guessed at. A field
+ * whose callback value never resolves to a determinate one across every
+ * mapping AND was never sent at all falls back to "Not provided by PRMS".
  *
  * A real difference is `{ before, after }` with PRMS's value. `{}` means
  * the diff ran and found no real difference and no stored value on an
@@ -123,18 +137,21 @@ interface CallbackView {
   primaryCode: string | null;
   contributingCodes: string[];
   mappings: Record<string, unknown>[];
+  indicator: IndicatorFieldResolution;
+  quantitativeContribution: IndicatorFieldResolution;
 }
 
 /**
- * callbackPath null means PRMS does not send the field. A non-null value
- * on our side is emitted with after = NOT_PROVIDED_BY_PRMS. A null value
- * emits nothing. Pointing callbackPath at a mapping key (for example
- * 'mapping.indicator_description') is the whole change that starts
- * comparing it as a real difference.
+ * Pointing callbackPath at a mapping key (for example 'mapping.level') is
+ * the whole change that starts comparing a field as a real difference.
  * Unit of measurement and Target are hardcoded in the product and are not
- * diff fields.
+ * diff fields. Indicator and Quantitative contribution are NOT driven by
+ * this table at all — their resolution needs the indicators[] cardinality
+ * rule, which a single path string cannot express (see
+ * `resolveIndicatorField`); `buildChanges` handles the two of them
+ * directly.
  */
-type CallbackPath = string | null;
+type CallbackPath = string;
 
 interface FieldSpec {
   label: string;
@@ -181,18 +198,6 @@ const POOL_FUNDING_DIFF_FIELDS: FieldSpec[] = [
     callbackPath: 'mapping.toc_result_id',
     needsResolvedToc: true,
     before: (db) => db.toc.tocResultId,
-  },
-  {
-    label: INDICATOR,
-    callbackPath: null,
-    needsResolvedToc: true,
-    before: (db) => db.toc.indicator,
-  },
-  {
-    label: QUANTITATIVE_CONTRIBUTION,
-    callbackPath: null,
-    needsResolvedToc: true,
-    before: (db) => db.toc.quantitative,
   },
 ];
 
@@ -419,7 +424,62 @@ const readCallback = (rawBody: unknown): CallbackView => {
     primaryCode: primary === null ? null : scalar(primary.official_code),
     contributingCodes,
     mappings,
+    indicator: resolveIndicatorField(mappings, 'indicator_description'),
+    quantitativeContribution: resolveIndicatorField(
+      mappings,
+      'target_contribution',
+    ),
   };
+};
+
+type IndicatorFieldResolution =
+  | { kind: 'value'; value: PoolFundingChangeValue }
+  | { kind: 'unprovided' }
+  | { kind: 'ambiguous' };
+
+/**
+ * `toc_mappings[].indicators[]`, added to the callback 2026-09-29.
+ * Owner's rule (2026-09-29): exactly one entry is a determinate value; a
+ * mapping whose `indicators` key is present but holds zero or several
+ * entries is ambiguous and must not be guessed at — the field is skipped
+ * for the whole delivery, never averaged or defaulted to the first one. A
+ * mapping with no `indicators` key at all (every callback before
+ * 2026-09-29) is the ORIGINAL absence this field's "Not provided by PRMS"
+ * branch exists for, and stays distinct from ambiguity: 'ambiguous' wins
+ * over 'unprovided' when a delivery mixes both, because an anomaly PRMS
+ * actually sent is a stronger signal than a mapping that predates the
+ * capability.
+ */
+const resolveIndicatorField = (
+  mappings: Record<string, unknown>[],
+  key: 'indicator_description' | 'target_contribution',
+): IndicatorFieldResolution => {
+  let sawAmbiguous = false;
+  let sawAbsent = false;
+  const values: string[] = [];
+  for (const mapping of mappings) {
+    const raw = mapping.indicators;
+    if (raw === undefined) {
+      sawAbsent = true;
+      continue;
+    }
+    if (!Array.isArray(raw) || raw.length !== 1) {
+      sawAmbiguous = true;
+      continue;
+    }
+    const entry = asRecord(raw[0]);
+    const value = entry ? scalar(entry[key]) : null;
+    if (value !== null) {
+      values.push(value);
+    }
+  }
+  if (sawAmbiguous) {
+    return { kind: 'ambiguous' };
+  }
+  if (values.length > 0) {
+    return { kind: 'value', value: collapse(values) };
+  }
+  return sawAbsent ? { kind: 'unprovided' } : { kind: 'value', value: null };
 };
 
 /** One value stays a scalar. Two copies stay a list, so a repeated mapping is visible until dedupe. */
@@ -490,21 +550,20 @@ const assignChange = (
   changes[label] = { before, after };
 };
 
-const absentCallbackField = (label: string): boolean =>
-  POOL_FUNDING_DIFF_FIELDS.some(
-    (field) => field.label === label && field.callbackPath === null,
-  );
-
 /**
- * Real differences only. An unprovided-field marker is not a change:
- * apply must not treat it as something to write.
+ * Real differences only. An unprovided-field marker is not a change: apply
+ * must not treat it as something to write. Identified by the sentinel
+ * VALUE, not by a field-label lookup — Indicator and Quantitative
+ * contribution are not in `POOL_FUNDING_DIFF_FIELDS` at all (their
+ * resolution needs the indicators[] cardinality rule), and each can be
+ * either a real diff or "Not provided by PRMS" depending on the delivery.
  */
 export const applicableChanges = (
   changes: PoolFundingChanges,
 ): PoolFundingChanges => {
   const applicable: PoolFundingChanges = {};
   for (const [label, value] of Object.entries(changes)) {
-    if (!absentCallbackField(label)) {
+    if (value.after !== NOT_PROVIDED_BY_PRMS) {
       applicable[label] = value;
     }
   }
@@ -522,17 +581,34 @@ const recordUnprovided = (
   changes[label] = { before, after: NOT_PROVIDED_BY_PRMS };
 };
 
-const buildChanges = (db: DbView, rawBody: unknown): PoolFundingChanges => {
-  const callback = readCallback(rawBody);
+/**
+ * Indicator / Quantitative contribution: 'ambiguous' is dropped silently
+ * here (the caller already logged it once, before buildChanges ran, using
+ * the same CallbackView); 'unprovided' becomes the sentinel marker;
+ * 'value' is compared like any other field.
+ */
+const applyIndicatorResolution = (
+  changes: PoolFundingChanges,
+  label: string,
+  before: PoolFundingChangeValue,
+  resolution: IndicatorFieldResolution,
+): void => {
+  if (resolution.kind === 'ambiguous') {
+    return;
+  }
+  if (resolution.kind === 'unprovided') {
+    recordUnprovided(changes, label, before);
+    return;
+  }
+  assignChange(changes, label, before, resolution.value);
+};
+
+const buildChanges = (
+  db: DbView,
+  callback: CallbackView,
+): PoolFundingChanges => {
   const changes: PoolFundingChanges = {};
   for (const field of POOL_FUNDING_DIFF_FIELDS) {
-    if (field.callbackPath === null) {
-      if (field.needsResolvedToc && db.tocAmbiguous) {
-        continue;
-      }
-      recordUnprovided(changes, field.label, field.before(db));
-      continue;
-    }
     if (field.needsResolvedToc && db.tocAmbiguous) {
       continue;
     }
@@ -544,6 +620,21 @@ const buildChanges = (db: DbView, rawBody: unknown): PoolFundingChanges => {
       field.label,
       field.before(db),
       readCallbackPath(field.callbackPath, callback),
+    );
+  }
+
+  if (!db.tocAmbiguous) {
+    applyIndicatorResolution(
+      changes,
+      INDICATOR,
+      db.toc.indicator,
+      callback.indicator,
+    );
+    applyIndicatorResolution(
+      changes,
+      QUANTITATIVE_CONTRIBUTION,
+      db.toc.quantitative,
+      callback.quantitativeContribution,
     );
   }
   return changes;
@@ -635,7 +726,17 @@ export class PoolFundingMappingDiffService {
       );
     }
 
-    const changes = buildChanges(baseline, row.raw_body);
+    const callback = readCallback(row.raw_body);
+    if (
+      callback.indicator.kind === 'ambiguous' ||
+      callback.quantitativeContribution.kind === 'ambiguous'
+    ) {
+      this.logger._warn(
+        `Pool-funding diff found a toc_mappings entry with zero or several indicators[] for result_id=${snapshot.resultId}; Indicator/Quantitative contribution left out for this delivery`,
+      );
+    }
+
+    const changes = buildChanges(baseline, callback);
     await this.writeChanges(input.historyId, changes);
   }
 
