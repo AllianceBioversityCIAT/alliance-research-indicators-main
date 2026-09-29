@@ -395,6 +395,70 @@ describe('PrmsSyncHistoryModalComponent', () => {
     expect(text('[data-testid="prms-history-subheader"]')).toBe('1 event');
   });
 
+  function openChanges(changes: Record<string, unknown>): Element[] {
+    fixture.componentRef.setInput(
+      'history',
+      history([
+        event({
+          id: 42,
+          event_source: 'PRMS',
+          decision: 'APPROVE',
+          reviewer_name: 'Manuel Almanzar',
+          occurred_at: '2026-09-29T14:02:00.000Z',
+          decided_at: '2026-09-29T14:02:00.000Z',
+          changes
+        })
+      ])
+    );
+    open();
+    (document.body.querySelector('[data-testid="prms-history-changes-link"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    return Array.from(document.body.querySelectorAll('[data-testid="prms-history-change-row"]'));
+  }
+
+  // The diff carries the Science Programs as a list. JSON.stringify leaked the
+  // brackets and quotes into the cell as ["SP10"].
+  it('renders a list of values as plain text, not as JSON', () => {
+    const rows = openChanges({ 'Contributing Science Programs': { before: ['SP10', 'SP02'], after: null } });
+
+    expect(rows).toHaveLength(1);
+    const before = rows[0].querySelector('.prms-history__before');
+    expect(before?.textContent?.trim()).toBe('SP10, SP02');
+    expect(before?.textContent).not.toContain('[');
+    expect(before?.textContent).not.toContain('"');
+  });
+
+  it('renders an empty list as an empty cell', () => {
+    const rows = openChanges({ 'Contributing Science Programs': { before: ['SP10'], after: [] } });
+
+    expect(rows[0].querySelector('.prms-history__after')?.textContent?.trim()).toBe('');
+  });
+
+  // The ID and the title name the same ToC result, so showing both repeats one
+  // change as two rows. The ID is still applied server-side -- this hides it,
+  // it does not drop it from the payload.
+  it('hides the ToC result ID row when the ToC result row already shows the change', () => {
+    const rows = openChanges({
+      'Theory of Change result': { before: 'I-OC 1.1 Farmers', after: 'AOW-IOC 2.2 Landscape' },
+      'Theory of Change result ID': { before: '7173', after: '7169' }
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Theory of Change result');
+    expect(rows[0].textContent).not.toContain('7173');
+    expect(rows[0].textContent).not.toContain('7169');
+  });
+
+  // ...but a moved ID whose title happens to be unchanged is a real applied
+  // write, and hiding it unconditionally would render an empty modal.
+  it('keeps the ToC result ID row when the ToC result row is absent', () => {
+    const rows = openChanges({ 'Theory of Change result ID': { before: '7173', after: '7169' } });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain('Theory of Change result ID');
+    expect(rows[0].textContent).toContain('7169');
+  });
+
   it('closes on the Close button and returns focus to the trigger', async () => {
     trigger.focus();
     open();
