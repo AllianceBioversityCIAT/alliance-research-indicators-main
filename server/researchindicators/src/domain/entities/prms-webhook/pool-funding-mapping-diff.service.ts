@@ -158,7 +158,78 @@ interface FieldSpec {
   callbackPath: CallbackPath;
   needsResolvedToc: boolean;
   before: (db: DbView) => PoolFundingChangeValue;
+  /**
+   * Optional projection applied to BOTH sides before the equality test, so a
+   * field whose two sources speak different vocabularies compares on meaning
+   * rather than on spelling. It never touches what is stored or rendered --
+   * `before` still decides that.
+   */
+  compareAs?: (value: PoolFundingChangeValue) => PoolFundingChangeValue;
 }
+
+/**
+ * `result_pool_funding_toc_alignment.level` is `varchar(10)` and holds the
+ * lambda-toc category CODE (`OUTPUT` / `OUTCOME` / `EOI`). PRMS's decision
+ * callback returns the human LABEL for the same level. Comparing the two
+ * raw made every callback report a level change the reviewer never made
+ * (observed 2026-09-29: before `OUTCOME`, after `Intermediate Outcome` --
+ * the same level, twice).
+ *
+ * Only the OUTCOME label is directly observed from PRMS; the OUTPUT and EOI
+ * spellings mirror the client's own label map plus the obvious short forms.
+ * An unrecognised token is deliberately NOT forced into a bucket -- it falls
+ * through to a literal comparison, so an unexpected PRMS vocabulary shows up
+ * as a visible diff instead of being silently swallowed as "equal".
+ */
+type TocLevelCode = 'OUTPUT' | 'OUTCOME' | 'EOI';
+
+/** Mirrors the client's `SpTocAlignmentBlockComponent.LEVEL_LABELS` (§4.7). */
+const LEVEL_LABELS: Record<TocLevelCode, string> = {
+  OUTPUT: 'High Level Output',
+  OUTCOME: 'Intermediate Outcome',
+  EOI: '2030 Outcome',
+};
+
+const LEVEL_SYNONYMS: Record<string, TocLevelCode> = {
+  OUTPUT: 'OUTPUT',
+  'HIGH LEVEL OUTPUT': 'OUTPUT',
+  HLO: 'OUTPUT',
+  OUTCOME: 'OUTCOME',
+  'INTERMEDIATE OUTCOME': 'OUTCOME',
+  IOC: 'OUTCOME',
+  EOI: 'EOI',
+  '2030 OUTCOME': 'EOI',
+  'END OF INITIATIVE OUTCOME': 'EOI',
+  'END OF INITIATIVE': 'EOI',
+};
+
+/** Case, separator and inner-whitespace differences are not level changes. */
+const levelKey = (value: string): string =>
+  value.trim().toUpperCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
+
+const levelCode = (value: string): TocLevelCode | null =>
+  LEVEL_SYNONYMS[levelKey(value)] ?? null;
+
+/** Renders a stored code as the label the user reads in the form. */
+const levelLabel = (value: string | null): string | null => {
+  if (value === null) {
+    return null;
+  }
+  const code = levelCode(value);
+  return code === null ? value : LEVEL_LABELS[code];
+};
+
+const canonicalLevel = (
+  value: PoolFundingChangeValue,
+): PoolFundingChangeValue => {
+  if (value === null) {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => levelCode(item) ?? levelKey(item));
+  }
+  return levelCode(value) ?? levelKey(value);
+};
 
 const emptyToc = (): TocValues => ({
   level: null,
@@ -185,7 +256,8 @@ const POOL_FUNDING_DIFF_FIELDS: FieldSpec[] = [
     label: TOC_LEVEL,
     callbackPath: 'mapping.level',
     needsResolvedToc: true,
-    before: (db) => db.toc.level,
+    before: (db) => levelLabel(db.toc.level),
+    compareAs: canonicalLevel,
   },
   {
     label: TOC_RESULT,
@@ -543,8 +615,10 @@ const assignChange = (
   label: string,
   before: PoolFundingChangeValue,
   after: PoolFundingChangeValue,
+  compareAs?: (value: PoolFundingChangeValue) => PoolFundingChangeValue,
 ): void => {
-  if (sameValue(before, after)) {
+  const project = compareAs ?? ((value: PoolFundingChangeValue) => value);
+  if (sameValue(project(before), project(after))) {
     return;
   }
   changes[label] = { before, after };
@@ -620,6 +694,7 @@ const buildChanges = (
       field.label,
       field.before(db),
       readCallbackPath(field.callbackPath, callback),
+      field.compareAs,
     );
   }
 

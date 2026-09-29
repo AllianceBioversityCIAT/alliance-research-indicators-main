@@ -9,6 +9,16 @@ interface BeforeAfter {
   after?: unknown;
 }
 
+/**
+ * Both keys name the SAME Theory of Change result -- the server diffs the id
+ * and the title as separate fields because the apply step writes both columns,
+ * but to a reader they are one change shown twice. The id is the less legible
+ * of the two, so it yields to the title when both arrive. It is only hidden,
+ * never dropped from the payload: PRMS's id is what actually gets written.
+ */
+const TOC_RESULT_FIELD = 'Theory of Change result';
+const TOC_RESULT_ID_FIELD = 'Theory of Change result ID';
+
 @Component({
   selector: 'app-prms-sync-history-modal',
   imports: [DialogModule, CustomTagComponent],
@@ -49,7 +59,10 @@ export class PrmsSyncHistoryModalComponent {
     if (changes == null || typeof changes !== 'object') {
       return [];
     }
-    return Object.entries(changes as Record<string, unknown>).map(([field, value]) => {
+    const record = changes as Record<string, unknown>;
+    const fields = Object.keys(record).filter(field => !(field === TOC_RESULT_ID_FIELD && TOC_RESULT_FIELD in record));
+    return fields.map(field => {
+      const value = record[field];
       if (isBeforeAfter(value)) {
         return { field, before: formatChangeValue(value.before), after: formatChangeValue(value.after) };
       }
@@ -178,6 +191,14 @@ function formatChangeValue(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  // The Science Program fields arrive as lists. JSON.stringify rendered them
+  // with their brackets and quotes -- ["SP10"] -- in a cell a reviewer reads.
+  if (Array.isArray(value)) {
+    return value
+      .map(item => formatChangeValue(item))
+      .filter(item => item.length > 0)
+      .join(', ');
+  }
   try {
     return JSON.stringify(value);
   } catch {
