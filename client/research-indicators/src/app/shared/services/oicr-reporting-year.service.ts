@@ -21,8 +21,9 @@ export class OicrReportingYearService {
   readonly year = signal<number>(DEFAULT_OICR_REPORTING_YEAR);
 
   load(): Promise<number> {
-    this.loadPromise ??= this.api
-      .GET_ConfigurationByKey(APPLICATION_CONFIGURATION_KEY.OICR_REPORTING_YEAR)
+    // Promise.resolve() first, so a synchronous throw also ends in the default year.
+    this.loadPromise ??= Promise.resolve()
+      .then(() => this.api.GET_ConfigurationByKey(APPLICATION_CONFIGURATION_KEY.OICR_REPORTING_YEAR))
       .then(res => parseYear(res?.data?.simple_value))
       .catch(() => DEFAULT_OICR_REPORTING_YEAR)
       .then(year => {

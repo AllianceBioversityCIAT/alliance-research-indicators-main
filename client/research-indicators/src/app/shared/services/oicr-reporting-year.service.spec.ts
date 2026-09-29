@@ -41,6 +41,14 @@ describe('OicrReportingYearService', () => {
     await expect(service.load()).resolves.toBe(DEFAULT_OICR_REPORTING_YEAR);
   });
 
+  it('falls back to the default when the API call throws synchronously', async () => {
+    api.GET_ConfigurationByKey.mockImplementation(() => {
+      throw new TypeError('not a function');
+    });
+
+    await expect(service.load()).resolves.toBe(DEFAULT_OICR_REPORTING_YEAR);
+  });
+
   it('requests the configuration only once per session', async () => {
     api.GET_ConfigurationByKey.mockResolvedValue({ data: { simple_value: '2026' } });
 
