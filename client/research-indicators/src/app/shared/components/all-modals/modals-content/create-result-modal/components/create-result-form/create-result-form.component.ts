@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, LOCALE_ID, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, LOCALE_ID, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
@@ -22,6 +22,7 @@ import { SelectModule } from 'primeng/select';
 import localeEs from '@angular/common/locales/es';
 import { NgTemplateOutlet, registerLocaleData } from '@angular/common';
 import { GetYearsService } from '@shared/services/control-list/get-years.service';
+import { OicrReportingYearService } from '@shared/services/oicr-reporting-year.service';
 import { SharedResultFormComponent } from '@shared/components/shared-result-form/shared-result-form.component';
 import { WordCountService } from '@shared/services/word-count.service';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
@@ -55,6 +56,7 @@ export class CreateResultFormComponent {
   allModalsService = inject(AllModalsService);
   indicatorsService = inject(IndicatorsService);
   yearsService = inject(GetYearsService);
+  oicrReportingYear = inject(OicrReportingYearService);
   getContractsService = inject(GetContractsService);
   getResultsService = inject(GetResultsService);
   createResultManagementService = inject(CreateResultManagementService);
@@ -67,6 +69,13 @@ export class CreateResultFormComponent {
   // External links by environment
   prmsUrl: string = environment.prmsUrl;
   tipUrl: string = environment.tipUrl;
+
+  /** OICRs are reported for a single, configurable year (OICR.REPORTING_YEAR). */
+  oicrYearOptions = computed(() => [{ report_year: this.oicrReportingYear.year() }]);
+
+  constructor() {
+    void this.oicrReportingYear.load();
+  }
 
   body = signal<{ indicator_id: number | null; title: string | null; contract_id: string | null; year: number | null }>({
     indicator_id: null,
@@ -187,9 +196,9 @@ export class CreateResultFormComponent {
   onIndicatorChange(newIndicatorId: number | null) {
     this.body.update(b => {
       const updatedBody = { ...b, indicator_id: newIndicatorId };
-      // If indicator is OICR (5), preselect year 2025
+      // If indicator is OICR (5), preselect its configured reporting year
       if (newIndicatorId === 5) {
-        updatedBody.year = 2025;
+        updatedBody.year = this.oicrReportingYear.year();
       }
       return updatedBody;
     });

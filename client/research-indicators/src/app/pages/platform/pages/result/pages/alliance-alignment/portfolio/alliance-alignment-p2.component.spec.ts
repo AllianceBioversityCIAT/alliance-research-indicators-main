@@ -84,6 +84,12 @@ describe('AllianceAlignmentP2Component', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Contribution to SDG');
   });
 
+  it('filters the "Other" Research Area (18) out of the options, and nothing else', () => {
+    expect(component.researchAreaOptionFilter({ lever_id: 18 })).toBe(false);
+    expect(component.researchAreaOptionFilter({ id: '18' })).toBe(false);
+    expect(component.researchAreaOptionFilter({ lever_id: 12 })).toBe(true);
+  });
+
   it('should use default input callbacks', () => {
     expect(component.getShortDescription('A long description')).toBe('A long description');
     expect(component.canRemove({ id: 1 })).toBe(true);

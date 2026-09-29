@@ -1766,6 +1766,14 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('temp/oicrs/123/metadata', {});
     });
 
+    it('should call GET_OICRMetadata with the source of an OICR from results', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.GET_OICRMetadata(3311, 'result');
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('temp/oicrs/3311/metadata?source=result', {});
+    });
+
     it('should call fastResponse', () => {
       const body = { prompt: 'test', input_text: 'test input' };
       (mockToPromiseService.post as jest.Mock).mockResolvedValue({ data: {} });
