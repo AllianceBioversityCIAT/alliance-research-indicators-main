@@ -216,3 +216,4 @@
 - **New server module:** `src/domain/entities/control-lists/`, registered at path `control-lists` in `main.routes.ts` and `entities.module.ts`. **New client page:** `center-admin/control-lists`. **Shared shell:** `AdministrationNavChild` gained optional `children` (one nested level).
 - **Child guides:** no new child `CLAUDE.md` is needed yet (a standard entity module). At archive, the client child guide should mention the nested-nav `children` field and the error-contract pattern (`errorDetail.errors`, never `description`).
 - **CodeGraph:** re-index pending.
+- **Lint gate on committed blobs (Leader, after `847cda8d`):** `git show HEAD:<file> | npx eslint --stdin --stdin-filename <file>` over all 19 server `.ts` files in the commit → **19 linted, 0 failing**. Falsifier (K-004): the same file with CRLF line endings → **13 errors**, so the gate does redden. Server lint criterion PASS. The client gate (`npm run lint -- --quiet`) was green in the workers' runs.

@@ -107,7 +107,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
   - [x] The route is reachable only through `centerAdminGuard`: route config reviewed, and the route test quoted (J-9).
   - [x] A1–A5 visible in `/swagger` with tags, operation and params (local boot; quote what was seen).
   - [x] No hex literals in the new component files.
-  - [ ] Server: `npm test -- --silent`, `npx eslint src/domain/entities/control-lists`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`.
+  - [x] Server: `npm test -- --silent`, `npx eslint src/domain/entities/control-lists`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`. *(Server lint measured on the committed LF blobs: the Windows working tree is CRLF under `core.autocrlf=true`. Server tests: 3 pre-existing failures — see Run 5.)*
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 
 ### T-02 — Slice 2: Lists (table + API + list header)
