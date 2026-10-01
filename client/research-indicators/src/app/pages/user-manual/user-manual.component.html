@@ -1,0 +1,56 @@
+<div class="um-root">
+  <header class="um-topbar">
+    <button type="button" class="um-topbar__burger" (click)="toggleMenu()"
+      [attr.aria-expanded]="menuOpen()" aria-controls="um-sidebar" aria-label="Toggle manual menu">
+      <span class="material-symbols-rounded" aria-hidden="true">{{ menuOpen() ? 'close' : 'menu' }}</span>
+    </button>
+
+    <a class="um-topbar__brand" routerLink="/user-manual">
+      <img [src]="'STAR.png' | s3ImageUrl" alt="STAR" class="um-topbar__logo" />
+      <span class="um-topbar__divider" aria-hidden="true"></span>
+      <span class="um-topbar__title">User manual</span>
+    </a>
+
+    <a class="um-topbar__back" href="/home">
+      <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>
+      Go to STAR
+    </a>
+  </header>
+
+  <div class="um-layout">
+    <!-- Backdrop only exists while the off-canvas menu is open on narrow screens. -->
+    @if (menuOpen()) {
+    <div class="um-backdrop" (click)="closeMenu()" aria-hidden="true"></div>
+    }
+
+    <nav id="um-sidebar" class="um-sidebar" [class.um-sidebar--open]="menuOpen()" aria-label="Manual modules">
+      <p class="um-sidebar__eyebrow">Modules</p>
+      <ul class="um-sidebar__list">
+        @for (module of modules; track module.slug) {
+        <li>
+          <a class="um-sidebar__item" [routerLink]="['/user-manual', module.slug]" routerLinkActive="um-sidebar__item--active"
+            [routerLinkActiveOptions]="{ exact: true }" (click)="closeMenu()">
+            <span class="material-symbols-rounded um-sidebar__icon" aria-hidden="true">{{ module.icon }}</span>
+            <span class="um-sidebar__text">
+              <span class="um-sidebar__label">{{ module.label }}</span>
+              <span class="um-sidebar__summary">{{ module.summary }}</span>
+            </span>
+            @if (module.status === 'draft') {
+            <span class="um-sidebar__badge">Soon</span>
+            }
+          </a>
+        </li>
+        }
+      </ul>
+
+      <div class="um-sidebar__help">
+        <span class="material-symbols-rounded" aria-hidden="true">support_agent</span>
+        <p>Something still unclear? Write to <a href="mailto:alliance-itsupport@cgiar.org">alliance-itsupport&#64;cgiar.org</a>.</p>
+      </div>
+    </nav>
+
+    <main class="um-content" appManualAnchors>
+      <router-outlet />
+    </main>
+  </div>
+</div>

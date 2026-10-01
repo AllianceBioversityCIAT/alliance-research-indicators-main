@@ -1,0 +1,511 @@
+<div class="um-hero">
+  <div class="um-hero__art" aria-hidden="true"><span class="material-symbols-rounded">home</span></div>
+  <div>
+    <h1 class="um-hero__title">Home</h1>
+    <p class="um-hero__sub">
+      Home is the first screen you see after signing in to STAR. It gathers the announcements from the STAR team,
+      shortcuts to the places you use most, the results you touched most recently, and a summary of everything you
+      have reported so far.
+    </p>
+    <div class="um-hero__meta">
+      <span>For researchers, Principal Investigators and reporting staff</span>
+      <span>No prior STAR experience needed</span>
+      <span>About 6 minutes to read</span>
+    </div>
+  </div>
+</div>
+
+<nav class="um-toc" aria-label="On this page">
+  <h2>On this page</h2>
+  <ol>
+    <li><a href="#purpose">What this page is for</a></li>
+    <li><a href="#access">Getting to Home</a></li>
+    <li><a href="#map">Map of the screen</a></li>
+    <li><a href="#launcher">What do you want to do?</a></li>
+    <li><a href="#banner">Welcome banner</a></li>
+    <li><a href="#main-actions">Main actions</a></li>
+    <li><a href="#latest">My latest results</a></li>
+    <li><a href="#by-status">My results by status</a></li>
+    <li><a href="#by-indicator">My results by indicator</a></li>
+    <li><a href="#first">Before your first result</a></li>
+    <li><a href="#screens">On smaller screens</a></li>
+    <li><a href="#faq">Frequently asked questions</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<!-- 1 -->
+<section class="um-section" id="purpose">
+  <h2><span class="um-section__num">1</span>What this page is for</h2>
+  <p class="um-lead">Home answers one question: what should I do next in STAR?</p>
+  <p>It does that with four things, all of them about <strong>you</strong>:</p>
+  <ul>
+    <li>Any message the STAR team is currently publishing — deadlines, maintenance, new features.</li>
+    <li>Shortcuts to your projects, your results and your dashboard.</li>
+    <li>The three results you edited most recently, each with how complete it is.</li>
+    <li>A count of all your results, grouped by stage and by indicator.</li>
+  </ul>
+  <div class="um-callout um-callout--warn">
+    <span class="material-symbols-rounded" aria-hidden="true">person</span>
+    <p>
+      <strong>Everything on Home is personal.</strong> Every figure counts only the results
+      <strong>you created</strong>. A result reported by a colleague on the same project will not appear here, even
+      when you can open and read it elsewhere in STAR.
+    </p>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="um-section" id="access">
+  <h2><span class="um-section__num">2</span>Getting to Home</h2>
+  <p class="um-lead">Signing in takes you there automatically.</p>
+  <ol class="um-steps">
+    <li>Open STAR in your browser.</li>
+    <li>On the sign-in screen, choose <span class="um-ui">Continue with your CGIAR account</span>. STAR does not ask
+      you for a separate password — it uses your organisation account.</li>
+    <li>Once you are in, STAR opens Home for you.</li>
+  </ol>
+  <p>
+    From anywhere else in STAR you can come back by clicking <span class="um-ui">Home</span> in the blue bar at the top,
+    or by clicking the STAR logo on its left.
+  </p>
+  <div class="um-callout um-callout--info">
+    <span class="material-symbols-rounded" aria-hidden="true">translate</span>
+    <p>
+      The STAR interface is in English. Throughout this manual, button and section names are written exactly as they
+      appear on screen, like this: <span class="um-ui">Create Result</span>.
+    </p>
+  </div>
+  <div class="um-callout um-callout--warn">
+    <span class="material-symbols-rounded" aria-hidden="true">shield</span>
+    <p>
+      Cannot sign in? That is an account question rather than a STAR one. Contact Alliance IT Support at
+      <a href="mailto:alliance-itsupport&#64;cgiar.org">alliance-itsupport&#64;cgiar.org</a>.
+    </p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="um-section" id="map">
+  <h2><span class="um-section__num">3</span>Map of the screen</h2>
+  <p class="um-lead">Home has five areas. Click a number to find out what it is.</p>
+
+  <div class="hm-switch" role="group" aria-label="Choose which version of Home to preview">
+    <button type="button" [class.hm-switch__on]="hasResults()" (click)="hasResults.set(true)">
+      I already have results
+    </button>
+    <button type="button" [class.hm-switch__on]="!hasResults()" (click)="hasResults.set(false)">
+      I have not reported anything yet
+    </button>
+  </div>
+
+  <div class="hm-mock">
+    <div class="hm-mock__chrome" aria-hidden="true"><i></i><i></i><i></i></div>
+
+    <div class="hm-mock__bar" aria-hidden="true">
+      <img [src]="'STAR.png' | s3ImageUrl" alt="" class="hm-mock__logo" />
+      <span class="hm-mock__navitem hm-mock__navitem--on">Home</span>
+      <span class="hm-mock__navitem">Projects</span>
+      <span class="hm-mock__navitem">Results Center</span>
+      <span class="hm-mock__navitem">Results Dashboard</span>
+      <span class="hm-mock__cta">
+        <span class="material-symbols-rounded">add_circle</span>Create Result
+      </span>
+      <span class="hm-mock__search">
+        <span class="material-symbols-rounded">search</span>Search
+      </span>
+    </div>
+
+    <!-- Zone 1 -->
+    <div class="hm-zone" [class.hm-zone--on]="activeZone() === 1">
+      <button type="button" class="hm-pin" (click)="selectZone(1)"
+        [attr.aria-pressed]="activeZone() === 1" aria-label="Area 1, Welcome banner">1</button>
+      <div class="hm-banner">
+        <div class="hm-banner__art" aria-hidden="true"></div>
+        <div>
+          <b>Welcome to STAR</b>
+          <small>The current announcement from the STAR team appears here.</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="hm-mock__body">
+      <div class="hm-mock__main">
+        <!-- Zone 2 -->
+        <div class="hm-zone" [class.hm-zone--on]="activeZone() === 2">
+          <button type="button" class="hm-pin" (click)="selectZone(2)"
+            [attr.aria-pressed]="activeZone() === 2" aria-label="Area 2, Main actions">2</button>
+          <div class="hm-h">Main actions</div>
+          <div class="hm-sub">Effortlessly access your key actions and get started.</div>
+          <div class="hm-actions" aria-hidden="true">
+            <div class="hm-action"><span class="material-symbols-rounded">folder_open</span>My projects</div>
+            <div class="hm-action"><span class="material-symbols-rounded">description</span>My results</div>
+            <div class="hm-action"><span class="material-symbols-rounded">insights</span>My dashboard</div>
+          </div>
+        </div>
+
+        <!-- Zone 3 -->
+        <div class="hm-zone" [class.hm-zone--on]="activeZone() === 3">
+          <button type="button" class="hm-pin" (click)="selectZone(3)"
+            [attr.aria-pressed]="activeZone() === 3" aria-label="Area 3, My latest results">3</button>
+          @if (hasResults()) {
+          <div class="hm-rowhead">
+            <div>
+              <div class="hm-h">My latest results</div>
+              <div class="hm-sub">View and track your most recent results.</div>
+            </div>
+            <span class="hm-btn" aria-hidden="true">Create Result</span>
+          </div>
+          <div class="hm-cards" aria-hidden="true">
+            <div class="hm-card"><i class="hm-l hm-l--s"></i><i class="hm-l"></i><i class="hm-l hm-l--m"></i>
+              <i class="hm-bar"><b style="width:62%"></b></i></div>
+            <div class="hm-card"><i class="hm-l hm-l--s"></i><i class="hm-l"></i><i class="hm-l hm-l--m"></i>
+              <i class="hm-bar"><b style="width:28%"></b></i></div>
+            <div class="hm-card"><i class="hm-l hm-l--s"></i><i class="hm-l"></i><i class="hm-l hm-l--m"></i>
+              <i class="hm-bar"><b style="width:100%"></b></i></div>
+          </div>
+          } @else {
+          <div class="hm-absent">
+            <span class="material-symbols-rounded" aria-hidden="true">visibility_off</span>
+            <span>This whole area — heading, cards and the <strong>Create Result</strong> button next to it — stays
+              hidden until you have at least one result.</span>
+          </div>
+          }
+        </div>
+      </div>
+
+      <div class="hm-mock__side">
+        <!-- Zone 4 -->
+        <div class="hm-zone hm-panel" [class.hm-zone--on]="activeZone() === 4">
+          <button type="button" class="hm-pin" (click)="selectZone(4)"
+            [attr.aria-pressed]="activeZone() === 4" aria-label="Area 4, My results by status">4</button>
+          <div class="hm-h hm-h--sm">My results by status</div>
+          @if (hasResults()) {
+          <div class="hm-statusrow"><span>Editing</span><i><b style="width:100%;background:var(--ac-light-blue-300)"></b></i><em>7</em></div>
+          <div class="hm-statusrow"><span>Submitted</span><i><b style="width:57%;background:var(--ac-warning-1)"></b></i><em>4</em></div>
+          <div class="hm-statusrow"><span>Approved</span><i><b style="width:29%;background:var(--ac-green-500)"></b></i><em>2</em></div>
+          } @else {
+          <div class="hm-empty"><b>No results yet</b><span>It looks like you haven't created any results yet.</span></div>
+          }
+        </div>
+
+        <!-- Zone 5 -->
+        <div class="hm-zone hm-panel" [class.hm-zone--on]="activeZone() === 5">
+          <button type="button" class="hm-pin" (click)="selectZone(5)"
+            [attr.aria-pressed]="activeZone() === 5" aria-label="Area 5, My results by indicator">5</button>
+          <div class="hm-h hm-h--sm">My results by indicator</div>
+          @if (hasResults()) {
+          <div class="hm-inds">
+            <div class="hm-ind"><span>Capacity sharing</span><b>5</b></div>
+            <div class="hm-ind"><span>Innovation development</span><b>3</b></div>
+            <div class="hm-ind"><span>Policy change</span><b>2</b></div>
+            <div class="hm-ind"><span>OICR</span><b>0</b></div>
+          </div>
+          } @else {
+          <div class="hm-empty"><b>No results yet</b><span>It looks like you haven't created any results yet.</span></div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hm-readout" role="status">
+    @if (activeZoneDetail(); as zone) {
+    <span class="hm-readout__num">{{ zone.id }}</span>
+    <p><strong>{{ zone.name }}</strong> — {{ zone.blurb }} <a [href]="'#' + zone.anchor">Read the full section</a>.</p>
+    } @else {
+    <span class="material-symbols-rounded hm-readout__hint" aria-hidden="true">touch_app</span>
+    <p>Pick one of the five numbers above and its description appears here.</p>
+    }
+  </div>
+
+  <div class="um-callout um-callout--info">
+    <span class="material-symbols-rounded" aria-hidden="true">info</span>
+    <p>This is a drawing, not a screenshot. The names and numbers are examples — your Home shows your own data.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="um-section" id="launcher">
+  <h2><span class="um-section__num">4</span>What do you want to do?</h2>
+  <p class="um-lead">Pick the sentence that matches you and Home will point you to the right control.</p>
+  <div class="hm-tasks">
+    @for (task of tasks; track task.id) {
+    <div class="hm-task" [class.hm-task--open]="openTask() === task.id">
+      <button type="button" class="hm-task__q" (click)="toggleTask(task.id)" [attr.aria-expanded]="openTask() === task.id">
+        <span class="material-symbols-rounded" aria-hidden="true">{{ openTask() === task.id ? 'expand_less' : 'expand_more' }}</span>
+        {{ task.goal }}
+      </button>
+      @if (openTask() === task.id) {
+      <div class="hm-task__a">
+        <p>{{ task.answer }}</p>
+        <a [href]="'#' + task.anchor">Go to the relevant section</a>
+      </div>
+      }
+    </div>
+    }
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="um-section" id="banner">
+  <h2><span class="um-section__num">5</span>Welcome banner</h2>
+  <p class="um-lead">Area 1 — the blue strip across the top.</p>
+  <p>
+    It carries the STAR logo, a <strong>title</strong> and a <strong>short message</strong>. The STAR team writes that
+    message and changes it whenever there is something you need to know: a reporting deadline, a planned maintenance
+    window, or a feature that has just been released.
+  </p>
+  <ul>
+    <li>The text changes on its own — there is nothing for you to set.</li>
+    <li>The banner is informative only: it has no buttons and no links.</li>
+    <li>If the STAR team has not published anything, the strip appears without a message. That is normal.</li>
+  </ul>
+  <div class="um-callout um-callout--tip">
+    <span class="material-symbols-rounded" aria-hidden="true">lightbulb</span>
+    <p>Read it every time you sign in during reporting season. Deadlines are announced here first.</p>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="um-section" id="main-actions">
+  <h2><span class="um-section__num">6</span>Main actions</h2>
+  <p class="um-lead">Area 2 — <em>"Effortlessly access your key actions and get started."</em></p>
+  <p>Three large cards, each one a shortcut. Click anywhere on a card to follow it.</p>
+
+  <div class="um-table-wrap">
+    <table class="um-table">
+      <thead>
+        <tr><th>Card</th><th>Where it takes you</th><th>Use it when…</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="um-ui">My projects</span></td>
+          <td>The <strong>Projects</strong> page, already narrowed to the projects you take part in.</td>
+          <td>You want to look at a project or contract and the results attached to it.</td>
+        </tr>
+        <tr>
+          <td><span class="um-ui">My results</span></td>
+          <td>The <strong>Results Center</strong>, already narrowed to the results you created.</td>
+          <td>You want to search, filter, review or export your results.</td>
+        </tr>
+        <tr>
+          <td><span class="um-ui">My dashboard</span></td>
+          <td>The <strong>Results Dashboard</strong>.</td>
+          <td>You want the charts and totals rather than a list.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="um-callout um-callout--info">
+    <span class="material-symbols-rounded" aria-hidden="true">filter_alt</span>
+    <p>
+      <strong>My projects</strong> and <strong>My results</strong> open with the scope set to <em>My</em>. Once you are
+      there you can widen it to see everything you are allowed to see — the shortcut only chooses your starting point.
+    </p>
+  </div>
+  <div class="um-callout um-callout--tip">
+    <span class="material-symbols-rounded" aria-hidden="true">keyboard</span>
+    <p>
+      Not using a mouse? Press <span class="um-kbd">Tab</span> to move between the cards and
+      <span class="um-kbd">Enter</span> to open the one that is highlighted.
+    </p>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="um-section" id="latest">
+  <h2><span class="um-section__num">7</span>My latest results</h2>
+  <p class="um-lead">Area 3 — <em>"View and track your most recent results."</em></p>
+  <p>
+    Exactly <strong>three</strong> cards, showing the results <strong>you created</strong> that were
+    <strong>changed most recently</strong>, newest first. It is a shortcut back to work in progress, not a list of
+    everything you have.
+  </p>
+
+  <h3>What is on a card</h3>
+  <div class="hm-anatomy">
+    <div class="hm-rc" aria-hidden="true">
+      <div class="hm-rc__top"><i class="hm-rc__dot"></i>Capacity sharing for development</div>
+      <div class="hm-rc__title">Training workshop on climate-smart agriculture for extension agents in the…</div>
+      <div class="hm-rc__project">Project <span class="material-symbols-rounded">arrow_forward</span> A1234 - Resilient seed systems</div>
+      <div class="hm-rc__tag">Editing</div>
+      <div class="hm-rc__bar"><b style="width:62%"></b></div>
+      <div class="hm-rc__foot">Last update on 28/09/2026</div>
+    </div>
+    <ol>
+      <li><strong>Indicator</strong> — which indicator the result belongs to, with its icon.</li>
+      <li><strong>Title</strong> — long titles are cut after 30 words and end with "…". The full title is on the result itself.</li>
+      <li><strong>Project</strong> — the contract code and name the result is attached to. It is missing when the result has no contract yet.</li>
+      <li><strong>Status</strong> — a coloured label with the current stage. Hover it to read what that stage means.</li>
+      <li><strong>Progress bar</strong> — how much of the result is filled in. It uses the colour of the status.</li>
+      <li><strong>Last update</strong> — when the result last changed.</li>
+    </ol>
+  </div>
+
+  <h3>Opening a result</h3>
+  <p>Click anywhere on the card. STAR opens that result so you can keep editing or just read it.</p>
+
+  <h3>The progress bar</h3>
+  <p>
+    Each result is made of several sections, and each section counts as complete once its required information is
+    saved. The bar shows how far along you are and reaches <strong>100%</strong> when the result is complete. Which
+    sections are required depends on the indicator, so two results at "50%" are not necessarily missing the same
+    amount of work.
+  </p>
+  <div class="um-callout um-callout--tip">
+    <span class="material-symbols-rounded" aria-hidden="true">checklist</span>
+    <p>To see exactly what is missing, open the result: its left-hand menu marks every completed section with a green check.</p>
+  </div>
+
+  <h3>Creating a result</h3>
+  <ol class="um-steps">
+    <li>Click <span class="um-ui">Create Result</span>. There is one in the blue top bar, always available, and a second one beside this section once you have at least one result.</li>
+    <li>Fill in the few details STAR asks for in the window that opens.</li>
+    <li>Confirm. The new result opens so you can start completing it, and it becomes the first card in this section.</li>
+  </ol>
+</section>
+
+<!-- 8 -->
+<section class="um-section" id="by-status">
+  <h2><span class="um-section__num">8</span>My results by status</h2>
+  <p class="um-lead">Area 4 — the upper panel on the right.</p>
+  <p>One row per stage, and each row carries three things:</p>
+  <ul>
+    <li>The <strong>name of the stage</strong>, for example <span class="um-ui">Editing</span> or <span class="um-ui">Submitted</span>.</li>
+    <li>A <strong>coloured bar</strong>. The longest bar is your biggest group; the others are drawn relative to it. It is a visual comparison, not a percentage.</li>
+    <li>The <strong>number of results</strong> at that stage.</li>
+  </ul>
+  <p>Rows are ordered from the largest group down, and <strong>a stage with no results is not listed at all</strong>.</p>
+
+  <div class="um-callout um-callout--info">
+    <span class="material-symbols-rounded" aria-hidden="true">ads_click</span>
+    <p>
+      <strong>Every row is a link.</strong> Click one and STAR opens your results already filtered to that stage — the
+      quickest way to answer "which ones exactly?".
+    </p>
+  </div>
+  <div class="um-callout um-callout--tip">
+    <span class="material-symbols-rounded" aria-hidden="true">event</span>
+    <p>Before a deadline, click the <span class="um-ui">Editing</span> row: that is your to-do list.</p>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="um-section" id="by-indicator">
+  <h2><span class="um-section__num">9</span>My results by indicator</h2>
+  <p class="um-lead">Area 5 — the lower panel on the right.</p>
+  <p>
+    A tile for every indicator STAR collects, each showing how many results <strong>you</strong> have reported under it.
+    Indicators where you have nothing still appear, showing <strong>0</strong> — so you can see at a glance what you
+    have not reported on.
+  </p>
+  <ul>
+    <li>Click a tile to open your results filtered to that indicator.</li>
+    <li>If the list is long, the panel scrolls on its own without moving the rest of the page.</li>
+  </ul>
+  <div class="um-callout um-callout--info">
+    <span class="material-symbols-rounded" aria-hidden="true">help</span>
+    <p>
+      Not sure which indicator your work belongs to? Open <span class="um-ui">About Indicators</span> in the Resources
+      menu on the left for a description of each one.
+    </p>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="um-section" id="first">
+  <h2><span class="um-section__num">10</span>Before your first result</h2>
+  <p class="um-lead">What a brand-new account looks like.</p>
+  <p>Until you report something, Home looks emptier than described above, and none of it is an error:</p>
+  <div class="um-table-wrap">
+    <table class="um-table">
+      <thead><tr><th>Area</th><th>What you see</th></tr></thead>
+      <tbody>
+        <tr><td>Welcome banner</td><td>Unchanged — it does not depend on your results.</td></tr>
+        <tr><td>Main actions</td><td>Unchanged — the three shortcuts always work.</td></tr>
+        <tr><td>My latest results</td><td><strong>Hidden entirely</strong>, including the <span class="um-ui">Create Result</span> button beside it.</td></tr>
+        <tr><td>My results by status</td><td>The message <em>"No results yet"</em>.</td></tr>
+        <tr><td>My results by indicator</td><td>The message <em>"No results yet"</em>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="um-callout um-callout--warn">
+    <span class="material-symbols-rounded" aria-hidden="true">add_circle</span>
+    <p>
+      Because the middle of the page is hidden, use the <span class="um-ui">Create Result</span> button in the
+      <strong>blue bar at the top</strong> to report your first result. It is always there.
+    </p>
+  </div>
+  <p>Use the switch in <a href="#map">Map of the screen</a> to compare the two versions side by side.</p>
+</section>
+
+<!-- 11 -->
+<section class="um-section" id="screens">
+  <h2><span class="um-section__num">11</span>On smaller screens</h2>
+  <p class="um-lead">Nothing disappears — it just stacks differently.</p>
+  <div class="um-table-wrap">
+    <table class="um-table">
+      <thead><tr><th>Screen</th><th>How Home is arranged</th></tr></thead>
+      <tbody>
+        <tr><td>Desktop monitor</td><td>Main content on the left, the two summary panels in a column on the right.</td></tr>
+        <tr><td>Small laptop or tablet</td><td>The summary panels move below the main content. You reach them by scrolling.</td></tr>
+        <tr><td>Phone</td><td>Everything is in one column and the three <span class="um-ui">Main actions</span> cards stack on top of each other.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="um-callout um-callout--tip">
+    <span class="material-symbols-rounded" aria-hidden="true">desktop_windows</span>
+    <p>Home reads fine on a phone, but filling in a result is far more comfortable on a laptop or desktop.</p>
+  </div>
+</section>
+
+<!-- 12 -->
+<section class="um-section" id="faq">
+  <h2><span class="um-section__num">12</span>Frequently asked questions</h2>
+  <p class="um-lead">The questions people ask most about this page.</p>
+
+  <details class="um-faq"><summary>Why can I not see a result a colleague reported?</summary>
+    <p>Home only counts results you created yourself. To find other people's results, open <span class="um-ui">My results</span> and widen the scope, or use the <span class="um-ui">Search</span> box in the top bar.</p></details>
+
+  <details class="um-faq"><summary>I only see three results. Where are the rest?</summary>
+    <p>That section is deliberately limited to your three most recently updated results. Your full list is in <span class="um-ui">My results</span>.</p></details>
+
+  <details class="um-faq"><summary>A result I just edited is not at the top.</summary>
+    <p>The order follows the moment each result was last changed. Reload the page to pick up the newest information.</p></details>
+
+  <details class="um-faq"><summary>The progress bar is not at 100% but I think I filled everything in.</summary>
+    <p>A section counts only once all of its required fields are saved. Open the result and look at the left-hand menu: the sections without a green check are the ones still missing something.</p></details>
+
+  <details class="um-faq"><summary>A status is missing from "My results by status".</summary>
+    <p>Stages where you have no results are not listed. The stage will appear the moment one of your results reaches it.</p></details>
+
+  <details class="um-faq"><summary>An indicator shows 0. Is something broken?</summary>
+    <p>No. Every indicator is listed whether or not you have reported under it, so a 0 simply means you have nothing there yet.</p></details>
+
+  <details class="um-faq"><summary>The banner announces something that is no longer relevant.</summary>
+    <p>The STAR team publishes that message. Let them know through your usual support channel and they will update it.</p></details>
+
+  <details class="um-faq"><summary>The numbers do not match what I just did.</summary>
+    <p>Home reads your figures when the page opens. Reload the page — <span class="um-kbd">F5</span>, or <span class="um-kbd">&#8984;</span> + <span class="um-kbd">R</span> on a Mac — to refresh them.</p></details>
+</section>
+
+<!-- 13 -->
+<section class="um-section" id="glossary">
+  <h2><span class="um-section__num">13</span>Glossary</h2>
+  <p class="um-lead">Words this page uses that are specific to STAR.</p>
+  <div class="um-table-wrap">
+    <table class="um-table">
+      <tbody>
+        <tr><td><strong>STAR</strong></td><td>The Alliance Bioversity–CIAT platform for reporting research indicators.</td></tr>
+        <tr><td><strong>Result</strong></td><td>Something your research produced or achieved that is worth reporting — a training course, an innovation, a policy change, and so on.</td></tr>
+        <tr><td><strong>Indicator</strong></td><td>The category a result belongs to. It decides which information STAR asks you for.</td></tr>
+        <tr><td><strong>Status</strong></td><td>The stage a result has reached, from being written through to being approved.</td></tr>
+        <tr><td><strong>Contract / Project</strong></td><td>The funded piece of work a result is attached to, identified by a code such as A1234.</td></tr>
+        <tr><td><strong>Green check</strong></td><td>The tick shown next to a section of a result once its required information is complete. Green checks are what fill the progress bar.</td></tr>
+        <tr><td><strong>Results Center</strong></td><td>The page listing every result you are allowed to see, with search, filters and export.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
