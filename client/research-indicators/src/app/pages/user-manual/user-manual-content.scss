@@ -123,6 +123,16 @@
   }
 }
 
+/* Several manual classes set `font-family` at one-class specificity, exactly
+   like the app's `.material-symbols-rounded`. Whichever stylesheet loads last
+   then wins, and an icon silently renders as its ligature text ("folder_open")
+   instead of a glyph. Two classes beats one, so this settles it for the whole
+   manual rather than per element. */
+.um-root .material-symbols-rounded {
+  font-family: 'Material Symbols Rounded';
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
 .um-section__num {
   display: inline-grid;
   place-items: center;
@@ -134,6 +144,12 @@
   color: var(--ac-white-1);
   font-family: 'Space Grotesk', sans-serif;
   font-size: 14px;
+
+  /* The badge holds a section number almost everywhere, but a module icon on
+     a chapter that has no number yet. */
+  &--icon {
+    font-size: 17px;
+  }
 }
 
 .um-lead {

@@ -1,13 +1,13 @@
 <section class="um-section">
   @if (module(); as module) {
-  <h2><span class="um-section__num material-symbols-rounded !text-[16px]">{{ module.icon }}</span>{{ module.label }}</h2>
+  <h2><span class="um-section__num um-section__num--icon material-symbols-rounded">{{ module.icon }}</span>{{ module.label }}</h2>
   <p class="um-lead">{{ module.summary }}</p>
   <div class="um-callout um-callout--info">
     <span class="material-symbols-rounded" aria-hidden="true">schedule</span>
     <p>This chapter is being written. In the meantime, the chapters below are ready to read.</p>
   </div>
   } @else {
-  <h2><span class="um-section__num material-symbols-rounded !text-[16px]">help</span>Chapter not found</h2>
+  <h2><span class="um-section__num um-section__num--icon material-symbols-rounded">help</span>Chapter not found</h2>
   <p class="um-lead">That address does not match any chapter of this manual.</p>
   }
 
