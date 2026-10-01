@@ -186,6 +186,9 @@ export class ResultResponseMapper {
   public result_code: string;
   public status_id: string;
   public year: string;
+  // PRMS reporting phase. OpenSearch does not return it yet; it is declared now
+  // so the STAR import picks it up as soon as PRMS adds the attribute.
+  public phase_id?: number;
   public pdf_link: string;
   public prms_link: string;
   public last_update_at: string;
@@ -348,6 +351,19 @@ export class PolicyStageMapper {
   public name: string;
   public definition: string;
 }
+
+export type PrmsSearchParams = Partial<
+  Record<
+    | 'year'
+    | 'centerAcronym'
+    | 'resultType'
+    | 'resultCode'
+    | 'source'
+    | 'fundingType'
+    | 'statusId',
+    string | number
+  >
+>;
 
 export class PrmsTemporalResponseMapper {
   public code: number;

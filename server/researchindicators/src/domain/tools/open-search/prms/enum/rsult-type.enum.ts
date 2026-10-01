@@ -25,3 +25,19 @@ export const ResultPrmsStatusMapper = {
   3: ResultStatusEnum.SUBMITTED_IN_PRMS,
   4: ResultStatusEnum.DISCONTINUED_IN_PRMS,
 };
+
+/**
+ * PRMS `status_id` -> STAR status, for PRMS results imported as STAR results.
+ * Statuses missing from this map are not imported.
+ */
+export const ResultPrmsToStarStatusMapper: Partial<
+  Record<number, ResultStatusEnum>
+> = {
+  1: ResultStatusEnum.DRAFT, // Editing
+  2: ResultStatusEnum.APPROVED, // Quality Assessed
+  3: ResultStatusEnum.SUBMITTED, // Submitted
+  5: ResultStatusEnum.SUBMITTED, // Pending Review
+  6: ResultStatusEnum.APPROVED, // Approved
+  // 4 Discontinued: provisionally skipped until it has a STAR equivalent.
+  // 7 Rejected: skipped.
+};

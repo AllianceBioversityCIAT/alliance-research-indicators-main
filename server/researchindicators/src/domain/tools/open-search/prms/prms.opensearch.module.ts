@@ -11,6 +11,7 @@ import { PrmsRepository } from './repositories/prms.repository';
 import { ClarisaCountriesModule } from '../../clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ClarisaRegionsModule } from '../../clarisa/entities/clarisa-regions/clarisa-regions.module';
 import { ClarisaInstitutionsModule } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.module';
+import { GreenChecksModule } from '../../../entities/green-checks/green-checks.module';
 import { SaveAllSectionsModule } from '../../../shared/services/save-all-sections.module';
 import { ClarisaInnovationCharacteristicsModule } from '../../clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.module';
 import { ClarisaInnovationTypesModule } from '../../clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.module';
@@ -38,6 +39,7 @@ import { ClarisaInstitutionTypesModule } from '../../clarisa/entities/clarisa-in
     ClarisaActorTypesModule,
     ClarisaInstitutionTypesModule,
     SaveAllSectionsModule,
+    GreenChecksModule,
   ],
 })
 export class PrmsOpenSearchModule {}

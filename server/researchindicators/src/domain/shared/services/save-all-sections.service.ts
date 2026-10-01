@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, FindOptionsWhere, In } from 'typeorm';
+import { DataSource, FindOptionsWhere, In, Not } from 'typeorm';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import {
   CounterResults,
@@ -110,19 +110,24 @@ export class SaveResultService {
       // Matching is done exclusively on `public_link` (official publication URL).
       // `external_link` is platform-specific (TIP/AICCRA/PRMS portal) and must
       // never be used for deduplication.
-      const duplicateValidation = await this.duplicateResultValidation({
-        platformCode: extraData.platformCode,
-        publicLink: result.public_link,
-        indicatorId: result.createResult.indicator_id,
-        reportYearId: result.createResult.year,
-        // When updating an existing row, exclude it from the duplicate set.
-        excludeResultId: findResult?.result_id,
-      });
+      const duplicateValidation = extraData?.duplicateByTitle
+        ? await this.duplicateTitleValidation(
+            result.createResult.title,
+            findResult?.result_id,
+          )
+        : await this.duplicateResultValidation({
+            platformCode: extraData.platformCode,
+            publicLink: result.public_link,
+            indicatorId: result.createResult.indicator_id,
+            reportYearId: result.createResult.year,
+            // When updating an existing row, exclude it from the duplicate set.
+            excludeResultId: findResult?.result_id,
+          });
 
       // Rule 1 & 2: skip creation/update when a higher-priority duplicate exists.
       if (duplicateValidation.shouldOmit) {
         this.logger.debug(
-          `Skipping result ${result.official_code} from ${this.platformCode(extraData.platformCode)} because a higher-priority duplicate exists for public link.`,
+          `Skipping result ${result.official_code} from ${this.platformCode(extraData.platformCode)} because ${extraData?.duplicateByTitle ? 'a result with the same title exists' : 'a higher-priority duplicate exists for public link'}.`,
         );
         this._currentUser.clearSystemUser();
         return;
@@ -183,6 +188,14 @@ export class SaveResultService {
         external_link: result?.external_link,
         public_link: result?.public_link,
         created_at: result.created_at,
+        // Only flows that send them write these, so a re-sync without a phase
+        // never clears the one a PRMS push stored.
+        ...(!isEmpty(result?.prms_result_code) && {
+          prms_result_code: result.prms_result_code,
+        }),
+        ...(!isEmpty(result?.prms_phase_id) && {
+          prms_phase_id: result.prms_phase_id,
+        }),
       });
 
       await this._resultsService.updateGeneralInfo(
@@ -343,6 +356,34 @@ export class SaveResultService {
    *  - `resultsToDelete`         → `result_id` values safe to remove after sync.
    *  - `protectedFromDeletion`   → duplicates that lost but cannot be deleted (Rule 4).
    */
+  /**
+   * Title-only duplicate rule: the incoming result is skipped when another live
+   * result already uses the same title. Nothing is ever deleted.
+   */
+  async duplicateTitleValidation(
+    title: string,
+    excludeResultId?: number,
+  ): Promise<DuplicateResultValidationResult> {
+    const noDuplicates: DuplicateResultValidationResult = {
+      shouldOmit: false,
+      resultsToDelete: [],
+      protectedFromDeletion: [],
+    };
+    if (isEmpty(title?.trim())) return noDuplicates;
+
+    const duplicate = await this.dataSource.getRepository(Result).findOne({
+      where: {
+        title: title.trim(),
+        is_active: true,
+        is_snapshot: false,
+        ...(excludeResultId && { result_id: Not(excludeResultId) }),
+      },
+      select: { result_id: true },
+    });
+
+    return { ...noDuplicates, shouldOmit: !!duplicate };
+  }
+
   async duplicateResultValidation(params: {
     platformCode: ReportingPlatformEnum;
     publicLink?: string | null;
@@ -459,6 +500,7 @@ export type ExtraData<T extends object> = {
   statusMapper?: Record<number, ResultStatusEnum>;
   findOptions?: FindOptionsKeyMap<T>;
   manageOfficialCode?: boolean;
+  duplicateByTitle?: boolean;
 };
 
 export type FindOptionsKeyMap<

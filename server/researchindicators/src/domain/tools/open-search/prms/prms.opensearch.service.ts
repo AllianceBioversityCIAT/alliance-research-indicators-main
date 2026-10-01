@@ -4,6 +4,7 @@ import {
   InnovationDevelopmentQuestionnaireMapper,
   InnovationDevelopmentSummaryMapper,
   PrmsKnowledgeProductDto,
+  PrmsSearchParams,
   PrmsTemporalResponseMapper,
   PolicyChangeSummaryMapper,
   ResultResponseMapper,
@@ -39,7 +40,9 @@ import { PooledFundingContractsService } from '../../../entities/pooled-funding-
 import {
   AcronymExContractEnum,
   ResultPrmsStatusMapper,
+  ResultPrmsToStarStatusMapper,
 } from './enum/rsult-type.enum';
+import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -117,6 +120,7 @@ export class PrmsOpenSearchService
     private readonly clarisaInnovationReadinessLevelsService: ClarisaInnovationReadinessLevelsService,
     private readonly clarisaActorTypesService: ClarisaActorTypesService,
     private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
+    private readonly greenCheckRepository: GreenCheckRepository,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -223,9 +227,6 @@ export class PrmsOpenSearchService
 
   //TODO: Review this function to check if it is working correctly and complete the process
   async getData(year: number) {
-    const size = 50;
-    let page = 1;
-    let keepGoing = true;
     const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
@@ -238,39 +239,15 @@ export class PrmsOpenSearchService
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.PRMS_INTEGRATION,
       );
-      while (keepGoing) {
-        const centerAcronym = ['Bioversity (Alliance)', 'CIAT (Alliance)'];
-        let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
-        if (!isEmpty(year)) {
-          prmsUrl += `&year=${year}`;
-        }
-        const response = await firstValueFrom(
-          this.httpService.get<SearcherResponseDto>(prmsUrl),
-        ).then((response) => response.data);
-        await Promise.all(
-          response.data.map(async (item) => {
-            await this.dataSource
-              .getRepository(SyncStagingRecordsEntity)
-              .save({
-                execution_code: executionCode,
-                code: parseInt(item.result_code),
-                year: parseInt(item.year),
-                data: item,
-              })
-              .catch((error) => {
-                this.logger.error(
-                  `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
-                );
-              });
-          }),
-        );
-
-        if (page >= response.totalPages) {
-          keepGoing = false;
-        }
-
-        page++;
+      const centerAcronym = ['Bioversity (Alliance)', 'CIAT (Alliance)'];
+      const params: PrmsSearchParams = {
+        fundingType: 'Result',
+        centerAcronym: centerAcronym.join(','),
+      };
+      if (!isEmpty(year)) {
+        params.year = year;
       }
+      await this.fetchPrmsPages(params, executionCode);
       const prmsResults =
         await this.prmsRepository.findTemporalResults<ResultResponseMapper>(
           executionCode,
@@ -292,6 +269,168 @@ export class PrmsOpenSearchService
       this.logger.error(`Error getting data from PRMS: ${errorMessage}`);
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  /**
+   * Imports PRMS results as STAR results. STAR assigns the official code; the
+   * PRMS `result_code` is kept in `prms_result_code` and is the key a re-run
+   * uses to update instead of creating again. A result that lands as APPROVED
+   * is versioned right away, without checking completeness.
+   */
+  async getDataAsStar(params: PrmsSearchParams) {
+    const executionCode = uuidv4();
+    const currentCode: { current: number } = { current: null };
+    const resultSaved: number[] = [];
+    const counters: CounterResults = {
+      createdRecords: 0,
+      updatedRecords: 0,
+      errorRecords: 0,
+    };
+    try {
+      const syncProcessLog = await this.syncProcessLogService.initiateSync(
+        SyncProcessEnum.PRMS_INTEGRATION,
+      );
+      await this.fetchPrmsPages(params, executionCode);
+      const prmsResults =
+        await this.prmsRepository.findTemporalResults<ResultResponseMapper>(
+          executionCode,
+        );
+
+      const dataProcessed = await this.processDataAsStar(prmsResults);
+
+      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+        platformCode: ReportingPlatformEnum.STAR,
+        resultSaved,
+        currentCode,
+        counters,
+        manageOfficialCode: true,
+        duplicateByTitle: true,
+        findOptions: {
+          prms_result_code: 'prms_result_code',
+          is_snapshot: 'is_version_applied',
+        },
+      });
+      await this.versionApprovedResults(dataProcessed);
+      await this.syncProcessLogService.update(syncProcessLog.id, counters);
+      await this.syncProcessLogService.endSync(syncProcessLog.id);
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(`Error getting PRMS data as STAR: ${errorMessage}`);
+    } finally {
+      await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  private async fetchPrmsPages(
+    params: PrmsSearchParams,
+    executionCode: string,
+  ): Promise<void> {
+    const size = 50;
+    let page = 1;
+    let keepGoing = true;
+    while (keepGoing) {
+      const response = await firstValueFrom(
+        this.httpService.get<SearcherResponseDto>(
+          this.buildPrmsUrl(size, page, params),
+        ),
+      ).then((response) => response.data);
+      await Promise.all(
+        response.data.map(async (item) => {
+          await this.dataSource
+            .getRepository(SyncStagingRecordsEntity)
+            .save({
+              execution_code: executionCode,
+              code: parseInt(item.result_code),
+              year: parseInt(item.year),
+              data: item,
+            })
+            .catch((error) => {
+              this.logger.error(
+                `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
+              );
+            });
+        }),
+      );
+
+      if (page >= response.totalPages) {
+        keepGoing = false;
+      }
+
+      page++;
+    }
+  }
+
+  private buildPrmsUrl(
+    size: number,
+    page: number,
+    params: PrmsSearchParams,
+  ): string {
+    const query = [`size=${size}`, `page=${page}`];
+    for (const [key, value] of Object.entries(params)) {
+      if (isEmpty(value)) continue;
+      query.push(`${key}=${encodeURIComponent(String(value))}`);
+    }
+    return `${this.appConfig.SEARCH_PRMS_URL}/result?${query.join('&')}`;
+  }
+
+  private async processDataAsStar(
+    prmsData: PrmsTemporalResponseMapper[],
+  ): Promise<ExternalMappersDto[]> {
+    const starStatusByCode = new Map<number, ResultStatusEnum>();
+    const phaseByCode = new Map<number, number>();
+    const importable = prmsData.filter((data) => {
+      const starStatus =
+        ResultPrmsToStarStatusMapper[Number(data?.data?.status_id)];
+      if (!starStatus) {
+        this.logger.warn(
+          `Skipping PRMS result ${data?.data?.result_code} because status ${data?.data?.status_id} is not imported into STAR.`,
+        );
+        return false;
+      }
+      const code = parseInt(data.data.result_code);
+      starStatusByCode.set(code, starStatus);
+      phaseByCode.set(code, data.data.phase_id);
+      return true;
+    });
+
+    const results = await this.processData(importable);
+    for (const result of results) {
+      result.status_id = starStatusByCode.get(result.official_code);
+      result.prms_result_code = result.official_code;
+      result.prms_phase_id = phaseByCode.get(result.official_code);
+    }
+    return results;
+  }
+
+  private async versionApprovedResults(
+    results: ExternalMappersDto[],
+  ): Promise<void> {
+    for (const result of results) {
+      if (result.status_id !== ResultStatusEnum.APPROVED) continue;
+      const year = result.createResult.year;
+      try {
+        // Missing when the save failed or was skipped as a duplicate.
+        const saved = await this.dataSource.getRepository(Result).findOne({
+          where: {
+            prms_result_code: result.prms_result_code,
+            platform_code: ReportingPlatformEnum.STAR,
+            report_year_id: year,
+            is_snapshot: false,
+          },
+          select: { result_official_code: true },
+        });
+        if (!saved) continue;
+        await this.greenCheckRepository.createSnapshot(
+          saved.result_official_code,
+          year,
+        );
+      } catch (error) {
+        const errorMessage = (error as Error).message ?? 'Unknown error';
+        this.logger.error(
+          `Error versioning PRMS result ${result.prms_result_code}: ${errorMessage}`,
+        );
+      }
     }
   }
 
