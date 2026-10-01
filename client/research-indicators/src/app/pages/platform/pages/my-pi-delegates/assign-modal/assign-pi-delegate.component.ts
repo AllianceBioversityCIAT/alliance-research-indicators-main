@@ -572,6 +572,12 @@ export class AssignPiDelegateComponent implements OnInit {
       confirmCallback: {
         label: 'Save',
         event: () => {
+          // Close the Assign modal BEFORE the alert goes away (the alert closes
+          // right after this callback returns), so the user never sees it sitting
+          // alone while the request is in flight. Instant: its fade-out would
+          // otherwise show the form already emptied by clearState(). Feedback
+          // arrives as a toast.
+          this.allModalsService.closeModal('assignPiDelegate', { instant: true });
           void this.executeAssign(assignments);
         }
       },
@@ -593,7 +599,6 @@ export class AssignPiDelegateComponent implements OnInit {
         summary: 'PI Delegates updated',
         detail: 'The delegate assignments have been saved successfully.'
       });
-      this.allModalsService.closeModal('assignPiDelegate');
     } else {
       // R-UI-007 AC.3: error state — service.assign already refetches; show error.
       this.actions.showToast({

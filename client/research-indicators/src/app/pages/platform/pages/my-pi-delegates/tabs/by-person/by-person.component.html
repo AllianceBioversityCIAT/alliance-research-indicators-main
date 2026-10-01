@@ -161,7 +161,7 @@
                 class="by-person__history-btn"
                 [attr.aria-label]="'Delegation history for ' + row.name"
                 pTooltip="Delegation history"
-                tooltipPosition="top"
+                tooltipPosition="left"
                 (click)="onHistory(row)"
                 (keydown.enter)="onHistory(row)"
               >
@@ -173,7 +173,7 @@
                   class="by-person__assign-btn by-person__assign-btn--danger"
                   [attr.aria-label]="'Remove ' + row.name + ' as PI Delegate'"
                   pTooltip="Remove delegate"
-                  tooltipPosition="top"
+                  tooltipPosition="left"
                   (click)="onRemoveDelegate(row)"
                   (keydown.enter)="onRemoveDelegate(row)"
                 >
@@ -185,7 +185,7 @@
                   class="by-person__assign-btn"
                   [attr.aria-label]="'Assign projects to ' + row.name"
                   pTooltip="Assign projects to this person"
-                  tooltipPosition="top"
+                  tooltipPosition="left"
                   (click)="onAssign(row)"
                   (keydown.enter)="onAssign(row)"
                 >
