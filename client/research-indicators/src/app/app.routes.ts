@@ -37,6 +37,12 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/oicr-download/oicr-download.component').then(m => m.default)
   },
   {
+    // Public on purpose: the STAR user manual must be readable without signing in,
+    // so it is declared ahead of the authenticated shell and carries no rolesGuard.
+    path: 'user-manual',
+    loadChildren: () => import('./pages/user-manual/user-manual.routes').then(m => m.userManualRoutes)
+  },
+  {
     path: 'reporting',
     loadComponent: () => import('./pages/reporting/reporting.component').then(m => m.default)
   },

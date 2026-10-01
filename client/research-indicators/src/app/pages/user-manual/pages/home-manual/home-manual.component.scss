@@ -1,0 +1,385 @@
+/* Drawings and interactive helpers for the Home chapter.
+   Shared documentation styles come from the shell (user-manual-content.scss). */
+
+:host {
+  display: contents;
+}
+
+/* ---------- browser drawing ---------- */
+.hm-mock {
+  padding: 14px;
+  border: 1px solid var(--ac-grey-300);
+  border-radius: 12px;
+  background: var(--ac-background);
+
+  &__chrome {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+
+    i {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--ac-grey-300);
+    }
+  }
+
+  /* Drawn to the real navbar's palette (`alliance-navbar.component.scss`):
+     `#173F6F` ground, `#00b6ff` for the page you are on with its 3px rule,
+     `#1689ca` for Create Result, and a 10%-white search field. */
+  &__bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 5px 10px;
+    border-radius: 7px 7px 0 0;
+    background: var(--ac-primary-blue-500);
+    color: #ffffffe0;
+    font-size: 9.5px;
+  }
+
+  &__logo {
+    height: 26px;
+    flex-shrink: 0;
+  }
+
+  &__navitem--on {
+    position: relative;
+    color: var(--ac-light-blue-200);
+    font-weight: 600;
+    padding-bottom: 5px;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: auto 0 0;
+      height: 2px;
+      background: var(--ac-light-blue-200);
+    }
+  }
+
+  &__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: var(--ac-light-blue-300);
+    color: var(--ac-white-1);
+
+    .material-symbols-rounded {
+      font-size: 11px;
+    }
+  }
+
+  &__search {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 22px 4px 8px;
+    border-radius: 6px;
+    background: #ffffff1a;
+    color: #ffffffa6;
+
+    .material-symbols-rounded {
+      font-size: 11px;
+    }
+  }
+
+  &__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 200px;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  &__main,
+  &__side {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+}
+
+/* ---------- clickable areas ---------- */
+.hm-zone {
+  position: relative;
+  padding: 8px;
+  border-radius: 8px;
+  transition: box-shadow 0.15s, background 0.15s;
+
+  /* A ring rather than a border: the panels underneath have their own white
+     background, which swallows a tint and hides a 1px dashed edge. */
+  &--on {
+    box-shadow: 0 0 0 2px var(--ac-orange-1);
+    background: #f582201a;
+  }
+}
+
+.hm-pin {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ac-white-1);
+  border-radius: 50%;
+  background: var(--ac-orange-1);
+  color: var(--ac-white-1);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 5px #0b1e3c4d;
+
+  &:hover,
+  &[aria-pressed='true'] {
+    background: var(--ac-primary-blue-600);
+    transform: scale(1.12);
+  }
+}
+
+/* ---------- drawn Home pieces ---------- */
+.hm-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 7px;
+  background: var(--ac-primary-blue-500);
+  color: var(--ac-white-1);
+
+  &__art {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--ac-light-blue-300), #153c71 70%);
+  }
+
+  b {
+    display: block;
+    font-size: 13px;
+    text-transform: uppercase;
+  }
+
+  small {
+    font-size: 10.5px;
+    font-weight: 300;
+    opacity: 0.9;
+  }
+}
+
+.hm-h {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ac-primary-blue-600);
+
+  &--sm {
+    font-size: 11px;
+  }
+}
+
+.hm-sub {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 300;
+  color: var(--ac-grey-700);
+}
+
+.hm-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.hm-action {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 64px;
+  padding: 8px;
+  border-radius: 7px;
+  background: linear-gradient(100deg, var(--ac-primary-blue-600), #7c9cb9);
+  color: var(--ac-white-1);
+  font-size: 9.5px;
+  text-transform: uppercase;
+
+  .material-symbols-rounded {
+    font-size: 15px;
+  }
+}
+
+.hm-rowhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hm-btn {
+  flex-shrink: 0;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: var(--ac-primary-blue-500);
+  color: var(--ac-white-1);
+  font-size: 9.5px;
+}
+
+.hm-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px;
+  border: 0.4px solid var(--ac-grey-200);
+  border-radius: 7px;
+  background: var(--ac-white-1);
+}
+
+.hm-l {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ac-grey-200);
+
+  &--s { width: 45%; }
+  &--m { width: 72%; }
+}
+
+.hm-bar {
+  height: 4px;
+  margin-top: 3px;
+  border-radius: 3px;
+  background: var(--ac-grey-200);
+  overflow: hidden;
+
+  b {
+    display: block;
+    height: 100%;
+    background: var(--ac-light-blue-300);
+  }
+}
+
+.hm-absent {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--ac-grey-300);
+  border-radius: 7px;
+  background: var(--ac-grey-100);
+  color: var(--ac-grey-700);
+  font-size: 11.5px;
+
+  .material-symbols-rounded {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  /* The sentence is one flex item, so inline <strong> stays inline. */
+  > span {
+    line-height: 1.5;
+  }
+}
+
+.hm-panel {
+  border: 0.4px solid var(--ac-grey-200);
+  border-radius: 7px;
+  background: var(--ac-white-1);
+}
+
+.hm-statusrow {
+  display: grid;
+  grid-template-columns: 48px 1fr 14px;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--ac-primary-blue-600);
+  font-size: 9.5px;
+
+  i {
+    height: 5px;
+    border-radius: 9px;
+    background: var(--ac-grey-200);
+    overflow: hidden;
+  }
+
+  b {
+    display: block;
+    height: 100%;
+  }
+
+  em {
+    font-style: normal;
+    text-align: right;
+  }
+}
+
+.hm-inds {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.hm-ind {
+  padding: 5px 6px;
+  border: 0.4px solid var(--ac-grey-200);
+  border-radius: 5px;
+  font-size: 8.5px;
+  color: var(--ac-grey-700);
+  line-height: 1.3;
+
+  b {
+    display: block;
+    color: var(--ac-primary-blue-600);
+    font-size: 12px;
+  }
+}
+
+.hm-empty {
+  margin-top: 8px;
+  padding: 10px 8px;
+  border-radius: 6px;
+  background: var(--ac-grey-100);
+  text-align: center;
+  font-size: 9px;
+  color: var(--ac-grey-600);
+
+  b {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--ac-primary-blue-600);
+    font-size: 10.5px;
+  }
+}
+
+@media (width <= 820px) {
+  .hm-mock__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hm-actions,
+  .hm-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-zone,
+  .hm-pin {
+    transition: none;
+  }
+}

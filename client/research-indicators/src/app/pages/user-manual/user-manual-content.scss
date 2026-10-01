@@ -1,0 +1,369 @@
+/* Documentation design system shared by every manual module page.
+   Loaded unencapsulated by the manual shell; every rule is `.um-` prefixed. */
+
+.um-hero {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 3vw, 2.25rem);
+  padding: 24px 32px;
+  border-radius: var(--um-radius);
+  background: var(--ac-primary-blue-500);
+  color: var(--ac-white-1);
+  box-shadow: 0 8px 28px #112f5c38;
+}
+
+.um-hero__art {
+  flex: 0 0 clamp(72px, 16%, 112px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, var(--ac-light-blue-300), #153c71 70%);
+
+  .material-symbols-rounded {
+    font-size: 48px;
+    color: #ffffffd9;
+  }
+}
+
+.um-hero__title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.um-hero__sub {
+  margin: 6px 0 0;
+  max-width: 72ch;
+  font-size: 14px;
+  font-weight: 300;
+  color: #ffffffeb;
+}
+
+.um-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+
+  span {
+    padding: 2px 10px;
+    border: 1px solid #ffffff33;
+    border-radius: 999px;
+    background: #ffffff1a;
+    font-size: 12px;
+  }
+}
+
+/* ---------------- Sections ---------------- */
+.um-section {
+  padding: 26px 30px;
+  border: 0.4px solid var(--ac-grey-200);
+  border-radius: var(--um-radius);
+  background: var(--ac-white-1);
+  /* Clears the sticky top bar so an anchored heading is not hidden behind it. */
+  scroll-margin-top: 76px;
+
+  > h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ac-primary-blue-600);
+  }
+
+  h3 {
+    margin: 22px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ac-primary-blue-600);
+  }
+
+  p {
+    margin: 0 0 10px;
+  }
+
+  /* Tailwind's preflight strips list markers globally; documentation prose
+     needs them back, so they are restored here rather than per page. */
+  ul {
+    margin: 0 0 12px;
+    padding-left: 20px;
+    list-style: disc outside;
+  }
+
+  ol {
+    margin: 0 0 12px;
+    padding-left: 22px;
+    list-style: decimal outside;
+  }
+
+  li::marker {
+    color: var(--ac-light-blue-400);
+  }
+
+  /* Preflight also clears link colour; documentation needs links to look
+     like links, including inside callouts and tables. */
+  a {
+    color: var(--ac-light-blue-400);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+    &:hover {
+      color: var(--ac-primary-blue-600);
+    }
+  }
+
+  li {
+    margin-bottom: 4px;
+  }
+}
+
+.um-section__num {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--ac-primary-blue-500);
+  color: var(--ac-white-1);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+}
+
+.um-lead {
+  margin: 0 0 18px !important;
+  color: var(--ac-grey-700);
+  font-size: 14px;
+  font-weight: 300;
+}
+
+/* ---------------- Inline bits ---------------- */
+.um-ui {
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: #e8f0f7;
+  color: var(--ac-primary-blue-600);
+  font-size: 0.92em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.um-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--ac-grey-300);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--ac-grey-100);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+}
+
+/* ---------------- Callouts ---------------- */
+.um-callout {
+  display: flex;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border-left: 3px solid;
+  font-size: 14px;
+
+  .material-symbols-rounded {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 20px;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  &--info {
+    border-left-color: var(--ac-light-blue-300);
+    background: var(--ac-light-blue-50);
+    color: var(--ac-primary-blue-600);
+  }
+
+  &--tip {
+    border-left-color: var(--ac-green-500);
+    background: var(--ac-green-100);
+    color: #1f4e24;
+  }
+
+  &--warn {
+    border-left-color: var(--ac-warning-1);
+    background: var(--ac-warning-surface);
+    color: var(--ac-warning-fg);
+  }
+}
+
+/* ---------------- Tables ---------------- */
+.um-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0 12px;
+}
+
+.um-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--ac-grey-200);
+    background: var(--ac-grey-100);
+    color: var(--ac-primary-blue-600);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--ac-grey-200);
+    vertical-align: top;
+  }
+}
+
+/* ---------------- Numbered steps ---------------- */
+.um-steps {
+  counter-reset: um-step;
+  list-style: none !important;
+  padding-left: 0 !important;
+
+  li {
+    counter-increment: um-step;
+    position: relative;
+    margin-bottom: 12px;
+    padding-left: 40px;
+
+    &::before {
+      content: counter(um-step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--ac-light-blue-300);
+      color: var(--ac-white-1);
+      font-size: 13px;
+      font-weight: 600;
+    }
+  }
+}
+
+/* ---------------- FAQ ---------------- */
+.um-faq {
+  border-bottom: 1px solid var(--ac-grey-200);
+
+  summary {
+    padding: 11px 4px;
+    color: var(--ac-primary-blue-600);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    /* Drawn, not an icon ligature: a `content: 'add'` marker is read out as
+       the word "add" inside the question's accessible name. */
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      margin-right: 11px;
+      vertical-align: 2px;
+      border-right: 2px solid var(--ac-light-blue-400);
+      border-bottom: 2px solid var(--ac-light-blue-400);
+      transform: rotate(-45deg);
+      transition: transform 0.15s ease-out;
+    }
+  }
+
+  &[open] summary::before {
+    transform: rotate(45deg);
+  }
+
+  > p {
+    padding: 0 4px 12px 29px;
+    color: var(--ac-grey-800);
+  }
+}
+
+/* ---------------- On-this-page ---------------- */
+.um-toc {
+  padding: 16px 20px;
+  border: 0.4px solid var(--ac-grey-200);
+  border-radius: var(--um-radius);
+  background: var(--ac-white-1);
+
+  h2 {
+    margin: 0 0 8px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10.5px;
+    font-weight: 300;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ac-grey-600);
+  }
+
+  ol {
+    counter-reset: um-toc;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    counter-increment: um-toc;
+  }
+
+  a {
+    display: flex;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    color: var(--ac-primary-blue-600);
+    font-size: 13.5px;
+    text-decoration: none;
+
+    &::before {
+      content: counter(um-toc);
+      min-width: 16px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      color: var(--ac-grey-600);
+    }
+
+    &:hover {
+      background: var(--ac-light-blue-50);
+    }
+  }
+}
+
+@media (width <= 720px) {
+  .um-section {
+    padding: 20px 18px;
+  }
+
+  .um-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px;
+  }
+}
