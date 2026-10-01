@@ -327,6 +327,18 @@ export const routes: Routes = [
           isLoggedIn: true
         }
       },
+      // @akili-spec institutional-performance/control-lists T-01 — design §6.1; path must
+      // match the sidebar link in alliance-sidebar.component.ts exactly (J-9, KZ-017).
+      {
+        path: 'administration/center-admin/control-lists',
+        loadComponent: () =>
+          import('@platform/pages/administration/center-admin/control-lists/control-lists.component').then(m => m.default),
+        canMatch: [centerAdminGuard],
+        data: {
+          title: 'Control Lists',
+          isLoggedIn: true
+        }
+      },
       {
         path: 'administration/configuration/prompt-manager',
         loadComponent: () =>

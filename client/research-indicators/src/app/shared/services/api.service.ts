@@ -41,6 +41,12 @@ import { GlobalTarget } from '../interfaces/global-target.interface';
 import { GetResultsByContract } from '../interfaces/get-results-by-contract.interface';
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
+import {
+  ControlListCategory,
+  ControlListCategoryCreatePayload,
+  ControlListCategoryUpdatePayload,
+  ControlListPortfolioSummary
+} from '@shared/interfaces/control-lists.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
 import { GetResultsStatus } from '../interfaces/get-results-status.interface';
@@ -228,6 +234,28 @@ export class ApiService {
 
   DELETE_Portfolio = (portfolioId: number): Promise<MainResponse<unknown>> => {
     return this.TP.delete(`portfolios/${portfolioId}`, {});
+  };
+
+  // @akili-spec institutional-performance/control-lists T-01 (A1–A5) — categories only; lists/values follow in T-02/T-03.
+  GET_ControlListCategories = (portfolioId: number): Promise<MainResponse<ControlListCategory[]>> => {
+    const httpParams = new HttpParams().set('portfolioId', String(portfolioId));
+    return this.TP.get('control-lists/categories', { params: httpParams });
+  };
+
+  GET_ControlListPortfolioSummaries = (): Promise<MainResponse<ControlListPortfolioSummary[]>> => {
+    return this.TP.get('control-lists/portfolios/summary', {});
+  };
+
+  POST_ControlListCategory = (body: ControlListCategoryCreatePayload): Promise<MainResponse<ControlListCategory>> => {
+    return this.TP.post('control-lists/categories', body, {});
+  };
+
+  PATCH_ControlListCategory = (id: number, body: ControlListCategoryUpdatePayload): Promise<MainResponse<ControlListCategory>> => {
+    return this.TP.patch(`control-lists/categories/${id}`, body, {});
+  };
+
+  DELETE_ControlListCategory = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/categories/${id}`, {});
   };
 
   GET_FundingTypes = (): Promise<MainResponse<FundingType[]>> => {

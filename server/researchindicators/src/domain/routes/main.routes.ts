@@ -70,6 +70,7 @@ import { ResultPrmsSyncModule } from '../entities/result-prms-sync/result-prms-s
 import { BilateralProjectMappingModule } from '../entities/bilateral-project-mapping/bilateral-project-mapping.module';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
+import { ControlListsModule } from '../entities/control-lists/control-lists.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
@@ -260,6 +261,10 @@ const children: Routes = [
   {
     path: 'portfolios',
     module: PortfoliosModule,
+  },
+  {
+    path: 'control-lists',
+    module: ControlListsModule,
   },
   {
     path: 'configuration',

@@ -17,4 +17,7 @@ export type ModalName =
   | 'simulateProfile'
   | 'portfolio2025LeverSdgs'
   | 'portfolio2026SdgTargets'
-  | 'poolFundingHelp';
+  | 'poolFundingHelp'
+  // @akili-spec institutional-performance/control-lists — T-01: category mode only;
+  // the mode switch stays extensible for list/value modes in T-02/T-03.
+  | 'controlListForm';

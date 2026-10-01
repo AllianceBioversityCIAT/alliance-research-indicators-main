@@ -1,6 +1,7 @@
 import { Routes } from '@nestjs/core';
 import { route } from './main.routes';
 import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
+import { ControlListsModule } from '../entities/control-lists/control-lists.module';
 
 /**
  * T-07 (R-IUA-013 AC.5). No other node in this route tree is covered by a
@@ -25,5 +26,23 @@ describe('main.routes — results/innovation-use registration', () => {
 
     expect(innovationUseNode).toBeDefined();
     expect(innovationUseNode.module).toBe(ResultInnovationUseModule);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/control-lists), KZ-017: a route
+ * node is not a registration on its own (RouterModule.register() looks the
+ * module up in modulesContainer and returns silently when absent) — the
+ * companion gate is `entities.module.spec.ts`'s membership assertion. This
+ * spec is the falsifiable check over the route *tree* node itself.
+ */
+describe('main.routes — control-lists registration (T-01)', () => {
+  it('registers ControlListsModule at path control-lists', () => {
+    const controlListsNode = (route as Routes).find(
+      (node) => (node as { path?: string }).path === 'control-lists',
+    ) as { module?: unknown };
+
+    expect(controlListsNode).toBeDefined();
+    expect(controlListsNode.module).toBe(ControlListsModule);
   });
 });

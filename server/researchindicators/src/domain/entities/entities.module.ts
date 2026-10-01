@@ -95,6 +95,7 @@ import { BilateralModule } from './bilateral/bilateral.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
+import { ControlListsModule } from './control-lists/control-lists.module';
 import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
@@ -204,6 +205,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     PiDelegatesModule,
     UsersModule,
     PortfoliosModule,
+    ControlListsModule,
     StrategicObjectivesModule,
     ImpactOutcomesModule,
     ResultImpactOutcomesModule,

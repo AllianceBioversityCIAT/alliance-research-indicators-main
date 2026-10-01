@@ -1,11 +1,25 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter, Route, Router, Routes } from '@angular/router';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { routes } from './app.routes';
 import { CacheService } from '@services/cache/cache.service';
+import { RolesService } from '@services/cache/roles.service';
+import { centerAdminGuard } from '@guards/center-admin.guard';
+
+/** Recursively finds a route declaration by its own `path`, independent of nesting depth. */
+function findRouteByPath(routeList: Routes, path: string): Route | undefined {
+  for (const route of routeList) {
+    if (route.path === path) return route;
+    if (route.children) {
+      const found = findRouteByPath(route.children, path);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
 
 /**
  * The guarded platform route has an empty path, so its `canMatch` runs for every url the
@@ -60,5 +74,49 @@ describe('app.routes — unauthenticated deep links', () => {
 
   it('keeps protected pages reachable when logged in', async () => {
     await expect(navigate('/results-center', true)).resolves.toBe('/results-center');
+  });
+});
+
+/**
+ * institutional-performance/control-lists T-01, judgment J-9 / falsifier 7.
+ * R-CTL-007 AC.2 has two clauses — no menu item AND cannot open the route — this
+ * covers the second one, which the re-cut tasks.md had dropped. KZ-017: a link that
+ * compiles can still 404, so the resolved URL is asserted against the literal path
+ * the sidebar uses (`/administration/center-admin/control-lists`, design §6.1),
+ * not just "navigation did not throw".
+ */
+describe('app.routes — control-lists route declares canMatch (J-9)', () => {
+  it('the control-lists route config declares canMatch: [centerAdminGuard]', () => {
+    const route = findRouteByPath(routes, 'administration/center-admin/control-lists');
+    expect(route).toBeTruthy();
+    expect(route?.canMatch).toEqual([centerAdminGuard]);
+  });
+
+  const navigateAsCenterAdmin = async (canAccessCenterAdmin: boolean) => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(routes),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideLocationMocks(),
+        {
+          provide: CacheService,
+          useValue: { isLoggedIn: signal(true), isValidatingToken: signal(false), dataCache: signal({}) }
+        },
+        { provide: RolesService, useValue: { canAccessCenterAdmin: () => canAccessCenterAdmin } }
+      ]
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/administration/center-admin/control-lists').catch(() => undefined);
+    return router.url;
+  };
+
+  it('rejects a resolved user without center-admin access (falsifier 7: removing canMatch would let this through)', async () => {
+    await expect(navigateAsCenterAdmin(false)).resolves.toBe('/home');
+  });
+
+  it('admits Center Admin / System Admin to the exact path the sidebar link resolves to', async () => {
+    await expect(navigateAsCenterAdmin(true)).resolves.toBe('/administration/center-admin/control-lists');
   });
 });

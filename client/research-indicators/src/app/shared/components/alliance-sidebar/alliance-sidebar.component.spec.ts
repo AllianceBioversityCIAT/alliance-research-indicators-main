@@ -294,6 +294,78 @@ describe('AllianceSidebarComponent', () => {
     );
   });
 
+  // ─── institutional-performance/control-lists T-01 — nested Portfolio Management
+  // group (D-CTL-9, P-9, P-12). The exact array (not arrayContaining) pins the four
+  // existing children's order, labels and links so a future edit cannot silently
+  // move or drop one while only adding Control Lists underneath Portfolio Management.
+  it('keeps the exact four center-admin children, with Control Lists nested under Portfolio Management only', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+
+    const centerAdmin = component.administrationGroups().find(group => group.id === 'center-admin');
+
+    expect(centerAdmin?.children).toEqual([
+      { label: 'Bulk upload', link: '/administration/center-admin/bulk-upload', s3Image: 'images/brain.png' },
+      {
+        label: 'SDG Management',
+        link: '/administration/center-admin/sdg-management',
+        icon: 'pi-bullseye',
+        iconSize: '13px'
+      },
+      {
+        label: 'Bilateral Mapping',
+        link: '/administration/center-admin/bilateral-mapping',
+        icon: 'pi-sitemap',
+        iconSize: '13px'
+      },
+      {
+        label: 'Portfolio Management',
+        link: '/administration/center-admin/portfolio-management',
+        icon: 'pi-briefcase',
+        iconSize: '13px',
+        children: [
+          {
+            label: 'Control Lists',
+            link: '/administration/center-admin/control-lists',
+            icon: 'pi-list',
+            iconSize: '13px'
+          }
+        ]
+      }
+    ]);
+  });
+
+  it('renders Control Lists nested under Portfolio Management in the EXPANDED sidebar (falsifier 5)', () => {
+    const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    cache.isSidebarCollapsed.mockReturnValue(false);
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    fixture.detectChanges();
+
+    const nestedGroup = (fixture.nativeElement as HTMLElement).querySelector('.option-nested-children');
+    expect(nestedGroup).toBeTruthy();
+    const link = nestedGroup?.querySelector('a[href="/administration/center-admin/control-lists"]');
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain('Control Lists');
+  });
+
+  it('renders Control Lists nested under Portfolio Management in the COLLAPSED flyout (falsifier 5)', () => {
+    const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+    cache.isSidebarCollapsed.mockReturnValue(true);
+    roles.canAccessCenterAdmin.mockReturnValue(true);
+    fixture.detectChanges();
+
+    component.toggleAdministrationFlyout('center-admin', { stopPropagation: jest.fn() } as unknown as Event);
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector(
+      'a.admin-flyout-row--nested[href="/administration/center-admin/control-lists"]'
+    );
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain('Control Lists');
+  });
+
   it('should clear flyout id when closeAdministrationFlyout is called', () => {
     component.administrationFlyoutGroupId.set('center-admin');
     const cdr = (component as unknown as { cdr: ChangeDetectorRef }).cdr;

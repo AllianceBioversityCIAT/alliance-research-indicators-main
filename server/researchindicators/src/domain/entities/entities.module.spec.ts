@@ -4,6 +4,7 @@ import { join } from 'path';
 import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
+import { ControlListsModule } from './control-lists/control-lists.module';
 
 /**
  * T-07 attempt 2 (DD-15, tasks.md trap 4, KZ-001).
@@ -67,6 +68,21 @@ describe('EntitiesModule — result-prms-sync registration (T-13)', () => {
     const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
 
     expect(imports).toContain(ResultPrmsSyncModule);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/control-lists), KZ-017. A route
+ * node in main.routes.ts (see main.routes.spec.ts) is not a registration —
+ * RouterModule.register() only stamps MODULE_PATH metadata and looks the
+ * module up in modulesContainer, returning silently and 404-ing every
+ * handler when it is absent. This is the module-graph half of that gate.
+ */
+describe('EntitiesModule — control-lists registration (T-01)', () => {
+  it('lists ControlListsModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(ControlListsModule);
   });
 });
 

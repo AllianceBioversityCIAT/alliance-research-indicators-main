@@ -1,0 +1,168 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  ValidationPipe,
+  UsePipes,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import { ControlListsService } from './control-lists.service';
+import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
+import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
+import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
+import { RolesGuard } from '../../shared/guards/roles.guard';
+import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { ResponseUtils } from '../../shared/utils/response.utils';
+import { Roles } from '../../shared/decorators/roles.decorator';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+
+// Admin-only module (design.md §8, D-CTL-7): every handler here is
+// CENTER_ADMIN / SYSTEM_ADMIN. TECHNICAL_SUPPORT is deliberately NOT
+// granted, unlike portfolios.controller.ts's broader set. A13 (the consumer
+// read, open to any authenticated user) belongs to T-04, not this slice.
+@Controller()
+@ApiTags('Control Lists')
+@ApiBearerAuth()
+@UseInterceptors(SetUpInterceptor)
+@UseGuards(RolesGuard)
+export class ControlListsController {
+  constructor(private readonly controlListsService: ControlListsService) {}
+
+  // A1
+  @Get('categories')
+  @ApiOperation({ summary: 'List categories for a portfolio' })
+  @ApiQuery({
+    name: 'portfolioId',
+    type: Number,
+    required: true,
+    description: 'Portfolio id to scope the read',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async getCategories(@Query() query: GetCategoriesQueryDto) {
+    return this.controlListsService
+      .getCategories(query.portfolioId)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Categories found',
+          data,
+          status: HttpStatus.OK,
+        }),
+      );
+  }
+
+  // A2
+  @Get('portfolios/summary')
+  @ApiOperation({ summary: 'Category count per portfolio' })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async getPortfoliosSummary() {
+    return this.controlListsService.getPortfoliosSummary().then((data) =>
+      ResponseUtils.format({
+        description: 'Portfolio category summary found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A3
+  @Post('categories')
+  @ApiOperation({ summary: 'Create a category' })
+  @ApiBody({
+    type: CreateControlListCategoryDto,
+    description: 'Create a category',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async createCategory(@Body() dto: CreateControlListCategoryDto) {
+    return this.controlListsService.createCategory(dto).then((data) =>
+      ResponseUtils.format({
+        description: 'Category created successfully',
+        data,
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
+  // A4
+  @Patch('categories/:id')
+  @ApiOperation({ summary: 'Update a category' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Category id',
+  })
+  @ApiBody({
+    type: UpdateControlListCategoryDto,
+    description: 'Update a category',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async updateCategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateControlListCategoryDto,
+  ) {
+    return this.controlListsService.updateCategory(id, dto).then((data) =>
+      ResponseUtils.format({
+        description: 'Category updated successfully',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A5
+  @Delete('categories/:id')
+  @ApiOperation({ summary: 'Delete a category' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Category id',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async removeCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.controlListsService.removeCategory(id).then((data) =>
+      ResponseUtils.format({
+        description: `Category ${data.id} was deleted successfully`,
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+}

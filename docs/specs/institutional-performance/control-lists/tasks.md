@@ -49,7 +49,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-01 — Slice 1: Categories (table + API + page shell, menu and navigator)
 
 - **Jira:** [AC-1780](https://cgiarmel.atlassian.net/browse/AC-1780) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
-- **Status:** todo · **Size:** L · **Dependencies:** none
+- **Status:** done (PASS on attempt 2, 2026-10-01) · **Size:** L · **Dependencies:** none
 - **Requirements covered:** R-CTL-001 (category isolation, default portfolio, *not configured* stays selectable — J-2), R-CTL-002 *Duplicate name* (the *non-empty* scenario needs lists and closes in T-02), R-CTL-007 for A1–A5 (server roles; client `canMatch` and menu gating), R-CTL-008 *Menu placement* (incl. **BUT it must NOT** change existing items) and the page header and navigator, R-CTL-010 (2 categories), NFR-CTL-002/003/005
 - **Design refs:** §3 (categories), §4 A1–A5, §5 rules 1, 2, 7, §6.1, §6.2 header + navigator, §8, D-CTL-2, D-CTL-7–11, D-CTL-14 (explicit seed ids), P-2, P-5, P-6, P-8, P-9, P-11, P-12, P-14
 - **Scope — database:** `server/researchindicators/src/db/migrations/<epochMs>-createControlListCategories.ts` — `control_list_categories` extending `AuditableEntity`, FK `portfolio_id` → `portfolios.id` RESTRICT, `uq_control_list_categories_portfolio_name`, explicit `utf8mb4_unicode_ci`. Seed 2 categories for Portfolio 2 (resolved by years — D-CTL-8) with explicit ids 1–2, `INSERT … SELECT … WHERE NOT EXISTS`, then `AUTO_INCREMENT` above them. `down` drops the table.
@@ -102,11 +102,11 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
   - `src/domain/entities/entities.module.spec.ts` and `main.routes.ts` — re-run.
 - **Review:** `full` — new tables, authorization surface and the shared sidebar.
 - **Done criteria:**
-  - [ ] Migration up/re-run/revert/re-apply on the local dev DB as above; `SHOW CREATE TABLE` quoted in `execution.md`.
-  - [ ] Server and client specs green; falsifiers 1–7 each observed red, then reverted.
-  - [ ] The route is reachable only through `centerAdminGuard`: route config reviewed, and the route test quoted (J-9).
-  - [ ] A1–A5 visible in `/swagger` with tags, operation and params (local boot; quote what was seen).
-  - [ ] No hex literals in the new component files.
+  - [x] Migration up/re-run/revert/re-apply on the local dev DB as above; `SHOW CREATE TABLE` quoted in `execution.md`. *(The revert/re-apply ran during the attempt-1 incident recovery — see Run 5.)*
+  - [x] Server and client specs green; falsifiers 1–7 each observed red, then reverted. *(Server: 3 failures in 2 suites that reproduce at base 18ef3255 — pre-existing.)*
+  - [x] The route is reachable only through `centerAdminGuard`: route config reviewed, and the route test quoted (J-9).
+  - [x] A1–A5 visible in `/swagger` with tags, operation and params (local boot; quote what was seen).
+  - [x] No hex literals in the new component files.
   - [ ] Server: `npm test -- --silent`, `npx eslint src/domain/entities/control-lists`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 

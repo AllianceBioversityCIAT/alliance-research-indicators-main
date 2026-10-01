@@ -106,6 +106,24 @@
           <span class="sidebar-option-label body-2 text">{{ child.label }}</span>
         </span>
       </a>
+      @if (child.children?.length) {
+      <div class="option-nested-children" role="group" [attr.aria-label]="child.label + ' pages'">
+        @for (grandchild of child.children; track grandchild.link) {
+        <a class="option option--nested option--nested-child atc-primary-blue-400 block" [routerLink]="grandchild.link"
+          routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+          <span class="option-nested-inner flex min-w-0 items-center gap-[12px] pl-2">
+            @if (grandchild.s3Image) {
+            <img [src]="grandchild.s3Image | s3ImageUrl" alt="" class="shrink-0 object-contain"
+              [style.width]="grandchild.iconSize ?? '14px'" [style.height]="grandchild.iconSize ?? '14px'" />
+            } @else {
+            <i class="sidebar-option-icon" [ngClass]="'pi ' + grandchild.icon" [style.fontSize]="grandchild.iconSize ?? null"></i>
+            }
+            <span class="sidebar-option-label body-2 text">{{ grandchild.label }}</span>
+          </span>
+        </a>
+        }
+      </div>
+      }
       }
       }
     </div>
@@ -153,6 +171,23 @@
           <span class="admin-flyout-label sidebar-option-label body-2 !text-[12.5px] text-[#112F5C]">{{ child.label
             }}</span>
         </a>
+        @if (child.children?.length) {
+        @for (grandchild of child.children; track grandchild.link) {
+        <a class="admin-flyout-row admin-flyout-row--nested flex min-w-0 cursor-pointer items-center gap-3 rounded-md px-2 py-2 no-underline atc-primary-blue-400 hover:bg-[var(--ac-grey-100)]"
+          [routerLink]="grandchild.link" routerLinkActive="admin-flyout-row--active"
+          [routerLinkActiveOptions]="{ exact: true }" (click)="closeAdministrationFlyout()">
+          @if (grandchild.s3Image) {
+          <img [src]="grandchild.s3Image | s3ImageUrl" alt="" class="shrink-0 object-contain"
+            [style.width]="grandchild.iconSize ?? '14px'" [style.height]="grandchild.iconSize ?? '14px'" />
+          } @else {
+          <i class="sidebar-option-icon shrink-0 atc-primary-blue-600" [ngClass]="'pi ' + grandchild.icon"
+            [style.fontSize]="grandchild.iconSize ?? null"></i>
+          }
+          <span class="admin-flyout-label sidebar-option-label body-2 !text-[12.5px] atc-primary-blue-600">{{ grandchild.label
+            }}</span>
+        </a>
+        }
+        }
         }
       </div>
       }

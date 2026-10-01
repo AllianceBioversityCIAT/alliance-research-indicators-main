@@ -1,0 +1,88 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <section class="flex w-full min-w-0 flex-col gap-[18px]">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="flex flex-col gap-[2px]">
+            <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600">Control lists</h1>
+            <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] atc-grey-700">
+              Manage the categories, lists and values other STAR modules read by portfolio.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="flex flex-col gap-1 min-w-[220px]">
+              <label for="controlListsPortfolioSelect" class="text-sm font-medium atc-grey-800">Portfolio</label>
+              <p-select inputId="controlListsPortfolioSelect" [options]="portfolioOptions()" optionLabel="displayLabel"
+                optionValue="portfolioIdValue" [ngModel]="selectedPortfolioId()" (ngModelChange)="selectPortfolio($event)"
+                placeholder="Select a portfolio" aria-label="Select portfolio" data-testid="portfolio-select">
+              </p-select>
+            </div>
+
+            <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '140px' }"
+              (onClick)="startCreate()" data-testid="new-category-button">
+            </p-button>
+          </div>
+        </div>
+
+        <div class="flex min-h-[320px] w-full flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white">
+          @if (loading()) {
+          <app-custom-progress-bar></app-custom-progress-bar>
+          }
+
+          @if (loadError()) {
+          <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state">
+            <p class="m-0 text-sm atc-red-1">We could not load control lists. Please refresh the page.</p>
+          </div>
+          } @else if (!loading()) {
+          @if (!hasCategories()) {
+          <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+            <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+            <p class="m-0 text-sm atc-grey-700">No categories yet for this portfolio.</p>
+            <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+              styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreate()" data-testid="empty-new-category-button">
+            </p-button>
+          </div>
+          } @else {
+          <ul class="m-0 flex list-none flex-col gap-1 p-3" data-testid="category-list" aria-label="Categories">
+            @for (category of categories(); track trackByCategoryId($index, category)) {
+            <li class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-[var(--ac-grey-100)]"
+              data-testid="category-row">
+              <span class="truncate text-sm atc-grey-900">{{ category.name }}</span>
+              <span class="flex shrink-0 items-center gap-2">
+                <button type="button"
+                  class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                  [attr.aria-label]="'Edit ' + category.name" (click)="startEdit(category)">
+                  <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
+                </button>
+                <button type="button"
+                  class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                  [attr.aria-label]="'Delete ' + category.name" (click)="delete(category)">
+                  <i class="pi pi-trash !text-[12px] atc-red-1"></i>
+                </button>
+              </span>
+            </li>
+            }
+          </ul>
+          }
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<app-modal modalName="controlListForm" [clearModal]="clearModal">
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8">
+    <div class="flex flex-col gap-1">
+      <app-input label="Category name" [signal]="form" optionValue="name" [isRequired]="true" [maxLength]="150"
+        placeholder="e.g. Key Performance Indicators (KPIs)"></app-input>
+      @if (nameFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="name-field-error">{{ nameFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="form" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+  </div>
+</app-modal>
