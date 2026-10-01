@@ -3,14 +3,14 @@
 - **Module:** institutional-performance (new) — server + client
 - **Spec id:** 2026-09-control-lists
 - **Status:** draft
-- **Depth:** Standard (new module, new tables and API, one migration + seed; no change to existing data or screens)
+- **Depth:** Standard (new module, new tables and API, three migrations + seed; no change to existing data or screens)
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Parent spec:** [`../family.md`](../family.md) — child 1 of 5; shared rules **F-1 … F-9** apply and are cited, not restated
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Center Admin tools
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — this spec stays aligned with it
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-09-26 (Adjust round 1: key naming — no portfolio segment; qualified reference added. Judgment-day J-2: unconfigured portfolios stay selectable)
+- **Last updated:** 2026-10-01 (requester: value ID visible and read-only — R-CTL-004; list membership checked by the consumer service, no composite FK — R-CTL-006). Earlier: 2026-09-26 Adjust round 1 (key naming) and judgment-day J-2 (unconfigured portfolios stay selectable)
 
 ---
 
@@ -155,6 +155,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 **Details**
 - Inputs: code (required, 1–30, unique in list, case-insensitive), value (required, 1–150, unique in list, case-insensitive), description (optional ≤ 500), display order (integer ≥ 0), active (boolean, default true).
 - Behavior: a new value's code is proposed as `<PREFIX>-<nn>` (next number in the list) and is editable (F-6). Inactive values stay readable but are excluded when a consumer asks for *active values only*.
+- **Permanent ID (requester, 2026-10-01):** every value has its own primary key `id`, assigned by the system. The values table shows it as the first column, and the value modal shows it in edit mode; **it is never editable**. It is the permanent reference that consumers store and that code may rely on (F-9). The code and the name stay editable, so nothing may depend on them. Seeded values carry explicit ids, so they are the same in every environment.
 - Outputs: the value with id, code, value, description, display order, active, in-use count.
 
 #### Scenario: Duplicate code or value
@@ -172,6 +173,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 **Acceptance criteria**
 - [ ] AC.1 — Create `201`, update `200`; the consumer endpoint with `activeOnly=true` omits inactive values.
 - [ ] AC.2 — Duplicates (code or value, any letter case) → `409`.
+- [ ] AC.3 — The ID is shown in the table and in the edit modal as read-only. An update that sends `id` in the body → `400`, and the stored id is unchanged.
 
 ### R-CTL-005 — In-use protection
 
@@ -205,6 +207,13 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 - Inputs: portfolio id, system key, `activeOnly` (default true).
 - Outputs: the list's values ordered by display order, then code (natural numeric order).
 - Errors: unknown key for the portfolio → `404`.
+- **List membership (requester, 2026-10-01):** a consumer stores only the value `id`, with a plain FK to `control_list_values.id`. The database therefore cannot tell a *Direction* id from a *Unit of measure* id. This module exports a service check, `assertValueInList(valueId, portfolioId, listKey)`, and every consumer calls it before saving. **No composite FK** (requester decision).
+
+#### Scenario: Value from another list
+- GIVEN value `DIR-01` belongs to `kpi.direction`
+- WHEN a consumer validates it against `kpi.unit_of_measure` for the same portfolio
+- THEN the check fails with `400` naming the expected list
+- BUT it must NOT pass for a value of the right key in another portfolio
 
 #### Scenario: Ordered read
 - GIVEN `org.level` has L1…L4 with display order 1…4
@@ -213,6 +222,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 
 **Acceptance criteria**
 - [ ] AC.1 — `200` with ordered values; unknown key → `404`.
+- [ ] AC.2 — `assertValueInList` passes for a value of the given key and portfolio; it fails with `400` for another list's value or another portfolio's value, and with `404` for an unknown id.
 
 ### R-CTL-007 — Access control
 
@@ -323,7 +333,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 
 - New entities (portfolio-scoped): category, list (with `is_system`, immutable key), value. All extend `AuditableEntity`.
 - Unique indexes: category `(portfolio_id, name)`, list `(portfolio_id, key)`, value `(list_id, code)` and `(list_id, value)` — case-insensitive via collation.
-- One migration creates the tables and seeds R-CTL-010; migrations are append-only.
+- Three migrations, one per vertical slice (categories, lists, values), each creating its table and seeding its part of R-CTL-010. Migrations are append-only.
 - No OpenSearch fields.
 
 ## 8. API surface delta
@@ -346,7 +356,7 @@ None outside STAR (no CLARISA, AGRESSO, OpenSearch or socket events). Client: si
 | Sort order wrong (lexical instead of natural) | Client unit test on the sort comparator with `1, 2, 10` fixture |
 | Export content differs from the screen | Client unit test on the export row builder (filtered + sorted input → rows) |
 | Type/compile error hidden by the test runner | `npm run build` (server) and `ng build` (client) in verification |
-| Migration/seed not applied or not idempotent | migration run twice on the disposable TEST schema; row counts = 2 / 6 / 23 |
+| Migration/seed not applied or not idempotent | migration run twice on the local development database (`ari_local_mysql`); row counts = 2 / 6 / 23 |
 | Sidebar regression on existing items | Existing `alliance-sidebar` spec suite + a new assertion that existing items keep order |
 | **Column resize and table layout** (rendered geometry) | **No automated check in jsdom.** Substitute: manual check at the HITL pause in a real browser (drag a header edge, page, sort; widths persist) |
 | Visual fidelity to the mockup | **No automated check.** Substitute: side-by-side human review against `../mockup/ControlledLists.dc.html` at the HITL pause |
@@ -358,6 +368,7 @@ None outside STAR (no CLARISA, AGRESSO, OpenSearch or socket events). Client: si
 | Dependency | None upstream. Downstream: `organizational-structure` registers the first consumer (`org.level`) |
 | Assumption | `TECHNICAL_SUPPORT` is **not** granted write access (F-1), unlike portfolio creation (C-4) |
 | Risk | A consumer forgets to register its in-use provider → a used value becomes deletable. Mitigation: DB foreign keys from consumer rows to value ids |
+| Risk | A consumer forgets to call `assertValueInList` → a value from the wrong list is stored, and with no composite FK (requester decision) nothing catches it. Mitigation: each consumer spec cites design §5 rule 10, and its review checks every write that stores a value id (judgment J-15) |
 | Risk | Seed names diverge from what the business later agrees. Mitigation: all seeded values are editable |
 
 ## 12. Open questions

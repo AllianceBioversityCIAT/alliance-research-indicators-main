@@ -9,7 +9,7 @@
 - **Parent spec:** [`../family.md`](../family.md) (F-1 … F-9)
 - **Visual reference:** artboard *1 · Control Lists* — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP · [`../mockup/ControlledLists.dc.html`](../mockup/ControlledLists.dc.html)
 - **Exploration:** delegated to one Explore scout (citations as run, folded into §13 Premise Ledger)
-- **Last updated:** 2026-09-26 (judgment-day round 1 fixes J-1, J-2; user-approved suspects J-3, J-4)
+- **Last updated:** 2026-10-01 (requester: D-CTL-14 permanent value ID, D-CTL-15 membership check without a composite FK, D-CTL-16 vertical-slice delivery). These postdate `judgment.md` — see §12. Earlier: 2026-09-26 judgment-day round 1 fixes J-1, J-2; user-approved suspects J-3, J-4
 
 ---
 
@@ -61,7 +61,7 @@ flowchart LR
 | `repositories/*.repository.ts` | One repository per entity, same pattern as `PortfoliosRepository` |
 | `dto/*.dto.ts` | Create/update DTOs for category, list, value; query DTOs for `portfolioId`, `activeOnly` |
 | sibling `*.spec.ts` for controller, service, registry, repositories | Unit tests |
-| `src/db/migrations/<epochMs>-createControlListsTables.ts` | Tables, indexes, FKs, seed for Portfolio 2 |
+| `src/db/migrations/<epochMs>-createControlListCategories.ts` · `…-createControlLists.ts` · `…-createControlListValues.ts` | One migration per slice (D-CTL-16): each creates its table, indexes and FKs and seeds its part for Portfolio 2 |
 | `src/domain/routes/main.routes.ts`, `src/domain/entities/entities.module.ts` | Register the module (path `control-lists`) |
 
 **Client** — `client/research-indicators/src/app/`
@@ -99,7 +99,8 @@ All three tables extend `AuditableEntity` (created/updated by and at, `is_active
 - **Active flag** — the value's *Active* is the inherited `is_active` (D-CTL-4).
 - **Deletes are physical** (D-CTL-5), so unique indexes never collide with deleted rows.
 - `portfolio_id` on `control_lists` is denormalized from the category for the `(portfolio, key)` read and index; the service keeps them equal (§5).
-- **Seed** (in the same migration): resolves Portfolio 2 by `start_year = 2026 AND end_year = 2030` (not by literal id — P-6), then inserts 2 categories, 6 system lists and 23 values from R-CTL-010 with `INSERT … SELECT … WHERE NOT EXISTS` so a re-run adds nothing. `down` drops the three tables.
+- **Permanent value ID** (D-CTL-14): `control_list_values.id` is the value's own PK, shown read-only in the UI and never accepted in an update body. It is the only reference consumers store (F-9).
+- **Seed** (one per slice migration): resolves Portfolio 2 by `start_year = 2026 AND end_year = 2030` (not by literal id — P-6). The categories migration inserts 2 categories, the lists migration 6 system lists, and the values migration 23 values (R-CTL-010). Each uses `INSERT … SELECT … WHERE NOT EXISTS`, so a re-run adds nothing. Seeded rows carry **explicit ids** (categories 1–2, lists 1–6, values 1–23) so a system value has the same id in every environment (D-CTL-14), and each migration then resets `AUTO_INCREMENT` above them. Each `down` drops only its own table, so the reverse order is values → lists → categories.
 - No OpenSearch fields. No backfill.
 
 ---
@@ -120,7 +121,7 @@ Base path `/api/control-lists` (unversioned — root `CLAUDE.md` §4.1). Class-l
 | A8 | `DELETE /lists/:id` | same | — | `{ id }` | 404 · 409 system list · 409 has values |
 | A9 | `GET /lists/:id/values` | same | — | `Value[]` incl. inactive, each with `inUse: number` | 404 |
 | A10 | `POST /lists/:id/values` | same | `{code?, value, description?, displayOrder?, isActive?}` — `code` defaults to the proposed `<prefix>-<nn>` | `Value` (201) | 404 · 409 duplicate code/value |
-| A11 | `PATCH /values/:id` | same | `{code?, value?, description?, displayOrder?, isActive?}` | `Value` | 404 · 409 duplicate |
+| A11 | `PATCH /values/:id` | same | `{code?, value?, description?, displayOrder?, isActive?}` — **`id` not whitelisted** (D-CTL-14) | `Value` | 400 if `id` sent (forbidNonWhitelisted) · 404 · 409 duplicate |
 | A12 | `DELETE /values/:id` | same | — | `{ id }` | 404 · 409 in use (description: count + "deactivate instead") |
 | A13 | `GET /by-key/:listKey/values?portfolioId=&activeOnly=true` | any authenticated user (no `@Roles`) | `portfolioId` required, `activeOnly` default true | `Value[]` ordered by display order, then natural code | 400 · 404 unknown key |
 
@@ -139,6 +140,7 @@ Response shapes are wrapped by `ResponseInterceptor` (`ServerResponseDto`). Mach
 7. **Audit** — creates set `created_by`, updates set `updated_by`, via `CurrentUserUtil.audit`.
 8. **Transactions** — each write touches one row, so no multi-row transaction is needed. The seed runs inside the migration's own transaction.
 9. **Side effects** — none (no OpenSearch, sockets, queues).
+10. **List membership** (D-CTL-15) — the exported `ControlListsService.assertValueInList(valueId, portfolioId, listKey)` loads the value with its list in one query. It returns the value when `list.list_key = listKey` and `list.portfolio_id = portfolioId`, throws `BadRequestException` naming the expected key otherwise, and throws `NotFoundException` for an unknown id. Consumers call it before every insert or update that stores a value id. It does **not** check `is_active`: a record that already references a deactivated value must stay saveable (R-CTL-004 *Deactivate*). Offering only active values for a new selection is the consumer form's job, through A13 `activeOnly=true`. The 400 description says which part failed (list key or portfolio). There is no composite FK, so a consumer that forgets the call has no DB backstop. That is why each consumer spec must cite this rule (risk in requirements §11).
 
 ---
 
@@ -157,8 +159,8 @@ Response shapes are wrapped by `ResponseInterceptor` (`ServerResponseDto`). Mach
 | Header | Title *Control lists*, description, **Portfolio** selector, **+ New category** | Selector options come from `GET_Portfolios` + A2. **Every portfolio stays selectable.** A portfolio with 0 categories carries the label *(not configured)*, and selecting it shows an empty state with **+ New category**, so its first category can be created from the page. The default is the portfolio whose years contain the current year |
 | Left navigator (≈300 px) | Categories (collapsible) with their lists and value counts; per category: edit and *add list* icon buttons with `aria-label` | Selecting a list loads A9 |
 | List header | Category caps label, list name, description, **Reference `P<id> · <key>`**, *Used by*, **Edit list**, **Delete list** (custom lists only) | Qualified reference computed on the client (R-CTL-003) |
-| Values table | `DataTable` with columns Code · Value · Description · Order · In use · Active · Actions (edit, delete) | See 6.3 |
-| Modal `controlListForm` | One modal with three modes: category / list / value. Only **Cancel** and **Save** | Field errors shown inline from 400/409 `errors` payloads |
+| Values table | `DataTable` with columns **ID** · Code · Value · Description · Order · In use · Active · Actions (edit, delete) | See 6.3. ID is read-only (D-CTL-14); default sort stays Code ascending (F-7) |
+| Modal `controlListForm` | One modal with three modes: category / list / value. Only **Cancel** and **Save** | Field errors shown inline from 400/409 `errors` payloads. In value-edit mode the ID is shown as read-only text, not an input; in create mode it is absent |
 | Confirm | `showGlobalAlert` pattern (as Portfolio Management) | A blocked delete shows the server's 409 description and a single *Close* |
 
 UI states: loading = `app-custom-progress-bar`; empty = per region (no categories / no lists / no values) with its call to action; error = inline message; success = `showToast`.
@@ -208,7 +210,7 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 | Layer | Tests |
 | --- | --- |
 | Server unit | Service: every rule in §5, including duplicate checks (pre-check **and** a simulated `QueryFailedError` errno 1062 → `ConflictException`), immutable key, system-list delete, in-use block with a **test provider registered in the registry**, code proposal (`UOM-07`, `L5`). Controller: each handler returns the envelope; the roles metadata equals `[CENTER_ADMIN, SYSTEM_ADMIN]` on A1–A12 and is absent on A13. Registry: sums across two providers |
-| Server e2e/integration | `test:integration` on the disposable TEST schema: migration up, row counts 2 / 6 / 23, re-run adds 0; cross-portfolio isolation; duplicate insert → 409 |
+| Server e2e/integration | `test:integration` on the local development database (`ari_local_mysql`, requester 2026-10-01): migration up, row counts 2 / 6 / 23, re-run adds 0; cross-portfolio isolation; duplicate insert → 409 |
 | Client unit | Natural comparator; export row builder (filtered + sorted input → rows); `DataTable` (page size keeps sort and search; default sort); sidebar (nested child renders; existing children unchanged); page (default portfolio; an unconfigured portfolio is selectable and shows the empty state with + New category; qualified reference; blocked-delete message) |
 | Build | `npm run build` (server), `ng build` (client) — the compile gate |
 | Manual (HITL) | Real browser: resize a column, page, sort — the width holds; visual check against the mockup |
@@ -217,7 +219,7 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 
 - Migration merges with the code. On Dev it is applied by the pipeline on deploy (root `CLAUDE.md` §4.3). For Prod, confirm the pipeline behaves the same before assuming parity.
 - No feature flag: the page is visible only to admins, and it is additive.
-- Backout: revert the code, then run the migration `down` (drops the three tables — safe while no consumer exists).
+- Backout: revert the code, then run the slice migrations' `down` in reverse order (values → lists → categories). This is safe while no consumer exists.
 
 ## 12. Design decisions log
 
@@ -236,6 +238,11 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 | D-CTL-11 | 2026-09-26 | The service maps errno 1062 to `ConflictException` itself (judgment J-1) | Existing helper yields 400 and is not global; raw errors surface as 500 (P-14) | Reusing `sqlErrorsHelper` |
 | D-CTL-12 | 2026-09-26 | *Used by* is derived at read time from the registry; no `used_by` column (judgment J-3) | A stored label has no writer and would drift from the consumers actually registered | A `used_by` column set by migrations |
 | D-CTL-13 | 2026-09-26 | Moving a list to another portfolio's category → 400 (judgment J-4) | R-CTL-001 pins every cross-portfolio write at 400 | 409 |
+| D-CTL-14 | 2026-10-01 | Each value's own PK `id` is its permanent reference: shown read-only in the table and the modal, rejected in update bodies, with explicit ids for seeded rows | Code and name are editable (F-6), so logic that keys on them breaks silently when an admin renames them. The id is immutable, and explicit seed ids make it identical across environments (requester) | A separate immutable `system_code` column; relying on the editable code |
+| D-CTL-15 | 2026-10-01 | List membership is checked by the consumer's service through `assertValueInList`; plain FK to `control_list_values.id` only | The requester rejected a composite FK `(list_id, value_id)`. The service check returns a named 400; the plain FK still blocks deleting a value in use | Composite FK (requester: no) |
+| D-CTL-16 | 2026-10-01 | Delivery by vertical slices: categories → lists → values → usage. Each task ships its table + server + screen, and is executed as a server dispatch plus a client dispatch in parallel (cross-package, root `CLAUDE.md` §4.3) | The requester wants every task visible and testable end to end. One migration per data slice (T-01…T-03) keeps each task self-contained; T-04 adds behavior on the existing tables, with no schema | Horizontal split (all server first, then all client) — the original 10-task plan |
+
+**Judgment status:** D-CTL-14…16 were reviewed in Judgment Day round 2 (2026-10-01): APPROVED, 0 confirmed severe, suspects J-9…J-11 pending the user — see `judgment.md`.
 
 **Reversion challenge (Step 2.3):** not triggered — no decision removes, disables or inverts shipped behavior. Every change is additive; the sidebar change only adds an optional field.
 
@@ -266,11 +273,11 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 
 | Measure | Estimate |
 | --- | --- |
-| Tasks | 10 (4 server, 6 client — including one manual HITL check). Re-sized at `tasks.md` (was 9): the client page split into plumbing (T-08) and page (T-09) to keep each task one session |
-| LOC (incl. tests) | ~2,100 (server ~950, client ~1,150) |
-| Review rounds | ≤ 2 per task; ≤ 14 in total |
+| Tasks | 5: four vertical slices (each DB + server + screen) and one manual HITL check. Re-cut on 2026-10-01 (D-CTL-16); was 10 horizontal tasks |
+| LOC (incl. tests) | ~2,250 (server ~1,050, client ~1,200), including the ID column and `assertValueInList` |
+| Review rounds | ≤ 2 per task; ≤ 10 in total |
 
-The estimate matches the **Standard** depth, and the spec should not be split: the three pieces (model, API, page) are one user-visible feature. It does exceed ~400 LOC, so it is delivered in **2 PRs**: server first, then client.
+The estimate matches the **Standard** depth. Each slice is about 400–700 LOC, so it is delivered as **one PR per slice** (4 PRs, plus the HITL check). Each PR is user-visible and can be reviewed on its own.
 
 ## 15. Open questions
 

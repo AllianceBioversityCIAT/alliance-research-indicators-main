@@ -9,7 +9,7 @@
 | Approval Mode | `gated` |
 | Leader | Claude (Opus 5.5) · Implementer wrapper `akili-implementer` · Reviewer wrapper `akili-reviewer` |
 | Jira | epic AC-1773 — mark each sub-task / story Done when it closes (AC workflow has no direct Open → Done) |
-| Status | **ready to start T-01** — scratch schema loaded from a current `stardb` dump (Run 3) |
+| Status | **re-planned (Run 4)** — 5 vertical slices; judgment round 2 APPROVED; T-01 waits on the user's decision on suspects J-9…J-11 |
 
 ## Task Execution History
 
@@ -64,3 +64,26 @@
   - the committed `baseline.sql` (2026-08-14) is stale and should be refreshed as a separate change.
   Neither is in this spec's scope.
 - **MySQL version note:** the scratch image is `mysql:8.0` (8.0.46); the source server is 8.4.8. The load succeeded on 8.0. The image is left unchanged (`docker-compose.test.yml` is a shared file).
+
+### 2026-10-01 — Run 4: new developer machine; tasks re-cut into vertical slices
+
+- **Machine:** the user's Windows 11 machine (Docker Desktop). Runs 1–3 ran on another machine (macOS), so the scratch container from Run 3 does not exist here.
+- **Persistent local development database (not the TEST scratch schema):**
+  - container `ari_local_mysql`, `mysql:8.4` (8.4.11), `127.0.0.1:3306`, named volume `ari_local_mysql_data`, `--restart unless-stopped`, `--skip-log-bin`;
+  - restored from the user-provided `stardb-20260930_23_40_01.sql` with `DEFINER=` stripped: 219 tables and views, 24 routines, 365 `migrations` rows, 14,602 `results`;
+  - `server/researchindicators/.env` (gitignored) `ARI_MYSQL_*` → `127.0.0.1:3306 / stardb` (`DB_PORT=3306`). The resolved target was verified with dotenv, not by the variable name;
+  - `migration:show` against it: 344 applied, 0 pending (the database also carries rows from other branches).
+
+  This database holds real data, and **it is not the evidence target for any task**. Migration checks still run on the disposable `ARI_TEST_MYSQL_*` schema (`127.0.0.1:3307`, `ari_scratch_test`), which still has to be created on this machine (`npm run compose:test:up` + load).
+- **Re-plan (requester, 2026-10-01):**
+  1. Kept the generic model (D-CTL-1) after the requester reviewed the trade-off against one table per list.
+  2. Each value's own PK `id` is visible and read-only, with explicit seed ids (D-CTL-14, R-CTL-004 AC.3).
+  3. No composite FK. List membership is checked in the consumer service through `assertValueInList` (D-CTL-15, R-CTL-006 AC.2).
+  4. Tasks re-cut from 10 horizontal tasks into 5: four vertical slices (DB + server + screen) and the HITL check (D-CTL-16). One migration and one PR per slice.
+- **Open before T-01:** RB-3 — `judgment.md` predates D-CTL-14…16 (re-run `/akili-judge` or accept explicitly here). RB-4 — Jira sub-tasks need re-mapping.
+- No code changed; no attempt consumed; no Jira transition.
+- **Later the same day (requester):**
+  - **No disposable schema.** Every DB check runs on the local development database `ari_local_mysql` (`127.0.0.1:3306/stardb`). `ARI_TEST_MYSQL_*` in `.env` now point to it, and the resolved target was checked with dotenv: CORE and TEST both resolve to `127.0.0.1:3306/stardb`.
+    - `migration:test:bootstrap` / `baseline:test:load` must never run here. The guard in `load-baseline.js:64` should refuse, but running it to observe the refusal was blocked by the session's permission classifier, so the refusal is **not** verified red (K-004).
+  - **Jira re-mapped** (user said yes): AC-1780…AC-1784 rewritten as T-01…T-05 and re-parented to AC-1779 / AC-1775 / AC-1778 / AC-1776 / AC-1774. AC-1785…AC-1789 retitled `[OBSOLETE]` and left Open for the PO to close. No status transitions.
+  - **Judgment Day round 2:** two blind `sonnet` judges → APPROVED. 0 confirmed severe; 3 suspects (J-9 route-guard test, J-10 roles falsifiers in T-02/T-03, J-11 "no lists" empty state); 6 info. Ledger in `judgment.md`.

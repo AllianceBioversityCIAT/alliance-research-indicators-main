@@ -5,12 +5,20 @@
 - **Status:** not-started
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
-- **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — APPROVED)
+- **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — APPROVED before D-CTL-14…16; see RB-3)
 - **Branch:** `institutional-kpis`
-- **Jira:** epic [AC-1773](https://cgiarmel.atlassian.net/browse/AC-1773) · stories AC-1774 (US1) · AC-1775 (US2) · AC-1776 (US3) · AC-1777 (US4) · AC-1778 (US5) · AC-1779 (US6). Mark each Done when its task finishes.
-- **Last updated:** 2026-09-27
+- **Jira:** epic [AC-1773](https://cgiarmel.atlassian.net/browse/AC-1773) · stories AC-1774 (US1) · AC-1775 (US2) · AC-1776 (US3) · AC-1777 (US4) · AC-1778 (US5) · AC-1779 (US6). Sub-tasks re-mapped 2026-10-01: AC-1780…AC-1784 = T-01…T-05; AC-1785…AC-1789 marked [OBSOLETE] (left open for the PO to close). Mark each Done when its task finishes.
+- **Last updated:** 2026-10-01 — re-cut into vertical slices at the requester's request (design D-CTL-16). The earlier 10-task horizontal plan is in git history (`07f85abd`).
 
 > **Legend for verification fields.** *Falsifier* = the concrete input or mutation that must turn the gate red. *Red run* = what must be observed failing, and on which assertion. *Disqualifier* = what makes a green reading worthless. *Consumers* = existing files that pin a symbol this task changes (from the Premise Ledger + a test-file grep). An absent value reads `n/a` or `none`, never blank.
+
+> **Slice rule (D-CTL-16).** Every task T-01…T-04 delivers its **database** part (T-01…T-03: a migration + seed; T-04: no schema change — its DB check is a temporary FK table inside the integration test), its **server** (entity, repository, DTOs, service rules, endpoints, Swagger, tests) and its **screen** (the part of the Control Lists page a user can open and use). Each task is executed as two parallel dispatches — one server Implementer, one client Implementer. That is safe for editing across packages (root `CLAUDE.md` §4.3). The client codes against the contract in design §4 with a mocked `ApiService`. One Reviewer audits the combined diff, and the Leader re-measures both full suites after both workers report. A task closes only when both halves pass.
+
+> **Evidence database (requester, 2026-10-01).** There is no disposable schema. Every DB check runs on the user's **local development database**: `ari_local_mysql`, `127.0.0.1:3306/stardb`, restored from the STAR backup of 2026-09-30. `ARI_TEST_MYSQL_*` point to it, so `migration:test:execute`, `migration:test:revert` and `test:integration` hit it. Rules:
+> - Verify the **resolved** host and port before each run (dotenv), never just the variable name.
+> - **Never run `migration:test:bootstrap` or `baseline:test:load`.** They would load the baseline schema onto a database that holds real data. `load-baseline.js:64` should refuse (host == `ARI_MYSQL_HOST`), but that refusal has **not** been observed red (K-004), so do not rely on it.
+> - A `revert` may drop only the table its own slice created. Tests clean up every row and temporary table they create.
+> - The shared remote Dev database stays forbidden as evidence (root `CLAUDE.md` §4.3).
 
 ---
 
@@ -18,341 +26,244 @@
 
 ```mermaid
 graph TD
-  T01[T-01 Migration + entities + seed] --> T03[T-03 Service + DTOs + repositories]
-  T02[T-02 Usage registry] --> T03
-  T03 --> T04[T-04 Controller + roles + Swagger + registration + integration]
-  T05[T-05 Natural sort + xlsx export utils] --> T06[T-06 DataTable component]
-  T07[T-07 Sidebar nested children]
-  T04 --> T08[T-08 ApiService + types + modal + route]
-  T08 --> T09[T-09 Control Lists page]
-  T06 --> T09
-  T07 --> T09
-  T09 --> T10[T-10 HITL browser check + rollout premise]
+  T01[T-01 Categories: table + API + page shell, menu, navigator] --> T02[T-02 Lists: table + API + list header]
+  T02 --> T03[T-03 Values: table + API + values DataTable with read-only ID]
+  T03 --> T04[T-04 Usage and consumer access: in-use, Used by, by-key read, membership check]
+  T04 --> T05[T-05 HITL browser check + rollout premise]
 ```
 
-| PR | Tasks | Content |
+| PR | Task | What a user can do after it merges to `dev` |
 | --- | --- | --- |
-| **PR 1 — server** | T-01, T-02, T-03, T-04 | Tables, seed, API, tests. Reviewable alone; nothing user-visible |
-| **PR 2 — client** | T-05, T-06, T-07, T-08, T-09, T-10 | Shared utils and table, sidebar, page. Depends on PR 1 being deployed to Dev for T-10 |
+| **PR 1** | T-01 | Open *Center admin › Portfolio Management › Control Lists*, pick a portfolio, create, edit and delete categories |
+| **PR 2** | T-02 | Create and edit lists inside a category, see the reference `P<id> · <key>`, and see that system lists cannot be deleted |
+| **PR 3** | T-03 | Manage the values of a list in the standard table (ID, sort, page, search, export) |
+| **PR 4** | T-04 | See *In use* and *Used by*; a delete of a value in use is blocked; other modules can read and validate values |
+| — | T-05 | Human check on Dev; no code |
 
-T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before PR 1 merges (no server dependency).
+The slices are strictly sequential. T-01's migration FKs to the existing `portfolios` table, T-02's to categories and T-03's to lists. T-04 adds no schema, and its code reads the three tables.
 
 ---
 
 ## 2. Task list
 
-### T-01 — Migration: create the three tables and seed Portfolio 2
+### T-01 — Slice 1: Categories (table + API + page shell, menu and navigator)
 
-- **Jira:** [AC-1780](https://cgiarmel.atlassian.net/browse/AC-1780) (story [AC-1774](https://cgiarmel.atlassian.net/browse/AC-1774))
-- **Status:** todo · **Size:** M · **Dependencies:** none
-- **Requirements covered:** R-CTL-010 (all ACs + *Seed is idempotent*), R-CTL-002/003/004 uniqueness at DB level, NFR-CTL-003
-- **Design refs:** §3 Data model, D-CTL-5, D-CTL-8, P-4, P-6
-- **Scope (files):**
-  - `server/researchindicators/src/db/migrations/<epochMs>-createControlListsTables.ts`
-  - `server/researchindicators/src/domain/entities/control-lists/entities/control-list-category.entity.ts`
-  - `…/entities/control-list.entity.ts`
-  - `…/entities/control-list-value.entity.ts`
-- **Description:** create `control_list_categories`, `control_lists`, `control_list_values` extending `AuditableEntity`, with the unique indexes of §3, FKs with RESTRICT, and explicit `utf8mb4_unicode_ci`. Seed Portfolio 2 — resolved by `start_year = 2026 AND end_year = 2030` — with 2 categories, 6 system lists (`is_system = 1`, `code_prefix` UOM/DIR/FRQ/KLV/KTY/L) and 23 values, using `INSERT … SELECT … WHERE NOT EXISTS`. `down` drops the tables in reverse FK order. No `used_by` column (D-CTL-12).
-- **Tests:** run on the disposable TEST schema only: `npm run migration:test:bootstrap`, then `npm run migration:test:execute`; count rows; run the seed statements a second time; `npm run migration:test:revert`; `npm run migration:test:execute` again.
-- **Falsifier:** (1) replace the portfolio lookup by a year range that matches nothing → the seed inserts 0 rows and the count check must read 0 / 0 / 0. (2) Remove the `WHERE NOT EXISTS` guard → the second run must fail on the unique index or double the counts.
-- **Red run:** the row-count assertion (2 / 6 / 23) observed failing under falsifier (1); the idempotency assertion observed failing under falsifier (2).
-- **Disqualifier:** a run against the shared **Dev** database is not evidence and is forbidden (root `CLAUDE.md` §4.3). A count read from a failed migration output is a confident zero (K-014): check the raw output for errors first.
-- **Consumers:** none (new tables). `src/domain/entities/entities.module.spec.ts` is touched only in T-04.
-- **Review:** `full` — schema and seed are correctness-critical and append-only once merged.
-- **Done criteria:**
-  - [ ] Forward migration applies cleanly on TEST; counts are 2 categories / 6 lists / 23 values for Portfolio 2 and 0 rows for Portfolio 1.
-  - [ ] A second seed run adds 0 rows.
-  - [ ] Revert and re-apply both succeed.
-  - [ ] `SHOW CREATE TABLE` shows the three unique indexes, the RESTRICT FKs and `utf8mb4_unicode_ci`.
-  - [ ] Inserting `dir-01` into `kpi.direction` (which already holds `DIR-01`) fails on the unique index (case-insensitive — P-4).
-  - [ ] `npm run build` (server) passes.
-- **Skills:** `nestjs-expert`
+- **Jira:** [AC-1780](https://cgiarmel.atlassian.net/browse/AC-1780) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
+- **Status:** todo · **Size:** L · **Dependencies:** none
+- **Requirements covered:** R-CTL-001 (category isolation, default portfolio, *not configured* stays selectable — J-2), R-CTL-002 *Duplicate name* (the *non-empty* scenario needs lists and closes in T-02), R-CTL-007 for A1–A5 (server roles; client `canMatch` and menu gating), R-CTL-008 *Menu placement* (incl. **BUT it must NOT** change existing items) and the page header and navigator, R-CTL-010 (2 categories), NFR-CTL-002/003/005
+- **Design refs:** §3 (categories), §4 A1–A5, §5 rules 1, 2, 7, §6.1, §6.2 header + navigator, §8, D-CTL-2, D-CTL-7–11, D-CTL-14 (explicit seed ids), P-2, P-5, P-6, P-8, P-9, P-11, P-12, P-14
+- **Scope — database:** `server/researchindicators/src/db/migrations/<epochMs>-createControlListCategories.ts` — `control_list_categories` extending `AuditableEntity`, FK `portfolio_id` → `portfolios.id` RESTRICT, `uq_control_list_categories_portfolio_name`, explicit `utf8mb4_unicode_ci`. Seed 2 categories for Portfolio 2 (resolved by years — D-CTL-8) with explicit ids 1–2, `INSERT … SELECT … WHERE NOT EXISTS`, then `AUTO_INCREMENT` above them. `down` drops the table.
+- **Scope — server:** `src/domain/entities/control-lists/`:
+  - `entities/control-list-category.entity.ts`;
+  - `repositories/control-list-category.repository.ts`;
+  - `dto/` category create/update + `portfolioId` query;
+  - `control-lists.service.ts` (category rules);
+  - `control-lists.controller.ts` (A1 with `lists: []` until T-02, A2, A3–A5);
+  - `control-lists.module.ts`;
+  - registration in `src/domain/routes/main.routes.ts` (path `control-lists`) and `src/domain/entities/entities.module.ts`.
 
-### T-02 — Usage registry (in-use counts and *Used by*)
-
-- **Jira:** [AC-1781](https://cgiarmel.atlassian.net/browse/AC-1781) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
-- **Status:** todo · **Size:** S · **Dependencies:** none
-- **Requirements covered:** R-CTL-005 (mechanism, AC.3), R-CTL-003 *Used by*
-- **Design refs:** §5.5, D-CTL-3, D-CTL-12, P-10
-- **Scope:** `server/…/domain/entities/control-lists/control-list-usage.registry.ts` (+ `.spec.ts`)
-- **Description:** a singleton where consumer modules register a provider made of a consumer name, the list keys it reads, and an async count function over value ids. It exposes the summed count per value id and the consumer names per list key. It has **no request-scoped dependency**.
-- **Tests:** unit — two fake providers on the same key sum their counts; a provider for another key contributes nothing; the consumer names come back per key, and an unknown key returns an empty list.
-- **Falsifier:** make the sum return only the first provider's count → the two-provider test (fixture: provider A returns 2 and provider B returns 3 for the same value id; expected 5) must fail. The two providers' counts must differ, so first-only and summed readings diverge.
-- **Red run:** the `expected 5` assertion observed failing under the falsifier.
-- **Disqualifier:** a fixture where both providers return the same number cannot tell first-only from summed (KZ-004 inert fixture).
-- **Consumers:** none (new symbol).
-- **Review:** `checklist` — small, isolated, fully unit-testable.
-- **Done criteria:**
-  - [ ] Registry spec green; falsifier observed red and reverted.
-  - [ ] The registry's constructor injects nothing request-scoped (checked against `current-user.util.ts:7`).
-- **Skills:** `nestjs-expert`
-
-### T-03 — Service, DTOs and repositories: all business rules
-
-- **Jira:** [AC-1782](https://cgiarmel.atlassian.net/browse/AC-1782) (story [AC-1775](https://cgiarmel.atlassian.net/browse/AC-1775))
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02
-- **Requirements covered:** R-CTL-001 (isolation, cross-portfolio write → 400), R-CTL-002, R-CTL-003 (immutable key, system list, same key in two portfolios, custom list lifecycle, `usedBy`), R-CTL-004 (uniqueness, code proposal, deactivate), R-CTL-005 (block when in use), R-CTL-006 (ordered read, `activeOnly`, unknown key)
-- **Design refs:** §5 rules 1–8, D-CTL-4, D-CTL-5, D-CTL-11, D-CTL-13, P-14
-- **Scope:**
-  - `…/control-lists/control-lists.service.ts` (+ `.spec.ts`)
-  - `…/control-lists/dto/*.dto.ts` — create/update for category, list, value; query DTOs
-  - `…/control-lists/repositories/*.repository.ts` (+ specs), same pattern as `PortfoliosRepository`
-- **Description:** implement every rule in design §5, including:
-  - `portfolio_id` copied from the category;
-  - the update DTO for lists has no `listKey`;
-  - code proposal `<prefix>-<nn>` / `L<n>`;
-  - the error map — duplicate → 409, cross-portfolio move → 400, system-list delete → 409, non-empty delete → 409, in-use delete → 409, unknown portfolio/key → 404;
-  - a `QueryFailedError` errno 1062 caught around each insert/update and rethrown as `ConflictException` naming the field — never through `sqlErrorsHelper`;
-  - audit through `CurrentUserUtil.audit`.
-- **Tests (unit, mocked repositories):**
-  - one test per scenario of R-CTL-001…006;
-  - a simulated 1062 → 409;
-  - code proposal returns `UOM-08` after `UOM-07`, and `L5` after `L4`;
-  - `activeOnly` omits inactive values;
-  - the ordered read puts `UOM-2` before `UOM-10` when display orders are equal.
-- **Falsifier:** (1) route the 1062 catch through `sqlErrorsHelper` → the test must fail on status 400 ≠ 409. (2) Accept `listKey` in the list update DTO → the immutable-key test must fail. (3) Drop the in-use check → the delete test (a fake provider returning 3) must fail on `ConflictException`. (4) Move a list to another portfolio's category and return 409 → the J-4 test must fail on 400.
-- **Red run:** each falsifier observed red on its **status/exception assertion**, not on setup.
-- **Disqualifier:**
-  - A uniqueness test whose duplicate differs only in id, not in letter case, cannot prove case-insensitivity. The fixture must use `dir-01` against `DIR-01`.
-  - A portfolio-isolation test with one portfolio proves nothing. The fixture needs two portfolios holding the same key.
-- **Consumers:** none (new symbols).
-- **Review:** `full` — carries every business rule and the J-1/J-4 fixes.
-- **Done criteria:**
-  - [ ] Service spec green; falsifiers 1–4 each observed red, then reverted.
-  - [ ] Every `AND IT MUST` / `BUT it must NOT` clause of R-CTL-001…006 maps to a named test (see §3 coverage).
-  - [ ] `npm run build` (server) passes.
-- **Skills:** `nestjs-expert`, `error-handling-patterns`, `api-design-principles`
-
-### T-04 — Controller, roles, Swagger, module registration and integration test
-
-- **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1777](https://cgiarmel.atlassian.net/browse/AC-1777))
-- **Status:** todo · **Size:** M · **Dependencies:** T-03
-- **Requirements covered:** R-CTL-007 (server: denied and allowed roles), R-CTL-001 AC.1–2 (end to end), R-CTL-006 (open to authenticated users), R-CTL-010 AC.1 (through the API), NFR-CTL-002, NFR-CTL-005
-- **Design refs:** §4 (A1–A13), §8, D-CTL-7, P-5
-- **Scope:**
-  - `…/control-lists/control-lists.controller.ts` (+ `.spec.ts`)
-  - `…/control-lists/control-lists.module.ts`
-  - `server/researchindicators/src/domain/routes/main.routes.ts` (path `control-lists`)
-  - `server/researchindicators/src/domain/entities/entities.module.ts`
-  - integration test under the server's `test:integration` config
-- **Description:**
-  - 13 handlers per §4, wrapped with `ResponseUtils.format`.
-  - Class-level `RolesGuard` and `SetUpInterceptor`.
-  - `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` on A1–A12; none on A13.
-  - `ValidationPipe({ whitelist, forbidNonWhitelisted, transform })` on writes.
-  - Full Swagger annotations.
-  - Register the module in the two sites above.
+  Siblings `*.spec.ts` for the service, the controller and the repository.
+- **Scope — screen:**
+  - `shared/interfaces/administration-nav.interface.ts` (optional `children`) and `shared/components/alliance-sidebar/*`: *Control Lists* nested under *Portfolio Management* in **both** template loops (`.html:69` expanded, `.html:115` flyout);
+  - `app.routes.ts`: lazy `administration/center-admin/control-lists`, `canMatch: [centerAdminGuard]`;
+  - `shared/interfaces/control-lists.interface.ts`;
+  - `ApiService`: A1–A5;
+  - `modal.types.ts` + `all-modals.service.ts` (`controlListForm` at both config sites, like `portfolioManagement` `:155`, `:303`);
+  - page `pages/platform/pages/administration/center-admin/control-lists/control-lists.component.{ts,html,scss,spec.ts}` with: header (title, portfolio selector defaulting to the current-year portfolio, *(not configured)* label, **+ New category**); left navigator of categories with edit and delete icon buttons (`aria-label`); modal in category mode; delete via `showGlobalAlert`; loading, empty, error and success states.
+- **Description:** the first usable screen. The service checks that the portfolio exists (404). It returns a field-named 409 on a duplicate name, and also catches `QueryFailedError` errno 1062 and rethrows `ConflictException` — never through `sqlErrorsHelper` (D-CTL-11, P-14). Audit runs through `CurrentUserUtil.audit`. Class-level `RolesGuard` + `SetUpInterceptor`; `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)` on A1–A5; `ValidationPipe({ whitelist, forbidNonWhitelisted, transform })` on writes; full Swagger.
 - **Tests:**
-  - Controller unit: the roles metadata of each handler equals `[CENTER_ADMIN, SYSTEM_ADMIN]` on A1–A12 and is absent on A13; each handler returns the envelope with the documented status.
-  - Integration on the TEST schema: a Contributor gets 403 on a write; Center Admin and System Admin get 201; a cross-portfolio read returns nothing; a duplicate returns 409; `PATCH /lists/:id` with `listKey` returns 400.
+  - **DB, on the local development database only (`ari_local_mysql`, 127.0.0.1:3306 — requester, 2026-10-01; never the shared Dev):** `npm run migration:test:execute` → 2 rows for Portfolio 2 and 0 for Portfolio 1, with ids 1 and 2. Re-run the seed statement → 0 rows added. `npm run migration:test:revert` and then re-apply. `SHOW CREATE TABLE` shows the unique index, the RESTRICT FK and the collation.
+  - **Server unit:** duplicate name in another letter case → 409. Simulated 1062 → 409. Unknown portfolio → 404. The same name in two portfolios → allowed. Controller: roles metadata on A1–A5 equals `[CENTER_ADMIN, SYSTEM_ADMIN]`, iterating every handler.
+  - **Server integration (local dev DB):** a Contributor with a **valid** token → 403 on A3. Center Admin and System Admin → 201.
+  - **Client unit:**
+    - route (J-9): the `control-lists` route declares `canMatch: [centerAdminGuard]`, and the guard returns `false` for a resolved user without center-admin access and `true` for Admin / Center Admin;
+    - sidebar: the nested child renders in the expanded mode and in the flyout; the exact array of the existing four children is unchanged; the hide filter still works;
+    - page: the default portfolio is chosen; a 0-category portfolio is selectable and shows the empty state with **+ New category**; create/edit/delete category flows call `ApiService` with real `MainResponse` shapes; a server 409 is shown as-is.
 - **Falsifier:**
-  - (1) Add `TECHNICAL_SUPPORT` to one write handler → the roles-metadata test must fail.
-  - (2) Remove `@Roles` from A12 → the Contributor-403 integration case must fail.
-  - (3) Drop `forbidNonWhitelisted` → the `listKey` case must return 200 and fail.
-- **Red run:** observed on the status assertion of each case.
+  1. Seed lookup by a year range that matches nothing → the count check reads 0.
+  2. Remove `WHERE NOT EXISTS` → the second run fails on the unique index or doubles the count.
+  3. Route the 1062 catch through `sqlErrorsHelper` → the test fails on 400 ≠ 409.
+  4. Add `TECHNICAL_SUPPORT` to A3 → the roles-metadata test fails.
+  5. Render nested children only in the expanded loop → the flyout test fails.
+  6. Disable 0-category portfolios in the selector → the selectable test fails.
+  7. Remove `canMatch` from the `control-lists` route → the route test fails (J-9).
+- **Red run:** each falsifier observed failing on its count, status, roles, DOM, route or exact-array assertion — not on setup. Then revert it.
 - **Disqualifier:**
-  - A roles test that inspects only one handler cannot cover 12; iterate every write handler.
-  - An integration run on Dev is not allowed.
-  - A 403 produced by a missing token, rather than by the role, is the wrong red: the Contributor must hold a valid token.
-- **Consumers:** `src/domain/entities/entities.module.spec.ts` (registration; re-run it); `src/domain/routes/main.routes.ts` (route table).
-- **Review:** `full` — authorization surface.
-- **Done criteria:**
-  - [ ] Controller spec and integration test green; falsifiers observed red.
-  - [ ] All 13 endpoints appear in `/swagger` with tags, operation and params (checked on a local boot; quote what was seen).
-  - [ ] `npm test -- --silent`, `npx eslint src/domain/entities/control-lists` and `npm run build` pass (server).
-- **Skills:** `nestjs-expert`, `api-design-principles`
-
-### T-05 — Client utils: natural comparator and xlsx export
-
-- **Jira:** [AC-1784](https://cgiarmel.atlassian.net/browse/AC-1784) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
-- **Status:** todo · **Size:** S · **Dependencies:** none
-- **Requirements covered:** R-CTL-009 *Natural sort*, *Export respects filter and sort*
-- **Design refs:** §6.3, D-CTL-6, P-3; judgment J-5 (CommonJS)
-- **Scope:**
-  - `client/research-indicators/src/app/shared/utils/natural-compare.util.ts` (+ spec)
-  - `…/shared/utils/xlsx-export.util.ts` (+ spec)
-  - `client/research-indicators/angular.json` (`allowedCommonJsDependencies: ["exceljs"]`, only if `ng build` warns)
-- **Description:**
-  - A comparator that is natural and case-insensitive, sorts nulls last and is stable.
-  - An export util that takes `{columns, rows, fileName}`, builds a header row plus data rows in the given order with `exceljs` loaded through a dynamic `import()`, and downloads through an object URL.
-  - Its row-building step is a pure function, so it can be tested without the library.
-- **Tests:**
-  - Comparator with the fixture `['UOM-10','UOM-2','uom-1', null]`, expecting `['uom-1','UOM-2','UOM-10', null]`.
-  - Export row builder: given 5 rows and a column subset, it returns exactly those cells in that order.
-- **Falsifier:**
-  - Swap the comparator for `localeCompare` without `numeric` → `UOM-10` sorts before `UOM-2` and the test must fail.
-  - Make the builder ignore the given order and sort by id → the fixture must use rows whose given order differs from id order, so the test fails.
-- **Red run:** both observed on the equality assertion.
-- **Disqualifier:** a comparator fixture without a two-digit number cannot tell natural from lexical order.
-- **Consumers:** none (new symbols). `angular.json` has no test consumers.
-- **Review:** `checklist` — pure functions.
-- **Done criteria:**
-  - [ ] Specs green; both falsifiers observed red.
-  - [ ] `ng build` succeeds. `exceljs` appears only in a lazy chunk, not in `main` (read the build stats). The initial bundle stays under the budgets in `angular.json`.
-- **Skills:** `angular-developer`
-
-### T-06 — Shared `DataTable` component (table standard F-7)
-
-- **Jira:** [AC-1785](https://cgiarmel.atlassian.net/browse/AC-1785) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
-- **Status:** todo · **Size:** M · **Dependencies:** T-05
-- **Requirements covered:** R-CTL-009 (all ACs), NFR-CTL-004 (`aria-sort`), R-CTL-008 empty/loading states for tables
-- **Design refs:** §6.3, §6.4 tokens, judgment J-7
-- **Scope:** `client/research-indicators/src/app/shared/components/data-table/data-table.component.{ts,html,scss,spec.ts}`
-- **Description:**
-  - A standalone component that wraps PrimeNG `p-table`, driven by a column config.
-  - Features: resizable columns in `expand` mode; a paginator with 10 / 25 / 50 / 100 rows, defaulting to 10; custom sort through the natural comparator, defaulting to the first `code` column ascending; `aria-sort` on headers; local search over the configured fields; export of the filtered and sorted rows across all pages; slots for row actions, loading and empty.
-  - Column widths, page size and sort persist within the session.
-  - Styled with token classes only, no hex literals.
-- **Tests (component):**
-  - The default order is natural by code.
-  - Changing the page size keeps the sort and the search.
-  - The export receives the filtered and sorted rows from all pages.
-  - Headers expose `aria-sort`.
-- **Falsifier:**
-  - Make export pass only the current page's rows → with 12 rows, page size 10 and a search matching 11, the export must receive 11 rows, so the test fails.
-  - Reset the sort on a page-size change → the sort-persistence test must fail.
-- **Red run:** observed on the row-count and order assertions.
-- **Disqualifier:**
-  - jsdom cannot measure column widths, so a resize test in jsdom proves only that the input is bound, not the behavior. **Resize behavior is covered by T-10** (real browser), and this task must not claim it.
-  - A test with fewer rows than one page cannot tell "all pages" from "current page".
-- **Consumers:** none (new component; no existing table is migrated — `../family.md` §5).
-- **Review:** `full` — shared pattern that siblings will reuse.
-- **Done criteria:**
-  - [ ] Component spec green; falsifiers observed red.
-  - [ ] The spec states in a comment that resize behavior is verified in T-10, not here.
-  - [ ] `npm run lint -- --quiet` and `ng build` pass.
-- **Skills:** `angular-developer`, `ui-ux-pro-max`
-
-### T-07 — Sidebar: one nested level under a Center admin child
-
-- **Jira:** [AC-1786](https://cgiarmel.atlassian.net/browse/AC-1786) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
-- **Status:** todo · **Size:** S · **Dependencies:** none
-- **Requirements covered:** R-CTL-008 *Menu placement* (incl. **BUT it must NOT** change existing items), AC.1 (expanded and collapsed)
-- **Design refs:** §6.1, D-CTL-9, P-8, P-9, P-12; judgment J-6
-- **Scope:**
-  - `client/research-indicators/src/app/shared/interfaces/administration-nav.interface.ts` (optional `children`)
-  - `client/research-indicators/src/app/shared/components/alliance-sidebar/alliance-sidebar.component.{ts,html,scss}`
-  - `…/alliance-sidebar.component.spec.ts`
-- **Description:**
-  - Give `AdministrationNavChild` an optional `children`.
-  - Add **Control Lists** as the only nested child of *Portfolio Management*, linking to `/administration/center-admin/control-lists`.
-  - Render nested children indented in **both** template loops: the expanded one (`.html:69`) and the collapsed flyout (`.html:115`).
-  - Nested links use the same `routerLinkActive` / `exact: true` treatment as today's child links. The parent group stays a non-navigational `<button>`.
-- **Tests:**
-  - A nested child renders under Portfolio Management in the expanded mode and in the flyout.
-  - The existing four children keep their order, labels and links: assert the exact array.
-  - The hide filter still works.
-- **Falsifier:**
-  - Render nested children only in the expanded loop → the flyout test must fail.
-  - Reorder or relabel an existing child → the exact-array test must fail. Today no test pins the order (P-12), so this test is new and must be seen red first.
-- **Red run:** the flyout assertion and the exact-array assertion observed failing under their falsifiers.
-- **Disqualifier:** checking only that `Control Lists` exists (`arrayContaining`) cannot catch a moved or renamed existing item.
+  - Any run against the shared **Dev** database is forbidden and is not evidence (root `CLAUDE.md` §4.3).
+  - A count read from a failed migration output is a confident zero (K-014): check the raw output first.
+  - `arrayContaining` for the sidebar cannot catch a moved existing item.
+  - A fixture where every portfolio has categories cannot exercise *not configured*.
+  - A 403 caused by a missing token is the wrong red.
+  - `npm test` green does not prove the `ModalName` union compiles; `ng build` is required.
 - **Consumers:**
-  - `alliance-sidebar.component.spec.ts:61-72` (exact `toEqual` for Bilateral), `:157-168` (hide test builds an `AdministrationNavGroup`) and `:175-186` (Portfolio Management `arrayContaining`) — re-run them all.
-  - `administration-nav.interface.ts` readers: `alliance-sidebar.component.ts:21,50,51,203` (P-9).
-- **Review:** `full` — shared shell rendered on every admin route.
+  - `alliance-sidebar.component.spec.ts:61-72, 157-168, 175-186`;
+  - `alliance-sidebar.component.ts:21,50,51,203` (P-9);
+  - `all-modals.service.ts:155,303` and `modal.types.ts:1-18` (P-11) — run `grep -rln "ModalName" src` before editing and list every hit;
+  - `src/domain/entities/entities.module.spec.ts` and `main.routes.ts` — re-run.
+- **Review:** `full` — new tables, authorization surface and the shared sidebar.
 - **Done criteria:**
-  - [ ] Sidebar spec green, including the existing assertions; falsifiers observed red.
-  - [ ] Existing Center admin items are visually unchanged. Quote what T-10 saw.
-  - [ ] `npm run lint -- --quiet` passes.
-- **Skills:** `angular-developer`
+  - [ ] Migration up/re-run/revert/re-apply on the local dev DB as above; `SHOW CREATE TABLE` quoted in `execution.md`.
+  - [ ] Server and client specs green; falsifiers 1–7 each observed red, then reverted.
+  - [ ] The route is reachable only through `centerAdminGuard`: route config reviewed, and the route test quoted (J-9).
+  - [ ] A1–A5 visible in `/swagger` with tags, operation and params (local boot; quote what was seen).
+  - [ ] No hex literals in the new component files.
+  - [ ] Server: `npm test -- --silent`, `npx eslint src/domain/entities/control-lists`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`.
+- **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 
-### T-08 — Client plumbing: ApiService methods, types, modal registration, route
+### T-02 — Slice 2: Lists (table + API + list header)
 
-- **Jira:** [AC-1787](https://cgiarmel.atlassian.net/browse/AC-1787) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
-- **Status:** todo · **Size:** S · **Dependencies:** T-04
-- **Requirements covered:** R-CTL-007 client (`canMatch: [centerAdminGuard]`), R-CTL-008 (route), data contracts for R-CTL-001…006
-- **Design refs:** §2.1 client table, §4, P-2, P-11
-- **Scope:**
-  - `client/research-indicators/src/app/shared/services/api.service.ts`
-  - `…/shared/interfaces/control-lists.interface.ts`
-  - `…/shared/types/modal.types.ts` (`controlListForm`)
-  - `…/shared/services/cache/all-modals.service.ts` (config at both sites, like `portfolioManagement` `:155` and `:303`)
-  - `client/research-indicators/src/app/app.routes.ts` (lazy route `administration/center-admin/control-lists`, `canMatch: [centerAdminGuard]`, `data: {title: 'Control Lists', isLoggedIn: true}`)
-- **Description:**
-  - Typed `GET_`, `POST_`, `PATCH_` and `DELETE_` methods for A1–A13, all returning `MainResponse<T>`.
-  - The modal name registered in the union and at both config sites.
-  - The route pointing to the page component from T-09. Until T-09 exists, the task creates a minimal page stub; T-09 replaces it.
+- **Jira:** [AC-1781](https://cgiarmel.atlassian.net/browse/AC-1781) (story [AC-1775](https://cgiarmel.atlassian.net/browse/AC-1775))
+- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Requirements covered:** R-CTL-001 (cross-portfolio move → 400 — J-4), R-CTL-002 *Delete a non-empty category* → 409, R-CTL-003 (all scenarios except *Used by*, which closes in T-04), R-CTL-010 (6 system lists)
+- **Design refs:** §3 (lists), §4 A1 (lists summary), A6–A8, §5 rules 1, 3, 6, §6.2 list header, D-CTL-2, D-CTL-13
+- **Scope — database:** `<epochMs>-createControlLists.ts` — `control_lists` with FK `category_id` → categories RESTRICT, FK `portfolio_id`, `uq_control_lists_portfolio_key`, `idx_control_lists_category`, collation. Seed 6 system lists (`is_system = 1`, keys and prefixes UOM/DIR/FRQ/KLV/KTY/L per R-CTL-010) with explicit ids 1–6, then reset `AUTO_INCREMENT`. `down` drops only this table.
+- **Scope — server:**
+  - `entities/control-list.entity.ts`;
+  - `repositories/control-list.repository.ts`;
+  - `dto/` list create (with `listKey`) and update (**without** `listKey`);
+  - service rules: `portfolio_id` copied from the category; immutable key; system list never deleted; the same key allowed in two portfolios; category delete blocked while it has lists;
+  - A1 now returns `lists` (id, key, name, `valueCount` 0 until T-03, `isSystem`, `usedBy: []` until T-04);
+  - A6–A8.
+- **Scope — screen:** navigator lists under each category, with value counts and an *add list* icon button; list header (caps category label, name, description, **Reference `P<id> · <key>`**, **Edit list**, **Delete list** for custom lists only); modal in list mode with the key disabled in edit mode; `ApiService` A6–A8.
 - **Tests:**
-  - An ApiService spec (existing file, if present) checks each new method's URL and verb.
-  - `ng build` is the compile gate for the modal union and the config sites.
+  - **DB (local dev DB):** 6 lists for Portfolio 2 with ids 1–6; the re-run adds 0; revert drops only `control_lists` and leaves categories intact; re-apply.
+  - **Server unit:** `PATCH` with `listKey` → 400; system list delete → 409; the same key in Portfolio 1 → 201; a second in Portfolio 2 → 409; move to another portfolio's category → 400; delete a category with lists → 409, with the description naming them; custom list create/edit/delete → 201/200/200.
+  - **Server integration (local dev DB):** `PATCH /lists/:id` with `listKey` → 400 through the real `ValidationPipe`.
+  - **Server unit (J-10):** the roles metadata of A6–A8 equals `[CENTER_ADMIN, SYSTEM_ADMIN]`, iterating every new handler.
+  - **Client unit:** the reference reads `P2 · kpi.direction`; *Delete list* is hidden for system lists; the key input is disabled in edit mode; selecting a list updates the header; a category with 0 lists shows its empty state with **+ Add list** (J-11).
 - **Falsifier:**
-  - Omit `controlListForm` from the `all-modals` config → `ng build` must fail, or the modal-open test in T-09 must fail. State which one before writing the code.
-  - Point a method at a wrong path → the URL test must fail.
-- **Red run:** a build error or the URL assertion.
-- **Disqualifier:** a green `npm test` alone does not prove the union compiles (K-004: the runner may erase types), so `ng build` is required.
-- **Consumers:** `all-modals.service.ts:155,303`; `modal.types.ts:1-18`. Run `grep -rln "ModalName" src` before editing and list every hit here.
-- **Review:** `checklist` — mechanical plumbing guarded by the compiler.
+  1. Accept `listKey` in the update DTO → the immutable-key test fails.
+  2. Drop `forbidNonWhitelisted` → the integration case returns 200 and fails.
+  3. Return 409 for the cross-portfolio move → the J-4 test fails on 400.
+  4. Build the reference from the portfolio name → it fails on `P2 · …`.
+  5. Show *Delete list* for every list → the system-list test fails.
+  6. Add `TECHNICAL_SUPPORT` to A6 → the roles-metadata test fails (J-10).
+  7. Render nothing for a category with 0 lists → the empty-state test fails (J-11).
+- **Red run:** each observed on its status, roles or DOM assertion.
+- **Disqualifier:** a portfolio-isolation test with one portfolio proves nothing (the fixture needs two portfolios holding the same key). The same Dev and K-014 rules as T-01.
+- **Consumers:** the T-01 service, controller and page specs (A1 shape change) — re-run them.
+- **Review:** `full` — immutable key and J-4.
 - **Done criteria:**
-  - [ ] `ng build` passes; the URL tests are green.
-  - [ ] The route is reachable only through `centerAdminGuard` (route config reviewed).
-- **Skills:** `angular-developer`
+  - [ ] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
+  - [ ] A6–A8 in `/swagger`.
+  - [ ] Both packages' test, lint and build gates as in T-01.
+- **Skills:** `nestjs-expert`, `api-design-principles`, `angular-developer`
 
-### T-09 — Control Lists page
+### T-03 — Slice 3: Values (table + API + values table with a read-only ID)
 
-- **Jira:** [AC-1788](https://cgiarmel.atlassian.net/browse/AC-1788) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
-- **Status:** todo · **Size:** L · **Dependencies:** T-06, T-07, T-08
-- **Requirements covered:** R-CTL-001 client (default portfolio; every portfolio selectable, *not configured* label and empty state — J-2), R-CTL-002/003/004 UI flows, R-CTL-003 qualified reference `P<id> · <key>` and *Used by*, R-CTL-005 blocked-delete message, R-CTL-008 layout and four UI states, NFR-CTL-004 (modal focus, `aria-label`)
-- **Design refs:** §6.2, §6.4, D-CTL-2, D-CTL-10, D-CTL-12; mockup `../mockup/ControlledLists.dc.html`
-- **Scope:** `client/research-indicators/src/app/pages/platform/pages/administration/center-admin/control-lists/control-lists.component.{ts,html,scss,spec.ts}`
-- **Description:** a standalone page with the following regions and behavior:
-  - **Header:** a portfolio selector (default = current-year portfolio; all selectable) and **+ New category**.
-  - **Left navigator:** categories and their lists, with the edit and add-list icon buttons.
-  - **List header:** the caps category label, name, description, **Reference `P<id> · <key>`**, *Used by* (or *Not linked to a form yet*), **Edit list**, and **Delete list** for custom lists only.
-  - **Values table:** the `DataTable` with Code · Value · Description · Order · In use · Active · Actions.
-  - **Modal:** one `controlListForm` modal in category, list or value mode, with **Cancel** and **Save**; in list-edit mode the system key is disabled.
-  - **Deletes:** confirmed through `showGlobalAlert`. A server 409 is shown as-is, with *Close*.
-  - **States:** loading, empty per region, error and success toasts.
-  - **Styling:** tokens only, signals for state, HTTP through `ApiService`.
-- **Tests (component, `ApiService` mocked):**
-  - The default portfolio is chosen.
-  - A portfolio with 0 categories is selectable and shows the empty state with **+ New category**.
-  - The reference reads `P2 · kpi.direction`.
-  - *Delete list* is hidden for system lists.
-  - A 409 on a value delete shows the server description.
-  - The system-key input is disabled in list-edit mode.
-  - Each empty state renders.
+- **Jira:** [AC-1782](https://cgiarmel.atlassian.net/browse/AC-1782) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
+- **Status:** todo · **Size:** L · **Dependencies:** T-02
+- **Requirements covered:** R-CTL-003 *Custom list lifecycle* (a list with values cannot be deleted), R-CTL-004 (all, incl. **AC.3 read-only ID**), R-CTL-009 (all ACs except resize persistence, which T-05 covers), R-CTL-008 empty and loading states for the table, R-CTL-010 (23 values; total 2 / 6 / 23), NFR-CTL-003, NFR-CTL-004 (`aria-sort`)
+- **Design refs:** §3 (values, permanent ID), §4 A1 (`valueCount`), A9–A12, §5 rules 2, 4, 6, §6.2 values table + modal, §6.3, D-CTL-4, D-CTL-5, D-CTL-6, D-CTL-14, P-3, P-4; judgment J-5, J-7
+- **Scope — database:** `<epochMs>-createControlListValues.ts` — `control_list_values` with FK `list_id` → lists RESTRICT, `uq_control_list_values_list_code`, `uq_control_list_values_list_value`, `idx_control_list_values_list_order`, collation. Seed 23 values with **explicit ids 1–23**, then reset `AUTO_INCREMENT`. `down` drops only this table.
+- **Scope — server:**
+  - `entities/control-list-value.entity.ts`;
+  - `repositories/control-list-value.repository.ts`;
+  - `dto/` value create/update — **`id` not whitelisted** in update (D-CTL-14);
+  - service rules: case-insensitive uniqueness of code and value; code proposal `<prefix>-<nn>` / `L<n>`; deactivate through `is_active`; a list with values cannot be deleted; physical delete (the in-use block arrives in T-04);
+  - A1 `valueCount`; A9–A12.
+- **Scope — screen:**
+  - `shared/utils/natural-compare.util.ts` and `shared/utils/xlsx-export.util.ts` (+ specs; `exceljs` loaded lazily; `angular.json` `allowedCommonJsDependencies` only if `ng build` warns);
+  - `shared/components/data-table/data-table.component.{ts,html,scss,spec.ts}` (F-7: page sizes 10/25/50/100, resizable columns in `expand` mode, natural sort with Code ascending by default, `aria-sort`, local search, export of the filtered and sorted rows across all pages, action, loading and empty slots; tokens only);
+  - on the page: the values table with **ID** · Code · Value · Description · Order · Active · Actions, the modal in value mode (proposed code pre-filled; **ID shown as read-only text in edit mode, absent in create mode**), value delete via confirm;
+  - `ApiService` A9–A12.
+- **Tests:**
+  - **DB (local dev DB):** 23 values with ids 1–23 and totals 2 / 6 / 23; the re-run adds 0; inserting `dir-01` into `kpi.direction` (which holds `DIR-01`) fails on the unique index (P-4); revert drops only `control_list_values`; re-apply.
+  - **Server unit:** duplicate code or value in another letter case → 409; simulated 1062 → 409; `PATCH` with `id` → 400 and the id unchanged; code proposal `UOM-08` after `UOM-07` and `L5` after `L4`; deactivate keeps the value in A9; delete a list with values → 409; the roles metadata of A9–A12 equals `[CENTER_ADMIN, SYSTEM_ADMIN]`, iterating every new handler (J-10).
+  - **Client unit:**
+    - comparator: `['UOM-10','UOM-2','uom-1', null]` → `['uom-1','UOM-2','UOM-10', null]`;
+    - export row builder: a given order that differs from id order is kept;
+    - `DataTable`: the default order is natural by code; a page-size change keeps the sort and the search; export receives the filtered and sorted rows of all pages (12 rows, page size 10, search matching 11 → 11); headers expose `aria-sort`;
+    - page: the ID column renders and has no input in the row; the edit modal shows the ID as text with no form control bound to it; the create modal has no ID.
 - **Falsifier:**
-  - Disable 0-category portfolios in the selector (the pre-J-2 behavior) → the selectable test must fail.
-  - Build the reference from the portfolio name instead of the id → it must fail on `P2 · …`.
-  - Show *Delete list* for every list → the system-list test must fail.
-- **Red run:** each observed on its DOM assertion.
+  1. Remove `WHERE NOT EXISTS` from the values seed → the re-run fails or doubles.
+  2. Whitelist `id` in the update DTO → the read-only-ID server test fails on 400.
+  3. Bind the ID to an input in the modal → the "no form control" DOM test fails.
+  4. Swap the comparator for `localeCompare` without `numeric` → `UOM-10` sorts before `UOM-2`.
+  5. Export only the current page → the 11-row assertion fails.
+  6. Reset the sort on a page-size change → the persistence test fails.
+  7. Add `TECHNICAL_SUPPORT` to A12 → the roles-metadata test fails (J-10).
+- **Red run:** each observed on its count, status, roles, DOM, order or row-count assertion.
 - **Disqualifier:**
-  - A fixture where every portfolio has categories cannot exercise the *not configured* path.
-  - The mock must return real `MainResponse` shapes; a mock of the wrong shape makes every test pass vacuously.
-  - Layout and visual fidelity are not provable in jsdom; T-10 covers them.
-- **Consumers:** none (new page).
-- **Review:** `full` — main user surface.
+  - A uniqueness fixture differing only in id, not in letter case, cannot prove case-insensitivity.
+  - A comparator fixture without a two-digit number cannot tell natural from lexical order.
+  - A table test with fewer rows than one page cannot tell all pages from the current page.
+  - jsdom cannot measure column widths, so resize behavior is **not** claimed here (T-05), and the spec says so in a comment.
+- **Consumers:** T-01/T-02 specs (A1 `valueCount`); `angular.json` (no test consumers).
+- **Review:** `full` — DB uniqueness, the permanent ID and the shared table pattern.
 - **Done criteria:**
-  - [ ] Page spec green; falsifiers observed red.
-  - [ ] No hex literals in the component files (`grep -n "#[0-9a-fA-F]\{3,6\}" …/control-lists/*` returns 0).
-  - [ ] `npm test -- --silent`, `npm run lint -- --quiet` and `ng build` pass (client).
-- **Skills:** `angular-developer`, `ui-ux-pro-max`
+  - [ ] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
+  - [ ] `ng build`: `exceljs` only in a lazy chunk, not in `main` (read the build stats); the initial bundle within budget.
+  - [ ] A9–A12 in `/swagger`; both packages' test, lint and build gates.
+- **Skills:** `nestjs-expert`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 
-### T-10 — HITL: real-browser check and rollout premise
+### T-04 — Slice 4: Usage and consumer access (in-use, *Used by*, by-key read, membership check)
 
-- **Jira:** [AC-1789](https://cgiarmel.atlassian.net/browse/AC-1789) (story [AC-1779](https://cgiarmel.atlassian.net/browse/AC-1779))
-- **Status:** todo · **Size:** S · **Dependencies:** T-09, PR 1 deployed to Dev
-- **Requirements covered:** R-CTL-009 AC.2 (resize persistence — the substitute gate from requirements §10), R-CTL-008 visual fidelity and *Menu placement* in a real browser, the P-13 rollout premise
+- **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
+- **Status:** todo · **Size:** M · **Dependencies:** T-03
+- **Requirements covered:** R-CTL-005 (all, incl. AC.3 test consumer), R-CTL-003 *Used by*, R-CTL-006 (ordered read, `activeOnly`, unknown key, **membership check — AC.2**), R-CTL-004 *Deactivate* (consumer read omits inactive values), R-CTL-007 (A13 open to any authenticated user), R-CTL-001 AC.1–2 end to end
+- **Design refs:** §4 A1 `usedBy`, A9 `inUse`, A12 block, A13; §5 rules 5, 10; D-CTL-3, D-CTL-12, D-CTL-14, D-CTL-15, P-10
+- **Scope — database:** **no schema change.** The integration test creates a temporary consumer table on the local dev DB with a plain FK to `control_list_values.id` `ON DELETE RESTRICT`. It proves the DB backstop (D-CTL-3) and drops the table afterwards.
+- **Scope — server:**
+  - `control-list-usage.registry.ts` (+ spec): a singleton of providers (consumer name, list keys, async count over value ids), with **no request-scoped dependency** (P-10);
+  - A9 `inUse` summed across providers; A12 refuses with 409 when the sum is > 0 (the description states the count and proposes deactivation); A1 `usedBy` derived from the registry (D-CTL-12);
+  - A13 `GET /by-key/:listKey/values` with no `@Roles`, ordered by display order then natural code, `activeOnly` default true;
+  - `ControlListsService.assertValueInList(valueId, portfolioId, listKey)` (D-CTL-15);
+  - the module exports the service and the registry.
+- **Scope — screen:** the **In use** column in the values table; the list header shows *Used by* or *Not linked to a form yet*; a 409 on a value delete shows the server description with a single *Close*.
+- **Tests:**
+  - **Server unit:**
+    - registry: two providers on the same key returning 2 and 3 sum to 5; another key contributes nothing; consumer names come back per key;
+    - service: delete with a provider returning 3 → 409, and the value is still there;
+    - A13: ordered read puts `UOM-2` before `UOM-10` at equal order; `activeOnly` omits inactive values; unknown key → 404;
+    - `assertValueInList`: the right key and portfolio → returns the value; a `kpi.direction` value checked against `kpi.unit_of_measure` → 400 naming the expected key; the right key in another portfolio → 400; unknown id → 404;
+    - controller: A13 has no roles metadata.
+  - **Server integration (local dev DB):** a registered test provider drives `inUse` in A9 and the 409 in A12; the temporary FK table blocks a physical delete; any authenticated user gets 200 on A13.
+  - **Client unit:** the *In use* column shows the count; *Used by* lists names, or shows *Not linked to a form yet* when empty; a 409 message is shown verbatim.
+- **Falsifier:**
+  1. Make the registry return only the first provider's count → the sum-to-5 test fails.
+  2. Drop the in-use check → the delete test fails on `ConflictException`.
+  3. Make `assertValueInList` check only the portfolio, not the key → the cross-list test fails on 400.
+  4. Check only the key, not the portfolio → the cross-portfolio test fails.
+  5. Add `@Roles` to A13 → the open-read test fails.
+- **Red run:** each observed on its sum, exception, status or roles assertion.
+- **Disqualifier:**
+  - A fixture where both providers return the same number cannot tell first-only from summed (KZ-004).
+  - A membership fixture with a single list or a single portfolio cannot falsify 3 or 4.
+  - Injecting `CurrentUserUtil` into the registry makes it request-scoped — check the constructor against `current-user.util.ts:7`.
+- **Consumers:** T-01…T-03 service, controller and page specs (A1, A9 and A12 shape changes).
+- **Review:** `full` — the protection rule and the contract every later child depends on.
+- **Done criteria:**
+  - [ ] Specs and integration green; falsifiers 1–5 observed red, then reverted.
+  - [ ] All 13 endpoints in `/swagger` (quote what was seen).
+  - [ ] Both packages' test, lint and build gates.
+- **Skills:** `nestjs-expert`, `error-handling-patterns`, `api-design-principles`, `angular-developer`
+
+### T-05 — HITL: real-browser check and rollout premise
+
+- **Jira:** [AC-1784](https://cgiarmel.atlassian.net/browse/AC-1784) (story [AC-1774](https://cgiarmel.atlassian.net/browse/AC-1774))
+- **Status:** todo · **Size:** S · **Dependencies:** T-04 deployed to Dev
+- **Requirements covered:** R-CTL-009 AC.2 (resize persistence — the substitute gate from requirements §10), R-CTL-008 visual fidelity and *Menu placement* in a real browser, NFR-CTL-001 (timing, 3 runs), NFR-CTL-004 (keyboard pass), the P-13 rollout premise
 - **Design refs:** §10 Manual row, §11 Rollout, P-13, judgment J-7
 - **Scope:** no code. Update `execution.md` with the observations.
-- **Description:** the requester, or a person they name, runs a checklist on Dev with an Admin account:
-  1. open *Center admin › Portfolio Management › Control Lists*;
+- **Description:** the requester, or a person they name, runs this checklist on Dev with an Admin account:
+  1. open *Center admin › Portfolio Management › Control Lists*, expanded and with the flyout;
   2. drag a column edge, change the page, sort — the width holds;
   3. export with a search active — the file holds only the matching rows;
-  4. delete an in-use value — the value is blocked. `L1 Division` is in use only after child 2 exists, so until then this step is a known gap; use a value with count 0 to check the confirm flow;
-  5. compare the page with artboard 1 of the mockup;
-  6. collapse the sidebar and use the flyout;
-  7. confirm whether the Prod pipeline applies migrations like Dev.
+  4. the ID column cannot be edited in the table or in the modal;
+  5. delete an in-use value — it is blocked (until child 2 registers a consumer this is a known gap — RB-1; use a value with count 0 to check the confirm flow);
+  6. compare with artboard 1 of the mockup;
+  7. keyboard pass through the modal and the table headers;
+  8. confirm whether the Prod pipeline applies migrations like Dev.
 - **Tests:** manual, recorded verbatim.
 - **Falsifier:** step 2 fails if the widths reset after sorting; step 1 fails if the item is missing in the flyout.
-- **Red run:** n/a — human observation. Record what was actually seen (KZ-002).
-- **Disqualifier:** an observation that covers rendering only ("the page loads") does not discharge steps 2–4. Quote the observed words and tick only the clauses they cover.
+- **Red run:** n/a — human observation; record what was actually seen (KZ-002).
+- **Disqualifier:** "the page loads" does not discharge steps 2–5. Quote the observed words and tick only what they cover.
 - **Consumers:** n/a.
-- **Review:** `checklist` — records a human check.
+- **Review:** `checklist`.
 - **Done criteria:**
-  - [ ] Steps 1–6 observed and quoted in `execution.md`.
-  - [ ] P-13 settled: Prod behavior recorded, or carried as an open rollout item with the owner named.
+  - [ ] Steps 1–7 observed and quoted in `execution.md`.
+  - [ ] P-13 settled, or carried as an open rollout item with the owner named.
 - **Skills:** n/a
 
 ---
@@ -361,51 +272,47 @@ T-02 ∥ T-01 and T-05 ∥ T-07 are independent; T-05/T-06/T-07 can start before
 
 | Requirement › scenario / clause | Owning task(s) |
 | --- | --- |
-| R-CTL-001 *Lists are isolated per portfolio* — THEN 3 values | T-03, T-04 (integration) |
-| R-CTL-001 — **BUT it must NOT** return other portfolios' rows | T-03 (two-portfolio fixture), T-04 |
-| R-CTL-001 — **AND IT MUST** reject a cross-portfolio write (400) | T-03 (falsifier 4), T-04 |
-| R-CTL-001 *Default portfolio* — P2 selected | T-09 |
-| R-CTL-001 — **AND IT MUST** keep P1 selectable with the empty state | T-09 (J-2 falsifier) |
-| R-CTL-002 *Delete a non-empty category* → 409 · **BUT** nothing deleted | T-03 |
-| R-CTL-002 *Duplicate name* (case variant) → 409 | T-03 (case fixture), T-01 (DB index), T-04 |
-| R-CTL-003 *System key is fixed* → 400 · **AND IT MUST** keep the key | T-03 (falsifier 2), T-04 (falsifier 3) |
-| R-CTL-003 *Same key in two portfolios* → 201 · shows `P1 · …`/`P2 · …` · **BUT** second in same portfolio → 409 | T-03, T-09 (reference) |
-| R-CTL-003 *System list cannot be deleted* → 409 · **BUT** nothing removed | T-03, T-09 (button hidden) |
-| R-CTL-003 *Custom list lifecycle* → 200 | T-03 |
-| R-CTL-003 *Used by* label | T-02, T-03, T-09 |
-| R-CTL-004 *Duplicate code or value* → 409 · **BUT** not created | T-03, T-01 |
-| R-CTL-004 *Deactivate* — omitted with `activeOnly` · **AND IT MUST** stay in admin read | T-03 |
-| R-CTL-005 *Value in use* → 409 · **BUT** not deleted | T-02, T-03 (falsifier 3), T-09 (message), T-10 (step 4, gap noted) |
-| R-CTL-005 *Value not in use* → 200 | T-03 |
-| R-CTL-005 AC.3 test consumer | T-02, T-03 |
-| R-CTL-006 *Ordered read* | T-03 |
-| R-CTL-007 *Denied role* → 403 · **BUT** no data changed | T-04 |
-| R-CTL-007 *Allowed roles* → 201 | T-04 |
-| R-CTL-007 AC.2 menu/route hidden without access | T-07 (group gated), T-08 (`canMatch`) |
-| R-CTL-008 *Menu placement* · **BUT** existing items unchanged | T-07, T-10 |
-| R-CTL-008 *Empty list* + four UI states | T-09 |
-| R-CTL-009 *Natural sort* | T-05, T-06 |
-| R-CTL-009 *Export respects filter and sort* · **BUT** no hidden rows | T-05, T-06 |
-| R-CTL-009 AC.1 page size keeps sort/search | T-06 |
-| R-CTL-009 AC.2 resize persists | T-10 (real browser; jsdom gap recorded in T-06) |
-| R-CTL-010 seed counts + *Seed is idempotent* | T-01, T-04 |
-| NFR-CTL-001 performance | T-10 (timing on Dev, 3 runs; report spread if > effect) |
-| NFR-CTL-002 security | T-04 |
-| NFR-CTL-003 DB uniqueness | T-01 |
-| NFR-CTL-004 a11y | T-06, T-09, T-10 (keyboard pass) |
-| NFR-CTL-005 Swagger | T-04 |
+| R-CTL-001 *Lists are isolated per portfolio* · **BUT** no other portfolio's rows | T-01 (categories), T-02 (lists), T-04 (end to end) |
+| R-CTL-001 **AND IT MUST** reject a cross-portfolio write (400) | T-02 (falsifier 3) |
+| R-CTL-001 *Default portfolio* · P1 selectable with empty state | T-01 (falsifier 6) |
+| R-CTL-002 *Duplicate name* (case variant) → 409 | T-01 |
+| R-CTL-002 *Delete a non-empty category* → 409 · **BUT** nothing deleted | T-02 |
+| R-CTL-003 *System key is fixed* · *Same key in two portfolios* · *System list cannot be deleted* | T-02 |
+| R-CTL-003 *Custom list lifecycle* | T-02 (no values), T-03 (with values → 409) |
+| R-CTL-003 *Used by* | T-04 |
+| R-CTL-004 *Duplicate code or value* · AC.1–2 | T-03 |
+| R-CTL-004 *Deactivate* — admin read keeps it · consumer read omits it | T-03 (admin), T-04 (A13) |
+| R-CTL-004 AC.3 read-only permanent ID | T-03 (falsifiers 2, 3), T-05 (step 4) |
+| R-CTL-005 *Value in use* · *Value not in use* · AC.3 test consumer | T-04, T-05 (step 5, gap RB-1) |
+| R-CTL-006 *Ordered read*, unknown key | T-04 |
+| R-CTL-006 *Value from another list* · AC.2 membership | T-04 (falsifiers 3, 4) |
+| R-CTL-007 *Denied role* · *Allowed roles* | T-01 (A1–A5, falsifier 4), T-02 (A6–A8, falsifier 6), T-03 (A9–A12, falsifier 7), T-04 (A13 open, falsifier 5) |
+| R-CTL-007 AC.2 menu hidden **and** route blocked without access | T-01 (sidebar test + route test, falsifier 7 — J-9) |
+| R-CTL-008 *Menu placement* · **BUT** existing items unchanged | T-01, T-05 |
+| R-CTL-008 *Empty list* + four UI states | T-01 (page, no categories), T-02 (no lists — J-11), T-03 (no values, table) |
+| R-CTL-009 natural sort · export · page size keeps sort/search | T-03 |
+| R-CTL-009 AC.2 resize persists | T-05 (jsdom gap recorded in T-03) |
+| R-CTL-010 seed 2 / 6 / 23 · *Seed is idempotent* | T-01, T-02, T-03 |
+| NFR-CTL-001 performance | T-05 |
+| NFR-CTL-002 security | T-01…T-04 (roles test per handler) |
+| NFR-CTL-003 DB uniqueness | T-01, T-02, T-03 |
+| NFR-CTL-004 a11y | T-01 (`aria-label`), T-03 (`aria-sort`), T-05 (keyboard) |
+| NFR-CTL-005 Swagger | T-01…T-04 |
 
 ## 4. Risks & blockers log
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-09-27 | T-10 step 4 cannot show a real in-use value until `organizational-structure` registers its consumer | Unit falsifier in T-03 covers the rule; re-check in child 2's HITL | Requester | open |
-| RB-2 | 2026-09-27 | Prod pipeline may not apply migrations (P-13) | Settle in T-10 before merging to `main` | Requester | open |
+| RB-1 | 2026-09-27 | T-05 step 5 cannot show a real in-use value until `organizational-structure` registers its consumer | T-04 unit + integration (test provider, temporary FK table) cover the rule; re-check in child 2's HITL | Requester | open |
+| RB-2 | 2026-09-27 | The Prod pipeline may not apply migrations (P-13) | Settle in T-05 before merging to `main` | Requester | open |
+| RB-3 | 2026-10-01 | `judgment.md` (APPROVED) predated D-CTL-14…16 and this re-cut | Judgment Day round 2 run 2026-10-01: APPROVED, 0 confirmed severe; suspects J-9…J-11 await the user | Requester | closed (suspects pending) |
+| RB-4 | 2026-10-01 | Jira sub-tasks AC-1780…AC-1789 describe the old horizontal split | Re-mapped with the user's go-ahead: AC-1780…AC-1784 rewritten as T-01…T-05 and re-parented; AC-1785…AC-1789 titled [OBSOLETE], still Open — closing them is the PO's call | Requester | closed |
+| RB-5 | 2026-10-01 | T-01 and T-03 are size L, with both packages in one task | Two parallel dispatches per task (slice rule); if a half overruns, split that half's dispatch, not the task | Leader | open |
 
 ## 5. Done definition
 
-- [ ] T-01 … T-10 `done`, each with its Reviewer PASS recorded in `execution.md`.
-- [ ] T-10 human check done **before** `/akili-validate`.
+- [ ] T-01 … T-05 `done`, each with its Reviewer PASS recorded in `execution.md`.
+- [ ] T-05 human check done **before** `/akili-validate`.
 - [ ] Every row of §3 covered.
 - [ ] Swagger lists the 13 endpoints.
-- [ ] Rollout note (P-13 outcome, backout = revert + migration `down`) recorded.
+- [ ] Rollout note (P-13 outcome; backout = revert + migration `down` values → lists → categories) recorded.

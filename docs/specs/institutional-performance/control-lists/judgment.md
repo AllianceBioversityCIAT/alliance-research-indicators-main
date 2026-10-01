@@ -39,3 +39,47 @@
 | 1 | orchestrator (bounded: J-1, J-2 only) — design §5.2, §6.2, §10, §12 D-CTL-10/11, §13 P-14; requirements R-CTL-001; 4 mockup `<option>`s | both judges, scoped to the delta: 0 severe; 2 cosmetic suggestions (row order in §12/§13) — applied | **J-1 closed · J-2 closed** |
 
 **JUDGMENT: APPROVED ✅** (confirmed severe findings resolved within one round; suspects J-3/J-4 then approved by the user and applied without re-judgment)
+
+---
+
+# Round 2 — 2026-10-01 delta (D-CTL-14…16, vertical-slice re-cut)
+
+- **Target:** the 2026-10-01 delta of `design.md` (D-CTL-14 permanent read-only value ID with explicit seed ids, D-CTL-15 `assertValueInList` without a composite FK, D-CTL-16 vertical slices), `requirements.md` (R-CTL-004 AC.3, R-CTL-006 membership scenario + AC.2, §7) and the rewritten `tasks.md` (T-01…T-05). Context: `proposal.md`, `../family.md`, round 1 above, codebase.
+- **Immutable snapshot:** scratchpad `jd2/` (`delta.diff` + full copies), taken before any round-2 edit. The later evidence-database edit (requester: no disposable schema) is **outside** this target.
+- **Mode:** blind dual review, read-only judges (`akili-reviewer`, model `sonnet`; author `opus`). Composite FK excluded as a fix by the requester's decision.
+- **Status:** **approved** — 0 confirmed severe; 3 single-judge severe findings recorded as **suspect**, awaiting the user's decision
+
+## Frozen ledger — round 2
+
+| ID | Judges | Severity | Finding | Evidence | State |
+| --- | --- | --- | --- | --- | --- |
+| J-9 | A-1 only | SEVERE (single judge) | R-CTL-007 AC.2 has two clauses (no menu item **and** cannot open the route). T-01 wires `canMatch: [centerAdminGuard]` but tests only menu visibility. The old T-08 done criterion "route reachable only through `centerAdminGuard`" was dropped by the re-cut | `requirements.md` R-CTL-007 AC.2; `tasks.md` T-01 Tests/Done; `delta.diff` removed line | suspect |
+| J-10 | B-1 only | SEVERE (single judge) | §3 claims T-02/T-03 run a roles test over their new handlers (NFR-CTL-002), but neither task lists a roles falsifier. A6–A12 (7 of 13 endpoints) have no gate that turns red if `@Roles` is dropped or widened | `tasks.md` §3 rows NFR-CTL-002, R-CTL-007; T-02 and T-03 falsifier lists | suspect |
+| J-11 | B-2 only | SEVERE (single judge) | R-CTL-008 names three empty states (no categories / no lists / no values). No task owns "category with 0 lists"; T-02 is absent from the §3 row | `requirements.md` R-CTL-008 Details + AC.2; `tasks.md` §3 row R-CTL-008 | suspect |
+| J-12 | A-2 + B-4 | WARNING | `requirements.md` Depth line still says "one migration + seed"; §7 says three | `requirements.md:6` vs §7 | info |
+| J-13 | A-3 + B-3 | WARNING | Slice rule and §1 say every slice ships a migration and FKs to the previous table; T-04 has no schema change and T-01 has no previous slice (same blanket claim in D-CTL-16) | `tasks.md` slice rule, §1; T-04 Scope — database; `design.md` D-CTL-16 | info |
+| J-14 | A-4 (WARNING) + B-6 (SUGGESTION) | WARNING | `assertValueInList` is silent on inactive values; an implementer must guess whether it checks `is_active` | `design.md` §5 rule 10; R-CTL-006 AC.2; R-CTL-004 *Deactivate* | info |
+| J-15 | B-5 | WARNING | No risk row for "a consumer forgets to call `assertValueInList`"; unlike the in-use case there is no DB backstop | `requirements.md` §11; D-CTL-15 | info |
+| J-16 | A-5 | SUGGESTION | The single 400 branch "names the expected key" even when the real mismatch is the portfolio | `design.md` §5 rule 10 | info |
+| J-17 | A-6 | SUGGESTION | Only T-01 carries the "no hex literals" done criterion; T-02…T-04 add screen code too (the Reviewer checklist catches it anyway) | `tasks.md` done criteria | info |
+
+**Counts:** 0 confirmed severe · 3 suspect · 0 contradictions · 6 info.
+**Counts checked by both judges:** 2 / 6 / 23 seed (7+3+4+3+2+4 = 23), explicit ids 1–2 / 1–6 / 1–23, 13 endpoints (5+3+4+1), 5 tasks, 4 PRs, ≤ 10 review rounds, 3 migrations — consistent apart from J-12. Round-1 fixes J-1…J-4 intact.
+
+## Correction plan — round 2 (pending user decision)
+
+| ID | Proposed fix |
+| --- | --- |
+| J-9 | T-01: add a routing test — `canMatch` rejects a non-center-admin user — with a falsifier (remove `canMatch` → the test fails), plus the done criterion |
+| J-10 | T-02 and T-03: add a roles-metadata falsifier mirroring T-01's (add `TECHNICAL_SUPPORT` to one new handler → fails) and iterate every new write handler |
+| J-11 | T-02: add a "category with 0 lists shows the empty state with + Add list" test and falsifier; add T-02 to the §3 R-CTL-008 row |
+| J-12, J-13, J-14 | Info, corroborated by both judges; cheap wording fixes (J-14: state that `assertValueInList` ignores `is_active`, so records keep referencing deactivated values — R-CTL-004) |
+| J-15, J-16, J-17 | Info only |
+
+## Rounds — round 2
+
+| Round | Fix actor | Re-judgment | Result |
+| --- | --- | --- | --- |
+| 2 | orchestrator, user-approved 2026-10-01 (suspects J-9, J-10, J-11 + info J-12…J-15): tasks T-01/T-02/T-03 tests, falsifiers and §3 rows; slice-rule wording; design §5 rule 10 (`is_active`, failure detail, no backstop); requirements Depth line + §11 risk row | not re-judged (no confirmed severe; additive test and wording changes) | **J-9…J-15 applied** · J-16 folded into rule 10 · J-17 info |
+
+**JUDGMENT (round 2): APPROVED ✅** (no severe finding confirmed by both judges; suspects J-9/J-10/J-11 await the user's decision)
