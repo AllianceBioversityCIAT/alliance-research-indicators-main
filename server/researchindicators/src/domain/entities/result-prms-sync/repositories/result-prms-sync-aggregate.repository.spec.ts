@@ -164,6 +164,8 @@ describe('ResultPrmsSyncAggregateRepository', () => {
           sp_role: 'PRIMARY',
           toc_result_title: 'Primary ToC result for SP01',
           indicator_description: 'Primary indicator description for SP01',
+          // mysql2 hands back a `decimal(18,2)` as a string, not a number.
+          quantitative_contribution: '12.50',
           aligns_with_toc: 1,
         },
         {
@@ -171,6 +173,7 @@ describe('ResultPrmsSyncAggregateRepository', () => {
           sp_role: null,
           toc_result_title: null,
           indicator_description: null,
+          quantitative_contribution: null,
           aligns_with_toc: 0,
         },
       ],
@@ -202,6 +205,8 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     expect(aggregate?.is_partner_not_applicable).toBe(true);
     expect(aggregate?.primary_contract?.is_primary).toBe(true);
     expect(aggregate?.science_programs[0].aligns_with_toc).toBe(true);
+    expect(aggregate?.science_programs[0].quantitative_contribution).toBe(12.5);
+    expect(aggregate?.science_programs[1].quantitative_contribution).toBeNull();
     expect(aggregate?.science_programs[1].sp_role).toBeNull();
     expect(aggregate?.evidence[0].is_private).toBe(false);
     expect(aggregate?.evidence[1].is_private).toBe(true);

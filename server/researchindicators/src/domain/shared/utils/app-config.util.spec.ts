@@ -10,6 +10,16 @@ describe('AppConfig', () => {
     process.env = { ...prev };
   });
 
+  it('reads the PRMS webhook base and secret as separate env vars', () => {
+    process.env.ARI_PRMS_WEBHOOK_CALLBACK_URL = 'https://star.example.org/api';
+    process.env.ARI_PRMS_WEBHOOK_SECRET = 'segment-k7';
+    const cfg = new AppConfig(dataSource);
+    expect(cfg.ARI_PRMS_WEBHOOK_CALLBACK_URL).toBe(
+      'https://star.example.org/api',
+    );
+    expect(cfg.ARI_PRMS_WEBHOOK_SECRET).toBe('segment-k7');
+  });
+
   it('reads boolean and numeric env flags', () => {
     process.env.ARI_PORT = '3000';
     process.env.ARI_IS_PRODUCTION = 'true';

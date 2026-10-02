@@ -23,10 +23,15 @@ import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import { ResultsUtil } from '../../shared/utils/results.util';
 import {
+  PRMS_SYNC_HISTORY_FOUND,
+  PrmsSyncHistoryDto,
+} from './dto/prms-sync-history.dto';
+import {
   PRMS_SYNC_HTTP_DESCRIPTIONS,
   PrmsSyncResponseDto,
   PrmsSyncStatusDto,
 } from './dto/prms-sync.dto';
+import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import {
   PrmsSyncPersistedRefusalException,
@@ -109,6 +114,7 @@ export class ResultPrmsSyncController {
   constructor(
     private readonly resultPrmsSyncService: ResultPrmsSyncService,
     private readonly statusReader: ResultPrmsSyncStatusReader,
+    private readonly historyReader: PrmsSyncHistoryReader,
     private readonly resultsUtil: ResultsUtil,
   ) {}
 
@@ -209,6 +215,48 @@ export class ResultPrmsSyncController {
       const data = await this.statusReader.getStatus(this.resultsUtil.resultId);
       return ResponseUtils.format({
         description: PRMS_SYNC_HTTP_DESCRIPTIONS.statusFound,
+        status: HttpStatus.OK,
+        data,
+      });
+    } catch (error) {
+      if (error instanceof HttpException) {
+        return ResponseUtils.format({
+          description: httpExceptionDescription(error),
+          status: error.getStatus(),
+        });
+      }
+      throw error;
+    }
+  }
+
+  @Get('history')
+  @GetResultVersion()
+  @ApiOperation({
+    summary: 'Read the PRMS synchronization history for a result',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: PrmsSyncHistoryDto,
+    description: PRMS_SYNC_HISTORY_FOUND,
+  })
+  @ApiResponse({
+    status: HttpStatus.NOT_FOUND,
+    description: PRMS_SYNC_HTTP_DESCRIPTIONS.notFound,
+  })
+  @Roles(
+    SecRolesEnum.CONTRIBUTOR,
+    SecRolesEnum.CENTER_ADMIN,
+    SecRolesEnum.SYSTEM_ADMIN,
+  )
+  @ResultOwner()
+  @UseGuards(RolesGuard, ResultOwnerGuard)
+  async getHistory() {
+    try {
+      const data = await this.historyReader.getHistory(
+        this.resultsUtil.resultId,
+      );
+      return ResponseUtils.format({
+        description: PRMS_SYNC_HISTORY_FOUND,
         status: HttpStatus.OK,
         data,
       });

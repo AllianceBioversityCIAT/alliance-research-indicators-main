@@ -1,0 +1,81 @@
+:host {
+  display: block;
+}
+
+.prms-sync-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.prms-sync-section--neutral {
+  border: 1px solid var(--ac-grey-200);
+  background: var(--ac-white-1);
+}
+
+.prms-sync-section--approved {
+  border: 1px solid color-mix(in srgb, var(--ac-green-300) 38%, transparent);
+  background: color-mix(in srgb, var(--ac-green-300) 6%, transparent);
+}
+
+.prms-sync-section--rejected {
+  border: 1px solid color-mix(in srgb, var(--ac-red-1) 34%, transparent);
+  background: color-mix(in srgb, var(--ac-red-1) 6%, transparent);
+}
+
+.prms-sync-section__tag {
+  align-self: flex-start;
+}
+
+.prms-sync-section__actor,
+.prms-sync-section__code {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.prms-sync-section__code {
+  display: flex;
+}
+
+.prms-sync-section__code-value {
+  font-weight: 600;
+}
+
+.prms-sync-section__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.prms-sync-section__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-decoration: none;
+  cursor: pointer;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ac-light-blue-400);
+    outline-offset: 2px;
+  }
+}

@@ -694,6 +694,17 @@ describe('ApiService', () => {
       expect(calledUrl).toBe('results/123/prms-sync');
     });
 
+    it('should call GET_PrmsSyncHistory without a version segment', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.GET_PrmsSyncHistory(123);
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/123/prms-sync/history', { useResultInterceptor: true });
+      const calledUrl = (mockToPromiseService.get as jest.Mock).mock.calls[0][0] as string;
+      expect(calledUrl).not.toContain('v1/');
+      expect(calledUrl).toBe('results/123/prms-sync/history');
+    });
+
     it('should call PATCH_Feedback', () => {
       const body = { test: 'data' } as any;
       (mockToPromiseService.patch as jest.Mock).mockResolvedValue({ data: {} });

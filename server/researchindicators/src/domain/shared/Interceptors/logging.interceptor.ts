@@ -9,6 +9,7 @@ import { finalize } from 'rxjs/operators';
 import { Request } from 'express';
 import { ENV } from '../utils/env.utils';
 import { LoggerUtil } from '../utils/logger.util';
+import { redactCallbackPath } from '../utils/path-redaction.util';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -31,7 +32,7 @@ export class LoggingInterceptor implements NestInterceptor {
       const request: Request = ctx.getRequest<Request>();
       const ip = request.socket?.remoteAddress;
       method = request.method;
-      url = request.url;
+      url = redactCallbackPath(request.url);
       message = `- By ${ip}`;
       userId = (request as any)?.user?.sec_user_id;
       actorId = (request as any)?.actor?.sec_user_id;

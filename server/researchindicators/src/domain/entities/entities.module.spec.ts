@@ -5,6 +5,7 @@ import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { ControlListsModule } from './control-lists/control-lists.module';
+import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 
 /**
  * T-07 attempt 2 (DD-15, tasks.md trap 4, KZ-001).
@@ -83,6 +84,22 @@ describe('EntitiesModule — control-lists registration (T-01)', () => {
     const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
 
     expect(imports).toContain(ControlListsModule);
+  });
+});
+
+/**
+ * T-03 (docs/specs/bilateral/prms-sync/decision-webhook). Same KZ-001 gap
+ * as T-13 above: `main.routes.spec.ts` pins the `prms-webhook` route
+ * *node*, which `RouterModule.register()` looks up in `modulesContainer`
+ * and skips silently if it is absent — a mocked-provider controller spec
+ * stays green through that miss. This is the falsifiable module-graph
+ * gate for the registration surface.
+ */
+describe('EntitiesModule — prms-webhook registration (T-03)', () => {
+  it('lists PrmsWebhookModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(PrmsWebhookModule);
   });
 });
 

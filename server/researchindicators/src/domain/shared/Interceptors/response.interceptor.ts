@@ -12,6 +12,7 @@ import { ServerResponseDto } from '../global-dto/server-response.dto';
 import { ServiceResponseDto } from '../global-dto/service-response.dto';
 import { ENV } from '../utils/env.utils';
 import { LoggerUtil } from '../utils/logger.util';
+import { redactCallbackPath } from '../utils/path-redaction.util';
 
 export class ResponseInterceptor implements NestInterceptor {
   intercept(
@@ -47,7 +48,7 @@ export class ResponseInterceptor implements NestInterceptor {
           description: 'Unknown message',
           errors: null,
           timestamp: new Date().toISOString(),
-          path: request.url,
+          path: redactCallbackPath(request.url),
         };
 
         if (this.isServiceResponseDto(res)) {
@@ -70,7 +71,7 @@ export class ResponseInterceptor implements NestInterceptor {
           _logger,
           res?.stack,
           request.method,
-          request.url,
+          redactCallbackPath(request.url),
           (request as any)?.user?.sec_user_id,
           // @akili-spec changes/profile-simulation — R-IMP-005/NFR-IMP-004
           // log attribution: only present under an active session.

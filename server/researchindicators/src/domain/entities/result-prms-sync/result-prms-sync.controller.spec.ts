@@ -24,6 +24,7 @@ import { ResultsUtil } from '../../shared/utils/results.util';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
+import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { AppConfigService } from '../app-config/app-config.service';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
@@ -35,6 +36,8 @@ import {
 } from './dto/prms-sync.dto';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
 import { ResultPrmsSyncLogRepository } from './repositories/result-prms-sync-log.repository';
+import { PRMS_SYNC_HISTORY_FOUND } from './dto/prms-sync-history.dto';
+import { PrmsSyncHistoryReader } from './prms-sync-history.reader';
 import { ResultPrmsSyncController } from './result-prms-sync.controller';
 import { ResultPrmsSyncStatusReader } from './result-prms-sync-status.reader';
 import {
@@ -57,18 +60,21 @@ describe('ResultPrmsSyncController', () => {
   const reflector = new Reflector();
   const sync = jest.fn();
   const getStatus = jest.fn();
+  const getHistory = jest.fn();
   const resultsUtil = { resultId: 42 } as unknown as ResultsUtil;
   let controller: ResultPrmsSyncController;
 
   beforeEach(async () => {
     sync.mockReset();
     getStatus.mockReset();
+    getHistory.mockReset();
     const passthrough = { canActivate: () => true };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ResultPrmsSyncController],
       providers: [
         { provide: ResultPrmsSyncService, useValue: { sync } },
         { provide: ResultPrmsSyncStatusReader, useValue: { getStatus } },
+        { provide: PrmsSyncHistoryReader, useValue: { getHistory } },
         { provide: ResultsUtil, useValue: resultsUtil },
         mockPortfolioUtilProvider,
       ],
@@ -83,7 +89,7 @@ describe('ResultPrmsSyncController', () => {
   });
 
   describe('DD-11 / DD-11b guard triad', () => {
-    it.each(['sync', 'getStatus'] as const)(
+    it.each(['sync', 'getStatus', 'getHistory'] as const)(
       '%s carries Roles + ResultOwnerGuard and never ResultStatusGuard',
       (handler) => {
         const fn = ResultPrmsSyncController.prototype[handler];
@@ -176,6 +182,60 @@ describe('ResultPrmsSyncController', () => {
       expect(operation.summary).toBeDefined();
       expect(lastAttemptProps.join(',')).not.toMatch(/request_payload/);
       expect(statusProps.join(',')).not.toMatch(/request_payload/);
+    });
+
+    it('documents GET history under the Result PRMS Sync tag', () => {
+      const operation = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        ResultPrmsSyncController.prototype.getHistory,
+      );
+      const tags = Reflect.getMetadata(
+        DECORATORS.API_TAGS,
+        ResultPrmsSyncController,
+      );
+
+      expect(operation.summary).toBe(
+        'Read the PRMS synchronization history for a result',
+      );
+      expect(tags).toEqual(['Result PRMS Sync']);
+    });
+  });
+
+  describe('GET history guard parity (NFR-SSP-001)', () => {
+    const metadataOf = (handler: 'getStatus' | 'getHistory') => {
+      const fn = ResultPrmsSyncController.prototype[handler];
+      return {
+        guards: Reflect.getMetadata(GUARDS_METADATA, fn) ?? [],
+        roles: Reflect.getMetadata(ROLES_KEY, fn),
+        owners: Reflect.getMetadata(RESULT_OWNER_KEY, fn),
+      };
+    };
+
+    it('getHistory guard metadata equals getStatus, guard by guard', () => {
+      const history = metadataOf('getHistory');
+      const status = metadataOf('getStatus');
+
+      expect(history.guards).toEqual(status.guards);
+      expect(history.guards).toContain(ResultOwnerGuard);
+      expect(history.guards).toContain(RolesGuard);
+      expect(history.roles).toEqual(status.roles);
+      expect(history.roles).toEqual(mutationRoles);
+      expect(history.owners).toEqual(status.owners);
+      expect(history.owners).toBeDefined();
+    });
+
+    it('denies a caller whose roles contain none of the three (403)', () => {
+      const guard = new RolesGuard(new Reflector());
+      const allowed = guard.canActivate({
+        switchToHttp: () => ({
+          getRequest: () => ({ user: { roles: [SecRolesEnum.GLOBAL] } }),
+        }),
+        getHandler: () => ResultPrmsSyncController.prototype.getHistory,
+        getClass: () => ResultPrmsSyncController,
+      } as never);
+
+      // RolesGuard returns false; Nest turns that into ForbiddenException (403).
+      expect(allowed).toBe(false);
     });
   });
 
@@ -341,6 +401,33 @@ describe('ResultPrmsSyncController', () => {
     });
   });
 
+  describe('GET /history', () => {
+    it('returns 200 with an empty timeline when the result was never synced', async () => {
+      const data = {
+        prms_result_code: null,
+        prms_phase_id: null,
+        sync_count: 0,
+        events: [],
+      };
+      getHistory.mockResolvedValue(data);
+
+      const response = await controller.getHistory();
+
+      expect(getHistory).toHaveBeenCalledWith(42);
+      expect(response.status).toBe(HttpStatus.OK);
+      expect(response.description).toBe(PRMS_SYNC_HISTORY_FOUND);
+      expect(response.data).toEqual(data);
+    });
+
+    it('surfaces 404 when the reader cannot find the result', async () => {
+      getHistory.mockRejectedValue(new NotFoundException('Result not found'));
+
+      const response = await controller.getHistory();
+
+      expect(response.status).toBe(HttpStatus.NOT_FOUND);
+    });
+  });
+
   /**
    * T-13d: the `{ provide: ResultPrmsSyncService, useValue: { sync } }`
    * module above can never exercise insertRefusedByStar. This block wires
@@ -391,6 +478,11 @@ describe('ResultPrmsSyncController', () => {
         { getEnv: jest.fn() } as unknown as AppConfigService,
         { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
         { user_id: 7 } as unknown as CurrentUserUtil,
+        // T-11: this scenario is a gate refusal (pool_funding_alignment_green:
+        // false) and never reaches the outbound history write.
+        {
+          recordOutboundPendingReview: jest.fn(),
+        } as unknown as PrmsWebhookDeliveryRepository,
       );
 
       const passthrough = { canActivate: () => true };
@@ -401,6 +493,10 @@ describe('ResultPrmsSyncController', () => {
           {
             provide: ResultPrmsSyncStatusReader,
             useValue: { getStatus: jest.fn() },
+          },
+          {
+            provide: PrmsSyncHistoryReader,
+            useValue: { getHistory: jest.fn() },
           },
           { provide: ResultsUtil, useValue: resultsUtil },
           mockPortfolioUtilProvider,
