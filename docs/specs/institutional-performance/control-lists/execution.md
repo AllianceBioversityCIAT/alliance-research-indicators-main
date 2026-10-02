@@ -217,3 +217,6 @@
 - **Child guides:** no new child `CLAUDE.md` is needed yet (a standard entity module). At archive, the client child guide should mention the nested-nav `children` field and the error-contract pattern (`errorDetail.errors`, never `description`).
 - **CodeGraph:** re-index pending.
 - **Lint gate on committed blobs (Leader, after `847cda8d`):** `git show HEAD:<file> | npx eslint --stdin --stdin-filename <file>` over all 19 server `.ts` files in the commit → **19 linted, 0 failing**. Falsifier (K-004): the same file with CRLF line endings → **13 errors**, so the gate does redden. Server lint criterion PASS. The client gate (`npm run lint -- --quiet`) was green in the workers' runs.
+- **Human check (user, 2026-10-01, local):** the user ran T-01 locally (server on `:3001`, client `ng serve` on `:4200`, DB `ari_local_mysql`) and reported "Todo funcionó bien". This informal check does **not** discharge any T-05 step (KZ-002: it does not say which behaviors were observed).
+- **Session paused (2026-10-01):** all local services stopped (`ari_local_mysql` stopped; dev servers on 3001/4200 stopped). **Next eligible task: T-02 (Slice 2: Lists).** Pending user decision: transition Jira AC-1780 to Done.
+- **To resume:** `docker start ari_local_mysql`, then `/akili-execute institutional-performance/control-lists` (or `/akili-resume`).
