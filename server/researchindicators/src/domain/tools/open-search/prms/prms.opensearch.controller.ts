@@ -99,8 +99,8 @@ export class PrmsOpenSearchController {
     required: false,
     type: String,
     description:
-      'PRMS status ids, comma-separated. Imported: 1, 2, 3, 5, 6; 4 and 7 are skipped',
-    example: '1,2,3',
+      'PRMS status ids, comma-separated. Only 5, 6 and 7 are imported (all as Approved); any other status is skipped',
+    example: '5,6,7',
   })
   @ApiQuery({
     name: 'async',

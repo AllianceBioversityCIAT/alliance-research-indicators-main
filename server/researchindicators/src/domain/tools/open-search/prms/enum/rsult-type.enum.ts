@@ -28,16 +28,14 @@ export const ResultPrmsStatusMapper = {
 
 /**
  * PRMS `status_id` -> STAR status, for PRMS results imported as STAR results.
- * Statuses missing from this map are not imported.
+ * Only these three PRMS statuses are imported, and all of them land in STAR as
+ * Approved. Every other PRMS status (1 Editing, 2 Quality Assessed,
+ * 3 Submitted, 4 Discontinued) is not imported.
  */
 export const ResultPrmsToStarStatusMapper: Partial<
   Record<number, ResultStatusEnum>
 > = {
-  1: ResultStatusEnum.DRAFT, // Editing
-  2: ResultStatusEnum.APPROVED, // Quality Assessed
-  3: ResultStatusEnum.SUBMITTED, // Submitted
-  5: ResultStatusEnum.SUBMITTED, // Pending Review
+  5: ResultStatusEnum.APPROVED, // Pending Review
   6: ResultStatusEnum.APPROVED, // Approved
-  // 4 Discontinued: provisionally skipped until it has a STAR equivalent.
-  // 7 Rejected: skipped.
+  7: ResultStatusEnum.APPROVED, // Rejected
 };

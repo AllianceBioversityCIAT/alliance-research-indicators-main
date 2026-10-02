@@ -434,20 +434,20 @@ describe('PrmsOpenSearchService', () => {
         year: '2025',
         centerAcronym: 'Bioversity (Alliance),CIAT (Alliance)',
         source: 'W3/Bilateral',
-        statusId: '1,2,3',
+        statusId: '5,6,7',
         resultType: undefined,
         resultCode: '',
       });
 
       expect(httpService.get).toHaveBeenCalledWith(
-        'https://prms-search.test/result?size=50&page=1&year=2025&centerAcronym=Bioversity%20(Alliance)%2CCIAT%20(Alliance)&source=W3%2FBilateral&statusId=1%2C2%2C3',
+        'https://prms-search.test/result?size=50&page=1&year=2025&centerAcronym=Bioversity%20(Alliance)%2CCIAT%20(Alliance)&source=W3%2FBilateral&statusId=5%2C6%2C7',
       );
     });
 
     it('should save as STAR with a STAR-generated code, keyed by the PRMS result code', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue([
-        buildTemporalMapper({ result_code: '28731', status_id: '3' }),
+        buildTemporalMapper({ result_code: '28731', status_id: '6' }),
       ]);
 
       await service.getDataAsStar({ year: 2025 });
@@ -472,7 +472,7 @@ describe('PrmsOpenSearchService', () => {
       expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
     });
 
-    it('should map PRMS statuses to STAR and skip Discontinued and Rejected', async () => {
+    it('should import only Pending Review, Approved and Rejected, all as Approved', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue(
         ['1', '2', '3', '4', '5', '6', '7'].map((status, i) =>
@@ -488,19 +488,17 @@ describe('PrmsOpenSearchService', () => {
       expect(
         savedResults().map((r) => [r.prms_result_code, r.status_id]),
       ).toEqual([
-        [100, ResultStatusEnum.DRAFT],
-        [101, ResultStatusEnum.APPROVED],
-        [102, ResultStatusEnum.SUBMITTED],
-        [104, ResultStatusEnum.SUBMITTED],
+        [104, ResultStatusEnum.APPROVED],
         [105, ResultStatusEnum.APPROVED],
+        [106, ResultStatusEnum.APPROVED],
       ]);
     });
 
     it('should carry phase_id into prms_phase_id when PRMS sends it', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue([
-        buildTemporalMapper({ result_code: '1', status_id: '1', phase_id: 6 }),
-        buildTemporalMapper({ result_code: '2', status_id: '1' }),
+        buildTemporalMapper({ result_code: '1', status_id: '5', phase_id: 6 }),
+        buildTemporalMapper({ result_code: '2', status_id: '5' }),
       ]);
 
       await service.getDataAsStar({ year: 2025 });
@@ -511,17 +509,17 @@ describe('PrmsOpenSearchService', () => {
       ]);
     });
 
-    it('should version only the approved results that were saved', async () => {
+    it('should version every imported result that was saved', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue([
         buildTemporalMapper({
           result_code: '10',
-          status_id: '2',
+          status_id: '5',
           year: '2025',
         }),
         buildTemporalMapper({
           result_code: '11',
-          status_id: '6',
+          status_id: '7',
           year: '2025',
         }),
         buildTemporalMapper({
@@ -557,8 +555,8 @@ describe('PrmsOpenSearchService', () => {
     it('should keep versioning the rest when one snapshot fails', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue([
-        buildTemporalMapper({ result_code: '10', status_id: '2' }),
-        buildTemporalMapper({ result_code: '11', status_id: '2' }),
+        buildTemporalMapper({ result_code: '10', status_id: '6' }),
+        buildTemporalMapper({ result_code: '11', status_id: '6' }),
       ]);
       resultRepoHandle.findOne
         .mockResolvedValueOnce({ result_official_code: 5001 })

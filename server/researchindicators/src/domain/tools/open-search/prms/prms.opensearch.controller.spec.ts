@@ -76,7 +76,7 @@ describe('PrmsOpenSearchController', () => {
         undefined,
         'W3/Bilateral',
         undefined,
-        '1,2,3',
+        '5,6,7',
         async,
       );
 
@@ -87,7 +87,7 @@ describe('PrmsOpenSearchController', () => {
       resultCode: undefined,
       source: 'W3/Bilateral',
       fundingType: undefined,
-      statusId: '1,2,3',
+      statusId: '5,6,7',
     };
 
     it('should be restricted to SYSTEM_ADMIN only', () => {
