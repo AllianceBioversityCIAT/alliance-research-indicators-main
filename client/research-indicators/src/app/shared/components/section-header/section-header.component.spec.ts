@@ -453,6 +453,39 @@ describe('SectionHeaderComponent', () => {
     expect(items[0].items?.length).toBe(0);
   });
 
+  it('showOicrTemplateDownload is true for an OICR outside Portfolio 2', () => {
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    expect(component.showOicrTemplateDownload()).toBe(true);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5 });
+    expect(component.showOicrTemplateDownload()).toBe(true);
+  });
+
+  it('showOicrTemplateDownload is false for a Portfolio 2 OICR', () => {
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
+    expect(component.showOicrTemplateDownload()).toBe(false);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 2 });
+    expect(component.showOicrTemplateDownload()).toBe(false);
+  });
+
+  it('showOicrTemplateDownload is false for a non-OICR result', () => {
+    (cacheService.currentMetadata as any).set({ indicator_id: 1, portfolio: { id: 1 } });
+    expect(component.showOicrTemplateDownload()).toBe(false);
+  });
+
+  it('renders the download icon only when showOicrTemplateDownload() is true', () => {
+    // Pins the TEMPLATE binding: asserting the computed alone cannot catch the @if
+    // still reading `indicator_id === 5` directly.
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+  });
+
   it('showStarPdfReport should require STAR result and supported indicators', () => {
     (cacheService.currentResultId as any).set('STAR-8');
     (cacheService.currentMetadata as any).set({ indicator_id: 1, result_official_code: 8, report_year: 2026 });
