@@ -62,7 +62,7 @@ class StubSelectComponent {
   @ContentChild('item') itemTemplate?: TemplateRef<unknown>;
 
   // One dropdown option, with the status config GET temp/oicrs returns.
-  fakeOption = {
+  fakeOption: Record<string, unknown> = {
     id: 3311,
     external_id: '3138',
     title: 'Result OICR',
@@ -78,7 +78,12 @@ class StubSelectComponent {
     }
   };
 
-  fakeSelectedOption = { external_id: 'LAC-2501', title: 'Fake OICR', maturity_level: 'High', report_year: 2024 };
+  fakeSelectedOption: Record<string, unknown> = {
+    external_id: 'LAC-2501',
+    title: 'Fake OICR',
+    maturity_level: 'High',
+    report_year: 2024
+  };
 }
 
 @Component({ selector: 'app-textarea', standalone: true, template: '' })
@@ -625,7 +630,61 @@ describe('OicrFormFieldsComponent', () => {
         expect(clearIcon).not.toBeNull();
       });
     });
+
+    describe('existing-OICR code shown in the option (oicr_internal_code over result_official_code)', () => {
+      // GET temp/oicrs returns `external_id` (results.result_official_code) and, for rows backed by
+      // result_oicrs, `oicr_internal_code`. The option must show the internal code when the row has one
+      // and keep falling back to the official code when it does not.
+      const renderOptions = () => {
+        disabledComponent.body = signal<any>({ tagging: { tag_id: 2 }, link_result: { external_oicr_id: 5 } });
+        disabledFixture.detectChanges();
+        return disabledFixture.debugElement
+          .queryAll(By.directive(StubSelectComponent))
+          .find(sel => (sel.componentInstance as StubSelectComponent).label === 'Select existing OICR')!;
+      };
+
+      it('prefers oicr_internal_code in the #item and #rows templates when the row has one', () => {
+        const select = renderOptions();
+        const stub = select.componentInstance as StubSelectComponent;
+        stub.fakeOption = { ...stub.fakeOption, oicr_internal_code: 'OICR-LAC-2025-01' };
+        stub.fakeSelectedOption = { ...stub.fakeSelectedOption, oicr_internal_code: 'OICR-AFR-2024-07' };
+        disabledFixture.detectChanges();
+
+        const text = select.nativeElement.textContent as string;
+        expect(text).toContain('OICR-LAC-2025-01');
+        expect(text).toContain('OICR-AFR-2024-07');
+        expect(text).not.toContain('3138');
+        expect(text).not.toContain('LAC-2501');
+      });
+
+      it.each([undefined, null, '   '])('falls back to external_id when oicr_internal_code is %p', code => {
+        const select = renderOptions();
+        const stub = select.componentInstance as StubSelectComponent;
+        stub.fakeOption = { ...stub.fakeOption, oicr_internal_code: code };
+        stub.fakeSelectedOption = { ...stub.fakeSelectedOption, oicr_internal_code: code };
+        disabledFixture.detectChanges();
+
+        const text = select.nativeElement.textContent as string;
+        expect(text).toContain('3138');
+        expect(text).toContain('LAC-2501');
+      });
+
+      it('lets the user search by the internal code too', () => {
+        const stub = renderOptions().componentInstance as StubSelectComponent;
+        expect(stub.customFilterBy.split(',')).toContain('oicr_internal_code');
+      });
+
+      it.each([
+        [{ oicr_internal_code: 'OICR-1', external_id: '3138' }, 'OICR-1'],
+        [{ oicr_internal_code: '  OICR-2  ', external_id: '3138' }, 'OICR-2'],
+        [{ oicr_internal_code: '', external_id: '3138' }, '3138'],
+        [{ oicr_internal_code: null, external_id: '3138' }, '3138'],
+        [{ external_id: ' 3138 ' }, '3138'],
+        [{}, ''],
+        [null, '']
+      ])('oicrDisplayCode(%p) -> %p', (item, expected) => {
+        expect(disabledComponent.oicrDisplayCode(item as any)).toBe(expected);
+      });
+    });
   });
 });
-
-

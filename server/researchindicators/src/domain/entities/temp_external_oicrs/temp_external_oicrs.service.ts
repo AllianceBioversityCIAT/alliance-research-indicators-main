@@ -40,6 +40,8 @@ export interface ExistingOicrOption {
   source: ExternalOicrSourceEnum;
   title: string;
   external_id: string;
+  /** `result_oicrs.oicr_internal_code`; null when the row has none (every TEMP row). */
+  oicr_internal_code: string | null;
   maturity_level: string;
   report_year: string;
   /** Status name (text); kept for search and as a fallback label. */
@@ -88,6 +90,8 @@ export class TempExternalOicrsService extends BaseServiceSimple<
       ...external.map((oicr) => ({
         ...oicr,
         source: ExternalOicrSourceEnum.EXTERNAL,
+        // TEMP_external_oicrs has no internal code column; only `results` rows can have one.
+        oicr_internal_code: null,
         // TEMP rows only carry a status name; every one of them is a published OICR.
         status:
           oicr.result_status?.trim().toLowerCase() === 'published'
@@ -121,6 +125,7 @@ export class TempExternalOicrsService extends BaseServiceSimple<
               ? AS source,
               r.title,
               CAST(r.result_official_code AS CHAR) AS external_id,
+              ro.oicr_internal_code,
               CAST(ro.maturity_level_id AS CHAR) AS maturity_level,
               CAST(r.report_year_id AS CHAR) AS report_year,
               r.result_status_id,

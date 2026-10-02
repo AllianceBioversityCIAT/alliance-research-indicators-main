@@ -82,6 +82,7 @@ describe('TempExternalOicrsService', () => {
       source: ExternalOicrSourceEnum.RESULT,
       title: 'Result OICR',
       external_id: '3138',
+      oicr_internal_code: 'OICR-LAC-2025-01',
       maturity_level: '2',
       report_year: '2025',
       result_status_id: 10,
@@ -134,6 +135,7 @@ describe('TempExternalOicrsService', () => {
           is_active: true,
           result_status: 'published',
           source: ExternalOicrSourceEnum.EXTERNAL,
+          oicr_internal_code: null,
           status: published,
         },
         {
@@ -141,10 +143,24 @@ describe('TempExternalOicrsService', () => {
           is_active: true,
           result_status: null,
           source: ExternalOicrSourceEnum.EXTERNAL,
+          oicr_internal_code: null,
           status: null,
         },
         { ...resultOption, id: 3311, status: accepted },
       ]);
+    });
+
+    it('carries result_oicrs.oicr_internal_code on the result-sourced options', async () => {
+      mockExternalFind.mockResolvedValue([]);
+      arrangeQueries('2026', [resultOicr]);
+
+      const result = await service.findExternalOicrs();
+
+      expect(mockQuery.mock.calls[1][0]).toContain('ro.oicr_internal_code');
+      expect(result[0]).toMatchObject({
+        external_id: '3138',
+        oicr_internal_code: 'OICR-LAC-2025-01',
+      });
     });
 
     it('only offers OICR results reported before OICR.REPORTING_YEAR', async () => {

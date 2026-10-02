@@ -144,5 +144,7 @@ export interface Oicr {
   maturity_level: string;
   report_year: string;
   external_id?: string;
+  /** `result_oicrs.oicr_internal_code`; shown instead of `external_id` when present. */
+  oicr_internal_code?: string | null;
   handle_link?: string | null;
 }
