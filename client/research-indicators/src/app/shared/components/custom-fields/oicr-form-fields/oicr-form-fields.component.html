@@ -35,14 +35,14 @@
   <div class="flex flex-col">
     <app-select label="Select existing OICR" helperText="Select an OICR previously reported in the Alliance."
       [signal]="body" [optionValue]="oicrOptionValue" optionLabel="title" serviceName="oicrResults" [isRequired]="true"
-      [customFilterBy]="'external_id,title,maturity_level,report_year'" (selectEvent)="onSelectOicr($event)"
+      [customFilterBy]="'oicr_internal_code,external_id,title,maturity_level,report_year'" (selectEvent)="onSelectOicr($event)"
       placeholder="Select OICR" scrollHeight="310px" [disabled]="disabled || this.createResultManagementService.editingOicr()"
       [hideSelected]="false" textSpan="OICR selected">
       <!-- Item template -->
       <ng-template #item let-item>
         <div class="flex flex-col gap-2 text-[14px] w-full min-w-0" pTooltip="{{ item?.title }}">
           <p class="text-[#4C5158] font-[400] w-full overflow-hidden whitespace-nowrap text-ellipsis">
-            <b>{{ item?.external_id }} -</b>
+            <b>{{ oicrDisplayCode(item) }} -</b>
             {{ item?.title }}
           </p>
 
@@ -85,7 +85,7 @@
               <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
             </div>
             <div class="flex">
-              <p class="text-[#4C5158] font-[500] flex leading-4">{{ item?.external_id }} -{{ item?.title }}</p>
+              <p class="text-[#4C5158] font-[500] flex leading-4">{{ oicrDisplayCode(item) }} -{{ item?.title }}</p>
             </div>
             <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
               <button

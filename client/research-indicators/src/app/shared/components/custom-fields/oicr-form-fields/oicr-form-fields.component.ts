@@ -5,7 +5,7 @@ import { SelectComponent } from '../select/select.component';
 import { TextareaComponent } from '../textarea/textarea.component';
 import { InputComponent } from '../input/input.component';
 import { OICR_HELPER_TEXTS } from '@shared/constants/oicr-helper-texts.constants';
-import { ExistingOicrSource, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { ExistingOicrSource, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { OicrResultsService } from '@shared/services/short-control-list/oicr-results.service';
 import { FastResponseData } from '@shared/interfaces/fast-response.interface';
 import { PROMPT_OICR_DETAILS } from '@shared/constants/result-ai.constants';
@@ -90,6 +90,14 @@ export class OicrFormFieldsComponent {
     }
 
     return false;
+  }
+
+  /**
+   * Code shown for an existing-OICR option: the OICR internal code when the row has
+   * one, otherwise the result official code (`external_id`), as before.
+   */
+  oicrDisplayCode(item: Partial<Oicr> | null | undefined): string {
+    return item?.oicr_internal_code?.trim() || item?.external_id?.trim() || '';
   }
 
   onSelectOicr(external_oicr_id: number) {
