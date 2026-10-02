@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { ControlListsController } from '../src/domain/entities/control-lists/control-lists.controller';
 import { ControlListsService } from '../src/domain/entities/control-lists/control-lists.service';
 import { ControlListCategoryRepository } from '../src/domain/entities/control-lists/repositories/control-list-category.repository';
+import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
 import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
@@ -42,6 +43,7 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
   let app: INestApplication;
   let dataSource: DataSource;
   let portfolio2Id: number;
+  let scratchCategoryId: number;
   const createdCategoryIds: number[] = [];
 
   const TEST_NAME_PREFIX = '__t01_itest_category__';
@@ -89,6 +91,21 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
     // config; the DTO's @IsInt() needs a real JS number in the JSON body.
     portfolio2Id = Number(portfolio2.id);
 
+    // T-02 rework attempt 2 (risk Reviewer defects 2/3): a persistent
+    // scratch category for the PATCH /categories/:id null/'' cases below —
+    // inserted directly, same technique as the lists integration suite,
+    // since this suite is about PATCH behaviour, not category creation.
+    const categoryInsert = await dataSource.query(
+      `INSERT INTO control_list_categories (portfolio_id, name, description, display_order, is_active, created_at)
+       VALUES (?, ?, ?, 0, 1, NOW())`,
+      [
+        portfolio2Id,
+        `${TEST_NAME_PREFIX}scratch_${Date.now()}`,
+        'to be cleared',
+      ],
+    );
+    scratchCategoryId = Number(categoryInsert.insertId);
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [ControlListsController],
       providers: [
@@ -96,6 +113,10 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
         {
           provide: ControlListCategoryRepository,
           useFactory: () => new ControlListCategoryRepository(dataSource),
+        },
+        {
+          provide: ControlListRepository,
+          useFactory: () => new ControlListRepository(dataSource),
         },
         PortfoliosService,
         {
@@ -136,6 +157,12 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
     if (createdCategoryIds.length > 0) {
       await dataSource.query(
         `DELETE FROM control_list_categories WHERE id IN (${createdCategoryIds.join(',')})`,
+      );
+    }
+    if (scratchCategoryId) {
+      await dataSource.query(
+        `DELETE FROM control_list_categories WHERE id = ?`,
+        [scratchCategoryId],
       );
     }
     // Belt-and-braces: also sweep by name prefix in case an assertion threw
@@ -227,5 +254,59 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
       .send({ name: 'whatever' })
       .expect(400);
+  });
+
+  // Risk Reviewer defect 2 (T-02 rework attempt 2): on attempt-1 code,
+  // `{name: null}` passed `@IsOptional()` untouched. Measured (not the
+  // originally-hypothesized 500): the duplicate-name pre-check's
+  // `findOne({ where: { name: null, ... } })` fell prey to the same
+  // TypeORM null-key-drop behavior noted on the list side and matched the
+  // first active category in the portfolio, so attempt-1 returned a bogus
+  // **409** here — the raw 500 (P-14) is what the list-side `name: null`
+  // case showed NOT happen either (it silently coerced to `''`, see
+  // `control-lists-lists.integration-spec.ts`). Whichever wrong status a
+  // given write path produces, it was never the clean 400 asserted below.
+  // This is the ONLY place that distinction can be proven, since a service
+  // unit test never passes through the real `ValidationPipe`.
+  it('returns 400 (not 500) when the PATCH body sets name to null, and the name stays unchanged', async () => {
+    const [before] = await dataSource.query(
+      `SELECT name FROM control_list_categories WHERE id = ?`,
+      [scratchCategoryId],
+    );
+
+    const response = await request(app.getHttpServer())
+      .patch(`/categories/${scratchCategoryId}`)
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .send({ name: null })
+      .expect(400);
+
+    expect(response.body?.message ?? response.body?.errors).toBeDefined();
+
+    const [after] = await dataSource.query(
+      `SELECT name FROM control_list_categories WHERE id = ?`,
+      [scratchCategoryId],
+    );
+    expect(after.name).toBe(before.name);
+  });
+
+  // Risk Reviewer defect 3: the client sends `description: ''` on PATCH
+  // when the field is emptied — the server must store that as cleared
+  // (normalized to NULL, control-lists.service.ts `normalizeDescription`),
+  // never as a literal `''` sitting next to NULL as a second "no
+  // description" representation.
+  it('returns 200 and clears description (stored as NULL) when the PATCH body sets description to an empty string', async () => {
+    const response = await request(app.getHttpServer())
+      .patch(`/categories/${scratchCategoryId}`)
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .send({ description: '' })
+      .expect(200);
+
+    expect(response.body?.data?.description).toBeNull();
+
+    const [after] = await dataSource.query(
+      `SELECT description FROM control_list_categories WHERE id = ?`,
+      [scratchCategoryId],
+    );
+    expect(after.description).toBeNull();
   });
 });

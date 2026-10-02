@@ -26,47 +26,109 @@
           </div>
         </div>
 
-        <div class="flex min-h-[320px] w-full flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white">
-          @if (loading()) {
-          <app-custom-progress-bar></app-custom-progress-bar>
-          }
-
-          @if (loadError()) {
-          <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state">
-            <p class="m-0 text-sm atc-red-1">We could not load control lists. Please refresh the page.</p>
-          </div>
-          } @else if (!loading()) {
-          @if (!hasCategories()) {
-          <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
-            <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
-            <p class="m-0 text-sm atc-grey-700">No categories yet for this portfolio.</p>
-            <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
-              styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreate()" data-testid="empty-new-category-button">
-            </p-button>
-          </div>
-          } @else {
-          <ul class="m-0 flex list-none flex-col gap-1 p-3" data-testid="category-list" aria-label="Categories">
-            @for (category of categories(); track trackByCategoryId($index, category)) {
-            <li class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-[var(--ac-grey-100)]"
-              data-testid="category-row">
-              <span class="truncate text-sm atc-grey-900">{{ category.name }}</span>
-              <span class="flex shrink-0 items-center gap-2">
-                <button type="button"
-                  class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
-                  [attr.aria-label]="'Edit ' + category.name" (click)="startEdit(category)">
-                  <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
-                </button>
-                <button type="button"
-                  class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
-                  [attr.aria-label]="'Delete ' + category.name" (click)="delete(category)">
-                  <i class="pi pi-trash !text-[12px] atc-red-1"></i>
-                </button>
-              </span>
-            </li>
+        <div class="flex min-h-[320px] w-full gap-4">
+          <div class="flex w-[300px] shrink-0 flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="navigator-panel">
+            @if (loading()) {
+            <app-custom-progress-bar></app-custom-progress-bar>
             }
-          </ul>
-          }
-          }
+
+            @if (loadError()) {
+            <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state">
+              <p class="m-0 text-sm atc-red-1">We could not load control lists. Please refresh the page.</p>
+            </div>
+            } @else if (!loading()) {
+            @if (!hasCategories()) {
+            <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+              <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+              <p class="m-0 text-sm atc-grey-700">No categories yet for this portfolio.</p>
+              <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+                styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreate()" data-testid="empty-new-category-button">
+              </p-button>
+            </div>
+            } @else {
+            <ul class="m-0 flex list-none flex-col gap-1 p-3" data-testid="category-list" aria-label="Categories">
+              @for (category of categories(); track trackByCategoryId($index, category)) {
+              <li class="flex flex-col gap-1" data-testid="category-row">
+                <div class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-[var(--ac-grey-100)]">
+                  <span class="truncate text-sm atc-grey-900">{{ category.name }}</span>
+                  <span class="flex shrink-0 items-center gap-2">
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Edit ' + category.name" (click)="startEdit(category)">
+                      <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Add a list to ' + category.name" (click)="startCreateList(category)" data-testid="add-list-button">
+                      <i class="pi pi-plus !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]"
+                      [attr.aria-label]="'Delete ' + category.name" (click)="delete(category)">
+                      <i class="pi pi-trash !text-[12px] atc-red-1"></i>
+                    </button>
+                  </span>
+                </div>
+
+                @if (category.lists.length > 0) {
+                <ul class="m-0 flex list-none flex-col gap-1 py-1 pl-4" data-testid="list-list">
+                  @for (list of category.lists; track trackByListId($index, list)) {
+                  <li>
+                    <button type="button"
+                      class="list-row flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border-0 bg-transparent px-3 py-2 text-left text-[13.5px]"
+                      [class.list-row--selected]="list.id === selectedListId()"
+                      [attr.aria-current]="list.id === selectedListId() ? 'true' : null"
+                      (click)="selectList(list.id)" data-testid="list-row">
+                      <span class="truncate atc-grey-900">{{ list.name }}</span>
+                      <span class="shrink-0 text-xs atc-grey-700">{{ list.valueCount }}</span>
+                    </button>
+                  </li>
+                  }
+                </ul>
+                } @else {
+                <div class="flex flex-col items-start gap-2 py-1 pl-4 pb-2" data-testid="category-empty-lists">
+                  <span class="text-xs atc-grey-700">No lists yet</span>
+                  <p-button label="Add list" icon="pi pi-plus !text-[11px]" severity="secondary" size="small"
+                    styleClass="!rounded-[8px] !text-[12px]" (onClick)="startCreateList(category)" data-testid="add-list-empty-button">
+                  </p-button>
+                </div>
+                }
+              </li>
+              }
+            </ul>
+            }
+            }
+          </div>
+
+          <div class="flex min-w-0 flex-1 flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="list-detail-panel">
+            @if (selectedList(); as list) {
+            <div class="flex items-start justify-between gap-4 border-b border-[var(--ac-grey-200)] p-4" data-testid="list-header">
+              <div class="flex min-w-0 flex-col gap-1">
+                <span class="font-['Space_Grotesk'] text-[10.5px] font-light uppercase tracking-[2.5px] atc-grey-700"
+                  data-testid="list-header-category">{{ selectedCategory()?.name }}</span>
+                <h2 class="m-0 text-[18px] font-bold atc-primary-blue-600" data-testid="list-header-name">{{ list.name }}</h2>
+                @if (list.description) {
+                <span class="text-[12.5px] atc-grey-900" data-testid="list-header-description">{{ list.description }}</span>
+                }
+                <span class="text-[12px] atc-grey-700">
+                  Reference: <strong class="atc-light-blue-400" data-testid="list-header-reference">{{ listReference() }}</strong>
+                </span>
+              </div>
+              <div class="flex shrink-0 gap-2">
+                <p-button label="Edit list" size="small" severity="secondary" styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="startEditList()" data-testid="edit-list-button"></p-button>
+                @if (!list.isSystem) {
+                <p-button label="Delete list" size="small" severity="danger" styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="deleteList()" data-testid="delete-list-button"></p-button>
+                }
+              </div>
+            </div>
+            } @else {
+            <div class="flex flex-1 items-center justify-center p-10" data-testid="list-detail-empty">
+              <p class="m-0 text-sm atc-grey-700">Select a list to see its details.</p>
+            </div>
+            }
+          </div>
         </div>
       </section>
     </div>
@@ -74,6 +136,25 @@
 </div>
 
 <app-modal modalName="controlListForm" [clearModal]="clearModal">
+  @if (modalMode() === 'list') {
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8" data-testid="list-form">
+    <app-input label="List name" [signal]="listForm" optionValue="name" [isRequired]="true" [maxLength]="150"
+      placeholder="e.g. Unit of measure"></app-input>
+    <div class="flex flex-col gap-1" data-testid="list-key-field">
+      <app-input label="System key" [signal]="listForm" optionValue="listKey" [isRequired]="true" [maxLength]="100"
+        [disabled]="isEditingList()" placeholder="e.g. kpi.data_source"></app-input>
+      @if (listKeyFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="list-key-field-error">{{ listKeyFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="listForm" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+    @if (!isEditingList()) {
+    <app-input label="Code prefix" [signal]="listForm" optionValue="codePrefix" [maxLength]="10"
+      placeholder="Optional, e.g. UOM"></app-input>
+    }
+  </div>
+  } @else {
   <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8">
     <div class="flex flex-col gap-1">
       <app-input label="Category name" [signal]="form" optionValue="name" [isRequired]="true" [maxLength]="150"
@@ -85,4 +166,5 @@
     <app-textarea label="Description" [signal]="form" optionValue="description" placeholder="Optional description"
       [rows]="4" [maxLength]="500"></app-textarea>
   </div>
+  }
 </app-modal>

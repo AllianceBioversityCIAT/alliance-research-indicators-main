@@ -8,7 +8,12 @@ import { InputComponent } from '@shared/components/custom-fields/input/input.com
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { CustomProgressBarComponent } from '@shared/components/custom-progress-bar/custom-progress-bar.component';
 import { Portfolio } from '@shared/interfaces/portfolio.interface';
-import { ControlListCategory, ControlListPortfolioSummary } from '@shared/interfaces/control-lists.interface';
+import {
+  ControlList,
+  ControlListCategory,
+  ControlListPortfolioSummary,
+  ControlListSummary
+} from '@shared/interfaces/control-lists.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -18,6 +23,19 @@ interface CategoryFormValue {
   name: string;
   description: string;
 }
+
+/** design §6.2 Modal row, list mode. `listKey` is disabled (not removed) in edit mode, and the
+ * value held here is never sent on PATCH (design §5 rule 3) — see `saveList()`. */
+interface ListFormValue {
+  listKey: string;
+  name: string;
+  description: string;
+  codePrefix: string;
+}
+
+/** The modal's current record type (design §6.2: "One modal with three modes: category / list /
+ * value"). T-02 adds `list`; `value` mode is T-03's. */
+type ControlListModalMode = 'category' | 'list';
 
 /**
  * A resolved client-side error: `message` is always display-safe text (never the exception
@@ -72,6 +90,54 @@ export default class ControlListsComponent implements OnInit {
   readonly formInvalid = computed(() => !this.form().name.trim());
   readonly hasCategories = computed(() => this.categories().length > 0);
 
+  // ─── T-02: lists (design §4 A6–A8, §6.2 navigator + list header) ──────────────
+  readonly modalMode = signal<ControlListModalMode>('category');
+  readonly selectedListId = signal<number | null>(null);
+  readonly savingList = signal(false);
+  readonly deletingListId = signal<number | null>(null);
+  readonly editingListId = signal<number | null>(null);
+  // Context for a create: which category the new list belongs to (not an editable field —
+  // it comes from the "add list" icon the admin clicked, design §6.2 navigator row).
+  private readonly createListCategoryId = signal<number | null>(null);
+  readonly listForm = signal<ListFormValue>({ listKey: '', name: '', description: '', codePrefix: '' });
+  // Design §6.2 Modal row: the field-named 409 for a duplicate key in the portfolio
+  // (`field: 'listKey'`, pinned by the Leader's error contract) is shown inline under the key input.
+  readonly listKeyFieldError = signal<string | null>(null);
+
+  readonly isEditingList = computed(() => this.editingListId() !== null);
+  readonly listModalTitle = computed(() => (this.isEditingList() ? 'Edit list' : 'New list'));
+  // §5 rule 3: listKey is required and immutable on create; create-only (ignored — disabled —
+  // once editing, since the field itself cannot change after creation).
+  readonly listFormInvalid = computed(() => {
+    const value = this.listForm();
+    if (!value.name.trim()) return true;
+    if (!this.isEditingList() && !/^[a-z0-9_.]{2,100}$/.test(value.listKey.trim())) return true;
+    return false;
+  });
+
+  // The category that contains the selected list, and the list itself (design §6.2 list header).
+  readonly selectedCategory = computed<ControlListCategory | undefined>(() => {
+    const listId = this.selectedListId();
+    if (listId === null) return undefined;
+    return this.categories().find(category => category.lists.some(list => list.id === listId));
+  });
+  readonly selectedList = computed<ControlListSummary | undefined>(() => {
+    const listId = this.selectedListId();
+    if (listId === null) return undefined;
+    for (const category of this.categories()) {
+      const found = category.lists.find(list => list.id === listId);
+      if (found) return found;
+    }
+    return undefined;
+  });
+
+  // D-CTL-2 / falsifier 4: built from the portfolio ID, never the portfolio name.
+  readonly listReference = computed(() => {
+    const list = this.selectedList();
+    const portfolioId = this.selectedPortfolioId();
+    return list && portfolioId !== null ? `P${portfolioId} · ${list.key}` : '';
+  });
+
   // R-CTL-001 "Default portfolio": every portfolio stays selectable; a 0-category one
   // is labelled "(not configured)" (A2) and opens on the empty state (design D-CTL-10).
   readonly portfolioOptions = computed<PortfolioOption[]>(() => {
@@ -99,6 +165,7 @@ export default class ControlListsComponent implements OnInit {
 
   trackByCategoryId = (_: number, category: ControlListCategory): number => category.id;
   trackByPortfolioId = (_: number, portfolio: PortfolioOption): number => portfolio.portfolioIdValue;
+  trackByListId = (_: number, list: ControlListSummary): number => list.id;
 
   async load(): Promise<void> {
     this.loading.set(true);
@@ -137,7 +204,14 @@ export default class ControlListsComponent implements OnInit {
   async selectPortfolio(portfolioId: number | null): Promise<void> {
     if (portfolioId === null || portfolioId === this.selectedPortfolioId()) return;
     this.selectedPortfolioId.set(portfolioId);
+    // R-CTL-001 isolation: a list id from the previous portfolio must not stay "selected"
+    // against the new portfolio's categories.
+    this.selectedListId.set(null);
     await this.loadCategories(portfolioId);
+  }
+
+  selectList(listId: number): void {
+    this.selectedListId.set(listId);
   }
 
   private async loadCategories(portfolioId: number): Promise<void> {
@@ -161,18 +235,40 @@ export default class ControlListsComponent implements OnInit {
   }
 
   startCreate(): void {
+    this.modalMode.set('category');
     this.resetForm();
     this.openModal();
   }
 
   startEdit(category: ControlListCategory): void {
+    this.modalMode.set('category');
     this.editingCategoryId.set(category.id);
     this.form.set({ name: category.name ?? '', description: category.description ?? '' });
     this.openModal();
   }
 
+  startCreateList(category: ControlListCategory): void {
+    this.modalMode.set('list');
+    this.resetListForm();
+    this.createListCategoryId.set(category.id);
+    this.openModal();
+  }
+
+  startEditList(): void {
+    const list = this.selectedList();
+    if (!list) return;
+    this.modalMode.set('list');
+    this.editingListId.set(list.id);
+    this.listForm.set({ listKey: list.key, name: list.name ?? '', description: list.description ?? '', codePrefix: '' });
+    this.openModal();
+  }
+
   clearModal = (): void => {
-    this.resetForm();
+    if (this.modalMode() === 'list') {
+      this.resetListForm();
+    } else {
+      this.resetForm();
+    }
     this.configureModal();
   };
 
@@ -185,13 +281,21 @@ export default class ControlListsComponent implements OnInit {
     this.nameFieldError.set(null);
     const value = this.form();
     const editingId = this.editingCategoryId();
-    const description = value.description.trim() || undefined;
+    // Leader-adjudicated defect: on create, an empty description is omitted (no column value
+    // to clear yet); on edit, an emptied description must be SENT as '' so the server actually
+    // clears it — `|| undefined` here would make `JSON.stringify` drop the key, and the save
+    // would silently leave the old description in place while reporting success.
+    const trimmedDescription = value.description.trim();
 
     try {
       const response =
         editingId === null
-          ? await this.api.POST_ControlListCategory({ portfolioId, name: value.name.trim(), description })
-          : await this.api.PATCH_ControlListCategory(editingId, { name: value.name.trim(), description });
+          ? await this.api.POST_ControlListCategory({
+              portfolioId,
+              name: value.name.trim(),
+              description: trimmedDescription || undefined
+            })
+          : await this.api.PATCH_ControlListCategory(editingId, { name: value.name.trim(), description: trimmedDescription });
 
       if (response?.successfulRequest === false) {
         this.handleSaveError(response);
@@ -305,33 +409,170 @@ export default class ControlListsComponent implements OnInit {
     });
   }
 
+  // ─── T-02: list CRUD (design §4 A6–A8, §5 rules 1, 3, 6) ───────────────────────
+
+  async saveList(): Promise<void> {
+    if (this.listFormInvalid() || this.savingList()) return;
+    const portfolioId = this.selectedPortfolioId();
+    if (portfolioId === null) return;
+
+    this.savingList.set(true);
+    this.listKeyFieldError.set(null);
+    const value = this.listForm();
+    const editingId = this.editingListId();
+    // Same fix as save() above, inherited from T-01's category PATCH (Leader-adjudicated
+    // defect): create omits an empty description, edit sends '' so a cleared field is actually
+    // cleared on the server instead of silently keeping the old value.
+    const trimmedDescription = value.description.trim();
+
+    try {
+      // §5 rule 3 / design A7: `listKey` is never part of the update body — the create-only
+      // key field stays disabled (not removed) in edit mode so the admin can still see it.
+      const response =
+        editingId === null
+          ? await this.api.POST_ControlList({
+              categoryId: this.createListCategoryId() ?? 0,
+              listKey: value.listKey.trim(),
+              name: value.name.trim(),
+              description: trimmedDescription || undefined,
+              codePrefix: value.codePrefix.trim() || undefined
+            })
+          : await this.api.PATCH_ControlList(editingId, { name: value.name.trim(), description: trimmedDescription });
+
+      if (response?.successfulRequest === false) {
+        this.handleListSaveError(response);
+        return;
+      }
+
+      this.actions.showToast({
+        severity: 'success',
+        summary: 'Control Lists',
+        detail: editingId === null ? 'List created successfully' : 'List updated successfully'
+      });
+      const createdId = editingId === null ? (response?.data as ControlList | undefined)?.id : undefined;
+      this.resetListForm();
+      this.modals.closeModal('controlListForm');
+      await this.loadCategories(portfolioId);
+      if (createdId !== undefined) {
+        this.selectedListId.set(createdId);
+      }
+    } catch {
+      this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'We could not save the list. Please try again.' });
+    } finally {
+      this.savingList.set(false);
+    }
+  }
+
+  // Design §6.2 Modal row: the duplicate-key 409 names `field: 'listKey'` — shown inline under
+  // the key input. Everything else (no field, a plain 404 string, a 400 array) falls back to a
+  // toast, same pattern as the category form's `handleSaveError` (reviewer finding 1).
+  private handleListSaveError(response: MainResponse<unknown>): void {
+    const fieldError = this.extractFieldError(response);
+    if (fieldError?.field === 'listKey') {
+      this.listKeyFieldError.set(fieldError.message);
+      return;
+    }
+    this.actions.showToast({
+      severity: 'error',
+      summary: 'Error',
+      detail: fieldError?.message || 'We could not save the list. Please try again.'
+    });
+  }
+
+  deleteList(): void {
+    const list = this.selectedList();
+    if (!list || this.deletingListId() !== null) return;
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: 'Delete list',
+      detail: `Are you sure you want to delete ${list.name || 'this list'}? This action cannot be undone.`,
+      confirmCallback: {
+        label: 'Continue',
+        event: () => {
+          void this.confirmDeleteList(list);
+        }
+      },
+      cancelCallback: { label: 'Cancel' },
+      buttonColor: 'var(--ac-light-blue-400)'
+    });
+  }
+
+  private async confirmDeleteList(list: ControlListSummary): Promise<void> {
+    const portfolioId = this.selectedPortfolioId();
+    if (portfolioId === null || this.deletingListId() !== null) return;
+
+    this.deletingListId.set(list.id);
+
+    try {
+      const response = await this.api.DELETE_ControlList(list.id);
+
+      if (response?.successfulRequest === false) {
+        // design §6.2 / A8: a blocked delete (409 system list, or 409 has values once T-03
+        // ships) is shown AS-IS — the server's own description — behind a single Close.
+        this.showBlockedDeleteListAlert(this.extractErrorMessage(response, 'This list could not be deleted.'));
+        return;
+      }
+
+      this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'List deleted successfully' });
+      this.selectedListId.set(null);
+      await this.loadCategories(portfolioId);
+    } catch {
+      this.showBlockedDeleteListAlert('This list could not be deleted.');
+    } finally {
+      this.deletingListId.set(null);
+    }
+  }
+
+  private showBlockedDeleteListAlert(detail: string): void {
+    this.actions.showGlobalAlert({
+      severity: 'error',
+      summary: 'Cannot delete list',
+      detail,
+      hasNoCancelButton: true,
+      generalButton: true,
+      confirmCallback: { label: 'Close', event: () => undefined },
+      buttonColor: 'var(--ac-light-blue-400)'
+    });
+  }
+
   private resetForm(): void {
     this.editingCategoryId.set(null);
     this.form.set({ name: '', description: '' });
     this.nameFieldError.set(null);
   }
 
+  private resetListForm(): void {
+    this.editingListId.set(null);
+    this.createListCategoryId.set(null);
+    this.listForm.set({ listKey: '', name: '', description: '', codePrefix: '' });
+    this.listKeyFieldError.set(null);
+  }
+
   private configureModal(): void {
+    const mode = this.modalMode();
     this.modals.modalConfig.update(modals => ({
       ...modals,
       controlListForm: {
         ...modals.controlListForm,
-        title: this.modalTitle(),
+        title: mode === 'list' ? this.listModalTitle() : this.modalTitle(),
         cancelText: 'Cancel',
         confirmText: 'Save',
         confirmAction: () => {
-          void this.save();
+          void (mode === 'list' ? this.saveList() : this.save());
         },
         cancelAction: () => this.modals.closeModal('controlListForm'),
-        disabledConfirmAction: () => this.formInvalid() || this.saving()
+        disabledConfirmAction: () => (mode === 'list' ? this.listFormInvalid() || this.savingList() : this.formInvalid() || this.saving())
       }
     }));
   }
 
   private openModal(): void {
-    // Clears a stale inline error from a previous failed attempt — startEdit() does not route
-    // through resetForm(), so without this a re-opened modal could still show the last name error.
+    // Clears a stale inline error from a previous failed attempt — startEdit()/startEditList()
+    // do not route through the reset*Form() helpers, so without this a re-opened modal could
+    // still show the last field error.
     this.nameFieldError.set(null);
+    this.listKeyFieldError.set(null);
     this.configureModal();
     this.modals.openModal('controlListForm');
   }

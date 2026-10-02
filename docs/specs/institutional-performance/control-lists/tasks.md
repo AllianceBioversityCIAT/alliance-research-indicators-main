@@ -113,7 +113,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-02 — Slice 2: Lists (table + API + list header)
 
 - **Jira:** [AC-1781](https://cgiarmel.atlassian.net/browse/AC-1781) (story [AC-1775](https://cgiarmel.atlassian.net/browse/AC-1775))
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done (PASS on attempt 2, 2026-10-02) · **Size:** M · **Dependencies:** T-01
 - **Requirements covered:** R-CTL-001 (cross-portfolio move → 400 — J-4), R-CTL-002 *Delete a non-empty category* → 409, R-CTL-003 (all scenarios except *Used by*, which closes in T-04), R-CTL-010 (6 system lists)
 - **Design refs:** §3 (lists), §4 A1 (lists summary), A6–A8, §5 rules 1, 3, 6, §6.2 list header, D-CTL-2, D-CTL-13
 - **Scope — database:** `<epochMs>-createControlLists.ts` — `control_lists` with FK `category_id` → categories RESTRICT, FK `portfolio_id`, `uq_control_lists_portfolio_key`, `idx_control_lists_category`, collation. Seed 6 system lists (`is_system = 1`, keys and prefixes UOM/DIR/FRQ/KLV/KTY/L per R-CTL-010) with explicit ids 1–6, then reset `AUTO_INCREMENT`. `down` drops only this table.
@@ -144,8 +144,8 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Consumers:** the T-01 service, controller and page specs (A1 shape change) — re-run them.
 - **Review:** `full` — immutable key and J-4.
 - **Done criteria:**
-  - [ ] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
-  - [ ] A6–A8 in `/swagger`.
+  - [x] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
+  - [x] A6–A8 in `/swagger`. *(Via `SwaggerModule.createDocument` on a created app — see Run 6.)*
   - [ ] Both packages' test, lint and build gates as in T-01.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `angular-developer`
 

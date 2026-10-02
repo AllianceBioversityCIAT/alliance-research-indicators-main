@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
 import ControlListsComponent from './control-lists.component';
 import { Portfolio } from '@shared/interfaces/portfolio.interface';
-import { ControlListCategory, ControlListPortfolioSummary } from '@shared/interfaces/control-lists.interface';
+import { ControlList, ControlListCategory, ControlListPortfolioSummary, ControlListSummary } from '@shared/interfaces/control-lists.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -21,7 +21,10 @@ class ModalStubComponent {
   @Input() clearModal: () => void = () => undefined;
 }
 
-@Component({ selector: 'app-input', standalone: true, template: '' })
+// T-02 (KZ-001): a real native <input [disabled]> so the "key input is disabled in edit mode"
+// falsifier asserts on RENDERED DOM, not just the component's `disabled` instance property —
+// an empty-template stub (T-01's original) would make that assertion vacuous.
+@Component({ selector: 'app-input', standalone: true, template: '<input [disabled]="disabled" />' })
 class InputStubComponent {
   @Input() signal!: WritableSignal<Record<string, unknown>>;
   @Input() optionValue = '';
@@ -29,6 +32,7 @@ class InputStubComponent {
   @Input() placeholder = '';
   @Input() isRequired = false;
   @Input() maxLength?: number;
+  @Input() disabled = false;
 }
 
 @Component({ selector: 'app-textarea', standalone: true, template: '' })
@@ -55,7 +59,36 @@ const category = (overrides: Partial<ControlListCategory> = {}): ControlListCate
   portfolioId: 2,
   name: 'Key Performance Indicators (KPIs)',
   description: null,
+  displayOrder: 0,
   lists: [],
+  ...overrides
+});
+
+// T-02 — design §4 A1 "lists: ListSummary[]" (id, key, name, value count, is_system, usedBy).
+const listSummary = (overrides: Partial<ControlListSummary> = {}): ControlListSummary => ({
+  id: 10,
+  key: 'kpi.direction',
+  name: 'Direction',
+  description: 'Whether a higher, lower or stable value is the goal.',
+  valueCount: 3,
+  isSystem: true,
+  usedBy: [],
+  ...overrides
+});
+
+// KZ-015 transition fixture: reviewer FAIL (T-02 rework) — this literally mirrors the server's
+// `ControlListResponse` (`control-lists.types.ts`): `key`, never `listKey`, and `codePrefix` is
+// always a `string` (NOT NULL column with a derived default — `deriveDefaultCodePrefix()` in
+// `control-lists.service.ts`), never `null`.
+const controlList = (overrides: Partial<ControlList> = {}): ControlList => ({
+  id: 20,
+  portfolioId: 2,
+  categoryId: 1,
+  key: 'kpi.custom',
+  name: 'Custom list',
+  description: null,
+  codePrefix: 'KPICUSTOM',
+  isSystem: false,
   ...overrides
 });
 
@@ -110,7 +143,11 @@ describe('ControlListsComponent', () => {
     GET_ControlListCategories: jest.fn(),
     POST_ControlListCategory: jest.fn(),
     PATCH_ControlListCategory: jest.fn(),
-    DELETE_ControlListCategory: jest.fn()
+    DELETE_ControlListCategory: jest.fn(),
+    // T-02 (A6–A8)
+    POST_ControlList: jest.fn(),
+    PATCH_ControlList: jest.fn(),
+    DELETE_ControlList: jest.fn()
   };
 
   const summaries: ControlListPortfolioSummary[] = [
@@ -136,6 +173,9 @@ describe('ControlListsComponent', () => {
     api.POST_ControlListCategory.mockResolvedValue(ok(category()));
     api.PATCH_ControlListCategory.mockResolvedValue(ok(category()));
     api.DELETE_ControlListCategory.mockResolvedValue(ok({ id: 1 }));
+    api.POST_ControlList.mockResolvedValue(ok(controlList()));
+    api.PATCH_ControlList.mockResolvedValue(ok(controlList()));
+    api.DELETE_ControlList.mockResolvedValue(ok({ id: 20 }));
 
     await TestBed.configureTestingModule({
       imports: [ControlListsComponent],
@@ -404,7 +444,27 @@ describe('ControlListsComponent', () => {
 
     await component.save();
 
-    expect(api.PATCH_ControlListCategory).toHaveBeenCalledWith(7, { name: 'Updated name', description: undefined });
+    // `existing.description` is null -> startEdit() seeds the form with '' -> trimmed stays ''.
+    // PATCH must send '' here (not `undefined`), same Leader-adjudicated rule as the dedicated
+    // "clears a description" test below — this one just pins the already-empty case.
+    expect(api.PATCH_ControlListCategory).toHaveBeenCalledWith(7, { name: 'Updated name', description: '' });
+  });
+
+  // Leader-adjudicated defect: `description: undefined` is dropped by JSON.stringify, so a PATCH
+  // meant to clear a description silently left the old value in place while the UI reported
+  // success. Observed RED against the pre-fix code (`value.description.trim() || undefined` on
+  // both create and edit) before this fix — PATCH sent `description: undefined` instead of ''.
+  it('clears a category description on edit when the field is emptied (PATCH sends empty string, not undefined)', async () => {
+    const existing = category({ id: 7, name: 'KPIs', description: 'Old description' });
+    await setup([existing]);
+
+    component.startEdit(existing);
+    expect(component.form().description).toBe('Old description');
+    component.form.update(current => ({ ...current, description: '' }));
+
+    await component.save();
+
+    expect(api.PATCH_ControlListCategory).toHaveBeenCalledWith(7, { name: 'KPIs', description: '' });
   });
 
   it('does not save an invalid (blank name) or already-saving form', async () => {
@@ -598,5 +658,241 @@ describe('ControlListsComponent', () => {
 
     expect(component.isEditing()).toBe(false);
     expect(component.form().name).toBe('');
+  });
+
+  // ─── T-02: Lists — navigator, list header, modal list mode (design §4 A6–A8, §6.2) ─────────
+
+  describe('lists', () => {
+    const directionList = listSummary({ id: 10, key: 'kpi.direction', name: 'Direction', isSystem: true });
+    const customList = listSummary({ id: 11, key: 'kpi.custom', name: 'Custom list', description: null, isSystem: false, valueCount: 0 });
+    const kpiCategory = category({ id: 1, name: 'KPIs', lists: [directionList, customList] });
+    const emptyCategory = category({ id: 2, name: 'Organizational structure', lists: [] });
+
+    // J-11 / falsifier 7: a category with 0 lists shows its empty state with + Add list.
+    it('shows the empty state with + Add list for a category with 0 lists (J-11)', async () => {
+      await setup([emptyCategory]);
+
+      const row = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="category-row"]')!;
+      expect(row.querySelector('[data-testid="category-empty-lists"]')).toBeTruthy();
+      const addListButton = row.querySelector('[data-testid="add-list-empty-button"]');
+      expect(addListButton).toBeTruthy();
+      expect(addListButton?.textContent).toContain('Add list');
+      // nothing renders for the (absent) list-list in this state
+      expect(row.querySelector('[data-testid="list-list"]')).toBeFalsy();
+    });
+
+    it('renders a list-row per list, with its value count, under a non-empty category', async () => {
+      await setup([kpiCategory]);
+
+      const rows = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="list-row"]');
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Direction');
+      expect(rows[0].textContent).toContain('3');
+    });
+
+    // "selecting a list updates the header" + "the reference reads P2 · kpi.direction"
+    it('selecting a list updates the header, showing its name, description and the qualified reference', async () => {
+      await setup([kpiCategory]);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-detail-empty"]')).toBeTruthy();
+
+      component.selectList(directionList.id);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="list-detail-empty"]')).toBeFalsy();
+      expect(el.querySelector('[data-testid="list-header-name"]')?.textContent?.trim()).toBe('Direction');
+      expect(el.querySelector('[data-testid="list-header-description"]')?.textContent?.trim()).toBe(directionList.description);
+      expect(el.querySelector('[data-testid="list-header-reference"]')?.textContent?.trim()).toBe('P2 · kpi.direction');
+    });
+
+    // Clicking the rendered row (not calling selectList() directly) — KZ-001.
+    it('clicking a rendered list row selects it and updates the header', async () => {
+      await setup([kpiCategory]);
+
+      const row = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-testid="list-row"]')[0] as HTMLButtonElement;
+      row.click();
+      fixture.detectChanges();
+
+      expect(component.selectedListId()).toBe(directionList.id);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-header-name"]')?.textContent?.trim()).toBe(
+        'Direction'
+      );
+    });
+
+    // Falsifier 5: showing Delete list for every list (dropping the !isSystem guard) must fail this.
+    it('hides Delete list for a system list, and shows it for a custom list', async () => {
+      await setup([kpiCategory]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      component.selectList(directionList.id);
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="delete-list-button"]')).toBeFalsy();
+      expect(el.querySelector('[data-testid="edit-list-button"]')).toBeTruthy();
+
+      component.selectList(customList.id);
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="delete-list-button"]')).toBeTruthy();
+    });
+
+    // "the key input is disabled in edit mode" — asserted on the RENDERED native input, not
+    // `component.listForm()` alone (KZ-001).
+    it('disables the key input in edit mode, and leaves it enabled on create', async () => {
+      await setup([kpiCategory]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      component.selectList(directionList.id);
+      component.startEditList();
+      fixture.detectChanges();
+      const editInput = el.querySelector('[data-testid="list-key-field"] input') as HTMLInputElement;
+      expect(editInput.disabled).toBe(true);
+      // the value is still shown, just not editable
+      expect(component.listForm().listKey).toBe('kpi.direction');
+
+      component.clearModal();
+      component.startCreateList(kpiCategory);
+      fixture.detectChanges();
+      const createInput = el.querySelector('[data-testid="list-key-field"] input') as HTMLInputElement;
+      expect(createInput.disabled).toBe(false);
+    });
+
+    it('creates a list preselecting the category whose "add list" icon was used', async () => {
+      await setup([kpiCategory]);
+
+      component.startCreateList(kpiCategory);
+      expect(component.modals.modalConfig()['controlListForm'].title).toBe('New list');
+      component.listForm.set({ listKey: 'kpi.custom2', name: 'Custom 2', description: 'desc', codePrefix: 'C2' });
+
+      await component.saveList();
+
+      expect(api.POST_ControlList).toHaveBeenCalledWith({
+        categoryId: kpiCategory.id,
+        listKey: 'kpi.custom2',
+        name: 'Custom 2',
+        description: 'desc',
+        codePrefix: 'C2'
+      });
+      expect(actions.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Control Lists',
+        detail: 'List created successfully'
+      });
+    });
+
+    // R-CTL-003 "System key is fixed" (client side): PATCH never carries `listKey`, and the
+    // title switches to "Edit list".
+    it('edits a list and never sends listKey in the PATCH body', async () => {
+      await setup([kpiCategory]);
+
+      component.selectList(customList.id);
+      component.startEditList();
+      expect(component.modals.modalConfig()['controlListForm'].title).toBe('Edit list');
+      component.listForm.update(current => ({ ...current, name: 'Renamed list' }));
+
+      await component.saveList();
+
+      // `customList.description` is null -> startEditList() seeds '' -> trimmed stays ''.
+      // PATCH must send '' here (not `undefined`), same rule as the dedicated clear-description
+      // test below.
+      expect(api.PATCH_ControlList).toHaveBeenCalledWith(customList.id, { name: 'Renamed list', description: '' });
+      const [, patchBody] = api.PATCH_ControlList.mock.calls[0];
+      expect(patchBody).not.toHaveProperty('listKey');
+    });
+
+    // Leader-adjudicated defect, same as the category test: an edit that empties the description
+    // must PATCH `description: ''`, not `undefined` (which JSON.stringify drops, leaving the old
+    // description in place while the save reports success). Observed RED against the pre-fix
+    // code before this fix was applied.
+    it('clears a list description on edit when the field is emptied (PATCH sends empty string, not undefined)', async () => {
+      const describedList = listSummary({
+        id: 12,
+        key: 'kpi.described',
+        name: 'Described list',
+        description: 'Old description',
+        isSystem: false
+      });
+      const categoryWithDescribedList = category({ id: 1, name: 'KPIs', lists: [describedList] });
+      await setup([categoryWithDescribedList]);
+
+      component.selectList(describedList.id);
+      component.startEditList();
+      expect(component.listForm().description).toBe('Old description');
+      component.listForm.update(current => ({ ...current, description: '' }));
+
+      await component.saveList();
+
+      expect(api.PATCH_ControlList).toHaveBeenCalledWith(describedList.id, { name: 'Described list', description: '' });
+    });
+
+    it('shows a field-named 409 duplicate-key error INLINE under the key input, never as a toast', async () => {
+      await setup([kpiCategory]);
+      const message = 'A list with key "kpi.custom2" already exists in this portfolio';
+      api.POST_ControlList.mockResolvedValueOnce(fail(409, { description: message, field: 'listKey' }));
+      component.startCreateList(kpiCategory);
+      component.listForm.set({ listKey: 'kpi.custom2', name: 'Custom 2', description: '', codePrefix: '' });
+
+      await component.saveList();
+      fixture.detectChanges();
+
+      expect(component.listKeyFieldError()).toBe(message);
+      const inline = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-key-field-error"]');
+      expect(inline?.textContent?.trim()).toBe(message);
+      expect(actions.showToast).not.toHaveBeenCalled();
+    });
+
+    it('asks for confirmation and deletes a custom list on Continue', async () => {
+      await setup([kpiCategory]);
+      component.selectList(customList.id);
+
+      component.deleteList();
+      expect(api.DELETE_ControlList).not.toHaveBeenCalled();
+      expect(actions.showGlobalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warning', summary: 'Delete list', confirmCallback: expect.objectContaining({ label: 'Continue' }) })
+      );
+
+      const alertConfig = actions.showGlobalAlert.mock.calls[0][0];
+      alertConfig.confirmCallback.event();
+      await fixture.whenStable();
+      await fixture.whenStable();
+
+      expect(api.DELETE_ControlList).toHaveBeenCalledWith(customList.id);
+      expect(actions.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Control Lists', detail: 'List deleted successfully' });
+      expect(component.selectedListId()).toBeNull();
+    });
+
+    // design §6.2 / A8: a 409 (e.g. system list, or a custom list with values once T-03 ships)
+    // is shown AS-IS behind a single Close — same pattern as the category delete block.
+    it('shows a blocked (409) list delete AS-IS behind a single Close, and does not toast success', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      api.DELETE_ControlList.mockResolvedValueOnce(fail(409, { description: 'System lists cannot be deleted.' }));
+
+      component.deleteList();
+      const alertConfig = actions.showGlobalAlert.mock.calls[actions.showGlobalAlert.mock.calls.length - 1][0];
+      alertConfig.confirmCallback.event();
+      await fixture.whenStable();
+      await fixture.whenStable();
+
+      expect(actions.showGlobalAlert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Cannot delete list',
+          detail: 'System lists cannot be deleted.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: expect.objectContaining({ label: 'Close' })
+        })
+      );
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'List deleted successfully' }));
+    });
+
+    it('resets the list id when the portfolio changes, so a stale selection cannot leak across portfolios (R-CTL-001)', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      expect(component.selectedListId()).toBe(directionList.id);
+
+      await component.selectPortfolio(1);
+
+      expect(component.selectedListId()).toBeNull();
+    });
   });
 });

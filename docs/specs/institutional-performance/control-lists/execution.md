@@ -220,3 +220,114 @@
 - **Human check (user, 2026-10-01, local):** the user ran T-01 locally (server on `:3001`, client `ng serve` on `:4200`, DB `ari_local_mysql`) and reported "Todo funcionó bien". This informal check does **not** discharge any T-05 step (KZ-002: it does not say which behaviors were observed).
 - **Session paused (2026-10-01):** all local services stopped (`ari_local_mysql` stopped; dev servers on 3001/4200 stopped). **Next eligible task: T-02 (Slice 2: Lists).** Pending user decision: transition Jira AC-1780 to Done.
 - **To resume:** `docker start ari_local_mysql`, then `/akili-execute institutional-performance/control-lists` (or `/akili-resume`).
+
+### 2026-10-02 — Run 6: T-02 (Slice 2: Lists)
+
+- **Leader:** Claude Opus 5.5.
+- **Base commit:** `1f16b32f`, after the `staging` merge. Before T-02, migration `CreatePrmsWebhookDeliveryTable1790086170692` from `staging` was applied to the local DB at the user's request (367 rows, 0 pending).
+- **Implementers:** 2 × `akili-implementer` (sonnet) in parallel, one server and one client, effort high.
+- **Reviewers:** 2 × `akili-reviewer` (opus), parallel lenses (migration + immutable key): risk (server) and reliability (client + contract).
+- **Leader relay mid-run:** A1 `ListSummary` must include `description` (the list header needs it). The server added it.
+
+#### Attempt 1 — FAIL (reliability lens) / PASS (risk lens)
+
+- **Files (server):**
+  - `src/db/migrations/1790900000001-createControlLists.ts`;
+  - `entities/control-list.entity.ts`, `repositories/control-list.repository(.spec).ts`, `dto/{create,update}-control-list.dto.ts`;
+  - modified `control-lists.{service,controller,module,types}.ts` and their specs, plus `control-lists.global-exceptions.spec.ts`;
+  - `test/control-lists-lists.integration-spec.ts`;
+  - `test/control-lists-categories.integration-spec.ts` (needed the new repository provider).
+- **Files (client):** `control-lists.component.{ts,html,scss,spec.ts}`, `control-lists.interface.ts`, `api.service.ts`.
+- **DB evidence (server worker):**
+  - top `migrations` row before = `CreatePrmsWebhookDeliveryTable1790086170692` (id 369);
+  - execute → 6 rows for P2, ids 1–6; seed statements re-run → 0 ×6;
+  - top row before revert = `CreateControlLists1790900000001` (id 370); the revert dropped only `control_lists`; top row after = id 369; categories intact; re-applied (id 371);
+  - `SHOW CREATE`: `uq_control_lists_portfolio_key`, `idx_control_lists_category`, FKs to `portfolios` and `control_list_categories` both RESTRICT, `utf8mb4_unicode_ci`, `AUTO_INCREMENT=7`.
+  - The DB rule held (foreground only, top row checked around the revert).
+- **Pinned bodies:**
+  - list-key duplicate: 409 `errors:{description, field:'listKey'}`;
+  - system-list delete: 409 `errors:{description}`;
+  - category has lists: 409 `errors:{description}`;
+  - cross-portfolio move: 400 `errors:'<string>'`.
+- **Reds observed (server):**
+  - falsifier 1 (`listKey` in the update DTO → 200);
+  - falsifier 2 (`forbidNonWhitelisted` off → 200);
+  - falsifier 3 (Conflict instead of BadRequest);
+  - falsifier 6 (roles `+[7]`);
+  - category-has-lists check disabled → nothing thrown;
+  - warn call removed → 0 calls.
+- **Reds observed (client):**
+  - falsifier 4 (`PAlliance 2026-2030 · kpi.direction`);
+  - falsifier 5 (delete button present on a system list);
+  - falsifier 7 (empty state null).
+- **Worker results:**
+  - server: control-lists 5 suites / 59 tests; integration 2 suites / 8 tests; build OK; Swagger A1–A8 via `createDocument` (no port bound);
+  - client: 31/31 in the component spec; full suite 342 / 7,889; lint and build OK; hex grep → 0.
+- **Leader re-measurement (serial):**
+  - no stray servers;
+  - DB: `migrations` 368, `control_lists` 6, categories 3 (one created by the user), `pi_delegate_history` 10;
+  - server 4,033 tests, 3 pre-existing failures; client 7,889 passed.
+- **Implementer judgment calls (accepted by the risk Reviewer):**
+  - seeded list names: "Unit of measure", "Direction", "Measurement frequency", "KPI level", "Type", "Organizational level";
+  - `code_prefix` NOT NULL, with a `deriveDefaultCodePrefix()` fallback.
+- **Reviewer (risk lens) — STATUS: PASS.** Every T-02 server clause holds; both judgment calls are consistent with the spec. ADVISORY:
+  1. `PATCH {"categoryId": null}` silently moves the list to the first active category with a 200: `IsOptional` passes `null`, and TypeORM drops null keys in `where` (`SelectQueryBuilder.js:2468`).
+  2. `PATCH {"name": null}` → 500 (NOT NULL, errno 1048); the T-01 category DTO likely has the same hole.
+  3. The client `ControlList` type does not match `ControlListResponse`.
+  4. The category-delete pre-check ignores inactive lists while the FK counts them → 500 (only reachable through direct DB edits).
+  5. Create/delete races → 1451/1452 → 500.
+  6. An empty `codePrefix` can be stored through the API.
+  7. The seed may insert fewer than 6 lists on Dev if a seeded category was deleted first — add a post-deploy count check to T-05.
+  8. The description cannot be cleared from the UI.
+- **Reviewer (reliability lens) — STATUS: FAIL:**
+  1. **Discovered Issue:** the client `ControlList` declares `listKey` and `codePrefix: string | null`, while the server `ControlListResponse` is `{id, portfolioId, categoryId, key, name, description, codePrefix: string, isSystem}`. `response.data.listKey` is always `undefined`, and the spec fixture uses the wrong shape too. **Violated Rule:** the brief's contract check ("any mismatch = FAIL"), design §4 A6/A7, root `CLAUDE.md` §4.2. **Remediation:** rename to `key`, make `codePrefix: string`, and make the fixture the literal server shape.
+  - ADVISORY:
+    - the description cannot be cleared (also T-01 categories); suggested fix: send the trimmed `''` on PATCH;
+    - an invalid key pattern leaves Save disabled with no message;
+    - array 400s go to a toast;
+    - `categoryId ?? 0`;
+    - a stale ASSUMPTION comment;
+    - the navigator is not collapsible (not in T-02's scope);
+    - the Leader should re-run client lint/build serially.
+- **Leader adjudication:**
+  - Reliability issue 1 is in scope and goes to rework.
+  - Risk advisories **1 and 2** and the description-clearing advisory (risk 8 / reliability 1) are folded into the rework as **Leader-adjudicated defects**. Each is a reachable state, in code this spec owns, that changes data on a 200 or answers 500 (KZ-008; design §5 rules 1–2, P-14). The same holes in the T-01 category DTO/form are included, because they are the same rule in the same module.
+  - All other advisories stay recorded only. Advisory 7 is carried to T-05 as a post-deploy check: `control_lists WHERE is_system=1` = 6 on Dev.
+
+#### Attempt 2 — PASS (both lenses)
+
+- **Effort:** xhigh. No migration command was run.
+- **Server:**
+  - `@ValidateIf(dto => dto.X !== undefined)` on `UpdateControlListDto.categoryId` / `.name` and on `UpdateControlListCategoryDto.name`. It replaces the inherited `IsOptional` (same `CONDITIONAL_VALIDATION` kind, class-own metadata wins); the inherited `IsInt` / `IsString` / `IsNotEmpty` checks stay.
+  - `normalizeDescription()` in `updateCategory` / `updateList`: `''`, whitespace or `null` → stored NULL.
+  - New tests: DTO pipe specs with the real `ValidationPipe`, and 5 integration cases against real MySQL.
+- **Reds observed against attempt-1 code** (the actual failure modes are recorded in place of the hypothesized 500):
+  - `categoryId: null` → **200** (silent move);
+  - list `name: null` → **200**, with the list renamed to `''` (the local `sql_mode` is non-strict);
+  - category `name: null` → bogus **409** (the duplicate pre-check matched a random category through TypeORM's null-key drop);
+  - `description: ''` → stored `''`.
+- **Client:**
+  - `ControlList` mirrors `ControlListResponse` (`key`, `codePrefix: string`), and `ControlListCategory` gains `displayOrder`;
+  - fixtures are the literal server shapes;
+  - PATCH sends the trimmed `''` to clear a description (lists and categories); POST omits it. Two clears-description tests observed red, then green.
+  - Falsifiers 4, 5 and 7 re-confirmed red.
+- **Worker results:** server control-lists 7 suites / 78 tests, integration 13/13, build OK, eslint clean on changed files; client 33/33 in the component spec, 342 / 7,891 full, lint and build OK.
+- **Leader re-measurement (serial):** no stray servers; server 426 suites / 4,052 tests, 3 pre-existing failures; client 342 / 7,891 passed; client `npm run lint -- --quiet` clean; `npm run build` complete.
+- **Reviewer (risk lens) — STATUS: PASS.** All 3 adjudicated defects resolved and proven at pipe and integration level, with no regressions. The contract is aligned field by field.
+- **Reviewer (reliability lens) — STATUS: PASS.** Attempt-1 issue 1 resolved, description clearing fixed, no regressions.
+- **ADVISORY (recorded only):**
+  - POST create (A3/A6) still stores a literal `''` description — reachable only through the API, not from the STAR UI;
+  - the integration 400 tests assert only that an error is present, not the exact body;
+  - comments cite review history instead of the contract rule.
+  - Carried from attempt 1: risk advisories 4–7. Advisory 7 is owed to T-05 as a check that `control_lists WHERE is_system=1` = 6 on Dev.
+- **Requirements covered:**
+  - R-CTL-001 (cross-portfolio move 400);
+  - R-CTL-002 *Delete a non-empty category* (409 + warn log);
+  - R-CTL-003, all scenarios except *Used by*: immutable key, same key in two portfolios, system list cannot be deleted, custom list lifecycle;
+  - R-CTL-008 *Empty list* (no lists);
+  - R-CTL-010 (6 lists);
+  - NFR-CTL-002/003/005.
+- **Forward pointers:**
+  - **T-03:** A1 `valueCount` stays 0 until values exist; a list with values must block its delete (409, non-field `{description}` shape); apply `normalizeDescription` to value descriptions too; seeded list names are editable.
+  - **T-04:** `usedBy` is still `[]`. P-10 still applies: `ControlListsService` is request-scoped.
+- **Final status: PASS on attempt 2.**

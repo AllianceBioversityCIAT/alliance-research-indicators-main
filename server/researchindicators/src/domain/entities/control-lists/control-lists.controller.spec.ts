@@ -11,6 +11,8 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
+import { CreateControlListDto } from './dto/create-control-list.dto';
+import { UpdateControlListDto } from './dto/update-control-list.dto';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -23,6 +25,9 @@ describe('ControlListsController', () => {
     createCategory: jest.fn(),
     updateCategory: jest.fn(),
     removeCategory: jest.fn(),
+    createList: jest.fn(),
+    updateList: jest.fn(),
+    removeList: jest.fn(),
   };
 
   const mockFormat = jest.fn();
@@ -64,6 +69,9 @@ describe('ControlListsController', () => {
       'createCategory',
       'updateCategory',
       'removeCategory',
+      'createList',
+      'updateList',
+      'removeList',
     ];
 
     it.each(handlers)(
@@ -166,6 +174,63 @@ describe('ControlListsController', () => {
       expect(mockService.removeCategory).toHaveBeenCalledWith(9);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
         description: 'Category 9 was deleted successfully',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+  });
+
+  describe('createList (A6)', () => {
+    it('creates a list and returns 201', async () => {
+      const dto: CreateControlListDto = {
+        categoryId: 1,
+        listKey: 'kpi.custom_source',
+        name: 'Custom source',
+      };
+      const data = { id: 7, ...dto };
+      mockService.createList.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.createList(dto);
+
+      expect(mockService.createList).toHaveBeenCalledWith(dto);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'List created successfully',
+        data,
+        status: HttpStatus.CREATED,
+      });
+    });
+  });
+
+  describe('updateList (A7)', () => {
+    it('updates a list and returns 200', async () => {
+      const dto: UpdateControlListDto = { name: 'Renamed list' };
+      const data = { id: 2, name: 'Renamed list' };
+      mockService.updateList.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.updateList(2, dto);
+
+      expect(mockService.updateList).toHaveBeenCalledWith(2, dto);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'List updated successfully',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+  });
+
+  describe('removeList (A8)', () => {
+    it('deletes a list and returns its id', async () => {
+      const data = { id: 3 };
+      mockService.removeList.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.removeList(3);
+
+      expect(mockService.removeList).toHaveBeenCalledWith(3);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'List 3 was deleted successfully',
         data,
         status: HttpStatus.OK,
       });

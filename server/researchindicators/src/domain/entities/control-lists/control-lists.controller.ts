@@ -26,6 +26,8 @@ import { ControlListsService } from './control-lists.service';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
+import { CreateControlListDto } from './dto/create-control-list.dto';
+import { UpdateControlListDto } from './dto/update-control-list.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -160,6 +162,85 @@ export class ControlListsController {
     return this.controlListsService.removeCategory(id).then((data) =>
       ResponseUtils.format({
         description: `Category ${data.id} was deleted successfully`,
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A6
+  @Post('lists')
+  @ApiOperation({ summary: 'Create a list' })
+  @ApiBody({
+    type: CreateControlListDto,
+    description: 'Create a list',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async createList(@Body() dto: CreateControlListDto) {
+    return this.controlListsService.createList(dto).then((data) =>
+      ResponseUtils.format({
+        description: 'List created successfully',
+        data,
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
+  // A7
+  @Patch('lists/:id')
+  @ApiOperation({ summary: 'Update a list' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'List id',
+  })
+  @ApiBody({
+    type: UpdateControlListDto,
+    description: 'Update a list',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async updateList(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateControlListDto,
+  ) {
+    return this.controlListsService.updateList(id, dto).then((data) =>
+      ResponseUtils.format({
+        description: 'List updated successfully',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A8
+  @Delete('lists/:id')
+  @ApiOperation({ summary: 'Delete a list' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'List id',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async removeList(@Param('id', ParseIntPipe) id: number) {
+    return this.controlListsService.removeList(id).then((data) =>
+      ResponseUtils.format({
+        description: `List ${data.id} was deleted successfully`,
         data,
         status: HttpStatus.OK,
       }),

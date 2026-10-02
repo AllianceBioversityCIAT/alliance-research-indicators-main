@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
+import { ControlListRepository } from './repositories/control-list.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { GlobalExceptions } from '../../shared/error-management/global.exception';
@@ -20,8 +21,20 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
  * Leader decision: KEEP the server payload as-is (`errors: { description,
  * field }` for the 409). This file is the contract test the Risk Reviewer
  * asked for "so the contract is tested where it is produced (KZ-017)".
+ *
+ * T-02 extends this with the list contract (forward pointer from T-01,
+ * Leader contract note mid-T-02): duplicate list key is the same
+ * {description, field} object shape (field: 'listKey'); a system-list
+ * delete and a category-with-lists delete are NON-field conflicts, so the
+ * service throws `ConflictException({ message: { description } })` — the
+ * SAME envelope as the field-named conflicts, minus the `field` key.
+ * `GlobalExceptions` therefore puts the OBJECT `{description}` on the wire
+ * as `errors` for these two as well, never a bare string, so the client can
+ * read `errors.description` uniformly for every 409 this module throws. The
+ * cross-portfolio list move (400) is the one exception: it is a plain
+ * string, like the 404 test below.
  */
-describe('Control Lists — real GlobalExceptions contract (T-01 rework)', () => {
+describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   let service: ControlListsService;
   let filter: GlobalExceptions;
   let errorSpy: jest.SpyInstance;
@@ -35,6 +48,18 @@ describe('Control Lists — real GlobalExceptions contract (T-01 rework)', () =>
     save: mockSave,
     update: jest.fn(),
     delete: jest.fn(),
+  };
+
+  const mockListFindOne = jest.fn();
+  const mockListFind = jest.fn();
+  const mockListSave = jest.fn();
+  const mockListDelete = jest.fn();
+  const mockListRepository = {
+    find: mockListFind,
+    findOne: mockListFindOne,
+    save: mockListSave,
+    update: jest.fn(),
+    delete: mockListDelete,
   };
 
   const mockPortfoliosFindOne = jest.fn();
@@ -80,6 +105,9 @@ describe('Control Lists — real GlobalExceptions contract (T-01 rework)', () =>
     jest
       .spyOn(LoggerUtil.prototype, '_log')
       .mockImplementation(() => undefined);
+    jest
+      .spyOn(LoggerUtil.prototype, '_warn')
+      .mockImplementation(() => undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -87,6 +115,10 @@ describe('Control Lists — real GlobalExceptions contract (T-01 rework)', () =>
         {
           provide: ControlListCategoryRepository,
           useValue: mockCategoryRepository,
+        },
+        {
+          provide: ControlListRepository,
+          useValue: mockListRepository,
         },
         { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
@@ -155,6 +187,162 @@ describe('Control Lists — real GlobalExceptions contract (T-01 rework)', () =>
       errors: 'Portfolio 999 not found',
       timestamp: expect.any(String),
       path: '/api/control-lists/categories',
+    });
+  });
+
+  it('409 duplicate list key: errors is the OBJECT {description, field: "listKey"} (T-02)', async () => {
+    mockFindOne.mockResolvedValue({
+      id: 1,
+      portfolio_id: 2,
+      is_active: true,
+    });
+    mockListFindOne.mockResolvedValue({
+      id: 9,
+      portfolio_id: 2,
+      list_key: 'kpi.direction',
+      is_active: true,
+    });
+
+    let thrown: unknown;
+    try {
+      await service.createList({
+        categoryId: 1,
+        listKey: 'kpi.direction',
+        name: 'Direction',
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/lists', method: 'POST' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'A list with key "kpi.direction" already exists in this portfolio',
+        field: 'listKey',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists',
+    });
+  });
+
+  it('409 system-list delete: errors is the OBJECT {description} with NO field (non-field conflict, T-02)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 6,
+      portfolio_id: 2,
+      list_key: 'org.level',
+      name: 'Organizational level',
+      is_system: true,
+      is_active: true,
+    });
+
+    let thrown: unknown;
+    try {
+      await service.removeList(6);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/lists/6', method: 'DELETE' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'List "Organizational level" (key org.level) is a system list and cannot be deleted',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/6',
+    });
+  });
+
+  it('409 category-has-lists delete: errors is the OBJECT {description} with NO field, naming the blocking lists (T-02)', async () => {
+    mockFindOne.mockResolvedValue({
+      id: 2,
+      name: 'Organizational structure',
+      portfolio_id: 2,
+      is_active: true,
+    });
+    mockListFind.mockResolvedValue([
+      { id: 6, name: 'Organizational level', category_id: 2, is_active: true },
+    ]);
+
+    let thrown: unknown;
+    try {
+      await service.removeCategory(2);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/categories/2',
+      method: 'DELETE',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'Category "Organizational structure" cannot be deleted while it has lists: Organizational level',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/categories/2',
+    });
+  });
+
+  it('400 cross-portfolio list move: errors is a PLAIN STRING (D-CTL-13, judgment J-4, T-02)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 1,
+      portfolio_id: 2,
+      category_id: 1,
+      is_active: true,
+    });
+    mockFindOne.mockResolvedValue({
+      id: 9,
+      portfolio_id: 1,
+      is_active: true,
+    });
+
+    let thrown: unknown;
+    try {
+      await service.updateList(1, { categoryId: 9 });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/lists/1', method: 'PATCH' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(json).toHaveBeenCalledWith({
+      description: 'BadRequestException',
+      status: HttpStatus.BAD_REQUEST,
+      errors: 'Category 9 belongs to a different portfolio than list 1',
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/1',
     });
   });
 });

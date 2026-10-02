@@ -42,10 +42,13 @@ import { GetResultsByContract } from '../interfaces/get-results-by-contract.inte
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
 import {
+  ControlList,
   ControlListCategory,
   ControlListCategoryCreatePayload,
   ControlListCategoryUpdatePayload,
-  ControlListPortfolioSummary
+  ControlListCreatePayload,
+  ControlListPortfolioSummary,
+  ControlListUpdatePayload
 } from '@shared/interfaces/control-lists.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
@@ -257,6 +260,20 @@ export class ApiService {
 
   DELETE_ControlListCategory = (id: number): Promise<MainResponse<{ id: number }>> => {
     return this.TP.delete(`control-lists/categories/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/control-lists T-02 (client half) — A6–A8.
+  POST_ControlList = (body: ControlListCreatePayload): Promise<MainResponse<ControlList>> => {
+    return this.TP.post('control-lists/lists', body, {});
+  };
+
+  // `listKey` must never be part of `body` (design §5 rule 3 — the update DTO omits it).
+  PATCH_ControlList = (id: number, body: ControlListUpdatePayload): Promise<MainResponse<ControlList>> => {
+    return this.TP.patch(`control-lists/lists/${id}`, body, {});
+  };
+
+  DELETE_ControlList = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/lists/${id}`, {});
   };
 
   GET_FundingTypes = (): Promise<MainResponse<FundingType[]>> => {

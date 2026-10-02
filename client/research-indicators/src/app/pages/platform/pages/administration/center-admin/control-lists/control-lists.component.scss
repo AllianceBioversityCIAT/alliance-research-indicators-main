@@ -3,3 +3,10 @@
   display: block;
   width: 100%;
 }
+
+// T-02: the selected list row in the navigator (design §6.2 "Nav selected / hover background").
+// A plain class, not a Tailwind arbitrary-value utility, because `[class.x]` binding target names
+// cannot contain `[`, `]`, `(` or `)` — Angular's template parser reads those as binding delimiters.
+.list-row--selected {
+  background: var(--ac-grey-100);
+}
