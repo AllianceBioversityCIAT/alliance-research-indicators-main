@@ -7,12 +7,15 @@ import {
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
+import { ControlListValueRepository } from './repositories/control-list-value.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
+import { ControlListValue } from './entities/control-list-value.entity';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 
 describe('ControlListsService', () => {
@@ -46,6 +49,22 @@ describe('ControlListsService', () => {
     save: mockListSave,
     update: mockListUpdate,
     delete: mockListDelete,
+  };
+
+  const mockValueFind = jest.fn();
+  const mockValueFindOne = jest.fn();
+  const mockValueCount = jest.fn();
+  const mockValueSave = jest.fn();
+  const mockValueUpdate = jest.fn();
+  const mockValueDelete = jest.fn();
+
+  const mockValueRepository = {
+    find: mockValueFind,
+    findOne: mockValueFindOne,
+    count: mockValueCount,
+    save: mockValueSave,
+    update: mockValueUpdate,
+    delete: mockValueDelete,
   };
 
   const mockPortfoliosFindOne = jest.fn();
@@ -90,12 +109,30 @@ describe('ControlListsService', () => {
       ...overrides,
     }) as ControlList;
 
+  const buildValue = (
+    overrides: Partial<ControlListValue> = {},
+  ): ControlListValue =>
+    ({
+      id: 1,
+      list_id: 2,
+      code: 'DIR-01',
+      value: 'Increase',
+      description: null,
+      display_order: 1,
+      is_active: true,
+      ...overrides,
+    }) as ControlListValue;
+
   beforeEach(async () => {
     jest.clearAllMocks();
     mockCurrentUser.audit.mockReturnValue({ created_by: 1 });
     // Default: no lists, so existing category-only assertions below keep
     // their original shape unless a test overrides mockListFind itself.
     mockListFind.mockResolvedValue([]);
+    // Default: no values, so A1's new valueCount query (and the T-03
+    // list-has-values delete check) stay 0 unless a test overrides them.
+    mockValueFind.mockResolvedValue([]);
+    mockValueCount.mockResolvedValue(0);
     logSpy = jest
       .spyOn(LoggerUtil.prototype, '_log')
       .mockImplementation(() => undefined);
@@ -113,6 +150,10 @@ describe('ControlListsService', () => {
         {
           provide: ControlListRepository,
           useValue: mockListRepository,
+        },
+        {
+          provide: ControlListValueRepository,
+          useValue: mockValueRepository,
         },
         { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
@@ -211,6 +252,9 @@ describe('ControlListsService', () => {
           key: 'kpi.direction',
           name: 'Direction',
           description: 'Whether the KPI should increase, decrease or hold',
+          // D-CTL-17 (T-03 rework attempt 2): ListSummary also carries
+          // codePrefix, so the client can mirror proposeNextCode.
+          codePrefix: 'DIR',
           valueCount: 0,
           isSystem: true,
           usedBy: [],
@@ -222,6 +266,7 @@ describe('ControlListsService', () => {
           key: 'org.level',
           name: 'Organizational level',
           description: null,
+          codePrefix: 'DIR',
           valueCount: 0,
           isSystem: true,
           usedBy: [],
@@ -348,6 +393,33 @@ describe('ControlListsService', () => {
         where: { portfolio_id: 1, name: dto.name, is_active: true },
       });
     });
+
+    // Leader-adjudicated forward pointer (T-03 rework attempt 2):
+    // normalizeDescription() also runs on CREATE (categories, lists,
+    // values), not only on PATCH.
+    it.each([
+      ['an empty string', ''],
+      ['an all-whitespace string', '   '],
+      ['a literal null', null],
+    ])(
+      'normalizes description: %s to a stored NULL on create',
+      async (_label, description) => {
+        mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
+        mockFindOne.mockResolvedValue(null);
+        mockSave.mockResolvedValue(
+          buildCategory({ id: 5, name: dto.name, description: null }),
+        );
+
+        await service.createCategory({
+          ...dto,
+          description: description as unknown as string,
+        });
+
+        expect(mockSave).toHaveBeenCalledWith(
+          expect.objectContaining({ description: null }),
+        );
+      },
+    );
   });
 
   describe('updateCategory', () => {
@@ -665,6 +737,34 @@ describe('ControlListsService', () => {
         ),
       );
     });
+
+    // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
+    // create-time normalization as categories.
+    it.each([
+      ['an empty string', ''],
+      ['an all-whitespace string', '   '],
+      ['a literal null', null],
+    ])(
+      'normalizes description: %s to a stored NULL on create',
+      async (_label, description) => {
+        mockFindOne.mockResolvedValue(
+          buildCategory({ id: 1, portfolio_id: 2 }),
+        );
+        mockListFindOne.mockResolvedValue(null);
+        mockListSave.mockResolvedValue(
+          buildList({ id: 7, portfolio_id: 2, description: null }),
+        );
+
+        await service.createList({
+          ...dto,
+          description: description as unknown as string,
+        });
+
+        expect(mockListSave).toHaveBeenCalledWith(
+          expect.objectContaining({ description: null }),
+        );
+      },
+    );
   });
 
   describe('updateList', () => {
@@ -810,21 +910,447 @@ describe('ControlListsService', () => {
       );
     });
 
-    // R-CTL-003 "Custom list lifecycle" (no-values branch; the "has values"
-    // 409 is T-03's — control_list_values does not exist in this slice).
+    // R-CTL-003 "Custom list lifecycle" (no-values branch).
     it('deletes a custom (non-system) list with no values (200) and logs', async () => {
       mockListFindOne.mockResolvedValue(
         buildList({ id: 8, is_system: false, portfolio_id: 2 }),
       );
+      mockValueCount.mockResolvedValue(0);
       mockListDelete.mockResolvedValue({ affected: 1 });
 
       const result = await service.removeList(8);
 
+      expect(mockValueCount).toHaveBeenCalledWith({ where: { list_id: 8 } });
       expect(mockListDelete).toHaveBeenCalledWith(8);
       expect(result).toEqual({ id: 8 });
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           'control_lists.deleted entity=control_list id=8 portfolio_id=2 user_id=1',
+        ),
+      );
+    });
+
+    // T-03 forward pointer (T-02 execution.md): a list with values cannot
+    // be deleted — 409, non-field {description} shape, warn log — even when
+    // it is not a system list.
+    it('throws ConflictException (409) for a custom list with values and logs a warning, deleting nothing', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({
+          id: 8,
+          is_system: false,
+          portfolio_id: 2,
+          name: 'Custom source',
+          list_key: 'kpi.custom_source',
+        }),
+      );
+      mockValueCount.mockResolvedValue(3);
+
+      let thrown: unknown;
+      try {
+        await service.removeList(8);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toMatchObject({
+        status: 409,
+        response: {
+          message: {
+            description: expect.stringContaining('Custom source'),
+          },
+        },
+      });
+      expect(mockListDelete).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.blocked_delete entity=control_list id=8 reason=has_values count=3',
+        ),
+      );
+    });
+  });
+
+  describe('getValues (A9)', () => {
+    it('throws NotFoundException when the list does not exist', async () => {
+      mockListFindOne.mockResolvedValue(null);
+
+      await expect(service.getValues(99)).rejects.toThrow(NotFoundException);
+      expect(mockValueFind).not.toHaveBeenCalled();
+    });
+
+    it('returns values ordered by display_order then id, including inactive ones', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 9, list_id: 2, code: 'DIR-02', is_active: false }),
+        buildValue({ id: 8, list_id: 2, code: 'DIR-01' }),
+      ]);
+
+      const result = await service.getValues(2);
+
+      expect(mockValueFind).toHaveBeenCalledWith({
+        where: { list_id: 2 },
+        order: { display_order: 'ASC', id: 'ASC' },
+      });
+      expect(result).toEqual([
+        {
+          id: 9,
+          listId: 2,
+          code: 'DIR-02',
+          value: 'Increase',
+          description: null,
+          displayOrder: 1,
+          isActive: false,
+          inUse: 0,
+        },
+        {
+          id: 8,
+          listId: 2,
+          code: 'DIR-01',
+          value: 'Increase',
+          description: null,
+          displayOrder: 1,
+          isActive: true,
+          inUse: 0,
+        },
+      ]);
+    });
+  });
+
+  describe('createValue (A10)', () => {
+    const dto: CreateControlListValueDto = { value: 'Decrease' };
+
+    it('throws NotFoundException for an unknown list', async () => {
+      mockListFindOne.mockResolvedValue(null);
+
+      await expect(service.createValue(99, dto)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(mockValueSave).not.toHaveBeenCalled();
+    });
+
+    it('proposes the next zero-padded code from the list prefix when code is omitted', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({ id: 2, code_prefix: 'DIR' }),
+      );
+      mockValueFind.mockResolvedValue([
+        buildValue({ code: 'DIR-01' }),
+        buildValue({ code: 'DIR-02' }),
+      ]);
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 10, list_id: 2, code: 'DIR-03', value: dto.value }),
+      );
+
+      const result = await service.createValue(2, dto);
+
+      expect(mockValueSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          list_id: 2,
+          code: 'DIR-03',
+          value: 'Decrease',
+        }),
+      );
+      expect(result.code).toBe('DIR-03');
+    });
+
+    // design §5 rule 4: org.level's prefix L has no dash.
+    it('proposes "L5" (no dash, no zero-pad) after L1..L4 for the org.level prefix', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({ id: 6, code_prefix: 'L', list_key: 'org.level' }),
+      );
+      mockValueFind.mockResolvedValue([
+        buildValue({ code: 'L1' }),
+        buildValue({ code: 'L2' }),
+        buildValue({ code: 'L3' }),
+        buildValue({ code: 'L4' }),
+      ]);
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 24, list_id: 6, code: 'L5', value: 'Section' }),
+      );
+
+      const result = await service.createValue(6, { value: 'Section' });
+
+      expect(mockValueSave).toHaveBeenCalledWith(
+        expect.objectContaining({ list_id: 6, code: 'L5' }),
+      );
+      expect(result.code).toBe('L5');
+    });
+
+    it('uses an admin-supplied code as-is (no proposal)', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 11, list_id: 2, code: 'CUSTOM-1', value: 'Hold' }),
+      );
+
+      await service.createValue(2, { code: 'CUSTOM-1', value: 'Hold' });
+
+      expect(mockValueSave).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'CUSTOM-1' }),
+      );
+      // The proposal lookup is skipped entirely when a code is supplied.
+      expect(mockValueFind).not.toHaveBeenCalled();
+    });
+
+    it('throws a field-named ConflictException (field: code) on a pre-checked duplicate code (any letter case)', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFindOne.mockResolvedValue(buildValue({ id: 5, code: 'dir-01' }));
+
+      await expect(
+        service.createValue(2, { code: 'DIR-01', value: 'Increase' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'code' }) },
+      });
+      expect(mockValueSave).not.toHaveBeenCalled();
+    });
+
+    it('throws a field-named ConflictException (field: value) on a pre-checked duplicate value', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFindOne
+        .mockResolvedValueOnce(null) // code pre-check passes
+        .mockResolvedValueOnce(buildValue({ id: 5, value: 'increase' })); // value pre-check collides
+
+      await expect(
+        service.createValue(2, { code: 'DIR-09', value: 'Increase' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'value' }) },
+      });
+      expect(mockValueSave).not.toHaveBeenCalled();
+    });
+
+    it('maps a simulated errno 1062 on save to a 409 naming the duplicated field from sqlMessage (DB backstop)', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockRejectedValue({
+        errno: 1062,
+        sqlMessage:
+          "Duplicate entry '2-Increase' for key 'uq_control_list_values_list_value'",
+      });
+
+      await expect(
+        service.createValue(2, { code: 'DIR-09', value: 'Increase' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'value' }) },
+      });
+    });
+
+    it('creates a value, defaulting displayOrder to 0 and isActive to true, and logs', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 11, list_id: 2, code: 'DIR-09', value: 'Hold' }),
+      );
+
+      await service.createValue(2, { code: 'DIR-09', value: 'Hold' });
+
+      expect(mockValueSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          display_order: 0,
+          is_active: true,
+          created_by: 1,
+        }),
+      );
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.created entity=control_list_value id=11 portfolio_id=2 user_id=1',
+        ),
+      );
+    });
+
+    // Rework attempt 2 (Reviewer risk-lens FAIL, Leader decision A10):
+    // attempt 1 only proposed when `dto.code === undefined` — `''` and a
+    // literal `null` (which the DTO lets through unchanged; see
+    // CreateControlListValueDto.code) both skipped the proposal and
+    // reached the NOT NULL `code` column as-is. The DTO's own `@Transform`
+    // already collapses a whitespace-only string to `''` before this ever
+    // runs, so this only needs to prove `''` and `null`, not `'   '` again
+    // (that is covered at the DTO layer, `create-control-list-value.dto.spec.ts`).
+    it.each([
+      ['an empty string', ''],
+      ['a literal null', null],
+    ])(
+      'proposes a code when dto.code is %s, not just when omitted',
+      async (_label, code) => {
+        mockListFindOne.mockResolvedValue(
+          buildList({ id: 2, code_prefix: 'DIR' }),
+        );
+        mockValueFind.mockResolvedValue([buildValue({ code: 'DIR-01' })]);
+        mockValueFindOne.mockResolvedValue(null);
+        mockValueSave.mockResolvedValue(
+          buildValue({ id: 12, list_id: 2, code: 'DIR-02', value: 'Decrease' }),
+        );
+
+        const result = await service.createValue(2, {
+          code: code as unknown as string,
+          value: 'Decrease',
+        });
+
+        expect(mockValueFind).toHaveBeenCalledWith({ where: { list_id: 2 } });
+        expect(mockValueSave).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'DIR-02' }),
+        );
+        expect(result.code).toBe('DIR-02');
+      },
+    );
+
+    // Leader-adjudicated forward pointer (T-03 rework attempt 2):
+    // normalizeDescription() also runs on CREATE for values.
+    it.each([
+      ['an empty string', ''],
+      ['an all-whitespace string', '   '],
+      ['a literal null', null],
+    ])(
+      'normalizes description: %s to a stored NULL on create',
+      async (_label, description) => {
+        mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+        mockValueFindOne.mockResolvedValue(null);
+        mockValueSave.mockResolvedValue(
+          buildValue({ id: 13, list_id: 2, code: 'DIR-09', description: null }),
+        );
+
+        await service.createValue(2, {
+          code: 'DIR-09',
+          value: 'Hold',
+          description: description as unknown as string,
+        });
+
+        expect(mockValueSave).toHaveBeenCalledWith(
+          expect.objectContaining({ description: null }),
+        );
+      },
+    );
+  });
+
+  describe('updateValue (A11)', () => {
+    it('throws NotFoundException when the value does not exist', async () => {
+      mockValueFindOne.mockResolvedValue(null);
+
+      await expect(
+        service.updateValue(1, { value: 'Renamed' }),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockValueUpdate).not.toHaveBeenCalled();
+    });
+
+    it('throws a field-named ConflictException (field: code) when changing to an existing code', async () => {
+      mockValueFindOne
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, code: 'DIR-01' }),
+        )
+        .mockResolvedValueOnce(buildValue({ id: 5, code: 'DIR-02' }));
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+
+      await expect(
+        service.updateValue(1, { code: 'DIR-02' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'code' }) },
+      });
+      expect(mockValueUpdate).not.toHaveBeenCalled();
+    });
+
+    it('updates code, value, description and audits updated_by, re-reading the row', async () => {
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 2 });
+      mockValueFindOne
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, code: 'DIR-01', value: 'Increase' }),
+        )
+        .mockResolvedValueOnce(null) // code availability check
+        .mockResolvedValueOnce(null) // value availability check
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, code: 'DIR-01b', value: 'Up' }),
+        );
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockValueUpdate.mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateValue(1, {
+        code: 'DIR-01b',
+        value: 'Up',
+        description: 'd',
+      });
+
+      expect(mockValueUpdate).toHaveBeenCalledWith(1, {
+        code: 'DIR-01b',
+        value: 'Up',
+        description: 'd',
+        updated_by: 2,
+      });
+      expect(result.code).toBe('DIR-01b');
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.updated entity=control_list_value id=1 portfolio_id=2 user_id=1',
+        ),
+      );
+    });
+
+    it('deactivates a value through isActive, keeping it readable (R-CTL-004 "Deactivate")', async () => {
+      mockValueFindOne
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, is_active: true }),
+        )
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, is_active: false }),
+        );
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockValueUpdate.mockResolvedValue({ affected: 1 });
+
+      const result = await service.updateValue(1, { isActive: false });
+
+      expect(mockValueUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ is_active: false }),
+      );
+      expect(result.isActive).toBe(false);
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['an all-whitespace string', '   '],
+      ['a literal null', null],
+    ])('normalizes description: %s to a stored NULL', async (_label, value) => {
+      mockValueFindOne
+        .mockResolvedValueOnce(buildValue({ id: 1, list_id: 2 }))
+        .mockResolvedValueOnce(
+          buildValue({ id: 1, list_id: 2, description: null }),
+        );
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockValueUpdate.mockResolvedValue({ affected: 1 });
+
+      await service.updateValue(1, { description: value });
+
+      expect(mockValueUpdate).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ description: null }),
+      );
+    });
+  });
+
+  describe('removeValue (A12)', () => {
+    it('throws NotFoundException when the value does not exist', async () => {
+      mockValueFindOne.mockResolvedValue(null);
+
+      await expect(service.removeValue(1)).rejects.toThrow(NotFoundException);
+      expect(mockValueDelete).not.toHaveBeenCalled();
+    });
+
+    // T-04 owns the in-use (registry) block; this slice only physically
+    // deletes the row (D-CTL-5) — tasks.md T-03 "A12 here is a physical
+    // delete".
+    it('physically deletes the value and returns its id, logging the write', async () => {
+      mockValueFindOne.mockResolvedValue(buildValue({ id: 9, list_id: 2 }));
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockValueDelete.mockResolvedValue({ affected: 1 });
+
+      const result = await service.removeValue(9);
+
+      expect(mockValueDelete).toHaveBeenCalledWith(9);
+      expect(result).toEqual({ id: 9 });
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.deleted entity=control_list_value id=9 portfolio_id=2 user_id=1',
         ),
       );
     });

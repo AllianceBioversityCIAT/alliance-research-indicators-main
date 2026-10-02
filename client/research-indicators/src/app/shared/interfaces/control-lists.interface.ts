@@ -10,6 +10,11 @@
  * `control-lists.service.ts`) literally: `{ id, key, name, description, valueCount, isSystem,
  * usedBy }`. The server does return `description` on every list summary — confirmed at
  * review (reviewer FAIL, T-02 rework) — so no reconciliation gap remains here.
+ *
+ * `codePrefix` (D-CTL-17, T-03 rework): the proposed-code heuristic must use the SAME prefix
+ * the server's `proposeNextCode` uses, not one inferred from existing codes (reviewer FAIL —
+ * a code in another list's prefix could otherwise win). See `deriveNextProposedCode()` in
+ * `control-lists.component.ts`.
  */
 export interface ControlListSummary {
   id: number;
@@ -20,6 +25,7 @@ export interface ControlListSummary {
   isSystem: boolean;
   /** Consumer names reading this list, or [] = "Not linked to a form yet" (design §5 rule 5). */
   usedBy: string[];
+  codePrefix: string;
 }
 
 /**
@@ -93,4 +99,47 @@ export interface ControlListCategoryCreatePayload {
 export interface ControlListCategoryUpdatePayload {
   name?: string;
   description?: string;
+}
+
+// ─── T-03 (client half) — design §3 (permanent value ID, D-CTL-14), §4 A9–A12 ───────────────
+//
+// Mirrors the server's `ControlListValueResponse` (`control-lists.types.ts`) literally: `{ id,
+// listId, code, value, description, displayOrder, isActive, inUse }`. `inUse` is carried as
+// optional here only because this slice's UI does not render it (T-04 owns the "In use" column).
+export interface ControlListValue {
+  id: number;
+  listId: number;
+  code: string;
+  value: string;
+  description: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  /** T-04 (design §4 A9 "inUse: number"). Not read by this slice's UI. */
+  inUse?: number;
+}
+
+/**
+ * A10 create body (design §4): `{code?, value, description?, displayOrder?, isActive?}` —
+ * `code` is optional because the server proposes `<prefix>-<nn>` / `L<n>` when omitted
+ * (design §5 rule 4); this slice's create modal pre-fills it on the client instead (see
+ * `control-lists.component.ts` for which choice — Not Done/Assumptions in the Leader's report).
+ */
+export interface ControlListValueCreatePayload {
+  code?: string;
+  value: string;
+  description?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+/**
+ * A11 update body (design §4) — **`id` is never sent** (D-CTL-14 / falsifier 2: whitelisting it
+ * would let an update silently try to change the permanent reference).
+ */
+export interface ControlListValueUpdatePayload {
+  code?: string;
+  value?: string;
+  description?: string;
+  displayOrder?: number;
+  isActive?: boolean;
 }

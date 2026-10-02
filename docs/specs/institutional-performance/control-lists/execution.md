@@ -332,3 +332,134 @@
   - **T-04:** `usedBy` is still `[]`. P-10 still applies: `ControlListsService` is request-scoped.
 - **Final status: PASS on attempt 2.**
 - **Lint gate on committed blobs (Leader, after `a77f94d5`):** 18 server `.ts` files linted via stdin → 0 failing. The gate was proven able to redden in Run 5 (CRLF falsifier).
+
+### 2026-10-02 — Run 7: T-03 (Slice 3: Values)
+
+- **Base commit:** `f94fd95c`.
+- **Implementers:** 2 × sonnet in parallel, server and client, effort high.
+- **Reviewers:** 2 × opus, parallel lenses: risk (server) and reliability (client + DataTable + contract).
+- **Leader relay:** the client's assumed Value shape was relayed to the server mid-run. The field names already matched; the server adds `inUse: 0`, which the client carries as optional.
+
+#### Attempt 1 — FAIL (both lenses)
+
+- **Files (server):**
+  - `src/db/migrations/1790900000002-createControlListValues.ts`;
+  - `entities/control-list-value.entity.ts`, `repositories/control-list-value.repository(.spec).ts`, `dto/{create,update}-control-list-value.dto.ts` (+ update DTO spec);
+  - modified service, controller, module and types, and their specs;
+  - `test/control-lists-values.integration-spec.ts`; the two earlier integration specs needed the new provider.
+- **Files (client):**
+  - `shared/utils/{natural-compare,xlsx-export}.util(.spec).ts`;
+  - `shared/components/data-table/*`;
+  - `control-lists.interface.ts`, `api.service.ts`, `control-lists.component.*`;
+  - `angular.json` (`allowedCommonJsDependencies: ["exceljs"]`, added after the CommonJS warning was observed).
+- **DB evidence (server worker):**
+  - top row before: id 371, `CreateControlLists`;
+  - execute → 23 values, ids 1–23; seed re-run → 0;
+  - without `NOT EXISTS` → `ER_DUP_ENTRY` on PRIMARY;
+  - `dir-01` into `kpi.direction` → `ER_DUP_ENTRY '2-dir-01' for key uq_control_list_values_list_code`;
+  - top row before revert: id 372 (own); the revert dropped only `control_list_values`; top row after: 371; re-applied;
+  - `SHOW CREATE`: FK `list_id` → `control_lists` RESTRICT, uq `(list_id, code)`, uq `(list_id, value)`, idx `(list_id, display_order)`, `utf8mb4_unicode_ci`, `AUTO_INCREMENT=24`.
+- **Reds observed:**
+  - server: `id` whitelisted → DTO spec resolves; TECHNICAL_SUPPORT on A12 → `+ 7`; list-has-values check disabled → nothing thrown; `ValidateIf` removed → null code/value resolve;
+  - client: falsifier 3 (ID bound to `<input>`), 4 (no numeric → 3 assertions), 5 (export sliced → 10 ≠ 11), 6 (sort reset → `code` ≠ `value`).
+  - `ng build` caught an AOT error that Jest missed (`T extends Record<string, unknown>`), fixed with `T extends object`.
+- **Leader re-measurement (serial):**
+  - no stray servers;
+  - DB: `migrations` 369, values 23, lists 7 (the 7th is "Otra", id 15, `created_by` 39 — the same user as category "indicador", i.e. the user's manual testing, not a test leak), categories 3, `pi_delegate_history` 10;
+  - server 4,091 tests, 3 pre-existing failures; client 345 / 7,925; lint clean; build complete; initial bundle 1.35 MB; `exceljs-min` in a lazy chunk.
+- **Reviewer (risk lens) — STATUS: FAIL:**
+  1. **Discovered Issue:** a value can be saved with an empty code, and a null code is not rejected:
+     - POST `{code: ""}` → 201 with `code = ''`;
+     - PATCH `{code: ""}` blanks the stored code;
+     - POST `{code: null}` → probably 1048 → 500, or a false 409.
+     - Same family: `{displayOrder: null}` / `{isActive: null}` on A11 → NOT NULL.
+     **Violated Rule:** R-CTL-004 (code required, 1–30); design §5 rule 4 (an empty code gets the proposal); §4 A10. **Remediation:** treat `''`, whitespace and `null` as omitted on A10; add `IsNotEmpty` / `MinLength(1)`; null → 400 on A11; DTO-spec cases observed red.
+  2. **Discovered Issue:** the client pre-fill (`deriveNextProposedCode`) ignores the list's `code_prefix`. `X-50` in `kpi.direction` pre-fills `X-51` instead of `DIR-04`. **Violated Rule:** design §5 rule 4; T-03 Scope — screen. **Remediation:** give the client `codePrefix` and mirror `proposeNextCode`, or let the server expose the proposal.
+  - ADVISORY:
+    - A10 does not apply `normalizeDescription` (also true of category and list create);
+    - the `L<n>` format is chosen by prefix, not by key;
+    - A1 counts values N+1;
+    - the 1062 fallback reports `code`;
+    - the integration DataSource returns bigint ids as strings, so a case-only self-rename is uncovered.
+- **Reviewer (reliability lens) — STATUS: FAIL:**
+  1. **Discovered Issue:** the client code proposal diverges from the server: (a) a mixed-prefix code wins; (b) an empty list pre-fills nothing, so a new list's first value never shows a proposed code. **Violated Rule:** T-03 Scope — screen ("proposed code pre-filled"); R-CTL-004; design §5 rule 4. **Remediation:** add `codePrefix` to A1 `ListSummary` (record a D-CTL decision) and mirror the server rule, including `<prefix>-01` on an empty list; tests for the mixed prefix and the empty list.
+  2. **Discovered Issue:** `displayOrder` can reach the server as `null` (`p-inputNumber` emits `null` when cleared), and the A11 DTO lets `null` through into a NOT NULL column. **Violated Rule:** design §4 A11 vs §3 — contract mismatch. **Remediation:** normalize on the client; `@ValidateIf` on `displayOrder` / `isActive` → 400; tests.
+  3. **Discovered Issue:** a `data-table.component.ts` comment asserts an unobserved red — that removing `customSort` / `sortFunction` would fail the click test. The test cannot tell natural from lexical order (`toContain('Alpha value 1')`). **Violated Rule:** root `CLAUDE.md` §4.3 K-004 / KZ-014; KZ-001. **Remediation:** assert the exact natural first page, ascending and descending; observe red for each mutation separately; reword the comment.
+  - ADVISORY:
+    - stale response in `selectList` → `loadValues` (A's late response can overwrite B, and the next "Add value" POSTs a code from A's values to B);
+    - search with no matches shows the false "No values yet" state and unmounts the table;
+    - no catch on an `exceljs` chunk-load failure;
+    - `displayRows` coerces nulls to `''` (nulls sort first) and sorts numbers as strings;
+    - `computed()` over plain `@Input`s; unused `implements OnInit`; `trackByIndex` misnamed;
+    - stale ASSUMPTION comments; `inUse` optional;
+    - sheet name hard-coded to `Values`; booleans exported raw;
+    - `bg-white` is not a token;
+    - `resetPageOnSort` may jump to page 1 after a reload — check in T-05;
+    - the resize disclaimer is in the component, not the spec.
+- **Leader adjudication:**
+  - Every FAIL item is in scope.
+  - Contract decision **D-CTL-17**, recorded in `design.md` §12, with the A1 row updated: A1 `ListSummary` gains `codePrefix` (and documents the `description` added in T-02). The client mirrors the server's `proposeNextCode`, including `<prefix>-01` on an empty list.
+  - Folded in as **Leader-adjudicated defects** (reachable, in code this spec owns — KZ-008):
+    - the stale-response race in `loadValues`, which can write a wrong code into another list;
+    - the false empty state on a search with no matches (R-CTL-008 UI states);
+    - `normalizeDescription` on create for values, categories and lists (the forward pointer was only half met);
+    - the resize disclaimer moved or copied into the spec file (the T-03 disqualifier's wording).
+  - All other advisories are recorded only.
+
+#### Attempt 2 — PASS (both lenses)
+
+- **Effort:** xhigh. No migration command was run.
+- **Server:**
+  - A10: code trimmed; `''`, whitespace or `null` → proposed code (rule 4);
+  - A11: `''` / whitespace / `null` code → 400; `''` / `null` value → 400; `null` displayOrder / isActive → 400;
+  - `normalizeDescription` on create for A3, A6 and A10;
+  - D-CTL-17: `ListSummary.codePrefix`.
+  - `proposeNextCode`: pattern `^L(\d+)$` (prefix `L`) or `^<escaped>-(\d+)$`; next number = max + 1; `L<n>` unpadded, otherwise `<prefix>-<nn>`; an empty list gives `<prefix>-01`.
+- **Client:**
+  - `deriveNextProposedCode` mirrors `proposeNextCode` line by line, using `codePrefix`, and always pre-fills;
+  - `displayOrder` sends 0 on POST and is omitted on PATCH when cleared;
+  - the `loadValues` stale-response guard covers every branch;
+  - DataTable separates `hasNoRows` from no-matches, with `emptymessage` keeping the table mounted;
+  - the click-sort test asserts exact natural arrays in both directions;
+  - the resize disclaimer is now in the spec; stale ASSUMPTION comments replaced.
+- **Reds observed:**
+  - client, from its first report:
+    - mixed prefix → `Received "X-51"`; empty list → `Received ""`;
+    - displayOrder null on POST and on PATCH;
+    - stale guard → A's rows overwrote B's; no-matches → table unmounted;
+    - removing `[customSort]` → 3 tests red; removing `(sortFunction)` → 2 tests red. The comment was reworded to what was observed.
+    - Falsifiers 3–6 re-confirmed.
+  - **server, only after the Leader required it** (the first report had "no red lines to paste" — a K-004/KZ-014 gap, corrected within the attempt):
+    - gate back to `=== undefined` → unit `Number of calls: 0` ×2; integration `Expected "SCR-01" Received ""` and `expected 201, got 409`;
+    - `@IsNotEmpty` removed → resolves;
+    - `ValidateIf` removed → `null` resolves;
+    - `normalizeDescription` removed → raw value stored;
+    - `codePrefix` removed → TS2741;
+    - leak check after the red that inserted a row: 0 rows with `code=''`.
+- **Worker results:** server control-lists 10 suites / 142 tests, integration 3 suites / 24 tests, build OK, eslint clean; client 345 / 7,930, lint and build OK, hex grep → 0.
+- **Leader re-measurement (serial):**
+  - no stray servers;
+  - DB: `migrations` 369, values 23, 0 rows with id > 23 or `code = ''`, lists 7, categories 3, `pi_delegate_history` 10;
+  - server 429 suites / 4,116 tests, 3 pre-existing failures; client 345 / 7,930; lint clean; build complete; initial bundle 1.35 MB; `exceljs-min` in a lazy chunk.
+- **Reviewer (risk lens) — STATUS: PASS.** Both FAIL issues resolved; the client and server algorithms are identical; `normalizeDescription` is on create; D-CTL-17 is on both sides; no regressions; every red is a real red of its gate.
+- **Reviewer (reliability lens) — STATUS: PASS.** FAIL issues 1–3 and all four adjudicated defects resolved, with no regressions.
+- **ADVISORY (recorded only):**
+  - the proposal regex is case-sensitive while the unique index is not, so an API-saved `dir-04` makes the next proposal 409 (fix: the `i` flag on both sides);
+  - a whitespace-only `value` passes A10/A11;
+  - the `org.level` fixture expects `codePrefix: 'DIR'` (misleading);
+  - a spec comment says "row 11 of 12";
+  - `hasNoMatches` is unused;
+  - `valuesLoading` can stick after a portfolio switch (no visible effect found);
+  - no catch on an `exceljs` chunk-load failure;
+  - `bg-white` on the export button is not a token.
+- **Requirements covered:**
+  - R-CTL-003 *Custom list lifecycle* (a list with values → 409);
+  - R-CTL-004, all of it, incl. AC.3 (read-only permanent ID);
+  - R-CTL-009 (natural sort, export of filtered + sorted rows, page size keeps sort and search; resize persistence → T-05);
+  - R-CTL-008 table states;
+  - R-CTL-010 (23 values; totals 2 / 6 / 23 seeded);
+  - NFR-CTL-003, NFR-CTL-004 (`aria-sort`).
+- **Forward pointers:**
+  - **T-04:** A9 `inUse` is 0 until the registry exists; the client's `ControlListValue.inUse?` is optional; A12 must gain the in-use block (409, non-field `{description}`, "deactivate instead"); A13 reads by key with natural code order (reuse the same comparator semantics); `ControlListsService` is request-scoped (P-10).
+  - **T-05:** resize persistence in a real browser; check whether the table jumps to page 1 after a reload (`resetPageOnSort`); post-deploy check that `control_lists WHERE is_system=1` = 6 and values = 23 on Dev.
+- **Final status: PASS on attempt 2.**

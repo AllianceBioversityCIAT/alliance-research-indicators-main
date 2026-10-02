@@ -1,0 +1,98 @@
+<div class="flex flex-col gap-3" data-testid="data-table-root">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="relative w-[22rem] max-w-full">
+      <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+        <i class="pi pi-search !text-[12px] atc-grey-700" aria-hidden="true"></i>
+      </span>
+      <input type="text" [attr.placeholder]="searchPlaceholder" [attr.aria-label]="searchPlaceholder" [value]="searchTerm()"
+        (input)="onSearchInput($any($event.target).value)" data-testid="data-table-search"
+        class="w-full !pl-9 !rounded-[8px] py-2 border !max-h-[27px] !text-[12px] atc-grey-700 rounded-lg" />
+    </div>
+
+    <button type="button" (click)="exportValues()" [disabled]="exporting()" data-testid="data-table-export"
+      class="inline-flex items-center gap-2 rounded-[9px] border border-[var(--ac-grey-200)] bg-white px-3 py-1.5 text-[13px] atc-grey-900 disabled:opacity-60">
+      <i class="pi pi-file-export !text-[12px]" aria-hidden="true"></i>
+      Export .xlsx
+    </button>
+  </div>
+
+  @if (loading) {
+  <app-custom-progress-bar></app-custom-progress-bar>
+  }
+
+  @if (!loading && hasNoRows()) {
+    @if (emptyStateTemplate) {
+    <ng-container [ngTemplateOutlet]="emptyStateTemplate"></ng-container>
+    } @else {
+    <div class="flex flex-col items-center justify-center gap-2 p-10" data-testid="data-table-empty">
+      <i class="pi pi-inbox !text-[26px] atc-grey-700" aria-hidden="true"></i>
+      <p class="m-0 text-sm atc-grey-700">{{ emptyMessage }}</p>
+    </div>
+    }
+  } @else {
+  <p-table [value]="displayRows()" [loading]="loading" [paginator]="true" [rows]="pageSize()"
+    [rowsPerPageOptions]="pageSizeOptions" [sortField]="sortField()" [sortOrder]="sortOrder()" [customSort]="true"
+    (sortFunction)="onSortFunction($event)" (onPage)="onPage($event)" [rowTrackBy]="trackByIndex"
+    styleClass="p-datatable-gridlines table-custom-styles" [resizableColumns]="true" columnResizeMode="expand"
+    data-testid="data-table">
+    <ng-template pTemplate="header">
+      <tr>
+        @for (column of columns; track column.field) {
+        <th [pSortableColumn]="column.field" [pSortableColumnDisabled]="column.sortable === false" pResizableColumn
+          [style.width]="column.width" [attr.data-testid]="'column-header-' + column.field">
+          <div class="flex items-center gap-2 text-[13px] font-medium atc-grey-800">
+            {{ column.header }}
+            @if (column.sortable !== false) {
+            <p-sortIcon [field]="column.field"></p-sortIcon>
+            }
+          </div>
+        </th>
+        }
+        @if (rowActionsTemplate) {
+        <th class="text-[13px] font-medium atc-grey-800" data-testid="column-header-actions">Actions</th>
+        }
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="body" let-row>
+      <tr data-testid="data-table-row">
+        @for (column of columns; track column.field) {
+        <td [attr.data-testid]="'cell-' + column.field">
+          @switch (column.type) {
+          @case ('code') {
+          <span class="font-mono text-[12.5px] atc-light-blue-400">{{ cellValue(row, column) }}</span>
+          }
+          @case ('badge') {
+          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[12px] font-medium"
+            [style.background-color]="cellValue(row, column) ? 'var(--ac-green-100)' : 'var(--ac-grey-200)'"
+            [style.color]="cellValue(row, column) ? 'var(--ac-green-700)' : 'var(--ac-grey-700)'">
+            {{ badgeLabel(cellValue(row, column)) }}
+          </span>
+          }
+          @case ('number') {
+          <span class="block text-right tabular-nums">{{ cellValue(row, column) }}</span>
+          }
+          @default {
+          {{ cellValue(row, column) }}
+          }
+          }
+        </td>
+        }
+        @if (rowActionsTemplate) {
+        <td data-testid="cell-actions">
+          <ng-container [ngTemplateOutlet]="rowActionsTemplate" [ngTemplateOutletContext]="{ $implicit: row }"></ng-container>
+        </td>
+        }
+      </tr>
+    </ng-template>
+
+    <ng-template pTemplate="emptymessage">
+      <tr>
+        <td [attr.colspan]="columns.length + (rowActionsTemplate ? 1 : 0)" class="p-8 text-center" data-testid="data-table-no-matches">
+          <span class="text-sm atc-grey-700">No records match your search.</span>
+        </td>
+      </tr>
+    </ng-template>
+  </p-table>
+  }
+</div>

@@ -9,6 +9,7 @@ import { ControlListsController } from '../src/domain/entities/control-lists/con
 import { ControlListsService } from '../src/domain/entities/control-lists/control-lists.service';
 import { ControlListCategoryRepository } from '../src/domain/entities/control-lists/repositories/control-list-category.repository';
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
+import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
 import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
 import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
@@ -121,6 +122,10 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
         {
           provide: ControlListRepository,
           useFactory: () => new ControlListRepository(dataSource),
+        },
+        {
+          provide: ControlListValueRepository,
+          useFactory: () => new ControlListValueRepository(dataSource),
         },
         PortfoliosService,
         {

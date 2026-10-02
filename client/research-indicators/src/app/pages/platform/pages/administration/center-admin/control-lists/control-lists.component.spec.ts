@@ -5,7 +5,13 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
 import ControlListsComponent from './control-lists.component';
 import { Portfolio } from '@shared/interfaces/portfolio.interface';
-import { ControlList, ControlListCategory, ControlListPortfolioSummary, ControlListSummary } from '@shared/interfaces/control-lists.interface';
+import {
+  ControlList,
+  ControlListCategory,
+  ControlListPortfolioSummary,
+  ControlListSummary,
+  ControlListValue
+} from '@shared/interfaces/control-lists.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -65,6 +71,8 @@ const category = (overrides: Partial<ControlListCategory> = {}): ControlListCate
 });
 
 // T-02 — design §4 A1 "lists: ListSummary[]" (id, key, name, value count, is_system, usedBy).
+// `codePrefix` (D-CTL-17, T-03 rework): defaults to 'DIR', the seeded prefix for `kpi.direction`
+// (R-CTL-010 / tasks.md T-02 seed: UOM/DIR/FRQ/KLV/KTY/L).
 const listSummary = (overrides: Partial<ControlListSummary> = {}): ControlListSummary => ({
   id: 10,
   key: 'kpi.direction',
@@ -73,6 +81,7 @@ const listSummary = (overrides: Partial<ControlListSummary> = {}): ControlListSu
   valueCount: 3,
   isSystem: true,
   usedBy: [],
+  codePrefix: 'DIR',
   ...overrides
 });
 
@@ -89,6 +98,19 @@ const controlList = (overrides: Partial<ControlList> = {}): ControlList => ({
   description: null,
   codePrefix: 'KPICUSTOM',
   isSystem: false,
+  ...overrides
+});
+
+// T-03 — design §4 A9–A12. Mirrors the client-side `ControlListValue` interface, which in turn
+// mirrors the server's `ControlListValueResponse` (see that interface's own doc comment).
+const controlListValue = (overrides: Partial<ControlListValue> = {}): ControlListValue => ({
+  id: 101,
+  listId: 10,
+  code: 'DIR-01',
+  value: 'Increase',
+  description: null,
+  displayOrder: 1,
+  isActive: true,
   ...overrides
 });
 
@@ -147,7 +169,12 @@ describe('ControlListsComponent', () => {
     // T-02 (A6–A8)
     POST_ControlList: jest.fn(),
     PATCH_ControlList: jest.fn(),
-    DELETE_ControlList: jest.fn()
+    DELETE_ControlList: jest.fn(),
+    // T-03 (A9–A12)
+    GET_ControlListValues: jest.fn(),
+    POST_ControlListValue: jest.fn(),
+    PATCH_ControlListValue: jest.fn(),
+    DELETE_ControlListValue: jest.fn()
   };
 
   const summaries: ControlListPortfolioSummary[] = [
@@ -176,6 +203,10 @@ describe('ControlListsComponent', () => {
     api.POST_ControlList.mockResolvedValue(ok(controlList()));
     api.PATCH_ControlList.mockResolvedValue(ok(controlList()));
     api.DELETE_ControlList.mockResolvedValue(ok({ id: 20 }));
+    api.GET_ControlListValues.mockResolvedValue(ok([]));
+    api.POST_ControlListValue.mockResolvedValue(ok(controlListValue()));
+    api.PATCH_ControlListValue.mockResolvedValue(ok(controlListValue()));
+    api.DELETE_ControlListValue.mockResolvedValue(ok({ id: 101 }));
 
     await TestBed.configureTestingModule({
       imports: [ControlListsComponent],
@@ -893,6 +924,402 @@ describe('ControlListsComponent', () => {
       await component.selectPortfolio(1);
 
       expect(component.selectedListId()).toBeNull();
+    });
+  });
+
+  // ─── T-03: Values (design §4 A9–A12, §6.2 values table + modal, §6.3 DataTable) ───────────
+
+  describe('values', () => {
+    const directionList = listSummary({ id: 10, key: 'kpi.direction', name: 'Direction', isSystem: true, valueCount: 2 });
+    const kpiCategory = category({ id: 1, name: 'KPIs', lists: [directionList] });
+
+    const directionValues: ControlListValue[] = [
+      controlListValue({ id: 101, listId: 10, code: 'DIR-01', value: 'Increase', displayOrder: 1 }),
+      controlListValue({ id: 102, listId: 10, code: 'DIR-02', value: 'Decrease', displayOrder: 2 })
+    ];
+
+    it('loads values for the selected list (A9)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok(directionValues));
+
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(api.GET_ControlListValues).toHaveBeenCalledWith(directionList.id);
+      expect(component.values()).toEqual(directionValues);
+    });
+
+    // Leader-adjudicated defect (T-03 rework): with no guard, selecting list A then quickly list
+    // B let A's slower A9 response arrive AFTER B's and overwrite B's table with A's rows — and
+    // the next "Add value" on B would then derive its proposed code from A's values and POST it
+    // to B. This resolves A's response only AFTER B's has already landed and asserts B's rows
+    // are unaffected by A's late arrival.
+    it('drops a stale GET_ControlListValues response that resolves after the selection moved to a different list', async () => {
+      const secondList = listSummary({ id: 11, key: 'kpi.custom', name: 'Custom list', isSystem: false, codePrefix: 'CUS', valueCount: 1 });
+      const multiListCategory = category({ id: 1, name: 'KPIs', lists: [directionList, secondList] });
+      await setup([multiListCategory]);
+
+      let resolveA!: (value: MainResponse<ControlListValue[]>) => void;
+      const pendingA = new Promise<MainResponse<ControlListValue[]>>(resolve => {
+        resolveA = resolve;
+      });
+      const bValues = [controlListValue({ id: 201, listId: secondList.id, code: 'CUS-01' })];
+      api.GET_ControlListValues.mockImplementationOnce(() => pendingA); // A — selected first, resolves LAST
+      api.GET_ControlListValues.mockResolvedValueOnce(ok(bValues)); // B — selected second, resolves FIRST
+
+      component.selectList(directionList.id); // A
+      component.selectList(secondList.id); // B — the admin navigated away from A before it resolved
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.selectedListId()).toBe(secondList.id);
+      expect(component.values()).toEqual(bValues);
+
+      // A's late response arrives now — it must be dropped, not overwrite B's rows.
+      resolveA(ok(directionValues));
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.selectedListId()).toBe(secondList.id);
+      expect(component.values()).toEqual(bValues);
+      expect(api.GET_ControlListValues).toHaveBeenCalledTimes(2);
+    });
+
+    // Falsifier 3: binding the ID to an input would make this fail — the ID column renders as
+    // plain text (no `<input>` anywhere in that cell), same for every other column (the shared
+    // DataTable never puts a form control in a cell).
+    it('renders the ID column as plain read-only text in the values table, with no input anywhere in the row', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const idCells = el.querySelectorAll('[data-testid="cell-id"]');
+      expect(idCells.length).toBe(2);
+      expect(idCells[0].textContent?.trim()).toBe('101');
+      expect(idCells[0].querySelector('input')).toBeFalsy();
+    });
+
+    it('shows the values empty state with + Add value for a list with no values', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok([]));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="values-empty-state"]')).toBeTruthy();
+      expect(el.querySelector('[data-testid="add-value-empty-button"]')).toBeTruthy();
+    });
+
+    // ─── Modal: ID read-only in edit mode, absent in create mode (R-CTL-004 AC.3) ────────────
+
+    it('shows the ID as read-only TEXT in the edit modal, with no form control bound to it (falsifier 3)', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startEditValue(directionValues[0]);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const idNode = el.querySelector('[data-testid="value-id-readonly"]');
+      expect(idNode).toBeTruthy();
+      expect(idNode?.tagName.toLowerCase()).not.toBe('input');
+      expect(idNode?.querySelector('input')).toBeFalsy();
+      expect(idNode?.textContent?.trim()).toBe('101');
+    });
+
+    it('has no ID control at all in the create modal', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startCreateValue();
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="value-id-readonly"]')).toBeFalsy();
+    });
+
+    // ─── Code proposal (D-CTL-17, design §5 rule 4) — mirrors the server's `proposeNextCode`,
+    // keyed off the LIST's OWN `codePrefix`, never a prefix guessed from the loaded codes ──────
+
+    it('pre-fills the proposed next code on create, computed from the already-loaded values of the SAME prefix', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(
+        ok([controlListValue({ id: 1, code: 'DIR-07' }), controlListValue({ id: 2, code: 'DIR-03' })])
+      );
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.startCreateValue();
+
+      expect(component.valueForm().code).toBe('DIR-08');
+    });
+
+    it('proposes a no-dash code (org.level convention: L4 -> L5)', async () => {
+      const orgLevelList = listSummary({ id: 20, key: 'org.level', name: 'Organizational level', codePrefix: 'L', isSystem: true });
+      const orgCategory = category({ id: 3, name: 'Organizational structure', lists: [orgLevelList] });
+      await setup([orgCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(
+        ok([controlListValue({ id: 1, listId: 20, code: 'L1' }), controlListValue({ id: 2, listId: 20, code: 'L4' }), controlListValue({ id: 3, listId: 20, code: 'L2' })])
+      );
+      component.selectList(orgLevelList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.startCreateValue();
+
+      expect(component.valueForm().code).toBe('L5');
+    });
+
+    // Reviewer FAIL (T-03 attempt 1, reliability finding 1a): the OLD heuristic inferred the
+    // prefix from whichever existing code happened to carry the highest trailing number,
+    // whatever prefix it used — so a value whose code was hand-edited to `X-50` would win and
+    // propose `X-51` even on a `kpi.unit_of_measure` list (whose own prefix is `UOM`), while the
+    // server would propose `UOM-08`. The fix keys the regex off `list.codePrefix` and ignores
+    // every code that does not match the list's OWN prefix pattern.
+    it('ignores a value code carrying a DIFFERENT prefix when proposing the next code (mixed-prefix, reviewer finding 1a)', async () => {
+      const uomList = listSummary({ id: 30, key: 'kpi.unit_of_measure', name: 'Unit of measure', codePrefix: 'UOM', isSystem: true });
+      const uomCategory = category({ id: 4, name: 'KPIs', lists: [uomList] });
+      await setup([uomCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(
+        ok([
+          controlListValue({ id: 1, listId: 30, code: 'UOM-01' }),
+          controlListValue({ id: 2, listId: 30, code: 'UOM-02' }),
+          controlListValue({ id: 3, listId: 30, code: 'UOM-03' }),
+          controlListValue({ id: 4, listId: 30, code: 'UOM-04' }),
+          controlListValue({ id: 5, listId: 30, code: 'UOM-05' }),
+          controlListValue({ id: 6, listId: 30, code: 'UOM-06' }),
+          controlListValue({ id: 7, listId: 30, code: 'UOM-07' }),
+          // Hand-edited to another list's prefix, with a higher trailing number than any UOM code.
+          controlListValue({ id: 8, listId: 30, code: 'X-50' })
+        ])
+      );
+      component.selectList(uomList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.startCreateValue();
+
+      expect(component.valueForm().code).toBe('UOM-08');
+    });
+
+    // Reviewer FAIL (T-03 attempt 1, reliability finding 1b): the OLD heuristic left the code
+    // blank on an empty list (no code to infer a prefix from), so a brand-new list's very first
+    // value never showed a proposed code at all. D-CTL-17 / design §5 rule 4: the client now
+    // pre-fills `<prefix>-01` (or `L1`) exactly as the server's `proposeNextCode` would.
+    it('pre-fills <prefix>-01 when the list has no existing values (empty list, reviewer finding 1b)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok([]));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.startCreateValue();
+
+      expect(component.valueForm().code).toBe('DIR-01');
+    });
+
+    // ─── Create / edit against real MainResponse shapes ──────────────────────────────────────
+
+    it('creates a value and reloads values + categories (so valueCount updates)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startCreateValue();
+      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: 'Hold steady', displayOrder: 3, isActive: true });
+      api.GET_ControlListCategories.mockClear();
+
+      await component.saveValue();
+
+      expect(api.POST_ControlListValue).toHaveBeenCalledWith(directionList.id, {
+        code: 'DIR-03',
+        value: 'Maintain',
+        description: 'Hold steady',
+        displayOrder: 3,
+        isActive: true
+      });
+      expect(actions.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Control Lists',
+        detail: 'Value created successfully'
+      });
+      // Reloads both A9 (this list's values) and A1 (categories, for valueCount) — Leader's
+      // brief: "After value create/delete, the navigator valueCount must update".
+      expect(api.GET_ControlListValues).toHaveBeenCalledTimes(2); // initial select + reload after save
+      expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(1);
+    });
+
+    // ─── Cleared Order field (reviewer finding, T-03 rework) ──────────────────────────────────
+    // `p-inputNumber` emits `null` when the field is cleared; the component's `ValueFormValue`
+    // type is `number | null` for exactly this reason. A NOT NULL `display_order` column must
+    // never receive that `null` on the wire.
+
+    it('sends displayOrder: 0 on CREATE when the Order field was cleared (null)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startCreateValue();
+      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: '', displayOrder: null, isActive: true });
+
+      await component.saveValue();
+
+      expect(api.POST_ControlListValue).toHaveBeenCalledWith(
+        directionList.id,
+        expect.objectContaining({ displayOrder: 0 })
+      );
+    });
+
+    it('omits displayOrder on PATCH when the Order field was cleared (null), instead of wiping it to 0', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startEditValue(directionValues[0]);
+      component.valueForm.update(current => ({ ...current, displayOrder: null }));
+
+      await component.saveValue();
+
+      const [, patchBody] = api.PATCH_ControlListValue.mock.calls[0];
+      expect(patchBody).not.toHaveProperty('displayOrder');
+    });
+
+    // Falsifier 2: whitelisting `id` in the update DTO is a SERVER-side mutation, but the client
+    // contract must not even offer it — the PATCH body sent here never carries an `id` key.
+    it('edits a value and never sends `id` in the PATCH body (D-CTL-14 / falsifier 2)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+
+      component.startEditValue(directionValues[0]);
+      component.valueForm.update(current => ({ ...current, value: 'Increase sharply' }));
+
+      await component.saveValue();
+
+      expect(api.PATCH_ControlListValue).toHaveBeenCalledWith(101, {
+        code: 'DIR-01',
+        value: 'Increase sharply',
+        description: '',
+        displayOrder: 1,
+        isActive: true
+      });
+      const [, patchBody] = api.PATCH_ControlListValue.mock.calls[0];
+      expect(patchBody).not.toHaveProperty('id');
+    });
+
+    it('shows a field-named 409 duplicate-CODE error inline under the code input, never as a toast', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      const message = 'A value with code "DIR-01" already exists in this list';
+      api.POST_ControlListValue.mockResolvedValueOnce(fail(409, { description: message, field: 'code' }));
+
+      component.startCreateValue();
+      component.valueForm.update(current => ({ ...current, value: 'Increase' }));
+      await component.saveValue();
+      fixture.detectChanges();
+
+      expect(component.valueCodeFieldError()).toBe(message);
+      const inline = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="value-code-field-error"]');
+      expect(inline?.textContent?.trim()).toBe(message);
+      expect(actions.showToast).not.toHaveBeenCalled();
+    });
+
+    it('shows a field-named 409 duplicate-VALUE error inline under the value input, never as a toast', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      const message = 'A value "Increase" already exists in this list';
+      api.POST_ControlListValue.mockResolvedValueOnce(fail(409, { description: message, field: 'value' }));
+
+      component.startCreateValue();
+      component.valueForm.update(current => ({ ...current, value: 'Increase' }));
+      await component.saveValue();
+      fixture.detectChanges();
+
+      expect(component.valueValueFieldError()).toBe(message);
+      const inline = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="value-value-field-error"]');
+      expect(inline?.textContent?.trim()).toBe(message);
+      expect(actions.showToast).not.toHaveBeenCalled();
+    });
+
+    // ─── Delete: confirm flow + blocked (409) shown AS-IS ─────────────────────────────────────
+
+    it('asks for confirmation before deleting a value, deletes on Continue, and reloads values + categories', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      api.GET_ControlListCategories.mockClear();
+
+      component.deleteValue(directionValues[0]);
+      expect(api.DELETE_ControlListValue).not.toHaveBeenCalled();
+      expect(actions.showGlobalAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'warning', summary: 'Delete value', confirmCallback: expect.objectContaining({ label: 'Continue' }) })
+      );
+
+      const alertConfig = actions.showGlobalAlert.mock.calls[actions.showGlobalAlert.mock.calls.length - 1][0];
+      alertConfig.confirmCallback.event();
+      await fixture.whenStable();
+      await fixture.whenStable();
+      await fixture.whenStable();
+      await fixture.whenStable();
+
+      expect(api.DELETE_ControlListValue).toHaveBeenCalledWith(101);
+      expect(actions.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Control Lists', detail: 'Value deleted successfully' });
+      expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(1);
+      expect(component.deletingValueId()).toBeNull();
+    });
+
+    it('shows a blocked (409) value delete AS-IS behind a single Close, and does not toast success', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      api.DELETE_ControlListValue.mockResolvedValueOnce(fail(409, { description: 'This value is in use by 3 records. Deactivate it instead.' }));
+
+      component.deleteValue(directionValues[0]);
+      const alertConfig = actions.showGlobalAlert.mock.calls[actions.showGlobalAlert.mock.calls.length - 1][0];
+      alertConfig.confirmCallback.event();
+      await fixture.whenStable();
+      await fixture.whenStable();
+
+      expect(actions.showGlobalAlert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          severity: 'error',
+          summary: 'Cannot delete value',
+          detail: 'This value is in use by 3 records. Deactivate it instead.',
+          hasNoCancelButton: true,
+          generalButton: true,
+          confirmCallback: expect.objectContaining({ label: 'Close' })
+        })
+      );
+      expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'Value deleted successfully' }));
+    });
+
+    it('clears the values list and state when the portfolio changes (R-CTL-001 isolation)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      expect(component.values().length).toBe(2);
+
+      await component.selectPortfolio(1);
+
+      expect(component.values()).toEqual([]);
     });
   });
 });

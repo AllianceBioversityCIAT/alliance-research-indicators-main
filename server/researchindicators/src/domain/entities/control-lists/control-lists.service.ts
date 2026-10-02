@@ -6,12 +6,16 @@ import {
 } from '@nestjs/common';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
+import { ControlListValueRepository } from './repositories/control-list-value.repository';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
 import { UpdateControlListDto } from './dto/update-control-list.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
+import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
+import { ControlListValue } from './entities/control-list-value.entity';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import {
   CurrentUserUtil,
@@ -20,6 +24,7 @@ import {
 import {
   ControlListCategoryResponse,
   ControlListResponse,
+  ControlListValueResponse,
   ListSummary,
   PortfolioCategoriesSummary,
 } from './control-lists.types';
@@ -38,6 +43,7 @@ export class ControlListsService {
   constructor(
     private readonly categoryRepository: ControlListCategoryRepository,
     private readonly listRepository: ControlListRepository,
+    private readonly valueRepository: ControlListValueRepository,
     private readonly portfoliosService: PortfoliosService,
     private readonly currentUser: CurrentUserUtil,
   ) {}
@@ -60,10 +66,23 @@ export class ControlListsService {
       order: { id: 'ASC' },
     });
 
+    // T-03: A1's valueCount now counts real rows per list (design §4 A1).
+    // `usedBy` stays [] until the T-04 registry exists.
+    const listsWithCounts = await Promise.all(
+      lists.map(async (list) => ({
+        list,
+        valueCount: await this.valueRepository.count({
+          where: { list_id: list.id },
+        }),
+      })),
+    );
+
     return categories.map((category) =>
       this.mapCategory(
         category,
-        lists.filter((list) => list.category_id === category.id),
+        listsWithCounts.filter(
+          (entry) => entry.list.category_id === category.id,
+        ),
       ),
     );
   }
@@ -96,7 +115,11 @@ export class ControlListsService {
     const newCategory: Partial<ControlListCategory> = {
       portfolio_id: dto.portfolioId,
       name: dto.name,
-      description: dto.description,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2):
+      // normalizeDescription() also runs on CREATE, not only on update —
+      // ''/whitespace/null all store NULL (same single representation of
+      // "no description" as the PATCH path).
+      description: this.normalizeDescription(dto.description),
       display_order: 0,
       ...this.currentUser.audit(SetAuditEnum.NEW),
     };
@@ -212,7 +235,9 @@ export class ControlListsService {
       category_id: category.id,
       list_key: dto.listKey,
       name: dto.name,
-      description: dto.description,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
+      // normalization on create as on update (categories, lists, values).
+      description: this.normalizeDescription(dto.description),
       code_prefix: dto.codePrefix ?? this.deriveDefaultCodePrefix(dto.listKey),
       is_system: false,
       ...this.currentUser.audit(SetAuditEnum.NEW),
@@ -276,9 +301,7 @@ export class ControlListsService {
   async removeList(id: number): Promise<{ id: number }> {
     const list = await this.findActiveListOrFail(id);
 
-    // R-CTL-003 "System list cannot be deleted". The "has values" block
-    // (R-CTL-003 "Custom list lifecycle", non-empty branch) is T-03's — the
-    // values table does not exist in this slice.
+    // R-CTL-003 "System list cannot be deleted".
     if (list.is_system) {
       this.logger._warn(
         `control_lists.blocked_delete entity=control_list id=${id} reason=is_system`,
@@ -288,9 +311,163 @@ export class ControlListsService {
       );
     }
 
+    // T-03 (R-CTL-003 "Custom list lifecycle", non-empty branch; forward
+    // pointer from T-02): a list with values cannot be deleted, regardless
+    // of whether those values are active or deactivated — physical delete
+    // (D-CTL-5) means a deactivated value is still a row. The in-use
+    // protection on a VALUE's own delete (A12) is T-04's; this is a
+    // separate rule on the LIST's delete.
+    const valueCount = await this.valueRepository.count({
+      where: { list_id: id },
+    });
+    if (valueCount > 0) {
+      this.logger._warn(
+        `control_lists.blocked_delete entity=control_list id=${id} reason=has_values count=${valueCount}`,
+      );
+      this.throwNonFieldConflict(
+        `List "${list.name}" (key ${list.list_key}) cannot be deleted while it has values`,
+      );
+    }
+
     await this.listRepository.delete(id);
 
     this.logWrite('deleted', 'control_list', id, list.portfolio_id);
+
+    return { id };
+  }
+
+  // ---------------------------------------------------------------------
+  // A9 — GET /lists/:id/values
+  // ---------------------------------------------------------------------
+  async getValues(listId: number): Promise<ControlListValueResponse[]> {
+    await this.findActiveListOrFail(listId);
+
+    const values = await this.valueRepository.find({
+      where: { list_id: listId },
+      order: { display_order: 'ASC', id: 'ASC' },
+    });
+
+    return values.map((value) => this.mapValue(value));
+  }
+
+  // ---------------------------------------------------------------------
+  // A10 — POST /lists/:id/values
+  // ---------------------------------------------------------------------
+  async createValue(
+    listId: number,
+    dto: CreateControlListValueDto,
+  ): Promise<ControlListValueResponse> {
+    const list = await this.findActiveListOrFail(listId);
+
+    // Rework attempt 2 (Reviewer risk-lens FAIL, Leader decision A10):
+    // attempt 1 only proposed when `dto.code === undefined`, so `''`,
+    // whitespace (the DTO's own `@Transform` already collapses
+    // whitespace-only to `''` before this runs — see
+    // `CreateControlListValueDto.code`) and a literal `null` (the DTO has
+    // no `@IsNotEmpty()`, by design, so `null` reaches here unchanged) all
+    // skipped the proposal, saved straight into the NOT NULL `code` column,
+    // and either stored `''`/blew up with a raw 1048/500 or produced a
+    // false 409. `== null` deliberately catches BOTH `undefined` and
+    // `null` in one check (the DTO's declared type is `string | undefined`,
+    // but `null` reaches here at runtime regardless — see the dto's own
+    // comment). A non-empty, already-trimmed code falls through unchanged.
+    let code = dto.code;
+    if (code == null || code === '') {
+      const existingValues = await this.valueRepository.find({
+        where: { list_id: list.id },
+      });
+      code = this.proposeNextCode(
+        list,
+        existingValues.map((value) => value.code),
+      );
+    }
+
+    await this.assertValueFieldsAvailable(list.id, code, dto.value);
+
+    const newValue: Partial<ControlListValue> = {
+      list_id: list.id,
+      code,
+      value: dto.value,
+      // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
+      // create-time normalization as categories/lists above.
+      description: this.normalizeDescription(dto.description),
+      display_order: dto.displayOrder ?? 0,
+      is_active: dto.isActive ?? true,
+      ...this.currentUser.audit(SetAuditEnum.NEW),
+    };
+
+    let saved: ControlListValue;
+    try {
+      saved = await this.valueRepository.save(newValue);
+    } catch (error) {
+      this.rethrowAsValueConflictIfDuplicate(error, code, dto.value);
+    }
+
+    this.logWrite('created', 'control_list_value', saved.id, list.portfolio_id);
+
+    return this.mapValue(saved);
+  }
+
+  // ---------------------------------------------------------------------
+  // A11 — PATCH /values/:id
+  // ---------------------------------------------------------------------
+  async updateValue(
+    id: number,
+    dto: UpdateControlListValueDto,
+  ): Promise<ControlListValueResponse> {
+    const value = await this.findValueOrFail(id);
+    const list = await this.findListForValue(value);
+
+    if (dto.code !== undefined && dto.code !== value.code) {
+      await this.assertCodeAvailable(value.list_id, dto.code, id);
+    }
+    if (dto.value !== undefined && dto.value !== value.value) {
+      await this.assertValueNameAvailable(value.list_id, dto.value, id);
+    }
+
+    const update: Partial<ControlListValue> = {
+      ...(dto.code !== undefined ? { code: dto.code } : {}),
+      ...(dto.value !== undefined ? { value: dto.value } : {}),
+      ...(dto.description !== undefined
+        ? { description: this.normalizeDescription(dto.description) }
+        : {}),
+      ...(dto.displayOrder !== undefined
+        ? { display_order: dto.displayOrder }
+        : {}),
+      ...(dto.isActive !== undefined ? { is_active: dto.isActive } : {}),
+      ...this.currentUser.audit(SetAuditEnum.UPDATE),
+    };
+
+    try {
+      await this.valueRepository.update(id, update);
+    } catch (error) {
+      this.rethrowAsValueConflictIfDuplicate(
+        error,
+        dto.code ?? value.code,
+        dto.value ?? value.value,
+      );
+    }
+
+    const updated = await this.valueRepository.findOne({ where: { id } });
+
+    this.logWrite('updated', 'control_list_value', id, list.portfolio_id);
+
+    return this.mapValue(updated);
+  }
+
+  // ---------------------------------------------------------------------
+  // A12 — DELETE /values/:id
+  // ---------------------------------------------------------------------
+  async removeValue(id: number): Promise<{ id: number }> {
+    const value = await this.findValueOrFail(id);
+    const list = await this.findListForValue(value);
+
+    // T-04 adds the in-use (registry) block here; this slice only removes
+    // the row physically (D-CTL-5) — tasks.md T-03 scope note: "A12 here is
+    // a physical delete (plus the list-has-values rule lives on A8)".
+    await this.valueRepository.delete(id);
+
+    this.logWrite('deleted', 'control_list_value', id, list.portfolio_id);
 
     return { id };
   }
@@ -328,6 +505,33 @@ export class ControlListsService {
     return list;
   }
 
+  // Unlike `findActiveCategoryOrFail` / `findActiveListOrFail`, this does
+  // NOT filter `is_active: true`. Deletes are physical for all three tables
+  // (D-CTL-5), so `is_active` on a value is never a soft-delete marker —
+  // it is the Active flag an admin toggles (D-CTL-4). A deactivated value
+  // must still be findable, for both the admin read (R-CTL-004 "Deactivate"
+  // — "IT MUST still be returned by the admin read") and for re-activating
+  // it later.
+  private async findValueOrFail(id: number): Promise<ControlListValue> {
+    const value = await this.valueRepository.findOne({ where: { id } });
+    if (!value) {
+      throw new NotFoundException(`Value ${id} not found`);
+    }
+    return value;
+  }
+
+  private async findListForValue(
+    value: ControlListValue,
+  ): Promise<ControlList> {
+    const list = await this.listRepository.findOne({
+      where: { id: value.list_id },
+    });
+    if (!list) {
+      throw new NotFoundException(`List ${value.list_id} not found`);
+    }
+    return list;
+  }
+
   private async assertCategoryNameAvailable(
     portfolioId: number,
     name: string,
@@ -360,6 +564,44 @@ export class ControlListsService {
     }
   }
 
+  // R-CTL-004 "Duplicate code or value": both are checked, case-insensitive
+  // via the column's explicit collation (P-4), scoped to the list. Used by
+  // createValue (code AND value against the proposed/supplied pair).
+  private async assertValueFieldsAvailable(
+    listId: number,
+    code: string,
+    value: string,
+  ): Promise<void> {
+    await this.assertCodeAvailable(listId, code);
+    await this.assertValueNameAvailable(listId, value);
+  }
+
+  private async assertCodeAvailable(
+    listId: number,
+    code: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const existing = await this.valueRepository.findOne({
+      where: { list_id: listId, code },
+    });
+    if (existing && existing.id !== excludeId) {
+      this.throwDuplicateValueConflict(code, 'code');
+    }
+  }
+
+  private async assertValueNameAvailable(
+    listId: number,
+    value: string,
+    excludeId?: number,
+  ): Promise<void> {
+    const existing = await this.valueRepository.findOne({
+      where: { list_id: listId, value },
+    });
+    if (existing && existing.id !== excludeId) {
+      this.throwDuplicateValueConflict(value, 'value');
+    }
+  }
+
   // design.md §5 rule 2 / D-CTL-11: the service — never `sqlErrorsHelper`
   // (P-14) — catches a concurrent-insert race at the unique index (errno
   // 1062) and rethrows a field-named 409. Any other error is rethrown as-is.
@@ -388,6 +630,34 @@ export class ControlListsService {
     throw error;
   }
 
+  // Two unique indexes guard this table (`uq_control_list_values_list_code`,
+  // `uq_control_list_values_list_value` — design §3), so a race caught here
+  // (as opposed to the synchronous pre-check above) must disambiguate which
+  // one tripped from the driver error's message/sqlMessage, to keep the
+  // field-named 409 contract (code vs value) even on this backstop path.
+  // Falls back to 'code' when neither index name is present in the message
+  // (defensive; the pre-check already covers the common, non-race case).
+  private rethrowAsValueConflictIfDuplicate(
+    error: unknown,
+    code: string,
+    value: string,
+  ): never {
+    const errno = (error as { errno?: number })?.errno;
+
+    if (errno === MYSQL_DUPLICATE_ENTRY_ERRNO) {
+      const message = String(
+        (error as { sqlMessage?: string; message?: string })?.sqlMessage ??
+          (error as { message?: string })?.message ??
+          '',
+      );
+      if (message.includes('uq_control_list_values_list_value')) {
+        this.throwDuplicateValueConflict(value, 'value');
+      }
+      this.throwDuplicateValueConflict(code, 'code');
+    }
+    throw error;
+  }
+
   private throwDuplicateNameConflict(name: string): never {
     throw new ConflictException({
       message: {
@@ -402,6 +672,18 @@ export class ControlListsService {
       message: {
         description: `A list with key "${listKey}" already exists in this portfolio`,
         field: 'listKey',
+      },
+    });
+  }
+
+  private throwDuplicateValueConflict(
+    fieldValue: string,
+    field: 'code' | 'value',
+  ): never {
+    throw new ConflictException({
+      message: {
+        description: `A value with ${field} "${fieldValue}" already exists in this list`,
+        field,
       },
     });
   }
@@ -448,6 +730,36 @@ export class ControlListsService {
     return alnum.slice(0, 10) || 'LIST';
   }
 
+  // design.md §5 rule 4: `<prefix>-<nn>` zero-padded to 2 digits (e.g.
+  // UOM-08 after UOM-07); `org.level`'s prefix `L` is the one exception —
+  // no dash, no zero-padding (`L5` after `L4`). `nn`/`n` is 1 + the highest
+  // numeric suffix already in the list; a list with no matching codes yet
+  // starts at 1. The admin can still edit the proposal (F-6).
+  private proposeNextCode(list: ControlList, existingCodes: string[]): string {
+    const prefix = list.code_prefix;
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const isOrgLevelFormat = prefix === 'L';
+    const pattern = isOrgLevelFormat
+      ? new RegExp(`^${escapedPrefix}(\\d+)$`)
+      : new RegExp(`^${escapedPrefix}-(\\d+)$`);
+
+    let maxSuffix = 0;
+    for (const code of existingCodes) {
+      const match = pattern.exec(code);
+      if (match) {
+        const suffix = parseInt(match[1], 10);
+        if (suffix > maxSuffix) {
+          maxSuffix = suffix;
+        }
+      }
+    }
+
+    const next = maxSuffix + 1;
+    return isOrgLevelFormat
+      ? `${prefix}${next}`
+      : `${prefix}-${String(next).padStart(2, '0')}`;
+  }
+
   // design.md §9: info-level log through LoggerUtil on create/update/delete,
   // naming the entity, its id, its portfolio and the acting user id.
   private logWrite(
@@ -463,7 +775,7 @@ export class ControlListsService {
 
   private mapCategory(
     category: ControlListCategory,
-    lists: ControlList[] = [],
+    listEntries: { list: ControlList; valueCount: number }[] = [],
   ): ControlListCategoryResponse {
     return {
       id: category.id,
@@ -471,21 +783,40 @@ export class ControlListsService {
       name: category.name,
       description: category.description ?? null,
       displayOrder: category.display_order,
-      lists: lists.map((list) => this.mapListSummary(list)),
+      lists: listEntries.map((entry) =>
+        this.mapListSummary(entry.list, entry.valueCount),
+      ),
     };
   }
 
-  // valueCount stays 0 and usedBy stays [] until T-03 (values) and T-04
-  // (the usage registry) exist.
-  private mapListSummary(list: ControlList): ListSummary {
+  // valueCount is the real row count per list (T-03). usedBy stays [] until
+  // the T-04 registry exists.
+  private mapListSummary(list: ControlList, valueCount = 0): ListSummary {
     return {
       id: list.id,
       key: list.list_key,
       name: list.name,
       description: list.description ?? null,
-      valueCount: 0,
+      // D-CTL-17: additive field so the client can mirror proposeNextCode.
+      codePrefix: list.code_prefix,
+      valueCount,
       isSystem: list.is_system,
       usedBy: [],
+    };
+  }
+
+  private mapValue(value: ControlListValue): ControlListValueResponse {
+    return {
+      id: value.id,
+      listId: value.list_id,
+      code: value.code,
+      value: value.value,
+      description: value.description ?? null,
+      displayOrder: value.display_order,
+      isActive: value.is_active,
+      // T-04 sums real provider counts (design §5 rule 5); until the
+      // registry exists this stays 0.
+      inUse: 0,
     };
   }
 

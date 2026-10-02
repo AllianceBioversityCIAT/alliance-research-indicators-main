@@ -3,16 +3,19 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { ModalComponent } from '@shared/components/modal/modal.component';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { CustomProgressBarComponent } from '@shared/components/custom-progress-bar/custom-progress-bar.component';
+import { DataTableColumn, DataTableComponent } from '@shared/components/data-table/data-table.component';
 import { Portfolio } from '@shared/interfaces/portfolio.interface';
 import {
   ControlList,
   ControlListCategory,
   ControlListPortfolioSummary,
-  ControlListSummary
+  ControlListSummary,
+  ControlListValue
 } from '@shared/interfaces/control-lists.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ApiService } from '@shared/services/api.service';
@@ -34,8 +37,22 @@ interface ListFormValue {
 }
 
 /** The modal's current record type (design §6.2: "One modal with three modes: category / list /
- * value"). T-02 adds `list`; `value` mode is T-03's. */
-type ControlListModalMode = 'category' | 'list';
+ * value"). T-02 added `list`; T-03 adds `value`. */
+type ControlListModalMode = 'category' | 'list' | 'value';
+
+/** design §6.2 Modal row, value mode. `id` is NEVER part of this (D-CTL-14 / falsifier 2/3) —
+ * the permanent ID is tracked separately (`editingValueId`) and rendered as read-only text, with
+ * no form control bound to it. */
+interface ValueFormValue {
+  code: string;
+  value: string;
+  description: string;
+  // `number | null`: `<app-input type="number">` (`p-inputNumber`) emits `null` when the field is
+  // cleared (reviewer finding, T-03 rework) — a plain `number` here would hide that at the type
+  // level while still letting it happen at runtime. `saveValue()` normalises it before sending.
+  displayOrder: number | null;
+  isActive: boolean;
+}
 
 /**
  * A resolved client-side error: `message` is always display-safe text (never the exception
@@ -60,7 +77,18 @@ export interface PortfolioOption extends Portfolio {
 @Component({
   selector: 'app-control-lists',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, SelectModule, ModalComponent, InputComponent, TextareaComponent, CustomProgressBarComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ButtonModule,
+    SelectModule,
+    ToggleSwitchModule,
+    ModalComponent,
+    InputComponent,
+    TextareaComponent,
+    CustomProgressBarComponent,
+    DataTableComponent
+  ],
   templateUrl: './control-lists.component.html',
   styleUrl: './control-lists.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -154,6 +182,56 @@ export default class ControlListsComponent implements OnInit {
     });
   });
 
+  // ─── T-03: values (design §4 A9–A12, §6.2 values table + modal, §6.3 DataTable) ───────────
+  readonly values = signal<ControlListValue[]>([]);
+  readonly valuesLoading = signal(false);
+  readonly valuesLoadError = signal(false);
+  readonly savingValue = signal(false);
+  readonly deletingValueId = signal<number | null>(null);
+  readonly editingValueId = signal<number | null>(null);
+  readonly valueForm = signal<ValueFormValue>({ code: '', value: '', description: '', displayOrder: 0, isActive: true });
+  // Design §6.2 Modal row: a field-named 409 on 'code' or 'value' (duplicate, R-CTL-004) is
+  // shown inline under its own input — two separate signals because both fields can conflict
+  // independently.
+  readonly valueCodeFieldError = signal<string | null>(null);
+  readonly valueValueFieldError = signal<string | null>(null);
+
+  readonly isEditingValue = computed(() => this.editingValueId() !== null);
+  readonly valueModalTitle = computed(() => (this.isEditingValue() ? 'Edit value' : 'New value'));
+  readonly valueFormInvalid = computed(() => {
+    const form = this.valueForm();
+    if (!form.value.trim()) return true;
+    // Code is optional on CREATE (design §5 rule 4 — the server proposes one when blank), but
+    // once a value is established its code must not be saved blank.
+    if (this.isEditingValue() && !form.code.trim()) return true;
+    return false;
+  });
+
+  // design §6.3 DataTable column config — "ID" plain text (read-only, D-CTL-14), Code, Value,
+  // Description, Order, Active, Actions. "In use" is T-04 scope (tasks.md T-03 scope note),
+  // not built here.
+  readonly valueColumns: DataTableColumn<ControlListValue>[] = [
+    { field: 'id', header: 'ID', type: 'text', sortable: false },
+    { field: 'code', header: 'Code', type: 'code', sortable: true },
+    { field: 'value', header: 'Value', type: 'text', sortable: true },
+    { field: 'description', header: 'Description', type: 'text', sortable: false },
+    { field: 'displayOrder', header: 'Order', type: 'number', sortable: true },
+    { field: 'isActive', header: 'Active', type: 'badge', sortable: false }
+  ];
+  readonly valueSearchFields: (keyof ControlListValue & string)[] = ['code', 'value', 'description'];
+
+  // design §6.3 "Export … with the list name in the file name".
+  readonly valuesExportFileName = computed(() => {
+    const list = this.selectedList();
+    const slug =
+      (list?.name ?? 'values')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '') || 'values';
+    return `control-list-values-${slug}.xlsx`;
+  });
+
   ngOnInit(): void {
     this.configureModal();
     void this.load();
@@ -207,11 +285,42 @@ export default class ControlListsComponent implements OnInit {
     // R-CTL-001 isolation: a list id from the previous portfolio must not stay "selected"
     // against the new portfolio's categories.
     this.selectedListId.set(null);
+    this.values.set([]);
     await this.loadCategories(portfolioId);
   }
 
   selectList(listId: number): void {
     this.selectedListId.set(listId);
+    void this.loadValues(listId);
+  }
+
+  // Leader-adjudicated defect (T-03 rework): with no guard, selecting list A then quickly list B
+  // let A's slower response land AFTER B's and overwrite B's table with A's rows — and the next
+  // "Add value" on B would then derive its proposed code from A's values and POST it to B. Every
+  // branch below re-checks `selectedListId()` against the `listId` this call started with, so a
+  // response for a list the admin has since navigated away from is silently dropped.
+  private async loadValues(listId: number): Promise<void> {
+    this.valuesLoading.set(true);
+    this.valuesLoadError.set(false);
+
+    try {
+      const response = await this.api.GET_ControlListValues(listId);
+      if (this.selectedListId() !== listId) return;
+      if (response?.successfulRequest === false) {
+        this.valuesLoadError.set(true);
+        this.values.set([]);
+        return;
+      }
+      this.values.set(Array.isArray(response?.data) ? response.data : []);
+    } catch {
+      if (this.selectedListId() !== listId) return;
+      this.valuesLoadError.set(true);
+      this.values.set([]);
+    } finally {
+      if (this.selectedListId() === listId) {
+        this.valuesLoading.set(false);
+      }
+    }
   }
 
   private async loadCategories(portfolioId: number): Promise<void> {
@@ -263,9 +372,74 @@ export default class ControlListsComponent implements OnInit {
     this.openModal();
   }
 
+  // ─── T-03: value modal (design §4 A10/A11, §6.2 Modal row value mode) ─────────────────────
+
+  startCreateValue(): void {
+    const list = this.selectedList();
+    if (!list) return;
+    this.modalMode.set('value');
+    this.resetValueForm();
+    // D-CTL-17: computed HERE on the client, from the codes already loaded for this list (no
+    // network round trip) — but using the LIST's own `codePrefix`, not one guessed from the
+    // codes themselves (reviewer FAIL, T-03 rework attempt 1: a code belonging to another list's
+    // prefix, e.g. a stray `X-50`, could otherwise win). The rule mirrors the server's
+    // `proposeNextCode` exactly, including `<prefix>-01` / `L1` on an empty list, so this never
+    // diverges from what A10 would propose server-side when `code` is omitted.
+    const proposedCode = this.deriveNextProposedCode(
+      list.codePrefix,
+      this.values().map(existing => existing.code)
+    );
+    this.valueForm.update(current => ({ ...current, code: proposedCode }));
+    this.openModal();
+  }
+
+  startEditValue(value: ControlListValue): void {
+    this.modalMode.set('value');
+    this.editingValueId.set(value.id);
+    this.valueForm.set({
+      code: value.code,
+      value: value.value,
+      description: value.description ?? '',
+      displayOrder: value.displayOrder,
+      isActive: value.isActive
+    });
+    this.openModal();
+  }
+
+  updateValueFormActive(isActive: boolean): void {
+    this.valueForm.update(current => ({ ...current, isActive }));
+  }
+
+  // D-CTL-17 / design §5 rule 4: a LITERAL mirror of the server's `proposeNextCode`
+  // (`control-lists.service.ts`) — same escaping, same `L<n>` special case, same "ignore a code
+  // from another prefix" behavior, same `<prefix>-01` / `L1` result on an empty (or
+  // all-foreign-prefix) list. Keep this in lockstep with the server function if either changes.
+  private deriveNextProposedCode(codePrefix: string, existingCodes: string[]): string {
+    const escapedPrefix = codePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const isOrgLevelFormat = codePrefix === 'L';
+    const pattern = isOrgLevelFormat ? new RegExp(`^${escapedPrefix}(\\d+)$`) : new RegExp(`^${escapedPrefix}-(\\d+)$`);
+
+    let maxSuffix = 0;
+    for (const code of existingCodes) {
+      const match = pattern.exec(code);
+      if (match) {
+        const suffix = parseInt(match[1], 10);
+        if (suffix > maxSuffix) {
+          maxSuffix = suffix;
+        }
+      }
+    }
+
+    const next = maxSuffix + 1;
+    return isOrgLevelFormat ? `${codePrefix}${next}` : `${codePrefix}-${String(next).padStart(2, '0')}`;
+  }
+
   clearModal = (): void => {
-    if (this.modalMode() === 'list') {
+    const mode = this.modalMode();
+    if (mode === 'list') {
       this.resetListForm();
+    } else if (mode === 'value') {
+      this.resetValueForm();
     } else {
       this.resetForm();
     }
@@ -516,6 +690,7 @@ export default class ControlListsComponent implements OnInit {
 
       this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'List deleted successfully' });
       this.selectedListId.set(null);
+      this.values.set([]);
       await this.loadCategories(portfolioId);
     } catch {
       this.showBlockedDeleteListAlert('This list could not be deleted.');
@@ -528,6 +703,149 @@ export default class ControlListsComponent implements OnInit {
     this.actions.showGlobalAlert({
       severity: 'error',
       summary: 'Cannot delete list',
+      detail,
+      hasNoCancelButton: true,
+      generalButton: true,
+      confirmCallback: { label: 'Close', event: () => undefined },
+      buttonColor: 'var(--ac-light-blue-400)'
+    });
+  }
+
+  // ─── T-03: value CRUD (design §4 A10–A12, §5 rules 2, 4, 6) ────────────────────────────────
+
+  async saveValue(): Promise<void> {
+    if (this.valueFormInvalid() || this.savingValue()) return;
+    const list = this.selectedList();
+    const portfolioId = this.selectedPortfolioId();
+    if (!list || portfolioId === null) return;
+
+    this.savingValue.set(true);
+    this.valueCodeFieldError.set(null);
+    this.valueValueFieldError.set(null);
+    const formValue = this.valueForm();
+    const editingId = this.editingValueId();
+    const trimmedCode = formValue.code.trim();
+    const trimmedValue = formValue.value.trim();
+    // Same Leader-adjudicated rule as the category/list forms above: create omits an empty
+    // description (nothing to clear yet); edit sends '' so the server actually clears it.
+    const trimmedDescription = formValue.description.trim();
+    // Reviewer finding (T-03 rework): `p-inputNumber` emits `null` when the Order field is
+    // cleared, and the DTO's NOT NULL column would 500 (or false-409) on that. On CREATE, a
+    // cleared Order sends a safe default of 0; on EDIT, the key is omitted entirely so a value
+    // the admin otherwise left untouched is not silently reset to 0.
+    const hasValidDisplayOrder = typeof formValue.displayOrder === 'number' && Number.isFinite(formValue.displayOrder);
+
+    try {
+      const response =
+        editingId === null
+          ? await this.api.POST_ControlListValue(list.id, {
+              code: trimmedCode || undefined,
+              value: trimmedValue,
+              description: trimmedDescription || undefined,
+              displayOrder: hasValidDisplayOrder ? (formValue.displayOrder as number) : 0,
+              isActive: formValue.isActive
+            })
+          : await this.api.PATCH_ControlListValue(editingId, {
+              code: trimmedCode,
+              value: trimmedValue,
+              description: trimmedDescription,
+              ...(hasValidDisplayOrder ? { displayOrder: formValue.displayOrder as number } : {}),
+              isActive: formValue.isActive
+            });
+
+      if (response?.successfulRequest === false) {
+        this.handleValueSaveError(response);
+        return;
+      }
+
+      this.actions.showToast({
+        severity: 'success',
+        summary: 'Control Lists',
+        detail: editingId === null ? 'Value created successfully' : 'Value updated successfully'
+      });
+      this.resetValueForm();
+      this.modals.closeModal('controlListForm');
+      await this.loadValues(list.id);
+      // Leader's brief: "After value create/delete, the navigator valueCount must update" —
+      // A1's `ControlListSummary.valueCount` is stale until categories are reloaded, same
+      // staleness fix as the A2 "(not configured)" label refresh above.
+      await this.loadCategories(portfolioId);
+    } catch {
+      this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'We could not save the value. Please try again.' });
+    } finally {
+      this.savingValue.set(false);
+    }
+  }
+
+  // Design §6.2 Modal row: a field-named 409 names `field: 'code'` or `field: 'value'` (R-CTL-004
+  // "Duplicate code or value") — shown inline under the matching input. Anything else falls back
+  // to a toast, same pattern as the category/list handlers (reviewer finding 1).
+  private handleValueSaveError(response: MainResponse<unknown>): void {
+    const fieldError = this.extractFieldError(response);
+    if (fieldError?.field === 'code') {
+      this.valueCodeFieldError.set(fieldError.message);
+      return;
+    }
+    if (fieldError?.field === 'value') {
+      this.valueValueFieldError.set(fieldError.message);
+      return;
+    }
+    this.actions.showToast({
+      severity: 'error',
+      summary: 'Error',
+      detail: fieldError?.message || 'We could not save the value. Please try again.'
+    });
+  }
+
+  deleteValue(value: ControlListValue): void {
+    if (this.deletingValueId() !== null) return;
+
+    this.actions.showGlobalAlert({
+      severity: 'warning',
+      summary: 'Delete value',
+      detail: `Are you sure you want to delete ${value.value || 'this value'}? This action cannot be undone.`,
+      confirmCallback: {
+        label: 'Continue',
+        event: () => {
+          void this.confirmDeleteValue(value);
+        }
+      },
+      cancelCallback: { label: 'Cancel' },
+      buttonColor: 'var(--ac-light-blue-400)'
+    });
+  }
+
+  private async confirmDeleteValue(value: ControlListValue): Promise<void> {
+    const list = this.selectedList();
+    const portfolioId = this.selectedPortfolioId();
+    if (!list || portfolioId === null || this.deletingValueId() !== null) return;
+
+    this.deletingValueId.set(value.id);
+
+    try {
+      const response = await this.api.DELETE_ControlListValue(value.id);
+
+      if (response?.successfulRequest === false) {
+        // design §6.2 / A12: a blocked delete (409 in use — T-04; here, any other 409) is shown
+        // AS-IS — the server's own description — behind a single Close.
+        this.showBlockedDeleteValueAlert(this.extractErrorMessage(response, 'This value could not be deleted.'));
+        return;
+      }
+
+      this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'Value deleted successfully' });
+      await this.loadValues(list.id);
+      await this.loadCategories(portfolioId);
+    } catch {
+      this.showBlockedDeleteValueAlert('This value could not be deleted.');
+    } finally {
+      this.deletingValueId.set(null);
+    }
+  }
+
+  private showBlockedDeleteValueAlert(detail: string): void {
+    this.actions.showGlobalAlert({
+      severity: 'error',
+      summary: 'Cannot delete value',
       detail,
       hasNoCancelButton: true,
       generalButton: true,
@@ -549,30 +867,44 @@ export default class ControlListsComponent implements OnInit {
     this.listKeyFieldError.set(null);
   }
 
+  private resetValueForm(): void {
+    this.editingValueId.set(null);
+    this.valueForm.set({ code: '', value: '', description: '', displayOrder: 0, isActive: true });
+    this.valueCodeFieldError.set(null);
+    this.valueValueFieldError.set(null);
+  }
+
   private configureModal(): void {
     const mode = this.modalMode();
     this.modals.modalConfig.update(modals => ({
       ...modals,
       controlListForm: {
         ...modals.controlListForm,
-        title: mode === 'list' ? this.listModalTitle() : this.modalTitle(),
+        title: mode === 'list' ? this.listModalTitle() : mode === 'value' ? this.valueModalTitle() : this.modalTitle(),
         cancelText: 'Cancel',
         confirmText: 'Save',
         confirmAction: () => {
-          void (mode === 'list' ? this.saveList() : this.save());
+          void (mode === 'list' ? this.saveList() : mode === 'value' ? this.saveValue() : this.save());
         },
         cancelAction: () => this.modals.closeModal('controlListForm'),
-        disabledConfirmAction: () => (mode === 'list' ? this.listFormInvalid() || this.savingList() : this.formInvalid() || this.saving())
+        disabledConfirmAction: () =>
+          mode === 'list'
+            ? this.listFormInvalid() || this.savingList()
+            : mode === 'value'
+              ? this.valueFormInvalid() || this.savingValue()
+              : this.formInvalid() || this.saving()
       }
     }));
   }
 
   private openModal(): void {
-    // Clears a stale inline error from a previous failed attempt — startEdit()/startEditList()
-    // do not route through the reset*Form() helpers, so without this a re-opened modal could
-    // still show the last field error.
+    // Clears a stale inline error from a previous failed attempt — startEdit()/startEditList()/
+    // startEditValue() do not route through the reset*Form() helpers, so without this a
+    // re-opened modal could still show the last field error.
     this.nameFieldError.set(null);
     this.listKeyFieldError.set(null);
+    this.valueCodeFieldError.set(null);
+    this.valueValueFieldError.set(null);
     this.configureModal();
     this.modals.openModal('controlListForm');
   }

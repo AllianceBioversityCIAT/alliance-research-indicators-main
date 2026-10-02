@@ -111,7 +111,7 @@ Base path `/api/control-lists` (unversioned — root `CLAUDE.md` §4.1). Class-l
 
 | # | Method + path | Roles | Input | Response `data` | Errors |
 | --- | --- | --- | --- | --- | --- |
-| A1 | `GET /categories?portfolioId=` | CENTER_ADMIN, SYSTEM_ADMIN | `portfolioId` required | `Category[]`, each with `lists: ListSummary[]` (id, key, name, value count, is_system, `usedBy: string[]` — consumer names from the registry, empty = *Not linked to a form yet*) | 400 missing id · 404 portfolio |
+| A1 | `GET /categories?portfolioId=` | CENTER_ADMIN, SYSTEM_ADMIN | `portfolioId` required | `Category[]`, each with `lists: ListSummary[]` (id, key, name, description, codePrefix, value count, is_system — D-CTL-17 — `usedBy: string[]` — consumer names from the registry, empty = *Not linked to a form yet*) | 400 missing id · 404 portfolio |
 | A2 | `GET /portfolios/summary` | CENTER_ADMIN, SYSTEM_ADMIN | — | `{ portfolioId, categories: number }[]` — drives *not configured* | — |
 | A3 | `POST /categories` | CENTER_ADMIN, SYSTEM_ADMIN | `{portfolioId, name, description?}` | `Category` (201) | 400 · 404 portfolio · 409 duplicate name |
 | A4 | `PATCH /categories/:id` | same | `{name?, description?}` | `Category` | 404 · 409 duplicate |
@@ -241,6 +241,7 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 | D-CTL-14 | 2026-10-01 | Each value's own PK `id` is its permanent reference: shown read-only in the table and the modal, rejected in update bodies, with explicit ids for seeded rows | Code and name are editable (F-6), so logic that keys on them breaks silently when an admin renames them. The id is immutable, and explicit seed ids make it identical across environments (requester) | A separate immutable `system_code` column; relying on the editable code |
 | D-CTL-15 | 2026-10-01 | List membership is checked by the consumer's service through `assertValueInList`; plain FK to `control_list_values.id` only | The requester rejected a composite FK `(list_id, value_id)`. The service check returns a named 400; the plain FK still blocks deleting a value in use | Composite FK (requester: no) |
 | D-CTL-16 | 2026-10-01 | Delivery by vertical slices: categories → lists → values → usage. Each task ships its table + server + screen, and is executed as a server dispatch plus a client dispatch in parallel (cross-package, root `CLAUDE.md` §4.3) | The requester wants every task visible and testable end to end. One migration per data slice (T-01…T-03) keeps each task self-contained; T-04 adds behavior on the existing tables, with no schema | Horizontal split (all server first, then all client) — the original 10-task plan |
+| D-CTL-17 | 2026-10-02 | A1 `ListSummary` also returns `description` (T-02) and `codePrefix` (T-03). The client pre-fills the proposed value code with the same rule as the server (§5 rule 4), including `<prefix>-01` on an empty list | The list header needs the description. Without the prefix, the client had to guess it from existing codes and diverged from rule 4 (T-03 attempt-1 FAIL, both lenses). Additive fields; no consumer breaks | A client heuristic over existing codes; a separate code-proposal endpoint |
 
 **Judgment status:** D-CTL-14…16 were reviewed in Judgment Day round 2 (2026-10-01): APPROVED, 0 confirmed severe, suspects J-9…J-11 pending the user — see `judgment.md`.
 

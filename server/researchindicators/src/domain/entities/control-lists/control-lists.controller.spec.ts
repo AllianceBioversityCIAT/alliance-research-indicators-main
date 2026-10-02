@@ -13,6 +13,8 @@ import { UpdateControlListCategoryDto } from './dto/update-control-list-category
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
 import { UpdateControlListDto } from './dto/update-control-list.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
+import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -28,6 +30,10 @@ describe('ControlListsController', () => {
     createList: jest.fn(),
     updateList: jest.fn(),
     removeList: jest.fn(),
+    getValues: jest.fn(),
+    createValue: jest.fn(),
+    updateValue: jest.fn(),
+    removeValue: jest.fn(),
   };
 
   const mockFormat = jest.fn();
@@ -61,7 +67,9 @@ describe('ControlListsController', () => {
 
   // Falsifier 4 (tasks.md T-01): adding TECHNICAL_SUPPORT to any of A1–A5
   // must fail this test. D-CTL-7: unlike portfolios.controller, this module
-  // grants only CENTER_ADMIN + SYSTEM_ADMIN.
+  // grants only CENTER_ADMIN + SYSTEM_ADMIN. Falsifier 7 (tasks.md T-03):
+  // adding TECHNICAL_SUPPORT to A12 (or any of A9–A12) must fail this test
+  // too (J-10 — iterates every new handler).
   describe('roles metadata (NFR-CTL-002, D-CTL-7)', () => {
     const handlers: Array<keyof ControlListsController> = [
       'getCategories',
@@ -72,6 +80,10 @@ describe('ControlListsController', () => {
       'createList',
       'updateList',
       'removeList',
+      'getValues',
+      'createValue',
+      'updateValue',
+      'removeValue',
     ];
 
     it.each(handlers)(
@@ -231,6 +243,76 @@ describe('ControlListsController', () => {
       expect(mockService.removeList).toHaveBeenCalledWith(3);
       expect(ResponseUtils.format).toHaveBeenCalledWith({
         description: 'List 3 was deleted successfully',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+  });
+
+  describe('getValues (A9)', () => {
+    it('reads the list id from the param and returns the formatted envelope', async () => {
+      const data = [{ id: 1, listId: 2, code: 'DIR-01', value: 'Increase' }];
+      mockService.getValues.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.getValues(2);
+
+      expect(mockService.getValues).toHaveBeenCalledWith(2);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Values found',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+  });
+
+  describe('createValue (A10)', () => {
+    it('creates a value and returns 201', async () => {
+      const dto: CreateControlListValueDto = { value: 'Hold' };
+      const data = { id: 7, listId: 2, code: 'DIR-03', ...dto };
+      mockService.createValue.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.createValue(2, dto);
+
+      expect(mockService.createValue).toHaveBeenCalledWith(2, dto);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Value created successfully',
+        data,
+        status: HttpStatus.CREATED,
+      });
+    });
+  });
+
+  describe('updateValue (A11)', () => {
+    it('updates a value and returns 200', async () => {
+      const dto: UpdateControlListValueDto = { value: 'Renamed value' };
+      const data = { id: 5, value: 'Renamed value' };
+      mockService.updateValue.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.updateValue(5, dto);
+
+      expect(mockService.updateValue).toHaveBeenCalledWith(5, dto);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Value updated successfully',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+  });
+
+  describe('removeValue (A12)', () => {
+    it('deletes a value and returns its id', async () => {
+      const data = { id: 6 };
+      mockService.removeValue.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.removeValue(6);
+
+      expect(mockService.removeValue).toHaveBeenCalledWith(6);
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Value 6 was deleted successfully',
         data,
         status: HttpStatus.OK,
       });

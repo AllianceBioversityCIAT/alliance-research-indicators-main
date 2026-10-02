@@ -152,7 +152,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-03 — Slice 3: Values (table + API + values table with a read-only ID)
 
 - **Jira:** [AC-1782](https://cgiarmel.atlassian.net/browse/AC-1782) (story [AC-1778](https://cgiarmel.atlassian.net/browse/AC-1778))
-- **Status:** todo · **Size:** L · **Dependencies:** T-02
+- **Status:** done (PASS on attempt 2, 2026-10-02) · **Size:** L · **Dependencies:** T-02
 - **Requirements covered:** R-CTL-003 *Custom list lifecycle* (a list with values cannot be deleted), R-CTL-004 (all, incl. **AC.3 read-only ID**), R-CTL-009 (all ACs except resize persistence, which T-05 covers), R-CTL-008 empty and loading states for the table, R-CTL-010 (23 values; total 2 / 6 / 23), NFR-CTL-003, NFR-CTL-004 (`aria-sort`)
 - **Design refs:** §3 (values, permanent ID), §4 A1 (`valueCount`), A9–A12, §5 rules 2, 4, 6, §6.2 values table + modal, §6.3, D-CTL-4, D-CTL-5, D-CTL-6, D-CTL-14, P-3, P-4; judgment J-5, J-7
 - **Scope — database:** `<epochMs>-createControlListValues.ts` — `control_list_values` with FK `list_id` → lists RESTRICT, `uq_control_list_values_list_code`, `uq_control_list_values_list_value`, `idx_control_list_values_list_order`, collation. Seed 23 values with **explicit ids 1–23**, then reset `AUTO_INCREMENT`. `down` drops only this table.
@@ -192,8 +192,8 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Consumers:** T-01/T-02 specs (A1 `valueCount`); `angular.json` (no test consumers).
 - **Review:** `full` — DB uniqueness, the permanent ID and the shared table pattern.
 - **Done criteria:**
-  - [ ] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
-  - [ ] `ng build`: `exceljs` only in a lazy chunk, not in `main` (read the build stats); the initial bundle within budget.
+  - [x] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
+  - [x] `ng build`: `exceljs` only in a lazy chunk, not in `main` (read the build stats); the initial bundle within budget. *(`exceljs-min` lazy chunk 947 kB; Initial total 1.35 MB vs 2 MB warning — Leader's own build run.)*
   - [ ] A9–A12 in `/swagger`; both packages' test, lint and build gates.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 

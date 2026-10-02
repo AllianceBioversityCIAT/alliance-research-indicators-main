@@ -115,6 +115,8 @@
                 </span>
               </div>
               <div class="flex shrink-0 gap-2">
+                <p-button label="Add value" icon="pi pi-plus !text-[12px]" size="small" severity="info"
+                  styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-button"></p-button>
                 <p-button label="Edit list" size="small" severity="secondary" styleClass="!rounded-[9px] !text-[13px]"
                   (onClick)="startEditList()" data-testid="edit-list-button"></p-button>
                 @if (!list.isSystem) {
@@ -122,6 +124,43 @@
                   (onClick)="deleteList()" data-testid="delete-list-button"></p-button>
                 }
               </div>
+            </div>
+
+            <div class="min-h-0 flex-1 p-4" data-testid="values-panel">
+              @if (valuesLoadError()) {
+              <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="values-error-state">
+                <p class="m-0 text-sm atc-red-1">We could not load values. Please refresh the page.</p>
+              </div>
+              } @else {
+              <app-data-table [columns]="valueColumns" [rows]="values()" [loading]="valuesLoading()"
+                [searchFields]="valueSearchFields" [exportFileName]="valuesExportFileName()"
+                searchPlaceholder="Search code, value or description" emptyMessage="No values yet for this list."
+                data-testid="values-table">
+                <ng-template #rowActions let-row>
+                  <div class="flex gap-2">
+                    <button type="button" [attr.aria-label]="'Edit ' + row.value" (click)="startEditValue(row)"
+                      data-testid="edit-value-button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+                      <i class="pi pi-pencil !text-[12px] atc-light-blue-400"></i>
+                    </button>
+                    <button type="button" [attr.aria-label]="'Delete ' + row.value" (click)="deleteValue(row)"
+                      data-testid="delete-value-button"
+                      class="inline-flex h-[27px] w-[27px] cursor-pointer items-center justify-center rounded-[8px] bg-[var(--ac-grey-100)] transition-colors duration-150 hover:bg-[var(--ac-grey-200)]">
+                      <i class="pi pi-trash !text-[12px] atc-red-1"></i>
+                    </button>
+                  </div>
+                </ng-template>
+                <ng-template #emptyState>
+                  <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="values-empty-state">
+                    <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                    <p class="m-0 text-sm atc-grey-700">No values yet for this list.</p>
+                    <p-button label="Add value" icon="pi pi-plus !text-[12px]" severity="info" size="small"
+                      styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-empty-button">
+                    </p-button>
+                  </div>
+                </ng-template>
+              </app-data-table>
+              }
             </div>
             } @else {
             <div class="flex flex-1 items-center justify-center p-10" data-testid="list-detail-empty">
@@ -153,6 +192,37 @@
     <app-input label="Code prefix" [signal]="listForm" optionValue="codePrefix" [maxLength]="10"
       placeholder="Optional, e.g. UOM"></app-input>
     }
+  </div>
+  } @else if (modalMode() === 'value') {
+  <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8" data-testid="value-form">
+    @if (isEditingValue()) {
+    <div class="flex flex-col gap-1">
+      <span class="text-xs font-medium uppercase tracking-wide atc-grey-700">ID</span>
+      <span class="text-sm atc-grey-900" data-testid="value-id-readonly">{{ editingValueId() }}</span>
+    </div>
+    }
+    <div class="flex flex-col gap-1" data-testid="value-code-field">
+      <app-input label="Code" [signal]="valueForm" optionValue="code" [maxLength]="30"
+        placeholder="Proposed automatically if left blank"></app-input>
+      @if (valueCodeFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="value-code-field-error">{{ valueCodeFieldError() }}</p>
+      }
+    </div>
+    <div class="flex flex-col gap-1">
+      <app-input label="Value" [signal]="valueForm" optionValue="value" [isRequired]="true" [maxLength]="150"
+        placeholder="e.g. Increase"></app-input>
+      @if (valueValueFieldError()) {
+      <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="value-value-field-error">{{ valueValueFieldError() }}</p>
+      }
+    </div>
+    <app-textarea label="Description" [signal]="valueForm" optionValue="description" placeholder="Optional description"
+      [rows]="4" [maxLength]="500"></app-textarea>
+    <app-input label="Order" type="number" [signal]="valueForm" optionValue="displayOrder" [min]="0"></app-input>
+    <div class="flex items-center gap-3">
+      <p-toggleswitch inputId="valueActiveToggle" [ngModel]="valueForm().isActive" (ngModelChange)="updateValueFormActive($event)"
+        data-testid="value-active-toggle"></p-toggleswitch>
+      <label for="valueActiveToggle" class="text-sm atc-grey-900">Active</label>
+    </div>
   </div>
   } @else {
   <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8">

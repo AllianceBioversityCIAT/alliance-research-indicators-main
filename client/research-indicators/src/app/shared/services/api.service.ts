@@ -48,7 +48,10 @@ import {
   ControlListCategoryUpdatePayload,
   ControlListCreatePayload,
   ControlListPortfolioSummary,
-  ControlListUpdatePayload
+  ControlListUpdatePayload,
+  ControlListValue,
+  ControlListValueCreatePayload,
+  ControlListValueUpdatePayload
 } from '@shared/interfaces/control-lists.interface';
 import { GetGeoLocation } from '../interfaces/get-geo-location.interface';
 import { GetIndicatorsResultsAmount } from '../interfaces/get-indicators-results-amount.interface';
@@ -274,6 +277,25 @@ export class ApiService {
 
   DELETE_ControlList = (id: number): Promise<MainResponse<{ id: number }>> => {
     return this.TP.delete(`control-lists/lists/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/control-lists T-03 (client half) — A9–A12.
+  GET_ControlListValues = (listId: number): Promise<MainResponse<ControlListValue[]>> => {
+    return this.TP.get(`control-lists/lists/${listId}/values`, {});
+  };
+
+  POST_ControlListValue = (listId: number, body: ControlListValueCreatePayload): Promise<MainResponse<ControlListValue>> => {
+    return this.TP.post(`control-lists/lists/${listId}/values`, body, {});
+  };
+
+  // `id` must never be part of `body` (design §4 A11 / D-CTL-14 — the permanent value ID is
+  // never sent in an update).
+  PATCH_ControlListValue = (id: number, body: ControlListValueUpdatePayload): Promise<MainResponse<ControlListValue>> => {
+    return this.TP.patch(`control-lists/values/${id}`, body, {});
+  };
+
+  DELETE_ControlListValue = (id: number): Promise<MainResponse<{ id: number }>> => {
+    return this.TP.delete(`control-lists/values/${id}`, {});
   };
 
   GET_FundingTypes = (): Promise<MainResponse<FundingType[]>> => {

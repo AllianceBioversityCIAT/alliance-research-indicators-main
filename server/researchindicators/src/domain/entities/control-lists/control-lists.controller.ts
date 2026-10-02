@@ -28,6 +28,8 @@ import { UpdateControlListCategoryDto } from './dto/update-control-list-category
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
 import { UpdateControlListDto } from './dto/update-control-list.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
+import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -241,6 +243,114 @@ export class ControlListsController {
     return this.controlListsService.removeList(id).then((data) =>
       ResponseUtils.format({
         description: `List ${data.id} was deleted successfully`,
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A9
+  @Get('lists/:id/values')
+  @ApiOperation({ summary: 'List the values of a list' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'List id',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async getValues(@Param('id', ParseIntPipe) id: number) {
+    return this.controlListsService.getValues(id).then((data) =>
+      ResponseUtils.format({
+        description: 'Values found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A10
+  @Post('lists/:id/values')
+  @ApiOperation({ summary: 'Create a value in a list' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'List id',
+  })
+  @ApiBody({
+    type: CreateControlListValueDto,
+    description: 'Create a value',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async createValue(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateControlListValueDto,
+  ) {
+    return this.controlListsService.createValue(id, dto).then((data) =>
+      ResponseUtils.format({
+        description: 'Value created successfully',
+        data,
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
+  // A11
+  @Patch('values/:id')
+  @ApiOperation({ summary: 'Update a value' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Value id',
+  })
+  @ApiBody({
+    type: UpdateControlListValueDto,
+    description: 'Update a value',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async updateValue(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateControlListValueDto,
+  ) {
+    return this.controlListsService.updateValue(id, dto).then((data) =>
+      ResponseUtils.format({
+        description: 'Value updated successfully',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // A12
+  @Delete('values/:id')
+  @ApiOperation({ summary: 'Delete a value' })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Value id',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async removeValue(@Param('id', ParseIntPipe) id: number) {
+    return this.controlListsService.removeValue(id).then((data) =>
+      ResponseUtils.format({
+        description: `Value ${data.id} was deleted successfully`,
         data,
         status: HttpStatus.OK,
       }),

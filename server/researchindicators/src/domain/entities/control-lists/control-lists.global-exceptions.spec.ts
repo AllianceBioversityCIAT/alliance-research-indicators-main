@@ -3,6 +3,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
+import { ControlListValueRepository } from './repositories/control-list-value.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { GlobalExceptions } from '../../shared/error-management/global.exception';
@@ -33,6 +34,11 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
  * read `errors.description` uniformly for every 409 this module throws. The
  * cross-portfolio list move (400) is the one exception: it is a plain
  * string, like the 404 test below.
+ *
+ * T-03 extends this with the values contract: duplicate code/value are the
+ * SAME {description, field} object shape (field: 'code' | 'value'); a
+ * list-has-values delete is a non-field conflict, the same envelope as the
+ * T-02 non-field conflicts above, minus the `field` key.
  */
 describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   let service: ControlListsService;
@@ -60,6 +66,20 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     save: mockListSave,
     update: jest.fn(),
     delete: mockListDelete,
+  };
+
+  const mockValueFindOne = jest.fn();
+  const mockValueFind = jest.fn();
+  const mockValueCount = jest.fn();
+  const mockValueSave = jest.fn();
+  const mockValueDelete = jest.fn();
+  const mockValueRepository = {
+    find: mockValueFind,
+    findOne: mockValueFindOne,
+    count: mockValueCount,
+    save: mockValueSave,
+    update: jest.fn(),
+    delete: mockValueDelete,
   };
 
   const mockPortfoliosFindOne = jest.fn();
@@ -108,6 +128,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
+    mockValueCount.mockResolvedValue(0);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -119,6 +140,10 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
         {
           provide: ControlListRepository,
           useValue: mockListRepository,
+        },
+        {
+          provide: ControlListValueRepository,
+          useValue: mockValueRepository,
         },
         { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
@@ -343,6 +368,131 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       errors: 'Category 9 belongs to a different portfolio than list 1',
       timestamp: expect.any(String),
       path: '/api/control-lists/lists/1',
+    });
+  });
+
+  // T-03 forward pointer (T-02 execution.md): "a list with values cannot be
+  // deleted → 409, non-field body errors: { description } (same shape as
+  // system-list delete)".
+  it('409 list-has-values delete: errors is the OBJECT {description} with NO field (non-field conflict, T-03)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 7,
+      portfolio_id: 2,
+      list_key: 'kpi.custom_source',
+      name: 'Custom source',
+      is_system: false,
+      is_active: true,
+    });
+    mockValueCount.mockResolvedValue(2);
+
+    let thrown: unknown;
+    try {
+      await service.removeList(7);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/lists/7', method: 'DELETE' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'List "Custom source" (key kpi.custom_source) cannot be deleted while it has values',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/7',
+    });
+  });
+
+  // Pinned 409 contract (T-03 brief): duplicate code → {description, field:
+  // 'code'}.
+  it('409 duplicate value code: errors is the OBJECT {description, field: "code"} (T-03)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 2,
+      portfolio_id: 2,
+      is_active: true,
+    });
+    mockValueFindOne.mockResolvedValue({
+      id: 9,
+      list_id: 2,
+      code: 'DIR-01',
+    });
+
+    let thrown: unknown;
+    try {
+      await service.createValue(2, { code: 'DIR-01', value: 'Increase' });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/lists/2/values',
+      method: 'POST',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description: 'A value with code "DIR-01" already exists in this list',
+        field: 'code',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/2/values',
+    });
+  });
+
+  // Pinned 409 contract (T-03 brief): duplicate value → {description, field:
+  // 'value'}.
+  it('409 duplicate value name: errors is the OBJECT {description, field: "value"} (T-03)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 2,
+      portfolio_id: 2,
+      is_active: true,
+    });
+    mockValueFindOne
+      .mockResolvedValueOnce(null) // code pre-check passes
+      .mockResolvedValueOnce({ id: 9, list_id: 2, value: 'Increase' });
+
+    let thrown: unknown;
+    try {
+      await service.createValue(2, { code: 'DIR-09', value: 'Increase' });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/lists/2/values',
+      method: 'POST',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'A value with value "Increase" already exists in this list',
+        field: 'value',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/2/values',
     });
   });
 });
