@@ -194,7 +194,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Done criteria:**
   - [x] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
   - [x] `ng build`: `exceljs` only in a lazy chunk, not in `main` (read the build stats); the initial bundle within budget. *(`exceljs-min` lazy chunk 947 kB; Initial total 1.35 MB vs 2 MB warning — Leader's own build run.)*
-  - [ ] A9–A12 in `/swagger`; both packages' test, lint and build gates.
+  - [x] A9–A12 in `/swagger`; both packages' test, lint and build gates. *(Swagger via `createDocument`; server lint on committed blobs of `f7955d46`: 18 linted, 0 failing; server tests: 3 pre-existing failures.)*
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `angular-developer`, `ui-ux-pro-max`
 
 ### T-04 — Slice 4: Usage and consumer access (in-use, *Used by*, by-key read, membership check)

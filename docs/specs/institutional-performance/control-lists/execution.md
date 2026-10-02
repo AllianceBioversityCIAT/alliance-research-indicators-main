@@ -463,3 +463,4 @@
   - **T-04:** A9 `inUse` is 0 until the registry exists; the client's `ControlListValue.inUse?` is optional; A12 must gain the in-use block (409, non-field `{description}`, "deactivate instead"); A13 reads by key with natural code order (reuse the same comparator semantics); `ControlListsService` is request-scoped (P-10).
   - **T-05:** resize persistence in a real browser; check whether the table jumps to page 1 after a reload (`resetPageOnSort`); post-deploy check that `control_lists WHERE is_system=1` = 6 and values = 23 on Dev.
 - **Final status: PASS on attempt 2.**
+- **Lint gate on committed blobs (Leader, after `f7955d46`):** 18 server `.ts` files linted via stdin → 0 failing.
