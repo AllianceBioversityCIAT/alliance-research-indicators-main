@@ -146,7 +146,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Done criteria:**
   - [x] Migration checks on the local dev DB quoted; specs green; falsifiers 1–7 observed red, then reverted.
   - [x] A6–A8 in `/swagger`. *(Via `SwaggerModule.createDocument` on a created app — see Run 6.)*
-  - [ ] Both packages' test, lint and build gates as in T-01.
+  - [x] Both packages' test, lint and build gates as in T-01. *(Server lint on committed blobs of `a77f94d5`: 18 linted, 0 failing. Server tests: 3 pre-existing failures.)*
 - **Skills:** `nestjs-expert`, `api-design-principles`, `angular-developer`
 
 ### T-03 — Slice 3: Values (table + API + values table with a read-only ID)

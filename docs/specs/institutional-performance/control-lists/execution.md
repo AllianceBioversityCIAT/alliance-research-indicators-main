@@ -331,3 +331,4 @@
   - **T-03:** A1 `valueCount` stays 0 until values exist; a list with values must block its delete (409, non-field `{description}` shape); apply `normalizeDescription` to value descriptions too; seeded list names are editable.
   - **T-04:** `usedBy` is still `[]`. P-10 still applies: `ControlListsService` is request-scoped.
 - **Final status: PASS on attempt 2.**
+- **Lint gate on committed blobs (Leader, after `a77f94d5`):** 18 server `.ts` files linted via stdin → 0 failing. The gate was proven able to redden in Run 5 (CRLF falsifier).
