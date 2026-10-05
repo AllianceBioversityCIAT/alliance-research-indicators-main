@@ -47,6 +47,9 @@ import {
   PrmsWebhookDeliveryRepository,
   RecordImportedHistoryInput,
 } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
+import { BilateralService } from '../../../entities/bilateral/bilateral.service';
+import { tocLevelCode } from '../../../entities/prms-webhook/pool-funding-mapping-diff.service';
+import { TocLevel } from '../../toc-integration/dto/toc-integration.types';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
@@ -96,6 +99,52 @@ import { SessionLengthEnum } from '../../../entities/session-lengths/enum/sessio
 import { InnovationDevAnticipatedUsers } from '../../../entities/innovation-dev-anticipated-users/enum/innovation-dev-anticipated-users.enum';
 import { ActorRolesEnum } from '../../../entities/actor-roles/enum/actor-roles.enum';
 
+/**
+ * PRMS `toc_alignment` -> the pool-funding alignment STAR stores. The SP
+ * whose role is "Primary submitter" (or `primary_entity`) is the primary
+ * SP; every other entity contributes. STAR keeps one ToC row, on the
+ * primary SP, so the first named ToC result of that SP is the one saved.
+ * Returns null when PRMS sends no ToC alignment.
+ */
+export const mapPrmsAlignment = (
+  source: ResultResponseMapper | undefined,
+): {
+  primarySpCode: string;
+  contributingSpCodes: string[];
+  toc: { level: TocLevel | null; title: string } | null;
+} | null => {
+  const entries = (source?.toc_alignment ?? []).filter(
+    (entry) => !isEmpty(entry?.entity?.official_code?.trim()),
+  );
+  if (!entries.length) return null;
+
+  const primaryEntry =
+    entries.find((entry) => /primary/i.test(entry.initiative_role ?? '')) ??
+    entries.find(
+      (entry) =>
+        entry.entity.official_code.trim() ===
+        source?.primary_entity?.official_code?.trim(),
+    ) ??
+    entries[0];
+  const primarySpCode = primaryEntry.entity.official_code.trim();
+  const tocResult = (primaryEntry.toc_results ?? []).find(
+    (candidate) => !isEmpty(candidate?.result_name?.trim()),
+  );
+
+  return {
+    primarySpCode,
+    contributingSpCodes: entries
+      .filter((entry) => entry !== primaryEntry)
+      .map((entry) => entry.entity.official_code.trim()),
+    toc: tocResult
+      ? {
+          level: tocLevelCode(tocResult.level ?? null),
+          title: tocResult.result_name.trim(),
+        }
+      : null,
+  };
+};
+
 const validDate = (value: unknown): Date | null => {
   if (value == null || value === '') return null;
   const date = new Date(value as string);
@@ -137,6 +186,7 @@ export class PrmsOpenSearchService
     private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
     private readonly greenCheckRepository: GreenCheckRepository,
     private readonly prmsHistoryRepository: PrmsWebhookDeliveryRepository,
+    private readonly bilateralService: BilateralService,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -442,7 +492,7 @@ export class PrmsOpenSearchService
             report_year_id: year,
             is_snapshot: false,
           },
-          select: { result_official_code: true },
+          select: { result_id: true, result_official_code: true },
         })
         .catch((error) => {
           this.logger.error(
@@ -451,6 +501,12 @@ export class PrmsOpenSearchService
           return null;
         });
       if (!saved) continue;
+
+      await this.importAlignment(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_id,
+      );
 
       await this.recordImportedHistory(
         result,
@@ -470,6 +526,31 @@ export class PrmsOpenSearchService
           `Error versioning PRMS result ${result.prms_result_code}: ${errorMessage}`,
         );
       }
+    }
+  }
+
+  /**
+   * Saves the pool-funding alignment and ToC PRMS has for the result, when
+   * PRMS sends them. Goes before the version so the version carries them.
+   */
+  private async importAlignment(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    resultId: number,
+  ): Promise<void> {
+    const alignment = mapPrmsAlignment(source);
+    if (!alignment) return;
+    try {
+      await this.bilateralService.importAlignmentFromPrms(
+        resultId,
+        alignment,
+        result.userData?.sec_user_id ?? null,
+      );
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error saving the ToC alignment of PRMS result ${result.prms_result_code}: ${errorMessage}`,
+      );
     }
   }
 

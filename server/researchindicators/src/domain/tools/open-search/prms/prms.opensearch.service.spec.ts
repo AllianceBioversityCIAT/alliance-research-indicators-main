@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { DataSource, Like } from 'typeorm';
 import { of } from 'rxjs';
-import { PrmsOpenSearchService } from './prms.opensearch.service';
+import {
+  PrmsOpenSearchService,
+  mapPrmsAlignment,
+} from './prms.opensearch.service';
+import { BilateralService } from '../../../entities/bilateral/bilateral.service';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { ResultsService } from '../../../entities/results/results.service';
@@ -72,6 +76,7 @@ describe('PrmsOpenSearchService', () => {
   let temporalRepoHandle: { save: jest.Mock };
   let greenCheckRepository: { createSnapshot: jest.Mock };
   let prmsHistoryRepository: { replaceImportedHistory: jest.Mock };
+  let bilateralService: { importAlignmentFromPrms: jest.Mock };
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -310,6 +315,12 @@ describe('PrmsOpenSearchService', () => {
           useValue: { createSnapshot: jest.fn().mockResolvedValue(undefined) },
         },
         {
+          provide: BilateralService,
+          useValue: {
+            importAlignmentFromPrms: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
           provide: PrmsWebhookDeliveryRepository,
           useValue: {
             replaceImportedHistory: jest
@@ -323,6 +334,7 @@ describe('PrmsOpenSearchService', () => {
     service = module.get(PrmsOpenSearchService);
     greenCheckRepository = module.get(GreenCheckRepository);
     prmsHistoryRepository = module.get(PrmsWebhookDeliveryRepository);
+    bilateralService = module.get(BilateralService);
     httpService = module.get(HttpService);
     resultsService = module.get(ResultsService);
     resultRepository = module.get(ResultRepository);
@@ -554,7 +566,7 @@ describe('PrmsOpenSearchService', () => {
           report_year_id: 2025,
           is_snapshot: false,
         },
-        select: { result_official_code: true },
+        select: { result_id: true, result_official_code: true },
       });
       expect(greenCheckRepository.createSnapshot).toHaveBeenCalledTimes(1);
       expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
@@ -701,6 +713,176 @@ describe('PrmsOpenSearchService', () => {
 
       await importOne({ status_id: '7' });
 
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        5001,
+        2025,
+      );
+    });
+  });
+
+  describe('mapPrmsAlignment', () => {
+    const toc = (
+      code: string,
+      role: string,
+      results: { level: string; result_name: string }[] = [],
+    ) => ({
+      entity: { official_code: code, name: code },
+      initiative_role: role,
+      toc_results: results.map((r) => ({
+        ...r,
+        sub_entity: { official_code: code, description: null },
+      })),
+    });
+
+    it('maps the PRMS payload: primary submitter, its first ToC result, level as STAR code', () => {
+      const source = buildResultMapper({
+        primary_entity: { official_code: 'SP06', name: 'Climate Action' },
+        toc_alignment: [
+          toc('SP06', 'Primary submitter', [
+            {
+              level: 'High Level Output',
+              result_name:
+                '3.1.1. Institutional innovations and technical practices',
+            },
+            {
+              level: 'High Level Output',
+              result_name:
+                '3.1.1. Institutional innovations and technical practices',
+            },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: [],
+        toc: {
+          level: 'OUTPUT',
+          title: '3.1.1. Institutional innovations and technical practices',
+        },
+      });
+    });
+
+    it('turns every other entity into a contributing SP', () => {
+      const source = buildResultMapper({
+        toc_alignment: [
+          toc('SP02', 'Contributor'),
+          toc('SP06', 'Primary submitter', [
+            { level: 'Intermediate Outcome', result_name: 'IOC 1' },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: ['SP02'],
+        toc: { level: 'OUTCOME', title: 'IOC 1' },
+      });
+    });
+
+    it('falls back to primary_entity when no entry says Primary', () => {
+      const source = buildResultMapper({
+        primary_entity: { official_code: 'SP06', name: 'Climate Action' },
+        toc_alignment: [toc('SP02', 'Contributor'), toc('SP06', 'Other')],
+      });
+
+      expect(mapPrmsAlignment(source).primarySpCode).toBe('SP06');
+    });
+
+    it('keeps the SPs with no ToC when the primary has no named result', () => {
+      const source = buildResultMapper({
+        toc_alignment: [
+          toc('SP06', 'Primary submitter', [
+            { level: 'HLO', result_name: ' ' },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: [],
+        toc: null,
+      });
+    });
+
+    it('returns null when PRMS sends no ToC alignment', () => {
+      expect(mapPrmsAlignment(buildResultMapper({ toc_alignment: [] }))).toBe(
+        null,
+      );
+      expect(mapPrmsAlignment(undefined)).toBe(null);
+    });
+  });
+
+  describe('getDataAsStar ToC alignment', () => {
+    const run = async (overrides: Partial<ResultResponseMapper>) => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      await service.getDataAsStar({ year: 2025 });
+    };
+
+    const alignedSource = {
+      toc_alignment: [
+        {
+          entity: { official_code: 'SP06', name: 'Climate Action' },
+          initiative_role: 'Primary submitter',
+          toc_results: [
+            {
+              level: 'High Level Output',
+              sub_entity: { official_code: 'SP06', description: null },
+              result_name: 'HLO 3.1.1',
+            },
+          ],
+        },
+      ],
+    } as Partial<ResultResponseMapper>;
+
+    it('saves the alignment on the live row before the version is created', async () => {
+      await run(alignedSource);
+
+      expect(bilateralService.importAlignmentFromPrms).toHaveBeenCalledWith(
+        34105,
+        {
+          primarySpCode: 'SP06',
+          contributingSpCodes: [],
+          toc: { level: 'OUTPUT', title: 'HLO 3.1.1' },
+        },
+        null,
+      );
+      expect(
+        bilateralService.importAlignmentFromPrms.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        greenCheckRepository.createSnapshot.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does nothing when PRMS sends no ToC alignment', async () => {
+      await run({ toc_alignment: [] });
+
+      expect(bilateralService.importAlignmentFromPrms).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalled();
+    });
+
+    it('still writes history and the version when the alignment fails', async () => {
+      bilateralService.importAlignmentFromPrms.mockRejectedValueOnce(
+        new Error('db down'),
+      );
+
+      await run(alignedSource);
+
+      expect(prmsHistoryRepository.replaceImportedHistory).toHaveBeenCalled();
       expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
         5001,
         2025,

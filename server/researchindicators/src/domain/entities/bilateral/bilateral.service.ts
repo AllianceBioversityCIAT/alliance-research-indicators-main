@@ -5,7 +5,7 @@ import {
   NotFoundException,
   NotImplementedException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import {
   PoolFundingAlignmentContext,
@@ -828,86 +828,17 @@ export class BilateralService {
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
-      if (previousAlignment) {
-        await manager.getRepository(ResultPoolFundingAlignmentSp).update(
-          {
-            alignment_id: previousAlignment.id,
-            is_active: true,
-          },
-          {
-            is_active: false,
-            deleted_at: now,
-            updated_by: actorUserId,
-          },
-        );
-        await manager.getRepository(ResultPoolFundingAlignment).update(
-          {
-            id: previousAlignment.id,
-            is_active: true,
-          },
-          {
-            is_active: false,
-            deleted_at: now,
-            updated_by: actorUserId,
-          },
-        );
-      }
-
-      const newAlignment = await manager
-        .getRepository(ResultPoolFundingAlignment)
-        .save({
-          result_id: resultId,
-          has_contribution: dto.has_contribution,
-          created_by: actorUserId,
-          updated_by: actorUserId,
-        });
-
-      if (leverCodes.length) {
-        await manager.getRepository(ResultPoolFundingAlignmentSp).save(
-          leverCodes.map((spCode) => ({
-            alignment_id: newAlignment.id,
-            // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
-            // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
-            sp_code: spCode,
-            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
-            // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
-            // Primary and STORED explicitly on every row (never transmitted
-            // per-row on the wire). `satisfies SpRole` ties this literal to
-            // the same shared union the read-back carrier and the DTO use
-            // (design.md §4, D-C2-14) — they agree by type, not convention.
-            sp_role: (spCode === primarySpCode
-              ? 'PRIMARY'
-              : 'CONTRIBUTING') satisfies SpRole,
-            created_by: actorUserId,
-            updated_by: actorUserId,
-          })),
-        );
-      }
-
-      // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-093, R-BIL-095
-      //
-      // Independent per-SP upsert (design §6.3 step 4): each validated entry
-      // updates/creates ONLY its own (result, sp_code) row — SPs absent from
-      // `toc_alignments` are never touched (R-BIL-092 AC.1). Then the
-      // cascade (step 5) deactivates rows for deselected SPs.
-      if (tocUpserts) {
-        for (const upsert of tocUpserts) {
-          await this.tocAlignmentRepository.upsertForSp(
-            upsert,
-            actorUserId,
-            manager,
-          );
-        }
-      }
-
-      if (tocSpCodesToDeactivate.length) {
-        await this.tocAlignmentRepository.deactivateForSps(
-          resultId,
-          tocSpCodesToDeactivate,
-          actorUserId,
-          manager,
-        );
-      }
+      await this.persistAlignment(manager, {
+        resultId,
+        previousAlignmentId: previousAlignment?.id ?? null,
+        hasContribution: dto.has_contribution,
+        spCodes: leverCodes,
+        primarySpCode,
+        tocUpserts,
+        tocSpCodesToDeactivate,
+        actorUserId,
+        now,
+      });
 
       await manager.getRepository(ResultReviewHistory).save({
         result_id: resultId,
@@ -952,6 +883,202 @@ export class BilateralService {
     });
 
     return response;
+  }
+
+  /**
+   * Writes the pool-funding alignment and ToC a PRMS result already has in
+   * PRMS. ONLY for `fetch-prms-data-as-star`, a one-off import: the data is
+   * PRMS's own record of the result, not a user's choice, so none of the
+   * gates `updateAlignment` applies to a user's save run here (PRMS
+   * read-only source, the 2026 ToC version lock, contributor and
+   * already-synced checks, catalog validation). The write itself is the
+   * same `persistAlignment`. No review-history entry and no socket event:
+   * nobody is editing the result.
+   *
+   * `toc_result_id` is looked up in the lambda-toc catalog by title. When
+   * it is not there, or the catalog is down, the row keeps PRMS's title and
+   * level with a null id.
+   */
+  async importAlignmentFromPrms(
+    resultId: number,
+    input: {
+      primarySpCode: string;
+      contributingSpCodes: string[];
+      toc: { level: TocLevel | null; title: string } | null;
+    },
+    actorUserId: number | null,
+  ): Promise<void> {
+    const spCodes = [
+      input.primarySpCode,
+      ...input.contributingSpCodes.filter(
+        (code) => code !== input.primarySpCode,
+      ),
+    ].filter((code, index, all) => all.indexOf(code) === index);
+
+    const tocUpserts: TocAlignmentUpsertInput[] = input.toc
+      ? [
+          {
+            result_id: resultId,
+            sp_code: input.primarySpCode,
+            aligns_with_toc: true,
+            level: input.toc.level,
+            toc_result_id: await this.findTocResultIdByTitle(
+              input.primarySpCode,
+              input.toc.level,
+              input.toc.title,
+            ),
+            toc_result_title: input.toc.title,
+          },
+        ]
+      : [];
+
+    const [previousAlignment, activeToc] = await Promise.all([
+      this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+      this.tocAlignmentRepository.findActiveByResultId(resultId),
+    ]);
+    const keptSps = new Set(tocUpserts.map((upsert) => upsert.sp_code));
+    const tocSpCodesToDeactivate = activeToc
+      .map((row) => row.sp_code)
+      .filter((spCode) => !keptSps.has(spCode));
+
+    await this.dataSource.transaction((manager) =>
+      this.persistAlignment(manager, {
+        resultId,
+        previousAlignmentId: previousAlignment?.id ?? null,
+        hasContribution: true,
+        spCodes,
+        primarySpCode: input.primarySpCode,
+        tocUpserts,
+        tocSpCodesToDeactivate,
+        actorUserId,
+        now: new Date(),
+      }),
+    );
+  }
+
+  private async findTocResultIdByTitle(
+    spCode: string,
+    level: TocLevel | null,
+    title: string,
+  ): Promise<number | null> {
+    if (!level) return null;
+    const normalize = (value: string | null | undefined) =>
+      (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+    try {
+      const catalog = await this.tocIntegrationService.getTocResults(
+        spCode,
+        level,
+      );
+      const match = catalog.find(
+        (candidate) => normalize(candidate.title) === normalize(title),
+      );
+      return match?.toc_result_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The pool-funding alignment write shared by `updateAlignment` (a user's
+   * save) and `importAlignmentFromPrms` (the one-off PRMS import): replaces
+   * the active alignment and its SP rows, upserts the ToC rows and
+   * deactivates the ToC of SPs no longer selected. Runs inside the caller's
+   * transaction; every gate and validation is the caller's job.
+   */
+  private async persistAlignment(
+    manager: EntityManager,
+    args: {
+      resultId: number;
+      previousAlignmentId: number | null;
+      hasContribution: boolean;
+      spCodes: string[];
+      primarySpCode: string | null;
+      tocUpserts: TocAlignmentUpsertInput[] | null;
+      tocSpCodesToDeactivate: string[];
+      actorUserId: number | null;
+      now: Date;
+    },
+  ): Promise<void> {
+    if (args.previousAlignmentId !== null) {
+      await manager.getRepository(ResultPoolFundingAlignmentSp).update(
+        {
+          alignment_id: args.previousAlignmentId,
+          is_active: true,
+        },
+        {
+          is_active: false,
+          deleted_at: args.now,
+          updated_by: args.actorUserId,
+        },
+      );
+      await manager.getRepository(ResultPoolFundingAlignment).update(
+        {
+          id: args.previousAlignmentId,
+          is_active: true,
+        },
+        {
+          is_active: false,
+          deleted_at: args.now,
+          updated_by: args.actorUserId,
+        },
+      );
+    }
+
+    const newAlignment = await manager
+      .getRepository(ResultPoolFundingAlignment)
+      .save({
+        result_id: args.resultId,
+        has_contribution: args.hasContribution,
+        created_by: args.actorUserId,
+        updated_by: args.actorUserId,
+      });
+
+    if (args.spCodes.length) {
+      await manager.getRepository(ResultPoolFundingAlignmentSp).save(
+        args.spCodes.map((spCode) => ({
+          alignment_id: newAlignment.id,
+          // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
+          // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
+          sp_code: spCode,
+          // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
+          // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
+          // Primary and STORED explicitly on every row (never transmitted
+          // per-row on the wire). `satisfies SpRole` ties this literal to
+          // the same shared union the read-back carrier and the DTO use
+          // (design.md §4, D-C2-14) — they agree by type, not convention.
+          sp_role: (spCode === args.primarySpCode
+            ? 'PRIMARY'
+            : 'CONTRIBUTING') satisfies SpRole,
+          created_by: args.actorUserId,
+          updated_by: args.actorUserId,
+        })),
+      );
+    }
+
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-093, R-BIL-095
+    //
+    // Independent per-SP upsert (design §6.3 step 4): each validated entry
+    // updates/creates ONLY its own (result, sp_code) row — SPs absent from
+    // `toc_alignments` are never touched (R-BIL-092 AC.1). Then the
+    // cascade (step 5) deactivates rows for deselected SPs.
+    if (args.tocUpserts) {
+      for (const upsert of args.tocUpserts) {
+        await this.tocAlignmentRepository.upsertForSp(
+          upsert,
+          args.actorUserId,
+          manager,
+        );
+      }
+    }
+
+    if (args.tocSpCodesToDeactivate.length) {
+      await this.tocAlignmentRepository.deactivateForSps(
+        args.resultId,
+        args.tocSpCodesToDeactivate,
+        args.actorUserId,
+        manager,
+      );
+    }
   }
 
   /**
