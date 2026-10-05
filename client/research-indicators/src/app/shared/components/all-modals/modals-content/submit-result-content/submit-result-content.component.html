@@ -55,12 +55,12 @@
 
     <div class="flex flex-col md:flex-row gap-5">
       <div class="flex-1 xl:max-w-[200px]">
-        <app-input label="OICR No" helperText="Internal code assigned by SPRM." [isRequired]="true"
+        <app-input label="OICR No" helperText="Internal code assigned by MELP." [isRequired]="true"
           [validateEmpty]="true" [optionValue]="'oicr_internal_code'" [signal]="form"
           placeholder="e.g. LAC-2501"></app-input>
       </div>
       <div class="flex-1">
-        <app-input label="SharePoint Folder Link" helperText="SPRM SharePoint Folder Link" pattern="url"
+        <app-input label="SharePoint Folder Link" helperText="MELP SharePoint Folder Link" pattern="url"
           [optionValue]="'sharepoint_link'" [signal]="form" placeholder="Paste the SharePoint folder link"></app-input>
       </div>
     </div>

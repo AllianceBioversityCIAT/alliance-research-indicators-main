@@ -567,7 +567,7 @@ export class CreateOicrFormComponent implements OnInit {
         summary: `Thank you for ${(this.createResultManagementService.currentRequestedResultCode() && 'update') || ''} your submission`,
         hasNoCancelButton: true,
         detail:
-          'Your OICR will be reviewed by PISA-SPRM and the assigned regional MEL specialist will reach out to support you in finalizing the next steps of the OICR development process.',
+          'Your OICR will be reviewed by MELP and the assigned regional MEL specialist will reach out to support you in finalizing the next steps of the OICR development process.',
         confirmCallback: {
           label: 'Done',
           event: () => {
