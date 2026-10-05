@@ -451,14 +451,52 @@ export class PrmsWebhookDeliveryRepository {
     );
   }
   /**
-   * Writes one imported history row unless the same result/year already has
-   * an active row with that source and status, so re-running the import adds
-   * nothing. Returns whether a row was inserted.
+   * Replaces the imported history of one result/year in one transaction:
+   * deletes the rows a previous import wrote, then writes `rows`. Re-running
+   * the import therefore leaves one set of rows instead of piling them up.
+   *
+   * The DELETE is the single exception to this table being append-only
+   * (R-PWH-005), and it can only reach imported rows: they are the only ones
+   * with no `delivery_id` and `raw_headers = {}`. A PRMS callback always
+   * stores its real headers, and a STAR push stores NULL headers, so real
+   * history is never deleted.
    */
-  async recordImportedHistory(
+  async replaceImportedHistory(
+    key: { resultOfficialCode: string; resultYear: number },
+    rows: RecordImportedHistoryInput[],
+  ): Promise<{ deleted: number; inserted: number }> {
+    return this.dataSource.transaction(async (manager) => {
+      const deleteResult = await manager.query(
+        `
+        DELETE FROM result_prms_sync_history
+        WHERE result_official_code = ?
+          AND result_year = ?
+          AND delivery_id IS NULL
+          AND raw_headers = JSON_OBJECT()
+        `,
+        [key.resultOfficialCode, key.resultYear],
+      );
+      let inserted = 0;
+      for (const row of rows) {
+        if (await this.insertImportedHistory(manager, row)) inserted++;
+      }
+      return {
+        deleted: Number(asOk(deleteResult).affectedRows ?? 0),
+        inserted,
+      };
+    });
+  }
+
+  /**
+   * Writes one imported row unless the result/year already has an active row
+   * with that source and status (a real push or callback, since the import's
+   * own rows were just deleted). Returns whether a row was inserted.
+   */
+  private async insertImportedHistory(
+    manager: EntityManager,
     input: RecordImportedHistoryInput,
   ): Promise<boolean> {
-    const result = await this.dataSource.query(
+    const result = await manager.query(
       `
       INSERT INTO result_prms_sync_history
         (delivery_id, occurred_at, environment, correlation_outcome,

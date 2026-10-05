@@ -71,7 +71,7 @@ describe('PrmsOpenSearchService', () => {
   let clarisaInstitutionTypesService: jest.Mocked<ClarisaInstitutionTypesService>;
   let temporalRepoHandle: { save: jest.Mock };
   let greenCheckRepository: { createSnapshot: jest.Mock };
-  let prmsHistoryRepository: { recordImportedHistory: jest.Mock };
+  let prmsHistoryRepository: { replaceImportedHistory: jest.Mock };
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -312,7 +312,9 @@ describe('PrmsOpenSearchService', () => {
         {
           provide: PrmsWebhookDeliveryRepository,
           useValue: {
-            recordImportedHistory: jest.fn().mockResolvedValue(true),
+            replaceImportedHistory: jest
+              .fn()
+              .mockResolvedValue({ deleted: 0, inserted: 0 }),
           },
         },
       ],
@@ -603,9 +605,14 @@ describe('PrmsOpenSearchService', () => {
       ]);
       resultRepoHandle.findOne.mockResolvedValue(saved);
       await service.getDataAsStar({ year: 2025 });
-      return prmsHistoryRepository.recordImportedHistory.mock.calls.map(
-        (call) => call[0],
-      );
+      const calls = prmsHistoryRepository.replaceImportedHistory.mock.calls;
+      if (calls.length === 0) return [];
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toEqual({
+        resultOfficialCode: '5001',
+        resultYear: 2025,
+      });
+      return calls[0][1];
     };
 
     const pendingReview = {
@@ -688,7 +695,7 @@ describe('PrmsOpenSearchService', () => {
     });
 
     it('still versions the result when the history write fails', async () => {
-      prmsHistoryRepository.recordImportedHistory.mockRejectedValueOnce(
+      prmsHistoryRepository.replaceImportedHistory.mockRejectedValueOnce(
         new Error('history down'),
       );
 

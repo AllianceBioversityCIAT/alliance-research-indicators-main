@@ -43,7 +43,10 @@ import {
   PrmsImportedDecision,
   ResultPrmsToStarStatusMapper,
 } from './enum/rsult-type.enum';
-import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
+import {
+  PrmsWebhookDeliveryRepository,
+  RecordImportedHistoryInput,
+} from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
@@ -475,16 +478,19 @@ export class PrmsOpenSearchService
    * written. A PRMS Approved or Rejected result also gets the decision row
    * a PRMS callback would have written, so the history keeps what PRMS
    * decided even though STAR shows all of them as Approved. Re-running the
-   * import does not add rows a second time.
+   * import replaces these rows instead of adding more.
    */
   private async recordImportedHistory(
     result: ExternalMappersDto,
     source: ResultResponseMapper,
     resultOfficialCode: number,
   ): Promise<void> {
-    const base = {
+    const key = {
       resultOfficialCode: String(resultOfficialCode),
       resultYear: result.createResult.year,
+    };
+    const base = {
+      ...key,
       prmsResultCode: result.prms_result_code,
       environment: this.appConfig.ARI_IS_PRODUCTION ? 'PROD' : 'TEST',
     };
@@ -495,8 +501,8 @@ export class PrmsOpenSearchService
     );
     const decision = PrmsImportedDecision[Number(source?.status_id)];
 
-    try {
-      await this.prmsHistoryRepository.recordImportedHistory({
+    const rows: RecordImportedHistoryInput[] = [
+      {
         ...base,
         occurredAt: submittedAt,
         eventSource: 'STAR',
@@ -504,18 +510,22 @@ export class PrmsOpenSearchService
         decision: null,
         decidedAt: null,
         actorUserId: result.userData?.sec_user_id ?? null,
+      },
+    ];
+    if (decision) {
+      rows.push({
+        ...base,
+        occurredAt: decidedAt,
+        eventSource: 'PRMS',
+        status: decision.status,
+        decision: decision.decision,
+        decidedAt,
+        actorUserId: null,
       });
-      if (decision) {
-        await this.prmsHistoryRepository.recordImportedHistory({
-          ...base,
-          occurredAt: decidedAt,
-          eventSource: 'PRMS',
-          status: decision.status,
-          decision: decision.decision,
-          decidedAt,
-          actorUserId: null,
-        });
-      }
+    }
+
+    try {
+      await this.prmsHistoryRepository.replaceImportedHistory(key, rows);
     } catch (error) {
       const errorMessage = (error as Error).message ?? 'Unknown error';
       this.logger.error(
