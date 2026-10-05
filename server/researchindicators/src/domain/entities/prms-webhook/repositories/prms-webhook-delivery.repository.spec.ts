@@ -7,6 +7,7 @@ import { DeliveryProcessingState } from '../enum/delivery-processing-state.enum'
 import {
   PrmsWebhookDeliveryRepository,
   RecordDeliveryInput,
+  RecordImportedHistoryInput,
   RecordOutboundPendingReviewInput,
 } from './prms-webhook-delivery.repository';
 
@@ -622,6 +623,168 @@ describe('PrmsWebhookDeliveryRepository', () => {
       expect(table.rows).toHaveLength(2);
       expect(dataSourceQuery).toHaveBeenCalledTimes(2);
       expect(table.rows.every((row) => row.event_source === 'STAR')).toBe(true);
+    });
+  });
+
+  describe('recordImportedHistory (PRMS results imported as STAR)', () => {
+    /**
+     * Decodes the emitted INSERT … SELECT by its own column list and runs
+     * its NOT EXISTS guard against `rows`, so a placeholder shifted one
+     * column, or a guard keyed on the wrong column, changes the outcome.
+     */
+    const importedTable = () => {
+      const rows: FakeRow[] = [];
+      const execute = (sql: string, params: unknown[]) => {
+        const match =
+          /INSERT\s+INTO\s+result_prms_sync_history\s*\(([\s\S]*?)\)\s*SELECT\s+([\s\S]*?)\s+FROM\s+DUAL\s+WHERE\s+NOT\s+EXISTS\s*\(([\s\S]*)\)/i.exec(
+            sql,
+          );
+        if (!match) throw new Error(`unparseable INSERT\n${sql}`);
+        const columns = match[1].split(',').map((c) => c.trim());
+        const tokens = match[2].split(',').map((t) => t.trim());
+        expect(tokens).toHaveLength(columns.length);
+        const row: FakeRow = {};
+        let paramIndex = 0;
+        columns.forEach((column, i) => {
+          const token = tokens[i];
+          if (token === '?') row[column] = params[paramIndex++];
+          else if (/^NULL$/i.test(token)) row[column] = null;
+          else if (/^TRUE$/i.test(token)) row[column] = true;
+          else throw new Error(`unsupported literal ${token}`);
+        });
+        const guardColumns = [...match[3].matchAll(/(\w+)\s*=\s*\?/g)].map(
+          (m) => m[1],
+        );
+        expect(guardColumns).toEqual([
+          'result_official_code',
+          'result_year',
+          'event_source',
+          'status',
+        ]);
+        const guardParams = params.slice(paramIndex);
+        expect(guardParams).toHaveLength(guardColumns.length);
+        expect(match[3]).toMatch(/duplicate_of_id IS NULL/);
+        expect(match[3]).toMatch(/is_active = TRUE/);
+        const exists = rows.some(
+          (existing) =>
+            existing.duplicate_of_id === null &&
+            existing.is_active === true &&
+            guardColumns.every(
+              (column, i) => existing[column] === guardParams[i],
+            ),
+        );
+        if (exists) return { affectedRows: 0 };
+        rows.push(row);
+        return { affectedRows: 1, insertId: rows.length };
+      };
+      return { rows, execute };
+    };
+
+    const importedInput = (
+      overrides: Partial<RecordImportedHistoryInput> = {},
+    ): RecordImportedHistoryInput => ({
+      resultOfficialCode: '5001',
+      resultYear: 2025,
+      prmsResultCode: 28731,
+      environment: 'TEST',
+      occurredAt: OCCURRED_AT,
+      eventSource: 'PRMS',
+      status: 'REJECTED',
+      decision: 'REJECT',
+      decidedAt: OCCURRED_AT,
+      actorUserId: null,
+      ...overrides,
+    });
+
+    it('writes the row with every JSON column as {} and no delivery, reviewer or justification', async () => {
+      const fake = importedTable();
+      dataSourceQuery.mockImplementation(fake.execute);
+
+      const inserted = await repository.recordImportedHistory(importedInput());
+
+      expect(inserted).toBe(true);
+      expect(transaction).not.toHaveBeenCalled();
+      expect(fake.rows).toEqual([
+        {
+          delivery_id: null,
+          occurred_at: OCCURRED_AT,
+          environment: 'TEST',
+          correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+          result_official_code: '5001',
+          result_year: 2025,
+          prms_result_id: null,
+          prms_result_code: 28731,
+          decision: 'REJECT',
+          justification: null,
+          decided_at: OCCURRED_AT,
+          raw_body: '{}',
+          raw_headers: '{}',
+          processing_state: DeliveryProcessingState.PROCESSED,
+          processing_error: null,
+          duplicate_of_id: null,
+          created_by: null,
+          is_active: true,
+          event_source: 'PRMS',
+          status: 'REJECTED',
+          actor_user_id: null,
+          reviewer_name: null,
+          reviewer_role: null,
+          science_program_code: null,
+          changes: '{}',
+        },
+      ]);
+    });
+
+    it('does not write the same source and status twice for one result and year', async () => {
+      const fake = importedTable();
+      dataSourceQuery.mockImplementation(fake.execute);
+
+      await repository.recordImportedHistory(importedInput());
+      const second = await repository.recordImportedHistory(importedInput());
+
+      expect(second).toBe(false);
+      expect(fake.rows).toHaveLength(1);
+    });
+
+    it('still writes a different status, another year or another result', async () => {
+      const fake = importedTable();
+      dataSourceQuery.mockImplementation(fake.execute);
+
+      await repository.recordImportedHistory(importedInput());
+      await repository.recordImportedHistory(
+        importedInput({
+          eventSource: 'STAR',
+          status: 'PENDING_REVIEW',
+          decision: null,
+          decidedAt: null,
+          actorUserId: 7,
+        }),
+      );
+      await repository.recordImportedHistory(
+        importedInput({ status: 'APPROVED', decision: 'APPROVE' }),
+      );
+      await repository.recordImportedHistory(
+        importedInput({ resultYear: 2026 }),
+      );
+      await repository.recordImportedHistory(
+        importedInput({ resultOfficialCode: '5002' }),
+      );
+
+      expect(
+        fake.rows.map((row) => [
+          row.result_official_code,
+          row.result_year,
+          row.event_source,
+          row.status,
+        ]),
+      ).toEqual([
+        ['5001', 2025, 'PRMS', 'REJECTED'],
+        ['5001', 2025, 'STAR', 'PENDING_REVIEW'],
+        ['5001', 2025, 'PRMS', 'APPROVED'],
+        ['5001', 2026, 'PRMS', 'REJECTED'],
+        ['5002', 2025, 'PRMS', 'REJECTED'],
+      ]);
+      expect(fake.rows[1].actor_user_id).toBe(7);
     });
   });
 

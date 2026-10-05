@@ -39,3 +39,17 @@ export const ResultPrmsToStarStatusMapper: Partial<
   6: ResultStatusEnum.APPROVED, // Approved
   7: ResultStatusEnum.APPROVED, // Rejected
 };
+
+/**
+ * The PRMS decision an imported result records in its sync history, by PRMS
+ * `status_id`. Pending Review (5) has no decision yet.
+ */
+export const PrmsImportedDecision: Partial<
+  Record<
+    number,
+    { status: 'APPROVED' | 'REJECTED'; decision: 'APPROVE' | 'REJECT' }
+  >
+> = {
+  6: { status: 'APPROVED', decision: 'APPROVE' },
+  7: { status: 'REJECTED', decision: 'REJECT' },
+};

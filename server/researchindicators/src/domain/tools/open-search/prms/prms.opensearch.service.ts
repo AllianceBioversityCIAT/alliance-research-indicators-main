@@ -40,8 +40,10 @@ import { PooledFundingContractsService } from '../../../entities/pooled-funding-
 import {
   AcronymExContractEnum,
   ResultPrmsStatusMapper,
+  PrmsImportedDecision,
   ResultPrmsToStarStatusMapper,
 } from './enum/rsult-type.enum';
+import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
@@ -91,6 +93,16 @@ import { SessionLengthEnum } from '../../../entities/session-lengths/enum/sessio
 import { InnovationDevAnticipatedUsers } from '../../../entities/innovation-dev-anticipated-users/enum/innovation-dev-anticipated-users.enum';
 import { ActorRolesEnum } from '../../../entities/actor-roles/enum/actor-roles.enum';
 
+const validDate = (value: unknown): Date | null => {
+  if (value == null || value === '') return null;
+  const date = new Date(value as string);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+/** A decision can never be dated before the submission it answers. */
+const laterOf = (candidate: Date | null, floor: Date): Date =>
+  candidate && candidate.getTime() >= floor.getTime() ? candidate : floor;
+
 @Injectable()
 export class PrmsOpenSearchService
   implements ExternalMappersInterface<ExternalMappersDto>
@@ -121,6 +133,7 @@ export class PrmsOpenSearchService
     private readonly clarisaActorTypesService: ClarisaActorTypesService,
     private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
     private readonly greenCheckRepository: GreenCheckRepository,
+    private readonly prmsHistoryRepository: PrmsWebhookDeliveryRepository,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -297,7 +310,8 @@ export class PrmsOpenSearchService
           executionCode,
         );
 
-      const dataProcessed = await this.processDataAsStar(prmsResults);
+      const { results: dataProcessed, sources } =
+        await this.processDataAsStar(prmsResults);
 
       await this.saveResultService.bulkSaveAllSections(dataProcessed, {
         platformCode: ReportingPlatformEnum.STAR,
@@ -311,7 +325,7 @@ export class PrmsOpenSearchService
           is_snapshot: 'is_version_applied',
         },
       });
-      await this.versionApprovedResults(dataProcessed);
+      await this.finalizeImportedResults(dataProcessed, sources);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
@@ -376,9 +390,11 @@ export class PrmsOpenSearchService
 
   private async processDataAsStar(
     prmsData: PrmsTemporalResponseMapper[],
-  ): Promise<ExternalMappersDto[]> {
-    const starStatusByCode = new Map<number, ResultStatusEnum>();
-    const phaseByCode = new Map<number, number>();
+  ): Promise<{
+    results: ExternalMappersDto[];
+    sources: Map<number, ResultResponseMapper>;
+  }> {
+    const sources = new Map<number, ResultResponseMapper>();
     const importable = prmsData.filter((data) => {
       const starStatus =
         ResultPrmsToStarStatusMapper[Number(data?.data?.status_id)];
@@ -388,30 +404,35 @@ export class PrmsOpenSearchService
         );
         return false;
       }
-      const code = parseInt(data.data.result_code);
-      starStatusByCode.set(code, starStatus);
-      phaseByCode.set(code, data.data.phase_id);
+      sources.set(parseInt(data.data.result_code), data.data);
       return true;
     });
 
     const results = await this.processData(importable);
     for (const result of results) {
-      result.status_id = starStatusByCode.get(result.official_code);
+      const source = sources.get(result.official_code);
+      result.status_id = ResultPrmsToStarStatusMapper[Number(source.status_id)];
       result.prms_result_code = result.official_code;
-      result.prms_phase_id = phaseByCode.get(result.official_code);
+      result.prms_phase_id = source.phase_id;
     }
-    return results;
+    return { results, sources };
   }
 
-  private async versionApprovedResults(
+  /**
+   * For every imported result that was saved: writes its PRMS sync history
+   * and versions it. Every one of them is Approved in STAR, so every one is
+   * versioned, without checking completeness.
+   */
+  private async finalizeImportedResults(
     results: ExternalMappersDto[],
+    sources: Map<number, ResultResponseMapper>,
   ): Promise<void> {
     for (const result of results) {
-      if (result.status_id !== ResultStatusEnum.APPROVED) continue;
       const year = result.createResult.year;
-      try {
-        // Missing when the save failed or was skipped as a duplicate.
-        const saved = await this.dataSource.getRepository(Result).findOne({
+      // Missing when the save failed or was skipped as a duplicate.
+      const saved = await this.dataSource
+        .getRepository(Result)
+        .findOne({
           where: {
             prms_result_code: result.prms_result_code,
             platform_code: ReportingPlatformEnum.STAR,
@@ -419,8 +440,23 @@ export class PrmsOpenSearchService
             is_snapshot: false,
           },
           select: { result_official_code: true },
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Error finding imported PRMS result ${result.prms_result_code}: ${(error as Error).message}`,
+          );
+          return null;
         });
-        if (!saved) continue;
+      if (!saved) continue;
+
+      await this.recordImportedHistory(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_official_code,
+      );
+
+      if (result.status_id !== ResultStatusEnum.APPROVED) continue;
+      try {
         await this.greenCheckRepository.createSnapshot(
           saved.result_official_code,
           year,
@@ -431,6 +467,60 @@ export class PrmsOpenSearchService
           `Error versioning PRMS result ${result.prms_result_code}: ${errorMessage}`,
         );
       }
+    }
+  }
+
+  /**
+   * Every imported result gets the PENDING_REVIEW row a push would have
+   * written. A PRMS Approved or Rejected result also gets the decision row
+   * a PRMS callback would have written, so the history keeps what PRMS
+   * decided even though STAR shows all of them as Approved. Re-running the
+   * import does not add rows a second time.
+   */
+  private async recordImportedHistory(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    resultOfficialCode: number,
+  ): Promise<void> {
+    const base = {
+      resultOfficialCode: String(resultOfficialCode),
+      resultYear: result.createResult.year,
+      prmsResultCode: result.prms_result_code,
+      environment: this.appConfig.ARI_IS_PRODUCTION ? 'PROD' : 'TEST',
+    };
+    const submittedAt = validDate(source?.created_date) ?? new Date();
+    const decidedAt = laterOf(
+      validDate(source?.last_updated_date),
+      submittedAt,
+    );
+    const decision = PrmsImportedDecision[Number(source?.status_id)];
+
+    try {
+      await this.prmsHistoryRepository.recordImportedHistory({
+        ...base,
+        occurredAt: submittedAt,
+        eventSource: 'STAR',
+        status: 'PENDING_REVIEW',
+        decision: null,
+        decidedAt: null,
+        actorUserId: result.userData?.sec_user_id ?? null,
+      });
+      if (decision) {
+        await this.prmsHistoryRepository.recordImportedHistory({
+          ...base,
+          occurredAt: decidedAt,
+          eventSource: 'PRMS',
+          status: decision.status,
+          decision: decision.decision,
+          decidedAt,
+          actorUserId: null,
+        });
+      }
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error writing PRMS sync history for result ${resultOfficialCode} (PRMS ${result.prms_result_code}): ${errorMessage}`,
+      );
     }
   }
 

@@ -124,11 +124,13 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   return delivery;
 };
 
-const asOk = (result: unknown): { insertId?: number } => {
+const asOk = (
+  result: unknown,
+): { insertId?: number; affectedRows?: number } => {
   if (Array.isArray(result)) {
-    return (result[0] ?? {}) as { insertId?: number };
+    return (result[0] ?? {}) as { insertId?: number; affectedRows?: number };
   }
-  return (result ?? {}) as { insertId?: number };
+  return (result ?? {}) as { insertId?: number; affectedRows?: number };
 };
 
 /**
@@ -194,6 +196,25 @@ export interface RecordOutboundPendingReviewInput {
    */
   resultYear: number;
   prmsResultCode: number | null;
+}
+
+/**
+ * One history row for a PRMS result imported as a STAR result
+ * (`fetch-prms-data-as-star`). There was no real push or callback, so the
+ * row carries only what the PRMS search index knows: no `delivery_id`, no
+ * reviewer, no justification, and `{}` for every JSON column.
+ */
+export interface RecordImportedHistoryInput {
+  resultOfficialCode: string;
+  resultYear: number;
+  prmsResultCode: number | null;
+  environment: string;
+  occurredAt: Date;
+  eventSource: 'STAR' | 'PRMS';
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  decision: 'APPROVE' | 'REJECT' | null;
+  decidedAt: Date | null;
+  actorUserId: number | null;
 }
 
 @Injectable()
@@ -428,5 +449,62 @@ export class PrmsWebhookDeliveryRepository {
         input.userId,
       ],
     );
+  }
+  /**
+   * Writes one imported history row unless the same result/year already has
+   * an active row with that source and status, so re-running the import adds
+   * nothing. Returns whether a row was inserted.
+   */
+  async recordImportedHistory(
+    input: RecordImportedHistoryInput,
+  ): Promise<boolean> {
+    const result = await this.dataSource.query(
+      `
+      INSERT INTO result_prms_sync_history
+        (delivery_id, occurred_at, environment, correlation_outcome,
+         result_official_code, result_year, prms_result_id, prms_result_code,
+         decision, justification, decided_at, raw_body, raw_headers,
+         processing_state, processing_error, duplicate_of_id, created_by,
+         is_active, event_source, status, actor_user_id, reviewer_name,
+         reviewer_role, science_program_code, changes)
+      SELECT NULL, ?, ?, ?, ?, ?, NULL, ?, ?, NULL, ?, ?, ?, ?, NULL, NULL, NULL, TRUE,
+             ?, ?, ?, NULL, NULL, NULL, ?
+      FROM DUAL
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM result_prms_sync_history
+        WHERE result_official_code = ?
+          AND result_year = ?
+          AND event_source = ?
+          AND status = ?
+          AND duplicate_of_id IS NULL
+          AND is_active = TRUE
+      )
+      `,
+      // 25 columns, 15 placeholders + 10 literals, then the 4 NOT EXISTS
+      // params. Keep in lockstep with the column list.
+      [
+        input.occurredAt,
+        input.environment,
+        DeliveryCorrelationOutcome.CORRELATED,
+        input.resultOfficialCode,
+        input.resultYear,
+        input.prmsResultCode,
+        input.decision,
+        input.decidedAt,
+        '{}',
+        '{}',
+        DeliveryProcessingState.PROCESSED,
+        input.eventSource,
+        input.status,
+        input.actorUserId,
+        '{}',
+        input.resultOfficialCode,
+        input.resultYear,
+        input.eventSource,
+        input.status,
+      ],
+    );
+    return Number(asOk(result).affectedRows ?? 0) > 0;
   }
 }

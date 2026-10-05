@@ -24,6 +24,7 @@ import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-
 import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
 import { Result } from '../../../entities/results/entities/result.entity';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
+import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
@@ -70,6 +71,7 @@ describe('PrmsOpenSearchService', () => {
   let clarisaInstitutionTypesService: jest.Mocked<ClarisaInstitutionTypesService>;
   let temporalRepoHandle: { save: jest.Mock };
   let greenCheckRepository: { createSnapshot: jest.Mock };
+  let prmsHistoryRepository: { recordImportedHistory: jest.Mock };
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -307,11 +309,18 @@ describe('PrmsOpenSearchService', () => {
           provide: GreenCheckRepository,
           useValue: { createSnapshot: jest.fn().mockResolvedValue(undefined) },
         },
+        {
+          provide: PrmsWebhookDeliveryRepository,
+          useValue: {
+            recordImportedHistory: jest.fn().mockResolvedValue(true),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(PrmsOpenSearchService);
     greenCheckRepository = module.get(GreenCheckRepository);
+    prmsHistoryRepository = module.get(PrmsWebhookDeliveryRepository);
     httpService = module.get(HttpService);
     resultsService = module.get(ResultsService);
     resultRepository = module.get(ResultRepository);
@@ -569,6 +578,126 @@ describe('PrmsOpenSearchService', () => {
 
       expect(greenCheckRepository.createSnapshot).toHaveBeenCalledTimes(2);
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+    });
+  });
+
+  describe('getDataAsStar sync history', () => {
+    const CREATED = '2026-03-08T09:25:26.212Z';
+    const UPDATED = '2026-04-23T16:20:15.000Z';
+
+    const importOne = async (
+      overrides: Partial<ResultResponseMapper>,
+      saved: unknown = { result_official_code: 5001 },
+    ) => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          year: '2025',
+          created_date: CREATED as unknown as Date,
+          last_updated_date: UPDATED as unknown as Date,
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(saved);
+      await service.getDataAsStar({ year: 2025 });
+      return prmsHistoryRepository.recordImportedHistory.mock.calls.map(
+        (call) => call[0],
+      );
+    };
+
+    const pendingReview = {
+      resultOfficialCode: '5001',
+      resultYear: 2025,
+      prmsResultCode: 28731,
+      environment: 'TEST',
+      occurredAt: new Date(CREATED),
+      eventSource: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      decidedAt: null,
+      actorUserId: null,
+    };
+
+    it('writes only PENDING_REVIEW for a PRMS Pending Review result', async () => {
+      const rows = await importOne({ status_id: '5' });
+
+      expect(rows).toEqual([pendingReview]);
+    });
+
+    it('writes PENDING_REVIEW then APPROVED for a PRMS Approved result', async () => {
+      const rows = await importOne({ status_id: '6' });
+
+      expect(rows).toEqual([
+        pendingReview,
+        {
+          ...pendingReview,
+          occurredAt: new Date(UPDATED),
+          eventSource: 'PRMS',
+          status: 'APPROVED',
+          decision: 'APPROVE',
+          decidedAt: new Date(UPDATED),
+        },
+      ]);
+    });
+
+    it('writes PENDING_REVIEW then REJECTED for a PRMS Rejected result, while STAR saves it as Approved', async () => {
+      const rows = await importOne({ status_id: '7' });
+
+      expect(rows.map((row) => [row.eventSource, row.status])).toEqual([
+        ['STAR', 'PENDING_REVIEW'],
+        ['PRMS', 'REJECTED'],
+      ]);
+      expect(rows[1].decision).toBe('REJECT');
+      expect(
+        saveResultService.bulkSaveAllSections.mock.calls[0][0][0].status_id,
+      ).toBe(ResultStatusEnum.APPROVED);
+    });
+
+    it('never dates the decision before the submission', async () => {
+      const rows = await importOne({
+        status_id: '6',
+        last_updated_date: '2026-01-01T00:00:00.000Z' as unknown as Date,
+      });
+
+      expect(rows[1].decidedAt).toEqual(new Date(CREATED));
+      expect(rows[1].occurredAt).toEqual(new Date(CREATED));
+    });
+
+    it('credits the PENDING_REVIEW row to the PRMS creator when STAR knows them', async () => {
+      resultRepository.findUserByEmailOrCarnet.mockResolvedValue({
+        sec_user_id: 42,
+      } as any);
+
+      const rows = await importOne({
+        status_id: '6',
+        created_by: { first_name: 'A', last_name: 'B', email: 'a@b.org' },
+      });
+
+      expect(rows[0].actorUserId).toBe(42);
+      expect(rows[1].actorUserId).toBeNull();
+    });
+
+    it('writes no history and no version for a result that was not saved', async () => {
+      const rows = await importOne({ status_id: '6' }, null);
+
+      expect(rows).toEqual([]);
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('still versions the result when the history write fails', async () => {
+      prmsHistoryRepository.recordImportedHistory.mockRejectedValueOnce(
+        new Error('history down'),
+      );
+
+      await importOne({ status_id: '7' });
+
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        5001,
+        2025,
+      );
     });
   });
 
