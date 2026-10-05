@@ -134,7 +134,7 @@ export class CreateResultFormComponent {
       `You selected “<em><strong>${projectFirst || ''}</strong>${projectSecond ? ' - ' + projectSecond : ''}</em>” with the “<em>${indicatorName}</em>” indicator. ` +
       `Results from Science Programs and Accelerators (W1/W2 pooled funding) using this indicator cannot be reported in STAR. ` +
       `Please report directly in PRMS.<br/><br/>` +
-      `If you have any questions, please contact the SPRM team at: ` +
+      `If you have any questions, please contact the MELP team at: ` +
       `<a class="text-[#1689CA] hover:underline" href="mailto:Alliance-SPRM@cgiar.org">Alliance-SPRM@cgiar.org</a>`
     );
   }
