@@ -27,8 +27,9 @@ interface CategoryFormValue {
   description: string;
 }
 
-/** design §6.2 Modal row, list mode. `listKey` is disabled (not removed) in edit mode, and the
- * value held here is never sent on PATCH (design §5 rule 3) — see `saveList()`. */
+/** design §6.2 Modal row, list mode. `listKey` and `codePrefix` are both disabled (not removed)
+ * in edit mode — `codePrefix` pre-filled from the list's real prefix so the admin can see it —
+ * and neither value held here is ever sent on PATCH (design §5 rule 3) — see `saveList()`. */
 interface ListFormValue {
   listKey: string;
   name: string;
@@ -368,7 +369,7 @@ export default class ControlListsComponent implements OnInit {
     if (!list) return;
     this.modalMode.set('list');
     this.editingListId.set(list.id);
-    this.listForm.set({ listKey: list.key, name: list.name ?? '', description: list.description ?? '', codePrefix: '' });
+    this.listForm.set({ listKey: list.key, name: list.name ?? '', description: list.description ?? '', codePrefix: list.codePrefix ?? '' });
     this.openModal();
   }
 

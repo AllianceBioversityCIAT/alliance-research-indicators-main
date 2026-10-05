@@ -464,3 +464,25 @@
   - **T-05:** resize persistence in a real browser; check whether the table jumps to page 1 after a reload (`resetPageOnSort`); post-deploy check that `control_lists WHERE is_system=1` = 6 and values = 23 on Dev.
 - **Final status: PASS on attempt 2.**
 - **Lint gate on committed blobs (Leader, after `f7955d46`):** 18 server `.ts` files linted via stdin → 0 failing.
+
+### 2026-10-05 — Change request CR-1 (user): Code prefix shown read-only on list edit; flaky export test fixed
+
+- **Request (user):** the list modal shows every field on create but not on edit (for example, Code prefix). Review which other fields are missing, and at least add the prefix to the edit modal as non-editable.
+- **Leader field audit (create vs edit):**
+  - **List:** create shows Name, System key, Description and Code prefix. Edit showed Name, System key (disabled) and Description, while Code prefix was hidden and seeded `''`.
+  - **Category:** create and edit match (Name, Description).
+  - **Value:** create and edit match (Code, Value, Description, Order, Active); edit also shows the read-only ID.
+  - **Not shown in either list mode** (reported to the user, not built):
+    - the **category** — on create it is assigned silently from context; A7 accepts a same-portfolio `categoryId` move, but no UI exists for it;
+    - the **system / custom** type.
+  - The prefix stays non-editable after create, because the A7 update DTO does not whitelist it.
+- **Implementer:** sonnet, medium.
+  - Code prefix is rendered in edit mode as a disabled input, pre-filled from `list.codePrefix` (D-CTL-17); create is unchanged; the PATCH body is still exactly `{name, description}`.
+  - 3 DOM-level tests. The two render tests were observed red before the fix (`Received: null`, spec :805 and :819). The PATCH-keys test was proven by a mutation adding `codePrefix` (array diff `+ "codePrefix"`).
+- **Defect found by the Leader during re-measurement:** `xlsx-export.util.spec.ts` (from T-03) failed in **2 of 3** full client runs and always passed alone.
+  - **Root cause:** fake timers were enabled before the real `exceljs` / JSZip `writeBuffer`, which schedules its own timers, so `runAllTimersAsync` raced the library → 5 s timeout.
+  - **Fix (test only; the util is unchanged):** real timers; a `setTimeout` spy that captures only the util's 100 ms cleanup callback and forwards every other call; explicit invocation and assertions; a 30 s timeout; `restoreAllMocks`.
+  - **Red:** with `revokeObjectURL` removed from the util → `Expected: "blob:xlsx-export" Number of calls: 0`.
+  - **Results:** the worker ran the full suite twice, 7,933 green both times. Leader re-measurement: 345 / 7,933 passed; lint clean.
+- **Reviewer (opus) — STATUS: PASS.** ADVISORY: the spy matches any 100 ms timer, not only the util's (no such exceljs timer found; harden only if it ever flakes).
+- **Files:** `control-lists.component.{html,ts,spec.ts}`, `shared/utils/xlsx-export.util.spec.ts`.

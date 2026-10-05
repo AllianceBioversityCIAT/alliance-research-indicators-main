@@ -188,10 +188,10 @@
     </div>
     <app-textarea label="Description" [signal]="listForm" optionValue="description" placeholder="Optional description"
       [rows]="4" [maxLength]="500"></app-textarea>
-    @if (!isEditingList()) {
-    <app-input label="Code prefix" [signal]="listForm" optionValue="codePrefix" [maxLength]="10"
-      placeholder="Optional, e.g. UOM"></app-input>
-    }
+    <div class="flex flex-col gap-1" data-testid="list-code-prefix-field">
+      <app-input label="Code prefix" [signal]="listForm" optionValue="codePrefix" [maxLength]="10"
+        [disabled]="isEditingList()" placeholder="Optional, e.g. UOM"></app-input>
+    </div>
   </div>
   } @else if (modalMode() === 'value') {
   <div class="flex w-[min(560px,80vw)] flex-col gap-5 px-10 py-8" data-testid="value-form">

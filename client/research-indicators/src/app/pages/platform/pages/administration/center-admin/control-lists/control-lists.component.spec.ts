@@ -30,7 +30,10 @@ class ModalStubComponent {
 // T-02 (KZ-001): a real native <input [disabled]> so the "key input is disabled in edit mode"
 // falsifier asserts on RENDERED DOM, not just the component's `disabled` instance property —
 // an empty-template stub (T-01's original) would make that assertion vacuous.
-@Component({ selector: 'app-input', standalone: true, template: '<input [disabled]="disabled" />' })
+// Code-prefix-on-edit (follow-up) adds a `[value]` binding from the backing signal for the same
+// reason: "shows the list's real prefix" must be asserted on the rendered input, not just on
+// `component.listForm()`.
+@Component({ selector: 'app-input', standalone: true, template: '<input [disabled]="disabled" [value]="signal()[optionValue]" />' })
 class InputStubComponent {
   @Input() signal!: WritableSignal<Record<string, unknown>>;
   @Input() optionValue = '';
@@ -784,6 +787,55 @@ describe('ControlListsComponent', () => {
       fixture.detectChanges();
       const createInput = el.querySelector('[data-testid="list-key-field"] input') as HTMLInputElement;
       expect(createInput.disabled).toBe(false);
+    });
+
+    // Follow-up to T-02: Code prefix was hidden entirely on edit. It must now show — disabled,
+    // pre-filled with the list's real prefix — same treatment as System key above (KZ-001: asserted
+    // on the rendered native input, not just `component.listForm()`).
+    it('shows the Code prefix input on edit, disabled, pre-filled with the list\'s real prefix', async () => {
+      await setup([kpiCategory]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      // directionList's codePrefix defaults to 'DIR' (listSummary() default).
+      component.selectList(directionList.id);
+      component.startEditList();
+      fixture.detectChanges();
+
+      const editInput = el.querySelector('[data-testid="list-code-prefix-field"] input') as HTMLInputElement;
+      expect(editInput).toBeTruthy();
+      expect(editInput.disabled).toBe(true);
+      expect(editInput.value).toBe('DIR');
+      expect(component.listForm().codePrefix).toBe('DIR');
+    });
+
+    it('shows the Code prefix input enabled and empty on create', async () => {
+      await setup([kpiCategory]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      component.startCreateList(kpiCategory);
+      fixture.detectChanges();
+
+      const createInput = el.querySelector('[data-testid="list-code-prefix-field"] input') as HTMLInputElement;
+      expect(createInput).toBeTruthy();
+      expect(createInput.disabled).toBe(false);
+      expect(createInput.value).toBe('');
+    });
+
+    // The server's A7 update DTO (`forbidNonWhitelisted`) accepts only name/description/categoryId —
+    // codePrefix must never ride along on a PATCH, same rule already proven for listKey above.
+    it('edits a list and never sends codePrefix (or listKey) in the PATCH body', async () => {
+      await setup([kpiCategory]);
+
+      component.selectList(directionList.id);
+      component.startEditList();
+      component.listForm.update(current => ({ ...current, name: 'Renamed direction' }));
+
+      await component.saveList();
+
+      const [, patchBody] = api.PATCH_ControlList.mock.calls[0];
+      expect(Object.keys(patchBody).sort()).toEqual(['description', 'name']);
+      expect(patchBody).not.toHaveProperty('codePrefix');
+      expect(patchBody).not.toHaveProperty('listKey');
     });
 
     it('creates a list preselecting the category whose "add list" icon was used', async () => {

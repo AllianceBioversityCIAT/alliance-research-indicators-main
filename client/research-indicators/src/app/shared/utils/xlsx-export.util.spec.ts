@@ -98,14 +98,37 @@ describe('xlsx-export.util', () => {
       document.createElement = originalCreateElement;
       document.body.appendChild = originalAppendChild;
       jest.useRealTimers();
+      // Restores the `setTimeout` spy below (and any other jest.spyOn in this file) — plain
+      // `jest.fn()` reassignments like createObjectURLSpy/revokeObjectURLSpy are unaffected.
+      jest.restoreAllMocks();
     });
 
+    // Leader-verified root cause (K-004 rework, reproduced 2/3 full-suite runs, passed alone):
+    // `jest.useFakeTimers()` raced the REAL `exceljs` (JSZip) internal scheduling against
+    // `await jest.runAllTimersAsync()` — under suite load, module compile could still be in
+    // flight when the drain ran and executed BEFORE exceljs's own timers/setImmediate calls were
+    // even scheduled, so `exportPromise` never settled and the test hit the default 5000 ms
+    // timeout. Fix: run on REAL timers end-to-end (no `jest.useFakeTimers()`), which removes the
+    // race entirely for exceljs's internals — nothing about them is mocked here. Only THIS
+    // util's OWN 100 ms cleanup timer is intercepted (captured, not auto-run), so the final
+    // assertions are deterministic and never depend on that wall-clock delay actually elapsing —
+    // no fixed sleep anywhere in this test.
     it('writes a workbook, downloads it via an object URL, and revokes the URL afterwards', async () => {
-      jest.useFakeTimers();
+      const realSetTimeout = globalThis.setTimeout;
+      let revokeCallback: (() => void) | undefined;
+      jest.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: () => void, timeout?: number, ...args: unknown[]) => {
+        if (timeout === 100) {
+          revokeCallback = handler;
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        }
+        // Anything else (e.g. exceljs/JSZip's own internal scheduling) still runs on a REAL
+        // timer, unmocked — only the util's known 100 ms cleanup call is captured above.
+        return realSetTimeout(handler, timeout, ...args);
+      }) as typeof setTimeout);
+
       const rows: Row[] = [{ id: 1, code: 'UOM-1', value: 'Percentage' }];
 
       const exportPromise = exportRowsToXlsx({ columns, rows, fileName: 'control-list-values.xlsx' });
-      await jest.runAllTimersAsync();
       await exportPromise;
 
       expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
@@ -115,7 +138,15 @@ describe('xlsx-export.util', () => {
       expect(linkElement.download).toBe('control-list-values.xlsx');
       expect(linkElement.href).toBe('blob:xlsx-export');
       expect(linkElement.click).toHaveBeenCalledTimes(1);
+
+      // The cleanup timer is scheduled but intentionally not auto-run (see spy above) — invoke
+      // it directly, deterministically, instead of waiting on its real 100 ms delay.
+      expect(revokeCallback).toBeDefined();
+      expect(revokeObjectURLSpy).not.toHaveBeenCalled();
+      revokeCallback?.();
+
+      expect(linkElement.remove).toHaveBeenCalledTimes(1);
       expect(revokeObjectURLSpy).toHaveBeenCalledWith('blob:xlsx-export');
-    });
+    }, 30000);
   });
 });
