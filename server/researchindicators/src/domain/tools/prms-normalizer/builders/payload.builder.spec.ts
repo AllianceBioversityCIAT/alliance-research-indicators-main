@@ -137,6 +137,7 @@ const completeAggregate = (
       toc_result_id: null,
       toc_result_title: null,
       indicator_description: null,
+      quantitative_contribution: null,
       aligns_with_toc: true,
     },
   ],

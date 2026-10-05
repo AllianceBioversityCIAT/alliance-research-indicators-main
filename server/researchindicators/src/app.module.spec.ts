@@ -20,7 +20,8 @@ import { JwtMiddleware } from './domain/shared/middlewares/jwr.middleware';
  * arguments. A future change that widened the exclude list to cover the
  * Innovation Use route would be caught by this assertion; today's list
  * (`configuration/:key`, `/`, `/admin(.*)`, `/admin/public(.*)`,
- * `/.well-known(.*)`, `/favicon.ico`, `reports/:resultCode/pdf`) contains
+ * `/.well-known(.*)`, `/favicon.ico`, `reports/:resultCode/pdf`,
+ * `prms-callback(.*)`) contains
  * no such entry.
  */
 describe('AppModule — JwtMiddleware exclude list (R-IUA-002 AC.7, DD-16)', () => {

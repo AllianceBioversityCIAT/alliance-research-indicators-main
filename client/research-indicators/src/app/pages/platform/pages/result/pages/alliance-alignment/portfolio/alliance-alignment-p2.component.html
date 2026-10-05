@@ -128,7 +128,8 @@
         <app-multiselect label="Research Areas" [signal]="body" optionLabel="full_name" optionValue="lever_id"
           signalOptionValue="research_areas" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
           [disabledSelectedScroll]="true" [filterBy]="'short_name,other_names,full_name,name'" serviceName="levers"
-          [serviceParams]="serviceParams" placeholder="Select the research areas">
+          [serviceParams]="serviceParams" [optionFilter]="researchAreaOptionFilter"
+          placeholder="Select the research areas">
         </app-multiselect>
 
         <app-multiselect label="Strategic Objectives" [signal]="body" optionLabel="name" optionValue="id"

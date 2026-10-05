@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, WritableSignal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked, ViewChild, WritableSignal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CacheService } from '../../services/cache/cache.service';
@@ -11,6 +11,9 @@ import { ApiService } from '../../services/api.service';
 import { GetMetadataService } from '../../services/get-metadata.service';
 import { SubmissionService } from '../../services/submission.service';
 import { CustomTagComponent } from '../custom-tag/custom-tag.component';
+import { PrmsSyncCardComponent } from '../prms-sync-card/prms-sync-card.component';
+import { PrmsSyncHistoryModalComponent } from '../prms-sync-history-modal/prms-sync-history-modal.component';
+import { PrmsSyncHistoryResponse } from '@shared/interfaces/prms-sync-history.interface';
 import { StatusDropdownComponent } from '../status-dropdown/status-dropdown.component';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -48,7 +51,18 @@ interface SidebarOption {
 
 @Component({
   selector: 'app-result-sidebar',
-  imports: [CustomTagComponent, StatusDropdownComponent, RouterLink, RouterLinkActive, ButtonModule, CommonModule, TooltipModule, S3ImageUrlPipe],
+  imports: [
+    CustomTagComponent,
+    StatusDropdownComponent,
+    RouterLink,
+    RouterLinkActive,
+    ButtonModule,
+    CommonModule,
+    TooltipModule,
+    S3ImageUrlPipe,
+    PrmsSyncCardComponent,
+    PrmsSyncHistoryModalComponent
+  ],
   templateUrl: './result-sidebar.component.html',
   styleUrl: './result-sidebar.component.scss'
 })
@@ -154,11 +168,72 @@ export class ResultSidebarComponent {
   // than an empty label.
   prmsResultCode = computed(() => this.bilateralService.currentAlignment()?.prms_result_code ?? null);
 
+  readonly prmsHistory = signal<PrmsSyncHistoryResponse | null>(null);
+  readonly prmsHistoryPhase = signal<'loading' | 'loaded' | 'failed'>('loading');
+  readonly prmsHistoryOpen = signal(false);
+  private prmsHistoryFetchGen = 0;
+
+  /**
+   * `prms_result_code` here is the history payload's copy of `results.prms_result_code`
+   * (Q1), not a code stored on a history row. Null means the metadata write failed:
+   * hide the card rather than render it without a code.
+   */
+  readonly showPrmsSyncCard = computed(() => {
+    const history = this.prmsHistory();
+    return this.prmsHistoryPhase() === 'loaded' && (history?.events.length ?? 0) > 0 && history?.prms_result_code != null;
+  });
+
+  readonly showLegacyPrmsCode = computed(() => {
+    if (this.prmsHistoryPhase() === 'loading' || this.showPrmsSyncCard() || this.prmsResultCode() == null) return false;
+    const history = this.prmsHistory();
+    const loadedWithEventsButNoResultsCode =
+      this.prmsHistoryPhase() === 'loaded' && (history?.events.length ?? 0) > 0 && history?.prms_result_code == null;
+    return !loadedWithEventsButNoResultsCode;
+  });
+
+  @ViewChild(PrmsSyncCardComponent) prmsSyncCard?: PrmsSyncCardComponent;
+
+  private readonly prmsHistoryEffect = effect(() => {
+    const resultCode = this.cache.getCurrentNumericResultId();
+    untracked(() => {
+      void this.fetchPrmsSyncHistory(resultCode);
+    });
+  });
+
   prmsSyncInFlight = signal(false);
 
   hasPoolFundingOption = computed(() => {
     return this.allOptionsWithGreenChecks().some(o => o.path === 'pool-funding-alignment' && !o.hide);
   });
+
+  onPrmsHistoryVisible(open: boolean): void {
+    this.prmsHistoryOpen.set(open);
+    if (!open) {
+      setTimeout(() => this.prmsSyncCard?.focusHistoryLink(), 0);
+    }
+  }
+
+  async fetchPrmsSyncHistory(resultCode: number): Promise<void> {
+    const generation = ++this.prmsHistoryFetchGen;
+    this.prmsHistoryPhase.set('loading');
+    try {
+      const response = await this.api.GET_PrmsSyncHistory(resultCode);
+      if (generation !== this.prmsHistoryFetchGen) return;
+      if (!response?.successfulRequest || !response.data) {
+        this.prmsHistory.set(null);
+        this.prmsHistoryPhase.set('failed');
+        console.error('PRMS sync history request failed', { resultCode });
+        return;
+      }
+      this.prmsHistory.set(response.data);
+      this.prmsHistoryPhase.set('loaded');
+    } catch {
+      if (generation !== this.prmsHistoryFetchGen) return;
+      this.prmsHistory.set(null);
+      this.prmsHistoryPhase.set('failed');
+      console.error('PRMS sync history request failed', { resultCode });
+    }
+  }
 
   async onPrmsSync(): Promise<void> {
     if (!this.canSyncPrms() || this.prmsSyncInFlight() || this.prmsAlreadySynced()) return;
@@ -169,6 +244,7 @@ export class ResultSidebarComponent {
         await this.metadata.update(this.cache.getCurrentNumericResultId());
         const resultCode = this.route.snapshot.paramMap.get('id') ?? String(this.cache.getCurrentNumericResultId());
         await this.bilateralService.getAlignment(resultCode);
+        await this.fetchPrmsSyncHistory(this.cache.getCurrentNumericResultId());
         // A successful push is a terminal, irreversible event -- the result becomes
         // read-only in STAR -- so it gets a blocking modal rather than a toast that
         // scrolls away unseen. Reuses the SAME `showGlobalAlert` the reporting-year

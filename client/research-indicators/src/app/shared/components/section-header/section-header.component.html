@@ -39,7 +39,7 @@
   @if (this.cache.showSectionHeaderActions()) {
   <div class="buttons-container rs-gap-x-[15]">
     <div class="flex items-center gap-1">
-      @if (cache.currentMetadata().indicator_id === 5) {
+      @if (showOicrTemplateDownload()) {
       <app-download-oicr-template [onlyIcon]="true"></app-download-oicr-template>
       }
       @if (showStarPdfReport()) {

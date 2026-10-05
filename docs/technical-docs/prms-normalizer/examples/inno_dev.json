@@ -1,0 +1,66 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "innovation_development",
+      "data": {
+        "created_date": "2025-10-24T19:36:04Z",
+        "created_by": { "name": "Sara Jani", "email": "s.jani@cgiar.org" },
+        "submitted_by": {
+          "email": "mohammad.salem@codeobia.com",
+          "name": "Mohammad Salem",
+          "comment": "",
+          "submitted_date": "2025-11-24T14:28:02Z"
+        },
+        "lead_center": { "institution_id": 1279, "acronym": "ICARDA" },
+        "title": "Climate-resilient wheat variety development toolkit",
+        "description": "Innovative toolkit for accelerating drought-tolerant wheat variety development through participatory breeding approaches",
+        "toc_mapping": {
+          "science_program_id": "SP01",
+          "aow_compose_code": "SP01-AOW05",
+          "result_title": "HLO20.AOW5.IO3 Assess performance",
+          "result_indicator_description": "Availability of MELIA Report on AoWs (performance data)",
+          "result_indicator_type_name": "Number of innovations (innovation development)"
+        },
+        "geo_focus": {
+          "scope_code": 4,
+          "scope_label": "National",
+          "countries": [{ "id": 788, "name": "Tunisia" }]
+        },
+        "contributing_center": [
+          {
+            "institution_id": 1279,
+            "acronym": "ICARDA"
+          }
+        ],
+        "contributing_partners": [
+          {
+            "name": "Partner Organization"
+          }
+        ],
+        "evidence": [
+          {
+            "link": "https://hdl.handle.net/20.500.1176/70001",
+            "description": ""
+          }
+        ],
+        "contributing_bilateral_projects": [
+          {
+            "grant_title": "D-200358-Enhancing Food Security and Climate Resilience in Morocco and Tunisia"
+          }
+        ],
+        "innovation_development": {
+          "innovation_typology": {
+            "code": 12,
+            "name": "Technological innovation"
+          },
+          "innovation_developers": "ICARDA Wheat Breeding Team",
+          "innovation_readiness_level": {
+            "level": 0
+          }
+        }
+      }
+    }
+  ]
+}

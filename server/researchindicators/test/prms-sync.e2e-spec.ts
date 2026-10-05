@@ -292,6 +292,30 @@ describe('PRMS sync e2e (T-14, DC-3 + guard matrix)', () => {
     expect(ingestSpy).not.toHaveBeenCalled();
   });
 
+  /**
+   * T-03 / R-SSP-001 AC.6 / DC-7. Routing only.
+   *
+   * The harness stubs JwtMiddleware.prototype.use (above, beforeAll), so an
+   * auth assertion here would pass vacuously (sibling DD-11 / P-17). This
+   * case claims the mount path and nothing else: unversioned history is
+   * reachable, `/api/v1/.../history` is not. Authorization stays with the
+   * unit-level guard-parity check.
+   */
+  it('DC-7: GET history is mounted unversioned and /api/v1/.../history is 404', async () => {
+    asActor(owner);
+    const unversioned = await request(app.getHttpServer()).get(
+      `/api/results/${CODE.guard}/prms-sync/history`,
+    );
+    const versioned = await request(app.getHttpServer()).get(
+      `/api/v1/results/${CODE.guard}/prms-sync/history`,
+    );
+
+    expect({
+      unversioned: unversioned.status,
+      versioned: versioned.status,
+    }).toEqual({ unversioned: 200, versioned: 404 });
+  });
+
   it('indicator_id 3, 5, 6 and PRMS policy type 1 are each refused with their own reason', async () => {
     asActor(owner);
     const kp = await request(app.getHttpServer())
@@ -432,6 +456,21 @@ describe('PRMS sync e2e (T-14, DC-3 + guard matrix)', () => {
   }, 120_000);
 
   async function seedCatalogs(): Promise<void> {
+    // Parents first. INSERT IGNORE turns a missing parent into a warning and
+    // inserts nothing, so the later results row then fails its own FK.
+    await q(
+      `INSERT IGNORE INTO indicator_types (indicator_type_id, name, is_active, created_at)
+       VALUES (1, 'Result', 1, NOW())`,
+    );
+    await q(
+      `INSERT IGNORE INTO reporting_platforms (platform_code, platform_name, is_active, created_at)
+       VALUES ('STAR', 'STAR', 1, NOW())`,
+    );
+    await q(
+      `INSERT IGNORE INTO clarisa_geo_scope (code, name, is_active, created_at)
+       VALUES (?, 'This is yet to be determined', 1, NOW())`,
+      [ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED],
+    );
     await q(
       `INSERT IGNORE INTO result_status (result_status_id, name, is_active, created_at)
        VALUES (?, 'Approved', 1, NOW()), (?, 'Draft', 1, NOW())`,
@@ -441,12 +480,18 @@ describe('PRMS sync e2e (T-14, DC-3 + guard matrix)', () => {
       `INSERT IGNORE INTO indicators (indicator_id, name, indicator_type_id, is_active, created_at)
        VALUES
          (?, 'Capacity Sharing for Development', 1, 1, NOW()),
+         (?, 'Innovation Development', 1, 1, NOW()),
+         (?, 'Knowledge Product', 1, 1, NOW()),
          (?, 'Policy Change', 1, 1, NOW()),
-         (?, 'OICR', 1, 1, NOW())`,
+         (?, 'OICR', 1, 1, NOW()),
+         (?, 'Innovation Use', 1, 1, NOW())`,
       [
         IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        IndicatorsEnum.INNOVATION_DEV,
+        IndicatorsEnum.KNOWLEDGE_PRODUCT,
         IndicatorsEnum.POLICY_CHANGE,
         IndicatorsEnum.OICR,
+        IndicatorsEnum.INNOVATION_USE,
       ],
     );
     await q(

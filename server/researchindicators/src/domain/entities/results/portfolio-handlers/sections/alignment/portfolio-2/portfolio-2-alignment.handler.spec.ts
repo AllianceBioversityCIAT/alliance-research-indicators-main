@@ -112,6 +112,33 @@ describe('Portfolio2AlignmentHandler', () => {
       );
     });
 
+    it('keeps is_primary=false on a contributing Research Area (OICR round trip)', async () => {
+      const context: PortfolioHandlerContext = {
+        ...baseContext,
+        result: { indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT },
+      };
+
+      await handler.save(context, {
+        ...payload,
+        research_areas: [
+          { lever_id: '11', is_primary: true },
+          { lever_id: '12', is_primary: false },
+        ],
+      } as any);
+
+      expect(resultLeversService.create).toHaveBeenCalledWith(
+        context.resultId,
+        [
+          { lever_id: 11, is_primary: true, custom_lever_name: undefined },
+          { lever_id: 12, is_primary: false, custom_lever_name: undefined },
+        ],
+        'lever_id',
+        LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+        manager,
+        ['is_primary', 'custom_lever_name'],
+      );
+    });
+
     it('should clear legacy levers and persist portfolio 2 alignment fields', async () => {
       const context: PortfolioHandlerContext = {
         ...baseContext,

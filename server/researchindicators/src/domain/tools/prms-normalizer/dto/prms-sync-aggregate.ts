@@ -21,6 +21,15 @@ export interface PrmsScienceProgramSnapshot {
   toc_result_id: number | null;
   toc_result_title: string | null;
   indicator_description: string | null;
+  /**
+   * `result_pool_funding_toc_alignment.quantitative_contribution`, the
+   * SP's numeric contribution to the ToC indicator. 2026-09-29: PRMS
+   * enabled STAR to send it as `toc_mapping.target_contribution`. The
+   * column is `decimal(18,2)`, which mysql2 returns as a string, so the
+   * repository coerces it to a number here -- the wire contract is
+   * `number`, not `"12.00"`.
+   */
+  quantitative_contribution: number | null;
   aligns_with_toc: boolean | null;
 }
 

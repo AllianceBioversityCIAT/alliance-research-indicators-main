@@ -68,6 +68,7 @@ import { SignalEndpointService } from './signal-endpoint.service';
 import { GetCurrentUser } from '../interfaces/get-current-user.interfce';
 import { PatchSubmitResult, PatchSubmitResultLatest } from '../interfaces/patch_submit-result.interface';
 import { PrmsSyncResponse } from '../interfaces/prms-sync.interface';
+import { PrmsSyncHistoryResponse } from '../interfaces/prms-sync-history.interface';
 import { GetClarisaInstitutionsTypes } from '@shared/interfaces/get-clarisa-institutions-types.interface';
 import { GetSdgs } from '@shared/interfaces/get-sdgs.interface';
 import { PatchIpOwner } from '@shared/interfaces/patch-ip-owners';
@@ -125,7 +126,7 @@ import {
 } from '@shared/interfaces/app-config.interface';
 import { GetTags } from '@shared/interfaces/get-tags.interface';
 import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interface';
-import { LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { ExistingOicrSource, LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetApi, PatchLeverSdgTargetsRequest } from '@shared/interfaces/lever-sdg-target.interface';
 import { MaturityLevel } from '@shared/interfaces/maturity-level.interface';
 import { InteractionFeedbackPayload } from '@shared/interfaces/feedback-interaction.interface';
@@ -1097,6 +1098,11 @@ export class ApiService {
     return this.TP.post(url(), {}, { useResultInterceptor: true });
   };
 
+  GET_PrmsSyncHistory = (resultCode: number): Promise<MainResponse<PrmsSyncHistoryResponse>> => {
+    const url = () => `results/${resultCode}/prms-sync/history`;
+    return this.TP.get(url(), { useResultInterceptor: true });
+  };
+
   GET_ReviewStatuses = () => {
     const url = () => `results/status/review-statuses`;
     return this.TP.get(url(), {});
@@ -1170,8 +1176,8 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  GET_OICRMetadata = (resultCode: number): Promise<MainResponse<OicrCreation>> => {
-    const url = () => `temp/oicrs/${resultCode}/metadata`;
+  GET_OICRMetadata = (resultCode: number, source?: ExistingOicrSource): Promise<MainResponse<OicrCreation>> => {
+    const url = () => `temp/oicrs/${resultCode}/metadata${source ? `?source=${source}` : ''}`;
     return this.TP.get(url(), {});
   };
 

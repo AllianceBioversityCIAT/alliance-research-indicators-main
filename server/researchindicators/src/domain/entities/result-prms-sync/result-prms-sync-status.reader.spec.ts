@@ -15,6 +15,7 @@ describe('ResultPrmsSyncStatusReader', () => {
 
   beforeEach(() => {
     query.mockReset();
+    query.mockResolvedValue([]);
   });
 
   describe('mapLastAttempt', () => {
@@ -123,6 +124,58 @@ describe('ResultPrmsSyncStatusReader', () => {
     expect(JSON.stringify(status)).not.toContain('should-not-leak');
     expect(status.sync_state).toBe('failed');
     expect(status.is_synced_to_prms).toBe(false);
+    expect(status).toHaveProperty('last_decision');
+    expect(status.last_decision).toBeNull();
+  });
+
+  it('keeps sync_state and last_attempt byte-identical to the pre-change baseline', async () => {
+    // Captured against the unmodified reader (HEAD 6540e33f, 8 tests green)
+    // before last_decision existed. The mock answers by table, so routing
+    // last_attempt at result_prms_sync_history returns a verdict row and
+    // this comparison goes red. The two fields are asserted on their own.
+    const baselineLastAttempt = {
+      attempt_number: 1,
+      outcome: PrmsSyncOutcome.TRANSPORT_FAILED,
+      http_status: null,
+      request_id: null,
+      failure_reason: 'PRMS Normalizer returned no HTTP response',
+      environment: 'TEST',
+      prms_type: 'capacity_sharing',
+      created_at: '2026-09-15T00:00:00.000Z',
+    };
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([
+          {
+            ...baselineLastAttempt,
+            request_payload: { api_key: 'should-not-leak' },
+          },
+        ]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([
+          {
+            decision: 'REJECT',
+            decided_at: '2026-09-20T15:30:00.000Z',
+            justification: 'a verdict is not an attempt',
+            prms_result_code: 77,
+            occurred_at: '2026-09-20T15:30:04.000Z',
+          },
+        ]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 0, prms_result_code: null },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    expect(status.sync_state).toBe('failed');
+    expect(status.last_attempt).toEqual(baselineLastAttempt);
+    expect(status.last_attempt).not.toHaveProperty('request_payload');
   });
 
   it('reads the status of a version (snapshot) row — the results query does not constrain is_snapshot', async () => {
@@ -142,5 +195,243 @@ describe('ResultPrmsSyncStatusReader', () => {
     expect(resultsSql).toBeDefined();
     expect(resultsSql).not.toMatch(/is_snapshot/i);
     expect(status.is_synced_to_prms).toBe(true);
+    expect(status.sync_state).toBe('synced');
+    expect(status.last_attempt).toBeNull();
+    expect(status.last_decision).toBeNull();
+  });
+
+  it('returns APPROVE with decided_at and null justification', async () => {
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([
+          {
+            decision: 'APPROVE',
+            decided_at: '2026-09-18T11:00:00.000Z',
+            justification: null,
+            prms_result_code: '9001',
+            occurred_at: '2026-09-18T11:00:03.000Z',
+          },
+        ]);
+      }
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 1, prms_result_code: 10 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    expect(status.last_decision).toEqual({
+      decision: 'APPROVE',
+      decided_at: '2026-09-18T11:00:00.000Z',
+      justification: null,
+      prms_result_code: 9001,
+      delivery_received_at: '2026-09-18T11:00:03.000Z',
+    });
+    const decisionSql = issuedSql(query).find((sql) =>
+      /result_prms_sync_history/.test(sql),
+    );
+    expect(decisionSql).toMatch(/correlation_outcome\s*=\s*'CORRELATED'/);
+    expect(decisionSql).toMatch(/duplicate_of_id\s+IS\s+NULL/);
+    // T-11 amendment: the guard against reading T-11's own outbound rows
+    // back as a PRMS verdict, asserted on the emitted SQL text (KZ-001).
+    expect(decisionSql).toMatch(/event_source\s*=\s*'PRMS'/);
+    expect(decisionSql).not.toMatch(/raw_body/);
+  });
+
+  it('returns REJECT justification verbatim and keeps the earlier decision in history', async () => {
+    const earlier = {
+      decision: 'APPROVE',
+      decided_at: '2026-09-10T08:00:00.000Z',
+      justification: null,
+      prms_result_code: 11,
+      occurred_at: '2026-09-10T08:00:02.000Z',
+      correlation_outcome: 'CORRELATED',
+      duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
+    };
+    const later = {
+      decision: 'REJECT',
+      decided_at: '2026-09-20T15:30:00.000Z',
+      justification: '  Evidence does not support the claim.\n',
+      prms_result_code: null,
+      occurred_at: '2026-09-20T15:30:04.000Z',
+      correlation_outcome: 'CORRELATED',
+      duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
+    };
+    const duplicateNewer = {
+      decision: 'REJECT',
+      decided_at: '2026-09-21T00:00:00.000Z',
+      justification: 'should-not-surface',
+      prms_result_code: 99,
+      occurred_at: '2026-09-21T00:00:01.000Z',
+      correlation_outcome: 'DUPLICATE',
+      duplicate_of_id: 5 as number | null,
+      event_source: 'PRMS',
+    };
+    const uncorrelatedNewer = {
+      decision: 'REJECT',
+      decided_at: '2026-09-22T00:00:00.000Z',
+      justification: 'unknown-ref',
+      prms_result_code: 3,
+      occurred_at: '2026-09-22T00:00:01.000Z',
+      correlation_outcome: 'UNKNOWN_REFERENCE',
+      duplicate_of_id: null as number | null,
+      event_source: 'PRMS',
+    };
+    const history = [earlier, later, duplicateNewer, uncorrelatedNewer];
+    const outbound = {
+      attempt_number: 4,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      http_status: 200,
+      request_id: 'req-out',
+      failure_reason: null,
+      environment: 'TEST',
+      prms_type: 'innovation_use',
+      created_at: '2026-09-01T00:00:00.000Z',
+    };
+
+    query.mockImplementation((sql: string) => {
+      if (/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql)) {
+        history.length = 0;
+        return Promise.resolve([]);
+      }
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([outbound]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve(projectDeliveries(sql, history));
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 1, prms_result_code: 10 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    expect(status.last_decision).toEqual({
+      decision: 'REJECT',
+      decided_at: '2026-09-20T15:30:00.000Z',
+      justification: '  Evidence does not support the claim.\n',
+      prms_result_code: null,
+      delivery_received_at: '2026-09-20T15:30:04.000Z',
+    });
+    expect(status.sync_state).toBe('synced');
+    expect(status.last_attempt).toEqual(outbound);
+    expect(history).toHaveLength(4);
+    expect(history[0]).toBe(earlier);
+    for (const [sql] of query.mock.calls) {
+      expect(sql).toMatch(/^\s*SELECT\b/i);
+      expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE|REPLACE)\b/i);
+    }
+    expect(issuedSql(query).join('\n')).not.toMatch(/prms_phase_id/);
+    const decisionCall = query.mock.calls.find((call) =>
+      /result_prms_sync_history/.test(call[0] as string),
+    );
+    // Two params, both the same id: the query resolves the official code AND
+    // the year through `results`, because the history is keyed on the PAIR.
+    // Neither half identifies a version on its own.
+    expect(decisionCall?.[1]).toEqual([42, 42]);
+  });
+
+  it("Falsifier 4 (T-11 amendment) — a result pushed ACCEPTED with NO inbound verdict returns last_decision = null, not T-11's own STAR row read back as a decision (R-PWH-008 AC.3 regression)", async () => {
+    // T-11's own write: correlation_outcome CORRELATED, duplicate_of_id
+    // NULL (Pivot decision 2) — satisfies every predicate in
+    // LAST_DECISION_SQL EXCEPT event_source. Decision/decided_at/
+    // justification are NULL exactly as the repository writes them.
+    const starOutboundRow = {
+      decision: null as string | null,
+      decided_at: null as string | null,
+      justification: null as string | null,
+      prms_result_code: 9199,
+      occurred_at: '2026-09-23T09:00:00.000Z',
+      correlation_outcome: 'CORRELATED',
+      duplicate_of_id: null as number | null,
+      event_source: 'STAR',
+    };
+    const history = [starOutboundRow];
+    const outbound = {
+      attempt_number: 1,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      http_status: 200,
+      request_id: 'req-star-only',
+      failure_reason: null,
+      environment: 'TEST',
+      prms_type: 'capacity_sharing',
+      created_at: '2026-09-23T09:00:00.000Z',
+    };
+
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([outbound]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve(projectDeliveries(sql, history));
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 1, prms_result_code: 9199 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const status = await reader.getStatus(42);
+
+    // This is THE assertion the amendment exists to protect. Deleting
+    // `AND event_source = 'PRMS'` from LAST_DECISION_SQL makes
+    // `projectDeliveries` stop filtering (its own filter is gated on the
+    // SAME text), the STAR-only row surfaces, and this reddens — a green
+    // here with the guard removed would mean the fixture asserted on the
+    // mock's shape instead of the emitted SQL (KZ-001).
+    expect(status.last_decision).toBeNull();
+    expect(status.sync_state).toBe('synced');
+    expect(status.last_attempt).toEqual(outbound);
   });
 });
+
+function issuedSql(query: jest.Mock): string[] {
+  return query.mock.calls.map((call) => call[0] as string);
+}
+
+function projectDeliveries(
+  sql: string,
+  history: Array<{
+    decided_at: string;
+    correlation_outcome: string;
+    duplicate_of_id: number | null;
+    event_source?: string;
+  }>,
+) {
+  let rows = history.slice();
+  if (/correlation_outcome\s*=\s*'CORRELATED'/.test(sql)) {
+    rows = rows.filter((row) => row.correlation_outcome === 'CORRELATED');
+  }
+  if (/duplicate_of_id\s+IS\s+NULL/i.test(sql)) {
+    rows = rows.filter((row) => row.duplicate_of_id == null);
+  }
+  // T-11 amendment (KZ-001): this filter is decoded from the SQL TEXT, not
+  // asserted on a mock call. Remove `AND event_source = 'PRMS'` from the
+  // real `LAST_DECISION_SQL` and this regex stops matching, so the filter
+  // silently stops applying and a STAR-only row surfaces — that is what
+  // makes Falsifier 4 an honest red, not a mock-return assertion.
+  if (/event_source\s*=\s*'PRMS'/.test(sql)) {
+    rows = rows.filter((row) => row.event_source === 'PRMS');
+  }
+  if (/ORDER BY\s+decided_at\s+DESC/i.test(sql)) {
+    rows.sort((a, b) => (a.decided_at < b.decided_at ? 1 : -1));
+  }
+  if (/LIMIT\s+1/i.test(sql)) {
+    rows = rows.slice(0, 1);
+  }
+  return rows;
+}

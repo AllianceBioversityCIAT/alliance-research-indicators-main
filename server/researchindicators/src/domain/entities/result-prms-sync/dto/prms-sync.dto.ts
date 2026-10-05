@@ -71,6 +71,39 @@ export class PrmsSyncLastAttemptDto {
   created_at: Date | string;
 }
 
+export class PrmsSyncLastDecisionDto {
+  @ApiProperty({
+    enum: ['APPROVE', 'REJECT'],
+    description:
+      'Science Program verdict on the latest non-duplicate correlated delivery.',
+  })
+  decision: string | null;
+
+  @ApiProperty({ nullable: true })
+  decided_at: Date | string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Reviewer text verbatim. Null when PRMS sent none (typical for APPROVE).',
+  })
+  justification: string | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  prms_result_code: number | null;
+
+  @ApiProperty({
+    description:
+      // Physical column renamed to `occurred_at` by the 2026-09-23 Pivot
+      // (table is now the sync HISTORY, not only inbound deliveries).
+      // This DTO field name is kept for API-contract stability — a T-13
+      // naming choice this T-01b schema rename does not reopen.
+      'When STAR recorded the event (column occurred_at).',
+  })
+  delivery_received_at: Date | string | null;
+}
+
 export class PrmsSyncStatusDto {
   @ApiProperty({
     enum: ['never_synced', 'synced', 'failed'],
@@ -92,4 +125,12 @@ export class PrmsSyncStatusDto {
       'Most recent attempt. Never includes request_payload (R-PRMS-014 AC.2).',
   })
   last_attempt: PrmsSyncLastAttemptDto | null;
+
+  @ApiPropertyOptional({
+    type: () => PrmsSyncLastDecisionDto,
+    nullable: true,
+    description:
+      'Latest non-duplicate correlated decision, or null when none exists (R-PWH-008). A projection — earlier decisions stay in the history.',
+  })
+  last_decision: PrmsSyncLastDecisionDto | null;
 }

@@ -47,7 +47,8 @@ import {
 import { Country, Region } from '@shared/interfaces/get-geo-location.interface';
 import { environment } from '@envs/environment';
 import { Lever } from '@shared/interfaces/oicr-creation.interface';
-import { GetLeversParams } from '@shared/interfaces/get-levers.interface';
+import { GetLevers, GetLeversParams } from '@shared/interfaces/get-levers.interface';
+import { GetLeversService } from '@shared/services/control-list/get-levers.service';
 import { TooltipModule } from 'primeng/tooltip';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
 import { Router } from '@angular/router';
@@ -69,6 +70,28 @@ import { AccordionModule } from 'primeng/accordion';
 import { SubmissionService } from '@shared/services/submission.service';
 
 const OTHER_LEVER_ID = 9;
+/** Research Area "Other" (Portfolio 2), seeded by migration 1790688406000. */
+const OTHER_RESEARCH_AREA_ID = 18;
+/** Portfolio whose step 2 options are Research Areas instead of levers. */
+const RESEARCH_AREAS_PORTFOLIO_ID = 2;
+
+const LEVER_LABELS = {
+  primary: 'Primary Levers',
+  contributing: 'Contributing Levers',
+  placeholder: 'Select the levers',
+  singular: 'Lever',
+  plural: 'Levers',
+  selected: 'Levers selected'
+};
+
+const RESEARCH_AREA_LABELS = {
+  primary: 'Primary Research Areas',
+  contributing: 'Contributing Research Areas',
+  placeholder: 'Select the research areas',
+  singular: 'Research Area',
+  plural: 'Research Areas',
+  selected: 'Research Areas selected'
+};
 
 @Component({
   selector: 'app-create-oicr-form',
@@ -193,6 +216,54 @@ export class CreateOicrFormComponent implements OnInit {
 
     return Number.isFinite(reportYear) && reportYear > 0 ? { reportYear } : undefined;
   });
+
+  private readonly getLeversService = inject(GetLeversService);
+
+  /** Step 2 options for the OICR's reporting year (the same list both pickers load). */
+  stepTwoOptions = computed((): GetLevers[] => {
+    const params = this.leverServiceParams();
+    return params ? this.getLeversService.getList(params)() : [];
+  });
+
+  /** Portfolio 2 OICRs pick Research Areas in step 2; earlier ones pick levers. */
+  isResearchAreaMode = computed(() =>
+    this.stepTwoOptions().some(option => Number(option.portfolio_id) === RESEARCH_AREAS_PORTFOLIO_ID)
+  );
+
+  /** Statuses in which the OICR modal fields are read-only (same list the other steps use). */
+  isStatusLocked(): boolean {
+    const statusId = this.createResultManagementService.statusId();
+    return statusId != null && [10, 11, 12, 13, 14, 15].includes(statusId);
+  }
+
+  stepTwoLabels = computed(() => (this.isResearchAreaMode() ? RESEARCH_AREA_LABELS : LEVER_LABELS));
+
+  /**
+   * In Research Area mode, drop every step 2 selection that is not a Research Area of
+   * this year: the contract lever seeded as primary and the levers prefilled from a
+   * previous OICR both belong to Portfolio 1.
+   */
+  dropSelectionsOutsideStepTwoOptions = effect(
+    () => {
+      if (!this.isResearchAreaMode()) return;
+      const optionIds = new Set(this.stepTwoOptions().map(option => Number(option.lever_id ?? option.id)));
+      const isOption = (lever: Lever) => optionIds.has(Number(lever.lever_id));
+      const stepTwo = this.createResultManagementService.createOicrBody().step_two;
+      const primary = stepTwo?.primary_lever ?? [];
+      const contributing = stepTwo?.contributor_lever ?? [];
+      if (primary.every(isOption) && contributing.every(isOption)) return;
+
+      this.createResultManagementService.createOicrBody.update(body => ({
+        ...body,
+        step_two: {
+          ...body.step_two,
+          primary_lever: primary.filter(isOption),
+          contributor_lever: contributing.filter(isOption)
+        }
+      }));
+    },
+    { allowSignalWrites: true }
+  );
 
   private readonly publishedStatusId = 14;
 
@@ -496,7 +567,7 @@ export class CreateOicrFormComponent implements OnInit {
         summary: `Thank you for ${(this.createResultManagementService.currentRequestedResultCode() && 'update') || ''} your submission`,
         hasNoCancelButton: true,
         detail:
-          'Your OICR will be reviewed by PISA-SPRM and the assigned regional MEL specialist will reach out to support you in finalizing the next steps of the OICR development process.',
+          'Your OICR will be reviewed by MELP and the assigned regional MEL specialist will reach out to support you in finalizing the next steps of the OICR development process.',
         confirmCallback: {
           label: 'Done',
           event: () => {
@@ -780,7 +851,8 @@ export class CreateOicrFormComponent implements OnInit {
   }
 
   isOtherLever(lever: Lever): boolean {
-    return Number(lever.lever_id) === OTHER_LEVER_ID;
+    const id = Number(lever.lever_id);
+    return id === OTHER_LEVER_ID || id === OTHER_RESEARCH_AREA_ID;
   }
 
   getLeverCustomNameSignal(lever: Lever) {
