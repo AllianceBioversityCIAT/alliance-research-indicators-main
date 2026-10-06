@@ -247,3 +247,31 @@
 - **Out-of-scope finding:** 5 sibling fixture suites fail in Nest bootstrap (`ResultPolicyChangeModule` imports index [0] undefined) — pre-existing; reproduced alone.
 - **Constitution impact:** none.
 
+### T-03 — Layout migration: INNOVATION USE column group and data dictionary rows
+
+- **Status:** in progress (attempt 1)
+- **Date:** 2026-10-05 · started on the user's instruction ("sí, hazlo así y sigue con T-03")
+- **Implementer:** Cursor `grok-4.7-high` (Size S, pattern copy → `high`, not `xhigh`), fresh worker. Orca `task_e1dd5b84d3e7` / `ctx_d270656ab693`. Brief: `T-03-brief.md` (session scratchpad). The T-02 worker was released after its PASS (`ctx_5cd0c3dab8bd`).
+- **Dev access note:** step 1 authorizes exactly two read-only `SELECT`s on the shared Dev DB (CORE target) through `npm run typeorm query`. All writes go to scratch.
+
+#### Attempt 1 → PASS
+
+- **Files changed:** `server/researchindicators/src/db/migrations/1791400000000-StarRawInnovationUseColumnGroup.ts` (224 lines) · `…/src/db/migration-specs/1791400000000-StarRawInnovationUseColumnGroup.spec.ts` (241) · `…/test/fixtures/innovation-use/star-raw-innovation-use-column-group.fixture-spec.ts` (338).
+- **Dev readings (P-11 / P-16): UNVERIFIED → handed to T-05.** Both mandated read-only `SELECT`s against the CORE target failed before any row returned: `Error: connect ETIMEDOUT … errorno: 'ETIMEDOUT', code: 'ETIMEDOUT', syscall: 'connect', fatal: true`. No other route was tried (per the Disqualifier). The seeded round trip uses the 10 fallback groups from `sheet-presentation.ts`, explicitly not presented as a Dev reading.
+- **Colour:** `FF6A1B9A` (`private static readonly FILL_ARGB`), distinct from the 10 group colours; a repo-wide grep finds it only in the three new files. Shown to the user at the T-05 visual check.
+- **Implementer judgment (Reviewer-confirmed):** `down()` also keys on `section_fill_argb`, because the seed already holds `Actors` / `Organizations` dictionary rows (`star-results-metadata-dictionary.seed.ts:381-391`). The fixture seeds those labels so the guard is live.
+- **Implementer verification:** spec 5/5. Round trip on empty tables and on seeded tables (10 groups + 3 dictionary rows): byte-identical after `down()`. Falsifiers red:
+  - (a) no `COALESCE` → `QueryFailedError: Column 'sort_order' cannot be null`;
+  - (b) `down()` by `sort_order >= 0` → `Expected length: 10 / Received length: 0`;
+  - (c) `UPDATE … from_col = from_col + 1` → spec `not /\bUPDATE\b/i` red, and seeded identity `from_col` 1 vs 2.
+  Applied on scratch; T-02 fixture still 36/36.
+- **Evidence re-run (Leader inline): VERIFIED.** Migration spec `Tests: 5 passed` · `npm run test:fixtures -- star-raw-innovation-use-column-group` `Tests: 2 passed` · `npm run test:fixtures -- report-innovation-use-view` `Tests: 36 passed` · eslint exit 0 · prettier clean · scratch `migration:show`: `[X] 417 StarRawInnovationUseColumnGroup1791400000000`, 0 pending.
+- **Reviewer (`akili-reviewer`, override (b): stored fields / shared layout tables): PASS** — "Every sort_order is computed in SQL as `COALESCE(MAX(sort_order),0)+k` … every value is bound as a param. Nothing is UPDATEd, and `down()` deletes exactly the 10 inserted rows. The spec and the seeded round trip both catch falsifiers (a)–(c)." The labels match design §3.2 in order; the section is on the first row only (safe because the handler maps `r.section ?? ''`, `…workbook.handler.ts:204`).
+- **ADVISORY (recorded):**
+  - the seeded case does not pin the new rows' `sort_order` (expected group 11, dictionary 65–73); only the empty case pins `+k`;
+  - correction (KZ-014): the Implementer report says the seed's `Actors`/`Organizations` have "a null section", but the seed stores `''` (`seed.ts:382,388`); `down()` is unaffected (fill key);
+  - JD-6 cosmetic window applies (deploy order is checked at T-05);
+  - the reviewer had no `SendMessage` and delivered via handback (K-009 recorded, not a non-delivery).
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 1 not reported by host, ended complete.
+- **Closing:** PASS attempt 1. Review rounds spec total: 7 of ~11. Requirements covered: R-IUX-007 (DB rows), NFR-IUX-003 (`down()`), NFR-IUX-004, D5. Constitution impact: none.
+

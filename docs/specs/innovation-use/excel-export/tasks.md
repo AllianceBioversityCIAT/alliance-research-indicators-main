@@ -124,7 +124,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ### T-03 — Layout migration: INNOVATION USE column group and data dictionary rows
 
-- **Status:** todo · **Size:** S · **Dependencies:** none (runs after T-02, sequentially)
+- **Status:** done (PASS attempt 1, 2026-10-05; P-11/P-16 handed to T-05 — see `execution.md`) · **Size:** S · **Dependencies:** none (runs after T-02, sequentially)
 - **Requirements covered:**
   - R-IUX-007:
     - band 75–83 labelled INNOVATION USE with its own colour;
@@ -148,9 +148,9 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 - **Consumers:** `report-layout.repository.ts:35-62` (reads groups and dictionary for every export), `STAR_RAW_COLUMN_GROUP_FALLBACK` (kept in sync by T-04).
 - **Review:** `checklist`: small, pattern-copy of `1779910000000`/`1780690000000`, with the risky parts pinned by falsifiers.
 - **Done criteria:**
-  - [ ] Dev readings recorded (or the hand-off recorded)
-  - [ ] Spec green; round trip green with seeded rows; Falsifiers (a)–(c) observed red
-  - [ ] `npx eslint` and `npx prettier --check` clean on both files
+  - [x] Dev readings recorded (or the hand-off recorded)
+  - [x] Spec green; round trip green with seeded rows; Falsifiers (a)–(c) observed red
+  - [x] `npx eslint` and `npx prettier --check` clean on both files
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
