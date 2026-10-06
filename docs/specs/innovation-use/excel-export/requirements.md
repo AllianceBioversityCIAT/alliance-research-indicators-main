@@ -178,6 +178,14 @@ One line per active Innovation Use measure (`quantification_role_id = 3`): `• 
 | Linked innovation description | the dev result's description | optional; `NA` when there is no qualifying link |
 | Linked innovation geographic scope | geo scope name | optional; `NA` when there is no qualifying link |
 
+> **Amended 2026-10-06 (user request, T-07):** the exported *Linked innovation development* cell is a **hyperlink** to the linked result's General Information page in STAR: `{ARI_CLIENT_HOST}/result/{platform_code}-{result_official_code}/general-information`. This is the same URL shape the *Link to platform* column already uses (`star-results-export.repository.ts:74`). The shown text is unchanged. The link exists only when a qualifying link exists **and** the target's `platform_code` is not NULL. Otherwise the cell shows its text (`Not provided`, `Not applicable`, or the bare code) with no link.
+
+#### Scenario: Linked dev is a hyperlink
+- GIVEN an Innovation Use result with a qualifying link to `STAR-1234 - Drought-tolerant bean`
+- WHEN the workbook is generated
+- THEN the cell shows `STAR-1234 - Drought-tolerant bean` and links to `{ARI_CLIENT_HOST}/result/STAR-1234/general-information`
+- BUT a cell reading `Not provided` or `Not applicable` must NOT carry a link
+
 A **qualifying link** is what rule 16 counts: an active role-5 `link_results` row whose target is active and has `indicator_id = 2`.
 
 #### Scenario: Link to a deleted dev result

@@ -269,6 +269,14 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     key: 'innovation_use_linked_dev',
     header: 'Linked innovation development',
     width: 48,
+    hyperlink: {
+      urlField: 'innovation_use_linked_dev_url',
+      displayField: 'innovation_use_linked_dev',
+      linkAppearance: {
+        colorArgb: 'FF0563C1',
+        underline: true,
+      },
+    },
   },
   { key: 'innovation_use_actors', header: 'Actors', width: 56 },
   { key: 'innovation_use_organizations', header: 'Organizations', width: 56 },

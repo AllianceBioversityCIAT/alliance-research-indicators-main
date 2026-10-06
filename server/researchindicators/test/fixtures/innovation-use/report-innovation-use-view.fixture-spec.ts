@@ -138,6 +138,7 @@ const IU_SELECT_LIST = [
   'iu.innovation_use_level AS innovation_use_level',
   'iu.innovation_use_level_explanation AS innovation_use_level_explanation',
   'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
+  "CONCAT('https://star.example/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url",
   'iu.innovation_use_actors AS innovation_use_actors',
   'iu.innovation_use_organizations AS innovation_use_organizations',
   'iu.innovation_use_quantifications AS innovation_use_quantifications',
@@ -427,7 +428,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     readinessId?: number | null;
     skipCard?: boolean;
     active?: boolean;
-  }): Promise<LinkCells & { id: number }> {
+  }): Promise<LinkCells & { id: number; officialCode: number }> {
     const title = options && 'title' in options ? options.title : DEV_TITLE;
     const platform =
       options && 'platform' in options ? options.platform : PLATFORM;
@@ -456,6 +457,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
           : levelText(READINESS_OK_LEVEL, READINESS_OK_NAME);
     return {
       id: dev.id,
+      officialCode: dev.officialCode,
       innovation_use_linked_dev: devLabel(
         platform ?? null,
         dev.officialCode,
@@ -516,6 +518,19 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       resultId,
     ]);
     return Number(row.v);
+  }
+
+  async function expectLinkedDevCode(
+    resultId: number,
+    expected: string | null,
+  ): Promise<void> {
+    const [row] = await q(
+      `SELECT innovation_use_linked_dev_code AS code
+         FROM report_innovation_use
+        WHERE result_id = ?`,
+      [resultId],
+    );
+    expect(row?.code ?? null).toBe(expected);
   }
 
   async function loadCells(resultId: number): Promise<Cells | undefined> {
@@ -1221,6 +1236,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       }),
       ['innovation_use_linked_dev'],
     );
+    await expectLinkedDevCode(id, null);
   });
 
   it('rule 16: an inactive role-5 link does not qualify', async () => {
@@ -1238,6 +1254,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       }),
       ['innovation_use_linked_dev'],
     );
+    await expectLinkedDevCode(id, null);
   });
 
   it('rule 16: an active role-5 link to an indicator-1 target does not qualify', async () => {
@@ -1257,6 +1274,12 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       }),
       ['innovation_use_linked_dev'],
     );
+    await expectLinkedDevCode(id, null);
+  });
+
+  it('no role-5 link leaves the linked dev code NULL', async () => {
+    const { id } = await seedUseBase({ withLink: false });
+    await expectLinkedDevCode(id, null);
   });
 
   it('capacity sharing (indicator 1) renders all nine cells Not applicable', async () => {
@@ -1281,6 +1304,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       [],
       IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
     );
+    await expectLinkedDevCode(subject.id, null);
   });
 
   it('NULL actor flag is the disaggregated branch', async () => {
@@ -1406,6 +1430,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     await linkDev(id, dev.id);
     expect(dev.innovation_use_linked_dev).not.toContain(' - ');
     await expectCase('dev-title-null', id, baseCells({ ...dev }), []);
+    await expectLinkedDevCode(id, `${PLATFORM}-${dev.officialCode}`);
   });
 
   it('a null development platform leaves the bare official code', async () => {
@@ -1416,6 +1441,27 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       false,
     );
     await expectCase('dev-platform-null', id, baseCells({ ...dev }), []);
+    await expectLinkedDevCode(id, null);
+  });
+
+  it('a qualifying link with platform STAR exposes STAR-<official code>', async () => {
+    const [existing] = await q(
+      `SELECT platform_code FROM reporting_platforms WHERE platform_code = ?`,
+      ['STAR'],
+    );
+    if (!existing) {
+      await q(
+        `INSERT INTO reporting_platforms (platform_code, platform_name) VALUES (?, ?)`,
+        ['STAR', 'STAR'],
+      );
+    }
+    const dev = await seedQualifyingDev({
+      platform: 'STAR',
+      title: 'Drought-tolerant bean',
+    });
+    const { id } = await seedUseBase({ withLink: false, link: dev });
+    await linkDev(id, dev.id);
+    await expectLinkedDevCode(id, `STAR-${dev.officialCode}`);
   });
 
   it('an inactive detail row behaves as no detail row', async () => {
@@ -1525,6 +1571,14 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     expect(lowerIdDev.innovation_use_linked_dev).not.toContain(
       'Higher id development',
     );
+    await expectLinkedDevCode(id, `${PLATFORM}-${lowerIdDev.officialCode}`);
+    const [picked] = await q(
+      `SELECT innovation_use_linked_dev_code AS code
+         FROM report_innovation_use
+        WHERE result_id = ?`,
+      [id],
+    );
+    expect(picked.code).not.toBe(`${PLATFORM}-${higherIdDev.officialCode}`);
   });
 
   it('snapshot and soft-deleted results are absent, and no result id is repeated', async () => {

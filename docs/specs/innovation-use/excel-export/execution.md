@@ -426,3 +426,58 @@
 - **Review rounds spec total:** 11 of ~11 (T-06 was added after the budget was set; no tripwire is claimed for a user-added task).
 
 - **Preview approved:** after seeing `star_results_metadata_innovation_use_preview_v2.xlsx`, the user said "haz commit de T-06 y sigue con T-07" (2026-10-06). It covers the export subset and its order. The per-item T-05 G3 visual checks on real Dev data stay open (KZ-002).
+
+- **Commit:** `2cc75999` (T-06 + the 2026-10-06 spec amendment), on the user's instruction.
+
+## Spec amendment (2026-10-06): linked dev as a hyperlink → T-07
+
+- **Trigger (user):** "es posible que en el campo linked sea un hipervínculo … ARI_CLIENT_HOST podríamos usarlo para armar la url al resultado hacia general information". Approved with "haz commit de T-06 y sigue con T-07".
+- **Amendments:**
+  - `requirements.md` R-IUX-006: an amendment note and a new scenario "Linked dev is a hyperlink", incl. *BUT must NOT* link `Not provided` / `Not applicable`.
+  - `design.md` §3.2a: "Hyperlink (T-07)" paragraph and **DD-8**.
+  - `tasks.md`: new **T-07** and its summary row.
+  - `git diff`: 1 line removed (design §3.2a paragraph, extended), 44 added.
+- **Decision (Leader, stated to the user, not objected to):** the link exists only when the target's `platform_code` is not NULL. A NULL platform falls back to plain text.
+- **Carry:** the T-07 Reviewer brief checks conformance to `requirements.md#R-IUX-006` and `design.md#3.2a` / DD-8 as amended 2026-10-06.
+
+### T-07 — Linked innovation development as a hyperlink
+
+- **Status:** in progress (attempt 1)
+- **Date:** 2026-10-06
+- **Implementer:** Cursor `grok-4.7-high`, fresh worker, Orca `task_8cd5ac814b35` / `ctx_dc9112607999`. Brief: `T-07-brief.md` (session scratchpad).
+
+#### Attempt 1 → PASS
+
+- **Files changed:**
+  - new: `src/db/migrations/1791600000000-AddLinkedDevCodeToReportInnovationUseView.ts` + its spec;
+  - modified: `star-results-export.repository(.spec).ts`, `star-results-metadata.columns.ts`, `…workbook.handler.spec.ts`, `report-innovation-use-view.fixture-spec.ts`.
+  - Applied migrations `1791300000000` / `1791400000000` / `1791500000000` untouched (`git diff` empty).
+- **View:** `CREATE OR REPLACE VIEW` = the `1791300000000` definition + the lateral's `CONCAT(r2.platform_code, '-', CAST(r2.result_official_code AS CHAR)) AS dev_code` + trailing `innovation_use_linked_dev_code`. `down()` = `new CreateReportInnovationUseView1791300000000().up(queryRunner)`.
+- **Phase 2:** `CONCAT('${ARI_CLIENT_HOST}/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url` (mirrors `platform_link`). Column 77 `hyperlink` with `urlField`, `displayField`, `linkAppearance`, no `emptyDisplay`; still 80 columns.
+- **Red run (deviation recorded, Reviewer-accepted):** the pin reds were observed after the code existed, by removing and then restoring the behavior. They are real assertion-level reds (K-004 met), but not a pins-first ordering. They are not to become the norm.
+- **Falsifiers (finished code, restored):**
+  - (a) `CONCAT_WS` → the platform-NULL case `Expected: null / Received: "907791300652210"`;
+  - (b) `emptyDisplay: 'Not available'` → `Expected: "Not provided" / Received: "Not available"`;
+  - (c) suffix dropped → the repository-spec substring red (the read-back is mocked, so it cannot see SQL — declared KZ-017);
+  - (d) `down()` as `DROP VIEW` → spec (f) red, and the scratch revert gave `ER_NO_SUCH_TABLE`.
+- **Evidence re-run (Leader inline, run alone): VERIFIED.**
+  - `npm test -- --silent` → `Test Suites: 425 passed` / `Tests: 4036 passed`;
+  - `npm run build` exit 0;
+  - `npm run test:fixtures -- --testPathPattern='star-raw-innovation-use|report-innovation-use-view'` → 3 suites / `Tests: 41 passed`;
+  - scratch `migration:show`: `[X] 421 AddLinkedDevCodeToReportInnovationUseView1791600000000`, 0 pending;
+  - eslint exit 0; prettier clean.
+- **Reviewer (`akili-reviewer`, override (b): stored view / shared export; named checks R-IUX-006, design §3.2a, DD-8 as amended 2026-10-06): PASS.** The view was compared line by line with `1791300000000`: identical except the two additions. `down()` restores it. No placeholders. The URL mirrors `platform_link`. Column 77 has no `emptyDisplay`, so a `Not provided` / `Not applicable` cell can never carry a URL. The read-back is exact. The fixture covers the whole scope-3 list.
+- **ADVISORY (recorded):**
+  - the red-run ordering deviation (above);
+  - the STAR fixture case inserts `reporting_platforms` 'STAR' when missing and never deletes it (shared-catalog pattern; harmless while `maxWorkers: 1`);
+  - TIP/PRMS target URLs (`/result/TIP-<code>/general-information`) are not exercised — confirm the client route grammar before rollout (added to T-05 G3).
+- **Preview:** the Leader generated `~/Downloads/star_results_metadata_innovation_use_preview_v3.xlsx` (real handler and builder, mocked data, example host). Column 77: row 6 `{text: 'STAR-1234 - Drought-tolerant bean variety', hyperlink: 'https://star.example.org/result/STAR-1234/general-information'}`, row 7 `Not provided` (plain), row 8 `Not applicable` (plain). **User confirmation pending; commit deferred.**
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 1 not reported by host, ended complete.
+- **Preview approved:** the user asked whether `star.example.org` was a defect. The Leader explained it is the preview's mocked row; the real URL uses `this.appConfig.ARI_CLIENT_HOST` (`star-results-export.repository.ts:148`). The user then said "sí, haz commit de T-07" (2026-10-06).
+- **Dev finding (2026-10-06, user-reported, no change made):** the user's local server against the shared DB failed with `Cannot merge already merged cells` at `ExcelWorkbookBuilder.renderPreamble` (`excel-workbook.builder.ts:226`, the column-group merge loop).
+  - The user's screenshot of `report_workbook_column_group` on that DB: `INNOVATION DETAILS 61–87` (sort 10), `INNOVATION USE 75–80` (sort 12), `OICR DETAILS 88–101` (sort 11).
+  - Cause: a Dev-only Innovation Development development shifted OICR to 88–101 and added a band over 61–87, which overlaps ours. This **falsifies P-11 on Dev** (it holds on the base branch / Prod).
+  - Per the user, that development will be removed on Thursday; its layout rows must be reverted with it (OICR back to 61–74, the INNOVATION DETAILS row deleted) for the export to render on Dev.
+  - Our migrations reference no Innovation Development rows (confirmed to the user); no change on our side. Until then the Dev export likely fails for every user.
+- **Commit:** T-07 committed on the user's instruction.
+

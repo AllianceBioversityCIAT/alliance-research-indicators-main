@@ -145,6 +145,7 @@ export class StarResultsExportRepository {
         iu.innovation_use_level AS innovation_use_level,
         iu.innovation_use_level_explanation AS innovation_use_level_explanation,
         iu.innovation_use_linked_dev AS innovation_use_linked_dev,
+        CONCAT('${this.appConfig.ARI_CLIENT_HOST}/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url,
         iu.innovation_use_actors AS innovation_use_actors,
         iu.innovation_use_organizations AS innovation_use_organizations,
         iu.innovation_use_quantifications AS innovation_use_quantifications

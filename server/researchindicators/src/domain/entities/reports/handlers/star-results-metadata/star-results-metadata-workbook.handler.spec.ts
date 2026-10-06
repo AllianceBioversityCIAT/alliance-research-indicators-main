@@ -241,6 +241,8 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       innovation_use_organizations: '• CIAT - Alliance of Bioversity and CIAT',
       innovation_use_quantifications: '• 12 hectare — Area under the practice',
       innovation_use_linked_dev: 'STAR-100 - Drought tolerant bean',
+      innovation_use_linked_dev_url:
+        'https://app.example/result/STAR-100/general-information',
       innovation_use_linked_dev_readiness: 'Level 4: Proven under testing',
       innovation_use_linked_dev_description:
         'A bean variety selected for drought.',
@@ -262,7 +264,14 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       'innovation_use_organizations',
       'innovation_use_quantifications',
     ];
-    findStarResultsMetadataRows.mockResolvedValue([innovationUseRow]);
+    findStarResultsMetadataRows.mockResolvedValue([
+      innovationUseRow,
+      {
+        result_code: 'IU-unlinked',
+        innovation_use_linked_dev: 'Not provided',
+        innovation_use_linked_dev_url: null,
+      },
+    ]);
     const spec = await handler.buildWorkbookSpec(baseFilters);
     const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
     const wb = new ExcelJS.Workbook();
@@ -290,8 +299,18 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     headers.forEach((header, index) => {
       const col = 75 + index;
       expect(headerRow.getCell(col).value).toBe(header);
+      if (keys[index] === 'innovation_use_linked_dev') {
+        expect(dataRow.getCell(col).value).toEqual({
+          text: 'STAR-100 - Drought tolerant bean',
+          hyperlink: 'https://app.example/result/STAR-100/general-information',
+        });
+        return;
+      }
       expect(dataRow.getCell(col).value).toBe(innovationUseRow[keys[index]]);
     });
+    const unlinked = ws!.getRow(7).getCell(77);
+    expect(unlinked.value).toBe('Not provided');
+    expect(typeof unlinked.value).toBe('string');
     const actorsCol = 75 + headers.indexOf('Actors');
     expect(headerRow.getCell(actorsCol).value).toBe('Actors');
     expect(dataRow.getCell(actorsCol).value).toBe(actors);

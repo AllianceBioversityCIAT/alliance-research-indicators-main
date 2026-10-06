@@ -140,6 +140,9 @@ describe('StarResultsExportRepository', () => {
     expect(sql).toContain(
       'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
     );
+    expect(sql).toContain(
+      "CONCAT('https://app.example/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url",
+    );
     expect(sql).not.toContain(
       'iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness',
     );

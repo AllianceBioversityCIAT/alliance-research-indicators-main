@@ -279,6 +279,37 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ---
 
+### T-07 — Linked innovation development as a hyperlink to the linked result
+
+- **Status:** done (PASS attempt 1, 2026-10-06; preview approved by the user — see `execution.md`) · **Size:** M · **Dependencies:** T-06 · added 2026-10-06 (user request)
+- **Requirements covered:** R-IUX-006 as amended 2026-10-06 (hyperlink scenario, incl. *BUT must NOT* link a `Not provided` / `Not applicable` cell), NFR-IUX-003 (`down()` restores the previous view exactly), NFR-IUX-004, D1 (the new column's NULL rules), D4
+- **Design refs:** §3.2a "Hyperlink (T-07)", DD-8
+- **Constraint:** `1791300000000` and `1791500000000` (and `1791400000000`) are applied on the shared DB and must not be edited.
+- **Scope:**
+  1. New migration `src/db/migrations/<ts>-AddLinkedDevCodeToReportInnovationUseView.ts` (`<ts>` > 1791500000000): `CREATE OR REPLACE VIEW report_innovation_use` with the **identical** definition of `1791300000000` plus one trailing column `innovation_use_linked_dev_code` = `CONCAT(r2.platform_code, '-', r2.result_official_code)` from the linked-dev lateral (NULL with no qualifying link or a NULL platform). Every other column, filter and lateral stays byte-identical in meaning. `down()` restores the previous definition exactly, e.g. by running `new CreateReportInnovationUseView1791300000000().up(queryRunner)`. No params → no `?` / `:word` outside quoted strings. The header comment carries the same R3 note as `1791300000000`.
+  2. Its migration spec: identical to `1791300000000`'s spec assertions (a)–(f), adapted: 10 aliases, the new alias present once, still exactly 4 guarded laterals, no top-level aggregate, `down()` re-creates the old view (no `DROP VIEW`).
+  3. T-02 fixture (`report-innovation-use-view.fixture-spec.ts`): assert `innovation_use_linked_dev_code` on the linked-dev cases. Qualifying link with platform → `STAR-<code>`. Rule-16 failures (deleted dev, inactive link, indicator-1 target, no link) → NULL. Platform NULL → NULL. 2 qualifying links → the code of the highest `link_result_id`. Other indicator → NULL. The 9-cell parity and the EXPLAIN gate stay green; the plan assertions still hold with the extra column.
+  4. TS: Phase 2 selects `CONCAT('${ARI_CLIENT_HOST}/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url`, interpolated from `this.appConfig.ARI_CLIENT_HOST` exactly as the `platform_link` item. Export column 77 gets the `hyperlink` spec of design §3.2a with no `emptyDisplay`. Still 80 columns. Update the repository spec and the read-back test: column 77 is `{ text: <display>, hyperlink: <url> }` for a linked row, and a plain `Not provided` string with no hyperlink for an unlinked row. The T-02 fixture's `IU_SELECT_LIST` follows the repository.
+  5. Apply the new migration on scratch and leave it applied (`migration:test:revert` → the old view returns, then `migration:test:execute`).
+- **Falsifier:**
+  - (a) Build the code with `CONCAT_WS` (bare code when the platform is NULL): the platform-NULL fixture case is red.
+  - (b) Add `emptyDisplay: 'Not available'` to column 77: the read-back "unlinked row shows `Not provided`" assertion is red.
+  - (c) Drop the `/general-information` suffix: the repository-spec / read-back URL assertion is red.
+  - (d) `down()` as `DROP VIEW`: the migration spec's down assertion is red, and the scratch revert leaves no view (`ERROR 1146`).
+- **Red run:** pins first, red on their assertions, quoted; then each Falsifier red on the finished code, quoted. An import-fails red does not count.
+- **Disqualifier:** mocked SQL proves nothing about the view (KZ-001); the T-02 fixture on the real repository SQL is the SQL evidence. **Cannot reach:** the real `ARI_CLIENT_HOST` value per environment, and whether the STAR route resolves for non-STAR platforms (TIP/PRMS targets would link to `/result/<PLATFORM>-<code>/general-information`, which mirrors the client's route grammar but is not exercised here).
+- **Consumers:** `star-results-export.repository(.spec).ts`, `star-results-metadata.columns.ts`, `…workbook.handler.spec.ts`, `excel-workbook.builder.ts` (hyperlink rendering, unchanged), the T-02 / T-03 / T-06 fixtures. Full server suite.
+- **Review:** `full`.
+- **Done criteria:**
+  - [x] New view migration + spec green; applied on scratch; revert restores the old view
+  - [x] T-02 fixture green with the code assertions; EXPLAIN gate green
+  - [x] Read-back proves the hyperlink on a linked row and its absence on an unlinked row; Falsifiers (a)–(d) observed red, quoted
+  - [x] Full server suite green; `npm run build` exit 0; eslint and prettier clean on touched files
+  - [x] Generated `.xlsx` preview shown to the user before commit
+- **Skills:** `nestjs-expert`, `tdd`
+
+---
+
 ## Coverage closure (scenario and clause level)
 
 | Requirement clause | Owner |
@@ -323,6 +354,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 | T-04 | M | ~310 | full |
 | T-05 | S | ~10 (docs) | checklist |
 | T-06 | M | ~250 (migration + spec + fixture + TS) | full |
+| T-07 | M | ~400 (view migration + spec + fixture + TS) | full |
 | **Total** | | **~1,460** | |
 
 No task is `skip-eligible`.
