@@ -3,6 +3,7 @@
 - **Module:** reports (reads `result-innovation-dev`)
 - **Spec id:** 2026-10-innovation-dev-excel-export
 - **Status:** paused (2026-10-06) — resume after the Excel-wide layout spec; T-03/T-04 to be re-planned against it
+- **Layout re-plan (design FU-2):** T-03 keeps only the dictionary half; T-04 tags its columns with a new `INNOVATION_DEVELOPMENT` section and drops the fallback row and banner literal.
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — round 1 fixed, **not re-judged**, by user choice)

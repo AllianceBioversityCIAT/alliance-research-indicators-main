@@ -92,3 +92,24 @@
 - **Issues encountered:** none.
 - **Final verification:** VERIFIED.
 - **User visual approval (D7, scope step 8):** the Leader opened `/tmp/excel-layout-T-02-preview.xlsx` for the user, listing what to check (tabs "Raw data" then "Data dictionary"; banner C1:CB1; the 11 row-4 bands with ranges and colours; no INNOVATION DETAILS). User, 2026-10-06: "lo veo bien". What that observation covered: the generated file's header layout with mocked rows (one `RC` row) — not Dev or Prod data, and not Prod's tables (T-03, G-WBL-1).
+
+### T-03 — Rollout gate and doc notes
+
+- **Status:** `[~]` — documentation PASS (attempt 1); **open on the human gate G-WBL-1** (Prod reading not yet recorded; Disqualifier, precedent AC-1681 T-05).
+- **Date:** 2026-10-06
+- **Effort:** low (Size S, documentation). Review: `checklist`.
+- **Skills deviation:** `cognitive-doc-design` could not load on the Cursor host; brief carried "short, scannable rows, one claim per row".
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium` (fresh worker), Orca `run_7b470bc81d7f` / `task_a8beaf300171` / `ctx_93bf8fbb9382`. Brief: `T-03-brief.md` (session scratchpad). Report: `/tmp/excel-layout-T-03-report.md`.
+- **Files changed:** `docs/specs/innovation-use/OPEN-ITEMS.md` (+10: new §3.4 with G-WBL-1, FU-1, FU-3) · `docs/specs/innovation-dev/excel-export/tasks.md` (+1: FU-2 re-plan line under the pause note).
+- **Implementer verification:** `grep -n "G-WBL-1\|3.4\|FU-1\|FU-3" docs/specs/innovation-use/OPEN-ITEMS.md` → new rows at 141, 147–149 (136/138 are the pre-existing §3.3 FU rows); each Prod query 1 hit (line 147); `grep -n INNOVATION_DEVELOPMENT docs/specs/innovation-dev/excel-export/tasks.md` → line 6. Not Done: none.
+- **Evidence re-run (Leader inline, non-author): VERIFIED.** `git diff --stat` → the two doc files (+11) plus the pre-existing `.codegraph/.gitignore`; `git diff -- docs/ | grep '^-[^-]' | wc -l` → `0` (additions only).
+- **Reviewer: PASS (checklist)** — P-4 → G-WBL-1 in OPEN-ITEMS §3.4; FU-1, FU-3 → §3.4; FU-2 → innovation-dev `tasks.md:6`. Queries character-identical to Scope 1; comparison rule and adopt-or-drift outcome match; G-WBL-1 marked owed, not done; FU-3 values confirmed in `1777026100000-FixStarRawColumnGroupsEvidences.ts:31`; link resolves.
+- **runtime events:** none.
+- **spawns:** implementer (Cursor grok-4.7-medium) not reported by host, ended complete · reviewer not reported by host, ended complete.
+- **Requirements covered:** D8 (home for the human gate), requirements §8, design FU-1/FU-2/FU-3.
+- **Decisions made:** Leader narrowing — Scope 3 says "`OPEN-ITEMS.md` §3.3, as the precedent did"; §3.3 is the AC-1681 spec's own subsection, so this spec's items went to a new sibling §3.4 in the same file and table shape. Reviewer noted it as followed, not a defect.
+- **Issues encountered:** none.
+- **Still owed (human):** G-WBL-1 — run the two read-only `SELECT`s on Prod and compare with requirements §1 before the `main` merge; record the reading here. Until then T-03 stays `[~]`.

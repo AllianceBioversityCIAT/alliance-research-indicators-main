@@ -2,7 +2,7 @@
 
 - **Module:** reports (workbook `star_results_metadata`)
 - **Spec id:** 2026-10-excel-layout-server-side
-- **Status:** in-progress (T-01, T-02 done)
+- **Status:** in-progress (T-01, T-02 done; T-03 open on human gate G-WBL-1)
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — **APPROVED** after round 1 + scoped re-judgment)
@@ -119,7 +119,7 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 
 ### T-03 — Rollout gate and doc notes
 
-- **Status:** not-started · **Size:** S · **Dependencies:** T-02
+- **Status:** [~] in-progress — docs PASS 2026-10-06; open until the human Prod reading (G-WBL-1) is recorded · **Size:** S · **Dependencies:** T-02
 - **Requirements covered:** D8 (Prod layout, P-4); requirements §8 cross-system note; design FU-1, FU-2, FU-3
 - **Design refs:** §11, §14; Premise Ledger P-4
 - **Scope:**
@@ -133,9 +133,9 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 - **Consumers:** none.
 - **Review:** `checklist` — documentation only; the reviewer checks that P-4, FU-1, FU-2 and FU-3 each have a home.
 - **Done criteria:**
-  - [ ] G-WBL-1 written with the exact read-only queries
-  - [ ] Innovation-dev re-plan line written
-  - [ ] FU-1 and FU-3 recorded
+  - [x] G-WBL-1 written with the exact read-only queries
+  - [x] Innovation-dev re-plan line written
+  - [x] FU-1 and FU-3 recorded
   - [ ] Prod reading recorded by the human (may stay open at archive only by explicit user acceptance)
 - **Skills:** `cognitive-doc-design`
 
