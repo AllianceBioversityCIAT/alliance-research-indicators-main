@@ -38,7 +38,7 @@ function applies(expression: string): string {
 }
 
 function catalogName(idExpr: string, nameExpr: string): string {
-  return `IF(${idExpr} IS NULL, NULL, COALESCE(${nameExpr}, CONCAT('Unknown (id ', ${idExpr}, ')')))`;
+  return `IF(${idExpr} IS NULL, NULL, COALESCE(NULLIF(${nameExpr}, ''), CONCAT('Unknown (id ', ${idExpr}, ')')))`;
 }
 
 function yesNo(column: string): string {
@@ -55,7 +55,7 @@ const READINESS_LEVEL_SQL = `IF(
                 'Level ',
                 cirl.level,
                 ': ',
-                COALESCE(cirl.name, CONCAT('Unknown (id ', cirl.id, ')'))
+                COALESCE(NULLIF(cirl.name, ''), CONCAT('Unknown (id ', cirl.id, ')'))
               )
             )
           )`;
@@ -261,7 +261,7 @@ export class CreateReportInnovationDevView1791700000000
               '',
               '• ',
               COALESCE(
-                cat.name,
+                NULLIF(cat.name, ''),
                 CONCAT('Unknown (id ', ra.actor_type_id, ')')
               ),
               IF(
@@ -319,7 +319,7 @@ export class CreateReportInnovationDevView1791700000000
                   ' - ',
                   IF(valid_text(ci.acronym), ci.acronym, NULL),
                   COALESCE(
-                    ci.name,
+                    NULLIF(ci.name, ''),
                     CONCAT('Unknown (id ', rit.institution_id, ')')
                   )
                 )
@@ -330,7 +330,7 @@ export class CreateReportInnovationDevView1791700000000
               CONCAT(
                 '• ',
                 COALESCE(
-                  parent_type.name,
+                  NULLIF(parent_type.name, ''),
                   CONCAT('Unknown (id ', rit.institution_type_id, ')')
                 ),
                 ' (',
@@ -352,7 +352,7 @@ export class CreateReportInnovationDevView1791700000000
                   CONCAT(
                     '• ',
                     COALESCE(
-                      parent_type.name,
+                      NULLIF(parent_type.name, ''),
                       CONCAT('Unknown (id ', rit.institution_type_id, ')')
                     ),
                     ' > ',
@@ -360,7 +360,7 @@ export class CreateReportInnovationDevView1791700000000
                       rit.sub_institution_type_id IS NULL,
                       report_field(NULL, TRUE, TRUE),
                       COALESCE(
-                        sub_type.name,
+                        NULLIF(sub_type.name, ''),
                         CONCAT(
                           'Unknown (id ',
                           rit.sub_institution_type_id,
@@ -372,7 +372,7 @@ export class CreateReportInnovationDevView1791700000000
                   CONCAT(
                     '• ',
                     COALESCE(
-                      parent_type.name,
+                      NULLIF(parent_type.name, ''),
                       CONCAT('Unknown (id ', rit.institution_type_id, ')')
                     )
                   )
@@ -401,8 +401,8 @@ export class CreateReportInnovationDevView1791700000000
           CONCAT(
             '• ',
             IF(
-              tf.name IS NOT NULL,
-              tf.name,
+              NULLIF(tf.name, '') IS NOT NULL,
+              NULLIF(tf.name, ''),
               IF(
                 ritf.tool_function_id IS NOT NULL,
                 CONCAT('Unknown (id ', ritf.tool_function_id, ')'),

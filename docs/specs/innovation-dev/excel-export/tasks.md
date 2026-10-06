@@ -37,7 +37,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-01 — Settle P-12, then author the `report_innovation_dev` view migration
 
-- **Status:** `[~]` reopened 2026-10-06 for amendment A-1 (blank catalog names) — PASS 2026-10-06 before the amendment, see `execution.md` · **Size:** M · **Dependencies:** none
+- **Status:** done (PASS 2026-10-06; amendment A-1 PASS 2026-10-06, see `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements covered:**
   - R-IDX-001 (whole);
   - R-IDX-002…005 (cell expressions: every row of their tables, every line format, every rule);
@@ -88,7 +88,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   - [x] Migration spec green; the 3 Falsifier mutations observed red at assertion level, messages quoted
   - [x] `npx eslint` and `npx prettier --check` clean on both files
   - [x] `migration:test:revert` drops the view, then it is re-applied
-  - [ ] **A-1:** blank catalog names fall back to `Unknown (id n)` in every catalog-name cell and slot; migration spec assertion added and seen red with one `NULLIF` removed; re-applied on scratch; eslint/prettier clean
+  - [x] **A-1:** blank catalog names fall back to `Unknown (id n)` in every catalog-name cell and slot; migration spec assertion added and seen red with one `NULLIF` removed; re-applied on scratch; eslint/prettier clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---

@@ -102,3 +102,27 @@
 - **Briefs to re-issue:** none in flight (T-02 worker `ctx_e7ba9d89e47c` was released at the pause); every new brief carries the amended text.
 - **OQ-1 / OQ-2 answered at this gate:** OQ-1 confirmed as proposed; OQ-2 keep column 89 (recorded in `requirements.md` §10). T-03 unblocked.
 - **User approval of the amendments:** "Approve" (2026-10-06).
+
+### Approval mode change (2026-10-06)
+
+- **User:** "vamos a agilizar esto vas a seguir desarrollando las tareas a menos de que salga un fatal fail en el review de resto sigues y recuerda que cada que salga un pass en la tarea cierras el worker y mandas la otra tarea en otro worker".
+- **Effect:** from here the continue gate auto-passes (`pre-approved` for routine progress). Stops remain for a Reviewer `FATAL_FAIL`, and — per the command's exception list — a HALT after 3 failed attempts, a Pivot, or a budget tripwire are reported. One fresh Cursor worker per task; released right after its Reviewer PASS.
+
+### T-01 — Amendment A-1: blank catalog names → `Unknown (id n)` (rework)
+
+- **Status:** PASS (rework attempt 1). T-01 closed again.
+- **Date:** 2026-10-06
+- **Effort:** high. **Review mode:** parallel lens reviewers (migration surface): A = reliability + risk, B = readability + resilience. Override (e) rework applies.
+- **Implementer:** Cursor `grok-4.7-high` (fresh worker), Orca `run_230d9e1c0beb` / `task_b8d3cf4ba559` / `ctx_23e1eb01459c`. Brief: `IDX-T-01-A1-brief.md` (session scratchpad). Report: `/tmp/idx-t01-a1-report.md`.
+- **Files changed:** `server/researchindicators/src/db/migrations/1791700000000-CreateReportInnovationDevView.ts` (edited in place; `e5db630a` unpushed) · `server/researchindicators/src/db/migration-specs/1791700000000-CreateReportInnovationDevView.spec.ts` (+ assertion (g)).
+- **Sites changed (name operand only):** helper `catalogName` `:41` (nature, type, anticipated users, dissemination, expansion) · readiness name `:58` (`:53` whole-cell fallback has no name operand, unchanged) · actor type `:264` · known institution `:322` (acronym slot unchanged) · institution type `:333/:355/:375` · sub-type `:363` · tool function `:404–405` (`NULLIF(tf.name,'') IS NOT NULL` / `NULLIF(tf.name,'')`, falls through to the existing `Unknown (id n)` branch).
+- **Implementer verification:** migration spec 7/7; falsifier — readiness `NULLIF` removed → `(g) every catalog-name COALESCE wraps the name in NULLIF` red, `expect(bareNames).toEqual([])` `Received ["cirl.name"]`, restored. Scratch: head confirmed, `migration:test:revert` (one `DROP VIEW`), `migration:test:execute`; B-1 = 0. Fixture `report-innovation-dev-view`: **5 failed / 51 passed** — the 4 `expectBreak` pins (`nature/type/users/dissemination blank name`) now read `Unknown (id 9076xx)` (expected `Not provided`), and `tool name empty` (`expectParity`) now reads `• Unknown (id 907654)` (expected `• `). These are the behavioural proof of A-1; T-02 flips the pins.
+- **Not Done / Assumptions (verbatim):** "a blank tool-function name is a catalog-name slot under A-1, so it now renders `Unknown (id n)` even though that turns a previously green `expectParity` pin red." — supported by tasks.md T-02 ("and any other catalog-name cell or slot"); no blocker.
+- **Evidence re-run (Leader inline, non-author): VERIFIED.** migration spec `Tests: 7 passed` · `npx eslint` both files exit 0 · `npx prettier --check` clean · fixture `Tests: 5 failed, 51 passed, 56 total`, the same 5 cases.
+- **Reviewer A (reliability + risk): PASS** — only name operands changed; ids, `applies`, `mandatory`, `report_field`, readiness fallback, acronym slot byte-identical; 12 COALESCE sites + tool slot covered; no new `NP` path; no `?`/`:word`; (g) not tautological.
+- **Reviewer B (readability + resilience): PASS** — 12 sites counted independently; `down()`/`CREATE OR REPLACE` unchanged; count pin judged a strength; parser whitespace-independent.
+- **ADVISORY (recorded, not gating):** (A1/B1) assertion (g) cannot see the tool-function `IF` site — the named guard for it is T-02's `tool name empty` pin (B suggests rewriting it as a 13th `COALESCE`); (A2/B5) whitespace-only names fall back only via PAD SPACE collation (spaces), a tab/newline name would render a blank bullet — the spec says "blank (`''`)"; worth one case if catalogs can hold such values; (A3) the committed T-01 state leaves 5 known reds in the uncommitted T-02 fixture until T-02 lands — do not read them as a regression; (B2) duplicated quote-skipping scanner in the spec helpers; (B4) (g) is text-only, not evidence about cell values (KZ-001); (B6) other local scratch DBs that applied the original `e5db630a` keep the old view until revert + re-apply.
+- **runtime events:** none.
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer A 8 calls, 58,465 tokens, ended complete · reviewer B 8 calls, 55,315 tokens, ended complete.
+- **Requirements covered:** requirements §3 note (amended), design §3.1 (amended).
+- **Continue gate:** auto-approved (user approval-mode change, above).

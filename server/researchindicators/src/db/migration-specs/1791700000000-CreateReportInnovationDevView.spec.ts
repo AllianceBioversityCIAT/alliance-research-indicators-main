@@ -180,6 +180,91 @@ function stripLaterals(sql: string): string {
   return out;
 }
 
+function splitTopLevelArgs(inner: string): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let start = 0;
+  let i = 0;
+  while (i < inner.length) {
+    const ch = inner[i];
+    if (ch === "'" || ch === '"') {
+      const quote = ch;
+      i += 1;
+      while (i < inner.length) {
+        if (inner[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (inner[i] === quote) {
+          if (inner[i + 1] === quote) {
+            i += 2;
+            continue;
+          }
+          break;
+        }
+        i += 1;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === '(') {
+      depth += 1;
+    } else if (ch === ')') {
+      depth -= 1;
+    } else if (ch === ',' && depth === 0) {
+      args.push(inner.slice(start, i));
+      start = i + 1;
+    }
+    i += 1;
+  }
+  args.push(inner.slice(start));
+  return args;
+}
+
+function findCoalesceCalls(sql: string): string[][] {
+  const calls: string[][] = [];
+  const marker = /COALESCE\s*\(/gi;
+  let match: RegExpExecArray | null;
+  while ((match = marker.exec(sql)) !== null) {
+    const open = match.index + match[0].length - 1;
+    let depth = 0;
+    let i = open;
+    for (; i < sql.length; i += 1) {
+      const ch = sql[i];
+      if (ch === "'" || ch === '"') {
+        const quote = ch;
+        i += 1;
+        while (i < sql.length) {
+          if (sql[i] === '\\') {
+            i += 2;
+            continue;
+          }
+          if (sql[i] === quote) {
+            if (sql[i + 1] === quote) {
+              i += 2;
+              continue;
+            }
+            break;
+          }
+          i += 1;
+        }
+        continue;
+      }
+      if (ch === '(') {
+        depth += 1;
+      } else if (ch === ')') {
+        depth -= 1;
+        if (depth === 0) {
+          calls.push(splitTopLevelArgs(sql.slice(open + 1, i)));
+          break;
+        }
+      }
+    }
+    marker.lastIndex = i + 1;
+  }
+  return calls;
+}
+
 describe('CreateReportInnovationDevView1791700000000', () => {
   let upSql = '';
   let downCalls: string[] = [];
@@ -235,5 +320,18 @@ describe('CreateReportInnovationDevView1791700000000', () => {
 
   it('(f) down() is exactly the drop', () => {
     expect(downCalls).toEqual(['DROP VIEW IF EXISTS report_innovation_dev']);
+  });
+
+  it('(g) every catalog-name COALESCE wraps the name in NULLIF', () => {
+    const catalogCoalesces = findCoalesceCalls(upSql).filter((args) =>
+      args.some((arg) => arg.includes('Unknown (id ')),
+    );
+    const bareNames = catalogCoalesces
+      .map((args) => args[0].trim())
+      .filter(
+        (nameOperand) => !/^NULLIF\s*\([\s\S]+,\s*''\s*\)$/i.test(nameOperand),
+      );
+    expect(catalogCoalesces).toHaveLength(12);
+    expect(bareNames).toEqual([]);
   });
 });
