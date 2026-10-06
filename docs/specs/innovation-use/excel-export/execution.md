@@ -330,3 +330,40 @@
   - **User's response:** "haz commit". The user did not itemize which visual criteria they checked, so T-05 step 3's per-item criteria (colour, merged cells, bullet wrapping, `Not applicable` row, dictionary, notice) are **not** ticked on this basis (KZ-002); T-05 still owns them.
 - **Commit (user-instructed 2026-10-05):** T-04 committed after the preview.
 
+### T-05 — Rollout and human gates
+
+- **Status:** `[~]` — step 5 (docs) PASS; steps 1–4 are human gates and remain open (tracked in `OPEN-ITEMS.md` §3.3 as G1–G6)
+- **Date:** 2026-10-05 · docs on the user's instruction ("sí, haz la documentación")
+- **Step 5 (docs) — author:** Leader inline (three small documentation edits; no code). Independence is kept by the Reviewer below.
+  - `docs/trd/trd.md` ADR-11 checklist cell: the R3 line, verbatim from the task — "`report_innovation_use` transcribes `innovation_use_validation`; any migration redefining it, `valid_text` or `report_field` must run `report-innovation-use-view.fixture-spec.ts`."
+  - `docs/specs/innovation-use/family.md` row 7: `specifying` → `executing`, with the 4 commit ids (unpushed) and the open T-05 gates.
+  - `docs/specs/innovation-use/OPEN-ITEMS.md` new §3.3:
+    - G1 P-4 Prod MySQL version;
+    - G2 P-12 Prod deploy order;
+    - G3 visual check, explicitly NOT discharged by the mocked-data preview;
+    - G4 OQ-1;
+    - G5 P-11/P-16 Dev readings;
+    - G6 real-volume timing;
+    - FU-1 LATERAL for the other `report_*` views;
+    - FU-2 scratch collation defect;
+    - FU-3 the 5 pre-existing Nest-bootstrap fixture failures;
+    - FU-4 the broken `migration:scan`.
+- **Falsifier / red run (task):** `grep -c report_innovation_use docs/trd/trd.md` → `0` at the start of step 5 (observed), then `1` after the edit (observed).
+- **Reviewer (`akili-reviewer`, override (a): the ADR-11 line is an obligation other readers execute): PASS** — "All three doc edits for T-05 step 5 are accurate … The ADR-11 line uses the exact R3 wording from `tasks.md:223`, and the family row 7 status and OPEN-ITEMS §3.3 claim nothing beyond what `execution.md`, `design.md` §13/§14 and `tasks.md` RB-2 support." ADVISORY: none.
+- **spawns:** reviewer 1 not reported by host, ended complete.
+- **Open (human, blocking `main`):** G1 and G2. Also open: G3–G6. T-05 cannot reach `[x]` until they are settled with quoted evidence (KZ-002).
+
+## Summary (as of 2026-10-05)
+
+| Task | Status | Attempts | Review verdicts | Commit |
+| --- | --- | --- | --- | --- |
+| T-01 view migration | PASS | 2 | 3 (FAIL+PASS lens pair, PASS) | `c26aaff4` |
+| T-02 parity + EXPLAIN fixture | PASS | 2 (+2 continuations, 1 stopped probe) | 3 (FAIL, FAIL, PASS) | `0091be2e` |
+| T-03 layout migration | PASS | 1 | 1 | `7dd41597` |
+| T-04 TS wiring | PASS | 1 | 1 | `abf90565` |
+| T-05 rollout + human gates | `[~]` docs PASS; G1–G6 open | — | 1 (docs) | this commit |
+
+- **Budget (design §15):** 5 tasks as estimated; ~1,450 LOC estimated (actual well above it for T-02's fixture, ~1,820 lines alone); review verdicts 9 against ~11. No tripwire fired on review rounds.
+- **User-approved spec amendments:** NFR-IUX-002 scoped to indicator 6; NFR-IUX-001 reduced to a structural gate with timing as a reading (DD-4 kept).
+- **Pushed:** nothing. The user pushes.
+

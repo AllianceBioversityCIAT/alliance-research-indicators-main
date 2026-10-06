@@ -205,7 +205,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ### T-05 — Rollout and human gates (Prod premises, visual check, labels, docs)
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-02, T-04
+- **Status:** in progress `[~]` — docs done 2026-10-05; human gates G1–G6 open (`OPEN-ITEMS.md` §3.3) · **Size:** S · **Dependencies:** T-02, T-04
 - **Requirements covered:** NFR-IUX-003 (deploy order, cosmetic window, backout by name), OQ-1 (labels), requirements defect classes D6, D7, accepted risk R3 (documentation half), requirements §9 R1
 - **Design refs:** §11, §14; Premise Ledger P-4 and P-12 (settled here); P-11/P-16 if T-03 handed them off
 - **Scope:**
@@ -233,7 +233,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
   - [ ] P-12 settled with the quoted pipeline evidence, or a manual-apply plan recorded
   - [ ] Visual check quoted and covering each listed item
   - [ ] OQ-1 answered (or recorded as open and non-blocking by the product owner)
-  - [ ] ADR-11 line, family row 7, and OPEN-ITEMS updated
+  - [x] ADR-11 line, family row 7, and OPEN-ITEMS updated
 - **Skills:** none required (`cognitive-doc-design` for the doc edits)
 
 ---
