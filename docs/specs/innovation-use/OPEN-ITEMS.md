@@ -138,13 +138,13 @@ T-01…T-04 are Reviewer PASS and committed (unpushed). Full trail: [`excel-expo
 | **FU-3** | **Pre-existing fixture failures.** 5 fixture suites (`innovation-use-section-round-trip`, `-role-isolation`, `-edit-plus-add-id-collision`, `-result-creation`, `-level-boundary`) die in Nest bootstrap: `ResultPolicyChangeModule` imports index [0] undefined (circular import). Reproduced alone; not caused by AC-1681 | **open, owner TBD** |
 | **FU-4** | `npm run migration:scan` points to a missing script (`scripts/scan-migration-placeholders.js`) | **open** |
 
-### 3.4 `reports/excel-layout-server-side` — **G-WBL-1 open**
+### 3.4 `reports/excel-layout-server-side` — **done; G-WBL-1 waived**
 
 T-01 (`7c379141`) and T-02 (`2b906f7c`) are Reviewer PASS and committed (unpushed). Full trail: [`../reports/excel-layout-server-side/execution.md`](../reports/excel-layout-server-side/execution.md).
 
 | # | Item | State |
 | --- | --- | --- |
-| **G-WBL-1** | **P-4 · Prod layout.** Before the `main` merge, a human runs, read-only on Prod, `SELECT * FROM report_workbook_sheet ORDER BY workbook_key, sort_order;` and `SELECT * FROM report_workbook_column_group ORDER BY workbook_key, sheet_key, sort_order;` and compares with requirements §1 "intended layout" (2 sheets, 11 sections; fills compared case-insensitively, a missing `FF` prefix ignored). A difference goes to the user before merge: either the code adopts it, or the Prod rows were drift (design §11) | **owed (human), blocks `main`** |
+| **G-WBL-1** | **P-4 · Prod layout.** Before the `main` merge, a human runs, read-only on Prod, `SELECT * FROM report_workbook_sheet ORDER BY workbook_key, sort_order;` and `SELECT * FROM report_workbook_column_group ORDER BY workbook_key, sheet_key, sort_order;` and compares with requirements §1 "intended layout" (2 sheets, 11 sections; fills compared case-insensitively, a missing `FF` prefix ignored). A difference goes to the user before merge: either the code adopts it, or the Prod rows were drift (design §11) | **waived by the user 2026-10-06** — the export no longer reads the tables; the user tested the export. Optional: whoever has Prod access may still run it to know whether the first deploy changes Prod's file visibly |
 | **FU-1** | **Drop the layout tables.** `report_workbook_sheet` / `report_workbook_column_group` and their entities: the export no longer reads them (ruling (c) kept them); a later, separate human decision | **needs its own decision** |
 | **FU-3** | **Dictionary colours vs band colours.** The Data dictionary's section titles/fills stay in `report_data_dictionary` and already differ from the band colours (e.g. Evidences dictionary fill `FF5C7EC4`, migration `1777026100000:31`, vs band `FF64B1DD`); two sources of section identity remain; unifying them is a later decision | **open** |
 

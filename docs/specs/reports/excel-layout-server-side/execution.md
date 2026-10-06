@@ -95,7 +95,7 @@
 
 ### T-03 — Rollout gate and doc notes
 
-- **Status:** `[~]` — documentation PASS (attempt 1); **open on the human gate G-WBL-1** (Prod reading not yet recorded; Disqualifier, precedent AC-1681 T-05).
+- **Status:** PASS (attempt 1); G-WBL-1 waived by the user (below).
 - **Date:** 2026-10-06
 - **Effort:** low (Size S, documentation). Review: `checklist`.
 - **Skills deviation:** `cognitive-doc-design` could not load on the Cursor host; brief carried "short, scannable rows, one claim per row".
@@ -112,4 +112,13 @@
 - **Requirements covered:** D8 (home for the human gate), requirements §8, design FU-1/FU-2/FU-3.
 - **Decisions made:** Leader narrowing — Scope 3 says "`OPEN-ITEMS.md` §3.3, as the precedent did"; §3.3 is the AC-1681 spec's own subsection, so this spec's items went to a new sibling §3.4 in the same file and table shape. Reviewer noted it as followed, not a defect.
 - **Issues encountered:** none.
-- **Still owed (human):** G-WBL-1 — run the two read-only `SELECT`s on Prod and compare with requirements §1 before the `main` merge; record the reading here. Until then T-03 stays `[~]`.
+- **G-WBL-1 — waived by the user (2026-10-06).** The Leader confirmed that no code reads either table any more (B-2 = 0; readers deleted), so the Prod reading is a parity check — "will Prod's export change visibly at deploy?" — not a dependency, and recommended making it non-blocking. User: "ya lo probe y todo esta saliendo super asi que haz commit cerremos esto". What that observation covered: the user's own test of the export after T-02 (environment not stated; not a reading of Prod's tables). Residual risk accepted: if Prod's rows were hand-edited (as six Dev fills were, F-2), Prod users see the intended layout instead at the first deploy. P-4 stays `UNVERIFIED`; the done criterion closes by explicit user acceptance, as it allows.
+
+---
+
+## Summary
+
+- **Tasks:** 3/3 closed — T-01 `7c379141`, T-02 `2b906f7c`, T-03 `d6078cbd` + closure commit. Every task PASS on attempt 1; 3 Reviewer verdicts (budget ~6).
+- **Budget:** tasks 3/3; review rounds 3/~6; LOC over (~740 code lines in T-01 alone vs ~700 for the spec) — tripwire fired after T-01, user accepted.
+- **Human gates:** D7 visual check approved by the user (T-02); G-WBL-1 (Prod reading) waived by the user, P-4 `UNVERIFIED`.
+- **Open follow-ups:** FU-1 (drop the tables), FU-3 (dictionary vs band colours) — `docs/specs/innovation-use/OPEN-ITEMS.md` §3.4. FU-2 re-plan line in `docs/specs/innovation-dev/excel-export/tasks.md`.
