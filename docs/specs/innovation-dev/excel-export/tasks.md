@@ -12,7 +12,7 @@
 >
 > | # | Command (from `server/researchindicators`) | Reading |
 > | --- | --- | --- |
-> | B-1 | `SELECT (VIEW_DEFINITION LIKE '%order by%') FROM information_schema.VIEWS WHERE TABLE_NAME='report_innovation_dev'` (scratch) | `1`: the baseline-only view exists and carries a top-level `ORDER BY` |
+> | B-1 | ``SELECT LOCATE('order by `root`.`result_id`', VIEW_DEFINITION) > 0 FROM information_schema.VIEWS WHERE TABLE_NAME='report_innovation_dev'`` (scratch) | `1`: the baseline-only view exists and carries a top-level `ORDER BY root.result_id`. *(Amended 2026-10-06 at T-01's gate, user-approved: the first wording, `VIEW_DEFINITION LIKE '%order by%'`, also matches the `GROUP_CONCAT(… ORDER BY …)` that design §3.1 row 4 mandates inside the laterals, so no conforming view could read `0`.)* |
 > | B-2 | `SELECT COUNT(*), SUM(section_fill_argb='FF6A1B9A'), SUM(field_label='Link to Innovation Use'), SUM(section='Innovation details') FROM report_data_dictionary WHERE workbook_key='star_results_metadata'` (scratch) | `6 6 0 0`: scratch holds only the 6 Innovation Use rows. **No seed rows, no anchor**, so every layout fixture must seed its own pre-state |
 > | B-3 | `SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_NAME='innovation_dev_validation' AND ROUTINE_DEFINITION LIKE '%result_innovation_tool_function%'` (scratch) | `1`: scratch's function is the `1758125999162` body |
 > | B-4 | `grep -c report_innovation_dev src/domain/entities/reports/repositories/star-results-export.repository.ts` | `0` |
@@ -37,7 +37,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-01 — Settle P-12, then author the `report_innovation_dev` view migration
 
-- **Status:** not-started · **Size:** M · **Dependencies:** none
+- **Status:** done (PASS 2026-10-06, see `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements covered:**
   - R-IDX-001 (whole);
   - R-IDX-002…005 (cell expressions: every row of their tables, every line format, every rule);
@@ -68,7 +68,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
      - (d) exactly 4 `LEFT JOIN LATERAL` blocks, each containing `root.indicator_id = 2`;
      - (e) the 32 aliases of §3.2, all prefixed;
      - (f) `down()` is exactly the drop.
-  4. Apply on scratch (`npm run migration:test:execute`). Run `SELECT * FROM report_innovation_dev LIMIT 1` and B-1, which must now read `0`.
+  4. Apply on scratch (`npm run migration:test:execute`). Run `SELECT * FROM report_innovation_dev LIMIT 1` and B-1, which must now read `0`, and confirm the stored definition ends at the root `WHERE` (no top-level `ORDER BY`).
 - **Tests:** the migration spec. The behavioural proof is T-02.
 - **Falsifier** (each observed red at assertion level, message quoted in `execution.md`):
   - remove `root.indicator_id = 2` from one lateral → (d) red;
@@ -78,15 +78,15 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Red run:** before the file exists the spec's `import` fails. **That is a setup red and does not count.** The assertion-level red comes from applying each Falsifier mutation to the finished migration.
 - **Disqualifier:**
   - The spec proves **text, not behaviour** (KZ-001); a green here says nothing about any cell value.
-  - B-1 still reading `1` after step 4 means the baseline view survived. The task is not done.
+  - B-1 still reading `1` after step 4 means the baseline view survived. The task is not done. (B-1 measures the **top-level** order only; the lateral `GROUP_CONCAT … ORDER BY` is required by design §3.1.)
 - **Consumers:** none yet (new symbol). Phase 3 reads it in T-04.
 - **Review:** `full`: the cell expressions carry every green-check rule, the dominant defect class (D1).
 - **Done criteria:**
-  - [ ] P-12 outcome recorded (counts, or the Dev error verbatim) and, if non-zero, the user's ruling
-  - [ ] Migration applies on scratch; `SELECT … LIMIT 1` returns `result_id` + 32 aliases; B-1 reads `0`
-  - [ ] Migration spec green; the 3 Falsifier mutations observed red at assertion level, messages quoted
-  - [ ] `npx eslint` and `npx prettier --check` clean on both files
-  - [ ] `migration:test:revert` drops the view, then it is re-applied
+  - [x] P-12 outcome recorded (counts, or the Dev error verbatim) and, if non-zero, the user's ruling
+  - [x] Migration applies on scratch; `SELECT … LIMIT 1` returns `result_id` + 32 aliases; B-1 reads `0`
+  - [x] Migration spec green; the 3 Falsifier mutations observed red at assertion level, messages quoted
+  - [x] `npx eslint` and `npx prettier --check` clean on both files
+  - [x] `migration:test:revert` drops the view, then it is re-applied
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
