@@ -76,20 +76,20 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ### T-02 — Fixture suite: green-check parity, one row per result, EXPLAIN gate, timing
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01
-- **Requirements covered:** NFR-IUX-002 (whole), NFR-IUX-001 *Target* (merged view, positive plan match, ≤ 20 % timing), R-IUX-001 sc. "Many children, one row" + *AND IT MUST NOT duplicate* + *BUT must NOT include snapshot/soft-deleted*, R-IUX-001 sc. "Other indicators", R-IUX-002 all three scenarios (level ≥ 6 blank → NP; level < 6 stale text → NA and hidden; no active detail row → NP/NA; *AND IT MUST compare level not id*), R-IUX-003 sc. (Other blank → NP; NULL count → NP; aggregate `actors_count` NULL/≤0 → NP; *BUT must NOT* mark a 0 count NP when sum > 0; NULL flag = disaggregated), R-IUX-004 sc. (rules 6, 8, 8b, 9; *AND IT MUST* use the exact rule-8 predicate; NULL `is_organization_known` = not known; catalog row missing → `Unknown (id n)`), R-IUX-005 sc. (0/NULL → NP; blank unit → NP; *BUT must NOT* mark a negative NP; blank comment → `Comment: Not mandatory`), R-IUX-006 sc. (deleted dev → NP + 3×NA; *AND IT MUST* pick the highest `link_result_id`; NULL title/platform rendering), requirements defect classes D1, D2, D3
+- **Status:** done (PASS attempt 2, 2026-10-05 — see `execution.md`) · **Size:** L · **Dependencies:** T-01
+- **Requirements covered:** NFR-IUX-002 (whole), NFR-IUX-001 *Target* (merged view, positive plan match, timing recorded as a reading — as amended 2026-10-05), R-IUX-001 sc. "Many children, one row" + *AND IT MUST NOT duplicate* + *BUT must NOT include snapshot/soft-deleted*, R-IUX-001 sc. "Other indicators", R-IUX-002 all three scenarios (level ≥ 6 blank → NP; level < 6 stale text → NA and hidden; no active detail row → NP/NA; *AND IT MUST compare level not id*), R-IUX-003 sc. (Other blank → NP; NULL count → NP; aggregate `actors_count` NULL/≤0 → NP; *BUT must NOT* mark a 0 count NP when sum > 0; NULL flag = disaggregated), R-IUX-004 sc. (rules 6, 8, 8b, 9; *AND IT MUST* use the exact rule-8 predicate; NULL `is_organization_known` = not known; catalog row missing → `Unknown (id n)`), R-IUX-005 sc. (0/NULL → NP; blank unit → NP; *BUT must NOT* mark a negative NP; blank comment → `Comment: Not mandatory`), R-IUX-006 sc. (deleted dev → NP + 3×NA; *AND IT MUST* pick the highest `link_result_id`; NULL title/platform rendering), requirements defect classes D1, D2, D3
 - **Design refs:** §10 rows 2–3 and 5, §3.3, §3.4; Premise Ledger P-5 (re-measured at HEAD on seeded rows), P-18, P-19 (settled here)
 - **Scope:**
   1. `test/fixtures/innovation-use/report-innovation-use-view.fixture-spec.ts`, under the existing harness (`test/jest-fixtures.json`, `maxWorkers: 1`). The session first sets `group_concat_max_len = 4194304` (P-18).
   2. **Parity cases.** One result per rule: 2, 3, 4, 5, 6, 7, 8, 8b, 9, 10, 11, 14, 15, 16. Add one fully valid result, one Capacity Sharing result, one result with 2 qualifying links plus 3 actors, 2 organizations and 2 measures, one snapshot copy and one soft-deleted result. Add the NULL cases: actor flag NULL, `is_organization_known` NULL, catalog row missing (JD-1), dev title NULL, dev platform NULL, level NULL, inactive `riu`.
   3. **For every case:**
      - `expected = innovation_use_validation(id)`;
-     - assert `expected = TRUE` ⇔ no cell of the view row contains `Not provided`;
+     - assert `expected = TRUE` ⇔ no cell of the view row contains `Not provided` — **for Innovation Use results only** (`indicator_id = 6`). Other-indicator cases assert R-IUX-001's 9 × `Not applicable` instead, and the function is not evaluated for them (NFR-IUX-002 as amended 2026-10-05);
      - each single-rule case asserts the **exact** cell, and the exact slot text, that the rule names, and that every other cell is free of `Not provided`;
      - expected cell strings come from the `requirements.md` scenarios, never from the view's output.
   4. **One-row:** `SELECT result_id, COUNT(*) … GROUP BY result_id HAVING COUNT(*) > 1` over the view returns 0 rows. Snapshot and soft-deleted ids are absent.
   5. **EXPLAIN gate.** Seed ≥ 200 results of mixed indicators. Build the **real** Phase 2 SQL by calling `StarResultsExportRepository` with a capturing `queryRunner` (the pattern of `star-results-export.repository.spec.ts`). Run `EXPLAIN FORMAT=TREE` on scratch. Assert **positively**:
-     - 4 × `Materialize (invalidate on row from root)`, each over `Index lookup on <child> using <its result_id FK index> (result_id=root.result_id)`;
+     - 4 × `Materialize (invalidate on row from root)`, each correlated on `<child>.result_id = root.result_id` (the inner access path is cost-based and not asserted — NFR-IUX-001 as amended 2026-10-05);
      - the view root reached by a `PRIMARY` lookup;
      - **no** `Materialize`/`Hash` over a `results` scan beyond the baseline nodes of `report_general_information`, enumerated in the fixture.
      The query must run, which settles P-19.
@@ -105,7 +105,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
   - (f) Replace one lateral with a derived `GROUP BY` table (the alliance pattern). The positive `invalidate on row from root` match for that child is red.
 - **Red run:** every Falsifier is observed red **on its behavioral assertion** (a value or plan-line mismatch), and the message is quoted. A red from seeding, an FK error or a timeout is not a red.
 - **Disqualifier:**
-  - The timing figure is **evidence only if** the three runs on each side vary by less than the effect measured. Otherwise report the spread and mark NFR-IUX-001's 20 % target "inconclusive". Never pass it on a single run.
+  - The timing figure is **evidence only if** the three runs on each side vary by less than the effect measured. Otherwise report the spread and mark the reading "inconclusive" (the 20 % target was dropped by the 2026-10-05 NFR-IUX-001 amendment; the reading is recorded, never a gate). Never pass it on a single run.
   - The EXPLAIN gate on fewer than 200 seeded rows, or on a schema not at HEAD, is not evidence.
   - A parity case whose expected value was copied from the view's own output is inert (`tdd`'s inert fixture): expected strings come from the requirements.
   - A parity pass while B-2 still reads `0` is disqualified (rule 16 absent).
@@ -113,11 +113,11 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 - **Consumers:** the view (T-01). `star-results-export.repository.ts` is imported read-only for SQL capture.
 - **Review:** `full`: correctness-critical gate for D1–D3. Budgeted at 3 rounds (design §15).
 - **Done criteria:**
-  - [ ] All parity, one-row, NULL and exclusion cases green on scratch at HEAD
-  - [ ] Falsifiers (a)–(d) and (f) observed red with quoted messages; (e)'s blind spot recorded
-  - [ ] EXPLAIN plan excerpt quoted in `execution.md`; P-19 settled
-  - [ ] Timing: 3 + 3 medians and spread recorded, verdict pass / inconclusive / fail per the Disqualifier
-  - [ ] A design gap found here goes through the Pivot Protocol; the approved design is never quietly edited
+  - [x] All parity, one-row, NULL and exclusion cases green on scratch at HEAD
+  - [x] Falsifiers (a)–(d) and (f) observed red with quoted messages; (e)'s blind spot recorded
+  - [x] EXPLAIN plan excerpt quoted in `execution.md`; P-19 settled
+  - [x] Timing: 3 + 3 medians and spread recorded as a reading (no pass/fail since the 2026-10-05 NFR-IUX-001 amendment)
+  - [x] A design gap found here goes through the Pivot Protocol; the approved design is never quietly edited
 - **Skills:** `tdd`, `nestjs-expert`, `systematic-debugging`
 
 ---
