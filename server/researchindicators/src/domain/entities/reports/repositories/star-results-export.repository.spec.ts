@@ -140,13 +140,13 @@ describe('StarResultsExportRepository', () => {
     expect(sql).toContain(
       'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
     );
-    expect(sql).toContain(
+    expect(sql).not.toContain(
       'iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness',
     );
-    expect(sql).toContain(
+    expect(sql).not.toContain(
       'iu.innovation_use_linked_dev_description AS innovation_use_linked_dev_description',
     );
-    expect(sql).toContain(
+    expect(sql).not.toContain(
       'iu.innovation_use_linked_dev_geo_scope AS innovation_use_linked_dev_geo_scope',
     );
     expect(params).toEqual([10, 20, 10, 20]);

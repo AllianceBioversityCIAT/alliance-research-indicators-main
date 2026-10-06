@@ -367,3 +367,62 @@
 - **User-approved spec amendments:** NFR-IUX-002 scoped to indicator 6; NFR-IUX-001 reduced to a structural gate with timing as a reading (DD-4 kept).
 - **Pushed:** nothing. The user pushes.
 
+## Pivot Record: QA feedback (2026-10-06) → T-06
+
+- **Trigger:** the user's QA review (first reported as "BI", corrected by the user to QA) asked for the export to keep only one *linked* field, *Linked innovation development*, placed right after *Use level justification*. The user agreed the other three linked cells are fine but not needed now, and expects them to be requested again later.
+- **Constraint (user, 2026-10-06):** "las migraciones ya se aplicaron en la db compartida así que ajustes en las migraciones ya no se pueden". `1791300000000` and `1791400000000` are applied on the shared database, so they are immutable (ADR-5). The commits are still unpushed (`git status -sb`: ahead 6).
+- **Decision (user-approved plan):** keep the view unchanged, so all 9 cells stay available for a future request. Export 6 columns at 75–80 in the order level · justification · linked dev · actors · organizations · quantifications. Apply the layout change through a **new** migration that touches only the Innovation Use rows and re-orders them among themselves; `down()` restores the 9-row state exactly.
+- **Spec amendments (Correction Closure):**
+  - `requirements.md`: Executive Summary, §1 affected surface, R-IUX-006 (4 view cells, 1 exported), R-IUX-007 (6 columns 75–80, order, scenario 80 columns), §6 data requirements.
+  - `design.md`: Executive Summary layout bullet, §2.1 (new migration row; columns and presentation rows), new §3.2a export subset, §10 rows (unit specs, read-back), **DD-7**.
+  - `tasks.md`: new **T-06** and its summary row. T-01…T-04 stay as historical records.
+  - Sweep: `grep -n "83|75–83|9 columns|A–CE"` over the three documents. The remaining "9 cells" mentions (R-IUX-001 "Other indicators", NFR-IUX-002) refer to the **view**, which still has 9 cells, and stay true.
+  - `git diff`: 7 removed lines, each replaced by its amended form; 72 added.
+- **Affected ADR:** none (ADR-5 upheld: no applied migration is edited).
+- **Carry:** the T-06 Reviewer brief checks conformance to `requirements.md#R-IUX-006`, `#R-IUX-007` and `design.md#3.2a` / DD-7 as amended 2026-10-06.
+
+### T-06 — QA feedback: export 6 of the view's 9 columns (75–80)
+
+- **Status:** in progress (attempt 1)
+- **Date:** 2026-10-06
+
+- **Implementer:** Cursor `grok-4.7-high`, fresh worker, Orca `task_42e47945f204` / `ctx_09a4f0051412`. Brief: `T-06-brief.md` (session scratchpad).
+
+#### Attempt 1 → PASS
+
+- **Files changed:**
+  - new: `src/db/migrations/1791500000000-StarRawInnovationUseExportSubset.ts`, its spec, `test/fixtures/innovation-use/star-raw-innovation-use-export-subset.fixture-spec.ts`;
+  - modified: `star-results-export.repository(.spec).ts`, `star-results-metadata.columns.ts`, `….sheet-presentation.ts`, `…workbook.handler.spec.ts`, `report-innovation-use-view.fixture-spec.ts`.
+  - **Not touched:** `1791300000000` and `1791400000000` (`git diff` empty) and the view.
+- **Migration `1791500000000`:**
+  - `up`:
+    - group `to_col` 83 → 80, keyed on workbook + sheet + label + `from_col = 75` + `to_col = 83`;
+    - re-order the 6 kept IU dictionary rows to `MIN(sort_order) + offset` in the §3.2a order (nested derived table, avoiding MySQL 1093);
+    - `DELETE` the 3 view-only rows keyed on workbook + fill `FF6A1B9A` + labels.
+  - `down`:
+    - restore the R-IUX-002…006 order at base+0…5;
+    - re-insert the 3 rows exactly as `1791400000000` did, at base+6…8 (new ids — accepted by the Reviewer for NFR-IUX-003: nothing references dictionary ids);
+    - group 80 → 83.
+- **Red-then-green:** `Expected length: 80 / Received length: 83`; header order `Expected: "Linked innovation development" / Received: "Actors"`.
+- **Falsifiers (finished code, reverted):**
+  - (a) keys swapped → value-under-header red;
+  - (b) `DELETE` by label only → the seeded decoy row from another section (`Linked innovation readiness level`, fill `FF00897B`, sort 70) is lost, round trip red;
+  - (c) banner 83 → `Expected value: "C1:CB1"` red;
+  - (d) hardcoded `sort_order` → `71…76` expected, `0…5` received.
+- **Round trip (seeded, base 71, rolled back):** after `up`: group 75–80, IU rows 71…76 in the §3.2a order, other rows byte-identical. After `down`: groups and kept rows byte-identical incl. ids; re-inserted rows identical except id.
+- **Evidence re-run (Leader inline, run alone): VERIFIED.**
+  - `npm test -- --silent` → `Test Suites: 424 passed` / `Tests: 4030 passed`;
+  - `npm run build` exit 0;
+  - `npm run test:fixtures -- --testPathPattern='star-raw-innovation-use|report-innovation-use-view'` → 3 suites, `Tests: 39 passed`;
+  - scratch `migration:show`: `[X] 418 StarRawInnovationUseExportSubset1791500000000`, 0 pending;
+  - eslint exit 0 and prettier clean on all touched files.
+  - The 5 pre-existing Nest-bootstrap fixture failures (OPEN-ITEMS FU-3) are unchanged and not caused by T-06.
+- **Reviewer (`akili-reviewer`, override (b): stored fields on shared layout tables / shared export; named checks R-IUX-006, R-IUX-007, design §3.2a / DD-7 as amended 2026-10-06): PASS.** The new migration's WHERE clauses are bounded to the IU identifiers. The re-order is contiguous. `down()` matches `1791400000000`'s rows character by character. 1093 is avoided and executed on real MySQL. Phase 2 selects exactly 6. The read-back covers `BW4:CB4`, `C1:CB1` and `BI4:BV4`.
+- **ADVISORY (recorded):**
+  - if Dev's INNOVATION USE group was hand-edited away from 75–83, the group `UPDATE` changes 0 rows while the dictionary half applies (strict keys never widen) — the human check on Dev after deploy must confirm the band reads 75–80 (added to T-05 G3/G5);
+  - the Done criterion "preview shown before commit" is a human gate.
+- **Preview:** the Leader regenerated `~/Downloads/star_results_metadata_innovation_use_preview_v2.xlsx` with the real handler and builder and mocked data; the dictionary in the preview mimics the migration's order. Checked: 80 columns; `BW4:CB4`, `C1:CB1`, `BI4:BV4`; headers 75–80 in the §3.2a order; dictionary rows 108–113 in the same order. **User confirmation pending; commit deferred.**
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 1 not reported by host, ended complete.
+- **Review rounds spec total:** 11 of ~11 (T-06 was added after the budget was set; no tripwire is claimed for a user-added task).
+
+- **Preview approved:** after seeing `star_results_metadata_innovation_use_preview_v2.xlsx`, the user said "haz commit de T-06 y sigue con T-07" (2026-10-06). It covers the export subset and its order. The per-item T-05 G3 visual checks on real Dev data stay open (KZ-002).

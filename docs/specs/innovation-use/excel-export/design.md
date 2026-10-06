@@ -25,7 +25,7 @@
 - **One new view, `report_innovation_use`.** Its root is `results` (live rows). It reaches its 1:1 data (`result_innovation_use`, the use-level catalog) through plain joins, and each collection (actors, organizations, quantifications, linked dev) through a **`LEFT JOIN LATERAL`** that aggregates only the current result's rows.
 - **Why LATERAL, not the `report_alliance_alignment` pattern:** `EXPLAIN` shows the alliance pattern (derived table + `GROUP BY`) aggregates the **whole** child table on every export. Scalar subqueries in the SELECT list make the whole **view** materialize. LATERAL keeps the view merged into Phase 2 and reads each child by its `result_id` index, only for the requested results (P-5).
 - **Green-check rules are transcribed into cell expressions.** The view never calls `innovation_use_validation()`. Parity is enforced by a fixture suite that compares the function with the cells on real MySQL (NFR-IUX-002).
-- **Layout:** one appended column group (75–83) and nine dictionary rows, with nothing shifted. TS wiring adds 9 column specs, the Phase 2 join, the fallback group, banner span 83, and the new notice text.
+- **Layout:** one appended column group and dictionary rows, with nothing shifted — **75–80, six exported columns, since the 2026-10-06 QA amendment (§3.2a, DD-7)**; first shipped as 75–83 with nine. TS wiring adds 9 column specs, the Phase 2 join, the fallback group, banner span 83, and the new notice text.
 
 ---
 
@@ -69,12 +69,13 @@ STAR "Export" ─► GET /api/reports/resultCenter/xlsx (reports.controller.ts:1
 | --- | --- |
 | `src/db/migrations/<ts>-CreateReportInnovationUseView.ts` | `CREATE OR REPLACE VIEW report_innovation_use`. `down()`: `DROP VIEW IF EXISTS` |
 | `src/db/migrations/<ts+1>-StarRawInnovationUseColumnGroup.ts` | Appends the INNOVATION USE group (75–83) and 9 dictionary rows. `down()` deletes exactly those rows |
+| `src/db/migrations/<ts+2>-StarRawInnovationUseExportSubset.ts` *(T-06, 2026-10-06)* | Narrows the group to 75–80, deletes the 3 view-only dictionary rows, re-orders the 6 remaining Innovation Use rows among themselves (§3.2a). `down()` restores the 9-row state exactly |
 | `src/db/migration-specs/<ts>-CreateReportInnovationUseView.spec.ts` | SQL-text spec: no top-level `GROUP BY`/`ORDER BY`/`LIMIT`/`DISTINCT`, no `_validation(`, no `?`, `down()` drops the view |
 | `src/db/migration-specs/<ts+1>-StarRawInnovationUseColumnGroup.spec.ts` | SQL-text spec for the layout rows and their exact `down()` |
 | `test/fixtures/innovation-use/report-innovation-use-view.fixture-spec.ts` | Behavioral parity + one-row + `EXPLAIN` gate on scratch MySQL |
 | `…/reports/repositories/star-results-export.repository.ts` | +1 `LEFT JOIN`, +9 aliased columns, view list comment |
-| `…/star-results-metadata/star-results-metadata.columns.ts` | +9 `ExcelColumnSpec` (74 → 83) |
-| `…/star-results-metadata/star-results-metadata.sheet-presentation.ts` | +1 fallback group; `bannerTitleMergeToCol` 74 → 83 |
+| `…/star-results-metadata/star-results-metadata.columns.ts` | +9 `ExcelColumnSpec` (74 → 83); **T-06: 6 specs (74 → 80) in the §3.2a order** |
+| `…/star-results-metadata/star-results-metadata.sheet-presentation.ts` | +1 fallback group; `bannerTitleMergeToCol` 74 → 83; **T-06: group 75–80, banner 80** |
 | `…/star-results-metadata/star-results-metadata.banner-subtitle.ts` | Notice text without Innovation Use |
 | sibling `*.spec.ts` of the three TS files above + handler spec | Updated pins |
 
@@ -115,6 +116,21 @@ STAR "Export" ─► GET /api/reports/resultCenter/xlsx (reports.controller.ts:1
 | 81 | `innovation_use_linked_dev_readiness` | Linked innovation readiness level | `Level {level}: {name}` via `result_innovation_dev rid ON rid.result_id = r2.result_id AND rid.is_active = TRUE` → `clarisa_innovation_readiness_levels ON id = rid.innovation_readiness_id`, the same path as `readInnovationDevCardFacts` (service.ts:741-779) (*S-2*). Resolved inside the linked-dev lateral | FALSE | ind = 6 AND qualifying link exists |
 | 82 | `innovation_use_linked_dev_description` | Linked innovation description | `r2.description` | FALSE | same |
 | 83 | `innovation_use_linked_dev_geo_scope` | Linked innovation geographic scope | `clarisa_geo_scope.name` | FALSE | same |
+
+### 3.2a Export subset (amended 2026-10-06, QA feedback, user-approved — DD-7)
+
+The view keeps all 9 columns above. The **export** (Phase 2 select list, column specs, fallback group, banner, data dictionary) carries **6**, at Raw data columns 75–80, in this order:
+
+| Export col | View column | Header |
+| --- | --- | --- |
+| 75 | `innovation_use_level` | Innovation use level |
+| 76 | `innovation_use_level_explanation` | Use level justification |
+| 77 | `innovation_use_linked_dev` | Linked innovation development |
+| 78 | `innovation_use_actors` | Actors |
+| 79 | `innovation_use_organizations` | Organizations |
+| 80 | `innovation_use_quantifications` | Quantifications |
+
+`innovation_use_linked_dev_readiness`, `innovation_use_linked_dev_description` and `innovation_use_linked_dev_geo_scope` stay in the view as **view-only** columns. Phase 2 does not select them. The "col 75–83" numbers in §3.2 and §3.3 are the view's column order, not export positions.
 
 The `innovation_use_` prefix avoids collisions in the flat Phase 2 SELECT, which already holds generic keys such as `description` and `geo_scope` from other views.
 
@@ -192,8 +208,8 @@ No new log lines. A failure in Phase 2 surfaces through the existing `GlobalExce
 | **`EXPLAIN FORMAT=TREE` assertion** inside the fixture suite, on the **real** Phase 2 SQL text: captured from `StarResultsExportRepository`'s `queryRunner.query` call, the same capture pattern `star-results-export.repository.spec.ts` already uses (*JD-2*) | **Positive** matches (JD-2): four `Materialize (invalidate on row from root)` nodes, each correlated on `<child>.result_id = root.result_id` (the inner access path is cost-based and not asserted — amended 2026-10-05, NFR-IUX-001); the view's root `results` reached by `PRIMARY` lookup from `gi`; and **no** `Materialize` / `Hash` whose input is a scan of `results` other than the existing `report_general_information` nodes, which are enumerated in the fixture as the baseline. Mere absence of an alias does not count | Cost-based choices under Prod data volume. Merged-or-not is structural; access paths are cost-based, so the check runs on seeded rows (≥ 200 results, mixed indicators), not empty tables |
 | Layout migration round trip (*S-3*, requirements D5) | `up → down → up` on scratch **with representative layout rows seeded first** (the scratch tables are empty, B-3), asserting `down()` removes exactly the 10 inserted rows and leaves the seeded ones byte-identical | Dev's actual rows (P-11) |
 | Timing run (*S-3*, NFR-IUX-001) | Phase 2 duration, 3 repetitions before and 3 after, on the same seeded set | Prod volume. It is a reading, not the gate (D3). The ≤ 20% target was dropped on 2026-10-05 (NFR-IUX-001 amendment); real-volume timing is a human check on Dev at T-05 |
-| Repository + handler unit specs | JOIN string present, 83 columns, keys equal aliases, fallback 75–83, banner span 83, notice text | Real SQL (KZ-001: SQL is asserted in the fixture, not on the mocked call sequence) |
-| `.xlsx` read-back unit test (ExcelJS) | Header row and group band cells at 75–83 in the generated buffer | Visual rendering (colour, wrap) → human check |
+| Repository + handler unit specs | JOIN string present, 83 columns, keys equal aliases, fallback 75–83, banner span 83, notice text (**T-06: 80 columns, 6 select items, fallback 75–80, banner 80**) | Real SQL (KZ-001: SQL is asserted in the fixture, not on the mocked call sequence) |
+| `.xlsx` read-back unit test (ExcelJS) | Header row and group band cells at 75–83 in the generated buffer (**T-06: 75–80, §3.2a order**) | Visual rendering (colour, wrap) → human check |
 | `npm run build` | TS wiring compiles | Spec files (excluded by `tsconfig.build.json`) |
 
 **Drift (S-4, accepted risk R3):** no CI job runs `test:fixtures`, so this gate protects the spec at execute time only. The view migration's header names the parity fixture as mandatory for any future migration that redefines `innovation_use_validation`, `valid_text` or `report_field` (ADR-11 blind spot ii).
@@ -220,6 +236,7 @@ The parity fixture computes the expected per-cell result **from the function**, 
 | DD-4 | 2026-10-05 | No new index | Per-result child sets are small. The FK index on `result_id` already bounds each lateral to one result's rows. A composite index adds write cost on four shared child tables (`result_actors`, `result_institution_types`, `result_quantifications`, `link_results`) used by other indicators (*S-7*) | Composite `(result_id, role_id, is_active)`: revisit only if the T-02 EXPLAIN/timing shows otherwise. **Revisited 2026-10-05:** T-02 measured a role-index or `PRIMARY` access in two laterals and +68% on 210 seeded results. The user kept DD-4 (no new index) and amended NFR-IUX-001 to the structural gate instead; real-volume timing is a human check on Dev at T-05 |
 | DD-5 | 2026-10-05 | Prefix every key with `innovation_use_` | The Phase 2 SELECT is flat; generic aliases (`description`, `geo_scope`) already exist | Unprefixed keys |
 | DD-6 | 2026-10-05 | Linked dev follows **rule 16** (active indicator-2 target), not `findOne` (which returns any active link) | HITL ruling 2: cells follow the green check. The difference only shows when a linked dev is soft-deleted after linking, which is exactly when users need to see `Not provided` | Mirroring `findOne` |
+| DD-7 | 2026-10-06 | Export 6 of the view's 9 columns (75–80, linked dev right after the justification). Keep the view unchanged, and apply the layout change through a **new** migration | QA feedback (user-approved): the readiness, description and geo-scope cells are not needed today. The view and layout migrations are already applied on the shared database, so editing them is not possible (ADR-5). Keeping the 3 cells in the view lets them return later with a TS + layout change only | (a) Drop the 3 columns from the view: a second view migration, and the cells would have to be rebuilt if requested again. (b) Edit migrations `1791300000000`/`1791400000000` in place: forbidden once applied on a shared DB |
 
 **Reversion challenge (Step 2.3):** no DD removes delivered behavior. The notice edit (R-IUX-008) removes a sentence whose claim becomes false, and the Innovation Development half stays. No challenge was run.
 

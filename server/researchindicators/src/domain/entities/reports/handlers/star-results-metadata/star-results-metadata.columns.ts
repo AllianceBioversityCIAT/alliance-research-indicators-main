@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–CE (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–CB (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -265,32 +265,17 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     header: 'Use level justification',
     width: 48,
   },
+  {
+    key: 'innovation_use_linked_dev',
+    header: 'Linked innovation development',
+    width: 48,
+  },
   { key: 'innovation_use_actors', header: 'Actors', width: 56 },
   { key: 'innovation_use_organizations', header: 'Organizations', width: 56 },
   {
     key: 'innovation_use_quantifications',
     header: 'Quantifications',
     width: 56,
-  },
-  {
-    key: 'innovation_use_linked_dev',
-    header: 'Linked innovation development',
-    width: 48,
-  },
-  {
-    key: 'innovation_use_linked_dev_readiness',
-    header: 'Linked innovation readiness level',
-    width: 40,
-  },
-  {
-    key: 'innovation_use_linked_dev_description',
-    header: 'Linked innovation description',
-    width: 60,
-  },
-  {
-    key: 'innovation_use_linked_dev_geo_scope',
-    header: 'Linked innovation geographic scope',
-    width: 36,
   },
 ];
 

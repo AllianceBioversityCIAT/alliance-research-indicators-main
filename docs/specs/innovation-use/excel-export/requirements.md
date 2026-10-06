@@ -24,7 +24,7 @@
 
 ## Executive Summary
 
-The Results Center Excel export (`GET /api/reports/resultCenter/xlsx`) has no Innovation Use data, and its banner tells users so. This spec adds an **INNOVATION USE** column group to the Raw data sheet: **9 columns** covering every business field `ResultInnovationUseService.findOne` returns. The data comes from a new MySQL view, `report_innovation_use`. Each cell follows the section's green-check rules: a required value that is missing reads `Not provided`, and a value whose rule does not apply reads `Not applicable`. The view must cost the export only the rows it was asked for, which `report_alliance_alignment` does not guarantee.
+The Results Center Excel export (`GET /api/reports/resultCenter/xlsx`) has no Innovation Use data, and its banner tells users so. This spec adds an **INNOVATION USE** column group to the Raw data sheet: **6 columns** (amended 2026-10-06 from 9 after QA feedback; see R-IUX-006 and R-IUX-007). The data comes from a new MySQL view, `report_innovation_use`, which still exposes all 9 business fields `ResultInnovationUseService.findOne` returns, so the three dropped *linked* fields can return to the export later without a view change. Each cell follows the section's green-check rules: a required value that is missing reads `Not provided`, and a value whose rule does not apply reads `Not applicable`. The view must cost the export only the rows it was asked for, which `report_alliance_alignment` does not guarantee.
 
 ---
 
@@ -65,7 +65,7 @@ The Results Center Excel export (`GET /api/reports/resultCenter/xlsx`) has no In
 - the `report_alliance_alignment` SDG join mismatch between the migration and Dev (noted in design, not fixed here);
 - the empty `organizations_on_behalf` column (an existing defect: declared in the column specs, never selected).
 
-**Affected surface (what renders):** the downloaded `.xlsx`, both sheets. Raw data gains 9 columns, a group band and a wider banner. Data dictionary gains an Innovation Use section. The notice row changes text.
+**Affected surface (what renders):** the downloaded `.xlsx`, both sheets. Raw data gains 6 columns (75–80; amended 2026-10-06), a group band and a wider banner. Data dictionary gains an Innovation Use section. The notice row changes text.
 
 ---
 
@@ -167,7 +167,9 @@ One line per active Innovation Use measure (`quantification_role_id = 3`): `• 
 - BUT it must NOT mark a **negative** number as `Not provided` (rule 10 is `<> 0`)
 - AND a blank description reads `Comment: Not mandatory` (the green check does not require it)
 
-### R-IUX-006 — Linked Innovation Development result (4 cells)
+### R-IUX-006 — Linked Innovation Development result (4 view cells, 1 exported cell)
+
+> **Amended 2026-10-06 (QA feedback, user-approved):** the export shows **only** *Linked innovation development*. The view `report_innovation_use` keeps all four cells below, so they can be re-exported later without changing the view, which is already applied on the shared database. *Linked innovation readiness level*, *Linked innovation description* and *Linked innovation geographic scope* are **view-only**: they are not selected by Phase 2, not in the Raw data sheet, and not in the data dictionary.
 
 | Column header | Content | Rule |
 | --- | --- | --- |
@@ -185,14 +187,14 @@ A **qualifying link** is what rule 16 counts: an active role-5 `link_results` ro
 
 ### R-IUX-007 — Workbook layout
 
-- The 9 columns are appended **after OICR DETAILS** (columns 75–83), under a group band labelled **INNOVATION USE** with its own colour.
+- The 6 exported columns are appended **after OICR DETAILS** (columns 75–80), under a group band labelled **INNOVATION USE** with its own colour, in this order: Innovation use level · Use level justification · Linked innovation development · Actors · Organizations · Quantifications. *(Amended 2026-10-06 from 9 columns at 75–83 in the R-IUX-002…006 order, after QA feedback: the linked-dev cell moves to sit right after the justification, and the three other linked cells leave the export.)*
 - The banner title spans the new last column.
 - The Data dictionary sheet gains an *Innovation Use* section with one entry per new column, in column order, each with an explanation.
 - The fallback group list (used when the layout table is empty) matches the database rows.
 
 #### Scenario: Layout integrity
 - WHEN the workbook is generated
-- THEN Raw data has 83 columns, the INNOVATION USE band covers exactly 75–83, and every new header matches the dictionary label
+- THEN Raw data has 80 columns, the INNOVATION USE band covers exactly 75–80, and every new header matches the dictionary label, in the order above
 - BUT it must NOT move, rename or recolour any existing column or group
 
 ### R-IUX-008 — Banner notice
@@ -241,7 +243,7 @@ The "coming soon" notice no longer mentions Innovation Use, and keeps saying tha
 ## 6. Data requirements
 
 - New view `report_innovation_use` (migration `<ts>-CreateReportInnovationUseView.ts`).
-- New layout rows: 1 `report_workbook_column_group` row and 9 `report_data_dictionary` rows (migration `<ts>-StarRawInnovationUseColumnGroup.ts`), appended with no shifting.
+- New layout rows: 1 `report_workbook_column_group` row and 9 `report_data_dictionary` rows (migration `1791400000000-StarRawInnovationUseColumnGroup.ts`), appended with no shifting. **Amended 2026-10-06:** that migration is already applied on the shared database, so a second migration (`<ts>-StarRawInnovationUseExportSubset.ts`) narrows the group to 75–80, deletes the three view-only dictionary rows, and re-orders the six remaining Innovation Use dictionary rows among themselves. No other section's row moves, and `down()` restores the 9-row state exactly.
 - No table, column or index changes are expected. If `EXPLAIN` shows an index is missing, design records it as a decision.
 
 ## 7. API surface delta

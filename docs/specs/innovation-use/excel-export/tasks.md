@@ -238,6 +238,47 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ---
 
+### T-06 — QA feedback: export 6 of the view's 9 columns (75–80), linked dev after the justification
+
+- **Status:** done (PASS attempt 1, 2026-10-06; preview approved by the user — see `execution.md`) · **Size:** M · **Dependencies:** T-03, T-04 · added 2026-10-06 (user-approved amendment, QA feedback)
+- **Requirements covered:** R-IUX-006 as amended 2026-10-06 (only *Linked innovation development* is exported; 3 view-only cells), R-IUX-007 as amended (80 columns, band 75–80, the §3.2a order, *BUT must NOT* move, rename or recolour any other column or group), NFR-IUX-003 (the new `down()` restores exactly), NFR-IUX-004, D4, D5, D8
+- **Design refs:** §3.2a, DD-7, §2.1 (new migration row), §5, §10 rows 5–7
+- **Constraint (user, 2026-10-06):** migrations `1791300000000` (view) and `1791400000000` (layout) are **applied on the shared database**. They must **not** be edited. The view stays unchanged.
+- **Scope:**
+  1. New migration `src/db/migrations/<ts>-StarRawInnovationUseExportSubset.ts` (`<ts>` > 1791400000000), touching **only** the rows `1791400000000` inserted, identified exactly as its `down()` does (workbook + label/range for the group; workbook + `section_fill_argb = 'FF6A1B9A'` + field labels for the dictionary):
+     - `UPDATE` the INNOVATION USE group `to_col` 83 → 80;
+     - `DELETE` the 3 dictionary rows *Linked innovation readiness level*, *Linked innovation description*, *Linked innovation geographic scope*;
+     - re-order the 6 remaining rows: `base = MIN(sort_order)` of the 9 Innovation Use rows, then Innovation use level = base, Use level justification = base+1, Linked innovation development = base+2, Actors = base+3, Organizations = base+4, Quantifications = base+5. Computed in SQL; the section `Innovation Use` stays on the first row;
+     - `down()`: group `to_col` back to 83; re-insert the 3 rows exactly as `1791400000000` did (same labels, explanations, section NULL, fill); restore the original order base+0…base+8 in the R-IUX-002…006 order;
+     - params bound, never interpolated; no `:word` outside quoted strings.
+  2. Its migration spec (`src/db/migration-specs/<ts>-…spec.ts`): SQL text, params, the WHERE keys, no statement touching rows outside the Innovation Use identifiers, exact `down()`.
+  3. Round-trip fixture on scratch: seed the 10 fallback groups + representative dictionary rows, apply `1791400000000`, then run `up → down → up` of the new migration. After `up`: group 75–80, 6 IU rows in the §3.2a order and contiguous from base, other rows byte-identical. After `down`: byte-identical to the post-`1791400000000` state.
+  4. TS (`src/domain/entities/reports/…`):
+     - repository Phase 2 selects only the 6 exported aliases (the join stays);
+     - `star-results-metadata.columns.ts` has the 6 specs at 75–80 in the §3.2a order;
+     - fallback group 75–80; `bannerTitleMergeToCol: 80`; JSDoc range A–CB;
+     - update pins (80 columns), the repository spec, and the read-back test (headers and values at 75–80 in the new order; band `BW4:CB4`; banner `C1:CB1`; OICR band unchanged);
+     - the T-02 fixture's `IU_SELECT_LIST` follows the repository's 6 items, so the EXPLAIN gate still strips exactly what Phase 2 adds.
+  5. Apply the new migration on scratch and leave it applied; run the T-02 and T-03 fixtures.
+- **Falsifier:**
+  - (a) Swap two keys in the column specs (Actors ↔ Linked innovation development): the read-back value-under-header assertion is red.
+  - (b) Make the dictionary `DELETE` match by label only (no fill key): the seeded round trip loses the seed's `Actors`/`Organizations` rows, so the byte-identity check is red. (The 3 deleted labels are unique today; seed a same-label row from another section to make the mutation observable.)
+  - (c) Leave `bannerTitleMergeToCol: 83`: the read-back banner assertion is red.
+  - (d) Re-order with a hardcoded `sort_order` instead of `base + k`: the seeded round trip with a non-zero base is red.
+- **Red run:** pins updated first are red on their assertions (expected 80 received 83; expected header order received old), messages quoted; then each Falsifier observed red on the finished code, messages quoted.
+- **Disqualifier:** the round trip only counts with rows seeded around the Innovation Use rows (an empty table cannot show a mis-keyed DELETE or UPDATE). Mocked SQL proves nothing about the view (KZ-001); the T-02 fixture on the real repository SQL is the SQL evidence. **Cannot reach:** Dev's real `sort_order` values (P-16) and the visual rendering (a human check at the T-05 gate).
+- **Consumers:** `report-layout.repository.ts` (every export), `STAR_RAW_COLUMN_GROUP_FALLBACK`, `…workbook.handler(.spec).ts`, `star-results-export.repository(.spec).ts`, `excel-workbook.builder(.spec).ts` (`bannerTitleMergeToCol`), the T-02 and T-03 fixtures. The full server suite is part of the Verification.
+- **Review:** `full` (stored fields on shared layout tables; the shared export).
+- **Done criteria:**
+  - [x] New migration + spec green; seeded round trip green; Falsifiers (a)–(d) observed red, quoted
+  - [x] TS wiring at 75–80 in the §3.2a order; read-back green
+  - [x] `npm run test:fixtures -- report-innovation-use-view` and `-- star-raw-innovation-use-column-group` green; new migration applied on scratch
+  - [x] `npm test -- --silent` (full server suite) green; `npm run build` exit 0; `npx eslint` and `npx prettier --check` clean on touched files
+  - [x] Generated `.xlsx` preview shown to the user before commit (standing rule: no commit of a visual change before the user sees it)
+- **Skills:** `nestjs-expert`, `tdd`
+
+---
+
 ## Coverage closure (scenario and clause level)
 
 | Requirement clause | Owner |
@@ -281,6 +322,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 | T-03 | S | ~210 (migration ~110 + spec ~100) | checklist |
 | T-04 | M | ~310 | full |
 | T-05 | S | ~10 (docs) | checklist |
+| T-06 | M | ~250 (migration + spec + fixture + TS) | full |
 | **Total** | | **~1,460** | |
 
 No task is `skip-eligible`.

@@ -144,13 +144,10 @@ export class StarResultsExportRepository {
         lkr.link_results AS link_results,
         iu.innovation_use_level AS innovation_use_level,
         iu.innovation_use_level_explanation AS innovation_use_level_explanation,
+        iu.innovation_use_linked_dev AS innovation_use_linked_dev,
         iu.innovation_use_actors AS innovation_use_actors,
         iu.innovation_use_organizations AS innovation_use_organizations,
-        iu.innovation_use_quantifications AS innovation_use_quantifications,
-        iu.innovation_use_linked_dev AS innovation_use_linked_dev,
-        iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness,
-        iu.innovation_use_linked_dev_description AS innovation_use_linked_dev_description,
-        iu.innovation_use_linked_dev_geo_scope AS innovation_use_linked_dev_geo_scope
+        iu.innovation_use_quantifications AS innovation_use_quantifications
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id

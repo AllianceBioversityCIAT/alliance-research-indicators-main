@@ -118,16 +118,29 @@ type Cells = Record<CellKey, string>;
 /** Aliases of the four per-row laterals. The index MySQL picks is not asserted. */
 const LATERAL_ALIASES = ['ra', 'rit', 'rq', 'lr'] as const;
 
+/** Phase 2 exports six of the nine view cells (§3.2a). The view still has all nine. */
+const EXPORTED_CELL_KEYS = [
+  'innovation_use_level',
+  'innovation_use_level_explanation',
+  'innovation_use_linked_dev',
+  'innovation_use_actors',
+  'innovation_use_organizations',
+  'innovation_use_quantifications',
+] as const;
+
+const VIEW_ONLY_CELL_KEYS = [
+  'innovation_use_linked_dev_readiness',
+  'innovation_use_linked_dev_description',
+  'innovation_use_linked_dev_geo_scope',
+] as const;
+
 const IU_SELECT_LIST = [
   'iu.innovation_use_level AS innovation_use_level',
   'iu.innovation_use_level_explanation AS innovation_use_level_explanation',
+  'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
   'iu.innovation_use_actors AS innovation_use_actors',
   'iu.innovation_use_organizations AS innovation_use_organizations',
   'iu.innovation_use_quantifications AS innovation_use_quantifications',
-  'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
-  'iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness',
-  'iu.innovation_use_linked_dev_description AS innovation_use_linked_dev_description',
-  'iu.innovation_use_linked_dev_geo_scope AS innovation_use_linked_dev_geo_scope',
 ]
   .map((line) => `        ${line}`)
   .join(',\n');
@@ -1633,8 +1646,11 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     expect(capturedSql).toContain(
       'LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id',
     );
-    for (const key of CELL_KEYS) {
+    for (const key of EXPORTED_CELL_KEYS) {
       expect(capturedSql).toContain(`iu.${key} AS ${key}`);
+    }
+    for (const key of VIEW_ONLY_CELL_KEYS) {
+      expect(capturedSql).not.toContain(`iu.${key} AS ${key}`);
     }
 
     const selectChunk = `,\n${IU_SELECT_LIST}`;
