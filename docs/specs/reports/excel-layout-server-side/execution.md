@@ -54,3 +54,41 @@
 - **Decisions made:** none beyond the brief; no spec edits.
 - **Issues encountered:** none.
 - **Final verification:** VERIFIED (above). Closed by Reviewer PASS; gated mode — continue gate pending with the user.
+
+### Budget tripwire after T-01 (2026-10-06)
+
+- **Delta:** design §15 estimated ~700 LOC for the whole spec; T-01 alone landed ~740 code lines (`git diff --stat 7c379141~1 7c379141`, 792 incl. docs). Cause: prettier expanded each of the 80 column objects (`columns.ts` 326 lines vs 80–160 estimated) and a longer derivation spec (248 vs ~150). Mechanical lines, not logic. Review rounds: 1 of ~6.
+- **User decision:** "lo mas recomendado" — the Leader's recommendation was to accept the overrun and continue to T-02 (expected ~260 more lines). Continue.
+
+### T-02 — Handler and repository wiring; `.xlsx` read-back
+
+- **Status:** PASS (attempt 1). Visual approval (D7) recorded below.
+- **Date:** 2026-10-06
+- **Effort:** high (Size M; reverts delivered behaviour, many spec edits).
+- **Review mode:** lens checklist (single reviewer). Overrides (b) (exported symbols deleted) and (d) (reverts DB-driven behaviour) apply.
+- **Skills deviation:** `nestjs-expert`, `tdd` could not load on the Cursor host; discipline carried in prose.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-high` (fresh worker), Orca `run_7b470bc81d7f` / `task_91bc1136c428` / `ctx_c7e0c14b236c`. Brief: `T-02-brief.md` (session scratchpad). Report: `/tmp/excel-layout-T-02-report.md`.
+- **Consumer sweep (scope 1; totals before filtering, roots `server/researchindicators/src`, `/test`, `client/research-indicators/src`):** `findActiveSheets` 8 · `findColumnGroups` 10 · `ReportWorkbookColumnGroupRow` 3 · `STAR_RAW_COLUMN_GROUP_FALLBACK` 3 — all in the repository, its spec, the handler, its spec, sheet-presentation (inside P-6) and all removed. `STAR_RAW_SHEET_PREAMBLE_BASE` 3 (sheet-presentation + handler; kept, retyped). `bannerTitleMergeToCol` 10 — sheet-presentation (removed from base) plus builder `:100/:168`, builder spec `:34/:43/:1078/:1100`, types `:58`, row-limit spec `:45/:75`: the existing preamble contract (DD-3, P-5), not modified. `STAR_RESULTS_METADATA_RAW_COLUMNS` 5 (columns, T-01 derivation spec `:3/:204`, handler `:20/:80`). `WorkbookSheetRow` 4 (types definition kept; repository import removed; constants now imports it). `test/` and client: 0 for every symbol. No hit outside P-6 / P-11 needed new verification.
+- **Files changed:** `server/researchindicators/src/domain/entities/reports/constants/star-results-metadata.constants.ts` · `…/handlers/star-results-metadata/star-results-metadata-workbook.handler.ts` · `…/star-results-metadata-workbook.handler.spec.ts` · `…/star-results-metadata.sheet-presentation.ts` · `…/repositories/report-layout.repository.ts` · `…/repositories/report-layout.repository.spec.ts`. No builder, entity, migration change.
+- **Implementer verification:** reports 18 suites / 154 tests · full `npm test -- --silent` 428 suites / 4053 tests (Jest also printed "A worker process has failed to exit gracefully…") · build 0 · eslint 0 · prettier clean · B-2 every file `:0`.
+- **Falsifiers (quoted, each reverted):**
+  - (a) `findColumnGroups` re-added with the June rows → first red is product behaviour in the builder: `Cannot merge already merged cells` (`excel-workbook.builder.ts:226`, the 61–87 / 88–101 overlap). With the rows `from_col <= 80` → band assertion red `- "found": true, + "found": false, "label": "OICR DETAILS"`.
+  - (b) banner `79` → `Expected: "C1:CB1"` / `Received: "C1:CA1"`.
+  - (c) range lookup shifted +1 → `Expected: "FF35749A"` / `Received: "FF7E57C2"`.
+  - (d) `getWorksheet('Raw')` → `TypeError: Cannot read properties of undefined (reading 'getRow')`.
+  - Pre-wiring reds: sheet names `Raw`/`Dict` vs `Raw data`/`Data dictionary`; fill `FF222222` vs `FF35749A`; `getWorksheet('Raw data')` undefined.
+- **Not Done / Assumptions (verbatim):** "One-column bands (PARTNERS column 23, LINK TO RESULT column 30) are not stored in ExcelJS `model.merges`: a merge of a cell onto itself is dropped. The read-back asserts that cell's column, title and fill, and that no merge starts at that column. Multi-column bands assert the merge string. The builder was not changed." · "Falsifier (a) cannot show both June rows on the band assertion at once: painting OICR 88–101 after INNOVATION DETAILS 61–87 throws `Cannot merge already merged cells` inside the builder before any band expect. The quoted OICR assertion red used the paintable subset." · "The dictionary-row expect guards behaviour that already existed." · "Visual appearance of the preview file is the human check (D7). Prod's tables are T-03." — Leader reading: no blocker, no owed worker item; assumptions only. No continuation. The D7 approval is the user's gate, not worker work.
+- **Evidence re-run (Leader inline, non-author): VERIFIED.** `npx eslint <6 files>` exit 0 · `npx prettier --check <6 files>` clean · `npm run build` exit 0 · B-2 `grep -rn -c … src/domain/entities/reports | grep -v ':0$'` → no lines · `npm test -- --silent` → `Test Suites: 428 passed, 428 total` / `Tests: 4053 passed, 4053 total` · `git status` → the 6 files plus pre-existing unrelated entries.
+- **Preview read (Leader, ExcelJS load of `/tmp/excel-layout-T-02-preview.xlsx`):** sheets `Raw data | Data dictionary`; 80 columns; merges `A1:B1 C1:CB1 A2:CB2 A3:CB3 A4:N4 O4:V4 X4:AA4 AB4:AC4 AE4:AI4 AJ4:BD4 BE4:BH4 BI4:BV4 BW4:CB4`; row 4 titles/fills per column match requirements §1 (23 PARTNERS `FF325B94`, 30 LINK TO RESULT `FF7E57C2` as single cells).
+- **Reviewer: PASS** — sheets via constant + unchanged resolver with default / reorder / unknown-key cases; bands and `bannerTitleMergeToCol: lastColumn` from the derivation; base typed `Omit<…>`, literal 80 removed; `withHeaderFills(readonly StarRawSectionColumn[])` from the section, `FF1565C0` gone; repository keeps only `findDataDictionaryRows`; builder/entities/migrations untouched; whole J-2 list handled; read-back `INTENDED_RAW_BANDS` hand-written from §1; one-column-band handling accepted (same output as the old 23–23 / 30–30 fallback, NFR-WBL-001); falsifier (a)'s builder throw is product behaviour, not a setup red.
+- **ADVISORY (recorded, not gating):** (1) reliability — the new top-level `beforeEach` deletes `ARI_STAR_RESULTS_METADATA_SHEET_ORDER` without restoring it (no cross-file leak; in-file inconsistency with `withSheetOrder`); (2) readability — the read-back content search keeps the last matching cell (safe: goes red, not green); (3) readability — `excelColumnLetter` duplicates the local `letter` helper; (4) risk — Dev rows no longer affect the export (intended); G-WBL-1 Prod comparison before `main` merge (T-03).
+- **runtime events:** none.
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 10 calls, 65,898 tokens, ended complete.
+- **Requirements covered:** R-WBL-001, R-WBL-003 (rendered half + MUST NOT read), R-WBL-004, R-WBL-005 (rendered), R-WBL-007, NFR-WBL-001 (rendered), NFR-WBL-002.
+- **Decisions made:** none; no spec edits.
+- **Issues encountered:** none.
+- **Final verification:** VERIFIED.
+- **User visual approval (D7, scope step 8):** the Leader opened `/tmp/excel-layout-T-02-preview.xlsx` for the user, listing what to check (tabs "Raw data" then "Data dictionary"; banner C1:CB1; the 11 row-4 bands with ranges and colours; no INNOVATION DETAILS). User, 2026-10-06: "lo veo bien". What that observation covered: the generated file's header layout with mocked rows (one `RC` row) — not Dev or Prod data, and not Prod's tables (T-03, G-WBL-1).

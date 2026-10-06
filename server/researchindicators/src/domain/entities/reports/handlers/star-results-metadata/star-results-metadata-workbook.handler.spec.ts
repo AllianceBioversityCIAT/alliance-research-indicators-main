@@ -7,6 +7,7 @@ import { ReportLayoutRepository } from '../../repositories/report-layout.reposit
 import { StarResultsExportRepository } from '../../repositories/star-results-export.repository';
 import {
   STAR_RESULTS_METADATA_SHEET_KEYS,
+  STAR_RESULTS_METADATA_SHEET_ORDER_ENV,
   STAR_RESULTS_METADATA_WORKBOOK_KEY,
 } from '../../constants/star-results-metadata.constants';
 import { StarResultsMetadataWorkbookHandler } from './star-results-metadata-workbook.handler';
@@ -23,11 +24,62 @@ const readFileSync = fs.readFileSync as jest.MockedFunction<
   typeof fs.readFileSync
 >;
 
+/** Requirements §1 intended layout. Literals, not derived. */
+const INTENDED_RAW_BANDS = [
+  { fromCol: 1, toCol: 14, label: 'GENERAL INFORMATION', fillArgb: 'FF203C61' },
+  { fromCol: 15, toCol: 22, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
+  { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
+  { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
+  { fromCol: 28, toCol: 29, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
+  { fromCol: 30, toCol: 30, label: 'LINK TO RESULT', fillArgb: 'FF7E57C2' },
+  { fromCol: 31, toCol: 35, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
+  {
+    fromCol: 36,
+    toCol: 56,
+    label: 'CAPSHARING DETAILS',
+    fillArgb: 'FF4D7C31',
+  },
+  { fromCol: 57, toCol: 60, label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
+  { fromCol: 61, toCol: 74, label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
+  { fromCol: 75, toCol: 80, label: 'INNOVATION USE', fillArgb: 'FF6A1B9A' },
+] as const;
+
+function excelColumnLetter(col: number): string {
+  let n = col;
+  let s = '';
+  while (n > 0) {
+    n -= 1;
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
+
+async function withSheetOrder(
+  csv: string | undefined,
+  run: () => Promise<void>,
+): Promise<void> {
+  const key = STAR_RESULTS_METADATA_SHEET_ORDER_ENV;
+  const previous = process.env[key];
+  if (csv === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = csv;
+  }
+  try {
+    await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = previous;
+    }
+  }
+}
+
 describe('StarResultsMetadataWorkbookHandler', () => {
   let handler: StarResultsMetadataWorkbookHandler;
-  const findActiveSheets = jest.fn();
   const findDataDictionaryRows = jest.fn();
-  const findColumnGroups = jest.fn();
   const findStarResultsMetadataRows = jest.fn();
   const fetchMock = jest.fn();
 
@@ -48,18 +100,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     global.fetch = fetchMock as unknown as typeof fetch;
-    findActiveSheets.mockResolvedValue([
-      {
-        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
-        sheet_name: 'Raw',
-        sort_order: 1,
-      },
-      {
-        sheet_key: STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
-        sheet_name: 'Dict',
-        sort_order: 2,
-      },
-    ]);
+    delete process.env[STAR_RESULTS_METADATA_SHEET_ORDER_ENV];
     findDataDictionaryRows.mockResolvedValue([
       {
         section: 'S',
@@ -74,14 +115,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
         section_fill_argb: null,
       },
     ]);
-    findColumnGroups.mockResolvedValue([
-      {
-        from_col: 1,
-        to_col: 2,
-        label: 'L',
-        fill_argb: 'FF222222',
-      },
-    ]);
     findStarResultsMetadataRows.mockResolvedValue([{ result_code: 'RC' }]);
     existsSync.mockReturnValue(false);
 
@@ -92,9 +125,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
         {
           provide: ReportLayoutRepository,
           useValue: {
-            findActiveSheets,
             findDataDictionaryRows,
-            findColumnGroups,
           },
         },
         {
@@ -111,7 +142,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(handler.sheetOrderEnvVarName).toBeTruthy();
   });
 
-  it('builds workbook spec with DB column groups and fetched logo', async () => {
+  it('builds workbook spec from the server-side layout and a fetched logo', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
@@ -142,6 +173,141 @@ describe('StarResultsMetadataWorkbookHandler', () => {
         'innovation type, and related fields) is not yet included in this export — ' +
         'this section is coming soon.',
     );
+  });
+
+  it('builds Raw data then Data dictionary and does not read layout tables', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    await withSheetOrder(undefined, async () => {
+      const spec = await handler.buildWorkbookSpec(baseFilters);
+      expect(spec.sheets.map((s) => s.name)).toEqual([
+        'Raw data',
+        'Data dictionary',
+      ]);
+    });
+  });
+
+  it('fills Raw data column 31 header with FF35749A', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const raw = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
+    );
+    expect(raw?.columns[30]?.headerFillArgb).toBe('FF35749A');
+  });
+
+  it('puts findDataDictionaryRows onto the Data dictionary sheet', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const dictionary = spec.sheets.find(
+      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
+    );
+    expect(dictionary?.rows).toEqual([
+      {
+        section: 'S',
+        field_label: 'F',
+        explanation: 'E',
+        _rowFillArgb: 'FF111111',
+      },
+      {
+        section: '',
+        field_label: 'F2',
+        explanation: '',
+        _rowFillArgb: 'FF111111',
+      },
+    ]);
+  });
+
+  it('reads back the eleven section bands and the C1:CB1 banner', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    const ws = wb.getWorksheet('Raw data');
+    expect(ws).toBeDefined();
+    const merges = ws!.model.merges;
+    const banner = merges.find((m) => m.startsWith('C1:'));
+    expect(banner).toBe('C1:CB1');
+    for (const band of INTENDED_RAW_BANDS) {
+      let located: ExcelJS.Cell | undefined;
+      ws!.eachRow((row) => {
+        row.eachCell((cell) => {
+          if (cell.value === band.label) {
+            located = cell;
+          }
+        });
+      });
+      expect({ label: band.label, found: located !== undefined }).toEqual({
+        label: band.label,
+        found: true,
+      });
+      const rowNumber = Number(located!.row);
+      const range = `${excelColumnLetter(band.fromCol)}${rowNumber}:${excelColumnLetter(band.toCol)}${rowNumber}`;
+      if (band.fromCol === band.toCol) {
+        // ExcelJS drops a merge of a cell onto itself, so a one-column band is that cell.
+        expect(located!.col).toBe(band.fromCol);
+        expect(
+          merges.some((m) =>
+            m.startsWith(`${excelColumnLetter(band.fromCol)}${rowNumber}:`),
+          ),
+        ).toBe(false);
+      } else {
+        expect(merges).toContain(range);
+      }
+      expect(
+        (located!.fill as ExcelJS.FillPattern).fgColor?.argb?.toUpperCase(),
+      ).toBe(band.fillArgb);
+    }
+    const headerCell = ws!.getRow(5).getCell(31);
+    expect(
+      (headerCell.fill as ExcelJS.FillPattern).fgColor?.argb?.toUpperCase(),
+    ).toBe('FF35749A');
+  });
+
+  it('ignores an unknown key in the sheet-order override', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    await withSheetOrder('not_a_sheet,raw_data,data_dictionary', async () => {
+      const spec = await handler.buildWorkbookSpec(baseFilters);
+      expect(spec.sheets.map((s) => s.name)).toEqual([
+        'Raw data',
+        'Data dictionary',
+      ]);
+    });
+  });
+
+  it('reorders sheets when the override lists the dictionary first', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    await withSheetOrder('data_dictionary,raw_data', async () => {
+      const spec = await handler.buildWorkbookSpec(baseFilters);
+      expect(spec.sheets.map((s) => s.name)).toEqual([
+        'Data dictionary',
+        'Raw data',
+      ]);
+    });
   });
 
   it('includes cellDataType on raw sheet columns for year and date fields', async () => {
@@ -205,7 +371,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const wb = new ExcelJS.Workbook();
     // ExcelJS `load` typings are narrower than Node `Buffer` (ArrayBufferLike).
     await wb.xlsx.load(buf as never);
-    const ws = wb.getWorksheet('Raw');
+    const ws = wb.getWorksheet('Raw data');
     expect(ws).toBeDefined();
     const yearCol =
       raw.columns.findIndex((c) => c.key === 'reporting_year') + 1;
@@ -229,7 +395,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       arrayBuffer: async () => new Uint8Array([1]).buffer,
       headers: { get: () => 'image/png' },
     });
-    findColumnGroups.mockResolvedValueOnce([]);
     const actors =
       '• Farmers — Total: 12 (sex and age disaggregation not applicable)\n• Researchers — Total: 3 (sex and age disaggregation not applicable)';
     const innovationUseRow: Record<string, string> = {
@@ -276,7 +441,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf as never);
-    const ws = wb.getWorksheet('Raw');
+    const ws = wb.getWorksheet('Raw data');
     expect(ws).toBeDefined();
     const letter = (col: number): string => {
       let n = col;
@@ -289,7 +454,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       return s;
     };
     const merges = ws!.model.merges;
-    expect(merges).toContain(`${letter(3)}1:${letter(80)}1`);
+    expect(merges).toContain('C1:CB1');
     expect(merges).toContain(`${letter(75)}4:${letter(80)}4`);
     expect(merges).toContain(`${letter(61)}4:${letter(74)}4`);
     expect(ws!.getRow(4).getCell(75).value).toBe('INNOVATION USE');
@@ -354,7 +519,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buf as never);
     const col = raw.columns.findIndex((c) => c.key === 'public_link') + 1;
-    const cell = wb.getWorksheet('Raw')!.getRow(6).getCell(col);
+    const cell = wb.getWorksheet('Raw data')!.getRow(6).getCell(col);
     expect(cell.value).toEqual(
       expect.objectContaining({
         hyperlink: 'https://example.org/star-result',
@@ -449,20 +614,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
-  it('uses fallback column groups when DB returns none', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => new Uint8Array([1]).buffer,
-      headers: { get: () => 'image/png' },
-    });
-    findColumnGroups.mockResolvedValueOnce([]);
-    const spec = await handler.buildWorkbookSpec(baseFilters);
-    const raw = spec.sheets.find(
-      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
-    );
-    expect(raw?.presentation?.columnGroups?.length).toBeGreaterThan(0);
-  });
-
   it('uses bundled logo as logoImage when fetch fails and asset exists', async () => {
     fetchMock.mockResolvedValue({ ok: false });
     existsSync.mockReturnValue(true);
@@ -475,23 +626,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       buffer: expect.any(Buffer),
       extension: 'png',
     });
-  });
-
-  it('omits sheets not present in ordered metadata', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => new Uint8Array([1]).buffer,
-      headers: { get: () => 'image/png' },
-    });
-    findActiveSheets.mockResolvedValueOnce([
-      {
-        sheet_key: 'unknown',
-        sheet_name: 'X',
-        sort_order: 1,
-      },
-    ]);
-    const spec = await handler.buildWorkbookSpec(baseFilters);
-    expect(spec.sheets).toHaveLength(0);
   });
 
   it('maps bundled asset .jpg path to jpeg logoImage', async () => {
@@ -536,26 +670,5 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     });
     const spec = await handler.buildWorkbookSpec(baseFilters);
     expect(spec.sheets.length).toBeGreaterThan(0);
-  });
-
-  it('uses default header fill when DB column group has null fill_argb', async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => new Uint8Array([1]).buffer,
-      headers: { get: () => 'image/png' },
-    });
-    findColumnGroups.mockResolvedValueOnce([
-      {
-        from_col: 1,
-        to_col: 33,
-        label: 'All',
-        fill_argb: null as unknown as string,
-      },
-    ]);
-    const spec = await handler.buildWorkbookSpec(baseFilters);
-    const raw = spec.sheets.find(
-      (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
-    );
-    expect(raw?.columns?.[0]?.headerFillArgb).toBe('FF1565C0');
   });
 });

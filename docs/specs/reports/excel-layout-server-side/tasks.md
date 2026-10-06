@@ -2,7 +2,7 @@
 
 - **Module:** reports (workbook `star_results_metadata`)
 - **Spec id:** 2026-10-excel-layout-server-side
-- **Status:** in-progress (T-01 done)
+- **Status:** in-progress (T-01, T-02 done)
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — **APPROVED** after round 1 + scoped re-judgment)
@@ -71,7 +71,7 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 
 ### T-02 — Handler and repository wiring; `.xlsx` read-back
 
-- **Status:** not-started · **Size:** M · **Dependencies:** T-01
+- **Status:** [x] done (PASS attempt 1, visual approval 2026-10-06) · **Size:** M · **Dependencies:** T-01
 - **Requirements covered:**
   - R-WBL-001 (whole: "Default order" incl. *AND IT MUST NOT read `report_workbook_sheet`*; "Override still applies" incl. *BUT an unknown key is ignored*);
   - R-WBL-003 "Today's layout" incl. *AND IT MUST NOT read `report_workbook_column_group`* (rendered half);
@@ -107,12 +107,12 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 - **Consumers:** design P-6 and P-11 — `report-layout.repository.ts` + spec, `star-results-metadata-workbook.handler.ts` + spec, `star-results-metadata.sheet-presentation.ts`, `star-results-metadata.columns.ts`; plus every new hit of scope step 1. Not consumers (verified): the builder and its specs (`columnGroups` / `bannerTitleMergeToCol` contract unchanged, P-5); the client (P-6).
 - **Review:** `full` — overrides (b) (exported symbols deleted, response file shape) and (d) (reverts delivered DB-driven behaviour).
 - **Done criteria:**
-  - [ ] Consumer sweep recorded; every hit handled
-  - [ ] B-2 re-run reads `0` in every `src` file except the entity files' own names (no reader left)
-  - [ ] Specs green; full suite green (Leader re-measure); `npm run build` exit 0
-  - [ ] Falsifiers (a)–(d) observed red, quoted
-  - [ ] `npx eslint` / `npx prettier --check` clean on every touched file
-  - [ ] `.xlsx` offered for the visual check; user approval recorded before the commit
+  - [x] Consumer sweep recorded; every hit handled
+  - [x] B-2 re-run reads `0` in every `src` file except the entity files' own names (no reader left)
+  - [x] Specs green; full suite green (Leader re-measure); `npm run build` exit 0
+  - [x] Falsifiers (a)–(d) observed red, quoted
+  - [x] `npx eslint` / `npx prettier --check` clean on every touched file
+  - [x] `.xlsx` offered for the visual check; user approval recorded before the commit
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
