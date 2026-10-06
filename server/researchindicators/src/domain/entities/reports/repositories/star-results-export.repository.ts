@@ -34,7 +34,7 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
  * report_capacity_sharing_development, report_policy_change, report_oicr,
- * report_link_result.
+ * report_link_result, report_innovation_use.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -141,7 +141,16 @@ export class StarResultsExportRepository {
         oc.for_external_use_description AS for_external_use_description,
         oc.existing_oicr AS existing_oicr,
         oc.cgspace_link AS cgspace_link,
-        lkr.link_results AS link_results
+        lkr.link_results AS link_results,
+        iu.innovation_use_level AS innovation_use_level,
+        iu.innovation_use_level_explanation AS innovation_use_level_explanation,
+        iu.innovation_use_actors AS innovation_use_actors,
+        iu.innovation_use_organizations AS innovation_use_organizations,
+        iu.innovation_use_quantifications AS innovation_use_quantifications,
+        iu.innovation_use_linked_dev AS innovation_use_linked_dev,
+        iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness,
+        iu.innovation_use_linked_dev_description AS innovation_use_linked_dev_description,
+        iu.innovation_use_linked_dev_geo_scope AS innovation_use_linked_dev_geo_scope
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
@@ -151,7 +160,8 @@ export class StarResultsExportRepository {
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
       LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
-      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id`;
+      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id
+      LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';

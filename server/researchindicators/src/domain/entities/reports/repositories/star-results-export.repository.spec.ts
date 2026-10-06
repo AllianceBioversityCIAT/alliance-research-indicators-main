@@ -123,6 +123,32 @@ describe('StarResultsExportRepository', () => {
     );
     expect(sql).toContain('ev.notable_references AS notable_references');
     expect(sql).toContain('lkr.link_results AS link_results');
+    expect(sql).toContain(
+      'LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id',
+    );
+    expect(sql).toContain('iu.innovation_use_level AS innovation_use_level');
+    expect(sql).toContain(
+      'iu.innovation_use_level_explanation AS innovation_use_level_explanation',
+    );
+    expect(sql).toContain('iu.innovation_use_actors AS innovation_use_actors');
+    expect(sql).toContain(
+      'iu.innovation_use_organizations AS innovation_use_organizations',
+    );
+    expect(sql).toContain(
+      'iu.innovation_use_quantifications AS innovation_use_quantifications',
+    );
+    expect(sql).toContain(
+      'iu.innovation_use_linked_dev AS innovation_use_linked_dev',
+    );
+    expect(sql).toContain(
+      'iu.innovation_use_linked_dev_readiness AS innovation_use_linked_dev_readiness',
+    );
+    expect(sql).toContain(
+      'iu.innovation_use_linked_dev_description AS innovation_use_linked_dev_description',
+    );
+    expect(sql).toContain(
+      'iu.innovation_use_linked_dev_geo_scope AS innovation_use_linked_dev_geo_scope',
+    );
     expect(params).toEqual([10, 20, 10, 20]);
   });
 

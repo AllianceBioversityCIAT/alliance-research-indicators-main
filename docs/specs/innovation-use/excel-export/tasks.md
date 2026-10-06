@@ -157,7 +157,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ### T-04 — TS wiring: Phase 2 join, 9 column specs, fallback group, banner span, notice
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01, T-03
+- **Status:** done (PASS attempt 1, 2026-10-05; commit deferred until the user's visual check — see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-03
 - **Requirements covered:**
   - R-IUX-007: 83 columns, banner spans the last column, fallback matches the DB rows, new headers equal the dictionary labels, *BUT must NOT* move existing columns.
   - R-IUX-008 (whole): the notice drops Innovation Use and keeps Innovation Development.
@@ -186,7 +186,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
   - (a) Change one column key to `innovation_use_actor` (a typo). The read-back assertion "value under header Actors" goes red, because the cell is empty.
   - (b) Leave `bannerTitleMergeToCol: 74`. The read-back banner-merge assertion goes red.
   - (c) Leave the old notice. The `:142` assertion goes red.
-  - (d) Assign a number to `header`. `npm run build` goes red while jest stays green, which shows why the build is in the gate.
+  - (d) Assign a number to `header`. `npm run build` goes red while jest stays green, which shows why the build is in the gate. *(Observed 2026-10-05: jest went red too — ts-jest type-checks spec imports (`TS2322`). Both gates catch it; the prediction was wrong, not the gate.)*
 - **Red run:** after step 5's pin updates and before steps 1–4, the updated specs are red **on their assertions** (B-4 pins: expected 83 received 74; expected new notice received old). Quote the messages. Then the Falsifier mutations are applied to the finished code and observed red.
 - **Disqualifier:**
   - A spec that asserts only `toHaveLength(83)` or the presence of a class/key list proves presence, not alignment. Only the read-back value-under-header assertion proves (a) (presence ≠ behavior).
@@ -195,10 +195,10 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 - **Consumers** (design P-14, P-15): `…workbook.handler.ts`, `…workbook.handler.spec.ts`, `star-results-export.repository.spec.ts`, `result.repository.ts` and `filters-report.dto.ts` (they reference `findStarResultsMetadataRows`; the signature is unchanged), `excel-workbook.builder.ts` / `.types.ts` / `.builder.spec.ts` / `.row-limit.spec.ts` (`bannerTitleMergeToCol` readers; the type is unchanged), and the client `api.service.ts:386` / `api.service.spec.ts` (endpoint unchanged). The full server suite is part of the Verification.
 - **Review:** `full`: touches the shared export every user downloads.
 - **Done criteria:**
-  - [ ] Pins updated; red-then-green observed as described
-  - [ ] Read-back test green; Falsifiers (a)–(d) observed red
-  - [ ] Step 7 EXPLAIN gate green on the real SQL
-  - [ ] `npm test -- --silent` (full server suite) green; `npm run build` exit 0; `npx eslint` on touched files clean
+  - [x] Pins updated; red-then-green observed as described
+  - [x] Read-back test green; Falsifiers (a)–(d) observed red
+  - [x] Step 7 EXPLAIN gate green on the real SQL
+  - [x] `npm test -- --silent` (full server suite) green; `npm run build` exit 0; `npx eslint` on touched files clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---

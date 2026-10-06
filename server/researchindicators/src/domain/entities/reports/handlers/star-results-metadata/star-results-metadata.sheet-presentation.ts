@@ -59,6 +59,12 @@ export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
     label: 'OICR DETAILS',
     fillArgb: 'FFD9A041',
   },
+  {
+    fromCol: 75,
+    toCol: 83,
+    label: 'INNOVATION USE',
+    fillArgb: 'FF6A1B9A',
+  },
 ];
 
 /** Preamble without column groups (groups come from DB or fallback in the handler). */
@@ -71,7 +77,7 @@ export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,
   bannerTitleFontArgb: STAR_RAW_BANNER_TITLE_FONT_ARGB,
   bannerTitleMergeFromCol: 3,
-  bannerTitleMergeToCol: 74,
+  bannerTitleMergeToCol: 83,
   logoMergeFromCol: 1,
   logoMergeToCol: 2,
   /** Row 1 only so row 2 subtitle merge does not overlap the logo merge. */

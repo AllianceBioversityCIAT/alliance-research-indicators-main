@@ -1629,34 +1629,24 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     const capturedSql = phase2?.sql ?? '';
     const params = phase2?.params ?? [];
     expect(capturedSql).toContain('WHERE gi.result_id IN');
-    expect(capturedSql).not.toContain('report_innovation_use');
-
-    const selectMarker = 'lkr.link_results AS link_results';
-    const whereMarker = 'WHERE gi.result_id IN';
-    const selectAt = capturedSql.indexOf(selectMarker);
-    const whereAt = capturedSql.indexOf(whereMarker);
-    expect(selectAt).toBeGreaterThan(-1);
-    expect(whereAt).toBeGreaterThan(-1);
-    const withSelect =
-      capturedSql.slice(0, selectAt + selectMarker.length) +
-      ',\n' +
-      IU_SELECT_LIST +
-      capturedSql.slice(selectAt + selectMarker.length);
-    const whereAt2 = withSelect.indexOf(whereMarker);
-    const withView =
-      withSelect.slice(0, whereAt2) +
-      IU_JOIN +
-      '\n' +
-      withSelect.slice(whereAt2);
-    expect(withView).toContain(
+    expect(capturedSql).toContain('report_innovation_use');
+    expect(capturedSql).toContain(
       'LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id',
     );
     for (const key of CELL_KEYS) {
-      expect(withView).toContain(`iu.${key} AS ${key}`);
+      expect(capturedSql).toContain(`iu.${key} AS ${key}`);
     }
 
+    const selectChunk = `,\n${IU_SELECT_LIST}`;
+    const joinChunk = `\n${IU_JOIN}`;
+    expect(capturedSql).toContain(selectChunk);
+    expect(capturedSql).toContain(joinChunk);
+    const baseSql = capturedSql.replace(selectChunk, '').replace(joinChunk, '');
+    expect(baseSql).not.toContain('report_innovation_use');
+    const withView = capturedSql;
+
     const basePlan = planText(
-      await q(`EXPLAIN FORMAT=TREE ${capturedSql}`, params),
+      await q(`EXPLAIN FORMAT=TREE ${baseSql}`, params),
     );
     const withPlan = planText(
       await q(`EXPLAIN FORMAT=TREE ${withView}`, params),
@@ -1664,7 +1654,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
     writeFileSync('/tmp/t02-explain-base.txt', basePlan);
     writeFileSync('/tmp/t02-explain-with.txt', withPlan);
 
-    const phase2Rows = await q(capturedSql, params);
+    const phase2Rows = await q(withView, params);
     const basePrimary = countPrimaryLookups(basePlan);
     const withPrimary = countPrimaryLookups(withPlan);
     const baseScans = countResultsScans(basePlan);
@@ -1724,7 +1714,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       }
       return samples;
     };
-    const beforeRaw = await time(capturedSql);
+    const beforeRaw = await time(baseSql);
     const afterRaw = await time(withView);
     const before = summarize(beforeRaw);
     const after = summarize(afterRaw);

@@ -275,3 +275,58 @@
 - **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 1 not reported by host, ended complete.
 - **Closing:** PASS attempt 1. Review rounds spec total: 7 of ~11. Requirements covered: R-IUX-007 (DB rows), NFR-IUX-003 (`down()`), NFR-IUX-004, D5. Constitution impact: none.
 
+### T-04 — TS wiring: Phase 2 join, 9 column specs, fallback group, banner span, notice
+
+- **Status:** in progress (attempt 1)
+- **Date:** 2026-10-05 · started on the user's instruction ("sí, sigue con T-04")
+- **Implementer:** Cursor `grok-4.7-high` (Size M, shared export → `high`), fresh worker. Orca `task_ab24ebd34df6` / `ctx_bd4700c6235a`. Brief: `T-04-brief.md` (session scratchpad).
+- **Decisions made (brief):** the new notice text is fixed as "Note: The Innovation Development section (readiness level, innovation nature, innovation type, and related fields) is not yet included in this export — this section is coming soon." (R-IUX-008; wording pending OQ-1 confirmation at T-05). Step 7 also removes the T-02 fixture's test-local join append, closing T-02's "Ordering note".
+
+#### Attempt 1 → PASS
+
+- **Files changed:**
+  - `src/domain/entities/reports/repositories/star-results-export.repository.ts` (+ `.spec.ts`)
+  - `…/handlers/star-results-metadata/star-results-metadata.columns.ts`
+  - `….sheet-presentation.ts`
+  - `….banner-subtitle.ts`
+  - `star-results-metadata-workbook.handler.spec.ts`
+  - `test/fixtures/innovation-use/report-innovation-use-view.fixture-spec.ts`
+
+  The `banner-subtitle.spec.ts` does not pin the notice and was left unchanged. Diff: 7 files, ~360 lines.
+- **Red-then-green (pins updated before the wiring):**
+  - notice pin `Expected: "Note: The Innovation Development section … is not yet included in this export — this section is coming soon." / Received: "… and the Innovation Use section are not yet included … — these sections are coming soon."`;
+  - `Expected length: 83 / Received length: 74`;
+  - join pin `Expected substring: "LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id"`.
+
+  Then `Tests: 32 passed, 32 total` across the 3 files.
+- **Read-back:** `StarResultsMetadataWorkbookHandler › reads Innovation Use values back under headers 75–83`. It uses the real handler and builder, with `findColumnGroups` → `[]` so the fallback runs, and ExcelJS reads the buffer back. It asserts:
+  - banner merge `C1:CE1`;
+  - group merge `BW4:CE4` with label `INNOVATION USE`;
+  - OICR `BI4:BV4` and `Impact Areas` in column 74 unchanged;
+  - all 9 header/value pairs, including a two-line Actors cell.
+- **Falsifiers (finished code, reverted):**
+  - (a) key typo → Actors `Received: ""`;
+  - (b) banner 74 → `Expected value: "C1:CE1"` / received `"C1:BV1"`;
+  - (c) old notice → pin red;
+  - (d) `header: 1` → `npm run build` exit 1 `TS2322 … columns.ts:262`. **Jest also went red** (ts-jest type diagnostics), so the task's prediction "jest stays green" was false. It is reported as observed (K-004), and a note was added to `tasks.md` T-04 Falsifier (d).
+- **Step 7 (closes T-02's "Ordering note"):** the fixture now uses the captured repository SQL as-is and asserts it contains `report_innovation_use`, the join and the 9 select items. The baseline strips exactly the `IU_SELECT_LIST`/`IU_JOIN` chunks, asserts each was present first, and asserts the baseline then contains no `report_innovation_use`. Result: `Tests: 36 passed, 36 total`.
+- **Implementer note:** `ExcelColumnSpec` has no wrap field; the bullet columns use width 56, matching the existing `\n`-separated `quantification` column. Wrapping and readability are judged at the T-05 visual check.
+- **Evidence re-run (Leader inline, run alone): VERIFIED.**
+  - `npm test -- --silent` → `Test Suites: 423 passed, 423 total` / `Tests: 4021 passed, 4021 total`;
+  - `npm run build` exit 0;
+  - `npm run test:fixtures -- report-innovation-use-view` → `Tests: 36 passed, 36 total`;
+  - `npx eslint` exit 0 and prettier clean on the 7 touched files.
+- **Reviewer (`akili-reviewer`, override (b): shared export / response shape): PASS.** "The T-04 diff meets R-IUX-007, R-IUX-008, R-IUX-001 (Excel row) and D4/D8 … found no conformance issue." Keys = view aliases, headers = T-03 dictionary labels, in order. Nothing existing moved. The fallback matches the migration. The read-back proves value-under-header. The fixture baseline cannot leave the join behind.
+- **ADVISORY (recorded):**
+  - the read-back test keeps its own copy of the 9 headers, and nothing checks TS headers against the DB dictionary on the DB-layout path (T-05's human check covers it; an OQ-1 label change touches the specs, the test and a new migration together);
+  - D6 deploy order (code before view → every export 500s) stays a T-05 check.
+- **spawns:** implementer (Cursor grok-4.7-high) not reported by host, ended complete · reviewer 1 not reported by host, ended complete.
+- **Closing:** PASS attempt 1. Review rounds spec total: 8 of ~11. Requirements covered: R-IUX-001 (Excel row), R-IUX-007, R-IUX-008, D4, D8; T-02's ordering note closed. Constitution impact: none (no module or public surface change; the `findStarResultsMetadataRows` signature is unchanged).
+- **Commit deferred:** per the user's standing rule (no commit of a visual change before they see it), the T-04 code stays staged-but-uncommitted until the user has opened a generated `.xlsx` (T-05 step 3). `execution.md` and `tasks.md` are updated now (evidence before checkbox).
+
+- **Visual preview (2026-10-05, toward T-05 step 3):** the Leader generated `~/Downloads/star_results_metadata_innovation_use_preview.xlsx` with a scratch-only script (not in the repo; session scratchpad `gen-iu-xlsx.ts`).
+  - **Real code, mocked data:** the real `StarResultsMetadataWorkbookHandler` and `ExcelWorkbookBuilder`, the dictionary seed plus the T-03 migration's 9 rows, and the fallback column groups. Data rows are illustrative strings in the spec formats, NOT output of the view.
+  - **Leader-checked in the file:** Raw data has 83 columns; merges `C1:CE1` (banner), `BI4:BV4` (OICR, unchanged), `BW4:CE4` (INNOVATION USE, fill `FF6A1B9A`); the new notice text; the dictionary's Innovation Use section at rows 108–116.
+  - **User's response:** "haz commit". The user did not itemize which visual criteria they checked, so T-05 step 3's per-item criteria (colour, merged cells, bullet wrapping, `Not applicable` row, dictionary, notice) are **not** ticked on this basis (KZ-002); T-05 still owns them.
+- **Commit (user-instructed 2026-10-05):** T-04 committed after the preview.
+

@@ -139,8 +139,8 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     );
     expect(raw?.presentation?.bannerNotice?.text).toBe(
       'Note: The Innovation Development section (readiness level, innovation nature, ' +
-        'innovation type, and related fields) and the Innovation Use section are not yet ' +
-        'included in this export — these sections are coming soon.',
+        'innovation type, and related fields) is not yet included in this export — ' +
+        'this section is coming soon.',
     );
   });
 
@@ -162,7 +162,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(74);
+    expect(raw!.columns).toHaveLength(83);
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');
@@ -221,6 +221,86 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(d.getUTCFullYear()).toBe(2024);
     expect(d.getUTCMonth()).toBe(2);
     expect(d.getUTCDate()).toBe(15);
+  });
+
+  it('reads Innovation Use values back under headers 75–83', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1]).buffer,
+      headers: { get: () => 'image/png' },
+    });
+    findColumnGroups.mockResolvedValueOnce([]);
+    const actors =
+      '• Farmers — Total: 12 (sex and age disaggregation not applicable)\n• Researchers — Total: 3 (sex and age disaggregation not applicable)';
+    const innovationUseRow: Record<string, string> = {
+      result_code: 'IU-1',
+      innovation_use_level: 'Level 7: Uptake by farmers',
+      innovation_use_level_explanation:
+        'Farmers adopted the practice after the second season.',
+      innovation_use_actors: actors,
+      innovation_use_organizations: '• CIAT - Alliance of Bioversity and CIAT',
+      innovation_use_quantifications: '• 12 hectare — Area under the practice',
+      innovation_use_linked_dev: 'STAR-100 - Drought tolerant bean',
+      innovation_use_linked_dev_readiness: 'Level 4: Proven under testing',
+      innovation_use_linked_dev_description:
+        'A bean variety selected for drought.',
+      innovation_use_linked_dev_geo_scope: 'National',
+    };
+    const headers = [
+      'Innovation use level',
+      'Use level justification',
+      'Actors',
+      'Organizations',
+      'Quantifications',
+      'Linked innovation development',
+      'Linked innovation readiness level',
+      'Linked innovation description',
+      'Linked innovation geographic scope',
+    ];
+    const keys = [
+      'innovation_use_level',
+      'innovation_use_level_explanation',
+      'innovation_use_actors',
+      'innovation_use_organizations',
+      'innovation_use_quantifications',
+      'innovation_use_linked_dev',
+      'innovation_use_linked_dev_readiness',
+      'innovation_use_linked_dev_description',
+      'innovation_use_linked_dev_geo_scope',
+    ];
+    findStarResultsMetadataRows.mockResolvedValue([innovationUseRow]);
+    const spec = await handler.buildWorkbookSpec(baseFilters);
+    const buf = await new ExcelWorkbookBuilder().toBuffer(spec);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as never);
+    const ws = wb.getWorksheet('Raw');
+    expect(ws).toBeDefined();
+    const letter = (col: number): string => {
+      let n = col;
+      let s = '';
+      while (n > 0) {
+        n -= 1;
+        s = String.fromCharCode(65 + (n % 26)) + s;
+        n = Math.floor(n / 26);
+      }
+      return s;
+    };
+    const merges = ws!.model.merges;
+    expect(merges).toContain(`${letter(3)}1:${letter(83)}1`);
+    expect(merges).toContain(`${letter(75)}4:${letter(83)}4`);
+    expect(merges).toContain(`${letter(61)}4:${letter(74)}4`);
+    expect(ws!.getRow(4).getCell(75).value).toBe('INNOVATION USE');
+    expect(ws!.getRow(5).getCell(74).value).toBe('Impact Areas');
+    const headerRow = ws!.getRow(5);
+    const dataRow = ws!.getRow(6);
+    headers.forEach((header, index) => {
+      const col = 75 + index;
+      expect(headerRow.getCell(col).value).toBe(header);
+      expect(dataRow.getCell(col).value).toBe(innovationUseRow[keys[index]]);
+    });
+    const actorsCol = 75 + headers.indexOf('Actors');
+    expect(headerRow.getCell(actorsCol).value).toBe('Actors');
+    expect(dataRow.getCell(actorsCol).value).toBe(actors);
   });
 
   it('includes linkAppearance on public_link and platform_link columns', async () => {

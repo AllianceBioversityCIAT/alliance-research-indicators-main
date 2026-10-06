@@ -1,7 +1,7 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
 
 /**
- * Raw data sheet columns A–BV (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–CE (reference workbook "Raw data" header row).
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
   { key: 'result_code', header: 'Result Code', width: 14 },
@@ -256,6 +256,42 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: ExcelColumnSpec[] = [
     width: 48,
   },
   { key: 'impact_area', header: 'Impact Areas', width: 56 },
+  // @akili-spec docs/specs/innovation-use/excel-export
+  // Widths follow the existing long-text columns (quantification is 56).
+  // ExcelColumnSpec has no wrap flag; bullet cells carry `\n` like quantification.
+  { key: 'innovation_use_level', header: 'Innovation use level', width: 36 },
+  {
+    key: 'innovation_use_level_explanation',
+    header: 'Use level justification',
+    width: 48,
+  },
+  { key: 'innovation_use_actors', header: 'Actors', width: 56 },
+  { key: 'innovation_use_organizations', header: 'Organizations', width: 56 },
+  {
+    key: 'innovation_use_quantifications',
+    header: 'Quantifications',
+    width: 56,
+  },
+  {
+    key: 'innovation_use_linked_dev',
+    header: 'Linked innovation development',
+    width: 48,
+  },
+  {
+    key: 'innovation_use_linked_dev_readiness',
+    header: 'Linked innovation readiness level',
+    width: 40,
+  },
+  {
+    key: 'innovation_use_linked_dev_description',
+    header: 'Linked innovation description',
+    width: 60,
+  },
+  {
+    key: 'innovation_use_linked_dev_geo_scope',
+    header: 'Linked innovation geographic scope',
+    width: 36,
+  },
 ];
 
 export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [
