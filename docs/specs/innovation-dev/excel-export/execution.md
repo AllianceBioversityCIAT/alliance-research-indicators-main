@@ -100,4 +100,5 @@
 - **Documents amended:** `requirements.md` (§3 cell vocabulary note, glossary, §1 scope, R-IDX-006, NFR-IDX-001 (b), NFR-IDX-003, D9, §6, R4), `design.md` (Document Control, Executive Summary, §2, §2.1, §3.1, §5, §10, §11, P-7, P-10, §15), `tasks.md` (header, T-01 A-1, T-02 steps 2/6(b), T-03, T-04, T-05, coverage map).
 - **Correction closure:** forward sweep `grep -n -i "fallback\|group row\|column_group\|ColumnGroup\|column-group\|D9\|R4\|G-IDX-3\|layout migration\|<derived\|Unknown (id"` over the spec folder — every remaining hit is amended text or an unaffected reference (P-16, P-17, design §3.2a). Backward: requirements D9 ← design §1 non-goal (still accurate), T-05 coverage line updated. `git diff` of the three documents read: every removed line is an intended removal.
 - **Briefs to re-issue:** none in flight (T-02 worker `ctx_e7ba9d89e47c` was released at the pause); every new brief carries the amended text.
-- **Still open, asked at this gate:** OQ-1, OQ-2 (T-03 is blocked on them).
+- **OQ-1 / OQ-2 answered at this gate:** OQ-1 confirmed as proposed; OQ-2 keep column 89 (recorded in `requirements.md` §10). T-03 unblocked.
+- **User approval of the amendments:** "Approve" (2026-10-06).

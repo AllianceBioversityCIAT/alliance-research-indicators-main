@@ -158,7 +158,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   - [ ] Falsifiers (a)–(f) observed red with quoted messages
   - [ ] EXPLAIN excerpts (a) and (b) quoted in `execution.md`; B-7 still `60`
   - [ ] Timing recorded as a reading
-  - [ ] **OQ-1 and OQ-2 asked at this task's continue gate**; answers recorded in `requirements.md` §10 (T-03 is blocked until then)
+  - [x] **OQ-1 and OQ-2 asked at this task's continue gate**; answers recorded in `requirements.md` §10 (T-03 is blocked until then) — answered 2026-10-06 (OQ-1 confirmed, OQ-2 keep)
 - **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
 
 ---
@@ -339,6 +339,6 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 | # | Item | Owner |
 | --- | --- | --- |
-| RB-1 | OQ-1/OQ-2 unanswered through both specify gates; T-03 blocked on them | user, at T-02 continue gate |
+| RB-1 | ~~OQ-1/OQ-2 unanswered~~ — answered 2026-10-06 at T-02's gate | closed |
 | RB-2 | Dev DB may be unreachable from this machine (AC-1681 precedent): P-12 and P-14 then stay UNVERIFIED | T-01 / T-03 first steps |
 | RB-3 | Design fixes after Judgment Day round 1 were not re-judged; T-01 and T-03 Reviewers are the first independent audit of §3.2/§5 | Reviewer, T-01/T-03 |

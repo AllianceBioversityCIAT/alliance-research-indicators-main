@@ -292,6 +292,8 @@ STAR client: none. No CLARISA or OpenSearch change.
 | OQ-1 | Confirm the 5 new labels (84, 85, 88, 89, 112), the band label **INNOVATION DEVELOPMENT** and the line formats (actor, organization, tool function, linked tools) | user / product owner | **this requirements gate** (Kaizen KZ-innovation-use--excel-export-2: asked before build, not at rollout) |
 | OQ-2 | Keep *Sex and age disaggregation not applicable* (89)? It is in the GET but STAR never writes it; only the PRMS sync does | user | this requirements gate |
 
+**Answered 2026-10-06 at T-02's gate (user, AskUserQuestion):** OQ-1 — confirmed as proposed (labels 84, 85, 88, 89, 112 as in design §3.2a; band **INNOVATION DEVELOPMENT**; line formats of design §3.4). OQ-2 — **keep** column 89 (32 columns, 81–112).
+
 ## 11. Requirement ID Index
 
 | ID | Title | Kind |
