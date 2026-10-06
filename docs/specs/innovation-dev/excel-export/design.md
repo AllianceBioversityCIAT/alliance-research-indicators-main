@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked detailed design:** ../../../trd/trd.md (ADR-11: completeness lives in MySQL stored routines)
 - **Precedent:** `docs/specs/archive/2026-10-06-innovation-use--excel-export/design.md` (the view shape and rule transcription are reused; the join strategy is not — DD-1)
-- **Last updated:** 2026-10-06
+- **Last updated:** 2026-10-06 (amended at T-02's gate)
 
 ## Document Control
 
@@ -19,6 +19,7 @@
 | Exploration | One read-only scout (Innovation Dev GET contract, report views, latest migrations) + architect-run `EXPLAIN` probes on scratch MySQL `research_indicators_server_test_mysql` (8.0.46, **at HEAD**: 392 migrations, last `1791600000000`) |
 | Requirements gate | Passed 2026-10-06 ("Continue"). **OQ-1 and OQ-2 were not answered**; the proposals in `requirements.md` stand and are re-asked at this gate |
 | Judgment Day | Round 1 ([`judgment.md`](judgment.md)): 3 confirmed severe-class findings (C-1…C-3), 2 confirmed warnings, 5 single-judge items. User chose **Fix only** (no re-judgment). C-1…C-5 and S-2…S-5 applied 2026-10-06. S-1 (view-name ownership on Dev) left to HITL ruling 2, with a rollout rule (§11) |
+| Amendments | 2026-10-06 at T-02's gate, user-approved (Pivot Record in `execution.md`): blank catalog names → `Unknown (id n)` (§3.1); NFR-IDX-001 (b) EXPLAIN wording (§10); layout moved to server code — no group row, band and banner derived from a new section tag (§2, §2.1, §5, §11, P-7, P-10) |
 | Kaizen lessons applied | KZ-innovation-use--excel-export-1 (structural perf gate, timing is a reading) → NFR-IDX-001, §10 · KZ-innovation-use--excel-export-2 (OQ asked before build) → OQ-1 due at the gates · KZ-001 (assert in generated SQL/output) → §10 · KZ-017 (name what a check cannot reach) → §10 · K-015 (deploy ≠ migrate) → §11 |
 
 ---
@@ -28,7 +29,7 @@
 - **A new view, `report_innovation_dev`**, in the `report_innovation_use` shape: root `results` (live rows), 1:1 data and 6 catalogs by plain `LEFT JOIN`, and each collection (actors, organizations, tool functions, linked tools) through a `LEFT JOIN LATERAL` that aggregates only the current result's rows.
 - **It is NOT joined into Phase 2.** Phase 2 already references **60 tables** in its top-level join (P-3), and MySQL's cap is 61. Past the cap MySQL raises no error: it silently **stops merging** a view and materializes it whole (P-4). That is the D3 defect, landing on someone else's view. The view is read by a **Phase 3** query on the same connection, `SELECT … FROM report_innovation_dev WHERE result_id IN (…)`. Its rows are merged into the Phase 2 rows by `result_id` in TypeScript (DD-1).
 - **Green-check rules are transcribed into cell expressions** from `innovation_dev_validation` (`1758125999162`). Parity is enforced by a fixture suite on real MySQL (NFR-IDX-002).
-- **Layout:** one appended group (81–112). The 27 existing `Innovation details` dictionary rows are updated in place (label, explanation, section, order), and 5 rows are inserted. `down()` restores the seed values exactly. The TS side adds 32 column specs, the fallback group, banner span 112, and drops the notice row.
+- **Layout:** one appended band (81–112), derived in server code from a new `INNOVATION_DEVELOPMENT` section that tags the 32 columns (`docs/specs/reports/excel-layout-server-side`); no group row is written. The 27 existing `Innovation details` dictionary rows are updated in place (label, explanation, section, order), and 5 rows are inserted. `down()` restores the seed values exactly. The TS side adds the section, 32 tagged column specs (band and banner span 112 are derived), and drops the notice row. *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*
 
 ---
 
@@ -56,7 +57,7 @@
 ```
 STAR "Export" ─► GET /api/reports/resultCenter/xlsx
    └► StarResultsMetadataWorkbookHandler
-        ├► ReportLayoutRepository           (groups + dictionary)        ◄── layout migration
+        ├► ReportLayoutRepository           (dictionary only)            ◄── dictionary migration
         └► StarResultsExportRepository.findStarResultsMetadataRows
              Phase 1: findResultsV2 → ordered ids
              one pinned connection, one transaction, group_concat_max_len = 4 MiB
@@ -70,13 +71,13 @@ STAR "Export" ─► GET /api/reports/resultCenter/xlsx
 | Path | Responsibility |
 | --- | --- |
 | `src/db/migrations/<ts>-CreateReportInnovationDevView.ts` | `CREATE OR REPLACE VIEW report_innovation_dev` (§3). `down()`: `DROP VIEW IF EXISTS report_innovation_dev` (DD-6) |
-| `src/db/migrations/<ts+1>-StarRawInnovationDevColumnGroup.ts` | Group row 81–112; `UPDATE` the 27 seed rows; `INSERT` 5 rows (§5). `down()` exact |
+| `src/db/migrations/<ts+1>-StarRawInnovationDevDictionary.ts` | `UPDATE` the 27 seed rows; `INSERT` 5 rows (§5). No group row — the band is derived in code. `down()` exact |
 | `src/db/migration-specs/<ts>…spec.ts`, `<ts+1>…spec.ts` | SQL-text specs |
 | `test/fixtures/innovation-dev/report-innovation-dev-view.fixture-spec.ts` | Parity, one-row and `EXPLAIN` gate on scratch MySQL |
-| `test/fixtures/innovation-dev/star-raw-innovation-dev-column-group.fixture-spec.ts` | Layout round trip on a realistic pre-state (§10) |
+| `test/fixtures/innovation-dev/star-raw-innovation-dev-dictionary.fixture-spec.ts` | Dictionary round trip on a realistic pre-state (§10) |
 | `…/reports/repositories/star-results-export.repository.ts` | `gi.result_id` key in Phase 2; Phase 3 query in the same transaction; merge; view list comment |
-| `…/star-results-metadata/star-results-metadata.innovation-dev.columns.ts` (new) | 32 `ExcelColumnSpec`, spread into `STAR_RESULTS_METADATA_RAW_COLUMNS` (80 → 112). Kept in its own file because `columns.ts` is already 309 lines |
-| `…/star-results-metadata.sheet-presentation.ts` | +1 fallback group; `bannerTitleMergeToCol` 80 → 112 |
+| `…/star-results-metadata/star-results-metadata.innovation-dev.columns.ts` (new) | 32 `StarRawSectionColumn` tagged `section: 'INNOVATION_DEVELOPMENT'`, spread into `STAR_RESULTS_METADATA_RAW_COLUMNS` (80 → 112). Kept in its own file because `columns.ts` is already 309 lines |
+| `…/star-results-metadata.sections.ts` | +1 section `INNOVATION_DEVELOPMENT` (`INNOVATION DEVELOPMENT`, `FF00897B`). The band 81–112 and the banner end 112 are derived by `deriveColumnGroups`; no fallback or banner literal exists any more (excel-layout spec) |
 | `…/star-results-metadata.banner-subtitle.ts` + handler | Notice removed (R-IDX-007) |
 | sibling `*.spec.ts` of the files above + handler spec | Updated pins |
 
@@ -100,7 +101,7 @@ STAR "Export" ─► GET /api/reports/resultCenter/xlsx
 | Every cell is `report_field(value, mandatory, applies)`; **every** `applies` is the full expression of §3.2's *applies* column, wrapped `COALESCE(…, FALSE)` as a whole — never only its `U`/`L7`/`T` parts (JD C-2) | `report_field` treats a NULL `applies` as TRUE (P-19). A NULL variety, knowledge-sharing, expansion-potential or level must yield `NA`, not `NP`/`NM` or a stale value |
 | Yes/No cells (84, 89, 94, 99) use `CASE WHEN b IS NULL THEN NULL WHEN b = TRUE THEN 'Yes' ELSE 'No' END` (JD S-2) | `IF(b,'Yes','No')` turns NULL into `No`, hiding the `NP` of 94/99 (the check fails on NULL) and the `NM` of 84/89 |
 | Role and indicator ids interpolated from `ActorRolesEnum.INNOVATION_DEV`, `InstitutionTypeRoleEnum.INNOVATION_DEV`, `LinkResultRolesEnum.INNOVATION_DEV`, `IndicatorsEnum.INNOVATION_DEV`; catalog discriminators (`OTHER` actor 5, `OTHER` institution 78, anticipated users 2, dissemination 2, expansion 2) from their enums | One source of truth (K-005) |
-| `Not provided` only where the green check fails; a catalog name behind an accepted id is `COALESCE(name, CONCAT('Unknown (id ', id, ')'))` | NFR-IDX-002's biconditional |
+| `Not provided` only where the green check fails; a catalog name behind an accepted id is `COALESCE(NULLIF(name, ''), CONCAT('Unknown (id ', id, ')'))` — a blank name falls back like a missing one *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)* | NFR-IDX-002's biconditional |
 
 ### 3.2 Columns (view alias = `ExcelColumnSpec.key`, prefixed `innovation_dev_`)
 
@@ -218,7 +219,9 @@ No change. Same endpoint, guards and file name.
 
 ---
 
-## 5. Workflows — layout migration
+## 5. Workflows — dictionary migration
+
+*(Amended 2026-10-06: the group-row insert and delete are removed. Since `docs/specs/reports/excel-layout-server-side`, the export derives every band from the columns' section tag and never reads `report_workbook_column_group`.)*
 
 *(Rewritten after Judgment Day round 1, C-1 and C-3: the first draft matched rows by label alone and restored seed constants. Both are wrong. `Actors`/`Organizations` also label Innovation Use rows, and `1780690000000:38-39` / `1781215000000:33-37` shifted every row with `sort_order >= 26` after seeding.)*
 
@@ -239,8 +242,7 @@ No change. Same endpoint, guards and file name.
    - `section = 'Innovation Development'` on the row for column 81 only, NULL on the others;
    - `section_fill_argb = 'FF00897B'` on column 81 only, NULL on the others, matching the seed's pattern of one fill per section (`1777026000000:52`).
 3. `INSERT` the 5 new rows (84, 85, 88, 89, 112) at `B + k`, `section` NULL, fill NULL, `is_active = 1`.
-4. `INSERT` the group row `('star_results_metadata','raw_data', <MAX(group sort_order)+1 read once>, 81, 112, 'INNOVATION DEVELOPMENT', 'FF00897B', 1)`. `FF00897B` is used by no group (`sheet-presentation.ts:32-66`).
-5. Numeric values are interpolated as integers. No `?` and no `:word` (NFR-IDX-004).
+4. Numeric values are interpolated as integers. No `?` and no `:word` (NFR-IDX-004).
 
 **`down()`:**
 
@@ -251,7 +253,7 @@ No change. Same endpoint, guards and file name.
    - explanation **NULL** (the seed's `''` is stored as NULL by `1777025000000:45-60`);
    - `section` `'Innovation details'` on the first row and NULL on the rest;
    - fill `FF00897B` on the first row and NULL on the rest.
-4. Delete the 5 inserted rows by id and the group row by its exact values.
+4. Delete the 5 inserted rows by id.
 
 **Why relative positions:** rows `A+1 … A+27` were the block before `up()`. `up()` moves them past `B`, and nothing else is inserted in between, so `A + j` is exactly the pre-state on any database that passed the guard. The round-trip fixture (§10) proves it on a pre-state that includes the +1 shift and the Innovation Use rows.
 ## 6. Frontend impact
@@ -279,7 +281,7 @@ No new log lines. A Phase 3 failure rolls back and surfaces as the existing 500 
 | Migration specs (SQL text) | No `?`/`:word` outside quotes; no top-level `GROUP BY`/`ORDER BY`/`LIMIT`/`DISTINCT`/aggregate; no `_validation(`; 4 laterals each guarded by `root.indicator_id = 2`; 32 aliases; `down()` exact | Whether the SQL runs or returns the right values |
 | **Parity fixture** on scratch | For each case, `innovation_dev_validation(id) = TRUE` ⇔ no cell holds `Not provided`; each single-rule case turns exactly its cell/slot; expected strings come from `requirements.md`, never from the view. **NULL / empty cases (JD C-2, S-2, S-4):** variety NULL (85 = `NA`), knowledge sharing NULL at level ≥ 7 (94 = `NP`, 95 = `NA`), expansion potential NULL (112 = `NA`), level NULL (94–112 = `NA`), each Yes/No column NULL, `is_organization_known` NULL, actor type 5 with `''` custom name and org type 78 with `''` custom name (function TRUE, no `NP`). **Divergence fixtures** (§3.3): inactive `rid`, role-2 rows — each asserts the divergence, outside the biconditional | Dev/Prod data; Prod MySQL version |
 | **One-row fixture** | `COUNT(*) = 1` per `result_id` with many children; snapshot and soft-deleted ids absent | — |
-| **`EXPLAIN FORMAT=TREE`** of the **real Phase 3 SQL** (captured from the repository's `queryRunner.query`) on ≥ 200 seeded mixed results | 4 × `Materialize (invalidate on row from root)` correlated on `result_id`; root `results` by its `result_id` range/lookup, no full scan of the view. **And** the real Phase 2 SQL's top-level table count is **unchanged at 60** (guards DD-1) | Cost-based access paths at Prod volume; timing (a reading, 3 + 3 runs) |
+| **`EXPLAIN FORMAT=TREE`** of the **real Phase 3 SQL** (captured from the repository's `queryRunner.query`) on ≥ 200 seeded mixed results | 4 × `Materialize (invalidate on row from root)` correlated on `result_id`; root `results` by its `result_id` range/lookup, no full scan of the view. **And** the real Phase 2 SQL's top-level table count is **unchanged at 60**, and no view merged today becomes `<derived…>` — the 28 pre-existing `<derived…>` rows stay as they are (guards DD-1) *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)* | Cost-based access paths at Prod volume; timing (a reading, 3 + 3 runs) |
 | Layout round trip | `up → down → up` on scratch over a **realistic pre-state** (JD C-1/C-3): the 27 seed rows at their **post-shift** positions (seed + 1, after `Link to Innovation Use`), stored with NULL for `''`, **and** the 6 Innovation Use rows (incl. `Actors`/`Organizations`) and the OICR rows present. Asserts: `down()` restores every row byte-identical (label, explanation, section, fill, `sort_order`), the Innovation Use rows are byte-identical after `up()` **and** after `down()`, and a pre-state with one seed label altered makes `up()` throw with nothing applied | Dev's real rows (P-14) |
 | Repository unit spec | Phase 3 runs on the same `queryRunner`, inside the transaction, with the ids, after Phase 2; merge per the DD-1 merge contract; a Phase 3 failure rolls back; zero ids → no Phase 3. Existing pins on `queryRunnerQuery.mock.calls[n]` move by one call and are updated, never deleted (JD C-5) | Real SQL (asserted in fixtures, KZ-001) |
 | Handler + `.xlsx` read-back | 112 columns, band 81–112, headers = dictionary labels, no `coming soon` row | Visual rendering → human |
@@ -292,8 +294,8 @@ The parity fixture computes the expected verdict **from the function**, so mutat
 ## 11. Rollout
 
 - **Order:** the view migration must be live before the code (Phase 3 selects it unconditionally). Dev runs `migration:execute` on deploy; Prod ordering is UNVERIFIED (P-13) and checked by a human before the `main` merge — the same gate as precedent G2.
-- **Cosmetic window:** between the layout migration and the code, the old code paints the INNOVATION DEVELOPMENT band and the moved dictionary rows over missing columns. One deploy, no error (precedent JD-6).
-- **Dev overlap:** Dev still carries the June `INNOVATION DETAILS` group (61–87), so Dev exports fail with `Cannot merge already merged cells` until it is removed (requirements D9, accepted). Its removal must also revert that group row; this spec's layout migration does not touch it.
+- **Cosmetic window:** between the dictionary migration and the code, the old code's Data dictionary sheet already lists the 32 renamed and moved rows while Raw data still has 80 columns. One deploy, no error. *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*
+- **Dev overlap:** resolved. Since `docs/specs/reports/excel-layout-server-side` the export no longer reads Dev's group rows, so the June `INNOVATION DETAILS` band is never painted (requirements D9). *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*
 - **Dev view-name ownership (JD S-1, P-18):** on Dev, `report_innovation_dev` is also owned by `1781300000000-CreateReportInnovationDevView` (branch `origin/dev`), whose `down()` is `DROP VIEW IF EXISTS report_innovation_dev`. HITL ruling 2 keeps the name. **Rollout rule:** if Thursday's removal reverts that migration *after* this view is deployed to Dev, `migration:execute`-time re-creation does not happen (this migration is already recorded), so the person removing it must re-run this view's `up()` SQL or remove the June migration's row without running its `down()`. Owner: the user, at T-05.
 - **Backout:** revert the code first, then these two migrations by name (never a blind `migration:revert ×2`).
 
@@ -328,10 +330,10 @@ The parity fixture computes the expected verdict **from the function**, so mutat
 | P-4 | Past 61 tables MySQL **does not error**: it stops merging a view. One lateral-wrapped view counts as 1 table | data-env | Same query + `k` × `LEFT JOIN results xk`: k=1 → top 61, no error; k=2 → top 56, no error, with `<derivedN>` rows replacing merged tables; k=12 → 56, no error. Lateral wrapper `LEFT JOIN LATERAL (SELECT v.* FROM report_innovation_use v WHERE v.result_id = gi.result_id) z ON TRUE` → top 61, inner 7 `DEPENDENT` | 13310040 | DD-1 alternatives re-open. High | — |
 | P-5 | Latest green check is `1758125999162` | location | `grep -l -i innovation_dev_validation src/db/migrations/*.ts` → 9 files; `CREATE FUNCTION` in `1753460254629`, `1753992795699`, `1754341867460`, `1758039230848`, `1758050480166`, `1758125999162` (latest); the 3 Innovation Use files name it without redefining (count 0) | 13310040 | Transcription targets a stale rule set. High | — |
 | P-6 | Dictionary has 27 active `Innovation details` rows, seeded at sort 58–84 and **since shifted** (P-17); they sit right after `Link to Innovation Use` | data-env | `seed-data/star-results-metadata-dictionary.seed.ts:351-515`; inserted by `1777025000000…ts:45-60` (`''` stored as NULL); activated by `1781210173864…ts:8`. *(Corrected at JD round 1: the first citation said "no later migration touches them", from a grep for the text "innovation details", which cannot see a `sort_order` shift.)* | 13310040 | DD-4 targets rows that do not exist (repo-wise). High | — |
-| P-7 | Readers of the changed TS symbols (`STAR_RESULTS_METADATA_RAW_COLUMNS`, `STAR_RAW_COLUMN_GROUP_FALLBACK`, `STAR_RAW_SHEET_PREAMBLE_BASE`, `STAR_RAW_COMING_SOON_NOTICE`, `findStarResultsMetadataRows`) are the files listed in precedent P-14, plus the pins `…handler.spec.ts` (80 columns, notice), `star-results-export.repository.spec.ts` (`:77`, `:251`) | consumer | Precedent P-14 grep, re-run by **T-04 as its first step** over `server client` (one grep per symbol) | 13310040 | Missed failing specs. Low | — |
+| P-7 | Readers of the changed TS symbols (`STAR_RESULTS_METADATA_RAW_COLUMNS`, `STAR_RAW_SECTIONS` (was `STAR_RAW_COLUMN_GROUP_FALLBACK`, deleted by the excel-layout spec), `STAR_RAW_SHEET_PREAMBLE_BASE`, `STAR_RAW_COMING_SOON_NOTICE`, `findStarResultsMetadataRows`) are the files listed in precedent P-14, plus the pins `…handler.spec.ts` (80 columns, notice), `star-results-export.repository.spec.ts` (`:77`, `:251`) | consumer | Precedent P-14 grep, re-run by **T-04 as its first step** over `server client` (one grep per symbol) | 13310040 | Missed failing specs. Low | — |
 | P-8 | The `.xlsx` has no consumer that parses columns (client stores the blob) | consumer | Precedent P-15 (`api.service.ts:386`) | 13310040 | A client change is needed. Low | — |
 | P-9 | Catalog join keys: `cit.code`, `cic.id`, `cirl.id`, `idau.id`, `dq.id`, `ep.id`, `tool_functions.id`, `clarisa_actor_types.code`, `clarisa_institution_types.code`, `clarisa_institutions.code` | data-env | Entities cited in the scout report (`result-innovation-dev.entity.ts:220-266`, `result-actor.entity.ts:134-138`, `result-institution-type.entity.ts:83-114`) | 13310040 | Names render as `Unknown (id n)`. Low | — |
-| P-10 | Sharing: groups and dictionary are read for every section by `report-layout.repository.ts:35-62`; the 10 + 1 existing group rows and every dictionary row outside the id-resolved block stay untouched — **guaranteed by §5's id-keyed writes, not by labels** (P-16); Phase 3 shares Phase 2's connection and `group_concat_max_len` (set by `SET LOCAL`, which in MySQL is session scope, so it persists on the pooled connection — pre-existing, harmless here) | shared-state | as cited; `star-results-export.repository.ts:193-215`. *(Corrected at JD round 1: the label-matched draft would have rewritten Innovation Use rows.)* | 13310040 | Another section moves, or Phase 3 truncates lists at 1 KiB. High | — |
+| P-10 | Sharing *(updated 2026-10-06: since the excel-layout spec only the dictionary is read; the group table is not, and this spec writes no group row)*: groups and dictionary are read for every section by `report-layout.repository.ts:35-62`; the 10 + 1 existing group rows and every dictionary row outside the id-resolved block stay untouched — **guaranteed by §5's id-keyed writes, not by labels** (P-16); Phase 3 shares Phase 2's connection and `group_concat_max_len` (set by `SET LOCAL`, which in MySQL is session scope, so it persists on the pooled connection — pre-existing, harmless here) | shared-state | as cited; `star-results-export.repository.ts:193-215`. *(Corrected at JD round 1: the label-matched draft would have rewritten Innovation Use rows.)* | 13310040 | Another section moves, or Phase 3 truncates lists at 1 KiB. High | — |
 | P-11 | The green check joins `result_innovation_dev` **without** `is_active`; `findOne` and this view require an active row | other | `1758125999162` `up()` (`INNER JOIN result_innovation_dev rid ON r.result_id = rid.result_id`); `service.ts:456-459` | 13310040 | An inactive row with complete data: function TRUE, cells `NP`. Parity fixture excludes that case and records it as a known divergence. Low | — |
 | P-12 | No live indicator-2 result has **active** `result_actors` / `result_institution_types` rows of role 2 (Innovation Use) — the only other valid role, since both role columns are NOT NULL FKs (JD B J-10) | data-env | `UNVERIFIED — confirm at source before relying on it` (scratch holds no data; Dev not queried) | — | Parity breaks for those results (DD-7 shows fewer lines than the check counts). High | Read-only `SELECT COUNT(*)` on Dev for each table joined to `results` with `indicator_id = 2` and role `<> 1`, as **T-01's first step**; a non-zero count goes to the user before T-02 |
 | P-13 | Prod deploy applies migrations before the new code serves, and Prod MySQL ≥ 8.0.14 (`LATERAL`) | data-env | `UNVERIFIED — confirm at source before relying on it` (shared with precedent G1/G2, still open) | — | Every export 500s on Prod. High | Human, before the `main` merge — owner **T-05** |
@@ -354,8 +356,8 @@ The parity fixture computes the expected verdict **from the function**, so mutat
 
 | Metric | Estimate |
 | --- | --- |
-| Tasks | **5** (T-01 view + spec · T-02 fixtures · T-03 layout migration + round trip · T-04 TS wiring incl. Phase 3 · T-05 rollout/docs) |
-| LOC | **~2,300** (view ~400 · view spec ~200 · fixture suite ~800 · layout migration ~300 · layout spec + realistic round trip ~300 · TS + specs ~300). *Raised at JD round 1: id-resolved writes, relative `down()`, and NULL/divergence fixtures* |
+| Tasks | **5** (T-01 view + spec · T-02 fixtures · T-03 dictionary migration + round trip · T-04 TS wiring incl. Phase 3 · T-05 rollout/docs) |
+| LOC | **~2,300** (view ~400 · view spec ~200 · fixture suite ~800 · dictionary migration ~300 · its spec + realistic round trip ~300 · TS + specs ~300). *Raised at JD round 1: id-resolved writes, relative `down()`, and NULL/divergence fixtures* |
 | Review rounds | **~12** (precedent actuals: 11 verdicts for 7 tasks; T-02 and T-03 budgeted at 3) |
 
 Depth check: 5 tasks / ~2.3k LOC fits **Standard**, at its upper edge. No change.

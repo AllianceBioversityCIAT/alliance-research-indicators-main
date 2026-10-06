@@ -7,14 +7,14 @@
 - **Linked PRD section:** `docs/prd.md` — MEL-3 (export structured metadata to Excel), G8
 - **Linked tickets:** none yet (lands on branch `AC-1681-Include-the-Innovation-use-data-in-the-excel-export`)
 - **Precedent:** `docs/specs/archive/2026-10-06-innovation-use--excel-export/` (AC-1681), whose rules this spec reuses
-- **Last updated:** 2026-10-06
+- **Last updated:** 2026-10-06 (amended at T-02's gate: blank catalog names, NFR-IDX-001 (b), layout moved to server code)
 
 ## Document Control
 
 | Field | Value |
 | --- | --- |
 | Type | Change |
-| Depth | Standard (one view, one layout migration, TS wiring — no API or auth change) |
+| Depth | Standard (one view, one dictionary migration, TS wiring — no API or auth change) |
 | Approval Mode | gated |
 | Source of intent | `/akili-specify` argument (2026-10-06): *"desarrollar ahora el reporte de innovation dev partiendo de lo que ya tenemos en esta rama y las últimas migraciones del desarrollo de innovation use … las mismas reglas … se deben mostrar todos los campos del get de innovation dev … basarte en las vistas ya existentes como innovation use"* |
 | HITL rulings (2026-10-06) | (1) the group goes **after INNOVATION USE** (columns 81+), with nothing shifted; (2) the June Dev-only Innovation Development export (`5b426acf`, branch `dev`, removed on Thursday) is treated **as if it does not exist** — the view takes the name `report_innovation_dev`; (3) column labels come from the **existing seed dictionary** (`Innovation details` rows), plus new labels only for the GET fields the seed lacks |
@@ -33,7 +33,7 @@ The Results Center Excel export has no Innovation Development data, and a notice
 | Term | Meaning |
 | --- | --- |
 | Raw data sheet | The single data sheet of workbook `star_results_metadata`. Each section is a **column group** inside it |
-| Column group | A coloured, merged header band above a range of columns (`report_workbook_column_group`) |
+| Column group | A coloured, merged header band above a range of columns. Derived in server code from each column's section tag (`docs/specs/reports/excel-layout-server-side`); the `report_workbook_column_group` table is no longer read |
 | `report_field(value, mandatory, applies)` | Existing stored function: `Not applicable` when `applies` is false, `Not provided` when mandatory and blank, `Not mandatory` when optional and blank, otherwise the value |
 | Green check | `innovation_dev_validation(result_id)`; latest body in migration `1758125999162` |
 | Live result | A `results` row with `is_active = TRUE AND is_snapshot = FALSE` |
@@ -57,7 +57,7 @@ The Results Center Excel export has no Innovation Development data, and a notice
 | The GET's fields | `result-innovation-dev.service.ts:456-527` (inline object, ids only — every display name comes from a catalog join) |
 | Green-check rules | `1758125999162-AdaptInnovationDevValidationToManyToolFunctions.ts` `up()` |
 
-**In scope:** a new view, a layout migration (column group + dictionary), the export's TS wiring (repository SELECT, column specs, group fallback, banner span), and removal of the notice row.
+**In scope:** a new view, a dictionary migration, the export's TS wiring (repository SELECT, and column specs tagged with a new `INNOVATION_DEVELOPMENT` section, from which the band and the banner span are derived), and removal of the notice row.
 
 **Out of scope / NOT changing:**
 - other sections' columns, order and content;
@@ -84,7 +84,7 @@ The Results Center Excel export has no Innovation Development data, and a notice
 
 > **Cell vocabulary.** `NA` = `Not applicable` · `NP` = `Not provided` · `NM` = `Not mandatory`. Every cell is `NA` on a result whose `indicator_id ≠ 2`.
 > **Exclusions:** no audit columns, no surrogate or catalog ids (an id is always shown as its catalog name).
-> **`Not provided` follows the green check exactly.** A cell reads `NP` only when the green-check predicate that guards it fails. A missing catalog **name** behind an id the check accepts renders `Unknown (id {n})`, never `NP`.
+> **`Not provided` follows the green check exactly.** A cell reads `NP` only when the green-check predicate that guards it fails. A catalog **name** that is missing **or blank (`''`)** behind an id the check accepts renders `Unknown (id {n})`, never `NP`. *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*
 > **Booleans** render `Yes` / `No`. **Scaling answers** (1–5, no catalog) render the number.
 
 ### R-IDX-001 — One Innovation Development row per live result
@@ -204,9 +204,9 @@ All cells below are `NA` unless the readiness **level** is ≥ 7 (compare the ca
 ### R-IDX-006 — Workbook layout
 
 - The 32 columns are appended after INNOVATION USE (**81–112**), in the order of R-IDX-002…005, under a band labelled **INNOVATION DEVELOPMENT**, coloured `FF00897B` (the colour the seed already gives the `Innovation details` section).
-- The banner title spans column 112.
+- The banner title spans column 112 (derived from the column count).
 - **Data dictionary:** the 27 existing `Innovation details` rows are reused. Their labels are normalised (each newline run becomes one space, then trimmed, so each one equals its header — the full list is in design §3.2a), each gets an explanation, and the section is renamed **Innovation Development**. 5 rows are added for the fields the seed lacks: 84, 85, 88, 89, 112. All 32 move to the end of the dictionary, in column order.
-- The fallback group list matches the database rows.
+- The band is derived from the 32 columns' `INNOVATION_DEVELOPMENT` section tag (title **INNOVATION DEVELOPMENT**, fill `FF00897B`), per `docs/specs/reports/excel-layout-server-side`. No group row is written to the database. *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*
 
 #### Scenario: Layout integrity
 - WHEN the workbook is generated
@@ -228,7 +228,7 @@ The "coming soon" notice row no longer appears, because both Innovation sections
 ## 4. Non-Functional Requirements
 
 ### NFR-IDX-001 — The view costs only the rows asked for (performance)
-- **Target (structural, same bar as precedent NFR-IUX-001 as amended):** the export reads `report_innovation_dev` under `result_id IN (…)` **without degrading any existing view**: (a) MySQL merges `report_innovation_dev` in the query that reads it — no view-level materialization, each collection a per-row `Materialize (invalidate on row from root)` correlated on `result_id`; (b) the existing Phase 2 query keeps every view merged (its top-level table count does not grow past today's 60; MySQL silently un-merges a view past 61). Access paths and timing are **readings, not gates** (Kaizen KZ-innovation-use--excel-export-1). *(Amended 2026-10-06 at Judgment Day round 1, C-4: the first draft required the view to merge "under Phase 2", which the 61-table cap makes impossible without degradation — design DD-1.)*
+- **Target (structural, same bar as precedent NFR-IUX-001 as amended):** the export reads `report_innovation_dev` under `result_id IN (…)` **without degrading any existing view**: (a) MySQL merges `report_innovation_dev` in the query that reads it — no view-level materialization, each collection a per-row `Materialize (invalidate on row from root)` correlated on `result_id`; (b) no view that MySQL merges in Phase 2 today becomes un-merged: Phase 2's top-level table count stays at today's 60 (MySQL silently un-merges a view past 61). Phase 2 already carries 28 pre-existing `<derived…>` rows of 60; they are not this spec's to remove *(Amended 2026-10-06 at T-02's gate, user-approved — Pivot Record in `execution.md`.)*. Access paths and timing are **readings, not gates** (Kaizen KZ-innovation-use--excel-export-1). *(Amended 2026-10-06 at Judgment Day round 1, C-4: the first draft required the view to merge "under Phase 2", which the 61-table cap makes impossible without degradation — design DD-1.)*
 - **BUT it must NOT** call `innovation_dev_validation()` per row, and must NOT use a top-level `GROUP BY`, `DISTINCT`, aggregate, `ORDER BY` or `LIMIT`.
 - **How verified:** `EXPLAIN FORMAT=TREE` of the **real SQL the repository sends** (captured from `queryRunner.query`) on scratch MySQL seeded with ≥ 200 mixed results: the query that reads the view for (a), and the Phase 2 query for (b).
 
@@ -237,7 +237,7 @@ The "coming soon" notice row no longer appears, because both Innovation sections
 - **How verified:** fixture suite on scratch MySQL. One fixture per rule: short title, nature, type, readiness id, readiness explanation, variety count, anticipated users, actors empty, actor Other without name, organizations empty, each organization branch, beneficiaries, outcomes, knowledge sharing NULL, dissemination NULL, context, results, tool functions empty, *used beyond* NULL, adoption context. Plus a fully valid result, users-not-determined, level < 7, opt out, and another-indicator result.
 
 ### NFR-IDX-003 — Reversible (reliability)
-- Reverting the migrations drops `report_innovation_dev` (design DD-6: the baseline-only definition is not re-created — HITL ruling 2) and restores the previous dictionary rows **exactly**: label (byte-exact), explanation, section, fill, `sort_order` and activity of the 27 seed rows **as they stood before `up()`** (not the seed file's numbers, which later migrations shifted), the 5 new rows and the group row deleted, every other row untouched. *(Amended 2026-10-06, Judgment Day C-3/C-4.)*
+- Reverting the migrations drops `report_innovation_dev` (design DD-6: the baseline-only definition is not re-created — HITL ruling 2) and restores the previous dictionary rows **exactly**: label (byte-exact), explanation, section, fill, `sort_order` and activity of the 27 seed rows **as they stood before `up()`** (not the seed file's numbers, which later migrations shifted), the 5 new rows deleted, every other row untouched. *(Amended 2026-10-06, Judgment Day C-3/C-4.)*
 - **Deploy order:** the view migration MUST be applied before the code that joins it; otherwise every export 500s.
 
 ### NFR-IDX-004 — Migration safety (dx)
@@ -257,14 +257,14 @@ The "coming soon" notice row no longer appears, because both Innovation sections
 | D6 | Code deployed without the view → every export 500s | **No automated gate.** Substitute: a human checks `migration:show` on the target before merge |
 | D7 | Visual rendering (band, wrapping of bulleted cells, long headers) | **No automated gate.** Substitute: a human opens a generated file at the execute HITL pause |
 | D8 | Compiler-only defect in the TS wiring | `npm run build` |
-| D9 | Dev environment overlap with the June Dev-only layout (`INNOVATION DETAILS` 61–87) | **Accepted risk** (HITL ruling 2): resolved by its removal on Thursday, not by this spec |
+| D9 | Dev environment overlap with the June Dev-only layout (`INNOVATION DETAILS` 61–87) | **Resolved** by `docs/specs/reports/excel-layout-server-side` (2026-10-06): the export no longer reads Dev's group rows, so the June band cannot be painted. *(Was an accepted risk.)* |
 
 ---
 
 ## 6. Data requirements
 
 - New view `report_innovation_dev` (`CREATE OR REPLACE`). It supersedes the baseline-only definition (HITL ruling 2).
-- Layout migration: 1 `report_workbook_column_group` row (81–112); `UPDATE` the 27 seed rows (label, explanation, section, `sort_order` = `MAX + k`); `INSERT` 5 rows. `down()` restores the 27 rows' original values and deletes the 5.
+- Dictionary migration: `UPDATE` the 27 seed rows (label, explanation, section, `sort_order` = `MAX + k`); `INSERT` 5 rows. `down()` restores the 27 rows' original values and deletes the 5.
 - No table, column or index changes.
 
 ## 7. API surface delta
@@ -283,7 +283,7 @@ STAR client: none. No CLARISA or OpenSearch change.
 | R1 | Prod pipeline migration order not re-measured | NFR-IDX-003 deploy order; human check before the `main` merge (same as precedent G2) |
 | R2 | Prod MySQL `LATERAL` support (≥ 8.0.14) | Shared with precedent gate G1 |
 | R3 | A future redefinition of `innovation_dev_validation` silently diverges from the view (no CI runs fixtures) | **Accepted risk**; the view migration's header names the parity fixture as mandatory |
-| R4 | Dev shows `Cannot merge already merged cells` while the June layout still exists there | D9, accepted |
+| R4 | Dev showed `Cannot merge already merged cells` while the June layout existed there | Resolved (D9) |
 
 ## 10. Open questions
 

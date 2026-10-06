@@ -2,8 +2,7 @@
 
 - **Module:** reports (reads `result-innovation-dev`)
 - **Spec id:** 2026-10-innovation-dev-excel-export
-- **Status:** paused (2026-10-06) — resume after the Excel-wide layout spec; T-03/T-04 to be re-planned against it
-- **Layout re-plan (design FU-2):** T-03 keeps only the dictionary half; T-04 tags its columns with a new `INNOVATION_DEVELOPMENT` section and drops the fallback row and banner literal.
+- **Status:** in-progress — resumed 2026-10-06 after `docs/specs/reports/excel-layout-server-side` (done). Amended at T-02's gate (Pivot Record in `execution.md`): T-01 reopened for blank catalog names; T-02 step 6(b) reworded; T-03 keeps only the dictionary half; T-04 adds the `INNOVATION_DEVELOPMENT` section and tags its 32 columns (no fallback row, no banner literal).
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — round 1 fixed, **not re-judged**, by user choice)
@@ -27,7 +26,7 @@
 graph TD
   T01[T-01 View migration + SQL spec] --> T02[T-02 Fixtures: parity, one-row, EXPLAIN]
   T01 --> T04[T-04 TS wiring: Phase 3, merge, columns, notice]
-  T03[T-03 Layout migration + realistic round trip] --> T04
+  T03[T-03 Dictionary migration + realistic round trip] --> T04
   T02 --> T05[T-05 Rollout, human gates, docs]
   T04 --> T05
 ```
@@ -38,7 +37,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-01 — Settle P-12, then author the `report_innovation_dev` view migration
 
-- **Status:** done (PASS 2026-10-06, see `execution.md`) · **Size:** M · **Dependencies:** none
+- **Status:** `[~]` reopened 2026-10-06 for amendment A-1 (blank catalog names) — PASS 2026-10-06 before the amendment, see `execution.md` · **Size:** M · **Dependencies:** none
 - **Requirements covered:**
   - R-IDX-001 (whole);
   - R-IDX-002…005 (cell expressions: every row of their tables, every line format, every rule);
@@ -70,6 +69,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
      - (e) the 32 aliases of §3.2, all prefixed;
      - (f) `down()` is exactly the drop.
   4. Apply on scratch (`npm run migration:test:execute`). Run `SELECT * FROM report_innovation_dev LIMIT 1` and B-1, which must now read `0`, and confirm the stored definition ends at the root `WHERE` (no top-level `ORDER BY`).
+  5. **Amendment A-1 (2026-10-06, rework):** every catalog **name** rendered behind an id the green check accepts — single cells and line slots alike — uses `COALESCE(NULLIF(name, ''), CONCAT('Unknown (id ', id, ')'))` (design §3.1, requirements §3), so a blank name renders `Unknown (id n)`, never `Not provided`. The migration (`1791700000000`, committed `e5db630a`, **not pushed**) is edited in place: revert it on scratch first (`migration:test:revert`), edit, re-apply. The migration spec gains one assertion that every catalog-name `COALESCE` in the SQL wraps the name in `NULLIF(…, '')`. The behavioural proof is T-02's blank-name cases. *(Amended 2026-10-06 at T-02's gate, user-approved.)*
 - **Tests:** the migration spec. The behavioural proof is T-02.
 - **Falsifier** (each observed red at assertion level, message quoted in `execution.md`):
   - remove `root.indicator_id = 2` from one lateral → (d) red;
@@ -88,6 +88,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   - [x] Migration spec green; the 3 Falsifier mutations observed red at assertion level, messages quoted
   - [x] `npx eslint` and `npx prettier --check` clean on both files
   - [x] `migration:test:revert` drops the view, then it is re-applied
+  - [ ] **A-1:** blank catalog names fall back to `Unknown (id n)` in every catalog-name cell and slot; migration spec assertion added and seen red with one `NULLIF` removed; re-applied on scratch; eslint/prettier clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
@@ -122,6 +123,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
      - one result with 3 actors, 2 organizations, 3 tool functions and 2 links;
      - one snapshot copy and one soft-deleted result;
      - the **NULL / empty cases** of design §10: variety NULL, knowledge sharing NULL at level ≥ 7, expansion NULL, level NULL, each Yes/No NULL, `is_organization_known` NULL, actor 5 with `''`, org 78 with `''`.
+     - **blank catalog names (A-1):** a blank (`''`) name behind an accepted id (nature, type, anticipated users, dissemination, and any other catalog-name cell or slot) reads `Unknown (id n)` with the function TRUE — these cases replace the current `expectBreak` pins. *(Amended 2026-10-06 at T-02's gate, user-approved.)*
   3. **For every indicator-2 case:**
      - `expected = innovation_dev_validation(id)`;
      - assert `expected = TRUE` ⇔ no cell contains `Not provided`;
@@ -132,7 +134,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   5. **One-row:** `SELECT result_id, COUNT(*) FROM report_innovation_dev GROUP BY result_id HAVING COUNT(*) > 1` returns 0 rows. Snapshot and soft-deleted ids are absent.
   6. **EXPLAIN gate.** Seed ≥ 200 mixed results.
      - (a) `EXPLAIN FORMAT=TREE` of the Phase 3 SQL: 4 × `Materialize (invalidate on row from root)` correlated on `result_id`, and no `Materialize`/`Hash` over a full scan of `results` for the view.
-     - (b) Re-run B-7 on the Phase 2 SQL: still `60` top-level rows, no `<derived…>` row at `id = 1`.
+     - (b) Re-run B-7 on the Phase 2 SQL: still `60` top-level rows, and no view merged today becomes `<derived…>` — the 28 pre-existing `<derived…>` rows stay as they are (compare the set of `<derived…>` rows before and after; this spec adds no Phase 2 join). *(Amended 2026-10-06 at T-02's gate, user-approved.)*
      - **Ordering note:** T-04 has not run yet, so (a) uses a test-local Phase 3 string identical to design §2. T-04's Done criteria re-run this fixture against the real repository's captured SQL.
   7. **Timing:** Phase 3 on the seeded set, 3 runs, median and spread. A reading, not a gate.
 - **Tests:** this fixture (`npm run test:fixtures -- report-innovation-dev-view`).
@@ -161,11 +163,11 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ---
 
-### T-03 — Settle P-14, then author the layout migration with a realistic round trip
+### T-03 — Settle P-14, then author the dictionary migration with a realistic round trip
 
 - **Status:** not-started · **Size:** M · **Dependencies:** OQ-1 and OQ-2 answered (gate at T-02); must not run alongside T-01/T-02
 - **Requirements covered:**
-  - R-IDX-006 (whole): group 81–112 with label and colour; 27 rows reused, normalised, explained, renamed, moved last; 5 inserted; *AND IT MUST leave no `Innovation details` row*; *BUT must NOT change any Innovation Use row*; *BUT must NOT move, rename or recolour any existing column or group*.
+  - R-IDX-006 (dictionary half): 27 rows reused, normalised, explained, renamed, moved last; 5 inserted; *AND IT MUST leave no `Innovation details` row*; *BUT must NOT change any Innovation Use row*; *BUT must NOT move, rename or recolour any existing dictionary row*. The band itself is T-04 (derived in code; no group row — amended 2026-10-06).
   - NFR-IDX-003 (dictionary half: exact restore of the pre-`up()` rows).
   - NFR-IDX-004.
   - Defect class D5.
@@ -173,22 +175,21 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Scope:**
   1. **First step: settle P-14.** Run a read-only query on Dev: `SELECT id, sort_order, section, field_label, explanation, section_fill_argb FROM report_data_dictionary WHERE workbook_key='star_results_metadata' ORDER BY sort_order`. Record the anchor, the 27 rows that follow it, and whether each label matches the seed byte-for-byte. If Dev is unreachable, record the error verbatim; the migration's guard still protects every environment.
   2. Apply the OQ-1/OQ-2 answers to design §3.2a before writing any SQL (if column 89 is dropped, the count becomes 31 and every "32" in the spec is swept, per Correction Closure).
-  3. `src/db/migrations/<ts+1>-StarRawInnovationDevColumnGroup.ts`, exactly per design §5:
+  3. `src/db/migrations/<ts+1>-StarRawInnovationDevDictionary.ts`, exactly per design §5 (no group row):
      - anchor `Link to Innovation Use`;
      - an id-resolved block of 27 with a position-by-position byte-exact guard in TS;
      - `B = MAX` read once;
      - id-keyed `UPDATE`s and 5 `INSERT`s;
-     - the group row read once;
      - integer interpolation only, no `?`.
      `down()` is relative to the anchor, with NULL for `''`.
   4. `src/db/migration-specs/<ts+1>…spec.ts`: no `?`/`:word`; every `UPDATE` keyed by `id` (no `WHERE field_label =` in any write); the guard throws before any write on a mismatched block.
-  5. `test/fixtures/innovation-dev/star-raw-innovation-dev-column-group.fixture-spec.ts`: seed a **realistic pre-state** in a transaction. B-2 shows scratch has none, so the fixture builds it:
+  5. `test/fixtures/innovation-dev/star-raw-innovation-dev-dictionary.fixture-spec.ts`: seed a **realistic pre-state** in a transaction. B-2 shows scratch has none, so the fixture builds it:
      - the anchor rows `Link to Innovation Dev`/`Link to Innovation Use`;
      - the 27 seed rows at **seed sort + 1** (P-17), `''` stored as NULL, fill on the first only;
      - 2 OICR rows after them;
      - the 6 existing Innovation Use rows (already on scratch).
      Then run `up → down → up` and assert:
-     - after `up`: 32 rows in §3.2a order at `B+1…B+32`, Innovation Use rows byte-identical, one group row 81–112;
+     - after `up`: 32 rows in §3.2a order at `B+1…B+32`, Innovation Use rows byte-identical, and `report_workbook_column_group` untouched (no row written);
      - after `down`: every pre-state row byte-identical, including `sort_order`, NULLs and fill;
      - a pre-state with one seed label altered makes `up` throw with **zero** rows changed.
 - **Tests:** the migration spec and the round-trip fixture.
@@ -201,7 +202,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Disqualifier:**
   - A round trip whose pre-state lacks the Innovation Use rows, the +1 shift or the NULLs **cannot** turn (a)–(c) red, and is not evidence (judgment C-1/C-3).
   - **Cannot reach:** Dev's and Prod's real rows beyond the P-14 reading.
-- **Consumers:** `report-layout.repository.ts` (reader of both tables, unchanged); the fallback list in T-04 must match these rows.
+- **Consumers:** `report-layout.repository.ts` (`findDataDictionaryRows`, unchanged). T-04's column headers must equal these labels.
 - **Review:** `full`: shared tables read by every section; judgment found two severe defects here.
 - **Done criteria:**
   - [ ] P-14 reading (or Dev error) recorded
@@ -213,11 +214,11 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ---
 
-### T-04 — TS wiring: Phase 3 query and merge, 32 column specs, layout, notice removal
+### T-04 — TS wiring: Phase 3 query and merge, `INNOVATION_DEVELOPMENT` section and 32 tagged columns, notice removal
 
 - **Status:** not-started · **Size:** M · **Dependencies:** T-01, T-03
 - **Requirements covered:**
-  - R-IDX-006: Raw data at 112 columns, band 81–112, headers equal to dictionary labels in order, fallback list equal to the DB rows, banner 112, *BUT must NOT move existing columns*.
+  - R-IDX-006: Raw data at 112 columns, band 81–112, headers equal to dictionary labels in order, band derived from the `INNOVATION_DEVELOPMENT` tag, banner 112 derived, *BUT must NOT move existing columns*.
   - R-IDX-007 (whole).
   - NFR-IDX-001 (b), re-run on the real repository.
   - NFR-IDX-003 deploy order (code half).
@@ -226,7 +227,8 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Scope:**
   1. **First step: consumer sweep (P-7).** Run one grep per changed symbol over `server/researchindicators/src`, `server/researchindicators/test` and `client/research-indicators/src`:
      - `STAR_RESULTS_METADATA_RAW_COLUMNS`
-     - `STAR_RAW_COLUMN_GROUP_FALLBACK`
+     - `STAR_RAW_SECTIONS`
+     - `deriveColumnGroups`
      - `STAR_RAW_SHEET_PREAMBLE_BASE`
      - `STAR_RAW_COMING_SOON_NOTICE`
      - `bannerNotice`
@@ -239,13 +241,14 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
      - merge per the DD-1 contract: `String()` keys, Phase 2 order, all 32 keys = `Not applicable` for a missing Phase 3 row;
      - zero ids return before either phase;
      - the class comment lists the new view and Phase 3.
-  3. New `star-results-metadata.innovation-dev.columns.ts`: 32 `ExcelColumnSpec` in §3.2a order (key = alias, header = label), spread into `STAR_RESULTS_METADATA_RAW_COLUMNS` (80 → 112).
-  4. `sheet-presentation.ts`: fallback group `{81, 112, 'INNOVATION DEVELOPMENT', 'FF00897B'}`; `bannerTitleMergeToCol` 80 → 112.
+  3. New `star-results-metadata.innovation-dev.columns.ts`: 32 `StarRawSectionColumn` in §3.2a order (key = alias, header = label, `section: 'INNOVATION_DEVELOPMENT'`), spread at the end of `STAR_RESULTS_METADATA_RAW_COLUMNS` (80 → 112).
+  4. `star-results-metadata.sections.ts`: add `INNOVATION_DEVELOPMENT: { label: 'INNOVATION DEVELOPMENT', fillArgb: 'FF00897B' }`. The band 81–112 and the banner end 112 come from `deriveColumnGroups`; there is no fallback list or banner literal to edit. *(Amended 2026-10-06 at T-02's gate, user-approved.)*
   5. Notice: remove `STAR_RAW_COMING_SOON_NOTICE` and the `bannerNotice` line from the handler. The builder's warning-row capability stays.
   6. Specs:
      - repository spec: Phase 3 call, same `queryRunner`, inside the transaction; merge cases (order, string keys, missing row → `NA`); Phase 3 failure → rollback; the B-6 index pins moved by one, not deleted;
      - handler spec: 112 columns; no notice;
-     - `.xlsx` read-back: headers located **by content**, band cells at 81–112, no cell containing `coming soon`.
+     - `.xlsx` read-back: headers located **by content**, band cells at 81–112, no cell containing `coming soon`;
+     - excel-layout specs that pin today's layout, updated with expected values typed from the requirements (never from the derivation): sections spec 11 → 12 entries; derivation real-array test 11 → 12 bands and last column 80 → 112; handler read-back `INTENDED_RAW_BANDS` + `{81–112, INNOVATION DEVELOPMENT, FF00897B}` and banner `C1:CB1` → `C1:DH1`.
   7. Re-run T-02's fixture with Phase 3 SQL captured from the real repository (closes T-02's ordering note).
 - **Tests:** the specs above, the full server suite `npm test -- --silent`, `npm run build`, and the T-02 fixture re-run.
 - **Falsifier** (observed red, messages quoted):
@@ -253,20 +256,22 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   - (b) restore the `bannerNotice` line: the read-back's "no `coming soon`" assertion goes red.
   - (c) change one header in the columns file: the header = dictionary-label test goes red.
   - (d) assign a number to `header` in the new columns file: `npm run build` goes red (compile gate; jest may stay green).
+  - (e) tag column 81 `INNOVATION_USE` instead of `INNOVATION_DEVELOPMENT`: the read-back's band assertion goes red (INNOVATION USE 75–81, INNOVATION DEVELOPMENT 82–112).
 - **Red run:** each red on its assertion; (d) on the compiler error line.
 - **Disqualifier:**
   - A merge test whose mock returns ids of the same type on both sides cannot fail (a), and is inert.
   - A suite run while another agent is building is not evidence (root `CLAUDE.md` concurrency rule).
   - **Cannot reach:** visual rendering (D7), deploy order (D6).
 - **Consumers:**
-  - from B-5 and B-6: `…handler.spec.ts`, `star-results-export.repository.spec.ts`, `sheet-presentation.ts`, `banner-subtitle.ts`, `…handler.ts`;
+  - from B-5 and B-6: `…handler.spec.ts`, `star-results-export.repository.spec.ts`, `sheet-presentation.ts`, `banner-subtitle.ts`, `…handler.ts` (re-run B-5 first: the excel-layout spec already removed `bannerTitleMergeToCol: 80`);
+  - the excel-layout specs `star-results-metadata.sections.spec.ts` and `excel-workbook.column-groups.spec.ts` (real-array case);
   - plus every hit of step 1;
   - design P-8: `client/research-indicators/.../api.service.ts:386` stores the `.xlsx` blob without parsing it, so it is unaffected; the sweep re-confirms this.
 - **Review:** `full`: shared export path for every user; the merge is new logic.
 - **Done criteria:**
   - [ ] Consumer sweep recorded; every pinning file updated or confirmed unaffected
   - [ ] Specs green; `npm test -- --silent` full suite green (Leader re-measures after the worker reports); `npm run build` exit 0
-  - [ ] Falsifiers (a)–(d) observed red, quoted
+  - [ ] Falsifiers (a)–(e) observed red, quoted
   - [ ] T-02 fixture green against the real captured Phase 3 SQL; B-7 still `60` on the real Phase 2 SQL
   - [ ] `npx eslint` / `npx prettier --check` clean
   - [ ] A generated `.xlsx` (mocked data) offered to the user for the visual check (D7). **No commit before visual approval**
@@ -277,13 +282,13 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 ### T-05 — Rollout gates, risk notes, docs
 
 - **Status:** not-started · **Size:** S · **Dependencies:** T-02, T-04
-- **Requirements covered:** NFR-IDX-003 deploy order; defect classes D6, D7, D9; requirements §9 R1, R2, R4
+- **Requirements covered:** NFR-IDX-003 deploy order; defect classes D6, D7; requirements §9 R1, R2 (D9 / R4 resolved by the excel-layout spec, 2026-10-06)
 - **Design refs:** §11 (all bullets), §14 FU-1; Premise Ledger P-13, P-18
 - **Scope:**
   1. `docs/specs/innovation-use/OPEN-ITEMS.md` §3.3 (or an Innovation Development section next to it) gains these items:
      - **G-IDX-1:** Prod MySQL ≥ 8.0.14 and migrations-before-code. Shared with AC-1681 G1/G2. Owner: human, before the `main` merge.
      - **G-IDX-2:** the S-1 rollout rule. Thursday's removal of `5b426acf` must not run `1781300000000.down()` after this view is on Dev, or must re-apply it.
-     - **G-IDX-3:** Dev band overlap until that removal (D9).
+     - ~~**G-IDX-3:** Dev band overlap~~ — not filed: resolved by `docs/specs/reports/excel-layout-server-side` (D9).
      - **G-IDX-4:** per-item visual check on real data.
      - **FU-1:** Phase 2 is at 60 of 61 tables.
   2. `docs/trd/trd.md` ADR-11: one line naming `report_innovation_dev` and its parity fixture as a gate for redefinitions of `innovation_dev_validation`.
@@ -295,9 +300,9 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Consumers:** none.
 - **Review:** `checklist`: documentation only; the reviewer checks that every §11 bullet and FU-1 has a home.
 - **Done criteria:**
-  - [ ] OPEN-ITEMS entries G-IDX-1…4 and FU-1 written
+  - [ ] OPEN-ITEMS entries G-IDX-1, G-IDX-2, G-IDX-4 and FU-1 written
   - [ ] ADR-11 line added
-  - [ ] Human readings recorded for G-IDX-1…4 (may stay open at archive only by explicit user acceptance)
+  - [ ] Human readings recorded for G-IDX-1, G-IDX-2, G-IDX-4 (may stay open at archive only by explicit user acceptance)
 - **Skills:** `cognitive-doc-design`
 
 ---
@@ -315,11 +320,11 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 | R-IDX-003 users not determined → 4 × NA | T-02 |
 | R-IDX-004 readiness < 7; opt out; proceed with gaps + *BUT* 101–103 NM | T-02 |
 | R-IDX-005 optional scaling NM + *BUT must NOT* NP | T-02 |
-| R-IDX-006 layout + dictionary + *AND IT MUST* no orphan rows + *BUT* IU rows untouched | T-03 (DB rows), T-04 (sheet, fallback, banner) |
-| R-IDX-006 *BUT must NOT move/rename/recolour existing* | T-03 (group rows untouched in round trip), T-04 (columns 1–80 unchanged in read-back) |
+| R-IDX-006 layout + dictionary + *AND IT MUST* no orphan rows + *BUT* IU rows untouched | T-03 (dictionary rows), T-04 (sheet, section tag; band and banner derived) |
+| R-IDX-006 *BUT must NOT move/rename/recolour existing* | T-03 (Innovation Use dictionary rows untouched in round trip), T-04 (columns 1–80 unchanged in read-back) |
 | R-IDX-007 no notice | T-04 Falsifier (b) |
 | NFR-IDX-001 (a) merged view | T-02 step 6(a), re-run in T-04 step 7 |
-| NFR-IDX-001 (b) Phase 2 stays at 60 | T-02 step 6(b), T-04 step 7 |
+| NFR-IDX-001 (b) Phase 2 stays at 60, no view newly un-merged | T-02 step 6(b), T-04 step 7 |
 | NFR-IDX-001 *BUT* no `_validation()`/top-level aggregate | T-01 spec (b), (c) |
 | NFR-IDX-002 biconditional + 2 divergences | T-02 steps 3–4 |
 | NFR-IDX-003 view drop on revert | T-01 Done (revert) |

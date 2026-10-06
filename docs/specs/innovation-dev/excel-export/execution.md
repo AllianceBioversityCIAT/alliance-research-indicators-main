@@ -86,3 +86,18 @@
   2. T-02 step 6(b) "no `<derived…>` row at `id = 1`" cannot hold: the unmodified Phase 2 already has 28 derived tables of 60. Proposed amendment: "no view that is merged today becomes un-merged; the count stays 60" (also NFR-IDX-001 (b) wording).
 - **Pause record:** the user stopped this spec to first specify an Excel-wide change — the workbook layout (`report_workbook_column_group`, `report_workbook_sheet`) moves from the DB to server code, and group-band merges are computed from tagged column objects in `star-results-metadata.columns.ts`. That change reshapes T-03 (layout migration) and part of T-04; both must be re-planned against it before this spec resumes. Worker `ctx_e7ba9d89e47c` released.
 - **spawns:** implementer (Cursor grok-4.7-xhigh) not reported by host, ended complete.
+
+---
+
+## Pivot Record: T-02 gate — resume after the Excel-wide layout spec (2026-10-06)
+
+- **Trigger:** two spec tensions raised at T-02's gate (above), plus `docs/specs/reports/excel-layout-server-side` (done, `0197c92b`), which moved the workbook layout into server code and removed `STAR_RAW_COLUMN_GROUP_FALLBACK` and the banner literal this spec's T-03/T-04 targeted.
+- **User rulings (2026-10-06, AskUserQuestion):**
+  1. Blank catalog name → **fix the view** (A-1): `COALESCE(NULLIF(name, ''), CONCAT('Unknown (id ', id, ')'))`; T-01 reopened, its unpushed migration `1791700000000` (`e5db630a`) edited in place after a scratch revert. T-02's blank-name cases replace the `expectBreak` pins.
+  2. T-02 step 6(b) → **amend**: "no view merged today becomes `<derived…>`; the top-level count stays 60" (the 28 pre-existing derived rows stay). Same wording in NFR-IDX-001 (b) and design §10.
+  3. T-03/T-04 re-plan → **Leader amends, user approves the diff**: no group row (T-03 keeps only the dictionary half, files renamed `…InnovationDevDictionary…`); T-04 adds `INNOVATION_DEVELOPMENT` to `STAR_RAW_SECTIONS` and 32 `StarRawSectionColumn`s, band and banner derived, and updates the excel-layout specs that pin 11 bands / column 80. D9 / R4 / G-IDX-3 resolved by the excel-layout spec.
+- **ADR impact:** none.
+- **Documents amended:** `requirements.md` (§3 cell vocabulary note, glossary, §1 scope, R-IDX-006, NFR-IDX-001 (b), NFR-IDX-003, D9, §6, R4), `design.md` (Document Control, Executive Summary, §2, §2.1, §3.1, §5, §10, §11, P-7, P-10, §15), `tasks.md` (header, T-01 A-1, T-02 steps 2/6(b), T-03, T-04, T-05, coverage map).
+- **Correction closure:** forward sweep `grep -n -i "fallback\|group row\|column_group\|ColumnGroup\|column-group\|D9\|R4\|G-IDX-3\|layout migration\|<derived\|Unknown (id"` over the spec folder — every remaining hit is amended text or an unaffected reference (P-16, P-17, design §3.2a). Backward: requirements D9 ← design §1 non-goal (still accurate), T-05 coverage line updated. `git diff` of the three documents read: every removed line is an intended removal.
+- **Briefs to re-issue:** none in flight (T-02 worker `ctx_e7ba9d89e47c` was released at the pause); every new brief carries the amended text.
+- **Still open, asked at this gate:** OQ-1, OQ-2 (T-03 is blocked on them).
