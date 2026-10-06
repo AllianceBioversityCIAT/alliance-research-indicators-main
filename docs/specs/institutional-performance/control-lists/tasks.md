@@ -200,7 +200,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-04 — Slice 4: Usage and consumer access (in-use, *Used by*, by-key read, membership check)
 
 - **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
-- **Status:** done (PASS on attempt 1, 2026-10-06) — server `npm run build` pending (user watch server running) · **Size:** M · **Dependencies:** T-03
+- **Status:** done (PASS on attempt 1, 2026-10-06) · **Size:** M · **Dependencies:** T-03
 - **Requirements covered:** R-CTL-005 (all, incl. AC.3 test consumer), R-CTL-003 *Used by*, R-CTL-006 (ordered read, `activeOnly`, unknown key, **membership check — AC.2**), R-CTL-004 *Deactivate* (consumer read omits inactive values), R-CTL-007 (A13 open to any authenticated user), R-CTL-001 AC.1–2 end to end
 - **Design refs:** §4 A1 `usedBy`, A9 `inUse`, A12 block, A13; §5 rules 5, 10; D-CTL-3, D-CTL-12, D-CTL-14, D-CTL-15, P-10
 - **Scope — database:** **no schema change.** The integration test creates a temporary consumer table on the local dev DB with a plain FK to `control_list_values.id` `ON DELETE RESTRICT`. It proves the DB backstop (D-CTL-3) and drops the table afterwards.
@@ -236,7 +236,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Done criteria:**
   - [x] Specs and integration green; falsifiers 1–5 observed red, then reverted.
   - [x] All 13 endpoints in `/swagger` (quote what was seen). *(Via `SwaggerModule.createDocument`; paths quoted in Run 8.)*
-  - [ ] Both packages' test, lint and build gates.
+  - [x] Both packages' test, lint and build gates. *(Server lint on committed blobs of `6962e7ae`: 18 linted, 0 failing. Server `npm run build` exit 0 after the user stopped their dev servers. Server tests: 3 pre-existing failures. Client: 7,937 passed, lint and build OK.)*
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `api-design-principles`, `angular-developer`
 
 ### T-05 — HITL: real-browser check and rollout premise

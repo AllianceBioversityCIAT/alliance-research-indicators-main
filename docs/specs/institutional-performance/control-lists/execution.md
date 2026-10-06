@@ -561,3 +561,4 @@
   - **T-05:** confirm the user's servers are stopped, then run the server `npm run build`; then the HITL checklist.
 - **Final status: PASS on attempt 1.** Done criteria 1–2 met; criterion 3 waits on the server build.
 - **Lint gate on committed blobs (Leader, after `6962e7ae`):** 18 server `.ts` files linted via stdin → 0 failing. The server `npm run build` is still pending.
+- **Server build (Leader, 2026-10-06, after the user stopped their dev servers; nothing listening on 3001 or 4200):** `npm run build` → exit 0 (`nest build` + admin vite `✓ built`; `dist/main.js` present). T-04 done criterion 3 met.
