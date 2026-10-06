@@ -2,7 +2,7 @@
 
 - **Module:** reports (reads `result-innovation-dev`)
 - **Spec id:** 2026-10-innovation-dev-excel-export
-- **Status:** not-started
+- **Status:** paused (2026-10-06) — resume after the Excel-wide layout spec; T-03/T-04 to be re-planned against it
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — round 1 fixed, **not re-judged**, by user choice)
@@ -93,7 +93,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-02 — Fixture suite: green-check parity, one row per result, EXPLAIN gate
 
-- **Status:** not-started · **Size:** L · **Dependencies:** T-01
+- **Status:** in-progress `[~]` — PAUSED 2026-10-06 (spec paused for the Excel-wide layout change; two gate tensions open, see `execution.md`) · **Size:** L · **Dependencies:** T-01
 - **Requirements covered:**
   - NFR-IDX-002 (whole, incl. the two named divergences);
   - NFR-IDX-001 *Target* (a) and (b), timing as a reading;

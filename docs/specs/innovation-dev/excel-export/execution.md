@@ -67,3 +67,22 @@
 - **Constitution impact:** none.
 - **Decisions made:** B-1 amendment **approved by the user at the T-01 continue gate (2026-10-06, answer "1")**. Execute-time spec edit: `tasks.md` baseline table row B-1 (now `LOCATE('order by `root`.`result_id`', VIEW_DEFINITION) > 0`), T-01 step 4 and Disqualifier (B-1 measures the top-level order only). No requirement's meaning changed. Re-measured after the edit: `0`. Carry to the T-02 Reviewer as a named conformance check (`tasks.md` B-1 as amended 2026-10-06).
 - **Worker:** `ctx_fc5e703d6b13` released after PASS.
+
+### T-02 — Fixture suite: green-check parity, one row per result, EXPLAIN gate
+
+- **Status:** `[~]` PAUSED (spec paused by the user, 2026-10-06) — not reviewed, not committed.
+- **Date:** 2026-10-06
+- **Effort:** xhigh.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-xhigh`, Orca `run_ae4bc0c80537` / `task_52d3d53dc47b` / `ctx_e7ba9d89e47c` (fresh worker). Brief: `T-02-brief.md` (session scratchpad). Full report: `/tmp/t02-innovation-dev-t02-report.md`.
+- **Files changed (uncommitted, left in the working tree):** `server/researchindicators/test/fixtures/innovation-dev/report-innovation-dev-view.fixture-spec.ts` (new, 2,073 lines).
+- **Implementer verification:** 56/56; eslint and prettier clean; `git diff -- src` empty; scratch head `CreateReportInnovationDevView1791700000000`. Falsifier reds (scratch `CREATE OR REPLACE`, then restored, suite green again): (a) variety NULL expected `Not applicable` received `Not provided`; (b) `cirl.id >= 7` → level 6 knowledge sharing expected `Not applicable` received `Not provided`; (c) knowledge sharing NULL expected `Not provided` received `No`; (d) org 78 empty expected `• Other ()` received `• Other (Not provided)`; (e) count 0 expected `Not provided` received `0`; (f) derived `GROUP BY` actors lateral → `Expected substring: "invalidate on row from root"` received `-> Materialize  (cost=0..0 rows=0)`.
+- **EXPLAIN:** 210 results, 210 rows per child table at plan time. Phase 3: 4 × `Materialize (invalidate on row from root)` over `Index lookup … (result_id=root.result_id)`; root `Table scan on root` (reading). Phase 2 B-7: 60 top-level rows, 28 of them `<derivedN>` (pre-existing), `riu`/`ciul` still top-level. Timing (reading): 45.4 / 43.5 / 44.8 ms, median 44.8, spread 1.9.
+- **Evidence re-run (Leader inline, non-author): VERIFIED.** `npm run test:fixtures -- report-innovation-dev-view` → 56 passed · eslint exit 0 · prettier clean · `git status` shows only the new fixture folder.
+- **Spec tensions raised at the gate, unresolved (spec paused before the answer):**
+  1. A blank (`''`) catalog name behind an accepted id (nature, type, anticipated users, dissemination) renders `Not provided` while `innovation_dev_validation` is TRUE — contradicts requirements §3 ("never NP"). The fixture currently pins it as a break (`expectBreak`). Options offered: (a, recommended) harden the T-01 view so blank names fall to `Unknown (id n)` (T-01 rework, migration unpushed); (b) document it as a third divergence in NFR-IDX-002.
+  2. T-02 step 6(b) "no `<derived…>` row at `id = 1`" cannot hold: the unmodified Phase 2 already has 28 derived tables of 60. Proposed amendment: "no view that is merged today becomes un-merged; the count stays 60" (also NFR-IDX-001 (b) wording).
+- **Pause record:** the user stopped this spec to first specify an Excel-wide change — the workbook layout (`report_workbook_column_group`, `report_workbook_sheet`) moves from the DB to server code, and group-band merges are computed from tagged column objects in `star-results-metadata.columns.ts`. That change reshapes T-03 (layout migration) and part of T-04; both must be re-planned against it before this spec resumes. Worker `ctx_e7ba9d89e47c` released.
+- **spawns:** implementer (Cursor grok-4.7-xhigh) not reported by host, ended complete.
