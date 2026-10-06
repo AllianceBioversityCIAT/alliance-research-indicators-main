@@ -10,6 +10,7 @@ import { ControlListsService } from '../src/domain/entities/control-lists/contro
 import { ControlListCategoryRepository } from '../src/domain/entities/control-lists/repositories/control-list-category.repository';
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
+import { ControlListUsageRegistry } from '../src/domain/entities/control-lists/control-list-usage.registry';
 import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
 import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
@@ -133,6 +134,11 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
           useFactory: () => new PortfoliosRepository(dataSource),
         },
         CurrentUserUtil,
+        // T-04 (consumer per the brief's forward pointer): ControlListsService
+        // now depends on ControlListUsageRegistry. No providers are
+        // registered in this suite — it is about the immutable list key,
+        // not usage.
+        ControlListUsageRegistry,
         Reflector,
         RolesGuard,
         SetUpInterceptor,

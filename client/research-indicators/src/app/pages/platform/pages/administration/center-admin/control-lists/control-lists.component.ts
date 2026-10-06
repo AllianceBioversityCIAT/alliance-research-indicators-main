@@ -167,6 +167,13 @@ export default class ControlListsComponent implements OnInit {
     return list && portfolioId !== null ? `P${portfolioId} · ${list.key}` : '';
   });
 
+  // T-04 (design §4 A1 "usedBy: string[]", §5 rule 5, R-CTL-003 "Used by"): consumer names
+  // joined, or the fallback copy when no consumer has registered against this list's key yet.
+  readonly usedByLabel = computed(() => {
+    const usedBy = this.selectedList()?.usedBy ?? [];
+    return usedBy.length > 0 ? usedBy.join(', ') : 'Not linked to a form yet';
+  });
+
   // R-CTL-001 "Default portfolio": every portfolio stays selectable; a 0-category one
   // is labelled "(not configured)" (A2) and opens on the empty state (design D-CTL-10).
   readonly portfolioOptions = computed<PortfolioOption[]>(() => {
@@ -209,14 +216,16 @@ export default class ControlListsComponent implements OnInit {
   });
 
   // design §6.3 DataTable column config — "ID" plain text (read-only, D-CTL-14), Code, Value,
-  // Description, Order, Active, Actions. "In use" is T-04 scope (tasks.md T-03 scope note),
-  // not built here.
+  // Description, Order, In use, Active, Actions. "In use" (T-04, design §6.2 values table: "ID ·
+  // Code · Value · Description · Order · In use · Active · Actions") sits between Order and
+  // Active, sourced from A9's required `inUse` (design §4 A9, §5 rule 5).
   readonly valueColumns: DataTableColumn<ControlListValue>[] = [
     { field: 'id', header: 'ID', type: 'text', sortable: false },
     { field: 'code', header: 'Code', type: 'code', sortable: true },
     { field: 'value', header: 'Value', type: 'text', sortable: true },
     { field: 'description', header: 'Description', type: 'text', sortable: false },
     { field: 'displayOrder', header: 'Order', type: 'number', sortable: true },
+    { field: 'inUse', header: 'In use', type: 'number', sortable: false },
     { field: 'isActive', header: 'Active', type: 'badge', sortable: false }
   ];
   readonly valueSearchFields: (keyof ControlListValue & string)[] = ['code', 'value', 'description'];

@@ -29,6 +29,8 @@ import {
   PortfolioCategoriesSummary,
 } from './control-lists.types';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ControlListUsageRegistry } from './control-list-usage.registry';
+import { controlListNaturalCompare } from './control-list-natural-compare.util';
 
 // MySQL "Duplicate entry" errno. TypeORM's QueryFailedError copies every
 // driverError property (minus `name`) onto the thrown instance itself
@@ -46,6 +48,7 @@ export class ControlListsService {
     private readonly valueRepository: ControlListValueRepository,
     private readonly portfoliosService: PortfoliosService,
     private readonly currentUser: CurrentUserUtil,
+    private readonly usageRegistry: ControlListUsageRegistry,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -347,7 +350,58 @@ export class ControlListsService {
       order: { display_order: 'ASC', id: 'ASC' },
     });
 
-    return values.map((value) => this.mapValue(value));
+    // T-04 (design §5 rule 5): inUse is the sum of every registered
+    // provider's count for each value id — 0 when none is registered yet.
+    const counts = await this.usageRegistry.getInUseCounts(
+      values.map((value) => value.id),
+    );
+
+    return values.map((value) =>
+      this.mapValue(value, counts.get(value.id) ?? 0),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // A13 — GET /by-key/:listKey/values?portfolioId=&activeOnly=
+  // ---------------------------------------------------------------------
+  // Consumer read (design.md §8): no @Roles — any authenticated user.
+  // R-CTL-006 "Ordered read": display order first, then natural code order
+  // (`UOM-2` before `UOM-10` at equal order), mirroring the admin table's
+  // own ordering semantics (R-CTL-009, client naturalCompare).
+  async getValuesByKey(
+    portfolioId: number,
+    listKey: string,
+    activeOnly: boolean,
+  ): Promise<ControlListValueResponse[]> {
+    const list = await this.listRepository.findOne({
+      where: { portfolio_id: portfolioId, list_key: listKey, is_active: true },
+    });
+    if (!list) {
+      throw new NotFoundException(
+        `List "${listKey}" not found for portfolio ${portfolioId}`,
+      );
+    }
+
+    const values = await this.valueRepository.find({
+      where: activeOnly
+        ? { list_id: list.id, is_active: true }
+        : { list_id: list.id },
+    });
+
+    const sorted = [...values].sort((a, b) => {
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order;
+      }
+      return controlListNaturalCompare(a.code, b.code);
+    });
+
+    const counts = await this.usageRegistry.getInUseCounts(
+      sorted.map((value) => value.id),
+    );
+
+    return sorted.map((value) =>
+      this.mapValue(value, counts.get(value.id) ?? 0),
+    );
   }
 
   // ---------------------------------------------------------------------
@@ -462,9 +516,23 @@ export class ControlListsService {
     const value = await this.findValueOrFail(id);
     const list = await this.findListForValue(value);
 
-    // T-04 adds the in-use (registry) block here; this slice only removes
-    // the row physically (D-CTL-5) — tasks.md T-03 scope note: "A12 here is
-    // a physical delete (plus the list-has-values rule lives on A8)".
+    // T-04 (design §5 rule 5, R-CTL-005): refuse when the value is
+    // referenced by at least one record of a registered consumer. The
+    // description states the count and proposes deactivation (falsifier 2:
+    // dropping this check must fail on the ConflictException itself, not on
+    // its wording).
+    const inUse = await this.usageRegistry.getInUseCount(id);
+    if (inUse > 0) {
+      this.logger._warn(
+        `control_lists.blocked_delete entity=control_list_value id=${id} reason=in_use count=${inUse}`,
+      );
+      this.throwNonFieldConflict(
+        `Value "${value.value}" is referenced by ${inUse} record(s) and cannot be deleted; deactivate it instead`,
+      );
+    }
+
+    // Physical delete (D-CTL-5). The list-has-values rule lives on A8, not
+    // here.
     await this.valueRepository.delete(id);
 
     this.logWrite('deleted', 'control_list_value', id, list.portfolio_id);
@@ -789,8 +857,8 @@ export class ControlListsService {
     };
   }
 
-  // valueCount is the real row count per list (T-03). usedBy stays [] until
-  // the T-04 registry exists.
+  // valueCount is the real row count per list (T-03). usedBy is derived at
+  // read time from the registry (T-04, D-CTL-12) — nothing stored.
   private mapListSummary(list: ControlList, valueCount = 0): ListSummary {
     return {
       id: list.id,
@@ -801,11 +869,17 @@ export class ControlListsService {
       codePrefix: list.code_prefix,
       valueCount,
       isSystem: list.is_system,
-      usedBy: [],
+      usedBy: this.usageRegistry.getConsumerNamesForKey(list.list_key),
     };
   }
 
-  private mapValue(value: ControlListValue): ControlListValueResponse {
+  // inUse is the sum of every registered provider's count for this value id
+  // (design §5 rule 5, T-04) — the caller (getValues/getValuesByKey) looks
+  // it up once per batch and passes it in; 0 when none is registered yet.
+  private mapValue(
+    value: ControlListValue,
+    inUse = 0,
+  ): ControlListValueResponse {
     return {
       id: value.id,
       listId: value.list_id,
@@ -814,9 +888,7 @@ export class ControlListsService {
       description: value.description ?? null,
       displayOrder: value.display_order,
       isActive: value.is_active,
-      // T-04 sums real provider counts (design §5 rule 5); until the
-      // registry exists this stays 0.
-      inUse: 0,
+      inUse,
     };
   }
 

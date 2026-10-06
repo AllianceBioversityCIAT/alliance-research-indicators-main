@@ -486,3 +486,77 @@
   - **Results:** the worker ran the full suite twice, 7,933 green both times. Leader re-measurement: 345 / 7,933 passed; lint clean.
 - **Reviewer (opus) — STATUS: PASS.** ADVISORY: the spy matches any 100 ms timer, not only the util's (no such exceljs timer found; harden only if it ever flakes).
 - **Files:** `control-lists.component.{html,ts,spec.ts}`, `shared/utils/xlsx-export.util.spec.ts`.
+
+### 2026-10-06 — Run 8: T-04 (Slice 4: Usage and consumer access)
+
+- **Base commit:** `6da269ff`.
+- **Implementers:** server (sonnet, high) and client (sonnet, medium) in parallel. **Reviewers:** opus, two parallel lenses.
+- **Environment:** the **user's own dev servers** were running (`nest start --watch` on 3001 from `dist/`, `ng serve` on 4200), and they were left alone. The workers were told not to run the server's `npm run build`, which would delete `dist/` under the watch server; `npx tsc -p tsconfig.build.json --noEmit` was the compile gate. No migration commands were run (no schema change in this slice).
+
+#### Attempt 1 — PASS (both lenses)
+
+- **Server, new files:**
+  - `control-list-usage.registry.ts` — singleton with 0 constructor params;
+  - `control-list-value-lookup.service.ts` — holds `assertValueInList`; its constructor takes only the two repositories;
+  - `control-list-natural-compare.util.ts`;
+  - `dto/get-list-values-by-key-query.dto.ts`;
+  - `test/control-lists-usage.integration-spec.ts`.
+- **Server, modified:**
+  - A9 / A13 return real `inUse` (summed across providers);
+  - A12 blocks a value in use: 409 `errors:{description:'Value "<v>" is referenced by <n> record(s) and cannot be deleted; deactivate it instead'}`, plus a warn log;
+  - A1 `usedBy` comes from the registry;
+  - **A13** `GET /api/control-lists/by-key/:listKey/values?portfolioId=&activeOnly=true` — no `@Roles` (still authenticated through `JwtMiddleware`); ordered by display order, then natural code; unknown key → 404;
+  - the module exports the registry and the lookup service.
+- **`assertValueInList`:**
+  - cross-list → 400 `Value <id> belongs to list "<a>", not "<e>"` (checked first);
+  - cross-portfolio → 400 `… portfolio <a>, not portfolio <e>`;
+  - unknown id → 404;
+  - `is_active` is not checked.
+- **Design deviation, accepted by the risk Reviewer and amended in `design.md` §5 rule 10:** `assertValueInList` lives on `ControlListValueLookupService`, not on `ControlListsService` (P-10). The `tasks.md` registry-test wording was amended to match R-CTL-005, where counts are summed over every provider.
+- **Client:**
+  - `ControlListValue.inUse` is now required;
+  - an **In use** column (number), between Order and Active;
+  - the list header shows "Used by: <names joined ', '>", or "Not linked to a form yet" when there are none;
+  - the in-use 409 is shown as-is through the existing flow.
+- **Reds observed (server):**
+  - registry returning only the first provider → `Expected 5 Received 2`;
+  - A12 block disabled → nothing thrown;
+  - cross-list and cross-portfolio checks disabled → the promise resolved;
+  - `@Roles` added to A13 → `Received [9, 1]`;
+  - a `CurrentUserUtil` param added to the registry / lookup → `TestingModule.compile()` DI error.
+  - The temporary consumer table plus a raw `DELETE` proved the FK RESTRICT backstop.
+- **Reds observed (client):**
+  - column removed → index −1;
+  - fallback removed → `Received ""`;
+  - generic message → detail mismatch.
+- **Worker results:**
+  - server: control-lists 14 suites / 182 tests (stable 3×); integration 4 suites / 32 tests; full 4,156 with 3 pre-existing failures; tsc and eslint clean;
+  - Swagger via `createDocument`: all 13 endpoints (`/categories`, `/categories/{id}`, `/portfolios/summary`, `/lists`, `/lists/{id}`, `/lists/{id}/values`, `/values/{id}`, `/by-key/{listKey}/values`), tag "Control Lists", bearer;
+  - client: 345 / 7,937, lint and build OK, hex grep → 0.
+- **Leader re-measurement (serial):**
+  - DB: no `*itest*` tables; `migrations` 369; values 23; `pi_delegate_history` 10;
+  - server tsc clean; 433 suites / 4,156 tests, 3 pre-existing failures;
+  - client 345 / 7,937; lint clean.
+  - **Server `npm run build` not run** (the user's watch server is running) — open done criterion.
+- **⚠️ Data observation:** the user-created list **"Otra" (id 15)** no longer exists. It was present at the close of T-03 (Run 7: 7 lists).
+  - Leader audit plus the risk Reviewer's audit of every DELETE / DROP in the four integration suites: all target ids from the suite's own inserts (`control_lists` `AUTO_INCREMENT` is now 34) or `LIKE '__t0X_itest__%'` patterns that cannot match "Otra"; no deletes by category or list of seeded or user rows; no TRUNCATE.
+  - **The tests are cleared.** The user's own dev servers can write the same DB. The cause is undetermined (no binlog or general log), and the user has been asked. A UI delete would have printed `control_lists.deleted entity=control_list id=15` on the user's server console.
+- **ADVISORY (recorded):**
+  1. In the T-04 integration `afterAll`, `DROP TABLE IF EXISTS` is not in `finally`; a `beforeAll` failure before CREATE TABLE skips the rest of the cleanup (scratch rows leak; no user data at risk).
+  2. A12 does not map FK errno 1451 → 409, so a consumer with the FK but no provider (or a race) gets a 500 (P-14). **Carry to child 2 `organizational-structure`.**
+  3. The `assertValueInList` portfolio comparison is strict on a bigint (safe in production because `bigNumberStrings: false`; unsafe under a raw DataSource) — suggest `Number()` on both sides.
+  4. `register()` does not deduplicate — consumers must register once, from a singleton `onModuleInit`. **Carry to child 2.**
+  5. A13 returns 404 for an inactive list; `activeOnly` values `0` / `no` / empty resolve to true (fails safe); A13 exposes `inUse` and runs every provider's count on each read.
+  6. Client: the 409 fixture text is a placeholder, not the server's literal string; a stale comment at `component.ts:839`.
+  7. A10/A11 responses return `inUse: 0`; the client always reloads through A9, so this is harmless.
+- **Requirements covered:**
+  - R-CTL-005, all of it (including AC.3, the test consumer);
+  - R-CTL-003 *Used by*;
+  - R-CTL-006, AC.1–2 (ordered read, unknown key, *Value from another list*);
+  - R-CTL-004 *Deactivate* (A13 omits inactive values);
+  - R-CTL-007 (A13 open to any authenticated user);
+  - R-CTL-001 end to end.
+- **Forward pointers:**
+  - **child 2 (`organizational-structure`):** register the consumer once, from a singleton (`onModuleInit`); add the FK `ON DELETE RESTRICT` to `control_list_values.id`; call `ControlListValueLookupService.assertValueInList` before every write that stores a value id; map errno 1451 → 409 in A12 (advisory 2).
+  - **T-05:** confirm the user's servers are stopped, then run the server `npm run build`; then the HITL checklist.
+- **Final status: PASS on attempt 1.** Done criteria 1–2 met; criterion 3 waits on the server build.

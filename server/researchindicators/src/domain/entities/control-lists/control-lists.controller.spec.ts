@@ -34,6 +34,7 @@ describe('ControlListsController', () => {
     createValue: jest.fn(),
     updateValue: jest.fn(),
     removeValue: jest.fn(),
+    getValuesByKey: jest.fn(),
   };
 
   const mockFormat = jest.fn();
@@ -316,6 +317,53 @@ describe('ControlListsController', () => {
         data,
         status: HttpStatus.OK,
       });
+    });
+  });
+
+  describe('getValuesByKey (A13, T-04)', () => {
+    it('reads listKey from the param and portfolioId/activeOnly from the query, returning the envelope', async () => {
+      const query = { portfolioId: 2, activeOnly: true };
+      const data = [{ id: 1, listId: 3, code: 'DIR-01', value: 'Increase' }];
+      mockService.getValuesByKey.mockResolvedValue(data);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.getValuesByKey('kpi.direction', query);
+
+      expect(mockService.getValuesByKey).toHaveBeenCalledWith(
+        2,
+        'kpi.direction',
+        true,
+      );
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        description: 'Values found',
+        data,
+        status: HttpStatus.OK,
+      });
+    });
+
+    it('defaults activeOnly to true when the query omits it', async () => {
+      const query = { portfolioId: 2 } as any;
+      mockService.getValuesByKey.mockResolvedValue([]);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.getValuesByKey('kpi.direction', query);
+
+      expect(mockService.getValuesByKey).toHaveBeenCalledWith(
+        2,
+        'kpi.direction',
+        true,
+      );
+    });
+
+    // Falsifier 5 (tasks.md T-04): adding @Roles to A13 must fail this test
+    // (R-CTL-007 "the consumer read is available to any authenticated
+    // user").
+    it('declares NO roles metadata — open to any authenticated user (design §8)', () => {
+      const roles = Reflect.getMetadata(
+        ROLES_KEY,
+        ControlListsController.prototype.getValuesByKey,
+      );
+      expect(roles).toBeUndefined();
     });
   });
 });

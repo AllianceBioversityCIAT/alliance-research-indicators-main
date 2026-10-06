@@ -10,6 +10,7 @@ import { ControlListsService } from '../src/domain/entities/control-lists/contro
 import { ControlListCategoryRepository } from '../src/domain/entities/control-lists/repositories/control-list-category.repository';
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
+import { ControlListUsageRegistry } from '../src/domain/entities/control-lists/control-list-usage.registry';
 import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
 import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
@@ -129,6 +130,11 @@ describe('Control Lists — categories, roles against real MySQL (T-01)', () => 
           useFactory: () => new PortfoliosRepository(dataSource),
         },
         CurrentUserUtil,
+        // T-04 (consumer per the brief's forward pointer): ControlListsService
+        // now depends on ControlListUsageRegistry. No providers are
+        // registered in this suite, so A1 usedBy / A9 inUse stay [] / 0 —
+        // this suite is about categories, not usage.
+        ControlListUsageRegistry,
         Reflector,
         RolesGuard,
         SetUpInterceptor,

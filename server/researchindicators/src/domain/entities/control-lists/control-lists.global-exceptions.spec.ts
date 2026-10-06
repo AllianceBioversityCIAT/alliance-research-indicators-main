@@ -8,6 +8,7 @@ import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { GlobalExceptions } from '../../shared/error-management/global.exception';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ControlListUsageRegistry } from './control-list-usage.registry';
 
 /**
  * T-01 rework, Risk Reviewer issue 1 (verbatim): "the duplicate-name 409
@@ -39,6 +40,11 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
  * SAME {description, field} object shape (field: 'code' | 'value'); a
  * list-has-values delete is a non-field conflict, the same envelope as the
  * T-02 non-field conflicts above, minus the `field` key.
+ *
+ * T-04 extends this with the in-use contract (design §5 rule 5, R-CTL-005):
+ * a value delete blocked by the registry is ALSO a non-field conflict, the
+ * SAME envelope as the T-02/T-03 non-field conflicts, stating the count and
+ * proposing deactivation.
  */
 describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   let service: ControlListsService;
@@ -93,6 +99,13 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     user_id: 1,
   };
 
+  const mockGetInUseCount = jest.fn();
+  const mockUsageRegistry = {
+    getConsumerNamesForKey: jest.fn().mockReturnValue([]),
+    getInUseCounts: jest.fn().mockResolvedValue(new Map()),
+    getInUseCount: mockGetInUseCount,
+  };
+
   function makeHost(request: any) {
     const json = jest.fn();
     const status = jest.fn().mockReturnValue({ json });
@@ -129,6 +142,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
     mockValueCount.mockResolvedValue(0);
+    mockGetInUseCount.mockResolvedValue(0);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -147,6 +161,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
         },
         { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
+        { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
       ],
     }).compile();
 
@@ -493,6 +508,49 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       },
       timestamp: expect.any(String),
       path: '/api/control-lists/lists/2/values',
+    });
+  });
+
+  // Pinned 409 contract (T-04, design §5 rule 5 / R-CTL-005): errors is the
+  // OBJECT {description} with NO field (non-field conflict, same envelope
+  // family as the T-02/T-03 non-field conflicts above), naming the count and
+  // proposing deactivation.
+  it('409 value in use: errors is the OBJECT {description} with NO field, naming the count and proposing deactivation (T-04)', async () => {
+    mockValueFindOne.mockResolvedValue({
+      id: 9,
+      list_id: 2,
+      value: 'Division',
+    });
+    mockListFindOne.mockResolvedValue({
+      id: 2,
+      portfolio_id: 2,
+      is_active: true,
+    });
+    mockGetInUseCount.mockResolvedValue(3);
+
+    let thrown: unknown;
+    try {
+      await service.removeValue(9);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/values/9', method: 'DELETE' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'Value "Division" is referenced by 3 record(s) and cannot be deleted; deactivate it instead',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/values/9',
     });
   });
 });

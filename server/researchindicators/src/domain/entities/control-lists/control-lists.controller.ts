@@ -30,6 +30,7 @@ import { CreateControlListDto } from './dto/create-control-list.dto';
 import { UpdateControlListDto } from './dto/update-control-list.dto';
 import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
 import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
+import { GetListValuesByKeyQueryDto } from './dto/get-list-values-by-key-query.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -38,8 +39,9 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
 // Admin-only module (design.md §8, D-CTL-7): every handler here is
 // CENTER_ADMIN / SYSTEM_ADMIN. TECHNICAL_SUPPORT is deliberately NOT
-// granted, unlike portfolios.controller.ts's broader set. A13 (the consumer
-// read, open to any authenticated user) belongs to T-04, not this slice.
+// granted, unlike portfolios.controller.ts's broader set. The one exception
+// is A13 (getValuesByKey, T-04): the consumer read, open to any
+// authenticated user — it deliberately has NO @Roles decorator.
 @Controller()
 @ApiTags('Control Lists')
 @ApiBearerAuth()
@@ -355,5 +357,56 @@ export class ControlListsController {
         status: HttpStatus.OK,
       }),
     );
+  }
+
+  // A13 (design.md §4, §8, R-CTL-006): the consumer read. Deliberately
+  // carries NO @Roles decorator — RolesGuard allows any request through
+  // when a handler declares no roles metadata (roles.guard.ts:16-18), and
+  // JwtMiddleware already rejects an unauthenticated request before this
+  // controller is ever reached, so "no @Roles" here means "any
+  // authenticated user", not "public".
+  @Get('by-key/:listKey/values')
+  @ApiOperation({
+    summary:
+      "Read a list's values by portfolio and system key (consumer read, any authenticated user)",
+  })
+  @ApiParam({
+    name: 'listKey',
+    type: String,
+    required: true,
+    description: 'List system key',
+  })
+  @ApiQuery({
+    name: 'portfolioId',
+    type: Number,
+    required: true,
+    description: 'Portfolio id to scope the read',
+  })
+  @ApiQuery({
+    name: 'activeOnly',
+    type: Boolean,
+    required: false,
+    description: 'Omit inactive values when true (default true)',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async getValuesByKey(
+    @Param('listKey') listKey: string,
+    @Query() query: GetListValuesByKeyQueryDto,
+  ) {
+    return this.controlListsService
+      .getValuesByKey(query.portfolioId, listKey, query.activeOnly ?? true)
+      .then((data) =>
+        ResponseUtils.format({
+          description: 'Values found',
+          data,
+          status: HttpStatus.OK,
+        }),
+      );
   }
 }

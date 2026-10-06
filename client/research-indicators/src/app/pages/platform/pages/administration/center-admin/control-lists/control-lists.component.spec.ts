@@ -104,8 +104,9 @@ const controlList = (overrides: Partial<ControlList> = {}): ControlList => ({
   ...overrides
 });
 
-// T-03 — design §4 A9–A12. Mirrors the client-side `ControlListValue` interface, which in turn
-// mirrors the server's `ControlListValueResponse` (see that interface's own doc comment).
+// T-03/T-04 — design §4 A9–A12. Mirrors the client-side `ControlListValue` interface, which in
+// turn mirrors the server's `ControlListValueResponse` (see that interface's own doc comment).
+// `inUse` defaults to 0 (not in use) — T-04 made it a REQUIRED field (A9 always sends it).
 const controlListValue = (overrides: Partial<ControlListValue> = {}): ControlListValue => ({
   id: 101,
   listId: 10,
@@ -114,6 +115,7 @@ const controlListValue = (overrides: Partial<ControlListValue> = {}): ControlLis
   description: null,
   displayOrder: 1,
   isActive: true,
+  inUse: 0,
   ...overrides
 });
 
@@ -739,6 +741,58 @@ describe('ControlListsComponent', () => {
       expect(el.querySelector('[data-testid="list-header-reference"]')?.textContent?.trim()).toBe('P2 · kpi.direction');
     });
 
+    // ─── T-04: "Used by" (design §4 A1 "usedBy", §5 rule 5, R-CTL-003 "Used by") ─────────────
+
+    // Falsifier (b): a fixture where `usedBy` is already non-empty cannot prove the fallback
+    // text appears when it is empty — `directionList`'s default (`listSummary()`) IS `[]`.
+    it('shows "Not linked to a form yet" in the list header when usedBy is empty (falsifier b)', async () => {
+      await setup([kpiCategory]);
+
+      component.selectList(directionList.id);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="list-header-used-by"]')?.textContent?.trim()).toBe('Not linked to a form yet');
+    });
+
+    it('shows the joined consumer names in the list header "Used by" line when usedBy is populated', async () => {
+      const usedList = listSummary({
+        id: 13,
+        key: 'org.level',
+        name: 'Organizational level',
+        isSystem: true,
+        usedBy: ['Organizational Structure › Level']
+      });
+      const orgCategory = category({ id: 1, name: 'Organizational structure', lists: [usedList] });
+      await setup([orgCategory]);
+
+      component.selectList(usedList.id);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="list-header-used-by"]')?.textContent?.trim()).toBe('Organizational Structure › Level');
+    });
+
+    it('joins MULTIPLE consumer names in the "Used by" line (not just the first)', async () => {
+      const usedList = listSummary({
+        id: 14,
+        key: 'kpi.unit_of_measure',
+        name: 'Unit of measure',
+        isSystem: true,
+        usedBy: ['Organizational Structure › Level', 'Strategy Framework › KPI']
+      });
+      const kpiUomCategory = category({ id: 1, name: 'KPIs', lists: [usedList] });
+      await setup([kpiUomCategory]);
+
+      component.selectList(usedList.id);
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="list-header-used-by"]')?.textContent?.trim()).toBe(
+        'Organizational Structure › Level, Strategy Framework › KPI'
+      );
+    });
+
     // Clicking the rendered row (not calling selectList() directly) — KZ-001.
     it('clicking a rendered list row selects it and updates the header', async () => {
       await setup([kpiCategory]);
@@ -986,9 +1040,35 @@ describe('ControlListsComponent', () => {
     const kpiCategory = category({ id: 1, name: 'KPIs', lists: [directionList] });
 
     const directionValues: ControlListValue[] = [
-      controlListValue({ id: 101, listId: 10, code: 'DIR-01', value: 'Increase', displayOrder: 1 }),
-      controlListValue({ id: 102, listId: 10, code: 'DIR-02', value: 'Decrease', displayOrder: 2 })
+      controlListValue({ id: 101, listId: 10, code: 'DIR-01', value: 'Increase', displayOrder: 1, inUse: 3 }),
+      controlListValue({ id: 102, listId: 10, code: 'DIR-02', value: 'Decrease', displayOrder: 2, inUse: 0 })
     ];
+
+    // ─── T-04: "In use" column (design §4 A9 "inUse: number", §6.2 values table) ───────────────
+    // Falsifier (a): a fixture where every row shares the same inUse count cannot prove the
+    // column renders the PER-ROW value — directionValues above deliberately differ (3 vs 0).
+    it('renders the "In use" column between Order and Active, with the per-row count', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const el = fixture.nativeElement as HTMLElement;
+      const headers = Array.from(el.querySelectorAll('[data-testid^="column-header-"]')).map(node =>
+        node.getAttribute('data-testid')
+      );
+      const orderIndex = headers.indexOf('column-header-displayOrder');
+      const inUseIndex = headers.indexOf('column-header-inUse');
+      const activeIndex = headers.indexOf('column-header-isActive');
+      expect(inUseIndex).toBeGreaterThan(orderIndex);
+      expect(inUseIndex).toBeLessThan(activeIndex);
+
+      const inUseCells = el.querySelectorAll('[data-testid="cell-inUse"]');
+      expect(inUseCells.length).toBe(2);
+      expect(inUseCells[0].textContent?.trim()).toBe('3');
+      expect(inUseCells[1].textContent?.trim()).toBe('0');
+    });
 
     it('loads values for the selected list (A9)', async () => {
       await setup([kpiCategory]);

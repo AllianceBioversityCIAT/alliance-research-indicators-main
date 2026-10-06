@@ -101,11 +101,12 @@ export interface ControlListCategoryUpdatePayload {
   description?: string;
 }
 
-// ─── T-03 (client half) — design §3 (permanent value ID, D-CTL-14), §4 A9–A12 ───────────────
+// ─── T-03/T-04 (client half) — design §3 (permanent value ID, D-CTL-14), §4 A9–A12 ───────────
 //
 // Mirrors the server's `ControlListValueResponse` (`control-lists.types.ts`) literally: `{ id,
-// listId, code, value, description, displayOrder, isActive, inUse }`. `inUse` is carried as
-// optional here only because this slice's UI does not render it (T-04 owns the "In use" column).
+// listId, code, value, description, displayOrder, isActive, inUse }`. `inUse` is REQUIRED
+// (T-04, design §4 A9 "each with inUse: number") — A9 always sends it, summed across every
+// registered consumer (design §5 rule 5); it drives the values table's "In use" column.
 export interface ControlListValue {
   id: number;
   listId: number;
@@ -114,8 +115,7 @@ export interface ControlListValue {
   description: string | null;
   displayOrder: number;
   isActive: boolean;
-  /** T-04 (design §4 A9 "inUse: number"). Not read by this slice's UI. */
-  inUse?: number;
+  inUse: number;
 }
 
 /**

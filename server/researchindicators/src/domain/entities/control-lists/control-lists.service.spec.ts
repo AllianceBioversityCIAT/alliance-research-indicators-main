@@ -10,6 +10,7 @@ import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
 import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { ControlListUsageRegistry } from './control-list-usage.registry';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
 import { ControlListValue } from './entities/control-list-value.entity';
@@ -79,6 +80,18 @@ describe('ControlListsService', () => {
     user_id: 1,
   };
 
+  // T-04 (consumer per the brief's forward pointer): ControlListsService now
+  // depends on ControlListUsageRegistry. Defaults keep every pre-T-04 test
+  // in this file unchanged (usedBy: [], inUse: 0 everywhere, no block).
+  const mockGetConsumerNamesForKey = jest.fn();
+  const mockGetInUseCounts = jest.fn();
+  const mockGetInUseCount = jest.fn();
+  const mockUsageRegistry = {
+    getConsumerNamesForKey: mockGetConsumerNamesForKey,
+    getInUseCounts: mockGetInUseCounts,
+    getInUseCount: mockGetInUseCount,
+  };
+
   let logSpy: jest.SpyInstance;
   let warnSpy: jest.SpyInstance;
 
@@ -133,6 +146,9 @@ describe('ControlListsService', () => {
     // list-has-values delete check) stay 0 unless a test overrides them.
     mockValueFind.mockResolvedValue([]);
     mockValueCount.mockResolvedValue(0);
+    mockGetConsumerNamesForKey.mockReturnValue([]);
+    mockGetInUseCounts.mockResolvedValue(new Map());
+    mockGetInUseCount.mockResolvedValue(0);
     logSpy = jest
       .spyOn(LoggerUtil.prototype, '_log')
       .mockImplementation(() => undefined);
@@ -157,6 +173,7 @@ describe('ControlListsService', () => {
         },
         { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
+        { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
       ],
     }).compile();
 
@@ -271,6 +288,27 @@ describe('ControlListsService', () => {
           isSystem: true,
           usedBy: [],
         },
+      ]);
+    });
+
+    // T-04 (design §5 rule 5, D-CTL-12): usedBy is derived from the
+    // registry's consumer names for each list's OWN key — a different key
+    // registered elsewhere contributes nothing.
+    it("derives each list's usedBy from the registry's consumer names for its own key (A1, T-04)", async () => {
+      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
+      mockFind.mockResolvedValue([buildCategory({ id: 2, portfolio_id: 2 })]);
+      mockListFind.mockResolvedValue([
+        buildList({ id: 6, category_id: 2, list_key: 'org.level' }),
+      ]);
+      mockGetConsumerNamesForKey.mockImplementation((key: string) =>
+        key === 'org.level' ? ['Organizational Structure › Level'] : [],
+      );
+
+      const result = await service.getCategories(2);
+
+      expect(mockGetConsumerNamesForKey).toHaveBeenCalledWith('org.level');
+      expect(result[0].lists[0].usedBy).toEqual([
+        'Organizational Structure › Level',
       ]);
     });
   });
@@ -1014,6 +1052,28 @@ describe('ControlListsService', () => {
         },
       ]);
     });
+
+    // T-04 (design §5 rule 5): inUse is the SUMMED count from the registry
+    // per value id, 0 when none is registered.
+    it('attaches the summed in-use count per value from the registry', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 9, list_id: 2, code: 'L1' }),
+        buildValue({ id: 10, list_id: 2, code: 'L2' }),
+      ]);
+      mockGetInUseCounts.mockResolvedValue(
+        new Map([
+          [9, 5],
+          [10, 0],
+        ]),
+      );
+
+      const result = await service.getValues(2);
+
+      expect(mockGetInUseCounts).toHaveBeenCalledWith([9, 10]);
+      expect(result.find((v) => v.id === 9)?.inUse).toBe(5);
+      expect(result.find((v) => v.id === 10)?.inUse).toBe(0);
+    });
   });
 
   describe('createValue (A10)', () => {
@@ -1336,9 +1396,9 @@ describe('ControlListsService', () => {
       expect(mockValueDelete).not.toHaveBeenCalled();
     });
 
-    // T-04 owns the in-use (registry) block; this slice only physically
-    // deletes the row (D-CTL-5) — tasks.md T-03 "A12 here is a physical
-    // delete".
+    // Falsifier 2 guard (tasks.md T-04): with in-use at 0 (the default
+    // registry mock), the value still deletes physically (D-CTL-5) — the
+    // list-has-values rule lives on A8, not here.
     it('physically deletes the value and returns its id, logging the write', async () => {
       mockValueFindOne.mockResolvedValue(buildValue({ id: 9, list_id: 2 }));
       mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
@@ -1346,6 +1406,7 @@ describe('ControlListsService', () => {
 
       const result = await service.removeValue(9);
 
+      expect(mockGetInUseCount).toHaveBeenCalledWith(9);
       expect(mockValueDelete).toHaveBeenCalledWith(9);
       expect(result).toEqual({ id: 9 });
       expect(logSpy).toHaveBeenCalledWith(
@@ -1353,6 +1414,113 @@ describe('ControlListsService', () => {
           'control_lists.deleted entity=control_list_value id=9 portfolio_id=2 user_id=1',
         ),
       );
+    });
+
+    // Falsifier 2 (tasks.md T-04): dropping the in-use check must fail THIS
+    // on the ConflictException, and prove nothing was deleted.
+    it('throws 409 naming the count and proposing deactivation when in-use > 0, deletes nothing, and warns (R-CTL-005)', async () => {
+      mockValueFindOne.mockResolvedValue(
+        buildValue({ id: 9, list_id: 2, value: 'Division' }),
+      );
+      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockGetInUseCount.mockResolvedValue(3);
+
+      let thrown: unknown;
+      try {
+        await service.removeValue(9);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toMatchObject({
+        status: 409,
+        response: {
+          message: {
+            description: expect.stringMatching(/\b3\b.*deactivat/i),
+          },
+        },
+      });
+      expect(mockValueDelete).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.blocked_delete entity=control_list_value id=9 reason=in_use count=3',
+        ),
+      );
+    });
+  });
+
+  describe('getValuesByKey (A13, T-04)', () => {
+    it('throws NotFoundException for an unknown key in the portfolio (R-CTL-006 "Ordered read")', async () => {
+      mockListFindOne.mockResolvedValue(null);
+
+      await expect(
+        service.getValuesByKey(2, 'kpi.unknown', true),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockListFindOne).toHaveBeenCalledWith({
+        where: {
+          portfolio_id: 2,
+          list_key: 'kpi.unknown',
+          is_active: true,
+        },
+      });
+    });
+
+    // R-CTL-006 "Ordered read" + the natural-sort tie-break (same family as
+    // T-03's comparator fixture): equal display order, UOM-2 before UOM-10.
+    it('orders by display order first, then natural code (UOM-2 before UOM-10 at equal order)', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({ id: 3, list_key: 'kpi.unit_of_measure' }),
+      );
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 1, list_id: 3, code: 'UOM-10', display_order: 1 }),
+        buildValue({ id: 2, list_id: 3, code: 'UOM-2', display_order: 1 }),
+        buildValue({ id: 3, list_id: 3, code: 'UOM-1', display_order: 0 }),
+      ]);
+
+      const result = await service.getValuesByKey(
+        2,
+        'kpi.unit_of_measure',
+        true,
+      );
+
+      expect(result.map((v) => v.code)).toEqual(['UOM-1', 'UOM-2', 'UOM-10']);
+    });
+
+    it('reads with is_active: true when activeOnly is true (default)', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockValueFind.mockResolvedValue([]);
+
+      await service.getValuesByKey(2, 'kpi.direction', true);
+
+      expect(mockValueFind).toHaveBeenCalledWith({
+        where: { list_id: 3, is_active: true },
+      });
+    });
+
+    // R-CTL-004 "Deactivate": the consumer read with activeOnly=true omits
+    // inactive values; activeOnly=false includes them.
+    it('reads without an is_active filter when activeOnly is false', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockValueFind.mockResolvedValue([]);
+
+      await service.getValuesByKey(2, 'kpi.direction', false);
+
+      expect(mockValueFind).toHaveBeenCalledWith({
+        where: { list_id: 3 },
+      });
+    });
+
+    it('attaches the summed in-use count per value, same as A9', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 1, list_id: 3, code: 'DIR-01', display_order: 0 }),
+      ]);
+      mockGetInUseCounts.mockResolvedValue(new Map([[1, 4]]));
+
+      const result = await service.getValuesByKey(2, 'kpi.direction', true);
+
+      expect(result[0].inUse).toBe(4);
     });
   });
 });

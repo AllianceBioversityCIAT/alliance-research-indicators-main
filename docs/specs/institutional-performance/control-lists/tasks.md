@@ -200,7 +200,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-04 — Slice 4: Usage and consumer access (in-use, *Used by*, by-key read, membership check)
 
 - **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
-- **Status:** todo · **Size:** M · **Dependencies:** T-03
+- **Status:** done (PASS on attempt 1, 2026-10-06) — server `npm run build` pending (user watch server running) · **Size:** M · **Dependencies:** T-03
 - **Requirements covered:** R-CTL-005 (all, incl. AC.3 test consumer), R-CTL-003 *Used by*, R-CTL-006 (ordered read, `activeOnly`, unknown key, **membership check — AC.2**), R-CTL-004 *Deactivate* (consumer read omits inactive values), R-CTL-007 (A13 open to any authenticated user), R-CTL-001 AC.1–2 end to end
 - **Design refs:** §4 A1 `usedBy`, A9 `inUse`, A12 block, A13; §5 rules 5, 10; D-CTL-3, D-CTL-12, D-CTL-14, D-CTL-15, P-10
 - **Scope — database:** **no schema change.** The integration test creates a temporary consumer table on the local dev DB with a plain FK to `control_list_values.id` `ON DELETE RESTRICT`. It proves the DB backstop (D-CTL-3) and drops the table afterwards.
@@ -213,7 +213,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Scope — screen:** the **In use** column in the values table; the list header shows *Used by* or *Not linked to a form yet*; a 409 on a value delete shows the server description with a single *Close*.
 - **Tests:**
   - **Server unit:**
-    - registry: two providers on the same key returning 2 and 3 sum to 5; another key contributes nothing; consumer names come back per key;
+    - registry: two providers on the same key returning 2 and 3 sum to 5; a provider declaring another key contributes no consumer name to this key's *Used by* (counts are summed over every registered provider, per R-CTL-005 — amended at T-04); consumer names come back per key;
     - service: delete with a provider returning 3 → 409, and the value is still there;
     - A13: ordered read puts `UOM-2` before `UOM-10` at equal order; `activeOnly` omits inactive values; unknown key → 404;
     - `assertValueInList`: the right key and portfolio → returns the value; a `kpi.direction` value checked against `kpi.unit_of_measure` → 400 naming the expected key; the right key in another portfolio → 400; unknown id → 404;
@@ -234,8 +234,8 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Consumers:** T-01…T-03 service, controller and page specs (A1, A9 and A12 shape changes).
 - **Review:** `full` — the protection rule and the contract every later child depends on.
 - **Done criteria:**
-  - [ ] Specs and integration green; falsifiers 1–5 observed red, then reverted.
-  - [ ] All 13 endpoints in `/swagger` (quote what was seen).
+  - [x] Specs and integration green; falsifiers 1–5 observed red, then reverted.
+  - [x] All 13 endpoints in `/swagger` (quote what was seen). *(Via `SwaggerModule.createDocument`; paths quoted in Run 8.)*
   - [ ] Both packages' test, lint and build gates.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `api-design-principles`, `angular-developer`
 
