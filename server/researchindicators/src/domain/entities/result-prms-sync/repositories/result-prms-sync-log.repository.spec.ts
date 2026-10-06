@@ -312,12 +312,64 @@ describe('ResultPrmsSyncLogRepository', () => {
 
     await acceptedSettle();
 
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0][0]).toMatch(/prms_result_code\s*=\s*\?/);
     expect(query.mock.calls[0][0]).toMatch(/prms_phase_id\s*=\s*\?/);
     // result code, phase id, result id -- ORDER MATTERS: positional `?` params,
     // so a transposition writes the phase into prms_result_code.
     expect(query.mock.calls[0][1]).toEqual([555, 36, 42]);
+  });
+
+  it('also writes ONLY the PRMS code onto the live version of the pushed result', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await acceptedSettle();
+
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/SET live\.prms_result_code = \?/);
+    expect(liveSql).toMatch(/live\.is_snapshot = FALSE/);
+    expect(liveSql).toMatch(/live\.is_active = TRUE/);
+    expect(liveSql).toMatch(
+      /pushed\.result_official_code = live\.result_official_code/,
+    );
+    // The phase belongs to the pushed version, never to the live row.
+    expect(liveSql).not.toMatch(/prms_phase_id/);
+    expect(query.mock.calls[1][1]).toEqual([555, 42]);
+  });
+
+  it('does not touch the live version when PRMS returned no code', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: null,
+      prmsPhaseId: 36,
+    });
+
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('still writes the live code when the snapshot metadata write fails', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query
+      .mockRejectedValueOnce(new Error('snapshot write failed'))
+      .mockResolvedValueOnce({ affectedRows: 1 });
+
+    await expect(acceptedSettle()).resolves.toBe('settled');
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1][0])).toMatch(/live\.prms_result_code/);
   });
 
   it('SURVIVES a metadata write failure: still settled, never throws', async () => {

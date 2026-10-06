@@ -539,5 +539,47 @@ export class ResultPrmsSyncLogRepository {
           }`,
       );
     }
+
+    await this.recordPrmsResultCodeOnLiveVersion(input);
+  }
+
+  /**
+   * The push is made from a version (snapshot) row, but the PRMS code must also
+   * be visible on the live version of the same result. Only the code is copied:
+   * the phase belongs to the version that was sent, not to the live row.
+   *
+   * Same best-effort contract as the snapshot write, in its own try so that one
+   * failing never skips the other. A missing code is not written, so a response
+   * without one cannot erase a code the live row already holds.
+   */
+  private async recordPrmsResultCodeOnLiveVersion(
+    input: SettleIfInFlightInput,
+  ): Promise<void> {
+    if (input.prmsResultCode == null) {
+      return;
+    }
+
+    try {
+      await this.dataSource.query(
+        `
+        UPDATE results live
+        INNER JOIN results pushed
+          ON pushed.result_official_code = live.result_official_code
+        SET live.prms_result_code = ?
+        WHERE pushed.result_id = ?
+          AND live.is_snapshot = FALSE
+          AND live.is_active = TRUE
+          AND live.platform_code = 'STAR'
+        `,
+        [input.prmsResultCode, input.resultId],
+      );
+    } catch (error) {
+      this.logger._error(
+        `PRMS result code not stored on the live version of result ${input.resultId} (attempt ${input.attemptId}): ` +
+          `the sync IS recorded as ACCEPTED, but the live row has no prms_result_code. Do NOT re-sync. Cause: ${
+            (error as Error)?.message ?? error
+          }`,
+      );
+    }
   }
 }
