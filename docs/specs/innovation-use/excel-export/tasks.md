@@ -36,7 +36,7 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 
 ### T-01 — Bring scratch to HEAD, then author the `report_innovation_use` view migration
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done (PASS attempt 2, 2026-10-05 — see `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-IUX-001 (whole), R-IUX-002 (whole), R-IUX-003 (whole), R-IUX-004 (whole), R-IUX-005 (whole), R-IUX-006 (whole), NFR-IUX-001 *BUT* clause (no `*_validation()`, no top-level `GROUP BY`/`DISTINCT`/aggregate/`ORDER BY`/`LIMIT`), NFR-IUX-004, the requirements' exclusions note (JD-1, JD-10)
 - **Design refs:** §3.1–§3.5, §2.1 rows 1 and 3, DD-1, DD-2, DD-5, DD-6; Premise Ledger P-13 and P-20 (settled here)
 - **Scope:**
@@ -65,11 +65,11 @@ All tasks are in the server package, so they run **sequentially** in one worktre
 - **Consumers:** none yet (new symbol). Phase 2 joins it in T-04.
 - **Review:** `full`: the cell expressions carry every green-check rule, which is the spec's dominant defect class (D1).
 - **Done criteria:**
-  - [ ] Scratch at HEAD: `migration:show` 0 pending, B-2 = `1`, workaround recorded in `execution.md`
-  - [ ] Migration applies on scratch with no error (P-20 settled, outcome recorded); `SELECT … LIMIT 1` returns the 9 aliased columns + `result_id`
-  - [ ] Migration spec green; each of the 3 Falsifier mutations observed red at assertion level, messages quoted
-  - [ ] `npx eslint` on both files clean; `npx prettier --check` clean
-  - [ ] `migration:test:revert` drops the view (B-1's error returns), then re-apply
+  - [x] Scratch at HEAD: `migration:show` 0 pending, B-2 = `1`, workaround recorded in `execution.md`
+  - [x] Migration applies on scratch with no error (P-20 settled, outcome recorded); `SELECT … LIMIT 1` returns the 9 aliased columns + `result_id`
+  - [x] Migration spec green; each of the 3 Falsifier mutations observed red at assertion level, messages quoted
+  - [x] `npx eslint` on both files clean; `npx prettier --check` clean
+  - [x] `migration:test:revert` drops the view (B-1's error returns), then re-apply
 - **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging` (for step 1)
 
 ---
