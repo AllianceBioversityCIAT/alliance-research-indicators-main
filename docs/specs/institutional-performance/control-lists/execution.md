@@ -560,3 +560,4 @@
   - **child 2 (`organizational-structure`):** register the consumer once, from a singleton (`onModuleInit`); add the FK `ON DELETE RESTRICT` to `control_list_values.id`; call `ControlListValueLookupService.assertValueInList` before every write that stores a value id; map errno 1451 → 409 in A12 (advisory 2).
   - **T-05:** confirm the user's servers are stopped, then run the server `npm run build`; then the HITL checklist.
 - **Final status: PASS on attempt 1.** Done criteria 1–2 met; criterion 3 waits on the server build.
+- **Lint gate on committed blobs (Leader, after `6962e7ae`):** 18 server `.ts` files linted via stdin → 0 failing. The server `npm run build` is still pending.
