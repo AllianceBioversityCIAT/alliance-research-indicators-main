@@ -332,6 +332,9 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(liveSql).toMatch(/SET live\.prms_result_code = \?/);
     expect(liveSql).toMatch(/live\.is_snapshot = FALSE/);
     expect(liveSql).toMatch(/live\.is_active = TRUE/);
+    // Official codes are shared across platforms (TIP, PRMS, AICCRA rows exist
+    // with the same code in Dev), so without this filter a TIP row is written.
+    expect(liveSql).toMatch(/live\.platform_code = 'STAR'/);
     expect(liveSql).toMatch(
       /pushed\.result_official_code = live\.result_official_code/,
     );
