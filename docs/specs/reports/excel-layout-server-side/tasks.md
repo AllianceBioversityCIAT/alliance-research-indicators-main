@@ -2,7 +2,7 @@
 
 - **Module:** reports (workbook `star_results_metadata`)
 - **Spec id:** 2026-10-excel-layout-server-side
-- **Status:** not-started
+- **Status:** in-progress (T-01 done)
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — **APPROVED** after round 1 + scoped re-judgment)
@@ -31,7 +31,7 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 
 ### T-01 — Section catalog, tagged columns and the band derivation
 
-- **Status:** not-started · **Size:** M · **Dependencies:** none
+- **Status:** [x] done (PASS attempt 1, 2026-10-06) · **Size:** M · **Dependencies:** none
 - **Requirements covered:**
   - R-WBL-002 (whole: missing tag and unknown section both fail the build);
   - R-WBL-003 (derivation): "Today's layout" (bands only), "A column is added to a section", "A new section is appended" incl. *BUT no existing band moves, renames or recolours*, "Split section" incl. *BUT must NOT paint two bands or an overlapping band*, "Empty section";
@@ -61,10 +61,10 @@ All tasks are server-side and **sequential** in one worktree (root `CLAUDE.md` c
 - **Consumers:** `STAR_RESULTS_METADATA_RAW_COLUMNS` → `star-results-metadata-workbook.handler.ts` (design P-6). The retyped array is a subtype of `ExcelColumnSpec[]`, so the handler keeps compiling unchanged; B-1 must still read `143` tests green plus the new ones.
 - **Review:** `full` — override (b): an exported symbol is retyped and a new shared derivation contract is introduced.
 - **Done criteria:**
-  - [ ] Three specs green; B-1 suites still green
-  - [ ] Falsifiers (a)–(d) observed red, quoted
-  - [ ] `npm run build` exit 0; `npx eslint` and `npx prettier --check` clean on every touched file
-  - [ ] `git diff` touches only the files of scope items 1–4
+  - [x] Three specs green; B-1 suites still green
+  - [x] Falsifiers (a)–(d) observed red, quoted
+  - [x] `npm run build` exit 0; `npx eslint` and `npx prettier --check` clean on every touched file
+  - [x] `git diff` touches only the files of scope items 1–4
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---
