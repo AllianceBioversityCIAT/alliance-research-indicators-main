@@ -873,6 +873,13 @@ describe('AllianceAlignmentComponent', () => {
       } as never);
     }
 
+    // The mock's default metadata is the OICR indicator (5), which never shows the
+    // Pool Funding Alignment section at all — see the OICR test at the end of this
+    // block. Every warning case below needs an indicator that CAN show it.
+    beforeEach(() => {
+      cache.metadata.set({ indicator_id: 1 });
+    });
+
     it('does NOT change anything until the user confirms (enable path)', () => {
       seed([POOL, PLAIN]);
 
@@ -967,6 +974,29 @@ describe('AllianceAlignmentComponent', () => {
       //   would warn here, for a change that alters nothing about the section.
       expect(actions.showGlobalAlert).not.toHaveBeenCalled();
       expect(component.body().contracts.find(c => c.contract_id === '3')?.is_primary).toBe(true);
+    });
+
+    it('an OICR result never warns — the section is hidden for indicator 5', () => {
+      cache.metadata.set({ indicator_id: 5 });
+      seed([POOL, PLAIN]);
+
+      component.markAsPrimary(POOL, 'contract');
+
+      // ★ discriminating: this is the exact input that warns for indicator 1
+      //   (first test in this block). Only the indicator differs.
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(true);
+      expect(actions.saveCurrentSection).toHaveBeenCalled();
+    });
+
+    it('an OICR result does not warn when the Primary is cleared either', () => {
+      cache.metadata.set({ indicator_id: 5 });
+      seed([{ ...POOL, is_primary: true }]);
+
+      component.markAsPrimary({ ...POOL, is_primary: true }, 'contract');
+
+      expect(actions.showGlobalAlert).not.toHaveBeenCalled();
+      expect(component.body().contracts.find(c => c.contract_id === '1')?.is_primary).toBe(false);
     });
 
     it('swapping between two NON-contributing projects does not warn either', () => {

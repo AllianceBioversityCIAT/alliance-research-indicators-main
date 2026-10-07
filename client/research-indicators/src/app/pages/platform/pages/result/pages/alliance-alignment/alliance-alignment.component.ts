@@ -119,13 +119,13 @@ export default class AllianceAlignmentComponent {
   private readonly leverCustomNameSignals = new Map<string | number, WritableSignal<{ custom_lever_name: string }>>();
 
   contractServiceParams = computed(() => {
-    const indicatorId = this.cache.currentMetadata()?.indicator_id;
+    const indicatorId = Number(this.cache.currentMetadata()?.indicator_id);
     return {
       'exclude-pooled-funding': indicatorId !== 5
     };
   });
-  isOicrIndicator = computed(() => this.cache.currentMetadata()?.indicator_id === 5);
-  isPolicyChangeIndicator = computed(() => this.cache.currentMetadata()?.indicator_id === 4);
+  isOicrIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 5);
+  isPolicyChangeIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 4);
   isInnovationUseIndicator = computed(() => Number(this.cache.currentMetadata()?.indicator_id) === 6);
   isPortfolioP2Alignment = computed(() => this.getCurrentPortfolioId() === PORTFOLIO_P2_ID);
   alignmentRequestParams = computed(() => {
@@ -572,6 +572,9 @@ export default class AllianceAlignmentComponent {
     type: 'contract' | 'lever' | 'sdg'
   ): 'enable' | 'disable' | null {
     if (type !== 'contract') return null;
+    // OICR results never surface the Pool Funding Alignment section, so there is
+    // no section to enable or disable and nothing to interrupt the user for.
+    if (this.isOicrIndicator()) return null;
 
     const willHave = !item.is_primary && item.is_pool_funding_contributor === true;
     const hasNow = this.hasPoolFundingPrimary();
