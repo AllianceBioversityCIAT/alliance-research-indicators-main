@@ -95,7 +95,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-02 — Fixture suite: green-check parity, one row per result, EXPLAIN gate
 
-- **Status:** in-progress `[~]` — PAUSED 2026-10-06 (spec paused for the Excel-wide layout change; two gate tensions open, see `execution.md`) · **Size:** L · **Dependencies:** T-01
+- **Status:** done (PASS on attempt 2, 2026-10-06, see `execution.md`) · **Size:** L · **Dependencies:** T-01
 - **Requirements covered:**
   - NFR-IDX-002 (whole, incl. the two named divergences);
   - NFR-IDX-001 *Target* (a) and (b), timing as a reading;
@@ -154,10 +154,10 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Consumers:** the T-01 view. `star-results-export.repository.ts` is imported read-only for the B-7 Phase 2 SQL capture.
 - **Review:** `full`: correctness-critical gate for D1–D3, budgeted at 3 rounds.
 - **Done criteria:**
-  - [ ] All parity, NULL, divergence, one-row and exclusion cases green on scratch
-  - [ ] Falsifiers (a)–(f) observed red with quoted messages
-  - [ ] EXPLAIN excerpts (a) and (b) quoted in `execution.md`; B-7 still `60`
-  - [ ] Timing recorded as a reading
+  - [x] All parity, NULL, divergence, one-row and exclusion cases green on scratch
+  - [x] Falsifiers (a)–(f) observed red with quoted messages
+  - [x] EXPLAIN excerpts (a) and (b) quoted in `execution.md`; B-7 still `60`
+  - [x] Timing recorded as a reading
   - [x] **OQ-1 and OQ-2 asked at this task's continue gate**; answers recorded in `requirements.md` §10 (T-03 is blocked until then) — answered 2026-10-06 (OQ-1 confirmed, OQ-2 keep)
 - **Skills:** `nestjs-expert`, `tdd`, `systematic-debugging`
 
