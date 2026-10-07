@@ -242,7 +242,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 ### T-05 — HITL: real-browser check and rollout premise
 
 - **Jira:** [AC-1784](https://cgiarmel.atlassian.net/browse/AC-1784) (story [AC-1774](https://cgiarmel.atlassian.net/browse/AC-1774))
-- **Status:** todo · **Size:** S · **Dependencies:** T-04 deployed to Dev
+- **Status:** done — Dev run waived by the requester (local check, 2026-10-07; see `execution.md`) · **Size:** S · **Dependencies:** T-04 deployed to Dev
 - **Requirements covered:** R-CTL-009 AC.2 (resize persistence — the substitute gate from requirements §10), R-CTL-008 visual fidelity and *Menu placement* in a real browser, NFR-CTL-001 (timing, 3 runs), NFR-CTL-004 (keyboard pass), the P-13 rollout premise
 - **Design refs:** §10 Manual row, §11 Rollout, P-13, judgment J-7
 - **Scope:** no code. Update `execution.md` with the observations.
@@ -262,8 +262,8 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 - **Consumers:** n/a.
 - **Review:** `checklist`.
 - **Done criteria:**
-  - [ ] Steps 1–7 observed and quoted in `execution.md`.
-  - [ ] P-13 settled, or carried as an open rollout item with the owner named.
+  - [ ] Steps 1–7 observed and quoted in `execution.md`. *(Waived: requester checked locally, no per-step quotes; Dev run carried to rollout.)*
+  - [x] P-13 settled, or carried as an open rollout item with the owner named. *(Carried; owner: requester — `execution.md` T-05.)*
 - **Skills:** n/a
 
 ---

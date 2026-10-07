@@ -579,3 +579,13 @@
   - attempt 2 — **STATUS: PASS**, all blocking and advisory items applied; no new findings.
 - **Files:** `control-lists.service.ts`, `entities/control-list.entity.ts`, `control-lists.service.spec.ts`, `control-lists.global-exceptions.spec.ts`, `test/control-lists-lists.integration-spec.ts`; client `control-lists.component.{html,ts,spec.ts}`; spec docs.
 - **Final status: PASS on attempt 2.**
+
+### 2026-10-07 — T-05 (HITL): Dev run waived by the requester
+
+- **Requester's decision (verbatim):** "continua a la siguiente tarea sin hacer las pruebas en test. yo las hice en el local y no hubo problema".
+- **What this covers:** the requester ran the checks against their **local** environment and reported no problems. No per-step observations were given, so steps 1–7 are **not** quoted step by step (KZ-002), and nothing was observed on Dev. T-04 and CR-2 are not on `origin/dev` yet (checked 2026-10-07).
+- **Open items carried to rollout (owner: requester):**
+  - Steps 1–7 on Dev, especially step 2 (column widths kept after sort and page change: the R-CTL-009 AC.2 substitute gate) and step 1 (the item in the flyout).
+  - **P-13:** whether the Prod pipeline (Jenkins job `roar-monorepo-main`) applies migrations like Dev. Not settleable from the repo (`.github/workflows/jenkins-trigger-monorepo.yml` only triggers the Jenkins job). Check a `main` build console before the merge to `main`.
+  - Post-deploy check on Dev: `control_lists WHERE is_system=1` = 6 and values = 23 (pointer from Run 7).
+- **Final status:** done by requester waiver; Dev observation still open.
