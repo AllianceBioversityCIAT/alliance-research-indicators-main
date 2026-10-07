@@ -1,8 +1,10 @@
 import type { ExcelColumnSpec } from '../../core/excel-workbook.types';
+import { STAR_INNOVATION_DEV_RAW_COLUMNS } from './star-results-metadata.innovation-dev.columns';
 import type { StarRawSectionColumn } from './star-results-metadata.sections';
 
 /**
- * Raw data sheet columns A–CB (reference workbook "Raw data" header row).
+ * Raw data sheet columns A–DH (112 columns). Innovation Development is appended
+ * at 81–112; columns 1–80 stay in place.
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: StarRawSectionColumn[] = [
   {
@@ -523,6 +525,7 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: StarRawSectionColumn[] = [
     header: 'Quantifications',
     width: 56,
   },
+  ...STAR_INNOVATION_DEV_RAW_COLUMNS,
 ];
 
 export const STAR_RESULTS_METADATA_DICTIONARY_COLUMNS: ExcelColumnSpec[] = [

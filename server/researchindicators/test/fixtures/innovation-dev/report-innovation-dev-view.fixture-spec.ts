@@ -105,6 +105,9 @@ const ORG_BLANK_TYPE_CODE = 907_702;
 const ORG_BLANK_PARENT_CODE = 907_720;
 const ORG_BLANK_PARENT = 'Fixture parent type';
 const ORG_BLANK_CHILD_CODE = 907_721;
+const ORG_BLANK_PARENT_WITH_CHILD = 907_722;
+const ORG_CHILD_OF_BLANK_PARENT = 907_723;
+const ORG_CHILD_OF_BLANK_NAME = 'Named child of blank type';
 
 const CELL_KEYS = [
   'innovation_dev_short_title',
@@ -790,6 +793,19 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
     }
 
     await ensureNamed(
+      'indicator 1',
+      `SELECT indicator_id AS id, name FROM indicators WHERE indicator_id = ?`,
+      [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT],
+      'Capacity Sharing for Development',
+      `INSERT INTO indicators (indicator_id, name, indicator_type_id) VALUES (?, ?, 1)`,
+      [
+        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+        'Capacity Sharing for Development',
+      ],
+      `DELETE FROM indicators WHERE indicator_id = ?`,
+      [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT],
+    );
+    await ensureNamed(
       'anticipated users 1',
       `SELECT id, name FROM innovation_dev_anticipated_users WHERE id = 1`,
       [],
@@ -1003,6 +1019,22 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
         params: [ORG_BLANK_CHILD_CODE, ORG_BLANK_PARENT_CODE],
         del: `DELETE FROM clarisa_institution_types WHERE code = ?`,
         delParams: [ORG_BLANK_CHILD_CODE],
+      },
+      {
+        insert: `INSERT INTO clarisa_institution_types (code, name) VALUES (?, '')`,
+        params: [ORG_BLANK_PARENT_WITH_CHILD],
+        del: `DELETE FROM clarisa_institution_types WHERE code = ?`,
+        delParams: [ORG_BLANK_PARENT_WITH_CHILD],
+      },
+      {
+        insert: `INSERT INTO clarisa_institution_types (code, name, parent_code) VALUES (?, ?, ?)`,
+        params: [
+          ORG_CHILD_OF_BLANK_PARENT,
+          ORG_CHILD_OF_BLANK_NAME,
+          ORG_BLANK_PARENT_WITH_CHILD,
+        ],
+        del: `DELETE FROM clarisa_institution_types WHERE code = ?`,
+        delParams: [ORG_CHILD_OF_BLANK_PARENT],
       },
       {
         insert: `INSERT INTO innovation_dev_anticipated_users (id, name) VALUES (?, '')`,
@@ -2050,6 +2082,32 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
     );
   });
 
+  it('a blank institution-type name that has one child renders Unknown then the child name', async () => {
+    const id = await makeLevel6(
+      {},
+      {
+        actors: [FARMER],
+        orgs: [
+          {
+            known: false,
+            typeId: ORG_BLANK_PARENT_WITH_CHILD,
+            subTypeId: ORG_CHILD_OF_BLANK_PARENT,
+          },
+        ],
+      },
+    );
+    await expectParity(
+      'parent type blank name with child',
+      id,
+      level6Cells({
+        innovation_dev_organizations: orgTyped(
+          unknownId(ORG_BLANK_PARENT_WITH_CHILD),
+          ` > ${ORG_CHILD_OF_BLANK_NAME}`,
+        ),
+      }),
+    );
+  });
+
   it('an inactive innovation-dev row is invisible to the view while the function can still pass', async () => {
     const id = await makeLevel6({ active: false });
     await expectBreak('inactive rid', id, noDetailCells());
@@ -2169,40 +2227,6 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
         results: 210,
       });
 
-      const phase3 = `SELECT result_id, ${CELL_KEYS.join(', ')} FROM report_innovation_dev WHERE result_id IN (${inList})`;
-      const plan = planText(await q(`EXPLAIN FORMAT=TREE ${phase3}`, bulkIds));
-      writeFileSync('/tmp/t02-idx-explain.txt', plan);
-
-      const materializes = plan
-        .split('\n')
-        .filter((line) => line.includes('Materialize'));
-      expect(materializes).toHaveLength(4);
-      for (const line of materializes) {
-        expect(line).toContain('invalidate on row from root');
-      }
-      for (const alias of LATERAL_ALIASES) {
-        const found = lateralCorrelation(plan, alias);
-        expect({ alias, correlatedOnResultId: found !== null }).toEqual({
-          alias,
-          correlatedOnResultId: true,
-        });
-      }
-      const planLines = plan.split('\n');
-      const rootFilterAt = planLines.findIndex((line) =>
-        line.includes('root.result_id in ('),
-      );
-      expect(rootFilterAt).toBeGreaterThanOrEqual(0);
-      const rootAccess = planLines
-        .slice(rootFilterAt + 1)
-        .find((line) => /-> .* on root\b/.test(line));
-      expect(rootAccess).toMatch(
-        /(?:Table scan on root|(?:Covering )?Index (?:range scan|lookup) on root using PRIMARY)\b/,
-      );
-      expect(plan).not.toMatch(/\bHash\b/);
-      // Phase 3 tree only. Phase 2's 28 pre-existing <derived…> rows
-      // are compared on the traditional EXPLAIN below.
-      expect(plan).not.toMatch(/<derived/);
-
       const captured: { sql: string; params: unknown[] }[] = [];
       const fakeRunner = {
         connect: async () => undefined,
@@ -2267,10 +2291,56 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
       expect(topTables).not.toContain('report_innovation_dev');
       expect(capturedSql).not.toContain('report_innovation_dev');
 
+      const phase3Call = captured.find((call) =>
+        call.sql.includes('FROM report_innovation_dev'),
+      );
+      expect(phase3Call).toBeDefined();
+      const phase3 = phase3Call?.sql ?? '';
+      const phase3Params = phase3Call?.params ?? [];
+      expect(phase3Params).toEqual(bulkIds);
+      expect((phase3.match(/\?/g) ?? []).length).toBe(bulkIds.length);
+      for (const key of CELL_KEYS) {
+        expect(phase3).toContain(key);
+      }
+      const plan = planText(
+        await q(`EXPLAIN FORMAT=TREE ${phase3}`, phase3Params),
+      );
+      writeFileSync('/tmp/t02-idx-explain.txt', plan);
+
+      const materializes = plan
+        .split('\n')
+        .filter((line) => line.includes('Materialize'));
+      expect(materializes).toHaveLength(4);
+      for (const line of materializes) {
+        expect(line).toContain('invalidate on row from root');
+      }
+      for (const alias of LATERAL_ALIASES) {
+        const found = lateralCorrelation(plan, alias);
+        expect({ alias, correlatedOnResultId: found !== null }).toEqual({
+          alias,
+          correlatedOnResultId: true,
+        });
+      }
+      const planLines = plan.split('\n');
+      const rootFilterAt = planLines.findIndex((line) =>
+        line.includes('root.result_id in ('),
+      );
+      expect(rootFilterAt).toBeGreaterThanOrEqual(0);
+      const rootAccess = planLines
+        .slice(rootFilterAt + 1)
+        .find((line) => /-> .* on root\b/.test(line));
+      expect(rootAccess).toMatch(
+        /(?:Table scan on root|(?:Covering )?Index (?:range scan|lookup) on root using PRIMARY)\b/,
+      );
+      expect(plan).not.toMatch(/\bHash\b/);
+      // Phase 3 tree only. Phase 2's 28 pre-existing <derived…> rows
+      // are compared on the traditional EXPLAIN above.
+      expect(plan).not.toMatch(/<derived/);
+
       const samples: number[] = [];
       for (let run = 0; run < 3; run += 1) {
         const started = process.hrtime.bigint();
-        await q(phase3, bulkIds);
+        await q(phase3, phase3Params);
         samples.push(Number(process.hrtime.bigint() - started) / 1e6);
       }
       const timing = summarize(samples);

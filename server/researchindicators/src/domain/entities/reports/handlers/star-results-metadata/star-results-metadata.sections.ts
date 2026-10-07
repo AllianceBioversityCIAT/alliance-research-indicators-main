@@ -55,6 +55,10 @@ export const STAR_RAW_SECTIONS = {
     label: 'INNOVATION USE',
     fillArgb: 'FF6A1B9A',
   },
+  INNOVATION_DEVELOPMENT: {
+    label: 'INNOVATION DEVELOPMENT',
+    fillArgb: 'FF00897B',
+  },
 } as const satisfies Record<string, StarRawSectionEntry>;
 
 export type StarRawSectionKey = keyof typeof STAR_RAW_SECTIONS;

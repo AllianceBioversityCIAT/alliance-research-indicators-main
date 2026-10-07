@@ -2,7 +2,7 @@
 
 - **Module:** reports (reads `result-innovation-dev`)
 - **Spec id:** 2026-10-innovation-dev-excel-export
-- **Status:** in-progress — resumed 2026-10-06 after `docs/specs/reports/excel-layout-server-side` (done). Amended at T-02's gate (Pivot Record in `execution.md`): T-01 reopened for blank catalog names; T-02 step 6(b) reworded; T-03 keeps only the dictionary half; T-04 adds the `INNOVATION_DEVELOPMENT` section and tags its 32 columns (no fallback row, no banner literal).
+- **Status:** in-progress (T-01…T-04 done; T-05 not started — paused by the user 2026-10-06) — resumed 2026-10-06 after `docs/specs/reports/excel-layout-server-side` (done). Amended at T-02's gate (Pivot Record in `execution.md`): T-01 reopened for blank catalog names; T-02 step 6(b) reworded; T-03 keeps only the dictionary half; T-04 adds the `INNOVATION_DEVELOPMENT` section and tags its 32 columns (no fallback row, no banner literal).
 - **Owner:** ARI server squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — round 1 fixed, **not re-judged**, by user choice)
@@ -216,7 +216,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-04 — TS wiring: Phase 3 query and merge, `INNOVATION_DEVELOPMENT` section and 32 tagged columns, notice removal
 
-- **Status:** not-started · **Size:** M · **Dependencies:** T-01, T-03
+- **Status:** done (PASS attempt 1, visual approval 2026-10-06, see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-03
 - **Requirements covered:**
   - R-IDX-006: Raw data at 112 columns, band 81–112, headers equal to dictionary labels in order, band derived from the `INNOVATION_DEVELOPMENT` tag, banner 112 derived, *BUT must NOT move existing columns*.
   - R-IDX-007 (whole).
@@ -269,12 +269,12 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
   - design P-8: `client/research-indicators/.../api.service.ts:386` stores the `.xlsx` blob without parsing it, so it is unaffected; the sweep re-confirms this.
 - **Review:** `full`: shared export path for every user; the merge is new logic.
 - **Done criteria:**
-  - [ ] Consumer sweep recorded; every pinning file updated or confirmed unaffected
-  - [ ] Specs green; `npm test -- --silent` full suite green (Leader re-measures after the worker reports); `npm run build` exit 0
-  - [ ] Falsifiers (a)–(e) observed red, quoted
-  - [ ] T-02 fixture green against the real captured Phase 3 SQL; B-7 still `60` on the real Phase 2 SQL
-  - [ ] `npx eslint` / `npx prettier --check` clean
-  - [ ] A generated `.xlsx` (mocked data) offered to the user for the visual check (D7). **No commit before visual approval**
+  - [x] Consumer sweep recorded; every pinning file updated or confirmed unaffected
+  - [x] Specs green; `npm test -- --silent` full suite green (Leader re-measures after the worker reports); `npm run build` exit 0
+  - [x] Falsifiers (a)–(e) observed red, quoted
+  - [x] T-02 fixture green against the real captured Phase 3 SQL; B-7 still `60` on the real Phase 2 SQL
+  - [x] `npx eslint` / `npx prettier --check` clean
+  - [x] A generated `.xlsx` (mocked data) offered to the user for the visual check (D7). **No commit before visual approval**
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---

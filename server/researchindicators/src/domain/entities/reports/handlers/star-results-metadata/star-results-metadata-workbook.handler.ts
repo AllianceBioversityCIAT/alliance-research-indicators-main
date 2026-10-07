@@ -25,10 +25,7 @@ import {
   STAR_RESULTS_METADATA_SHEETS,
   STAR_RESULTS_METADATA_WORKBOOK_KEY,
 } from '../../constants/star-results-metadata.constants';
-import {
-  buildStarRawBannerSubtitle,
-  STAR_RAW_COMING_SOON_NOTICE,
-} from './star-results-metadata.banner-subtitle';
+import { buildStarRawBannerSubtitle } from './star-results-metadata.banner-subtitle';
 import { STAR_RAW_SHEET_PREAMBLE_BASE } from './star-results-metadata.sheet-presentation';
 import {
   STAR_RAW_SECTIONS,
@@ -100,7 +97,6 @@ export class StarResultsMetadataWorkbookHandler
         bannerTitleMergeToCol: lastColumn,
         columnGroups,
         bannerSubtitle: buildStarRawBannerSubtitle(filters.filters),
-        bannerNotice: { text: STAR_RAW_COMING_SOON_NOTICE },
         ...(headerLogo ? { logoImage: headerLogo } : { logoPath: undefined }),
       },
     };

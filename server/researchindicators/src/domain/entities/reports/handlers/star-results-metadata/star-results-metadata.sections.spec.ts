@@ -32,11 +32,16 @@ const INTENDED_LAYOUT = [
   { key: 'POLICY_DETAILS', label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
   { key: 'OICR_DETAILS', label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
   { key: 'INNOVATION_USE', label: 'INNOVATION USE', fillArgb: 'FF6A1B9A' },
+  {
+    key: 'INNOVATION_DEVELOPMENT',
+    label: 'INNOVATION DEVELOPMENT',
+    fillArgb: 'FF00897B',
+  },
 ] as const;
 
 describe('STAR_RAW_SECTIONS', () => {
-  it('declares the 11 sections of the intended layout', () => {
-    expect(Object.keys(STAR_RAW_SECTIONS)).toHaveLength(11);
+  it('declares the 12 sections of the intended layout', () => {
+    expect(Object.keys(STAR_RAW_SECTIONS)).toHaveLength(12);
     expect(
       (
         Object.keys(STAR_RAW_SECTIONS) as (keyof typeof STAR_RAW_SECTIONS)[]
