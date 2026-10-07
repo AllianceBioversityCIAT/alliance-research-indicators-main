@@ -165,7 +165,7 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 
 ### T-03 — Settle P-14, then author the dictionary migration with a realistic round trip
 
-- **Status:** not-started · **Size:** M · **Dependencies:** OQ-1 and OQ-2 answered (gate at T-02); must not run alongside T-01/T-02
+- **Status:** done (PASS on attempt 2, 2026-10-06, see `execution.md`) · **Size:** M · **Dependencies:** OQ-1 and OQ-2 answered (gate at T-02); must not run alongside T-01/T-02
 - **Requirements covered:**
   - R-IDX-006 (dictionary half): 27 rows reused, normalised, explained, renamed, moved last; 5 inserted; *AND IT MUST leave no `Innovation details` row*; *BUT must NOT change any Innovation Use row*; *BUT must NOT move, rename or recolour any existing dictionary row*. The band itself is T-04 (derived in code; no group row — amended 2026-10-06).
   - NFR-IDX-003 (dictionary half: exact restore of the pre-`up()` rows).
@@ -205,11 +205,11 @@ All tasks are server-side and run **sequentially** in one worktree (root `CLAUDE
 - **Consumers:** `report-layout.repository.ts` (`findDataDictionaryRows`, unchanged). T-04's column headers must equal these labels.
 - **Review:** `full`: shared tables read by every section; judgment found two severe defects here.
 - **Done criteria:**
-  - [ ] P-14 reading (or Dev error) recorded
-  - [ ] OQ-1/OQ-2 answers applied, sweep done
-  - [ ] Migration spec and round-trip fixture green; Falsifiers (a)–(d) observed red, quoted
-  - [ ] `npx eslint` / `npx prettier --check` clean
-  - [ ] Applied on scratch, then reverted, then re-applied; scratch left with the pre-state rows removed (fixture cleans up)
+  - [x] P-14 reading (or Dev error) recorded
+  - [x] OQ-1/OQ-2 answers applied, sweep done
+  - [x] Migration spec and round-trip fixture green; Falsifiers (a)–(d) observed red, quoted
+  - [x] `npx eslint` / `npx prettier --check` clean
+  - [x] Applied on scratch, then reverted, then re-applied; scratch left with the pre-state rows removed (fixture cleans up). *(Amended 2026-10-06: with the never-seeded no-op of design §5, a schema-only scratch applies, reverts and re-applies the migration as a no-op; any hand-seeded rows are removed and `migration:test:bootstrap` on a fresh container reports 0 pending.)*
 - **Skills:** `nestjs-expert`, `tdd`
 
 ---

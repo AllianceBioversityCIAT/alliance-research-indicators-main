@@ -225,6 +225,8 @@ No change. Same endpoint, guards and file name.
 
 *(Rewritten after Judgment Day round 1, C-1 and C-3: the first draft matched rows by label alone and restored seed constants. Both are wrong. `Actors`/`Organizations` also label Innovation Use rows, and `1780690000000:38-39` / `1781215000000:33-37` shifted every row with `sort_order >= 26` after seeding.)*
 
+**Never-seeded database → no-op.** If the workbook has **no** anchor row, **no** `section = 'Innovation details'` row and **no** `section = 'Innovation Development'` row, `up()` and `down()` do nothing (a schema-only scratch database; no environment holding the seed reaches this branch). Any partial state — the anchor present with a wrong block, or the anchor absent while seed or final rows exist — still throws before any write. *(Amended 2026-10-06 at T-03's review — both Reviewers: the scratch baseline is schema-only (B-2: no anchor), so a strict anchor throw would stop `migration:test:bootstrap` for every later migration.)*
+
 **Identifying the 27 rows (P-16, P-17). Never by label alone.**
 
 1. Read once, in TS, before writing: the anchor row `field_label = 'Link to Innovation Use'` (workbook `star_results_metadata`). Its `sort_order` is `A`.
