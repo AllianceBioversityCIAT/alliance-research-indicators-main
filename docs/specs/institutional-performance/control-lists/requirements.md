@@ -25,7 +25,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 | **Category** | A named group of lists, e.g. *Key Performance Indicators (KPIs)* |
 | **List** | A named set of values, identified within its portfolio by an immutable **system key** (e.g. `org.level`) that code uses to read it |
 | **Qualified reference** | Display-only label `P<portfolio id> · <key>` (e.g. `P2 · org.level`), computed, never stored |
-| **System list** | A list that a module reads; created by the system (seed/migration), never deletable |
+| **System list** | A list that a module reads; created by the system (seed/migration), stored as `is_system = 1`. Since CR-2 (2026-10-07) it has no delete protection: like any list, it can be deleted once it has no values |
 | **Custom list** | A list an admin creates; exists with no form linked until development links it |
 | **Value** | One entry in a list: code, value, description, display order, active flag |
 | **In use** | A value is referenced by at least one record of a consuming module |
@@ -118,7 +118,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 - Inputs: name (required, 1–150), system key (required on create, pattern `^[a-z0-9_.]{2,100}$`, unique per portfolio), category (required), description (optional ≤ 500).
 - Behavior: the **system key names the list's meaning, not its portfolio** — it carries no portfolio or year segment. The same key exists once per portfolio (e.g. `org.level` in Portfolio 1 and in Portfolio 2), and consumers read by `(portfolio, key)` (R-CTL-006). Rationale: portfolio years are editable data (Portfolio 1 moved from 2021–2025 to 2010–2025 — migration `1783024745006-UpdatePortfolio1Years.ts`), so a year inside an immutable key would become false; and a portfolio-bearing key would force code changes for every new portfolio and a rename on every copy.
 - Display: wherever a list is identified, the UI shows a **qualified reference** built at read time from the portfolio's id and the key — `P2 · org.level`. It is never stored.
-- The **system key never changes after creation**. A list is a **system list** when it was created by the system; system lists cannot be deleted. A custom list can be deleted only when it has no values. Moving a list to another category of the same portfolio is allowed. Each list shows *Used by* — the consumer(s) that read it, or *Not linked to a form yet*.
+- The **system key never changes after creation**. **Any list can be deleted, including the seeded ones, but only when it has no values** (requester, 2026-10-07 — CR-2; there is no "system list" protection). The seeded lists keep `is_system = 1` in the database, but the flag has no behavioral effect. A value in use cannot be deleted (R-CTL-005), so a list whose values are in use can never be emptied and therefore never deleted. Moving a list to another category of the same portfolio is allowed. Each list shows *Used by* — the consumer(s) that read it, or *Not linked to a form yet*.
 
 #### Scenario: System key is fixed
 - GIVEN the list `org.level` exists
@@ -133,20 +133,20 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 - AND the list header shows `P1 · org.level` and `P2 · org.level` respectively
 - BUT it must NOT accept a second `org.level` inside the same portfolio (`409`)
 
-#### Scenario: System list cannot be deleted
-- GIVEN `kpi.unit_of_measure` is a system list
+#### Scenario: A list with values cannot be deleted (CR-2 — replaces "System list cannot be deleted")
+- GIVEN `kpi.unit_of_measure` holds values
 - WHEN an Admin deletes it
 - THEN the request fails with `409`
 - BUT it must NOT remove the list or its values
 
-#### Scenario: Custom list lifecycle
-- GIVEN an Admin created `kpi.data_source` with no values
+#### Scenario: List lifecycle (any list, seeded or created)
+- GIVEN an Admin created `kpi.data_source` with no values — or emptied a seeded list
 - WHEN they delete it
 - THEN it is removed (`200`)
 
 **Acceptance criteria**
 - [ ] AC.1 — Create returns `201` with `is_system = false` for admin-created lists.
-- [ ] AC.2 — Key update → `400`; system-list delete → `409`; non-empty custom-list delete → `409`.
+- [ ] AC.2 — Key update → `400`; delete of a list with values → `409`; delete of an empty list (seeded or created) → `200`.
 
 ### R-CTL-004 — Values CRUD with uniqueness and ordering
 
@@ -306,7 +306,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
   - `kpi.type` (KTY): Institutional, Customized
 - Category *Organizational structure*:
   - `org.level`: `L1` Division, `L2` Department, `L3` Office, `L4` Unit
-- The module also works when all data is deleted (custom data only; system lists remain).
+- The module also works when all data is deleted (any category, list or value can be removed once nothing depends on it — CR-2).
 
 #### Scenario: Seed is idempotent
 - GIVEN the seed already ran
@@ -352,7 +352,7 @@ None outside STAR (no CLARISA, AGRESSO, OpenSearch or socket events). Client: si
 | Portfolio leakage (data crosses portfolios) | Server e2e/integration: two portfolios, cross-read returns nothing |
 | Duplicate or case-variant values stored | DB unique indexes + e2e duplicate insert → `409` |
 | In-use value deleted | Unit test with a registered test consumer → `409` |
-| Immutable key edited / system list deleted | Unit tests → `400` / `409` |
+| Immutable key edited / list with values deleted | Unit tests → `400` / `409` |
 | Sort order wrong (lexical instead of natural) | Client unit test on the sort comparator with `1, 2, 10` fixture |
 | Export content differs from the screen | Client unit test on the export row builder (filtered + sorted input → rows) |
 | Type/compile error hidden by the test runner | `npm run build` (server) and `ng build` (client) in verification |

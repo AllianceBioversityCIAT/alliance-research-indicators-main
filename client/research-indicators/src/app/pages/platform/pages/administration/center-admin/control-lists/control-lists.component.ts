@@ -692,8 +692,8 @@ export default class ControlListsComponent implements OnInit {
       const response = await this.api.DELETE_ControlList(list.id);
 
       if (response?.successfulRequest === false) {
-        // design §6.2 / A8: a blocked delete (409 system list, or 409 has values once T-03
-        // ships) is shown AS-IS — the server's own description — behind a single Close.
+        // design §6.2 / A8: a blocked delete (409 has values — any list, seeded or created,
+        // CR-2) is shown AS-IS — the server's own description — behind a single Close.
         this.showBlockedDeleteListAlert(this.extractErrorMessage(response, 'This list could not be deleted.'));
         return;
       }

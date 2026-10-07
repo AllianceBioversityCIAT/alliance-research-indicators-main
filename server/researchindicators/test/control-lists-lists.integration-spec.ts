@@ -48,6 +48,12 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   let portfolio2Id: number;
   let scratchCategoryId: number;
   let scratchListId: number;
+  // CR-2 (2026-10-07): scratch lists inserted with `is_system = 1`, used
+  // only to prove A8 `removeList` no longer gates on the flag. Never the
+  // real seeded lists.
+  let scratchSystemEmptyListId: number | null;
+  let scratchSystemWithValueListId: number;
+  let scratchSystemValueId: number;
 
   const TEST_PREFIX = '__t02_itest__';
 
@@ -112,6 +118,40 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
     );
     scratchListId = Number(listInsert.insertId);
 
+    // CR-2 scratch rows: one empty seeded-style list (is_system = 1, no
+    // values) and one seeded-style list with one value, both never touched
+    // except by the CR-2 tests below.
+    const systemEmptyListInsert = await dataSource.query(
+      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, ?, 'SCR', 1, 1, NOW())`,
+      [
+        portfolio2Id,
+        scratchCategoryId,
+        `${TEST_PREFIX}sys_empty_key_${Date.now()}`,
+        `${TEST_PREFIX}sys_empty_list`,
+      ],
+    );
+    scratchSystemEmptyListId = Number(systemEmptyListInsert.insertId);
+
+    const systemWithValueListInsert = await dataSource.query(
+      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, ?, 'SCR', 1, 1, NOW())`,
+      [
+        portfolio2Id,
+        scratchCategoryId,
+        `${TEST_PREFIX}sys_val_key_${Date.now()}`,
+        `${TEST_PREFIX}sys_val_list`,
+      ],
+    );
+    scratchSystemWithValueListId = Number(systemWithValueListInsert.insertId);
+
+    const systemValueInsert = await dataSource.query(
+      `INSERT INTO control_list_values (list_id, code, value, display_order, is_active, created_at)
+       VALUES (?, 'SCR-01', ?, 0, 1, NOW())`,
+      [scratchSystemWithValueListId, `${TEST_PREFIX}sys_value`],
+    );
+    scratchSystemValueId = Number(systemValueInsert.insertId);
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [ControlListsController],
       providers: [
@@ -171,6 +211,25 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
     if (scratchListId) {
       await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
         scratchListId,
+      ]);
+    }
+    // CR-2 scratch rows: `scratchSystemEmptyListId` is deleted BY its own
+    // test (A8, 200) — a defensive no-op delete here handles a failed test
+    // leaving it behind. `scratchSystemWithValueListId`'s 409 test deletes
+    // nothing, so its value row then its list row are cleaned up here.
+    if (scratchSystemEmptyListId) {
+      await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
+        scratchSystemEmptyListId,
+      ]);
+    }
+    if (scratchSystemValueId) {
+      await dataSource.query(`DELETE FROM control_list_values WHERE id = ?`, [
+        scratchSystemValueId,
+      ]);
+    }
+    if (scratchSystemWithValueListId) {
+      await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
+        scratchSystemWithValueListId,
       ]);
     }
     if (scratchCategoryId) {
@@ -311,5 +370,54 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
       [scratchListId],
     );
     expect(after.description).toBeNull();
+  });
+
+  // CR-2 / D-CTL-18 (2026-10-07): "system list cannot be deleted" is
+  // removed — any list, seeded (`is_system = 1`) or created, can be
+  // deleted once it has no values. This scratch list is NOT one of the
+  // real seeded lists; it is inserted in `beforeAll` with `is_system = 1`
+  // for this purpose only.
+  it('returns 200 and physically deletes an empty seeded-style list (is_system = 1) — CR-2', async () => {
+    const response = await request(app.getHttpServer())
+      .delete(`/lists/${scratchSystemEmptyListId}`)
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .expect(200);
+
+    expect(response.body?.data?.id).toBe(scratchSystemEmptyListId);
+
+    const rows = await dataSource.query(
+      `SELECT id FROM control_lists WHERE id = ?`,
+      [scratchSystemEmptyListId],
+    );
+    expect(rows).toHaveLength(0);
+
+    // Deleted by this test itself — afterAll's defensive cleanup is a
+    // no-op for it; clear the var so a second accidental delete attempt
+    // there is harmless either way.
+    scratchSystemEmptyListId = null;
+  });
+
+  // CR-2: `is_system` grants no exemption from the values rule — a
+  // seeded-style list WITH values is blocked the same way a custom list
+  // with values is (409, nothing removed).
+  it('returns 409 and deletes nothing for a seeded-style list (is_system = 1) with values — CR-2', async () => {
+    const response = await request(app.getHttpServer())
+      .delete(`/lists/${scratchSystemWithValueListId}`)
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .expect(409);
+
+    expect(response.body?.message ?? response.body?.errors).toBeDefined();
+
+    const rows = await dataSource.query(
+      `SELECT id FROM control_lists WHERE id = ?`,
+      [scratchSystemWithValueListId],
+    );
+    expect(rows).toHaveLength(1);
+
+    const valueRows = await dataSource.query(
+      `SELECT id FROM control_list_values WHERE id = ?`,
+      [scratchSystemValueId],
+    );
+    expect(valueRows).toHaveLength(1);
   });
 });

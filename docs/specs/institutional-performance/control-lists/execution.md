@@ -562,3 +562,20 @@
 - **Final status: PASS on attempt 1.** Done criteria 1–2 met; criterion 3 waits on the server build.
 - **Lint gate on committed blobs (Leader, after `6962e7ae`):** 18 server `.ts` files linted via stdin → 0 failing. The server `npm run build` is still pending.
 - **Server build (Leader, 2026-10-06, after the user stopped their dev servers; nothing listening on 3001 or 4200):** `npm run build` → exit 0 (`nest build` + admin vite `✓ built`; `dist/main.js` present). T-04 done criterion 3 met.
+
+### 2026-10-07 — Change request CR-2 (requester): any list can be deleted once it has no values
+
+- **Request (requester):** the organization manages every list, including the seeded ones. Remove the "system list cannot be deleted" rule (D-CTL-18). `is_system` stays in the schema with no behavioral effect; no migration.
+- **Spec amended first:** `requirements.md` R-CTL-003 (scenarios, AC.2), glossary, R-CTL-010 note, test-strategy table; `design.md` A8 row, §5 rule 6, §6 list header, test-strategy row, D-CTL-18; `tasks.md` superseded notes on T-02 and a `### CR-2` section.
+- **Note:** an earlier session started this change and was interrupted after the server part; this run resumed it from the uncommitted working tree.
+- **Server:** `removeList` (A8) no longer checks `is_system`; a list with values gets the same non-field 409 whether seeded or created. Tests: unit (empty seeded list → 200 + log; seeded list with values → 409 + warn), GlobalExceptions contract (409 body), integration on scratch `is_system = 1` lists (200 delete; 409 with values, nothing removed).
+- **Client:** the `!isSystem` guard on *Delete list* is removed. Tests: the button shows on a seeded list; a seeded list goes through confirm → `DELETE_ControlList`; the 409 fixture now uses the server's real text.
+- **Reds observed:**
+  - client: the updated button test before the template fix → `Received: null` (spec :818);
+  - server: the `is_system` guard re-added at the top of `removeList` → 3 failed (file restored; green again).
+- **Leader measurement:** server control-lists unit 14 suites / 183 tests; integration `control-lists-lists` 7/7; `tsc -p tsconfig.build.json --noEmit` exit 0; `npx eslint` clean. Client component 60/60; `ng lint` clean. Full suites and server `npm run build` not re-run for this change.
+- **Reviewer (opus):**
+  - attempt 1 — **FAIL**, text only: 4 places still said system lists cannot be deleted (requirements glossary, design test-strategy row, a service comment, the client 409 fixture). Advisories: `tasks.md` stale, an unscoped `LIKE` values sweep in the integration `afterAll` (`_` is a wildcard), the seeded-list delete path untested in the client.
+  - attempt 2 — **STATUS: PASS**, all blocking and advisory items applied; no new findings.
+- **Files:** `control-lists.service.ts`, `entities/control-list.entity.ts`, `control-lists.service.spec.ts`, `control-lists.global-exceptions.spec.ts`, `test/control-lists-lists.integration-spec.ts`; client `control-lists.component.{html,ts,spec.ts}`; spec docs.
+- **Final status: PASS on attempt 2.**

@@ -304,22 +304,15 @@ export class ControlListsService {
   async removeList(id: number): Promise<{ id: number }> {
     const list = await this.findActiveListOrFail(id);
 
-    // R-CTL-003 "System list cannot be deleted".
-    if (list.is_system) {
-      this.logger._warn(
-        `control_lists.blocked_delete entity=control_list id=${id} reason=is_system`,
-      );
-      this.throwNonFieldConflict(
-        `List "${list.name}" (key ${list.list_key}) is a system list and cannot be deleted`,
-      );
-    }
-
-    // T-03 (R-CTL-003 "Custom list lifecycle", non-empty branch; forward
-    // pointer from T-02): a list with values cannot be deleted, regardless
-    // of whether those values are active or deactivated — physical delete
-    // (D-CTL-5) means a deactivated value is still a row. The in-use
-    // protection on a VALUE's own delete (A12) is T-04's; this is a
-    // separate rule on the LIST's delete.
+    // CR-2 / D-CTL-18 (2026-10-07): there is no "system list" protection.
+    // Any list — seeded (`is_system = 1`) or admin-created — can be
+    // deleted once it has no values; `is_system` keeps no behavioral
+    // effect on delete (it stays in the schema/entity and is shown read-only
+    // as `isSystem` in list responses). A list with values cannot be deleted,
+    // regardless of whether those values are active or deactivated —
+    // physical delete (D-CTL-5) means a deactivated value is still a row.
+    // The in-use protection on a VALUE's own delete (A12) is T-04's; this
+    // is a separate rule on the LIST's delete.
     const valueCount = await this.valueRepository.count({
       where: { list_id: id },
     });
@@ -756,7 +749,7 @@ export class ControlListsService {
     });
   }
 
-  // Non-field 409s (system-list delete, category-has-lists): the same
+  // Non-field 409s (category-has-lists, list-has-values, value-in-use): the same
   // `{message: {description}}` envelope as the field-named conflicts above,
   // but with no `field` key — GlobalExceptions then puts the OBJECT
   // `{description}` (never a bare string) on the wire as `errors` (Leader

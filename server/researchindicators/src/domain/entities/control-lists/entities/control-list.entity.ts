@@ -41,8 +41,11 @@ export class ControlList extends AuditableEntity {
   @Column({ name: 'code_prefix', type: 'varchar', length: 10 })
   code_prefix: string;
 
-  // True only for lists created by the seed migration; never deletable
-  // (R-CTL-003 "System list cannot be deleted").
+  // True only for lists created by the seed migration. CR-2 / D-CTL-18
+  // (2026-10-07) removed the "system list cannot be deleted" rule: this
+  // flag no longer gates A8 `removeList` and has no other behavioral
+  // effect — it stays in the schema (append-only migrations) and is
+  // surfaced read-only as `isSystem` in list responses.
   @ApiProperty({ type: Boolean, name: 'is_system' })
   @Column({ name: 'is_system', type: 'boolean', default: false })
   is_system: boolean;

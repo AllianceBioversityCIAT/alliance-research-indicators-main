@@ -928,27 +928,35 @@ describe('ControlListsService', () => {
       expect(mockListDelete).not.toHaveBeenCalled();
     });
 
-    // R-CTL-003 "System list cannot be deleted".
-    it('throws ConflictException (409) for a system list and logs a warning, deleting nothing', async () => {
+    // R-CTL-003 "List lifecycle (any list, seeded or created)" (CR-2,
+    // D-CTL-18): `is_system` has no behavioral effect on delete. An empty
+    // seeded-style list (is_system = 1, no values) deletes like any other.
+    it('deletes an empty seeded-style list (is_system = 1) with no values (200) and logs — CR-2', async () => {
       mockListFindOne.mockResolvedValue(
         buildList({
           id: 1,
           is_system: true,
           name: 'Direction',
           list_key: 'kpi.direction',
+          portfolio_id: 2,
         }),
       );
+      mockValueCount.mockResolvedValue(0);
+      mockListDelete.mockResolvedValue({ affected: 1 });
 
-      await expect(service.removeList(1)).rejects.toThrow(ConflictException);
-      expect(mockListDelete).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith(
+      const result = await service.removeList(1);
+
+      expect(mockValueCount).toHaveBeenCalledWith({ where: { list_id: 1 } });
+      expect(mockListDelete).toHaveBeenCalledWith(1);
+      expect(result).toEqual({ id: 1 });
+      expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.blocked_delete entity=control_list id=1 reason=is_system',
+          'control_lists.deleted entity=control_list id=1 portfolio_id=2 user_id=1',
         ),
       );
     });
 
-    // R-CTL-003 "Custom list lifecycle" (no-values branch).
+    // R-CTL-003 "List lifecycle" (no-values branch), custom list.
     it('deletes a custom (non-system) list with no values (200) and logs', async () => {
       mockListFindOne.mockResolvedValue(
         buildList({ id: 8, is_system: false, portfolio_id: 2 }),
@@ -968,9 +976,9 @@ describe('ControlListsService', () => {
       );
     });
 
-    // T-03 forward pointer (T-02 execution.md): a list with values cannot
-    // be deleted — 409, non-field {description} shape, warn log — even when
-    // it is not a system list.
+    // T-03 forward pointer (T-02 execution.md), CR-2 generalization: a list
+    // with values cannot be deleted — 409, non-field {description} shape,
+    // warn log — regardless of `is_system`, custom or seeded.
     it('throws ConflictException (409) for a custom list with values and logs a warning, deleting nothing', async () => {
       mockListFindOne.mockResolvedValue(
         buildList({
@@ -1003,6 +1011,44 @@ describe('ControlListsService', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining(
           'control_lists.blocked_delete entity=control_list id=8 reason=has_values count=3',
+        ),
+      );
+    });
+
+    // CR-2: a seeded-style list (is_system = 1) WITH values is blocked the
+    // same way — `is_system` grants no exemption from the values rule.
+    it('throws ConflictException (409) for a seeded-style list (is_system = 1) with values and logs a warning, deleting nothing', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({
+          id: 6,
+          is_system: true,
+          portfolio_id: 2,
+          name: 'Organizational level',
+          list_key: 'org.level',
+        }),
+      );
+      mockValueCount.mockResolvedValue(4);
+
+      let thrown: unknown;
+      try {
+        await service.removeList(6);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toMatchObject({
+        status: 409,
+        response: {
+          message: {
+            description: expect.stringContaining('Organizational level'),
+          },
+        },
+      });
+      expect(mockListDelete).not.toHaveBeenCalled();
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'control_lists.blocked_delete entity=control_list id=6 reason=has_values count=4',
         ),
       );
     });

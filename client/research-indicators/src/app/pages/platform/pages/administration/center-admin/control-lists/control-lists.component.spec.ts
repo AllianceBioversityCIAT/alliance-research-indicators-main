@@ -807,14 +807,15 @@ describe('ControlListsComponent', () => {
       );
     });
 
-    // Falsifier 5: showing Delete list for every list (dropping the !isSystem guard) must fail this.
-    it('hides Delete list for a system list, and shows it for a custom list', async () => {
+    // CR-2 / D-CTL-18: any list, seeded or created, can be deleted once empty, so Delete list
+    // shows on every list. Restoring the `!isSystem` guard must fail this.
+    it('shows Delete list for a seeded (system) list and for a custom list', async () => {
       await setup([kpiCategory]);
       const el = fixture.nativeElement as HTMLElement;
 
       component.selectList(directionList.id);
       fixture.detectChanges();
-      expect(el.querySelector('[data-testid="delete-list-button"]')).toBeFalsy();
+      expect(el.querySelector('[data-testid="delete-list-button"]')).toBeTruthy();
       expect(el.querySelector('[data-testid="edit-list-button"]')).toBeTruthy();
 
       component.selectList(customList.id);
@@ -996,12 +997,29 @@ describe('ControlListsComponent', () => {
       expect(component.selectedListId()).toBeNull();
     });
 
-    // design §6.2 / A8: a 409 (e.g. system list, or a custom list with values once T-03 ships)
-    // is shown AS-IS behind a single Close — same pattern as the category delete block.
+    // CR-2 / D-CTL-18: a seeded (system) list goes through the same confirm → DELETE path.
+    it('asks for confirmation and deletes a seeded (system) list on Continue', async () => {
+      await setup([kpiCategory]);
+      component.selectList(directionList.id);
+
+      component.deleteList();
+      expect(api.DELETE_ControlList).not.toHaveBeenCalled();
+
+      const alertConfig = actions.showGlobalAlert.mock.calls[0][0];
+      alertConfig.confirmCallback.event();
+      await fixture.whenStable();
+      await fixture.whenStable();
+
+      expect(api.DELETE_ControlList).toHaveBeenCalledWith(directionList.id);
+      expect(actions.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Control Lists', detail: 'List deleted successfully' });
+    });
+
+    // design §6.2 / A8: a 409 (a list with values — any list, seeded or created, CR-2) is shown
+    // AS-IS behind a single Close — same pattern as the category delete block.
     it('shows a blocked (409) list delete AS-IS behind a single Close, and does not toast success', async () => {
       await setup([kpiCategory]);
       component.selectList(directionList.id);
-      api.DELETE_ControlList.mockResolvedValueOnce(fail(409, { description: 'System lists cannot be deleted.' }));
+      api.DELETE_ControlList.mockResolvedValueOnce(fail(409, { description: 'List "Direction" (key kpi.direction) cannot be deleted while it has values' }));
 
       component.deleteList();
       const alertConfig = actions.showGlobalAlert.mock.calls[actions.showGlobalAlert.mock.calls.length - 1][0];
@@ -1013,7 +1031,7 @@ describe('ControlListsComponent', () => {
         expect.objectContaining({
           severity: 'error',
           summary: 'Cannot delete list',
-          detail: 'System lists cannot be deleted.',
+          detail: 'List "Direction" (key kpi.direction) cannot be deleted while it has values',
           hasNoCancelButton: true,
           generalButton: true,
           confirmCallback: expect.objectContaining({ label: 'Close' })

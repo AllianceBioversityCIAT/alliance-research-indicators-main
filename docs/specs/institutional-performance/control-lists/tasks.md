@@ -35,7 +35,7 @@ graph TD
 | PR | Task | What a user can do after it merges to `dev` |
 | --- | --- | --- |
 | **PR 1** | T-01 | Open *Center admin › Portfolio Management › Control Lists*, pick a portfolio, create, edit and delete categories |
-| **PR 2** | T-02 | Create and edit lists inside a category, see the reference `P<id> · <key>`, and see that system lists cannot be deleted |
+| **PR 2** | T-02 | Create and edit lists inside a category, see the reference `P<id> · <key>`, and see that system lists cannot be deleted *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)* |
 | **PR 3** | T-03 | Manage the values of a list in the standard table (ID, sort, page, search, export) |
 | **PR 4** | T-04 | See *In use* and *Used by*; a delete of a value in use is blocked; other modules can read and validate values |
 | — | T-05 | Human check on Dev; no code |
@@ -121,22 +121,22 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
   - `entities/control-list.entity.ts`;
   - `repositories/control-list.repository.ts`;
   - `dto/` list create (with `listKey`) and update (**without** `listKey`);
-  - service rules: `portfolio_id` copied from the category; immutable key; system list never deleted; the same key allowed in two portfolios; category delete blocked while it has lists;
+  - service rules: `portfolio_id` copied from the category; immutable key; system list never deleted *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*; the same key allowed in two portfolios; category delete blocked while it has lists;
   - A1 now returns `lists` (id, key, name, `valueCount` 0 until T-03, `isSystem`, `usedBy: []` until T-04);
   - A6–A8.
 - **Scope — screen:** navigator lists under each category, with value counts and an *add list* icon button; list header (caps category label, name, description, **Reference `P<id> · <key>`**, **Edit list**, **Delete list** for custom lists only); modal in list mode with the key disabled in edit mode; `ApiService` A6–A8.
 - **Tests:**
   - **DB (local dev DB):** 6 lists for Portfolio 2 with ids 1–6; the re-run adds 0; revert drops only `control_lists` and leaves categories intact; re-apply.
-  - **Server unit:** `PATCH` with `listKey` → 400; system list delete → 409; the same key in Portfolio 1 → 201; a second in Portfolio 2 → 409; move to another portfolio's category → 400; delete a category with lists → 409, with the description naming them; custom list create/edit/delete → 201/200/200.
+  - **Server unit:** `PATCH` with `listKey` → 400; system list delete → 409 *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*; the same key in Portfolio 1 → 201; a second in Portfolio 2 → 409; move to another portfolio's category → 400; delete a category with lists → 409, with the description naming them; custom list create/edit/delete → 201/200/200.
   - **Server integration (local dev DB):** `PATCH /lists/:id` with `listKey` → 400 through the real `ValidationPipe`.
   - **Server unit (J-10):** the roles metadata of A6–A8 equals `[CENTER_ADMIN, SYSTEM_ADMIN]`, iterating every new handler.
-  - **Client unit:** the reference reads `P2 · kpi.direction`; *Delete list* is hidden for system lists; the key input is disabled in edit mode; selecting a list updates the header; a category with 0 lists shows its empty state with **+ Add list** (J-11).
+  - **Client unit:** the reference reads `P2 · kpi.direction`; *Delete list* is hidden for system lists *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*; the key input is disabled in edit mode; selecting a list updates the header; a category with 0 lists shows its empty state with **+ Add list** (J-11).
 - **Falsifier:**
   1. Accept `listKey` in the update DTO → the immutable-key test fails.
   2. Drop `forbidNonWhitelisted` → the integration case returns 200 and fails.
   3. Return 409 for the cross-portfolio move → the J-4 test fails on 400.
   4. Build the reference from the portfolio name → it fails on `P2 · …`.
-  5. Show *Delete list* for every list → the system-list test fails.
+  5. Show *Delete list* for every list → the system-list test fails. *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)* — CR-2 inverts it: restoring the `!isSystem` guard now fails the test.
   6. Add `TECHNICAL_SUPPORT` to A6 → the roles-metadata test fails (J-10).
   7. Render nothing for a category with 0 lists → the empty-state test fails (J-11).
 - **Red run:** each observed on its status, roles or DOM assertion.
@@ -268,6 +268,16 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 
 ---
 
+### CR-2 — Change request: any list can be deleted once empty (2026-10-07)
+
+- **Request (requester):** the organization manages every list, including the seeded ones; drop the "system list cannot be deleted" rule (D-CTL-18).
+- **Requirements covered:** R-CTL-003 (amended scenarios and AC.2), R-CTL-010 note.
+- **Scope — server:** `removeList` (A8) no longer checks `is_system`; the list-with-values 409 applies to every list. `is_system` stays in the schema (no migration).
+- **Scope — client:** *Delete list* shows on every list; the 409 is still shown as-is.
+- **Tests:** server unit (empty seeded list → 200; seeded list with values → 409), the GlobalExceptions contract, integration on scratch `is_system = 1` lists, client DOM (button on a seeded list) and the confirm → DELETE path for a seeded list.
+- **Falsifier:** restore the `is_system` guard in `removeList` → 3 server tests fail; restore the `!isSystem` template guard → the client button test fails.
+- **Evidence:** `execution.md` → CR-2.
+
 ## 3. Scenario and clause coverage
 
 | Requirement › scenario / clause | Owning task(s) |
@@ -277,8 +287,9 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 | R-CTL-001 *Default portfolio* · P1 selectable with empty state | T-01 (falsifier 6) |
 | R-CTL-002 *Duplicate name* (case variant) → 409 | T-01 |
 | R-CTL-002 *Delete a non-empty category* → 409 · **BUT** nothing deleted | T-02 |
-| R-CTL-003 *System key is fixed* · *Same key in two portfolios* · *System list cannot be deleted* | T-02 |
-| R-CTL-003 *Custom list lifecycle* | T-02 (no values), T-03 (with values → 409) |
+| R-CTL-003 *System key is fixed* · *Same key in two portfolios* | T-02 |
+| R-CTL-003 *A list with values cannot be deleted* (replaces *System list cannot be deleted*) | T-02, CR-2 |
+| R-CTL-003 *List lifecycle (any list, seeded or created)* | T-02 (no values), T-03 (with values → 409), CR-2 (seeded lists) |
 | R-CTL-003 *Used by* | T-04 |
 | R-CTL-004 *Duplicate code or value* · AC.1–2 | T-03 |
 | R-CTL-004 *Deactivate* — admin read keeps it · consumer read omits it | T-03 (admin), T-04 (A13) |

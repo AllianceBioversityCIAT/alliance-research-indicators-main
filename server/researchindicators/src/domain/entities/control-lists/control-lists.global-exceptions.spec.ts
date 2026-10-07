@@ -26,13 +26,13 @@ import { ControlListUsageRegistry } from './control-list-usage.registry';
  *
  * T-02 extends this with the list contract (forward pointer from T-01,
  * Leader contract note mid-T-02): duplicate list key is the same
- * {description, field} object shape (field: 'listKey'); a system-list
- * delete and a category-with-lists delete are NON-field conflicts, so the
- * service throws `ConflictException({ message: { description } })` — the
- * SAME envelope as the field-named conflicts, minus the `field` key.
- * `GlobalExceptions` therefore puts the OBJECT `{description}` on the wire
- * as `errors` for these two as well, never a bare string, so the client can
- * read `errors.description` uniformly for every 409 this module throws. The
+ * {description, field} object shape (field: 'listKey'); a category-with-
+ * lists delete is a NON-field conflict, so the service throws
+ * `ConflictException({ message: { description } })` — the SAME envelope as
+ * the field-named conflicts, minus the `field` key. `GlobalExceptions`
+ * therefore puts the OBJECT `{description}` on the wire as `errors` for
+ * this case too, never a bare string, so the client can read
+ * `errors.description` uniformly for every 409 this module throws. The
  * cross-portfolio list move (400) is the one exception: it is a plain
  * string, like the 404 test below.
  *
@@ -40,6 +40,13 @@ import { ControlListUsageRegistry } from './control-list-usage.registry';
  * SAME {description, field} object shape (field: 'code' | 'value'); a
  * list-has-values delete is a non-field conflict, the same envelope as the
  * T-02 non-field conflicts above, minus the `field` key.
+ *
+ * CR-2 (2026-10-07) removes the "system list cannot be deleted" rule
+ * entirely: `is_system` has no behavioral effect on A8 `removeList`. An
+ * empty seeded-style list (`is_system = 1`, no values) deletes (200, no
+ * exception); a seeded-style list WITH values is blocked by the SAME
+ * list-has-values non-field conflict as a custom list — see the test
+ * below, which replaces the former pinned system-list-delete 409 body.
  *
  * T-04 extends this with the in-use contract (design §5 rule 5, R-CTL-005):
  * a value delete blocked by the registry is ALSO a non-field conflict, the
@@ -274,7 +281,14 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     });
   });
 
-  it('409 system-list delete: errors is the OBJECT {description} with NO field (non-field conflict, T-02)', async () => {
+  // CR-2 / D-CTL-18 (2026-10-07): "system list cannot be deleted" is
+  // removed — a seeded-style list (`is_system = 1`) with no values deletes
+  // like any other (200, no exception, nothing for this filter-contract
+  // spec to pin). The seeded-style list WITH values case below replaces
+  // this test: `is_system` grants no exemption from the values rule, and
+  // the 409 body is the SAME non-field {description} shape as a custom
+  // list with values.
+  it('409 seeded-style list (is_system = 1) with values, delete: errors is the OBJECT {description} with NO field (non-field conflict, CR-2)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 6,
       portfolio_id: 2,
@@ -283,6 +297,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       is_system: true,
       is_active: true,
     });
+    mockValueCount.mockResolvedValue(4);
 
     let thrown: unknown;
     try {
@@ -303,7 +318,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       status: HttpStatus.CONFLICT,
       errors: {
         description:
-          'List "Organizational level" (key org.level) is a system list and cannot be deleted',
+          'List "Organizational level" (key org.level) cannot be deleted while it has values',
       },
       timestamp: expect.any(String),
       path: '/api/control-lists/lists/6',
@@ -388,7 +403,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
 
   // T-03 forward pointer (T-02 execution.md): "a list with values cannot be
   // deleted → 409, non-field body errors: { description } (same shape as
-  // system-list delete)".
+  // system-list delete — that 409 was removed by CR-2)".
   it('409 list-has-values delete: errors is the OBJECT {description} with NO field (non-field conflict, T-03)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 7,

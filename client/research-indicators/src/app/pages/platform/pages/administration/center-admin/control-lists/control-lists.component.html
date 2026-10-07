@@ -122,10 +122,8 @@
                   styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-button"></p-button>
                 <p-button label="Edit list" size="small" severity="secondary" styleClass="!rounded-[9px] !text-[13px]"
                   (onClick)="startEditList()" data-testid="edit-list-button"></p-button>
-                @if (!list.isSystem) {
                 <p-button label="Delete list" size="small" severity="danger" styleClass="!rounded-[9px] !text-[13px]"
                   (onClick)="deleteList()" data-testid="delete-list-button"></p-button>
-                }
               </div>
             </div>
 
