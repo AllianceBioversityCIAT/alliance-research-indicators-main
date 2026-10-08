@@ -119,6 +119,23 @@ describe('ControlListValueLookupService', () => {
     ).rejects.toThrow(/kpi\.direction/);
   });
 
+  // mysql2 returns BIGINT columns as strings; a strict !== against the
+  // numeric portfolioId would wrongly reject a same-portfolio value.
+  it('accepts the value when list.portfolio_id is a string bigint equal to portfolioId', async () => {
+    mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 3 }));
+    mockListFindOne.mockResolvedValue(
+      buildList({
+        id: 3,
+        portfolio_id: '2' as unknown as number,
+        list_key: 'kpi.direction',
+      }),
+    );
+
+    const result = await service.assertValueInList(1, 2, 'kpi.direction');
+
+    expect(result.id).toBe(1);
+  });
+
   // Falsifier 4 (tasks.md T-04): a value of the RIGHT key in ANOTHER
   // portfolio must 400, not pass because the key matched.
   it('throws BadRequestException for a value of the right key in ANOTHER portfolio', async () => {

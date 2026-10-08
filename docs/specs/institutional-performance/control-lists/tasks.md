@@ -2,13 +2,13 @@
 
 - **Module:** institutional-performance (new) — server + client
 - **Spec id:** 2026-09-control-lists
-- **Status:** not-started
+- **Status:** T-01…T-05, CR-1, CR-2 done — in validation (2026-10-07)
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — APPROVED before D-CTL-14…16; see RB-3)
 - **Branch:** `institutional-kpis`
 - **Jira:** epic [AC-1773](https://cgiarmel.atlassian.net/browse/AC-1773) · stories AC-1774 (US1) · AC-1775 (US2) · AC-1776 (US3) · AC-1777 (US4) · AC-1778 (US5) · AC-1779 (US6). Sub-tasks re-mapped 2026-10-01: AC-1780…AC-1784 = T-01…T-05; AC-1785…AC-1789 marked [OBSOLETE] (left open for the PO to close). Mark each Done when its task finishes.
-- **Last updated:** 2026-10-01 — re-cut into vertical slices at the requester's request (design D-CTL-16). The earlier 10-task horizontal plan is in git history (`07f85abd`).
+- **Last updated:** 2026-10-07 — CR-2, T-05 waiver, validation sweep. Earlier: 2026-10-01 — re-cut into vertical slices at the requester's request (design D-CTL-16). The earlier 10-task horizontal plan is in git history (`07f85abd`).
 
 > **Legend for verification fields.** *Falsifier* = the concrete input or mutation that must turn the gate red. *Red run* = what must be observed failing, and on which assertion. *Disqualifier* = what makes a green reading worthless. *Consumers* = existing files that pin a symbol this task changes (from the Premise Ledger + a test-file grep). An absent value reads `n/a` or `none`, never blank.
 
@@ -124,7 +124,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
   - service rules: `portfolio_id` copied from the category; immutable key; system list never deleted *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*; the same key allowed in two portfolios; category delete blocked while it has lists;
   - A1 now returns `lists` (id, key, name, `valueCount` 0 until T-03, `isSystem`, `usedBy: []` until T-04);
   - A6–A8.
-- **Scope — screen:** navigator lists under each category, with value counts and an *add list* icon button; list header (caps category label, name, description, **Reference `P<id> · <key>`**, **Edit list**, **Delete list** for custom lists only); modal in list mode with the key disabled in edit mode; `ApiService` A6–A8.
+- **Scope — screen:** navigator lists under each category, with value counts and an *add list* icon button; list header (caps category label, name, description, **Reference `P<id> · <key>`**, **Edit list**, **Delete list** for custom lists only *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*); modal in list mode with the key disabled in edit mode; `ApiService` A6–A8.
 - **Tests:**
   - **DB (local dev DB):** 6 lists for Portfolio 2 with ids 1–6; the re-run adds 0; revert drops only `control_lists` and leaves categories intact; re-apply.
   - **Server unit:** `PATCH` with `listKey` → 400; system list delete → 409 *(superseded by CR-2 / D-CTL-18, 2026-10-07: any list deletes once it has no values)*; the same key in Portfolio 1 → 201; a second in Portfolio 2 → 409; move to another portfolio's category → 400; delete a category with lists → 409, with the description naming them; custom list create/edit/delete → 201/200/200.
@@ -201,14 +201,14 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 
 - **Jira:** [AC-1783](https://cgiarmel.atlassian.net/browse/AC-1783) (story [AC-1776](https://cgiarmel.atlassian.net/browse/AC-1776))
 - **Status:** done (PASS on attempt 1, 2026-10-06) · **Size:** M · **Dependencies:** T-03
-- **Requirements covered:** R-CTL-005 (all, incl. AC.3 test consumer), R-CTL-003 *Used by*, R-CTL-006 (ordered read, `activeOnly`, unknown key, **membership check — AC.2**), R-CTL-004 *Deactivate* (consumer read omits inactive values), R-CTL-007 (A13 open to any authenticated user), R-CTL-001 AC.1–2 end to end
+- **Requirements covered:** R-CTL-005 (all, incl. AC.3 test consumer), R-CTL-003 *Used by*, R-CTL-006 (ordered read, `activeOnly`, unknown key, **membership check — AC.2**), R-CTL-004 *Deactivate* (consumer read omits inactive values), R-CTL-007 (A13 open to any authenticated user), R-CTL-001 AC.1–2 end to end *(Corrected at validation, 2026-10-07: no test proved cross-portfolio isolation until `test/control-lists-isolation.integration-spec.ts`, added in the validation remediation run.)*
 - **Design refs:** §4 A1 `usedBy`, A9 `inUse`, A12 block, A13; §5 rules 5, 10; D-CTL-3, D-CTL-12, D-CTL-14, D-CTL-15, P-10
 - **Scope — database:** **no schema change.** The integration test creates a temporary consumer table on the local dev DB with a plain FK to `control_list_values.id` `ON DELETE RESTRICT`. It proves the DB backstop (D-CTL-3) and drops the table afterwards.
 - **Scope — server:**
   - `control-list-usage.registry.ts` (+ spec): a singleton of providers (consumer name, list keys, async count over value ids), with **no request-scoped dependency** (P-10);
   - A9 `inUse` summed across providers; A12 refuses with 409 when the sum is > 0 (the description states the count and proposes deactivation); A1 `usedBy` derived from the registry (D-CTL-12);
   - A13 `GET /by-key/:listKey/values` with no `@Roles`, ordered by display order then natural code, `activeOnly` default true;
-  - `ControlListsService.assertValueInList(valueId, portfolioId, listKey)` (D-CTL-15);
+  - `ControlListsService.assertValueInList(valueId, portfolioId, listKey)` (D-CTL-15) — *delivered on `ControlListValueLookupService` instead (design §5 rule 10, P-10)*;
   - the module exports the service and the registry.
 - **Scope — screen:** the **In use** column in the values table; the list header shows *Used by* or *Not linked to a form yet*; a 409 on a value delete shows the server description with a single *Close*.
 - **Tests:**
@@ -282,7 +282,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 
 | Requirement › scenario / clause | Owning task(s) |
 | --- | --- |
-| R-CTL-001 *Lists are isolated per portfolio* · **BUT** no other portfolio's rows | T-01 (categories), T-02 (lists), T-04 (end to end) |
+| R-CTL-001 *Lists are isolated per portfolio* · **BUT** no other portfolio's rows · AC.2 | T-01 (categories), T-02 (lists), validation remediation (two-portfolio integration: `control-lists-isolation.integration-spec.ts`) |
 | R-CTL-001 **AND IT MUST** reject a cross-portfolio write (400) | T-02 (falsifier 3) |
 | R-CTL-001 *Default portfolio* · P1 selectable with empty state | T-01 (falsifier 6) |
 | R-CTL-002 *Duplicate name* (case variant) → 409 | T-01 |
@@ -316,7 +316,7 @@ The slices are strictly sequential. T-01's migration FKs to the existing `portfo
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-09-27 | T-05 step 5 cannot show a real in-use value until `organizational-structure` registers its consumer | T-04 unit + integration (test provider, temporary FK table) cover the rule; re-check in child 2's HITL | Requester | open |
 | RB-2 | 2026-09-27 | The Prod pipeline may not apply migrations (P-13) | Settle in T-05 before merging to `main` | Requester | open |
-| RB-3 | 2026-10-01 | `judgment.md` (APPROVED) predated D-CTL-14…16 and this re-cut | Judgment Day round 2 run 2026-10-01: APPROVED, 0 confirmed severe; suspects J-9…J-11 await the user | Requester | closed (suspects pending) |
+| RB-3 | 2026-10-01 | `judgment.md` (APPROVED) predated D-CTL-14…16 and this re-cut | Judgment Day round 2 run 2026-10-01: APPROVED, 0 confirmed severe; suspects J-9…J-11 await the user | Requester | closed (suspects later applied — `judgment.md`) |
 | RB-4 | 2026-10-01 | Jira sub-tasks AC-1780…AC-1789 describe the old horizontal split | Re-mapped with the user's go-ahead: AC-1780…AC-1784 rewritten as T-01…T-05 and re-parented; AC-1785…AC-1789 titled [OBSOLETE], still Open — closing them is the PO's call | Requester | closed |
 | RB-5 | 2026-10-01 | T-01 and T-03 are size L, with both packages in one task | Two parallel dispatches per task (slice rule); if a half overruns, split that half's dispatch, not the task | Leader | open |
 

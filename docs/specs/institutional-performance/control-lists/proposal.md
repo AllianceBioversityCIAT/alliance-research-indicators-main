@@ -37,7 +37,7 @@ Stop hard-coding vocabularies. The KPI forms (Idea 2) and the organizational str
 | An admin on Control Lists (Portfolio 2) | they create a category, a list or a value | it is saved for Portfolio 2 only |
 | A value | they edit its code, name, order or *Active* flag | forms that read the list reflect it; inactive values disappear from new selections but stay on existing records |
 | A value used by records (e.g. *Division*, used by 3 org entries) | they press Delete | deletion is blocked and the dialog proposes deactivation |
-| A system list (e.g. `org.level`) | they try to delete it | it cannot be deleted; its **system key** is fixed |
+| A system list (e.g. `org.level`) | they try to delete it | its **system key** is fixed; it can be deleted only once it has no values *(CR-2, 2026-10-07: originally "it cannot be deleted")* |
 | A new list created by an admin | it is saved | it exists with no form linked (*Used by: not linked yet*) until development links it |
 
 ## 5. Scope
@@ -45,7 +45,7 @@ Stop hard-coding vocabularies. The KPI forms (Idea 2) and the organizational str
 | Element | Fields (* required) | Rules |
 | --- | --- | --- |
 | Category | Name*, Description | Seed: *Key Performance Indicators (KPIs)*, *Organizational structure* |
-| List | Name*, System key* (fixed once created, `[a-z0-9_.]`, **no portfolio or year segment**), Category, Description; *Used by* (read-only) | Unique per portfolio, so `org.level` exists once in each portfolio; the UI shows the qualified reference `P2 · org.level` (computed, not stored). System lists cannot be deleted; a custom list can be deleted when empty |
+| List | Name*, System key* (fixed once created, `[a-z0-9_.]`, **no portfolio or year segment**), Category, Description; *Used by* (read-only) | Unique per portfolio, so `org.level` exists once in each portfolio; the UI shows the qualified reference `P2 · org.level` (computed, not stored). Any list, system or custom, can be deleted when empty *(CR-2, 2026-10-07)* |
 | Value | Code* (unique in list), Value* (unique in list), Description, Display order, Active | In-use count shown; a value in use cannot be deleted |
 
 Seed data (F-8):
@@ -99,7 +99,7 @@ No open questions — decisions in `../family.md` §4.
 
 ## 13. Success Criteria
 - An admin can create, edit and delete categories, lists and values for Portfolio 2 using only Save and Delete.
-- A value in use cannot be deleted; a system list cannot be deleted.
+- A value in use cannot be deleted; a list can be deleted only once it has no values *(CR-2, 2026-10-07: originally "a system list cannot be deleted")*.
 - The values table meets F-7.
 
 ## 14. Next Step

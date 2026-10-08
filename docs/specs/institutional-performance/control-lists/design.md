@@ -2,14 +2,14 @@
 
 - **Module:** institutional-performance (new) — server `domain/entities/control-lists/` + client Center admin page
 - **Spec id:** 2026-09-control-lists
-- **Status:** draft
+- **Status:** implemented — in validation (2026-10-07)
 - **Owner:** Hector F. Tobón (requester)
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked TRD:** [`docs/trd/trd.md`](../../../trd/trd.md) — backend module layout, response envelope, auth
 - **Parent spec:** [`../family.md`](../family.md) (F-1 … F-9)
 - **Visual reference:** artboard *1 · Control Lists* — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP · [`../mockup/ControlledLists.dc.html`](../mockup/ControlledLists.dc.html)
 - **Exploration:** delegated to one Explore scout (citations as run, folded into §13 Premise Ledger)
-- **Last updated:** 2026-10-01 (requester: D-CTL-14 permanent value ID, D-CTL-15 membership check without a composite FK, D-CTL-16 vertical-slice delivery). These postdate `judgment.md` — see §12. Earlier: 2026-09-26 judgment-day round 1 fixes J-1, J-2; user-approved suspects J-3, J-4
+- **Last updated:** 2026-10-07 (validation sweep: §2.1 files, A4 response, §5 rule 2 scope, §14 actuals; CR-2 / D-CTL-18). Earlier: 2026-10-06 §5 rule 10 amended at T-04; 2026-10-02 D-CTL-17; 2026-10-01 (requester: D-CTL-14 permanent value ID, D-CTL-15 membership check without a composite FK, D-CTL-16 vertical-slice delivery). These postdate `judgment.md` — see §12. Earlier: 2026-09-26 judgment-day round 1 fixes J-1, J-2; user-approved suspects J-3, J-4
 
 ---
 
@@ -53,14 +53,18 @@ flowchart LR
 
 | Path | Responsibility |
 | --- | --- |
-| `control-lists.module.ts` | Declares controller, service, repositories, registry; **exports** the service and the registry for consumers |
+| `control-lists.module.ts` | Declares controller, service, repositories, registry and lookup service; **exports** the service, the registry and `ControlListValueLookupService` for consumers |
 | `control-lists.controller.ts` | HTTP edge for all endpoints in §4; class-level `RolesGuard` |
 | `control-lists.service.ts` | Validation and business rules (§5) |
 | `control-list-usage.registry.ts` | Singleton holding the in-use providers registered by consumers |
+| `control-list-value-lookup.service.ts` | Singleton holding `assertValueInList` (§5 rule 10; added at T-04, P-10) |
+| `control-list-natural-compare.util.ts` | Server-side natural code comparator for A13 ordering (T-04) |
+| `control-lists.types.ts` | Shared response types (`ListSummary`, category/value shapes) |
 | `entities/control-list-category.entity.ts`, `entities/control-list.entity.ts`, `entities/control-list-value.entity.ts` | TypeORM entities (§3) |
 | `repositories/*.repository.ts` | One repository per entity, same pattern as `PortfoliosRepository` |
 | `dto/*.dto.ts` | Create/update DTOs for category, list, value; query DTOs for `portfolioId`, `activeOnly` |
-| sibling `*.spec.ts` for controller, service, registry, repositories | Unit tests |
+| sibling `*.spec.ts` for controller, service, registry, repositories, lookup service, DTOs; `control-lists.global-exceptions.spec.ts` (real `GlobalExceptions` wire contract) | Unit tests |
+| `test/control-lists-{categories,lists,values,usage,isolation}.integration-spec.ts` | Integration tests on the local development DB (`test:integration`) |
 | `src/db/migrations/<epochMs>-createControlListCategories.ts` · `…-createControlLists.ts` · `…-createControlListValues.ts` | One migration per slice (D-CTL-16): each creates its table, indexes and FKs and seeds its part for Portfolio 2 |
 | `src/domain/routes/main.routes.ts`, `src/domain/entities/entities.module.ts` | Register the module (path `control-lists`) |
 
@@ -74,7 +78,7 @@ flowchart LR
 | `shared/interfaces/administration-nav.interface.ts` | Adds optional `children` to `AdministrationNavChild` |
 | `shared/components/alliance-sidebar/*` | Renders one nested level under a child (expanded and collapsed flyout) |
 | `shared/interfaces/control-lists.interface.ts` | Client types for category, list, value |
-| `shared/services/api.service.ts` | New `GET_/POST_/PATCH_/DELETE_` methods for §4 |
+| `shared/services/api.service.ts` | New `GET_/POST_/PATCH_/DELETE_` methods for A1–A12 (A13 serves consumer forms; no client method yet) |
 | `shared/types/modal.types.ts`, `shared/services/cache/all-modals.service.ts` | Register modal name `controlListForm` |
 | `pages/platform/pages/administration/center-admin/control-lists/control-lists.component.{ts,html,scss,spec.ts}` | The page: portfolio selector, category/list navigator, list header, values table, modal, confirm |
 | `app.routes.ts` | Lazy route `administration/center-admin/control-lists`, `canMatch: [centerAdminGuard]` |
@@ -114,7 +118,7 @@ Base path `/api/control-lists` (unversioned — root `CLAUDE.md` §4.1). Class-l
 | A1 | `GET /categories?portfolioId=` | CENTER_ADMIN, SYSTEM_ADMIN | `portfolioId` required | `Category[]`, each with `lists: ListSummary[]` (id, key, name, description, codePrefix, value count, is_system — D-CTL-17 — `usedBy: string[]` — consumer names from the registry, empty = *Not linked to a form yet*) | 400 missing id · 404 portfolio |
 | A2 | `GET /portfolios/summary` | CENTER_ADMIN, SYSTEM_ADMIN | — | `{ portfolioId, categories: number }[]` — drives *not configured* | — |
 | A3 | `POST /categories` | CENTER_ADMIN, SYSTEM_ADMIN | `{portfolioId, name, description?}` | `Category` (201) | 400 · 404 portfolio · 409 duplicate name |
-| A4 | `PATCH /categories/:id` | same | `{name?, description?}` | `Category` | 404 · 409 duplicate |
+| A4 | `PATCH /categories/:id` | same | `{name?, description?}` | `Category`, with its `lists` (same shape as A1; fixed at validation, 2026-10-07) | 404 · 409 duplicate |
 | A5 | `DELETE /categories/:id` | same | — | `{ id }` | 404 · 409 has lists (description names them) |
 | A6 | `POST /lists` | same | `{categoryId, listKey, name, description?, codePrefix?}` | `List` (201, `is_system=false`) | 400 key pattern · 404 category · 409 duplicate key in portfolio |
 | A7 | `PATCH /lists/:id` | same | `{name?, description?, categoryId?}` — **`listKey` not whitelisted** | `List` | 400 if `listKey` sent (forbidNonWhitelisted) · 400 category of another portfolio (R-CTL-001) · 404 |
@@ -132,9 +136,9 @@ Response shapes are wrapped by `ResponseInterceptor` (`ServerResponseDto`). Mach
 ## 5. Workflows & business rules
 
 1. **Portfolio integrity** — A3 checks the portfolio exists (404). A6 copies `portfolio_id` from the category. A7 with `categoryId` rejects a category of another portfolio with **400**, as R-CTL-001 requires for a cross-portfolio write (judgment J-4). Values inherit the portfolio through their list.
-2. **Uniqueness** — the service checks first, to return a field-named 409. The DB unique index is the backstop for a concurrent insert: the service **catches a `QueryFailedError` with errno 1062 around every insert/update of the three tables and rethrows `ConflictException`**, naming the field. It must **not** rely on `sql-errors.const.ts` (it maps 1062 to 400 and is not wired into `GlobalExceptions`, which would return 500 for a raw `QueryFailedError` — P-14).
+2. **Uniqueness** — the service checks first, to return a field-named 409. The DB unique index is the backstop for a concurrent insert: the service **catches a `QueryFailedError` with errno 1062 around every insert/update that writes a uniquely indexed column (name, key, code, value) and rethrows `ConflictException`**, naming the field. A7 (`updateList`) writes none of them, so it has no catch. It must **not** rely on `sql-errors.const.ts` (it maps 1062 to 400 and is not wired into `GlobalExceptions`, which would return 500 for a raw `QueryFailedError` — P-14).
 3. **Immutable key** — `listKey` exists only in the create DTO. The update DTO omits it, so `forbidNonWhitelisted` returns 400.
-4. **Code proposal** — when `code` is empty on A10, the service uses `<code_prefix>-<nn>`, zero-padded to 2 digits, with `nn` = 1 + the highest numeric suffix already in the list. For `org.level` (prefix `L`, no dash) it uses `L<n>`. The admin can edit it.
+4. **Code proposal** — when `code` is empty on A10, the service uses `<code_prefix>-<nn>`, zero-padded to 2 digits, with `nn` = 1 + the highest numeric suffix already in the list. The suffix scan ignores letter case (the unique index does too), so `dir-04` counts; the server and the client pre-fill (D-CTL-17) use the same rule. For `org.level` (prefix `L`, no dash) it uses `L<n>`. The admin can edit it.
 5. **In-use and *Used by*** — `ControlListUsageRegistry` holds providers registered by consumer modules. Each provider declares a **consumer name** (e.g. *Organizational Structure › Level*), the list keys it reads and a count function over value ids. A1 derives each list's `usedBy` from the providers that declare its key — nothing is stored (judgment J-3). A9 attaches the summed counts; A12 refuses when the sum is > 0. Consumers also add a DB FK to `control_list_values.id` with `ON DELETE RESTRICT` (child 2 owns that migration). **The registry has no request-scoped dependency** (P-10).
 6. **Delete rules** — category: only with no lists. List: only with no values, whether seeded or created (`is_system` has no effect — CR-2, D-CTL-18). Value: only if in-use = 0.
 7. **Audit** — creates set `created_by`, updates set `updated_by`, via `CurrentUserUtil.audit`.
@@ -241,10 +245,10 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 | D-CTL-14 | 2026-10-01 | Each value's own PK `id` is its permanent reference: shown read-only in the table and the modal, rejected in update bodies, with explicit ids for seeded rows | Code and name are editable (F-6), so logic that keys on them breaks silently when an admin renames them. The id is immutable, and explicit seed ids make it identical across environments (requester) | A separate immutable `system_code` column; relying on the editable code |
 | D-CTL-15 | 2026-10-01 | List membership is checked by the consumer's service through `assertValueInList`; plain FK to `control_list_values.id` only | The requester rejected a composite FK `(list_id, value_id)`. The service check returns a named 400; the plain FK still blocks deleting a value in use | Composite FK (requester: no) |
 | D-CTL-16 | 2026-10-01 | Delivery by vertical slices: categories → lists → values → usage. Each task ships its table + server + screen, and is executed as a server dispatch plus a client dispatch in parallel (cross-package, root `CLAUDE.md` §4.3) | The requester wants every task visible and testable end to end. One migration per data slice (T-01…T-03) keeps each task self-contained; T-04 adds behavior on the existing tables, with no schema | Horizontal split (all server first, then all client) — the original 10-task plan |
-| D-CTL-18 | 2026-10-07 | No "system list" protection: any list, seeded or created, can be deleted once it has no values. `is_system` stays in the schema (append-only migrations) but has no behavioral effect; the UI shows *Delete list* on every list | Requester (CR-2): the organization manages every list, including the initial ones. The value-in-use protection (R-CTL-005) still prevents deleting anything a consumer depends on | Keeping system lists undeletable (original R-CTL-003) |
 | D-CTL-17 | 2026-10-02 | A1 `ListSummary` also returns `description` (T-02) and `codePrefix` (T-03). The client pre-fills the proposed value code with the same rule as the server (§5 rule 4), including `<prefix>-01` on an empty list | The list header needs the description. Without the prefix, the client had to guess it from existing codes and diverged from rule 4 (T-03 attempt-1 FAIL, both lenses). Additive fields; no consumer breaks | A client heuristic over existing codes; a separate code-proposal endpoint |
+| D-CTL-18 | 2026-10-07 | No "system list" protection: any list, seeded or created, can be deleted once it has no values. `is_system` stays in the schema (append-only migrations) but has no behavioral effect; the UI shows *Delete list* on every list | Requester (CR-2): the organization manages every list, including the initial ones. The value-in-use protection (R-CTL-005) still prevents deleting anything a consumer depends on | Keeping system lists undeletable (original R-CTL-003) |
 
-**Judgment status:** D-CTL-14…16 were reviewed in Judgment Day round 2 (2026-10-01): APPROVED, 0 confirmed severe, suspects J-9…J-11 pending the user — see `judgment.md`.
+**Judgment status:** D-CTL-14…16 were reviewed in Judgment Day round 2 (2026-10-01): APPROVED, 0 confirmed severe; suspects J-9…J-11 were later applied — see `judgment.md`.
 
 **Reversion challenge (Step 2.3):** not triggered — no decision removes, disables or inverts shipped behavior. Every change is additive; the sidebar change only adds an optional field.
 
@@ -276,7 +280,7 @@ Info-level logs through `LoggerUtil` on create, update and delete (entity, id, p
 | Measure | Estimate |
 | --- | --- |
 | Tasks | 5: four vertical slices (each DB + server + screen) and one manual HITL check. Re-cut on 2026-10-01 (D-CTL-16); was 10 horizontal tasks |
-| LOC (incl. tests) | ~2,250 (server ~1,050, client ~1,200), including the ID column and `assertValueInList` |
+| LOC (incl. tests) | ~2,250 (server ~1,050, client ~1,200), including the ID column and `assertValueInList`. **Actual (measured at validation, 2026-10-07, `git diff --shortstat 18ef3255 HEAD` on the spec's paths):** server ~7,400, client ~6,100 insertions. The tripwire was exceeded from T-01 (~2,770 lines) and not re-baselined during execution; most of the excess is tests (the service spec alone is ~1,570 lines) |
 | Review rounds | ≤ 2 per task; ≤ 10 in total |
 
 The estimate matches the **Standard** depth. Each slice is about 400–700 LOC, so it is delivered as **one PR per slice** (4 PRs, plus the HITL check). Each PR is user-visible and can be reviewed on its own.

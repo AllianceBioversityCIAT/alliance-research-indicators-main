@@ -336,7 +336,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('renders Control Lists nested under Portfolio Management in the EXPANDED sidebar (falsifier 5)', () => {
-    const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
+    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
     const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
     cache.isSidebarCollapsed.mockReturnValue(false);
     roles.canAccessCenterAdmin.mockReturnValue(true);
@@ -350,7 +350,7 @@ describe('AllianceSidebarComponent', () => {
   });
 
   it('renders Control Lists nested under Portfolio Management in the COLLAPSED flyout (falsifier 5)', () => {
-    const cache = TestBed.inject(CacheService) as { isSidebarCollapsed: jest.Mock };
+    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
     const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
     cache.isSidebarCollapsed.mockReturnValue(true);
     roles.canAccessCenterAdmin.mockReturnValue(true);

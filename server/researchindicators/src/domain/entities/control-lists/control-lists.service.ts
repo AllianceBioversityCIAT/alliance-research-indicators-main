@@ -64,21 +64,12 @@ export class ControlListsService {
       order: { display_order: 'ASC', id: 'ASC' },
     });
 
-    const lists = await this.listRepository.find({
-      where: { portfolio_id: portfolioId, is_active: true },
-      order: { id: 'ASC' },
-    });
-
     // T-03: A1's valueCount now counts real rows per list (design §4 A1).
     // `usedBy` stays [] until the T-04 registry exists.
-    const listsWithCounts = await Promise.all(
-      lists.map(async (list) => ({
-        list,
-        valueCount: await this.valueRepository.count({
-          where: { list_id: list.id },
-        }),
-      })),
-    );
+    const listsWithCounts = await this.loadListEntries({
+      portfolio_id: portfolioId,
+      is_active: true,
+    });
 
     return categories.map((category) =>
       this.mapCategory(
@@ -184,7 +175,13 @@ export class ControlListsService {
       category.portfolio_id,
     );
 
-    return this.mapCategory(updated);
+    // R-CTL-002: A4 returns the category's real list summaries (A1's shape).
+    const listEntries = await this.loadListEntries({
+      category_id: id,
+      is_active: true,
+    });
+
+    return this.mapCategory(updated, listEntries);
   }
 
   // ---------------------------------------------------------------------
@@ -241,7 +238,11 @@ export class ControlListsService {
       // Leader-adjudicated forward pointer (T-03 rework attempt 2): same
       // normalization on create as on update (categories, lists, values).
       description: this.normalizeDescription(dto.description),
-      code_prefix: dto.codePrefix ?? this.deriveDefaultCodePrefix(dto.listKey),
+      // A-1: empty / whitespace-only codePrefix counts as absent (`??` alone
+      // would store ''); a given prefix is stored trimmed, so " DIR" cannot
+      // produce " DIR-01" proposals.
+      code_prefix:
+        dto.codePrefix?.trim() || this.deriveDefaultCodePrefix(dto.listKey),
       is_system: false,
       ...this.currentUser.audit(SetAuditEnum.NEW),
     };
@@ -801,8 +802,8 @@ export class ControlListsService {
     const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const isOrgLevelFormat = prefix === 'L';
     const pattern = isOrgLevelFormat
-      ? new RegExp(`^${escapedPrefix}(\\d+)$`)
-      : new RegExp(`^${escapedPrefix}-(\\d+)$`);
+      ? new RegExp(`^${escapedPrefix}(\\d+)$`, 'i')
+      : new RegExp(`^${escapedPrefix}-(\\d+)$`, 'i');
 
     let maxSuffix = 0;
     for (const code of existingCodes) {
@@ -831,6 +832,25 @@ export class ControlListsService {
   ): void {
     this.logger._log(
       `control_lists.${action} entity=${entity} id=${id} portfolio_id=${portfolioId} user_id=${this.currentUser.user_id}`,
+    );
+  }
+
+  private async loadListEntries(
+    where: Partial<
+      Pick<ControlList, 'portfolio_id' | 'category_id' | 'is_active'>
+    >,
+  ): Promise<{ list: ControlList; valueCount: number }[]> {
+    const lists = await this.listRepository.find({
+      where,
+      order: { id: 'ASC' },
+    });
+    return Promise.all(
+      lists.map(async (list) => ({
+        list,
+        valueCount: await this.valueRepository.count({
+          where: { list_id: list.id },
+        }),
+      })),
     );
   }
 

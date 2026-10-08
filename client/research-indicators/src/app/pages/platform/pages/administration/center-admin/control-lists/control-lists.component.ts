@@ -423,11 +423,12 @@ export default class ControlListsComponent implements OnInit {
   // D-CTL-17 / design §5 rule 4: a LITERAL mirror of the server's `proposeNextCode`
   // (`control-lists.service.ts`) — same escaping, same `L<n>` special case, same "ignore a code
   // from another prefix" behavior, same `<prefix>-01` / `L1` result on an empty (or
-  // all-foreign-prefix) list. Keep this in lockstep with the server function if either changes.
+  // all-foreign-prefix) list, same case-insensitive suffix scan (the unique index ignores case, so
+  // `dir-04` counts). Keep this in lockstep with the server function if either changes.
   private deriveNextProposedCode(codePrefix: string, existingCodes: string[]): string {
     const escapedPrefix = codePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const isOrgLevelFormat = codePrefix === 'L';
-    const pattern = isOrgLevelFormat ? new RegExp(`^${escapedPrefix}(\\d+)$`) : new RegExp(`^${escapedPrefix}-(\\d+)$`);
+    const pattern = isOrgLevelFormat ? new RegExp(`^${escapedPrefix}(\\d+)$`, 'i') : new RegExp(`^${escapedPrefix}-(\\d+)$`, 'i');
 
     let maxSuffix = 0;
     for (const code of existingCodes) {

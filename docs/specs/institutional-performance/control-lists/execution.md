@@ -9,7 +9,7 @@
 | Approval Mode | `gated` |
 | Leader | Claude (Opus 5.5) · Implementer wrapper `akili-implementer` · Reviewer wrapper `akili-reviewer` |
 | Jira | epic AC-1773 — mark each sub-task / story Done when it closes (AC workflow has no direct Open → Done) |
-| Status | **re-planned (Run 4)** — 5 vertical slices; judgment round 2 APPROVED; T-01 waits on the user's decision on suspects J-9…J-11 |
+| Status | **in validation** (2026-10-07) — T-01…T-05, CR-1, CR-2 done; `/akili-validate` remediation in progress (see `validation-report.md`) |
 
 ## Task Execution History
 
@@ -555,7 +555,7 @@
   - R-CTL-006, AC.1–2 (ordered read, unknown key, *Value from another list*);
   - R-CTL-004 *Deactivate* (A13 omits inactive values);
   - R-CTL-007 (A13 open to any authenticated user);
-  - R-CTL-001 end to end.
+  - R-CTL-001 end to end. *(Corrected at validation, 2026-10-07: no test proved cross-portfolio isolation until `test/control-lists-isolation.integration-spec.ts`, added in the validation remediation run.)*
 - **Forward pointers:**
   - **child 2 (`organizational-structure`):** register the consumer once, from a singleton (`onModuleInit`); add the FK `ON DELETE RESTRICT` to `control_list_values.id`; call `ControlListValueLookupService.assertValueInList` before every write that stores a value id; map errno 1451 → 409 in A12 (advisory 2).
   - **T-05:** confirm the user's servers are stopped, then run the server `npm run build`; then the HITL checklist.
@@ -589,3 +589,49 @@
   - **P-13:** whether the Prod pipeline (Jenkins job `roar-monorepo-main`) applies migrations like Dev. Not settleable from the repo (`.github/workflows/jenkins-trigger-monorepo.yml` only triggers the Jenkins job). Check a `main` build console before the merge to `main`.
   - Post-deploy check on Dev: `control_lists WHERE is_system=1` = 6 and values = 23 (pointer from Run 7).
 - **Final status:** done by requester waiver; Dev observation still open.
+
+### 2026-10-07 — Run 9: `/akili-validate` and remediation
+
+- **Validation (attempt 1): FAIL**, recorded in `validation-report.md`. Blocking: R-CTL-001 had no two-portfolio test, although Run 8 claimed "end to end". 16 WARN.
+- **Remediation, requested by the user ("arregla todo"):** server and client implementers (sonnet) ran in parallel, cross-package. The Leader did the doc sweep (R-3) and the Constitution Impact section (R-7).
+- **Server:**
+  - **R-1:** new `test/control-lists-isolation.integration-spec.ts` (5 tests). It uses two real portfolios with the same `list_key`. It checks A1 both ways and A13 per portfolio, with exact ids. It also proves R-CTL-003 *Same key in two portfolios*.
+  - **R-5:** Center Admin and System Admin each create a value (A10) → 201.
+  - **A-1:** an empty or whitespace `codePrefix` now falls back to the derived prefix, and a given prefix is stored trimmed.
+  - **A-2:** the code-proposal suffix scan ignores letter case.
+  - **A4:** now returns the category's real `lists`, through `loadListEntries`, which it shares with A1.
+  - **`assertValueInList`:** compares portfolio ids with `Number()` on both sides.
+- **Client:**
+  - **R-2:** the 3 spec type errors this spec introduced are fixed, so `tsc -p tsconfig.spec.json` is back to 945 from 948.
+  - **R-5:** new export test combining a search with a descending sort (11 rows, all pages, exact order), and a test for the export file name.
+  - **A-2 mirror:** the client code proposal now ignores letter case too (D-CTL-17 lockstep; design §5 rule 4).
+- **Reds observed** (each restored from a backup copy, never `git checkout`):
+  - A-1: `code_prefix: ""` / `"   "`.
+  - trim: `Received code_prefix " DIR "`.
+  - A-2 server: `Received DIR-02`; A-2 client: `Expected "DIR-05" Received "DIR-02"`.
+  - A4: the lists query was absent.
+  - R-1 A1, with the categories portfolio filter removed: `Expected value: not 1090 Received array: [1011, 1090, 1091, 1, 2]`.
+  - R-1 A13, with `portfolio_id` removed from the by-key lookup: red.
+  - R-5, with A10 restricted to `SYSTEM_ADMIN`: `Expected: 201 Received: 403`.
+  - client: descending order reversed; the search filter leaked `"Score (0-100)"`; file-name slug `values`.
+  - **No red:** A9 (it is per-list and takes no portfolio), so A9 is not counted as isolation evidence. Removing the portfolio filter from the lists query alone does not redden A1; the categories filter is the guard.
+- **Reviewer (opus):**
+  - attempt 1 **FAIL**: the client code proposal was still case-sensitive, so it diverged from the server (reachable 409); the Run 8 claim was not yet corrected.
+  - attempt 2 **PASS**. Advisory: a failed DELETE in the isolation `afterAll` would skip the remaining ones (local test DB only).
+- **Leader re-measurement (final, serial, no agent active):**
+  - server: 431/433 suites, 4,160/4,163 tests; the same 3 pre-existing failures (innovation-use ×2, capdev-bulk);
+  - server: control-lists unit 189; integration 5 suites / 39 tests; `tsc --noEmit` 0; eslint on the 5 changed files 0 failing;
+  - client: 345/345 suites, 7,941/7,941 tests; lint clean; spec tsc 945; `ng build` exit 0 (Initial 1.35 MB).
+  - Server `npm run build` was not run, because the user's watch server on :3001 uses `dist/`. `tsc --noEmit` is the compile gate.
+- **Status:** validation blocker closed. Remaining WARNs are the T-05 rollout items (owner: requester) and low-risk advisories.
+
+## Constitution Impact
+
+Recorded at `/akili-validate` (2026-10-07); the guide and TRD sync is owed to `/akili-archive` (Constitution & Graph Sync).
+
+| Change | Surface | Guides / docs to sync |
+| --- | --- | --- |
+| New server module `domain/entities/control-lists/` (13 endpoints under `/api/control-lists`, 3 tables) | New module + public API | `server/researchindicators/src/CLAUDE.md` (module list); TRD module layout + data model |
+| `ControlListUsageRegistry` and `ControlListValueLookupService` exported for consumers | Cross-module contract: a consumer registers once from a singleton `onModuleInit`, adds an FK `ON DELETE RESTRICT` to `control_list_values.id`, and calls `assertValueInList` before every write that stores a value id (design §5 rules 5 and 10) | Server child guide (integration rule for consumers); first consumer is child 2 `organizational-structure` |
+| Shared client `shared/components/data-table/` (F-7 table standard: natural sort, resizable columns, page sizes, search, lazy `exceljs` export) | New reusable component | `client/research-indicators/src/CLAUDE.md` (where shared components live; "new tables use DataTable"); `docs/ux-ui/design.md` component inventory |
+| `AdministrationNavChild.children` (one nested sidebar level) | Shared nav interface | Client child guide; `docs/ux-ui/design.md` IA (Center admin › Portfolio Management group) |

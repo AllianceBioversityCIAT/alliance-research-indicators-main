@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
+import { DataTableComponent } from '@shared/components/data-table/data-table.component';
 import ControlListsComponent from './control-lists.component';
 import { Portfolio } from '@shared/interfaces/portfolio.interface';
 import {
@@ -1088,6 +1089,19 @@ describe('ControlListsComponent', () => {
       expect(inUseCells[1].textContent?.trim()).toBe('0');
     });
 
+    // R-CTL-009 "Export respects filter and sort" — the page half: the file name carries the
+    // SELECTED list's name (design §6.3), read off the rendered DataTable, not the page's computed.
+    it('passes an export file name containing the selected list name to the rendered data table', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(ok(directionValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const table = fixture.debugElement.query(By.directive(DataTableComponent)).componentInstance as DataTableComponent<ControlListValue>;
+      expect(table.exportFileName).toBe('control-list-values-direction.xlsx');
+    });
+
     it('loads values for the selected list (A9)', async () => {
       await setup([kpiCategory]);
       api.GET_ControlListValues.mockResolvedValueOnce(ok(directionValues));
@@ -1211,6 +1225,22 @@ describe('ControlListsComponent', () => {
       component.startCreateValue();
 
       expect(component.valueForm().code).toBe('DIR-08');
+    });
+
+    // Validation A-2: the suffix scan ignores letter case, like the server and the case-insensitive
+    // unique index — a lowercase `dir-04` must count, or the pre-filled `DIR-02` would 409 on Save.
+    it('counts a lowercase code of the same prefix when proposing the next code (dir-04 -> DIR-05)', async () => {
+      await setup([kpiCategory]);
+      api.GET_ControlListValues.mockResolvedValueOnce(
+        ok([controlListValue({ id: 1, code: 'DIR-01' }), controlListValue({ id: 2, code: 'dir-04' })])
+      );
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.startCreateValue();
+
+      expect(component.valueForm().code).toBe('DIR-05');
     });
 
     it('proposes a no-dash code (org.level convention: L4 -> L5)', async () => {

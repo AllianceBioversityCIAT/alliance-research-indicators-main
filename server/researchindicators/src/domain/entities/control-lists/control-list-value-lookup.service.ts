@@ -70,7 +70,8 @@ export class ControlListValueLookupService {
     }
     // Falsifier 4 (tasks.md T-04): checking only the key, not the
     // portfolio, must fail the cross-portfolio case.
-    if (list.portfolio_id !== portfolioId) {
+    // mysql2 may return BIGINT as a string — compare numerically.
+    if (Number(list.portfolio_id) !== Number(portfolioId)) {
       throw new BadRequestException(
         `Value ${valueId} belongs to portfolio ${list.portfolio_id}, not portfolio ${portfolioId}`,
       );

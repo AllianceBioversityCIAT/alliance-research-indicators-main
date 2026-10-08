@@ -525,6 +525,34 @@ describe('ControlListsService', () => {
       );
     });
 
+    // R-CTL-002 output: A4 returns the category's REAL list summaries (same
+    // shape as A1's entry), not the `lists: []` mapCategory default.
+    it('returns the category real list summaries (not []) after a PATCH', async () => {
+      mockFindOne
+        .mockResolvedValueOnce(buildCategory({ id: 1, name: 'Old name' }))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(buildCategory({ id: 1, name: 'New name' }));
+      mockUpdate.mockResolvedValue({ affected: 1 });
+      mockListFind.mockResolvedValue([
+        buildList({ id: 5, category_id: 1, list_key: 'kpi.direction' }),
+      ]);
+      mockValueCount.mockResolvedValue(3);
+
+      const result = await service.updateCategory(1, { name: 'New name' });
+
+      expect(mockListFind).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { category_id: 1, is_active: true },
+        }),
+      );
+      expect(result.lists).toHaveLength(1);
+      expect(result.lists[0]).toMatchObject({
+        id: 5,
+        key: 'kpi.direction',
+        valueCount: 3,
+      });
+    });
+
     it('does NOT log when update fails on an unknown category', async () => {
       mockFindOne.mockResolvedValue(null);
 
@@ -714,6 +742,35 @@ describe('ControlListsService', () => {
         name: dto.name,
         isSystem: false,
       });
+    });
+
+    it.each(['', '   '])(
+      'treats codePrefix %j as absent and stores the derived prefix (A-1)',
+      async (codePrefix) => {
+        mockFindOne.mockResolvedValue(
+          buildCategory({ id: 1, portfolio_id: 2 }),
+        );
+        mockListFindOne.mockResolvedValue(null);
+        mockListSave.mockResolvedValue(buildList({ id: 8 }));
+
+        await service.createList({ ...dto, codePrefix });
+
+        expect(mockListSave).toHaveBeenCalledWith(
+          expect.objectContaining({ code_prefix: 'KPICUSTOMS' }),
+        );
+      },
+    );
+
+    it('stores a given codePrefix trimmed (" DIR " -> "DIR")', async () => {
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+      mockListFindOne.mockResolvedValue(null);
+      mockListSave.mockResolvedValue(buildList({ id: 8 }));
+
+      await service.createList({ ...dto, codePrefix: ' DIR ' });
+
+      expect(mockListSave).toHaveBeenCalledWith(
+        expect.objectContaining({ code_prefix: 'DIR' }),
+      );
     });
 
     it('throws a field-named ConflictException (field: listKey) on a pre-checked duplicate key', async () => {
@@ -1181,6 +1238,29 @@ describe('ControlListsService', () => {
         expect.objectContaining({ list_id: 6, code: 'L5' }),
       );
       expect(result.code).toBe('L5');
+    });
+
+    // A-2: the unique index is case-insensitive, so the suffix scan must be
+    // too — a lowercase `dir-04` must still count and yield DIR-05, not a
+    // colliding DIR-04.
+    it('proposes DIR-05 when an existing code is lowercase dir-04 (case-insensitive scan)', async () => {
+      mockListFindOne.mockResolvedValue(
+        buildList({ id: 2, code_prefix: 'DIR' }),
+      );
+      mockValueFind.mockResolvedValue([
+        buildValue({ code: 'DIR-01' }),
+        buildValue({ code: 'dir-04' }),
+      ]);
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 12, list_id: 2, code: 'DIR-05', value: dto.value }),
+      );
+
+      await service.createValue(2, dto);
+
+      expect(mockValueSave).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'DIR-05' }),
+      );
     });
 
     it('uses an admin-supplied code as-is (no proposal)', async () => {

@@ -236,8 +236,47 @@ describe('DataTableComponent', () => {
     expect(exportSpy).toHaveBeenCalledTimes(1);
     const [callArg] = exportSpy.mock.calls[0];
     expect(callArg.rows).toHaveLength(11);
-    expect(callArg.rows.some(row => row.value.includes('Score'))).toBe(false);
+    expect((callArg.rows as ValueRow[]).some(row => row.value.includes('Score'))).toBe(false);
     expect(callArg.fileName).toBe('values.xlsx');
+
+    exportSpy.mockRestore();
+  });
+
+  it('exports the rows matching the search across ALL pages in the active DESCENDING sort order (R-CTL-009)', async () => {
+    await setup();
+    const dataTable = fixture.debugElement.children[0].componentInstance as DataTableComponent<ValueRow>;
+    const exportSpy = jest.spyOn(xlsxExportUtil, 'exportRowsToXlsx').mockResolvedValue(undefined);
+
+    // Two header clicks: ascending, then descending on `value`.
+    headerCell('value').click();
+    fixture.detectChanges();
+    headerCell('value').click();
+    fixture.detectChanges();
+    const input = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="data-table-search"]') as HTMLInputElement;
+    input.value = 'Alpha';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(headerCell('value').getAttribute('aria-sort')).toBe('descending');
+
+    await dataTable.exportValues();
+
+    // 11 matching rows (row 7 "Score (0-100)" excluded) > page size 10, natural DESC (12 before 9).
+    const [callArg] = exportSpy.mock.calls[0];
+    expect((callArg.rows as ValueRow[]).map(row => row.value)).toEqual([
+      'Alpha value 12',
+      'Alpha value 11',
+      'Alpha value 10',
+      'Alpha value 9',
+      'Alpha value 8',
+      'Alpha value 6',
+      'Alpha value 5',
+      'Alpha value 4',
+      'Alpha value 3',
+      'Alpha value 2',
+      'Alpha value 1'
+    ]);
 
     exportSpy.mockRestore();
   });

@@ -2,7 +2,7 @@
 
 - **Module:** institutional-performance (new) — server + client
 - **Spec id:** 2026-09-control-lists
-- **Status:** draft
+- **Status:** implemented — in validation (2026-10-07)
 - **Depth:** Standard (new module, new tables and API, three migrations + seed; no change to existing data or screens)
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Parent spec:** [`../family.md`](../family.md) — child 1 of 5; shared rules **F-1 … F-9** apply and are cited, not restated
@@ -10,7 +10,7 @@
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — this spec stays aligned with it
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-10-01 (requester: value ID visible and read-only — R-CTL-004; list membership checked by the consumer service, no composite FK — R-CTL-006). Earlier: 2026-09-26 Adjust round 1 (key naming) and judgment-day J-2 (unconfigured portfolios stay selectable)
+- **Last updated:** 2026-10-07 (CR-2: any list, seeded or created, can be deleted once it has no values — R-CTL-003, D-CTL-18). Earlier: 2026-10-01 (requester: value ID visible and read-only — R-CTL-004; list membership checked by the consumer service, no composite FK — R-CTL-006). Earlier: 2026-09-26 Adjust round 1 (key naming) and judgment-day J-2 (unconfigured portfolios stay selectable)
 
 ---
 
@@ -252,7 +252,7 @@ Admins get a new page, *Center admin › Portfolio Management › Control Lists*
 - **As an** Admin **I want** the page nested under Portfolio Management in the left menu **so that** it is clear the configuration depends on a portfolio (F-3).
 
 **Details**
-- Behavior: the sidebar shows *Portfolio Management* followed by an indented group: **Control Lists**, then **Organizational Structure** and **Strategy Framework** — those two appear only once their own specs ship. Existing Center admin items keep their order and look. The page has three areas: a category › list navigator, a list header (name, category, qualified reference `P<n> · <key>`, *Used by*, *Edit list*, *Delete list* for custom lists only), and the values table (R-CTL-009). Create/edit of a category, list or value happens in a modal with only **Cancel** and **Save**; a delete opens a confirmation dialog.
+- Behavior: the sidebar shows *Portfolio Management* followed by an indented group: **Control Lists**, then **Organizational Structure** and **Strategy Framework** — those two appear only once their own specs ship. Existing Center admin items keep their order and look. The page has three areas: a category › list navigator, a list header (name, category, qualified reference `P<n> · <key>`, *Used by*, *Edit list*, *Delete list* on every list — CR-2), and the values table (R-CTL-009). Create/edit of a category, list or value happens in a modal with only **Cancel** and **Save**; a delete opens a confirmation dialog.
 - UI states: **loading** (progress bar, as in Portfolio Management), **empty** (no categories / no lists / no values, each with its call to action), **error** (inline message, retry by refresh), **success** (a toast after each save or delete).
 
 #### Scenario: Menu placement
