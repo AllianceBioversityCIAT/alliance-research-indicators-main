@@ -1,0 +1,78 @@
+<!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-13 -->
+<section
+  class="overflow-hidden rounded-lg border border-solid border-[color:var(--ac-pfm-neutral-bg)] bg-[var(--ac-background)]"
+  [attr.data-testid]="'pfm-group-' + group().code">
+  <button
+    type="button"
+    class="flex w-full cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 border-0 bg-transparent px-4 py-3 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+    data-testid="pfm-group-toggle"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="'pfm-group-body-' + group().code"
+    (click)="store.toggleGroup(group().code)">
+    <i class="pi {{ open() ? 'pi-chevron-down' : 'pi-chevron-right' }} text-[12px] text-[var(--ac-pfm-neutral-fg)]" aria-hidden="true"></i>
+    <span class="text-[12.5px] font-semibold tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-group-code">{{ group().code }}</span>
+    <span class="min-w-0 flex-1 basis-60">
+      <span class="block text-[14px] font-semibold text-[var(--ac-grey-900)]" data-testid="pfm-group-name">{{ group().name }}</span>
+      <span class="block text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-lead"
+        >Lead PI: {{ group().lead_pi }} · {{ group().donor }}</span
+      >
+    </span>
+    <span class="text-[12.5px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-count">{{ countLabel() }}</span>
+    <span class="flex h-2.5 w-40 gap-0.5 overflow-hidden rounded-md" aria-hidden="true" data-testid="pfm-group-bar">
+      @for (s of segments(); track s.key) {
+        <span
+          class="h-full {{ s.seg }}"
+          [style.flex-grow]="s.n"
+          [style.flex-basis]="0"
+          [attr.title]="s.title(s.n)"
+          [attr.data-testid]="'pfm-group-seg-' + s.key"></span>
+      }
+    </span>
+    <span class="sr-only" data-testid="pfm-group-bar-summary">{{ barSummary() }}</span>
+    <span
+      class="inline-flex items-center whitespace-nowrap rounded-full border border-solid px-3 py-1 text-[12px] font-semibold {{
+        group().attention
+          ? 'border-[color:var(--ac-pfm-warning-border)] bg-[var(--ac-pfm-warning-bg)] text-[var(--ac-pfm-warning-fg)]'
+          : 'border-[color:var(--ac-pfm-success-bg)] bg-[var(--ac-pfm-success-bg)] text-[var(--ac-pfm-success-fg)]'
+      }}"
+      data-testid="pfm-group-flag"
+      >{{ flagLabel() }}</span
+    >
+  </button>
+
+  @if (open()) {
+    <div [id]="'pfm-group-body-' + group().code" class="overflow-x-auto" data-testid="pfm-group-body">
+      <div
+        class="{{ grid }} bg-[var(--ac-pfm-neutral-bg)] px-4 py-2 text-[11.5px] font-medium uppercase tracking-wide text-[var(--ac-pfm-neutral-fg)]"
+        role="presentation">
+        @for (c of columns; track c) {
+          <span>{{ c }}</span>
+        }
+      </div>
+      @if (error()) {
+        <div class="flex items-center gap-3 px-4 py-4 text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-group-error">
+          <span>Could not load the results of this project.</span>
+          <button
+            type="button"
+            class="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[var(--ac-pfm-info-fg)] underline"
+            data-testid="pfm-group-retry"
+            (click)="store.retryGroup(group().code)">
+            Retry
+          </button>
+        </div>
+      } @else if (loading()) {
+        <div class="flex flex-col gap-2 px-4 py-3" aria-busy="true" data-testid="pfm-rows-skeleton">
+          @for (i of skeletons; track i) {
+            <div class="h-10 animate-pulse rounded-md bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-row-skeleton"></div>
+          }
+        </div>
+      } @else {
+        @for (r of rows(); track r.result_code) {
+          <app-pfm-result-row [row]="r" />
+        } @empty {
+          <p class="m-0 px-4 py-4 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-empty">No results in this project.</p>
+        }
+      }
+    </div>
+  }
+</section>

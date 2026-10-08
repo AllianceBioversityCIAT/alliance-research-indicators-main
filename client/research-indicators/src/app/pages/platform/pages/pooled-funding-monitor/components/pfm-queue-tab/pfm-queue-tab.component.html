@@ -99,7 +99,7 @@
       }
     </div>
 
-    <!-- T-13 replaces this slot with <app-pfm-project-group> per group -->
+    <!-- Groups are never rendered while the queue is stale (NFR-PFM-006) -->
     <div data-testid="pfm-groups-slot">
       @if (store.queueState().error) {
         <!-- the page shows the inline error + Retry; the previous query's groups are never rendered -->
@@ -117,11 +117,11 @@
           </button>
         </div>
       } @else {
-        <ul class="m-0 list-none p-0">
+        <div class="flex flex-col gap-3">
           @for (g of q.groups; track g.code) {
-            <li [attr.data-testid]="'pfm-group-' + g.code">{{ g.code }} {{ g.name }}</li>
+            <app-pfm-project-group [group]="g" />
           }
-        </ul>
+        </div>
       }
     </div>
 

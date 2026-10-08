@@ -326,3 +326,60 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The `noOldNumbers` check scans the whole page.
   - Dark-mode contrast of the selected chip is not yet verified.
 - **Budget:** about 470 LOC over 2 rounds. Client total is about 2,420 of the revised cap of about 3,200.
+
+#### T-13 — Project groups, result rows, View → **Reviewer PASS · HITL pending** (2026-10-08)
+
+- **Implementer, attempt 1 (sonnet, medium effort)**
+  - Added `pfm-project-group`:
+    - The header is a native `<button>` with `aria-expanded`/`aria-controls`.
+    - It shows the code, name, "Lead PI: … · donor", and the count.
+    - A stacked bar has one `title` per segment; zero-value segments are filtered out.
+    - The flag shows "N need(s) attention" or "All clear".
+    - Rows load lazily through the store: a 3-row skeleton first, and an error with Retry per group.
+  - Added `pfm-result-row`, with columns in mockup order: Result, STAR status, Pool funding mapping, PRMS status, Updated, Action.
+    - View is the only action and appears on every row.
+    - The title and View use `buildResultLink` through a real `routerLink` with `queryParams`.
+  - Rows sit in `overflow-x-auto` with a `min-w-[62rem]` grid.
+  - The badge `value` is typed with the shared unions.
+  - K-004 reds observed:
+    - `aria-expanded` hardcoded.
+    - `snapshot_years` dropped, which made the `?version=` test fail.
+    - View hidden on out-of-scope rows.
+    - The text "Sync" injected.
+- **Reviewer round 1 — STATUS: FAIL:** on Not-sent rows the dash had `title="Not sent"`, which shadowed the PRMS hint "Not synced to PRMS yet". This breaks R-PFM-012 and R-PFM-004.
+- **Implementer, attempt 2 (high effort)**
+  - Removed the dash `title`; `aria-label="Not sent"` stays.
+  - The spec asserts the effective tooltip (`closest('[title]')`) equals the hint. The red was observed: `Expected: "Not synced to PRMS yet"` / `Received: "Not sent"`.
+  - Leader-directed a11y fix: the bar inside the button changed from `<ul>` to `aria-hidden` `<span>`s, plus an `sr-only` summary of the non-zero segments. Its red was observed by changing the separator.
+- **Reviewer round 2 — STATUS: PASS.**
+- **Leader closing re-measure (quiet window, no worker active)**
+  - Full client suite: `npx jest --silent --coverage=false` gave 357 suites and 8019/8019 passing.
+  - `npx tsc -p tsconfig.spec.json --noEmit` reports 945 errors, the same as the baseline. 0 of them match `pooled-funding-monitor|result-link|pfm`.
+  - The implementer reports eslint clean on the feature, the NFR-PFM-003 greps clean, and `ng build` passing.
+- **Open Done item (consolidated HITL, owner):** see "HITL checklist" below. Until it is quoted here, T-09 and T-13 stay `[~]`.
+- **ADVISORY:**
+  - The mapping cell adds `mapping_note` and a primary-SP badge that the mockup group row does not show. Judge this at the HITL.
+  - Enter/Space depend on the native `<button>`, so they are untested in jsdom.
+  - Whether the `sr-only` text is actually hidden and announced needs a browser check.
+  - A group-body id would break if a project code contains spaces. This was not reproducible from the fixtures.
+- **Budget:** about 500 LOC over 2 rounds. The client total is about 2,920 against the revised cap of about 3,200.
+
+#### HITL checklist (owner, running app) — pending
+
+1. Open `/pooled-funding-contribution-monitor` with an allowed role. The page renders, with no `NG04002`. **(T-09, KZ-017)**
+2. The sidebar shows the monitor under *My PI Delegates*. A contributor-only user does not see it.
+3. Click **View** on one approved result that has a snapshot and on one draft. Both open the correct result page. **(T-13)**
+4. Compare the page side by side with `mockup/pooled-funding-contribution-monitor.html` at ≥ 1280 px and at 1024 px, in light and in dark mode.
+   - Bar proportions.
+   - KPI navy accent.
+   - Titles in dark mode, where `--ac-primary-blue-300` has low contrast.
+   - Contrast of the selected chip.
+   - Light neutral fg at about 3.9:1.
+   - Omitted subtitles: pipeline `createdNote` and sync-activity `monthSub`.
+   - Project option labels "CODE — name".
+   - Mapping-cell extras.
+5. Keyboard pass:
+   - Toggle and tabs: arrows, Home and End.
+   - Chips.
+   - A group header with Enter and Space.
+   - Focus is visible throughout.

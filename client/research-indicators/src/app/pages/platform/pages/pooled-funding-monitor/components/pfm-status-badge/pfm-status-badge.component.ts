@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
+import { PfmMappingState, PfmPrmsStatus, PfmStarLabel } from '../../pfm.interfaces';
+
 export type PfmBadgeKind = 'star' | 'mapping' | 'prms' | 'sp';
 
 const SUCCESS = 'bg-[var(--ac-pfm-success-bg)] text-[var(--ac-pfm-success-fg)]';
@@ -39,7 +41,8 @@ const PRMS_NOT_SENT = 'Not sent';
 })
 export class PfmStatusBadgeComponent {
   kind = input.required<PfmBadgeKind>();
-  value = input.required<string>();
+  /** Shared wire unions; `string & {}` keeps the 'sp' kind (a program name) and unknown values accepted. */
+  value = input.required<PfmStarLabel | PfmMappingState | PfmPrmsStatus | (string & {})>();
   /** DB hex color (clarisa_science_programs.color); only used when kind === 'sp'. */
   color = input<string | null | undefined>(null);
 

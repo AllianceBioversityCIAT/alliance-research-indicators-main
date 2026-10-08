@@ -347,7 +347,7 @@ graph TD
 
 ### T-13 — Queue tab: project groups, result rows, View (client)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-08, T-12
+- **Status:** in-progress (Reviewer PASS; HITL pending) · **Size:** M · **Dependencies:** T-08, T-12
 - **Requirements covered:**
   - R-PFM-011 — collapsed by default; header contents (code, name, "Lead PI: … · donor", count, stacked bar with per-segment `title`, attention / "All clear" flag); "Expand and collapse" via click, Enter or Space with `aria-expanded`, other groups keep state; "Lazy rows" with loading skeleton.
   - R-PFM-012 — columns and order as received from the server; PRMS "—" + tooltip.
@@ -369,7 +369,7 @@ graph TD
   - Click View in the running app and confirm the result page opens (KZ-017).
   - Compare the whole page side by side with `mockup/pooled-funding-contribution-monitor.html` at ≥ 1280 px and 1024 px, in light and dark mode.
 - **Done:**
-  - [ ] Green.
+  - [x] Green.
   - [ ] HITL observations quoted in `execution.md`.
 - **Disqualifies:** a router-mocked `href` check offered as proof that navigation works.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`

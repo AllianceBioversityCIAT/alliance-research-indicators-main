@@ -34,6 +34,11 @@ function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip
     chip: signal<PfmChip | null>(over.chip ?? null),
     filters: signal<PfmFilters>(over.filters ?? EMPTY),
     queueState: signal({ loading: over.loading ?? false, error: false }),
+    openGroups: signal<ReadonlySet<string>>(new Set()),
+    groupRows: signal({}),
+    groupState: signal({}),
+    toggleGroup: jest.fn(),
+    retryGroup: jest.fn(),
     setFilter: jest.fn(),
     setChip: jest.fn(),
     resetFilters: jest.fn()

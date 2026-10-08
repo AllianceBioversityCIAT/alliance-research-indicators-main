@@ -1,5 +1,5 @@
 @if (isNotSent()) {
-  <span class="text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-badge-not-sent">—</span>
+  <span class="text-[var(--ac-pfm-neutral-fg)]" role="img" aria-label="Not sent" data-testid="pfm-badge-not-sent">—</span>
 } @else {
   <span
     class="inline-flex items-center text-xs font-medium whitespace-nowrap tabular-nums {{ shapeClasses() }} {{ toneClasses() }}"

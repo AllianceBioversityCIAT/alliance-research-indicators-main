@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 import { PfmChip, PfmChipCounts, PfmFilters, PfmStatusFilter } from '../../pfm.interfaces';
+import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
 import { PfmStoreService } from '../../services/pfm-store.service';
 
 /** Sentinel of the "All …" option (a null model would render the placeholder instead of the option). */
@@ -36,10 +37,10 @@ const LEGEND = [
   { label: 'Not synced', dot: 'bg-[var(--ac-pfm-seg-not-started)]' }
 ];
 
-/** Filters, quick-view chips and footer of the Results queue. T-13 replaces the groups slot with `pfm-project-group`. */
+/** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
-  imports: [FormsModule, SelectModule],
+  imports: [FormsModule, SelectModule, PfmProjectGroupComponent],
   templateUrl: './pfm-queue-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
