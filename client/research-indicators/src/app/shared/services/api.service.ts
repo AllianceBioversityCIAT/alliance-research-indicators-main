@@ -10,6 +10,7 @@ import {
   piDelegateScopeParam,
   ProjectDelegates
 } from '../interfaces/pi-delegates.interface';
+import { PfmQueue, PfmQueueQuery, PfmResultRow, PfmScope, PfmSummary, pfmQueryString } from '@platform/pages/pooled-funding-monitor/pfm.interfaces';
 import { GetViewComponents, Indicator, IndicatorTypes } from '../interfaces/api.interface';
 import { GeneralInformation } from '@interfaces/result/general-information.interface';
 import {
@@ -1264,6 +1265,27 @@ export class ApiService {
   POST_feedback = (body: InteractionFeedbackPayload) => {
     const url = () => `interactions`;
     return this.TP.post(url(), body, { isAuth: environment.feedbackUrl });
+  };
+
+  // ─── Pooled Funding Monitor — @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor (T-07) ──
+  // Read-only. Empty / null query params are omitted from the URL.
+
+  /** GET /api/pooled-funding-monitor/summary?scope=mine|all */
+  GET_PfmSummary = (scope: PfmScope): Promise<MainResponse<PfmSummary>> => {
+    const url = () => `pooled-funding-monitor/summary${pfmQueryString({ scope })}`;
+    return this.TP.get(url(), {});
+  };
+
+  /** GET /api/pooled-funding-monitor/queue?scope&project&sp&status&type&chip */
+  GET_PfmQueue = (query: PfmQueueQuery): Promise<MainResponse<PfmQueue>> => {
+    const url = () => `pooled-funding-monitor/queue${pfmQueryString(query)}`;
+    return this.TP.get(url(), {});
+  };
+
+  /** GET /api/pooled-funding-monitor/queue/projects/:projectCode/results (same query as /queue) */
+  GET_PfmProjectResults = (projectCode: string, query: PfmQueueQuery): Promise<MainResponse<PfmResultRow[]>> => {
+    const url = () => `pooled-funding-monitor/queue/projects/${encodeURIComponent(projectCode)}/results${pfmQueryString(query)}`;
+    return this.TP.get(url(), {});
   };
 
   // ─── PI Delegates — @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-01) ──────────

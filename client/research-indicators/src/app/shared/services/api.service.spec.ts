@@ -2362,6 +2362,26 @@ describe('ApiService', () => {
     });
   });
 
+  // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor (T-07)
+  describe('Pooled Funding Monitor — GET urls', () => {
+    const urlOf = () => (mockToPromiseService.get as jest.Mock).mock.calls.at(-1)?.[0] as string;
+
+    it('summary carries the scope', () => {
+      service.GET_PfmSummary('all');
+      expect(urlOf()).toBe('pooled-funding-monitor/summary?scope=all');
+    });
+
+    it('queue omits empty params', () => {
+      service.GET_PfmQueue({ scope: 'mine', project: null, sp: 'SP01', status: undefined, type: 3, chip: null });
+      expect(urlOf()).toBe('pooled-funding-monitor/queue?scope=mine&sp=SP01&type=3');
+    });
+
+    it('project results encode the code and reuse the query', () => {
+      service.GET_PfmProjectResults('A 1/2', { scope: 'all', chip: 'synced' });
+      expect(urlOf()).toBe('pooled-funding-monitor/queue/projects/A%201%2F2/results?scope=all&chip=synced');
+    });
+  });
+
   // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
   describe('PI Delegates — scope query parameter', () => {
     const urlOf = () => (mockToPromiseService.get as jest.Mock).mock.calls.at(-1)?.[0] as string;

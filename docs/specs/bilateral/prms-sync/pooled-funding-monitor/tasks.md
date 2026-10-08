@@ -215,7 +215,7 @@ graph TD
 
 ### T-07 — `ApiService` methods, interfaces, `PfmStore` (client)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-05 (contract)
+- **Status:** done · **Size:** M · **Dependencies:** T-05 (contract)
 - **Requirements covered:**
   - R-PFM-002 — "Switching scope": keeps filters/tab, clears group cache.
   - R-PFM-009 — "Changing a filter clears the chip".
@@ -231,8 +231,8 @@ graph TD
   - A second expand of the same group makes no new call.
   - `scope`/`tab` sync with query params.
 - **Done:**
-  - [ ] Green.
-  - [ ] A grep shows no POST/PATCH/DELETE in the new files.
+  - [x] Green.
+  - [x] A grep shows no POST/PATCH/DELETE in the new files.
 - **Disqualifies:** asserting only that `ApiService` was called, without checking the resulting signal values.
 - **Skills:** `angular-developer`, `tdd`
 

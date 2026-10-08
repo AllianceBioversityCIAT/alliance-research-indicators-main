@@ -184,3 +184,26 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 
   Spread ≤ 15 % of median (well under the 50 % no-pass threshold). **What this cannot reach (KZ-017):** service-level timing excludes HTTP/middleware overhead, and 155 rows says nothing about Prod volume (≈ 4k in the mockup) — the 5 correlated subqueries per row (T-02 advisory) remain the first suspect if Prod misses. Recorded as a scope gap, not as a Prod pass.
 - **Continue gate:** owner-directed (compact, then T-07).
+
+#### T-07 — `ApiService` methods, interfaces, `PfmStore` → **PASS / done** (2026-10-08)
+
+- **Implementer (akili-implementer, sonnet, medium) — attempt 1:**
+  - Added `pfm.interfaces.ts` (wire types mirroring the server DTOs/enums; exported const arrays + unions for the T-13 badge; `updated_at` documented as a server UTC display label; `pfmQueryString` omits null/undefined/'').
+  - Added `services/pfm-store.service.ts` (+ spec, 11 tests). Provided per page (`@Injectable()`, not root); the page must provide it and call `init()`. Per-section seq counters guard against stale responses; group rows are deduped while in flight.
+  - Added `GET_PfmSummary`, `GET_PfmQueue`, `GET_PfmProjectResults` to `api.service.ts` (+3 URL tests).
+  - K-004 reds observed, each reverted:
+    1. Removing the cache guard failed "second expand makes no new call".
+    2. Removing `chip.set(null)` failed "filter change sets chip null".
+    3. Removing `resetGroups()` from `setScope` failed "scope change … empties groupRows".
+  - `tsc -p tsconfig.spec.json --noEmit` reported 945 errors in total, all pre-existing; none are in the new files.
+  - The mutation grep over the new files matched only `Set.delete`.
+- **Reviewer (akili-reviewer, opus) — STATUS: PASS:**
+  - The wire types match the server DTOs and enums one for one, and the project-results response is an array.
+  - The store follows §6.4 and R-PFM-002/009/011/014/016.
+  - The spec asserts signal values, so the disqualifier does not apply.
+- **Leader re-measure:** `npx jest src/app/pages/platform/pages/pooled-funding-monitor src/app/shared/services/api.service.spec.ts --silent --coverage=false` → 3 suites, 275/275 passed.
+- **ADVISORY (non-gating):**
+  - RELIABILITY — `setFilter` has no same-value guard, so re-setting the same value clears the chip and refetches. T-12 should wire `p-select` onChange only, or add a guard.
+  - READABILITY — the chip has two "none" values, `null` and `'all'`. T-12/T-13 must treat both as *All results*.
+- **What this cannot reach (KZ-017):** real HTTP, a router round-trip inside a mounted component, and rendering. These are covered by T-09+ and the HITL.
+- **Budget:** about 660 LOC (prod ≈ 420, test ≈ 240) and 1 round, against the revised cap of about 2,000 client LOC and ≤ 2 rounds per task.
