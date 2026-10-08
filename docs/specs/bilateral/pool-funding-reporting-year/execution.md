@@ -663,3 +663,43 @@ Production code is within scale.
 - the versioning SP moves Pool Funding rows from live to snapshot
 - the PRMS import does not set a primary contract
 - the snapshot's `is_synced_to_prms` is not copied
+
+### T-10 — Server: display-only read → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Implementer | Claude `akili-implementer` (Sonnet, effort medium; Cursor quota still out, owner re-route), skills `nestjs-expert`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (Opus, fresh context), **PASS**. The execute-time spec edits (R-PRY-007, R-PRY-003 row split, §1 qualifier, design row, §5.x) were checked as named conformance items. |
+| Requirements covered | R-PRY-007 (server) |
+
+**Files changed (6):**
+- `result.repository.ts`: the context gains `is_snapshot` and the query selects `r.is_snapshot`.
+- `bilateral.service.ts`, in `buildAlignment`:
+  - computes `displayOnly`
+  - widens `visibleAlignment` / `toc_alignments` to `eligible || displayOnly`
+  - ORs `displayOnly` into `is_read_only` and returns `display_only`
+  - leaves `eligible` raw and the write paths untouched
+- `update-pool-funding-alignment.dto.ts`: `display_only` with `@ApiProperty`.
+- Specs: `bilateral.service.spec.ts` (matrix, a fixed STAR-20081 case, a snapshot-only row), `bilateral.controller.spec.ts` (field list), `result.repository.spec.ts` (asserts the SQL selects `r.is_snapshot`, KZ-001).
+
+**Implementer verification (as reported):**
+- Scoped: 14 suites, 298 tests. `tsc` exited 0, `eslint` exited 0.
+- Falsifier (a), drop `isSnapshot`: the snapshot-only row fails with `Expected: true / Received: false`.
+  - The STAR-20081 row stays green under (a), because its PRMS code alone triggers `display_only`. The snapshot-only row was added to give (a) a red that discriminates.
+- Falsifier (b), gate the ToC on `eligible` only: STAR-20081 expected `[ObjectContaining {level OUTPUT, sp_code SP05, toc_result_id 7220}]` but received `[]`.
+- Falsifier (c), drop `displayOnly` from `is_read_only`: 3 rows fail with `Expected: true / Received: false`.
+
+**Evidence re-run (Leader inline): VERIFIED.**
+- `tsc` exited 0, and `eslint` on the 6 changed files exited 0.
+- Full server suite (`npm test -- --silent`): **424 suites / 4086 tests**.
+
+**ADVISORY:**
+1. `listIndicators` now also returns indicator groups for display-only results. This is a read, consistent with §5.x, but no test covers it.
+2. The ToC catalog (`getHlosIndicatorsForResult` / SP catalog) stays `unmapped` for STAR-20081, because it has no bilateral mapping. **Forward pointer → T-11:** the client must render the display-only ToC from the saved read-back fields (`toc_result_title`, `indicator_description`, …), not from a catalog lookup.
+3. A comment above `version_locked` / `toc_alignments` is slightly stale.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer 19 calls, 101812 tokens, ended complete; reviewer 16 calls, 69832 tokens, ended complete`.

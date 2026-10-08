@@ -506,6 +506,7 @@ describe('BilateralController (T-15.6)', () => {
           'is_synced_to_prms',
           'prms_result_code',
           'is_read_only',
+          'display_only',
           'version_locked',
           'has_pool_funding_data',
           'reporting_year',

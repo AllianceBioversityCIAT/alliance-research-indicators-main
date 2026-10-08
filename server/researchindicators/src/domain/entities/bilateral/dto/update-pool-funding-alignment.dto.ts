@@ -248,6 +248,14 @@ export class AlignmentResponse {
   })
   is_read_only: boolean;
 
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'True when the result is not Pool Funding eligible but still carries a record (is a snapshot, is synced to PRMS, or has a PRMS code). The saved alignment and ToC are returned read-only; `eligible` stays the raw contract fact.',
+  })
+  display_only: boolean;
+
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
   // `report_year_id` differs from the configured reporting year — same
   // Number(...) comparison as the hlos-indicators read (D-V2-7).

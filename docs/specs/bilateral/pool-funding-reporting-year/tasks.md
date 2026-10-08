@@ -376,7 +376,7 @@ graph TD
 
 ### T-10 — Server: display-only read for non-eligible results with a record *(amended 2026-10-08)*
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-03
+- **Status:** done · **Size:** S · **Dependencies:** T-03
 - **Requirements:** R-PRY-007 (server side)
 - **Design:** §5.x
 - **Scope:**
@@ -401,8 +401,8 @@ graph TD
 - **Consumers:** client `AlignmentResponse` (T-11), the sidebar and the page. `updateAlignment`/contribution specs stay green (write paths unchanged).
 - **Review:** `full`
 - **Done:**
-  - [ ] Tests green, falsifiers red
-  - [ ] `tsc` + `eslint` clean
+  - [x] Tests green, falsifiers red
+  - [x] `tsc` + `eslint` clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-11 — Client: show the display-only section *(amended 2026-10-08)*

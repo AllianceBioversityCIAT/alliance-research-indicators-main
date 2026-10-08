@@ -285,6 +285,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         // Null until the result syncs; the field is ALWAYS present on the response.
         prms_result_code: null,
         is_read_only: false,
+        display_only: false,
         // T-07 (R-BIL-096): both fields ALWAYS present on the response.
         version_locked: false,
         has_pool_funding_data: true,
@@ -340,6 +341,134 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.getAlignment(999, '999', user),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // R-PRY-007 (amended 2026-10-08) — display-only read for a non-eligible
+    // result that still carries a record. Expected values come from the spec
+    // matrix, not recomputed from the service.
+    describe('display_only (R-PRY-007)', () => {
+      const ctx = (overrides: Record<string, unknown> = {}) => ({
+        result_id: 34283,
+        result_official_code: 20081,
+        is_pool_funding_contributor: false,
+        is_synced_to_prms: false,
+        is_snapshot: false,
+        platform_code: 'STAR',
+        report_year_id: 2025,
+        prms_result_code: null,
+        ...overrides,
+      });
+      const alignmentRow = {
+        id: 1,
+        result_id: 34283,
+        has_contribution: true,
+        selected_levers: [],
+        sp_roles: [{ sp_code: 'SP05', sp_role: 'PRIMARY' }],
+      };
+      // Non-empty on purpose: an empty ToC cannot tell the gate apart.
+      const tocRow = {
+        id: 10,
+        sp_code: 'SP05',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 7220,
+        indicator_id: null,
+        quantitative_contribution: null,
+      };
+
+      beforeEach(() => {
+        resolveReportingYear.mockResolvedValue(2026);
+        findAllCatalog.mockResolvedValue([
+          {
+            official_code: 'SP05',
+            name: 'SP Five',
+            category: 'Science programs',
+            color: '#000000',
+            icon_key: 'SP05',
+          },
+        ]);
+      });
+
+      it('eligible live: data returned, not display_only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({ is_pool_funding_contributor: true, report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBe(true);
+        expect(out.toc_alignments).toHaveLength(1);
+        expect(out.is_read_only).toBe(false);
+      });
+
+      it('STAR-20081: non-eligible snapshot, unsynced, SP05/7220 -> display_only with data, ToC, read-only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            is_snapshot: 1,
+            is_synced_to_prms: 0,
+            prms_result_code: 28663,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(true);
+        expect(out.has_contribution).toBe(true);
+        expect(out.selected_science_programs).toEqual([
+          expect.objectContaining({ code: 'SP05', role: 'PRIMARY' }),
+        ]);
+        expect(out.toc_alignments).toEqual([
+          expect.objectContaining({
+            sp_code: 'SP05',
+            level: 'OUTPUT',
+            toc_result_id: 7220,
+          }),
+        ]);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible snapshot without a PRMS code or sync is still display_only (isSnapshot alone)', async () => {
+        findContext.mockResolvedValueOnce(ctx({ is_snapshot: 1 }));
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(true);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible live with a PRMS code: display_only and read-only', async () => {
+        findContext.mockResolvedValueOnce(ctx({ prms_result_code: 28663 }));
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(true);
+        expect(out.has_contribution).toBe(true);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible live, no code, unsynced: data hidden, not display_only', async () => {
+        findContext.mockResolvedValueOnce(ctx());
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.selected_science_programs).toEqual([]);
+        expect(out.toc_alignments).toEqual([]);
+        expect(out.is_read_only).toBe(false);
+      });
     });
 
     describe('reporting-year flags (R-PRY-002, R-PRY-006)', () => {

@@ -24,6 +24,9 @@ export interface PoolFundingAlignmentContext {
   version_id?: number;
   report_year_id?: number;
   is_synced_to_prms: boolean | number | string;
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
+  // Snapshot rows feed the display-only read for non-eligible results.
+  is_snapshot?: boolean | number | string;
   // Code PRMS assigns on a successful ingest; null until the result has synced.
   prms_result_code: number | string | null;
   is_pool_funding_contributor: boolean | number | string;
@@ -202,6 +205,7 @@ export class ResultRepository
         r.version_id,
         r.report_year_id,
         r.is_synced_to_prms,
+        r.is_snapshot,
         r.prms_result_code,
         r.platform_code,
         r.indicator_id,

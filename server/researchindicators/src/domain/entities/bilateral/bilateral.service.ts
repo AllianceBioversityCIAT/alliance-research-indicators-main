@@ -649,7 +649,15 @@ export class BilateralService {
     // surfaces regardless of sync state. Unions with the existing R-BIL-015
     // synced gate so the FE only needs to read `is_read_only`.
     const isPrmsSourced = this.isPrmsSourced(context.platform_code);
-    const visibleAlignment = eligible ? alignment : null;
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
+    // A non-eligible result that still carries a record (snapshot, synced, or
+    // PRMS code) is shown read-only. `eligible` stays the raw contract fact.
+    const displayOnly =
+      !eligible &&
+      (this.toBoolean(context.is_snapshot) ||
+        isSyncedToPrms ||
+        context.prms_result_code != null);
+    const visibleAlignment = eligible || displayOnly ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
     // Read off `visibleAlignment`, NEVER the raw `alignment` — mirrors the
@@ -676,7 +684,8 @@ export class BilateralService {
         context.prms_result_code == null
           ? null
           : Number(context.prms_result_code),
-      is_read_only: isPrmsSourced || isSyncedToPrms,
+      is_read_only: isPrmsSourced || isSyncedToPrms || displayOnly,
+      display_only: displayOnly,
       // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
       // Same Number(...) comparison as the hlos-indicators read (D-V2-7);
       // `toc_alignments` follows the same eligibility visibility gate as
@@ -689,8 +698,8 @@ export class BilateralService {
         isSyncedToPrms ||
         context.prms_result_code != null,
       reporting_year: year,
-      toc_alignments: (eligible ? tocAlignmentRows : []).map((row) =>
-        this.toTocAlignmentReadback(row),
+      toc_alignments: (eligible || displayOnly ? tocAlignmentRows : []).map(
+        (row) => this.toTocAlignmentReadback(row),
       ),
     };
   }
