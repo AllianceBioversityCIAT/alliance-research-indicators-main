@@ -591,6 +591,11 @@ Per-screen note (STAR): dark+light parity is not codified as a hard product cons
 
 - **2026-09-04 — The blank-starter-Actor-card affordance (2026-08-21 `DD-10` above) is SUPERSEDED by `changes/innovation-use-required-fields` `DD-7`.** Spec: `docs/specs/changes/innovation-use-required-fields`. The client no longer creates a blank actor row when the server returns zero actors; `Add other actor` is unchanged and still appends one blank row on click. *Rationale:* `DD-10`'s premise — "actors are required, so a blank starter card helps completion" — is exactly the premise `R-IUR-011` removes (the "at least one actor is required" rule is deleted from both the UI and the green check). Keeping the seed would open every fresh Innovation Use result with five amber validation errors on a row the user never created, and would flip a valid empty result to invalid on first paint. The 2026-08-21 entry's decision and rationale prose are preserved verbatim; only a SUPERSEDED marker pointing here was added, per this log's append-only convention (§12, "Append-only. New decisions go to the bottom.").
 
+- **2026-10-08 — Pool Funding on a past reporting year is read-only, with its own banner.** Spec: `docs/specs/bilateral/pool-funding-reporting-year`. Three user-visible decisions:
+  - **Read-only, one grey banner.** A result outside the configured reporting year shows its saved Pool Funding answer with every control disabled or absent, under a single grey `pf-alignment-reporting-year-banner`. This cause outranks "synced to PRMS" so the page never shows two lock banners; the synced badge stays.
+  - **Sidebar.** On a past year the PRMS SYNC button is hidden, and the whole Pool Funding section is hidden when the result has no Pool Funding data (`has_pool_funding_data`).
+  - **No Save on a past year.** Save is absent, not disabled, through the opt-in `hideSave` input on the shared `NavigationButtonsComponent` (default `false`, so every other screen is unchanged). *Owner decision.* *Rationale:* a disabled Save reads as "fixable"; the year lock is permanent for that result.
+
 ---
 
 ## 13. Open Gaps / Open Questions

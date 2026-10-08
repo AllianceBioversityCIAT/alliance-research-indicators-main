@@ -300,7 +300,7 @@ graph TD
 
 ### T-08 — Page read-only mode (`reporting-year` cause)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-06
+- **Status:** done (uncommitted — awaiting owner visual approval at T-09 HITL) · **Size:** M · **Dependencies:** T-06
 - **Requirements:**
   - R-PRY-003 "Past-year answered, never synced": THEN saved answer displayed; AND controls cannot change data; AND no Save; AND IT MUST show the banner
   - R-PRY-004 client side: a `pool_funding_year_locked` 409 is shown as the locked state
@@ -312,6 +312,7 @@ graph TD
   - Synced badge keyed on `isSyncedToPrms()`.
   - `isVersionLocked409` also matches `pool_funding_year_locked`.
   - SP card: `aria-disabled="true"` and no hover affordance when `!editable()`.
+  - *(Amended 2026-10-08, owner decision, design §6 "Save, past reporting year")* `NavigationButtonsComponent` gains an opt-in `@Input() hideSave = false`; the Pool Funding page passes `[hideSave]="alignment()?.version_locked === true"`, so Save is absent (not disabled) on a past year. Default leaves every other screen unchanged.
 - **Tests:** `pool-funding-alignment.component.spec.ts`
   - cause table, one case per row, including past-year synced → `reporting-year` with the synced badge still present
   - exactly one lock banner rendered
@@ -330,14 +331,14 @@ graph TD
   - testids `pf-alignment-version-locked-banner`, `pf-alignment-synced-badge`: grep them across `client/research-indicators` and list every hit.
 - **Review:** `full`
 - **Done:**
-  - [ ] Tests green, falsifiers red
-  - [ ] Client `tsc` + lint clean
-  - [ ] Component style budget respected
+  - [x] Tests green, falsifiers red
+  - [x] Client `tsc` + lint clean
+  - [x] Component style budget respected
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
 
 ### T-09 — Baseline docs, rollout note, end-to-end + HITL check
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08
+- **Status:** in-progress (awaiting owner HITL) · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08
 - **Requirements:**
   - R-PRY-001 "Seeded value" (live `GET /api/configuration/ARI_PRMS_SYNC` → `"2026"`)
   - R-PRY-002 "Change without deploy", end-to-end
@@ -365,10 +366,10 @@ graph TD
 - **Consumers:** none.
 - **Review:** `checklist`
 - **Done:**
-  - [ ] Docs updated
-  - [ ] e2e boot green with its red observed
+  - [x] Docs updated
+  - [x] e2e boot green with its red observed
   - [ ] HITL quote recorded per item
-  - [ ] Prod migration check written into the rollout note
+  - [x] Prod migration check written into the rollout note
 - **Skills:** `cognitive-doc-design`
 
 ---

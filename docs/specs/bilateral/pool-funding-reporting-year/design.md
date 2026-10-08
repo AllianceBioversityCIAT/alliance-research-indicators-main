@@ -207,6 +207,7 @@ Under `reporting-year`, the ToC block banner (`pf-alignment-version-locked-banne
 | Make Primary (html :263) | `@if (editable() && !isReadOnly() && !primaryControlDisabled())` + guard ts :679 | `editable` |
 | ToC block radios / selects / suggestions / quantitative contribution input (`sp-toc-alignment-block.component.html` :62, :73, :152, :193, :262, :306, :414) | `[disabled]="disabled()"` ← `blocksDisabled()` (includes `!editable()`) | `editable` |
 | Save (`app-navigation-buttons`, html :486) | `[showSave]="editable() && !isReadOnly()"`; `canSave` checks `editable` (ts :383) | `editable` |
+| Save, past reporting year (amended 2026-10-08, owner decision at T-08) | The shared `NavigationButtonsComponent` renders Save whenever `isEditableStatus() \|\| showSave`, so `showSave=false` alone leaves a disabled Save on screen. It gains an opt-in `@Input() hideSave = false` that suppresses the button. The Pool Funding page passes `[hideSave]="alignment()?.version_locked === true"`. Owner: *"el save solo debería aparecer cuando el resultado está con el año configurado; de resto no debería salir"*. The default `false` leaves every other screen unchanged | `version_locked` |
 
 Controls that stay active but change nothing: help buttons (html :11, :88) and catalog retry (html :370; block :129). The page has no justification or lever control. The client never calls the contribution endpoints, so their lock is server-only.
 
@@ -287,7 +288,7 @@ Fixtures vary **both** year and data per case (KZ-004).
 | --- | --- | --- |
 | Sidebar hides every other-year result (`result-sidebar.component.ts:122`) | Past-year results with no data would show an empty, locked section | Hidden when `has_pool_funding_data !== true` |
 | | `general-information` / `alliance-alignment` re-fetch the alignment to refresh visibility | Same signal and choke point; still works |
-| | Sidebar specs asserting "locked → hidden" (`result-sidebar.component.spec.ts` :407, :418, :455) | Expected red. T-07 realigns them from the failing run (K-018) |
+| | Sidebar specs asserting "locked → hidden" (`result-sidebar.component.spec.ts` :407, :418, :455) | Stay green. Their fixtures omit `has_pool_funding_data`, so `!== true` keeps today's hide (§5); no red is predicted. Past-year visibility is covered by new cases that set the flag |
 | `toc_mapping_version_locked` 409 on the PATCH (R-BIL-097 AC.2/AC.3) | The client 409 matcher keys on it; specs in `bilateral.service.updateAlignment.tocAlignments.spec.ts` and the controller Swagger text cite it | The client also matches the new code (old kept for an older server); specs realigned; Swagger updated. The `/usr/bin/grep -rln toc_mapping_version_locked` sweep finds 3 server files + the client page and its spec |
 | Unset env → `?year=` / `?phase=` omitted | An environment that relied on omission would now send `2026` | P-6 UNVERIFIED; settled at the HITL pause |
 | The PATCH allowed on other years without `toc_alignments` | The current-year behavior is unchanged | Superseded for other-year results only (R-PRY-004) |
