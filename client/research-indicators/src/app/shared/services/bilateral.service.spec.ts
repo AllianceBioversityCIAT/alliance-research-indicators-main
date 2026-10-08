@@ -1159,4 +1159,51 @@ describe('BilateralService', () => {
       });
     });
   });
+
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-08 / R-PRY-004
+  // The REAL GlobalExceptions body for the T-04 refusal: top-level `description` is
+  // the exception name, and the thrown `{ description, code }` sits in `errors`.
+  describe('patchAlignment 409 pool_funding_year_locked (R-PRY-004)', () => {
+    const conflict = (errors: unknown): MainResponse<AlignmentResponse> =>
+      ({
+        data: undefined,
+        status: 409,
+        description: 'error',
+        timestamp: '',
+        path: '',
+        successfulRequest: false,
+        errorDetail: { errors: errors as string, detail: '', description: 'ConflictException' }
+      }) as unknown as MainResponse<AlignmentResponse>;
+    const body = { description: 'Pool Funding is read-only: result year 2025 is not the reporting year 2026', code: 'pool_funding_year_locked' };
+
+    it('extracts code and errorDescription from an object errors envelope', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(body));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({
+        ok: false,
+        status: 409,
+        description: 'ConflictException',
+        code: 'pool_funding_year_locked',
+        errorDescription: body.description
+      });
+    });
+
+    it('extracts them from stringified-JSON errors too', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(JSON.stringify(body)));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect((result as { code?: string }).code).toBe('pool_funding_year_locked');
+    });
+
+    it('a 409 without a code object leaves code undefined (other 409s unchanged)', async () => {
+      for (const errors of ['', 'plain text', '{not-json', JSON.stringify(['x']), undefined]) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(errors));
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+        expect(result).toEqual({ ok: false, status: 409, description: 'ConflictException' });
+      }
+    });
+  });
 });

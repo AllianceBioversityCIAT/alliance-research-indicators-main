@@ -54,6 +54,13 @@ export type PatchAlignmentResult =
       // deselecting the Primary's SP mid-edit) can still reach the server, so the
       // error is parsed rather than silently dropped as an unmapped 400.
       primarySpError?: string;
+      // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-08 / R-PRY-004
+      // 409 body from GlobalExceptions: top-level `description` is the exception
+      // NAME ("ConflictException"); the object the service threw lands in `errors`
+      // as `{ description, code }`. `code` is the machine-readable discriminator
+      // (`pool_funding_year_locked`); `errorDescription` is the prose beside it.
+      code?: string;
+      errorDescription?: string;
     };
 
 @Injectable({ providedIn: 'root' })
@@ -242,6 +249,7 @@ export class BilateralService {
       const unknownSpCodes = this.extractUnknownSpCodes(res?.errorDetail);
       const tocAlignmentErrors = this.extractTocAlignmentErrors(res?.errorDetail);
       const primarySpError = this.extractPrimarySpError(res?.errorDetail);
+      const errorCode = this.extractErrorCode(res?.errorDetail);
       return {
         ok: false,
         status: res?.status ?? 0,
@@ -249,7 +257,9 @@ export class BilateralService {
         ...(fieldErrors ? { fieldErrors } : {}),
         ...(unknownSpCodes ? { unknownSpCodes } : {}),
         ...(tocAlignmentErrors ? { tocAlignmentErrors } : {}),
-        ...(primarySpError ? { primarySpError } : {})
+        ...(primarySpError ? { primarySpError } : {}),
+        ...(errorCode?.code ? { code: errorCode.code } : {}),
+        ...(errorCode?.description ? { errorDescription: errorCode.description } : {})
       };
     } finally {
       this.savingAlignment.set(false);
@@ -339,6 +349,29 @@ export class BilateralService {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
     const description = (value as Record<string, unknown>)['description'];
     return typeof description === 'string' && description.trim().length > 0 ? description : undefined;
+  }
+
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-08 / R-PRY-004
+  // Pull the top-level `errors.code` / `errors.description` pair out of an object
+  // 409 envelope. Same tolerance as `extractPrimarySpError`: `errors` may arrive as
+  // an already-parsed object or as stringified JSON; anything else yields nothing.
+  private extractErrorCode(errorDetail: ErrorResponse | undefined): { code?: string; description?: string } | undefined {
+    const raw: unknown = errorDetail?.errors;
+    let parsed: unknown = raw;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith('{')) return undefined;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        return undefined;
+      }
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    const rec = parsed as Record<string, unknown>;
+    const code = typeof rec['code'] === 'string' && rec['code'].trim() ? rec['code'] : undefined;
+    const description = typeof rec['description'] === 'string' && rec['description'].trim() ? rec['description'] : undefined;
+    return code || description ? { code, description } : undefined;
   }
 
   private extractFieldErrors(errorDetail: ErrorResponse | undefined): Record<string, string> | undefined {

@@ -54,6 +54,12 @@ export interface AlignmentResponse {
   // Configured reporting year, echoed for read-only banner copy. The client
   // never reads the app_config key (D-3).
   reporting_year?: number;
+  // R-PRY-007 (server-computed): the result is NOT eligible (no contributing
+  // contract) but holds a Pool Funding record worth showing: a snapshot, a PRMS
+  // sync or a PRMS code. The section is then visible and strictly read-only
+  // (`is_read_only` is true). `eligible` stays the raw contract fact. Optional so
+  // a payload that omits it keeps today's hide-when-ineligible behaviour.
+  display_only?: boolean;
   toc_alignments?: SavedTocAlignment[];
 }
 

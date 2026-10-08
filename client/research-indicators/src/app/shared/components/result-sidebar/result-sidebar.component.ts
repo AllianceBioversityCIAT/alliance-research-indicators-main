@@ -107,7 +107,9 @@ export class ResultSidebarComponent {
   //
   //  1. CONTRACT — `alignment.eligible` is the server's
   //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
-  //     contract does not contribute to pool funding. Pre-existing behaviour.
+  //     contract does not contribute to pool funding. Pre-existing behaviour,
+  //     EXCEPT `display_only === true` (R-PRY-007): a non-eligible result with a
+  //     saved record (snapshot, PRMS sync or PRMS code) stays visible, read-only.
   //  2. YEAR — hide only when `version_locked === true` AND
   //     `has_pool_funding_data !== true`. A past-year result that already has
   //     an answer or a PRMS sync stays in the sidebar. Both flags are compared
@@ -120,7 +122,7 @@ export class ResultSidebarComponent {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
     const hiddenByYearWithoutData = alignment?.version_locked === true && alignment.has_pool_funding_data !== true;
-    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || alignment.eligible === false || hiddenByYearWithoutData;
+    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || (alignment.eligible === false && alignment.display_only !== true) || hiddenByYearWithoutData;
     return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
   }
 

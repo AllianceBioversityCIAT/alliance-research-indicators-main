@@ -138,6 +138,8 @@ export default class PoolFundingAlignmentComponent {
   readonly versionLockedFrom409 = signal(false);
 
   readonly SYNCED_BANNER = 'This result has been pushed to PRMS. Alignment can no longer be edited from STAR.';
+  readonly DISPLAY_ONLY_BANNER =
+    "This result's contract does not contribute to Pool Funding. The saved Pool Funding record below is shown for reference and is read-only.";
   readonly READ_ONLY_BANNER = "You don't have permission to edit this section.";
   readonly SYNCED_BADGE_LABEL = 'Synced — read only';
   readonly SYNCED_BADGE_ARIA_LABEL = 'Pool Funding Alignment is synced and read only';
@@ -179,8 +181,24 @@ export default class PoolFundingAlignmentComponent {
   readonly REJECTED_SP_MESSAGE_SUFFIX = '. Remove them and save again.';
   readonly HLO_SECTION_LABEL = 'Map Theory of Change results and indicators';
   // AC-09.1 — live-version gate notice (2026-only ToC mapping).
-  readonly VERSION_LOCKED_BANNER =
-    'Theory of Change alignment is only editable on the live 2026 version of this result. The alignment below is read-only.';
+  // Year-aware (R-PRY-003 / design §6): the year comes from the server's
+  // `reporting_year`, never a literal. Only rendered when the cause is not
+  // `reporting-year`, so a past-year result shows one lock banner, not two.
+  readonly versionLockedBanner = computed(() => {
+    const year = this.alignment()?.reporting_year;
+    const version = year ? `live ${year} version` : 'live version';
+    return `Theory of Change alignment is only editable on the ${version} of this result. The alignment below is read-only.`;
+  });
+  // R-PRY-003 — copy per design §6. The result's own year is not part of the
+  // alignment payload, so it comes from the result metadata already in the cache.
+  readonly reportingYearBanner = computed(() => {
+    // `currentMetadata()` is per-result and loaded before this page renders.
+    const resultYear = this.cache.currentMetadata()?.report_year;
+    const editableYear = this.alignment()?.reporting_year;
+    const belongs = resultYear ? `reporting year ${resultYear}` : 'a different reporting year';
+    const only = editableYear ? `only editable for ${editableYear}` : 'only editable for the current reporting year';
+    return `This result belongs to ${belongs}. Pool Funding alignment is ${only}; the data below is read-only.`;
+  });
   // AC-08.4 — stale snapshot warning tag (display-only).
   readonly STALE_SNAPSHOT_TAG = 'Stale — catalog item no longer available';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-129
@@ -214,13 +232,24 @@ export default class PoolFundingAlignmentComponent {
 
   readonly isReadOnly = computed(() => !!this.alignment()?.is_read_only);
   readonly eligible = computed(() => !!this.alignment()?.eligible);
+  // R-PRY-007 — non-eligible result with a saved record: shown read-only from the
+  // server's read-back fields, never from the (empty, unmapped) picker/catalog.
+  readonly displayOnly = computed(() => this.alignment()?.display_only === true);
 
   // REQ-BIL-ASR-02 — distinguish WHY the section is read-only so the badge + banner
   // copy can differ while inputs stay disabled identically (AC-02.5). `is_read_only`
   // is now a union (R-BIL-071): synced-to-PRMS OR PRMS-sourced.
   readonly isSyncedToPrms = computed(() => !!this.alignment()?.is_synced_to_prms);
-  readonly readOnlyCause = computed<'synced' | 'prms-sourced' | 'permission' | null>(() => {
-    if (this.isReadOnly()) return this.isSyncedToPrms() ? 'synced' : 'prms-sourced';
+  // First match wins (design §5): prms-sourced → reporting-year → display-only → synced → permission.
+  // `reporting-year` outranks `synced` (D-9): the year is the permanent reason.
+  // `display-only` (R-PRY-007) sits right after `reporting-year`, so a past-year
+  // display-only result shows one banner. The server sets `is_read_only` for it,
+  // so it is carved out of the `prms-sourced` row, which would otherwise claim it.
+  readonly readOnlyCause = computed<'synced' | 'prms-sourced' | 'reporting-year' | 'display-only' | 'permission' | null>(() => {
+    if (this.isReadOnly() && !this.isSyncedToPrms() && !this.displayOnly()) return 'prms-sourced';
+    if (this.alignment()?.version_locked === true) return 'reporting-year';
+    if (this.displayOnly()) return 'display-only';
+    if (this.isReadOnly()) return 'synced';
     if (!this.editable()) return 'permission';
     return null;
   });
@@ -440,6 +469,10 @@ export default class PoolFundingAlignmentComponent {
   // row is excluded server-side, never returned at all. Deliberately does not
   // filter on `aligns_with_toc` — an orphaned "No" row is still retained data
   // that must not silently vanish (R-BIL-129's rationale draws no distinction).
+  // R-PRY-007 — every saved ToC row, as read back by the server. Display-only pages
+  // have no catalog, so nothing here is derived from it (no stale/orphan logic).
+  readonly displayOnlyTocRows = computed<SavedTocAlignment[]>(() => this.alignment()?.toc_alignments ?? []);
+
   readonly orphanedTocAlignments = computed<SavedTocAlignment[]>(() => {
     const primary = this.primarySpCode();
     const saved = this.alignment()?.toc_alignments ?? [];
@@ -516,17 +549,22 @@ export default class PoolFundingAlignmentComponent {
         return;
       }
       this.loadFailed.set(false);
-      if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
+      if ((alignment.eligible === false && alignment.display_only !== true) || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
       }
       this.seedFromServer(alignment);
-      // Picker options are per-result (REQ-BIL-ASR-01): only fetch once the
-      // alignment confirms the result is eligible. The picker endpoint is only
-      // reachable on eligible results (pitfall 4).
-      void this.bilateralService.getSciencePrograms(resultCode);
-      // §8 — section load = 3 GETs (alignment, science-programs, catalog).
-      void this.bilateralService.getTocCatalog(resultCode);
+      // R-PRY-007 — a display-only result is non-eligible: the picker and the ToC
+      // catalog are eligible-only and would come back unmapped/empty. The page
+      // renders the saved record from the alignment payload alone.
+      if (alignment.display_only !== true) {
+        // Picker options are per-result (REQ-BIL-ASR-01): only fetch once the
+        // alignment confirms the result is eligible. The picker endpoint is only
+        // reachable on eligible results (pitfall 4).
+        void this.bilateralService.getSciencePrograms(resultCode);
+        // §8 — section load = 3 GETs (alignment, science-programs, catalog).
+        void this.bilateralService.getTocCatalog(resultCode);
+      }
       this.clarityService?.trackEvent('bilateral.alignment.viewed', {
         result_code: alignment.result_code,
         eligible: alignment.eligible,
@@ -1005,14 +1043,17 @@ export default class PoolFundingAlignmentComponent {
     if (result.status === 409) {
       // AC-08.3/09.1 — version-locked 409: refetch alignment + catalog, render the
       // version-gate notice and disable the ToC inputs. Matched by code/description.
-      if (this.isVersionLocked409(result.description)) {
+      if (this.isVersionLocked409(result.description, result.code)) {
         this.versionLockedFrom409.set(true);
         await this.bilateralService.getAlignment(this.resultCode());
         await this.bilateralService.getTocCatalog(this.resultCode());
         this.actions.showToast({
           severity: 'warning',
           summary: 'Version locked',
-          detail: 'Theory of Change alignment is locked for this version. Your ToC changes were not applied.'
+          detail:
+            result.code === this.POOL_FUNDING_YEAR_LOCKED_CODE
+              ? 'This result is outside the configured reporting year and is read-only. Your changes were not applied.'
+              : 'Theory of Change alignment is locked for this version. Your ToC changes were not applied.'
         });
         return;
       }
@@ -1039,7 +1080,15 @@ export default class PoolFundingAlignmentComponent {
     // 5xx — global httpErrorInterceptor owns the toast; form state preserved for retry.
   }
 
-  private isVersionLocked409(description: string | undefined): boolean {
+  // Machine code of the past-year write refusal (R-PRY-004). GlobalExceptions puts
+  // the thrown object in `errors`, so BilateralService surfaces it as `code`; the
+  // top-level `description` is only the exception name ("ConflictException").
+  private readonly POOL_FUNDING_YEAR_LOCKED_CODE = 'pool_funding_year_locked';
+
+  private isVersionLocked409(description: string | undefined, code?: string): boolean {
+    // `code` carries both the year lock and (when the server sends it there) the
+    // older ToC code; the description path below stays for an older server.
+    if (code === this.POOL_FUNDING_YEAR_LOCKED_CODE || code === 'toc_mapping_version_locked') return true;
     if (!description) return false;
     return description.toLowerCase().includes('toc_mapping_version_locked') ||
       description.toLowerCase().includes('version locked');

@@ -181,4 +181,38 @@ describe('NavigationButtonsComponent', () => {
       expect(saveButton(fixture.nativeElement)).toBeTruthy();
     });
   });
+
+  describe('hideSave', () => {
+    const saveButton = (): HTMLButtonElement | undefined =>
+      Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find(b =>
+        b.textContent?.includes('Save')
+      );
+
+    it('default (false): Save follows isEditableStatus() || showSave, as before', () => {
+      isEditableStatus.mockReturnValue(true);
+      fixture.componentRef.setInput('showSave', false);
+      fixture.detectChanges();
+      expect(saveButton()).toBeDefined();
+
+      isEditableStatus.mockReturnValue(false);
+      fixture.componentRef.setInput('showSave', true);
+      fixture.detectChanges();
+      expect(saveButton()).toBeDefined();
+
+      fixture.componentRef.setInput('showSave', false);
+      fixture.detectChanges();
+      expect(saveButton()).toBeUndefined();
+    });
+
+    it('true: no Save button even when isEditableStatus() is true and showSave is true', () => {
+      isEditableStatus.mockReturnValue(true);
+      fixture.componentRef.setInput('showSave', true);
+      fixture.detectChanges();
+      expect(saveButton()).toBeDefined();
+
+      fixture.componentRef.setInput('hideSave', true);
+      fixture.detectChanges();
+      expect(saveButton()).toBeUndefined();
+    });
+  });
 });

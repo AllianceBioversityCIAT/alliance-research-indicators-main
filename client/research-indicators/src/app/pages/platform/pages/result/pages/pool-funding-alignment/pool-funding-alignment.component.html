@@ -19,7 +19,7 @@
               <i class="pi pi-question-circle text-[15px]" aria-hidden="true"></i>
             </button>
           </div>
-          @if (readOnlyCause() === 'synced') {
+          @if (isSyncedToPrms()) {
             <app-custom-tag
               statusId="pf-synced"
               [statusName]="SYNCED_BADGE_LABEL"
@@ -58,6 +58,20 @@
                data-testid="pf-alignment-prms-sourced-banner">
             <i class="pi pi-shield text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
             <span>{{ PRMS_SOURCED_BANNER }}</span>
+          </div>
+        } @else if (readOnlyCause() === 'reporting-year') {
+          <div role="status" aria-live="polite"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-grey-500)] bg-[var(--ac-grey-100)] text-sm text-[var(--ac-grey-800)] flex items-center gap-2.5"
+               data-testid="pf-alignment-reporting-year-banner">
+            <i class="pi pi-lock text-[var(--ac-grey-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ reportingYearBanner() }}</span>
+          </div>
+        } @else if (readOnlyCause() === 'display-only') {
+          <div role="status" aria-live="polite"
+               class="mb-6 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-grey-500)] bg-[var(--ac-grey-100)] text-sm text-[var(--ac-grey-800)] flex items-center gap-2.5"
+               data-testid="pf-alignment-display-only-banner">
+            <i class="pi pi-lock text-[var(--ac-grey-600)] text-base shrink-0" aria-hidden="true"></i>
+            <span>{{ DISPLAY_ONLY_BANNER }}</span>
           </div>
         } @else if (readOnlyCause() === 'permission') {
           <div role="status" aria-live="polite"
@@ -141,7 +155,62 @@
           }
         </section>
 
-        @if (formData().has_contribution === true) {
+        <!--
+          R-PRY-007 — display-only: the saved SPs and ToC rows come from the alignment
+          payload (`selected_science_programs`, `toc_alignments`), never from the picker
+          or the ToC catalog, which are empty/unmapped for a non-eligible result. No
+          control here: the interactive picker and ToC block below are not rendered.
+        -->
+        @if (displayOnly() && formData().has_contribution === true) {
+          <section class="mb-6 flex flex-col gap-3" data-testid="pf-alignment-display-only-section">
+            @for (sp of formData().selected_sps; track sp.official_code) {
+              <div class="rounded-[10px] p-3.5 flex items-center justify-between gap-3 border border-[var(--ac-grey-300)] bg-white"
+                   [attr.data-testid]="'pf-alignment-display-only-sp-' + sp.official_code">
+                <span class="text-[14px] text-[var(--ac-grey-900)] leading-tight">
+                  <strong>{{ sp.official_code }}</strong>@if (sp.name) { - {{ sp.name }}}
+                </span>
+                @if (isPrimary(sp.official_code)) {
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--ac-primary-blue-100)] text-[var(--ac-primary-blue-800)] border border-[var(--ac-primary-blue-300)] shrink-0">
+                    <i class="pi pi-star-fill text-[var(--ac-primary-blue-600)]" aria-hidden="true"></i>
+                    Primary
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-200/80 text-slate-700 border border-slate-300 shrink-0">
+                    Contributing
+                  </span>
+                }
+              </div>
+            }
+            @for (row of displayOnlyTocRows(); track row.sp_code) {
+              <div class="pf-stale-snapshot flex flex-col gap-2 p-4 rounded-[8px]"
+                   [attr.data-testid]="'pf-alignment-display-only-toc-' + row.sp_code">
+                <strong class="text-[14px] text-[var(--ac-grey-800)]">{{ row.sp_code }}</strong>
+                <div class="text-[13px] text-[var(--ac-grey-700)] flex flex-col gap-1">
+                  @if (row.aligns_with_toc) {
+                    @if (row.level) {
+                      <span>{{ row.level }}</span>
+                    }
+                    <span>{{ row.toc_result_title }}</span>
+                    @if (row.indicator_description) {
+                      <span>{{ row.indicator_description }}</span>
+                    }
+                    @if (row.indicator_id !== null) {
+                      <span>
+                        {{ row.unit_of_measurement || '—' }} ·
+                        Target ({{ row.target_year }}): {{ row.target_value ?? '—' }} ·
+                        Contribution: {{ row.quantitative_contribution ?? '—' }}
+                      </span>
+                    }
+                  } @else {
+                    <span>{{ NO_TOC_ALIGNMENT_MESSAGE }}</span>
+                  }
+                </div>
+              </div>
+            }
+          </section>
+        }
+
+        @if (formData().has_contribution === true && !displayOnly()) {
           <section class="mb-6" data-testid="pf-alignment-levers-section">
             @if (loadingSciencePrograms() && mappingStatus() === null) {
               <div role="status" aria-live="polite" aria-busy="true"
@@ -207,10 +276,12 @@
                   @for (sp of sciencePrograms(); track sp.code) {
                     @let isSelected = isSelectedSp(sp.code);
                     @let isPrim = isPrimary(sp.code);
-                    <div class="rounded-[10px] p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 border-2"
+                    <div class="rounded-[10px] p-3.5 flex items-center justify-between gap-3 transition-all duration-150 border-2"
+                         [class.cursor-pointer]="editable()"
+                         [class.cursor-not-allowed]="!editable()"
                          [class.bg-white]="!isSelected"
                          [class.border-[var(--ac-grey-300)]]="!isSelected"
-                         [class.hover:border-[var(--ac-primary-blue-300)]]="!isSelected"
+                         [class.hover:border-[var(--ac-primary-blue-300)]]="!isSelected && editable()"
                          [class.bg-[var(--ac-primary-blue-50)]]="isSelected && isPrim"
                          [class.bg-slate-50]="isSelected && !isPrim"
                          [class.border-[var(--ac-primary-blue-600)]]="isSelected && isPrim"
@@ -218,6 +289,7 @@
                          tabindex="0"
                          role="checkbox"
                          [attr.aria-checked]="isSelected"
+                         [attr.aria-disabled]="!editable()"
                          [attr.data-testid]="'pf-alignment-sp-card-' + sp.code"
                          (click)="toggleSp(sp)"
                          (keydown.enter)="toggleSp(sp)"
@@ -376,12 +448,12 @@
                 </div>
               } @else if (showTocBlocks()) {
 
-              @if (versionLocked()) {
+              @if (versionLocked() && readOnlyCause() !== 'reporting-year') {
                 <div role="status" aria-live="polite"
                      class="mb-4 p-3.5 rounded-r-[8px] border-l-4 border-l-[var(--ac-primary-blue-500)] bg-[var(--ac-primary-blue-50)] text-sm text-[var(--ac-primary-blue-900)] flex items-center gap-2.5"
                      data-testid="pf-alignment-version-locked-banner">
                   <i class="pi pi-info-circle text-[var(--ac-primary-blue-600)] text-base shrink-0" aria-hidden="true"></i>
-                  <span>{{ VERSION_LOCKED_BANNER }}</span>
+                  <span>{{ versionLockedBanner() }}</span>
                 </div>
               }
 
@@ -484,6 +556,7 @@
     [showBack]="true"
     [showNext]="false"
     [showSave]="editable() && !isReadOnly()"
+    [hideSave]="alignment()?.version_locked === true || displayOnly()"
     [disableSave]="!canSave() || saving()"
     (back)="onBack()"
     (save)="onSave()" />
