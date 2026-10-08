@@ -122,7 +122,7 @@ graph TD
 
 ### T-03 — Pure aggregation functions (server)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done · **Size:** M · **Dependencies:** T-01
 - **Requirements covered:**
   - R-PFM-005 — "Cards agree with the queue".
   - R-PFM-006 — exact partition + precedence + "AND IT MUST … sum exactly to the total".
@@ -141,8 +141,8 @@ graph TD
   - a fixture whose stage sum ≠ total must fail the invariant test;
   - a chip applied before counting must change the counts and fail the test.
 - **Done:**
-  - [ ] Green.
-  - [ ] The invariant test observed red with one stage rule deliberately broken.
+  - [x] Green.
+  - [x] The invariant test observed red with one stage rule deliberately broken.
 - **Disqualifies:** recomputing expected values with the same function under test (tautology).
 - **Skills:** `nestjs-expert`, `tdd`
 
