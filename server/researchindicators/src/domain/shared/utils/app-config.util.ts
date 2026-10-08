@@ -74,6 +74,11 @@ export class AppConfig {
     return process.env.ARI_PRMS_WEBHOOK_SECRET;
   }
 
+  // PRMS sync year / CLARISA phase (e.g. "2026"). Empty string when unset.
+  get ARI_PRMS_SYNC(): string {
+    return process.env.ARI_PRMS_SYNC?.trim() || '';
+  }
+
   //CLARISA user
   get ARI_CLARISA_USER(): string {
     return process.env.ARI_CLARISA_USER;

@@ -18,6 +18,7 @@ import {
 import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
 import { normalizeExternalCode } from '../../../entities/bilateral-project-mapping/utils/external-code.util';
 import { ENV } from '../../../shared/utils/env.utils';
+import { AppConfig } from '../../../shared/utils/app-config.util';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
@@ -51,6 +52,7 @@ export class ClarisaProjectsService {
   constructor(
     http: HttpService,
     private readonly phaseResolver: MappingPhaseResolver,
+    private readonly appConfig: AppConfig,
   ) {
     this.connection = new Clarisa(http);
   }
@@ -228,14 +230,14 @@ export class ClarisaProjectsService {
     }
 
     try {
-      // `phase` comes from ENV.PRMS_SYNC_YEAR (`ARI_PRMS_SYNC`), the same year
+      // `phase` comes from AppConfig.ARI_PRMS_SYNC, the same year
       // TocIntegrationService sends. Scoping the feed to one phase keeps an
       // older-phase project from shadowing the current one when both share a
       // normalized external_code (e.g. `A1080` 2025 vs `B-A1080` 2026). Appended
       // only when set, so an unset value leaves the URL as it was. Not part of
       // the cache: the year is process-constant and a change arrives with a
       // restart, which empties the cache anyway.
-      const phase = ENV.PRMS_SYNC_YEAR;
+      const phase = this.appConfig.ARI_PRMS_SYNC;
       const path = phase
         ? `api/projects?phase=${encodeURIComponent(phase)}`
         : 'api/projects';

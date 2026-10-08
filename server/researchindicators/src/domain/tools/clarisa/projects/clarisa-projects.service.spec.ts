@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ClarisaProjectsModule } from './clarisa-projects.module';
 import { ClarisaProjectsService } from './clarisa-projects.service';
 import { MappingPhaseResolver } from './mapping-phase.resolver';
@@ -70,8 +71,11 @@ describe('ClarisaProjectsService', () => {
         ClarisaProjectsModule,
         {
           module: class MockDbModule {},
-          providers: [{ provide: DataSource, useValue: mockDataSource }],
-          exports: [DataSource],
+          providers: [
+            { provide: DataSource, useValue: mockDataSource },
+            AppConfig,
+          ],
+          exports: [DataSource, AppConfig],
           global: true,
         },
       ],
