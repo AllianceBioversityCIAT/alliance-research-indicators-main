@@ -843,6 +843,51 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     });
   });
 
+  describe('countSyncedThisYear', () => {
+    it('counts DISTINCT results of the current UTC year, not the sum of the monthly rows', async () => {
+      // 1001 (Mar+May+Sep), 1003 (May), 1005 (Aug) = 3. The monthly rows sum to 5.
+      expect(await repo.countSyncedThisYear(ALL, NOW)).toBe(3);
+      const monthly = await repo.findMonthlySyncs(ALL, NOW);
+      expect(monthly.reduce((a, m) => a + m.synced, 0)).toBe(5);
+    });
+
+    it("PI scope only counts that PI's results", async () => {
+      expect(await repo.countSyncedThisYear(MINE(PI_A), NOW)).toBe(2); // 1001, 1003
+      expect(await repo.countSyncedThisYear(MINE(PI_B), NOW)).toBe(1); // 1005
+      expect(await repo.countSyncedThisYear(MINE(STRANGER), NOW)).toBe(0);
+    });
+
+    it('year boundary: 2025-12-31 23:00 UTC belongs to 2025, and OICR / TIP / refused rows never count', async () => {
+      expect(
+        await repo.countSyncedThisYear(ALL, new Date('2025-12-31T23:30:00Z')),
+      ).toBe(1); // only the 2025-12-31 23:00 ACCEPTED of 1001
+    });
+
+    it('does not depend on the MySQL session time zone', async () => {
+      await q(`SET time_zone = '+13:00'`);
+      try {
+        expect(await repo.countSyncedThisYear(ALL, NOW)).toBe(3);
+      } finally {
+        await q(`SET time_zone = '+00:00'`);
+      }
+    });
+  });
+
+  describe('isPiOfAnyContributingProject', () => {
+    it('is true for a project lead and for an ACTIVE delegate', async () => {
+      expect(await repo.isPiOfAnyContributingProject(PI_A)).toBe(true);
+      expect(await repo.isPiOfAnyContributingProject(PI_B)).toBe(true);
+      expect(await repo.isPiOfAnyContributingProject(DELEGATE_A)).toBe(true);
+    });
+
+    it('is false for a revoked delegate and for a user with no staff row or delegation', async () => {
+      expect(await repo.isPiOfAnyContributingProject(REVOKED_DELEGATE_A)).toBe(
+        false,
+      );
+      expect(await repo.isPiOfAnyContributingProject(STRANGER)).toBe(false);
+    });
+  });
+
   describe('findFilterOptions', () => {
     it('portfolio: projects, the five PRMS types (never OICR) and SPs grouped by category', async () => {
       const options = await repo.findFilterOptions(ALL);

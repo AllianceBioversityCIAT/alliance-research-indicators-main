@@ -164,7 +164,7 @@ graph TD
 
 ### T-05 — Service, controller, module registration, Swagger, e2e (server)
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-02, T-03, T-04
+- **Status:** in-progress `[~]` — code reviewed PASS; blocked on RB-1 (timing) · **Size:** L · **Dependencies:** T-02, T-03, T-04
 - **Requirements covered:**
   - R-PFM-001 — 403 for contributor-only; "BUT it must NOT rely on the client alone"; "Unauthenticated" → 401.
   - R-PFM-002 — "Switching scope" server side; "AND IT MUST be one consistent dataset" (one derivation per request).
@@ -189,9 +189,9 @@ graph TD
   - **If the spread exceeds 50 % of the median, the number is not evidence** — report the spread instead of passing.
   - Local volume (≈156 rows) cannot show Prod behavior. Record that as a scope gap (KZ-017), not as a pass for Prod.
 - **Done:**
-  - [ ] Unit + e2e green.
-  - [ ] Swagger lists the 3 endpoints.
-  - [ ] The module appears in both registrations.
+  - [x] Unit + e2e green.
+  - [x] Swagger lists the 3 endpoints.
+  - [x] The module appears in both registrations.
   - [ ] Timing table recorded.
 - **Disqualifies:** an e2e that mocks the guard or the repository; a "route registered" claim checked by reading `main.routes.ts` instead of an HTTP call (KZ-017 precedent).
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`

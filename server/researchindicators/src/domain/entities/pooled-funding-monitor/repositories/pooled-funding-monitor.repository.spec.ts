@@ -188,4 +188,31 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     // min(six-month start 2026-05-01, year start 2026-01-01) = 2026-01-01T00:00:00Z
     expect(params[0]).toBe(Date.UTC(2026, 0, 1) / 1000);
   });
+
+  it('counts synced-this-year over the UTC calendar year of `now`, bound as epochs', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([{ synced: '3' }]);
+    const out = await repository.countSyncedThisYear(
+      { scope: PfmScopeEnum.MINE, userId: 4242 },
+      new Date('2026-10-08T12:00:00Z'),
+    );
+    expect(out).toBe(3);
+    const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params.slice(0, 2)).toEqual([
+      Date.UTC(2026, 0, 1) / 1000,
+      Date.UTC(2027, 0, 1) / 1000,
+    ]);
+    expect(params.filter((p: unknown) => p === 4242)).toHaveLength(2);
+    expect(sql).toContain('COUNT(DISTINCT r.result_id)');
+    expect(sql).not.toContain('4242');
+  });
+
+  it('isPiOfAnyContributingProject binds the user id and reads row presence', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([{ ok: 1 }]);
+    expect(await repository.isPiOfAnyContributingProject(7)).toBe(true);
+    const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params).toEqual([7, 7]);
+    expect(sql).not.toContain('= 7');
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([]);
+    expect(await repository.isPiOfAnyContributingProject(7)).toBe(false);
+  });
 });

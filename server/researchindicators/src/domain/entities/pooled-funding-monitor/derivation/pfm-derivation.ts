@@ -23,7 +23,8 @@ export interface PfmRawRow {
   /** Latest result_prms_sync_history.status (e.g. PENDING_REVIEW); null when no row. */
   prms_history_status: string | null;
   prms_justification: string | null;
-  updated_at: Date;
+  /** `results.updated_at` is nullable: a missing stamp renders "—", it never throws. */
+  updated_at: Date | null;
 }
 
 export interface PfmDerivedRow {
@@ -203,7 +204,7 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     ),
     prmsStatus,
     prmsHint: derivePrmsHint(prmsStatus, row.prms_justification),
-    updatedLabel: formatPfmDateTime(row.updated_at),
+    updatedLabel: row.updated_at ? formatPfmDateTime(row.updated_at) : '—',
     isOutOfScope,
     isReady:
       starLabel === PfmStarLabelEnum.APPROVED &&

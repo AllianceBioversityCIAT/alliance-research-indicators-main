@@ -197,6 +197,10 @@ describe('pfm-derivation', () => {
       );
       expect(derivePfmRow(raw()).updatedLabel).toBe('09 Apr, 08:07');
     });
+
+    it('a null updated_at renders the em dash and does not throw', () => {
+      expect(derivePfmRow(raw({ updated_at: null })).updatedLabel).toBe('—');
+    });
   });
 
   describe('matchesStatusFilter (R-PFM-009)', () => {

@@ -362,6 +362,55 @@ export class PooledFundingMonitorRepository {
     }));
   }
 
+  /**
+   * Summary footer: DISTINCT monitored results with an ACCEPTED sync attempt in
+   * the UTC calendar year of `now`. Cannot be summed from the monthly rows (a
+   * result accepted in two months would count twice). Same FROM/WHERE as
+   * `findMonthlySyncs`; every value is a bound parameter.
+   */
+  async countSyncedThisYear(
+    scope: PfmRepositoryScope,
+    now: Date = new Date(),
+  ): Promise<number> {
+    const fromEpoch = Math.floor(Date.UTC(now.getUTCFullYear(), 0, 1) / 1000);
+    const toEpoch = Math.floor(Date.UTC(now.getUTCFullYear() + 1, 0, 1) / 1000);
+    const where = this.monitoredWhere(scope);
+    const rows: { synced: string | number }[] = await this.dataSource.query(
+      `SELECT COUNT(DISTINCT r.result_id) AS synced
+       ${this.monitoredFrom()}
+       INNER JOIN result_prms_sync_log l
+         ON l.external_reference = ${CODE_AS_TEXT_SQL}
+        AND l.result_year = r.report_year_id
+        AND l.outcome = 'ACCEPTED'
+        AND l.is_active = 1
+        AND UNIX_TIMESTAMP(l.created_at) >= ?
+        AND UNIX_TIMESTAMP(l.created_at) < ?
+       ${where.sql}`,
+      [fromEpoch, toEpoch, ...where.params],
+    );
+    return Number(rows[0]?.synced ?? 0);
+  }
+
+  /**
+   * R-PFM-002 empty state: is the authenticated user PI (project lead) or an
+   * active delegate of at least one CONTRIBUTING project? Project-based, not
+   * result-based: a PI whose projects hold no monitored result yet is still a PI.
+   * Independent of the scope the page is showing.
+   */
+  async isPiOfAnyContributingProject(userId: number): Promise<boolean> {
+    const pi = this.piPredicate(userId);
+    const rows: unknown[] = await this.dataSource.query(
+      `SELECT 1 AS ok
+       FROM agresso_contracts ac
+       WHERE ac.is_active = 1
+         AND ${effectivePoolFundingContributorSql('ac')}
+         AND ${pi.sql}
+       LIMIT 1`,
+      pi.params,
+    );
+    return rows.length > 0;
+  }
+
   /** R-PFM-009: options come from the scope's data, never from a hard-coded list. */
   async findFilterOptions(
     scope: PfmRepositoryScope,
@@ -450,6 +499,34 @@ export class PooledFundingMonitorRepository {
   }
 
   /**
+   * My Projects predicate (agresso-contract.repository), minus created_by:
+   * the user is the project lead (carnet resolved through the e-mail join) or an
+   * active delegate. Parenthesised as one unit so no AND binds across its OR (KZ-017).
+   */
+  private piPredicate(userId: number): Fragment {
+    return {
+      sql: `(
+        ac.projectLeadId IN (
+          SELECT aus.carnet
+          FROM sec_users su
+          INNER JOIN alliance_user_staff aus
+            ON LOWER(TRIM(aus.email)) = LOWER(TRIM(su.email))
+          WHERE su.sec_user_id = ?
+            AND aus.carnet IS NOT NULL
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM pi_delegates pd
+          WHERE pd.project_id = ac.agreement_id
+            AND pd.delegate_user_id = ?
+            AND pd.is_active = 1
+        )
+      )`,
+      params: [userId, userId],
+    };
+  }
+
+  /**
    * Shared WHERE (R-PFM-003 + R-PFM-002). Every OR is inside its own parentheses
    * so no AND can bind across it (KZ-017); the integration spec asserts it on rows.
    */
@@ -479,25 +556,9 @@ export class PooledFundingMonitorRepository {
         // Never degrade to the portfolio by accident (R-PFM-002 BUT-clause).
         throw new Error('PI scope requires the authenticated sec_user_id');
       }
-      // My Projects predicate (agresso-contract.repository), minus created_by.
-      clauses.push(`(
-        ac.projectLeadId IN (
-          SELECT aus.carnet
-          FROM sec_users su
-          INNER JOIN alliance_user_staff aus
-            ON LOWER(TRIM(aus.email)) = LOWER(TRIM(su.email))
-          WHERE su.sec_user_id = ?
-            AND aus.carnet IS NOT NULL
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM pi_delegates pd
-          WHERE pd.project_id = ac.agreement_id
-            AND pd.delegate_user_id = ?
-            AND pd.is_active = 1
-        )
-      )`);
-      params.push(scope.userId, scope.userId);
+      const pi = this.piPredicate(scope.userId);
+      clauses.push(pi.sql);
+      params.push(...pi.params);
     }
 
     return { sql: `WHERE ${clauses.join('\n        AND ')}`, params };
