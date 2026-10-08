@@ -89,7 +89,7 @@ graph TD
 
 ### T-02 — ToC and CLARISA consume the year; retire the env var
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done · **Size:** M · **Dependencies:** T-01
 - **Requirements:**
   - R-PRY-002 "Change without deploy": the lambda-toc `year=2027` / CLARISA `phase=2027` clause, and the BUT clause "must NOT serve 2026 cache for 2027"
   - R-PRY-002 "Env var retired": both THEN and AND IT MUST
@@ -120,10 +120,10 @@ graph TD
 - **Consumers:** `bilateral.service.ts` (`getTocResultsForSps` callers :407, :968, :1370), `pool-funding-mapping-apply.service.ts:612`, and the two specs above. Grep `getTocResultsForSps\|getTocResults(` over `server/researchindicators/src` and `server/researchindicators/test` before editing, and list every hit in `execution.md`.
 - **Review:** `checklist` — mechanical rewiring with focused tests.
 - **Done:**
-  - [ ] P-6 answer recorded
-  - [ ] Tests green, falsifiers observed red
-  - [ ] `/usr/bin/grep -rn "process.env.ARI_PRMS_SYNC\|PRMS_SYNC_YEAR\|appConfig.ARI_PRMS_SYNC" server/researchindicators/src server/researchindicators/test` → 0. Scope note: this grep cannot see `dist/` or `.env`, which are intentionally out of scope
-  - [ ] `tsc` + `eslint` clean
+  - [x] P-6 answer recorded
+  - [x] Tests green, falsifiers observed red
+  - [x] `/usr/bin/grep -rn "process.env.ARI_PRMS_SYNC\|PRMS_SYNC_YEAR\|appConfig.ARI_PRMS_SYNC" server/researchindicators/src server/researchindicators/test` → 0. Scope note: this grep cannot see `dist/` or `.env`, which are intentionally out of scope
+  - [x] `tsc` + `eslint` clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-03 — Bilateral year threading, constant removal, read flags
@@ -403,7 +403,7 @@ graph TD
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-10-08 | P-6 unknown: an env that omitted `ARI_PRMS_SYNC` changes outbound URLs | Settled at T-02 start | d.casanas | open |
+| RB-1 | 2026-10-08 | P-6 unknown: an env that omitted `ARI_PRMS_SYNC` changes outbound URLs | Settled at T-02 start: owner confirmed both envs set 2026 (execution.md T-02) | d.casanas | closed |
 | RB-2 | 2026-10-08 | Prod seed migration not auto-applied (K-015) | Resolver falls back to 2026; T-09 rollout check | d.casanas | open |
 | RB-3 | 2026-10-08 | OQ-3: contribution endpoints lack the external-source gate (pre-existing) | Out of scope; carried forward | d.casanas | open |
 

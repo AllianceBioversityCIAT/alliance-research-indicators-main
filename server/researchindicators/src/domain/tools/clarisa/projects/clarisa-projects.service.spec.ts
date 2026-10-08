@@ -6,7 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { AppConfig } from '../../../shared/utils/app-config.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 import { ClarisaProjectsModule } from './clarisa-projects.module';
 import { ClarisaProjectsService } from './clarisa-projects.service';
 import { MappingPhaseResolver } from './mapping-phase.resolver';
@@ -48,6 +48,7 @@ describe('ClarisaProjectsService', () => {
   let service: ClarisaProjectsService;
   let phaseResolver: MappingPhaseResolver;
   let connectionGet: jest.Mock;
+  let resolveReportingYear: jest.Mock;
   let mockRepository: {
     findOne: jest.Mock;
   };
@@ -63,6 +64,7 @@ describe('ClarisaProjectsService', () => {
     mockDataSource = {
       getRepository: jest.fn().mockReturnValue(mockRepository),
     };
+    resolveReportingYear = jest.fn().mockResolvedValue(2026);
 
     // Build the REAL ClarisaProjectsModule to prove all module providers (including MappingPhaseResolver)
     // are properly registered in the module (Design §11 F-2 gate).
@@ -73,9 +75,12 @@ describe('ClarisaProjectsService', () => {
           module: class MockDbModule {},
           providers: [
             { provide: DataSource, useValue: mockDataSource },
-            AppConfig,
+            {
+              provide: ReportingYearResolver,
+              useValue: { resolve: resolveReportingYear },
+            },
           ],
-          exports: [DataSource, AppConfig],
+          exports: [DataSource, ReportingYearResolver],
           global: true,
         },
       ],
@@ -300,36 +305,59 @@ describe('ClarisaProjectsService', () => {
 
       expect(out.map((p) => p.id)).toEqual([1, 3]);
       expect(connectionGet).toHaveBeenCalledTimes(1);
-      expect(connectionGet).toHaveBeenCalledWith('api/projects');
+      expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2026');
     });
 
-    describe('CLARISA phase query param (ARI_PRMS_SYNC)', () => {
-      const originalPhase = process.env.ARI_PRMS_SYNC;
-      afterEach(() => {
-        if (originalPhase === undefined) {
-          delete process.env.ARI_PRMS_SYNC;
-        } else {
-          process.env.ARI_PRMS_SYNC = originalPhase;
-        }
-      });
-
-      it('requests api/projects?phase=<ARI_PRMS_SYNC> when the env var is set', async () => {
-        process.env.ARI_PRMS_SYNC = ' 2026 ';
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-02 / R-PRY-002, NFR-PRY-001
+    describe('reporting-year phase', () => {
+      it('requests api/projects?phase= from the resolver', async () => {
+        resolveReportingYear.mockResolvedValueOnce(2027);
         connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
 
         await service.findProjectById(1);
 
-        expect(connectionGet).toHaveBeenCalledTimes(1);
-        expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2026');
+        expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2027');
       });
 
-      it('requests plain api/projects when ARI_PRMS_SYNC is unset', async () => {
-        delete process.env.ARI_PRMS_SYNC;
-        connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+      it('refetches inside the TTL when the phase changes and returns the new payload', async () => {
+        resolveReportingYear
+          .mockResolvedValueOnce(2026)
+          .mockResolvedValueOnce(2027);
+        connectionGet
+          .mockResolvedValueOnce([bilateralProject(2026, 'Y2026')])
+          .mockResolvedValueOnce([bilateralProject(2027, 'Y2027')]);
 
-        await service.findProjectById(1);
+        const first = await service.findProjectById(2026);
+        const second = await service.findProjectById(2027);
 
-        expect(connectionGet).toHaveBeenCalledWith('api/projects');
+        expect(connectionGet).toHaveBeenCalledTimes(2);
+        expect(connectionGet).toHaveBeenNthCalledWith(
+          1,
+          'api/projects?phase=2026',
+        );
+        expect(connectionGet).toHaveBeenNthCalledWith(
+          2,
+          'api/projects?phase=2027',
+        );
+        expect(first?.short_name).toBe('Y2026');
+        expect(second?.short_name).toBe('Y2027');
+      });
+
+      it('does not serve an old phase when the new phase fetch fails', async () => {
+        resolveReportingYear
+          .mockResolvedValueOnce(2026)
+          .mockResolvedValueOnce(2027);
+        connectionGet
+          .mockResolvedValueOnce([bilateralProject(1, 'OLD')])
+          .mockRejectedValueOnce(new Error('upstream down'));
+
+        const cached = await service.findProjectById(1);
+        expect(cached?.short_name).toBe('OLD');
+
+        await expect(service.findProjectById(1)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        expect(connectionGet).toHaveBeenCalledTimes(2);
       });
     });
 

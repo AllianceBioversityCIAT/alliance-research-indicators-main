@@ -4,6 +4,7 @@ import { TocIntegrationService } from '../../tools/toc-integration/toc-integrati
 import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { PrmsWebhookCallbackModule } from './prms-webhook-callback.module';
 
 // KZ-001 — assertions are on the SQL text and the parameter arrays.
@@ -301,6 +302,9 @@ describe('PoolFundingMappingApplyService', () => {
     service = new PoolFundingMappingApplyService(
       db as unknown as DataSource,
       catalog as unknown as TocIntegrationService,
+      {
+        resolve: jest.fn().mockResolvedValue(2026),
+      } as unknown as ReportingYearResolver,
     );
   });
 
@@ -396,7 +400,7 @@ describe('PoolFundingMappingApplyService', () => {
 
     await apply();
 
-    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME');
+    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME', 2026);
     const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
     expect(inserted).toBeDefined();
     expectSql(inserted as RecordedQuery, INSERT_TOC_SQL, [

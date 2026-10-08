@@ -52,6 +52,7 @@ import {
   SpMappingRowLike,
 } from './utils/sp-mapping.predicate';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -166,6 +167,7 @@ export class BilateralService {
     private readonly tocIntegrationService: TocIntegrationService,
     // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092
     private readonly tocAlignmentRepository: ResultPoolFundingTocAlignmentRepository,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
   /**
@@ -403,10 +405,12 @@ export class BilateralService {
       };
     }
 
+    const year = await this.reportingYearResolver.resolve();
     const tocResultsByKey =
       await this.tocIntegrationService.getTocResultsForSps(
         spCodes,
         allowedLevels,
+        year,
       );
 
     // One catalogs[] entry per SP (deriveSciencePrograms order), each with
@@ -965,9 +969,11 @@ export class BilateralService {
     const normalize = (value: string | null | undefined) =>
       (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
     try {
+      const year = await this.reportingYearResolver.resolve();
       const catalog = await this.tocIntegrationService.getTocResults(
         spCode,
         level,
+        year,
       );
       const match = catalog.find(
         (candidate) => normalize(candidate.title) === normalize(title),
@@ -1364,10 +1370,15 @@ export class BilateralService {
       });
     }
     const comboKeys = [...combos.keys()];
+    const year = await this.reportingYearResolver.resolve();
     const catalogs = await Promise.all(
       comboKeys.map((key) => {
         const combo = combos.get(key);
-        return this.tocIntegrationService.getTocResults(combo.sp, combo.level);
+        return this.tocIntegrationService.getTocResults(
+          combo.sp,
+          combo.level,
+          year,
+        );
       }),
     );
     const catalogByKey = new Map(

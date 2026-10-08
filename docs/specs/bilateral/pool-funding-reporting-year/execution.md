@@ -67,3 +67,61 @@
 - The worker wrote its report to `docs/specs/.../t-01-implementer-report.md`, which is outside the brief's file scope. The Leader removed the file and folded its content into this entry.
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer 16 calls, 62585 tokens, ended complete`.
+
+### T-02 — ToC and CLARISA consume the year; env var retired → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Orca task / dispatch | `task_e4687ddcac8e` / `ctx_e6d305a36dee` |
+| Implementer | Cursor · `grok-4.7-high`, effort medium, skills `nestjs-expert`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (fresh context) — **PASS** |
+| Requirements covered | R-PRY-002 "Change without deploy" (ToC/CLARISA clauses + BUT), "Env var retired" (THEN + AND IT MUST), NFR-PRY-001 (ToC/CLARISA half) |
+
+**P-6 answer:**
+- The owner answered on 2026-10-08, before dispatch: *"Yes, both set 2026"*. Dev on-prem and Prod AWS both set `ARI_PRMS_SYNC=2026`.
+- So always sending `?year=` and `?phase=` does not change behaviour. P-6 moves from UNVERIFIED to `user-stated`, and RB-1 is closed.
+
+**Consumer grep (`getTocResultsForSps\|getTocResults(`, over `src/` and `test/`, before the edits):**
+- Real callers:
+  - `bilateral.service.ts` :407 (`getTocResultsForSps`), :968 and :1370 (`getTocResults`), plus a comment at :354.
+  - `pool-funding-mapping-apply.service.ts:612`.
+- Definitions in `toc-integration.service.ts`: :48 and :126, plus an internal call at :135 and a comment at :72.
+- Specs: `toc-integration.service.spec.ts`, `bilateral.service.spec.ts`, `bilateral.service.getHlosIndicatorsForResult.spec.ts`.
+- Excluded on purpose: `PrmsTocService.getTocResults` (`prms-toc.service.ts` and its spec) is a different class and was not modified.
+
+**Files changed (18):**
+- `server/researchindicators/.env.example`
+- `toc-integration.service.ts` and its spec
+- `clarisa-projects.service.ts` and its spec
+- `app-config.util.ts`
+- `env.utils.ts`
+- `bilateral.service.ts`, plus 7 `bilateral.service*.spec.ts` files (constructor and resolver realignment)
+- `pool-funding-mapping-apply.service.ts` and its spec
+- `test/bilateral-primary-contributing-sp.integration-spec.ts`
+
+**Implementer verification (as reported):**
+- eslint on 17 `.ts` files exited 0. `tsc --noEmit` exited 0. The full suite had 423 suites and 4048 tests passing.
+- The env grep exited 1 with zero hits. It cannot see `dist/` or `.env`; `.env` was untouched on purpose.
+- Falsifier (a): restoring the shared `cacheKey()` gave `Expected number of calls: 2 / Received number of calls: 1` at `expect(httpGet).toHaveBeenCalledTimes(2)`. The two payloads differ (`toc_result_id` 2026 vs 2027), and the next line asserts on the payload.
+- Falsifier (b): allowing stale-on-error across phases gave `Received promise resolved instead of rejected … "short_name": "OLD"` at `await expect(service.findProjectById(1)).rejects.toBeInstanceOf(ServiceUnavailableException)`.
+- Both mutations were reverted and the suite went back to green.
+
+**Evidence re-run (Leader inline): VERIFIED.**
+- The env grep had 0 hits. `tsc --noEmit -p tsconfig.json` exited 0. `npx eslint` on the 17 changed `.ts` files exited 0.
+- The full server suite (`npm test -- --silent`) had **423 suites / 4048 tests passing**.
+
+**Scope gap (KZ-017):**
+- `test/bilateral-primary-contributing-sp.integration-spec.ts` was type-checked but **not executed**, because `npm test` uses `rootDir: src`.
+- **Forward pointer → T-03:** T-03 already owes `npm run test:integration` for this file, and that run covers the T-02 change too.
+
+**ADVISORY (4R, non-gating):**
+1. `cacheKey()` is now the public Map key, not the cache identity. A rename such as `mapKey` is optional.
+2. In `getCachedAll`, `now` is taken before `resolve()`. The skew is milliseconds against a 5-minute TTL.
+3. The `resolve()` call at `bilateral.service.ts:972` sits inside an existing `try`, so a throw would be swallowed. That is unreachable today, because the resolver degrades to 2026 instead of throwing. **Forward pointer → T-03:** re-check this when the year is threaded properly.
+4. After a year change, the old year's ToC entries stay in memory until a restart. They are small, and they are never served for the new year.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer not reported by host, ended complete; reviewer 14 calls, 88450 tokens, ended complete`.

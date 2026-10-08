@@ -18,7 +18,7 @@ import {
 import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
 import { normalizeExternalCode } from '../../../entities/bilateral-project-mapping/utils/external-code.util';
 import { ENV } from '../../../shared/utils/env.utils';
-import { AppConfig } from '../../../shared/utils/app-config.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
@@ -47,12 +47,16 @@ export class ClarisaProjectsService {
   private readonly connection: Clarisa;
   private readonly TTL_MS = 5 * 60 * 1000;
 
-  private cache: { data: ClarisaProject[]; fetchedAt: number } | null = null;
+  private cache: {
+    data: ClarisaProject[];
+    fetchedAt: number;
+    phase: number;
+  } | null = null;
 
   constructor(
     http: HttpService,
     private readonly phaseResolver: MappingPhaseResolver,
-    private readonly appConfig: AppConfig,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {
     this.connection = new Clarisa(http);
   }
@@ -228,24 +232,25 @@ export class ClarisaProjectsService {
 
   private async getCachedAll(): Promise<ClarisaProject[]> {
     const now = Date.now();
-    if (this.cache && now - this.cache.fetchedAt < this.TTL_MS) {
+    const phase = await this.reportingYearResolver.resolve();
+    if (
+      this.cache &&
+      this.cache.phase === phase &&
+      now - this.cache.fetchedAt < this.TTL_MS
+    ) {
       return this.cache.data;
     }
 
     try {
-      // `phase` comes from AppConfig.ARI_PRMS_SYNC, the same year
-      // TocIntegrationService sends. Scoping the feed to one phase keeps an
-      // older-phase project from shadowing the current one when both share a
-      // normalized external_code (e.g. `A1080` 2025 vs `B-A1080` 2026). Appended
-      // only when set, so an unset value leaves the URL as it was. Not part of
-      // the cache: the year is process-constant and a change arrives with a
-      // restart, which empties the cache anyway.
-      const phase = this.appConfig.ARI_PRMS_SYNC;
-      const path = phase
-        ? `api/projects?phase=${encodeURIComponent(phase)}`
-        : 'api/projects';
+      // `phase` is the reporting year the resolver just read, the same year
+      // TocIntegrationService sends. It is always sent. The cache records
+      // that phase: a different phase is a miss, so a year change cannot be
+      // served from another year's feed. On upstream error a cached feed is
+      // served only when its phase matches; a mismatch falls through to the
+      // cold-cache 503 below.
+      const path = `api/projects?phase=${encodeURIComponent(String(phase))}`;
       const data = await this.connection.get<ClarisaProject[]>(path);
-      this.cache = { data, fetchedAt: now };
+      this.cache = { data, fetchedAt: now, phase };
 
       let sourceCenterCount = 0;
       let legacyLeadCount = 0;
@@ -262,7 +267,7 @@ export class ClarisaProjectsService {
 
       return data;
     } catch (err) {
-      if (this.cache) {
+      if (this.cache && this.cache.phase === phase) {
         this.logger.warn(
           `[ClarisaProjectsService] upstream error; serving stale cache (age=${Math.round(
             (now - this.cache.fetchedAt) / 1000,

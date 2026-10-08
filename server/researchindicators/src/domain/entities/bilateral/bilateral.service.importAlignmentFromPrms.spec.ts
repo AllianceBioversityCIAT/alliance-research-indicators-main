@@ -16,6 +16,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
 import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
@@ -113,6 +114,10 @@ describe('BilateralService.importAlignmentFromPrms', () => {
         { provide: ClarisaProjectsService, useValue: {} },
         { provide: ClarisaCgiarEntitiesService, useValue: {} },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+        },
         { provide: TocIntegrationService, useValue: { getTocResults } },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
@@ -147,7 +152,7 @@ describe('BilateralService.importAlignmentFromPrms', () => {
         sp_role: 'CONTRIBUTING',
       }),
     ]);
-    expect(getTocResults).toHaveBeenCalledWith('SP06', 'OUTPUT');
+    expect(getTocResults).toHaveBeenCalledWith('SP06', 'OUTPUT', 2026);
     expect(upsertForSp).toHaveBeenCalledWith(
       {
         result_id: 34105,

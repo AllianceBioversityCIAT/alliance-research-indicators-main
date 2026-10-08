@@ -17,6 +17,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import {
   TocIndicatorTarget,
@@ -243,6 +244,10 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+        },
         { provide: TocIntegrationService, useValue: { getTocResultsForSps } },
         {
           provide: BilateralProjectMappingService,
@@ -341,6 +346,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).toHaveBeenCalledWith(
       ['SP02', 'SP06'],
       ['OUTPUT'],
+      2026,
     );
     expect(out.mapping_status).toBe('mapped');
     expect(out.clarisa_project).toEqual({
@@ -487,6 +493,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).toHaveBeenCalledWith(
       ['SP01', 'SP03'],
       ['OUTCOME', 'EOI'],
+      2026,
     );
 
     expect(out.mapping_status).toBe('mapped');

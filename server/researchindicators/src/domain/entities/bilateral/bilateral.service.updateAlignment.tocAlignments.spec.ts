@@ -22,6 +22,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
@@ -167,6 +168,10 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+        },
         { provide: TocIntegrationService, useValue: { getTocResults } },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
@@ -301,7 +306,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
     // Catalog fetched only for the referenced (SP01, OUTPUT) combo.
     expect(getTocResults).toHaveBeenCalledTimes(1);
-    expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+    expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
 
     expect(upsertForSp).toHaveBeenCalledTimes(1);
     expect(upsertForSp).toHaveBeenCalledWith(
@@ -1286,7 +1291,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         // row is proven by T-04, not here.
         expect(thrown).not.toBeInstanceOf(BadRequestException);
         expect(getTocResults).toHaveBeenCalledTimes(1);
-        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
       });
 
       it('R-BIL-111 AC.4 — Level-only (toc_result_id absent) rejects with missing_required_fields naming toc_result_id, catalog never consulted', async () => {
@@ -1349,7 +1354,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(errors).toEqual([
           { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
         ]);
-        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
       });
 
       it('R-BIL-113 AC.6 — quantitative_contribution supplied without indicator_id → 400 contribution_without_indicator on quantitative_contribution, never missing_required_fields (D-C1-8)', async () => {

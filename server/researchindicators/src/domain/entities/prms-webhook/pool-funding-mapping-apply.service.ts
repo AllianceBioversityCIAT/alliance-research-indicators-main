@@ -16,6 +16,7 @@ import {
   tocLevelCode,
 } from './pool-funding-mapping-diff.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import {
   TocIndicator,
   TocResult,
@@ -452,6 +453,7 @@ export class PoolFundingMappingApplyService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tocIntegration: TocIntegrationService,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
   /**
@@ -609,7 +611,8 @@ export class PoolFundingMappingApplyService {
 
     let results: TocResult[];
     try {
-      results = await this.tocIntegration.getTocResults(sp, level);
+      const year = await this.reportingYearResolver.resolve();
+      results = await this.tocIntegration.getTocResults(sp, level, year);
     } catch (error) {
       this.logger._warn(
         `Pool-funding apply could not read the ToC catalog for history id=${historyId} (${sp}/${level}): ${errorText(error)}; the stored indicator is left in place`,
