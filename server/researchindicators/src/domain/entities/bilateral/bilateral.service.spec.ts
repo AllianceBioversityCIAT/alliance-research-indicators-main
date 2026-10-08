@@ -1759,6 +1759,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       result_id: 19792,
       result_official_code: 19792,
       version_id: 1,
+      report_year_id: 2026,
       is_pool_funding_contributor: true,
       is_synced_to_prms: false,
       platform_code: 'STAR',
@@ -1851,6 +1852,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       result_id: 19792,
       result_official_code: 19792,
       version_id: 1,
+      report_year_id: 2026,
       is_pool_funding_contributor: true,
       is_synced_to_prms: false,
       platform_code: 'STAR',
@@ -1891,6 +1893,109 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.deleteContribution(19792, '19792', 'IND-001', user, 'SP01'),
       ).rejects.toBeInstanceOf(NotFoundException);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-04 / R-PRY-004
+  // Contribution POST and PATCH share upsertContribution; DELETE is
+  // deleteContribution. Both enter through getEditableContributionContext.
+  // ---------------------------------------------------------------------------
+  describe('contribution writes — reporting-year lock (R-PRY-004)', () => {
+    const lockedContext = {
+      result_id: 19792,
+      result_official_code: 19792,
+      version_id: 1,
+      report_year_id: 2025,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+    };
+    const alignment = {
+      id: 1,
+      result_id: 19792,
+      has_contribution: true,
+      selected_levers: [{ lever_code: 'SP01', lever_name: 'SP01' }],
+    };
+
+    async function expectYearLocked(run: () => Promise<unknown>) {
+      let thrown: HttpException | undefined;
+      try {
+        await run();
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+      expect(thrown).toBeInstanceOf(ConflictException);
+      const response = thrown!.getResponse() as {
+        message: { code: string };
+      };
+      expect(response.message.code).toBe('pool_funding_year_locked');
+      expect(fakeRepo.save).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    }
+
+    it.each(['POST', 'PATCH'])(
+      '%s contribution on a 2025 result → 409 pool_funding_year_locked',
+      async () => {
+        findContext.mockResolvedValueOnce(lockedContext);
+        findActiveAlignment.mockResolvedValueOnce(alignment);
+        findActiveMapping.mockResolvedValueOnce(null);
+
+        await expectYearLocked(() =>
+          service.upsertContribution(
+            19792,
+            '19792',
+            'IND-001',
+            { indicator_type: 'NOOP', narrative: 'x' } as never,
+            user,
+            'SP01',
+          ),
+        );
+      },
+    );
+
+    it('DELETE contribution on a 2025 result → 409 pool_funding_year_locked', async () => {
+      findContext.mockResolvedValueOnce(lockedContext);
+      findActiveAlignment.mockResolvedValueOnce(alignment);
+      findActiveMapping.mockResolvedValueOnce({
+        id: 7,
+        result_id: 19792,
+        lever_code: 'SP01',
+        indicator_code: 'IND-001',
+        indicator_type: 'NOOP',
+      });
+
+      await expectYearLocked(() =>
+        service.deleteContribution(19792, '19792', 'IND-001', user, 'SP01'),
+      );
+    });
+
+    it('PRMS-sourced 2025 contribution keeps the PRMS 409 (source gate first)', async () => {
+      findContext.mockResolvedValueOnce({
+        ...lockedContext,
+        platform_code: 'PRMS',
+      });
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.upsertContribution(
+          19792,
+          '19792',
+          'IND-001',
+          { indicator_type: 'NOOP' } as never,
+          user,
+          'SP01',
+        );
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(ConflictException);
+      expect(thrown!.message).toBe(
+        'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+      );
+      expect(fakeRepo.save).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
   });

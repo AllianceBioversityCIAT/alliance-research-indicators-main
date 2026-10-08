@@ -46,6 +46,8 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     result_official_code: 19792,
     result_status_id: 1,
     version_id: 1,
+    // Current reporting year, so the R-PRY-004 lock does not mask lever checks.
+    report_year_id: 2026,
     is_synced_to_prms: false,
     is_pool_funding_contributor: true,
     agresso_agreement_id: 'D527',

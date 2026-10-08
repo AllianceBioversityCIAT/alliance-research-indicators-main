@@ -781,6 +781,11 @@ export class BilateralService {
     // distinctly-worded rejection — see assertNonPrmsExternalSourceWritable.
     this.assertNonPrmsExternalSourceWritable(context.platform_code);
 
+    // R-PRY-004: other-year results are read-only on every body. Source
+    // gates stay first; the contributor and already-synced checks come
+    // after, and nothing is written or emitted on this path.
+    this.assertReportingYearWritable(context, year);
+
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(
         'Result project is not a Pool Funding Contributor',
@@ -800,25 +805,12 @@ export class BilateralService {
       resultCode,
     );
 
-    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
-    //
-    // Version gate extracted from `validateTocAlignments` (design.md §4 step
-    // 2) so it keeps firing before Primary validation (T-06 step 3) is
-    // inserted below. Trigger condition is unchanged from the original
-    // inline check: fires ONLY when `toc_alignments` is present, so legacy
-    // bodies still bypass it entirely (R-BIL-097 AC.3).
-    if (dto.toc_alignments) {
-      this.assertTocMappingVersionUnlocked(context, year);
-    }
-
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120..122, D-C2-15
     //
     // Primary resolution (design.md §4 step 3, §5.1) runs BEFORE the
-    // transaction opens too, so a rejection here observes no partial write
-    // (R-BIL-121's atomicity clause) — same reasoning as the version gate
-    // above. Positioned after it (R-BIL-130) and before
-    // `validateTocAlignments`, which is passed the resolved Primary below
-    // for the T-07 restriction (R-BIL-124).
+    // transaction opens, so a rejection here observes no partial write
+    // (R-BIL-121's atomicity clause). Other-year bodies never reach it:
+    // the reporting-year guard above already returned 409.
     const primarySpCode = this.resolvePrimarySpCode(
       dto,
       leverCodes,
@@ -927,7 +919,7 @@ export class BilateralService {
    * PRMS. ONLY for `fetch-prms-data-as-star`, a one-off import: the data is
    * PRMS's own record of the result, not a user's choice, so none of the
    * gates `updateAlignment` applies to a user's save run here (PRMS
-   * read-only source, the 2026 ToC version lock, contributor and
+   * read-only source, the reporting-year lock, contributor and
    * already-synced checks, catalog validation). The write itself is the
    * same `persistAlignment`. No review-history entry and no socket event:
    * nobody is editing the result.
@@ -1123,33 +1115,29 @@ export class BilateralService {
   }
 
   /**
-   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+   * @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-04 / R-PRY-004, D-8
    *
-   * Version gate: live version (`report_year_id`, literal year per D-V2-7)
-   * ≠ the configured reporting year passed in → 409
-   * `toc_mapping_version_locked`
-   * (R-BIL-097). Extracted from `validateTocAlignments` — where it used to
-   * be the first statement — so it keeps firing BEFORE Primary validation
-   * (T-06), which the call site inserts after this check. Left inside
-   * `validateTocAlignments`, a new `400 primary_sp_required` would move in
-   * front of this shipped `409`, displacing a tested contract (R-BIL-097
-   * AC.2). The trigger condition (only when `toc_alignments` is present,
-   * R-BIL-097 AC.3) lives at the call site, not here, so it stays visible
-   * next to the other pre-transaction steps instead of being duplicated.
+   * Other-year results are read-only. `report_year_id` (literal year) differs
+   * from the reporting year resolved by the caller → 409
+   * `pool_funding_year_locked`. Replaces the ToC version gate, which only
+   * fired when `toc_alignments` was present. Callers run this after the
+   * source gates and before the contributor and already-synced checks, and
+   * before any transaction or socket emit.
    */
-  private assertTocMappingVersionUnlocked(
+  private assertReportingYearWritable(
     context: {
-      report_year_id?: number | string;
+      report_year_id?: number | string | null;
     },
     year: number,
   ): void {
-    if (Number(context.report_year_id) !== year) {
+    const resultYear = Number(context.report_year_id);
+    if (resultYear !== year) {
       // GlobalExceptions surfaces `exception.response.message` into the
-      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
+      // envelope's `errors` field — same packing as the other object 409s.
       throw new ConflictException({
         message: {
-          description: `ToC mapping is locked to live version ${year}`,
-          code: 'toc_mapping_version_locked',
+          description: `Pool Funding is read-only: result year ${resultYear} is not the reporting year ${year}`,
+          code: 'pool_funding_year_locked',
         },
       });
     }
@@ -1160,10 +1148,9 @@ export class BilateralService {
    *
    * Resolves the Primary SP for this save. `design.md` §5.1 is normative —
    * the five steps below map 1:1 onto it. Runs BEFORE the transaction opens
-   * (called from the pre-transaction block in `updateAlignment`, right after
-   * the T-04 version gate), so a rejection here observes no partial write
-   * (R-BIL-121's atomicity clause) — same reasoning as the version gate.
-   * Positioned after it (R-BIL-130: the shipped 409 keeps winning) and
+   * (called from the pre-transaction block in `updateAlignment`, after the
+   * reporting-year guard), so a rejection here observes no partial write
+   * (R-BIL-121). Other-year bodies never reach it (R-PRY-004). It runs
    * before `validateTocAlignments`, which is handed the resolved Primary as
    * a parameter for the T-07 restriction (R-BIL-124).
    *
@@ -1252,9 +1239,9 @@ export class BilateralService {
    * resolved from the validated catalog entries, so the transaction only
    * persists — it never re-reads upstream.
    *
-   * The version gate (former step "a" here) has been EXTRACTED to the call
-   * site as `assertTocMappingVersionUnlocked`, invoked before this method
-   * runs — see design.md §4 step 2 and R-BIL-130.
+   * The live-version lock that used to be step "a" here is gone.
+   * `assertReportingYearWritable` rejects every other-year write before
+   * this method runs (R-PRY-004, D-8).
    *
    *   a. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
    *      `toc_alignment_not_primary_sp` (T-07 / R-BIL-124: a selected SP
@@ -1832,10 +1819,7 @@ export class BilateralService {
     };
   }
 
-  private async getEditableContributionContext(
-    resultId: number,
-    _year: number,
-  ) {
+  private async getEditableContributionContext(resultId: number, year: number) {
     const context =
       await this.resultRepository.findPoolFundingAlignmentContext(resultId);
 
@@ -1846,6 +1830,8 @@ export class BilateralService {
     // R-BIL-071: same architectural source gate as updateAlignment — runs
     // first so PRMS-sourced results always return the locked 409 wording.
     this.assertPrmsSourceWritable(context.platform_code);
+    // R-PRY-004: year lock after the PRMS gate, before contributor / synced.
+    this.assertReportingYearWritable(context, year);
 
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(

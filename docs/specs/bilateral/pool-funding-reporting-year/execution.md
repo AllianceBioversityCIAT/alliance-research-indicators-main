@@ -240,3 +240,63 @@
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer 7 calls, 37713 tokens, ended complete`.
+
+### T-04 — Server write guard `pool_funding_year_locked` → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Orca task / dispatch | `task_ddbe81125bfd` / `ctx_7d0c9d8b420f`. Ran in parallel with T-06 (client). |
+| Implementer | Cursor · `grok-4.7-high`, effort high, skills `nestjs-expert`, `error-handling-patterns`, `tdd` |
+| Reviewer | **Parallel lens mode** (authorization / write gate). Two fresh Claude `akili-reviewer` contexts: (1) conformance + reliability → **PASS**; (2) risk + resilience / security → **PASS** |
+| Requirements covered | R-PRY-004: legacy body on a past year (409 + nothing written + no emit), current year still writable, contribution POST/PATCH/DELETE, source gates first, response changes |
+
+**First-step greps:**
+- `getEditableContributionContext` has two callers plus its definition: `bilateral.service.ts:1595` (`upsertContribution`), `:1684` (`deleteContribution`), and the definition at `:1835`. **P-11 holds.**
+- Before the edit, `toc_mapping_version_locked` appeared only in `bilateral.service.ts`, `bilateral.controller.ts` and `bilateral.service.updateAlignment.tocAlignments.spec.ts`, with 0 hits in `test/`. After the edit there are 0 hits in `src` and `test`.
+
+**Files changed (7):**
+- `bilateral.service.ts`: adds `assertReportingYearWritable`. It runs in `updateAlignment` after both source gates, and in `getEditableContributionContext(resultId, year)` after the PRMS gate. Both placements come before the contributor and synced checks and before any transaction or emit. `assertTocMappingVersionUnlocked` and its call are deleted.
+- `bilateral.controller.ts`: Swagger 409.
+- Specs:
+  - `bilateral.service.spec.ts`
+  - `bilateral.service.updateAlignment.reportingYear.spec.ts` (new)
+  - `bilateral.service.updateAlignment.tocAlignments.spec.ts`
+  - `bilateral.service.sourceReadOnlyGate.spec.ts`
+  - `bilateral.service.normalizeLeverCodes.spec.ts`
+
+**Implementer verification (as reported):**
+- 5 scoped suites, 119 tests: green. `tsc`: 0. `eslint`: 0.
+- Falsifiers, each observed red and then reverted:
+  - (a) Guard moved after the transaction: `Expected number of calls: 0, Received number of calls: 3` at `expect(save).not.toHaveBeenCalled()`.
+  - (b) Guard wrapped in `if (dto.toc_alignments)`, 2025 legacy body: `Expected constructor: ConflictException, Received value: undefined` at `expect(thrown).toBeInstanceOf(ConflictException)`.
+  - (c) Guard removed from `getEditableContributionContext`: the same `ConflictException` vs `undefined` on POST, PATCH and DELETE.
+- K-018 realignment, from the failing run: `Expected: "toc_mapping_version_locked", Received: "pool_funding_year_locked"`. The 2024 and 2025 legacy bodies are now rejected.
+
+**Evidence re-run (Leader inline, after the parallel workers had reported): VERIFIED.**
+- The `toc_mapping_version_locked` grep finds 0 hits. `tsc --noEmit -p tsconfig.json` exits 0. `npx eslint` on the 7 changed files exits 0.
+- The full server suite (`npm test -- --silent`) passes: **424 suites / 4068 tests**.
+
+**Not Done / Assumptions (carried verbatim in gist):**
+- The `[advisory-grade]` 2027 write-path snapshot case was **not** added. It needs a full ToC catalog fixture, and it was optional.
+- Current-year write fixtures that omitted `report_year_id` now set 2026. Without it, `Number(undefined)` would lock them. The Reviewer confirmed that `findPoolFundingAlignmentContext` really selects `r.report_year_id` (`result.repository.ts:203`), so these fixtures match production rows.
+
+**Reviewer findings on the questions asked (both lenses):**
+- **No bypass.** All four HTTP write routes are guarded. `importAlignmentFromPrms`, the PRMS webhook mapping-apply and the versioning stored procedures are system-driven, and R-PRY-004 does not require the guard on them. No role bypasses the guard: it lives in the service, and `SYSTEM_ADMIN` skips only `RolesGuard`.
+- **409 shape.** The guard throws `ConflictException({ message: { description, code } })`, the same packing as the removed 409, so the envelope stays consistent and nothing sensitive leaks.
+- **Null `report_year_id` is now write-locked.** This follows design §2.1 ("a null year counts as a mismatch, consistent with `version_locked`") and the GET side already shows such a result as locked. The behaviour change is that a legacy-body PATCH on a null-year result now gets a 409. Nothing is deleted. Both reviewers flagged this for the rollout note, below.
+
+**ADVISORY (non-gating):**
+1. Six `mockResolvedValueOnce` values queued in the three contribution year-lock tests are never consumed, and `clearAllMocks` does not drain them. The suite is order-dependent but green today. Fix: `mockReset` in a scoped `afterEach`.
+2. The 409 text for a null or undefined year reads "result year 0" or "NaN". The `code` is correct and the client matches on `code`. Consider printing "unknown" instead.
+3. There is no test for a null `report_year_id` (null counts as a mismatch).
+4. There is no contribution-path test for a 2025 non-contributor or a synced result. The guard is shared, and these cases are optional.
+5. Transient config read: if only the `app_config` query fails, the resolver falls back to 2026. On an env configured for 2027, that request then treats 2026 as writable. The spec accepts this (NFR-PRY-002). A stricter write-only failure mode is candidate future work.
+6. The Swagger 409 text on the contribution routes does not mention `pool_funding_year_locked`. Design only asked for the PATCH route, so this is a docs gap, not a violation.
+
+**Forward pointer → T-09 rollout note:** state that results with a null `report_year_id` are locked for writes (advisory 3 and the null-year finding above), and that a transient `app_config` read failure falls back to 2026 (advisory 5).
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer not reported by host, ended complete; reviewer-1 17 calls, 78173 tokens, ended complete; reviewer-2 19 calls, 92268 tokens, ended complete`.

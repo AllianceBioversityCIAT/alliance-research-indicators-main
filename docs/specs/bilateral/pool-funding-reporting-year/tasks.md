@@ -168,7 +168,7 @@ graph TD
 
 ### T-04 — Server write guard `pool_funding_year_locked`
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-03
+- **Status:** done · **Size:** M · **Dependencies:** T-03
 - **Requirements:** R-PRY-004:
   - "Legacy body on past year": THEN, and AND IT MUST (nothing written, no socket event)
   - "Current year still writable"
@@ -204,9 +204,9 @@ graph TD
   - `bilateral.service.updateAlignment.tocAlignments.spec.ts`
 - **Review:** `full` — authorization/write gate.
 - **Done:**
-  - [ ] Tests green, falsifiers observed red
-  - [ ] `/usr/bin/grep -rn toc_mapping_version_locked server/researchindicators/src server/researchindicators/test` → 0
-  - [ ] `tsc` + `eslint` clean
+  - [x] Tests green, falsifiers observed red
+  - [x] `/usr/bin/grep -rn toc_mapping_version_locked server/researchindicators/src server/researchindicators/test` → 0
+  - [x] `tsc` + `eslint` clean
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ### T-05 — PRMS sync gate `reporting_year`

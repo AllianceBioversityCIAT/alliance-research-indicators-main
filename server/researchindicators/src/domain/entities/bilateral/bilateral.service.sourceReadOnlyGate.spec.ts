@@ -50,6 +50,8 @@ describe('BilateralService source-based read-only gate (T-15.2)', () => {
     result_official_code: 19792,
     result_status_id: 1,
     version_id: 1,
+    // Current reporting year, so the R-PRY-004 lock does not mask these gates.
+    report_year_id: 2026,
     is_pool_funding_contributor: true,
     is_synced_to_prms: overrides.is_synced_to_prms ?? false,
     agresso_agreement_id: 'D527',
