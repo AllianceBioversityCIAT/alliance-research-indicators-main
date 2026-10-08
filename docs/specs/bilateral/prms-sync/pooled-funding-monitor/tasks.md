@@ -198,7 +198,7 @@ graph TD
 
 ### T-06 — Design tokens + `pfm-status-badge` (client)
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** NFR-PFM-003 (no hex, no new `.scss`), NFR-PFM-004 (contrast; non-color cue), R-PFM-004 rendering of STAR / mapping / PRMS values, R-PFM-012 PRMS "—" when Not sent
 - **Design refs:** §6.2 token table, DD-PFM-8, DD-PFM-10, §2.2 `pfm-status-badge`
 - **Files:** the **existing** global `--ac-*` token stylesheet under `client/research-indicators/src/styles/` (add `--ac-pfm-*` light + dark values); `components/pfm-status-badge/*` (+ spec)
@@ -207,9 +207,9 @@ graph TD
   - Each value renders a text label (status never conveyed by color alone).
   - SP badge takes a runtime color and derives its background with `color-mix`.
 - **Done:**
-  - [ ] Spec asserts the rendered label for every value.
-  - [ ] `git diff --name-only --diff-filter=A | grep '\.scss$'` returns nothing.
-  - [ ] No `#[0-9a-fA-F]{3,6}` in new component files (the token stylesheet is the only allowed place).
+  - [x] Spec asserts the rendered label for every value.
+  - [x] `git diff --name-only --diff-filter=A | grep '\.scss$'` returns nothing.
+  - [x] No `#[0-9a-fA-F]{3,6}` in new component files (the token stylesheet is the only allowed place).
 - **Disqualifies:** a contrast claim made from jsdom. jsdom cannot compute contrast, so contrast is verified at the HITL pause (see §3).
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 

@@ -65,3 +65,21 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Decision recorded:** mapping-state precedence = no alignment → *Not started* before `has_contribution=0` → *No SP contribution* (Reviewer: conforms; design §5 bullet order is imprecise, not the code).
 - **Requirements covered:** R-PFM-004, R-PFM-009 (status matching), R-PFM-010 (chip matching), R-PFM-012 (rank), Glossary §2.
 - **Total:** 2 attempts, 2 review rounds. **Continue gate:** auto-approved (pre-approved mode).
+
+#### T-06 — Design tokens + `pfm-status-badge` — **PASS** (2026-10-08)
+
+- **Attempts:** 1 (first report omitted the `--ac-pfm-seg-*` family that design §6.2 lists and had no K-004 red; returned to the same worker before review, per Step 2.3 item 0).
+- **Skills / effort:** `angular-developer`, `ui-ux-pro-max` · medium.
+- **Files:** `client/.../src/styles/colors.scss` (+22 tokens in `:root`, +22 in `[data-theme='dark']`: status pairs success/info/review/neutral/danger/warning(+border), `outscope-fg`, and 8 `seg-*` incl. `seg-pending-group` for the mockup's group-bar amber); new `pages/.../pooled-funding-monitor/components/pfm-status-badge/` (ts, html, spec — no `.scss`).
+- **Verification:** `npx jest src/app/pages/platform/pages/pooled-funding-monitor --silent --coverage=false` → 17/17. eslint clean. No new `.scss` (staged + untracked checks empty). No hex in new component files. K-004: PRMS Rejected tone DANGER→SUCCESS ⇒ 1 red (`prms "Rejected" renders a pill with the danger token`), restored ⇒ 17/17.
+- **Reviewer (opus):** `STATUS: PASS` — labels match server enums; PRMS Not sent → "—"; SP badge binds DB color as `--sp` + `color-mix` (DD-PFM-8); Tailwind runtime CDN generates classes composed in TS.
+- **ADVISORY (non-gating, carried to HITL in T-13):**
+  - RISK — light neutral pair `#6b7a89` on `#eef1f5` ≈ 3.9:1 and "—" `#6b7a89` on white ≈ 4.4:1 (hand-computed, unmeasured) — below AA 4.5:1 for small text. NFR-PFM-004 requires AA → **must be measured at the T-13 HITL; darken `--ac-pfm-neutral-fg` if confirmed.**
+  - a11y — bare "—" has no accessible name → T-13 brief: `aria-label="Not sent"` (or visually-hidden text).
+  - READABILITY — badge value names typed as string literals; switch to the shared client type once T-07's `pfm.interfaces.ts` exists.
+  - READABILITY — Tailwind `text-xs` vs STAR `fs-*` scale (design §6.2) — pick deliberately in later UI tasks.
+  - DOCS — client guide asks new tokens to be listed in `client/research-indicators/README.md` and `docs/ux-ui/design.md` §7 → deferred to `/akili-archive` documentation pass.
+  - Dark palette implementer-chosen → covered by the NFR-PFM-004 dark-mode HITL check.
+- **Unrun check:** `tsc -p tsconfig.spec.json` on the new spec not run (Reviewer note); Leader full-suite + tsc pass scheduled at the end of PR 2.
+- **Requirements covered:** NFR-PFM-003, NFR-PFM-004 (non-color cue; contrast pending HITL), R-PFM-004 rendering, R-PFM-012 ("—").
+- **Continue gate:** auto-approved (pre-approved mode).

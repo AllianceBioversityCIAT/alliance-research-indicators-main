@@ -59,6 +59,29 @@
   --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
+  // Pooled Funding Monitor (--ac-pfm-*): semantic status pairs, see spec design.md 6.2
+  --ac-pfm-success-bg: #e6f2ea;
+  --ac-pfm-success-fg: #1d6b3e;
+  --ac-pfm-info-bg: #e7eefa;
+  --ac-pfm-info-fg: #0f4c9a;
+  --ac-pfm-review-bg: #efe9f7;
+  --ac-pfm-review-fg: #5b3d96;
+  --ac-pfm-neutral-bg: #eef1f5;
+  --ac-pfm-neutral-fg: #6b7a89;
+  --ac-pfm-danger-bg: #fdeceb;
+  --ac-pfm-danger-fg: #b4443a;
+  --ac-pfm-warning-bg: #fdf0d5;
+  --ac-pfm-warning-fg: #8a5a08;
+  --ac-pfm-warning-border: #e9cf9e;
+  --ac-pfm-outscope-fg: #2f7cc4;
+  --ac-pfm-seg-not-started: #c9d3de;
+  --ac-pfm-seg-incomplete: #e0b35c;
+  --ac-pfm-seg-ready: #7db0dd;
+  --ac-pfm-seg-pending: #d78a1a;
+  --ac-pfm-seg-pending-group: #e0a92c;
+  --ac-pfm-seg-approved: #3f9e5c;
+  --ac-pfm-seg-rejected: #b4443a;
+  --ac-pfm-seg-no-sp: #2f7cc4;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -176,4 +199,26 @@ $colors: (
   --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
+  --ac-pfm-success-bg: #1d3a2a;
+  --ac-pfm-success-fg: #8fd6ab;
+  --ac-pfm-info-bg: #1b2b46;
+  --ac-pfm-info-fg: #9dc2f2;
+  --ac-pfm-review-bg: #2a2340;
+  --ac-pfm-review-fg: #c4b0ea;
+  --ac-pfm-neutral-bg: #2b3037;
+  --ac-pfm-neutral-fg: #aab5c0;
+  --ac-pfm-danger-bg: #43211f;
+  --ac-pfm-danger-fg: #f0a39b;
+  --ac-pfm-warning-bg: #3d3014;
+  --ac-pfm-warning-fg: #f0cf85;
+  --ac-pfm-warning-border: #6b5521;
+  --ac-pfm-outscope-fg: #7fb5e8;
+  --ac-pfm-seg-not-started: #5b6672;
+  --ac-pfm-seg-incomplete: #c9a04f;
+  --ac-pfm-seg-ready: #6aa0d0;
+  --ac-pfm-seg-pending: #e09a2e;
+  --ac-pfm-seg-pending-group: #e0b445;
+  --ac-pfm-seg-approved: #57b576;
+  --ac-pfm-seg-rejected: #e0766b;
+  --ac-pfm-seg-no-sp: #5a9fdc;
 }
