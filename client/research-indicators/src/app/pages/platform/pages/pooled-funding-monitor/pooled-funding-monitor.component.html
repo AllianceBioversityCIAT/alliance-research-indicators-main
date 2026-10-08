@@ -118,9 +118,7 @@
       </div>
     } @else {
       <div role="tabpanel" id="pfm-panel-queue" aria-labelledby="pfm-tab-queue" tabindex="0" data-testid="pfm-panel-queue">
-        @if (store.queueState().loading || (!store.queue() && !store.queueState().error)) {
-          <div class="h-48 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-queue-skeleton" aria-busy="true"></div>
-        } @else if (store.queueState().error) {
+        @if (store.queueState().error) {
           <div class="text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-queue-error">
             The results queue could not be loaded.
             <button
@@ -131,7 +129,12 @@
             </button>
           </div>
         }
-        <!-- T-12 / T-13: filters, chips, project groups and rows render here -->
+        <!-- Only the very first load shows the full-panel skeleton; later refetches skeleton the groups area only -->
+        @if (store.queue()) {
+          <app-pfm-queue-tab />
+        } @else if (!store.queueState().error) {
+          <div class="h-48 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-queue-skeleton" aria-busy="true"></div>
+        }
       </div>
     }
   }

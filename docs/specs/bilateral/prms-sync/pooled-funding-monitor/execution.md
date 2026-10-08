@@ -292,3 +292,37 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The pipeline segment `<ul>` should get `aria-hidden`.
   - The SP bar has no outer track (the mockup uses a light track).
 - **Budget:** about 490 LOC, 1 round. The client total is about 1,950 against the revised cap of about 2,000. **T-12 and T-13 will exceed the cap. Re-escalate after T-12 or T-13 per the owner rule.**
+
+#### Escalation 2026-10-08 — client budget cap reached after T-11
+
+- **Where the client stands:** about 1,950 LOC against the revised cap of about 2,000. T-12 and T-13 are still open, estimated at 900–1,100 LOC, roughly half of it tests.
+- **Owner decision (Daniela Pino):** "Seguir hasta T-13 (Recomendado)". The client cap is raised to about 3,200 LOC, with at most 2 rounds per task. Visual HITL happens at the end.
+
+#### T-12 — Queue tab: filters, chips, footer → **PASS / done** (2026-10-08)
+
+- **Implementer (sonnet), attempt 1, effort medium.** Added `pfm-queue-tab`, which injects the page-scoped store.
+  - **Filters:** 4 `p-select`s built from `filter_options`. The SP filter is grouped by category. Each binds `(onChange)`.
+  - **Chips:** 7, in mockup order, with counts taken straight from `chip_counts`. The selected chip has `aria-pressed`, a check icon, and bold + underline.
+  - **Rest of the tab:** Reset, a count line per scope plus the legend, and an empty state when the filters match nothing. The group area is a placeholder for T-13.
+  - **Loading:** the queue panel shows the full skeleton only on the first load.
+  - **K-004 reds observed:**
+    - Chip counts set to `groups.length` made the count test fail.
+    - Removing `aria-pressed` failed 2 tests.
+    - Disabling the marker failed its test.
+    - Reset calling only `setChip(null)` failed the Reset test.
+- **Reviewer (opus) round 1 — STATUS: FAIL.** A queue refetch that failed or was still in flight rendered the previous query's chip counts, groups and `monitored_total` under the new filters, chip and scope. This violates NFR-PFM-006 and R-PFM-016.
+- **Implementer attempt 2, effort high, remediation (a).** Added `stale = loading || error`.
+  - While stale, chip counts and the count line are hidden.
+  - The groups area shows nothing on error and a skeleton while loading.
+  - Filters, Reset, the chips without numbers, and the legend stay visible.
+  - Two page-level transition tests were added. K-004 red: with the guards reverted, both failed. Test 1 rendered "Showing 41 results across 6 projects · 99 flagged portfolio-wide" next to the error. Test 2 showed the leftover chip count "41".
+- **Reviewer round 2 — STATUS: PASS.**
+- **Leader re-measure:** `npx jest src/app/pages/platform/pages/pooled-funding-monitor --silent --coverage=false` gave 10 suites, 70/70. The NFR-PFM-003 greps are clean. The implementer reports tsc at 945 (baseline), eslint clean, and `ng build` OK.
+- **ADVISORY (for the HITL / not gating):**
+  - Project options show "CODE — name"; the mockup shows names only.
+  - "All Science Programs" sits in a group of one item.
+  - The active chip's count badge is not filled with the accent colour, as it is in the mockup.
+  - `filter_options` stay stale during the refetch that follows a scope change.
+  - The `noOldNumbers` check scans the whole page.
+  - Dark-mode contrast of the selected chip is not yet verified.
+- **Budget:** about 470 LOC over 2 rounds. Client total is about 2,420 of the revised cap of about 3,200.

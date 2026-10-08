@@ -323,7 +323,7 @@ graph TD
 
 ### T-12 — Queue tab: filters, Reset, quick-view chips, footer + legend, empty states (client)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-09
+- **Status:** done · **Size:** M · **Dependencies:** T-09
 - **Requirements covered:**
   - R-PFM-009 — 4 filters with data-driven options, SP options grouped by category, "Reset".
   - R-PFM-010 — 7 chips with counts; "Single selection": one active chip, color **and** non-color cue; groups without matches disappear.
@@ -340,8 +340,8 @@ graph TD
   - Empty state when `groups=[]`.
   - No element labelled "year".
 - **Done:**
-  - [ ] Green.
-  - [ ] The NFR-PFM-003 grep is clean.
+  - [x] Green.
+  - [x] The NFR-PFM-003 grep is clean.
 - **Disqualifies:** a client recomputing chip counts (violates NFR-PFM-006). The test must fail if the component derives counts itself.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 

@@ -131,6 +131,88 @@ describe('PooledFundingMonitorComponent', () => {
     expect(kpiValue('need_attention')).toBe('123');
   });
 
+  it('a chip change refetches without removing the filters; only the groups area shows a skeleton (T-12)', async () => {
+    api.GET_PfmSummary.mockResolvedValue(ok(summary('mine')));
+    await create();
+    fixture.detectChanges();
+    await flush();
+    q('pfm-tab-queue')?.click();
+    await flush();
+    expect(q('pfm-filter-project')).not.toBeNull();
+
+    const next = deferred<ReturnType<typeof ok<PfmQueue>>>();
+    api.GET_PfmQueue.mockReturnValue(next.promise);
+    q('pfm-chip-synced')?.click();
+    fixture.detectChanges();
+    expect(q('pfm-queue-skeleton')).toBeNull();
+    expect(q('pfm-filter-project')).not.toBeNull();
+    expect(q('pfm-groups-skeleton')).not.toBeNull();
+
+    next.resolve(ok(queue));
+    await flush();
+    expect(q('pfm-groups-skeleton')).toBeNull();
+    expect(q('pfm-chip-synced')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  describe('stale queue numbers (NFR-PFM-006)', () => {
+    const loaded: PfmQueue = {
+      ...queue,
+      chip_counts: { all: 41, attention: 7, mapping: 5, ready: 3, pending: 11, prms_rejected: 2, synced: 13 },
+      groups: [
+        {
+          code: 'P100',
+          name: 'Alpha',
+          lead_pi: null,
+          donor: null,
+          result_count: 4,
+          attention: 1,
+          counts: { approved: 1, pending: 1, rejected: 1, out_of_scope: 0, not_sent: 1 }
+        }
+      ],
+      totals: { results: 41, projects: 6, monitored_total: 99 }
+    };
+    async function openQueueLoaded(): Promise<void> {
+      api.GET_PfmSummary.mockResolvedValue(ok(summary('mine')));
+      api.GET_PfmQueue.mockResolvedValue(ok(loaded));
+      await create();
+      fixture.detectChanges();
+      await flush();
+      q('pfm-tab-queue')?.click();
+      await flush();
+      expect(q('pfm-count-line')?.textContent).toContain('41 results');
+    }
+    const noOldNumbers = () => {
+      expect(el.textContent).not.toContain('flagged portfolio-wide');
+      expect(el.textContent).not.toContain('99');
+      expect(q('pfm-chip-count')).toBeNull();
+      expect(q('pfm-count-line')).toBeNull();
+      expect(q('pfm-group-P100')).toBeNull();
+    };
+
+    it('a failed refetch after a scope change shows only filters + error + Retry, no old counts', async () => {
+      await openQueueLoaded();
+      const failing = deferred<ReturnType<typeof ok<PfmQueue>>>();
+      api.GET_PfmQueue.mockReturnValue(failing.promise);
+      q('pfm-scope-all')?.click();
+      failing.reject(new Error('boom'));
+      await flush();
+      await flush();
+      expect(q('pfm-queue-error')).not.toBeNull();
+      expect(q('pfm-filter-project')).not.toBeNull();
+      noOldNumbers();
+    });
+
+    it('during an in-flight refetch no old count is visible; filters stay', async () => {
+      await openQueueLoaded();
+      api.GET_PfmQueue.mockReturnValue(deferred<ReturnType<typeof ok<PfmQueue>>>().promise);
+      q('pfm-chip-synced')?.click();
+      fixture.detectChanges();
+      expect(q('pfm-filter-project')).not.toBeNull();
+      expect(q('pfm-groups-skeleton')).not.toBeNull();
+      noOldNumbers();
+    });
+  });
+
   it('a failed summary shows an inline error with Retry; the queue tab still works (R-PFM-016)', async () => {
     api.GET_PfmSummary.mockRejectedValueOnce(new Error('boom')).mockResolvedValue(ok(summary('mine')));
     await create();

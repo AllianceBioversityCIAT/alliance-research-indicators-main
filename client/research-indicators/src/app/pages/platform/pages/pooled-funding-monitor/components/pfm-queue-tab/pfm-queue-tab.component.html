@@ -1,0 +1,139 @@
+<!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-12 -->
+<!-- Read-only (R-PFM-014): filters, chips, Reset only; no year filter. Tokens only (NFR-PFM-003). -->
+@if (queue(); as q) {
+  <div class="flex flex-col gap-4" data-testid="pfm-queue-tab">
+    <div class="flex flex-wrap items-end gap-3" role="group" aria-label="Filters">
+      <div class="flex min-w-[13rem] flex-1 flex-col gap-1 text-[12.5px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+        <label for="pfm-filter-project-input">Project contributing to Pool funding</label>
+        <p-select
+          inputId="pfm-filter-project-input"
+          [options]="projectOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="store.filters().project ?? ALL"
+          (onChange)="onFilter('project', $event.value)"
+          appendTo="body"
+          [filter]="true"
+          filterBy="label"
+          styleClass="w-full"
+          data-testid="pfm-filter-project" />
+      </div>
+      <div class="flex min-w-[13rem] flex-1 flex-col gap-1 text-[12.5px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+        <label for="pfm-filter-sp-input">Science Program</label>
+        <p-select
+          inputId="pfm-filter-sp-input"
+          [options]="spOptions()"
+          [group]="true"
+          optionLabel="label"
+          optionValue="value"
+          optionGroupLabel="label"
+          optionGroupChildren="items"
+          [ngModel]="store.filters().sp ?? ALL"
+          (onChange)="onFilter('sp', $event.value)"
+          appendTo="body"
+          [filter]="true"
+          filterBy="label"
+          styleClass="w-full"
+          data-testid="pfm-filter-sp" />
+      </div>
+      <div class="flex min-w-[11rem] flex-1 flex-col gap-1 text-[12.5px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+        <label for="pfm-filter-status-input">Status</label>
+        <p-select
+          inputId="pfm-filter-status-input"
+          [options]="statusOptions"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="store.filters().status ?? ALL"
+          (onChange)="onFilter('status', $event.value)"
+          appendTo="body"
+          styleClass="w-full"
+          data-testid="pfm-filter-status" />
+      </div>
+      <div class="flex min-w-[11rem] flex-1 flex-col gap-1 text-[12.5px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+        <label for="pfm-filter-type-input">Result type</label>
+        <p-select
+          inputId="pfm-filter-type-input"
+          [options]="typeOptions()"
+          optionLabel="label"
+          optionValue="value"
+          [ngModel]="store.filters().type ?? ALL"
+          (onChange)="onFilter('type', $event.value)"
+          appendTo="body"
+          styleClass="w-full"
+          data-testid="pfm-filter-type" />
+      </div>
+      <button
+        type="button"
+        class="cursor-pointer border-0 bg-transparent px-2 py-2 text-[13px] font-semibold text-[var(--ac-pfm-info-fg)] underline focus-visible:outline focus-visible:outline-2"
+        data-testid="pfm-reset"
+        (click)="store.resetFilters()">
+        Reset
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Quick views" data-testid="pfm-chips">
+      <span class="text-[12.5px] font-medium text-[var(--ac-pfm-neutral-fg)]">Quick views</span>
+      @for (c of chips; track c.key) {
+        <button
+          type="button"
+          class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid px-3 py-1.5 text-[12.5px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 {{
+            activeChip() === c.key
+              ? 'border-[color:var(--ac-pfm-info-fg)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-info-fg)] underline'
+              : 'border-[color:var(--ac-pfm-neutral-bg)] bg-transparent font-medium text-[var(--ac-pfm-neutral-fg)]'
+          }}"
+          [attr.aria-pressed]="activeChip() === c.key"
+          [attr.data-testid]="'pfm-chip-' + c.key"
+          (click)="selectChip(c.key)">
+          @if (activeChip() === c.key) {
+            <i class="pi pi-check text-[10px]" aria-hidden="true" data-testid="pfm-chip-check"></i>
+          }
+          {{ c.label }}
+          @if (!stale()) {
+            <span
+              class="inline-flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums bg-[var(--ac-pfm-neutral-bg)]"
+              data-testid="pfm-chip-count"
+              >{{ q.chip_counts[c.count] }}</span
+            >
+          }
+        </button>
+      }
+    </div>
+
+    <!-- T-13 replaces this slot with <app-pfm-project-group> per group -->
+    <div data-testid="pfm-groups-slot">
+      @if (store.queueState().error) {
+        <!-- the page shows the inline error + Retry; the previous query's groups are never rendered -->
+      } @else if (store.queueState().loading) {
+        <div class="h-32 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-groups-skeleton" aria-busy="true"></div>
+      } @else if (q.groups.length === 0) {
+        <div class="flex flex-col items-start gap-2 rounded-lg bg-[var(--ac-pfm-neutral-bg)] p-5" data-testid="pfm-queue-empty">
+          <p class="m-0 text-[15px] font-semibold text-[var(--ac-grey-900)]">No results match these filters</p>
+          <button
+            type="button"
+            class="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[var(--ac-pfm-info-fg)] underline"
+            data-testid="pfm-empty-reset"
+            (click)="store.resetFilters()">
+            Reset
+          </button>
+        </div>
+      } @else {
+        <ul class="m-0 list-none p-0">
+          @for (g of q.groups; track g.code) {
+            <li [attr.data-testid]="'pfm-group-' + g.code">{{ g.code }} {{ g.name }}</li>
+          }
+        </ul>
+      }
+    </div>
+
+    <footer class="flex flex-col gap-2 text-[12.5px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-queue-footer">
+      @if (!stale()) {
+        <p class="m-0" data-testid="pfm-count-line">{{ countLine() }}</p>
+      }
+      <ul class="m-0 flex list-none flex-wrap gap-4 p-0" data-testid="pfm-legend" aria-label="PRMS bar colors">
+        @for (l of legend; track l.label) {
+          <li class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm {{ l.dot }}" aria-hidden="true"></span>{{ l.label }}</li>
+        }
+      </ul>
+    </footer>
+  </div>
+}
