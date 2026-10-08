@@ -300,3 +300,63 @@
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer-1 17 calls, 78173 tokens, ended complete; reviewer-2 19 calls, 92268 tokens, ended complete`.
+
+### T-07 — Sidebar: section visibility + PRMS SYNC hidden → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Orca task / dispatch | `task_fe2544c77500` / `ctx_c15546a71f36`. Ran in parallel with T-05 (server). |
+| Implementer | Cursor · `grok-4.7-high`, effort medium, skills `angular-developer`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (fresh context) — **PASS** |
+| Requirements covered | R-PRY-003: all 4 state-table rows; "Past-year synced result" (THEN, AND card, BUT no button); "Past-year, never touched" (hidden); "Current year unaffected" |
+
+**Files changed (3):**
+- `result-sidebar.component.ts`: the year gate is now `version_locked === true && has_pool_funding_data !== true`. The gate comment is rewritten.
+- `result-sidebar.component.html`: the PRMS SYNC button is wrapped in `version_locked !== true`. The card and legacy block are unchanged.
+- `result-sidebar.component.spec.ts`: four §5 rows, each with distinct year and data:
+  - ineligible, 2024, has data → hidden
+  - current year 2026 → button enabled
+  - locked, 2023 vs configured 2027, no data → hidden
+  - locked, 2025 synced, code 9746 → shown, button absent, card rendered
+
+**Consumer grep (`sidebar-prms-sync-button`):**
+- The executable hits are only `result-sidebar.component.spec.ts` and `.html`. There is no e2e file.
+- `dist/` and `coverage/` also match. Those are generated files and nothing executes them.
+- `hasPoolFundingOption` is read by the computed in `.ts`, the `@if` in `.html`, and the spec expectations.
+
+**Implementer verification (as reported):**
+- The sidebar spec passed 160/160 (`--coverage=false`).
+- `tsc -p tsconfig.spec.json` stayed at the baseline of 945, with the spec file's 19 errors as the identical normalized set. The component `.ts` and `.html` have 0 errors.
+- Lint is clean.
+- Initial red, before the change, in the "§5 locked with data" case: `Matcher error: received value must not be null nor undefined. Received has value: undefined` at `expect(poolFundingItem()?.textContent).toContain('Pool funding alignment')`.
+- Falsifiers, each reverted afterwards:
+  - (a) Restoring hide on `version_locked === true` makes the same case fail with `Received has value: undefined`.
+  - (b) Using `[disabled]` instead of omitting the button makes `expect(syncButton()).toBeNull()` receive `<button ... data-testid="sidebar-prms-sync-button" disabled="" ...>PRMS SYNC</button>`.
+- KZ-015 transition: the locked-with-data case first renders 2026 unlocked with the button enabled. It then flips to `version_locked: true` with code 9746 and asserts the button is absent while the item and card stay.
+
+**Evidence re-run (Leader inline, after both parallel workers reported): VERIFIED.**
+- The sidebar spec passed 160/160.
+- `tsc -p tsconfig.spec.json` reported **945** errors, the baseline.
+- Lint printed "All files pass linting".
+- The full client suite (`npm test -- --silent`) passed **341 suites / 7855 → 7859 tests**.
+- `npm run build` completed with "Application bundle generation complete". No warning names `ResultSidebarComponent`. The NG8102, NG8107 and NG8112 warnings and the SCSS budget warnings are all on files T-07 did not touch. The Reviewer recommended this build because it is the only gate that type-checks templates.
+
+**Not Done / Assumptions (carried verbatim in gist):**
+- The three existing "locked → hidden" specs (`:410`, `:421`, `:458`) did **not** go red.
+- Their fixtures omit `has_pool_funding_data`, and design §5 line 168 says that case keeps today's hide.
+- The block comment was updated, and no assertion was rewritten without a failure (K-018).
+
+**Decisions:**
+- The Reviewer recommends correcting design §12.1 row wording. That row predicts a red for those specs which cannot occur.
+- This is recorded here rather than edited mid-run, because it is a doc-accuracy fix and not a requirement change. **Forward pointer → T-09** (docs task).
+
+**ADVISORY (non-gating):**
+1. The button's year rule lives in the template, while the section rule is in a `computed`. A `prmsSyncButtonVisible()` computed would give the button rule one testable choke point.
+2. Pre-existing hex literals on the button and the legacy span predate this diff. They are left for a separate token cleanup.
+3. State-table row 2 ("current year, any data") is tested only with data. The no-data variant runs through unchanged older code.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer not reported by host, ended complete; reviewer 11 calls, 56444 tokens, ended complete`.

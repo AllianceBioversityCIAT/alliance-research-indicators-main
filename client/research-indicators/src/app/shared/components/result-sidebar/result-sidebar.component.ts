@@ -98,25 +98,29 @@ export class ResultSidebarComponent {
       }));
   });
 
-  // Three gates, applied at ONE point so the `OPTIONAL` divider, the Pool
+  // Gates, applied at ONE point so the `OPTIONAL` divider, the Pool
   // funding alignment item and the PRMS SYNC button cannot disagree with each
   // other (the button reads `hasPoolFundingOption()`, which derives from this
   // same filter). The section flag can only subtract: `true` leaves the
-  // existing rules in charge.
+  // existing rules in charge. The PRMS SYNC button is omitted on its own when
+  // `version_locked === true`; this filter does not hide the card with it.
   //
   //  1. CONTRACT — `alignment.eligible` is the server's
   //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
   //     contract does not contribute to pool funding. Pre-existing behaviour.
-  //  2. YEAR — `alignment.version_locked` is the server's comparison of
-  //     `report_year_id` against the configured reporting year. Compared with
-  //     `=== true` on purpose: a server that omits the field leaves the
-  //     section VISIBLE, matching today.
+  //  2. YEAR — hide only when `version_locked === true` AND
+  //     `has_pool_funding_data !== true`. A past-year result that already has
+  //     an answer or a PRMS sync stays in the sidebar. Both flags are compared
+  //     with `=== true`: a server that omits `has_pool_funding_data` still hides a
+  //     locked result, and a server that omits `version_locked` leaves the
+  //     section visible.
   //  3. SECTION FLAG — hidden when the flag resolves to disabled. OR-ed with
   //     the rules above; never a replacement of them.
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {
     if (option.path !== 'pool-funding-alignment') return false;
     const meta = this.cache.currentMetadata();
-    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || alignment.eligible === false || alignment.version_locked === true;
+    const hiddenByYearWithoutData = alignment?.version_locked === true && alignment.has_pool_funding_data !== true;
+    const hiddenByExistingRules = meta?.indicator_id === 5 || !alignment || alignment.eligible === false || hiddenByYearWithoutData;
     return hiddenByExistingRules || !this.poolFundingFlags.sectionEnabled();
   }
 

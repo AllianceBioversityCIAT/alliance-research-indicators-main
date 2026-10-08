@@ -266,7 +266,7 @@ graph TD
 
 ### T-07 — Sidebar: section visibility + PRMS SYNC hidden
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-06
+- **Status:** done · **Size:** M · **Dependencies:** T-06
 - **Requirements:** R-PRY-003:
   - the state table, all 4 rows
   - "Past-year synced result": THEN, AND card content, BUT button must NOT be rendered
@@ -293,9 +293,9 @@ graph TD
   - `hasPoolFundingOption` readers in the sidebar.
 - **Review:** `full` — visible behavior change on a shared shell.
 - **Done:**
-  - [ ] Tests green, falsifiers red
-  - [ ] Every hit of the grep is listed and green
-  - [ ] Client `tsc` + lint clean
+  - [x] Tests green, falsifiers red
+  - [x] Every hit of the grep is listed and green
+  - [x] Client `tsc` + lint clean
 - **Skills:** `angular-developer`, `tdd`
 
 ### T-08 — Page read-only mode (`reporting-year` cause)
