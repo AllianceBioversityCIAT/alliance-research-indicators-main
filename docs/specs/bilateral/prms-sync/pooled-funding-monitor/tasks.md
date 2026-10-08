@@ -164,7 +164,7 @@ graph TD
 
 ### T-05 — Service, controller, module registration, Swagger, e2e (server)
 
-- **Status:** in-progress `[~]` — code reviewed PASS; blocked on RB-1 (timing) · **Size:** L · **Dependencies:** T-02, T-03, T-04
+- **Status:** done · **Size:** L · **Dependencies:** T-02, T-03, T-04
 - **Requirements covered:**
   - R-PFM-001 — 403 for contributor-only; "BUT it must NOT rely on the client alone"; "Unauthenticated" → 401.
   - R-PFM-002 — "Switching scope" server side; "AND IT MUST be one consistent dataset" (one derivation per request).
@@ -192,7 +192,7 @@ graph TD
   - [x] Unit + e2e green.
   - [x] Swagger lists the 3 endpoints.
   - [x] The module appears in both registrations.
-  - [ ] Timing table recorded.
+  - [x] Timing table recorded.
 - **Disqualifies:** an e2e that mocks the guard or the repository; a "route registered" claim checked by reading `main.routes.ts` instead of an HTTP call (KZ-017 precedent).
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
@@ -431,7 +431,8 @@ graph TD
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
-| RB-1 | 2026-10-08 | Local DB lacks migrations `1790086170692`, `1791213000000`, `1791214000000` → `result_prms_sync_history` absent; T-02/T-05 PRMS branch cannot run locally | Owner decides whether to run `npm run migration:execute` locally. Until then, report the PRMS branch as **inconclusive** | Daniela Pino | open |
+| RB-1 | 2026-10-08 | Local DB lacks migrations `1790086170692`, `1791213000000`, `1791214000000` → `result_prms_sync_history` absent; T-02/T-05 PRMS branch cannot run locally | Owner decides whether to run `npm run migration:execute` locally. Until then, report the PRMS branch as **inconclusive** | Daniela Pino | closed — owner authorized; Leader applied all 3 on 2026-10-08 (0 pending) |
+| RB-3 | 2026-10-08 | Scratch schema `ari_scratch_test` now holds `result_prms_sync_log`/`_history` created by the app-boot e2e **without `migrations` rows** → a later `npm run migration:test:execute` there hits `ER_TABLE_EXISTS_ERROR` | Recreate scratch (`compose:test:down` → `compose:test:up` → `migration:test:bootstrap`) before the next scratch migration run; harness fix (insert migration rows, as `prms-webhook.e2e-spec.ts` does) left as advisory | Daniela Pino | open |
 | RB-2 | 2026-10-08 | Local data has zero PRMS activity, so the page will show every result as *Not sent* | Expected. Seeded fixtures cover PRMS states | — | open |
 
 ## 5. Done definition

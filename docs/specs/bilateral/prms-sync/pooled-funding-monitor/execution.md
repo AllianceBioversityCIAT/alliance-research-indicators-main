@@ -165,3 +165,22 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - READABILITY — sink list is hand-maintained; comment the boot-time readers; add lazy readers (`ARI_PRMS_NORMALIZER_HOST`, `ARI_PRMS_TOC_HOST`, `ARI_TOC_INTEGRATION_HOST`) as cheap insurance.
 - **Open Done item:** "Timing table recorded" — NFR-PFM-002 **INCONCLUSIVE** (local DB lacks `result_prms_sync_history`; RB-1). Per Step 2.3 item 0 the task cannot reach `[x]` with an outstanding gap → **`[~]`**, escalated to the owner (RB-1: apply local migrations and measure, or waive with the gap recorded).
 - **Total:** 2 attempts, 3 review rounds (2 parallel lenses + 1 re-review).
+
+#### Escalation 2026-10-08 — budget tripwire + RB-1 (owner decisions)
+
+- **Budget tripwire fired** after 7/13 tasks: `git diff --shortstat f93bde88..HEAD -- server/ client/` → 5,288 insertions (prod 2,100 · test 3,188) vs design §13 budget ≈ 2,400 for the whole spec. Cause: real-MySQL integration + e2e + AppModule-boot harnesses (≈ 1,750 test LOC not sized in the budget) and a heavier SQL repository. Review rounds 11 for 7 tasks (budget ≈ 18 / 13).
+- **Owner (Daniela Pino):** RB-1 → "Ejecútalas tú" (Leader to apply the local migrations); budget → asked to `/compact` and continue with T-07 (recorded as: continue, revised cap ≈ 2,000 more client LOC, ≤ 2 rounds/task; re-escalate if exceeded).
+- **RB-1 executed by the Leader:** target verified (`localhost:3307/alliancereportingdb`); `migration:show` (ANSI-stripped) listed exactly 3 pending — `1790086170692`, `1791213000000`, `1791214000000`; `npm run build` → exit 0; `npm run migration:execute` → all 3 "executed successfully"; re-check → 0 pending. **RB-1 closed.**
+
+#### T-05 — timing closed → **PASS / done** (2026-10-08)
+
+- **NFR-PFM-002 measurement (Leader, quiet window, read-only session):** harness `scratchpad/scripts/pfm-timing.js` — compiled `PooledFundingMonitorService` + repository on the local DB, `SET SESSION TRANSACTION READ ONLY`, scope `all`, user 1, 1 warm-up + 5 runs each. Volume: 155 monitored results, 43 project groups, biggest group `A1080` (20 results).
+
+| Endpoint (service call) | Runs (ms) | Median | Spread | Target |
+|---|---|---|---|---|
+| summary | 17, 16, 16, 17, 16 | 16 ms | 2 ms | p95 ≤ 2 s |
+| queue | 18, 20, 19, 21, 21 | 20 ms | 3 ms | p95 ≤ 2 s |
+| group rows (`A1080`) | 18, 17, 17, 16, 16 | 17 ms | 2 ms | p95 ≤ 1 s |
+
+  Spread ≤ 15 % of median (well under the 50 % no-pass threshold). **What this cannot reach (KZ-017):** service-level timing excludes HTTP/middleware overhead, and 155 rows says nothing about Prod volume (≈ 4k in the mockup) — the 5 correlated subqueries per row (T-02 advisory) remain the first suspect if Prod misses. Recorded as a scope gap, not as a Prod pass.
+- **Continue gate:** owner-directed (compact, then T-07).
