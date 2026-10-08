@@ -237,3 +237,26 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - Dark mode: the `h1` uses `--ac-primary-blue-300`, which is low contrast in dark mode, and the cards share the page background token. Check at HITL.
   - Copy: the mockup subtitle says "sync approved results … to PRMS" on a view-only page. Confirm with the owner at HITL.
 - **Budget:** about 720 LOC over 2 rounds. Client total after T-07 and T-09 is about 1,380 of the revised cap of about 2,000. **Projection:** T-10 through T-13 will exceed the cap, so expect a re-escalation.
+
+#### T-10 — Sidebar monitor item → **PASS / done** (2026-10-08)
+
+- **Implementer (sonnet, medium), attempt 1:**
+  - `piOptions()` now returns *My PI Delegates* when `canSeePiDelegates()` holds. It then adds the monitor (`/pooled-funding-contribution-monitor`, `pi-chart-bar`, 13px) when both `canAccessPooledFundingMonitor()` and `sectionEnabled()` hold.
+  - The section guard changed from `canSeePiDelegates()` to `piOptions().length > 0`. That one `@if` wraps both the expanded and the collapsed branch.
+  - The existing hidden-section test was renamed to "hides the whole PI section when no PI option is visible". Its assertions are unchanged.
+- **Case (b) red BEFORE the change:** 3 failed, 37 passed.
+  - The (b) assertion failed with `Expected substring: "PRINCIPAL INVESTIGATOR"` / `Received string: " RESOURCES keyboard_double_arrow_left  About Indicators ACCOUNTAsk for HelpLog out"`.
+  - The collapsed (b) assertion failed with `Received: null`.
+  - The (a) assertion failed with `Expected: 1 Received: -1`.
+- **Case (d) red:** removing `sectionEnabled()` failed only (d). The guard was then restored.
+- **Reviewer (opus): STATUS: PASS.**
+  - The visibility test was not weakened, and both branches are gated.
+  - The flag is loaded app-wide: `app.config.ts` initializer plus `cognito.service.ts` after login.
+  - *My PI Delegates* is unchanged when there is no monitor access.
+- **Leader re-measure:** `npx jest src/app/pages/platform/platform.component.spec.ts src/app/shared/components/alliance-sidebar --silent --coverage=false` gave 2 suites, 54/54.
+- **tsc:** 945, at baseline. The 7 TS2352 errors in the sidebar spec were there before this change; the comparison was by count only.
+- **ADVISORY:**
+  - Flag fail-open: the item is visible until the flag read resolves, and stays visible if the read fails. This is shared-service design, and the server still enforces access.
+  - The comment above `piOptions()` reads awkwardly.
+  - Not reached by these tests: real nav rendering in the running app. That goes to the T-13 HITL.
+- **Budget:** about 77 LOC, 1 round. Client total is about 1,460 of the revised cap of about 2,000.

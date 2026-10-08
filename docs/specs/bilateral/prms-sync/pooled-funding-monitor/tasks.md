@@ -280,7 +280,7 @@ graph TD
 
 ### T-10 — Sidebar: monitor item under *My PI Delegates* (client)
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-09
+- **Status:** done · **Size:** S · **Dependencies:** T-09
 - **Requirements covered:** R-PFM-001 — "Allowed viewer" (item next to *My PI Delegates*), "AND IT MUST appear even when the viewer cannot see *My PI Delegates*", "Contributor-only" → "nav item is NOT shown"; DD-PFM-11, DD-PFM-12
 - **Design refs:** §2.2 sidebar row; §12 reversion challenge
 - **Files:** `alliance-sidebar.component.{ts,html}` (+ spec)
@@ -294,8 +294,8 @@ graph TD
   - (c) contributor-only, no access → no section.
   - (d) flag off → monitor absent.
 - **Done:**
-  - [ ] Green.
-  - [ ] Case (b) observed red before the change.
+  - [x] Green.
+  - [x] Case (b) observed red before the change.
 - **Disqualifies:** deleting or weakening the existing visibility test.
 - **Skills:** `angular-developer`
 
