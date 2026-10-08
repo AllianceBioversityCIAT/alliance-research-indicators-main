@@ -119,3 +119,24 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY (non-gating; carried into briefs):** T-11 must render `in_scope` / `out_of_scope` as sent and derive shares from group sums (never `total − out_of_scope`); `pfmAttentionFlag` copy has no §4 response field → T-13 owns the flag copy client-side (or T-05 adds it; decide once); SP sort is plain string (fine for zero-padded codes); the "cards agree" test could also assert the sum equality directly.
 - **Requirements covered:** R-PFM-005, R-PFM-006, R-PFM-007, R-PFM-008, R-PFM-010, R-PFM-011, R-PFM-015, R-PFM-002 (`is_pi_of_any` passthrough), NFR-PFM-006.
 - **Continue gate:** auto-approved (pre-approved mode).
+
+#### T-04 — `NotContributorOnlyGuard` — attempt 1: **FAIL** (spec premise defect)
+
+- **Skills / effort:** `nestjs-expert` · medium.
+- **Files:** `guards/not-contributor-only.guard.ts` + `.spec.ts` (12 tests). Implementer verification: guards 12/12, module 4 suites / 90; eslint clean. K-004: `every`→`some` ⇒ `[3,9]` red.
+- **Leader correction before review:** the T-04 Done line "`[3]` red under `some`" was non-falsifiable (`some` still denies `[3]`); corrected to `[3, 9]`.
+- **Reviewer (opus):** `STATUS: FAIL` — verbatim issue:
+  1. **Discovered Issue:** A machine-token request carries a real integer `sec_user_id` and real roles, so the guard's machine-token check never fires. Path: `jwr.middleware.ts` L100-108 `req.user = isValid.user` ← `AppSecretsService.validation` (`app-secrets.service.ts` L120-127) → `app-secret.repository.ts` L18-35 `getUserValidation(responsible_user_id)` returns `{sec_user_id:int, roles: JSON_ARRAYAGG(role_id)}`. Reachable: an `app_secrets` row whose responsible user is SYSTEM_ADMIN ⇒ `{sec_user_id:<int>, roles:[1]}` ⇒ `canActivate` true. The spec's "machine token" fixture `{roles:[1]}` is a shape no real machine request has. **Violated Rule:** design §8 "Machine token | Refused (403)", design §4 "403 for … machine tokens", requirements §8 "Machine tokens: not supported". Root: the spec's own false premise (tasks T-04 Behavior "no `sec_user_id` (machine token)", design §5 step 1). **Remediation:** deny when `request.credential === 'machine'` (set by `JwtMiddleware.applyImpersonation` on all branches; typed at `request-with-user.dto.ts` L47); realistic fixture `{user:{sec_user_id:7, roles:[1]}, credential:'machine'}` → deny; allow fixtures carry `credential:'jwt'`; K-004 by deleting the credential check; correct the premise in tasks/design/docstring.
+- **ADVISORY:** a user with no active roles arrives as `roles=[null]` (LEFT JOIN + `JSON_ARRAYAGG`) → `[null].every(r=>r===3)` is false ⇒ allowed. Harden: ignore non-integer roles before the empty/every check. (Leader folds this into attempt 2 because it is the same clause — "empty role list → deny" — not new scope.)
+- **Spec correction (not a Pivot):** the requirement is unchanged (machine tokens refused); only the design's *detection mechanism* was wrong. Corrected design §5 step 1, design §8 row, tasks T-04 Behavior + Tests. Correction-closure sweep: grep `machine token|no \`sec_user_id\`` over requirements/design/tasks — remaining hits (requirements §8, design §4 L172, design §10 test row) state the behaviour, not the mechanism, and stay true.
+
+#### T-04 — attempt 2: **PASS** (2026-10-08)
+
+- **Effort:** high (bumped). **Change:** deny on `request.credential === 'machine'` (literal verified: `ImpersonationCredential = 'jwt' | 'machine' | 'bypass'`, set on every middleware branch); non-integer roles filtered before the empty/every check (`[null]` case); sec_user_id/roles checks kept as defense in depth; docstring corrected.
+- **Tests (18):** deny `[3]`, `[3,3]`, `[]`, `[null]`, `[3,null]`, roles missing, no / string `sec_user_id`, missing / null user, machine + `[1]`, machine + `[9]`; allow `[3,9]`, `[3,null,9]`, `[1]`/`[10]`/`[7]` (`jwt`), `[1]` (`bypass`).
+- **K-004:** credential check deleted ⇒ 2 red (both machine cases); integer filter removed ⇒ 2 red (`[null]`, `[3,null]`); `every`→`some` ⇒ `[3,9]` red (attempt 1).
+- **Verification — Leader re-measured:** `npx jest src/domain/entities/pooled-funding-monitor --silent` → 4 suites, 96/96. eslint clean (implementer).
+- **Reviewer (opus):** `STATUS: PASS` — credential always set before the guard; tests discriminate. Ruling on `bypass`: correct to allow — set only when `ARI_LOCAL_AUTH_BYPASS==='true'` and not production (`env.utils.ts` L124-129), stands for a human stub user (SYSTEM_ADMIN), so the "user-scoped data" reason for refusing machine tokens does not apply; denying it would make the page unusable in local dev.
+- **Hand-off to T-05:** confirm end-to-end that the routes are not in the JWT exclude list (401 without token).
+- **Total:** 2 attempts, 2 review rounds. **Requirements covered:** R-PFM-001 (403 clause), NFR-PFM-001 (role part), DD-PFM-2.
+- **Continue gate:** auto-approved (pre-approved mode).

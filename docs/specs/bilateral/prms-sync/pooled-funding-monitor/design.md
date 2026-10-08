@@ -198,7 +198,7 @@ Errors:
 ## 5. Workflows & business rules
 
 1. The request passes `JwtMiddleware` and then `NotContributorOnlyGuard`. The guard:
-   - rejects machine tokens (no `sec_user_id`);
+   - rejects machine tokens by **`request.credential === 'machine'`** (set by `JwtMiddleware` on every branch). A machine token is *not* identifiable by a missing `sec_user_id`: `AppSecretsService.validation` gives it the responsible human's integer `sec_user_id` and roles (corrected 2026-10-08, T-04 review);
    - rejects users whose role list is empty or contains only role 3.
 2. The service resolves scope. For `mine`, the PI predicate uses the **authenticated** user's carnet and user id, never request input (NFR-PFM-001).
 3. The repository runs the base query. The service maps each row through `pfm-derivation`, applying the D-3/D-4 tables from R-PFM-004.
@@ -275,7 +275,7 @@ None. No CLARISA, AGRESSO, PRMS, socket, queue or cron involvement. Reads only t
 | Item | Decision |
 |---|---|
 | Who can call | Any user with at least one role ≠ `CONTRIBUTOR (3)`. `SYSTEM_ADMIN` included (DD-PFM-2) |
-| Machine token | Refused (403): data is user-scoped |
+| Machine token | Refused (403): data is user-scoped. Detected by `request.credential === 'machine'`, never by user fields — the machine path carries its responsible user's identity (T-04 correction) |
 | Scope isolation | PI scope derived only from `request.user`. The project-results endpoint 404s for projects outside scope |
 | SQL safety | All request values are bound parameters. `effectivePoolFundingContributorSql` is called with a literal alias only |
 | PII | Names of PIs and titles are already visible to these roles elsewhere (My Projects, Results Center). Nothing new is exposed |

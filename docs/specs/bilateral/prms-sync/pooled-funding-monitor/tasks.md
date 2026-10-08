@@ -148,17 +148,17 @@ graph TD
 
 ### T-04 — `NotContributorOnlyGuard` (server)
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-PFM-001 "Contributor-only user" → "every monitor API endpoint answers 403"; NFR-PFM-001 (role part); DD-PFM-2
 - **Design refs:** §2.1 `guards/`, §5 step 1, §8
 - **Files:** `guards/not-contributor-only.guard.ts` (+ `.spec.ts`)
 - **Behavior:**
-  - Deny when `request.user` is missing, has no `sec_user_id` (machine token), has an empty role list, or **every** role is 3.
+  - Deny when `request.credential === 'machine'`; when `request.user` is missing or has no integer `sec_user_id`; when its role list has no integer role; or when **every** role is 3. *(Corrected 2026-10-08: a machine token carries its responsible user's `sec_user_id` and roles, so "no `sec_user_id`" never identified it.)*
   - Allow otherwise, including role-1-only users and role 3 + 9.
-- **Tests:** [3] → deny; [3, 9] → allow; [1] → allow; [] → deny; machine token → deny; [10] → allow.
+- **Tests:** [3] → deny; [3, 9] → allow; [1] → allow; [] → deny; `[null]` → deny; machine token (`credential:'machine'`, `{sec_user_id: 7, roles: [1]}`) → deny; [10] → allow. Allow fixtures carry `credential:'jwt'`.
 - **Done:**
-  - [ ] Green.
-  - [ ] [3] → deny observed red when the check is flipped to `some`.
+  - [x] Green.
+  - [x] The `every`→`some` flip observed red on `[3, 9]` (corrected 2026-10-08 at execution: under `some`, `[3]` is still denied, so `[3]` cannot be the red-making input for that mutation — the discriminating input is `[3, 9]`).
 - **Disqualifies:** testing only allowed cases.
 - **Skills:** `nestjs-expert`
 
