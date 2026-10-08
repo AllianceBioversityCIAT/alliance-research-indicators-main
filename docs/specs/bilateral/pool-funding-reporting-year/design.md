@@ -160,7 +160,7 @@ Both are deliberate: the year is the more permanent reason. Neither case is reac
 
 | Condition | Result |
 | --- | --- |
-| `indicator_id === 5` · no alignment · `eligible === false` · section flag off | hidden (unchanged) |
+| `indicator_id === 5` · no alignment · `eligible === false` (unless `display_only`, §5.x — amended 2026-10-08) · section flag off | hidden (unchanged) |
 | `version_locked === true` AND `has_pool_funding_data !== true` | hidden |
 | `version_locked === true` AND `has_pool_funding_data === true` | **shown** |
 | otherwise | shown (unchanged) |
@@ -188,6 +188,35 @@ Under `reporting-year`, the ToC block banner (`pf-alignment-version-locked-banne
 - CLARISA refetches on its first call after the change. On upstream failure it does not serve an old-phase stale feed.
 
 ---
+
+### 5.x Display-only for non-eligible results with a record (R-PRY-007, amended 2026-10-08)
+
+**Server, `BilateralService.getAlignment`:**
+- `findPoolFundingAlignmentContext` also selects `r.is_snapshot`.
+- `displayOnly = !eligible && (isSnapshot || isSyncedToPrms || context.prms_result_code != null)`.
+- `visibleAlignment = eligible || displayOnly ? alignment : null`. `toc_alignments` follows the same gate, and `has_pool_funding_data` is computed from `visibleAlignment`, as today.
+- `is_read_only` becomes `isPrmsSourced || isSyncedToPrms || displayOnly`.
+- The response gains `display_only: boolean`, with Swagger on the DTO.
+- `eligible` stays the raw contract fact, because write paths and the picker key on it.
+- Write paths are untouched (`updateAlignment` contributor 400, `getEditableContributionContext`).
+
+**Client:**
+- `AlignmentResponse.display_only?: boolean`.
+- Sidebar `shouldHidePoolFundingTab`: `alignment.eligible === false` becomes `alignment.eligible === false && alignment.display_only !== true`. The year rule (`version_locked && !has_pool_funding_data`) still applies afterwards.
+- Sidebar PRMS SYNC button: rendered only when `version_locked !== true && display_only !== true`.
+- Pool Funding page:
+  - The constructor redirect `alignment.eligible === false` becomes `alignment.eligible === false && alignment.display_only !== true`.
+  - The page is read-only through `is_read_only`, so `editable` is false.
+  - `hideSave` also covers `display_only === true`.
+  - It reuses the grey permission banner recipe with cause `display-only`, inserted after `reporting-year` in the cause order. When `reporting-year` applies, that banner wins, keeping one banner.
+- The picker and any eligible-only fetch are not called when `display_only`. The page must not request eligible-only endpoints for a non-eligible result.
+
+**Out of scope:**
+- The versioning SP moving Pool Funding rows from live to snapshot.
+- The PRMS import not setting a primary contract.
+- `is_synced_to_prms` not being copied to the snapshot.
+
+These are recorded for the owner, not changed here.
 
 ## 6. Frontend
 

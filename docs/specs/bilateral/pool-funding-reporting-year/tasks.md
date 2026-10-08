@@ -338,7 +338,7 @@ graph TD
 
 ### T-09 — Baseline docs, rollout note, end-to-end + HITL check
 
-- **Status:** in-progress (awaiting owner HITL) · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08
+- **Status:** in-progress (awaiting owner HITL) · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08, T-10, T-11 *(T-10/T-11 added 2026-10-08)*
 - **Requirements:**
   - R-PRY-001 "Seeded value" (live `GET /api/configuration/ARI_PRMS_SYNC` → `"2026"`)
   - R-PRY-002 "Change without deploy", end-to-end
@@ -374,6 +374,67 @@ graph TD
 
 ---
 
+### T-10 — Server: display-only read for non-eligible results with a record *(amended 2026-10-08)*
+
+- **Status:** todo · **Size:** S · **Dependencies:** T-03
+- **Requirements:** R-PRY-007 (server side)
+- **Design:** §5.x
+- **Scope:**
+  - `findPoolFundingAlignmentContext` selects `r.is_snapshot`, and the context type gains it.
+  - `getAlignment` computes `displayOnly`, widens `visibleAlignment`/`toc_alignments` to it, ORs it into `is_read_only`, and returns `display_only`.
+  - DTO Swagger for `display_only`.
+  - Write paths untouched.
+- **Tests:** `bilateral.service.spec.ts` and the controller DTO field list.
+  - Matrix: (eligible, snapshot, code, synced) → (`display_only`, data returned, `is_read_only`), with these rows:
+    - eligible live → data, not display_only
+    - non-eligible snapshot with alignment + ToC → display_only, data and ToC returned, read-only
+    - non-eligible live with code → display_only, read-only
+    - non-eligible live, no code, unsynced → hidden data, not display_only
+  - The STAR-20081 shape is fixed as a case: non-eligible snapshot, `is_synced_to_prms 0`, SP05/7220.
+  - The repository spec asserts that the SQL selects `r.is_snapshot` (KZ-001).
+- **Falsifier:**
+  - (a) Drop `isSnapshot` from `displayOnly` → the snapshot case goes red.
+  - (b) Keep `toc_alignments` gated on `eligible` only → the ToC assertion goes red.
+  - (c) Drop `displayOnly` from `is_read_only` → the read-only assertion goes red.
+- **Red run:** observed for (a)–(c).
+- **Disqualifier:** a fixture whose alignment/ToC is empty cannot tell (b). The snapshot fixture must carry a ToC row.
+- **Consumers:** client `AlignmentResponse` (T-11), the sidebar and the page. `updateAlignment`/contribution specs stay green (write paths unchanged).
+- **Review:** `full`
+- **Done:**
+  - [ ] Tests green, falsifiers red
+  - [ ] `tsc` + `eslint` clean
+- **Skills:** `nestjs-expert`, `tdd`
+
+### T-11 — Client: show the display-only section *(amended 2026-10-08)*
+
+- **Status:** todo · **Size:** M · **Dependencies:** T-10, T-08
+- **Requirements:** R-PRY-007 (client side)
+- **Design:** §5.x, §6
+- **Scope:**
+  - `AlignmentResponse.display_only?`.
+  - Sidebar hide rule and PRMS SYNC button gate as in §5.x.
+  - Pool Funding page redirect gate, `hideSave` also on `display_only`, and a `display-only` read-only cause/banner after `reporting-year` (one banner only).
+  - No eligible-only fetch (picker) when `display_only`.
+- **Tests:** `result-sidebar.component.spec.ts`, `pool-funding-alignment.component.spec.ts`
+  - non-eligible + display_only → item visible, no PRMS SYNC button, card shown when there is history
+  - non-eligible, not display_only → hidden
+  - page does not redirect on display_only, shows the saved ToC, all controls inert, no Save, exactly one banner
+  - display_only + past year → only the reporting-year banner
+- **Falsifier:**
+  - (a) Revert the sidebar rule to `eligible === false` → the visible case goes red.
+  - (b) Revert the page redirect → the no-redirect case goes red.
+  - (c) Omit `display_only` from `hideSave` → the no-Save case goes red.
+- **Red run:** observed for (a)–(c).
+- **Disqualifier:** KZ-015. At least one case flips the alignment after the first render.
+- **Consumers:**
+  - `hasPoolFundingOption` readers
+  - the testids `sidebar-prms-sync-button` and `pf-alignment-*-banner`
+- **Review:** `full`
+- **Done:**
+  - [ ] Tests green, falsifiers red
+  - [ ] Client `tsc` (945 baseline) + lint + build clean
+- **Skills:** `angular-developer`, `tdd`
+
 ## 4. Coverage closure (scenario / clause → task)
 
 | Requirement · scenario · clause | Task |
@@ -397,6 +458,7 @@ graph TD
 | R-PRY-004 client handling of 409 | T-08 |
 | R-PRY-005 · THEN refused · AND no Normalizer · AND no log row · ordering | T-05 |
 | R-PRY-006 · flag values · AND `reporting_year` | T-03 |
+| R-PRY-007 display-only (amended 2026-10-08) | T-10 (server), T-11 (client), T-09 HITL (STAR-20081) |
 | NFR-PRY-001 | T-01 (no cache), T-02 (keyed caches), T-09 (note) |
 | NFR-PRY-002 | T-01 |
 

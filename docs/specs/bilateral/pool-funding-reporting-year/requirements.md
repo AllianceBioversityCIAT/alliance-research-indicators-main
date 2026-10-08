@@ -41,7 +41,7 @@ year also needs a deploy, because half of the year logic is a code constant.
 
 **Who asked.** Product owner (chat, 2026-10-08).
 
-**Not changing.** The contract rule (`eligible` = primary contract contributes to Pool Funding),
+**Not changing.** The contract rule (`eligible` = primary contract contributes to Pool Funding — still the write/edit rule; R-PRY-007, amended 2026-10-08, adds a read-only display for non-eligible results with a record),
 the indicator rule (`indicator_id === 5` hidden), the two feature toggles from
 `pool-funding-feature-toggles`, external/PRMS-sourced read-only rules, and the PRMS sync
 history/card content itself.
@@ -137,7 +137,8 @@ and the new year gates (R-PRY-004/005) all read the resolved reporting year.
 
 | `eligible` | Year | Has data | Section | Editable | PRMS SYNC button | Sync card / history |
 | --- | --- | --- | --- | --- | --- | --- |
-| false | any | any | hidden | — | absent | absent |
+| false, not `display_only` | any | any | hidden | — | absent | absent |
+| false, `display_only` (R-PRY-007, amended 2026-10-08) | any | yes | **visible** | **no** | **absent** | shown under its existing rule |
 | true | = reporting | any | visible | per existing rules | per existing rules | per existing rules |
 | true | ≠ reporting | **yes** | **visible** | **no** | **absent** | **shown under its existing rule** (history events + PRMS code) |
 | true | ≠ reporting | no | hidden | — | absent | absent |
@@ -216,6 +217,39 @@ Existing subtractive rules still apply first: `indicator_id === 5`, section togg
 - AND `reporting_year` equals the resolved reporting year
 
 ---
+
+### R-PRY-007 — Display-only Pool Funding for non-eligible results with a record *(amended 2026-10-08, owner decision)*
+
+**Context.** In past years a contract can stop contributing to the Pool Funding. The result's saved Pool Funding record must then still be visible, read-only. Evidence: result STAR-20081 has two contracts, `A1708` and `G224`. Neither is primary, neither is a contributor, and neither has a bilateral mapping. Its 2025 snapshot (`result_id 34283`) holds an active alignment and ToC (SP05 · OUTPUT · `toc_result_id 7220`), but the section is hidden because `eligible = false`. The owner's words, verbatim:
+> "la version snapshot es la que deberia mostrar el toc … la viva si se somete a las reglas normales que deben estar con un contrato que contribulla al pool funding y que sea el agno adecuado en la version si tiene los datos deberia mostrar ademas que deberia mostrar si tiene prms code deberia mostrar esa info"
+> "si porque en agnos apsados hay contratos que dejan de contribuir al pool funding entonces pues es normal pero se deberia poder ver asi no se pueda editar"
+
+**Rule.** Define `display_only = !eligible && (is_snapshot || is_synced_to_prms || prms_result_code != null)`.
+
+| Result | Section | Data returned | Editable |
+| --- | --- | --- | --- |
+| Eligible (snapshot or live) | Rules R-PRY-003 / R-PRY-004 unchanged | yes | per year and source rules |
+| Not eligible, `display_only` | visible | alignment, SPs, ToC and the PRMS info, all read-only | **never** |
+| Not eligible, not `display_only` | hidden (today's rule) | none | never |
+
+**Scenario: Snapshot with a record, no contributing contract**
+- GIVEN a snapshot result whose contracts are not Pool Funding contributors
+- AND it has an active alignment and ToC
+- WHEN the user opens it
+- THEN the Pool Funding section is visible and shows the saved alignment and ToC
+- AND every control is inert, with no Save and no PRMS SYNC button
+- AND IT MUST NOT redirect away from the Pool Funding page
+
+**Scenario: Live result with a PRMS code, no contributing contract**
+- GIVEN a live result with a `prms_result_code` and no contributing contract
+- WHEN the user opens it
+- THEN the Pool Funding section is visible, read-only, and shows the PRMS info (code, sync card, links) plus any saved record
+
+**Scenario: Live result, no contract, no record**
+- GIVEN a live result with no contributing contract, no PRMS code and no sync
+- THEN the section stays hidden (unchanged)
+
+**Server writes are unchanged.** The contributor check (400) and the year guard (409) still reject every write on a non-eligible result. `display_only` is a read-side flag only.
 
 ## 5. Non-functional requirements
 

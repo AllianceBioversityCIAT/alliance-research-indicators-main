@@ -632,3 +632,34 @@ Production code is within scale.
 - `spawns: implementer 14 calls, 80469 tokens, ended partial; implementer (continuation) 19 calls, 90776 tokens, ended complete; reviewer 22 calls, 70465 tokens, ended FAIL; reviewer 15 calls, 59311 tokens, ended PASS`
 - `continuations: 1 (e2e boot after the scratch-DB probe)`
 - `runtime events: none`
+
+## Pivot-lite record: R-PRY-007 display-only (2026-10-08) — owner-approved scope growth
+
+**Trigger.** During HITL preparation the owner reported that STAR-20081 should show its ToC. A read-only investigation of the Dev DB (VPN up, SELECT only, `SET SESSION TRANSACTION READ ONLY`) found:
+
+| `result_id` | Version | Contracts | Primary? | Contributor? | `is_synced_to_prms` | Alignment + ToC |
+| --- | --- | --- | --- | --- | --- | --- |
+| 34172 | live | A1708, G224 | none | no; no bilateral mapping | 1 | deactivated |
+| 34283 | 2025 snapshot | A1708, G224 | none | no; no bilateral mapping | 0 | active: SP05 · OUTPUT · `toc_result_id 7220` |
+
+- For the live result, the alignment and ToC were deactivated at 22:16:44 by the versioning SP (`1791468452856-UpdateSPVersionDeletePRMSPhase` ~L820-903). That SP moves Pool Funding rows to the new version.
+- The section is hidden on both versions by `eligible = false`. This is **not** caused by the year rule.
+
+**Owner decisions, verbatim:**
+- *"la version snapshot es la que deberia mostrar el toc … la viva si se somete a las reglas normales … si tiene prms code deberia mostrar esa info"*
+- *"si porque en agnos apsados hay contratos que dejan de contribuir al pool funding … se deberia poder ver asi no se pueda editar"*
+- Scope option chosen: **"Tarea nueva en este spec"**.
+
+**Amendment.**
+- `requirements.md` gains R-PRY-007. Two edits to existing text:
+  - the R-PRY-003 state table's `false` row is split
+  - the §1 "Not changing" sentence is qualified
+- `design.md` gains §5.x. The sidebar table's `eligible === false` row is qualified.
+- `tasks.md` gains T-10 (server) and T-11 (client). T-09 now depends on both, and the coverage row is added.
+
+**Correction-closure sweep.** `grep -n -i "eligible"` was run across `requirements.md` and `design.md`. Every remaining site is either a precondition of an eligible-only scenario, which is still true, or the new text.
+
+**Out of scope, recorded for the owner:**
+- the versioning SP moves Pool Funding rows from live to snapshot
+- the PRMS import does not set a primary contract
+- the snapshot's `is_synced_to_prms` is not copied
