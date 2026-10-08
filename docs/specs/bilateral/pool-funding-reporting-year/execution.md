@@ -755,3 +755,56 @@ Production code is within scale.
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer 27 calls, 155722 tokens, ended complete; reviewer 18 calls, 98269 tokens, ended complete`.
+
+## T-09 HITL — owner visual approval (2026-10-08)
+
+The owner received the per-result checklist below and replied, verbatim: *"lo veo bien haz commit"*.
+
+Checklist sent:
+- STAR-20081: the 2025 snapshot and the live version
+- the past-year synced result (code 9746)
+- a past-year answered, unsynced result
+- a current-year result
+- items (1)–(5)
+
+**KZ-002 note:** the approval was given as one blanket statement, not item by item. It is recorded as the owner's acceptance of the whole checklist, and that is how it is attested.
+
+- **Display-only banner copy:** the owner raised no objection and the current wording stands. The suggested plural rewording was not taken up.
+- **PRMS-sourced vs display-only banner:** accepted as built. No `is_prms_sourced` field was added.
+
+**T-08 and T-11 committed** after this approval, as `[SPEC:…] feat(pool-funding-alignment) … (T-08, T-11)`, under the standing "no commit before visual approval" rule.
+
+**T-09 → PASS.** All Done items are met: docs updated, e2e boot green with its red observed, HITL recorded, and the Prod migration check written into the rollout note.
+
+## Summary
+
+| Task | Result | Attempts | Implementer |
+| --- | --- | --- | --- |
+| T-01 Resolver + key + seed | PASS | 1 | Grok |
+| T-02 ToC/CLARISA read the year; env retired | PASS | 1 | Grok |
+| T-03 Year threading + read flags | PASS | 1 | Grok |
+| T-04 Write guard `pool_funding_year_locked` | PASS (2 parallel lens reviewers) | 1 | Grok |
+| T-05 PRMS sync gate `reporting_year` | PASS | 1 | Grok |
+| T-06 Client contract + `editable` | PASS | 1 | Grok |
+| T-07 Sidebar visibility + PRMS SYNC | PASS | 1 | Grok |
+| T-08 Page read-only mode (+ `hideSave` amendment) | PASS | 2 | Claude Sonnet (Grok died on Cursor quota) |
+| T-09 Docs, rollout note, e2e, HITL | PASS | 2 | Claude Sonnet |
+| T-10 Server display-only (R-PRY-007, amended) | PASS | 1 | Claude Sonnet |
+| T-11 Client display-only (R-PRY-007, amended) | PASS | 1 | Claude Sonnet |
+
+- **Final suites** (`npm test -- --silent`): server **424 suites / 4086 tests**; client **341 suites / 7892 tests**.
+- **Client build:** completes. Client `tsc -p tsconfig.spec.json` is at the 945 baseline.
+- **Budget tripwire:** fired after T-08 (LOC ~2.7× the estimate, mostly tests). The owner chose to continue.
+- **Scope grew twice, both times with owner approval:**
+  - Save absent off-year (`hideSave`).
+  - R-PRY-007 display-only (T-10, T-11).
+- **Open risks:**
+  - RB-2: the Prod seed migration is applied by hand. Until then the server falls back to 2026.
+  - RB-3: OQ-3 is carried.
+  - RB-4: the integration environment is blocked.
+- **Owner follow-ups outside this spec:**
+  - The versioning SP moves Pool Funding rows from the live version to the snapshot.
+  - The PRMS import sets no primary contract.
+  - The snapshot does not copy `is_synced_to_prms`.
+  - The `pi-delegates` e2e writes to the shared Dev DB.
+  - Pre-existing client 409 matchers on the top-level `description` are probably dead.

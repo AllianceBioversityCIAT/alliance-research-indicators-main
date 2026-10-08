@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-10-pool-funding-reporting-year
-- **Status:** in-progress
+- **Status:** done
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
@@ -300,7 +300,7 @@ graph TD
 
 ### T-08 — Page read-only mode (`reporting-year` cause)
 
-- **Status:** done (uncommitted — awaiting owner visual approval at T-09 HITL) · **Size:** M · **Dependencies:** T-06
+- **Status:** done · **Size:** M · **Dependencies:** T-06
 - **Requirements:**
   - R-PRY-003 "Past-year answered, never synced": THEN saved answer displayed; AND controls cannot change data; AND no Save; AND IT MUST show the banner
   - R-PRY-004 client side: a `pool_funding_year_locked` 409 is shown as the locked state
@@ -338,7 +338,7 @@ graph TD
 
 ### T-09 — Baseline docs, rollout note, end-to-end + HITL check
 
-- **Status:** in-progress (awaiting owner HITL) · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08, T-10, T-11 *(T-10/T-11 added 2026-10-08)*
+- **Status:** done · **Size:** S · **Dependencies:** T-04, T-05, T-07, T-08, T-10, T-11 *(T-10/T-11 added 2026-10-08)*
 - **Requirements:**
   - R-PRY-001 "Seeded value" (live `GET /api/configuration/ARI_PRMS_SYNC` → `"2026"`)
   - R-PRY-002 "Change without deploy", end-to-end
@@ -368,7 +368,7 @@ graph TD
 - **Done:**
   - [x] Docs updated
   - [x] e2e boot green with its red observed
-  - [ ] HITL quote recorded per item
+  - [x] HITL quote recorded per item
   - [x] Prod migration check written into the rollout note
 - **Skills:** `cognitive-doc-design`
 
@@ -407,7 +407,7 @@ graph TD
 
 ### T-11 — Client: show the display-only section *(amended 2026-10-08)*
 
-- **Status:** done (uncommitted — awaiting owner visual approval at T-09 HITL) · **Size:** M · **Dependencies:** T-10, T-08
+- **Status:** done · **Size:** M · **Dependencies:** T-10, T-08
 - **Requirements:** R-PRY-007 (client side)
 - **Design:** §5.x, §6
 - **Scope:**
@@ -473,7 +473,7 @@ graph TD
 
 ## 6. Done definition
 
-- [ ] T-01 … T-09 done, each with a Reviewer PASS in `execution.md`
-- [ ] Full server and client suites green, re-measured by the Leader
-- [ ] HITL check (T-09) quoted **before** `/akili-validate` (KZ-007)
-- [ ] Rollout note in place
+- [x] T-01 … T-09 done, each with a Reviewer PASS in `execution.md`
+- [x] Full server and client suites green, re-measured by the Leader
+- [x] HITL check (T-09) quoted **before** `/akili-validate` (KZ-007)
+- [x] Rollout note in place
