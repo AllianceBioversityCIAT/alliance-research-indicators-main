@@ -260,3 +260,35 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The comment above `piOptions()` reads awkwardly.
   - Not reached by these tests: real nav rendering in the running app. That goes to the T-13 HITL.
 - **Budget:** about 77 LOC, 1 round. Client total is about 1,460 of the revised cap of about 2,000.
+
+#### T-11 — Coverage tab → **PASS / done** (2026-10-08)
+
+- **Implementer (sonnet, medium), attempt 1:**
+  - New components: `pfm-coverage-tab`, `pfm-pipeline-card`, `pfm-sp-coverage-card` and `pfm-sync-activity-card`.
+  - `<app-pfm-coverage-tab>` is wired into the coverage panel after T-09's skeleton and error branches.
+  - Values and order are rendered exactly as the server sends them. Share %, widths and heights are presentation only.
+  - K-004 reds observed:
+    - Removing the `value > 0` segment filter failed "zero stage renders no segment".
+    - Gating the month label on `synced > 0` failed "month without syncs still renders its label".
+    - Combined run: 2 failed, 32 passed. Both were restored.
+- **Leader adjudication (R-PFM-016):**
+  - The three cards all come from the single summary request, so the "per section" state is the summary section.
+  - The T-09 panel-level skeleton plus error/Retry satisfies the requirement's own scenario. The Reviewer confirmed this.
+- **Reviewer (opus) STATUS: PASS.**
+  - Stage order, labels, notes and segment tokens match the mockup and `PFM_STAGES`.
+  - SP row format, subtitle and legend copy match per scope.
+  - There is no client recomputation (NFR-PFM-006).
+  - The style-binding tests are labelled binding-only, so the disqualifier is not triggered.
+  - Dropping "· N in June, the cycle high" is correct: `monthly` covers only 6 months.
+- **Leader re-measure:**
+  - `npx jest src/app/pages/platform/pages/pooled-funding-monitor --silent --coverage=false` → 9 suites, 56/56.
+  - NFR-PFM-003: no `.s?css` in `git status`, and no hex in non-spec pfm `.ts`/`.html`.
+  - From the Implementer: tsc at 945 (baseline), and `ng build` passes.
+- **ADVISORY (carry to the T-13 HITL):**
+  - The pipeline subtitle `createdNote` ("across all/your projects contributing to Pool funding") is omitted.
+  - The sync-activity subtitle "Results pushed to PRMS over the {year} reporting cycle" is omitted.
+  - There is a single `h-48` skeleton instead of card-shaped blocks.
+  - An empty `sp_coverage` shows no message.
+  - The pipeline segment `<ul>` should get `aria-hidden`.
+  - The SP bar has no outer track (the mockup uses a light track).
+- **Budget:** about 490 LOC, 1 round. The client total is about 1,950 against the revised cap of about 2,000. **T-12 and T-13 will exceed the cap. Re-escalate after T-12 or T-13 per the owner rule.**

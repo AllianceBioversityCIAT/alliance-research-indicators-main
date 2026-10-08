@@ -110,8 +110,11 @@
               Retry
             </button>
           </div>
+        } @else {
+          @if (store.summary(); as summary) {
+            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" />
+          }
         }
-        <!-- T-11: pipeline, Science Program coverage and sync activity render here -->
       </div>
     } @else {
       <div role="tabpanel" id="pfm-panel-queue" aria-labelledby="pfm-tab-queue" tabindex="0" data-testid="pfm-panel-queue">

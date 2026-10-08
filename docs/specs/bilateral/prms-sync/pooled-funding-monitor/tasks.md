@@ -301,7 +301,7 @@ graph TD
 
 ### T-11 — Coverage tab: pipeline, SP coverage, sync activity (client)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-09
+- **Status:** done · **Size:** M · **Dependencies:** T-09
 - **Requirements covered:**
   - R-PFM-006 — 7 stage tiles + header figures; "BUT a stage with value 0 must NOT render a zero-width segment that steals keyboard focus".
   - R-PFM-007 — rows "{code} — {name}", "{synced} / {total}", scope-specific subtitle and legend, "Bars are proportional" (rendered widths).
@@ -316,8 +316,8 @@ graph TD
   - Copy switches with scope.
 - **Known gap:** jsdom cannot measure rendered bar widths. The spec asserts the computed style value; actual proportion is checked visually at the HITL pause.
 - **Done:**
-  - [ ] Green.
-  - [ ] The NFR-PFM-003 grep is clean.
+  - [x] Green.
+  - [x] The NFR-PFM-003 grep is clean.
 - **Disqualifies:** asserting the bound style string as proof of visual proportion.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 

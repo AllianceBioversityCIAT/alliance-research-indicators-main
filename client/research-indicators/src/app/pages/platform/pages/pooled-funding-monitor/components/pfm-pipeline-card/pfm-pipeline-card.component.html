@@ -1,0 +1,46 @@
+<section class="rounded-lg border border-solid border-[color:var(--ac-pfm-neutral-bg)] bg-[var(--ac-background)] p-4" data-testid="pfm-pipeline-card" aria-labelledby="pfm-pipeline-title">
+  <h2 id="pfm-pipeline-title" class="m-0 text-[15px] font-semibold text-[var(--ac-grey-900)]">Result pipeline — Pool funding mapping to PRMS</h2>
+
+  <div class="mt-3 flex flex-wrap gap-x-8 gap-y-2" data-testid="pfm-pipeline-figures">
+    <p class="m-0">
+      <span class="text-[26px] font-semibold tabular-nums text-[var(--ac-grey-900)]" data-testid="pfm-pipeline-total">{{ pipeline().total | number }}</span>
+      <span class="ml-1 text-[12.5px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-pipeline-total-sub"
+        >results · {{ pipeline().in_scope | number }} in PRMS scope</span
+      >
+    </p>
+    @for (f of figures(); track f.key) {
+      <p class="m-0" [attr.data-testid]="'pfm-pipeline-fig-' + f.key">
+        <span class="text-[26px] font-semibold tabular-nums {{ f.ink }}" data-testid="pfm-fig-value">{{ f.value | number }}</span>
+        <span class="ml-1 text-[12.5px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-fig-text">{{ f.text }}</span>
+      </p>
+    }
+  </div>
+
+  <ul class="m-0 mt-3 flex h-3 list-none gap-0.5 overflow-hidden rounded-md p-0" data-testid="pfm-pipeline-bar">
+    @for (s of segments(); track s.key) {
+      <li
+        class="h-full {{ s.seg }}"
+        [style.flex-grow]="s.value"
+        [style.flex-basis]="0"
+        [attr.title]="(s.value | number) + ' ' + s.label.toLowerCase()"
+        [attr.data-testid]="'pfm-segment-' + s.key"></li>
+    }
+  </ul>
+
+  <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 xl:grid-cols-4" data-testid="pfm-pipeline-stages">
+    @for (s of stages(); track s.key) {
+      <li class="flex gap-2" [attr.data-testid]="'pfm-stage-' + s.key">
+        <span class="mt-2 h-2.5 w-2.5 flex-none rounded-[3px] {{ s.seg }}" aria-hidden="true"></span>
+        <div class="min-w-0">
+          <p class="m-0 text-[11.5px] font-medium uppercase tracking-wide text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-group">{{ s.groupLabel }}</p>
+          <p class="m-0 text-[12.5px] font-medium text-[var(--ac-grey-900)]" data-testid="pfm-stage-label">{{ s.label }}</p>
+          <p class="m-0 text-[20px] font-semibold tabular-nums {{ s.ink }}">
+            <span data-testid="pfm-stage-value">{{ s.value | number }}</span>
+            <span class="ml-1 text-[12px] font-normal text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-share">{{ s.share }}%</span>
+          </p>
+          <p class="m-0 text-[12px] leading-4 text-[var(--ac-pfm-neutral-fg)]">{{ s.note }}</p>
+        </div>
+      </li>
+    }
+  </ul>
+</section>
