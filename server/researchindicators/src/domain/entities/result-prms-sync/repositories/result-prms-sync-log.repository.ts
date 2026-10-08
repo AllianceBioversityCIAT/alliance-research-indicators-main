@@ -83,6 +83,12 @@ export interface SettleIfInFlightInput {
   externalReference?: string | null;
   prmsResultCode?: number | null;
   prmsPhaseId?: number | null;
+  /**
+   * Code already stored on the pushed version, threaded from the aggregate.
+   * Used only to warn when PRMS returns a different non-null code. The
+   * UPDATE itself never overwrites an existing code.
+   */
+  storedPrmsResultCode?: number | null;
 }
 
 export interface InsertRefusedByStarInput {
@@ -508,6 +514,12 @@ export class ResultPrmsSyncLogRepository {
    * Best-effort metadata write, deliberately OUTSIDE the settle transaction and
    * deliberately unable to throw.
    *
+   * `prms_result_code` is immutable once set. The UPDATE assigns
+   * `COALESCE(prms_result_code, ?)`, so an existing code never changes and a
+   * null response code never erases one. `prms_phase_id` is always written.
+   * When the pushed version already holds a code and PRMS returns a different
+   * non-null code, the stored value is kept and the mismatch is logged.
+   *
    * These two columns are descriptive: nothing reads them to make a decision.
    * Losing them costs a lookup; losing the settle costs correctness. So a failure
    * here is logged loudly and swallowed, leaving a diagnosable mismatch (an
@@ -516,11 +528,13 @@ export class ResultPrmsSyncLogRepository {
   private async recordAcceptedPrmsMetadata(
     input: SettleIfInFlightInput,
   ): Promise<void> {
+    this.warnIfStoredPrmsResultCodeMismatch(input);
+
     try {
       await this.dataSource.query(
         `
         UPDATE results
-        SET prms_result_code = ?,
+        SET prms_result_code = COALESCE(prms_result_code, ?),
             prms_phase_id = ?
         WHERE result_id = ?
         `,
@@ -544,18 +558,48 @@ export class ResultPrmsSyncLogRepository {
   }
 
   /**
+   * The COALESCE in the pushed-version UPDATE already keeps the stored code.
+   * This only makes the disagreement visible: a re-push whose PRMS response
+   * carries a different non-null code must not look like a silent success.
+   */
+  private warnIfStoredPrmsResultCodeMismatch(
+    input: SettleIfInFlightInput,
+  ): void {
+    const stored = input.storedPrmsResultCode;
+    const returned = input.prmsResultCode;
+    if (stored == null || returned == null || stored === returned) {
+      return;
+    }
+
+    this.logger._warn(
+      `PRMS result code mismatch for result ${input.resultId}: stored ${stored}, returned ${returned}. The stored code is immutable and was kept.`,
+    );
+  }
+
+  /**
    * The push is made from a version (snapshot) row, but the PRMS code must also
    * be visible on the live version of the same result. Only the code is copied:
-   * the phase belongs to the version that was sent, not to the live row.
+   * the phase belongs to the version that was sent, not to the live row, and
+   * is never written here.
+   *
+   * A result has one PRMS code. The value bound here is the code already stored
+   * on the pushed version when there is one (`storedPrmsResultCode`), otherwise
+   * the code PRMS just returned. A re-push that returns a different code must
+   * not plant that new code on a live row whose copy was missed earlier.
+   *
+   * The live code is immutable too. The UPDATE matches only rows whose
+   * `prms_result_code` is still NULL, so a live row that already holds a code
+   * is never overwritten. The write is skipped only when both the stored code
+   * and the returned code are null.
    *
    * Same best-effort contract as the snapshot write, in its own try so that one
-   * failing never skips the other. A missing code is not written, so a response
-   * without one cannot erase a code the live row already holds.
+   * failing never skips the other.
    */
   private async recordPrmsResultCodeOnLiveVersion(
     input: SettleIfInFlightInput,
   ): Promise<void> {
-    if (input.prmsResultCode == null) {
+    const code = input.storedPrmsResultCode ?? input.prmsResultCode;
+    if (code == null) {
       return;
     }
 
@@ -570,8 +614,9 @@ export class ResultPrmsSyncLogRepository {
           AND live.is_snapshot = FALSE
           AND live.is_active = TRUE
           AND live.platform_code = 'STAR'
+          AND live.prms_result_code IS NULL
         `,
-        [input.prmsResultCode, input.resultId],
+        [code, input.resultId],
       );
     } catch (error) {
       this.logger._error(

@@ -1,5 +1,6 @@
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import {
@@ -313,7 +314,7 @@ describe('ResultPrmsSyncLogRepository', () => {
     await acceptedSettle();
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[0][0]).toMatch(/prms_result_code\s*=\s*\?/);
+    expect(query.mock.calls[0][0]).toMatch(/COALESCE\(prms_result_code, \?\)/);
     expect(query.mock.calls[0][0]).toMatch(/prms_phase_id\s*=\s*\?/);
     // result code, phase id, result id -- ORDER MATTERS: positional `?` params,
     // so a transposition writes the phase into prms_result_code.
@@ -335,6 +336,7 @@ describe('ResultPrmsSyncLogRepository', () => {
     // Official codes are shared across platforms (TIP, PRMS, AICCRA rows exist
     // with the same code in Dev), so without this filter a TIP row is written.
     expect(liveSql).toMatch(/live\.platform_code = 'STAR'/);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
     expect(liveSql).toMatch(
       /pushed\.result_official_code = live\.result_official_code/,
     );
@@ -356,9 +358,89 @@ describe('ResultPrmsSyncLogRepository', () => {
       userId: 7,
       prmsResultCode: null,
       prmsPhaseId: 36,
+      storedPrmsResultCode: null,
     });
 
     expect(query).toHaveBeenCalledTimes(1);
+    const pushedSql = String(query.mock.calls[0][0]);
+    expect(pushedSql).toMatch(/COALESCE\(prms_result_code, \?\)/);
+    expect(query.mock.calls[0][1]).toEqual([null, 36, 42]);
+  });
+
+  it('copies the stored code onto the live row when PRMS returns no code', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: null,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: 9475,
+    });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0][1]).toEqual([null, 36, 42]);
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
+    expect(query.mock.calls[1][1]).toEqual([9475, 42]);
+  });
+
+  it('writes the returned code on the live row when nothing is stored yet', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: 8888,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: null,
+    });
+
+    expect(query.mock.calls[1][1]).toEqual([8888, 42]);
+  });
+
+  it('warns and keeps the stored code when PRMS returns a different non-null code', async () => {
+    const warnSpy = jest
+      .spyOn(LoggerUtil.prototype, '_warn')
+      .mockImplementation(() => undefined);
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: 8888,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: 9475,
+    });
+
+    const pushedSql = String(query.mock.calls[0][0]);
+    expect(pushedSql).toMatch(/COALESCE\(prms_result_code, \?\)/);
+    expect(query.mock.calls[0][1]).toEqual([8888, 36, 42]);
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
+    expect(query.mock.calls[1][1]).toEqual([9475, 42]);
+    expect(query.mock.calls[1][1]).not.toEqual([8888, 42]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const message = String(warnSpy.mock.calls[0][0]);
+    expect(message).toContain('42');
+    expect(message).toContain('9475');
+    expect(message).toContain('8888');
+    warnSpy.mockRestore();
   });
 
   it('still writes the live code when the snapshot metadata write fails', async () => {

@@ -490,6 +490,19 @@ describe('ResultPrmsSyncService', () => {
     );
   });
 
+  it('passes the stored PRMS result code through to settle', async () => {
+    aggregateRepository.loadByResultId.mockResolvedValue({
+      result_id: 42,
+      prms_result_code: 9475,
+    });
+
+    await service.sync(42);
+
+    expect(
+      logRepository.settleIfInFlight.mock.calls[0][0].storedPrmsResultCode,
+    ).toBe(9475);
+  });
+
   it('settles ACCEPTED with the PRMS result_code and records its absence when missing', async () => {
     const first = await service.sync(42);
     expect(first.outcome).toBe(PrmsSyncOutcome.ACCEPTED);

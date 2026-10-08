@@ -31,6 +31,7 @@ const emptySlices = {
 const kpAggregate = (evidence: PrmsEvidenceSnapshot[]): PrmsSyncAggregate => ({
   result_id: 8741,
   result_official_code: 10855,
+  prms_result_code: null,
   indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
   created_at: new Date('2024-03-01T10:00:00.000Z'),
   title: 'Knowledge product type-block fixture',
