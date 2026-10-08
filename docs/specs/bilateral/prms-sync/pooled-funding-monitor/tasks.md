@@ -254,7 +254,7 @@ graph TD
 
 ### T-09 — Page shell: route, client guard, header, scope toggle, KPI cards, tabs, PI-empty state (client)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-06, T-07
+- **Status:** in-progress (Reviewer PASS; running-app HITL batched with T-13) · **Size:** M · **Dependencies:** T-06, T-07
 - **Requirements covered:**
   - R-PFM-001 — "Contributor-only" → "navigating directly … redirects away"; "clicking it renders the page in the running app (no `NG04002`)".
   - R-PFM-002 — default *Only my results as PI*; "Viewer with no PI projects" + "BUT it must NOT show the portfolio data silently".
@@ -273,7 +273,7 @@ graph TD
   - DOM contains no "Sync" button.
 - **Manual (HITL):** open `/pooled-funding-contribution-monitor` in the running app. Quote what was observed (KZ-002).
 - **Done:**
-  - [ ] Specs green.
+  - [x] Specs green.
   - [ ] Running-app check quoted in `execution.md`.
 - **Disqualifies:** a router-mocked spec offered as proof the route resolves (KZ-017).
 - **Skills:** `angular-developer`, `ui-ux-pro-max`

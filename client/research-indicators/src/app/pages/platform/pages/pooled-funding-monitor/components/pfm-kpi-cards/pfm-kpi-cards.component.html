@@ -1,0 +1,13 @@
+<ul class="m-0 grid list-none grid-cols-2 gap-3 p-0 xl:grid-cols-4" data-testid="pfm-kpi-cards">
+  @for (c of cards(); track c.key) {
+    <li
+      class="rounded-lg border border-solid border-[color:var(--ac-pfm-neutral-bg)] border-l-4 bg-[var(--ac-background)] px-4 py-3 {{ c.accent }}"
+      [attr.data-testid]="'pfm-kpi-' + c.key">
+      <p class="m-0 text-[12.5px] font-medium leading-4 text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-label">{{ c.label }}</p>
+      <p class="m-0 mt-1 text-[28px] font-semibold leading-8 tabular-nums {{ c.ink }}" data-testid="pfm-kpi-value">
+        {{ c.value.toLocaleString('en-US') }}
+      </p>
+      <p class="m-0 mt-0.5 text-[12px] leading-4 text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-sub">{{ c.sub }}</p>
+    </li>
+  }
+</ul>

@@ -60,6 +60,7 @@
   --ac-pool-funding-fg: #1b5e20;
   --ac-pool-funding-border: #2e7d32;
   // Pooled Funding Monitor (--ac-pfm-*): semantic status pairs, see spec design.md 6.2
+  --ac-pfm-accent-navy: #0d2b4e;
   --ac-pfm-success-bg: #e6f2ea;
   --ac-pfm-success-fg: #1d6b3e;
   --ac-pfm-info-bg: #e7eefa;
@@ -199,6 +200,7 @@ $colors: (
   --ac-warning-fg: #8a4b08;
   --ac-pool-funding-fg: #a5d6a7;
   --ac-pool-funding-border: #66bb6a;
+  --ac-pfm-accent-navy: #7c9cb9;
   --ac-pfm-success-bg: #1d3a2a;
   --ac-pfm-success-fg: #8fd6ab;
   --ac-pfm-info-bg: #1b2b46;

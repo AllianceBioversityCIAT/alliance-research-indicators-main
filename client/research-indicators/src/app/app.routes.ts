@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { piDelegatesGuard } from '@guards/pi-delegates.guard';
+import { pooledFundingMonitorGuard } from '@guards/pooled-funding-monitor.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
@@ -223,6 +224,16 @@ export const routes: Routes = [
         canMatch: [rolesGuard, piDelegatesGuard],
         data: {
           title: 'My PI Delegates',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'pooled-funding-contribution-monitor',
+        loadComponent: () =>
+          import('@pages/platform/pages/pooled-funding-monitor/pooled-funding-monitor.component').then(m => m.default),
+        canMatch: [rolesGuard, pooledFundingMonitorGuard],
+        data: {
+          title: 'Pooled Funding Contribution Monitor',
           isLoggedIn: true
         }
       },

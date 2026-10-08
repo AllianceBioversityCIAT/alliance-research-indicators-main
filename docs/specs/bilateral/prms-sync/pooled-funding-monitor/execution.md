@@ -207,3 +207,33 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - READABILITY — the chip has two "none" values, `null` and `'all'`. T-12/T-13 must treat both as *All results*.
 - **What this cannot reach (KZ-017):** real HTTP, a router round-trip inside a mounted component, and rendering. These are covered by T-09+ and the HITL.
 - **Budget:** about 660 LOC (prod ≈ 420, test ≈ 240) and 1 round, against the revised cap of about 2,000 client LOC and ≤ 2 rounds per task.
+
+#### T-09 — Page shell → **Reviewer PASS · HITL pending** (2026-10-08)
+
+- **Implementer (sonnet) attempt 1, effort medium.**
+  - Built the route `pooled-funding-contribution-monitor` (`canMatch: [rolesGuard, pooledFundingMonitorGuard]`), `pooledFundingMonitorGuard` (awaits `PoolFundingFlagsService.load()`, allows only when `canAccessPooledFundingMonitor()` and `sectionEnabled()` are true, otherwise sends the user to `/home`), and `RolesService.canAccessPooledFundingMonitor` (`some(role_id !== 3)`).
+  - Built the page component: provides `PfmStoreService` and calls `init()`; scope toggle with `aria-pressed`; `pfm-kpi-cards`; 2-tab tablist with roving tabindex and arrow/Home/End keys; PI-empty state; skeleton and error-with-retry per section.
+  - Added a route spec that walks the real `routes` array and awaits `loadComponent()`.
+  - K-004 reds observed: the guard condition, the RolesService predicate, an injected "Sync now" button, `piEmpty` forced false, and a renamed route path.
+- **Reviewer (opus) round 1 — STATUS: FAIL.**
+  - (1) The PI-empty button read "Switch to Whole portfolio"; design §6.3 says "View whole portfolio", and there was an extra sub-line.
+  - (2) KPI card 2's accent used `--ac-pfm-seg-ready` (light blue); the mockup uses navy `#0d2b4e` (R-PFM-005).
+- **Implementer attempt 2, effort high.**
+  - Fixed the label and removed the sub-line.
+  - Added the new token `--ac-pfm-accent-navy` in `colors.scss`: light `#0d2b4e`, dark `#7c9cb9`.
+  - Fixed the honesty of the guard spec comment.
+  - `aria-controls` is now set only on the selected tab.
+  - K-004 reds observed for the label and the token.
+- **Reviewer round 2 — STATUS: PASS.**
+- **Leader verification.**
+  - K-004 for the `aria-controls` assertion, which was unseen: I bound the attribute unconditionally and got 1 failed / 42 passed; I restored it.
+  - Re-measure: `npx jest src/app/pages/platform/pages/pooled-funding-monitor src/app/shared/guards/pooled-funding-monitor.guard.spec.ts src/app/shared/services/cache/roles.service.spec.ts src/app/app.routes.spec.ts --silent --coverage=false` gave 8 suites and 83/83 passing.
+  - Implementer: tsc spec total 945 (unchanged), none in T-09 files; `ng build --configuration development` passes.
+- **Open Done item — running-app check (KZ-017).**
+  - It needs an authenticated Cognito session in a browser, which the Leader cannot drive headless.
+  - It is **batched into the consolidated owner HITL at T-13** (open `/pooled-funding-contribution-monitor`, quote what is observed). T-09 therefore stays **`[~]`/HITL pending**; T-10 proceeds on the code dependency.
+- **ADVISORY (non-gating):**
+  - Risk: the flag read fails open. `PoolFundingFlagsService` returns true on error, so the page opens when the flag read fails. This is shared-service behaviour; the server still enforces access.
+  - Dark mode: the `h1` uses `--ac-primary-blue-300`, which is low contrast in dark mode, and the cards share the page background token. Check at HITL.
+  - Copy: the mockup subtitle says "sync approved results … to PRMS" on a view-only page. Confirm with the owner at HITL.
+- **Budget:** about 720 LOC over 2 rounds. Client total after T-07 and T-09 is about 1,380 of the revised cap of about 2,000. **Projection:** T-10 through T-13 will exceed the cap, so expect a re-escalation.
