@@ -5,7 +5,7 @@
 - **Family path:** `docs/specs/institutional-performance/`
 - **Parent spec / Feature:** Institutional Performance / Alliance Strategy 2026–2030 configuration, KPI planning and KPI reporting in STAR
 - **Date created:** 2026-09-25
-- **Last updated:** 2026-09-26 — manifest edit approved by the requester: former child 1 split into three (Control Lists, Organizational Structure, Strategy Framework)
+- **Last updated:** 2026-10-08 — requester decision: Organizational Structure is global (not portfolio-scoped), versioned per year, and keeps every entry visible in earlier years; F-2/F-3 amended, child 2 row updated. Previous: 2026-09-26 — former child 1 split into three (Control Lists, Organizational Structure, Strategy Framework)
 - **Spec-family status:** `open`
 - **Owner / Squad:** Hector F. Tobón (requester, on behalf of PISA4 / Strategy Refresh)
 - **Source ideas:** `STAR Module ideas/00_README_Institutional-Performance-Ideas.md` and `Idea-1/2/3_*.md` (OneDrive · Strategy Refresh · KPI Validation, 2026-09-25)
@@ -21,7 +21,7 @@
 Idea 1 (reference data) was split into three children because each one is useful on its own and each depends on the one before it:
 
 - **Control Lists** holds the vocabularies that the other two read, including the organizational levels.
-- **Organizational Structure** holds the versioned org units that own dimensions, objectives and, later, KPIs and mapped records.
+- **Organizational Structure** holds the versioned org units that own dimensions, objectives and, later, KPIs and mapped records. It is **one living tree, not tied to a portfolio** (2026-10-08); portfolio-scoped children refer to its units by permanent ID.
 - **Strategy Framework** holds the strategy and monitoring hierarchies plus the annual Institutional Objectives. It uses owner units from the structure.
 
 Ideas 2 (KPI planning) and 3 (KPI reporting) follow. A mapping module (results and other records → indicators and org units) is expected after this family's reference data; it is not yet a row here.
@@ -33,7 +33,7 @@ Ideas 2 (KPI planning) and 3 (KPI reporting) follow. A mapping module (results a
 | # | Spec Path | Title / Scope | Depends on | Parallel-safe | Status | Owner |
 |---|---|---|---|---|---|---|
 | 1 | `institutional-performance/control-lists` | Portfolio-scoped control lists: categories, lists and values, with in-use protection | `none` | `no` (shared nav + table pattern introduced here) | `done` (archived: `archive/2026-10-08-institutional-performance--control-lists/`) | Hector F. Tobón |
-| 2 | `institutional-performance/organizational-structure` | Versioned 4-level org structure (L1 Division › L2 Department › L3 Office › L4 Unit): permanent IDs, effective-dated changes, as-of views, close/successor | `control-lists` | `no` | `pending` | Hector F. Tobón |
+| 2 | `institutional-performance/organizational-structure` | **Global** (no portfolio) living 4-level org structure (L1 Division › L2 Department › L3 Office › L4 Unit): permanent IDs, versions per year, year views that include later-deleted/inactivated entries, inactivate/successor, logical delete, append-only change log | `control-lists` | `no` | `pending` | Hector F. Tobón |
 | 3 | `institutional-performance/strategy-framework` | IO → SO, EN; PA → DIM → IND; annual Institutional Objectives. Extends `impact_outcomes` / `strategic_objectives` | `organizational-structure` | `no` | `pending` | Hector F. Tobón |
 | 4 | `institutional-performance/institutional-indicators` | Idea 2 — KPI definition, planning cycles, published view, edit mode for directors and delegates | `strategy-framework` | `no` | `pending` | Hector F. Tobón |
 | 5 | `institutional-performance/kpi-reporting` | Idea 3 — achievement capture per period, evidence, review workflow, assisted extraction | `institutional-indicators` | `no` | `pending` | Hector F. Tobón |
@@ -67,8 +67,8 @@ Decided by the requester on 2026-09-25 and 2026-09-26. Children cite these IDs i
 | ID | Rule |
 | --- | --- |
 | **F-1 Access** | Center Admin and System Admin can read and write everything. Client: `centerAdminGuard` (`canAccessCenterAdmin` already admits role 1 Admin and role 9 Center Admin — `client/…/shared/services/cache/roles.service.ts:9-10,34`). Server: `@Roles(...)` for the same roles; `SYSTEM_ADMIN` bypasses. No new roles |
-| **F-2 Portfolio scope** | Every list, structure and framework element belongs to a portfolio. Only **Portfolio 2 (2026–2030)** is configured now; Portfolio 1 appears in the selector as "not configured". Global control lists are a later decision |
-| **F-3 Navigation** | Under *Center admin*, the three new pages are **nested under Portfolio Management** in the left menu, in this order: *Control Lists → Organizational Structure → Strategy Framework*. Each page has a portfolio selector, defaulting to the portfolio whose dates contain today. Existing Center admin items and the Portfolio Management page are **not changed** |
+| **F-2 Portfolio scope** | Every list, structure and framework element belongs to a portfolio. Only **Portfolio 2 (2026–2030)** is configured now; Portfolio 1 appears in the selector as "not configured". Global control lists are a later decision. **Exception (2026-10-08): the Organizational Structure is global** — one living tree with no portfolio; portfolio-scoped elements reference its units by permanent ID (F-9) |
+| **F-3 Navigation** | Under *Center admin*, the three new pages are **nested under Portfolio Management** in the left menu, in this order: *Control Lists → Organizational Structure → Strategy Framework*. Each page has a portfolio selector, defaulting to the portfolio whose dates contain today — **except Organizational Structure**, which has a *Structure year* selector instead (2026-10-08). Existing Center admin items and the Portfolio Management page are **not changed** |
 | **F-4 CRUD** | Admins add, edit and delete; the only form actions are **Save**, **Cancel** and **Delete**. No lifecycle statuses, no per-element source, no workbook import |
 | **F-5 Delete protection** | Nothing with children or associated information can be deleted. The dialog names the blocker and offers the alternative (deactivate a value, close an org entry) |
 | **F-6 Codes** | Codes are proposed automatically, editable, and unique within their scope |
