@@ -228,7 +228,18 @@ export class ClarisaProjectsService {
     }
 
     try {
-      const data = await this.connection.get<ClarisaProject[]>('api/projects');
+      // `phase` comes from ENV.PRMS_SYNC_YEAR (`ARI_PRMS_SYNC`), the same year
+      // TocIntegrationService sends. Scoping the feed to one phase keeps an
+      // older-phase project from shadowing the current one when both share a
+      // normalized external_code (e.g. `A1080` 2025 vs `B-A1080` 2026). Appended
+      // only when set, so an unset value leaves the URL as it was. Not part of
+      // the cache: the year is process-constant and a change arrives with a
+      // restart, which empties the cache anyway.
+      const phase = ENV.PRMS_SYNC_YEAR;
+      const path = phase
+        ? `api/projects?phase=${encodeURIComponent(phase)}`
+        : 'api/projects';
+      const data = await this.connection.get<ClarisaProject[]>(path);
       this.cache = { data, fetchedAt: now };
 
       let sourceCenterCount = 0;

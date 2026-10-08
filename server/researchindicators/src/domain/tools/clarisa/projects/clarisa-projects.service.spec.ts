@@ -268,6 +268,36 @@ describe('ClarisaProjectsService', () => {
       expect(connectionGet).toHaveBeenCalledWith('api/projects');
     });
 
+    describe('CLARISA phase query param (ARI_PRMS_SYNC)', () => {
+      const originalPhase = process.env.ARI_PRMS_SYNC;
+      afterEach(() => {
+        if (originalPhase === undefined) {
+          delete process.env.ARI_PRMS_SYNC;
+        } else {
+          process.env.ARI_PRMS_SYNC = originalPhase;
+        }
+      });
+
+      it('requests api/projects?phase=<ARI_PRMS_SYNC> when the env var is set', async () => {
+        process.env.ARI_PRMS_SYNC = ' 2026 ';
+        connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+
+        await service.findProjectById(1);
+
+        expect(connectionGet).toHaveBeenCalledTimes(1);
+        expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2026');
+      });
+
+      it('requests plain api/projects when ARI_PRMS_SYNC is unset', async () => {
+        delete process.env.ARI_PRMS_SYNC;
+        connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+
+        await service.findProjectById(1);
+
+        expect(connectionGet).toHaveBeenCalledWith('api/projects');
+      });
+    });
+
     it('excludes bilateral projects led by other centers or without lead', async () => {
       connectionGet.mockResolvedValueOnce([
         bilateralProject(1, '3S-ASEAN'),
