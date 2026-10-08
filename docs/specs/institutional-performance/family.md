@@ -32,7 +32,7 @@ Ideas 2 (KPI planning) and 3 (KPI reporting) follow. A mapping module (results a
 
 | # | Spec Path | Title / Scope | Depends on | Parallel-safe | Status | Owner |
 |---|---|---|---|---|---|---|
-| 1 | `institutional-performance/control-lists` | Portfolio-scoped control lists: categories, lists and values, with in-use protection | `none` | `no` (shared nav + table pattern introduced here) | `in-validation` | Hector F. Tobón |
+| 1 | `institutional-performance/control-lists` | Portfolio-scoped control lists: categories, lists and values, with in-use protection | `none` | `no` (shared nav + table pattern introduced here) | `done` (archived: `archive/2026-10-08-institutional-performance--control-lists/`) | Hector F. Tobón |
 | 2 | `institutional-performance/organizational-structure` | Versioned 4-level org structure (L1 Division › L2 Department › L3 Office › L4 Unit): permanent IDs, effective-dated changes, as-of views, close/successor | `control-lists` | `no` | `pending` | Hector F. Tobón |
 | 3 | `institutional-performance/strategy-framework` | IO → SO, EN; PA → DIM → IND; annual Institutional Objectives. Extends `impact_outcomes` / `strategic_objectives` | `organizational-structure` | `no` | `pending` | Hector F. Tobón |
 | 4 | `institutional-performance/institutional-indicators` | Idea 2 — KPI definition, planning cycles, published view, edit mode for directors and delegates | `strategy-framework` | `no` | `pending` | Hector F. Tobón |
