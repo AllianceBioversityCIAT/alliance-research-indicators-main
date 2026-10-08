@@ -43,8 +43,8 @@ export interface AlignmentResponse {
   // Null until the result has synced -- the sidebar shows the line only when set.
   prms_result_code?: number | null;
   is_read_only: boolean;
-  // Server-computed live-version gate: `report_year_id !== MAPPABLE_LIVE_VERSION`
-  // (bilateral.service.ts getAlignment). The server has always emitted this on the
+  // Server-computed year gate: `report_year_id` differs from the configured
+  // reporting year (bilateral.service.ts getAlignment). The server has always emitted this on the
   // alignment payload; it simply was not declared here. Optional so an older server
   // that omits it leaves the sidebar gate FAILING OPEN (section stays visible)
   // rather than hiding Pool Funding for everyone.

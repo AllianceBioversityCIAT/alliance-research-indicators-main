@@ -44,7 +44,6 @@ import {
 } from '../../tools/toc-integration/dto/toc-integration.types';
 import {
   allowedLevelsFor,
-  MAPPABLE_LIVE_VERSION,
   resolveResultTypeKey,
 } from './utils/toc-level-rules.util';
 import {
@@ -345,7 +344,8 @@ export class BilateralService {
    *   2. `result_type` + `allowed_levels` from `toc-level-rules.util.ts`
    *      (single source of truth, D-V2-3) off the result's indicator type.
    *   3. `version_locked` = live version year (`context.report_year_id`,
-   *      literal year per D-V2-7) ≠ `MAPPABLE_LIVE_VERSION` (2026).
+   *      literal year per D-V2-7) ≠ the configured reporting year
+   *      (`app_config.ARI_PRMS_SYNC`).
    *   4. SP chain UNCHANGED: result → AGRESSO → bilateral_project_mapping
    *      → CLARISA project → `deriveSciencePrograms`. Unmapped at any step
    *      ⇒ `mapping_status: 'unmapped'`, `catalogs: []`, zero upstream ToC
@@ -369,6 +369,7 @@ export class BilateralService {
   ): Promise<BilateralHlosIndicatorsResponse> {
     const resolution = await this.resolveMappedProject(resultId);
     const { context } = resolution;
+    const year = await this.reportingYearResolver.resolve();
 
     const resultType = resolveResultTypeKey(context.indicator_id);
     const allowedLevels = allowedLevelsFor(resultType);
@@ -378,7 +379,7 @@ export class BilateralService {
       result_type: resultType,
       allowed_levels: allowedLevels,
       // D-V2-7: `report_year_id` carries the literal report year (e.g. 2026).
-      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
+      version_locked: Number(context.report_year_id) !== year,
     };
 
     if (resolution.status === 'unmapped' || resolution.status === 'stale') {
@@ -405,7 +406,6 @@ export class BilateralService {
       };
     }
 
-    const year = await this.reportingYearResolver.resolve();
     const tocResultsByKey =
       await this.tocIntegrationService.getTocResultsForSps(
         spCodes,
@@ -421,7 +421,7 @@ export class BilateralService {
       levels: allowedLevels.map((level) => ({
         level,
         toc_results: (tocResultsByKey.get(`${spCode}:${level}`) ?? []).map(
-          (tocResult) => this.toWireTocResult(tocResult, level),
+          (tocResult) => this.toWireTocResult(tocResult, level, year),
         ),
       })),
     }));
@@ -443,6 +443,7 @@ export class BilateralService {
   private toWireTocResult(
     tocResult: TocResult,
     level: TocLevel,
+    year: number,
   ): BilateralTocCatalogResult {
     return {
       toc_result_id: tocResult.toc_result_id,
@@ -450,7 +451,7 @@ export class BilateralService {
       description: tocResult.description ?? '',
       aow_code: level === 'EOI' ? null : (tocResult.wp_short_name ?? null),
       indicators: (tocResult.indicators ?? []).map((indicator) =>
-        this.toWireTocIndicator(indicator),
+        this.toWireTocIndicator(indicator, year),
       ),
     };
   }
@@ -460,35 +461,42 @@ export class BilateralService {
    *
    * Upstream `TocIndicator` → frozen wire shape: `unit_messurament` →
    * `unit_of_measurement` (D-V2-4); `targets[]` resolved to the single
-   * `MAPPABLE_LIVE_VERSION` entry — `(target_value, 2026)` when an upstream
-   * target with `target_date == '2026'` exists, `(null, 2026)` otherwise.
-   * The raw targets array never reaches the wire (R-BIL-090 AC.3).
-   * `type_value` passes through unfiltered (OQ-V2-2).
+   * configured-reporting-year entry — `(target_value, year)` when an
+   * upstream target with `target_date == String(year)` exists,
+   * `(null, year)` otherwise. The raw targets array never reaches the
+   * wire (R-BIL-090 AC.3). `type_value` passes through unfiltered
+   * (OQ-V2-2). The year is the caller's resolved reporting year
+   * (`app_config.ARI_PRMS_SYNC`).
    */
   private toWireTocIndicator(
     indicator: TocIndicator,
+    year: number,
   ): BilateralTocCatalogIndicator {
     return {
       indicator_id: indicator.indicator_id,
       indicator_description: indicator.indicator_description,
       unit_of_measurement: indicator.unit_messurament ?? '',
       type_value: indicator.type_value ?? '',
-      target_value: this.resolveLiveTargetValue(indicator),
-      target_year: MAPPABLE_LIVE_VERSION,
+      target_value: this.resolveLiveTargetValue(indicator, year),
+      target_year: year,
     };
   }
 
   /**
    * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 + T-06 / R-BIL-090, R-BIL-095
    *
-   * Shared target resolution for the live version: the upstream `targets[]`
-   * entry with `target_date == '2026'` wins, else null. Used by both the
-   * catalog read wire mapping and the write-path snapshot copy so saved
-   * snapshots always match what the FE was shown.
+   * Shared target resolution for the configured reporting year: the
+   * upstream `targets[]` entry with `target_date == String(year)` wins,
+   * else null. Used by both the catalog read wire mapping and the
+   * write-path snapshot copy so saved snapshots always match what the FE
+   * was shown. `year` is the caller's resolved reporting year.
    */
-  private resolveLiveTargetValue(indicator: TocIndicator): string | null {
+  private resolveLiveTargetValue(
+    indicator: TocIndicator,
+    year: number,
+  ): string | null {
     const liveTarget = (indicator.targets ?? []).find(
-      (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+      (target) => target.target_date === String(year),
     );
     return liveTarget?.target_value ?? null;
   }
@@ -608,7 +616,17 @@ export class BilateralService {
   async getAlignment(
     resultId: number,
     resultCode: string,
+    user: User,
+  ): Promise<AlignmentResponse> {
+    const year = await this.reportingYearResolver.resolve();
+    return this.buildAlignment(resultId, resultCode, user, year);
+  }
+
+  private async buildAlignment(
+    resultId: number,
+    resultCode: string,
     _user: User,
+    year: number,
   ): Promise<AlignmentResponse> {
     const [context, alignment, tocAlignmentRows] = await Promise.all([
       this.resultRepository.findPoolFundingAlignmentContext(resultId),
@@ -663,7 +681,14 @@ export class BilateralService {
       // Same Number(...) comparison as the hlos-indicators read (D-V2-7);
       // `toc_alignments` follows the same eligibility visibility gate as
       // the rest of the alignment payload (mirrors `visibleAlignment`).
-      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
+      version_locked: Number(context.report_year_id) !== year,
+      // Answered contribution (including an explicit false), a completed
+      // PRMS sync, or a PRMS result code. Sync history alone does not count.
+      has_pool_funding_data:
+        (visibleAlignment?.has_contribution ?? null) !== null ||
+        isSyncedToPrms ||
+        context.prms_result_code != null,
+      reporting_year: year,
       toc_alignments: (eligible ? tocAlignmentRows : []).map((row) =>
         this.toTocAlignmentReadback(row),
       ),
@@ -743,6 +768,8 @@ export class BilateralService {
       throw new NotFoundException('Result not found');
     }
 
+    const year = await this.reportingYearResolver.resolve();
+
     // R-BIL-071: architectural source gate runs first — PRMS owns the data
     // regardless of contributor status or sync state, so reject before any
     // domain-eligibility check fires (avoids leaking "not a contributor"
@@ -781,7 +808,7 @@ export class BilateralService {
     // inline check: fires ONLY when `toc_alignments` is present, so legacy
     // bodies still bypass it entirely (R-BIL-097 AC.3).
     if (dto.toc_alignments) {
-      this.assertTocMappingVersionUnlocked(context);
+      this.assertTocMappingVersionUnlocked(context, year);
     }
 
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120..122, D-C2-15
@@ -813,6 +840,7 @@ export class BilateralService {
           context,
           resultId,
           primarySpCode,
+          year,
         )
       : null;
 
@@ -879,7 +907,12 @@ export class BilateralService {
       });
     });
 
-    const response = await this.getAlignment(resultId, resultCode, user);
+    const response = await this.buildAlignment(
+      resultId,
+      resultCode,
+      user,
+      year,
+    );
     this.serverGateway.emitPoolFundingAlignmentChanged({
       result_code: response.result_code,
       by_user_id: actorUserId,
@@ -912,6 +945,7 @@ export class BilateralService {
     },
     actorUserId: number | null,
   ): Promise<void> {
+    const year = await this.reportingYearResolver.resolve();
     const spCodes = [
       input.primarySpCode,
       ...input.contributingSpCodes.filter(
@@ -930,6 +964,7 @@ export class BilateralService {
               input.primarySpCode,
               input.toc.level,
               input.toc.title,
+              year,
             ),
             toc_result_title: input.toc.title,
           },
@@ -964,12 +999,12 @@ export class BilateralService {
     spCode: string,
     level: TocLevel | null,
     title: string,
+    year: number,
   ): Promise<number | null> {
     if (!level) return null;
     const normalize = (value: string | null | undefined) =>
       (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
     try {
-      const year = await this.reportingYearResolver.resolve();
       const catalog = await this.tocIntegrationService.getTocResults(
         spCode,
         level,
@@ -1091,7 +1126,8 @@ export class BilateralService {
    * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
    *
    * Version gate: live version (`report_year_id`, literal year per D-V2-7)
-   * ≠ `MAPPABLE_LIVE_VERSION` (2026) → 409 `toc_mapping_version_locked`
+   * ≠ the configured reporting year passed in → 409
+   * `toc_mapping_version_locked`
    * (R-BIL-097). Extracted from `validateTocAlignments` — where it used to
    * be the first statement — so it keeps firing BEFORE Primary validation
    * (T-06), which the call site inserts after this check. Left inside
@@ -1101,15 +1137,18 @@ export class BilateralService {
    * R-BIL-097 AC.3) lives at the call site, not here, so it stays visible
    * next to the other pre-transaction steps instead of being duplicated.
    */
-  private assertTocMappingVersionUnlocked(context: {
-    report_year_id?: number | string;
-  }): void {
-    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
+  private assertTocMappingVersionUnlocked(
+    context: {
+      report_year_id?: number | string;
+    },
+    year: number,
+  ): void {
+    if (Number(context.report_year_id) !== year) {
       // GlobalExceptions surfaces `exception.response.message` into the
       // envelope's `errors` field — same packing as the unknown_sp_codes 400.
       throw new ConflictException({
         message: {
-          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
+          description: `ToC mapping is locked to live version ${year}`,
           code: 'toc_mapping_version_locked',
         },
       });
@@ -1244,7 +1283,7 @@ export class BilateralService {
    *
    * Snapshots (R-BIL-095): "Yes" rows copy `toc_result_title`,
    * `indicator_description`, `unit_messurament` (verbatim upstream spelling,
-   * D-V2-4) and the 2026-resolved `(target_value, target_year)` from the
+   * D-V2-4) and the configured-year `(target_value, target_year)` from the
    * validated catalog entry. "No" rows null every ToC/snapshot column.
    */
   private async validateTocAlignments(
@@ -1258,6 +1297,7 @@ export class BilateralService {
     // when `has_contribution` is false, in which case `effectiveSpCodes` is
     // already empty and every entry is caught by `sp_not_selected` first.
     primarySpCode: string | null,
+    year: number,
   ): Promise<TocAlignmentUpsertInput[]> {
     const errors: TocAlignmentValidationError[] = [];
     const effective = new Set(effectiveSpCodes);
@@ -1370,7 +1410,6 @@ export class BilateralService {
       });
     }
     const comboKeys = [...combos.keys()];
-    const year = await this.reportingYearResolver.resolve();
     const catalogs = await Promise.all(
       comboKeys.map((key) => {
         const combo = combos.get(key);
@@ -1470,8 +1509,10 @@ export class BilateralService {
         unit_messurament: indicator
           ? (indicator.unit_messurament ?? null)
           : null,
-        target_value: indicator ? this.resolveLiveTargetValue(indicator) : null,
-        target_year: indicator ? MAPPABLE_LIVE_VERSION : null,
+        target_value: indicator
+          ? this.resolveLiveTargetValue(indicator, year)
+          : null,
+        target_year: indicator ? year : null,
       };
     });
   }
@@ -1482,7 +1523,13 @@ export class BilateralService {
     query: ListIndicatorsQueryDto,
     user: User,
   ): Promise<IndicatorGroupResponse[]> {
-    const alignment = await this.getAlignment(resultId, resultCode, user);
+    const year = await this.reportingYearResolver.resolve();
+    const alignment = await this.buildAlignment(
+      resultId,
+      resultCode,
+      user,
+      year,
+    );
 
     if (!alignment.has_contribution) {
       return [];
@@ -1544,7 +1591,8 @@ export class BilateralService {
     user: User,
     leverCode: string,
   ): Promise<MappingResponse> {
-    const context = await this.getEditableContributionContext(resultId);
+    const year = await this.reportingYearResolver.resolve();
+    const context = await this.getEditableContributionContext(resultId, year);
     const alignment = await this.getActiveAlignmentForLever(
       resultId,
       leverCode,
@@ -1632,7 +1680,8 @@ export class BilateralService {
     user: User,
     leverCode: string,
   ): Promise<void> {
-    const context = await this.getEditableContributionContext(resultId);
+    const year = await this.reportingYearResolver.resolve();
+    const context = await this.getEditableContributionContext(resultId, year);
     await this.getActiveAlignmentForLever(resultId, leverCode);
     const previousMapping =
       await this.mappingRepository.findActiveMappingByResultLeverIndicator(
@@ -1783,7 +1832,10 @@ export class BilateralService {
     };
   }
 
-  private async getEditableContributionContext(resultId: number) {
+  private async getEditableContributionContext(
+    resultId: number,
+    _year: number,
+  ) {
     const context =
       await this.resultRepository.findPoolFundingAlignmentContext(resultId);
 

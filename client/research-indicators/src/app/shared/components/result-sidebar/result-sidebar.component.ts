@@ -107,13 +107,10 @@ export class ResultSidebarComponent {
   //  1. CONTRACT — `alignment.eligible` is the server's
   //     `toBoolean(context.is_pool_funding_contributor)`: the result's primary
   //     contract does not contribute to pool funding. Pre-existing behaviour.
-  //  2. YEAR — `alignment.version_locked` is the server's
-  //     `report_year_id !== MAPPABLE_LIVE_VERSION`. The reporting year is NOT a
-  //     configurable parameter anywhere in this system (no app_config row, no ENV
-  //     var, and `report_years.is_active` is the soft-delete flag, not a reporting
-  //     window); it is the constant in toc-level-rules.util.ts, and the server
-  //     resolves the comparison for us. Compared with `=== true` on purpose: a
-  //     server that omits the field leaves the section VISIBLE, matching today.
+  //  2. YEAR — `alignment.version_locked` is the server's comparison of
+  //     `report_year_id` against the configured reporting year. Compared with
+  //     `=== true` on purpose: a server that omits the field leaves the
+  //     section VISIBLE, matching today.
   //  3. SECTION FLAG — hidden when the flag resolves to disabled. OR-ed with
   //     the rules above; never a replacement of them.
   private shouldHidePoolFundingTab(option: SidebarOption, alignment: AlignmentResponse | null): boolean {

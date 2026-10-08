@@ -66,6 +66,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   // T-01 (R-BIL-125 AC.4) — named so the cascade-pin tests below can assert
   // deactivation calls; behavior is unchanged (still a bare jest.fn()).
   const deactivateForSps = jest.fn();
+  const resolveReportingYear = jest.fn();
 
   // Mimic TypeORM's actual save: echo back the payload (merged with an id)
   // so `savedMapping` carries the lever_code / indicator_code / indicator_type
@@ -107,6 +108,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   beforeEach(async () => {
     transaction.mockImplementation(async (cb) => cb(fakeManager));
     findActiveTocRows.mockResolvedValue([]);
+    resolveReportingYear.mockReset();
+    resolveReportingYear.mockResolvedValue(2026);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -191,7 +194,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         },
         {
           provide: ReportingYearResolver,
-          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+          useValue: { resolve: resolveReportingYear },
         },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
@@ -284,6 +287,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         is_read_only: false,
         // T-07 (R-BIL-096): both fields ALWAYS present on the response.
         version_locked: false,
+        has_pool_funding_data: true,
+        reporting_year: 2026,
         toc_alignments: [],
       });
     });
@@ -335,6 +340,115 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.getAlignment(999, '999', user),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    describe('reporting-year flags (R-PRY-002, R-PRY-006)', () => {
+      const flagContext = (overrides: Record<string, unknown> = {}) => ({
+        result_id: 19792,
+        result_official_code: 19792,
+        is_pool_funding_contributor: true,
+        is_synced_to_prms: false,
+        platform_code: 'STAR',
+        report_year_id: 2026,
+        prms_result_code: null,
+        ...overrides,
+      });
+
+      it('version_locked is false for a 2026 result when the configured year is 2026', async () => {
+        resolveReportingYear.mockResolvedValue(2026);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(false);
+        expect(out.reporting_year).toBe(2026);
+      });
+
+      it('version_locked is true for a 2026 result when the configured year is 2027', async () => {
+        resolveReportingYear.mockResolvedValue(2027);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(true);
+        expect(out.reporting_year).toBe(2027);
+      });
+
+      it('version_locked is false for a 2027 result when the configured year is 2027', async () => {
+        resolveReportingYear.mockResolvedValue(2027);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2027 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(false);
+        expect(out.reporting_year).toBe(2027);
+      });
+
+      it.each([
+        {
+          label: 'null contribution, unsynced, no code',
+          hasContribution: null,
+          synced: false,
+          code: null,
+          expected: false,
+        },
+        {
+          label: 'false contribution, unsynced, no code',
+          hasContribution: false,
+          synced: false,
+          code: null,
+          expected: true,
+        },
+        {
+          label: 'null contribution, synced, no code',
+          hasContribution: null,
+          synced: true,
+          code: null,
+          expected: true,
+        },
+        {
+          label: 'null contribution, unsynced, code 9746',
+          hasContribution: null,
+          synced: false,
+          code: 9746,
+          expected: true,
+        },
+      ])(
+        'has_pool_funding_data is $expected when $label',
+        async ({ hasContribution, synced, code, expected }) => {
+          findContext.mockResolvedValueOnce(
+            flagContext({
+              is_synced_to_prms: synced,
+              prms_result_code: code,
+            }),
+          );
+          findActiveAlignment.mockResolvedValueOnce(
+            hasContribution === null
+              ? null
+              : {
+                  id: 1,
+                  result_id: 19792,
+                  has_contribution: hasContribution,
+                  selected_levers: [],
+                  sp_roles: [],
+                },
+          );
+
+          const out = await service.getAlignment(19792, '19792', user);
+
+          expect(out.has_pool_funding_data).toBe(expected);
+          expect(out.reporting_year).toBe(2026);
+        },
+      );
     });
 
     // -------------------------------------------------------------------------
@@ -1019,24 +1133,27 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       findContext.mockResolvedValueOnce(eligibleContext());
       findActiveAlignment.mockResolvedValueOnce(null);
 
-      // R-BIL-123 AC.2 (PATCH half — Reviewer FAIL, T-08 attempt 2). The
-      // describe-level `beforeEach` mocks `getAlignment` to `{}`, so this
-      // override gives it a REAL role-bearing shape instead, then the
-      // assertion below reads `updateAlignment`'s OWN return value. That is
-      // what makes AC.2 falsifiable: if anything between `const response =
-      // await this.getAlignment(...)` and `updateAlignment`'s `return
-      // response` (bilateral.service.ts:869-876) drops or rewrites a field
-      // — e.g. stripping `role` off `selected_science_programs` — this
-      // assertion goes red. The two-read test below never calls
-      // `updateAlignment` at all, so it cannot see that defect (see its
-      // comment).
-      jest.spyOn(service, 'getAlignment').mockResolvedValueOnce({
-        result_code: '19792',
-        selected_science_programs: [
-          { code: 'SP06', role: 'PRIMARY' },
-          { code: 'SP09', role: 'CONTRIBUTING' },
-        ],
-      } as never);
+      // R-BIL-123 AC.2 (PATCH half). updateAlignment returns the private
+      // `buildAlignment` read-back (it no longer re-enters `getAlignment`,
+      // so the year resolved for the write is the year on the read). This
+      // override gives that read-back a role-bearing shape, then the
+      // assertion below reads `updateAlignment`'s OWN return value. If
+      // anything between the `buildAlignment` call and the return drops or
+      // rewrites a field — e.g. stripping `role` — this assertion goes red.
+      jest
+        .spyOn(
+          service as unknown as {
+            buildAlignment: () => Promise<unknown>;
+          },
+          'buildAlignment',
+        )
+        .mockResolvedValueOnce({
+          result_code: '19792',
+          selected_science_programs: [
+            { code: 'SP06', role: 'PRIMARY' },
+            { code: 'SP09', role: 'CONTRIBUTING' },
+          ],
+        });
 
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,

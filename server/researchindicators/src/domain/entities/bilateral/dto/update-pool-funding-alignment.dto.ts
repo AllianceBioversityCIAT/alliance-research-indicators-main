@@ -191,7 +191,7 @@ export class TocAlignmentReadbackResponse {
     nullable: true,
     example: 2026,
     description:
-      'MAPPABLE_LIVE_VERSION (2026) when an indicator was chosen. Null when aligns_with_toc is false, or when no indicator was chosen — a partial row must not claim a target year for a target it has no indicator for.',
+      'Configured reporting year (`app_config.ARI_PRMS_SYNC`) when an indicator was chosen. Null when aligns_with_toc is false, or when no indicator was chosen — a partial row must not claim a target year for a target it has no indicator for.',
   })
   target_year: number | null;
 }
@@ -249,14 +249,28 @@ export class AlignmentResponse {
   is_read_only: boolean;
 
   // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
-  // `report_year_id !== MAPPABLE_LIVE_VERSION (2026)` — same Number(...)
-  // comparison as the hlos-indicators read (D-V2-7).
+  // `report_year_id` differs from the configured reporting year — same
+  // Number(...) comparison as the hlos-indicators read (D-V2-7).
   @ApiProperty({
     type: Boolean,
     description:
-      'report_year_id !== MAPPABLE_LIVE_VERSION (2026) — same comparison as the hlos-indicators read.',
+      'True when report_year_id differs from the configured reporting year (`app_config.ARI_PRMS_SYNC`) — same comparison as the hlos-indicators read.',
   })
   version_locked: boolean;
+
+  @ApiProperty({
+    type: Boolean,
+    description:
+      'True when has_contribution is answered (including false), the result is synced to PRMS, or prms_result_code is present.',
+  })
+  has_pool_funding_data: boolean;
+
+  @ApiProperty({
+    type: Number,
+    example: 2026,
+    description: 'Configured reporting year (`app_config.ARI_PRMS_SYNC`).',
+  })
+  reporting_year: number;
 
   @ApiProperty({
     type: () => [TocAlignmentReadbackResponse],

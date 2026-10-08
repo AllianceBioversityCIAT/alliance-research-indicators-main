@@ -128,7 +128,7 @@ graph TD
 
 ### T-03 — Bilateral year threading, constant removal, read flags
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-02
+- **Status:** done · **Size:** L · **Dependencies:** T-02
 - **Requirements:**
   - R-PRY-002: the 2027 editable / 2026 read-only clause of "Change without deploy", the "row wins over env" clause, and the "no constant reader" half of AND IT MUST
   - R-PRY-006: all three THEN/AND clauses
@@ -160,10 +160,10 @@ graph TD
   - The integration suite `test/bilateral-primary-contributing-sp.integration-spec.ts` (years 2025/2026) needs the seeded row or a resolver stub; run `npm run test:integration` for it, because `npm test` does not reach `test/` (KZ-017).
 - **Review:** `full` — largest diff, many call sites.
 - **Done:**
-  - [ ] Tests green, falsifiers observed red
-  - [ ] `/usr/bin/grep -rn MAPPABLE_LIVE_VERSION server/researchindicators/src server/researchindicators/test client/research-indicators/src` → 0 code hits (comments rewritten)
-  - [ ] `tsc` + `eslint` clean
-  - [ ] Integration suite run, result quoted
+  - [x] Tests green, falsifiers observed red
+  - [x] `/usr/bin/grep -rn MAPPABLE_LIVE_VERSION server/researchindicators/src server/researchindicators/test client/research-indicators/src` → 0 code hits (comments rewritten)
+  - [x] `tsc` + `eslint` clean
+  - [x] Integration suite run, result quoted
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-04 — Server write guard `pool_funding_year_locked`
@@ -406,6 +406,7 @@ graph TD
 | RB-1 | 2026-10-08 | P-6 unknown: an env that omitted `ARI_PRMS_SYNC` changes outbound URLs | Settled at T-02 start: owner confirmed both envs set 2026 (execution.md T-02) | d.casanas | closed |
 | RB-2 | 2026-10-08 | Prod seed migration not auto-applied (K-015) | Resolver falls back to 2026; T-09 rollout check | d.casanas | open |
 | RB-3 | 2026-10-08 | OQ-3: contribution endpoints lack the external-source gate (pre-existing) | Out of scope; carried forward | d.casanas | open |
+| RB-4 | 2026-10-08 | Integration suite environment-blocked: test DB passwords unset, scratch schema incomplete (`clarisa_levers` missing, `migration:test:bootstrap` fails at `CreateClarisaInnovationUseLevels`); `bilateral-primary-contributing-sp` stubs the resolver to 2026 | Recorded at T-03 (execution.md); re-run once scratch schema + credentials exist. Not counted as a pass | d.casanas | open |
 
 ## 6. Done definition
 

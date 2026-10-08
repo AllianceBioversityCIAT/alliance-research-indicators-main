@@ -53,6 +53,7 @@ const catalogResult = (): TocResult =>
         targets: [
           { target_value: '12', target_date: '2025' },
           { target_value: '40', target_date: '2026' },
+          { target_value: '91', target_date: '2027' },
         ],
       },
     ],
@@ -289,8 +290,10 @@ describe('PoolFundingMappingApplyService', () => {
   let warn: jest.SpyInstance;
   let errorLog: jest.SpyInstance;
   let catalog: FakeTocCatalog;
+  let resolveYear: jest.Mock;
 
   beforeEach(() => {
+    resolveYear = jest.fn().mockResolvedValue(2026);
     db = new FakeApplyDb();
     warn = jest
       .spyOn(LoggerUtil.prototype, '_warn')
@@ -303,7 +306,7 @@ describe('PoolFundingMappingApplyService', () => {
       db as unknown as DataSource,
       catalog as unknown as TocIntegrationService,
       {
-        resolve: jest.fn().mockResolvedValue(2026),
+        resolve: resolveYear,
       } as unknown as ReportingYearResolver,
     );
   });
@@ -394,6 +397,34 @@ describe('PoolFundingMappingApplyService', () => {
     db.sps = [primarySp()];
     db.tocs = [tocRow()];
   };
+
+  it('writes targetYear from the configured reporting year when it is 2027', async () => {
+    resolveYear.mockResolvedValue(2027);
+    armIndicatorCase();
+
+    await apply();
+
+    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME', 2027);
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect(inserted).toBeDefined();
+    expect((inserted as RecordedQuery).params).toEqual(
+      expect.arrayContaining(['91', 2027]),
+    );
+    expectSql(inserted as RecordedQuery, INSERT_TOC_SQL, [
+      VERSION_RESULT_ID,
+      'SP06',
+      INHERITED.aligns_with_toc,
+      INHERITED.level,
+      7169,
+      CATALOG_INDICATOR_ID,
+      '55',
+      'New title',
+      'Landscapes with an active plan',
+      'Landscapes',
+      '91',
+      2027,
+    ]);
+  });
 
   it('writes the callback indicator, not the inherited one, when the ToC result moves', async () => {
     armIndicatorCase();

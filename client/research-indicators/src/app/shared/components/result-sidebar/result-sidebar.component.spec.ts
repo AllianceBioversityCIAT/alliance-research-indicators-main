@@ -399,9 +399,9 @@ describe('ResultSidebarComponent', () => {
       });
 
       // --- Live-version (year) gate -------------------------------------------
-      // The reporting year is NOT a configurable parameter: the server resolves
-      // `report_year_id !== MAPPABLE_LIVE_VERSION` and ships the answer as
-      // `version_locked` on the alignment payload. These assert the sidebar
+      // The server compares `report_year_id` with the configured reporting
+      // year and ships the answer as `version_locked` on the alignment
+      // payload. These assert the sidebar
       // consumes it ALONGSIDE the pre-existing contract gate, never instead of it.
 
       it('hides the Pool Funding alignment tab when version_locked=true, even though eligible=true', () => {

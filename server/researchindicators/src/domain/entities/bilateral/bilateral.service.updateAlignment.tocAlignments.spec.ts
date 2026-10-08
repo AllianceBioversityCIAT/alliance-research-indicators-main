@@ -419,7 +419,19 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         },
       ],
     };
-    (service.getAlignment as jest.Mock).mockResolvedValueOnce(readBack);
+    const buildAlignment = jest
+      .spyOn(
+        service as unknown as {
+          buildAlignment: (
+            resultId: number,
+            resultCode: string,
+            user: User,
+            year: number,
+          ) => Promise<typeof readBack>;
+        },
+        'buildAlignment',
+      )
+      .mockResolvedValueOnce(readBack);
 
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
@@ -443,8 +455,8 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
     // Same object the read path produced — single mapping path (D-V2-5).
     expect(out).toBe(readBack);
-    expect(service.getAlignment).toHaveBeenCalledTimes(1);
-    expect(service.getAlignment).toHaveBeenCalledWith(19792, '19792', user);
+    expect(buildAlignment).toHaveBeenCalledTimes(1);
+    expect(buildAlignment).toHaveBeenCalledWith(19792, '19792', user, 2026);
     expect(out.version_locked).toBe(false);
     expect(out.toc_alignments).toHaveLength(1);
   });
