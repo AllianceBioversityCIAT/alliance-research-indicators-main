@@ -2,7 +2,7 @@
 
 - **Module:** bilateral (server `domain/entities/bilateral`, `result-prms-sync`, `tools/{toc-integration,clarisa}`; client result sidebar + Pool Funding Alignment page)
 - **Spec id:** 2026-10-pool-funding-reporting-year
-- **Status:** draft
+- **Status:** approved (judgment-day) · executed 2026-10-08 · validated WARN (`validation-report.md`)
 - **Owner:** d.casanas@cgiar.org
 - **Depth:** Standard
 - **Approval mode:** gated
@@ -321,7 +321,7 @@ Paths as today: the Pool Funding handlers are `@Version('1')` (`/api/v1/...`); `
 
 ## 12. Requirement ID index
 
-R-PRY-001 · R-PRY-002 · R-PRY-003 · R-PRY-004 · R-PRY-005 · R-PRY-006 · NFR-PRY-001 · NFR-PRY-002
+R-PRY-001 · R-PRY-002 · R-PRY-003 · R-PRY-004 · R-PRY-005 · R-PRY-006 · R-PRY-007 *(amended 2026-10-08)* · NFR-PRY-001 · NFR-PRY-002
 
 ## 13. Sign-off
 

@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-10-pool-funding-reporting-year
-- **Status:** draft (judgment-day round 1 fixes applied — see `judgment.md`)
+- **Status:** approved (judgment-day) · executed 2026-10-08 with two owner-approved amendments (§6 `hideSave`, §5.x display-only) · validated WARN
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked detailed design:** ../../../trd/trd.md (§9.1 integrations; Results endpoints list)
@@ -29,7 +29,7 @@ On the client:
 - The PRMS SYNC button is not rendered for an other-year result.
 - The page shows a `reporting-year` read-only banner, which replaces the ToC version-locked banner.
 
-**Budget (tripwire for `/akili-execute`):** **9 tasks · ~850 LOC incl. tests · ~13 review rounds** (re-derived after judgment round 1; existing spec realignment in toc/clarisa/sidebar/bilateral/sync-gate suites is most of the LOC). This stays within Standard depth.
+**Budget (tripwire for `/akili-execute`):** **9 tasks · ~850 LOC incl. tests · ~13 review rounds** *(planned)*. **Actual (re-derived 2026-10-08 at `/akili-validate`):** 11 tasks (T-10/T-11 added by the R-PRY-007 amendment) · +2831/−389 LOC `git diff --shortstat ec490da3c..e5cb2d43d -- server client` · 14 Reviewer verdicts. The tripwire fired after T-08, and the owner chose to continue (`execution.md`). (re-derived after judgment round 1; existing spec realignment in toc/clarisa/sidebar/bilateral/sync-gate suites is most of the LOC). This stays within Standard depth.
 
 ---
 
@@ -320,7 +320,7 @@ Fixtures vary **both** year and data per case (KZ-004).
 | --- | --- | --- |
 | Sidebar hides every other-year result (`result-sidebar.component.ts:122`) | Past-year results with no data would show an empty, locked section | Hidden when `has_pool_funding_data !== true` |
 | | `general-information` / `alliance-alignment` re-fetch the alignment to refresh visibility | Same signal and choke point; still works |
-| | Sidebar specs asserting "locked → hidden" (`result-sidebar.component.spec.ts` :407, :418, :455) | Stay green. Their fixtures omit `has_pool_funding_data`, so `!== true` keeps today's hide (§5); no red is predicted. Past-year visibility is covered by new cases that set the flag |
+| | Sidebar specs asserting "locked → hidden" (`result-sidebar.component.spec.ts` :410, :421, :458 at HEAD) | Stay green. Their fixtures omit `has_pool_funding_data`, so `!== true` keeps today's hide (§5); no red is predicted. Past-year visibility is covered by new cases that set the flag |
 | `toc_mapping_version_locked` 409 on the PATCH (R-BIL-097 AC.2/AC.3) | The client 409 matcher keys on it; specs in `bilateral.service.updateAlignment.tocAlignments.spec.ts` and the controller Swagger text cite it | The client also matches the new code (old kept for an older server); specs realigned; Swagger updated. The `/usr/bin/grep -rln toc_mapping_version_locked` sweep finds 3 server files + the client page and its spec |
 | Unset env → `?year=` / `?phase=` omitted | An environment that relied on omission would now send `2026` | P-6 UNVERIFIED; settled at the HITL pause |
 | The PATCH allowed on other years without `toc_alignments` | The current-year behavior is unchanged | Superseded for other-year results only (R-PRY-004) |

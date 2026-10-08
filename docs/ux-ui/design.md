@@ -595,6 +595,7 @@ Per-screen note (STAR): dark+light parity is not codified as a hard product cons
   - **Read-only, one grey banner.** A result outside the configured reporting year shows its saved Pool Funding answer with every control disabled or absent, under a single grey `pf-alignment-reporting-year-banner`. This cause outranks "synced to PRMS" so the page never shows two lock banners; the synced badge stays.
   - **Sidebar.** On a past year the PRMS SYNC button is hidden, and the whole Pool Funding section is hidden when the result has no Pool Funding data (`has_pool_funding_data`).
   - **No Save on a past year.** Save is absent, not disabled, through the opt-in `hideSave` input on the shared `NavigationButtonsComponent` (default `false`, so every other screen is unchanged). *Owner decision.* *Rationale:* a disabled Save reads as "fixable"; the year lock is permanent for that result.
+- **2026-10-08 — A non-eligible snapshot or PRMS result shows Pool Funding display-only.** Spec: `docs/specs/bilateral/pool-funding-reporting-year` (R-PRY-007). A result whose contract is not eligible but that already carries a snapshot, a PRMS sync or a PRMS code shows its saved Pool Funding record read-only under a grey `pf-alignment-display-only-banner` (`DISPLAY_ONLY_BANNER`: "This result's contract does not contribute to Pool Funding. The saved Pool Funding record below is shown for reference and is read-only."). There is no Save, no PRMS SYNC and no redirect. *Owner decision.*
 
 ---
 

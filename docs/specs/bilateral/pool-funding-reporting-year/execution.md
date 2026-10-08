@@ -412,7 +412,7 @@
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer 17 calls, 67626 tokens, ended complete`.
 
-### T-08 — Page read-only mode (`reporting-year` cause) — in progress
+### T-08 — Page read-only mode (`reporting-year` cause) → **PASS** (attempt 2; committed 7a4bbca23 after HITL)
 
 **Runtime event, attempt 1, Grok/Cursor (`task_bb322f1f61e0` / `ctx_ce2a1131b99d`):**
 - The worker read 15 files with no edits. A claude-mem hook then blocked a full-file `Read` of `pool-funding-alignment.component.ts`, and the turn ended idle without a report.
@@ -546,7 +546,7 @@ Production code is within scale.
 
 **Owner decision:** "Seguir con T-09" (continue). T-09 implementation is routed to Claude `akili-implementer` (Sonnet). Cursor usage is still exhausted, and the owner's T-08 re-route answer covered T-09.
 
-### T-09 — Baseline docs, rollout note, e2e + HITL — in progress
+### T-09 — Baseline docs, rollout note, e2e + HITL → **PASS** (HITL recorded below)
 
 **Attempt 1:** Claude `akili-implementer` (Sonnet, effort medium, skill `cognitive-doc-design`).
 
@@ -704,7 +704,7 @@ Production code is within scale.
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer 19 calls, 101812 tokens, ended complete; reviewer 16 calls, 69832 tokens, ended complete`.
 
-### T-11 — Client: display-only section → **PASS** (uncommitted, awaiting owner visual approval)
+### T-11 — Client: display-only section → **PASS** (committed 7a4bbca23 after HITL)
 
 | Field | Value |
 | --- | --- |
@@ -808,3 +808,27 @@ Checklist sent:
   - The snapshot does not copy `is_synced_to_prms`.
   - The `pi-delegates` e2e writes to the shared Dev DB.
   - Pre-existing client 409 matchers on the top-level `description` are probably dead.
+
+
+## Validation remediation (2026-10-08)
+
+`validation-report.md` returned **WARN**: 0 FAIL in code or tests. The owner chose "Arreglar docs (R-1, R-4)" and "Excepción KZ-002".
+
+- **R-3, the KZ-002 exception.** The T-09 HITL is accepted as a **blanket approval** of the per-result checklist the owner was sent ("lo veo bien haz commit"). The owner explicitly declined to re-attest it item by item. This is a recorded exception to KZ-002: the per-item mapping of results to items (1)–(5) does not exist.
+- **R-4, metadata.** The following were corrected:
+  - the budget, re-derived in design §0 and in the `tasks.md` header
+  - R-PRY-007 added to the requirements §12 index
+  - the Done definition now reads T-01 … T-11
+  - a note on the T-08 cause order
+  - the requirements/design status lines
+  - the §12.1 line references
+  - the T-08/T-09/T-11 headers
+  - The sign-off checkboxes in `requirements.md` §13 are left for the owner.
+- **R-1, the TRD/UX doc fixes.** Delegated to an implementer; the result is recorded below.
+- **R-2, still open.** The live `GET /api/configuration/ARI_PRMS_SYNC` → `"2026"` check is carried as a rollout item. A read-only Dev query showed the `ARI_PRMS_SYNC` row absent until the branch is merged to `dev`, whose pipeline runs `migration:execute`.
+- **R-1 applied** by an implementer and verified by the Leader against the code:
+  - **`docs/trd/trd.md:308`:**
+    - The table name is now `result_prms_sync_log`. The `reporting_year` gate entry has `persistsRow: false` (`sync-gate.ts:123-129`).
+    - `display_only` is added, with its rule.
+  - **`docs/ux-ui/design.md`:** a new 2026-10-08 display-only decision entry.
+    - The sidebar PRMS SYNC gate (`result-sidebar.component.html:179`) and the page's no-redirect gate (`pool-funding-alignment.component.ts:552`) were checked by the Leader.

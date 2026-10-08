@@ -8,7 +8,7 @@
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
 - **Baseline commit:** `ec490da3c`
 - **Last updated:** 2026-10-08
-- **Budget (tripwire):** 9 tasks · ~850 LOC · ~13 review rounds (design §0)
+- **Budget (tripwire):** 9 tasks · ~850 LOC · ~13 review rounds planned (design §0). Actual: 11 tasks · +2831/−389 · 14 verdicts (design §0, re-derived at validation)
 
 ---
 
@@ -306,7 +306,7 @@ graph TD
   - R-PRY-004 client side: a `pool_funding_year_locked` 409 is shown as the locked state
 - **Design:** §5 cause table, single banner, synced badge re-key, 409 matcher, §6 tables, D-9
 - **Scope:**
-  - `readOnlyCause` restructure, in order: prms-sourced → reporting-year → synced → permission.
+  - `readOnlyCause` restructure, in order: prms-sourced → reporting-year → synced → permission. *(T-11 later inserted `display-only` after `reporting-year`; see design §5.)*
   - New banner `pf-alignment-reporting-year-banner`, grey recipe, copy as in design §6.
   - `VERSION_LOCKED_BANNER` → computed, year-aware; hidden under `reporting-year`.
   - Synced badge keyed on `isSyncedToPrms()`.
@@ -473,7 +473,7 @@ graph TD
 
 ## 6. Done definition
 
-- [x] T-01 … T-09 done, each with a Reviewer PASS in `execution.md`
+- [x] T-01 … T-11 done, each with a Reviewer PASS in `execution.md`
 - [x] Full server and client suites green, re-measured by the Leader
 - [x] HITL check (T-09) quoted **before** `/akili-validate` (KZ-007)
 - [x] Rollout note in place
