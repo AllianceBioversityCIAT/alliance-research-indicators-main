@@ -83,3 +83,27 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Unrun check:** `tsc -p tsconfig.spec.json` on the new spec not run (Reviewer note); Leader full-suite + tsc pass scheduled at the end of PR 2.
 - **Requirements covered:** NFR-PFM-003, NFR-PFM-004 (non-color cue; contrast pending HITL), R-PFM-004 rendering, R-PFM-012 ("—").
 - **Continue gate:** auto-approved (pre-approved mode).
+
+#### T-02 — Repository: base monitored-results SQL, monthly series, filter options — **PASS** (2026-10-08)
+
+- **Attempts:** 1 · **Skills / effort:** `nestjs-expert`, `systematic-debugging` · high.
+- **Files (new):** `repositories/pooled-funding-monitor.repository.ts` (`findMonitoredResults`, `countContributingProjects`, `findMonthlySyncs`, `findFilterOptions`; `PfmMonitoredRow extends PfmRawRow`; pure `splitSciencePrograms` for DD-PFM-7), `repositories/pooled-funding-monitor.repository.spec.ts` (17 unit), `test/pooled-funding-monitor.integration-spec.ts` (21 on real MySQL).
+- **SQL approach:** raw `DataSource.query`, all request values bound; `effectivePoolFundingContributorSql('ac')` literal alias; PI predicate `projectLeadId IN (carnet via sec_users→alliance_user_staff) OR EXISTS active pi_delegates`, parenthesised; filters STAR / non-snapshot / active / `deleted_at IS NULL` / indicators {1,2,3,4,6} / primary active link / active contract; duplicate-current-row guard (newest `result_id` per platform+code); approval date `MAX(COALESCE(custom_date, created_at))` over versions of (code, year, platform); latest PRMS history `{status, justification}` ordered `COALESCE(decided_at, occurred_at) DESC, id DESC` (same as the history modal reader); dates emitted TZ-stable via `UNIX_TIMESTAMP` → ISO-Z string (resolves T-01 advisory).
+- **Seeded vs independent count (real MySQL, scratch schema; independent SQL shares no text with the repository):**
+
+| Scope | Repository | Independent SQL |
+|---|---|---|
+| Portfolio | 7 | 7 |
+| PI A | 4 | 4 |
+| PI B | 3 | 3 |
+
+  Independent query: `SELECT COUNT(DISTINCT r.result_official_code) FROM results r WHERE r.platform_code='STAR' AND r.is_snapshot=0 AND r.is_active=1 AND r.indicator_id<>5 AND r.result_id IN (SELECT rc.result_id FROM result_contracts rc WHERE rc.is_primary=1 AND rc.is_active=1 AND rc.contract_id IN (<hand-named projects>))`. Also asserted: delegate = PI A; revoked delegate / stranger = 0; exclusions (OICR, TIP, AICCRA, non-primary, non-contributing, inactive result/link/contract, no contract); snapshot pair → 1 row; NULL-role single SP → primary, two → none; approval date across UTC midnight; latest history per (code, year).
+- **K-004 reds:** drop platform filter → 7 fail; remove PI-OR parentheses → isolation fails (+7 rows, KZ-017 precedence case); plain `DATE_FORMAT` → session-TZ test fails; drop `result_year` from history lookup → 1 fail; remove duplicate guard → 4 fail. All restored.
+- **Verification — Leader re-measured in a quiet window:** `npx jest src/domain/entities/pooled-funding-monitor --silent` → 2 suites, 59/59; `PFM_MYSQL_PASSWORD=*** npx jest --config test/jest-integration.json test/pooled-funding-monitor --silent` → 21/21. eslint + prettier clean (implementer).
+- **Test DB handling:** disposable scratch schema `ari_scratch_test` only; seeding in one transaction rolled back in `afterAll` (asserts `results` empty). `alliancereportingdb` received read-only SELECTs only. PRMS log/history tables absent in scratch → created as TEMPORARY by replaying the real migration `up()` classes (`1789479131116`, `1790023167000`, `1790086170692`), FKs skipped (history has none by design).
+- **RB-1 status:** Reviewer ruling — PRMS branch **verified against a migration-faithful replica**, not inconclusive; remaining gap: *not yet run against a persistent, migrated table*. RB-1 stays open.
+- **Pre-existing defect found (out of scope, reported to owner):** `npm run migration:test:execute` on a clean scratch schema fails at `1787600000000-createPiDelegates` with `ER_FK_INCOMPATIBLE_COLUMNS` (charset/collation mismatch vs `agresso_contracts.agreement_id`); a partial empty `pi_delegates` table was left in the scratch schema. A worker attempt to hand-create tables on the scratch container was blocked by the permission classifier and was not retried.
+- **Reviewer (opus):** `STATUS: PASS` — no injection, all ORs parenthesised, scope from authenticated user only, predicate = My Projects minus `created_by`. Judgment calls accepted: `ac.is_active=1`; newest-row duplicate guard; no `event_source` filter on latest history (a STAR re-push after REJECTED must read Pending Review); SP options only from `has_contribution=1`; months returned sparse, zero-fill in T-03; `userId` required for MINE.
+- **ADVISORY (non-gating; carried into later briefs):** `results.updated_at` nullable vs `Date` type → T-05 renders "—"; duplicate guard lacks `deleted_at IS NULL` in its subquery (edge anomaly); `synced_this_year` cannot be the sum of monthly rows if it means distinct results → T-03 decides; raw `Error` for MINE without user id → T-05 makes unreachable / maps to HTTP; mixed `decided_at`/`occurred_at` clocks (same as history modal); 5 correlated subqueries per row → first suspect if NFR-PFM-002 misses in T-05; `npm run test:integration` needs `PFM_MYSQL_PASSWORD` (precedent: pi-delegates).
+- **Requirements covered:** R-PFM-003, R-PFM-002 (data predicate), R-PFM-004 (sources), R-PFM-008 (data), R-PFM-009 (options).
+- **Continue gate:** auto-approved (pre-approved mode).

@@ -81,7 +81,7 @@ graph TD
 
 ### T-02 — Repository: base monitored-results SQL, monthly series, filter options (server)
 
-- **Status:** todo · **Size:** L · **Dependencies:** none
+- **Status:** done · **Size:** L · **Dependencies:** none
 - **Requirements covered:**
   - R-PFM-003 — all scenarios: OICR excluded, non-primary, snapshots + "AND IT MUST not double-count", other platforms.
   - R-PFM-002 — "Default PI scope" data predicate.
@@ -113,10 +113,10 @@ graph TD
   - a synced result with and without history.
 - **Precondition:** the test DB has `result_prms_sync_history` (migration `1790086170692`). **Applying it to the local DB is a human decision (RB-1)** — the worker must stop and ask, not run `migration:execute`.
 - **Done:**
-  - [ ] Seeded counts equal an independent hand-written SQL count (quoted in `execution.md`).
-  - [ ] A query for PI A never returns PI B's rows.
-  - [ ] The TIP, OICR and non-primary rows are absent.
-  - [ ] The snapshot pair yields 1 row.
+  - [x] Seeded counts equal an independent hand-written SQL count (quoted in `execution.md`).
+  - [x] A query for PI A never returns PI B's rows.
+  - [x] The TIP, OICR and non-primary rows are absent.
+  - [x] The snapshot pair yields 1 row.
 - **Disqualifies:** if the PRMS-history branch ran against a DB without the table, report **inconclusive**, not pass. Asserting on generated SQL text instead of returned rows is also disqualified.
 - **Skills:** `nestjs-expert`, `systematic-debugging`
 
