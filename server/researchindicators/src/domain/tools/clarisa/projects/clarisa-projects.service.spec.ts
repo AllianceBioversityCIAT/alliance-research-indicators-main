@@ -206,7 +206,38 @@ describe('ClarisaProjectsService', () => {
       expect(service.hasSciencePrograms(project)).toBe(false);
     });
 
-    it('returns false when mapping is Confirmed but cgiar_entity_type_object code is not 22 (e.g. 26 for AOW)', () => {
+    it.each([
+      [23, 'Scaling programs', 'SP09'],
+      [24, 'Accelerators', 'SP13'],
+    ])(
+      'returns true for a Confirmed SP filed under entity code %i (%s, %s) — no entity-type narrowing',
+      (code, typeName, smoCode) => {
+        const project: ClarisaProject = {
+          id: 322,
+          short_name: 'B-A1080',
+          source_of_funding: 'bilateral',
+          project_mappings_array: [
+            {
+              id: 527,
+              project_id: 322,
+              program_id: 411,
+              allocation: 100,
+              status: 'Confirmed',
+              global_unit_object: {
+                id: 411,
+                name: 'Genebank',
+                smo_code: smoCode,
+                cgiar_entity_type_object: { code, name: typeName },
+              },
+            },
+          ],
+        };
+
+        expect(service.hasSciencePrograms(project)).toBe(true);
+      },
+    );
+
+    it('returns false when mapping is Confirmed but the mapping is an AOW (code 26, AOWxx smo_code)', () => {
       const project: ClarisaProject = {
         id: 3,
         short_name: 'P-AOW-MAPPING',

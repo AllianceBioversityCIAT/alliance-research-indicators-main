@@ -60,7 +60,10 @@ export class ClarisaProjectsService {
   /**
    * Checks whether a project carries at least one accepted Science Program mapping (R-BAS-004, R-PSP-003).
    * Computed once here and used by both the opt-in filter and the controller DTO mapping.
-   * Preserves code === 22 narrowing per D-PSP-8.
+   * No entity-type narrowing (closes D-PSP-8 / OQ-2): CLARISA files SP01–SP08 under
+   * code 22, SP09 under 23 (Scaling programs) and SP10–SP13 under 24 (Accelerators),
+   * so an SP is recognised by its `SPxx` smo_code — the same rule the per-result
+   * picker applies — which also keeps AOW rows (code 26, `AOWxx`) out.
    */
   hasSciencePrograms(project: ClarisaProject): boolean {
     const acceptedStatuses = ENV.BILATERAL_ACCEPTED_SP_STATUSES;
@@ -68,7 +71,7 @@ export class ClarisaProjectsService {
       project.project_mappings_array?.some(
         (m) =>
           isAcceptedSpStatus(m.status, acceptedStatuses) &&
-          m.global_unit_object?.cgiar_entity_type_object?.code === 22,
+          /^SP\d/i.test(m.global_unit_object?.smo_code?.trim() ?? ''),
       ) ?? false
     );
   }
