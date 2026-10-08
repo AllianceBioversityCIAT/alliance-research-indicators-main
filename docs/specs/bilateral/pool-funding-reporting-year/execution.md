@@ -703,3 +703,55 @@ Production code is within scale.
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer 19 calls, 101812 tokens, ended complete; reviewer 16 calls, 69832 tokens, ended complete`.
+
+### T-11 — Client: display-only section → **PASS** (uncommitted, awaiting owner visual approval)
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Implementer | Claude `akili-implementer` (Sonnet, effort high), skills `angular-developer`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (Opus, fresh context), **PASS**, audited as the T-11 delta on top of the T-08 diff |
+| Requirements covered | R-PRY-007 (client) |
+
+**Files changed, on top of the uncommitted T-08 work:**
+- `pool-funding-alignment.interface.ts`: `display_only?`.
+- `result-sidebar.component.{ts,html,spec.ts}`: the hide rule is `eligible === false && display_only !== true`. The PRMS SYNC button is omitted on `display_only`.
+- `pool-funding-alignment.component.{ts,html,spec.ts}`:
+  - adds the `displayOnly` and `displayOnlyTocRows` computeds
+  - the redirect excludes `display_only`
+  - `getSciencePrograms` and `getTocCatalog` are skipped on `display_only`
+  - new cause `display-only` with `pf-alignment-display-only-banner`
+  - `hideSave` covers `display_only`
+  - new read-only `pf-alignment-display-only-section`, rendered from the saved payload (SP rows, plus ToC level / `toc_result_title` / `indicator_description`). It works with an empty catalog (T-10 forward pointer closed).
+
+**Implementer verification (as reported):**
+- Scoped: 4 suites, 568 tests. `tsc` stays at 945. Lint passes.
+- Initial red (sidebar): `Received: null` at `> 914 | expect(poolFundingItem()).not.toBeNull();`.
+- Falsifiers, each reverted after observing the red:
+  - (a) The sidebar rule reverted makes the same two assertions red (:914, :926).
+  - (b) The redirect reverted gives 5 failures, including `expect(routerNavigate).not.toHaveBeenCalled()` with `Expected number of calls: 0 / Received number of calls: 1` and `expect(spRow).not.toBeNull()` with `Received: null`.
+  - (c) `displayOnly()` dropped from `hideSave` fails the Save-absent check with `Expected: false / Received: true`.
+- KZ-015: there is an "editable, then flip to display_only" case.
+
+**Evidence re-run (Leader inline): VERIFIED.**
+- Full client suite (`npm test -- --silent`): **341 suites / 7892 tests**. `tsc -p tsconfig.spec.json`: 945 (baseline). Lint passes.
+- `npm run build` completes. The only page warnings are the pre-existing NG8102 `sp.allocation ?? '—'`, now at html :265/:318; they were at :203/:256 and moved down because of the inserted markup.
+- No new hex literals in the added lines. The testid consumers outside specs are only the component html files.
+
+**Execute-time spec edit (2026-10-08):** the design §5 cause table now reads 1 prms-sourced (`&& display_only !== true`), 2 reporting-year, 3 **display-only**, 4 synced, 5 permission.
+- This brings the table in line with §5.x ("inserted after `reporting-year`"). It does not change an approved requirement's meaning. It closes the Reviewer's spec-drift advisory.
+- The banner copy is written into §5, pending owner sign-off.
+
+**Assumptions carried (verbatim in gist):**
+1. A PRMS-imported non-eligible live result shows the display-only banner and no "Owned by PRMS" badge, because the client cannot tell the case apart; the server ORs the flags. A server `is_prms_sourced` field would fix it. Owner's call.
+2. The display-only banner copy is the implementer's own wording.
+
+**ADVISORY:**
+1. The banner copy is singular ("This result's contract…") but STAR-20081 has two contracts. Wording for any number of contracts should be approved at the HITL check.
+2. A display-only result with `has_contribution === null` shows the banner and disabled empty radios.
+3. `track row.sp_code` would warn if the server ever returned two ToC rows for one SP. `track $index` would avoid that.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer 27 calls, 155722 tokens, ended complete; reviewer 18 calls, 98269 tokens, ended complete`.

@@ -173,10 +173,13 @@ Both flags are compared with `=== true`. A server that omits `has_pool_funding_d
 
 | # | Condition | Cause |
 | --- | --- | --- |
-| 1 | `is_read_only && !is_synced_to_prms` | `prms-sourced` |
+| 1 | `is_read_only && !is_synced_to_prms && display_only !== true` | `prms-sourced` |
 | 2 | `version_locked === true` | **`reporting-year`** |
-| 3 | `is_synced_to_prms` | `synced` |
-| 4 | `!editable()` | `permission` |
+| 3 | `display_only === true` *(amended 2026-10-08, R-PRY-007)* | `display-only` |
+| 4 | `is_synced_to_prms` | `synced` |
+| 5 | `!editable()` | `permission` |
+
+*Amended 2026-10-08 (R-PRY-007, T-11 review).* The server ORs `display_only` into `is_read_only`, so row 1 must exclude it. Otherwise every unsynced display-only result would read as `prms-sourced`. As a known consequence, a PRMS-imported non-eligible live result shows the display-only banner, not "owned by PRMS". The client cannot tell the two apart without a server `is_prms_sourced` field (owner's call). `display-only` banner copy, pending owner sign-off at the T-09 HITL: "This result's contract does not contribute to Pool Funding. The saved Pool Funding record below is shown for reference and is read-only." 
 
 Under `reporting-year`, the ToC block banner (`pf-alignment-version-locked-banner`, html :379-384) is suppressed, so only one banner explains the lock. The synced badge (`pf-alignment-synced-badge`, html :22-28) is re-keyed from `readOnlyCause() === 'synced'` to `isSyncedToPrms()`, so it still shows on a past-year synced result.
 

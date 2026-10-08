@@ -407,7 +407,7 @@ graph TD
 
 ### T-11 — Client: show the display-only section *(amended 2026-10-08)*
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-10, T-08
+- **Status:** done (uncommitted — awaiting owner visual approval at T-09 HITL) · **Size:** M · **Dependencies:** T-10, T-08
 - **Requirements:** R-PRY-007 (client side)
 - **Design:** §5.x, §6
 - **Scope:**
@@ -431,8 +431,8 @@ graph TD
   - the testids `sidebar-prms-sync-button` and `pf-alignment-*-banner`
 - **Review:** `full`
 - **Done:**
-  - [ ] Tests green, falsifiers red
-  - [ ] Client `tsc` (945 baseline) + lint + build clean
+  - [x] Tests green, falsifiers red
+  - [x] Client `tsc` (945 baseline) + lint + build clean
 - **Skills:** `angular-developer`, `tdd`
 
 ## 4. Coverage closure (scenario / clause → task)
