@@ -211,7 +211,7 @@ graph TD
 
 ### T-05 — PRMS sync gate `reporting_year`
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done · **Size:** M · **Dependencies:** T-01
 - **Requirements:** R-PRY-005 "Push on past year": THEN, AND IT MUST NOT call the Normalizer, AND IT MUST NOT write a log row; ordering after `not_already_synced`
 - **Design:** §2.1 (`sync-gate.ts`, `result-prms-sync-log.repository.ts`), §4 row 5, D-6, P-10, P-13
 - **Scope:**
@@ -234,9 +234,9 @@ graph TD
 - **Consumers:** the 9 `SyncGateSnapshot`/`loadGateSnapshot` files (design P-13 / §10). Run `npm run test:integration` for the claim-concurrency spec.
 - **Review:** `full` — gate ladder semantics.
 - **Done:**
-  - [ ] Tests green, falsifiers observed red
-  - [ ] Integration suite result quoted
-  - [ ] `tsc` + `eslint` clean
+  - [x] Tests green, falsifiers observed red
+  - [x] Integration suite result quoted
+  - [x] `tsc` + `eslint` clean
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-06 — Client contract + `BilateralService.editable`
@@ -406,7 +406,7 @@ graph TD
 | RB-1 | 2026-10-08 | P-6 unknown: an env that omitted `ARI_PRMS_SYNC` changes outbound URLs | Settled at T-02 start: owner confirmed both envs set 2026 (execution.md T-02) | d.casanas | closed |
 | RB-2 | 2026-10-08 | Prod seed migration not auto-applied (K-015) | Resolver falls back to 2026; T-09 rollout check | d.casanas | open |
 | RB-3 | 2026-10-08 | OQ-3: contribution endpoints lack the external-source gate (pre-existing) | Out of scope; carried forward | d.casanas | open |
-| RB-4 | 2026-10-08 | Integration suite environment-blocked: test DB passwords unset, scratch schema incomplete (`clarisa_levers` missing, `migration:test:bootstrap` fails at `CreateClarisaInnovationUseLevels`); `bilateral-primary-contributing-sp` stubs the resolver to 2026 | Recorded at T-03 (execution.md); re-run once scratch schema + credentials exist. Not counted as a pass | d.casanas | open |
+| RB-4 | 2026-10-08 | Integration suite environment-blocked: test DB passwords unset, scratch schema incomplete (`clarisa_levers` missing, `migration:test:bootstrap` fails at `CreateClarisaInnovationUseLevels`); `bilateral-primary-contributing-sp` stubs the resolver to 2026 | Recorded at T-03 (execution.md); re-run once scratch schema + credentials exist. Not counted as a pass. T-05 (2026-10-08): claim-concurrency run failed earlier with `ECONNREFUSED 127.0.0.1:3307` (container down) — different cause; and that spec mocks the snapshot without year fields, so it cannot exercise the gate (KZ-017) | d.casanas | open |
 
 ## 6. Done definition
 

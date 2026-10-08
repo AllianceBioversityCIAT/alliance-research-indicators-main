@@ -255,6 +255,67 @@ describe('ResultPrmsSyncService', () => {
     );
   });
 
+  it('2025 vs 2026 is a reporting_year refusal: log insert not called and Normalizer not called', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ report_year: 2025, reporting_year: 2026 }),
+    );
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.claimAttempt).not.toHaveBeenCalled();
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).message).toContain('2025');
+    expect((refusal as ConflictException).message).toContain('2026');
+  });
+
+  it('already-synced 2025 is refused as not_already_synced, ahead of reporting_year', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({
+        is_synced_to_prms: true,
+        report_year: 2025,
+        reporting_year: 2026,
+      }),
+    );
+
+    await expect(service.sync(42)).rejects.toMatchObject({
+      message: PRMS_SYNC_ALREADY_SYNCED,
+    });
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+  });
+
+  it('calls the Normalizer when report_year and reporting_year are absent', async () => {
+    const result = await service.sync(42);
+
+    expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(normalizer.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a null result year against a non-2026 reporting year without a log row', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ report_year: null, reporting_year: 2027 }),
+    );
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).message).toContain('2027');
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+  });
+
   it('persists REFUSED_BY_STAR only when the gate says persistsRow', async () => {
     logRepository.loadGateSnapshot.mockResolvedValue(
       eligibleFacts({ pool_funding_alignment_green: false }),

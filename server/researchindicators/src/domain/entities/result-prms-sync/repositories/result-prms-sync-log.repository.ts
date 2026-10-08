@@ -8,6 +8,7 @@ import { isFeatureFlagEnabled } from '../../../shared/utils/feature-flag.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
@@ -104,7 +105,10 @@ export class ResultPrmsSyncLogRepository {
     name: 'ResultPrmsSyncLogRepository',
   });
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly reportingYearResolver: ReportingYearResolver,
+  ) {}
 
   /**
    * R-PFT-003: a missing row, a non-`false` value, or a failed read is enabled.
@@ -131,6 +135,7 @@ export class ResultPrmsSyncLogRepository {
   }
 
   async loadGateSnapshot(resultId: number): Promise<PrmsSyncGateFacts> {
+    const reportingYear = await this.reportingYearResolver.resolve();
     const missing: PrmsSyncGateFacts = {
       exists: false,
       result_id: null,
@@ -142,6 +147,8 @@ export class ResultPrmsSyncLogRepository {
       indicator_id: null,
       prms_policy_type_id: null,
       prms_sync_button_enabled: false,
+      report_year: null,
+      reporting_year: reportingYear,
     };
 
     const rows = await this.dataSource.query(
@@ -152,6 +159,7 @@ export class ResultPrmsSyncLogRepository {
         r.is_synced_to_prms,
         r.result_status_id,
         r.indicator_id,
+        r.report_year_id,
         pool_funding_alignment_validation(r.result_id) AS alignment_green,
         ac.agreement_id,
         ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
@@ -203,6 +211,9 @@ export class ResultPrmsSyncLogRepository {
         row.policy_type_id == null ? null : Number(row.policy_type_id),
       ),
       prms_sync_button_enabled: prmsSyncButtonEnabled,
+      report_year:
+        row.report_year_id == null ? null : Number(row.report_year_id),
+      reporting_year: reportingYear,
     };
   }
 

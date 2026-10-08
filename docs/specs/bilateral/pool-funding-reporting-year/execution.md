@@ -360,3 +360,54 @@
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer 11 calls, 56444 tokens, ended complete`.
+
+### T-05 — PRMS sync gate `reporting_year` → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Orca task / dispatch | `task_9d14b2f6dd3e` / `ctx_12145de457e6`. Ran in parallel with T-07 (client) |
+| Implementer | Cursor · `grok-4.7-high`, effort high, skills `nestjs-expert`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (fresh context) — **PASS** |
+| Requirements covered | R-PRY-005 "Push on past year": THEN; no Normalizer call; no log row; ordering after `not_already_synced` |
+
+**Consumer grep:** `SyncGateSnapshot|loadGateSnapshot` over `src` and `test` returned 9 files.
+- **Changed (6):** `sync-gate.ts`/`.spec`, `result-prms-sync-log.repository.ts`/`.spec`, `result-prms-sync.service.spec.ts`, `test/result-prms-sync-claim-concurrency.integration-spec.ts`.
+- **Unchanged (3), because the new snapshot fields are optional (design §10):** `result-prms-sync.service.ts`, `result-prms-sync.controller.spec.ts`, `knowledge-product.builder.spec.ts`.
+- The Reviewer also grepped the whole repo outside `docs/` for anything that enumerates gate entry IDs. Nothing on the client or in a socket event enumerates them, so no consumer misses the new `'reporting_year'`.
+
+**Implementer verification (as reported):**
+- Scoped run: 3 suites, 80 tests pass. `tsc` exit 0. `eslint` exit 0.
+- Pre-implementation reds observed:
+  - `decision.allowed`: Expected false, Received true.
+  - entry id: Expected `"reporting_year"`, Received `null`.
+  - SQL: Expected substring `"r.report_year_id"`, absent from the SELECT.
+  - `snapshot.report_year`: undefined.
+- Falsifiers, each reverted after observing red:
+  - (a) `persistsRow: true` → `Expected number of calls: 0, Received number of calls: 1` on the log insert (failureReason "Result year 2025 is not the reporting year 2026").
+  - (b) Entry placed before `not_already_synced` → `Expected "not_already_synced", Received "reporting_year"`.
+  - (c) `!==` without `Number()` → `Expected true, Received false` on `decision.allowed` for the string `'2025'` vs `2025`.
+- Integration: `npm run test:integration -- --testPathPattern=result-prms-sync-claim-concurrency --forceExit` → 1 suite, 3 failed, `connect ECONNREFUSED 127.0.0.1:3307`. This is environmental: no scratch container was running, and none was started. The shared Dev DB was not used.
+
+**Evidence re-run (Leader inline, after both parallel workers reported): VERIFIED.** Server `tsc` exit 0. `npx eslint` on the 6 changed files exit 0. Full server suite (`npm test -- --silent`): **424 suites / 4080 tests passed**.
+
+**Not Done / Assumptions (carried verbatim in gist):**
+- The integration assertions never ran.
+- The refusal sentence is "Result year {year} is not the reporting year {configured}", with `null` when the year is null. The design requires both years to be named but does not fix the wording.
+- `ResultPrmsSyncModule` is not edited, because the resolver comes from the `@Global()` `GlobalUtilsModule`.
+- A non-2026 configured year (2027) is used in the gate mismatch case, the service null-year case and the repository stub.
+
+**RB-4 updated:**
+- This run failed on a different, earlier cause (`ECONNREFUSED`, container not running) than the one T-03 recorded (credentials unset, schema incomplete). It therefore says nothing about whether RB-4's original cause still holds.
+- The claim-concurrency integration spec mocks `loadGateSnapshot` with year-less facts, so even a working environment would not exercise the year gate there (KZ-017).
+- Only the repository spec's SQL-text assertion proves the SELECT, and nothing yet runs that SELECT against a real schema.
+
+**ADVISORY (non-gating):**
+1. `loadGateSnapshot` resolves the year before checking that the result exists, which costs one extra `app_config` read on a missing result. This is harmless.
+2. If a future builder sets `reporting_year` without `report_year`, `NaN` would refuse every push without explanation. A comment on the optional field is suggested.
+3. KZ-017 scope, as noted under RB-4 above.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer not reported by host, ended complete; reviewer 17 calls, 67626 tokens, ended complete`.

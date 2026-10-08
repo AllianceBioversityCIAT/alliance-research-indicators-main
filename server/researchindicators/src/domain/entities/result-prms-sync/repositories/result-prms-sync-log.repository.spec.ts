@@ -1,6 +1,7 @@
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import {
@@ -12,12 +13,14 @@ import { ResultPrmsSyncLogRepository } from './result-prms-sync-log.repository';
 describe('ResultPrmsSyncLogRepository', () => {
   let query: jest.Mock;
   let transactionQuery: jest.Mock;
+  let resolveYear: jest.Mock;
   let repository: ResultPrmsSyncLogRepository;
   let manager: Pick<EntityManager, 'query'>;
 
   beforeEach(() => {
     query = jest.fn();
     transactionQuery = jest.fn();
+    resolveYear = jest.fn().mockResolvedValue(2026);
     manager = { query: transactionQuery };
     const dataSource = {
       query,
@@ -25,7 +28,9 @@ describe('ResultPrmsSyncLogRepository', () => {
         work(manager as EntityManager),
       ),
     } as unknown as DataSource;
-    repository = new ResultPrmsSyncLogRepository(dataSource);
+    repository = new ResultPrmsSyncLogRepository(dataSource, {
+      resolve: resolveYear,
+    } as unknown as ReportingYearResolver);
   });
 
   const claim = (now = new Date('2026-09-15T12:00:00.000Z')) =>
@@ -619,6 +624,37 @@ describe('ResultPrmsSyncLogRepository', () => {
       is_pool_funding_contributor: 1,
       policy_type_id: null,
     };
+
+    it('loadGateSnapshot selects r.report_year_id and sets reporting_year from the resolver', async () => {
+      resolveYear.mockResolvedValue(2027);
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          report_year_id: '2025',
+        },
+      ]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      const selectSql = query.mock.calls[0][0] as string;
+      expect(selectSql).toContain('r.report_year_id');
+      expect(snapshot.report_year).toBe(2025);
+      expect(snapshot.reporting_year).toBe(2027);
+    });
+
+    it('loadGateSnapshot records a null report_year when report_year_id is null', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          report_year_id: null,
+        },
+      ]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      expect(snapshot.report_year).toBeNull();
+      expect(snapshot.reporting_year).toBe(2026);
+    });
 
     it('loadGateSnapshot does not constrain is_snapshot, and resolves a version row', async () => {
       query.mockResolvedValueOnce([snapshotRow]);
