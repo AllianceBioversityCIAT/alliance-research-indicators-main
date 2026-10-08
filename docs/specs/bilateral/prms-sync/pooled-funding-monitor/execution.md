@@ -43,3 +43,25 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Issues noted (non-blocking):** 5 pre-existing `tsc -p tsconfig.spec.json` errors in `results-center-table.component.spec.ts` (`updateFn` unknown ×3, `MouseEvent` casts ×2) — file untouched by this task; out of scope.
 - **Requirements covered:** R-PFM-013 (link rule half; the View rendering half is T-13).
 - **Continue gate:** auto-approved (pre-approved mode).
+
+#### T-01 — Pure derivation functions and enums — attempt 1: **FAIL**
+
+- **Skills / effort:** `nestjs-expert`, `tdd` · medium.
+- **Files:** `server/.../pooled-funding-monitor/derivation/pfm-derivation.ts` + `.spec.ts` (42 tests), `enum/pfm-{scope,star-label,mapping-state,prms-status,status-filter,chip}.enum.ts` (8 new files).
+- **Implementer verification:** `npx jest src/domain/entities/pooled-funding-monitor --silent` → 42 passed; eslint + prettier clean. K-004 mutation runs: status 7→Draft ⇒ 1 red; synced-without-history→Not sent ⇒ 5 red; No-SP check removed ⇒ 5 red; needsAttention including out-of-scope ⇒ 3 red; isReady without Approved ⇒ 3 red; all restored green.
+- **Review input deviation:** the change set is 8 new untracked files only, so the Reviewer was given their paths to read in full instead of an inline 668-line diff (diff ≡ file contents). Recorded per Step 2.3.
+- **Reviewer (opus):** `STATUS: FAIL` — verbatim issue:
+  1. **Discovered Issue:** `PfmScopeEnum.PORTFOLIO = 'portfolio'` in `enum/pfm-scope.enum.ts` does not match the API contract. Design §4 says `scope=mine|all` (default `mine`); `?scope=all` would be rejected and the client store mirroring `?scope=` would be built against the wrong value. **Violated Rule:** design.md §4, summary endpoint, "Query: `scope=mine|all` (default `mine`)". **Remediation:** change to `ALL = 'all'`, or amend design §4 with a logged decision first.
+- **Decisions judged conforming by the Reviewer:** (a) mapping checks "no alignment → Not started" before "has_contribution=0 → No SP contribution" — `has_contribution` is NOT NULL on the entity, so NULL only arises from a missing row; design §5's bullet order is the imprecise part. (b) case-insensitive PRMS history status, fallback Pending Review; (d) unmapped status → raw name, empty PI line; (e) Approved with null date → "Approved"; (g) red evidence via mutation runs; (h) DD-PFM-6 stage assignment deferred to T-03.
+- **ADVISORY (recorded, non-gating):** RELIABILITY — UTC formatting can shift the day if the Node process TZ ≠ UTC (mysql2 reads DATETIME in process-local time; no `timezone` in `orm.config`). To be handled where dates are read (T-02 brief). READABILITY — design §4 `chip_counts` keys (`attention`, `mapping`, `ready`, `pending`, `prms_rejected`, `synced`) differ from `PfmChipEnum` values; T-03/T-05 need an explicit mapping (`pending` = Awaiting PI, not PRMS Pending Review).
+
+#### T-01 — attempt 2: **PASS** (2026-10-08)
+
+- **Effort:** high (bumped per rework rule).
+- **Change:** `enum/pfm-scope.enum.ts` → `{ MINE = 'mine', ALL = 'all' }`; case-insensitive grep for `portfolio` in the module → no hits.
+- **Verification:** `npx jest src/domain/entities/pooled-funding-monitor --silent` → 1 suite, 42 passed; eslint + prettier clean.
+- **Reviewer (opus):** `STATUS: PASS` — issue 1 resolved; attempt-1 audit of the rest of T-01 stands.
+- **ADVISORY carried (non-gating):** UTC-vs-process-TZ date shift (→ T-02 brief); `chip_counts` keys vs `PfmChipEnum` mapping (→ T-03/T-05 briefs).
+- **Decision recorded:** mapping-state precedence = no alignment → *Not started* before `has_contribution=0` → *No SP contribution* (Reviewer: conforms; design §5 bullet order is imprecise, not the code).
+- **Requirements covered:** R-PFM-004, R-PFM-009 (status matching), R-PFM-010 (chip matching), R-PFM-012 (rank), Glossary §2.
+- **Total:** 2 attempts, 2 review rounds. **Continue gate:** auto-approved (pre-approved mode).

@@ -52,7 +52,7 @@ graph TD
 
 ### T-01 — Pure derivation functions and enums (server)
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-PFM-004 (all 3 scenarios), R-PFM-009 (status-filter matching), R-PFM-010 (chip matching), R-PFM-012 (row rank), Glossary §2 (*Ready*, *Needs attention*, *Out of scope*)
 - **Design refs:** §2.1 `derivation/pfm-derivation.ts`, `enum/`; §5 steps 3–4; DD-PFM-6, DD-PFM-7
 - **Files:** `server/researchindicators/src/domain/entities/pooled-funding-monitor/derivation/pfm-derivation.ts` (+ `.spec.ts`), `enum/pfm-*.enum.ts`
@@ -73,9 +73,9 @@ graph TD
   - `has_contribution=0` with `mapping_complete=1` → *No SP contribution* and **not** `needsAttention`;
   - mapping *Complete* + status 2 → not `isReady`.
 - **Done:**
-  - [ ] `npm test -- --silent pfm-derivation` green.
-  - [ ] Each named red input observed failing once against a deliberately wrong mapping, then restored (K-004).
-  - [ ] `npx eslint` clean on new files.
+  - [x] `npm test -- --silent pfm-derivation` green.
+  - [x] Each named red input observed failing once against a deliberately wrong mapping, then restored (K-004).
+  - [x] `npx eslint` clean on new files.
 - **Disqualifies:** a test that asserts the function was *called* rather than its returned value; fixtures where all rows share the same status.
 - **Skills:** `nestjs-expert`, `tdd`
 
