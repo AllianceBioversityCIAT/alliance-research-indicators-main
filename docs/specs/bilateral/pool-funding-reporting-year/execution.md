@@ -195,3 +195,48 @@
 **Decisions / issues:**
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer not reported by host, ended complete; reviewer 11 calls, 87603 tokens, ended complete`.
+
+### T-06 — Client contract + `BilateralService.editable` → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-08 |
+| Final status | PASS (attempt 1 of 3) |
+| Orca task / dispatch | `task_4dfeeeed5df8` / `ctx_c9ae6e1c40b7`. Ran in parallel with T-04 (server), which is cross-package and edit-safe. |
+| Implementer | Cursor · `grok-4.7-high`, effort medium, skills `angular-developer`, `tdd` |
+| Reviewer | Claude `akili-reviewer` (fresh context) — **PASS** |
+| Requirements covered | R-PRY-003 "Past-year answered, never synced": the AND clause that controls cannot change data (via `editable`) |
+
+**Files changed (3):**
+- `client/research-indicators/src/app/shared/interfaces/bilateral/pool-funding-alignment.interface.ts`: adds `has_pool_funding_data?` and `reporting_year?`, and rewrites the `version_locked` comment.
+- `client/research-indicators/src/app/shared/services/bilateral.service.ts`: adds `if (alignment.version_locked === true) return false;` after the `is_read_only` check and above the center-admin bypass.
+- `client/research-indicators/src/app/shared/services/bilateral.service.spec.ts`: 3 owner-fixture cases.
+
+`toc-catalog.fixture.ts` is unchanged: the new fields are optional and the fixture has a different type.
+
+**Consumer grep:** the only production binding is `pool-funding-alignment.component.ts:213` (`readonly editable = this.bilateralService.editable`). Every other hit is that page's `this.editable()` calls or a spec.
+
+**Implementer verification (as reported):**
+- The scoped `bilateral.service.spec.ts` run passed 76/76.
+- Falsifier: dropping the new line made "false for an owner when version_locked is true" fail with `Expected: false / Received: true` at `expect(service.editable()).toBe(false)` (spec :737). The line was then restored.
+- `npm run lint -- --quiet` reported "All files pass linting".
+
+**`tsc -p tsconfig.spec.json`: the Done item is read as "no change from the baseline".**
+- The project has a pre-existing baseline of **945** errors (root `CLAUDE.md` §4.3, K-004).
+- After this change the count is still **945**.
+- The touched files carry **6** errors, all pre-existing TS2352 casts in the spec. That error set is identical to HEAD, per the Implementer's comparison.
+- None of these errors are on the new tests or the production lines.
+- The Reviewer accepted this reading on condition that it is recorded explicitly. "Clean" is not literally true.
+
+**Evidence re-run (Leader inline, after both parallel workers had reported): VERIFIED.**
+- The scoped spec passed 76/76.
+- `tsc -p tsconfig.spec.json` gave **945** `error TS` lines, of which 6 are in the touched files.
+- Lint passed: "All files pass linting".
+- The full client suite (`npm test -- --silent`) passed: **341 suites / 7855 tests**.
+
+**ADVISORY (non-gating):**
+- No test pins *center admin + locked → false*. The line's position above the admin bypass makes this behave correctly; a one-line case would pin it. Not in the task's test list.
+
+**Decisions / issues:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer not reported by host, ended complete; reviewer 7 calls, 37713 tokens, ended complete`.

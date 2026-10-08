@@ -91,6 +91,7 @@ export class BilateralService {
     const alignment = this.currentAlignment();
     if (!alignment) return false;
     if (alignment.is_read_only) return false;
+    if (alignment.version_locked === true) return false;
     if (this.rolesService.canAccessCenterAdmin()) return true;
     return this.currentResultService.isCurrentUserOwner();
   });

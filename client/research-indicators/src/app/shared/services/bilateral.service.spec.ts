@@ -724,6 +724,36 @@ describe('BilateralService', () => {
 
       expect(service.editable()).toBe(true);
     });
+
+    // R-PRY-003 — an owner of an other-year result cannot change data.
+    // The fixture is an owner and not a center admin: a non-owner would
+    // already be false for a different reason.
+    it('false for an owner when version_locked is true', () => {
+      service.currentAlignment.set({ ...readOnlyFalse, version_locked: true });
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(false);
+    });
+
+    it('true for an owner when version_locked is false', () => {
+      service.currentAlignment.set({ ...readOnlyFalse, version_locked: false });
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(true);
+    });
+
+    it('true for an owner when version_locked is absent (fail-open)', () => {
+      service.currentAlignment.set(readOnlyFalse);
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(true);
+    });
   });
 
   // --- T-BIL-TM2-02 — ToC mapping v2 catalog read + draft seams ---------------

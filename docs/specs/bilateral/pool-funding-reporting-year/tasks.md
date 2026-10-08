@@ -241,7 +241,7 @@ graph TD
 
 ### T-06 — Client contract + `BilateralService.editable`
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-03 (contract)
+- **Status:** done · **Size:** S · **Dependencies:** T-03 (contract)
 - **Requirements:** R-PRY-003 "Past-year answered, never synced": the AND clause "every data-changing control cannot change any data"
 - **Design:** §2.1 client rows 1–2, §6 row 1, D-3
 - **Scope:**
@@ -259,9 +259,9 @@ graph TD
 - **Consumers:** `editable` is read only by the Pool Funding page (P-9). `/usr/bin/grep -rn "bilateralService.editable\|\.editable()" client/research-indicators/src` must be quoted.
 - **Review:** `checklist`
 - **Done:**
-  - [ ] Tests green, falsifier red
-  - [ ] Client `tsc -p tsconfig.spec.json` clean
-  - [ ] Lint clean
+  - [x] Tests green, falsifier red
+  - [x] Client `tsc -p tsconfig.spec.json` clean
+  - [x] Lint clean
 - **Skills:** `angular-developer`, `tdd`
 
 ### T-07 — Sidebar: section visibility + PRMS SYNC hidden
