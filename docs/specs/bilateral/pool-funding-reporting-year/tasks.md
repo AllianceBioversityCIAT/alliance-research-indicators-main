@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-10-pool-funding-reporting-year
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
@@ -54,7 +54,7 @@ graph TD
 
 ### T-01 — `ReportingYearResolver`, `AppConfigKey.ARI_PRMS_SYNC`, seed migration
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements:** R-PRY-001 (both scenarios), NFR-PRY-002
 - **Design:** §2.1 rows 1–4, §3, D-1, D-2, D-11
 - **Scope:**
@@ -81,10 +81,10 @@ graph TD
 - **Consumers:** none yet (new symbol). `global-utils.module.ts` is imported by `app.module.ts:39`, `app-microservice.module.ts:26`, `cron.module.ts:11`; boot is covered by the T-09 e2e boot.
 - **Review:** `full` — migration plus a new global provider.
 - **Done:**
-  - [ ] Tests green; falsifiers (a)–(c) observed red, then reverted
-  - [ ] `tsc` + `eslint` clean
-  - [ ] Migration `up` checked on a disposable schema, or reviewed against `1786738949211` (Dev DB is shared, so no ad-hoc apply there)
-  - [ ] Re-running `up` keeps an existing `'2030'` value: `INSERT IGNORE` is asserted by reading the SQL text, because no shared database is touched
+  - [x] Tests green; falsifiers (a)–(c) observed red, then reverted
+  - [x] `tsc` + `eslint` clean
+  - [x] Migration `up` checked on a disposable schema, or reviewed against `1786738949211` (Dev DB is shared, so no ad-hoc apply there)
+  - [x] Re-running `up` keeps an existing `'2030'` value: `INSERT IGNORE` is asserted by reading the SQL text, because no shared database is touched
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-02 — ToC and CLARISA consume the year; retire the env var
