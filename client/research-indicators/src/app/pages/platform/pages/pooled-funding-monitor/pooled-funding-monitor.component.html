@@ -3,7 +3,7 @@
 <div class="flex flex-col pb-8" data-testid="pfm-page">
   <!-- White band (as My PI Delegates): header, scope, KPIs and tab strip on the surface; panels below on the page background -->
   <div class="flex flex-col bg-[var(--ac-pfm-surface)] pt-[8px] sm:pt-[12px] md:pt-[20px]" data-testid="pfm-band">
-  <header class="flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
+  <header class="flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[10px] pt-[9px] md:px-[28px]">
     <h1 class="atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
       Pooled Funding Contribution Monitor
     </h1>
@@ -12,7 +12,7 @@
     </p>
     @if (piEmpty()) {
       <div
-        class="flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+        class="my-2 flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
         role="note"
         data-testid="pfm-pi-empty">
         <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
