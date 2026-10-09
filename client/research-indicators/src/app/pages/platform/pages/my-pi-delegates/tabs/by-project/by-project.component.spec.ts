@@ -972,7 +972,7 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
     }
 
-    it('marks the selected chip with a blue surface and weight — never an underline', async () => {
+    it('marks the selected chip with the navy pill surface and weight — never an underline', async () => {
       await createAdminTable();
 
       // No underline: it read as a tab strip, and these filter the table below
@@ -980,17 +980,17 @@ describe('ByProjectComponent', () => {
       expect(fixture.nativeElement.querySelectorAll('.by-project__role-filters .absolute')).toHaveLength(0);
 
       const classesOf = (i: number) => chip(i).className;
-      expect(classesOf(0)).toContain('var(--ac-light-blue-50)');
+      expect(classesOf(0)).toContain('bg-[var(--ac-pfm-info-bg)]');
       expect(classesOf(0)).toContain('font-semibold');
       // ★ discriminating: an unselected chip keeps the neutral surface.
-      expect(classesOf(1)).toContain('var(--ac-grey-100)');
-      expect(classesOf(1)).not.toContain('var(--ac-light-blue-50)');
+      expect(classesOf(1)).toContain('bg-[var(--ac-pfm-surface)]');
+      expect(classesOf(1)).not.toContain('var(--ac-pfm-info-bg)');
 
       chip(1).click();
       fixture.detectChanges();
 
-      expect(classesOf(1)).toContain('var(--ac-light-blue-50)');
-      expect(classesOf(0)).not.toContain('var(--ac-light-blue-50)');
+      expect(classesOf(1)).toContain('var(--ac-pfm-info-bg)');
+      expect(classesOf(0)).not.toContain('var(--ac-pfm-info-bg)');
     });
 
     it('renders one chip per header counter, in the same order, with All active', async () => {
