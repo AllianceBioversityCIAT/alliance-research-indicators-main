@@ -730,3 +730,43 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - `lang="es"` was copied onto the title cell.
   - `codeNumber()` returns `'000'` where the Results Center returns `''`. Not reachable for monitored rows.
   - **Open a house-wide follow-up** for a shared result-code chip with tokens, plus dark-mode values for the `atc-*` house colours. That follow-up owns DD-PFM-14 and DD-PFM-16.
+
+#### HITL round 19 (owner, 2026-10-09) — long-title rule, Science Programs and Creator columns → **PASS (server + client); owner re-check pending**
+
+- **Owner request (verbatim):** "ponla misma regla que tnemos en result center para titulos largos, y saca otra columna para los SP  Y UNA PARA EL CREATOR".
+- **Root cause of the unclamped title:** `block` on the `<a>` overrode the `-webkit-box` display that `line-clamp` needs.
+- **Implementer (sonnet, high, tdd):**
+  - **Title:** now uses the Results Center structure (`<a class="block w-full h-full">` around `<div class="overflow-hidden line-clamp-3 xl:line-clamp-2">`).
+  - **Science Programs column:** the SP line and primary-SP badge moved out of the mapping cell into their own column. It shows "—" when empty.
+  - **Creator column:** server adds `creator` end-to-end (repository → derivation → service → DTO/Swagger). The query uses a PK `LEFT JOIN sec_users cu ON cu.sec_user_id = r.created_by`.
+  - **Grid:** 10 columns, `min-w-[106rem]`.
+  - **K-004 reds:**
+    - Server: 3 specs failed to compile on the new field.
+    - Client: 5 tests failed.
+    - The service-spec creator value was not seen red separately.
+  - **Title test:** rewritten to be stricter.
+  - **Integration seeding:** PI_A gets names. Result 1001 is now created by PI_A. A null-creator case was added.
+- **Leader:**
+  - Fixed NG8107 (`platformColors()?.` → `.`).
+  - Hardened the projection to `NULLIF(TRIM(CONCAT_WS(' ', first_name, last_name)), '')` (reviewer advisory: empty names would render a blank cell). This change has no dedicated red test and was verified by the existing suites only.
+- **Reviewer (opus): STATUS: PASS**, on condition that the R-PFM-012 table and DD-PFM-16 are amended. Both are done in this commit.
+  - One query path.
+  - No row multiplication or loss.
+  - No scope leak.
+  - No new class of personal data, since the Results Center already shows creator names.
+  - The clamp is identical to the Results Center's.
+  - NFR-PFM-005 holds.
+- **Gates (Leader re-measure):**
+
+  | Suite | Result |
+  |---|---|
+  | Server unit | 117/117 |
+  | Server scratch integration | 28/28 |
+  | Client PFM | 97/97 |
+  | Client build | no PfmResultRow warnings |
+
+  The implementer reports tsc 945, and eslint and the hex grep clean.
+- **Unverified:** the actual clamp layout. jsdom does not lay out text, so check at the HITL with a long title at ~1280px and ~1024px.
+- **ADVISORY:**
+  - The table uses two different empty dashes: "-" for Creator, "—" for SP and PRMS.
+  - The monitor has no sort or search by creator.

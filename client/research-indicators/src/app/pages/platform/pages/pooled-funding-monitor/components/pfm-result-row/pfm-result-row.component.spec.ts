@@ -11,6 +11,7 @@ const BASE: PfmResultRow = {
   snapshot_years: [],
   title: 'Alpha result',
   type: 'Innovation development',
+  creator: 'Ana Perez',
   star_label: 'Submitted',
   star_status_id: 2,
   pi_line: 'Awaiting PI approval',
@@ -51,13 +52,45 @@ describe('PfmResultRowComponent', () => {
     expect(render({ official_code: 7 }).q('pfm-row-code-number').textContent?.trim()).toBe('007');
   });
 
-  it('title is clamped to 3 lines, carries the full text as title, and is not underlined at rest', () => {
+  it('title follows the Results Center rule: inner div clamps 3 lines (2 on xl), the link is not clamped, full text in title, underline only on hover/focus', () => {
     const long = 'Long title '.repeat(60).trim();
     const { q } = render({ title: long });
     const t = q('pfm-row-title');
-    expect(t.classList).toContain('line-clamp-3');
+    const inner = t.querySelector('div') as HTMLElement;
+    expect(inner.classList).toContain('overflow-hidden');
+    expect(inner.classList).toContain('line-clamp-3');
+    expect(inner.classList).toContain('xl:line-clamp-2');
+    expect(inner.textContent?.trim()).toBe(long);
+    expect(t.classList).not.toContain('line-clamp-3');
+    expect(t.classList).toContain('block');
+    expect(t.classList).toContain('w-full');
     expect(t.getAttribute('title')).toBe(long);
     expect(t.classList).toContain('no-underline');
+    expect(t.className).toContain('hover:underline');
+    expect(t.className).toContain('focus-visible:underline');
+  });
+
+  it('Creator cell shows the creator name, or a dash when there is none', () => {
+    expect(render().q('pfm-row-creator').textContent?.trim()).toBe('Ana Perez');
+    expect(render({ creator: null }).q('pfm-row-creator').textContent?.trim()).toBe('-');
+  });
+
+  it('Science Programs cell holds the SP line and the primary-SP badge; the mapping cell holds neither', () => {
+    const { q } = render();
+    const sp = q('pfm-row-sp');
+    expect(sp.querySelector('[data-testid="pfm-row-sp-line"]')?.textContent?.trim()).toBe('SP01 (primary)');
+    expect(sp.querySelector('app-pfm-status-badge')).not.toBeNull();
+    const mapping = q('pfm-row-mapping');
+    expect(mapping.querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
+    expect(mapping.querySelectorAll('app-pfm-status-badge').length).toBe(1);
+    expect(mapping.querySelector('[data-testid="pfm-row-mapping-note"]')?.textContent?.trim()).toBe('Budget shares missing');
+  });
+
+  it('Science Programs cell shows a muted dash when there is no SP data', () => {
+    const { q } = render({ sp_line: '', primary_sp: null });
+    const sp = q('pfm-row-sp');
+    expect(sp.textContent?.trim()).toBe('—');
+    expect(sp.querySelector('app-pfm-status-badge')).toBeNull();
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {

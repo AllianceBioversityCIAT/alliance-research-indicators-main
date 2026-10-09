@@ -38,6 +38,7 @@ const row = (o: Partial<PfmMonitoredRow> = {}): PfmMonitoredRow =>
     contributing_sp_names: [],
     prms_history_status: null,
     prms_justification: null,
+    creator: 'Ana Perez',
     ...o,
   }) as PfmMonitoredRow;
 
@@ -166,6 +167,7 @@ describe('PooledFundingMonitorService', () => {
         snapshot_years: [2025],
         title: 'T',
         type: 'Knowledge Product',
+        creator: 'Ana Perez',
         star_label: 'Draft',
         star_status_id: 4,
         pi_line: expect.any(String),

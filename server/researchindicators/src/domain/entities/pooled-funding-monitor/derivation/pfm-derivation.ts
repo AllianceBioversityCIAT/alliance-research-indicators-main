@@ -23,6 +23,8 @@ export interface PfmRawRow {
   /** Latest result_prms_sync_history.status (e.g. PENDING_REVIEW); null when no row. */
   prms_history_status: string | null;
   prms_justification: string | null;
+  /** Creator display name (`sec_users` of `results.created_by`); null when unresolved. */
+  creator: string | null;
   /** `results.updated_at` is nullable: a missing stamp renders "—", it never throws. */
   updated_at: Date | null;
 }
@@ -34,6 +36,7 @@ export interface PfmDerivedRow {
   mappingState: PfmMappingStateEnum;
   mappingNote: string;
   spLine: string;
+  creator: string | null;
   prmsStatus: PfmPrmsStatusEnum;
   prmsHint: string;
   updatedLabel: string;
@@ -202,6 +205,7 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
       row.primary_sp,
       row.contributing_sp_names,
     ),
+    creator: row.creator ?? null,
     prmsStatus,
     prmsHint: derivePrmsHint(prmsStatus, row.prms_justification),
     updatedLabel: row.updated_at ? formatPfmDateTime(row.updated_at) : '—',

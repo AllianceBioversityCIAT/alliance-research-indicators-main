@@ -331,10 +331,12 @@ Each row SHALL show the columns below. Rows inside a group are ordered: needs at
 | Column | Content |
 |---|---|
 | Code | Results Center split chip: platform · official code (DD-PFM-16) |
-| Result | title (link), clamped to 3 lines, full title as tooltip |
+| Result | title (link). Results Center long-title rule: clamped to 3 lines, 2 lines at ≥ xl (inner `overflow-hidden line-clamp-3 xl:line-clamp-2` inside a block link); full title as tooltip (DD-PFM-16) |
 | Indicator | result type (indicator name) |
+| Creator | creator display name (first + last name of `results.created_by`); "-" when unresolved, as in the Results Center Creator column (DD-PFM-16) |
 | STAR status | colored badge + PI line |
-| Pool funding mapping | colored badge + SP line: "{SP code} {SP name} (primary) · {contributing}". Empty when mapping is *Not started*; "Not reported to PRMS" when out of scope. |
+| Pool funding mapping | colored badge + mapping note. Empty when mapping is *Not started*; "Not reported to PRMS" when out of scope. |
+| Science Programs | SP line "{SP code} {SP name} (primary) · {contributing}" + primary-SP badge; "—" when there is no SP data (DD-PFM-16) |
 | PRMS status | pill; "—" when *Not sent*; tooltip = PRMS hint |
 | Updated | "dd Mon, HH:mm" |
 | Action | **View** |

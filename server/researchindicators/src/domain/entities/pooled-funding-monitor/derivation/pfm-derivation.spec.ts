@@ -25,11 +25,23 @@ const raw = (o: Partial<PfmRawRow> = {}): PfmRawRow => ({
   is_synced_to_prms: 0,
   prms_history_status: null,
   prms_justification: null,
+  creator: 'Ana Perez',
   updated_at: new Date('2026-04-09T08:07:00Z'),
   ...o,
 });
 
 describe('pfm-derivation', () => {
+  describe('creator pass-through (HITL 19)', () => {
+    it('carries the creator name into the derived row', () => {
+      expect(derivePfmRow(raw({ creator: 'Ana Perez' })).creator).toBe(
+        'Ana Perez',
+      );
+    });
+    it('keeps a missing creator as null', () => {
+      expect(derivePfmRow(raw({ creator: null })).creator).toBeNull();
+    });
+  });
+
   describe('STAR label + PI line (R-PFM-004, D-3/D-4)', () => {
     // Red input: status 7 must be Returned (fails if mapped to Draft).
     it.each([

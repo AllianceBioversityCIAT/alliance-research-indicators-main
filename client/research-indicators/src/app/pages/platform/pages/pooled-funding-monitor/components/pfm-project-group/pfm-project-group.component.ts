@@ -13,7 +13,7 @@ const SEGMENTS: { key: 'approved' | 'pending' | 'rejected' | 'out_of_scope' | 'n
   { key: 'not_sent', seg: 'bg-[var(--ac-pfm-seg-not-started)]', title: n => `${n} not synced yet` }
 ];
 
-const COLUMNS = ['Code', 'Result', 'Indicator', 'STAR status', 'Pool funding mapping', 'PRMS status', 'Updated', 'Action'];
+const COLUMNS = ['Code', 'Result', 'Indicator', 'Creator', 'STAR status', 'Pool funding mapping', 'Science Programs', 'PRMS status', 'Updated', 'Action'];
 
 /** Collapsible project group: header summary + lazily loaded result rows. */
 @Component({

@@ -152,6 +152,8 @@ export interface PfmResultRow {
   snapshot_years: number[];
   title: string | null;
   type: string | null;
+  /** Creator display name; null when the server could not resolve one. */
+  creator: string | null;
   star_label: PfmStarLabel;
   star_status_id: number;
   pi_line: string;

@@ -22,6 +22,7 @@ const row = (over: Partial<PfmResultRow>): PfmResultRow => ({
   snapshot_years: [],
   title: 'R',
   type: 'T',
+  creator: null,
   star_label: 'Draft',
   star_status_id: 1,
   pi_line: '',
@@ -149,6 +150,25 @@ describe('PfmProjectGroupComponent', () => {
     expect(q('pfm-group-error')).not.toBeNull();
     (q('pfm-group-retry') as HTMLButtonElement).click();
     expect(store.retryGroup).toHaveBeenCalledWith('P100');
+  });
+
+  it('header lists the columns in order, with Creator after Indicator and Science Programs after the mapping', () => {
+    const { fixture, q, el } = setup();
+    (q('pfm-group-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const labels = Array.from(el.querySelectorAll('[role="presentation"] > span')).map(s => s.textContent?.trim());
+    expect(labels).toEqual([
+      'Code',
+      'Result',
+      'Indicator',
+      'Creator',
+      'STAR status',
+      'Pool funding mapping',
+      'Science Programs',
+      'PRMS status',
+      'Updated',
+      'Action'
+    ]);
   });
 
   it('View is on every row incl. out-of-scope and mapping-incomplete; no other action text; no dialog on click', () => {

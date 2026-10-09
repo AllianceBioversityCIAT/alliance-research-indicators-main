@@ -9,7 +9,7 @@ import { PfmStatusBadgeComponent } from '../pfm-status-badge/pfm-status-badge.co
 
 /** Column template shared by the group's header row and every result row (R-PFM-012 order). */
 export const PFM_ROW_GRID =
-  'grid min-w-[84rem] grid-cols-[7.5rem_minmax(16rem,2.4fr)_minmax(9rem,1fr)_minmax(9rem,1fr)_minmax(12rem,1.4fr)_minmax(7.5rem,0.8fr)_minmax(6.5rem,0.7fr)_5.5rem] items-start gap-x-6';
+  'grid min-w-[106rem] grid-cols-[7.5rem_minmax(16rem,2.4fr)_minmax(9rem,1fr)_minmax(8rem,1fr)_minmax(9rem,1fr)_minmax(12rem,1.4fr)_minmax(11rem,1.2fr)_minmax(7.5rem,0.8fr)_minmax(6.5rem,0.7fr)_5.5rem] items-start gap-x-6';
 
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
 @Component({

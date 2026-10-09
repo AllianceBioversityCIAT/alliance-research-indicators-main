@@ -198,6 +198,7 @@ export const mapMonitoredRow = (
     contributing_sp_names: contributing.map((sp) => sp.name),
     prms_history_status: latest?.status ?? null,
     prms_justification: latest?.justification ?? null,
+    creator: (row.creator_name as string | null) ?? null,
   } as PfmMonitoredRow;
 };
 
@@ -242,6 +243,7 @@ export class PooledFundingMonitorRepository {
         COALESCE(NULLIF(TRIM(ac.short_title), ''), ac.description) AS project_name,
         ac.donor AS donor,
         ac.project_lead_description AS lead_pi,
+        NULLIF(TRIM(CONCAT_WS(' ', cu.first_name, cu.last_name)), '') AS creator_name,
         (pfa.id IS NOT NULL) AS has_alignment,
         pfa.has_contribution AS has_contribution,
         pool_funding_alignment_validation(r.result_id) AS mapping_complete,
@@ -291,6 +293,7 @@ export class PooledFundingMonitorRepository {
       ${this.monitoredFrom()}
       LEFT JOIN indicators i ON i.indicator_id = r.indicator_id
       LEFT JOIN result_status rs ON rs.result_status_id = r.result_status_id
+      LEFT JOIN sec_users cu ON cu.sec_user_id = r.created_by
       LEFT JOIN result_pool_funding_alignment pfa
         ON pfa.id = (
           SELECT MAX(a.id)

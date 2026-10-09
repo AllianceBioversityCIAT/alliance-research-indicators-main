@@ -89,6 +89,7 @@ describe('mapMonitoredRow', () => {
     project_name: 'Alpha',
     donor: 'D',
     lead_pi: 'L',
+    creator_name: 'Ana Perez',
     has_alignment: 1,
     has_contribution: 1,
     mapping_complete: 0,
@@ -101,6 +102,11 @@ describe('mapMonitoredRow', () => {
     const row = mapMonitoredRow(base);
     expect(row.approved_at.toISOString()).toBe('2026-03-06T00:15:00.000Z');
     expect(row.updated_at.toISOString()).toBe('2026-03-05T23:30:00.000Z');
+  });
+
+  it('maps the creator name, null when the user is missing', () => {
+    expect(mapMonitoredRow(base).creator).toBe('Ana Perez');
+    expect(mapMonitoredRow({ ...base, creator_name: null }).creator).toBeNull();
   });
 
   it('keeps null dates null and parses a JSON string payload', () => {

@@ -152,6 +152,12 @@ export class PfmResultRowDto {
   snapshot_years: number[];
   @ApiProperty({ nullable: true, type: String }) title: string | null;
   @ApiProperty({ nullable: true, type: String }) type: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description: 'Creator display name (first + last); null when unresolved.',
+  })
+  creator: string | null;
   @ApiProperty() star_label: string;
   @ApiProperty() star_status_id: number;
   @ApiProperty() pi_line: string;

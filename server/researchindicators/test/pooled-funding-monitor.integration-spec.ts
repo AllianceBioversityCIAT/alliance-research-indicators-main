@@ -249,7 +249,12 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       [REVOKED_DELEGATE_A, 'r@x.org'],
       [STRANGER, 's@x.org'],
     ] as const) {
-      await insert('sec_users', { sec_user_id: id, email });
+      await insert('sec_users', {
+        sec_user_id: id,
+        email,
+        first_name: id === PI_A ? 'Ana' : null,
+        last_name: id === PI_A ? 'Perez' : null,
+      });
     }
     await insert('alliance_user_staff', {
       carnet: 'C-A',
@@ -306,6 +311,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
         contract: string | null;
         primary: number;
         contractActive: number;
+        creator: number;
       }> = {},
     ) => {
       await insert('results', {
@@ -320,6 +326,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
         is_active: o.active ?? 1,
         is_synced_to_prms: o.synced ?? 0,
         updated_at: '2026-10-01 10:20:30',
+        created_by: o.creator ?? null,
       });
       if (o.contract !== null) {
         await insert('result_contracts', {
@@ -361,7 +368,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
 
     // 1001: approved KP of P-A, COMPLETE mapping (primary SP01 + contributing SP02),
     // synced, with a snapshot of 2025 (the snapshot+current pair).
-    await result(1, 1001, { status: 6, synced: 1 });
+    await result(1, 1001, { status: 6, synced: 1, creator: PI_A });
     await result(2, 1001, { status: 6, year: 2025, snapshot: 1, synced: 1 });
     await alignment(
       1,
@@ -683,7 +690,13 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
         platform_code: 'STAR',
         title: 'Result 1001',
         is_synced_to_prms: true,
+        creator: 'Ana Perez',
       });
+    });
+
+    it('creator is null when the result has no created_by user', async () => {
+      const row = byCode(await repo.findMonitoredResults(ALL), 1002);
+      expect(row.creator).toBeNull();
     });
 
     it('mapping: Complete via the SQL function, Incomplete, Out of scope and Not started are distinguishable', async () => {

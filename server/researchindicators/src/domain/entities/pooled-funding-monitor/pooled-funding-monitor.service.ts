@@ -39,6 +39,7 @@ export interface PfmResultRow {
   snapshot_years: number[];
   title: string | null;
   type: string | null;
+  creator: string | null;
   star_label: string;
   star_status_id: number;
   pi_line: string;
@@ -167,6 +168,7 @@ export class PooledFundingMonitorService {
     snapshot_years: row.snapshot_years,
     title: row.title,
     type: row.indicator_name,
+    creator: d.creator,
     star_label: d.starLabel,
     star_status_id: row.result_status_id,
     pi_line: d.piLine,

@@ -4,8 +4,8 @@
     <span
       class="min-w-[58px] max-w-[58px] rounded-l-lg px-2 py-1 text-center text-[13px] font-[600]"
       data-testid="pfm-row-code-platform"
-      [style.color]="platformColors()?.text"
-      [style.background-color]="platformColors()?.background"
+      [style.color]="platformColors().text"
+      [style.background-color]="platformColors().background"
       >{{ row().platform_code }}</span
     >
     <span
@@ -16,29 +16,36 @@
   </div>
   <div class="min-w-0 break-words" lang="es">
     <a
-      class="block line-clamp-3 text-inherit no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
+      class="block h-full w-full text-inherit no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
       data-testid="pfm-row-title"
       [attr.title]="fullTitle()"
       [routerLink]="link().commands"
       [queryParams]="link().queryParams"
-      >{{ fullTitle() }}</a
+      ><div class="overflow-hidden line-clamp-3 xl:line-clamp-2">{{ fullTitle() }}</div></a
     >
   </div>
   <div class="min-w-0 break-words" data-testid="pfm-row-indicator">{{ row().type }}</div>
+  <div class="min-w-0 break-words" data-testid="pfm-row-creator">{{ row().creator || '-' }}</div>
   <div class="flex min-w-0 flex-col items-start gap-1">
     <app-pfm-status-badge kind="star" [value]="row().star_label" />
     <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-pi-line">{{ row().pi_line }}</p>
   </div>
-  <div class="flex min-w-0 flex-col items-start gap-1">
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-mapping">
     <app-pfm-status-badge kind="mapping" [value]="row().mapping_state" />
     @if (row().mapping_note) {
       <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-mapping-note">{{ row().mapping_note }}</p>
     }
-    @if (row().sp_line) {
-      <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-sp-line">{{ row().sp_line }}</p>
-    }
-    @if (row().primary_sp; as sp) {
-      <app-pfm-status-badge kind="sp" [value]="sp.name" [color]="sp.color" />
+  </div>
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-sp">
+    @if (row().sp_line || row().primary_sp) {
+      @if (row().sp_line) {
+        <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-sp-line">{{ row().sp_line }}</p>
+      }
+      @if (row().primary_sp; as sp) {
+        <app-pfm-status-badge kind="sp" [value]="sp.name" [color]="sp.color" />
+      }
+    } @else {
+      <span class="text-[var(--ac-pfm-neutral-fg)]">—</span>
     }
   </div>
   <div [attr.title]="row().prms_hint" data-testid="pfm-row-prms">
