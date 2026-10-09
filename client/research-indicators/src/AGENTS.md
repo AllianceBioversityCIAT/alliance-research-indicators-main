@@ -150,8 +150,8 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
     counters made clickable, and `matchesRole()` calls the very same `isPiOf()` / `isDelegateOf()`
     those counters use. Re-deriving the rule inside the filter is how a chip ends up showing a
     different set than the number it sits under. They combine with the search box (AND) and
-    `clearFilters()` resets them. The selected chip is marked by `--ac-light-blue-50` **plus a
-    heavier font weight** — no underline, which read as a tab strip when these are filters on the
+    `clearFilters()` resets them. The selected chip is the PFM Quick-views pill (navy border on `--ac-pfm-info-bg`, a check icon)
+    **plus a heavier font weight** — no underline, which read as a tab strip when these are filters on the
     table below, and the weight is what carries the state without colour (NFR-UI-002).
   - **Adding something is one affordance platform-wide.** *Assign New Delegate* reuses the
     `New Project Result` recipe verbatim — `<p-button icon="pi pi-plus" severity="info" size="small"

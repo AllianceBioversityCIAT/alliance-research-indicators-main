@@ -90,7 +90,7 @@
           [attr.data-testid]="'pfm-chip-' + c.key"
           (click)="selectChip(c.key)">
           @if (activeChip() === c.key) {
-            <i class="pi pi-check text-[10px]" aria-hidden="true" data-testid="pfm-chip-check"></i>
+            <i class="pi pi-check !text-[9px] leading-none" aria-hidden="true" data-testid="pfm-chip-check"></i>
           }
           {{ c.label }}
           @if (!stale()) {
