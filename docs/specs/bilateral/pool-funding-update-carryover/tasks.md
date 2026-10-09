@@ -62,7 +62,7 @@ graph TD
 
 ### T-02 — Real-MySQL fixture for the carry-over SQL
 
-- **Status:** pending · **Size:** S · **Dependencies:** T-01
+- **Status:** done · **Size:** S · **Dependencies:** T-01
 - **Requirements:** R-PUC-001 S-1, S-2, S-4, S-8 · R-PUC-002 S-5 · NFR-PUC-001
 - **Design:** §4, §6, D-2, D-3, D-4, D-9 (P-10, P-12)
 - **Scope:** new `server/researchindicators/test/fixtures/pool-funding-update-carryover.fixture-spec.ts`, modeled on `sp-versioning-pool-funding.fixture-spec.ts`. Band `906_000` / report year `2118` (re-grep sibling headers first, FP-45). Seeds a live row and a snapshot row directly, then calls the real `GreenCheckRepository.carryOverPoolFunding` inside a `dataSource.transaction` against the scratch schema. Read columns with `SHOW CREATE TABLE` before writing INSERTs. Distinct sentinel values per copied column (FP-48 copy-path discipline).
@@ -87,8 +87,8 @@ graph TD
 - **Consumers:** none (new file); `test/jest-fixtures.json` collects it.
 - **Review:** `full`.
 - **Done:**
-  - [ ] Fixture green; (f4)–(f9) observed red, then reverted
-  - [ ] `npx eslint` clean on the fixture
+  - [x] Fixture green; (f4)–(f9) observed red, then reverted (+ f10–f13 added in rework, execution.md)
+  - [x] `npx eslint` clean on the fixture
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-03 — Owner check on Dev (HITL)
