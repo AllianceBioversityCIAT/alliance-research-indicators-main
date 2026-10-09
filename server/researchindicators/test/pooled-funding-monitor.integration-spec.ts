@@ -296,6 +296,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       ['SP05', 'Epsilon program', null, null],
       ['SP08', 'Out of scope program', 'Science programs', null],
       ['SP09', 'Only on excluded rows', 'Science programs', null],
+      ['SP10', 'Only on a 2025 row', 'Science programs', null],
     ] as const) {
       await insert('clarisa_science_programs', {
         official_code: code,
@@ -468,6 +469,17 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     await alignment(6, 20, 1, [['SP09', 'PRIMARY']]);
     await alignment(7, 21, 1, [['SP09', 'PRIMARY']]);
 
+    // HITL 21: the monitor only counts report year 2026 (PFM_REPORT_YEAR).
+    // 1017: an otherwise-monitored P-A result of report year 2025 -> must not appear anywhere.
+    await result(40, 1017, { year: 2025 });
+    await alignment(8, 40, 1, [['SP10', 'PRIMARY']]);
+    // 1018: the same official code in 2026 (id 41) and 2025 (id 42, the NEWER id):
+    // the 2026 row must still be the one returned (dedupe is per report year).
+    await result(41, 1018);
+    await result(42, 1018, { year: 2025 });
+    // 1019: a SECOND OICR (indicator 5) of 2026 on P-B, with an accepted sync.
+    await result(43, 1019, { indicator: 5, contract: 'P-B' });
+
     // 1012: a code duplicated among CURRENT rows (2 STAR codes locally) -> once.
     await result(30, 1012);
     await result(31, 1012);
@@ -576,6 +588,8 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     await log('1002', YEAR, 'IN_FLIGHT', '2026-09-17 08:00:00'); // not accepted
     await log('1006', YEAR, 'ACCEPTED', '2026-09-18 08:00:00'); // OICR
     await log('1007', YEAR, 'ACCEPTED', '2026-09-19 08:00:00'); // TIP
+    await log('1017', 2025, 'ACCEPTED', '2026-06-10 08:00:00'); // report year 2025 result: out
+    await log('1019', YEAR, 'ACCEPTED', '2026-08-20 08:00:00'); // second OICR
   }
 
   // ------------------------------------------------------------- helpers ----
@@ -601,6 +615,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
          AND r.is_snapshot = 0
          AND r.is_active = 1
          AND r.indicator_id <> 5
+         AND r.report_year_id = ${YEAR}
          AND r.result_id IN (
            SELECT rc.result_id FROM result_contracts rc
            WHERE rc.is_primary = 1 AND rc.is_active = 1
@@ -619,9 +634,11 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       console.info(
         `T-02 portfolio count: repository=${rows.length} independent=${expected}`,
       );
-      expect(expected).toBe(7);
+      expect(expected).toBe(8);
       expect(rows).toHaveLength(expected);
-      expect(codes(rows)).toEqual([1001, 1002, 1003, 1004, 1005, 1012, 1014]);
+      expect(codes(rows)).toEqual([
+        1001, 1002, 1003, 1004, 1005, 1012, 1014, 1018,
+      ]);
     });
 
     it('returns result_status.config as a parsed object (null when the status has none)', async () => {
@@ -637,9 +654,25 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     it('excludes OICR, TIP/AICCRA, non-primary, non-contributing, inactive and contract-less rows', async () => {
       const present = codes(await repo.findMonitoredResults(ALL));
       for (const excluded of [
-        1006, 1007, 1008, 1009, 1010, 1011, 1013, 1015, 1016,
+        1006, 1007, 1008, 1009, 1010, 1011, 1013, 1015, 1016, 1017, 1019,
       ]) {
         expect(present).not.toContain(excluded);
+      }
+    });
+
+    it('HITL 21: only report year 2026 - a 2025 result never appears, and the 2026 row of a code wins over a newer 2025 id', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      expect(new Set(rows.map((r) => r.report_year))).toEqual(new Set([YEAR]));
+      expect(codes(rows)).not.toContain(1017);
+      expect(byCode(rows, 1018).result_id).toBe(41);
+    });
+
+    it('HITL 21: an OICR (indicator 5) result never appears, in any scope', async () => {
+      for (const scope of [ALL, MINE(PI_A), MINE(PI_B)]) {
+        const rows = await repo.findMonitoredResults(scope);
+        expect(rows.map((r) => r.indicator_id)).not.toContain(5);
+        expect(codes(rows)).not.toContain(1006);
+        expect(codes(rows)).not.toContain(1019);
       }
     });
 
@@ -662,7 +695,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
     it("PI scope returns only the projects the user leads, and never another PI's rows", async () => {
       const a = await repo.findMonitoredResults(MINE(PI_A));
       const b = await repo.findMonitoredResults(MINE(PI_B));
-      expect(codes(a)).toEqual([1001, 1002, 1003, 1012]);
+      expect(codes(a)).toEqual([1001, 1002, 1003, 1012, 1018]);
       expect(codes(b)).toEqual([1004, 1005, 1014]);
       expect(new Set(a.map((r) => r.project_code))).toEqual(new Set(['P-A']));
       expect(new Set(b.map((r) => r.project_code))).toEqual(new Set(['P-B']));
@@ -679,7 +712,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
 
     it("an active delegate sees exactly the PI's results; a revoked delegate and a stranger see none", async () => {
       expect(codes(await repo.findMonitoredResults(MINE(DELEGATE_A)))).toEqual([
-        1001, 1002, 1003, 1012,
+        1001, 1002, 1003, 1012, 1018,
       ]);
       expect(await repo.findMonitoredResults(MINE(REVOKED_DELEGATE_A))).toEqual(
         [],
@@ -853,6 +886,16 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       ]);
     });
 
+    it('HITL 21: a sync of a 2025 result or of an OICR never enters the series or the year-to-date count', async () => {
+      const out = await repo.findMonthlySyncs(ALL, NOW);
+      expect(out.find((m) => m.month === '2026-06')).toBeUndefined(); // 1017 (2025)
+      expect(out.find((m) => m.month === '2026-08')?.synced).toBe(1); // 1005 only, not OICR 1019
+      expect(await repo.findMonthlySyncs(MINE(PI_B), NOW)).toEqual([
+        { month: '2026-08', synced: 1 },
+      ]);
+      expect(await repo.countSyncedThisYear(ALL, NOW)).toBe(3);
+    });
+
     it('does not depend on the MySQL session time zone', async () => {
       await q(`SET time_zone = '+13:00'`);
       try {
@@ -954,6 +997,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       );
       expect(allSps).not.toContain('SP08'); // belongs to an out-of-scope alignment
       expect(allSps).not.toContain('SP09'); // only on OICR / TIP rows
+      expect(allSps).not.toContain('SP10'); // only on a report-year-2025 row
     });
 
     it("PI scope: options come from that PI's data only", async () => {

@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import {
   mapMonitoredRow,
+  PFM_MONITORED_INDICATOR_IDS,
+  PFM_REPORT_YEAR,
   PooledFundingMonitorRepository,
   splitSciencePrograms,
 } from './pooled-funding-monitor.repository';
@@ -216,7 +218,51 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     (dataSource.query as jest.Mock).mockResolvedValue([]);
     await repository.findMonitoredResults({ scope: PfmScopeEnum.ALL });
     const [, params] = (dataSource.query as jest.Mock).mock.calls[0];
-    expect(params).toEqual([6, 'STAR']);
+    expect(params).toEqual([6, 'STAR', 2026]);
+  });
+
+  describe('HITL 21: report year 2026 and no OICR in every monitored query', () => {
+    const scope = { scope: PfmScopeEnum.ALL } as const;
+    const calls = async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([]);
+      await repository.findMonitoredResults(scope);
+      await repository.findMonthlySyncs(scope);
+      await repository.countSyncedThisYear(scope);
+      await repository.findFilterOptions(scope);
+      return (dataSource.query as jest.Mock).mock.calls as [
+        string,
+        unknown[],
+      ][];
+    };
+
+    it('PFM_REPORT_YEAR is 2026', () => {
+      expect(PFM_REPORT_YEAR).toBe(2026);
+    });
+
+    it('binds the year (never interpolates it) in every query that selects results', async () => {
+      const all = await calls();
+      expect(all).toHaveLength(6); // base, monthly, synced-this-year, 3 filter-option queries
+      for (const [sql, params] of all) {
+        expect(sql).toContain('r.report_year_id = ?');
+        expect(params).toContain(2026);
+        expect(sql).not.toContain('2026');
+      }
+    });
+
+    it('excludes OICR (indicator 5) in every query that selects results', async () => {
+      for (const [sql] of await calls()) {
+        expect(sql).toContain('r.indicator_id IN (1, 2, 3, 4, 6)');
+      }
+      expect(PFM_MONITORED_INDICATOR_IDS).not.toContain(5);
+    });
+
+    it('the portfolio denominator counts projects, not results: no year predicate', async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([{ total: '2' }]);
+      await repository.countContributingProjects();
+      const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+      expect(sql).not.toContain('report_year');
+      expect(params).toBeUndefined();
+    });
   });
 
   it('sums window months into the epoch bound the monthly query binds', async () => {

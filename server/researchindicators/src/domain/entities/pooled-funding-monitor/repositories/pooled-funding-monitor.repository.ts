@@ -77,6 +77,13 @@ export interface PfmFilterOptions {
 /** The five PRMS result types (OICR = 5 is excluded, R-PFM-003). */
 export const PFM_MONITORED_INDICATOR_IDS = [1, 2, 3, 4, 6] as const;
 export const PFM_PLATFORM_CODE = 'STAR';
+/**
+ * The monitor counts ONLY results of this report year (`results.report_year_id`
+ * holds the year value itself): queue, chips, KPIs, coverage, pipeline, monthly
+ * series, filter options. Bound as a parameter in `monitoredWhere`.
+ */
+// TODO(pfm): read the report year from a configuration variable (app_config) instead of this constant — owner, HITL 2026-10-09.
+export const PFM_REPORT_YEAR = 2026;
 /** Status the approval date is read from (D-4). */
 const APPROVED_STATUS_ID = 6;
 
@@ -341,7 +348,12 @@ export class PooledFundingMonitorRepository {
     return rows.map(mapMonitoredRow);
   }
 
-  /** R-PFM-005 sub-line: every contributing project in the portfolio. */
+  /**
+   * R-PFM-005 sub-line: every contributing project in the portfolio. Deliberately
+   * NOT restricted by report year: it counts pool-funding PROJECTS (the "of N in
+   * portfolio" denominator), not results, so a project with no 2026 result is
+   * still part of the portfolio and shows as uncovered.
+   */
   async countContributingProjects(): Promise<number> {
     const rows: { total: string | number }[] = await this.dataSource.query(
       `SELECT COUNT(*) AS total
@@ -564,20 +576,23 @@ export class PooledFundingMonitorRepository {
    * so no AND can bind across it (KZ-017); the integration spec asserts it on rows.
    */
   private monitoredWhere(scope: PfmRepositoryScope): Fragment {
-    const params: unknown[] = [PFM_PLATFORM_CODE];
+    const params: unknown[] = [PFM_PLATFORM_CODE, PFM_REPORT_YEAR];
     const clauses = [
       `r.platform_code = ?`,
+      `r.report_year_id = ?`,
       `r.is_snapshot = 0`,
       `r.is_active = 1`,
       `r.deleted_at IS NULL`,
       `r.indicator_id IN (${PFM_MONITORED_INDICATOR_IDS.join(', ')})`,
       // One row per result even if a code was ever duplicated among current rows
-      // (2 such STAR codes exist locally): keep the newest.
+      // (2 such STAR codes exist locally): keep the newest OF THE SAME REPORT YEAR,
+      // so a newer row of another year cannot hide the monitored-year one.
       `r.result_id = (
         SELECT MAX(rl.result_id)
         FROM results rl
         WHERE rl.platform_code = r.platform_code
           AND rl.result_official_code = r.result_official_code
+          AND rl.report_year_id = r.report_year_id
           AND rl.is_snapshot = 0
           AND rl.is_active = 1
       )`,

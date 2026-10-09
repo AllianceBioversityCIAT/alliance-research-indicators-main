@@ -129,10 +129,15 @@ A result SHALL be monitored iff **all** of the following hold:
 1. It is the **current** (non-snapshot), active, non-deleted version **and its platform is STAR**. Results imported from TIP or AICCRA are excluded, because only STAR results are synced to PRMS.
 2. Its **primary** contract is a contributing project.
 3. Its type is one of the five PRMS result types: Knowledge Product, Innovation Development, Innovation Use, Capacity Sharing for Development, Policy Change.
+4. Its report year (`results.report_year_id`) is the monitored report year, currently **2026** (DD-PFM-18; to be read from `app_config` later).
 
 #### Scenario: OICR excluded
 - GIVEN an OICR whose primary contract is a contributing project
 - THEN it appears in no count, chart, chip or row
+
+#### Scenario: Other report years
+- GIVEN a result that meets 1–3 but whose report year is not 2026
+- THEN it appears in no count, chart, chip, row, filter option or monthly series
 
 #### Scenario: Results from other platforms
 - GIVEN a TIP or AICCRA result (e.g. status *Completed in TIP*) whose primary contract is a contributing project
@@ -444,7 +449,7 @@ They mount **unversioned** at `/api/...` unless a handler declares `@Version` (r
 | ID | Question | Owner | Due |
 |---|---|---|---|
 | OQ-6 | Hide page + nav when `POOL_FUNDING_SECTION_ENABLED` is off? Proposed default: **yes** | Daniela Pino | design approval |
-| OQ-7 | Reporting year scope for counts. Proposed default: **all years, no year filter** (the mockup hides the filter) | Daniela Pino | design approval |
+| OQ-7 | Reporting year scope for counts. ~~Proposed default: all years~~ **Superseded (HITL 2026-10-09, DD-PFM-18): report year 2026 only**, fixed server-side, no year filter in the UI; later read from `app_config` | Daniela Pino | resolved |
 | OQ-8 | SP grouping and donor source — resolved by the design from code/DB | design | design |
 
 ## 11. Requirement ID index

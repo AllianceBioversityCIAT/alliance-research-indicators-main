@@ -816,3 +816,33 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - No horizontal scroll at the owner's viewport.
   - Tag text is 9px below `xl`, same as the Results Center.
   - Fixed tracks (STAR, PRMS, Updated) with long labels.
+
+#### HITL round 21 (owner, 2026-10-09): monitor restricted to report year 2026, OICR exclusion made explicit → **PASS (server)**
+
+- **Owner (paraphrased from Spanish):** every result counted in the monitor (queue, its charts, KPIs, coverage) must be from 2026, with a TODO noting the year will later come from a variable. OICR (indicator 5) must not be counted. The Leader asked "queue only or the whole monitor?"; the owner answered: the whole monitor, plus the indicator filter.
+- **Implementer (sonnet, high, tdd):**
+  - Added `PFM_REPORT_YEAR = 2026` with `TODO(pfm)` to read it from `app_config`.
+  - Bound it in the shared `monitoredWhere` as `r.report_year_id = ?`, which covers:
+    - the monitored rows behind the queue, chips, groups, KPIs, pipeline and coverage;
+    - the monthly series and synced-this-year;
+    - the 3 filter-option queries.
+  - The newest-row dedupe is now scoped to the same year.
+  - OICR exclusion was already applied everywhere; it is now tested in every scope.
+  - The project-based denominator and `isPiOfAny` stay year-agnostic.
+  - Volume after the change: 58 monitored results in 23 groups for 2026. Timing medians are 8 ms.
+- **K-004:**
+  - Integration: 13 of 32 red before the fix.
+  - Unit: the red was a compile error only.
+  - OICR tests: already green; they are regression guards.
+- **Reviewer (opus): STATUS: PASS**, on condition of an R-PFM-003 amendment, which was done in this commit:
+  - item 4: report year 2026;
+  - new scenario: "Other report years".
+  - The reviewer also confirmed: binds and parameter order are correct, no interpolation, the dedupe is correct, NFR-PFM-006 is consistent, and the year-agnostic `isPiOfAny`/denominator are the right choice.
+- **Docs:**
+  - OQ-7 superseded by **DD-PFM-18**.
+  - DD-PFM-18 records the 2027 calendar-window risk while the TODO is open, and the empty-*mine* behaviour for PIs with no 2026 results.
+- **Gates:** server unit 127; scratch integration 32/32; eslint clean; build OK.
+- **ADVISORY / follow-ups:**
+  - Show "Report year 2026" in the UI, and add a dedicated empty message for *mine* with zero rows.
+  - Link the TODO to a tracking issue.
+  - Check whether the dedupe should also filter `deleted_at`. This is unconfirmed and was not introduced here.
