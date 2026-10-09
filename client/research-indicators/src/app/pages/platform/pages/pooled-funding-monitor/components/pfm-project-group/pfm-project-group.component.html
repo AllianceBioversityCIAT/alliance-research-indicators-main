@@ -10,7 +10,7 @@
     [attr.aria-controls]="'pfm-group-body-' + group().code"
     (click)="store.toggleGroup(group().code)">
     <span
-      class="w-[130px] shrink-0 break-words rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-3 py-2 font-mono text-[13px] font-bold leading-snug text-[var(--ac-pfm-accent-navy)]"
+      class="w-auto shrink-0 whitespace-nowrap rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-3 py-2 font-mono text-[13px] font-bold leading-snug text-[var(--ac-pfm-accent-navy)]"
       data-testid="pfm-group-code"
       >{{ group().code }}</span
     >

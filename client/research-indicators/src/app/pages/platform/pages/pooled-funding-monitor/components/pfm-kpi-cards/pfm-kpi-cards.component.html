@@ -1,14 +1,14 @@
-<ul class="m-0 flex w-full max-w-[60rem] list-none flex-row flex-wrap gap-3 p-0" data-testid="pfm-kpi-cards">
+<ul class="m-0 grid w-full list-none grid-cols-1 items-stretch gap-3 p-0 sm:grid-cols-2 xl:grid-cols-4" data-testid="pfm-kpi-cards">
   @for (c of cards(); track c.key) {
     <li
-      class="flex flex-col items-start gap-1 rounded-lg border border-solid border-l-[3px] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5 {{ c.size }} {{ c.accent }} {{ c.frame }}"
+      class="flex items-center gap-3 rounded-lg border border-solid border-l-[3px] bg-[color:var(--ac-grey-100)] px-2.5 py-2 {{ c.accent }} {{ c.frame }}"
       [attr.data-testid]="'pfm-kpi-' + c.key">
-      <span class="flex items-start gap-[5px]">
-        <i class="pi {{ c.icon }} {{ c.iconInk }} shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
-        <span class="atc-grey-600 m-0 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4" data-testid="pfm-kpi-label">{{ c.label }}</span>
-      </span>
-      <div class="mt-auto flex items-baseline gap-2">
-        <span class="font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums {{ c.ink }}" data-testid="pfm-kpi-value">{{ c.value.toLocaleString('en-US') }}</span>
+      <span class="min-w-[56px] shrink-0 text-center font-['Space_Grotesk'] text-[22px] font-semibold leading-7 tabular-nums {{ c.ink }}" data-testid="pfm-kpi-value">{{ c.value.toLocaleString('en-US') }}</span>
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi {{ c.icon }} {{ c.iconInk }} shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span class="atc-grey-600 m-0 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4" data-testid="pfm-kpi-label">{{ c.label }}</span>
+        </span>
         <span class="atc-grey-600 font-['Barlow'] text-[12px] leading-4" data-testid="pfm-kpi-sub">{{ c.sub }}</span>
       </div>
     </li>

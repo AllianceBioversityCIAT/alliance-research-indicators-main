@@ -612,3 +612,22 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - PFM jest 88/88 (Leader re-measure). The implementer reports eslint clean, hex grep clean and `ng build` OK.
   - **No automated gate can see scroll height (jsdom does no layout).** The owner's browser check is the only verification.
 - **Out of scope, noted:** other pages under the same shell that use `sr-only` without a positioned ancestor could show the same symptom.
+
+#### HITL round 13 (owner, 2026-10-09): KPI "number on the left" + narrower code chip → **PASS (code); owner re-check pending**
+
+- **Owner feedback (verbatim):** "demasiado amplio para el poco texto y las cards se ven muy feas  da una nueva propuesta".
+- **Leader proposal and owner choices (AskUserQuestion):**
+  - KPI cards: owner chose "Número a la izquierda (Recomendado)".
+  - Project groups: owner answered "solo haz la caja gris menos grande en w".
+- **Change:**
+  - **KPI layout:** each card is now a row.
+    - A fixed `min-w-[56px]` value column (22px, `tabular-nums`, current colour) sits to the left of an icon + label + sub-line column.
+    - The cards sit in an equal-height grid: 1 column, `sm:` 2, `xl:` 4.
+    - The uneven flex sizing and the `max-w-[60rem]` cap were dropped.
+  - **Unchanged:** card chrome, colours, copy and testids.
+  - **Code chip:** `w-[130px]` became `w-auto shrink-0 whitespace-nowrap px-3`.
+- **Reviewer: STATUS: PASS.**
+  - R-PFM-005 and KZ-001 are intact, there is no hex, and the left accent still wins.
+  - The code chip cannot make the page scroll sideways: the header uses `flex-wrap` and the card is `overflow-hidden`.
+- **Leader follow-up:** the implementer reintroduced `<p>` inside `<span>` on the KPI label (regression of round 8). The Leader fixed it again with a mechanical swap to `<span>`.
+- **Leader re-measure:** PFM jest 88/88.
