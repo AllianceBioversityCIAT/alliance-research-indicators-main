@@ -5,16 +5,20 @@ import { RESULT_ENTRY_SOURCE_QUERY, RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR } from
 import { buildResultLink } from '@shared/utils/result-link.util';
 import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PfmResultRow } from '../../pfm.interfaces';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { PfmStatusBadgeComponent } from '../pfm-status-badge/pfm-status-badge.component';
 
-/** Column template shared by the group's header row and every result row (R-PFM-012 order). */
+/**
+ * Column template shared by the group's header row and every result row (R-PFM-012 order).
+ * Min-width arithmetic (rem): columns 7.2+8.1+5.5+6+6.5+6.5+6.5+6+6+4.2 = 62.5, gaps 9 x 0.5 = 4.5, row padding px-6 = 3 -> 70.
+ */
 export const PFM_ROW_GRID =
-  'grid min-w-[106rem] grid-cols-[7.5rem_minmax(16rem,2.4fr)_minmax(9rem,1fr)_minmax(8rem,1fr)_minmax(9rem,1fr)_minmax(12rem,1.4fr)_minmax(11rem,1.2fr)_minmax(7.5rem,0.8fr)_minmax(6.5rem,0.7fr)_5.5rem] items-start gap-x-6';
+  'grid min-w-[70rem] grid-cols-[7.2rem_minmax(8.1rem,2.6fr)_minmax(5.5rem,1fr)_minmax(6rem,0.9fr)_6.5rem_minmax(6.5rem,1.4fr)_minmax(6.5rem,1.3fr)_6rem_6rem_4.2rem] items-start gap-x-2';
 
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
 @Component({
   selector: 'app-pfm-result-row',
-  imports: [RouterLink, PfmStatusBadgeComponent],
+  imports: [RouterLink, PfmStatusBadgeComponent, CustomTagComponent],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

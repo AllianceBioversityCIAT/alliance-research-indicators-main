@@ -5,6 +5,7 @@
 // T-11..T-13. Read-only: no Sync button, no "PRMS sync" label (R-PFM-014). Tailwind only, no stylesheet.
 
 import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject } from '@angular/core';
+import { RolesService } from '@shared/services/cache/roles.service';
 import { PfmKpiCardsComponent } from './components/pfm-kpi-cards/pfm-kpi-cards.component';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
@@ -23,10 +24,14 @@ export default class PooledFundingMonitorComponent implements OnInit {
   readonly store = inject(PfmStoreService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  readonly scopes: { value: PfmScope; label: string }[] = [
-    { value: 'mine', label: 'Only my results as PI' },
-    { value: 'all', label: 'Whole portfolio' }
-  ];
+  private readonly roles = inject(RolesService);
+
+  private static readonly MINE = { value: 'mine' as PfmScope, label: 'Only my results as PI' };
+  private static readonly ALL = { value: 'all' as PfmScope, label: 'Whole portfolio' };
+  /** Admins see the whole portfolio first (and open on it); everyone else keeps the PI scope first. */
+  readonly scopes: { value: PfmScope; label: string }[] = this.roles.isAdmin()
+    ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
+    : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
   readonly tabs: { value: PfmTab; label: string }[] = [
     { value: 'coverage', label: 'Portfolio coverage' },
     { value: 'queue', label: 'Results queue' }
@@ -39,7 +44,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.store.init();
+    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine' });
   }
 
   selectScope(scope: PfmScope): void {

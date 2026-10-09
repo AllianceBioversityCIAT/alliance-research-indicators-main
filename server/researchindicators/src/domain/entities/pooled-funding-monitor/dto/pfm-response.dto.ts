@@ -160,6 +160,20 @@ export class PfmResultRowDto {
   creator: string | null;
   @ApiProperty() star_label: string;
   @ApiProperty() star_status_id: number;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      'result_status.name: the status text the Results Center shows; null when unresolved.',
+  })
+  star_status_name: string | null;
+  @ApiProperty({
+    nullable: true,
+    type: Object,
+    description:
+      'result_status.config ({ color: { border, text, background }, icon: { color, name } }); null when unset.',
+  })
+  star_status_config: Record<string, unknown> | null;
   @ApiProperty() pi_line: string;
   @ApiProperty({ enum: PfmMappingStateEnum }) mapping_state: string;
   @ApiProperty() mapping_note: string;

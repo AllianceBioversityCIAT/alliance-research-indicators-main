@@ -70,6 +70,11 @@ const MINE = (userId: number): PfmRepositoryScope => ({
 });
 const ALL: PfmRepositoryScope = { scope: PfmScopeEnum.ALL };
 
+const APPROVED_STATUS_CONFIG = {
+  color: { border: '#0B8A3E', text: '#0B8A3E', background: '#E6F4EA' },
+  icon: { color: '#0B8A3E', name: 'pi-check-circle' },
+};
+
 describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
   let ds: DataSource;
   let repo: PooledFundingMonitorRepository;
@@ -199,7 +204,11 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       [6, 'Approved'],
       [7, 'Rejected'],
     ] as const) {
-      await insert('result_status', { result_status_id: id, name });
+      await insert('result_status', {
+        result_status_id: id,
+        name,
+        config: id === 6 ? JSON.stringify(APPROVED_STATUS_CONFIG) : null,
+      });
     }
 
     // Contracts: P-A (flag), P-B (active bilateral mapping), P-X (neither), P-Z (flag but inactive).
@@ -613,6 +622,16 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       expect(expected).toBe(7);
       expect(rows).toHaveLength(expected);
       expect(codes(rows)).toEqual([1001, 1002, 1003, 1004, 1005, 1012, 1014]);
+    });
+
+    it('returns result_status.config as a parsed object (null when the status has none)', async () => {
+      const rows = await repo.findMonitoredResults(ALL);
+      const approved = rows.find((r) => r.result_official_code === 1001);
+      const submitted = rows.find((r) => r.result_official_code === 1002);
+      expect(approved?.star_status_config).toEqual(APPROVED_STATUS_CONFIG);
+      expect(approved?.star_status_name).toBe('Approved');
+      expect(submitted?.star_status_name).toBe('Submitted');
+      expect(submitted?.star_status_config).toBeNull();
     });
 
     it('excludes OICR, TIP/AICCRA, non-primary, non-contributing, inactive and contract-less rows', async () => {

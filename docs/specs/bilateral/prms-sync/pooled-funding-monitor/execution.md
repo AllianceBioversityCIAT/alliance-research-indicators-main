@@ -770,3 +770,49 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY:**
   - The table uses two different empty dashes: "-" for Creator, "—" for SP and PRMS.
   - The monitor has no sort or search by creator.
+
+#### HITL round 20 (owner, 2026-10-09) — STAR status as in Results Center, no-scroll grid, admin default scope, PI-empty notice below → **PASS (server + client); owner re-check pending**
+
+- **Owner request (paraphrased from Spanish):**
+  - STAR status must be "igual" to the Results Center status, in a narrower column.
+  - Narrower Creator, Updated and Action columns, so the table does not scroll.
+  - Admins see *Whole portfolio* first, and it is their default.
+  - The PI-empty warning goes below the header card.
+- **Implementer (sonnet, high, tdd):**
+  - The STAR cell uses `shared/components/custom-tag`.
+  - The server adds `star_status_config` (`rs.config`, already parsed by mysql2; `toConfigObject` normalises it defensively) and `star_status_name` (`rs.name`). Both come from the existing `result_status` join.
+  - The tag text is the raw status name, falling back to `star_label`. `star_label` still drives filters and chips.
+  - Grid:
+    - `min-w-[70rem]`, `gap-x-2`.
+    - Width budget: 7.2 + 8.1 + 5.5 + 6 + 6.5 + 6.5 + 6.5 + 6 + 6 + 4.2 = 62.5rem, plus 4.5rem of gaps, plus 3rem of padding = 70rem.
+  - Admin default: `store.init({ defaultScope })`, supplied by the page from `RolesService.isAdmin()`. Button order is `[all, mine]` for admins. An explicit `?scope=` wins. Unknown values fall back.
+  - The PI-empty notice moved below the band.
+- **Reds observed:**
+  - Client: 5 initial tests and the "Rejected" tag-text test failed first.
+  - Server: compile-time failures only.
+  - Never seen red: the null-config and null-name fallbacks, the integration assertions, and "explicit `?scope=mine` wins". These are regression guards.
+- **Reviewer (opus): STATUS: PASS.**
+  - NFR-PFM-001 is unchanged; `isAdmin` affects only client ordering and the default.
+  - The grid arithmetic matches the template.
+  - The tag binding matches the Results Center.
+- **Advisories acted on (Leader-directed follow-up, same implementer):**
+  - Tag text: Results Center shows the raw status name, and our label differed for statuses 1, 5 and 7. Now uses `star_status_name`.
+  - Code chip overflow: the Code track went from 6.3rem to 7.2rem, with Result's minimum reduced from 9rem to 8.1rem.
+  - Indentation fixed.
+- **Docs updated by the Leader:**
+  - R-PFM-002: admin default.
+  - R-PFM-012: STAR row now uses the raw name, colours from config, and D-3 for filters.
+  - DD-PFM-17: 70rem is a content width, not a viewport.
+- **Leader re-measure:**
+
+  | Suite | Result |
+  |---|---|
+  | Client PFM | 108/108 |
+  | Server unit | 123/123 |
+  | Server scratch integration | 29/29 |
+
+  The implementer reports tsc 945, eslint and hex clean, and builds OK.
+- **Unverified (browser):**
+  - No horizontal scroll at the owner's viewport.
+  - Tag text is 9px below `xl`, same as the Results Center.
+  - Fixed tracks (STAR, PRMS, Updated) with long labels.

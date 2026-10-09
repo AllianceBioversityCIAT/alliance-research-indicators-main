@@ -10,26 +10,6 @@
     <p class="atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
       Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
     </p>
-    @if (piEmpty()) {
-      <div
-        class="my-2 flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
-        role="note"
-        data-testid="pfm-pi-empty">
-        <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
-        <div class="flex flex-col items-start">
-          <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
-            You are not PI of any project contributing to Pool funding
-          </p>
-          <button
-            type="button"
-            class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
-            data-testid="pfm-pi-empty-switch"
-            (click)="selectScope('all')">
-            View whole portfolio
-          </button>
-        </div>
-      </div>
-    }
   </header>
 
   <div class="flex flex-col gap-4 px-[24px] pb-4 md:px-[28px]">
@@ -56,9 +36,7 @@
     </div>
   </div>
 
-  @if (piEmpty()) {
-    <!-- PI-empty notice moved into the header (see header) -->
-  } @else {
+  @if (!piEmpty()) {
     <!-- KPI cards: share the summary request, so they share its loading / error state -->
     @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
       <div class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
@@ -115,6 +93,29 @@
   }
   </div>
 
+  @if (piEmpty()) {
+    <!-- PI-empty notice: content area below the white band, same padding as the tab panels -->
+    <div class="p-4">
+      <div
+        class="flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+        role="note"
+        data-testid="pfm-pi-empty">
+        <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
+        <div class="flex flex-col items-start">
+          <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+            You are not PI of any project contributing to Pool funding
+          </p>
+          <button
+            type="button"
+            class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
+            data-testid="pfm-pi-empty-switch"
+            (click)="selectScope('all')">
+            View whole portfolio
+          </button>
+        </div>
+      </div>
+    </div>
+  }
   @if (!piEmpty()) {
   <div class="border border-t-0 border-solid border-[color:var(--ac-grey-200)] p-4">
     @if (store.tab() === 'coverage') {

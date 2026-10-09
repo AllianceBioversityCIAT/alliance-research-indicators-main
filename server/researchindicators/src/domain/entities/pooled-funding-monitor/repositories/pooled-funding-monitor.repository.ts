@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, DeepPartial } from 'typeorm';
+import { ResultStatusConfig } from '../../result-status/entities/result-status.entity';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { PfmRawRow } from '../derivation/pfm-derivation';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
@@ -27,7 +28,14 @@ export interface PfmSpRef {
  * identity / grouping / filter fields the service and the three endpoints need.
  * All dates are real `Date` instants built from UTC strings (see `UTC_ISO_SQL`).
  */
+/** `result_status.config` (same shape the Results Center colours its status tag from). */
+export type PfmStarStatusConfig = DeepPartial<ResultStatusConfig>;
+
 export interface PfmMonitoredRow extends PfmRawRow {
+  /** `result_status.name`: the text the Results Center shows; null when unresolved. */
+  star_status_name: string | null;
+  /** Status presentation config; null when the column is NULL or unparseable. */
+  star_status_config: PfmStarStatusConfig | null;
   result_id: number;
   result_official_code: number;
   report_year: number;
@@ -128,6 +136,24 @@ const toJsonObject = <T>(value: unknown): T | null => {
   return typeof value === 'object' ? (value as T) : null;
 };
 
+/**
+ * A JSON column read through raw SQL may arrive as text or already parsed,
+ * depending on the driver; anything unusable becomes null (never throws).
+ */
+const toConfigObject = (value: unknown): PfmStarStatusConfig | null => {
+  let parsed: unknown = value;
+  if (typeof value === 'string') {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as PfmStarStatusConfig)
+    : null;
+};
+
 interface SpJson {
   code: string;
   role: string | null;
@@ -180,6 +206,8 @@ export const mapMonitoredRow = (
     indicator_name: (row.indicator_name as string | null) ?? null,
     result_status_id: Number(row.result_status_id),
     result_status_name: String(row.result_status_name ?? ''),
+    star_status_name: (row.star_status_name as string | null) ?? null,
+    star_status_config: toConfigObject(row.star_status_config),
     updated_at: toDate(row.updated_at_utc),
     approved_at: toDate(row.approved_at_utc),
     project_code: String(row.project_code),
@@ -237,6 +265,8 @@ export class PooledFundingMonitorRepository {
         i.name AS indicator_name,
         r.result_status_id,
         rs.name AS result_status_name,
+        rs.name AS star_status_name,
+        rs.config AS star_status_config,
         ${utcIso('r.updated_at')} AS updated_at_utc,
         r.is_synced_to_prms,
         ac.agreement_id AS project_code,

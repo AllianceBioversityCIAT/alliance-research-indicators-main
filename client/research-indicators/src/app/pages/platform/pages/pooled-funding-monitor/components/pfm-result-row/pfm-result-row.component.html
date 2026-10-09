@@ -26,8 +26,19 @@
   </div>
   <div class="min-w-0 break-words" data-testid="pfm-row-indicator">{{ row().type }}</div>
   <div class="min-w-0 break-words" data-testid="pfm-row-creator">{{ row().creator || '-' }}</div>
-  <div class="flex min-w-0 flex-col items-start gap-1">
-    <app-pfm-status-badge kind="star" [value]="row().star_label" />
+  <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-star">
+    <!-- Same tag as the Results Center status column (HITL 20) -->
+    <app-custom-tag
+      [statusId]="row().star_status_id"
+      [statusName]="row().star_status_name ?? row().star_label"
+      [statusColor]="row().star_status_config?.color?.text ?? undefined"
+      [statusBackground]="row().star_status_config?.color?.background ?? undefined"
+      [statusBorder]="row().star_status_config?.color?.border ?? undefined"
+      [icon]="true"
+      [iconName]="row().star_status_config?.icon?.name ?? undefined"
+      [iconColor]="row().star_status_config?.icon?.color ?? undefined"
+      [tiny]="true"
+      [multiline]="true" />
     <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-pi-line">{{ row().pi_line }}</p>
   </div>
   <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-mapping">

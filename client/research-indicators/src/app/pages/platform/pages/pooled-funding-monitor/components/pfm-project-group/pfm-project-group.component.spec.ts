@@ -25,6 +25,8 @@ const row = (over: Partial<PfmResultRow>): PfmResultRow => ({
   creator: null,
   star_label: 'Draft',
   star_status_id: 1,
+  star_status_name: null,
+  star_status_config: null,
   pi_line: '',
   mapping_state: 'Not started',
   mapping_note: '',

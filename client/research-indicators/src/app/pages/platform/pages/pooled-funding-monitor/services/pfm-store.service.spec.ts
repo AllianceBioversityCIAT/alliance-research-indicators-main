@@ -203,6 +203,33 @@ describe('PfmStoreService', () => {
     expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
   });
 
+  describe('default scope (admins open on the whole portfolio, HITL 20)', () => {
+    beforeEach(() => sessionStorage.clear());
+
+    it('init({ defaultScope: all }) without ?scope= loads and remembers all', async () => {
+      const store = build();
+      store.init({ defaultScope: 'all' });
+      await new Promise(r => setTimeout(r));
+      expect(store.scope()).toBe('all');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
+      expect(sessionStorage.getItem('ari.pfm.lastScope')).toBe('all');
+    });
+
+    it('an explicit ?scope=mine wins over defaultScope all', async () => {
+      const store = build({ scope: 'mine' });
+      store.init({ defaultScope: 'all' });
+      await new Promise(r => setTimeout(r));
+      expect(store.scope()).toBe('mine');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
+    });
+
+    it('an unknown ?scope= falls back to defaultScope', () => {
+      const store = build({ scope: 'bogus' });
+      store.init({ defaultScope: 'all' });
+      expect(store.scope()).toBe('all');
+    });
+  });
+
   it('init ignores unknown query values', () => {
     const store = build({ scope: 'bogus', tab: 'nope' });
     store.init();

@@ -101,7 +101,7 @@ The system SHALL expose the page to every authenticated user **except** users wh
 
 ### R-PFM-002 — Scope toggle
 
-The page SHALL offer a segmented toggle with **Only my results as PI** (default) and **Whole portfolio**. Every viewer allowed by R-PFM-001 may use both scopes (D-2).
+The page SHALL offer a segmented toggle with **Only my results as PI** (default) and **Whole portfolio**. For administrators the order is reversed and **Whole portfolio** is the default (DD-PFM-17). An explicit `?scope=` always wins. Every viewer allowed by R-PFM-001 may use both scopes (D-2).
 
 #### Scenario: Default PI scope
 - GIVEN an allowed viewer who is PI (project lead) or active delegate on at least one contributing project
@@ -334,7 +334,7 @@ Each row SHALL show the columns below. Rows inside a group are ordered: needs at
 | Result | title (link). Results Center long-title rule: clamped to 3 lines, 2 lines at ≥ xl (inner `overflow-hidden line-clamp-3 xl:line-clamp-2` inside a block link); full title as tooltip (DD-PFM-16) |
 | Indicator | result type (indicator name) |
 | Creator | creator display name (first + last name of `results.created_by`); "-" when unresolved, as in the Results Center Creator column (DD-PFM-16) |
-| STAR status | colored badge + PI line |
+| STAR status | Results Center status tag (`app-custom-tag`). The tag shows the raw STAR status name (`star_status_name`, as in the Results Center, not the D-3 derived label) with colours/icon from the status `config` (`star_status_config`); below it, the PI line (DD-PFM-17). Filters and chips still use the D-3 label |
 | Pool funding mapping | colored badge + mapping note. Empty when mapping is *Not started*; "Not reported to PRMS" when out of scope. |
 | Science Programs | SP line "{SP code} {SP name} (primary) · {contributing}" + primary-SP badge; "—" when there is no SP data (DD-PFM-16) |
 | PRMS status | pill; "—" when *Not sent*; tooltip = PRMS hint |

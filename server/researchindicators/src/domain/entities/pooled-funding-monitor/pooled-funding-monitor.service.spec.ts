@@ -179,7 +179,30 @@ describe('PooledFundingMonitorService', () => {
         prms_status: 'Not sent',
         prms_hint: expect.any(String),
         updated_at: '—',
+        star_status_name: null,
+        star_status_config: null,
       });
+    });
+
+    it('passes the STAR status name through for the displayed tag text', async () => {
+      repo.findMonitoredResults.mockResolvedValue([
+        row({ star_status_name: 'Rejected' }),
+      ]);
+      const [r] = await service.getProjectResults(1, 'P-A', {
+        scope: PfmScopeEnum.ALL,
+      });
+      expect(r.star_status_name).toBe('Rejected');
+    });
+
+    it('passes the STAR status config through so the client can colour the tag like the Results Center', async () => {
+      const config = { color: { border: 'b', text: 't', background: 'g' } };
+      repo.findMonitoredResults.mockResolvedValue([
+        row({ star_status_config: config }),
+      ]);
+      const [r] = await service.getProjectResults(1, 'P-A', {
+        scope: PfmScopeEnum.ALL,
+      });
+      expect(r.star_status_config).toEqual(config);
     });
 
     it('200 with an empty list when the project is in scope but filters exclude its rows', async () => {

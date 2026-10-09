@@ -109,6 +109,44 @@ describe('mapMonitoredRow', () => {
     expect(mapMonitoredRow({ ...base, creator_name: null }).creator).toBeNull();
   });
 
+  it('maps star_status_name from result_status.name, null when missing', () => {
+    expect(
+      mapMonitoredRow({ ...base, star_status_name: 'Rejected' })
+        .star_status_name,
+    ).toBe('Rejected');
+    expect(mapMonitoredRow(base).star_status_name).toBeNull();
+  });
+
+  describe('star_status_config (HITL 20: Results Center status colours)', () => {
+    const cfg = {
+      color: { border: '#7C9CB9', text: '#153C71', background: '#EEF4FA' },
+      icon: { color: '#153C71', name: 'pi-check' },
+    };
+
+    it('parses a JSON string (driver returns JSON columns as text) into an object', () => {
+      expect(
+        mapMonitoredRow({ ...base, star_status_config: JSON.stringify(cfg) })
+          .star_status_config,
+      ).toEqual(cfg);
+    });
+
+    it('passes an already-parsed object through', () => {
+      expect(
+        mapMonitoredRow({ ...base, star_status_config: cfg })
+          .star_status_config,
+      ).toEqual(cfg);
+    });
+
+    it('is null for NULL, empty, malformed JSON, or a non-object', () => {
+      for (const bad of [null, undefined, '', '{not json', '"str"', '[1]', 5]) {
+        expect(
+          mapMonitoredRow({ ...base, star_status_config: bad })
+            .star_status_config,
+        ).toBeNull();
+      }
+    });
+  });
+
   it('keeps null dates null and parses a JSON string payload', () => {
     const row = mapMonitoredRow({
       ...base,

@@ -1,3 +1,4 @@
+import { StatusConfig } from '@shared/interfaces/result-config.interface';
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-07
 // Wire types of design §4, mirrored from the server DTOs/enums in
 // server/researchindicators/src/domain/entities/pooled-funding-monitor/. Read-only feature.
@@ -156,6 +157,10 @@ export interface PfmResultRow {
   creator: string | null;
   star_label: PfmStarLabel;
   star_status_id: number;
+  /** result_status.name: the text the Results Center shows for this status; null when unresolved. */
+  star_status_name: string | null;
+  /** result_status.config (same shape the Results Center colours its status tag from); null when unset. */
+  star_status_config: StatusConfig | null;
   pi_line: string;
   mapping_state: PfmMappingState;
   mapping_note: string;

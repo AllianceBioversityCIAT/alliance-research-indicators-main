@@ -21,6 +21,7 @@ import {
   PfmFilterOptions,
   PfmRepositoryScope,
   PfmSpRef,
+  PfmStarStatusConfig,
   PooledFundingMonitorRepository,
 } from './repositories/pooled-funding-monitor.repository';
 import { PfmQueueQueryDto } from './dto/pfm-query.dto';
@@ -42,6 +43,8 @@ export interface PfmResultRow {
   creator: string | null;
   star_label: string;
   star_status_id: number;
+  star_status_name: string | null;
+  star_status_config: PfmStarStatusConfig | null;
   pi_line: string;
   mapping_state: string;
   mapping_note: string;
@@ -171,6 +174,8 @@ export class PooledFundingMonitorService {
     creator: d.creator,
     star_label: d.starLabel,
     star_status_id: row.result_status_id,
+    star_status_name: row.star_status_name ?? null,
+    star_status_config: row.star_status_config ?? null,
     pi_line: d.piLine,
     mapping_state: d.mappingState,
     mapping_note: d.mappingNote,

@@ -14,6 +14,8 @@ const BASE: PfmResultRow = {
   creator: 'Ana Perez',
   star_label: 'Submitted',
   star_status_id: 2,
+  star_status_name: null,
+  star_status_config: null,
   pi_line: 'Awaiting PI approval',
   mapping_state: 'Incomplete',
   mapping_note: 'Budget shares missing',
@@ -37,6 +39,51 @@ function render(over: Partial<PfmResultRow> = {}) {
 }
 
 describe('PfmResultRowComponent', () => {
+  it('STAR status renders the Results Center tag (app-custom-tag) with the label and the PI line under it, not the PFM badge', () => {
+    const { q } = render();
+    const cell = q('pfm-row-star');
+    const tag = cell.querySelector('app-custom-tag');
+    expect(tag).not.toBeNull();
+    expect(tag?.textContent).toContain('Submitted');
+    expect(cell.querySelector('app-pfm-status-badge')).toBeNull();
+    expect(cell.querySelector('[data-testid="pfm-row-pi-line"]')?.textContent?.trim()).toBe('Awaiting PI approval');
+  });
+
+  it('STAR tag takes colour, border and icon from star_status_config exactly like the Results Center', () => {
+    const { q } = render({
+      star_status_config: {
+        color: { text: 'rgb(1, 2, 3)', border: 'rgb(4, 5, 6)', background: 'rgb(7, 8, 9)' },
+        icon: { name: 'pi-check-circle', color: 'rgb(10, 11, 12)' }
+      }
+    });
+    const tag = q('pfm-row-star').querySelector('app-custom-tag') as HTMLElement;
+    const pill = tag.firstElementChild as HTMLElement;
+    expect(pill.style.color).toBe('rgb(1, 2, 3)');
+    expect(pill.style.borderColor).toBe('rgb(4, 5, 6)');
+    const icon = tag.querySelector('i') as HTMLElement;
+    expect(icon.classList.contains('pi-check-circle')).toBe(true);
+    expect(icon.style.color).toBe('rgb(10, 11, 12)');
+  });
+
+  it('STAR tag text is the Results Center status name, not the derived label', () => {
+    const { q } = render({ star_status_name: 'Rejected', star_label: 'Returned' });
+    expect(q('pfm-row-star').querySelector('app-custom-tag')?.textContent?.trim()).toBe('Rejected');
+  });
+
+  it('STAR tag text falls back to star_label when the status name is null', () => {
+    const { q } = render({ star_status_name: null, star_label: 'Returned' });
+    expect(q('pfm-row-star').querySelector('app-custom-tag')?.textContent?.trim()).toBe('Returned');
+  });
+
+  it('STAR tag falls back to the default look when star_status_config is null', () => {
+    const { q } = render({ star_status_config: null });
+    const icon = q('pfm-row-star').querySelector('app-custom-tag i') as HTMLElement;
+    expect(icon.classList.contains('pi-exclamation-circle')).toBe(true);
+    const pill = q('pfm-row-star').querySelector('app-custom-tag')?.firstElementChild as HTMLElement;
+    // default STATUS_COLOR_MAP[''] look, not an empty colour
+    expect(pill.style.borderColor).not.toBe('');
+  });
+
   it('View href is /result/STAR-<code> for a non-approved row, and the title links to the same place', () => {
     const { q } = render();
     expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');

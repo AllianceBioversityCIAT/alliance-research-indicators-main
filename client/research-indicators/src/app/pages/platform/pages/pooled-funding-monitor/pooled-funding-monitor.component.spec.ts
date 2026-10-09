@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { signal } from '@angular/core';
 import { ApiService } from '@services/api.service';
+import { RolesService } from '@shared/services/cache/roles.service';
 import PooledFundingMonitorComponent from './pooled-funding-monitor.component';
 import { PfmQueue, PfmScope, PfmSummary } from './pfm.interfaces';
 
@@ -50,13 +52,14 @@ describe('PooledFundingMonitorComponent', () => {
     fixture.detectChanges();
   };
 
-  async function create(): Promise<void> {
+  async function create(opts: { admin?: boolean; params?: Record<string, string> } = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [PooledFundingMonitorComponent],
       providers: [
         { provide: ApiService, useValue: api },
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } }
+        { provide: RolesService, useValue: { isAdmin: signal(!!opts.admin) } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.params ?? {}) } } }
       ]
     }).compileComponents();
     fixture = TestBed.createComponent(PooledFundingMonitorComponent);
@@ -110,6 +113,37 @@ describe('PooledFundingMonitorComponent', () => {
     expect(q('pfm-kpi-projects')?.querySelector('[data-testid="pfm-kpi-sub"]')?.textContent?.trim()).toBe('of 40 in portfolio');
   });
 
+  describe('admin default scope (HITL 20)', () => {
+    const order = () => Array.from(el.querySelectorAll('[data-testid^="pfm-scope-"]')).map(b => b.getAttribute('data-testid'));
+
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
+
+    it('admin without ?scope=: opens on the whole portfolio, and Whole portfolio is the first toggle button', async () => {
+      await create({ admin: true });
+      fixture.detectChanges();
+      await flush();
+      expect(order()).toEqual(['pfm-scope-all', 'pfm-scope-mine']);
+      expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
+    });
+
+    it('non-admin: opens on mine and the order is unchanged', async () => {
+      await create({ admin: false });
+      fixture.detectChanges();
+      await flush();
+      expect(order()).toEqual(['pfm-scope-mine', 'pfm-scope-all']);
+      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('admin with an explicit ?scope=mine stays on mine', async () => {
+      await create({ admin: true, params: { scope: 'mine' } });
+      fixture.detectChanges();
+      await flush();
+      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
+    });
+  });
+
   it('PI with no projects: shows the empty state, no KPI values, and switches to portfolio on click', async () => {
     api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope, scope === 'all'))));
     await create();
@@ -118,6 +152,8 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-pi-empty')?.textContent).toContain('You are not PI of any project contributing to Pool funding');
     expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
+    // HITL 20: the notice sits in the content area below the white band, not in the header card
+    expect(q('pfm-band')?.contains(q('pfm-pi-empty'))).toBe(false);
     expect(q('pfm-kpi-cards')).toBeNull();
     expect(el.querySelector('[data-testid="pfm-kpi-value"]')).toBeNull();
     expect(q('pfm-panel-coverage')).toBeNull();

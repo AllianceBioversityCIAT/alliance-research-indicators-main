@@ -55,12 +55,16 @@ export class PfmStoreService {
   private rowsSeq = 0;
   private readonly rowsInFlight = new Set<string>();
 
-  /** Reads ?scope=&tab= once (unknown values fall back to defaults) and loads both sections. */
-  init(): void {
+  /**
+   * Reads ?scope=&tab= once (unknown values fall back to defaults) and loads both sections.
+   * `defaultScope` is the scope used when the URL carries no valid ?scope= (admins pass 'all', HITL 20).
+   */
+  init(opts: { defaultScope?: PfmScope } = {}): void {
     const params = this.route.snapshot.queryParamMap;
     const scope = params.get('scope');
     const tab = params.get('tab');
     if ((PFM_SCOPES as readonly string[]).includes(scope ?? '')) this.scope.set(scope as PfmScope);
+    else if (opts.defaultScope) this.scope.set(opts.defaultScope);
     if ((PFM_TABS as readonly string[]).includes(tab ?? '')) this.tab.set(tab as PfmTab);
     rememberPfmScope(this.scope());
     void this.loadSummary();
