@@ -2,7 +2,7 @@
 
 - **Module:** results (STAR client version selector + shared global alert; one server field)
 - **Spec id:** 2026-10-update-result-year-prompt
-- **Status:** approved
+- **Status:** implemented
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md, APPROVED)
@@ -56,7 +56,7 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
 
 ### T-02 — Shared global alert: `infoCard`, `excludeYears` pipe, in-place swap
 
-- **Status:** [ ] · **Size:** S · **Dependencies:** none
+- **Status:** [x] · **Size:** S · **Dependencies:** none
 - **Requirements:**
   - R-URP-001: renders the `infoCard` used by S-1/S-2
   - R-URP-003:
@@ -112,14 +112,14 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
   - `GlobalAlert` interface importers: run `grep -rln "GlobalAlert" client/research-indicators/src/app` at execute time and record the result in `execution.md`.
 - **Review:** `full` — a shared component that every alert in the app renders through.
 - **Done:**
-  - [ ] Tests green; (f1)–(f4) observed red, then reverted
-  - [ ] `npm run build` green; spec `tsc` shows no new errors in the touched spec files
-  - [ ] Lint clean; full client suite green
+  - [x] Tests green; (f1)–(f4) observed red, then reverted
+  - [x] `npm run build` green; spec `tsc` shows no new errors in the touched spec files
+  - [x] Lint clean; full client suite green
 - **Skills:** `angular-developer`, `tdd`
 
 ### T-03 — Version selector: prompt flow
 
-- **Status:** [ ] · **Size:** S · **Dependencies:** T-01 (`updated_at` typing contract), T-02
+- **Status:** [x] · **Size:** S · **Dependencies:** T-01 (`updated_at` typing contract), T-02
 - **Requirements:**
   - R-URP-001:
     - S-1: latest copy, chip, caption, buttons; BUT no dropdown
@@ -162,14 +162,14 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
 - **Consumers:** `version-selector.component.spec.ts` (5 tests rewritten), and `submit-result-content.component.spec.ts` (uses `GET_Versions` and `TransformResultCodeResponse` — re-run it).
 - **Review:** `full` — the user-facing flow that sends the update request.
 - **Done:**
-  - [ ] Tests green; (f1)–(f5) observed red, then reverted
-  - [ ] `npm run build` green; spec `tsc` shows no new errors in touched spec files
-  - [ ] Lint clean; full client suite green
+  - [x] Tests green; (f1)–(f5) observed red, then reverted
+  - [x] `npm run build` green; spec `tsc` shows no new errors in touched spec files
+  - [x] Lint clean; full client suite green
 - **Skills:** `angular-developer`, `tdd`
 
 ### T-04 — Owner check on Dev (HITL)
 
-- **Status:** [ ] · **Size:** XS · **Dependencies:** T-03
+- **Status:** [x] · **Size:** XS · **Dependencies:** T-03
 - **Requirements:**
   - Visual fidelity: the defect class with no automated gate
   - S-1 / S-2 look
@@ -186,7 +186,7 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
 - **Consumers:** none
 - **Review:** `skip-eligible` — human check, no code. Its claim: the owner's verdict is recorded verbatim in `execution.md`.
 - **Done:**
-  - [ ] Owner verdict recorded; O-1 decided; commit only after the verdict (no-commit-before-visual-approval)
+  - [x] Owner verdict recorded; O-1 decided; commit only after the verdict (no-commit-before-visual-approval)
 - **Skills:** none
 
 ## 4. Coverage closure (scenario / clause → task)

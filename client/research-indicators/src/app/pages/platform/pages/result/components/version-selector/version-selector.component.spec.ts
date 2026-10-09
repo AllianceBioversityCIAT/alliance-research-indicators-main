@@ -10,6 +10,7 @@ import { GetMetadataService } from '@shared/services/get-metadata.service';
 import { Subject } from 'rxjs';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { signal } from '@angular/core';
+import { GetYearsByCodeService } from '@shared/services/control-list/get-years-by-code.service';
 
 class MockApiService {
   GET_Versions = jest.fn().mockReturnValue(Promise.resolve({ data: { live: [], versions: [] } }));
@@ -28,6 +29,10 @@ class MockCacheService {
   });
   getCurrentNumericResultId = jest.fn(() => 1);
   getCurrentPlatformCode = signal('STAR');
+}
+class MockGetYearsByCodeService {
+  main = jest.fn().mockResolvedValue(undefined);
+  list = signal<any[]>([{ report_year: 2024 }, { report_year: 2025 }, { report_year: 2026 }]);
 }
 class MockActionsService {
   showGlobalAlert = jest.fn();
@@ -56,6 +61,7 @@ describe('VersionSelectorComponent', () => {
         { provide: ApiService, useClass: MockApiService },
         { provide: CacheService, useClass: MockCacheService },
         { provide: ActionsService, useClass: MockActionsService },
+        { provide: GetYearsByCodeService, useClass: MockGetYearsByCodeService },
         { provide: GetMetadataService, useClass: MockGetMetadataService },
         { provide: Router, useClass: MockRouter },
         { provide: ActivatedRoute, useClass: MockActivatedRoute }
@@ -132,9 +138,9 @@ describe('VersionSelectorComponent', () => {
     expect(component.liveVersionData.result_id).toBe(10);
   });
 
-  it('should call updateResult and showGlobalAlert', () => {
+  it('should call updateResult and showGlobalAlert', async () => {
     const actions = TestBed.inject(ActionsService);
-    component.updateResult();
+    await component.updateResult();
     expect(actions.showGlobalAlert).toHaveBeenCalled();
   });
 
@@ -298,7 +304,8 @@ describe('VersionSelectorComponent', () => {
     (actions.showGlobalAlert as jest.Mock).mockImplementation(arg => {
       arg.confirmCallback?.event?.({});
     });
-    component.updateResult();
+    // S-3 fallback: no approved versions -> picker, whose confirm reads data.selected
+    await component.updateResult();
     await new Promise(r => setTimeout(r, 0));
     expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(expect.anything(), '');
   });
@@ -309,7 +316,7 @@ describe('VersionSelectorComponent', () => {
     expect(component['isResultRouteActive'](123)).toBe(false);
   });
 
-  it('should handle error if router.navigate promise is rejected in updateResult', () => {
+  it('should handle error if router.navigate promise is rejected in updateResult', async () => {
     const api = TestBed.inject(ApiService);
     const actions = TestBed.inject(ActionsService);
     const router = TestBed.inject(Router);
@@ -318,10 +325,10 @@ describe('VersionSelectorComponent', () => {
     (actions.showGlobalAlert as jest.Mock).mockImplementation(arg => {
       arg.confirmCallback?.event?.({ selected: '2023' });
     });
-    expect(() => component.updateResult()).not.toThrow();
+    await expect(component.updateResult()).resolves.toBeUndefined();
   });
 
-  it('should handle error if loadVersions throws after navigation in updateResult', () => {
+  it('should handle error if loadVersions throws after navigation in updateResult', async () => {
     const api = TestBed.inject(ApiService);
     const actions = TestBed.inject(ActionsService);
     const router = TestBed.inject(Router);
@@ -334,16 +341,16 @@ describe('VersionSelectorComponent', () => {
     (actions.showGlobalAlert as jest.Mock).mockImplementation(arg => {
       arg.confirmCallback?.event?.({ selected: '2023' });
     });
-    expect(() => component.updateResult()).not.toThrow();
+    await expect(component.updateResult()).resolves.toBeUndefined();
     component['loadVersions'] = originalLoadVersions;
   });
 
-  it('should not fail if confirmCallback.event is not defined in updateResult', () => {
+  it('should not fail if confirmCallback.event is not defined in updateResult', async () => {
     const actions = TestBed.inject(ActionsService);
     (actions.showGlobalAlert as jest.Mock).mockImplementation(arg => {
       delete arg.confirmCallback.event;
     });
-    expect(() => component.updateResult()).not.toThrow();
+    await expect(component.updateResult()).resolves.toBeUndefined();
   });
 
   it('should handle error if router.navigate promise is rejected in selectVersion', () => {
@@ -390,6 +397,150 @@ describe('VersionSelectorComponent', () => {
       queryParams: { version: null },
       queryParamsHandling: 'merge',
       replaceUrl: true
+    });
+  });
+
+  describe('updateResult prompt flow', () => {
+    const v = (report_year_id: number, extra: Record<string, unknown> = {}) => ({
+      report_year_id,
+      result_id: report_year_id - 2000,
+      result_official_code: 1,
+      result_status_id: 1,
+      updated_at: '2026-03-15T12:00:00.000Z',
+      ...extra
+    });
+    let actions: MockActionsService;
+    let api: MockApiService;
+    let years: MockGetYearsByCodeService;
+    let router: MockRouter;
+    let cache: MockCacheService;
+    let metadata: MockGetMetadataService;
+
+    const lastAlert = () => (actions.showGlobalAlert as jest.Mock).mock.calls[0][0];
+
+    beforeEach(() => {
+      actions = TestBed.inject(ActionsService) as any;
+      api = TestBed.inject(ApiService) as any;
+      years = TestBed.inject(GetYearsByCodeService) as any;
+      router = TestBed.inject(Router) as any;
+      cache = TestBed.inject(CacheService) as any;
+      metadata = TestBed.inject(GetMetadataService) as any;
+      // non-ascending order on purpose
+      component.approvedVersions.set([v(2024), v(2026), v(2025)] as any);
+      component.selectedResultId.set(26);
+    });
+
+    it('v1: prompts for the latest selected version with chip, caption and labels', async () => {
+      await component.updateResult();
+      expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      const alert = lastAlert();
+      expect(alert.detail).toBe('Do you want to update the most recent version of this result (2026)?');
+      expect(alert.severity).toBe('confirm');
+      expect(alert.summary).toBe('CONFIRM UPDATING');
+      expect(alert.infoCard.badge).toBe('2026 VERSION');
+      expect(alert.infoCard.caption).toBe('Latest reporting version · last updated 15 Mar 2026');
+      expect(alert.cancelCallback.label).toBe('No, choose another year');
+      expect(alert.confirmCallback.label).toBe('Yes, update 2026');
+      expect(alert.serviceName).toBeUndefined();
+      expect(alert.buttonColor).toBe('var(--ac-light-blue-400)');
+    });
+
+    it('v2: older selected version uses the older copy, never "most recent"', async () => {
+      component.selectedResultId.set(24);
+      await component.updateResult();
+      const alert = lastAlert();
+      expect(alert.detail).toBe('Do you want to update the 2024 version of this result?');
+      expect(alert.infoCard.badge).toBe('2024 VERSION');
+      expect(alert.infoCard.caption.startsWith('Reporting version')).toBe(true);
+      expect(alert.infoCard.caption).not.toContain('Latest');
+      expect(alert.detail).not.toContain('most recent');
+      expect(alert.infoCard.caption).not.toContain('most recent');
+    });
+
+    it('v3: with no selected chip the max year is offered, not versions[0]', async () => {
+      component.selectedResultId.set(null);
+      await component.updateResult();
+      expect(lastAlert().infoCard.badge).toBe('2026 VERSION');
+    });
+
+    it('v4: year missing from the allowed list falls back to the picker', async () => {
+      years.list.set([{ report_year: 2024 }, { report_year: 2025 }] as any);
+      await component.updateResult();
+      const alert = lastAlert();
+      expect(alert.serviceName).toBe('getYearsByCode');
+      expect(alert.selectorExcludeValues).toEqual([]);
+    });
+
+    it('v4: empty years list (failed request) falls back to the picker', async () => {
+      years.list.set([]);
+      await component.updateResult();
+      const alert = lastAlert();
+      expect(alert.serviceName).toBe('getYearsByCode');
+      expect(alert.selectorExcludeValues).toEqual([]);
+    });
+
+    it('v5: no approved versions falls back to the picker', async () => {
+      component.approvedVersions.set([]);
+      await component.updateResult();
+      const alert = lastAlert();
+      expect(alert.serviceName).toBe('getYearsByCode');
+      expect(alert.selectorExcludeValues).toEqual([]);
+    });
+
+    it.each([undefined, null, '', 'not-a-date'])('v6: invalid updated_at %p yields a caption without a date', async bad => {
+      component.approvedVersions.set([v(2024), v(2026, { updated_at: bad }), v(2025)] as any);
+      await component.updateResult();
+      expect(lastAlert().infoCard.caption).toBe('Latest reporting version');
+    });
+
+    it('v7: Yes patches once with the offered year and runs the success path', async () => {
+      (api.PATCH_ReportingCycle as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      const clearSpy = jest.spyOn(cache.lastResultId, 'set');
+      await component.updateResult();
+      lastAlert().confirmCallback.event();
+      await new Promise(r => setTimeout(r, 0));
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledTimes(1);
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2026');
+      expect(clearSpy).toHaveBeenCalledWith(null);
+      expect(metadata.update).toHaveBeenCalledWith(1);
+      expect(router.navigate).toHaveBeenCalledWith(
+        ['/result/1/general-information'],
+        expect.objectContaining({ queryParams: { version: null } })
+      );
+      const calls = (actions.showGlobalAlert as jest.Mock).mock.calls;
+      expect(calls[calls.length - 1][0].summary).toBe('RESULT UPDATED');
+    });
+
+    it('v7: Yes shows an error toast when the patch fails', async () => {
+      (api.PATCH_ReportingCycle as jest.Mock).mockResolvedValue({ successfulRequest: false, errorDetail: { errors: 'boom' } });
+      await component.updateResult();
+      lastAlert().confirmCallback.event();
+      await new Promise(r => setTimeout(r, 0));
+      expect(actions.showToast).toHaveBeenCalledWith({ severity: 'error', summary: 'Error', detail: 'boom' });
+      expect(metadata.update).not.toHaveBeenCalled();
+    });
+
+    it('v8: No swaps to a picker that excludes the offered year and confirms with the chosen one', async () => {
+      (api.PATCH_ReportingCycle as jest.Mock).mockResolvedValue({ successfulRequest: true });
+      await component.updateResult();
+      const swap = lastAlert().cancelSwapsTo;
+      expect(swap.serviceName).toBe('getYearsByCode');
+      expect(swap.selectorExcludeValues).toEqual([2026]);
+      swap.confirmCallback.event({ selected: '2025' });
+      await new Promise(r => setTimeout(r, 0));
+      expect(api.PATCH_ReportingCycle).toHaveBeenCalledWith(1, '2025');
+    });
+
+    it('v9: a second click while the refresh is in flight is ignored', async () => {
+      let release!: () => void;
+      years.main.mockReturnValue(new Promise<void>(res => (release = res)));
+      const first = component.updateResult();
+      const second = component.updateResult();
+      release();
+      await Promise.all([first, second]);
+      expect(years.main).toHaveBeenCalledTimes(1);
+      expect(actions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      expect(component.updating()).toBe(false);
     });
   });
 

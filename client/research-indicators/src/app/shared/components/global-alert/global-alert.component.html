@@ -16,6 +16,12 @@
     <div class="summary !font-[Space_Grotesk] !text-[{{ alert.color }}]">{{ alert.summary }}</div>
     <div class="detail -mt-1.5 leading-[22px] text-[#4C5158]" [innerHTML]="alert.detail"
       (click)="onDetailLinkClick($event, $index)" (keydown)="onDetailLinkClick($event, $index)"></div>
+    @if (alert.infoCard) {
+    <div class="info-card">
+      <span class="info-card-badge">{{ alert.infoCard.badge }}</span>
+      <span class="info-card-caption">{{ alert.infoCard.caption }}</span>
+    </div>
+    }
     @if (alert.selectorLabel) {
     <div class="w-full flex flex-col pb-2">
       <label class="label inline-block self-start" for="username">{{ alert.selectorLabel }}
@@ -24,7 +30,7 @@
 
       <p-select styleClass="w-full !text-start"
         [style]="isInvalid ? { width: '100%', border: '2px solid #E69F00' } : { width: '100%' }"
-        [options]="this.service?.list()" optionValue="this" [optionLabel]="'report_year'" [optionValue]="'report_year'"
+        [options]="this.service?.list() | excludeYears: alert.selectorExcludeValues" optionValue="this" [optionLabel]="'report_year'" [optionValue]="'report_year'"
         placeholder="Select the year" [scrollHeight]="'112px'" (ngModelChange)="onSelectChange($event)"
         [(ngModel)]="body().selectValue" class="!text-[13px] w-full">
         <ng-template let-item pTemplate="item">
@@ -88,7 +94,7 @@
     @if (!alert.hasNoButton) {
     <div class="flex gap-4 w-full place-content-center text-center">
       @if (!alert.hasNoCancelButton) {
-      <p-button [label]="alert.cancelCallback?.label" (onClick)="alert.cancelCallback?.event?.(); closeAlert($index)"
+      <p-button [label]="alert.cancelCallback?.label" (onClick)="onCancel(alert, $index)"
         variant="outlined"
         [style]="{ borderRadius: '13px', paddingLeft: '16px', paddingRight: '16px', border: '2px solid #035BA9', height: '38px' }" />
       }
