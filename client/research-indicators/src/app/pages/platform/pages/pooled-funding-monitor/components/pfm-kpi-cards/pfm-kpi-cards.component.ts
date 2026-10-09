@@ -10,6 +10,9 @@ interface KpiCard {
   accent: string;
   ink: string;
   frame: string;
+  size: string;
+  icon: string;
+  iconInk: string;
 }
 
 @Component({
@@ -31,7 +34,10 @@ export class PfmKpiCardsComponent {
         sub: this.scope() === 'mine' ? 'where you are PI' : `of ${k.projects_total.toLocaleString('en-US')} in portfolio`,
         accent: 'border-l-[color:var(--ac-pfm-info-fg)]',
         ink: 'text-[var(--ac-pfm-info-fg)]',
-        frame: 'border-[color:var(--ac-pfm-surface-border)]'
+        frame: 'border-[color:var(--ac-pfm-surface-border)]',
+        size: 'flex-[1.6_1_185px] min-w-[160px]',
+        icon: 'pi-briefcase',
+        iconInk: 'atc-primary-blue-300'
       },
       {
         key: 'monitored',
@@ -40,7 +46,10 @@ export class PfmKpiCardsComponent {
         sub: 'can be mapped and synced',
         accent: 'border-l-[color:var(--ac-pfm-accent-navy)]',
         ink: 'text-[var(--ac-pfm-accent-navy)]',
-        frame: 'border-[color:var(--ac-pfm-surface-border)]'
+        frame: 'border-[color:var(--ac-pfm-surface-border)]',
+        size: 'flex-[1.6_1_185px] min-w-[160px]',
+        icon: 'pi-list',
+        iconInk: 'atc-primary-blue-300'
       },
       {
         key: 'need_attention',
@@ -49,7 +58,10 @@ export class PfmKpiCardsComponent {
         sub: 'draft, pending mapping or pending sync',
         accent: 'border-l-[color:var(--ac-pfm-seg-pending)]',
         ink: 'text-[var(--ac-pfm-warning-fg)]',
-        frame: 'border-[color:var(--ac-pfm-warning-border)]'
+        frame: 'border-[color:var(--ac-pfm-warning-border)]',
+        size: 'flex-[1.6_1_185px] min-w-[160px]',
+        icon: 'pi-exclamation-triangle',
+        iconInk: 'atc-orange-1'
       },
       {
         key: 'synced',
@@ -58,7 +70,10 @@ export class PfmKpiCardsComponent {
         sub: `of ${k.in_prms_scope.toLocaleString('en-US')} in PRMS scope`,
         accent: 'border-l-[color:var(--ac-pfm-seg-approved)]',
         ink: 'text-[var(--ac-pfm-success-fg)]',
-        frame: 'border-[color:var(--ac-pfm-surface-border)]'
+        frame: 'border-[color:var(--ac-pfm-surface-border)]',
+        size: 'flex-[1_1_120px] min-w-[120px]',
+        icon: 'pi-check-circle',
+        iconInk: 'atc-primary-blue-300'
       }
     ];
   });

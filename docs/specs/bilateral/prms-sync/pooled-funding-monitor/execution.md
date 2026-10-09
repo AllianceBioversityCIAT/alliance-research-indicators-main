@@ -547,3 +547,16 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Owner decision DD-PFM-14:** the house colours are an accepted deviation from NFR-PFM-004. They have no dark-mode values, and they share My PI Delegates' defect, which is to be fixed house-wide.
 - **Reviewer: STATUS: PASS.** The markup is identical, there are no doubled gutters, and the attributes and PI-empty logic are intact.
 - **Leader re-measure:** PFM jest gave 12 suites and 88/88.
+
+#### HITL round 8 (owner, 2026-10-09) — KPI cards as My PI Delegates counters → **PASS (code); owner re-check pending**
+
+- **Owner request (verbatim):** "estos cards hazlos igual que pi delgates pero manten el color de borde y de # texto que ya tenemos defindo, los otros texto si igual pero el numero que mostramos dejalo del color que tenmos".
+- **Implementer (sonnet, high):**
+  - Copied the My PI Delegates counter markup: `rounded-lg border bg-grey-100 px-2.5 py-1.5`, 11px Space Grotesk `atc-grey-600` labels, 18px tabular values, and a 13px icon. The cards sit in a wrapping row capped at `max-w-[60rem]`.
+  - Kept, as the owner asked: our per-card value colours, the `border-l-[3px]` accent tokens, and the warning frame on *Need attention*.
+  - The sub-line uses 12px `atc-grey-600`. DD-PFM-14 covers the house colours.
+- **Reviewer: STATUS: PASS.**
+  - The markup matches My PI Delegates and the owner's colours are kept.
+  - In Tailwind v4 the left accent wins over the general border.
+  - R-PFM-005 copy and the KZ-001 testids are intact. There is no hex.
+- **Leader follow-up (mechanical, from the advisory):** the label `<p>` sat inside a `<span>`, which is invalid HTML. Changed it to `<span>`, matching My PI Delegates; the testid is kept. PFM jest re-run: 12 suites, 88/88.
