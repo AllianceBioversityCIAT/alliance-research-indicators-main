@@ -2,7 +2,7 @@
 
 - **Module:** bilateral (server only)
 - **Spec id:** 2026-10-pool-funding-update-carryover
-- **Status:** pending
+- **Status:** in progress
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -33,7 +33,7 @@ graph TD
 
 ### T-01 — `carryOverPoolFunding` + `newReportingCycle` transaction
 
-- **Status:** pending · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements:** R-PUC-001 (S-1…S-4 wiring), R-PUC-002 (SQL text), R-PUC-003 (S-6), NFR-PUC-001, NFR-PUC-002, NFR-PUC-003
 - **Design:** §2, §6, D-1…D-8
 - **Scope:**
@@ -55,9 +55,9 @@ graph TD
 - **Consumers:** `green-checks.service.spec.ts`, `green-checks.controller.spec.ts`, `impersonation-audit.interceptor.spec.ts` (design P-9) — all re-run.
 - **Review:** `full` — transactional write path on result data.
 - **Done:**
-  - [ ] Tests green; (f1)–(f3) observed red, then reverted
-  - [ ] `tsc` + `npx eslint` clean on changed files
-  - [ ] Full server suite green
+  - [x] Tests green; (f1)–(f3) observed red, then reverted
+  - [x] `tsc` + `npx eslint` clean on changed files
+  - [x] Full server suite green
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-02 — Real-MySQL fixture for the carry-over SQL

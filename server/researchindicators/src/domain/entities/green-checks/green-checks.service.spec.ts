@@ -31,6 +31,7 @@ describe('GreenChecksService', () => {
 
   const calculateGreenChecks = jest.fn();
   const createSnapshot = jest.fn();
+  const carryOverPoolFunding = jest.fn();
   const oircData = jest.fn();
   const getDataForSubmissionResult = jest.fn();
   const getDataForReviseResult = jest.fn();
@@ -164,6 +165,7 @@ describe('GreenChecksService', () => {
           useValue: {
             calculateGreenChecks,
             createSnapshot,
+            carryOverPoolFunding,
             oircData,
             getDataForSubmissionResult,
             getDataForReviseResult,
@@ -843,33 +845,139 @@ describe('GreenChecksService', () => {
   });
 
   describe('newReportingCycle', () => {
+    // @sdd-spec docs/specs/bilateral/pool-funding-update-carryover — T-01
+    const approved = {
+      result_id: 10,
+      result_official_code: 500,
+      result_status_id: ResultStatusEnum.APPROVED,
+      report_year_id: 2024,
+    };
+    let order: string[];
+    let txUpdate: jest.Mock;
+    let txFindOne: jest.Mock;
+    let txManager: { getRepository: jest.Mock };
+
+    const setupCycle = (snapshot: { result_id: number } | null) => {
+      order = [];
+      txUpdate = jest.fn(async () => {
+        order.push('tx:update');
+      });
+      txFindOne = jest.fn(async () => {
+        order.push('tx:findSnapshot');
+        return snapshot;
+      });
+      txManager = {
+        getRepository: jest.fn(() => ({
+          update: txUpdate,
+          findOne: txFindOne,
+        })),
+      };
+      resultRepo.findOne.mockResolvedValueOnce(approved);
+      carryOverPoolFunding.mockReset();
+      carryOverPoolFunding.mockImplementation(async () => {
+        order.push('carryOver');
+      });
+      transaction.mockImplementationOnce(
+        async (cb: (m: unknown) => Promise<unknown>) => {
+          order.push('tx:begin');
+          const out = await cb(txManager);
+          order.push('tx:commit');
+          return out;
+        },
+      );
+      const saveHistory = jest
+        .spyOn(service, 'saveHistory')
+        .mockImplementation(async () => {
+          order.push('saveHistory');
+          return {} as never;
+        });
+      return saveHistory;
+    };
+
     it('should throw when no approved active result exists', async () => {
       resultRepo.findOne.mockResolvedValueOnce(null);
 
       await expect(service.newReportingCycle(500, 2026)).rejects.toThrow(
         BadRequestException,
       );
+      expect(transaction).not.toHaveBeenCalled();
     });
 
-    it('should save draft history and update report year', async () => {
-      const approved = {
+    it('(a) carries Pool Funding over from the selected year snapshot inside the transaction', async () => {
+      const saveHistory = setupCycle({ result_id: 99 });
+
+      const out = await service.newReportingCycle(500, 2025);
+
+      expect(carryOverPoolFunding).toHaveBeenCalledWith(txManager, 10, 99, 1);
+      expect(order).toEqual([
+        'tx:begin',
+        'tx:update',
+        'tx:findSnapshot',
+        'carryOver',
+        'tx:commit',
+        'saveHistory',
+      ]);
+      expect(saveHistory).toHaveBeenCalledWith(
+        10,
+        expect.objectContaining({
+          from_status_id: ResultStatusEnum.APPROVED,
+          to_status_id: ResultStatusEnum.DRAFT,
+        }),
+      );
+      expect(out).toMatchObject({
         result_id: 10,
-        result_official_code: 500,
-        result_status_id: ResultStatusEnum.APPROVED,
-        report_year_id: 2024,
-      };
-      resultRepo.findOne
-        .mockResolvedValueOnce(approved)
-        .mockResolvedValueOnce(approved);
-      setupTransactionForSaveHistory();
+        report_year_id: 2025,
+        result_status_id: ResultStatusEnum.DRAFT,
+      });
+    });
+
+    it('(b) does not touch Pool Funding when the year has no snapshot', async () => {
+      const saveHistory = setupCycle(null);
 
       const out = await service.newReportingCycle(500, 2026);
 
-      expect(resultRepo.update).toHaveBeenCalled();
+      expect(carryOverPoolFunding).not.toHaveBeenCalled();
+      expect(txUpdate).toHaveBeenCalledTimes(1);
+      expect(saveHistory).toHaveBeenCalledTimes(1);
       expect(out).toMatchObject({
         report_year_id: 2026,
         result_status_id: ResultStatusEnum.DRAFT,
       });
+    });
+
+    it('(c) rejects and writes no history when the carry-over fails', async () => {
+      const saveHistory = setupCycle({ result_id: 99 });
+      carryOverPoolFunding.mockRejectedValueOnce(new Error('1062'));
+
+      await expect(service.newReportingCycle(500, 2025)).rejects.toThrow(
+        '1062',
+      );
+      expect(saveHistory).not.toHaveBeenCalled();
+      expect(order).not.toContain('tx:commit');
+    });
+
+    it('(e) looks up the snapshot of the selected year and updates only the live row', async () => {
+      setupCycle({ result_id: 99 });
+
+      await service.newReportingCycle(500, 2025);
+
+      expect(txFindOne).toHaveBeenCalledWith({
+        where: {
+          result_official_code: 500,
+          report_year_id: 2025,
+          is_snapshot: true,
+          is_active: true,
+        },
+        order: { result_id: 'DESC' },
+      });
+      expect(txUpdate).toHaveBeenCalledWith(
+        { result_official_code: 500, is_snapshot: false, is_active: true },
+        expect.objectContaining({
+          report_year_id: 2025,
+          result_status_id: ResultStatusEnum.DRAFT,
+        }),
+      );
+      expect(resultRepo.update).not.toHaveBeenCalled();
     });
   });
 
