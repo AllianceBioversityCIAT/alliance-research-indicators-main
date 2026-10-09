@@ -447,4 +447,31 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     expect(headerSql).not.toMatch(/is_snapshot/i);
     expect(aggregate).not.toBeNull();
   });
+
+  it('loads and normalises results.prms_result_code from the pushed version', async () => {
+    mockQueries({
+      header: [{ ...headerRow, prms_result_code: '9475' }],
+    });
+
+    const withCode = await repository.loadByResultId(11);
+    const headerSql = String(query.mock.calls[0][0]);
+
+    expect(headerSql).toMatch(/r\.prms_result_code/);
+    expect(withCode?.prms_result_code).toBe(9475);
+    expect(typeof withCode?.prms_result_code).toBe('number');
+
+    query.mockClear();
+    mockQueries({
+      header: [{ ...headerRow, prms_result_code: null }],
+    });
+    const withoutCode = await repository.loadByResultId(11);
+    expect(withoutCode?.prms_result_code).toBeNull();
+
+    query.mockClear();
+    mockQueries({
+      header: [{ ...headerRow, prms_result_code: '' }],
+    });
+    const blank = await repository.loadByResultId(11);
+    expect(blank?.prms_result_code).toBeNull();
+  });
 });

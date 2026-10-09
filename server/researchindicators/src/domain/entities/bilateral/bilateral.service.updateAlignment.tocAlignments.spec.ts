@@ -22,6 +22,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
@@ -31,10 +32,12 @@ import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types
 //
 // Focused smoke spec for the `toc_alignments[]` write path (design §6.3).
 // T-08 owns the exhaustive write matrix; here the new branches are pinned:
-//   1. Legacy body (no toc_alignments) — no gate, no catalog calls, no
-//      per-SP upsert (R-BIL-097 AC.3 + regression).
-//   2. Version gate — report_year ≠ 2026 + toc_alignments → 409
-//      `toc_mapping_version_locked`, nothing persisted (R-BIL-097 AC.2).
+//   1. Legacy body (no toc_alignments) on another year — 409
+//      `pool_funding_year_locked`, no catalog calls, no per-SP upsert
+//      (R-PRY-004; R-BIL-097 AC.3 superseded).
+//   2. Other-year body with toc_alignments → 409
+//      `pool_funding_year_locked`, nothing persisted (R-PRY-004; R-BIL-097
+//      AC.2's old code superseded, D-8).
 //   3. Happy path — "Yes" row upserted with catalog snapshots, "No" row
 //      with aligns_with_toc=false only (R-BIL-092 AC.2, R-BIL-095 AC.2).
 //   4. Atomic 400 — multiple per-alignment errors collected into a single
@@ -167,6 +170,10 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+        },
         { provide: TocIntegrationService, useValue: { getTocResults } },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
@@ -194,37 +201,40 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
   afterEach(() => jest.clearAllMocks());
 
-  it('legacy body (no toc_alignments) — no version gate, no catalog call, no per-SP upsert (R-BIL-097 AC.3)', async () => {
-    // Out-of-version result: the gate must NOT fire on a legacy body.
+  it('legacy body (no toc_alignments) on another year → 409 pool_funding_year_locked, nothing persisted (R-PRY-004)', async () => {
+    // Failing run (K-018): this 2024 legacy body used to resolve. It now
+    // rejects with ConflictException before the transaction opens.
     findContext.mockResolvedValue(baseContext({ report_year_id: 2024 }));
     findActiveAlignment.mockResolvedValue(null);
 
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
       sp_codes: ['SP01'],
-      // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-11
-      // re-base: has_contribution:true now requires a resolved Primary
-      // (R-BIL-121). Fixture-only change — the claim under test (a legacy
-      // body bypasses the version gate) is untouched.
       primary_sp_code: 'SP01',
     };
 
-    await expect(
-      service.updateAlignment(19792, '19792', dto, user),
-    ).resolves.toBeDefined();
+    let thrown: HttpException | undefined;
+    try {
+      await service.updateAlignment(19792, '19792', dto, user);
+    } catch (err) {
+      thrown = err as HttpException;
+    }
 
-    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(thrown).toBeInstanceOf(ConflictException);
+    const response = thrown!.getResponse() as {
+      message: { code: string };
+    };
+    expect(response.message.code).toBe('pool_funding_year_locked');
+    expect(transaction).not.toHaveBeenCalled();
     expect(getTocResults).not.toHaveBeenCalled();
     expect(upsertForSp).not.toHaveBeenCalled();
     expect(deactivateForSps).not.toHaveBeenCalled();
   });
 
-  // ⚠ OFF LIMITS (T-11) — R-BIL-097 AC.2 / R-BIL-130 AC.2. This block MUST
-  // pass unmodified — adding `primary_sp_code` here is the D-8 defect, not
-  // a re-base. It stays green because the version gate
-  // (`assertTocMappingVersionUnlocked`) fires before Primary validation
-  // for ANY request carrying `toc_alignments`, primary_sp_code or not.
-  it('version gate — toc_alignments on a non-2026 live version → 409 toc_mapping_version_locked, nothing persisted (R-BIL-097 AC.2)', async () => {
+  // R-BIL-097 AC.2's error code was superseded (D-8). The failing run
+  // received pool_funding_year_locked. Still no primary_sp_code: the year
+  // 409 fires before Primary validation.
+  it('other-year toc_alignments → 409 pool_funding_year_locked, nothing persisted (R-PRY-004)', async () => {
     findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
     findActiveAlignment.mockResolvedValue(null);
 
@@ -254,7 +264,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     const response = thrown!.getResponse() as {
       message: { code: string };
     };
-    expect(response.message.code).toBe('toc_mapping_version_locked');
+    expect(response.message.code).toBe('pool_funding_year_locked');
     expect(transaction).not.toHaveBeenCalled();
     expect(upsertForSp).not.toHaveBeenCalled();
     expect(getTocResults).not.toHaveBeenCalled();
@@ -301,7 +311,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
     // Catalog fetched only for the referenced (SP01, OUTPUT) combo.
     expect(getTocResults).toHaveBeenCalledTimes(1);
-    expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+    expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
 
     expect(upsertForSp).toHaveBeenCalledTimes(1);
     expect(upsertForSp).toHaveBeenCalledWith(
@@ -414,7 +424,19 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         },
       ],
     };
-    (service.getAlignment as jest.Mock).mockResolvedValueOnce(readBack);
+    const buildAlignment = jest
+      .spyOn(
+        service as unknown as {
+          buildAlignment: (
+            resultId: number,
+            resultCode: string,
+            user: User,
+            year: number,
+          ) => Promise<typeof readBack>;
+        },
+        'buildAlignment',
+      )
+      .mockResolvedValueOnce(readBack);
 
     const dto: UpdatePoolFundingAlignmentDto = {
       has_contribution: true,
@@ -438,8 +460,8 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
 
     // Same object the read path produced — single mapping path (D-V2-5).
     expect(out).toBe(readBack);
-    expect(service.getAlignment).toHaveBeenCalledTimes(1);
-    expect(service.getAlignment).toHaveBeenCalledWith(19792, '19792', user);
+    expect(buildAlignment).toHaveBeenCalledTimes(1);
+    expect(buildAlignment).toHaveBeenCalledWith(19792, '19792', user, 2026);
     expect(out.version_locked).toBe(false);
     expect(out.toc_alignments).toHaveLength(1);
   });
@@ -1087,8 +1109,8 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     });
 
     // -----------------------------------------------------------------------
-    // R-BIL-097 — version gate (write side; 409 + legacy bypass are pinned
-    // in the T-06 smoke tests above)
+    // R-BIL-097 — other-year writes (409). The former version-lock code is
+    // superseded; the current-year success case stays below.
     // -----------------------------------------------------------------------
     describe('R-BIL-097 — version gate', () => {
       it('AC.1 — result on live version 2026 (driver string form): PATCH with toc_alignments succeeds and persists', async () => {
@@ -1111,11 +1133,9 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
     });
 
     // -----------------------------------------------------------------------
-    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04
-    // R-BIL-130 — the shipped 409 version gate keeps firing before Primary
-    // validation (T-06, not yet landed). The gate now lives at the call
-    // site (`assertTocMappingVersionUnlocked`, ahead of `validateTocAlignments`)
-    // instead of inside it — see design.md §4 step 2.
+    // R-BIL-130 — an other-year body is 409 pool_funding_year_locked before
+    // Primary validation. The former version-lock code and the legacy-body
+    // bypass (AC.3) were superseded (D-8, R-PRY-004).
     // -----------------------------------------------------------------------
     describe('R-BIL-130 — version gate vs Primary validation ordering (T-04)', () => {
       // ⚠ T-11: AC.1 and AC.4 below MUST keep calling `patchDto` with NO
@@ -1123,7 +1143,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
       // `primary_sp_code`. Only AC.3 (has_contribution:true but no
       // toc_alignments at all, so it reaches Primary validation) is a
       // genuine re-base target.
-      it('AC.1 — has_contribution:true + toc_alignments present + non-2026 live version + no primary_sp_code → 409 toc_mapping_version_locked, NOT 400 (report_year_id: 2025)', async () => {
+      it('AC.1 — has_contribution:true + toc_alignments present + other year + no primary_sp_code → 409 pool_funding_year_locked, NOT 400 (report_year_id: 2025)', async () => {
         findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
 
         let thrown: HttpException | undefined;
@@ -1145,7 +1165,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         const response = thrown!.getResponse() as {
           message: { code: string };
         };
-        expect(response.message.code).toBe('toc_mapping_version_locked');
+        expect(response.message.code).toBe('pool_funding_year_locked');
         // Nothing persisted: the gate fires before the transaction opens and
         // before any catalog lookup Primary validation would trigger.
         expect(transaction).not.toHaveBeenCalled();
@@ -1154,28 +1174,30 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(getTocResults).not.toHaveBeenCalled();
       });
 
-      it('AC.3 — legacy body (no toc_alignments) on a non-2026 live version bypasses the gate entirely and validates normally (report_year_id: 2025)', async () => {
-        // Falsification target for the "extracted unconditionally" wrong
-        // implementation: if the call site dropped the `dto.toc_alignments`
-        // guard, this legacy body would newly trip the gate and this test
-        // would go red with a ConflictException instead of resolving.
+      it('AC.3 — legacy body (no toc_alignments) on another year → 409 pool_funding_year_locked, nothing persisted (report_year_id: 2025)', async () => {
+        // Failing run (K-018): this legacy body used to resolve. The
+        // unconditional year guard now rejects it before the transaction.
         findContext.mockResolvedValue(baseContext({ report_year_id: 2025 }));
 
         const dto: UpdatePoolFundingAlignmentDto = {
           has_contribution: true,
           sp_codes: ['SP01', 'SP03'],
-          // T-11 re-base — fixture-only change; the claim under test (a
-          // legacy body bypasses the version gate) is untouched. This
-          // block DOES reach resolvePrimarySpCode (no toc_alignments, so
-          // the gate is skipped, but Primary resolution always runs).
           primary_sp_code: 'SP01',
         };
 
-        await expect(
-          service.updateAlignment(19792, '19792', dto, user),
-        ).resolves.toBeDefined();
+        let thrown: HttpException | undefined;
+        try {
+          await service.updateAlignment(19792, '19792', dto, user);
+        } catch (err) {
+          thrown = err as HttpException;
+        }
 
-        expect(transaction).toHaveBeenCalledTimes(1);
+        expect(thrown).toBeInstanceOf(ConflictException);
+        const response = thrown!.getResponse() as {
+          message: { code: string };
+        };
+        expect(response.message.code).toBe('pool_funding_year_locked');
+        expect(transaction).not.toHaveBeenCalled();
         expect(getTocResults).not.toHaveBeenCalled();
         expect(upsertForSp).not.toHaveBeenCalled();
         expect(deactivateForSps).not.toHaveBeenCalled();
@@ -1286,7 +1308,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         // row is proven by T-04, not here.
         expect(thrown).not.toBeInstanceOf(BadRequestException);
         expect(getTocResults).toHaveBeenCalledTimes(1);
-        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
       });
 
       it('R-BIL-111 AC.4 — Level-only (toc_result_id absent) rejects with missing_required_fields naming toc_result_id, catalog never consulted', async () => {
@@ -1349,7 +1371,7 @@ describe('BilateralService.updateAlignment — toc_alignments write path (T-06)'
         expect(errors).toEqual([
           { sp_code: 'SP99', field: 'sp_code', error: 'sp_not_selected' },
         ]);
-        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT');
+        expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
       });
 
       it('R-BIL-113 AC.6 — quantitative_contribution supplied without indicator_id → 400 contribution_without_indicator on quantitative_contribution, never missing_required_fields (D-C1-8)', async () => {

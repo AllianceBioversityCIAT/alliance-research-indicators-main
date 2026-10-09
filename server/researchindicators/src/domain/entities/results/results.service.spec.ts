@@ -2471,6 +2471,27 @@ describe('ResultsService', () => {
       expect(mockMainRepo.find).toHaveBeenCalledTimes(2);
     });
 
+    it('should select updated_at alongside the existing columns on both queries', async () => {
+      mockMainRepo.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+      await service.findResultVersions(12345, 'STAR');
+
+      const expectedSelect = {
+        result_id: true,
+        result_official_code: true,
+        report_year_id: true,
+        result_status_id: true,
+        updated_at: true,
+      };
+      expect(mockMainRepo.find).toHaveBeenCalledTimes(2);
+      expect(mockMainRepo.find.mock.calls[0][0]?.select).toEqual(
+        expectedSelect,
+      );
+      expect(mockMainRepo.find.mock.calls[1][0]?.select).toEqual(
+        expectedSelect,
+      );
+    });
+
     it('should return empty arrays when no versions found', async () => {
       // Arrange
       const resultCode = 99999;

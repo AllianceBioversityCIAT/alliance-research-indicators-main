@@ -7,6 +7,7 @@ import { DeliveryProcessingState } from '../enum/delivery-processing-state.enum'
 import {
   PrmsWebhookDeliveryRepository,
   RecordDeliveryInput,
+  RecordImportedHistoryInput,
   RecordOutboundPendingReviewInput,
 } from './prms-webhook-delivery.repository';
 
@@ -625,6 +626,233 @@ describe('PrmsWebhookDeliveryRepository', () => {
     });
   });
 
+  describe('replaceImportedHistory (PRMS results imported as STAR)', () => {
+    /**
+     * A table driven by the SQL the repository emits. The INSERT … SELECT is
+     * decoded by its own column list and its NOT EXISTS guard is evaluated
+     * against the rows; the DELETE is evaluated from its own WHERE. A
+     * placeholder shifted one column, a guard on the wrong column, or a
+     * DELETE that reaches real rows all change what the table holds.
+     */
+    const importedTable = (seed: FakeRow[] = []) => {
+      const rows: FakeRow[] = [...seed];
+      const execute = (sql: string, params: unknown[]) => {
+        if (/^\s*DELETE/i.test(sql)) {
+          const where = /WHERE([\s\S]*)$/i.exec(sql)[1];
+          const columns = [...where.matchAll(/(\w+)\s*=\s*\?/g)].map(
+            (m) => m[1],
+          );
+          expect(columns).toEqual(['result_official_code', 'result_year']);
+          expect(where).toMatch(/delivery_id IS NULL/);
+          expect(where).toMatch(/raw_headers = JSON_OBJECT\(\)/);
+          const before = rows.length;
+          const keep = rows.filter(
+            (row) =>
+              !(
+                columns.every((column, i) => row[column] === params[i]) &&
+                row.delivery_id === null &&
+                row.raw_headers === '{}'
+              ),
+          );
+          rows.splice(0, rows.length, ...keep);
+          return { affectedRows: before - rows.length };
+        }
+        const match =
+          /INSERT\s+INTO\s+result_prms_sync_history\s*\(([\s\S]*?)\)\s*SELECT\s+([\s\S]*?)\s+FROM\s+DUAL\s+WHERE\s+NOT\s+EXISTS\s*\(([\s\S]*)\)/i.exec(
+            sql,
+          );
+        if (!match) throw new Error(`unparseable SQL\n${sql}`);
+        const columns = match[1].split(',').map((c) => c.trim());
+        const tokens = match[2].split(',').map((t) => t.trim());
+        expect(tokens).toHaveLength(columns.length);
+        const row: FakeRow = {};
+        let paramIndex = 0;
+        columns.forEach((column, i) => {
+          const token = tokens[i];
+          if (token === '?') row[column] = params[paramIndex++];
+          else if (/^NULL$/i.test(token)) row[column] = null;
+          else if (/^TRUE$/i.test(token)) row[column] = true;
+          else throw new Error(`unsupported literal ${token}`);
+        });
+        const guardColumns = [...match[3].matchAll(/(\w+)\s*=\s*\?/g)].map(
+          (m) => m[1],
+        );
+        expect(guardColumns).toEqual([
+          'result_official_code',
+          'result_year',
+          'event_source',
+          'status',
+        ]);
+        expect(match[3]).toMatch(/duplicate_of_id IS NULL/);
+        expect(match[3]).toMatch(/is_active = TRUE/);
+        const guardParams = params.slice(paramIndex);
+        expect(guardParams).toHaveLength(guardColumns.length);
+        const exists = rows.some(
+          (existing) =>
+            existing.duplicate_of_id === null &&
+            existing.is_active === true &&
+            guardColumns.every(
+              (column, i) => existing[column] === guardParams[i],
+            ),
+        );
+        if (exists) return { affectedRows: 0 };
+        rows.push(row);
+        return { affectedRows: 1 };
+      };
+      return { rows, execute };
+    };
+
+    const useTable = (fake: ReturnType<typeof importedTable>) => {
+      const manager = {
+        query: jest.fn(fake.execute),
+      } as unknown as EntityManager;
+      transaction.mockImplementation(
+        async (work: (m: EntityManager) => unknown) => work(manager),
+      );
+      return manager;
+    };
+
+    const KEY = { resultOfficialCode: '5001', resultYear: 2025 };
+
+    const importedRow = (
+      overrides: Partial<RecordImportedHistoryInput> = {},
+    ): RecordImportedHistoryInput => ({
+      ...KEY,
+      prmsResultCode: 28731,
+      environment: 'TEST',
+      occurredAt: OCCURRED_AT,
+      eventSource: 'PRMS',
+      status: 'REJECTED',
+      decision: 'REJECT',
+      decidedAt: OCCURRED_AT,
+      actorUserId: null,
+      ...overrides,
+    });
+
+    const pendingRow = importedRow({
+      eventSource: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      decidedAt: null,
+      actorUserId: 7,
+    });
+
+    it('writes the rows inside one transaction, every JSON column as {} and no delivery, reviewer or justification', async () => {
+      const fake = importedTable();
+      useTable(fake);
+
+      const outcome = await repository.replaceImportedHistory(KEY, [
+        importedRow(),
+      ]);
+
+      expect(outcome).toEqual({ deleted: 0, inserted: 1 });
+      expect(transaction).toHaveBeenCalledTimes(1);
+      expect(dataSourceQuery).not.toHaveBeenCalled();
+      expect(fake.rows).toEqual([
+        {
+          delivery_id: null,
+          occurred_at: OCCURRED_AT,
+          environment: 'TEST',
+          correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+          result_official_code: '5001',
+          result_year: 2025,
+          prms_result_id: null,
+          prms_result_code: 28731,
+          decision: 'REJECT',
+          justification: null,
+          decided_at: OCCURRED_AT,
+          raw_body: '{}',
+          raw_headers: '{}',
+          processing_state: DeliveryProcessingState.PROCESSED,
+          processing_error: null,
+          duplicate_of_id: null,
+          created_by: null,
+          is_active: true,
+          event_source: 'PRMS',
+          status: 'REJECTED',
+          actor_user_id: null,
+          reviewer_name: null,
+          reviewer_role: null,
+          science_program_code: null,
+          changes: '{}',
+        },
+      ]);
+    });
+
+    it('a second run replaces the previous import instead of piling rows up', async () => {
+      const fake = importedTable();
+      useTable(fake);
+
+      await repository.replaceImportedHistory(KEY, [pendingRow, importedRow()]);
+      const second = await repository.replaceImportedHistory(KEY, [
+        pendingRow,
+        importedRow({ status: 'APPROVED', decision: 'APPROVE' }),
+      ]);
+
+      expect(second).toEqual({ deleted: 2, inserted: 2 });
+      expect(fake.rows.map((row) => [row.event_source, row.status])).toEqual([
+        ['STAR', 'PENDING_REVIEW'],
+        ['PRMS', 'APPROVED'],
+      ]);
+    });
+
+    it('never deletes real push or callback rows, and does not duplicate them', async () => {
+      const realPush: FakeRow = {
+        result_official_code: '5001',
+        result_year: 2025,
+        delivery_id: null,
+        raw_headers: null,
+        event_source: 'STAR',
+        status: 'PENDING_REVIEW',
+        duplicate_of_id: null,
+        is_active: true,
+      };
+      const realCallback: FakeRow = {
+        result_official_code: '5001',
+        result_year: 2025,
+        delivery_id: '14',
+        raw_headers: { 'x-prms-delivery-id': '14' },
+        event_source: 'PRMS',
+        status: 'REJECTED',
+        duplicate_of_id: null,
+        is_active: true,
+      };
+      const fake = importedTable([realPush, realCallback]);
+      useTable(fake);
+
+      const outcome = await repository.replaceImportedHistory(KEY, [
+        pendingRow,
+        importedRow(),
+      ]);
+
+      expect(outcome).toEqual({ deleted: 0, inserted: 0 });
+      expect(fake.rows).toEqual([realPush, realCallback]);
+    });
+
+    it('only replaces the rows of its own result and year', async () => {
+      const fake = importedTable();
+      useTable(fake);
+
+      await repository.replaceImportedHistory(
+        { resultOfficialCode: '5002', resultYear: 2025 },
+        [importedRow({ resultOfficialCode: '5002' })],
+      );
+      await repository.replaceImportedHistory(
+        { resultOfficialCode: '5001', resultYear: 2026 },
+        [importedRow({ resultYear: 2026 })],
+      );
+      await repository.replaceImportedHistory(KEY, [importedRow()]);
+
+      expect(
+        fake.rows.map((row) => [row.result_official_code, row.result_year]),
+      ).toEqual([
+        ['5002', 2025],
+        ['5001', 2026],
+        ['5001', 2025],
+      ]);
+    });
+  });
+
   describe('history reads (R-PWH-005 AC.8)', () => {
     // Raw rows as mysql2 hands them back: BIGINT columns arrive as strings,
     // JSON columns already parsed, timestamps as Date.
@@ -792,7 +1020,7 @@ describe('PrmsWebhookDeliveryRepository', () => {
   });
 
   describe('append-only (R-PWH-005 AC.7)', () => {
-    it('the shipped repository source emits no UPDATE or DELETE against result_prms_sync_history, and never flips is_active', () => {
+    it('the shipped repository source emits no UPDATE, only the fenced imported-history DELETE, and never flips is_active', () => {
       // A lock on the real artifact, not on this suite's call log: a later
       // edit that adds a mutation reddens this without needing a fixture.
       const source = readFileSync(
@@ -800,7 +1028,16 @@ describe('PrmsWebhookDeliveryRepository', () => {
         'utf8',
       );
       expect(source).not.toMatch(/UPDATE\s+result_prms_sync_history/i);
-      expect(source).not.toMatch(/DELETE\s+FROM\s+result_prms_sync_history/i);
+      // The one DELETE is the imported-history replace, and it must stay
+      // fenced to rows only the import writes (no delivery_id, {} headers).
+      const deletes = [
+        ...source.matchAll(
+          /DELETE\s+FROM\s+result_prms_sync_history([\s\S]*?)`/gi,
+        ),
+      ];
+      expect(deletes).toHaveLength(1);
+      expect(deletes[0][1]).toMatch(/delivery_id IS NULL/);
+      expect(deletes[0][1]).toMatch(/raw_headers = JSON_OBJECT\(\)/);
       expect(source).not.toMatch(/is_active\s*=\s*(FALSE|0)\b/i);
       expect(source).toMatch(/INSERT\s+INTO\s+result_prms_sync_history/);
     });

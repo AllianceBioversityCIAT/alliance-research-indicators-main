@@ -18,6 +18,7 @@ import {
 import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
 import { normalizeExternalCode } from '../../../entities/bilateral-project-mapping/utils/external-code.util';
 import { ENV } from '../../../shared/utils/env.utils';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
@@ -46,11 +47,16 @@ export class ClarisaProjectsService {
   private readonly connection: Clarisa;
   private readonly TTL_MS = 5 * 60 * 1000;
 
-  private cache: { data: ClarisaProject[]; fetchedAt: number } | null = null;
+  private cache: {
+    data: ClarisaProject[];
+    fetchedAt: number;
+    phase: number;
+  } | null = null;
 
   constructor(
     http: HttpService,
     private readonly phaseResolver: MappingPhaseResolver,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {
     this.connection = new Clarisa(http);
   }
@@ -58,7 +64,10 @@ export class ClarisaProjectsService {
   /**
    * Checks whether a project carries at least one accepted Science Program mapping (R-BAS-004, R-PSP-003).
    * Computed once here and used by both the opt-in filter and the controller DTO mapping.
-   * Preserves code === 22 narrowing per D-PSP-8.
+   * No entity-type narrowing (closes D-PSP-8 / OQ-2): CLARISA files SP01–SP08 under
+   * code 22, SP09 under 23 (Scaling programs) and SP10–SP13 under 24 (Accelerators),
+   * so an SP is recognised by its `SPxx` smo_code — the same rule the per-result
+   * picker applies — which also keeps AOW rows (code 26, `AOWxx`) out.
    */
   hasSciencePrograms(project: ClarisaProject): boolean {
     const acceptedStatuses = ENV.BILATERAL_ACCEPTED_SP_STATUSES;
@@ -66,7 +75,7 @@ export class ClarisaProjectsService {
       project.project_mappings_array?.some(
         (m) =>
           isAcceptedSpStatus(m.status, acceptedStatuses) &&
-          m.global_unit_object?.cgiar_entity_type_object?.code === 22,
+          /^SP\d/i.test(m.global_unit_object?.smo_code?.trim() ?? ''),
       ) ?? false
     );
   }
@@ -223,13 +232,25 @@ export class ClarisaProjectsService {
 
   private async getCachedAll(): Promise<ClarisaProject[]> {
     const now = Date.now();
-    if (this.cache && now - this.cache.fetchedAt < this.TTL_MS) {
+    const phase = await this.reportingYearResolver.resolve();
+    if (
+      this.cache &&
+      this.cache.phase === phase &&
+      now - this.cache.fetchedAt < this.TTL_MS
+    ) {
       return this.cache.data;
     }
 
     try {
-      const data = await this.connection.get<ClarisaProject[]>('api/projects');
-      this.cache = { data, fetchedAt: now };
+      // `phase` is the reporting year the resolver just read, the same year
+      // TocIntegrationService sends. It is always sent. The cache records
+      // that phase: a different phase is a miss, so a year change cannot be
+      // served from another year's feed. On upstream error a cached feed is
+      // served only when its phase matches; a mismatch falls through to the
+      // cold-cache 503 below.
+      const path = `api/projects?phase=${encodeURIComponent(String(phase))}`;
+      const data = await this.connection.get<ClarisaProject[]>(path);
+      this.cache = { data, fetchedAt: now, phase };
 
       let sourceCenterCount = 0;
       let legacyLeadCount = 0;
@@ -246,7 +267,7 @@ export class ClarisaProjectsService {
 
       return data;
     } catch (err) {
-      if (this.cache) {
+      if (this.cache && this.cache.phase === phase) {
         this.logger.warn(
           `[ClarisaProjectsService] upstream error; serving stale cache (age=${Math.round(
             (now - this.cache.fetchedAt) / 1000,

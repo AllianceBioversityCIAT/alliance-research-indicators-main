@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, Not } from 'typeorm';
 import { SaveResultService } from './save-all-sections.service';
 import { ResultsService } from '../../entities/results/results.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
@@ -1257,180 +1257,273 @@ describe('SaveResultService', () => {
 
   // --- staging section-persistence tests (merged) ---
 
+  it('should persist public_link and sync geo location, partners, evidences and knowledge product', async () => {
+    resultRepoHandle.findOne.mockResolvedValue({
+      result_id: 5,
+      result_official_code: 7001,
+    } as any);
+    const counters = new CounterResults();
+    const dto = minimalResultDto();
+    dto.public_link = 'https://example.org/public';
+    dto.geoScope = { geo_scope_id: 2, countries: [] } as any;
+    dto.partners = { institutions: [{ institution_id: 10 }] } as any;
+    dto.evidence = { evidence: [{ evidence_url: 'https://e.org' }] } as any;
+    dto.knowledgeProduct = { open_access: true, citation: 'cite' } as any;
 
-    it('should persist public_link and sync geo location, partners, evidences and knowledge product', async () => {
+    await service.saveAllSections(dto, prmsExtraData(counters));
+
+    expect(resultRepoHandle.update).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({
+        public_link: 'https://example.org/public',
+        external_link: 'e',
+      }),
+    );
+    expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(5);
+    expect(resultsService.saveGeoLocation).toHaveBeenCalledWith(
+      5,
+      dto.geoScope,
+    );
+    expect(resultInstitutionsService.updatePartners).toHaveBeenCalledWith(
+      5,
+      dto.partners,
+    );
+    expect(resultEvidencesService.updateResultEvidences).toHaveBeenCalledWith(
+      5,
+      dto.evidence,
+    );
+    expect(knowledgeProductService.update).toHaveBeenCalledWith(
+      5,
+      dto.knowledgeProduct,
+    );
+    expect(resultsUtil.clearManually).toHaveBeenCalled();
+    expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+  });
+
+  it('should set and clear ResultsUtil context around section updates', async () => {
+    resultRepoHandle.findOne.mockResolvedValue(null);
+    resultsService.createResult.mockResolvedValue({
+      result_id: 60,
+      result_official_code: 7001,
+    } as any);
+
+    await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+    expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(60);
+    expect(resultsUtil.clearManually).toHaveBeenCalled();
+  });
+
+  it('should clear ResultsUtil context even when processing fails', async () => {
+    resultRepoHandle.findOne.mockResolvedValue(null);
+    resultsService.createResult.mockResolvedValue({
+      result_id: 61,
+      result_official_code: 7001,
+    } as any);
+    resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
+
+    await service.saveAllSections(minimalResultDto(), tipExtraData());
+
+    expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(61);
+    expect(resultsUtil.clearManually).toHaveBeenCalled();
+  });
+
+  it('should save policy change section when indicator is POLICY_CHANGE', async () => {
+    resultRepoHandle.findOne.mockResolvedValue({
+      result_id: 70,
+      result_official_code: 7001,
+    } as any);
+    const dto = minimalResultDto();
+    dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+    dto.policyChange = {
+      policy_type_id: 1,
+      policy_stage_id: 1,
+      evidence_stage: undefined,
+      implementing_organization: [{ institution_id: 8064 }] as any,
+      innovation_development: undefined,
+      innovation_use: undefined,
+    };
+
+    await service.saveAllSections(dto, prmsExtraData());
+
+    expect(resultPolicyChangeService.update).toHaveBeenCalledWith(
+      70,
+      dto.policyChange,
+    );
+  });
+
+  it('should not save policy change section when policyChange payload is empty', async () => {
+    resultRepoHandle.findOne.mockResolvedValue({
+      result_id: 71,
+      result_official_code: 7001,
+    } as any);
+    const dto = minimalResultDto();
+    dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
+    dto.policyChange = undefined;
+
+    await service.saveAllSections(dto, prmsExtraData());
+
+    expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
+  });
+
+  it('should save capacity sharing section when indicator is CAPACITY_SHARING', async () => {
+    resultRepoHandle.findOne.mockResolvedValue({
+      result_id: 80,
+      result_official_code: 7001,
+    } as any);
+    const dto = minimalResultDto();
+    dto.createResult.indicator_id =
+      IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
+    dto.capacitySharing = {
+      session_format_id: 2,
+      delivery_modality_id: 3,
+      session_length_id: 1,
+      group: {
+        session_participants_male: 59,
+        session_participants_female: 16,
+        session_participants_non_binary: 0,
+        session_participants_total: 75,
+        is_attending_organization: true,
+        trainee_organization_representative: [{ institution_id: 21 }] as any,
+      } as any,
+    };
+
+    await service.saveAllSections(dto, prmsExtraData());
+
+    expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
+      80,
+      dto.capacitySharing,
+    );
+  });
+
+  it('should save innovationDev and ipRights when indicator is INNOVATION_DEV', async () => {
+    resultRepoHandle.findOne.mockResolvedValue({
+      result_id: 90,
+      result_official_code: 7001,
+    } as any);
+    const dto = minimalResultDto();
+    dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
+    dto.innovationDev = {
+      short_title: 'Holistic framework',
+      innovation_nature_id: 1,
+      innovation_type_id: 13,
+      innovation_readiness_id: 14,
+      anticipated_users_id: 2,
+    } as any;
+    dto.ipRights = {
+      private_sector_engagement_id: 3,
+      formal_ip_rights_application_id: 2,
+    } as any;
+
+    await service.saveAllSections(dto, prmsExtraData());
+
+    expect(resultInnovationDevService.update).toHaveBeenCalledWith(
+      90,
+      dto.innovationDev,
+    );
+    expect(resultIpRightsService.update).toHaveBeenCalledWith(90, dto.ipRights);
+  });
+
+  describe('saveAllSections title duplicate handling', () => {
+    const starExtraData = (counters = new CounterResults()) => ({
+      platformCode: ReportingPlatformEnum.STAR,
+      counters,
+      resultSaved: [] as number[],
+      currentCode: { current: 0 },
+      duplicateByTitle: true,
+    });
+
+    it('should skip the save when another live result has the same title', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ result_id: 77 });
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.createResult.title = '  Same title  ';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, starExtraData(counters));
+
+      expect(resultRepoHandle.findOne).toHaveBeenLastCalledWith({
+        where: { title: 'Same title', is_active: true, is_snapshot: false },
+        select: { result_id: true },
+      });
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.CREATED]).toBe(0);
+      expect(counters[CounterResultsEnum.OMITTED_DUPLICATE]).toBe(1);
+    });
+
+    it('should exclude the row being updated from the title check', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce({ result_id: 5, result_official_code: 7001 })
+        .mockResolvedValueOnce(null);
+      const counters = new CounterResults();
+
+      await service.saveAllSections(
+        minimalResultDto(),
+        starExtraData(counters),
+      );
+
+      expect(resultRepoHandle.findOne.mock.calls[1][0].where).toEqual({
+        title: 't',
+        is_active: true,
+        is_snapshot: false,
+        result_id: Not(5),
+      });
+      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should ignore public_link duplicates when deduplicating by title', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, starExtraData());
+
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(
+        duplicateCandidates.findCandidatesForIncoming,
+      ).not.toHaveBeenCalled();
+      expect(resolutionRunner.applyGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveAllSections PRMS identifiers', () => {
+    it('should write prms_result_code and prms_phase_id when present', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 5,
         result_official_code: 7001,
       } as any);
-      const counters = new CounterResults();
       const dto = minimalResultDto();
-      dto.public_link = 'https://example.org/public';
-      dto.geoScope = { geo_scope_id: 2, countries: [] } as any;
-      dto.partners = { institutions: [{ institution_id: 10 }] } as any;
-      dto.evidence = { evidence: [{ evidence_url: 'https://e.org' }] } as any;
-      dto.knowledgeProduct = { open_access: true, citation: 'cite' } as any;
+      dto.prms_result_code = 28731;
+      dto.prms_phase_id = 6;
 
-      await service.saveAllSections(dto, prmsExtraData(counters));
+      await service.saveAllSections(dto, prmsExtraData());
 
       expect(resultRepoHandle.update).toHaveBeenCalledWith(
         5,
-        expect.objectContaining({
-          public_link: 'https://example.org/public',
-          external_link: 'e',
-        }),
+        expect.objectContaining({ prms_result_code: 28731, prms_phase_id: 6 }),
       );
-      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(5);
-      expect(resultsService.saveGeoLocation).toHaveBeenCalledWith(
-        5,
-        dto.geoScope,
-      );
-      expect(resultInstitutionsService.updatePartners).toHaveBeenCalledWith(
-        5,
-        dto.partners,
-      );
-      expect(resultEvidencesService.updateResultEvidences).toHaveBeenCalledWith(
-        5,
-        dto.evidence,
-      );
-      expect(knowledgeProductService.update).toHaveBeenCalledWith(
-        5,
-        dto.knowledgeProduct,
-      );
-      expect(resultsUtil.clearManually).toHaveBeenCalled();
-      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
     });
 
-
-    it('should set and clear ResultsUtil context around section updates', async () => {
-      resultRepoHandle.findOne.mockResolvedValue(null);
-      resultsService.createResult.mockResolvedValue({
-        result_id: 60,
-        result_official_code: 7001,
-      } as any);
-
-      await service.saveAllSections(minimalResultDto(), tipExtraData());
-
-      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(60);
-      expect(resultsUtil.clearManually).toHaveBeenCalled();
-    });
-
-
-    it('should clear ResultsUtil context even when processing fails', async () => {
-      resultRepoHandle.findOne.mockResolvedValue(null);
-      resultsService.createResult.mockResolvedValue({
-        result_id: 61,
-        result_official_code: 7001,
-      } as any);
-      resultsService.updateGeneralInfo.mockRejectedValueOnce(new Error('boom'));
-
-      await service.saveAllSections(minimalResultDto(), tipExtraData());
-
-      expect(resultsUtil.setCurrentResult).toHaveBeenCalledWith(61);
-      expect(resultsUtil.clearManually).toHaveBeenCalled();
-    });
-
-
-    it('should save policy change section when indicator is POLICY_CHANGE', async () => {
+    it('should leave both columns untouched when the DTO does not carry them', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 70,
+        result_id: 5,
         result_official_code: 7001,
       } as any);
-      const dto = minimalResultDto();
-      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
-      dto.policyChange = {
-        policy_type_id: 1,
-        policy_stage_id: 1,
-        evidence_stage: undefined,
-        implementing_organization: [{ institution_id: 8064 }] as any,
-        innovation_development: undefined,
-        innovation_use: undefined,
-      };
 
-      await service.saveAllSections(dto, prmsExtraData());
+      await service.saveAllSections(minimalResultDto(), prmsExtraData());
 
-      expect(resultPolicyChangeService.update).toHaveBeenCalledWith(
-        70,
-        dto.policyChange,
-      );
+      const written = resultRepoHandle.update.mock.calls[0][1];
+      expect(written).not.toHaveProperty('prms_result_code');
+      expect(written).not.toHaveProperty('prms_phase_id');
     });
-
-
-    it('should not save policy change section when policyChange payload is empty', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 71,
-        result_official_code: 7001,
-      } as any);
-      const dto = minimalResultDto();
-      dto.createResult.indicator_id = IndicatorsEnum.POLICY_CHANGE;
-      dto.policyChange = undefined;
-
-      await service.saveAllSections(dto, prmsExtraData());
-
-      expect(resultPolicyChangeService.update).not.toHaveBeenCalled();
-    });
-
-
-    it('should save capacity sharing section when indicator is CAPACITY_SHARING', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 80,
-        result_official_code: 7001,
-      } as any);
-      const dto = minimalResultDto();
-      dto.createResult.indicator_id =
-        IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT;
-      dto.capacitySharing = {
-        session_format_id: 2,
-        delivery_modality_id: 3,
-        session_length_id: 1,
-        group: {
-          session_participants_male: 59,
-          session_participants_female: 16,
-          session_participants_non_binary: 0,
-          session_participants_total: 75,
-          is_attending_organization: true,
-          trainee_organization_representative: [{ institution_id: 21 }] as any,
-        } as any,
-      };
-
-      await service.saveAllSections(dto, prmsExtraData());
-
-      expect(resultCapacitySharingService.update).toHaveBeenCalledWith(
-        80,
-        dto.capacitySharing,
-      );
-    });
-
-
-    it('should save innovationDev and ipRights when indicator is INNOVATION_DEV', async () => {
-      resultRepoHandle.findOne.mockResolvedValue({
-        result_id: 90,
-        result_official_code: 7001,
-      } as any);
-      const dto = minimalResultDto();
-      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_DEV;
-      dto.innovationDev = {
-        short_title: 'Holistic framework',
-        innovation_nature_id: 1,
-        innovation_type_id: 13,
-        innovation_readiness_id: 14,
-        anticipated_users_id: 2,
-      } as any;
-      dto.ipRights = {
-        private_sector_engagement_id: 3,
-        formal_ip_rights_application_id: 2,
-      } as any;
-
-      await service.saveAllSections(dto, prmsExtraData());
-
-      expect(resultInnovationDevService.update).toHaveBeenCalledWith(
-        90,
-        dto.innovationDev,
-      );
-      expect(resultIpRightsService.update).toHaveBeenCalledWith(
-        90,
-        dto.ipRights,
-      );
-    });
-
+  });
 });

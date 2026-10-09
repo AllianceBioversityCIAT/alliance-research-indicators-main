@@ -87,6 +87,7 @@ export class ResultPrmsSyncAggregateRepository {
       SELECT
         r.result_id,
         r.result_official_code,
+        r.prms_result_code,
         r.indicator_id,
         r.title,
         r.description,
@@ -433,6 +434,10 @@ export class ResultPrmsSyncAggregateRepository {
     return {
       result_id: Number(header.result_id),
       result_official_code: header.result_official_code,
+      // Same empty-string guard as the decimal sibling: mysql2 can hand the
+      // integer back as `"9475"`, and `Number('')` is 0, which a re-push
+      // would send as a real PRMS code.
+      prms_result_code: asDecimal(header.prms_result_code),
       indicator_id:
         header.indicator_id == null ? null : Number(header.indicator_id),
       created_at: new Date(header.created_at),

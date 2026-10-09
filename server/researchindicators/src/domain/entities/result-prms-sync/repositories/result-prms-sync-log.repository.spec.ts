@@ -1,5 +1,7 @@
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
+import { LoggerUtil } from '../../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import {
@@ -11,12 +13,14 @@ import { ResultPrmsSyncLogRepository } from './result-prms-sync-log.repository';
 describe('ResultPrmsSyncLogRepository', () => {
   let query: jest.Mock;
   let transactionQuery: jest.Mock;
+  let resolveYear: jest.Mock;
   let repository: ResultPrmsSyncLogRepository;
   let manager: Pick<EntityManager, 'query'>;
 
   beforeEach(() => {
     query = jest.fn();
     transactionQuery = jest.fn();
+    resolveYear = jest.fn().mockResolvedValue(2026);
     manager = { query: transactionQuery };
     const dataSource = {
       query,
@@ -24,7 +28,9 @@ describe('ResultPrmsSyncLogRepository', () => {
         work(manager as EntityManager),
       ),
     } as unknown as DataSource;
-    repository = new ResultPrmsSyncLogRepository(dataSource);
+    repository = new ResultPrmsSyncLogRepository(dataSource, {
+      resolve: resolveYear,
+    } as unknown as ReportingYearResolver);
   });
 
   const claim = (now = new Date('2026-09-15T12:00:00.000Z')) =>
@@ -312,12 +318,148 @@ describe('ResultPrmsSyncLogRepository', () => {
 
     await acceptedSettle();
 
-    expect(query).toHaveBeenCalledTimes(1);
-    expect(query.mock.calls[0][0]).toMatch(/prms_result_code\s*=\s*\?/);
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0][0]).toMatch(/COALESCE\(prms_result_code, \?\)/);
     expect(query.mock.calls[0][0]).toMatch(/prms_phase_id\s*=\s*\?/);
     // result code, phase id, result id -- ORDER MATTERS: positional `?` params,
     // so a transposition writes the phase into prms_result_code.
     expect(query.mock.calls[0][1]).toEqual([555, 36, 42]);
+  });
+
+  it('also writes ONLY the PRMS code onto the live version of the pushed result', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await acceptedSettle();
+
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/SET live\.prms_result_code = \?/);
+    expect(liveSql).toMatch(/live\.is_snapshot = FALSE/);
+    expect(liveSql).toMatch(/live\.is_active = TRUE/);
+    // Official codes are shared across platforms (TIP, PRMS, AICCRA rows exist
+    // with the same code in Dev), so without this filter a TIP row is written.
+    expect(liveSql).toMatch(/live\.platform_code = 'STAR'/);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
+    expect(liveSql).toMatch(
+      /pushed\.result_official_code = live\.result_official_code/,
+    );
+    // The phase belongs to the pushed version, never to the live row.
+    expect(liveSql).not.toMatch(/prms_phase_id/);
+    expect(query.mock.calls[1][1]).toEqual([555, 42]);
+  });
+
+  it('does not touch the live version when PRMS returned no code', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: null,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: null,
+    });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const pushedSql = String(query.mock.calls[0][0]);
+    expect(pushedSql).toMatch(/COALESCE\(prms_result_code, \?\)/);
+    expect(query.mock.calls[0][1]).toEqual([null, 36, 42]);
+  });
+
+  it('copies the stored code onto the live row when PRMS returns no code', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: null,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: 9475,
+    });
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[0][1]).toEqual([null, 36, 42]);
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
+    expect(query.mock.calls[1][1]).toEqual([9475, 42]);
+  });
+
+  it('writes the returned code on the live row when nothing is stored yet', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: 8888,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: null,
+    });
+
+    expect(query.mock.calls[1][1]).toEqual([8888, 42]);
+  });
+
+  it('warns and keeps the stored code when PRMS returns a different non-null code', async () => {
+    const warnSpy = jest
+      .spyOn(LoggerUtil.prototype, '_warn')
+      .mockImplementation(() => undefined);
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query.mockResolvedValue({ affectedRows: 1 });
+
+    await repository.settleIfInFlight({
+      attemptId: 8,
+      resultId: 42,
+      outcome: PrmsSyncOutcome.ACCEPTED,
+      userId: 7,
+      prmsResultCode: 8888,
+      prmsPhaseId: 36,
+      storedPrmsResultCode: 9475,
+    });
+
+    const pushedSql = String(query.mock.calls[0][0]);
+    expect(pushedSql).toMatch(/COALESCE\(prms_result_code, \?\)/);
+    expect(query.mock.calls[0][1]).toEqual([8888, 36, 42]);
+    const liveSql = String(query.mock.calls[1][0]);
+    expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
+    expect(query.mock.calls[1][1]).toEqual([9475, 42]);
+    expect(query.mock.calls[1][1]).not.toEqual([8888, 42]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const message = String(warnSpy.mock.calls[0][0]);
+    expect(message).toContain('42');
+    expect(message).toContain('9475');
+    expect(message).toContain('8888');
+    warnSpy.mockRestore();
+  });
+
+  it('still writes the live code when the snapshot metadata write fails', async () => {
+    transactionQuery
+      .mockResolvedValueOnce({ affectedRows: 1 })
+      .mockResolvedValueOnce({ affectedRows: 1 });
+    query
+      .mockRejectedValueOnce(new Error('snapshot write failed'))
+      .mockResolvedValueOnce({ affectedRows: 1 });
+
+    await expect(acceptedSettle()).resolves.toBe('settled');
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(String(query.mock.calls[1][0])).toMatch(/live\.prms_result_code/);
   });
 
   it('SURVIVES a metadata write failure: still settled, never throws', async () => {
@@ -482,6 +624,37 @@ describe('ResultPrmsSyncLogRepository', () => {
       is_pool_funding_contributor: 1,
       policy_type_id: null,
     };
+
+    it('loadGateSnapshot selects r.report_year_id and sets reporting_year from the resolver', async () => {
+      resolveYear.mockResolvedValue(2027);
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          report_year_id: '2025',
+        },
+      ]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      const selectSql = query.mock.calls[0][0] as string;
+      expect(selectSql).toContain('r.report_year_id');
+      expect(snapshot.report_year).toBe(2025);
+      expect(snapshot.reporting_year).toBe(2027);
+    });
+
+    it('loadGateSnapshot records a null report_year when report_year_id is null', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          report_year_id: null,
+        },
+      ]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      expect(snapshot.report_year).toBeNull();
+      expect(snapshot.reporting_year).toBe(2026);
+    });
 
     it('loadGateSnapshot does not constrain is_snapshot, and resolves a version row', async () => {
       query.mockResolvedValueOnce([snapshotRow]);

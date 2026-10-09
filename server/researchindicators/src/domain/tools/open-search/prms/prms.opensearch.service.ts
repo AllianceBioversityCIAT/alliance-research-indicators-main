@@ -4,6 +4,7 @@ import {
   InnovationDevelopmentQuestionnaireMapper,
   InnovationDevelopmentSummaryMapper,
   PrmsKnowledgeProductDto,
+  PrmsSearchParams,
   PrmsTemporalResponseMapper,
   PolicyChangeSummaryMapper,
   ResultResponseMapper,
@@ -43,7 +44,17 @@ import { PooledFundingContractsService } from '../../../entities/pooled-funding-
 import {
   AcronymExContractEnum,
   ResultPrmsStatusMapper,
+  PrmsImportedDecision,
+  ResultPrmsToStarStatusMapper,
 } from './enum/rsult-type.enum';
+import {
+  PrmsWebhookDeliveryRepository,
+  RecordImportedHistoryInput,
+} from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
+import { BilateralService } from '../../../entities/bilateral/bilateral.service';
+import { tocLevelCode } from '../../../entities/prms-webhook/pool-funding-mapping-diff.service';
+import { TocLevel } from '../../toc-integration/dto/toc-integration.types';
+import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
@@ -91,6 +102,62 @@ import { SessionLengthEnum } from '../../../entities/session-lengths/enum/sessio
 import { InnovationDevAnticipatedUsers } from '../../../entities/innovation-dev-anticipated-users/enum/innovation-dev-anticipated-users.enum';
 import { ActorRolesEnum } from '../../../entities/actor-roles/enum/actor-roles.enum';
 
+/**
+ * PRMS `toc_alignment` -> the pool-funding alignment STAR stores. The SP
+ * whose role is "Primary submitter" (or `primary_entity`) is the primary
+ * SP; every other entity contributes. STAR keeps one ToC row, on the
+ * primary SP, so the first named ToC result of that SP is the one saved.
+ * Returns null when PRMS sends no ToC alignment.
+ */
+export const mapPrmsAlignment = (
+  source: ResultResponseMapper | undefined,
+): {
+  primarySpCode: string;
+  contributingSpCodes: string[];
+  toc: { level: TocLevel | null; title: string } | null;
+} | null => {
+  const entries = (source?.toc_alignment ?? []).filter(
+    (entry) => !isEmpty(entry?.entity?.official_code?.trim()),
+  );
+  if (!entries.length) return null;
+
+  const primaryEntry =
+    entries.find((entry) => /primary/i.test(entry.initiative_role ?? '')) ??
+    entries.find(
+      (entry) =>
+        entry.entity.official_code.trim() ===
+        source?.primary_entity?.official_code?.trim(),
+    ) ??
+    entries[0];
+  const primarySpCode = primaryEntry.entity.official_code.trim();
+  const tocResult = (primaryEntry.toc_results ?? []).find(
+    (candidate) => !isEmpty(candidate?.result_name?.trim()),
+  );
+
+  return {
+    primarySpCode,
+    contributingSpCodes: entries
+      .filter((entry) => entry !== primaryEntry)
+      .map((entry) => entry.entity.official_code.trim()),
+    toc: tocResult
+      ? {
+          level: tocLevelCode(tocResult.level ?? null),
+          title: tocResult.result_name.trim(),
+        }
+      : null,
+  };
+};
+
+const validDate = (value: unknown): Date | null => {
+  if (value == null || value === '') return null;
+  const date = new Date(value as string);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+/** A decision can never be dated before the submission it answers. */
+const laterOf = (candidate: Date | null, floor: Date): Date =>
+  candidate && candidate.getTime() >= floor.getTime() ? candidate : floor;
+
 @Injectable()
 export class PrmsOpenSearchService
   implements ExternalMappersInterface<ExternalMappersDto>
@@ -120,6 +187,9 @@ export class PrmsOpenSearchService
     private readonly clarisaInnovationReadinessLevelsService: ClarisaInnovationReadinessLevelsService,
     private readonly clarisaActorTypesService: ClarisaActorTypesService,
     private readonly clarisaInstitutionTypesService: ClarisaInstitutionTypesService,
+    private readonly greenCheckRepository: GreenCheckRepository,
+    private readonly prmsHistoryRepository: PrmsWebhookDeliveryRepository,
+    private readonly bilateralService: BilateralService,
   ) {}
 
   async mapToExternalCreateResultDto(res: ExternalMappersDto[]): Promise<void> {
@@ -239,9 +309,6 @@ export class PrmsOpenSearchService
 
   //TODO: Review this function to check if it is working correctly and complete the process
   async getData(year: number) {
-    const size = 50;
-    let page = 1;
-    let keepGoing = true;
     const executionCode = uuidv4();
     const currentCode: { current: number } = { current: null };
     const resultSaved: number[] = [];
@@ -253,39 +320,15 @@ export class PrmsOpenSearchService
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.PRMS_INTEGRATION,
       );
-      while (keepGoing) {
-        const centerAcronym = ['Bioversity (Alliance)', 'CIAT (Alliance)'];
-        let prmsUrl = `${this.appConfig.SEARCH_PRMS_URL}/result?size=${size}&page=${page}&fundingType=Result&centerAcronym=${encodeURIComponent(centerAcronym.join(','))}`;
-        if (!isEmpty(year)) {
-          prmsUrl += `&year=${year}`;
-        }
-        const response = await firstValueFrom(
-          this.httpService.get<SearcherResponseDto>(prmsUrl),
-        ).then((response) => response.data);
-        await Promise.all(
-          response.data.map(async (item) => {
-            await this.dataSource
-              .getRepository(SyncStagingRecordsEntity)
-              .save({
-                execution_code: executionCode,
-                code: parseInt(item.result_code),
-                year: parseInt(item.year),
-                data: item,
-              })
-              .catch((error) => {
-                this.logger.error(
-                  `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
-                );
-              });
-          }),
-        );
-
-        if (page >= response.totalPages) {
-          keepGoing = false;
-        }
-
-        page++;
+      const centerAcronym = ['Bioversity (Alliance)', 'CIAT (Alliance)'];
+      const params: PrmsSearchParams = {
+        fundingType: 'Result',
+        centerAcronym: centerAcronym.join(','),
+      };
+      if (!isEmpty(year)) {
+        params.year = year;
       }
+      await this.fetchPrmsPages(params, executionCode);
       const prmsResults =
         await this.prmsRepository.findTemporalResults<ResultResponseMapper>(
           executionCode,
@@ -307,6 +350,321 @@ export class PrmsOpenSearchService
       this.logger.error(`Error getting data from PRMS: ${errorMessage}`);
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  /**
+   * Imports PRMS results as STAR results. STAR assigns the official code; the
+   * PRMS `result_code` is kept in `prms_result_code` and is the key a re-run
+   * uses to update instead of creating again. A result that lands as APPROVED
+   * is versioned right away, without checking completeness.
+   */
+  async getDataAsStar(params: PrmsSearchParams) {
+    const executionCode = uuidv4();
+    const currentCode: { current: number } = { current: null };
+    const resultSaved: number[] = [];
+    const counters: CounterResults = new CounterResults();
+    try {
+      const syncProcessLog = await this.syncProcessLogService.initiateSync(
+        SyncProcessEnum.PRMS_INTEGRATION,
+      );
+      await this.fetchPrmsPages(params, executionCode);
+      const prmsResults =
+        await this.prmsRepository.findTemporalResults<ResultResponseMapper>(
+          executionCode,
+        );
+
+      const { results: dataProcessed, sources } =
+        await this.processDataAsStar(prmsResults);
+
+      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+        platformCode: ReportingPlatformEnum.STAR,
+        resultSaved,
+        currentCode,
+        counters,
+        manageOfficialCode: true,
+        duplicateByTitle: true,
+        findOptions: {
+          prms_result_code: 'prms_result_code',
+          is_snapshot: 'is_version_applied',
+        },
+      });
+      await this.finalizeImportedResults(dataProcessed, sources);
+      await this.syncProcessLogService.update(syncProcessLog.id, counters);
+      await this.syncProcessLogService.endSync(syncProcessLog.id);
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(`Error getting PRMS data as STAR: ${errorMessage}`);
+    } finally {
+      await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  private async fetchPrmsPages(
+    params: PrmsSearchParams,
+    executionCode: string,
+  ): Promise<void> {
+    const size = 50;
+    let page = 1;
+    let keepGoing = true;
+    while (keepGoing) {
+      const response = await firstValueFrom(
+        this.httpService.get<SearcherResponseDto>(
+          this.buildPrmsUrl(size, page, params),
+        ),
+      ).then((response) => response.data);
+      await Promise.all(
+        response.data.map(async (item) => {
+          await this.dataSource
+            .getRepository(SyncStagingRecordsEntity)
+            .save({
+              execution_code: executionCode,
+              code: parseInt(item.result_code),
+              year: parseInt(item.year),
+              data: item,
+            })
+            .catch((error) => {
+              this.logger.error(
+                `Error saving temporal result ${item.result_code}: ${error.message} \n ${error.stack}`,
+              );
+            });
+        }),
+      );
+
+      if (page >= response.totalPages) {
+        keepGoing = false;
+      }
+
+      page++;
+    }
+  }
+
+  private buildPrmsUrl(
+    size: number,
+    page: number,
+    params: PrmsSearchParams,
+  ): string {
+    const query = [`size=${size}`, `page=${page}`];
+    for (const [key, value] of Object.entries(params)) {
+      if (isEmpty(value)) continue;
+      query.push(`${key}=${encodeURIComponent(String(value))}`);
+    }
+    return `${this.appConfig.SEARCH_PRMS_URL}/result?${query.join('&')}`;
+  }
+
+  private async processDataAsStar(
+    prmsData: PrmsTemporalResponseMapper[],
+  ): Promise<{
+    results: ExternalMappersDto[];
+    sources: Map<number, ResultResponseMapper>;
+  }> {
+    const sources = new Map<number, ResultResponseMapper>();
+    const importable = prmsData.filter((data) => {
+      const starStatus =
+        ResultPrmsToStarStatusMapper[Number(data?.data?.status_id)];
+      if (!starStatus) {
+        this.logger.warn(
+          `Skipping PRMS result ${data?.data?.result_code} because status ${data?.data?.status_id} is not imported into STAR.`,
+        );
+        return false;
+      }
+      sources.set(parseInt(data.data.result_code), data.data);
+      return true;
+    });
+
+    const results = await this.processData(importable);
+    for (const result of results) {
+      const source = sources.get(result.official_code);
+      result.status_id = ResultPrmsToStarStatusMapper[Number(source.status_id)];
+      result.prms_result_code = result.official_code;
+      // `phase_id` is not copied here: the live row keeps only the PRMS
+      // result code. The phase goes on the version (see storePhaseOnVersion).
+    }
+    return { results, sources };
+  }
+
+  /**
+   * For every imported result that was saved: writes its PRMS sync history
+   * and versions it. Every one of them is Approved in STAR, so every one is
+   * versioned, without checking completeness.
+   */
+  private async finalizeImportedResults(
+    results: ExternalMappersDto[],
+    sources: Map<number, ResultResponseMapper>,
+  ): Promise<void> {
+    for (const result of results) {
+      const year = result.createResult.year;
+      // Missing when the save failed or was skipped as a duplicate.
+      const saved = await this.dataSource
+        .getRepository(Result)
+        .findOne({
+          where: {
+            prms_result_code: result.prms_result_code,
+            platform_code: ReportingPlatformEnum.STAR,
+            report_year_id: year,
+            is_snapshot: false,
+          },
+          select: { result_id: true, result_official_code: true },
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Error finding imported PRMS result ${result.prms_result_code}: ${(error as Error).message}`,
+          );
+          return null;
+        });
+      if (!saved) continue;
+
+      await this.importAlignment(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_id,
+      );
+
+      await this.recordImportedHistory(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_official_code,
+      );
+
+      if (result.status_id !== ResultStatusEnum.APPROVED) continue;
+      try {
+        await this.greenCheckRepository.createSnapshot(
+          saved.result_official_code,
+          year,
+        );
+      } catch (error) {
+        const errorMessage = (error as Error).message ?? 'Unknown error';
+        this.logger.error(
+          `Error versioning PRMS result ${result.prms_result_code}: ${errorMessage}`,
+        );
+        continue;
+      }
+
+      await this.storePhaseOnVersion(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_id,
+        saved.result_official_code,
+      );
+    }
+  }
+
+  /**
+   * The PRMS phase belongs to the version, not to the live row: the live row
+   * keeps only `prms_result_code`. Clears any phase an earlier import left on
+   * the live row, then writes the PRMS `phase_id` onto the version just created.
+   */
+  private async storePhaseOnVersion(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    liveResultId: number,
+    resultOfficialCode: number,
+  ): Promise<void> {
+    const repository = this.dataSource.getRepository(Result);
+    try {
+      await repository.update(liveResultId, { prms_phase_id: null });
+      if (isEmpty(source?.phase_id)) return;
+      await repository.update(
+        {
+          result_official_code: resultOfficialCode,
+          report_year_id: result.createResult.year,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+          is_active: true,
+        },
+        { prms_phase_id: source.phase_id },
+      );
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error storing the PRMS phase of result ${result.prms_result_code}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Saves the pool-funding alignment and ToC PRMS has for the result, when
+   * PRMS sends them. Goes before the version so the version carries them.
+   */
+  private async importAlignment(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    resultId: number,
+  ): Promise<void> {
+    const alignment = mapPrmsAlignment(source);
+    if (!alignment) return;
+    try {
+      await this.bilateralService.importAlignmentFromPrms(
+        resultId,
+        alignment,
+        result.userData?.sec_user_id ?? null,
+      );
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error saving the ToC alignment of PRMS result ${result.prms_result_code}: ${errorMessage}`,
+      );
+    }
+  }
+
+  /**
+   * Every imported result gets the PENDING_REVIEW row a push would have
+   * written. A PRMS Approved or Rejected result also gets the decision row
+   * a PRMS callback would have written, so the history keeps what PRMS
+   * decided even though STAR shows all of them as Approved. Re-running the
+   * import replaces these rows instead of adding more.
+   */
+  private async recordImportedHistory(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    resultOfficialCode: number,
+  ): Promise<void> {
+    const key = {
+      resultOfficialCode: String(resultOfficialCode),
+      resultYear: result.createResult.year,
+    };
+    const base = {
+      ...key,
+      prmsResultCode: result.prms_result_code,
+      environment: this.appConfig.ARI_IS_PRODUCTION ? 'PROD' : 'TEST',
+    };
+    const submittedAt = validDate(source?.created_date) ?? new Date();
+    const decidedAt = laterOf(
+      validDate(source?.last_updated_date),
+      submittedAt,
+    );
+    const decision = PrmsImportedDecision[Number(source?.status_id)];
+
+    const rows: RecordImportedHistoryInput[] = [
+      {
+        ...base,
+        occurredAt: submittedAt,
+        eventSource: 'STAR',
+        status: 'PENDING_REVIEW',
+        decision: null,
+        decidedAt: null,
+        actorUserId: result.userData?.sec_user_id ?? null,
+      },
+    ];
+    if (decision) {
+      rows.push({
+        ...base,
+        occurredAt: decidedAt,
+        eventSource: 'PRMS',
+        status: decision.status,
+        decision: decision.decision,
+        decidedAt,
+        actorUserId: null,
+      });
+    }
+
+    try {
+      await this.prmsHistoryRepository.replaceImportedHistory(key, rows);
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error writing PRMS sync history for result ${resultOfficialCode} (PRMS ${result.prms_result_code}): ${errorMessage}`,
+      );
     }
   }
 

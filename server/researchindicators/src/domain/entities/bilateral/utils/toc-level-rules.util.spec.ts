@@ -1,19 +1,9 @@
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-02 / R-BIL-091, R-BIL-097 (D-V2-3, D-V2-7)
 
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
-import {
-  MAPPABLE_LIVE_VERSION,
-  allowedLevelsFor,
-  resolveResultTypeKey,
-} from './toc-level-rules.util';
+import { allowedLevelsFor, resolveResultTypeKey } from './toc-level-rules.util';
 
 describe('toc-level-rules.util', () => {
-  describe('MAPPABLE_LIVE_VERSION (R-BIL-097, D-V2-7)', () => {
-    it('is hardcoded to 2026', () => {
-      expect(MAPPABLE_LIVE_VERSION).toBe(2026);
-    });
-  });
-
   describe('resolveResultTypeKey (R-BIL-091)', () => {
     it('maps CAPACITY_SHARING_FOR_DEVELOPMENT (1) to capacity_sharing', () => {
       expect(

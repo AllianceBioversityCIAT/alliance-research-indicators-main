@@ -16,6 +16,7 @@ import { ClarisaProjectsService } from '../src/domain/tools/clarisa/projects/cla
 import { ClarisaCgiarEntitiesService } from '../src/domain/tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../src/domain/tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../src/domain/tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../src/domain/shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../src/domain/complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from '../src/domain/entities/bilateral/dto/update-pool-funding-alignment.dto';
@@ -363,6 +364,10 @@ describe('T-13 — Bilateral primary/contributing SP: PATCH -> read-back integra
           { provide: ClarisaProjectsService, useValue: {} },
           { provide: ClarisaCgiarEntitiesService, useValue: {} },
           { provide: PrmsTocService, useValue: {} },
+          {
+            provide: ReportingYearResolver,
+            useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+          },
           { provide: TocIntegrationService, useValue: {} },
           { provide: BilateralProjectMappingService, useValue: {} },
         ],
@@ -624,6 +629,10 @@ describe('T-13 — Bilateral primary/contributing SP: PATCH -> read-back integra
           { provide: ClarisaProjectsService, useValue: {} },
           { provide: ClarisaCgiarEntitiesService, useValue: {} },
           { provide: PrmsTocService, useValue: {} },
+          {
+            provide: ReportingYearResolver,
+            useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+          },
           { provide: TocIntegrationService, useValue: {} },
           { provide: BilateralProjectMappingService, useValue: {} },
         ],

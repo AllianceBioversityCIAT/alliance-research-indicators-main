@@ -3039,4 +3039,420 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-08 / R-PRY-003, R-PRY-004 (client)
+  describe('reporting-year read-only mode (R-PRY-003 / R-PRY-004)', () => {
+    const YEAR_BANNER = '[data-testid="pf-alignment-reporting-year-banner"]';
+    const LOCK_BANNERS = [
+      YEAR_BANNER,
+      '[data-testid="pf-alignment-version-locked-banner"]',
+      '[data-testid="pf-alignment-synced-banner"]',
+      '[data-testid="pf-alignment-prms-sourced-banner"]',
+      '[data-testid="pf-alignment-readonly-banner"]'
+    ];
+    const root = (): HTMLElement => fixture.nativeElement;
+    const lockBannerCount = (): number => LOCK_BANNERS.filter(sel => root().querySelector(sel) !== null).length;
+
+    const answered: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: true,
+      selected_science_programs: [],
+      reporting_year: 2026,
+      has_pool_funding_data: true
+    };
+
+    // Two SPs, SP01 saved as the Primary, ToC catalog loaded: every control the
+    // page can render is present, so "inert" is observable and not vacuous.
+    const arrangeAnsweredPage = (alignment: AlignmentResponse): void => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      sciencePrograms.set([
+        { code: 'SP01', name: 'A', category: null, color: null, icon_key: 'SP01', allocation: 50 },
+        { code: 'SP03', name: 'B', category: null, color: null, icon_key: 'SP03', allocation: 50 }
+      ]);
+      currentAlignment.set(alignment);
+      component.seedFromServer(alignment);
+      component.formData.update(f => ({ ...f, has_contribution: true, selected_sps: [sp('SP01'), sp('SP03')], primary_sp_code: 'SP01' }));
+      component.onSpSelectionChange();
+    };
+
+    const pastYear = (over: Partial<AlignmentResponse> = {}): AlignmentResponse => ({
+      ...answered,
+      version_locked: true,
+      ...over
+    });
+
+    it('cause table, row 1 — is_read_only without a PRMS sync is prms-sourced, even on a past year', () => {
+      editable.set(false);
+      currentAlignment.set(pastYear({ is_read_only: true, is_synced_to_prms: false }));
+      expect(component.readOnlyCause()).toBe('prms-sourced');
+    });
+
+    it('cause table, row 2 — a past year is reporting-year', () => {
+      editable.set(false);
+      currentAlignment.set(pastYear());
+      expect(component.readOnlyCause()).toBe('reporting-year');
+    });
+
+    it('cause table, row 2 outranks row 3 — a past-year result already synced is reporting-year, with the synced badge still shown', () => {
+      editable.set(false);
+      currentAlignment.set(pastYear({ is_read_only: true, is_synced_to_prms: true }));
+      fixture.detectChanges();
+
+      expect(component.readOnlyCause()).toBe('reporting-year');
+      expect(root().querySelector('[data-testid="pf-alignment-synced-badge"]')).not.toBeNull();
+      expect(root().querySelector(YEAR_BANNER)).not.toBeNull();
+      expect(root().querySelector('[data-testid="pf-alignment-synced-banner"]')).toBeNull();
+    });
+
+    it('cause table, row 3 — synced on the reporting year stays synced', () => {
+      editable.set(false);
+      currentAlignment.set({ ...answered, version_locked: false, is_read_only: true, is_synced_to_prms: true });
+      expect(component.readOnlyCause()).toBe('synced');
+    });
+
+    it('cause table, row 4 — not editable on the reporting year is permission', () => {
+      editable.set(false);
+      currentAlignment.set({ ...answered, version_locked: false });
+      expect(component.readOnlyCause()).toBe('permission');
+    });
+
+    it('cause table, fall-through — editable on the reporting year has no cause', () => {
+      currentAlignment.set({ ...answered, version_locked: false });
+      expect(component.readOnlyCause()).toBeNull();
+    });
+
+    it('banner states both years from the server flag and the result metadata, using no year literal', () => {
+      TestBed.inject(CacheService).currentMetadata.set({ result_title: 'T', report_year: 2025 } as never);
+      editable.set(false);
+      currentAlignment.set(pastYear({ reporting_year: 2031 }));
+      fixture.detectChanges();
+
+      const text = root().querySelector(YEAR_BANNER)?.textContent?.replace(/\s+/g, ' ').trim();
+      expect(text).toBe(
+        'This result belongs to reporting year 2025. Pool Funding alignment is only editable for 2031; the data below is read-only.'
+      );
+    });
+
+    it('renders exactly one lock banner on a past year with the ToC catalog flagged version_locked', () => {
+      tocCatalog.set(TOC_CATALOG_VERSION_LOCKED_FIXTURE);
+      editable.set(false);
+      arrangeAnsweredPage(pastYear());
+      tocCatalog.set(TOC_CATALOG_VERSION_LOCKED_FIXTURE);
+      fixture.detectChanges();
+
+      expect(component.versionLocked()).toBe(true);
+      expect(root().querySelector('app-sp-toc-alignment-block')).not.toBeNull();
+      expect(lockBannerCount()).toBe(1);
+      expect(root().querySelector(YEAR_BANNER)).not.toBeNull();
+      expect(root().querySelector('[data-testid="pf-alignment-version-locked-banner"]')).toBeNull();
+    });
+
+    it('keeps the ToC version-locked banner on the reporting year, with year-aware copy', () => {
+      tocCatalog.set(TOC_CATALOG_VERSION_LOCKED_FIXTURE);
+      arrangeAnsweredPage({ ...answered, version_locked: false, reporting_year: 2031 });
+      tocCatalog.set(TOC_CATALOG_VERSION_LOCKED_FIXTURE);
+      fixture.detectChanges();
+
+      const banner = root().querySelector('[data-testid="pf-alignment-version-locked-banner"]');
+      expect(banner?.textContent).toContain('live 2031 version');
+      expect(banner?.textContent).not.toContain('2026');
+    });
+
+    it('every data-changing control is inert and the saved answer stays visible, after flipping into the locked state', async () => {
+      // KZ-015: render EDITABLE first, then flip to the past-year lock.
+      arrangeAnsweredPage({ ...answered, version_locked: false });
+      fixture.detectChanges();
+      expect(root().querySelector(YEAR_BANNER)).toBeNull();
+      const card = root().querySelector('[data-testid="pf-alignment-sp-card-SP01"]') as HTMLElement;
+      expect(card.getAttribute('aria-disabled')).toBe('false');
+      expect(root().querySelector('[data-testid="pf-alignment-set-primary-SP03"]')).not.toBeNull();
+      expect(isEditableStatus()).toBe(true);
+      expect(Array.from(root().querySelectorAll('button')).some(b => b.textContent?.includes('Save'))).toBe(true);
+
+      editable.set(false);
+      currentAlignment.set(pastYear());
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.readOnlyCause()).toBe('reporting-year');
+      // radios
+      for (const id of ['pf-alignment-radio-yes', 'pf-alignment-radio-no']) {
+        const input = root().querySelector(`#${id}`) as HTMLInputElement | null;
+        expect(input).not.toBeNull();
+        expect(input!.disabled).toBe(true);
+      }
+      // SP cards: aria-disabled and no hover affordance
+      for (const code of ['SP01', 'SP03']) {
+        const spCard = root().querySelector(`[data-testid="pf-alignment-sp-card-${code}"]`) as HTMLElement;
+        expect(spCard.getAttribute('aria-disabled')).toBe('true');
+        expect(spCard.className).not.toContain('cursor-pointer');
+        expect(spCard.className).not.toContain('hover:');
+      }
+      // no Make Primary, no Save
+      expect(root().querySelector('[data-testid="pf-alignment-set-primary-SP03"]')).toBeNull();
+      // Save is ABSENT from the DOM on a past year, even with an editable submission
+      // status (the default here: isEditableStatus() is true). Owner decision, design §6.
+      expect(isEditableStatus()).toBe(true);
+      expect(Array.from(root().querySelectorAll('button')).some(b => b.textContent?.includes('Save'))).toBe(false);
+      // ToC block inputs disabled
+      expect(component.blocksDisabled()).toBe(true);
+      const block = fixture.debugElement.query(By.css('app-sp-toc-alignment-block'));
+      expect(block).not.toBeNull();
+      expect(block.componentInstance.disabled()).toBe(true);
+      // the saved answer is still displayed
+      expect(component.formData().has_contribution).toBe(true);
+      const yes = root().querySelector('#pf-alignment-radio-yes') as HTMLInputElement;
+      expect(yes.checked).toBe(true);
+      expect(root().querySelector('[data-testid="pf-alignment-role-primary-SP01"]')).not.toBeNull();
+      expect(lockBannerCount()).toBe(1);
+    });
+
+    it('a toggle on a locked SP card changes nothing', () => {
+      editable.set(false);
+      arrangeAnsweredPage(pastYear());
+      fixture.detectChanges();
+      (root().querySelector('[data-testid="pf-alignment-sp-card-SP03"]') as HTMLElement).click();
+      expect(component.formData().selected_sps.map(s => s.official_code)).toEqual(['SP01', 'SP03']);
+    });
+
+    // Same arrangement as the AC-08.3 test above: a dirty, savable form, so
+    // onSave() really reaches patchAlignment.
+    const arrangeSavable = (): void => {
+      tocCatalog.set(TOC_CATALOG_CAPSHARING_FIXTURE);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      component.onContributionChange(true);
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')], primary_sp_code: 'SP01' }));
+      component.onSpSelectionChange();
+      component.onDraftChange({ sp_code: 'SP01', aligns_with_toc: true, level: 'OUTPUT', toc_result_id: 5187, indicator_id: 5973, quantitative_contribution: 3 });
+    };
+
+    it('R-PRY-004 — a pool_funding_year_locked 409 refetches and lands in the locked state', async () => {
+      arrangeSavable();
+      fixture.detectChanges();
+      expect(component.readOnlyCause()).toBeNull();
+
+      patchAlignmentMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        description: 'ConflictException',
+        code: 'pool_funding_year_locked',
+        errorDescription: 'Pool Funding is read-only: result year 2025 is not the reporting year 2026'
+      } as PatchAlignmentResult);
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockImplementation(async () => {
+        editable.set(false);
+        currentAlignment.set(pastYear());
+        return currentAlignment();
+      });
+
+      await component.onSave();
+      fixture.detectChanges();
+
+      expect(getAlignmentMock).toHaveBeenCalledWith('RES-001');
+      expect(component.readOnlyCause()).toBe('reporting-year');
+      expect(root().querySelector(YEAR_BANNER)).not.toBeNull();
+      expect(showToastMock).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning', summary: 'Version locked' }));
+    });
+
+    it('a year-lock 409 shows neutral toast copy, not the Theory of Change one', async () => {
+      arrangeSavable();
+      patchAlignmentMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        description: 'ConflictException',
+        code: 'pool_funding_year_locked'
+      } as PatchAlignmentResult);
+
+      await component.onSave();
+
+      const toast = showToastMock.mock.calls.at(-1)![0];
+      expect(toast.summary).toBe('Version locked');
+      expect(toast.detail).toContain('outside the configured reporting year');
+      expect(toast.detail).not.toContain('Theory of Change');
+    });
+
+    it('a 409 that only says ConflictException (no code) is NOT read as a year lock', async () => {
+      arrangeSavable();
+      patchAlignmentMock.mockResolvedValue({ ok: false, status: 409, description: 'ConflictException' } as PatchAlignmentResult);
+
+      await component.onSave();
+
+      expect(showToastMock).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Synced to PRMS' }));
+    });
+
+    it('the 409 matcher still recognises the older toc_mapping_version_locked code', async () => {
+      arrangeSavable();
+      patchAlignmentMock.mockResolvedValue({
+        ok: false,
+        status: 409,
+        description: 'toc_mapping_version_locked'
+      } as PatchAlignmentResult);
+
+      await component.onSave();
+
+      expect(showToastMock).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Version locked' }));
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-11 / R-PRY-007 (client)
+  describe('display-only mode (R-PRY-007)', () => {
+    const root = (): HTMLElement => fixture.nativeElement;
+    const DISPLAY_BANNER = '[data-testid="pf-alignment-display-only-banner"]';
+    const YEAR_BANNER = '[data-testid="pf-alignment-reporting-year-banner"]';
+    const ALL_BANNERS = [
+      DISPLAY_BANNER,
+      YEAR_BANNER,
+      '[data-testid="pf-alignment-version-locked-banner"]',
+      '[data-testid="pf-alignment-synced-banner"]',
+      '[data-testid="pf-alignment-prms-sourced-banner"]',
+      '[data-testid="pf-alignment-readonly-banner"]'
+    ];
+    const bannerCount = (): number => ALL_BANNERS.filter(sel => root().querySelector(sel) !== null).length;
+    const flush = async (): Promise<void> => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    };
+
+    // The STAR-20081 shape: no contributing contract, snapshot, SP05 PRIMARY, one
+    // saved ToC row, and (server side) an `unmapped` result so the catalog is empty.
+    const star20081: AlignmentResponse = {
+      result_code: 'STAR-20081',
+      eligible: false,
+      has_pool_funding_alignment_eligible: false,
+      has_contribution: true,
+      selected_science_programs: [{ code: 'SP05', name: 'Scaling for Impact', role: 'PRIMARY' }],
+      selected_levers: [],
+      is_synced_to_prms: false,
+      is_read_only: true,
+      version_locked: true,
+      has_pool_funding_data: true,
+      reporting_year: 2026,
+      display_only: true,
+      toc_alignments: [
+        {
+          sp_code: 'SP05',
+          aligns_with_toc: true,
+          level: 'OUTPUT',
+          toc_result_id: 7220,
+          indicator_id: null,
+          quantitative_contribution: null,
+          toc_result_title: 'Suite of solutions focused on consumers',
+          indicator_description: null,
+          unit_of_measurement: null,
+          target_value: null,
+          target_year: null
+        }
+      ]
+    };
+
+    // Drives the real loadAlignment through the version watcher, as navigation does.
+    const load = async (alignment: AlignmentResponse, isEditable = false): Promise<void> => {
+      getAlignmentMock.mockImplementation(async () => {
+        editable.set(isEditable);
+        currentAlignment.set(alignment);
+        return alignment;
+      });
+      versionChangeCallbacks[0](null);
+      await flush();
+      fixture.detectChanges();
+    };
+
+    beforeEach(() => {
+      // Worst case for a display-only page: the service singleton is empty/unmapped.
+      mappingStatus.set('unmapped');
+      tocCatalog.set(TOC_CATALOG_EMPTY_LEVELS_FIXTURE);
+      getScienceProgramsMock.mockClear();
+      getTocCatalogMock.mockClear();
+      routerNavigate.mockClear();
+    });
+
+    it('does not redirect and does not call the eligible-only fetches', async () => {
+      await load(star20081);
+
+      expect(routerNavigate).not.toHaveBeenCalled();
+      expect(getScienceProgramsMock).not.toHaveBeenCalled();
+      expect(getTocCatalogMock).not.toHaveBeenCalled();
+      expect(component.loadFailed()).toBe(false);
+    });
+
+    it('still redirects a non-eligible result that is not display_only', async () => {
+      await load({ ...star20081, display_only: false, is_read_only: false });
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'general-information'], { replaceUrl: true });
+    });
+
+    it('renders the saved SP and ToC from the read-back fields while the catalog is empty and unmapped', async () => {
+      await load(star20081);
+
+      expect(root().querySelector('[data-testid="pf-alignment-unmapped-message"]')).toBeNull();
+      const spRow = root().querySelector('[data-testid="pf-alignment-display-only-sp-SP05"]') as HTMLElement;
+      expect(spRow).not.toBeNull();
+      expect(spRow.textContent).toContain('SP05');
+      expect(spRow.textContent).toContain('Primary');
+      const toc = root().querySelector('[data-testid="pf-alignment-display-only-toc-SP05"]') as HTMLElement;
+      expect(toc).not.toBeNull();
+      expect(toc.textContent).toContain('OUTPUT');
+      expect(toc.textContent).toContain('Suite of solutions focused on consumers');
+    });
+
+    it('shows a saved "No" ToC answer as not aligned', async () => {
+      await load({
+        ...star20081,
+        toc_alignments: [{ ...star20081.toc_alignments![0], aligns_with_toc: false, level: null, toc_result_id: null, toc_result_title: null }]
+      });
+
+      const toc = root().querySelector('[data-testid="pf-alignment-display-only-toc-SP05"]') as HTMLElement;
+      expect(toc.textContent).toContain('Not aligned with the Theory of Change.');
+    });
+
+    it('makes every control inert, with no Save, and exactly one banner (display-only) after flipping from an editable page', async () => {
+      // KZ-015: render an editable eligible page first, then flip to display-only.
+      await load({ ...baseAlignment, has_contribution: true, has_pool_funding_data: true, version_locked: false }, true);
+      expect(root().querySelector(DISPLAY_BANNER)).toBeNull();
+      expect(Array.from(root().querySelectorAll('button')).some(b => b.textContent?.includes('Save'))).toBe(true);
+
+      await load({ ...star20081, version_locked: false });
+
+      expect(component.readOnlyCause()).toBe('display-only');
+      for (const id of ['pf-alignment-radio-yes', 'pf-alignment-radio-no']) {
+        const input = root().querySelector(`#${id}`) as HTMLInputElement;
+        expect(input.disabled).toBe(true);
+      }
+      expect((root().querySelector('#pf-alignment-radio-yes') as HTMLInputElement).checked).toBe(true);
+      expect(root().querySelector('[data-testid="pf-alignment-set-primary-SP05"]')).toBeNull();
+      expect(root().querySelector('app-sp-toc-alignment-block')).toBeNull();
+      expect(Array.from(root().querySelectorAll('button')).some(b => b.textContent?.includes('Save'))).toBe(false);
+      expect(isEditableStatus()).toBe(true);
+      expect(bannerCount()).toBe(1);
+      expect(root().querySelector(DISPLAY_BANNER)).not.toBeNull();
+    });
+
+    it('display_only on a past year shows only the reporting-year banner', async () => {
+      await load({ ...star20081, version_locked: true });
+
+      expect(component.readOnlyCause()).toBe('reporting-year');
+      expect(bannerCount()).toBe(1);
+      expect(root().querySelector(YEAR_BANNER)).not.toBeNull();
+      expect(root().querySelector('[data-testid="pf-alignment-display-only-toc-SP05"]')).not.toBeNull();
+      expect(Array.from(root().querySelectorAll('button')).some(b => b.textContent?.includes('Save'))).toBe(false);
+    });
+
+    it('a display_only result that was PRMS-synced keeps the display-only cause, with the synced badge', async () => {
+      await load({ ...star20081, version_locked: false, is_synced_to_prms: true });
+
+      expect(component.readOnlyCause()).toBe('display-only');
+      expect(root().querySelector('[data-testid="pf-alignment-synced-badge"]')).not.toBeNull();
+      expect(bannerCount()).toBe(1);
+    });
+
+    it('a display_only "No" answer renders no SP or ToC rows', async () => {
+      await load({ ...star20081, has_contribution: false, selected_science_programs: [], toc_alignments: [] });
+
+      expect(root().querySelector('[data-testid="pf-alignment-display-only-sp-SP05"]')).toBeNull();
+      expect(root().querySelector('[data-testid="pf-alignment-display-only-toc-SP05"]')).toBeNull();
+      expect((root().querySelector('#pf-alignment-radio-no') as HTMLInputElement).checked).toBe(true);
+    });
+  });
+
 });

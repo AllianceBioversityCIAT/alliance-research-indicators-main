@@ -216,7 +216,8 @@ function readResultCode(row: Record<string, unknown>): number | null {
  * `obj_version.id` nested; `version_id` wins and `obj_version.id` is the fallback.
  *
  * `obj_version` also carries `phase_name` / `phase_year`, deliberately NOT stored
- * -- the year is already ours (MAPPABLE_LIVE_VERSION) and a second copy could drift.
+ * -- the reporting year is already the configured `app_config.ARI_PRMS_SYNC`
+ * value and a second copy could drift.
  *
  * ## Why this was wrong before
  *

@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { DataSource, Like } from 'typeorm';
 import { of } from 'rxjs';
-import { PrmsOpenSearchService } from './prms.opensearch.service';
+import {
+  PrmsOpenSearchService,
+  mapPrmsAlignment,
+} from './prms.opensearch.service';
+import { BilateralService } from '../../../entities/bilateral/bilateral.service';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { ResultsService } from '../../../entities/results/results.service';
@@ -18,10 +22,14 @@ import {
   ResultResponseMapper,
   PrmsTemporalResponseMapper,
 } from './dto/prms-response.dto';
-import { ResultTypeEnum } from './enum/rsult-type.enum';
+import { ResultPrmsStatusMapper, ResultTypeEnum } from './enum/rsult-type.enum';
 import { resolveIncomingPublicationIdentity } from '../../../shared/utils/publication-identity.util';
-import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
+import { Result } from '../../../entities/results/entities/result.entity';
+import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
+import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
 import { SaveResultService } from '../../../shared/services/save-all-sections.service';
 import { PrmsRepository } from './repositories/prms.repository';
@@ -67,6 +75,9 @@ describe('PrmsOpenSearchService', () => {
   let clarisaActorTypesService: jest.Mocked<ClarisaActorTypesService>;
   let clarisaInstitutionTypesService: jest.Mocked<ClarisaInstitutionTypesService>;
   let temporalRepoHandle: { save: jest.Mock };
+  let greenCheckRepository: { createSnapshot: jest.Mock };
+  let prmsHistoryRepository: { replaceImportedHistory: jest.Mock };
+  let bilateralService: { importAlignmentFromPrms: jest.Mock };
 
   const buildResultMapper = (
     overrides: Partial<ResultResponseMapper> = {},
@@ -301,10 +312,31 @@ describe('PrmsOpenSearchService', () => {
             }),
           },
         },
+        {
+          provide: GreenCheckRepository,
+          useValue: { createSnapshot: jest.fn().mockResolvedValue(undefined) },
+        },
+        {
+          provide: BilateralService,
+          useValue: {
+            importAlignmentFromPrms: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: PrmsWebhookDeliveryRepository,
+          useValue: {
+            replaceImportedHistory: jest
+              .fn()
+              .mockResolvedValue({ deleted: 0, inserted: 0 }),
+          },
+        },
       ],
     }).compile();
 
     service = module.get(PrmsOpenSearchService);
+    greenCheckRepository = module.get(GreenCheckRepository);
+    prmsHistoryRepository = module.get(PrmsWebhookDeliveryRepository);
+    bilateralService = module.get(BilateralService);
     httpService = module.get(HttpService);
     resultsService = module.get(ResultsService);
     resultRepository = module.get(ResultRepository);
@@ -373,6 +405,30 @@ describe('PrmsOpenSearchService', () => {
       expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
     });
 
+    it('should keep requesting the exact PRMS URL it always has', async () => {
+      httpService.get
+        .mockReturnValueOnce(of({ data: { totalPages: 2, data: [] } }) as any)
+        .mockReturnValueOnce(of({ data: { totalPages: 2, data: [] } }) as any);
+
+      await service.getData(2025);
+
+      expect(httpService.get.mock.calls.map((call) => call[0])).toEqual([
+        'https://prms-search.test/result?size=50&page=1&fundingType=Result&centerAcronym=Bioversity%20(Alliance)%2CCIAT%20(Alliance)&year=2025',
+        'https://prms-search.test/result?size=50&page=2&fundingType=Result&centerAcronym=Bioversity%20(Alliance)%2CCIAT%20(Alliance)&year=2025',
+      ]);
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          platformCode: ReportingPlatformEnum.PRMS,
+          statusMapper: ResultPrmsStatusMapper,
+        }),
+      );
+      const extraData = saveResultService.bulkSaveAllSections.mock.calls[0][1];
+      expect(extraData).not.toHaveProperty('manageOfficialCode');
+      expect(extraData).not.toHaveProperty('findOptions');
+      expect(extraData).not.toHaveProperty('duplicateByTitle');
+    });
+
     it('should omit year query param when year is empty', async () => {
       httpService.get.mockReturnValue(
         of({
@@ -384,6 +440,527 @@ describe('PrmsOpenSearchService', () => {
 
       const url = httpService.get.mock.calls[0][0] as string;
       expect(url).not.toContain('&year=');
+    });
+  });
+
+  describe('getDataAsStar', () => {
+    const onePage = () =>
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+
+    const savedResults = () =>
+      saveResultService.bulkSaveAllSections.mock.calls[0][0];
+
+    it('should build the PRMS URL from the given params, skipping empty ones', async () => {
+      onePage();
+
+      await service.getDataAsStar({
+        year: '2025',
+        centerAcronym: 'Bioversity (Alliance),CIAT (Alliance)',
+        source: 'W3/Bilateral',
+        statusId: '5,6,7',
+        resultType: undefined,
+        resultCode: '',
+      });
+
+      expect(httpService.get).toHaveBeenCalledWith(
+        'https://prms-search.test/result?size=50&page=1&year=2025&centerAcronym=Bioversity%20(Alliance)%2CCIAT%20(Alliance)&source=W3%2FBilateral&statusId=5%2C6%2C7',
+      );
+    });
+
+    it('should save as STAR with a STAR-generated code, keyed by the PRMS result code', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '28731', status_id: '6' }),
+      ]);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          platformCode: ReportingPlatformEnum.STAR,
+          manageOfficialCode: true,
+          duplicateByTitle: true,
+          findOptions: {
+            prms_result_code: 'prms_result_code',
+            is_snapshot: 'is_version_applied',
+          },
+        }),
+      );
+      const extraData = saveResultService.bulkSaveAllSections.mock.calls[0][1];
+      expect(extraData).not.toHaveProperty('statusMapper');
+      expect(savedResults()[0]).toEqual(
+        expect.objectContaining({ prms_result_code: 28731 }),
+      );
+      expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
+    });
+
+    it('should import only Pending Review, Approved and Rejected, all as Approved', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue(
+        ['1', '2', '3', '4', '5', '6', '7'].map((status, i) =>
+          buildTemporalMapper({
+            result_code: String(100 + i),
+            status_id: status,
+          }),
+        ),
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(
+        savedResults().map((r) => [r.prms_result_code, r.status_id]),
+      ).toEqual([
+        [104, ResultStatusEnum.APPROVED],
+        [105, ResultStatusEnum.APPROVED],
+        [106, ResultStatusEnum.APPROVED],
+      ]);
+    });
+
+    it('should not write phase_id onto the live row', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '1', status_id: '5', phase_id: 6 }),
+        buildTemporalMapper({ result_code: '2', status_id: '5' }),
+      ]);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults().map((r) => r.prms_phase_id)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(savedResults().map((r) => r.prms_result_code)).toEqual([1, 2]);
+    });
+
+    it('should store phase_id on the version and clear it on the live row', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '10',
+          status_id: '5',
+          year: '2025',
+          phase_id: 8,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(777, {
+        prms_phase_id: null,
+      });
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(
+        {
+          result_official_code: 5001,
+          report_year_id: 2025,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+          is_active: true,
+        },
+        { prms_phase_id: 8 },
+      );
+      expect(
+        greenCheckRepository.createSnapshot.mock.invocationCallOrder[0],
+      ).toBeLessThan(resultRepoHandle.update.mock.invocationCallOrder[1]);
+    });
+
+    it('should not touch the version phase when PRMS sends none', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '10', status_id: '5' }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).toHaveBeenCalledTimes(1);
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(777, {
+        prms_phase_id: null,
+      });
+    });
+
+    it('should not store the phase when versioning fails', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '10', status_id: '5', phase_id: 8 }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+      greenCheckRepository.createSnapshot.mockRejectedValueOnce(
+        new Error('SP failed'),
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+    });
+
+    it('should version every imported result that was saved', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '10',
+          status_id: '5',
+          year: '2025',
+        }),
+        buildTemporalMapper({
+          result_code: '11',
+          status_id: '7',
+          year: '2025',
+        }),
+        buildTemporalMapper({
+          result_code: '12',
+          status_id: '3',
+          year: '2025',
+        }),
+      ]);
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce({ result_official_code: 5001 })
+        .mockResolvedValueOnce(null);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledTimes(2);
+      expect(dataSource.getRepository).toHaveBeenCalledWith(Result);
+      expect(resultRepoHandle.findOne).toHaveBeenNthCalledWith(1, {
+        where: {
+          prms_result_code: 10,
+          platform_code: ReportingPlatformEnum.STAR,
+          report_year_id: 2025,
+          is_snapshot: false,
+        },
+        select: { result_id: true, result_official_code: true },
+      });
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledTimes(1);
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        5001,
+        2025,
+      );
+    });
+
+    it('should keep versioning the rest when one snapshot fails', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '10', status_id: '6' }),
+        buildTemporalMapper({ result_code: '11', status_id: '6' }),
+      ]);
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce({ result_official_code: 5001 })
+        .mockResolvedValueOnce({ result_official_code: 5002 });
+      greenCheckRepository.createSnapshot.mockRejectedValueOnce(
+        new Error('SP failed'),
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledTimes(2);
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+    });
+  });
+
+  describe('getDataAsStar sync history', () => {
+    const CREATED = '2026-03-08T09:25:26.212Z';
+    const UPDATED = '2026-04-23T16:20:15.000Z';
+
+    const importOne = async (
+      overrides: Partial<ResultResponseMapper>,
+      saved: unknown = { result_official_code: 5001 },
+    ) => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          year: '2025',
+          created_date: CREATED as unknown as Date,
+          last_updated_date: UPDATED as unknown as Date,
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(saved);
+      await service.getDataAsStar({ year: 2025 });
+      const calls = prmsHistoryRepository.replaceImportedHistory.mock.calls;
+      if (calls.length === 0) return [];
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toEqual({
+        resultOfficialCode: '5001',
+        resultYear: 2025,
+      });
+      return calls[0][1];
+    };
+
+    const pendingReview = {
+      resultOfficialCode: '5001',
+      resultYear: 2025,
+      prmsResultCode: 28731,
+      environment: 'TEST',
+      occurredAt: new Date(CREATED),
+      eventSource: 'STAR',
+      status: 'PENDING_REVIEW',
+      decision: null,
+      decidedAt: null,
+      actorUserId: null,
+    };
+
+    it('writes only PENDING_REVIEW for a PRMS Pending Review result', async () => {
+      const rows = await importOne({ status_id: '5' });
+
+      expect(rows).toEqual([pendingReview]);
+    });
+
+    it('writes PENDING_REVIEW then APPROVED for a PRMS Approved result', async () => {
+      const rows = await importOne({ status_id: '6' });
+
+      expect(rows).toEqual([
+        pendingReview,
+        {
+          ...pendingReview,
+          occurredAt: new Date(UPDATED),
+          eventSource: 'PRMS',
+          status: 'APPROVED',
+          decision: 'APPROVE',
+          decidedAt: new Date(UPDATED),
+        },
+      ]);
+    });
+
+    it('writes PENDING_REVIEW then REJECTED for a PRMS Rejected result, while STAR saves it as Approved', async () => {
+      const rows = await importOne({ status_id: '7' });
+
+      expect(rows.map((row) => [row.eventSource, row.status])).toEqual([
+        ['STAR', 'PENDING_REVIEW'],
+        ['PRMS', 'REJECTED'],
+      ]);
+      expect(rows[1].decision).toBe('REJECT');
+      expect(
+        saveResultService.bulkSaveAllSections.mock.calls[0][0][0].status_id,
+      ).toBe(ResultStatusEnum.APPROVED);
+    });
+
+    it('never dates the decision before the submission', async () => {
+      const rows = await importOne({
+        status_id: '6',
+        last_updated_date: '2026-01-01T00:00:00.000Z' as unknown as Date,
+      });
+
+      expect(rows[1].decidedAt).toEqual(new Date(CREATED));
+      expect(rows[1].occurredAt).toEqual(new Date(CREATED));
+    });
+
+    it('credits the PENDING_REVIEW row to the PRMS creator when STAR knows them', async () => {
+      resultRepository.findUserByEmailOrCarnet.mockResolvedValue({
+        sec_user_id: 42,
+      } as any);
+
+      const rows = await importOne({
+        status_id: '6',
+        created_by: { first_name: 'A', last_name: 'B', email: 'a@b.org' },
+      });
+
+      expect(rows[0].actorUserId).toBe(42);
+      expect(rows[1].actorUserId).toBeNull();
+    });
+
+    it('writes no history and no version for a result that was not saved', async () => {
+      const rows = await importOne({ status_id: '6' }, null);
+
+      expect(rows).toEqual([]);
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('still versions the result when the history write fails', async () => {
+      prmsHistoryRepository.replaceImportedHistory.mockRejectedValueOnce(
+        new Error('history down'),
+      );
+
+      await importOne({ status_id: '7' });
+
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        5001,
+        2025,
+      );
+    });
+  });
+
+  describe('mapPrmsAlignment', () => {
+    const toc = (
+      code: string,
+      role: string,
+      results: { level: string; result_name: string }[] = [],
+    ) => ({
+      entity: { official_code: code, name: code },
+      initiative_role: role,
+      toc_results: results.map((r) => ({
+        ...r,
+        sub_entity: { official_code: code, description: null },
+      })),
+    });
+
+    it('maps the PRMS payload: primary submitter, its first ToC result, level as STAR code', () => {
+      const source = buildResultMapper({
+        primary_entity: { official_code: 'SP06', name: 'Climate Action' },
+        toc_alignment: [
+          toc('SP06', 'Primary submitter', [
+            {
+              level: 'High Level Output',
+              result_name:
+                '3.1.1. Institutional innovations and technical practices',
+            },
+            {
+              level: 'High Level Output',
+              result_name:
+                '3.1.1. Institutional innovations and technical practices',
+            },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: [],
+        toc: {
+          level: 'OUTPUT',
+          title: '3.1.1. Institutional innovations and technical practices',
+        },
+      });
+    });
+
+    it('turns every other entity into a contributing SP', () => {
+      const source = buildResultMapper({
+        toc_alignment: [
+          toc('SP02', 'Contributor'),
+          toc('SP06', 'Primary submitter', [
+            { level: 'Intermediate Outcome', result_name: 'IOC 1' },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: ['SP02'],
+        toc: { level: 'OUTCOME', title: 'IOC 1' },
+      });
+    });
+
+    it('falls back to primary_entity when no entry says Primary', () => {
+      const source = buildResultMapper({
+        primary_entity: { official_code: 'SP06', name: 'Climate Action' },
+        toc_alignment: [toc('SP02', 'Contributor'), toc('SP06', 'Other')],
+      });
+
+      expect(mapPrmsAlignment(source).primarySpCode).toBe('SP06');
+    });
+
+    it('keeps the SPs with no ToC when the primary has no named result', () => {
+      const source = buildResultMapper({
+        toc_alignment: [
+          toc('SP06', 'Primary submitter', [
+            { level: 'HLO', result_name: ' ' },
+          ]),
+        ],
+      });
+
+      expect(mapPrmsAlignment(source)).toEqual({
+        primarySpCode: 'SP06',
+        contributingSpCodes: [],
+        toc: null,
+      });
+    });
+
+    it('returns null when PRMS sends no ToC alignment', () => {
+      expect(mapPrmsAlignment(buildResultMapper({ toc_alignment: [] }))).toBe(
+        null,
+      );
+      expect(mapPrmsAlignment(undefined)).toBe(null);
+    });
+  });
+
+  describe('getDataAsStar ToC alignment', () => {
+    const run = async (overrides: Partial<ResultResponseMapper>) => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      await service.getDataAsStar({ year: 2025 });
+    };
+
+    const alignedSource = {
+      toc_alignment: [
+        {
+          entity: { official_code: 'SP06', name: 'Climate Action' },
+          initiative_role: 'Primary submitter',
+          toc_results: [
+            {
+              level: 'High Level Output',
+              sub_entity: { official_code: 'SP06', description: null },
+              result_name: 'HLO 3.1.1',
+            },
+          ],
+        },
+      ],
+    } as Partial<ResultResponseMapper>;
+
+    it('saves the alignment on the live row before the version is created', async () => {
+      await run(alignedSource);
+
+      expect(bilateralService.importAlignmentFromPrms).toHaveBeenCalledWith(
+        34105,
+        {
+          primarySpCode: 'SP06',
+          contributingSpCodes: [],
+          toc: { level: 'OUTPUT', title: 'HLO 3.1.1' },
+        },
+        null,
+      );
+      expect(
+        bilateralService.importAlignmentFromPrms.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        greenCheckRepository.createSnapshot.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does nothing when PRMS sends no ToC alignment', async () => {
+      await run({ toc_alignment: [] });
+
+      expect(bilateralService.importAlignmentFromPrms).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalled();
+    });
+
+    it('still writes history and the version when the alignment fails', async () => {
+      bilateralService.importAlignmentFromPrms.mockRejectedValueOnce(
+        new Error('db down'),
+      );
+
+      await run(alignedSource);
+
+      expect(prmsHistoryRepository.replaceImportedHistory).toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).toHaveBeenCalledWith(
+        5001,
+        2025,
+      );
     });
   });
 

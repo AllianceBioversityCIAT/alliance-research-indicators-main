@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
 import { PrmsOpenSearchController } from './prms.opensearch.controller';
 import { PrmsOpenSearchService } from './prms.opensearch.service';
-import { RolesGuard } from '../../../shared/guards/roles.guard';
+import { ROLES_KEY, RolesGuard } from '../../../shared/guards/roles.guard';
+import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { ResponseUtils } from '../../../shared/utils/response.utils';
 import { TrueFalseEnum } from '../../../shared/enum/queries.enum';
 
@@ -12,6 +13,7 @@ describe('PrmsOpenSearchController', () => {
   let controller: PrmsOpenSearchController;
   const mockPrmsService = {
     getData: jest.fn(),
+    getDataAsStar: jest.fn(),
   };
   const mockFormat = jest.fn();
 
@@ -64,5 +66,63 @@ describe('PrmsOpenSearchController', () => {
       status: HttpStatus.OK,
     });
     expect(result).toEqual({ async: true });
+  });
+  describe('fetchPrmsDataAsStar', () => {
+    const call = (async: TrueFalseEnum) =>
+      controller.fetchPrmsDataAsStar(
+        '2025',
+        'CIAT (Alliance)',
+        'policy_change',
+        undefined,
+        'W3/Bilateral',
+        undefined,
+        '5,6,7',
+        async,
+      );
+
+    const expectedParams = {
+      year: '2025',
+      centerAcronym: 'CIAT (Alliance)',
+      resultType: 'policy_change',
+      resultCode: undefined,
+      source: 'W3/Bilateral',
+      fundingType: undefined,
+      statusId: '5,6,7',
+    };
+
+    it('should be restricted to SYSTEM_ADMIN only', () => {
+      expect(
+        Reflect.getMetadata(ROLES_KEY, controller.fetchPrmsDataAsStar),
+      ).toEqual([SecRolesEnum.SYSTEM_ADMIN]);
+    });
+
+    it('should pass every query param to getDataAsStar and format the response', async () => {
+      mockPrmsService.getDataAsStar.mockResolvedValue(undefined);
+      mockFormat.mockReturnValue({ ok: true });
+
+      const result = await call(TrueFalseEnum.FALSE);
+
+      expect(mockPrmsService.getDataAsStar).toHaveBeenCalledWith(
+        expectedParams,
+      );
+      expect(ResponseUtils.format).toHaveBeenCalledWith({
+        data: undefined,
+        description: 'Prms data fetched as STAR',
+        status: HttpStatus.OK,
+      });
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('should not wait for the import when async is true', async () => {
+      mockPrmsService.getDataAsStar.mockReturnValue(new Promise(() => {}));
+      mockFormat.mockReturnValue({ async: true });
+
+      const result = await call(TrueFalseEnum.TRUE);
+
+      expect(mockPrmsService.getDataAsStar).toHaveBeenCalledWith(
+        expectedParams,
+      );
+      expect(result).toEqual({ async: true });
+    });
   });
 });

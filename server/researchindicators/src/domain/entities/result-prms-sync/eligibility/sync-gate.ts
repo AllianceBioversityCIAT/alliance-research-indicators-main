@@ -24,12 +24,24 @@ export interface SyncGateSnapshot {
    * exact disable string; a missing or unreadable row is enabled (R-PFT-003).
    */
   prms_sync_button_enabled: boolean;
+  /**
+   * `results.report_year_id`. Optional so existing snapshot builders compile
+   * (D-6). A null year is a mismatch when `reporting_year` is present.
+   * Raw SQL can surface the column as a string; the gate compares with Number().
+   */
+  report_year?: number | null;
+  /**
+   * Configured reporting year from ReportingYearResolver. Absent → the
+   * `reporting_year` gate passes (D-6).
+   */
+  reporting_year?: number;
 }
 
 export type SyncGateEntryId =
   | 'feature_enabled'
   | 'result_exists'
   | 'not_already_synced'
+  | 'reporting_year'
   | 'approved'
   | 'alignment_green'
   | 'pool_funding_contributor'
@@ -43,8 +55,8 @@ export interface SyncGateEntry {
   fails: (snapshot: SyncGateSnapshot) => boolean;
   /**
    * JD-3: a refusal that is not a verdict about the result writes no log row
-   * (feature_enabled, result_exists, not_already_synced). Later entries write
-   * REFUSED_BY_STAR.
+   * (feature_enabled, result_exists, not_already_synced, reporting_year).
+   * Later entries write REFUSED_BY_STAR.
    */
   persistsRow: boolean;
 }
@@ -64,6 +76,12 @@ const UNMAPPABLE_INDICATORS = new Set<number>([
 
 /** PRMS `policy_type.id = 1` — Program, Budget, or Investment (D-2). */
 const PRMS_POLICY_TYPE_PROGRAM_BUDGET_OR_INVESTMENT = 1;
+
+const reportingYearDescription = (snapshot: SyncGateSnapshot): string => {
+  const resultYear =
+    snapshot.report_year == null ? 'null' : String(snapshot.report_year);
+  return `Result year ${resultYear} is not the reporting year ${snapshot.reporting_year}`;
+};
 
 const contractDescription = (snapshot: SyncGateSnapshot): string => {
   const agreementId = snapshot.primary_contract?.agreement_id;
@@ -99,6 +117,15 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     httpStatus: HttpStatus.CONFLICT,
     description: 'Result is already synced to PRMS',
     fails: (snapshot) => snapshot.is_synced_to_prms === true,
+    persistsRow: false,
+  },
+  {
+    id: 'reporting_year',
+    httpStatus: HttpStatus.CONFLICT,
+    description: reportingYearDescription,
+    fails: (snapshot) =>
+      snapshot.reporting_year !== undefined &&
+      Number(snapshot.report_year) !== snapshot.reporting_year,
     persistsRow: false,
   },
   {

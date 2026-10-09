@@ -6,6 +6,7 @@ import { ResultsUtil } from './results.util';
 import { QueryService } from './query.service';
 import { EnvAppConfigUtil } from './env-app-config.util';
 import { PortfolioUtil } from './portfolio.util';
+import { ReportingYearResolver } from './reporting-year.resolver';
 
 @Global()
 @Module({
@@ -17,6 +18,7 @@ import { PortfolioUtil } from './portfolio.util';
     QueryService,
     EnvAppConfigUtil,
     PortfolioUtil,
+    ReportingYearResolver,
   ],
   exports: [
     CurrentUserUtil,
@@ -26,6 +28,7 @@ import { PortfolioUtil } from './portfolio.util';
     QueryService,
     EnvAppConfigUtil,
     PortfolioUtil,
+    ReportingYearResolver,
   ],
 })
 export class GlobalUtilsModule {}

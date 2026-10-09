@@ -1,6 +1,6 @@
 // @sdd-spec results/cross-platform-duplicate-resolution
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, FindOptionsWhere } from 'typeorm';
+import { DataSource, FindOptionsWhere, Not } from 'typeorm';
 import { ExternalMappersDto } from '../global-dto/external-mappers.dto';
 import {
   CounterResults,
@@ -166,60 +166,70 @@ export class SaveResultService {
         where: findOptions,
       });
 
-      // Cross-platform duplicate check. `external_link` points at the source
-      // platform portal and would never produce a reliable cross-platform
-      // match, so it is never used. The identity FIELD is platform-dependent
-      // (R-RES-010, design §5.2 step 0): TIP/AICCRA keep `public_link`
-      // unchanged; PRMS's own `public_link` (its `pdf_link`) NEVER
-      // contributes an identity — PRMS resolves in memory instead, from
-      // `item.knowledge_product_summary.handle` (rev 4; carried into
-      // `dto.evidence.evidence[]` by `processData`, never from
-      // `processKnowledgeProduct`), because the sync path runs before the
-      // row is saved and the stored-side SQL branch is not available yet for
-      // the incoming row.
-      const identityResolution = resolveIncomingPublicationIdentity({
-        platformCode: extraData.platformCode,
-        indicatorId: result.createResult.indicator_id,
-        publicLink: result.public_link,
-        evidence: result.evidence?.evidence,
-      });
-
-      if (identityResolution.refused) {
-        // R-RES-010 AC.9: the payload itself carries more than one
-        // qualifying identity (e.g. a two-KP PRMS item). Never resolve on the
-        // first handle found — create/update normally below, count no
-        // omission, and skip the duplicate check entirely so nothing is
-        // submitted for deletion.
-        this.logger.warn(
-          `Result ${result.official_code} from ${this.platformCode(extraData.platformCode)} carries more than one publication identity; refusing duplicate resolution and processing it normally (no omission, no deletion).`,
+      if (extraData?.duplicateByTitle) {
+        // Title-only rule: the incoming result is omitted when another live
+        // result already uses the same title. Nothing is ever deleted, so
+        // `resolution` stays null and the destructive step below never runs.
+        incomingIsLoser = await this.duplicateTitleValidation(
+          result.createResult.title,
+          findResult?.result_id,
         );
-      }
+      } else {
+        // Cross-platform duplicate check. `external_link` points at the source
+        // platform portal and would never produce a reliable cross-platform
+        // match, so it is never used. The identity FIELD is platform-dependent
+        // (R-RES-010, design §5.2 step 0): TIP/AICCRA keep `public_link`
+        // unchanged; PRMS's own `public_link` (its `pdf_link`) NEVER
+        // contributes an identity — PRMS resolves in memory instead, from
+        // `item.knowledge_product_summary.handle` (rev 4; carried into
+        // `dto.evidence.evidence[]` by `processData`, never from
+        // `processKnowledgeProduct`), because the sync path runs before the
+        // row is saved and the stored-side SQL branch is not available yet for
+        // the incoming row.
+        const identityResolution = resolveIncomingPublicationIdentity({
+          platformCode: extraData.platformCode,
+          indicatorId: result.createResult.indicator_id,
+          publicLink: result.public_link,
+          evidence: result.evidence?.evidence,
+        });
 
-      const group = await this.buildDuplicateGroup({
-        publicLink: identityResolution.identity,
-        reportYearId: result.createResult.year,
-        platformCode: extraData.platformCode,
-        indicatorId: result.createResult.indicator_id,
-        officialCode: result.official_code,
-        findResult,
-      });
-      resolution = group.resolution;
-      participants = group.participants;
-      normalizedPublicLink = group.normalizedPublicLink;
-      incomingIsLoser = group.incomingIsLoser;
-      multiIdentityRefusedResultIds = group.multiIdentityRefusedResultIds;
+        if (identityResolution.refused) {
+          // R-RES-010 AC.9: the payload itself carries more than one
+          // qualifying identity (e.g. a two-KP PRMS item). Never resolve on the
+          // first handle found — create/update normally below, count no
+          // omission, and skip the duplicate check entirely so nothing is
+          // submitted for deletion.
+          this.logger.warn(
+            `Result ${result.official_code} from ${this.platformCode(extraData.platformCode)} carries more than one publication identity; refusing duplicate resolution and processing it normally (no omission, no deletion).`,
+          );
+        }
 
-      if (multiIdentityRefusedResultIds.length) {
-        // Mirrors the incoming-side refusal warn above (:169-171) — this is
-        // the STORED side (R-RES-010 AC.8): one of this group's stored
-        // participants itself resolves to more than one publication
-        // identity, so it was pulled out of `resolution.losers` and will
-        // never reach `deleteFullResultById`. Silent here is how the FAIL
-        // this attempt fixes happened: the runner never gets asked, and
-        // without this warn nothing on the sync path says so either.
-        this.logger.warn(
-          `Result(s) ${multiIdentityRefusedResultIds.join(', ')} refused for duplicate resolution: identity resolves to more than one publication (R-RES-010 AC.8). Skipping deletion; needs manual handling.`,
-        );
+        const group = await this.buildDuplicateGroup({
+          publicLink: identityResolution.identity,
+          reportYearId: result.createResult.year,
+          platformCode: extraData.platformCode,
+          indicatorId: result.createResult.indicator_id,
+          officialCode: result.official_code,
+          findResult,
+        });
+        resolution = group.resolution;
+        participants = group.participants;
+        normalizedPublicLink = group.normalizedPublicLink;
+        incomingIsLoser = group.incomingIsLoser;
+        multiIdentityRefusedResultIds = group.multiIdentityRefusedResultIds;
+
+        if (multiIdentityRefusedResultIds.length) {
+          // Mirrors the incoming-side refusal warn above (:169-171) — this is
+          // the STORED side (R-RES-010 AC.8): one of this group's stored
+          // participants itself resolves to more than one publication
+          // identity, so it was pulled out of `resolution.losers` and will
+          // never reach `deleteFullResultById`. Silent here is how the FAIL
+          // this attempt fixes happened: the runner never gets asked, and
+          // without this warn nothing on the sync path says so either.
+          this.logger.warn(
+            `Result(s) ${multiIdentityRefusedResultIds.join(', ')} refused for duplicate resolution: identity resolves to more than one publication (R-RES-010 AC.8). Skipping deletion; needs manual handling.`,
+          );
+        }
       }
 
       if (incomingIsLoser) {
@@ -227,7 +237,7 @@ export class SaveResultService {
         // handed to the single loser loop below — never deleted here, and never
         // by a direct call.
         this.logger.debug(
-          `Omitting result ${result.official_code} from ${this.platformCode(extraData.platformCode)}: a higher-priority duplicate prevails for this public link.`,
+          `Omitting result ${result.official_code} from ${this.platformCode(extraData.platformCode)}: ${extraData?.duplicateByTitle ? 'a live result with the same title exists' : 'a higher-priority duplicate prevails for this public link'}.`,
         );
         typeCounter = CounterResultsEnum.OMITTED_DUPLICATE;
       } else {
@@ -288,6 +298,14 @@ export class SaveResultService {
             external_link: result?.external_link,
             public_link: result?.public_link,
             created_at: result.created_at,
+            // Only flows that send them write these, so a re-sync without a
+            // phase never clears the one a PRMS push stored.
+            ...(!isEmpty(result?.prms_result_code) && {
+              prms_result_code: result.prms_result_code,
+            }),
+            ...(!isEmpty(result?.prms_phase_id) && {
+              prms_phase_id: result.prms_phase_id,
+            }),
           });
 
         await this._resultsService.updateGeneralInfo(
@@ -466,6 +484,29 @@ export class SaveResultService {
   }
 
   /**
+   * Title-only duplicate rule: `true` when another live result already uses
+   * the same title, so the incoming result is omitted. Nothing is ever deleted.
+   */
+  async duplicateTitleValidation(
+    title: string,
+    excludeResultId?: number,
+  ): Promise<boolean> {
+    if (isEmpty(title?.trim())) return false;
+
+    const duplicate = await this.dataSource.getRepository(Result).findOne({
+      where: {
+        title: title.trim(),
+        is_active: true,
+        is_snapshot: false,
+        ...(excludeResultId && { result_id: Not(excludeResultId) }),
+      },
+      select: { result_id: true },
+    });
+
+    return !!duplicate;
+  }
+
+  /**
    * Builds the duplicate group for one incoming row and resolves it.
    *
    * The incoming payload and `findResult` are collapsed into **one** participant:
@@ -637,13 +678,15 @@ export type ExtraData<T extends object> = {
   manageOfficialCode?: boolean;
   /** Shared by every audit row of one sync pass. */
   runId?: string;
+  /** Omit by live-result title instead of the public-link duplicate group. */
+  duplicateByTitle?: boolean;
 };
 
 export type FindOptionsKeyMap<
   T extends object,
   ExcludedKeys extends keyof FindOptionsWhere<Result> =
-  | 'platform_code'
-  | 'report_year_id',
+    | 'platform_code'
+    | 'report_year_id',
 > = {
-    [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
-  };
+  [K in Exclude<keyof FindOptionsWhere<Result>, ExcludedKeys>]?: keyof T;
+};

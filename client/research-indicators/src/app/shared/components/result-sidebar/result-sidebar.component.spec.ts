@@ -399,10 +399,13 @@ describe('ResultSidebarComponent', () => {
       });
 
       // --- Live-version (year) gate -------------------------------------------
-      // The reporting year is NOT a configurable parameter: the server resolves
-      // `report_year_id !== MAPPABLE_LIVE_VERSION` and ships the answer as
-      // `version_locked` on the alignment payload. These assert the sidebar
+      // The server compares `report_year_id` with the configured reporting
+      // year and ships the answer as `version_locked` on the alignment
+      // payload. These assert the sidebar
       // consumes it ALONGSIDE the pre-existing contract gate, never instead of it.
+      // The fixtures omit `has_pool_funding_data`, so a locked result still
+      // hides (omission keeps today's behaviour). A locked result that has
+      // data stays visible — see R-PRY-003 below.
 
       it('hides the Pool Funding alignment tab when version_locked=true, even though eligible=true', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set({
@@ -699,6 +702,255 @@ describe('ResultSidebarComponent', () => {
       fixture.detectChanges();
 
       expect(fixture.nativeElement.querySelector('[data-testid="sidebar-optional-divider"]')).toBeNull();
+    });
+  });
+
+  describe('R-PRY-003 reporting-year sidebar (§5)', () => {
+    function setAlignment(value: AlignmentResponse | null): void {
+      (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(value);
+    }
+
+    function poolFundingItem(): HTMLElement | null {
+      return (
+        Array.from(fixture.nativeElement.querySelectorAll('.option') as NodeListOf<HTMLElement>).find(node =>
+          (node.textContent ?? '').includes('Pool funding alignment')
+        ) ?? null
+      );
+    }
+
+    function syncButton(): HTMLButtonElement | null {
+      return fixture.nativeElement.querySelector('[data-testid="sidebar-prms-sync-button"]');
+    }
+
+    const syncedEvent = {
+      id: 7,
+      event_source: 'STAR' as const,
+      status: 'PENDING_REVIEW',
+      decision: null,
+      occurred_at: '2025-11-02T14:30:00.000Z',
+      decided_at: null,
+      justification: null,
+      actor_name: 'Ada Lovelace',
+      actor_name_short: 'Ada Lovelace',
+      reviewer_name: null,
+      reviewer_role: null
+    };
+
+    it('§5 existing rule — ineligible 2024 result with data stays hidden, with no button and no card', async () => {
+      (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: {
+          prms_result_code: 1111,
+          prms_phase_id: 4,
+          sync_count: 1,
+          events: [syncedEvent]
+        }
+      });
+      setAlignment({
+        result_code: 'RES-2024',
+        eligible: false,
+        has_pool_funding_alignment_eligible: false,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: true,
+        is_read_only: false,
+        prms_result_code: 1111,
+        version_locked: false,
+        has_pool_funding_data: true,
+        reporting_year: 2024
+      });
+      await component.fetchPrmsSyncHistory(123);
+      fixture.detectChanges();
+
+      expect(poolFundingItem()).toBeNull();
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(syncButton()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+    });
+
+    it("§5 otherwise — current reporting year 2026 keeps today's enabled PRMS SYNC button", () => {
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as GreenChecks);
+      setAlignment({
+        result_code: 'RES-2026',
+        eligible: true,
+        has_pool_funding_alignment_eligible: true,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: false,
+        is_read_only: false,
+        version_locked: false,
+        has_pool_funding_data: true,
+        reporting_year: 2026
+      });
+      fixture.detectChanges();
+
+      expect(poolFundingItem()).not.toBeNull();
+      expect(component.hasPoolFundingOption()).toBe(true);
+      expect(component.canSyncPrms()).toBe(true);
+      const button = syncButton();
+      expect(button).not.toBeNull();
+      expect(button?.disabled).toBe(false);
+      expect(button?.textContent).toContain('PRMS SYNC');
+    });
+
+    it('§5 locked without data — 2023 result against reporting year 2027 hides the item', () => {
+      setAlignment({
+        result_code: 'RES-2023',
+        eligible: true,
+        has_pool_funding_alignment_eligible: true,
+        has_contribution: null,
+        selected_levers: [],
+        is_synced_to_prms: false,
+        is_read_only: false,
+        prms_result_code: null,
+        version_locked: true,
+        has_pool_funding_data: false,
+        reporting_year: 2027
+      });
+      fixture.detectChanges();
+
+      expect(component.allOptionsWithGreenChecks().find(option => option.path === 'pool-funding-alignment')).toBeUndefined();
+      expect(poolFundingItem()).toBeNull();
+      expect(component.hasPoolFundingOption()).toBe(false);
+      expect(syncButton()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).toBeNull();
+    });
+
+    it('§5 locked with data — past-year synced result keeps the section and the card, and omits PRMS SYNC', async () => {
+      // KZ-015: the sidebar is already rendered (beforeEach). Show the current
+      // year first, then flip to the locked synced result — the transition the
+      // product performs when the alignment payload arrives and later changes.
+      cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+      cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as GreenChecks);
+      setAlignment({
+        result_code: 'RES-2026',
+        eligible: true,
+        has_pool_funding_alignment_eligible: true,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: false,
+        is_read_only: false,
+        version_locked: false,
+        has_pool_funding_data: true,
+        reporting_year: 2026
+      });
+      fixture.detectChanges();
+
+      expect(syncButton()).not.toBeNull();
+      expect(syncButton()?.disabled).toBe(false);
+      expect(poolFundingItem()).not.toBeNull();
+
+      (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue({
+        successfulRequest: true,
+        data: {
+          prms_result_code: 9746,
+          prms_phase_id: 6,
+          sync_count: 1,
+          events: [syncedEvent]
+        }
+      });
+      setAlignment({
+        result_code: 'RES-2025',
+        eligible: true,
+        has_pool_funding_alignment_eligible: true,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: true,
+        is_read_only: false,
+        prms_result_code: 9746,
+        version_locked: true,
+        has_pool_funding_data: true,
+        reporting_year: 2026
+      });
+      await component.fetchPrmsSyncHistory(123);
+      fixture.detectChanges();
+
+      expect(poolFundingItem()?.textContent).toContain('Pool funding alignment');
+      expect(component.hasPoolFundingOption()).toBe(true);
+      expect(syncButton()).toBeNull();
+
+      const card = fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]') as HTMLElement;
+      expect(card).not.toBeNull();
+      expect(card.querySelector('[data-testid="prms-sync-status"]')?.textContent).toContain('Pending Review');
+      expect(card.querySelector('[data-testid="prms-sync-actor"]')?.textContent).toContain('Ada Lovelace');
+      expect(card.querySelector('[data-testid="prms-sync-actor"]')?.textContent).toContain('·');
+      expect(card.querySelector('[data-testid="prms-sync-code"]')?.textContent).toContain('9746');
+      expect(card.textContent).toContain('Open result in PRMS');
+      expect(card.textContent).toContain('View full sync history');
+    });
+
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-11 / R-PRY-007 (client)
+    describe('R-PRY-007 display-only (non-eligible with a record)', () => {
+      const nonEligible = (over: Partial<AlignmentResponse> = {}): AlignmentResponse => ({
+        result_code: 'STAR-20081',
+        eligible: false,
+        has_pool_funding_alignment_eligible: false,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: false,
+        is_read_only: true,
+        prms_result_code: null,
+        version_locked: true,
+        has_pool_funding_data: true,
+        reporting_year: 2026,
+        ...over
+      });
+
+      it('shows the section and omits PRMS SYNC when non-eligible and display_only, then shows the card for its history', async () => {
+        // KZ-015: render hidden first (non-eligible, not display_only), then flip.
+        setAlignment(nonEligible({ display_only: false }));
+        fixture.detectChanges();
+        expect(poolFundingItem()).toBeNull();
+
+        (apiService.GET_PrmsSyncHistory as jest.Mock).mockResolvedValue({
+          successfulRequest: true,
+          data: { prms_result_code: 9746, prms_phase_id: 6, sync_count: 1, events: [syncedEvent] }
+        });
+        setAlignment(nonEligible({ display_only: true, is_synced_to_prms: true, prms_result_code: 9746 }));
+        await component.fetchPrmsSyncHistory(123);
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).not.toBeNull();
+        expect(component.hasPoolFundingOption()).toBe(true);
+        expect(syncButton()).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="prms-sync-card"]')).not.toBeNull();
+      });
+
+      it('omits PRMS SYNC on display_only even when the year is not locked (live result with a PRMS code)', () => {
+        cacheService.currentMetadata?.set({ ...cacheService.currentMetadata(), status_id: 6 });
+        cacheService.greenChecks?.set({ pool_funding_alignment: 1 } as GreenChecks);
+        setAlignment(nonEligible({ display_only: true, version_locked: false, prms_result_code: 9746 }));
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).not.toBeNull();
+        expect(syncButton()).toBeNull();
+      });
+
+      it('keeps a non-eligible result hidden when it is not display_only', () => {
+        setAlignment(nonEligible({ display_only: false }));
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).toBeNull();
+        expect(component.hasPoolFundingOption()).toBe(false);
+        expect(syncButton()).toBeNull();
+      });
+
+      it('keeps a non-eligible result hidden when display_only is omitted by an older server', () => {
+        const withoutField = nonEligible();
+        delete (withoutField as Partial<AlignmentResponse>).display_only;
+        setAlignment(withoutField);
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).toBeNull();
+      });
+
+      it('a display_only result without data on a past year stays hidden (the year rule still applies)', () => {
+        setAlignment(nonEligible({ display_only: true, has_pool_funding_data: false }));
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).toBeNull();
+      });
     });
   });
 
