@@ -40,6 +40,13 @@ describe('PfmSyncActivityCardComponent', () => {
     expect(el.querySelector<HTMLElement>('[data-testid="pfm-month-2026-03"] [data-testid="pfm-month-bar"]')?.style.height).toBe('0%');
   });
 
+  it('only a non-zero month gets the min-height stub class (zero stays zero height)', () => {
+    const { el } = render('all');
+    const bar = (m: string) => el.querySelector<HTMLElement>(`[data-testid="pfm-month-${m}"] [data-testid="pfm-month-bar"]`);
+    expect(bar('2026-03')?.className).not.toContain('min-h-');
+    expect(bar('2026-07')?.className).toContain('min-h-[6px]');
+  });
+
   // Data binding only: real rendered bar height is a HITL visual check.
   it('binds height = value / max (data binding, not proof of proportion)', () => {
     const { el } = render('all');

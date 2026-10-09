@@ -74,14 +74,14 @@
       }
     }
 
-    <div class="flex gap-1 border-0 border-b border-solid border-[color:var(--ac-pfm-neutral-bg)]" role="tablist" aria-label="Monitor sections">
+    <div class="flex gap-6 border-0 border-b border-solid border-[color:var(--ac-pfm-surface-border)]" role="tablist" aria-label="Monitor sections">
       @for (t of tabs; track t.value; let i = $index) {
         <button
           type="button"
           role="tab"
-          class="-mb-px cursor-pointer border-0 border-b-2 border-solid bg-transparent px-4 py-2 text-[14px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="-mb-px cursor-pointer border-0 border-b-[3px] border-solid bg-transparent px-1 py-3 text-[16px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             store.tab() === t.value
-              ? 'border-b-[color:var(--ac-pfm-info-fg)] font-semibold text-[var(--ac-pfm-info-fg)]'
+              ? 'border-b-[color:var(--ac-pfm-info-fg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
               : 'border-b-transparent font-medium text-[var(--ac-pfm-neutral-fg)]'
           }}"
           [id]="'pfm-tab-' + t.value"

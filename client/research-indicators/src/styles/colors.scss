@@ -83,6 +83,14 @@
   --ac-pfm-seg-approved: #3f9e5c;
   --ac-pfm-seg-rejected: #b4443a;
   --ac-pfm-seg-no-sp: #2f7cc4;
+  --ac-pfm-surface: #ffffff;
+  --ac-pfm-surface-border: #e4e9f0;
+  --ac-pfm-month-1: #c9d8ee;
+  --ac-pfm-month-2: #b0c8e6;
+  --ac-pfm-month-3: #8cb0dc;
+  --ac-pfm-month-4: #6192cc;
+  --ac-pfm-month-5: #3f74b8;
+  --ac-pfm-month-6: #234a94;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -223,4 +231,12 @@ $colors: (
   --ac-pfm-seg-approved: #57b576;
   --ac-pfm-seg-rejected: #e0766b;
   --ac-pfm-seg-no-sp: #5a9fdc;
+  --ac-pfm-surface: #23272d;
+  --ac-pfm-surface-border: #363c45;
+  --ac-pfm-month-1: #3a516e;
+  --ac-pfm-month-2: #44648a;
+  --ac-pfm-month-3: #4f78a8;
+  --ac-pfm-month-4: #5b8dc7;
+  --ac-pfm-month-5: #6ea3de;
+  --ac-pfm-month-6: #8bbcf0;
 }

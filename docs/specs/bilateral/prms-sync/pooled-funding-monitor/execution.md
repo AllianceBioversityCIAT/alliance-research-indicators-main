@@ -383,3 +383,33 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
    - Chips.
    - A group header with Enter and Space.
    - Focus is visible throughout.
+
+#### HITL round 1 (owner, 2026-10-09) — coverage tab restyle → **PASS (code); owner re-check pending**
+
+- **Owner observation (verbatim):** "portafolio coverage no esta con estilos, debe ser como la priemra foto y esta como la segunda sin clores y todo plano, ajustalo". The owner sent two screenshots: the mockup target and the running app. The running app showed:
+  - cards on the page background with no surface of their own;
+  - the pipeline header, tiles and bar laid out differently from the mockup;
+  - SP rows split over two lines;
+  - month values printed above zero-height bars.
+- **Implementer (sonnet, high):**
+  - New tokens in `colors.scss`, each with a light and a dark value: `--ac-pfm-surface`, `--ac-pfm-surface-border` and `--ac-pfm-month-1..6`.
+  - The card surface is applied to the pipeline, SP, sync, KPI and group cards.
+  - Pipeline: title and scope subtitle on the left, total on the right, figure line, 26px bar, 5-column tiles.
+  - SP rows on a single grid line, with a mono count.
+  - Sync card: subtitle "Results pushed to PRMS over the {year} reporting cycle", the label "RESULTS SYNCED PER MONTH", and a 6-shade month ramp. Month values are now `sr-only` text plus a `title`.
+  - Active tab is navy with a 3px underline.
+- **Reviewer round 1: FAIL.**
+  - (1) `min-h-[6px]` made a zero month render a visible bar, which breaks R-PFM-008.
+  - (2) The stage note was no longer visible, which breaks R-PFM-006 L216.
+- **Leader adjudication:**
+  - (1) Fixed in code.
+  - (2) Treated as an owner decision, because the owner's target screenshot has no notes. R-PFM-006 is amended and **DD-PFM-13** is recorded in `design.md`. The note stays available as a tooltip and as `sr-only` text.
+- **Implementer fix:**
+  - The minimum height now applies only when `synced > 0`. K-004 red observed: `Expected substring: not "min-h-"` / `Received string: "bg-[var(--ac-pfm-month-2)] min-h-[6px] rounded-t-md w-full"`.
+  - An `sr-only` note was added to each tile. K-004 red observed: `Received: undefined`.
+- **Reviewer round 2: PASS.**
+- **Leader re-measure:** PFM jest 12 suites, 87/87. Implementer gates: tsc 945, hex grep clean, eslint clean, `ng build` OK.
+- **ADVISORY (accessibility):**
+  - `--ac-pfm-month-1` and not-started bars are about 1.3–1.4:1 against their background (non-text).
+  - `--ac-pfm-neutral-fg` on white is about 4.4:1 for small labels.
+  - Month values are not visible as text.

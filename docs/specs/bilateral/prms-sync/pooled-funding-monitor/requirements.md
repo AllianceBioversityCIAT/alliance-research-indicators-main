@@ -213,7 +213,7 @@ The *Portfolio coverage* tab SHALL show one stacked bar with seven stages in thr
 
 Assignment precedence: (1) PRMS status ≠ *Not sent* → its In-PRMS stage; (2) out of scope; (3) the In-STAR rules.
 
-Each stage shows its value, its share (%), its label, its group and its note (mockup copy). The header shows:
+Each stage shows its value, its share (%), its label and its group. Its note (mockup copy) is exposed as a tooltip and to assistive tech only, not as visible text (owner HITL 2026-10-09, DD-PFM-13). The header shows:
 - the total and the count in PRMS scope;
 - in STAR, not synced yet (+ share);
 - in PRMS (+ share);

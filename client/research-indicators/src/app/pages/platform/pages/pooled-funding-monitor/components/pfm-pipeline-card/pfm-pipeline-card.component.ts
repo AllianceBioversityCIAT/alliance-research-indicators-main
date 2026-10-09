@@ -1,7 +1,7 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-11 (R-PFM-006)
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { PfmPipeline, PfmPipelineGroup, PfmPipelineStage } from '../../pfm.interfaces';
+import { PfmPipeline, PfmPipelineGroup, PfmPipelineStage, PfmScope } from '../../pfm.interfaces';
 
 interface StageView extends PfmPipelineStage {
   label: string;
@@ -68,6 +68,9 @@ const GROUP_LABELS: Record<PfmPipelineGroup, string> = { in_star: 'In STAR', in_
 })
 export class PfmPipelineCardComponent {
   pipeline = input.required<PfmPipeline>();
+  scope = input<PfmScope>('mine');
+
+  scopeNote = computed(() => (this.scope() === 'all' ? 'across all projects contributing to Pool funding' : 'across your projects contributing to Pool funding'));
 
   /** Display-only decoration of the server stages; values and order are exactly as sent. */
   stages = computed<StageView[]>(() => {

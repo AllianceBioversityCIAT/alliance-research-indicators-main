@@ -1,18 +1,23 @@
-<section class="rounded-lg border border-solid border-[color:var(--ac-pfm-neutral-bg)] bg-[var(--ac-background)] p-4" data-testid="pfm-sync-card" aria-labelledby="pfm-sync-title">
-  <h2 id="pfm-sync-title" class="m-0 text-[15px] font-semibold text-[var(--ac-grey-900)]">Sync activity</h2>
-  <p class="m-0 mt-1 text-[12.5px] text-[var(--ac-pfm-neutral-fg)]">Results synced per month</p>
-  <ul class="m-0 mt-3 grid h-40 list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
-    @for (b of bars(); track b.month) {
-      <li class="flex h-full flex-col items-center justify-end gap-1" [attr.data-testid]="'pfm-month-' + b.month">
-        <span class="text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-month-value">{{ b.synced | number }}</span>
-        <div class="flex w-full flex-1 items-end">
-          <div class="w-full rounded-t bg-[var(--ac-pfm-info-fg)]" [style.height]="b.height" data-testid="pfm-month-bar"></div>
+<section class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6 md:p-8" data-testid="pfm-sync-card" aria-labelledby="pfm-sync-title">
+  <h2 id="pfm-sync-title" class="m-0 text-[20px] font-semibold leading-7 text-[var(--ac-pfm-accent-navy)]">Sync activity</h2>
+  <p class="m-0 mt-1 text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-sub">Results pushed to PRMS over the {{ year() }} reporting cycle</p>
+  <p class="m-0 mt-6 text-[14px] font-medium uppercase tracking-wide text-[var(--ac-pfm-accent-navy)]">Results synced per month</p>
+  <ul class="m-0 mt-4 grid list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
+    @for (b of bars(); track b.month; let i = $index) {
+      <li class="flex flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
+        <div class="flex h-[150px] w-full items-end">
+          <div
+            class="w-full rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"
+            [style.height]="b.height"
+            [attr.title]="(b.synced | number) + ' results synced in ' + b.label"
+            data-testid="pfm-month-bar"></div>
         </div>
-        <span class="text-[12px] font-medium text-[var(--ac-grey-900)]" data-testid="pfm-month-label">{{ b.label }}</span>
+        <span class="sr-only" data-testid="pfm-month-value">{{ b.synced | number }}</span>
+        <span class="mt-2 font-mono text-[14px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-month-label">{{ b.label }}</span>
       </li>
     }
   </ul>
-  <p class="m-0 mt-3 text-[12.5px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-foot">
+  <p class="m-0 mt-4 text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-foot">
     {{ syncedThisYear() | number }} {{ scope() === 'all' ? 'results synced' : 'of your results synced' }} in {{ year() }}
   </p>
 </section>

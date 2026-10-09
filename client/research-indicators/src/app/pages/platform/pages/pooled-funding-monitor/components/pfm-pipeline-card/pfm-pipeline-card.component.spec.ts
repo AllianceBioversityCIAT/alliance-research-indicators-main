@@ -58,6 +58,8 @@ describe('PfmPipelineCardComponent', () => {
     expect(tile('rejected', 'value')).toBe('0');
     expect(tile('no_sp_contribution', 'group')).toBe('Out of scope');
     expect(tile('mapping_incomplete', 'group')).toBe('In STAR');
+    expect(tile('mapping_incomplete', 'note')).toBe('Projects or budget shares still missing');
+    expect(el.querySelector('[data-testid="pfm-stage-mapping_incomplete"] [data-testid="pfm-stage-note"]')?.className).toContain('sr-only');
   });
 
   it('a zero stage renders no segment, so no zero-width element can take focus', () => {

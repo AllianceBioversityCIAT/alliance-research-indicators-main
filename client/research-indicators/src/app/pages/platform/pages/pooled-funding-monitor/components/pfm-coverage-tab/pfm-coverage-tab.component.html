@@ -1,6 +1,6 @@
 <div class="flex flex-col gap-4" data-testid="pfm-coverage-tab">
-  <app-pfm-pipeline-card [pipeline]="summary().pipeline" />
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+  <app-pfm-pipeline-card [pipeline]="summary().pipeline" [scope]="scope()" />
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]">
     <app-pfm-sp-coverage-card [rows]="summary().sp_coverage" [scope]="scope()" />
     <app-pfm-sync-activity-card [monthly]="summary().monthly" [syncedThisYear]="summary().synced_this_year" [scope]="scope()" />
   </div>
