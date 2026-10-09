@@ -3,10 +3,10 @@
 @if (queue(); as q) {
   <div class="flex flex-col gap-4" data-testid="pfm-queue-tab">
     <div
-      class="flex flex-col gap-6 rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-8"
+      class="flex flex-col gap-5 rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6"
       data-testid="pfm-filters-card">
     <div class="flex flex-wrap items-end gap-4" role="group" aria-label="Filters">
-      <div class="flex min-w-[13rem] flex-1 flex-col gap-2 text-[14px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+      <div class="flex min-w-[13rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
         <label for="pfm-filter-project-input">Project contributing to Pool funding</label>
         <p-select
           inputId="pfm-filter-project-input"
@@ -18,10 +18,10 @@
           appendTo="body"
           [filter]="true"
           filterBy="label"
-          styleClass="w-full !h-[52px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[18px] !text-[var(--ac-pfm-accent-navy)]"
+          styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-project" />
       </div>
-      <div class="flex min-w-[13rem] flex-1 flex-col gap-2 text-[14px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+      <div class="flex min-w-[13rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
         <label for="pfm-filter-sp-input">Science Program</label>
         <p-select
           inputId="pfm-filter-sp-input"
@@ -36,10 +36,10 @@
           appendTo="body"
           [filter]="true"
           filterBy="label"
-          styleClass="w-full !h-[52px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[18px] !text-[var(--ac-pfm-accent-navy)]"
+          styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-sp" />
       </div>
-      <div class="flex min-w-[11rem] flex-1 flex-col gap-2 text-[14px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+      <div class="flex min-w-[11rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
         <label for="pfm-filter-status-input">Status</label>
         <p-select
           inputId="pfm-filter-status-input"
@@ -49,10 +49,10 @@
           [ngModel]="store.filters().status ?? ALL"
           (onChange)="onFilter('status', $event.value)"
           appendTo="body"
-          styleClass="w-full !h-[52px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[18px] !text-[var(--ac-pfm-accent-navy)]"
+          styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-status" />
       </div>
-      <div class="flex min-w-[11rem] flex-1 flex-col gap-2 text-[14px] font-medium text-[var(--ac-pfm-neutral-fg)]">
+      <div class="flex min-w-[11rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
         <label for="pfm-filter-type-input">Result type</label>
         <p-select
           inputId="pfm-filter-type-input"
@@ -62,12 +62,12 @@
           [ngModel]="store.filters().type ?? ALL"
           (onChange)="onFilter('type', $event.value)"
           appendTo="body"
-          styleClass="w-full !h-[52px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[18px] !text-[var(--ac-pfm-accent-navy)]"
+          styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-type" />
       </div>
       <button
         type="button"
-        class="h-[52px] cursor-pointer rounded-lg border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-6 text-[16px] font-medium text-[var(--ac-pfm-neutral-fg)] transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+        class="h-[40px] cursor-pointer rounded-lg border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-4 text-[13px] font-medium text-[var(--ac-pfm-neutral-fg)] transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
         data-testid="pfm-reset"
         (click)="store.resetFilters()">
         Reset
@@ -77,11 +77,11 @@
     <hr class="m-0 border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)]" aria-hidden="true" />
 
     <div class="flex flex-wrap items-center gap-3" role="group" aria-label="Quick views" data-testid="pfm-chips">
-      <span class="text-[14px] font-medium uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Quick views</span>
+      <span class="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Quick views</span>
       @for (c of chips; track c.key) {
         <button
           type="button"
-          class="inline-flex cursor-pointer items-center gap-3 rounded-full border border-solid py-2 pl-5 pr-3 text-[16px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 {{
+          class="inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid py-1.5 pl-4 pr-2.5 text-[13px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 {{
             activeChip() === c.key
               ? 'border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
               : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
@@ -95,7 +95,7 @@
           {{ c.label }}
           @if (!stale()) {
             <span
-              class="inline-flex h-[30px] min-w-[30px] items-center justify-center rounded-full px-2 text-[14px] font-semibold tabular-nums {{
+              class="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-[12px] font-semibold tabular-nums {{
                 activeChip() === c.key ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]' : 'bg-[var(--ac-pfm-neutral-bg)]'
               }}"
               data-testid="pfm-chip-count"
@@ -114,8 +114,8 @@
       } @else if (store.queueState().loading) {
         <div class="h-32 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-groups-skeleton" aria-busy="true"></div>
       } @else if (q.groups.length === 0) {
-        <div class="flex flex-col items-start gap-2 rounded-lg bg-[var(--ac-pfm-neutral-bg)] p-5" data-testid="pfm-queue-empty">
-          <p class="m-0 text-[15px] font-semibold text-[var(--ac-grey-900)]">No results match these filters</p>
+        <div class="flex flex-col items-start gap-2 rounded-lg bg-[var(--ac-pfm-neutral-bg)] p-4" data-testid="pfm-queue-empty">
+          <p class="m-0 text-[14px] font-semibold text-[var(--ac-grey-900)]">No results match these filters</p>
           <button
             type="button"
             class="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-[var(--ac-pfm-info-fg)] underline"
@@ -133,7 +133,7 @@
       }
     </div>
 
-    <footer class="flex flex-col gap-2 text-[14px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-queue-footer">
+    <footer class="flex flex-col gap-2 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-queue-footer">
       @if (!stale()) {
         <p class="m-0" data-testid="pfm-count-line">{{ countLine() }}</p>
       }

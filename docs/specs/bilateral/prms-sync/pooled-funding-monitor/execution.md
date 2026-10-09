@@ -484,3 +484,40 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY:**
   - The `p-select` root overrides may not reach the inner Aura label. Check at the HITL; if needed, use `labelStyleClass` or pass-through options.
   - The title link shows its underline only on hover.
+
+#### HITL round 5 (owner, 2026-10-09) — typography scaled to STAR → **PASS (code); owner re-check pending**
+
+- **Owner request (verbatim):** "en cuanto a tamanos todo lo de esta seccion esta mas grande que la app en general, basate en my pi delgates para tamanos de letras … el header hazlo como pi delagest pero no modifiques estilos de las cards".
+- **How the Leader read it:**
+  - The header copies My PI Delegates.
+  - Card visual styles stay unchanged.
+  - The KPI cards are not touched at all.
+  - All other text moves to the platform scale.
+- **Implementer (sonnet, high).** The scale it took from My PI Delegates:
+  - title 18/20
+  - description 15/20
+  - tabs 14, `px-5 py-3`
+  - labels 11 uppercase
+  - body 14, with meta and badges at 12–13
+- **Changes, by area:**
+  - **Header:** `max-w-[60rem]`.
+  - **Scope toggle:** 13px text, `py-1`.
+  - **Card titles:** 20 → 16.
+  - **Pipeline:** total 40 → 28; tiles 28 → 22.
+  - **Bars:** pipeline bar 26 → 20; SP bar 26 → 18.
+  - **Selects:** 52px / 18px text → 40px / 14px.
+  - **Chips:** 16 → 13.
+  - **Group:** name 20 → 15.
+  - **Rows:** title 17 → 14.
+  - **Badges:** 14 → 12.
+  - **Paddings:** trimmed to match.
+  - Exactly 8 html files changed. `pfm-kpi-cards` has no diff, and no spec changed.
+- **Reviewer: STATUS: PASS.**
+  - The diff touches size and spacing only. Colours, borders, radius and accents are byte-identical, and every attribute is intact.
+  - The smallest text is 11px.
+  - Muted text measures ≥ 5.0:1 in light and in dark.
+  - R-PFM-006, R-PFM-008 and R-PFM-014 are intact.
+- **Leader re-measure:** PFM jest 12 suites, 88/88.
+- **ADVISORY:**
+  - The View link and the toggle buttons are about 26–28px tall. That still meets 24px, but check it by touch at the HITL.
+  - The page background stays `--ac-background`. My PI Delegates uses a white page instead; this was not changed so the card surfaces stay the same.

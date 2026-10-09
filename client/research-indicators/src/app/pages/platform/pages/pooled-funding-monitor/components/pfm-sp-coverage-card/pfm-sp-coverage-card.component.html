@@ -1,7 +1,7 @@
-<section class="h-full rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6 md:p-8" data-testid="pfm-sp-card" aria-labelledby="pfm-sp-title">
-  <h2 id="pfm-sp-title" class="m-0 text-[20px] font-semibold leading-7 text-[var(--ac-pfm-accent-navy)]">Coverage by Science Program</h2>
-  <p class="m-0 mt-1 text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-sub">{{ copy().sub }}</p>
-  <p class="m-0 mt-5 flex gap-5 text-[14px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-legend">
+<section class="h-full rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6" data-testid="pfm-sp-card" aria-labelledby="pfm-sp-title">
+  <h2 id="pfm-sp-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Coverage by Science Program</h2>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-sub">{{ copy().sub }}</p>
+  <p class="m-0 mt-4 flex gap-5 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-legend">
     <span class="inline-flex items-center gap-2"
       ><span class="h-3 w-3 rounded-[4px] bg-[var(--ac-pfm-month-6)]" aria-hidden="true"></span
       ><span data-testid="pfm-sp-legend-synced">{{ copy().synced }}</span></span
@@ -11,16 +11,16 @@
       ><span data-testid="pfm-sp-legend-unsynced">{{ copy().unsynced }}</span></span
     >
   </p>
-  <ul class="m-0 mt-5 flex list-none flex-col gap-4 p-0">
+  <ul class="m-0 mt-4 flex list-none flex-col gap-3 p-0">
     @for (r of view(); track r.code) {
       <li class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_4.5rem]" [attr.data-testid]="'pfm-sp-row-' + r.code">
-        <span class="min-w-0 truncate text-[16px] text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-sp-label">{{ r.code }} — {{ r.name }}</span>
-        <div class="h-[26px] overflow-hidden rounded-md bg-[var(--ac-pfm-neutral-bg)]">
+        <span class="min-w-0 truncate text-[13px] text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-sp-label">{{ r.code }} — {{ r.name }}</span>
+        <div class="h-[18px] overflow-hidden rounded-md bg-[var(--ac-pfm-neutral-bg)]">
           <div class="h-full overflow-hidden rounded-md bg-[var(--ac-pfm-seg-not-started)]" [style.width]="r.wTotal" data-testid="pfm-sp-total-bar">
             <div class="h-full bg-[var(--ac-pfm-month-6)]" [style.width]="r.wSynced" data-testid="pfm-sp-synced-bar"></div>
           </div>
         </div>
-        <span class="text-right font-mono text-[15px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-count">{{ r.synced }} / {{ r.total }}</span>
+        <span class="text-right font-mono text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-count">{{ r.synced }} / {{ r.total }}</span>
       </li>
     }
   </ul>

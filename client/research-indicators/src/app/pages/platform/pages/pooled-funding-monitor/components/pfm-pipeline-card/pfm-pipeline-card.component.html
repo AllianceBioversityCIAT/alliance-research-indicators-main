@@ -1,27 +1,27 @@
-<section class="h-full rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6 md:p-8" data-testid="pfm-pipeline-card" aria-labelledby="pfm-pipeline-title">
+<section class="h-full rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6" data-testid="pfm-pipeline-card" aria-labelledby="pfm-pipeline-title">
   <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
     <div class="min-w-0">
-      <h2 id="pfm-pipeline-title" class="m-0 text-[20px] font-semibold leading-7 text-[var(--ac-pfm-accent-navy)]">Result pipeline — Pool funding mapping to PRMS</h2>
-      <p class="m-0 mt-1 text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-pipeline-scope">{{ scopeNote() }}</p>
+      <h2 id="pfm-pipeline-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Result pipeline — Pool funding mapping to PRMS</h2>
+      <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-pipeline-scope">{{ scopeNote() }}</p>
     </div>
     <p class="m-0 flex items-baseline gap-2">
-      <span class="text-[40px] font-bold leading-none tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-pipeline-total">{{ pipeline().total | number }}</span>
-      <span class="text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-pipeline-total-sub"
+      <span class="text-[28px] font-bold leading-none tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-pipeline-total">{{ pipeline().total | number }}</span>
+      <span class="text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-pipeline-total-sub"
         >results · {{ pipeline().in_scope | number }} in PRMS scope</span
       >
     </p>
   </div>
 
-  <div class="mt-6 flex flex-wrap gap-x-8 gap-y-2" data-testid="pfm-pipeline-figures">
+  <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2" data-testid="pfm-pipeline-figures">
     @for (f of figures(); track f.key) {
-      <p class="m-0 text-[16px] text-[var(--ac-pfm-neutral-fg)]" [attr.data-testid]="'pfm-pipeline-fig-' + f.key">
+      <p class="m-0 text-[13px] text-[var(--ac-pfm-neutral-fg)]" [attr.data-testid]="'pfm-pipeline-fig-' + f.key">
         <span class="font-semibold tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-fig-value">{{ f.value | number }}</span>
         <span class="ml-1" data-testid="pfm-fig-text">{{ f.text }}</span>
       </p>
     }
   </div>
 
-  <ul class="m-0 mt-3 flex h-[26px] list-none gap-0 overflow-hidden rounded-full p-0" data-testid="pfm-pipeline-bar">
+  <ul class="m-0 mt-3 flex h-[20px] list-none gap-0 overflow-hidden rounded-full p-0" data-testid="pfm-pipeline-bar">
     @for (s of segments(); track s.key) {
       <li
         class="h-full {{ s.seg }}"
@@ -32,17 +32,17 @@
     }
   </ul>
 
-  <ul class="m-0 mt-6 grid list-none grid-cols-1 gap-x-4 gap-y-6 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="pfm-pipeline-stages">
+  <ul class="m-0 mt-5 grid list-none grid-cols-1 gap-x-4 gap-y-6 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" data-testid="pfm-pipeline-stages">
     @for (s of stages(); track s.key) {
       <li class="flex gap-2.5" [attr.title]="s.note" [attr.data-testid]="'pfm-stage-' + s.key">
-        <span class="mt-3 h-3 w-3 flex-none rounded-[4px] {{ s.seg }}" aria-hidden="true"></span>
+        <span class="mt-2 h-3 w-3 flex-none rounded-[4px] {{ s.seg }}" aria-hidden="true"></span>
         <div class="min-w-0">
-          <p class="m-0 text-[28px] font-semibold leading-9 tabular-nums {{ s.ink }}">
+          <p class="m-0 text-[22px] font-semibold leading-7 tabular-nums {{ s.ink }}">
             <span data-testid="pfm-stage-value">{{ s.value | number }}</span>
-            <span class="ml-1.5 text-[14px] font-normal text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-share">{{ s.share }}%</span>
+            <span class="ml-1.5 text-[12px] font-normal text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-share">{{ s.share }}%</span>
           </p>
-          <p class="m-0 mt-1 text-[16px] font-medium text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-stage-label">{{ s.label }}</p>
-          <p class="m-0 mt-1 text-[13px] font-normal uppercase tracking-wide text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-group">{{ s.groupLabel }}</p>
+          <p class="m-0 mt-1 text-[13px] font-medium text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-stage-label">{{ s.label }}</p>
+          <p class="m-0 mt-1 text-[11px] font-normal uppercase tracking-wide text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-stage-group">{{ s.groupLabel }}</p>
           <p class="sr-only" data-testid="pfm-stage-note">{{ s.note }}</p>
         </div>
       </li>

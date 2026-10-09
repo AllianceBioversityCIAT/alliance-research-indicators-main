@@ -4,25 +4,25 @@
   [attr.data-testid]="'pfm-group-' + group().code">
   <button
     type="button"
-    class="flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-3 border-0 bg-transparent px-7 py-6 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+    class="flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-3 border-0 bg-transparent px-6 py-4 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
     data-testid="pfm-group-toggle"
     [attr.aria-expanded]="open()"
     [attr.aria-controls]="'pfm-group-body-' + group().code"
     (click)="store.toggleGroup(group().code)">
     <span
-      class="w-[150px] shrink-0 break-words rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-4 py-3 font-mono text-[15px] font-bold leading-snug text-[var(--ac-pfm-accent-navy)]"
+      class="w-[130px] shrink-0 break-words rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-3 py-2 font-mono text-[13px] font-bold leading-snug text-[var(--ac-pfm-accent-navy)]"
       data-testid="pfm-group-code"
       >{{ group().code }}</span
     >
     <span class="min-w-0 flex-1 basis-60">
-      <span class="block text-[20px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-group-name">{{ group().name }}</span>
-      <span class="mt-1 block text-[16px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-lead"
+      <span class="block text-[15px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-group-name">{{ group().name }}</span>
+      <span class="mt-1 block text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-lead"
         >Lead PI: {{ group().lead_pi }} · {{ group().donor }}</span
       >
     </span>
-    <span class="text-[17px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-count">{{ countLabel() }}</span>
+    <span class="text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-count">{{ countLabel() }}</span>
     <span
-      class="flex h-3 w-[230px] overflow-hidden rounded-full bg-[var(--ac-pfm-seg-not-started)]"
+      class="flex h-3 w-[190px] overflow-hidden rounded-full bg-[var(--ac-pfm-seg-not-started)]"
       aria-hidden="true"
       data-testid="pfm-group-bar">
       @for (s of segments(); track s.key) {
@@ -36,7 +36,7 @@
     </span>
     <span class="sr-only" data-testid="pfm-group-bar-summary">{{ barSummary() }}</span>
     <span
-      class="inline-flex items-center whitespace-nowrap rounded-full border border-solid px-5 py-2 text-[16px] font-semibold {{
+      class="inline-flex items-center whitespace-nowrap rounded-full border border-solid px-3.5 py-1 text-[12px] font-semibold {{
         group().attention
           ? 'border-[color:var(--ac-pfm-warning-border)] bg-[var(--ac-pfm-warning-bg)] text-[var(--ac-pfm-warning-fg)]'
           : 'border-[color:var(--ac-pfm-success-fg)] bg-[var(--ac-pfm-success-bg)] text-[var(--ac-pfm-success-fg)]'
@@ -50,14 +50,14 @@
   @if (open()) {
     <div [id]="'pfm-group-body-' + group().code" class="overflow-x-auto" data-testid="pfm-group-body">
       <div
-        class="{{ grid }} items-center border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] px-7 py-4 text-[13px] font-semibold uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]"
+        class="{{ grid }} items-center border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]"
         role="presentation">
         @for (c of columns; track c) {
           <span class="{{ $last ? 'text-right' : '' }}">{{ c }}</span>
         }
       </div>
       @if (error()) {
-        <div class="flex items-center gap-3 px-7 py-5 text-[14px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-group-error">
+        <div class="flex items-center gap-3 px-6 py-4 text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-group-error">
           <span>Could not load the results of this project.</span>
           <button
             type="button"
@@ -68,7 +68,7 @@
           </button>
         </div>
       } @else if (loading()) {
-        <div class="flex flex-col gap-2 px-7 py-4" aria-busy="true" data-testid="pfm-rows-skeleton">
+        <div class="flex flex-col gap-2 px-6 py-3" aria-busy="true" data-testid="pfm-rows-skeleton">
           @for (i of skeletons; track i) {
             <div class="h-10 animate-pulse rounded-md bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-row-skeleton"></div>
           }
@@ -77,7 +77,7 @@
         @for (r of rows(); track r.result_code) {
           <app-pfm-result-row [row]="r" />
         } @empty {
-          <p class="m-0 px-7 py-5 text-[14px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-empty">No results in this project.</p>
+          <p class="m-0 px-6 py-4 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-empty">No results in this project.</p>
         }
       }
     </div>
