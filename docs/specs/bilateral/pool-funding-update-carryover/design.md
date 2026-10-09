@@ -108,7 +108,7 @@ None.
 
 ## 11. Premise Ledger
 
-Count: 12 verified · 0 `UNVERIFIED`.
+Count: 11 verified · 1 refuted-and-amended (P-5, Low) · 0 `UNVERIFIED`.
 Blast-radius triggers: `live-path` (names the Update result action) — P-1; `consumer` (changes `newReportingCycle` behavior; writes rows other readers consume) — P-9, P-11. `shared-state`: none apply — no shared service/state is changed; the new repository method has no other caller.
 
 | # | Claim | Class | Citation (as run) | Verified at | If false | Settled by |

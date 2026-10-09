@@ -49,9 +49,9 @@ graph TD
 - **Falsifier:**
   - (f1) Call `saveHistory` before the transaction → case (c) goes red (history called).
   - (f2) Drop the `if (snapshot)` guard → case (b) goes red.
-  - (f3) Move the `_sp` insert before the alignment insert check → repository "skipped when 0 rows" case goes red.
+  - (f3) Drop the `newAlignmentId != null` guard on the `_sp` insert → repository "skips the SP insert when no live alignment was created" case goes red.
 - **Red run:** (f1)–(f3) observed at execute time and quoted.
-- **Disqualifier:** these are mocked-manager tests — they prove call wiring and order, **not** SQL correctness (column order, remap, unique index). They may not be cited as evidence for S-1 copy content, S-2, S-5, S-8; that is T-02's job (KZ-017). **Accepted gap:** the snapshot `findOne` and the status/year update are proven only by argument assertions (e), not against MySQL — they are plain TypeORM `findOne`/`update` with literal where-objects.
+- **Disqualifier:** these are mocked-manager tests — they prove call wiring and order, **not** SQL correctness (column order, remap, unique index). They may not be cited as evidence for S-1 copy content, S-2, S-5, S-8; that is T-02's job (KZ-017). **Accepted gaps (validation 2026-10-08):** S-6 rollback atomicity and S-2 "no `results` delete/re-create" are proven by mocks only (TypeORM `transaction` semantics trusted, no MySQL rollback fixture). **Accepted gap:** the snapshot `findOne` and the status/year update are proven only by argument assertions (e), not against MySQL — they are plain TypeORM `findOne`/`update` with literal where-objects.
 - **Consumers:** `green-checks.service.spec.ts`, `green-checks.controller.spec.ts`, `impersonation-audit.interceptor.spec.ts` (design P-9) — all re-run.
 - **Review:** `full` — transactional write path on result data.
 - **Done:**
@@ -80,9 +80,10 @@ graph TD
   - (f5) Copy the link verbatim instead of remapping → S-5 goes red (`<snapshot id>` ≠ `<live id>`).
   - (f6) Drop `is_active = TRUE` from the ToC source filter → S-1 goes red (2 ToC rows).
   - (f7) Swap two adjacent ToC columns in the INSERT list → S-1 column equality goes red (distinct sentinels).
+  - (f10) Drop `sp.updated_by = ?` from the SP deactivation → S-2 red. (f11) Hard-code `TRUE` for `has_contribution` → S-1 red. (f12) Drop `deleted_at = NOW()` from the ToC deactivation → S-2 red. (f13) Hard-code `created_by = 1` on the `_sp` insert → S-1 red. *(f10–f13 added in rework attempt 2, execution.md T-02.)*
   - (f8) Replace the mapping hard-delete with the soft-deactivate used for the other tables → S-2b goes red with `ER_DUP_ENTRY` on `uq_rpfim_result_indicator_active` (at carry-over or at the re-approval `SP_versioning`).
   - (f9) Delete mappings with `result_id IN (live, snapshot)` → S-2b "snapshot rows untouched" goes red.
-- **Red run:** (f4)–(f9) observed against the real schema and quoted.
+- **Red run:** (f4)–(f13) observed against the real schema and quoted.
 - **Disqualifier:** if `test:fixtures` collects 0 tests (file not named `*.fixture-spec.ts`), or the run shares the container with a concurrent `test:integration` (FP-51), the result is not evidence.
 - **Consumers:** none (new file); `test/jest-fixtures.json` collects it.
 - **Review:** `full`.
@@ -122,7 +123,7 @@ graph TD
 | S-4 | T-02 S-4 |
 | S-5 THEN remap, BUT no foreign link | T-02 S-5 (f5) |
 | S-6 THEN rollback, AND IT MUST no history | T-01 (c) (f1) |
-| S-7 | T-03 (HITL only — no code change, accepted) |
+| S-7 | T-03 (HITL only — **accepted gap** at validation: the owner confirmation does not name a non-eligible result, so "hidden as before" rests on R-PUC-004 needing no code change) |
 | NFR-PUC-001 | T-02 |
 | NFR-PUC-002/003 | T-01 (no migration, controller unchanged) |
 
