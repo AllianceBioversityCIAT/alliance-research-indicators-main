@@ -631,3 +631,15 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The code chip cannot make the page scroll sideways: the header uses `flex-wrap` and the card is `overflow-hidden`.
 - **Leader follow-up:** the implementer reintroduced `<p>` inside `<span>` on the KPI label (regression of round 8). The Leader fixed it again with a mechanical swap to `<span>`.
 - **Leader re-measure:** PFM jest 88/88.
+
+#### HITL round 14 (owner, 2026-10-09) — KPI cards back to the mockup design, grey background → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "asi pero con el fondo gris", with the mockup KPI row screenshot attached.
+- **Change:**
+  - Restored the round-3 KPI card design (`8d870aa1`): label on top, 40px value on the sub-line baseline, `rounded-[14px]`, 4px left accent, warning frame, 4-up grid, no icons.
+  - The only difference is the background, now `--ac-grey-100` (the My PI Delegates counter colour, which has a dark-mode value).
+  - The unused `icon`/`iconInk` fields were removed.
+- **Verification:**
+  - `git diff 8d870aa1 -- …/pfm-kpi-cards` shows exactly **one** changed line: the background class. The Reviewer had already passed that design in round 3.
+  - A new Reviewer spawn was not run for a one-class delta on reviewed markup. Recorded here.
+- **Leader re-measure:** PFM jest 88/88. The implementer reports tsc 945, eslint clean, hex grep clean and `ng build` OK.
