@@ -10,11 +10,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { filter, Subscription } from 'rxjs';
 import { environment } from '../../../../../../../environments/environment';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
-import {
-  RESULT_ENTRY_SOURCE_QUERY,
-  RESULT_ENTRY_SOURCE_VALUE_HOME,
-  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
-} from '@shared/constants/result-entry-source';
+import { RESULT_ENTRY_SOURCE_QUERY, isKnownResultEntrySource } from '@shared/constants/result-entry-source';
 
 @Component({
   selector: 'app-version-selector',
@@ -246,13 +242,13 @@ export class VersionSelectorComponent implements OnDestroy {
   editInPlatform() {
     const platformCode = this.cache.getCurrentPlatformCode();
     let url = '';
-    
+
     if (platformCode === PLATFORM_CODES.PRMS) {
       url = this.prmsUrl;
     } else if (platformCode === PLATFORM_CODES.TIP) {
       url = this.tipUrl;
     }
-    
+
     if (url) {
       window.open(url, '_blank', 'noopener,noreferrer');
     }
@@ -270,7 +266,7 @@ export class VersionSelectorComponent implements OnDestroy {
 
   private entrySourceQueryParamRecord(): { [RESULT_ENTRY_SOURCE_QUERY]?: string } {
     const from = this.route.snapshot.queryParamMap.get(RESULT_ENTRY_SOURCE_QUERY);
-    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(from)) {
       return { [RESULT_ENTRY_SOURCE_QUERY]: from };
     }
     return {};

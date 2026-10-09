@@ -1,6 +1,7 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-13 (R-PFM-004, 012, 013, 014)
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { RESULT_ENTRY_SOURCE_QUERY, RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR } from '@shared/constants/result-entry-source';
 import { buildResultLink } from '@shared/utils/result-link.util';
 import { PfmResultRow } from '../../pfm.interfaces';
 import { PfmStatusBadgeComponent } from '../pfm-status-badge/pfm-status-badge.component';
@@ -22,11 +23,13 @@ export class PfmResultRowComponent {
 
   link = computed(() => {
     const r = this.row();
-    return buildResultLink({
+    const base = buildResultLink({
       platform_code: r.platform_code,
       result_official_code: r.official_code,
       result_status_id: r.star_status_id,
       snapshot_years: r.snapshot_years
     });
+    // `from` makes the result breadcrumb start at the monitor queue instead of Projects.
+    return { commands: base.commands, queryParams: { ...base.queryParams, [RESULT_ENTRY_SOURCE_QUERY]: RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR } };
   });
 }

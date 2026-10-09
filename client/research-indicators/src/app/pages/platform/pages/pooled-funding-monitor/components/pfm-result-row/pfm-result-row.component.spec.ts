@@ -38,18 +38,20 @@ function render(over: Partial<PfmResultRow> = {}) {
 describe('PfmResultRowComponent', () => {
   it('View href is /result/STAR-<code> for a non-approved row, and the title links to the same place', () => {
     const { q } = render();
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234');
-    expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234');
+    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+    expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [2023, 2025, 2024] });
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234/general-information?version=2025');
+    const expected = '/result/STAR-1234/general-information?version=2025&from=pfm-monitor';
+    expect(q('pfm-row-view').getAttribute('href')).toBe(expected);
+    expect(q('pfm-row-title').getAttribute('href')).toBe(expected);
   });
 
   it('approved without snapshot years has no version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [] });
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234');
+    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
   it('View is present on out-of-scope and mapping-incomplete rows', () => {

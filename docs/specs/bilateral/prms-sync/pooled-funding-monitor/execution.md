@@ -657,3 +657,35 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - `git diff 59a5cf59 -- …/pfm-kpi-cards` shows only the container grid, the removed `size` sizing, and alignment tweaks (`items-center`, sub-line font). No `<p>` remains.
   - No new Reviewer spawn: the markup was already reviewed and the change is layout-only. Recorded here.
 - **Leader re-measure:** PFM jest 88/88. The implementer reports tsc 945, eslint and hex clean, and `ng build` OK.
+
+#### HITL round 16 (owner, 2026-10-09) — result breadcrumb from the monitor queue → **PASS (code); owner browser check pending**
+
+- **Owner request (verbatim):** "si redireccion al resultado desde queue el breadcrumb debe salir desde monitor queue".
+- **Implementer (sonnet, high, tdd):**
+  - Added `RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR`, `isPfmMonitorEntryFromUrl`, and the `isKnownResultEntrySource` type guard. The guard replaces the 4 hand-written whitelists that carry `from` across in-result navigation:
+    - sidebar ×2
+    - version selector
+    - `goToEvidence`
+  - `pfm-result-row` merges `from=pfm-monitor` into the queryParams of the title and View links.
+  - `section-header`:
+    - added an optional `queryParams` field to `BreadcrumbItem`;
+    - added `breadcrumbForPfmMonitorEntry`, which is checked first and produces *Monitor (`?tab=queue`) › Result*.
+  - K-004: 7 reds observed before implementation.
+  - 4 href assertions were made stricter by adding `from=pfm-monitor`.
+- **Reviewer (opus): STATUS: PASS.**
+  - The other breadcrumbs (Results Center, Home, What's New, Projects) are unchanged; `queryParams` is `undefined`-safe.
+  - The whitelist refactor preserves behaviour, and arbitrary `from` values are still dropped.
+  - `?tab=queue` is accepted by `init()`.
+  - R-PFM-013/014 still hold.
+  - Adding `from` stays within R-PFM-013 scope. Recorded as **DD-PFM-15**.
+  - The OICR resolver gap cannot be reached from the monitor.
+- **Gates (implementer):**
+  - jest: 286 suites, 6822 tests, all passing
+  - tsc: 945 (unchanged)
+  - eslint: clean
+  - ng build: OK
+- **Advisories:**
+  - The breadcrumb link resets scope and filters to the defaults. This is recorded in DD-PFM-15; browser Back keeps the state.
+  - The result-id extraction is now duplicated 3 times.
+  - Prettier whitespace noise in 2 unrelated files.
+- **Unverified (browser):** the click-through, and whether `from` survives section-tab and version switches.

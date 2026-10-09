@@ -224,7 +224,7 @@ describe('SectionHeaderComponent', () => {
 
     expect(actionsService.hideGlobalAlert).toHaveBeenCalled();
     expect(actionsService.showToast).toHaveBeenCalledWith({ severity: 'success', summary: 'Result deleted', detail: 'Result deleted successfully' });
-    expect((routerSpy.navigate as jest.Mock)).toHaveBeenCalledWith(['/results-center']);
+    expect(routerSpy.navigate as jest.Mock).toHaveBeenCalledWith(['/results-center']);
   });
 
   it('should handle unsuccessful delete response', async () => {
@@ -792,6 +792,28 @@ describe('SectionHeaderComponent', () => {
         { label: 'Results Center', route: '/results-center' },
         { label: 'Result ROAR-7', tooltip: 'OICR title' }
       ]);
+    });
+
+    it('should return Monitor → Result when result was opened from the PFM monitor queue (from query)', () => {
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706/general-information?from=pfm-monitor');
+      component['resultTitle'].set('Queue result title');
+
+      const breadcrumb = component.breadcrumb();
+      expect(breadcrumb.map(b => b.label)).toEqual(['Pooled Funding Contribution Monitor', 'Result STAR-1706']);
+      expect(breadcrumb[0].route).toBe('/pooled-funding-contribution-monitor');
+      expect(breadcrumb[0].queryParams).toEqual({ tab: 'queue' });
+      expect(breadcrumb[1].tooltip).toBe('Queue result title');
+    });
+
+    it('should keep the Results Center breadcrumb unchanged (no queryParams) for from=results-center', () => {
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706?from=results-center');
+      component['resultTitle'].set('T');
+
+      const breadcrumb = component.breadcrumb();
+      expect(breadcrumb.map(b => b.label)).toEqual(['Results Center', 'Result STAR-1706']);
+      expect(breadcrumb[0].queryParams).toBeUndefined();
     });
 
     it('should return Home → Result when result was opened from Home (from query)', () => {

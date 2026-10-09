@@ -26,11 +26,7 @@ import { SelectComponent } from '@shared/components/custom-fields/select/select.
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { TooltipModule } from 'primeng/tooltip';
 import { GetInnoDevOutputService } from '@shared/services/control-list/get-innovation-dev-output.service';
-import {
-  RESULT_ENTRY_SOURCE_QUERY,
-  RESULT_ENTRY_SOURCE_VALUE_HOME,
-  RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER
-} from '@shared/constants/result-entry-source';
+import { RESULT_ENTRY_SOURCE_QUERY, isKnownResultEntrySource } from '@shared/constants/result-entry-source';
 import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
 
 /** §6.4 / R-IUP-006 AC.4: the justification is gated on the resolved `level`, never on the id. */
@@ -136,9 +132,7 @@ export function formatInnovationDevLabel(
   return code ? `${code} - ${result.title ?? ''}` : `${result.title ?? ''}`;
 }
 
-export function formatInnovationDevReadiness(
-  readiness: { id?: number; level: number | null; name: string | null } | null | undefined
-): string {
+export function formatInnovationDevReadiness(readiness: { id?: number; level: number | null; name: string | null } | null | undefined): string {
   if (!readiness) return '';
   if (readiness.level !== null && readiness.name !== null) return `Level ${readiness.level} - ${readiness.name}`;
   if (readiness.level !== null) return `Level ${readiness.level}`;
@@ -217,7 +211,7 @@ export default class InnovationUseDetailsComponent {
   readonly formatInnovationDevReadiness = formatInnovationDevReadiness;
 
   body: WritableSignal<GetInnovationUseDetails> = signal(new GetInnovationUseDetails());
-  
+
   descriptionExpanded = signal(false);
 
   enrichmentSuccessForId = signal<number | null>(null);
@@ -852,7 +846,7 @@ export default class InnovationUseDetailsComponent {
     if (version) {
       queryParams['version'] = version;
     }
-    if (from === RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER || from === RESULT_ENTRY_SOURCE_VALUE_HOME) {
+    if (isKnownResultEntrySource(from)) {
       queryParams[RESULT_ENTRY_SOURCE_QUERY] = from;
     }
 

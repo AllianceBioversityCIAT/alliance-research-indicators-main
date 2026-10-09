@@ -170,7 +170,10 @@ describe('PfmProjectGroupComponent', () => {
     store.groupState.set({ P100: { loading: false, error: false } });
     fixture.detectChanges();
     const views = Array.from(el.querySelectorAll<HTMLAnchorElement>('[data-testid="pfm-row-view"]'));
-    expect(views.map(v => v.getAttribute('href'))).toEqual(['/result/STAR-1', '/result/STAR-2/general-information?version=2025']);
+    expect(views.map(v => v.getAttribute('href'))).toEqual([
+      '/result/STAR-1?from=pfm-monitor',
+      '/result/STAR-2/general-information?version=2025&from=pfm-monitor'
+    ]);
     views[0].addEventListener('click', e => e.preventDefault());
     views[0].click();
     expect(el.querySelector('[role="dialog"], p-dialog, p-drawer, dialog')).toBeNull();
