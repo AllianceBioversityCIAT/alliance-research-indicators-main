@@ -2,7 +2,7 @@
 
 - **Module:** bilateral (server only)
 - **Spec id:** 2026-10-pool-funding-update-carryover
-- **Status:** in progress
+- **Status:** done
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -93,7 +93,7 @@ graph TD
 
 ### T-03 — Owner check on Dev (HITL)
 
-- **Status:** pending · **Size:** XS · **Dependencies:** T-02, owner push + Dev deploy
+- **Status:** done · **Size:** XS · **Dependencies:** T-02, owner push + Dev deploy
 - **Requirements:** R-PUC-001 S-1 (end to end), R-PUC-004 S-7
 - **Scope:** owner opens an Approved result with a Pool Funding version (e.g. a 2025 version), clicks Update result, picks 2025 → the live Pool Funding page shows the 2025 alignment, SPs and ToC (when the result is eligible). A non-eligible result without PRMS code stays hidden.
 - **Falsifier:** before deploy, the same steps show an empty live section — that is the baseline the owner compares against.
@@ -102,7 +102,7 @@ graph TD
 - **Consumers:** n/a.
 - **Review:** `skip-eligible` — claim to prove: the owner's observation is the evidence; no code in this task.
 - **Done:**
-  - [ ] Owner confirmation quoted in `execution.md` (what was observed, which result)
+  - [x] Owner confirmation quoted in `execution.md` (what was observed, which result)
 - **Skills:** none
 
 ## 4. Coverage closure (scenario / clause → task)

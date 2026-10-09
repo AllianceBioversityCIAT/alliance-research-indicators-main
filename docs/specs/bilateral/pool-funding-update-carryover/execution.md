@@ -41,3 +41,23 @@
 - **Decisions — execute-time spec edit:** `design.md` §11 **P-5** refuted and amended (2026-10-08): the Dev-sourced baseline has **no** unique index on `result_pool_funding_alignment` (`uq_rpfa_active_result` exists only in the migration). Impact Low as the ledger predicted — D-2 stands; deactivation is what keeps one active alignment. No requirement meaning changed.
 - **spawns:** reviewer#1 — not reported by host (15 tool uses, ~77k tokens), ended fail · reviewer#2 — not reported by host (3 tool uses, ~41k tokens), ended complete
 - **Requirements covered:** R-PUC-001 S-1, S-2 (all clauses), S-4, S-8 · R-PUC-002 S-5 · NFR-PUC-001
+
+### T-03 — Owner check (HITL) — PASS
+
+- **Date:** 2026-10-08
+- **Owner confirmation (verbatim):** "lo veo funcional haz commit"
+- **What it covered:** the owner's own run of the flow described to them — Update result on an approved result whose selected year has a version, Pool Funding data visible and editable on the live version, version left intact. The confirmation does not name the result tested; it covers the observed behavior only (KZ-002).
+- **Review:** `skip-eligible` claim — the owner's observation is the evidence; no code in this task.
+
+## REVIEW_SKIPPED: T-03
+
+| Field | Content |
+| --- | --- |
+| predicate evidence | HITL task with no code; evidence is the owner confirmation above |
+| overrides checked | (a)–(g) evaluated: no code, contract, or data surface touched — none apply |
+| evidence re-run | n/a (manual observation by the owner) |
+| models | — |
+
+## Summary
+
+All 3 tasks closed: T-01 PASS (1 attempt), T-02 PASS (2 attempts), T-03 owner-confirmed. Budget tripwire: ~500 LOC planned vs +793/−40 actual (fixture-heavy), 3 Reviewer verdicts vs ~4 planned. Open for the owner: O-1, O-2, O-3 (design §10).
