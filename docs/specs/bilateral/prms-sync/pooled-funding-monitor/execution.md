@@ -460,3 +460,27 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Leader re-measure:** PFM jest + `app.routes.spec.ts` pass, 13 suites (see the command output in this session). The implementer reports the hex grep and eslint clean and `ng build` OK.
 - **Not reached by any automated check:** rendered contrast in light and dark mode. This is still the owner's HITL check.
 - **Noted for the archive:** My PI Delegates itself has the same dark-mode contrast defect. It is house-wide and out of scope here.
+
+#### HITL round 4 (owner, 2026-10-09) — Results queue restyle → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "estas son las imagenes de refrencia para el diseno de queue, actualmente no esta asi, ajsutalo". The owner attached two mockup images: filters/chips/collapsed groups, and the expanded table.
+- **Implementer (sonnet, high):**
+  - Filters and chips sit in one surface card. The `p-select`s are 52px with 18px text, set via `!` utilities in `styleClass`. Reset is an outlined button, with a divider below the filters.
+  - QUICK VIEWS are pill chips with count badges. The active chip has an info tint, a navy border, a filled navy badge and a check icon.
+  - Each group is its own card:
+    - a mono code chip
+    - the name in 20px navy
+    - a 230×12 bar on a grey track
+    - a warning or success flag pill
+    - a caret
+  - The expanded table has an uppercase header band and a 17px link title with the mono code and type underneath. Badges carry their sub-notes. Each row ends in an outlined View button, the only action.
+  - Badges are 14px medium weight. No tokens were added and no specs were changed.
+  - The mockup's "Request approval", "Complete mapping" and "Sync to PRMS" were deliberately not added, per R-PFM-013/014.
+- **Reviewer:** STATUS: PASS.
+  - R-PFM-010 keeps three non-colour cues.
+  - The T-12 stale guard, T-13 a11y and NFR-PFM-005 are intact.
+  - Contrast of all new pairs is ≥ 4.5:1 in light and dark. The lowest is the dark active chip at about 4.9:1.
+- **Leader re-measure:** PFM jest passes 12 suites, 88/88. The implementer reports tsc at 945, clean greps, clean eslint and a successful `ng build`.
+- **ADVISORY:**
+  - The `p-select` root overrides may not reach the inner Aura label. Check at the HITL; if needed, use `labelStyleClass` or pass-through options.
+  - The title link shows its underline only on hover.

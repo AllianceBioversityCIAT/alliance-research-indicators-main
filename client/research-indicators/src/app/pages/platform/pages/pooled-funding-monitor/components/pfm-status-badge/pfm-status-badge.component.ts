@@ -63,7 +63,7 @@ export class PfmStatusBadgeComponent {
     }
   });
 
-  shapeClasses = computed(() => (this.kind() === 'prms' ? 'rounded-full px-3 py-1' : 'rounded-md px-2 py-0.5'));
+  shapeClasses = computed(() => (this.kind() === 'prms' ? 'rounded-full px-3 py-1' : 'rounded-md px-2.5 py-1'));
 
   spVar = computed(() => (this.kind() === 'sp' ? this.color() || null : null));
 }
