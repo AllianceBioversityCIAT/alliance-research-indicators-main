@@ -643,3 +643,17 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - `git diff 8d870aa1 -- …/pfm-kpi-cards` shows exactly **one** changed line: the background class. The Reviewer had already passed that design in round 3.
   - A new Reviewer spawn was not run for a one-class delta on reviewed markup. Recorded here.
 - **Leader re-measure:** PFM jest 88/88. The implementer reports tsc 945, eslint clean, hex grep clean and `ng build` OK.
+
+#### HITL round 15 (owner, 2026-10-09) — KPI cards as My PI Delegates counters (final) → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "qeu sean igual que los de pi delegates".
+- **Change:** the KPI cards go back to the round-8 counter design that the Reviewer already passed. That design is:
+  - 11px Space Grotesk labels with icons;
+  - an 18px value in our colour, with the sub-line on the same baseline;
+  - `rounded-lg`, `grey-100`, `px-2.5 py-1.5`;
+  - our left accent and warning frame are kept.
+- **One layout fix:** the uneven `flex-[…]` widths and the `max-w-[60rem]` cap, which made labels wrap, are replaced by an equal-width grid: `grid-cols-1 sm:2 xl:4`, full band width.
+- **Verification:**
+  - `git diff 59a5cf59 -- …/pfm-kpi-cards` shows only the container grid, the removed `size` sizing, and alignment tweaks (`items-center`, sub-line font). No `<p>` remains.
+  - No new Reviewer spawn: the markup was already reviewed and the change is layout-only. Recorded here.
+- **Leader re-measure:** PFM jest 88/88. The implementer reports tsc 945, eslint and hex clean, and `ng build` OK.
