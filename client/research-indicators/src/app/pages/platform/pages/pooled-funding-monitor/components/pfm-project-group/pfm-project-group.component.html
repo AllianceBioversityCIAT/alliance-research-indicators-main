@@ -44,7 +44,7 @@
       data-testid="pfm-group-flag"
       >{{ flagLabel() }}</span
     >
-    <i class="pi {{ open() ? 'pi-caret-down' : 'pi-caret-right' }} text-[12px] text-[var(--ac-pfm-neutral-fg)]" aria-hidden="true"></i>
+    <i class="pi shrink-0 !text-[10px] !leading-none text-[var(--ac-pfm-neutral-fg)] {{ open() ? 'pi-chevron-up' : 'pi-chevron-down' }}" aria-hidden="true"></i>
   </button>
 
   @if (open()) {
