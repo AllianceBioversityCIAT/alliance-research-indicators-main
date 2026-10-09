@@ -27,11 +27,11 @@
          No underline: it read as a tab strip, and these are filters on the table
          below, not a change of view. The selected one is marked by a navy-outlined
          pill (with a check) plus a heavier weight, so the state survives without colour. -->
-    <div class="by-project__role-filters flex w-full flex-wrap gap-3 px-4 pt-2 pb-3" role="group"
+    <div class="by-project__role-filters flex w-full flex-wrap gap-3 px-4 pt-2 pb-2" role="group"
       aria-label="Filter projects by your role">
       @for (option of roleFilterOptions; track option.value) {
       <button type="button"
-        class="by-project__role-filter inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid py-1.5 pl-4 pr-2.5 font-['Barlow'] text-[13px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 {{
+        class="by-project__role-filter inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid py-1 pl-4 pr-2.5 font-['Barlow'] text-[13px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 {{
           roleTerm() === option.value
             ? 'border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
             : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
