@@ -466,7 +466,8 @@ export class PrmsOpenSearchService
       const source = sources.get(result.official_code);
       result.status_id = ResultPrmsToStarStatusMapper[Number(source.status_id)];
       result.prms_result_code = result.official_code;
-      result.prms_phase_id = source.phase_id;
+      // `phase_id` is not copied here: the live row keeps only the PRMS
+      // result code. The phase goes on the version (see storePhaseOnVersion).
     }
     return { results, sources };
   }
@@ -525,7 +526,48 @@ export class PrmsOpenSearchService
         this.logger.error(
           `Error versioning PRMS result ${result.prms_result_code}: ${errorMessage}`,
         );
+        continue;
       }
+
+      await this.storePhaseOnVersion(
+        result,
+        sources.get(result.prms_result_code),
+        saved.result_id,
+        saved.result_official_code,
+      );
+    }
+  }
+
+  /**
+   * The PRMS phase belongs to the version, not to the live row: the live row
+   * keeps only `prms_result_code`. Clears any phase an earlier import left on
+   * the live row, then writes the PRMS `phase_id` onto the version just created.
+   */
+  private async storePhaseOnVersion(
+    result: ExternalMappersDto,
+    source: ResultResponseMapper,
+    liveResultId: number,
+    resultOfficialCode: number,
+  ): Promise<void> {
+    const repository = this.dataSource.getRepository(Result);
+    try {
+      await repository.update(liveResultId, { prms_phase_id: null });
+      if (isEmpty(source?.phase_id)) return;
+      await repository.update(
+        {
+          result_official_code: resultOfficialCode,
+          report_year_id: result.createResult.year,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+          is_active: true,
+        },
+        { prms_phase_id: source.phase_id },
+      );
+    } catch (error) {
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Error storing the PRMS phase of result ${result.prms_result_code}: ${errorMessage}`,
+      );
     }
   }
 

@@ -186,8 +186,8 @@ export class ResultResponseMapper {
   public result_code: string;
   public status_id: string;
   public year: string;
-  // PRMS reporting phase. OpenSearch does not return it yet; it is declared now
-  // so the STAR import picks it up as soon as PRMS adds the attribute.
+  // PRMS reporting phase id (not a year). The STAR import stores it on the
+  // result version, never on the live row.
   public phase_id?: number;
   public pdf_link: string;
   public prms_link: string;

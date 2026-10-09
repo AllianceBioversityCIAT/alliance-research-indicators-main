@@ -517,7 +517,7 @@ describe('PrmsOpenSearchService', () => {
       ]);
     });
 
-    it('should carry phase_id into prms_phase_id when PRMS sends it', async () => {
+    it('should not write phase_id onto the live row', async () => {
       onePage();
       prmsRepository.findTemporalResults.mockResolvedValue([
         buildTemporalMapper({ result_code: '1', status_id: '5', phase_id: 6 }),
@@ -527,9 +527,81 @@ describe('PrmsOpenSearchService', () => {
       await service.getDataAsStar({ year: 2025 });
 
       expect(savedResults().map((r) => r.prms_phase_id)).toEqual([
-        6,
+        undefined,
         undefined,
       ]);
+      expect(savedResults().map((r) => r.prms_result_code)).toEqual([1, 2]);
+    });
+
+    it('should store phase_id on the version and clear it on the live row', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '10',
+          status_id: '5',
+          year: '2025',
+          phase_id: 8,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(777, {
+        prms_phase_id: null,
+      });
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(
+        {
+          result_official_code: 5001,
+          report_year_id: 2025,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+          is_active: true,
+        },
+        { prms_phase_id: 8 },
+      );
+      expect(
+        greenCheckRepository.createSnapshot.mock.invocationCallOrder[0],
+      ).toBeLessThan(resultRepoHandle.update.mock.invocationCallOrder[1]);
+    });
+
+    it('should not touch the version phase when PRMS sends none', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '10', status_id: '5' }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).toHaveBeenCalledTimes(1);
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(777, {
+        prms_phase_id: null,
+      });
+    });
+
+    it('should not store the phase when versioning fails', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '10', status_id: '5', phase_id: 8 }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValueOnce({
+        result_id: 777,
+        result_official_code: 5001,
+      });
+      greenCheckRepository.createSnapshot.mockRejectedValueOnce(
+        new Error('SP failed'),
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
     });
 
     it('should version every imported result that was saved', async () => {
