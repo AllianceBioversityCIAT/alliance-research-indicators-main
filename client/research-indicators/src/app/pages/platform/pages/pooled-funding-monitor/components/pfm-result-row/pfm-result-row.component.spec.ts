@@ -42,6 +42,24 @@ describe('PfmResultRowComponent', () => {
     expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
+  it('Code cell shows platform and number; Indicator cell shows type', () => {
+    const { q } = render();
+    expect(q('pfm-row-code-platform').textContent?.trim()).toBe('STAR');
+    expect(q('pfm-row-code-number').textContent?.trim()).toBe('1234');
+    expect(q('pfm-row-code').textContent).toMatch(/STAR\s*1234/);
+    expect(q('pfm-row-indicator').textContent?.trim()).toBe('Innovation development');
+    expect(render({ official_code: 7 }).q('pfm-row-code-number').textContent?.trim()).toBe('007');
+  });
+
+  it('title is clamped to 3 lines, carries the full text as title, and is not underlined at rest', () => {
+    const long = 'Long title '.repeat(60).trim();
+    const { q } = render({ title: long });
+    const t = q('pfm-row-title');
+    expect(t.classList).toContain('line-clamp-3');
+    expect(t.getAttribute('title')).toBe(long);
+    expect(t.classList).toContain('no-underline');
+  });
+
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [2023, 2025, 2024] });
     const expected = '/result/STAR-1234/general-information?version=2025&from=pfm-monitor';
@@ -64,7 +82,7 @@ describe('PfmResultRowComponent', () => {
     expect(q('pfm-row-updated').textContent?.trim()).toBe('03 Oct, 14:05');
     expect(q('pfm-row-pi-line').textContent?.trim()).toBe('Awaiting PI approval');
     expect(q('pfm-row-mapping-note').textContent?.trim()).toBe('Budget shares missing');
-    expect(q('pfm-row-meta').textContent?.trim()).toBe('STAR-1234 · Innovation development');
+    expect(q('pfm-row-meta')).toBeNull();
     expect(el.querySelectorAll('a').length).toBe(2);
     expect(el.querySelector('button')).toBeNull();
     expect(el.textContent).not.toMatch(/Sync|Request approval|Complete mapping/);

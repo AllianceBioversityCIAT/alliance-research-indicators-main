@@ -1,17 +1,30 @@
 <!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-13 -->
-<div class="{{ grid }} border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)] px-6 py-3.5 text-[13px]" data-testid="pfm-result-row">
-  <div class="min-w-0">
+<div class="{{ grid }} border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)] px-6 py-3.5 text-[14px]" data-testid="pfm-result-row">
+  <div class="flex" data-testid="pfm-row-code">
+    <span
+      class="min-w-[58px] max-w-[58px] rounded-l-lg px-2 py-1 text-center text-[13px] font-[600]"
+      data-testid="pfm-row-code-platform"
+      [style.color]="platformColors()?.text"
+      [style.background-color]="platformColors()?.background"
+      >{{ row().platform_code }}</span
+    >
+    <span
+      class="min-w-[43px] rounded-r-lg bg-[var(--ac-pfm-neutral-bg)] px-2 py-1 text-center text-[13px] text-[var(--ac-pfm-neutral-fg)]"
+      data-testid="pfm-row-code-number"
+      >{{ codeNumber() }}</span
+    >
+  </div>
+  <div class="min-w-0 break-words" lang="es">
     <a
-      class="text-[14px] font-medium leading-snug text-[var(--ac-pfm-info-fg)] no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
+      class="block line-clamp-3 text-inherit no-underline hover:underline focus-visible:underline focus-visible:outline focus-visible:outline-2"
       data-testid="pfm-row-title"
+      [attr.title]="fullTitle()"
       [routerLink]="link().commands"
       [queryParams]="link().queryParams"
-      >{{ row().title || row().result_code }}</a
+      >{{ fullTitle() }}</a
     >
-    <p class="m-0 mt-1 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-meta">
-      <span class="font-mono">{{ row().result_code }}</span> · {{ row().type }}
-    </p>
   </div>
+  <div class="min-w-0 break-words" data-testid="pfm-row-indicator">{{ row().type }}</div>
   <div class="flex min-w-0 flex-col items-start gap-1">
     <app-pfm-status-badge kind="star" [value]="row().star_label" />
     <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-pi-line">{{ row().pi_line }}</p>

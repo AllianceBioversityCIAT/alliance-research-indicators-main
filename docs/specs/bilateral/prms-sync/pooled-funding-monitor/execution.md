@@ -708,3 +708,25 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The storage test now cleans up in `finally`.
   - Added a comment that `breadcrumb` reads untracked `sessionStorage`.
 - **Leader re-measure:** jest 38 suites, 509/509 passing. Implementer: tsc 945, eslint clean, build OK.
+
+#### HITL round 18 (owner, 2026-10-09) — result rows in the Results Center layout → **PASS (code + docs); owner re-check pending**
+
+- **Owner (verbatim):** "actualiza como mostramos los result ira la segunda foto, asi es en result center, quiero que sea mismo diseno tamano y tipografia pon un columna para code y indicador".
+- **Implementer (sonnet, high):**
+  - The Code column copies the inline split chip from `results-center-table.component.html` (~L121-137). Colours come from `PLATFORM_COLOR_MAP`, and the number is padded to 3 digits.
+  - Result is the title link (`from`/`version` unchanged), using Results Center typography at 14px, no underline at rest, `line-clamp-3`, and the full title in `title=`.
+  - Indicator is a new column. The meta line was removed.
+  - `PFM_ROW_GRID` now has 8 columns, `min-w-[84rem]`.
+  - K-004: 3 new tests seen red against the old source. One assertion changed: `pfm-row-meta` text → null, now covered by the new Code/Indicator test.
+- **Reviewer round 1: FAIL.**
+  - (1) The chip colours are hex from the shared map, STAR ≈ 3.4:1. This breaks NFR-PFM-003/004.
+  - (2) The column change was not recorded against R-PFM-012.
+- **Leader adjudication:**
+  - Owner explicitly asked for the identical Results Center design. Recorded **DD-PFM-16** as an accepted deviation, fixed house-wide like DD-PFM-14.
+  - Amended the R-PFM-012 column table.
+- **Reviewer round 2: PASS.**
+- **Leader re-measure:** PFM jest 93/93. Implementer: tsc 945, eslint clean, hex grep clean, `ng build` OK.
+- **ADVISORY / follow-up:**
+  - `lang="es"` was copied onto the title cell.
+  - `codeNumber()` returns `'000'` where the Results Center returns `''`. Not reachable for monitored rows.
+  - **Open a house-wide follow-up** for a shared result-code chip with tokens, plus dark-mode values for the `atc-*` house colours. That follow-up owns DD-PFM-14 and DD-PFM-16.

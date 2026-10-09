@@ -330,7 +330,9 @@ Each row SHALL show the columns below. Rows inside a group are ordered: needs at
 
 | Column | Content |
 |---|---|
-| Result | title (link), result code, type |
+| Code | Results Center split chip: platform · official code (DD-PFM-16) |
+| Result | title (link), clamped to 3 lines, full title as tooltip |
+| Indicator | result type (indicator name) |
 | STAR status | colored badge + PI line |
 | Pool funding mapping | colored badge + SP line: "{SP code} {SP name} (primary) · {contributing}". Empty when mapping is *Not started*; "Not reported to PRMS" when out of scope. |
 | PRMS status | pill; "—" when *Not sent*; tooltip = PRMS hint |
