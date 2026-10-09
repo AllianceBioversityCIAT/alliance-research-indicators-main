@@ -107,6 +107,17 @@
     </div>
     </div>
 
+    <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-queue-footer">
+      @if (!stale()) {
+        <p class="m-0" data-testid="pfm-count-line">{{ countLine() }}</p>
+      }
+      <ul class="m-0 ml-auto flex list-none flex-wrap gap-4 p-0" data-testid="pfm-legend" aria-label="PRMS bar colors">
+        @for (l of legend; track l.label) {
+          <li class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm {{ l.dot }}" aria-hidden="true"></span>{{ l.label }}</li>
+        }
+      </ul>
+    </div>
+
     <!-- Groups are never rendered while the queue is stale (NFR-PFM-006) -->
     <div data-testid="pfm-groups-slot">
       @if (store.queueState().error) {
@@ -132,16 +143,5 @@
         </div>
       }
     </div>
-
-    <footer class="flex flex-col gap-2 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-queue-footer">
-      @if (!stale()) {
-        <p class="m-0" data-testid="pfm-count-line">{{ countLine() }}</p>
-      }
-      <ul class="m-0 flex list-none flex-wrap gap-4 p-0" data-testid="pfm-legend" aria-label="PRMS bar colors">
-        @for (l of legend; track l.label) {
-          <li class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm {{ l.dot }}" aria-hidden="true"></span>{{ l.label }}</li>
-        }
-      </ul>
-    </footer>
   </div>
 }

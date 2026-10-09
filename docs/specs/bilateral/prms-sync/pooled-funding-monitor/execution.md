@@ -585,3 +585,14 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The testid and `selectScope('all')` are kept.
 - **Reviewer: STATUS: PASS.** R-PFM-002 and §6.3 hold, and there are no hex values. The button text is at full `warning-fg`, about 6.4:1, which passes AA.
 - **Leader re-measure:** PFM jest 88/88.
+
+#### HITL round 11 (owner, 2026-10-09): count line and legend moved under the filters → **PASS (code); owner re-check pending**
+
+- **Owner request (verbatim):** "esto subelo y ponlo debajo de los filtros". It refers to the count line plus the legend.
+- **Change:**
+  - The block was moved, not duplicated. It now sits directly below the filters/chips card and above the groups.
+  - It is one row, with the count on the left and the legend on the right, and it wraps when space runs out.
+  - The T-12 stale guard, the testids and the R-PFM-015 copy are unchanged.
+- **Reviewer:** STATUS: PASS.
+- **Leader follow-up from the advisory:** the block is no longer at the end of the tab, so the `<footer>` element became a `<div>`. The testid is kept.
+- **Leader re-measure:** PFM jest 88/88.
