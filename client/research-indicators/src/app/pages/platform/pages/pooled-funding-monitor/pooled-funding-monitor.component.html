@@ -12,19 +12,22 @@
     </p>
     @if (piEmpty()) {
       <div
-        class="flex items-center gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+        class="flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
         role="note"
         data-testid="pfm-pi-empty">
-        <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
-          You are not PI of any project contributing to Pool funding
+        <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
+        <div class="flex flex-col items-start">
+          <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+            You are not PI of any project contributing to Pool funding
+          </p>
           <button
             type="button"
-            class="m-0 cursor-pointer border-0 bg-transparent p-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
+            class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
             data-testid="pfm-pi-empty-switch"
             (click)="selectScope('all')">
             View whole portfolio
           </button>
-        </p>
+        </div>
       </div>
     }
   </header>

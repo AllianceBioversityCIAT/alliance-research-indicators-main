@@ -573,3 +573,15 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Reviewer: STATUS: PASS.** R-PFM-002 and §6.3 hold, the testids and logic are intact, and there are no hex values.
 - **Leader re-measure:** PFM jest 88/88. The hex grep is clean. `ng build` completes; its only template warnings come from other components.
 - **ADVISORY (house-wide):** `warning-fg/80` on `warning-surface` is about 4.1:1 for 12.5px text, below AA. Without `/80` it would be about 6.4:1. My PI Delegates has the same notice, so this is covered by DD-PFM-14.
+
+#### HITL round 10 (owner, 2026-10-09) — PI-empty notice: warning icon + outlined button below → **PASS (code); owner re-check pending**
+
+- **Owner request (verbatim):** "ponle un icono de warning y le view hazlo como boton con borde sin fondo y que queda abajo, no al lado del texto que ya tenemos pero todo dentro del warning".
+- **What changed:**
+  - Added an `aria-hidden` `pi-exclamation-triangle` icon, 14px, in `warning-fg/80`.
+  - The container is now `items-start`, with the sentence on top and the button below it, all inside the notice.
+  - The button is outlined in `warning-fg` with no background, `rounded-md px-3 py-1 mt-2`, and a `/10` hover tint.
+  - It has a full focus ring: `outline`, `outline-2`, colour `warning-fg`, about 6.4:1.
+  - The testid and `selectScope('all')` are kept.
+- **Reviewer: STATUS: PASS.** R-PFM-002 and §6.3 hold, and there are no hex values. The button text is at full `warning-fg`, about 6.4:1, which passes AA.
+- **Leader re-measure:** PFM jest 88/88.
