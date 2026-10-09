@@ -5,6 +5,7 @@ import { PfmScope, PfmSpCoverage } from '../../pfm.interfaces';
 @Component({
   selector: 'app-pfm-sp-coverage-card',
   templateUrl: './pfm-sp-coverage-card.component.html',
+  host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmSpCoverageCardComponent {

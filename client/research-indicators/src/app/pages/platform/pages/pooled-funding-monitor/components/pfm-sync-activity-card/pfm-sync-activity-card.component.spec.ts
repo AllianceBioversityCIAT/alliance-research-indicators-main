@@ -47,6 +47,11 @@ describe('PfmSyncActivityCardComponent', () => {
     expect(bar('2026-07')?.className).toContain('min-h-[6px]');
   });
 
+  it('section fills the grid cell (h-full) so both cards share a height', () => {
+    const { el } = render('all');
+    expect(el.querySelector('[data-testid="pfm-sync-card"]')?.className).toContain('h-full');
+  });
+
   // Data binding only: real rendered bar height is a HITL visual check.
   it('binds height = value / max (data binding, not proof of proportion)', () => {
     const { el } = render('all');

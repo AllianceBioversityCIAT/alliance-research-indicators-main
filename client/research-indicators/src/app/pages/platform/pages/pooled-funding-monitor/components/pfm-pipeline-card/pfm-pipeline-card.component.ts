@@ -64,6 +64,7 @@ const GROUP_LABELS: Record<PfmPipelineGroup, string> = { in_star: 'In STAR', in_
   selector: 'app-pfm-pipeline-card',
   imports: [DecimalPipe],
   templateUrl: './pfm-pipeline-card.component.html',
+  host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmPipelineCardComponent {

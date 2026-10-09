@@ -413,3 +413,15 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - `--ac-pfm-month-1` and not-started bars are about 1.3–1.4:1 against their background (non-text).
   - `--ac-pfm-neutral-fg` on white is about 4.4:1 for small labels.
   - Month values are not visible as text.
+
+#### HITL round 2 (owner, 2026-10-09) — equal-height coverage cards → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "sync activity card esta mas pequeno en H que el de al lado, arregla eso".
+- **Cause:** the component hosts were inline, so the `<section>` did not fill its stretched grid cell.
+- **Fix (sonnet):**
+  - The SP, sync and pipeline hosts get `block h-full`, and each section gets `h-full`.
+  - The sync section is a `flex-col` and its chart is `flex-1 min-h-[150px]`. Bars are absolutely positioned inside a `relative flex-1` box.
+  - The zero-month rule is unchanged. One assertion was added (`h-full`).
+- **Reviewer:** STATUS: PASS.
+- **Leader re-measure:** PFM jest gave 12 suites, 88/88 passing.
+- **Not reached:** jsdom does not compute layout. Equal height and non-collapsed bars need a browser check.

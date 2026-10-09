@@ -1,13 +1,13 @@
-<section class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6 md:p-8" data-testid="pfm-sync-card" aria-labelledby="pfm-sync-title">
+<section class="flex h-full flex-col rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-6 md:p-8" data-testid="pfm-sync-card" aria-labelledby="pfm-sync-title">
   <h2 id="pfm-sync-title" class="m-0 text-[20px] font-semibold leading-7 text-[var(--ac-pfm-accent-navy)]">Sync activity</h2>
   <p class="m-0 mt-1 text-[15px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sync-sub">Results pushed to PRMS over the {{ year() }} reporting cycle</p>
   <p class="m-0 mt-6 text-[14px] font-medium uppercase tracking-wide text-[var(--ac-pfm-accent-navy)]">Results synced per month</p>
-  <ul class="m-0 mt-4 grid list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
+  <ul class="m-0 mt-4 grid min-h-[150px] flex-1 list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
     @for (b of bars(); track b.month; let i = $index) {
-      <li class="flex flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
-        <div class="flex h-[150px] w-full items-end">
+      <li class="flex h-full flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
+        <div class="relative w-full flex-1">
           <div
-            class="w-full rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"
+            class="absolute inset-x-0 bottom-0 rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"
             [style.height]="b.height"
             [attr.title]="(b.synced | number) + ' results synced in ' + b.label"
             data-testid="pfm-month-bar"></div>

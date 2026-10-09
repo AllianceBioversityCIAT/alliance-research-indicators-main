@@ -19,6 +19,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
   selector: 'app-pfm-sync-activity-card',
   imports: [DecimalPipe],
   templateUrl: './pfm-sync-activity-card.component.html',
+  host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmSyncActivityCardComponent {
