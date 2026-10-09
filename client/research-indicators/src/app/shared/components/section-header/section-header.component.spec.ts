@@ -806,6 +806,25 @@ describe('SectionHeaderComponent', () => {
       expect(breadcrumb[1].tooltip).toBe('Queue result title');
     });
 
+    it('PFM monitor breadcrumb reopens the remembered scope', () => {
+      sessionStorage.setItem('ari.pfm.lastScope', 'all');
+      try {
+        component['contractId'].set('A132');
+        component['currentUrl'].set('/result/STAR-1706?from=pfm-monitor');
+        expect(component.breadcrumb()[0].queryParams).toEqual({ tab: 'queue', scope: 'all' });
+      } finally {
+        sessionStorage.clear();
+      }
+    });
+
+    it('PFM monitor breadcrumb omits scope when none is remembered', () => {
+      sessionStorage.clear();
+      component['contractId'].set('A132');
+      component['currentUrl'].set('/result/STAR-1706?from=pfm-monitor');
+      expect(component.breadcrumb()[0].queryParams).toEqual({ tab: 'queue' });
+      expect('scope' in (component.breadcrumb()[0].queryParams ?? {})).toBe(false);
+    });
+
     it('should keep the Results Center breadcrumb unchanged (no queryParams) for from=results-center', () => {
       component['contractId'].set('A132');
       component['currentUrl'].set('/result/STAR-1706?from=results-center');

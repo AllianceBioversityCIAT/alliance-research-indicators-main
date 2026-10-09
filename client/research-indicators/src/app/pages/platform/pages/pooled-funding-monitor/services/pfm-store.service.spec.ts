@@ -65,6 +65,34 @@ describe('PfmStoreService', () => {
     router = { navigate: jest.fn().mockResolvedValue(true) };
   });
 
+  describe('remembers the scope for the result breadcrumb', () => {
+    beforeEach(() => sessionStorage.clear());
+
+    it('setScope(all) remembers all', async () => {
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      store.setScope('all');
+      expect(sessionStorage.getItem('ari.pfm.lastScope')).toBe('all');
+    });
+
+    it('init with ?scope=all remembers all', async () => {
+      const store = build({ scope: 'all' });
+      store.init();
+      await new Promise(r => setTimeout(r));
+      expect(sessionStorage.getItem('ari.pfm.lastScope')).toBe('all');
+    });
+
+    it('init without ?scope= keeps the default mine and remembers it', async () => {
+      sessionStorage.setItem('ari.pfm.lastScope', 'all');
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+      expect(store.scope()).toBe('mine');
+      expect(sessionStorage.getItem('ari.pfm.lastScope')).toBe('mine');
+    });
+  });
+
   it('summary error leaves queue data intact (R-PFM-016)', async () => {
     api.GET_PfmSummary.mockRejectedValue(new Error('boom'));
     const store = build();

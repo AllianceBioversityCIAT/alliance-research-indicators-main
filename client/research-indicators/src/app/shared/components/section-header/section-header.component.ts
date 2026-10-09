@@ -15,6 +15,7 @@ import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { DownloadOicrTemplateComponent } from '../download-oicr-template/download-oicr-template.component';
 import { RolesService } from '@shared/services/cache/roles.service';
+import { lastPfmScope } from '@shared/utils/pfm-last-scope.util';
 import { isHomeEntryFromUrl, isPfmMonitorEntryFromUrl, isResultsCenterEntryFromUrl } from '@shared/constants/result-entry-source';
 import { WhatsNewService } from '@platform/pages/whats-new/services/whats-new.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
@@ -303,6 +304,13 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     return undefined;
   }
 
+  /** Back to the queue tab, in the scope the user was viewing (omitted when none is remembered). */
+  // Reads sessionStorage, which signals do not track: `breadcrumb` stays fresh only because it recomputes on every currentUrl change.
+  private pfmMonitorQueryParams(): Record<string, string> {
+    const scope = lastPfmScope();
+    return scope ? { tab: 'queue', scope } : { tab: 'queue' };
+  }
+
   private breadcrumbForPfmMonitorEntry(fullUrl: string): BreadcrumbItem[] | undefined {
     if (this.isResultPage() && isPfmMonitorEntryFromUrl(fullUrl)) {
       const pathOnly = fullUrl.split(/[?#]/)[0];
@@ -310,7 +318,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
       const resultId = segs[0] === 'result' && segs.length >= 2 ? segs[1] : '';
       if (resultId) {
         return [
-          { label: 'Pooled Funding Contribution Monitor', route: '/pooled-funding-contribution-monitor', queryParams: { tab: 'queue' } },
+          { label: 'Pooled Funding Contribution Monitor', route: '/pooled-funding-contribution-monitor', queryParams: this.pfmMonitorQueryParams() },
           { label: `Result ${resultId}`, tooltip: this.resultTitle() }
         ];
       }

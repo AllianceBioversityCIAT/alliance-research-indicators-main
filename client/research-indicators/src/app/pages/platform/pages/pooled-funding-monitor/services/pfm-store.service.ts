@@ -7,6 +7,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ApiService } from '@services/api.service';
+import { rememberPfmScope } from '@shared/utils/pfm-last-scope.util';
 import {
   PFM_SCOPES,
   PFM_TABS,
@@ -61,11 +62,13 @@ export class PfmStoreService {
     const tab = params.get('tab');
     if ((PFM_SCOPES as readonly string[]).includes(scope ?? '')) this.scope.set(scope as PfmScope);
     if ((PFM_TABS as readonly string[]).includes(tab ?? '')) this.tab.set(tab as PfmTab);
+    rememberPfmScope(this.scope());
     void this.loadSummary();
     void this.loadQueue();
   }
 
   setScope(scope: PfmScope): void {
+    rememberPfmScope(scope);
     if (scope === this.scope()) return;
     this.scope.set(scope);
     this.syncUrl();

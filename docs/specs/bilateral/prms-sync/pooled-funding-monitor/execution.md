@@ -689,3 +689,22 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The result-id extraction is now duplicated 3 times.
   - Prettier whitespace noise in 2 unrelated files.
 - **Unverified (browser):** the click-through, and whether `from` survives section-tab and version switches.
+
+#### HITL round 17 (owner, 2026-10-09): breadcrumb reopens the scope the user came from → **PASS (code); owner browser check pending**
+
+- **Owner (verbatim):** "pero si viene del all debe quedar ahi y si vine del mine pues ahi".
+- **Change** (implementer sonnet, high, tdd):
+  - New `shared/utils/pfm-last-scope.util.ts`, `rememberPfmScope` / `lastPfmScope`: `sessionStorage` key `ari.pfm.lastScope`, try/catch, validated against `PFM_SCOPES`.
+  - The store remembers the effective scope in `init()` and in `setScope`. `init()` still defaults to `mine` (R-PFM-002).
+  - `section-header` sends `{tab:'queue', scope}` only when a scope is stored.
+  - DD-PFM-15 updated.
+- **K-004 reds:** util module missing; 3 store tests; 1 section-header test. "Omits scope when none stored" was not seen red; it is a guard.
+- **Reviewer: STATUS: PASS.**
+  - Sidebar default, scope switch, storage safety and validation are all intact.
+  - Edge cases noted:
+    - The last scope viewed wins over the scope the result was opened from, after a Back-Back sequence.
+    - A result opened in a new `noopener` tab gets no stored scope, so the default applies.
+- **Leader follow-up** (advisories, mechanical):
+  - The storage test now cleans up in `finally`.
+  - Added a comment that `breadcrumb` reads untracked `sessionStorage`.
+- **Leader re-measure:** jest 38 suites, 509/509 passing. Implementer: tsc 945, eslint clean, build OK.
