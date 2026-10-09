@@ -1,13 +1,13 @@
-<ul class="m-0 grid list-none grid-cols-2 gap-3 p-0 xl:grid-cols-4" data-testid="pfm-kpi-cards">
+<ul class="m-0 grid list-none grid-cols-2 gap-4 p-0 xl:grid-cols-4" data-testid="pfm-kpi-cards">
   @for (c of cards(); track c.key) {
     <li
-      class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] border-l-4 bg-[var(--ac-pfm-surface)] px-4 py-3 {{ c.accent }}"
+      class="flex flex-col gap-2 rounded-[14px] border border-solid border-l-4 bg-[var(--ac-pfm-surface)] px-5 py-4 {{ c.accent }} {{ c.frame }}"
       [attr.data-testid]="'pfm-kpi-' + c.key">
-      <p class="m-0 text-[12.5px] font-medium leading-4 text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-label">{{ c.label }}</p>
-      <p class="m-0 mt-1 text-[28px] font-semibold leading-8 tabular-nums {{ c.ink }}" data-testid="pfm-kpi-value">
-        {{ c.value.toLocaleString('en-US') }}
-      </p>
-      <p class="m-0 mt-0.5 text-[12px] leading-4 text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-sub">{{ c.sub }}</p>
+      <p class="m-0 font-['Barlow'] text-[12px] font-semibold uppercase leading-4 tracking-[0.1em] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-label">{{ c.label }}</p>
+      <div class="mt-auto flex items-baseline gap-3">
+        <span class="font-['Barlow'] text-[40px] font-bold leading-none tabular-nums {{ c.ink }}" data-testid="pfm-kpi-value">{{ c.value.toLocaleString('en-US') }}</span>
+        <span class="font-['Barlow'] text-[14px] leading-5 text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-kpi-sub">{{ c.sub }}</span>
+      </div>
     </li>
   }
 </ul>

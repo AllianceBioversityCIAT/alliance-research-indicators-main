@@ -2,27 +2,27 @@
 <!-- Read-only page (R-PFM-014): no sync controls, no "PRMS sync" label, two tabs only. Tokens only (NFR-PFM-003). -->
 <div class="flex flex-col gap-4 px-[24px] pb-8 pt-[8px] md:px-[28px] md:pt-[20px]" data-testid="pfm-page">
   <header class="flex flex-col gap-1">
-    <h1 class="m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px] text-[var(--ac-primary-blue-300)]">
+    <h1 class="m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px] text-[var(--ac-pfm-accent-navy)]">
       Pooled Funding Contribution Monitor
     </h1>
-    <p class="m-0 max-w-[60rem] py-1 font-['Barlow'] text-[15px] leading-[20px] text-[var(--ac-pfm-neutral-fg)]">
+    <p class="m-0 max-w-[1100px] text-[var(--ac-pfm-neutral-fg)] py-2 font-['Barlow'] text-[15px] font-normal leading-[20px]">
       Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
     </p>
   </header>
 
-  <div class="flex flex-wrap items-center gap-3">
-    <span class="text-[13px] font-medium text-[var(--ac-pfm-neutral-fg)]" id="pfm-scope-label">Viewing</span>
+  <div class="flex flex-wrap items-center gap-4">
+    <span class="text-[var(--ac-pfm-neutral-fg)] font-['Barlow'] text-[12px] font-semibold uppercase tracking-[0.12em]" id="pfm-scope-label">Viewing</span>
     <div
-      class="inline-flex rounded-lg border border-solid border-[color:var(--ac-pfm-neutral-bg)] p-0.5"
+      class="inline-flex gap-1 rounded-full border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] p-1"
       role="group"
       aria-labelledby="pfm-scope-label">
       @for (s of scopes; track s.value) {
         <button
           type="button"
-          class="cursor-pointer rounded-md border-0 px-3 py-1.5 text-[13px] font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="cursor-pointer rounded-full border-0 px-5 py-2 font-['Barlow'] text-[14px] font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             store.scope() === s.value
-              ? 'bg-[var(--ac-pfm-info-bg)] text-[var(--ac-pfm-info-fg)] font-semibold'
-              : 'bg-transparent text-[var(--ac-pfm-neutral-fg)]'
+              ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]'
+              : 'bg-transparent text-[var(--ac-pfm-accent-navy)]'
           }}"
           [attr.aria-pressed]="store.scope() === s.value"
           [attr.data-testid]="'pfm-scope-' + s.value"
@@ -74,15 +74,15 @@
       }
     }
 
-    <div class="flex gap-6 border-0 border-b border-solid border-[color:var(--ac-pfm-surface-border)]" role="tablist" aria-label="Monitor sections">
+    <div class="flex items-end gap-0 border-0 border-b border-solid border-[color:var(--ac-grey-200)] px-2" role="tablist" aria-label="Monitor sections">
       @for (t of tabs; track t.value; let i = $index) {
         <button
           type="button"
           role="tab"
-          class="-mb-px cursor-pointer border-0 border-b-[3px] border-solid bg-transparent px-1 py-3 text-[16px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="-mb-px flex cursor-pointer items-center border-0 border-b-2 border-solid bg-transparent px-5 py-3 font-['Barlow'] text-[14px] font-semibold leading-none transition-all duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             store.tab() === t.value
-              ? 'border-b-[color:var(--ac-pfm-info-fg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
-              : 'border-b-transparent font-medium text-[var(--ac-pfm-neutral-fg)]'
+              ? 'border-b-[color:var(--ac-pfm-info-fg)] text-[color:var(--ac-pfm-info-fg)]'
+              : 'border-b-transparent text-[color:var(--ac-pfm-neutral-fg)]'
           }}"
           [id]="'pfm-tab-' + t.value"
           [attr.aria-selected]="store.tab() === t.value"

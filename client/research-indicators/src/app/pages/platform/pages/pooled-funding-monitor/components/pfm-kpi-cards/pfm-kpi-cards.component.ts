@@ -9,6 +9,7 @@ interface KpiCard {
   sub: string;
   accent: string;
   ink: string;
+  frame: string;
 }
 
 @Component({
@@ -29,7 +30,8 @@ export class PfmKpiCardsComponent {
         value: k.projects,
         sub: this.scope() === 'mine' ? 'where you are PI' : `of ${k.projects_total.toLocaleString('en-US')} in portfolio`,
         accent: 'border-l-[color:var(--ac-pfm-info-fg)]',
-        ink: 'text-[var(--ac-pfm-info-fg)]'
+        ink: 'text-[var(--ac-pfm-info-fg)]',
+        frame: 'border-[color:var(--ac-pfm-surface-border)]'
       },
       {
         key: 'monitored',
@@ -37,7 +39,8 @@ export class PfmKpiCardsComponent {
         value: k.monitored,
         sub: 'can be mapped and synced',
         accent: 'border-l-[color:var(--ac-pfm-accent-navy)]',
-        ink: 'text-[var(--ac-grey-900)]'
+        ink: 'text-[var(--ac-pfm-accent-navy)]',
+        frame: 'border-[color:var(--ac-pfm-surface-border)]'
       },
       {
         key: 'need_attention',
@@ -45,7 +48,8 @@ export class PfmKpiCardsComponent {
         value: k.need_attention,
         sub: 'draft, pending mapping or pending sync',
         accent: 'border-l-[color:var(--ac-pfm-seg-pending)]',
-        ink: 'text-[var(--ac-pfm-warning-fg)]'
+        ink: 'text-[var(--ac-pfm-warning-fg)]',
+        frame: 'border-[color:var(--ac-pfm-warning-border)]'
       },
       {
         key: 'synced',
@@ -53,7 +57,8 @@ export class PfmKpiCardsComponent {
         value: k.synced,
         sub: `of ${k.in_prms_scope.toLocaleString('en-US')} in PRMS scope`,
         accent: 'border-l-[color:var(--ac-pfm-seg-approved)]',
-        ink: 'text-[var(--ac-pfm-success-fg)]'
+        ink: 'text-[var(--ac-pfm-success-fg)]',
+        frame: 'border-[color:var(--ac-pfm-surface-border)]'
       }
     ];
   });

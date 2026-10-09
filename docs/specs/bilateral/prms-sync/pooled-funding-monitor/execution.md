@@ -425,3 +425,38 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Reviewer:** STATUS: PASS.
 - **Leader re-measure:** PFM jest gave 12 suites, 88/88 passing.
 - **Not reached:** jsdom does not compute layout. Equal height and non-collapsed bars need a browser check.
+
+#### HITL round 3 (owner, 2026-10-09) — header, scope toggle, KPI cards, tabs → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "ajusta el diseno y colores de texto toma como ejemplo My PI Delegates en cuanto colores y tamano y diseno de tabs, ademas la segunda foto es la referencia que te pase".
+- **What was taken from where:**
+  - **From My PI Delegates:** the title and subtitle sizes and weights (18px semibold / 15px) and the tab-strip markup (`px-5 py-3 border-b-2 -mb-px`, 14px semibold).
+  - **From the mockup:** the subtitle `max-w-[1100px]`, the "VIEWING" uppercase label, and a segmented pill toggle.
+  - **KPI cards, also from the mockup:**
+    - surface + 14px radius + 4px left accent
+    - uppercase muted label
+    - 40px value on the same baseline as its sub-line
+    - a warning frame on *Need attention*
+    - a navy "eligible" value
+  - **Removed per R-PFM-014:** no Sync / "PRMS sync" element.
+- **Review, FAIL:** the borrowed house tokens have no dark-mode values.
+  - active tab and focus ring: ≈ 1.8:1
+  - h1: ≈ 1.05:1
+  - `--ac-grey-600` in light: ≈ 3.1:1
+  - `hover:bg-white/60` is not a token
+  - These violate NFR-PFM-004, C-4 and NFR-PFM-003.
+- **Leader decision:** keep the My PI Delegates layout and sizes, but swap colours to PFM tokens that look nearly identical in light mode and stay legible in dark.
+  - h1 → `accent-navy`
+  - active tab, border and focus → `info-fg`
+  - muted text → `neutral-fg`
+  - hover → `neutral-bg`
+  - active toggle → `accent-navy` bg with `surface` text
+  - The light `--ac-pfm-neutral-fg` was darkened from #6b7a89 to #5a6878 (≈ 5.6:1 on white). This closes the contrast advisory that had been open since T-06.
+- **Review, PASS.** Measured contrast:
+  - h1: 13:1 light / 6:1 dark
+  - active tab: 8:1 / 10:1
+  - muted text: 8:1 dark
+  - All attributes in place: tab a11y, `aria-pressed`, R-PFM-005 and R-PFM-014. No spec changes.
+- **Leader re-measure:** PFM jest + `app.routes.spec.ts` pass, 13 suites (see the command output in this session). The implementer reports the hex grep and eslint clean and `ng build` OK.
+- **Not reached by any automated check:** rendered contrast in light and dark mode. This is still the owner's HITL check.
+- **Noted for the archive:** My PI Delegates itself has the same dark-mode contrast defect. It is house-wide and out of scope here.
