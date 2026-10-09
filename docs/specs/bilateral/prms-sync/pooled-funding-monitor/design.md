@@ -323,6 +323,7 @@ None. No CLARISA, AGRESSO, PRMS, socket, queue or cron involvement. Reads only t
 | DD-PFM-11 | 2026-10-08 | Sidebar PI section renders when `piOptions().length > 0`; each item keeps its own visibility rule | A Center Admin who is PI of nothing must still reach the monitor; *My PI Delegates* keeps its backend check |
 | DD-PFM-12 | 2026-10-08 | OQ-6 → page gated by `POOL_FUNDING_SECTION_ENABLED`; OQ-7 → all reporting years, no year filter | Defaults accepted with the requirements |
 | DD-PFM-13 | 2026-10-09 | HITL visual rework: the coverage tab follows the owner's target screenshot. Cards get their own surface (`--ac-pfm-surface`/`-surface-border`); the month ramp uses `--ac-pfm-month-1..6`; stage notes are not visible text (tooltip + sr-only) | Owner (Daniela Pino): "debe ser como la primera foto". Amends R-PFM-006 note clause |
+| DD-PFM-14 | 2026-10-09 | HITL: the page header (title + description) reuses My PI Delegates' exact markup and house classes `atc-primary-blue-600` / `atc-grey-600` | Owner: "mismo margenes, padding, tamano y color de texto de pi delagtes". **Accepted deviation from NFR-PFM-004:** these house tokens have no dark-mode values (h1 ≈ 1.05:1 in dark) and `atc-grey-600` is ≈ 3.1:1 in light; same defect as My PI Delegates, to be fixed house-wide, not per page |
 
 **Reversion challenge (Step 2.3).** No decision removes delivered behavior. DD-PFM-11 *widens* when the PI section header renders. Challenge — "what does showing the header without *My PI Delegates* break?":
 - The `piDelegatesGuard` route check is unchanged.

@@ -538,3 +538,12 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY:**
   - The KPI cards now sit on the same surface as the band. Only a 1px border (about 1.2:1) plus the left accent separates them.
   - If the owner finds they blend in, giving the cards a light grey background would be a card-style change, which needs owner OK (round 5 said "no modifiques estilos de las cards").
+
+#### HITL round 7 (owner, 2026-10-09) — header identical to My PI Delegates → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "el titulo de Pooled Funding Contribution Monitor esta mas arriba que el de pi delegates, debe ser lo mismo, mismo margenes, padding, tamano y color de texto de pi delagtes".
+- **Cause:** the PFM header had `pt-[1px]`, while My PI Delegates has `pt-[9px] pb-[18px]`.
+- **Fix:** the header now copies `my-pi-delegates.component.html` L18–25 exactly, including the house colours `atc-primary-blue-600` and `atc-grey-600`. It was moved out of the padded wrapper so the gutters are not doubled. The band keeps the same `pt-[8px] sm:pt-[12px] md:pt-[20px]` as the My PI Delegates page wrapper, so the vertical offsets match.
+- **Owner decision DD-PFM-14:** the house colours are an accepted deviation from NFR-PFM-004. They have no dark-mode values, and they share My PI Delegates' defect, which is to be fixed house-wide.
+- **Reviewer: STATUS: PASS.** The markup is identical, there are no doubled gutters, and the attributes and PI-empty logic are intact.
+- **Leader re-measure:** PFM jest gave 12 suites and 88/88.
