@@ -560,3 +560,16 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - In Tailwind v4 the left accent wins over the general border.
   - R-PFM-005 copy and the KZ-001 testids are intact. There is no hex.
 - **Leader follow-up (mechanical, from the advisory):** the label `<p>` sat inside a `<span>`, which is invalid HTML. Changed it to `<span>`, matching My PI Delegates; the testid is kept. PFM jest re-run: 12 suites, 88/88.
+
+#### HITL round 9 (owner, 2026-10-09) — PI-empty state as My PI Delegates notice → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "ese warnign ponlo debajo de la descripcion de la seccion y usa el mismo diseno de watnign pero sin icono de pi delgates".
+- **Change:**
+  - The PI-empty state moved into the header, directly under the description.
+  - It now copies the My PI Delegates admin-notice classes (left amber rule, warning surface, 12.5px semibold `warning-fg/80`), without the icon.
+  - The R-PFM-002 copy is unchanged.
+  - "View whole portfolio" is kept, as design §6.3 requires. It is now an inline underlined text button with the same testid and a focus ring.
+  - The logic that hides the KPIs, tabs and panels is unchanged.
+- **Reviewer: STATUS: PASS.** R-PFM-002 and §6.3 hold, the testids and logic are intact, and there are no hex values.
+- **Leader re-measure:** PFM jest 88/88. The hex grep is clean. `ng build` completes; its only template warnings come from other components.
+- **ADVISORY (house-wide):** `warning-fg/80` on `warning-surface` is about 4.1:1 for 12.5px text, below AA. Without `/80` it would be about 6.4:1. My PI Delegates has the same notice, so this is covered by DD-PFM-14.

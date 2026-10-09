@@ -10,6 +10,23 @@
     <p class="atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
       Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
     </p>
+    @if (piEmpty()) {
+      <div
+        class="flex items-center gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+        role="note"
+        data-testid="pfm-pi-empty">
+        <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+          You are not PI of any project contributing to Pool funding
+          <button
+            type="button"
+            class="m-0 cursor-pointer border-0 bg-transparent p-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
+            data-testid="pfm-pi-empty-switch"
+            (click)="selectScope('all')">
+            View whole portfolio
+          </button>
+        </p>
+      </div>
+    }
   </header>
 
   <div class="flex flex-col gap-4 px-[24px] pb-4 md:px-[28px]">
@@ -37,18 +54,7 @@
   </div>
 
   @if (piEmpty()) {
-    <section
-      class="flex flex-col items-start gap-3 rounded-lg border border-solid border-[color:var(--ac-pfm-warning-border)] bg-[var(--ac-pfm-warning-bg)] p-5"
-      data-testid="pfm-pi-empty">
-      <p class="m-0 text-[15px] font-semibold text-[var(--ac-pfm-warning-fg)]">You are not PI of any project contributing to Pool funding</p>
-      <button
-        type="button"
-        class="cursor-pointer rounded-md border border-solid border-[color:var(--ac-pfm-warning-fg)] bg-transparent px-3 py-1.5 text-[13px] font-semibold text-[var(--ac-pfm-warning-fg)] focus-visible:outline focus-visible:outline-2"
-        data-testid="pfm-pi-empty-switch"
-        (click)="selectScope('all')">
-        View whole portfolio
-      </button>
-    </section>
+    <!-- PI-empty notice moved into the header (see header) -->
   } @else {
     <!-- KPI cards: share the summary request, so they share its loading / error state -->
     @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
