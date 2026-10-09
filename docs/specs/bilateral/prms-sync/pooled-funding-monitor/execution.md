@@ -521,3 +521,20 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY:**
   - The View link and the toggle buttons are about 26–28px tall. That still meets 24px, but check it by touch at the HITL.
   - The page background stays `--ac-background`. My PI Delegates uses a white page instead; this was not changed so the card surfaces stay the same.
+
+#### HITL round 6 (owner, 2026-10-09) — white header band like My PI Delegates → **PASS (code); owner re-check pending**
+
+- **Owner (verbatim):** "pero esto tenias que hacerlo cmo pi delgates, es decir con fondo blanco y asi".
+- **Implementer (sonnet, high):**
+  - New `pfm-band` (`bg-[var(--ac-pfm-surface)]`) using the My PI Delegates paddings. It holds the title, subtitle, toggle, KPI cards and tab strip.
+  - The panels sit in a `border border-t-0 border-[color:var(--ac-grey-200)] p-4` well on the grey page.
+  - The PI-empty logic was split into three equivalent `@if` blocks.
+  - Only one file changed.
+- **Reviewer: STATUS: PASS.**
+  - Structure only. All testids, roles and aria are intact.
+  - R-PFM-002 renders the same as before.
+  - Tokens have dark values, and there is no hex.
+- **Leader re-measure:** PFM jest 12 suites, 88/88.
+- **ADVISORY:**
+  - The KPI cards now sit on the same surface as the band. Only a 1px border (about 1.2:1) plus the left accent separates them.
+  - If the owner finds they blend in, giving the cards a light grey background would be a card-style change, which needs owner OK (round 5 said "no modifiques estilos de las cards").

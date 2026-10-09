@@ -1,6 +1,9 @@
 <!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09 -->
 <!-- Read-only page (R-PFM-014): no sync controls, no "PRMS sync" label, two tabs only. Tokens only (NFR-PFM-003). -->
-<div class="flex flex-col gap-4 px-[24px] pb-8 pt-[8px] md:px-[28px] md:pt-[20px]" data-testid="pfm-page">
+<div class="flex flex-col pb-8" data-testid="pfm-page">
+  <!-- White band (as My PI Delegates): header, scope, KPIs and tab strip on the surface; panels below on the page background -->
+  <div class="flex flex-col bg-[var(--ac-pfm-surface)] pt-[8px] sm:pt-[12px] md:pt-[20px]" data-testid="pfm-band">
+  <div class="flex flex-col gap-4 px-[24px] pb-4 md:px-[28px]">
   <header class="flex w-full max-w-[60rem] flex-col gap-[4px] pt-[1px]">
     <h1 class="m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px] text-[var(--ac-pfm-accent-navy)]">
       Pooled Funding Contribution Monitor
@@ -73,6 +76,10 @@
         <app-pfm-kpi-cards [kpis]="summary.kpis" [scope]="store.scope()" />
       }
     }
+  }
+  </div>
+
+  @if (!piEmpty()) {
 
     <div class="flex items-end gap-0 border-0 border-b border-solid border-[color:var(--ac-grey-200)] px-2" role="tablist" aria-label="Monitor sections">
       @for (t of tabs; track t.value; let i = $index) {
@@ -96,6 +103,11 @@
       }
     </div>
 
+  }
+  </div>
+
+  @if (!piEmpty()) {
+  <div class="border border-t-0 border-solid border-[color:var(--ac-grey-200)] p-4">
     @if (store.tab() === 'coverage') {
       <div role="tabpanel" id="pfm-panel-coverage" aria-labelledby="pfm-tab-coverage" tabindex="0" data-testid="pfm-panel-coverage">
         @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
@@ -137,5 +149,6 @@
         }
       </div>
     }
+  </div>
   }
 </div>
