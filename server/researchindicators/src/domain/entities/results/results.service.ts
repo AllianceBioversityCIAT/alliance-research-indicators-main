@@ -763,6 +763,7 @@ export class ResultsService {
       result_official_code: true,
       report_year_id: true,
       result_status_id: true,
+      updated_at: true,
     };
     const where = {
       result_official_code: resultCode,

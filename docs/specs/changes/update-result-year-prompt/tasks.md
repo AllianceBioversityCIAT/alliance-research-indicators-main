@@ -38,7 +38,7 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
 
 ### T-01 — `findResultVersions` returns `updated_at`
 
-- **Status:** [ ] · **Size:** XS · **Dependencies:** none
+- **Status:** [x] · **Size:** XS · **Dependencies:** none
 - **Requirements:** R-URP-004 (S-9: field added; BUT nothing removed or renamed), NFR-URP-002
 - **Design:** §5, §6, D-6, P-4, P-5
 - **Scope:** `results.service.ts` `findResultVersions`, adding `updated_at: true` to the shared `select` constant. Nothing else.
@@ -49,9 +49,9 @@ T-01 (server) and T-02 (client) touch different packages. They are safe to edit 
 - **Consumers:** `results.controller.spec.ts` (mocks `findResultVersions`), `results.service.spec.ts`; client consumers per P-5 are additive-safe.
 - **Review:** `checklist` — one-line additive select change.
 - **Done:**
-  - [ ] Test green; falsifier observed red, then reverted
-  - [ ] `npx eslint` + `tsc` clean on the changed files
-  - [ ] Full server suite green
+  - [x] Test green; falsifier observed red, then reverted
+  - [x] `npx eslint` + `tsc` clean on the changed files
+  - [x] Full server suite green
 - **Skills:** `nestjs-expert`
 
 ### T-02 — Shared global alert: `infoCard`, `excludeYears` pipe, in-place swap
