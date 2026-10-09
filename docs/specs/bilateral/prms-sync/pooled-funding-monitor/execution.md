@@ -596,3 +596,19 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Reviewer:** STATUS: PASS.
 - **Leader follow-up from the advisory:** the block is no longer at the end of the tab, so the `<footer>` element became a `<div>`. The testid is kept.
 - **Leader re-measure:** PFM jest 88/88.
+
+#### HITL round 12 (owner, 2026-10-09) — phantom empty scroll area → **fixed (code); owner browser check pending**
+
+- **Owner report (verbatim):** "puedo hacer un scroll en la pnatalla donde no hay nada, soluciona ese error". Screenshots show a viewport-sized empty grey area below the last project group.
+- **Root cause (implementer, sonnet, `systematic-debugging`; verified from code and CSS rules):**
+  - The platform shell `.grid-container` is `position: relative; height: 100vh`, while the actual scroller `.content` (`overflow-y: auto`) is not positioned.
+  - The monitor has `sr-only` elements (Tailwind v4 makes them `position: absolute`) with no positioned ancestor between them and the scroller: 43 group-header summaries, the stage-tile notes and the month values.
+  - Their containing block was therefore `.grid-container`, which sits outside the scroller. Laid out at their static positions deep in the content, they overflowed the shell and produced document-level scroll space.
+  - My PI Delegates has no `sr-only`/`absolute` elements, so it does not show the problem.
+- **Ruled out:** `p-select appendTo="body"` (closed overlays do not render), the page `pb-8`, the `h-full`/`flex-1` chains, the min-heights, and the sync bars (their parent was already `relative`).
+- **Fix:** `relative` added to the 3 direct containers (group header button, stage tile `li`, month column `li`). The change is additive and touches no visuals, testids or aria.
+- **Review:** the 3-token diff was read in full by the Leader. A separate Reviewer spawn was not run for a class-only additive change; this is recorded honestly here.
+- **Gates:**
+  - PFM jest 88/88 (Leader re-measure). The implementer reports eslint clean, hex grep clean and `ng build` OK.
+  - **No automated gate can see scroll height (jsdom does no layout).** The owner's browser check is the only verification.
+- **Out of scope, noted:** other pages under the same shell that use `sr-only` without a positioned ancestor could show the same symptom.

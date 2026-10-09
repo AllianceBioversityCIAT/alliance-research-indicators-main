@@ -4,7 +4,7 @@
   <p class="m-0 mt-5 text-[11px] font-medium uppercase tracking-wide text-[var(--ac-pfm-accent-navy)]">Results synced per month</p>
   <ul class="m-0 mt-4 grid min-h-[150px] flex-1 list-none grid-cols-6 gap-3 p-0" data-testid="pfm-sync-bars">
     @for (b of bars(); track b.month; let i = $index) {
-      <li class="flex h-full flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
+      <li class="relative flex h-full flex-col items-center" [attr.data-testid]="'pfm-month-' + b.month">
         <div class="relative w-full flex-1">
           <div
             class="absolute inset-x-0 bottom-0 rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"

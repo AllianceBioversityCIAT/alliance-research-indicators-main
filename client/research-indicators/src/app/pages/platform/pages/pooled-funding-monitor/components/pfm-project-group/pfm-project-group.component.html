@@ -4,7 +4,7 @@
   [attr.data-testid]="'pfm-group-' + group().code">
   <button
     type="button"
-    class="flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-3 border-0 bg-transparent px-6 py-4 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+    class="relative flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-3 border-0 bg-transparent px-6 py-4 text-left transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
     data-testid="pfm-group-toggle"
     [attr.aria-expanded]="open()"
     [attr.aria-controls]="'pfm-group-body-' + group().code"
