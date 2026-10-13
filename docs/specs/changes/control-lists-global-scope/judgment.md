@@ -79,3 +79,29 @@ Requester decision (2026-10-13): treat **J-1 as severe** and correct it together
 | S-5 | Separate write validator → 400; A13 → 404; `PortfoliosService` no longer injected (D-CLG-13) |
 | S-6 | `family.md` F-2/F-3 amended for value applicability |
 | S-7 | `refreshPortfolioSummaries` listed for removal |
+
+## 6. Round 1 scoped re-judgment (on `aa5a5009`)
+
+| Item | Judge A | Judge B |
+| --- | --- | --- |
+| J-2…J-6, J-8…J-14, S-1…S-7 | RESOLVED | RESOLVED |
+| J-1 | PARTIAL (see A2-1) | PARTIAL (see B2-1) |
+| J-7 | PARTIAL (see A2-2) | PARTIAL (see B2-2) |
+
+| # | New finding (fix-caused unless noted) | A | B | Severity A / B | Status |
+| --- | --- | --- | --- | --- | --- |
+| R2-1 | Seed functions exported from migration files are loaded by TypeORM as migrations (`orm.config.ts:55` glob; loader + name check) → every `migration:*` command fails | A2-1 | B2-1 | CRITICAL / CRITICAL | **Confirmed severe** |
+| R2-2 | Create DTO `@IsOptional` + `@ValidateIf` on one class: `null` still skipped → A10 accepts `portfolioIds: null` | A2-2 | B2-2 | WARNING / CRITICAL | Corroborated (severity split) |
+| R2-3 | "multi-select" vs "checkbox group" wording | A2-3 | B2-4 | SUGGESTION | Corroborated · info |
+| R2-4 | Seed suite can fail from fixture pollution of seeded ids | A2-4 | — | SUGGESTION | Suspect |
+| R2-5 | Empty A1 query DTO makes every A1 request 400 (`forbidUnknownValues`) | — | B2-3 | CRITICAL | **Refuted by the orchestrator:** Nest `ValidationPipe` sets `forbidUnknownValues: false` by default (`@nestjs/common` 10.4.19 `validation.pipe.js:25`; judge B itself cited this in round 1, B-15). A positive test is added anyway |
+
+## 7. Round 2 correction (final fix round)
+
+| Item | Correction |
+| --- | --- |
+| R2-1 | Seeds moved to `src/db/seeds/control-lists.seed.ts`; migration files export only their class (D-CLG-11, P-9); loader gate `migration:show` added (K-006) |
+| R2-2 | Create DTO uses `@ValidateIf` without `@IsOptional`; tests `null` → 400 on A10 and A11 |
+| R2-3 | Same term in both documents ("multi-select shown as a checkbox group") |
+| R2-4 | Other suites create rows above the seeded ranges and never touch seeded rows (stated in §10) |
+| R2-5 | Positive test: A1 with no params passes through the real pipe; P-10 records the default |

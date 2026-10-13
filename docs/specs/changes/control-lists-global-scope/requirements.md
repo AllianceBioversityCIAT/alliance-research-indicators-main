@@ -261,7 +261,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 **Details**
 - Each value has an **Applies to** set of portfolios. **Empty = applies to all portfolios** (the default, and the state of every seeded value).
-- Admin: the value form gets an **Applies to** multi-select of portfolios (empty shows *All portfolios*); the values table gets an **Applies to** column (*All* or the portfolio names) and a filter *Show values for: All / <portfolio>* that uses the same rule as the consumer read.
+- Admin: the value form gets an **Applies to** multi-select of portfolios, shown as a checkbox group (none ticked = *All portfolios*); the values table gets an **Applies to** column (*All* or the portfolio names) and a filter *Show values for: All / <portfolio>* that uses the same rule as the consumer read.
 - Consumer read by key: with `portfolioId`, it returns the values that apply to all portfolios **plus** those restricted to that portfolio; without it, it returns every value, each with its *Applies to* set (`appliesTo`: active portfolio ids; `appliesToAll`: no restriction at all). `activeOnly` combines with it. An unknown or inactive portfolio → `404`.
 - Writes accept only existing, active, non-repeated portfolio ids; anything else (including `null`) → `400` naming `portfolioIds`. On update, omitting `portfolioIds` keeps the current set, `[]` makes the value apply to all, a list replaces the set. Saving a value and its set is all-or-nothing.
 - **Soft-deleted portfolios:** portfolios are deactivated, not deleted, so a value may still be linked to one. Such links are hidden on read; a value whose only links point to inactive portfolios is offered nowhere and shown as *No active portfolio* (it is not "all").
