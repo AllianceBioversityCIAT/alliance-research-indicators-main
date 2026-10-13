@@ -931,3 +931,18 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - The spec asserts the label has no `min-w-[45px]` when an icon is present.
 - **K-004:** restoring the unconditional minimum made the new assertion fail; the change was then restored.
 - **Gates:** custom-tag + PFM jest 108/108.
+
+#### HITL round 26 (owner, 2026-10-13): SP pills hug their code (no fixed width) → done
+
+- **Owner (verbatim):** "si no tiene estrella queda un espacio en blanco eso no me gusta no debe tener un w fijo, debe ser dinamico".
+- **Change:**
+  - `custom-tag` gains an optional input, `fitContent` (default `false`). When it is `true`, the label drops its `!min-w-[45px]`.
+  - The monitor passes `fitContent=true` on every SP tag, so primary and contributing pills both size to their text.
+  - Other usages are unchanged.
+- **Tests:**
+  - New `custom-tag` spec: 45px minimum by default, none with `fitContent`.
+  - The row spec asserts that no SP pill label carries the minimum.
+- **K-004:** removing `[fitContent]` from the row made the row test fail (1 failed); restored.
+- **Gates:**
+  - Full client suite: 8045/8045.
+  - eslint: clean on `custom-tag` and pfm.

@@ -20,6 +20,16 @@ describe('CustomTagComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('keeps the 45px label minimum by default and drops it with fitContent', () => {
+    const label = () => fixture.nativeElement.querySelector('span') as HTMLElement;
+    fixture.componentRef.setInput('statusName', 'SP09');
+    fixture.detectChanges();
+    expect(label().className).toContain('min-w-[45px]');
+    fixture.componentRef.setInput('fitContent', true);
+    fixture.detectChanges();
+    expect(label().className).not.toContain('min-w-[45px]');
+  });
+
   it('renders no trailing icon by default, and renders it after the label when trailingIconName is set', () => {
     const trailing = () => fixture.nativeElement.querySelector('[data-testid="custom-tag-trailing-icon"]') as HTMLElement | null;
     expect(trailing()).toBeNull();

@@ -24,6 +24,8 @@ export class CustomTagComponent {
   /** Optional decorative icon after the label, inside the pill (e.g. `pi-star-fill` for a primary item). */
   @Input() trailingIconName?: string;
   @Input() trailingIconColor?: string;
+  /** When true the label has no minimum width, so the pill hugs its text (e.g. short codes like `SP06`). */
+  @Input() fitContent = false;
 
   getColors() {
     const status = String(this.statusId);

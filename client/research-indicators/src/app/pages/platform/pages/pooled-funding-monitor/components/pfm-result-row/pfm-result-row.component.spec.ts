@@ -174,6 +174,8 @@ describe('PfmResultRowComponent', () => {
     expect(tags[0].querySelector('app-custom-tag [data-testid="custom-tag-trailing-icon"].pi-star-fill')).not.toBeNull();
     expect(tags[1].querySelector('[data-testid="custom-tag-trailing-icon"]')).toBeNull();
     expect(tags[0].classList).not.toContain('ring-2');
+    // every SP pill hugs its code (no fixed 45px label width)
+    tags.forEach(t => expect(t.querySelector('app-custom-tag span')!.className).not.toContain('min-w-[45px]'));
     expect(sr(q('pfm-row-sp'))).toEqual(['SP01 Breeding, primary', 'SP09 Climate Action']);
     expect(q('pfm-row-sp').querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
   });

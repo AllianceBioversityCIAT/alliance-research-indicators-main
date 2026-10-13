@@ -9,7 +9,7 @@
     tooltipPosition="right"></i>
   }
   <span
-    class="font-semibold {{+statusId === 12 || +statusId === 13 ? '!min-w-[58px]' : ''}} {{statusId !== 4 && !trailingIconName ? '!min-w-[45px]' : ''}}"
+    class="font-semibold {{+statusId === 12 || +statusId === 13 ? '!min-w-[58px]' : ''}} {{statusId !== 4 && !trailingIconName && !fitContent ? '!min-w-[45px]' : ''}}"
     [class.leading-4]="!multiline" [class.leading-snug]="multiline" [class.min-w-0]="!!maxWidth || multiline"
     [class.truncate]="!!maxWidth && !multiline" [class.whitespace-nowrap]="!multiline"
     [class.whitespace-normal]="multiline" [class.break-words]="multiline"
