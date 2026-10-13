@@ -13,7 +13,7 @@
     "OrgStructure.dc.html": {
       "h": 1120,
       "is_interactive": true,
-      "title": "2 · Organizational Structure (versioned)",
+      "title": "2 · Organizational Structure (global, versioned per year)",
       "w": 1440,
       "x": 1520,
       "y": 0
@@ -64,7 +64,7 @@
       "x": 3040,
       "y": 0,
       "w": 340,
-      "text": "Try the versioning (artboard 2, Play):\n1. Open BOF › Global Treasury.\n2. Change Parent to POD.\n3. Keep “Organizational change”, set Effective from 2026-10-01, Save.\n4. Set “Structure as of” to 2026-10-02 — it now sits under POD.\n5. Open its History tab.\nDelete is blocked on BOF (children + linked dimensions).",
+      "text": "Try it (artboard 2, Play) — prototype current year = 2027:\n1. Set Structure year to 2026: Cacao of Excellence and Rice - Flar appear; in 2027 they are gone (deleted / inactivated from 2027).\n2. Tick “Show inactive / deleted” to see them in 2027 with their status.\n3. Open BOF › Global Treasury, change Parent to POD, keep Applies from 2028, Save. Compare 2027 vs 2028.\n4. Pick a director from Alliance staff (search “ana”).\n5. Open the History tab: versions per year + change log.\nDigital Inclusion shows “Change scheduled in 2028”.",
       "fill": "blue"
     }
   },

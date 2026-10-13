@@ -61,16 +61,16 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 | Scope | **Global — no `portfolio_id`.** One tree for the Alliance. The page has **no portfolio selector**; it has a *Structure year* selector instead (default = current year) |
 | Identity | Hidden **permanent ID**; visible **Code** (`ORG-###`, editable, unique across the whole tree **including inactive and deleted entries**, so a code is never reused for a different unit — F-6). The code does not encode the parent, so a move never renumbers |
 | Time model | **Per year.** Every version has `valid_from_year` and `valid_to_year` (integers; half-open `[from, to)`, open-ended = current). At most one version of an entry per year, so the structure of a year is unambiguous. No days, no times. **A version is created only when that entry changes; the tree is never copied per year.** If nothing changes for three years, every entry keeps its single open-ended version (`2026 → ∞`) and the structure of 2026, 2027 and 2028 is the same set of rows. A move of one unit in 2029 ends that unit's version at 2029 and adds one new version for it; the other ~116 entries are untouched |
-| Versions | `name`, `acronym`, `level`, `parent`, `director`, `director email` live in versions |
+| Versions | `name`, `acronym`, `level`, `parent`, `director` live in versions. **Director** is a staff member from the Agresso staff table (`alliance_user_staff`), stored by staff ID; name and email are read from it (requester, 2026-10-08 — see requirements R-ORG-016) |
 | Save | One field, **Applies from year** (default = current year). Same year as the current version → that version is updated in place. Later year → a new version is created. Earlier year → **Back-date** (must be ticked explicitly; warns about recalculated reports) |
 | Entry lifecycle | `active` → `inactive` from a year (optional successor; reactivate allowed, creates a new version) or `deleted` from a year (cannot be reactivated). Both are **logical**: the entry and all its versions stay in the database, and the year views before that year still show it |
 | Change log | Every write (edit, new version, back-date, inactivate, reactivate, delete) is recorded with user, recorded-at timestamp, year it applies from, and old → new values. The log is append-only and never edited. It keeps the fine-grained "who and when" that the annual versions leave out |
 | Hierarchy rules | L1: no parent · L2 under L1 · L3 under L2 · L4 under L3 or L2 (Office optional). Levels come from Control Lists (`org.level`, Q-1). A parent must be active **in the year** the child's version starts, and in every year it covers |
 | Roll-ups | The read service resolves each unit's parent **for the report year**. A record linked to a unit is resolved with the structure of the record's year (Q-2). A helper view exposes the current year's version |
-| Delete | **Physical delete only for an entry that never took effect** (its first version starts after the current year) and has no associated information. Any other delete is **logical** (ended from a year + `deleted`). Blocked while the entry has active children or associated information (F-5) |
+| Delete | **Physical delete only for an entry that did not exist before the current year** (its first version starts in the current year or later) and has no associated information. Any other delete is **logical** (ended from a year + `deleted`). Blocked while the entry has active children or associated information (F-5) |
 | KPI-managing flag | The *Manages institutional KPIs* flag is **not** part of the tree. It is a per-portfolio association (portfolio ↔ unit permanent ID), owned by the portfolio-scoped modules that need it (`institutional-indicators`). This page may display it read-only for a chosen portfolio (Q-3) |
 | Views | **Tree** (+ on container rows) and **Table** (F-7); filter *Show inactive / deleted*; *Structure year* selector |
-| Form | Code*, Level*, Name*, Acronym, Parent*, Responsible director, Director email, Applies from year*. Tabs: **Details**, **History** (versions per year + change log), **Linked data** |
+| Form | Code*, Level*, Name*, Acronym, Parent*, Responsible director (staff search), Applies from year*. Tabs: **Details**, **History** (versions per year + change log), **Linked data** |
 | Seed (F-8) | 3 divisions · 19 departments/regions · 1 office · 94 units from MMF sheet 04; DT = Technology Integration; the three parent-less units placed under the parent they appear with; all versions valid from **2026** |
 
 ## 6. Non-Goals
@@ -84,7 +84,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 ## 7. Affected Users, Systems, And Specs
 | Area | Impact |
 | --- | --- |
-| Server | `org_units` (permanent id, code, status, status_from_year, successor_id; **no portfolio_id**), `org_unit_versions` (unit id, valid_from_year, valid_to_year, name, acronym, level value id, parent unit id, director, email; unique `(unit_id, valid_from_year)`), `org_unit_change_log` (append-only); read service with `year`; roll-up helper; `.xlsx` export; migrations + seed. The per-portfolio KPI flag moves to `institutional-indicators` |
+| Server | `org_units` (permanent id, code, status, status_from_year, successor_id; **no portfolio_id**), `org_unit_versions` (unit id, valid_from_year, valid_to_year, name, acronym, level value id, parent unit id, director staff id → `alliance_user_staff.carnet`; unique `(unit_id, valid_from_year)`), `org_unit_change_log` (append-only); read service with `year`; roll-up helper; `.xlsx` export; migrations + seed. The per-portfolio KPI flag moves to `institutional-indicators` |
 | Client | new page with tree/table, year selector, versioned form with *Applies from year*, change-log history and dialogs; no portfolio selector |
 | Specs | `control-lists` (levels, Q-1), `strategy-framework` (portfolio-scoped elements refer to owner units by permanent ID), `institutional-indicators` (owns the KPI-managing flag), the future mapping module |
 
@@ -128,7 +128,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 - Moving a unit with linked records from a year changes department roll-ups from that year only; a report for an earlier year is unchanged.
 - A back-dated change applies from its year to all later versions, and the change log shows when it was entered.
 - After a unit is deleted or inactivated from a year, the structure of every earlier year still lists it with its name, parent and director for that year.
-- Nothing that ever took effect is physically deleted; in-place edits appear in the change log.
+- Nothing that existed in a past year is physically deleted; in-place edits appear in the change log.
 - An entry has at most one version per year.
 - The history of anything linked to a unit (KPIs first) is continuous across moves and renames, because the link is the permanent ID; only department-level views change from the move's year.
 - No entry with active children or associated information can be deleted or inactivated.

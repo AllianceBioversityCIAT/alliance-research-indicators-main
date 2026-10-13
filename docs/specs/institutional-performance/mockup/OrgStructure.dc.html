@@ -62,15 +62,9 @@ a{color:#035BA9}a:hover{color:#074B86}
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 2px">
 <h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Organizational structure</h1>
-<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 780px; line-height: 1.25">Level 1 Division › Level 2 Department › Level 3 Office (optional) › Level 4 Unit. Every entry keeps a permanent ID, so linked data follows it through renames and moves; changes take effect from a date and stay in its history.</p>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 820px; line-height: 1.25">One Alliance structure, shared by every portfolio: Level 1 Division › Level 2 Department › Level 3 Office (optional) › Level 4 Unit. Every entry keeps a permanent ID; changes apply from a year, and earlier years keep the structure they had.</p>
 </div>
-<div style="display: flex; gap: 10px; align-items: center">
-<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
-<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
-<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
-<option>Portfolio 1 · 2010–2025 (not configured)</option>
-</select>
-</div>
+<span style="font-size: 12px; color: #6B7079; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 5px 10px; white-space: nowrap">Prototype: current year = {{cur}}</span>
 </div>
 
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 8px 12px">
@@ -79,22 +73,23 @@ a{color:#035BA9}a:hover{color:#074B86}
 <button type="button" onClick="{{showTree}}" aria-pressed="{{isTree}}" style="height: 26px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{treeBg}}; color: {{treeFg}}">Tree</button>
 <button type="button" onClick="{{showTable}}" aria-pressed="{{isTable}}" style="height: 26px; border: 0; border-radius: 7px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; background: {{tableBg}}; color: {{tableFg}}">Table</button>
 </div>
-<label for="asof" style="font-size: 12.5px; color: #112F5C; font-weight: 600">Structure as of</label>
-<input id="asof" type="date" value="{{asOf}}" onChange="{{onAsOf}}" min="2026-01-01" max="2030-12-31" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px">
-<sc-if value="{{notToday}}" hint-placeholder-val="{{false}}">
-<button type="button" onClick="{{toToday}}" style="height: 26px; border: 0; background: transparent; color: #035BA9; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer; text-decoration: underline">Back to today</button>
+<label for="year" style="font-size: 12.5px; color: #112F5C; font-weight: 600">Structure year</label>
+<select id="year" value="{{yearStr}}" onChange="{{onYear}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; color: #112F5C; background: #ffffff">
+<sc-for list="{{yearOpts}}" as="y" hint-placeholder-count="5"><option value="{{y.v}}">{{y.l}}</option></sc-for>
+</select>
+<sc-if value="{{notCur}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{toCur}}" style="height: 26px; border: 0; background: transparent; color: #035BA9; font-family: Barlow, sans-serif; font-size: 12.5px; cursor: pointer; text-decoration: underline">Back to {{cur}}</button>
 </sc-if>
-<label style="display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #4C5158"><input type="checkbox" onChange="{{toggleFlagged}}" checked="{{onlyFlagged}}">Only KPI-managing entries</label>
-<label style="display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #4C5158"><input type="checkbox" onChange="{{toggleClosed}}" checked="{{showClosed}}">Show closed</label>
+<label style="display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #4C5158"><input type="checkbox" onChange="{{toggleEnded}}" checked="{{showEnded}}">Show inactive / deleted</label>
 </div>
 <div style="display: flex; gap: 8px">
 <button type="button" onClick="{{exportXls}}" style="height: 28px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Export .xlsx</button>
-<button type="button" onClick="{{addDivision}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ Level 1 Division</button>
+<button type="button" onClick="{{addDivision}}" style="height: 28px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">+ New entry</button>
 </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px">
-<sc-for list="{{counts}}" as="k" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px">
+<sc-for list="{{counts}}" as="k" hint-placeholder-count="4">
 <div style="background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; padding: 8px 14px"><div style="font-size: 12px; color: #6B7079">{{k.label}}</div><div style="font-size: 20px; font-weight: 700; color: #112F5C">{{k.n}}</div></div>
 </sc-for>
 </div>
@@ -107,12 +102,12 @@ a{color:#035BA9}a:hover{color:#074B86}
 </sc-if>
 
 <sc-if value="{{isTree}}" hint-placeholder-val="{{true}}">
-<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 160px 56px 40px; font-size: 13px; font-weight: 600; color: #112F5C; background: #F4F7F9; border-bottom: 1px solid #E8EBED; margin-top: 10px">
-<div style="padding: 9px 14px">Name</div><div style="padding: 9px 8px">Code</div><div style="padding: 9px 8px">Level</div><div style="padding: 9px 8px">Responsible director</div><div style="padding: 9px 8px">KPIs</div><div></div>
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 180px 40px; font-size: 13px; font-weight: 600; color: #112F5C; background: #F4F7F9; border-bottom: 1px solid #E8EBED; margin-top: 10px">
+<div style="padding: 9px 14px">Name</div><div style="padding: 9px 8px">Code</div><div style="padding: 9px 8px">Level</div><div style="padding: 9px 8px">Responsible director</div><div></div>
 </div>
 <div style="flex-grow: 1; overflow-y: auto">
 <sc-for list="{{tree}}" as="r" hint-placeholder-count="18">
-<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 160px 56px 40px; align-items: center; min-height: 34px; border-bottom: 1px solid #EEF0F2; background: {{r.bg}}; font-size: 13px">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 90px 100px 180px 40px; align-items: center; min-height: 34px; border-bottom: 1px solid #EEF0F2; background: {{r.bg}}; font-size: 13px">
 <div style="display: flex; align-items: center; gap: 6px; padding-left: {{r.pad}}px; min-width: 0">
 <sc-if value="{{r.hasKids}}" hint-placeholder-val="{{true}}">
 <button type="button" onClick="{{r.toggle}}" aria-label="{{r.toggleLabel}}" aria-expanded="{{r.open}}" style="width: 22px; height: 22px; border: 0; background: transparent; color: #112F5C; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate({{r.rot}}deg)" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
@@ -121,30 +116,33 @@ a{color:#035BA9}a:hover{color:#074B86}
 <button type="button" onClick="{{r.pick}}" style="border: 0; background: transparent; padding: 6px 0; cursor: pointer; text-align: left; font-family: Barlow, sans-serif; font-size: 13px; color: {{r.color}}; font-weight: {{r.weight}}; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</button>
 <sc-if value="{{r.hasAcr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; font-weight: 600; color: #153C71; flex-shrink: 0">{{r.acr}}</span></sc-if>
 <sc-if value="{{r.hasCount}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #6B7079; flex-shrink: 0">{{r.count}}</span></sc-if>
-<sc-if value="{{r.closed}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 1px 6px; flex-shrink: 0">Closed</span></sc-if>
+<sc-if value="{{r.ended}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 1px 6px; flex-shrink: 0">{{r.endedLabel}}</span></sc-if>
+<sc-if value="{{r.scheduled}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #035BA9; border: 1px solid #035BA9; border-radius: 5px; padding: 0 6px; flex-shrink: 0">{{r.scheduledLabel}}</span></sc-if>
 <sc-if value="{{r.changed}}" hint-placeholder-val="{{false}}"><span style="font-size: 10.5px; font-weight: 600; color: #153C71; background: #EAF1F8; border-radius: 5px; padding: 1px 6px; flex-shrink: 0">{{r.changedLabel}}</span></sc-if>
 </div>
 <div style="padding: 0 8px; font-size: 12px; color: #035BA9; font-weight: 600">{{r.code}}</div>
 <div style="padding: 0 8px; color: #4C5158; font-size: 12.5px">{{r.levelLabel}}</div>
-<div style="padding: 0 8px; color: #4C5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dir}}</div>
-<div style="padding: 0 8px"><sc-if value="{{r.flag}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; font-weight: 600; color: #1F4E24; background: #D3E7D5; border-radius: 6px; padding: 2px 7px">Yes</span></sc-if></div>
+<div style="padding: 0 8px; color: #4C5158; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center"><span style="overflow: hidden; text-overflow: ellipsis">{{r.dir}}</span><sc-if value="{{r.dirInactive}}" hint-placeholder-val="{{false}}"><span style="font-size: 10px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 0 5px; flex-shrink: 0">Inactive staff</span></sc-if></div>
 <div style="padding: 0 4px"><sc-if value="{{r.canAdd}}" hint-placeholder-val="{{false}}">
 <button type="button" onClick="{{r.add}}" aria-label="{{r.addLabel}}" title="{{r.addLabel}}" style="width: 24px; height: 24px; border: 0; border-radius: 7px; background: #D9E1EB; color: #035BA9; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
 </sc-if></div>
 </div>
 </sc-for>
+<sc-if value="{{treeEmpty}}" hint-placeholder-val="{{false}}">
+<div style="padding: 40px; text-align: center; font-size: 13px; color: #6B7079">No entries in {{year}}.</div>
+</sc-if>
 </div>
 </sc-if>
 
 <sc-if value="{{isTable}}" hint-placeholder-val="{{false}}">
 <div style="padding: 10px 12px 0">
 <label for="org-search" style="position: absolute; left: -9999px">Find an entry</label>
-<input id="org-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name, acronym, parent or director" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<input id="org-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name, acronym or director" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
 </div>
 <div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 10px 12px 0; border: 1px solid #E8EBED; border-radius: 6px">
 <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
 <thead><tr>
-<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="8">
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="9">
 <th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
 <button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 10px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
 </th>
@@ -153,13 +151,14 @@ a{color:#035BA9}a:hover{color:#074B86}
 <tbody>
 <sc-for list="{{t.rows}}" as="r" hint-placeholder-count="10">
 <tr style="background: {{r.bg}}">
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; color: #6B7079">{{r.pid}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2"><button type="button" onClick="{{r.pick}}" style="border: 0; background: #EAF1F8; color: #035BA9; font-family: Barlow, sans-serif; font-size: 12px; font-weight: 700; border-radius: 5px; padding: 1px 6px; cursor: pointer">{{r.code}}</button></td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.levelLabel}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #112F5C; font-weight: 600">{{r.name}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.acr}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.parentName}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dir}}</td>
-<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2">{{r.flagLabel}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">{{r.status}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">{{r.from}}</td>
 </tr>
 </sc-for>
@@ -183,15 +182,17 @@ a{color:#035BA9}a:hover{color:#074B86}
 </sc-if>
 </section>
 
-<section aria-label="Entry form" style="width: 430px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
+<section aria-label="Entry form" style="width: 440px; flex-shrink: 0; background: #ffffff; border: 1px solid #E8EBED; border-radius: 8px; display: flex; flex-direction: column; min-height: 0">
 <sc-if value="{{hasForm}}" hint-placeholder-val="{{true}}">
 <div style="padding: 14px 18px 0; display: flex; flex-direction: column; gap: 4px">
 <div style="display: flex; gap: 8px; align-items: center">
 <sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; font-weight: 700; color: #035BA9; background: #EAF1F8; border-radius: 5px; padding: 1px 6px">{{p.code}}</span></sc-if>
 <span style="font-family: 'Space Grotesk', sans-serif; font-size: 10.5px; letter-spacing: 2.5px; color: #6B7079">{{p.levelCaps}}</span>
+<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}"><span style="margin-left: auto; font-size: 11.5px; color: #6B7079">Permanent ID <strong style="color: #112F5C">{{p.pid}}</strong></span></sc-if>
 </div>
 <h2 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">{{p.title}}</h2>
 <span style="font-size: 12.5px; color: #6B7079">{{p.path}}</span>
+<sc-if value="{{p.hasStatus}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #4C5158; background: #F4F7F9; border: 1px solid #E8EBED; border-radius: 8px; padding: 5px 10px; margin-top: 4px">{{p.status}}</span></sc-if>
 <div role="tablist" aria-label="Entry sections" style="display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid #E8EBED">
 <button type="button" role="tab" aria-selected="{{onDetails}}" onClick="{{tabDetails}}" style="border: 0; background: transparent; padding: 8px 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer; color: #112F5C; font-weight: {{detailsW}}; border-bottom: 3px solid {{detailsLine}}">Details</button>
 <sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">
@@ -206,23 +207,23 @@ a{color:#035BA9}a:hover{color:#074B86}
 <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px">
 <div style="display: flex; flex-direction: column; gap: 5px">
 <label for="o-code" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Code *</label>
-<input id="o-code" type="text" value="{{f.code}}" onChange="{{on.code}}" style="height: 32px; border: 1px solid {{f.codeBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<input id="o-code" type="text" value="{{f.code}}" onChange="{{on.code}}" disabled="{{f.locked}}" style="height: 32px; border: 1px solid {{f.codeBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
 <sc-if value="{{f.hasCodeErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.codeErr}}</span></sc-if>
 </div>
 <div style="display: flex; flex-direction: column; gap: 5px">
 <label for="o-level" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Level *</label>
-<select id="o-level" value="{{f.level}}" onChange="{{on.level}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
+<select id="o-level" value="{{f.level}}" onChange="{{on.level}}" disabled="{{f.locked}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
 <sc-for list="{{levels}}" as="l" hint-placeholder-count="4"><option value="{{l.v}}">{{l.l}}</option></sc-for>
 </select>
 </div>
 <div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
 <label for="o-name" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Name *</label>
-<input id="o-name" type="text" value="{{f.name}}" onChange="{{on.name}}" placeholder="Write the full name" style="height: 32px; border: 1px solid {{f.nameBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<input id="o-name" type="text" value="{{f.name}}" onChange="{{on.name}}" disabled="{{f.locked}}" placeholder="Write the full name" style="height: 32px; border: 1px solid {{f.nameBorder}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
 <sc-if value="{{f.hasNameErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">Required</span></sc-if>
 </div>
 <div style="display: flex; flex-direction: column; gap: 5px">
 <label for="o-acr" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Acronym</label>
-<input id="o-acr" type="text" value="{{f.acr}}" onChange="{{on.acr}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<input id="o-acr" type="text" value="{{f.acr}}" onChange="{{on.acr}}" disabled="{{f.locked}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
 </div>
 <div style="display: flex; flex-direction: column; gap: 5px">
 <label for="o-parent" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.parentLabel}}</label>
@@ -232,53 +233,65 @@ a{color:#035BA9}a:hover{color:#074B86}
 </select>
 <sc-if value="{{f.hasParentErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.parentErr}}</span></sc-if>
 </div>
-<div style="display: flex; flex-direction: column; gap: 5px">
-<label for="o-dir" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Responsible director</label>
-<input id="o-dir" type="text" value="{{f.dir}}" onChange="{{on.dir}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
+<label for="o-dir" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Responsible director <span style="font-weight: 400; color: #6B7079">· Alliance staff (Agresso)</span></label>
+<sc-if value="{{f.hasDir}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 6px 10px">
+<div style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; color: #112F5C; font-weight: 600">{{f.dirName}}<sc-if value="{{f.dirInactive}}" hint-placeholder-val="{{false}}"><span style="font-size: 10px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 0 5px; margin-left: 6px">Inactive staff</span></sc-if></span><span style="font-size: 12px; color: #6B7079">{{f.dirEmail}} · ID {{f.dir}}</span></div>
+<button type="button" onClick="{{on.clearDir}}" disabled="{{f.locked}}" aria-label="Remove director" style="height: 26px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 7px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; cursor: pointer">Change</button>
 </div>
-<div style="display: flex; flex-direction: column; gap: 5px">
-<label for="o-mail" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Director email</label>
-<input id="o-mail" type="email" value="{{f.email}}" onChange="{{on.email}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
-</div>
-</div>
-<label style="display: flex; gap: 10px; align-items: flex-start; border: 1px solid #E8EBED; border-radius: 8px; padding: 9px 12px; font-size: 13px; color: #112F5C; cursor: pointer">
-<input type="checkbox" checked="{{f.flag}}" onChange="{{on.flag}}" style="margin-top: 2px">
-<span><strong>Manages institutional KPIs</strong> · Portfolio 2<br><span style="font-size: 12px; color: #6B7079">Offered as owner unit in the Strategy Framework and as reporting owner for KPIs.</span></span>
-</label>
-<sc-if value="{{f.showChange}}" hint-placeholder-val="{{false}}">
-<fieldset style="border: 1px solid #B0C4DD; background: #F4F8FC; border-radius: 8px; padding: 10px 12px; margin: 0; display: flex; flex-direction: column; gap: 8px">
-<legend style="font-size: 12.5px; font-weight: 700; color: #112F5C; padding: 0 4px">How should this change be saved?</legend>
-<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #112F5C; cursor: pointer"><input type="radio" name="chg" checked="{{f.isChange}}" onChange="{{on.modeChange}}" style="margin-top: 2px"><span><strong>Organizational change</strong> — keep the old version in the history.<br><span style="font-size: 12px; color: #6B7079">{{f.changeHint}}</span></span></label>
-<sc-if value="{{f.isChange}}" hint-placeholder-val="{{true}}">
-<div style="display: flex; align-items: center; gap: 8px; padding-left: 24px"><label for="o-eff" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Effective from *</label><input id="o-eff" type="date" value="{{f.eff}}" onChange="{{on.eff}}" min="{{f.effMin}}" style="height: 30px; border: 1px solid {{f.effBorder}}; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px"></div>
-<label style="display: flex; gap: 8px; align-items: flex-start; padding-left: 24px; font-size: 12.5px; color: #112F5C; cursor: pointer"><input type="checkbox" checked="{{f.backdate}}" onChange="{{on.backdate}}" style="margin-top: 2px"><span>Back-date — allow a date before the current version (from {{f.curFrom}})</span></label>
-<sc-if value="{{f.backdate}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B4A00; background: #FFF6E5; border: 1px solid #F0C877; border-radius: 8px; padding: 6px 10px; margin-left: 24px; line-height: 1.4">Reports for periods from that date will be recalculated with the new values.</span></sc-if>
-<sc-if value="{{f.hasEffErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600; padding-left: 24px">{{f.effErr}}</span></sc-if>
 </sc-if>
-<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: #112F5C; cursor: pointer"><input type="radio" name="chg" checked="{{f.isCorrection}}" onChange="{{on.modeCorrection}}" style="margin-top: 2px"><span><strong>Correction</strong> — fix a typo or mistake; no history entry.</span></label>
+<sc-if value="{{f.noDir}}" hint-placeholder-val="{{false}}">
+<input id="o-dir" type="search" value="{{f.dirQ}}" onChange="{{on.dirQ}}" disabled="{{f.locked}}" placeholder="Search staff by name or email (2+ letters)" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<sc-if value="{{f.hasDirHits}}" hint-placeholder-val="{{false}}">
+<div role="listbox" aria-label="Staff matches" style="display: flex; flex-direction: column; border: 1px solid #E8EBED; border-radius: 8px">
+<sc-for list="{{f.dirHits}}" as="h" hint-placeholder-count="3">
+<button type="button" role="option" onClick="{{h.pick}}" style="border: 0; border-bottom: 1px solid #EEF0F2; background: #ffffff; padding: 7px 10px; text-align: left; cursor: pointer; font-family: Barlow, sans-serif; display: flex; justify-content: space-between; gap: 10px"><span style="font-size: 13px; color: #112F5C">{{h.name}}</span><span style="font-size: 12px; color: #6B7079">{{h.email}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{f.dirNoHits}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B7079">No active staff match “{{f.dirQ}}”.</span></sc-if>
+</sc-if>
+</div>
+</div>
+<sc-if value="{{f.showYear}}" hint-placeholder-val="{{false}}">
+<fieldset style="border: 1px solid #B0C4DD; background: #F4F8FC; border-radius: 8px; padding: 10px 12px; margin: 0; display: flex; flex-direction: column; gap: 8px">
+<legend style="font-size: 12.5px; font-weight: 700; color: #112F5C; padding: 0 4px">When does this apply?</legend>
+<div style="display: flex; align-items: center; gap: 8px"><label for="o-year" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Applies from year *</label>
+<select id="o-year" value="{{f.yearStr}}" onChange="{{on.year}}" style="height: 30px; border: 1px solid {{f.yearBorder}}; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<sc-for list="{{f.yearOpts}}" as="y" hint-placeholder-count="4"><option value="{{y.v}}">{{y.l}}</option></sc-for>
+</select></div>
+<span style="font-size: 12px; color: #153C71; line-height: 1.4">{{f.yearHint}}</span>
+<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: #112F5C; cursor: pointer"><input type="checkbox" checked="{{f.backdate}}" onChange="{{on.backdate}}" style="margin-top: 2px"><span>Back-date — allow a year before {{cur}}</span></label>
+<sc-if value="{{f.backdate}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B4A00; background: #FFF6E5; border: 1px solid #F0C877; border-radius: 8px; padding: 6px 10px; line-height: 1.4">Reports for the years from the one you pick will be recalculated with the new values.</span></sc-if>
+<sc-if value="{{f.hasYearErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.yearErr}}</span></sc-if>
 </fieldset>
 </sc-if>
 </sc-if>
 
 <sc-if value="{{onHistory}}" hint-placeholder-val="{{false}}">
-<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0">
-<sc-for list="{{history}}" as="h" hint-placeholder-count="2">
-<li style="display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF0F2">
-<span style="width: 84px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: #112F5C">{{h.date}}</span>
-<div style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
-<span style="font-size: 13px; color: #112F5C; font-weight: 600">{{h.title}}</span>
-<sc-for list="{{h.lines}}" as="x" hint-placeholder-count="1"><span style="font-size: 12.5px; color: #4C5158">{{x.t}}</span></sc-for>
+<h3 style="margin: 0; font-size: 13px; color: #112F5C">Versions</h3>
+<div style="display: flex; flex-direction: column; border: 1px solid #E8EBED; border-radius: 8px">
+<sc-for list="{{versions}}" as="v" hint-placeholder-count="2">
+<div style="display: flex; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #EEF0F2; font-size: 12.5px"><span style="width: 90px; flex-shrink: 0; font-weight: 700; color: #112F5C">{{v.range}}</span><span style="color: #4C5158; min-width: 0">{{v.text}}</span></div>
+</sc-for>
 </div>
+<h3 style="margin: 4px 0 0; font-size: 13px; color: #112F5C">Change log</h3>
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<sc-for list="{{log}}" as="h" hint-placeholder-count="2">
+<li style="display: flex; flex-direction: column; gap: 3px; padding: 9px 0; border-bottom: 1px solid #EEF0F2">
+<div style="display: flex; justify-content: space-between; gap: 10px"><span style="font-size: 13px; color: #112F5C; font-weight: 600">{{h.title}}</span><span style="font-size: 11.5px; color: #6B7079; white-space: nowrap">{{h.when}} · {{h.who}}</span></div>
+<sc-for list="{{h.lines}}" as="x" hint-placeholder-count="1"><span style="font-size: 12.5px; color: #4C5158">{{x.t}}</span></sc-for>
 </li>
 </sc-for>
 </ol>
-<p style="margin: 0; font-size: 12px; color: #6B7079; line-height: 1.4">Reports filtered to a date before a change use the version valid on that date. Use “Structure as of” to see the tree on any date.</p>
+<p style="margin: 0; font-size: 12px; color: #6B7079; line-height: 1.4">The change log is append-only. Each version is valid for whole years; pick a “Structure year” to see the tree as it was.</p>
 </sc-if>
 
 <sc-if value="{{onLinked}}" hint-placeholder-val="{{false}}">
-<div style="font-size: 12.5px; color: #153C71; background: #F4F8FC; border: 1px solid #B0C4DD; border-radius: 8px; padding: 9px 12px; line-height: 1.45">Records link to the permanent ID <strong>{{p.pid}}</strong>, never to the name or the parent. When the entry is renamed or moved, its records follow it; from the effective date they count under the new parent.</div>
+<div style="font-size: 12.5px; color: #153C71; background: #F4F8FC; border: 1px solid #B0C4DD; border-radius: 8px; padding: 9px 12px; line-height: 1.45">Records link to the permanent ID <strong>{{p.pid}}</strong>, never to the name or the parent. A unit's KPIs stay one series across years; by department, each year counts under the parent it had that year.</div>
 <div style="display: flex; flex-direction: column; border: 1px solid #E8EBED; border-radius: 8px">
-<sc-for list="{{linked}}" as="l" hint-placeholder-count="5">
+<sc-for list="{{linked}}" as="l" hint-placeholder-count="4">
 <div style="display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #EEF0F2; font-size: 13px"><span style="color: #112F5C; font-weight: 600">{{l.label}}</span><span style="color: {{l.color}}; text-align: right">{{l.value}}</span></div>
 </sc-for>
 </div>
@@ -287,14 +300,14 @@ a{color:#035BA9}a:hover{color:#074B86}
 
 <div style="padding: 12px 18px; border-top: 1px solid #E8EBED; display: flex; justify-content: space-between; align-items: center">
 <div style="display: flex; gap: 6px">
-<sc-if value="{{isEdit}}" hint-placeholder-val="{{true}}">
+<sc-if value="{{p.canLifecycle}}" hint-placeholder-val="{{true}}">
 <button type="button" onClick="{{askDelete}}" style="height: 30px; border: 1px solid #F2B8C0; background: #ffffff; color: #B00020; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Delete</button>
-<button type="button" onClick="{{askClose}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{p.closeLabel}}</button>
+<button type="button" onClick="{{askLife}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{p.lifeLabel}}</button>
 </sc-if>
 </div>
 <div style="display: flex; gap: 8px">
 <button type="button" onClick="{{cancel}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">Cancel</button>
-<button type="button" onClick="{{save}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
+<button type="button" onClick="{{save}}" disabled="{{f.locked}}" style="height: 30px; border: 0; background: #035BA9; color: #ffffff; border-radius: 9px; padding: 0 18px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer">Save</button>
 </div>
 </div>
 </sc-if>
@@ -312,20 +325,26 @@ a{color:#035BA9}a:hover{color:#074B86}
 
 <sc-if value="{{hasConfirm}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; left: 0; top: 0; width: 1440px; height: 1120px; background: rgba(11, 30, 60, 0.38); display: flex; align-items: center; justify-content: center">
-<div role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="width: 500px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
+<div role="dialog" aria-modal="true" aria-labelledby="dlg-title" style="width: 520px; background: #ffffff; border-radius: 12px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 12px 40px rgba(11, 30, 60, 0.25)">
 <h2 id="dlg-title" style="margin: 0; font-size: 17px; color: #112F5C">{{c.title}}</h2>
 <p style="margin: 0; font-size: 13.5px; color: #4C5158; line-height: 1.45">{{c.body}}</p>
-<sc-if value="{{c.isClose}}" hint-placeholder-val="{{false}}">
+<sc-if value="{{c.hasYear}}" hint-placeholder-val="{{false}}">
 <div style="display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 10px 12px; align-items: center">
-<label for="c-date" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Closed from *</label>
-<input id="c-date" type="date" value="{{c.date}}" onChange="{{c.onDate}}" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px">
+<label for="c-year" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{c.yearLabel}}</label>
+<select id="c-year" value="{{c.yearStr}}" onChange="{{c.onYear}}" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
+<sc-for list="{{c.yearOpts}}" as="y" hint-placeholder-count="4"><option value="{{y.v}}">{{y.l}}</option></sc-for>
+</select>
+<sc-if value="{{c.hasSucc}}" hint-placeholder-val="{{false}}">
 <label for="c-succ" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Successor (optional)</label>
 <select id="c-succ" value="{{c.succ}}" onChange="{{c.onSucc}}" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; background: #ffffff">
 <option value="">None</option>
 <sc-for list="{{c.options}}" as="o" hint-placeholder-count="4"><option value="{{o.v}}">{{o.l}}</option></sc-for>
 </select>
+</sc-if>
 </div>
-<span style="font-size: 12px; color: #6B7079; line-height: 1.4">Use a successor for merges: from the closing date, records linked to this entry roll up to the successor. The records themselves are not changed.</span>
+<label style="display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: #112F5C; cursor: pointer"><input type="checkbox" checked="{{c.backdate}}" onChange="{{c.onBack}}" style="margin-top: 2px"><span>Back-date — allow a year before {{cur}}</span></label>
+<sc-if value="{{c.hasErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{c.err}}</span></sc-if>
+<span style="font-size: 12px; color: #6B7079; line-height: 1.4">{{c.note}}</span>
 </sc-if>
 <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px">
 <button type="button" onClick="{{closeConfirm}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 14px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">{{c.closeLabel}}</button>
@@ -340,58 +359,87 @@ a{color:#035BA9}a:hover{color:#074B86}
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
-const TODAY = '2026-09-26';
-const START = '2026-01-01';
+const CUR = 2027;
+const FIRST = 2026;
+const LAST = 2030;
 const LEVELS = { L1: 'Level 1 · Division', L2: 'Level 2 · Department', L3: 'Level 3 · Office', L4: 'Level 4 · Unit' };
 const SHORT = { L1: 'Division', L2: 'Department', L3: 'Office', L4: 'Unit' };
 const ALLOWED = { L1: [], L2: ['L1'], L3: ['L2'], L4: ['L2', 'L3'] };
+const VKEYS = ['name', 'acr', 'parent', 'dir', 'level'];
+const STAFF = [
+  { carnet: 'A0101', name: 'Marcela Quintero', email: 'm.quintero@cgiar.org', active: true },
+  { carnet: 'A0102', name: 'Mauricio Muñoz', email: 'e.munoz@cgiar.org', active: true },
+  { carnet: 'A0103', name: 'Franck Erick Kalla', email: 'f.noukam@cgiar.org', active: false },
+  { carnet: 'A0104', name: 'Vanessa Riveros', email: 'v.riveros@cgiar.org', active: true },
+  { carnet: 'A0105', name: 'Victor Guardia', email: 'v.guardia@cgiar.org', active: true },
+  { carnet: 'A0106', name: 'Stephanie Speck', email: 's.speck@cgiar.org', active: true },
+  { carnet: 'A0107', name: 'David Abreu', email: 'd.abreu@cgiar.org', active: true },
+  { carnet: 'A0108', name: 'Wanjiru Kamau-Rutenberg', email: 'w.kamaur@cgiar.org', active: true },
+  { carnet: 'A0109', name: 'Stephan Weise', email: 's.weise@cgiar.org', active: true },
+  { carnet: 'A0110', name: 'Maya Rajasekharan', email: 'm.rajasekharan@cgiar.org', active: true },
+  { carnet: 'A0111', name: 'Juan Lucas Restrepo', email: 'j.l.restrepo@cgiar.org', active: true },
+  { carnet: 'A0112', name: 'Ana Pérez', email: 'a.perez@cgiar.org', active: true },
+  { carnet: 'A0113', name: 'Luis Gómez', email: 'l.gomez@cgiar.org', active: true }
+];
 function U(names) { return names.map(n => ({ name: n, level: 'L4' })); }
 const TREE = [
   { id: 'research', name: 'Research', level: 'L1', kids: [
-    { name: 'Office of the Associate Director General, Research Strategy and Innovation', acr: 'ADG Research', level: 'L2', dir: 'Marcela Quintero', email: 'm.quintero@cgiar.org', flag: true, kids: U(['Impact SF', 'Gender']) },
-    { name: 'Digital Inclusion', level: 'L2', kids: U(['Inclusive Design and User Research', 'Digital Solution Development', 'Digital Transformation of Agri-food System', 'Data Driven Sustainability']) },
+    { name: 'Office of the Associate Director General, Research Strategy and Innovation', acr: 'ADG Research', level: 'L2', dir: 'A0101', kids: [{ id: 'gender', name: 'Gender', level: 'L4' }, { name: 'Impact SF', level: 'L4' }] },
+    { id: 'digital', name: 'Digital Inclusion', level: 'L2', kids: U(['Inclusive Design and User Research', 'Digital Solution Development', 'Digital Transformation of Agri-food System', 'Data Driven Sustainability']) },
     { name: 'Food Environment and Consumer Behaviour', level: 'L2', kids: U(['Food Environment and Consumer Behaviour']) },
-    { name: 'Policy, Inclusion and Socio-Economic Analyses for Impact and Learning', level: 'L2', kids: U(['Data Management and Open Science', 'MELP - Monitoring, Evaluation, Learning and Performance', 'Foresight and Applied Economics for Impact', 'Gender and Social Inclusion']) },
+    { id: 'pisa', name: 'Policy, Inclusion and Socio-Economic Analyses for Impact and Learning', level: 'L2', kids: U(['Data Management and Open Science', 'MELP - Monitoring, Evaluation, Learning and Performance', 'Foresight and Applied Economics for Impact', 'Gender and Social Inclusion']) },
     { name: 'Office for Program Delivery (OPD)', acr: 'OPD', level: 'L2', kids: U(['Science Editing Unit', 'Lever Program Management Officers (PMO)', 'Grants Management Unit (GMU)']) },
     { name: 'Office for Program Development and Strategy', level: 'L2', kids: U(['Office for Program Development and Strategy']) },
     { name: 'Climate Action', level: 'L2', kids: U(['Achieving Net-Zero', 'Climate Security and Migration', 'Climate Services for Agriculture', 'Climate Readiness']) },
     { name: 'Multifunctional Landscape', acr: 'MFL', level: 'L2', kids: U(['Low Emissions Landscapes', 'Soils and Water Management', 'Ecosystem Services and Environmental Impact', 'Biodiversity and Restoration for Livelihoods and Resilience', 'MFL Laboratories']) },
-    { name: 'Biodiversity for Food and Agriculture', level: 'L2', kids: U(['Agrobiodiversity in Production System', 'Plant Genetic Resources & seed Policies', 'Forest Genetic Resources for Resilient Landscape', 'Cacao of Excellence']) },
-    { name: 'Crops for Nutrition and Health', level: 'L2', kids: U(['Bean', 'Genebank', 'Cassava', 'Biotechnology', 'Tropical Forages', 'Banana', 'Rice', 'Rice - Flar']) }
+    { name: 'Biodiversity for Food and Agriculture', level: 'L2', kids: U(['Agrobiodiversity in Production System', 'Plant Genetic Resources & seed Policies', 'Forest Genetic Resources for Resilient Landscape']).concat([{ id: 'cacao', name: 'Cacao of Excellence', level: 'L4' }]) },
+    { name: 'Crops for Nutrition and Health', level: 'L2', kids: U(['Bean', 'Genebank', 'Cassava', 'Biotechnology', 'Tropical Forages', 'Banana']).concat([{ id: 'rice', name: 'Rice', level: 'L4' }, { id: 'flar', name: 'Rice - Flar', level: 'L4' }]) }
   ] },
   { id: 'global', name: 'Global Support', level: 'L1', kids: [
     { name: 'Office of the Director General', acr: 'ODG', level: 'L2', kids: [
-      { name: 'Legal Office', acr: 'Legal', level: 'L4', dir: 'Mauricio Muñoz', email: 'E.Munoz@cgiar.org', flag: true },
-      { name: 'Ethics Unit', acr: 'Ethics', level: 'L4', dir: 'Franck Erick Kalla', email: 'f.noukam@cgiar.org', flag: true },
+      { name: 'Legal Office', acr: 'Legal', level: 'L4', dir: 'A0102' },
+      { name: 'Ethics Unit', acr: 'Ethics', level: 'L4', dir: 'A0103' },
       { name: 'Internal Audit Unit', level: 'L4' }] },
-    { id: 'pod', name: 'People and Organizational Development', acr: 'POD', level: 'L2', dir: 'Riveros, Vanessa', email: 'V.Riveros@cgiar.org', flag: true, kids: U(['Culture Performance and Engagement', 'Total Rewards', 'Wellbeing, Health and Safety', 'Organizational Development and Strategy']).concat([
+    { id: 'pod', name: 'People and Organizational Development', acr: 'POD', level: 'L2', dir: 'A0104', kids: U(['Culture Performance and Engagement', 'Total Rewards', 'Wellbeing, Health and Safety', 'Organizational Development and Strategy']).concat([
       { id: 'hrops', name: 'HR Operations', level: 'L3', kids: U(['Global Specialized Services', 'HR Operations Africa', 'HR Operations Americas', 'HR Operations Asia', 'HR Operations Europe']) }]) },
-    { id: 'bof', name: 'Business Operations and Finance', acr: 'BOF', level: 'L2', dir: 'Victor Guardia', email: 'V.Guardia@cgiar.org', flag: true, kids: U(['Finance Quality Assurance', 'Global Treasury', 'Project Financial Analysis and Support – PLANS', 'Accounting Services', 'Financial Planning and Analysis FP&A', 'Security Management', 'Regional Operations and Finance Africa', 'Regional Operations and Finance Asia', 'Regional Operations and Finance Americas', 'Regional Operations and Finance Europe']) },
-    { name: 'Strategic Partnerships, Engagement and Communications', acr: 'SPEC', level: 'L2', dir: 'Stephanie Speck', email: 'S.Speck@cgiar.org', flag: true, kids: U(['Partnerships and Stakeholder Engagement', 'Proposal and Pipeline Management', 'Business Development and Diversification', 'Global Communications', 'Digital & Internal Comms', 'Publications, Brand & Graphic Design']) },
-    { name: 'Technology Integration', acr: 'DT', level: 'L2', dir: 'David Abreu', email: 'd.abreu@cgiar.org', flag: true, kids: U(['IT System Integration', 'IT Operations and Service Desk', 'Integration and Capacity Development', 'IT Network Infrastructure & Security', 'Innovation and Business Development']) }
+    { id: 'bof', name: 'Business Operations and Finance', acr: 'BOF', level: 'L2', dir: 'A0105', kids: [{ id: 'treasury', name: 'Global Treasury', level: 'L4' }].concat(U(['Finance Quality Assurance', 'Project Financial Analysis and Support – PLANS', 'Accounting Services', 'Financial Planning and Analysis FP&A', 'Security Management', 'Regional Operations and Finance Africa', 'Regional Operations and Finance Asia', 'Regional Operations and Finance Americas', 'Regional Operations and Finance Europe'])) },
+    { name: 'Strategic Partnerships, Engagement and Communications', acr: 'SPEC', level: 'L2', dir: 'A0106', kids: U(['Partnerships and Stakeholder Engagement', 'Proposal and Pipeline Management', 'Business Development and Diversification', 'Global Communications', 'Digital & Internal Comms', 'Publications, Brand & Graphic Design']) },
+    { name: 'Technology Integration', acr: 'DT', level: 'L2', dir: 'A0107', kids: U(['IT System Integration', 'IT Operations and Service Desk', 'Integration and Capacity Development', 'IT Network Infrastructure & Security', 'Innovation and Business Development']) }
   ] },
   { id: 'regional', name: 'Regional', level: 'L1', kids: [
-    { name: 'Africa', acr: 'Africa', level: 'L2', dir: 'Wanjiru Kamau-Rutenberg', email: 'W.KamauR@cgiar.org', flag: true, kids: U(['Managing Director Office Africa', 'Africa Partnerships', 'Regional Operations and Finance Africa', 'HR Operations Africa', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
-    { name: 'Asia', acr: 'Asia', level: 'L2', dir: 'Stephan Weise', email: 's.weise@cgiar.org', flag: true, kids: U(['Managing Director Office Asia', 'Asia Partnerships', 'Regional Operations and Finance Asia', 'HR Operations Asia', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
-    { name: 'Americas', acr: 'Americas', level: 'L2', dir: 'Maya Rajasekharan', email: 'M.Rajasekharan@cgiar.org', flag: true, kids: U(['Managing Director Office Americas', 'Americas Partnerships', 'Security', 'Bogota Office', 'Regional Operations and Finance Americas', 'HR Operations Americas', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
-    { name: 'Europe', acr: 'Europe', level: 'L2', dir: 'Juan Lucas Restrepo', email: 'J.L.Restrepo@cgiar.org', flag: true, kids: U(['Europe Partnerships', 'Regional Operations and Finance Europe', 'HR Operations Europe', 'Regional Communications', 'Regional IT Operations and Service Desk']) }
+    { name: 'Africa', acr: 'Africa', level: 'L2', dir: 'A0108', kids: U(['Managing Director Office Africa', 'Africa Partnerships', 'Regional Operations and Finance Africa', 'HR Operations Africa', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Asia', acr: 'Asia', level: 'L2', dir: 'A0109', kids: U(['Managing Director Office Asia', 'Asia Partnerships', 'Regional Operations and Finance Asia', 'HR Operations Asia', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Americas', acr: 'Americas', level: 'L2', dir: 'A0110', kids: U(['Managing Director Office Americas', 'Americas Partnerships', 'Security', 'Bogota Office', 'Regional Operations and Finance Americas', 'HR Operations Americas', 'Regional Communications', 'Regional IT Operations and Service Desk']) },
+    { name: 'Europe', acr: 'Europe', level: 'L2', dir: 'A0111', kids: U(['Europe Partnerships', 'Regional Operations and Finance Europe', 'HR Operations Europe', 'Regional Communications', 'Regional IT Operations and Service Desk']) }
   ] }
 ];
 const DIMS = { 'ADG Research': 'DIM-1.1, DIM-1.2, DIM-1.3', BOF: 'DIM-1.1, DIM-1.2', DT: 'DIM-1.1, DIM-1.4', POD: 'DIM-1.1', SPEC: 'DIM-1.1, DIM-1.2, DIM-1.3', Legal: 'DIM-1.1', Africa: 'DIM-1.2', Asia: 'DIM-1.2', Americas: 'DIM-1.2', Europe: 'DIM-1.2' };
-const VKEYS = ['name', 'acr', 'parent', 'dir', 'email', 'level'];
 function pad(n) { return String(n).padStart(3, '0'); }
 function cmp(a, b) { return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' }); }
+function staff(c) { return STAFF.find(x => x.carnet === c) || null; }
+function yearsFrom(a) { const o = []; for (let y = a; y <= LAST; y++) o.push(y); return o; }
 
 function seed() {
   const E = {}; const ids = []; let k = 1;
   (function walk(list, parent) {
     list.forEach(n => {
       const id = n.id || ('e' + k);
-      E[id] = { id: id, pid: 'OU-' + pad(k), code: 'ORG-' + pad(k), flag: !!n.flag, closed: '', succ: '', versions: [{ from: START, name: n.name, acr: n.acr || '', parent: parent, dir: n.dir || '', email: n.email || '', level: n.level }] };
+      E[id] = { id: id, pid: 'OU-' + pad(k), code: 'ORG-' + pad(k), status: 'active', endYear: null, succ: '',
+        versions: [{ from: FIRST, to: null, name: n.name, acr: n.acr || '', parent: parent, dir: n.dir || '', level: n.level }],
+        log: [{ when: '2026-01-15 09:00', who: 'System seed', title: 'Created as ' + SHORT[n.level] + ' (seed)', lines: [{ t: 'Applies from ' + FIRST }] }] };
       k++; ids.push(id);
       if (n.kids) walk(n.kids, id);
     });
   })(TREE, '');
+  // Scripted history so the year views differ (current year = 2027 in this prototype).
+  const g = E.gender; g.versions = [Object.assign({}, g.versions[0], { to: 2027 }), Object.assign({}, g.versions[0], { from: 2027, to: null, parent: 'pisa' })];
+  g.log.unshift({ when: '2026-11-20 14:05', who: 'Hector Tobón', title: 'New version from 2027', lines: [{ t: 'Moved: ADG Research → Policy, Inclusion and Socio-Economic Analyses…' }] });
+  const ca = E.cacao; ca.versions[0].to = 2027; ca.status = 'deleted'; ca.endYear = 2027;
+  ca.log.unshift({ when: '2027-01-08 10:12', who: 'Hector Tobón', title: 'Deleted from 2027', lines: [{ t: 'Still shown in 2026 and earlier' }] });
+  const fl = E.flar; fl.versions[0].to = 2027; fl.status = 'inactive'; fl.endYear = 2027; fl.succ = 'rice';
+  fl.log.unshift({ when: '2027-01-08 10:20', who: 'Hector Tobón', title: 'Inactivated from 2027', lines: [{ t: 'Successor: Rice' }] });
+  const di = E.digital; di.versions = [Object.assign({}, di.versions[0], { to: 2028 }), Object.assign({}, di.versions[0], { from: 2028, to: null, name: 'Digital Inclusion and AI' })];
+  di.log.unshift({ when: '2027-02-02 16:40', who: 'Hector Tobón', title: 'New version from 2028', lines: [{ t: 'Renamed: “Digital Inclusion” → “Digital Inclusion and AI”' }] });
   return { E: E, ids: ids, next: k };
 }
 
@@ -399,191 +447,233 @@ class Component extends DCLogic {
   constructor(props) {
     super(props);
     const s = seed();
-    this.state = { E: s.E, ids: s.ids, next: s.next, asOf: TODAY, view: 'tree', open: { global: true, pod: true, hrops: true }, sel: 'bof', mode: 'edit', createParent: '',
-      draft: {}, chg: 'change', eff: TODAY, backdate: false, errors: {}, tab: 'details', dlg: null, toast: '', onlyFlagged: false, showClosed: false, q: '', sort: 'code', dir: 1, size: 25, page: 0 };
+    this.state = { E: s.E, ids: s.ids, next: s.next, year: CUR, view: 'tree', open: { global: true, bof: true, research: true }, sel: 'treasury', mode: 'edit', createParent: '',
+      draft: {}, applies: CUR, backdate: false, dirQ: '', errors: {}, tab: 'details', dlg: null, toast: '', showEnded: false, q: '', sort: 'code', dir: 1, size: 25, page: 0 };
   }
-  ver(e, d) { let v = null; e.versions.forEach(x => { if (x.from <= d) v = x; }); return v; }
-  alive(e, d) { return !!this.ver(e, d) && (!e.closed || e.closed > d); }
-  shown(e, d) { if (!this.ver(e, d)) return false; if (!this.state.showClosed && !this.alive(e, d)) return false; if (this.state.onlyFlagged) { const has = (x) => x.flag || this.kidsOf(x.id, d).some(has); return has(e); } return true; }
-  kidsOf(id, d) { return this.state.ids.map(i => this.state.E[i]).filter(x => { const v = this.ver(x, d); return v && v.parent === id && (this.state.showClosed || this.alive(x, d)); }).sort((a, b) => cmp(a.code, b.code)); }
-  units(id, d) { return this.kidsOf(id, d).reduce((a, x) => a + (this.kidsOf(x.id, d).length ? this.units(x.id, d) : 1), 0); }
-  path(id, d) { const out = []; let e = this.state.E[id]; while (e) { const v = this.ver(e, d) || e.versions[0]; out.unshift(v.acr || v.name); e = this.state.E[v.parent]; } return out.join(' › '); }
+  ver(e, y) { return e.versions.find(v => v.from <= y && (v.to == null || v.to > y)) || null; }
+  last(e) { return e.versions[e.versions.length - 1]; }
+  disp(e, y) { const v = this.ver(e, y); if (v) return v; if (this.state.showEnded && e.endYear != null && e.endYear <= y && e.versions[0].from <= y) return this.last(e); return null; }
+  alive(e, y) { return !!this.ver(e, y); }
+  scheduled(e, y) { const n = e.versions.filter(v => v.from > y).map(v => v.from); return n.length ? Math.min.apply(null, n) : null; }
+  kidsOf(id, y) { return this.state.ids.map(i => this.state.E[i]).filter(x => { const v = this.disp(x, y); return v && v.parent === id; }).sort((a, b) => cmp(a.code, b.code)); }
+  activeKids(id, fromY) { return this.state.ids.map(i => this.state.E[i]).filter(x => x.versions.some(v => v.parent === id && (v.to == null || v.to > fromY))); }
+  units(id, y) { return this.kidsOf(id, y).reduce((a, x) => a + (this.kidsOf(x.id, y).length ? this.units(x.id, y) : 1), 0); }
+  path(id, y) { const out = []; let e = this.state.E[id]; let guard = 0; while (e && guard++ < 8) { const v = this.ver(e, y) || this.last(e); out.unshift(v.acr || v.name); e = this.state.E[v.parent]; } return out.join(' › '); }
   base() {
     const s = this.state;
     if (s.mode === 'create') {
-      const p = s.E[s.createParent]; const pv = p ? this.ver(p, s.asOf) : null;
+      const p = s.E[s.createParent]; const pv = p ? this.ver(p, s.year) : null;
       const lvl = !pv ? 'L1' : (pv.level === 'L1' ? 'L2' : 'L4');
-      return { code: 'ORG-' + pad(s.next), name: '', acr: '', parent: s.createParent, dir: '', email: '', level: lvl, flag: false };
+      return { code: 'ORG-' + pad(s.next), name: '', acr: '', parent: s.createParent, dir: '', level: lvl };
     }
     const e = s.E[s.sel]; if (!e) return null;
-    const v = this.ver(e, s.asOf) || e.versions[0];
-    return Object.assign({ code: e.code, flag: e.flag }, v);
+    const v = this.disp(e, s.year) || this.ver(e, s.year) || this.last(e);
+    return Object.assign({ code: e.code }, v);
   }
   val(k) { const d = this.state.draft; if (d[k] !== undefined) return d[k]; const b = this.base(); return b ? b[k] : ''; }
   set(k, v) { const d = Object.assign({}, this.state.draft); d[k] = v; this.setState({ draft: d, errors: {}, toast: '' }); }
-  pick(id) { this.setState({ sel: id, mode: 'edit', draft: {}, errors: {}, chg: 'change', eff: this.state.asOf, backdate: false, tab: 'details', toast: '' }); }
-  startCreate(pid) { const o = Object.assign({}, this.state.open); if (pid) o[pid] = true; this.setState({ mode: 'create', createParent: pid, draft: {}, errors: {}, tab: 'details', toast: '', open: o }); }
+  pick(id) { this.setState({ sel: id, mode: 'edit', draft: {}, errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '' }); }
+  startCreate(pid) { const o = Object.assign({}, this.state.open); if (pid) o[pid] = true; this.setState({ mode: 'create', createParent: pid, draft: {}, errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '', open: o }); }
   changedKeys() { const b = this.base(); if (!b) return []; return VKEYS.filter(k => this.state.draft[k] !== undefined && this.state.draft[k] !== b[k]); }
-  linkedCount(e) { const v = e.versions[e.versions.length - 1]; return DIMS[v.acr] ? 1 : 0; }
+  stamp() { return '2027-03-10 11:' + String(10 + (this.state.next % 40)).padStart(2, '0'); }
   save() {
-    const s = this.state; const b = this.base(); const v = Object.assign({}, b, s.draft); const errors = {};
+    const s = this.state; const b = this.base(); const v = Object.assign({}, b, s.draft); const errors = {}; const Y = Number(s.applies);
     if (!String(v.code).trim()) errors.code = 'Required';
-    else if (s.ids.some(id => id !== (s.mode === 'edit' ? s.sel : '') && s.E[id].code.toUpperCase() === String(v.code).trim().toUpperCase())) errors.code = 'This code is already used';
+    else if (s.ids.some(id => id !== (s.mode === 'edit' ? s.sel : '') && s.E[id].code.toUpperCase() === String(v.code).trim().toUpperCase())) errors.code = 'This code is already used (also by inactive or deleted entries)';
     if (!String(v.name).trim()) errors.name = 'Required';
     const need = ALLOWED[v.level];
-    const pv = v.parent ? this.ver(s.E[v.parent], s.asOf) : null;
+    const pe = v.parent ? s.E[v.parent] : null;
     if (need.length && !v.parent) errors.parent = 'Select a parent';
-    else if (need.length && pv && need.indexOf(pv.level) < 0) errors.parent = SHORT[v.level] + ' must sit under a ' + need.map(l => SHORT[l]).join(' or ');
+    else if (need.length && pe && need.indexOf((this.ver(pe, Y) || this.last(pe)).level) < 0) errors.parent = SHORT[v.level] + ' must sit under a ' + need.map(l => SHORT[l]).join(' or ');
+    else if (need.length && pe && !this.alive(pe, Y)) errors.parent = 'The parent is not active in ' + Y;
     else if (!need.length && v.parent) errors.parent = 'A Division has no parent';
     const changed = this.changedKeys();
     const e0 = s.mode === 'edit' ? s.E[s.sel] : null;
-    const curV = e0 ? this.ver(e0, s.asOf) : null;
-    if (e0 && changed.length && s.chg === 'change' && (!s.eff || (!s.backdate && s.eff <= curV.from) || s.eff < START)) errors.eff = s.backdate ? 'Pick a date from ' + START : 'Pick a date after ' + curV.from + ', or tick Back-date';
+    if (Y < CUR && !s.backdate) errors.year = 'Tick Back-date to apply from a year before ' + CUR;
+    if (e0 && changed.length && Y < e0.versions[0].from) errors.year = 'The entry starts in ' + e0.versions[0].from;
     if (Object.keys(errors).length) { this.setState({ errors: errors }); return; }
     const E = Object.assign({}, s.E);
-    const rec = { name: v.name.trim(), acr: v.acr, parent: v.parent, dir: v.dir, email: v.email, level: v.level };
+    const rec = { name: v.name.trim(), acr: v.acr, parent: v.parent, dir: v.dir, level: v.level };
+    const dname = rec.dir ? staff(rec.dir).name : '—';
     if (s.mode === 'create') {
       const id = 'n' + s.next;
-      E[id] = { id: id, pid: 'OU-' + pad(s.next), code: v.code.trim(), flag: !!v.flag, closed: '', succ: '', versions: [Object.assign({ from: s.asOf }, rec)] };
+      E[id] = { id: id, pid: 'OU-' + pad(s.next), code: v.code.trim(), status: 'active', endYear: null, succ: '', versions: [Object.assign({ from: Y, to: null }, rec)],
+        log: [{ when: this.stamp(), who: 'You', title: 'Created as ' + SHORT[rec.level] + (s.backdate && Y < CUR ? ' (back-dated)' : ''), lines: [{ t: 'Applies from ' + Y }, { t: 'Director: ' + dname }] }] };
       const o = Object.assign({}, s.open); if (v.parent) o[v.parent] = true;
-      this.setState({ E: E, ids: s.ids.concat([id]), next: s.next + 1, sel: id, mode: 'edit', draft: {}, open: o, toast: '“' + rec.name + '” created from ' + s.asOf + '.' });
+      this.setState({ E: E, ids: s.ids.concat([id]), next: s.next + 1, sel: id, mode: 'edit', draft: {}, open: o, year: Math.max(s.year, Y), toast: '“' + rec.name + '” created, applies from ' + Y + '.' });
       return;
     }
-    const e = Object.assign({}, e0, { code: v.code.trim(), flag: !!v.flag });
-    let msg = 'Changes to “' + rec.name + '” saved.';
+    const e = Object.assign({}, e0, { code: v.code.trim(), log: e0.log.slice() });
+    let msg = 'Code saved.';
+    const lines = [];
+    if (e0.code !== e.code) lines.push({ t: 'Code: ' + e0.code + ' → ' + e.code + ' (all years)' });
     if (changed.length) {
-      if (s.chg === 'correction') {
-        e.versions = e0.versions.map(x => x === curV ? Object.assign({}, x, rec) : x);
-        msg = 'Correction saved on the version valid since ' + curV.from + ' — no history entry.';
-      } else {
-        const delta = {}; changed.forEach(k => { delta[k] = rec[k]; });
-        const baseV = this.ver(e0, s.eff) || e0.versions[0];
-        e.versions = e0.versions.filter(x => x.from !== s.eff).map(x => x.from > s.eff ? Object.assign({}, x, delta) : x)
-          .concat([Object.assign({}, baseV, delta, { from: s.eff })]).sort((a, b) => cmp(a.from, b.from));
-        if (changed.indexOf('parent') >= 0) msg = '“' + rec.name + '” moves from ' + this.path(curV.parent, s.asOf) + ' to ' + this.path(rec.parent, s.asOf) + ' from ' + s.eff + '. Its linked records follow it and count under the new parent from that date; reports before that date keep the old parent.';
-        else msg = 'New version of “' + rec.name + '” valid from ' + s.eff + '. The previous version stays in the history.';
-      }
-    }
+      const vs = e0.versions.map(x => Object.assign({}, x));
+      let idx = vs.findIndex(x => x.from === Y); let kind = 'in place';
+      if (idx < 0) { const ci = vs.findIndex(x => x.from <= Y && (x.to == null || x.to > Y)); const cv = vs[ci]; const nv = Object.assign({}, cv, { from: Y }); cv.to = Y; vs.splice(ci + 1, 0, nv); idx = ci + 1; kind = 'split'; }
+      const old = Object.assign({}, vs[idx]);
+      changed.forEach(k => { vs[idx][k] = rec[k]; });
+      const kept = [];
+      for (let i = idx + 1; i < vs.length; i++) changed.forEach(k => { if (vs[i][k] === old[k]) vs[i][k] = rec[k]; else kept.push(k + ' from ' + vs[i].from); });
+      e.versions = vs;
+      changed.forEach(k => {
+        const o = k === 'parent' ? (old.parent ? this.path(old.parent, Y) : '—') : k === 'dir' ? (old.dir ? staff(old.dir).name : '—') : (old[k] || '—');
+        const n = k === 'parent' ? (rec.parent ? this.path(rec.parent, Y) : '—') : k === 'dir' ? dname : (rec[k] || '—');
+        lines.push({ t: ({ name: 'Name', acr: 'Acronym', parent: 'Moved', dir: 'Director', level: 'Level' })[k] + ': ' + o + ' → ' + n });
+      });
+      if (kept.length) lines.push({ t: 'Kept later deliberate change: ' + kept.join(', ') });
+      const back = Y < CUR;
+      e.log.unshift({ when: this.stamp(), who: 'You', title: (kind === 'in place' ? 'Edited in place (' + Y + ')' : 'New version from ' + Y) + (back ? ' · back-dated' : ''), lines: lines });
+      msg = kind === 'in place' ? 'Updated the version that starts in ' + Y + ' — no new version.' : 'New version from ' + Y + '. ' + (Y - 1) + ' and earlier keep the previous values.';
+      if (changed.indexOf('parent') >= 0) msg += ' Its records count under the new parent from ' + Y + '.';
+      if (back) msg += ' Back-dated: reports from ' + Y + ' are recalculated.';
+    } else if (lines.length) e.log.unshift({ when: this.stamp(), who: 'You', title: 'Code changed', lines: lines });
     E[s.sel] = e;
-    this.setState({ E: E, draft: {}, errors: {}, chg: 'change', toast: msg });
+    this.setState({ E: E, draft: {}, errors: {}, backdate: false, toast: msg });
   }
-  historyOf(e) {
-    const out = [];
-    e.versions.forEach((v, i) => {
-      if (i === 0) { out.push({ date: v.from, title: 'Created as ' + SHORT[v.level], lines: [{ t: '“' + v.name + '”' + (v.parent ? ' under ' + this.path(v.parent, v.from) : '') }] }); return; }
-      const p = e.versions[i - 1]; const lines = [];
-      if (p.name !== v.name) lines.push({ t: 'Renamed: “' + p.name + '” → “' + v.name + '”' });
-      if (p.acr !== v.acr) lines.push({ t: 'Acronym: ' + (p.acr || '—') + ' → ' + (v.acr || '—') });
-      if (p.parent !== v.parent) lines.push({ t: 'Moved: ' + this.path(p.parent, p.from) + ' → ' + this.path(v.parent, v.from) });
-      if (p.level !== v.level) lines.push({ t: 'Level: ' + SHORT[p.level] + ' → ' + SHORT[v.level] });
-      if (p.dir !== v.dir || p.email !== v.email) lines.push({ t: 'Director: ' + (p.dir || '—') + ' → ' + (v.dir || '—') });
-      out.push({ date: v.from, title: 'Organizational change', lines: lines.length ? lines : [{ t: 'No field changed' }] });
-    });
-    if (e.closed) out.push({ date: e.closed, title: 'Closed', lines: [{ t: e.succ ? 'Successor: ' + this.path(e.succ, e.closed) : 'No successor' }] });
-    return out.reverse();
+  doLife(kind) {
+    const s = this.state; const e = s.E[s.sel]; const Y = Number(s.dlg.year); const E = Object.assign({}, s.E);
+    if (Y < CUR && !s.dlg.backdate) { this.setState({ dlg: Object.assign({}, s.dlg, { err: 'Tick Back-date to use a year before ' + CUR }) }); return; }
+    const ne = Object.assign({}, e, { versions: e.versions.map(x => Object.assign({}, x)), log: e.log.slice() });
+    const name = this.last(e).name;
+    if (kind === 'reactivate') {
+      if (Y < e.endYear) { this.setState({ dlg: Object.assign({}, s.dlg, { err: 'Pick ' + e.endYear + ' or later' }) }); return; }
+      ne.versions.push(Object.assign({}, this.last(e), { from: Y, to: null })); ne.status = 'active'; ne.endYear = null; ne.succ = '';
+      ne.log.unshift({ when: this.stamp(), who: 'You', title: 'Reactivated from ' + Y, lines: [{ t: 'New version with its last values' }] });
+      E[s.sel] = ne; this.setState({ E: E, dlg: null, toast: '“' + name + '” reactivated from ' + Y + '.' }); return;
+    }
+    const kids = this.activeKids(e.id, kind === 'delete' && e.versions[0].from >= CUR ? e.versions[0].from : Y);
+    if (kids.length) { this.setState({ dlg: Object.assign({}, s.dlg, { err: 'Still has ' + kids.length + ' child entries active in ' + Y + ' or later: ' + kids.slice(0, 3).map(k => this.last(k).name).join(', ') + (kids.length > 3 ? '…' : '') + '. Move or inactivate them first.' }) }); return; }
+    const physical = kind === 'delete' && e.versions[0].from >= CUR;
+    if (physical) {
+      delete E[s.sel];
+      this.setState({ E: E, ids: s.ids.filter(i => i !== s.sel), sel: null, dlg: null, toast: '“' + name + '” did not exist before ' + CUR + ' and nothing is linked to it, so it was removed. Its change log is kept.' }); return;
+    }
+    if (Y <= e.versions[0].from) { this.setState({ dlg: Object.assign({}, s.dlg, { err: 'The entry starts in ' + e.versions[0].from + ': pick a later year' }) }); return; }
+    const later = e.versions.filter(x => x.from > Y).map(x => x.from);
+    if (later.length) { this.setState({ dlg: Object.assign({}, s.dlg, { err: 'A change is scheduled from ' + Math.min.apply(null, later) + '. Remove or move it first.' }) }); return; }
+    ne.versions = ne.versions.filter(x => x.from !== Y);
+    const lv = ne.versions[ne.versions.length - 1]; lv.to = Y;
+    ne.status = kind === 'delete' ? 'deleted' : 'inactive'; ne.endYear = Y; ne.succ = kind === 'delete' ? '' : (s.dlg.succ || '');
+    ne.log.unshift({ when: this.stamp(), who: 'You', title: (kind === 'delete' ? 'Deleted' : 'Inactivated') + ' from ' + Y + (Y < CUR ? ' · back-dated' : ''), lines: [{ t: ne.succ ? 'Successor: ' + this.path(ne.succ, Y) : 'Still shown in ' + (Y - 1) + ' and earlier' }] });
+    E[s.sel] = ne;
+    this.setState({ E: E, dlg: null, toast: '“' + name + '” ' + (kind === 'delete' ? 'deleted' : 'inactivated') + ' from ' + Y + '. It still appears in ' + (Y - 1) + ' and earlier' + (ne.succ ? '; from ' + Y + ' its records roll up to ' + this.path(ne.succ, Y) : '') + '.' });
   }
   renderVals() {
-    const s = this.state; const d = s.asOf;
+    const s = this.state; const y = s.year;
     const tree = [];
-    const walk = (pid, level) => this.kidsOf(pid, d).filter(e => this.shown(e, d)).forEach(e => {
-      const v = this.ver(e, d); const kids = this.kidsOf(e.id, d).filter(x => this.shown(x, d)); const open = !!s.open[e.id];
-      const sel = s.mode === 'edit' && s.sel === e.id; const later = e.versions.some(x => x.from > d); const changedAt = e.versions.length > 1 && v.from > START && v.from <= d;
-      tree.push({ name: v.name, acr: v.acr, hasAcr: !!v.acr && v.acr !== v.name, code: e.code, levelLabel: SHORT[v.level], dir: v.dir, flag: e.flag,
+    const walk = (pid, level) => this.kidsOf(pid, y).forEach(e => {
+      const v = this.disp(e, y); const kids = this.kidsOf(e.id, y); const open = !!s.open[e.id];
+      const sel = s.mode === 'edit' && s.sel === e.id; const sch = this.scheduled(e, y); const ended = !this.alive(e, y); const st = staff(v.dir);
+      const changedHere = !ended && v.from > FIRST && v.from === y;
+      tree.push({ name: v.name, acr: v.acr, hasAcr: !!v.acr && v.acr !== v.name, code: e.code, levelLabel: SHORT[v.level], dir: st ? st.name : '', dirInactive: !!st && !st.active,
         hasKids: kids.length > 0, noKids: kids.length === 0, open: open, rot: open ? 90 : 0, pad: 10 + level * 22,
-        bg: sel ? '#E3ECF6' : (level === 0 ? '#FAFBFC' : '#ffffff'), weight: level === 0 || sel ? 700 : 400, color: this.alive(e, d) ? '#112F5C' : '#6B7079',
-        hasCount: kids.length > 0, count: this.units(e.id, d) + ' units', closed: !this.alive(e, d),
-        changed: later || changedAt, changedLabel: later ? 'Change scheduled' : 'Changed ' + v.from,
-        canAdd: v.level !== 'L4' && this.alive(e, d), addLabel: 'Add an entry under ' + v.name, add: () => this.startCreate(e.id),
+        bg: sel ? '#E3ECF6' : (level === 0 ? '#FAFBFC' : '#ffffff'), weight: level === 0 || sel ? 700 : 400, color: ended ? '#6B7079' : '#112F5C',
+        hasCount: kids.length > 0, count: this.units(e.id, y) + ' units',
+        ended: ended, endedLabel: (e.status === 'deleted' ? 'Deleted' : 'Inactive') + ' from ' + e.endYear,
+        scheduled: !ended && sch != null, scheduledLabel: 'Change scheduled in ' + sch,
+        changed: changedHere, changedLabel: 'Changed in ' + v.from,
+        canAdd: v.level !== 'L4' && !ended, addLabel: 'Add an entry under ' + v.name, add: () => this.startCreate(e.id),
         toggleLabel: (open ? 'Collapse ' : 'Expand ') + v.name, toggle: () => { const o = Object.assign({}, this.state.open); o[e.id] = !o[e.id]; this.setState({ open: o }); }, pick: () => this.pick(e.id) });
       if (kids.length && open) walk(e.id, level + 1);
     });
     walk('', 0);
 
     const q = s.q.trim().toLowerCase();
-    let flat = s.ids.map(i => s.E[i]).filter(e => this.shown(e, d)).map(e => { const v = this.ver(e, d); const pe = s.E[v.parent]; const pv = pe ? this.ver(pe, d) : null;
-      return { id: e.id, code: e.code, level: v.level, levelLabel: LEVELS[v.level], name: v.name, acr: v.acr, parentName: pv ? pv.name : '—', dir: v.dir, flag: e.flag ? 'Yes' : 'No', flagLabel: e.flag ? 'Yes' : '—', from: v.from }; })
-      .filter(r => !q || (r.code + ' ' + r.name + ' ' + r.acr + ' ' + r.parentName + ' ' + r.dir).toLowerCase().indexOf(q) >= 0);
+    let flat = s.ids.map(i => s.E[i]).filter(e => this.disp(e, y)).map(e => { const v = this.disp(e, y); const pe = s.E[v.parent]; const pv = pe ? (this.ver(pe, y) || this.last(pe)) : null; const st = staff(v.dir); const ended = !this.alive(e, y);
+      return { id: e.id, pid: e.pid, code: e.code, level: v.level, levelLabel: LEVELS[v.level], name: v.name, acr: v.acr, parentName: pv ? (pe.code + ' · ' + pv.name) : '—', dir: st ? st.name + (st.active ? '' : ' (inactive staff)') : '', status: ended ? (e.status === 'deleted' ? 'Deleted' : 'Inactive') + ' from ' + e.endYear : 'Active', from: v.from + (v.to ? '–' + (v.to - 1) : ' →') }; })
+      .filter(r => !q || (r.code + ' ' + r.name + ' ' + r.acr + ' ' + r.dir).toLowerCase().indexOf(q) >= 0);
     flat.sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
     const pc = Math.max(1, Math.ceil(flat.length / s.size)); const page = Math.min(s.page, pc - 1); const start = page * s.size;
-    const COLS = [['code', 'Code', 100], ['level', 'Level', 150], ['name', 'Name', 260], ['acr', 'Acronym', 100], ['parentName', 'Parent', 220], ['dir', 'Director', 170], ['flag', 'KPIs', 70], ['from', 'Version from', 120]];
+    const COLS = [['pid', 'ID', 80], ['code', 'Code', 95], ['level', 'Level', 140], ['name', 'Name', 240], ['acr', 'Acronym', 95], ['parentName', 'Parent', 220], ['dir', 'Director', 160], ['status', 'Status', 140], ['from', 'Since', 95]];
     const t = { headers: COLS.map(c => { const on = s.sort === c[0]; return { label: c[1], w: c[2], icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none', sort: () => this.setState({ sort: c[0], dir: on ? -s.dir : 1, page: 0 }) }; }),
       rows: flat.slice(start, start + s.size).map(r => Object.assign({}, r, { bg: s.mode === 'edit' && s.sel === r.id ? '#E3ECF6' : '#ffffff', pick: () => this.pick(r.id) })),
       pages: Array.from({ length: pc }, (x, i) => ({ n: i + 1, aria: 'Page ' + (i + 1), bg: i === page ? '#035BA9' : '#ffffff', fg: i === page ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) })),
-      size: String(s.size), range: flat.length ? (start + 1) + '–' + Math.min(start + s.size, flat.length) + ' of ' + flat.length + ' entries' : '0 entries', setSize: (ev) => this.setState({ size: Number(ev.target.value), page: 0 }) };
+      size: String(s.size), range: flat.length ? (start + 1) + '–' + Math.min(start + s.size, flat.length) + ' of ' + flat.length + ' entries in ' + y : '0 entries in ' + y, setSize: (ev) => this.setState({ size: Number(ev.target.value), page: 0 }) };
 
-    const b = this.base(); const hasForm = !!b; const e = s.mode === 'edit' ? s.E[s.sel] : null; const curV = e ? this.ver(e, d) : null;
+    const b = this.base(); const hasForm = !!b; const e = s.mode === 'edit' ? s.E[s.sel] : null; const Y = Number(s.applies);
+    const locked = !!e && e.status === 'deleted';
     const lvl = this.val('level'); const need = ALLOWED[lvl] || [];
-    const parents = s.ids.map(i => s.E[i]).filter(x => x.id !== s.sel && this.alive(x, d) && need.indexOf(this.ver(x, d).level) >= 0).sort((a, c) => cmp(this.path(a.id, d), this.path(c.id, d))).map(x => ({ v: x.id, l: this.path(x.id, d) }));
+    const parents = s.ids.map(i => s.E[i]).filter(x => x.id !== s.sel && this.alive(x, Y) && need.indexOf(this.ver(x, Y).level) >= 0).sort((a, c) => cmp(this.path(a.id, Y), this.path(c.id, Y))).map(x => ({ v: x.id, l: this.path(x.id, Y) }));
     const changed = this.changedKeys();
-    const moving = changed.indexOf('parent') >= 0;
-    const f = hasForm ? { code: this.val('code'), level: lvl, name: this.val('name'), acr: this.val('acr'), parent: this.val('parent'), dir: this.val('dir'), email: this.val('email'), flag: !!this.val('flag'),
-      parents: parents, parentLabel: need.length ? 'Parent *' : 'Parent', parentEmpty: need.length ? 'Select a ' + need.map(l => SHORT[l]).join(' or ') : 'None — Divisions are top level', parentDisabled: !need.length, parentBg: need.length ? '#ffffff' : '#F4F7F9',
+    const dirC = this.val('dir'); const dSt = staff(dirC); const dq = s.dirQ.trim().toLowerCase();
+    const hits = dq.length >= 2 ? STAFF.filter(x => x.active && (x.name + ' ' + x.email).toLowerCase().indexOf(dq) >= 0).slice(0, 6).map(x => ({ name: x.name, email: x.email, pick: () => { const d = Object.assign({}, this.state.draft); d.dir = x.carnet; this.setState({ draft: d, dirQ: '' }); } })) : [];
+    const minY = s.backdate ? FIRST : CUR;
+    const covering = e ? e.versions.find(x => x.from === Y) : null;
+    const f = hasForm ? { code: this.val('code'), level: lvl, name: this.val('name'), acr: this.val('acr'), parent: this.val('parent'), locked: locked,
+      parents: parents, parentLabel: need.length ? 'Parent *' : 'Parent', parentEmpty: need.length ? 'Select a ' + need.map(l => SHORT[l]).join(' or ') + ' active in ' + Y : 'None — Divisions are top level', parentDisabled: !need.length || locked, parentBg: need.length ? '#ffffff' : '#F4F7F9',
       codeErr: s.errors.code || '', hasCodeErr: !!s.errors.code, codeBorder: s.errors.code ? '#B00020' : '#B9C0C5', hasNameErr: !!s.errors.name, nameBorder: s.errors.name ? '#B00020' : '#B9C0C5',
       parentErr: s.errors.parent || '', hasParentErr: !!s.errors.parent, parentBorder: s.errors.parent ? '#B00020' : '#B9C0C5',
-      showChange: s.mode === 'edit' && changed.length > 0, isChange: s.chg === 'change', isCorrection: s.chg === 'correction',
-      changeHint: moving ? 'Records linked to this entry will count under the new parent from this date.' : 'Reports before this date keep showing the previous values.',
-      eff: s.eff, effMin: s.backdate ? START : (curV ? curV.from : START), backdate: !!s.backdate, curFrom: curV ? curV.from : START, effErr: s.errors.eff || '', hasEffErr: !!s.errors.eff, effBorder: s.errors.eff ? '#B00020' : '#B9C0C5' } : {};
+      dir: dirC, hasDir: !!dSt, noDir: !dSt, dirName: dSt ? dSt.name : '', dirEmail: dSt ? dSt.email : '', dirInactive: !!dSt && !dSt.active, dirQ: s.dirQ, dirHits: hits, hasDirHits: hits.length > 0, dirNoHits: dq.length >= 2 && !hits.length,
+      showYear: !locked && (s.mode === 'create' || changed.length > 0), yearStr: String(Y), yearOpts: yearsFrom(minY).map(x => ({ v: String(x), l: String(x) + (x === CUR ? ' (current)' : '') })),
+      yearHint: s.mode === 'create' ? 'The entry exists from ' + Y + '. Earlier years will not show it.' : (covering ? 'A version already starts in ' + Y + ': it is updated in place (use this to fix typos).' : 'A new version starts in ' + Y + '. ' + (Y - 1) + ' and earlier keep the current values.' + (changed.indexOf('parent') >= 0 ? ' Linked records count under the new parent from ' + Y + '.' : '')),
+      backdate: !!s.backdate, yearErr: s.errors.year || '', hasYearErr: !!s.errors.year, yearBorder: s.errors.year ? '#B00020' : '#B9C0C5' } : {};
     const linked = e ? [
-      { label: 'Child entries (today)', value: String(this.kidsOf(e.id, d).length), color: '#4C5158' },
-      { label: 'Dimensions (owner unit)', value: DIMS[curV ? curV.acr : ''] || 'None', color: DIMS[curV ? curV.acr : ''] ? '#153C71' : '#6B7079' },
+      { label: 'Child entries (' + y + ')', value: String(this.kidsOf(e.id, y).length), color: '#4C5158' },
+      { label: 'Dimensions (owner unit)', value: DIMS[this.last(e).acr] || 'None', color: DIMS[this.last(e).acr] ? '#153C71' : '#6B7079' },
       { label: 'Institutional Objectives (owner unit)', value: 'None', color: '#6B7079' },
-      { label: 'KPIs and results', value: 'Shown once the mapping modules exist', color: '#6B7079' }
+      { label: 'KPIs and results', value: 'Shown once those modules exist', color: '#6B7079' }
     ] : [];
-    const tabStyle = (k) => s.tab === k;
-    let c = { title: '', body: '', closeLabel: 'Cancel', canAct: false, isClose: false, act: null, actLabel: '', actBg: '#B00020' };
+    const tabOn = (k) => s.tab === k;
+    let c = { title: '', body: '', closeLabel: 'Cancel', canAct: false, hasYear: false, hasSucc: false, act: null, actLabel: '', actBg: '#B00020' };
     if (s.dlg && e) {
-      const v = this.ver(e, d); const kids = this.kidsOf(e.id, d).length; const linkedN = DIMS[v.acr] ? 1 : 0;
+      const nm = this.last(e).name; const dy = Number(s.dlg.year);
+      const yearOpts = yearsFrom(s.dlg.backdate ? FIRST : CUR).map(x => ({ v: String(x), l: String(x) + (x === CUR ? ' (current)' : '') }));
+      const common = { hasYear: true, yearStr: String(dy), yearOpts: yearOpts, backdate: !!s.dlg.backdate, err: s.dlg.err || '', hasErr: !!s.dlg.err,
+        onYear: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { year: Number(ev.target.value), err: '' }) }),
+        onBack: () => this.setState({ dlg: Object.assign({}, this.state.dlg, { backdate: !this.state.dlg.backdate, err: '' }) }) };
       if (s.dlg.kind === 'delete') {
-        if (kids || linkedN) c = { title: 'Cannot delete “' + v.name + '”', body: (kids ? 'It has ' + kids + ' child entries. ' : '') + (linkedN ? 'Data is linked to it (owner of ' + DIMS[v.acr] + '). ' : '') + 'Entries with associated information cannot be deleted. Close it instead: it stays on historical records.', closeLabel: 'Close', canAct: false, isClose: false };
-        else c = { title: 'Delete “' + v.name + '”?', body: 'It has no children and no associated information, so it can be removed permanently.', closeLabel: 'Cancel', canAct: true, isClose: false, actLabel: 'Delete', actBg: '#B00020',
-          act: () => { const ids = s.ids.filter(i => i !== s.sel); this.setState({ ids: ids, sel: null, dlg: null, toast: '“' + v.name + '” deleted.' }); } };
-      } else if (e.closed) {
-        c = { title: 'Reopen “' + v.name + '”?', body: 'It was closed from ' + e.closed + '. Reopening removes the closing date.', closeLabel: 'Cancel', canAct: true, isClose: false, actLabel: 'Reopen', actBg: '#035BA9',
-          act: () => { const E = Object.assign({}, s.E); E[s.sel] = Object.assign({}, e, { closed: '', succ: '' }); this.setState({ E: E, dlg: null, toast: '“' + v.name + '” reopened.' }); } };
-      } else if (kids) {
-        c = { title: 'Cannot close “' + v.name + '” yet', body: 'It still has ' + kids + ' active child entries. Move them to another parent or close them first.', closeLabel: 'Close', canAct: false, isClose: false };
+        const linkedN = DIMS[this.last(e).acr] ? 1 : 0;
+        const physical = e.versions[0].from >= CUR;
+        if (linkedN) c = { title: 'Cannot delete “' + nm + '”', body: 'Data is linked to it (owner of ' + DIMS[this.last(e).acr] + '). Entries with associated information cannot be deleted. Inactivate it instead: it stays on historical records.', closeLabel: 'Close', canAct: false, hasYear: false };
+        else if (physical) c = { title: 'Delete “' + nm + '”?', body: 'It did not exist before ' + CUR + ' (it starts in ' + e.versions[0].from + ') and nothing is linked to it, so it will be removed. Its change log is kept.', closeLabel: 'Cancel', canAct: true, hasYear: false, actLabel: 'Delete', actBg: '#B00020', act: () => this.doLife('delete') };
+        else c = Object.assign({ title: 'Delete “' + nm + '”', body: 'It is not erased: it ends from the year you pick and stays visible in every earlier year. A deleted entry cannot be reactivated.', closeLabel: 'Cancel', canAct: true, yearLabel: 'Deleted from year *', hasSucc: false, note: 'Blocked while it has child entries active in that year or later.', actLabel: 'Delete', actBg: '#B00020', act: () => this.doLife('delete') }, common);
+      } else if (e.status === 'inactive') {
+        c = Object.assign({ title: 'Reactivate “' + nm + '”', body: 'Inactive from ' + e.endYear + '. Reactivating adds a version with its last values from the year you pick.', closeLabel: 'Cancel', canAct: true, yearLabel: 'Reactivate from year *', hasSucc: false, note: 'The successor link is removed.', actLabel: 'Reactivate', actBg: '#035BA9', act: () => this.doLife('reactivate') }, common);
       } else {
-        const opts = s.ids.map(i => s.E[i]).filter(x => x.id !== e.id && this.alive(x, d) && this.ver(x, d).level === v.level).map(x => ({ v: x.id, l: this.path(x.id, d) }));
-        c = { title: 'Close “' + v.name + '”', body: 'From the closing date it no longer appears in new selections. Records already linked keep pointing to it.', closeLabel: 'Cancel', canAct: true, isClose: true, actLabel: 'Close entry', actBg: '#035BA9',
-          date: s.dlg.date, succ: s.dlg.succ, options: opts,
-          onDate: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { date: ev.target.value }) }), onSucc: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { succ: ev.target.value }) }),
-          act: () => { const E = Object.assign({}, s.E); E[s.sel] = Object.assign({}, e, { closed: s.dlg.date, succ: s.dlg.succ }); this.setState({ E: E, dlg: null, toast: '“' + v.name + '” closed from ' + s.dlg.date + (s.dlg.succ ? '; its records roll up to ' + this.path(s.dlg.succ, d) + ' from that date.' : '.') }); } };
+        const lv = (this.ver(e, dy) || this.last(e)).level;
+        const opts = s.ids.map(i => s.E[i]).filter(x => x.id !== e.id && this.alive(x, dy) && this.ver(x, dy).level === lv).map(x => ({ v: x.id, l: this.path(x.id, dy) }));
+        c = Object.assign({ title: 'Inactivate “' + nm + '”', body: 'It ends from the year you pick. Records already linked keep pointing to it, and earlier years still show it.', closeLabel: 'Cancel', canAct: true, yearLabel: 'Inactive from year *', hasSucc: true, succ: s.dlg.succ, options: opts,
+          onSucc: (ev) => this.setState({ dlg: Object.assign({}, this.state.dlg, { succ: ev.target.value }) }),
+          note: 'Use a successor (same level) for merges: from that year, records linked to this entry roll up to the successor. The records themselves are not changed.', actLabel: 'Inactivate', actBg: '#035BA9', act: () => this.doLife('inactivate') }, common);
       }
     }
-    const allAlive = s.ids.map(i => s.E[i]).filter(x => this.alive(x, d)).map(x => ({ e: x, v: this.ver(x, d) }));
+    const visible = s.ids.map(i => s.E[i]).filter(x => this.alive(x, y)).map(x => ({ e: x, v: this.ver(x, y) }));
+    const versions = e ? e.versions.slice().reverse().map(x => { const st = staff(x.dir); return { range: x.from + (x.to ? '–' + (x.to - 1) : ' →'), text: x.name + (x.acr ? ' (' + x.acr + ')' : '') + ' · ' + SHORT[x.level] + ' · under ' + (x.parent ? this.path(x.parent, x.from) : 'top level') + ' · director ' + (st ? st.name : '—') }; }) : [];
     return {
-      tree: tree, t: t, q: s.q, onQ: (ev) => this.setState({ q: ev.target.value, page: 0 }),
+      cur: CUR, year: y, yearStr: String(y), yearOpts: yearsFrom(FIRST).map(x => ({ v: String(x), l: String(x) + (x === CUR ? ' (current)' : '') })),
+      notCur: y !== CUR, toCur: () => this.setState({ year: CUR }), onYear: (ev) => this.setState({ year: Number(ev.target.value), draft: {} }),
+      tree: tree, treeEmpty: tree.length === 0, t: t, q: s.q, onQ: (ev) => this.setState({ q: ev.target.value, page: 0 }),
       isTree: s.view === 'tree', isTable: s.view === 'table',
       treeBg: s.view === 'tree' ? '#ffffff' : 'transparent', treeFg: s.view === 'tree' ? '#112F5C' : '#6B7079', tableBg: s.view === 'table' ? '#ffffff' : 'transparent', tableFg: s.view === 'table' ? '#112F5C' : '#6B7079',
       showTree: () => this.setState({ view: 'tree' }), showTable: () => this.setState({ view: 'table' }),
-      asOf: d, notToday: d !== TODAY, onAsOf: (ev) => this.setState({ asOf: ev.target.value || TODAY, draft: {}, eff: ev.target.value || TODAY }), toToday: () => this.setState({ asOf: TODAY, eff: TODAY }),
-      onlyFlagged: s.onlyFlagged, showClosed: s.showClosed, toggleFlagged: () => this.setState({ onlyFlagged: !s.onlyFlagged }), toggleClosed: () => this.setState({ showClosed: !s.showClosed }),
-      exportXls: () => this.setState({ toast: 'Exported ' + allAlive.length + ' entries (structure as of ' + d + ') to organizational-structure_' + d + '.xlsx' }),
+      showEnded: s.showEnded, toggleEnded: () => this.setState({ showEnded: !s.showEnded }),
+      exportXls: () => this.setState({ toast: 'Exported ' + flat.length + ' entries of ' + y + ' to organizational-structure_' + y + '.xlsx' }),
       addDivision: () => this.startCreate(''),
       counts: [
-        { label: 'Level 1 · Divisions', n: allAlive.filter(x => x.v.level === 'L1').length },
-        { label: 'Level 2 · Departments', n: allAlive.filter(x => x.v.level === 'L2').length },
-        { label: 'Level 3 · Offices', n: allAlive.filter(x => x.v.level === 'L3').length },
-        { label: 'Level 4 · Units', n: allAlive.filter(x => x.v.level === 'L4').length },
-        { label: 'Manage institutional KPIs', n: allAlive.filter(x => x.e.flag).length }
+        { label: 'Level 1 · Divisions', n: visible.filter(x => x.v.level === 'L1').length },
+        { label: 'Level 2 · Departments', n: visible.filter(x => x.v.level === 'L2').length },
+        { label: 'Level 3 · Offices', n: visible.filter(x => x.v.level === 'L3').length },
+        { label: 'Level 4 · Units', n: visible.filter(x => x.v.level === 'L4').length }
       ],
       levels: Object.keys(LEVELS).map(k => ({ v: k, l: LEVELS[k] })),
       hasForm: hasForm, noForm: !hasForm, isEdit: s.mode === 'edit',
-      p: { code: e ? e.code : '', pid: e ? e.pid : '', levelCaps: (LEVELS[lvl] || '').toUpperCase(), title: s.mode === 'create' ? 'New entry' : (curV ? curV.name : ''),
-        path: s.mode === 'create' ? (s.createParent ? 'Under ' + this.path(s.createParent, d) : 'Top level') : (curV && curV.parent ? this.path(curV.parent, d) : 'Top level'),
-        histCount: e ? this.historyOf(e).length : 0, closeLabel: e && e.closed ? 'Reopen' : 'Close entry' },
-      onDetails: tabStyle('details') || s.mode === 'create', onHistory: tabStyle('history') && s.mode === 'edit', onLinked: tabStyle('linked') && s.mode === 'edit',
-      detailsW: tabStyle('details') ? 700 : 400, historyW: tabStyle('history') ? 700 : 400, linkedW: tabStyle('linked') ? 700 : 400,
-      detailsLine: tabStyle('details') ? '#00B6FF' : 'transparent', historyLine: tabStyle('history') ? '#00B6FF' : 'transparent', linkedLine: tabStyle('linked') ? '#00B6FF' : 'transparent',
+      p: { code: e ? e.code : '', pid: e ? e.pid : '', levelCaps: (LEVELS[lvl] || '').toUpperCase(), title: s.mode === 'create' ? 'New entry' : (b ? b.name : ''),
+        path: s.mode === 'create' ? (s.createParent ? 'Under ' + this.path(s.createParent, y) : 'Top level') : (b && b.parent ? this.path(b.parent, y) + ' (' + y + ')' : 'Top level'),
+        hasStatus: !!e && e.status !== 'active', status: e && e.status !== 'active' ? (e.status === 'deleted' ? 'Deleted' : 'Inactive') + ' from ' + e.endYear + (e.succ ? ' · successor ' + this.path(e.succ, e.endYear) : '') + (e.status === 'deleted' ? ' · read only' : '') : '',
+        histCount: e ? e.log.length : 0, canLifecycle: !!e && e.status !== 'deleted', lifeLabel: e && e.status === 'inactive' ? 'Reactivate' : 'Inactivate' },
+      onDetails: tabOn('details') || s.mode === 'create', onHistory: tabOn('history') && s.mode === 'edit', onLinked: tabOn('linked') && s.mode === 'edit',
+      detailsW: tabOn('details') ? 700 : 400, historyW: tabOn('history') ? 700 : 400, linkedW: tabOn('linked') ? 700 : 400,
+      detailsLine: tabOn('details') ? '#00B6FF' : 'transparent', historyLine: tabOn('history') ? '#00B6FF' : 'transparent', linkedLine: tabOn('linked') ? '#00B6FF' : 'transparent',
       tabDetails: () => this.setState({ tab: 'details' }), tabHistory: () => this.setState({ tab: 'history' }), tabLinked: () => this.setState({ tab: 'linked' }),
-      history: e ? this.historyOf(e) : [], linked: linked,
+      versions: versions, log: e ? e.log : [], linked: linked,
       f: f,
       on: { code: (ev) => this.set('code', ev.target.value), level: (ev) => this.set('level', ev.target.value), name: (ev) => this.set('name', ev.target.value), acr: (ev) => this.set('acr', ev.target.value),
-        parent: (ev) => this.set('parent', ev.target.value), dir: (ev) => this.set('dir', ev.target.value), email: (ev) => this.set('email', ev.target.value), flag: () => this.set('flag', !this.val('flag')),
-        eff: (ev) => this.setState({ eff: ev.target.value, errors: {} }), backdate: () => this.setState({ backdate: !this.state.backdate, errors: {} }), modeChange: () => this.setState({ chg: 'change' }), modeCorrection: () => this.setState({ chg: 'correction', errors: {} }) },
+        parent: (ev) => this.set('parent', ev.target.value), dirQ: (ev) => this.setState({ dirQ: ev.target.value }), clearDir: () => this.set('dir', ''),
+        year: (ev) => this.setState({ applies: Number(ev.target.value), errors: {} }), backdate: () => { const nb = !this.state.backdate; this.setState({ backdate: nb, applies: nb ? this.state.applies : Math.max(CUR, this.state.applies), errors: {} }); } },
       hasToast: !!s.toast, toast: s.toast,
-      save: () => this.save(), cancel: () => this.setState({ mode: 'edit', draft: {}, errors: {}, toast: '' }),
-      askDelete: () => this.setState({ dlg: { kind: 'delete' } }), askClose: () => this.setState({ dlg: { kind: 'close', date: d, succ: '' } }),
+      save: () => this.save(), cancel: () => this.setState({ mode: 'edit', draft: {}, errors: {}, dirQ: '', toast: '' }),
+      askDelete: () => this.setState({ dlg: { kind: 'delete', year: CUR, backdate: false, err: '' } }), askLife: () => this.setState({ dlg: { kind: e && e.status === 'inactive' ? 'reactivate' : 'inactivate', year: Math.max(CUR, e && e.endYear ? e.endYear : CUR), succ: '', backdate: false, err: '' } }),
       hasConfirm: !!s.dlg, c: c, closeConfirm: () => this.setState({ dlg: null })
     };
   }
