@@ -2,7 +2,7 @@
 
 - **Module:** control-lists — server `domain/entities/control-lists/` + client System admin page
 - **Spec id:** 2026-10-control-lists-global-scope
-- **Status:** draft — Judgment Day round 1 fixes applied (see `judgment.md`)
+- **Status:** approved (2026-10-13) — Judgment Day ESCALATED, R3-1/R3-2 corrected by requester decision (`judgment.md` §10)
 - **Owner:** Hector F. Tobón (requester)
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked TRD:** [`docs/trd/trd.md`](../../../trd/trd.md) — backend module layout, response envelope

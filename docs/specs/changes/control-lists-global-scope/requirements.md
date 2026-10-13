@@ -2,7 +2,7 @@
 
 - **Module:** control-lists (institutional-performance) — server + client
 - **Spec id:** 2026-10-control-lists-global-scope
-- **Status:** draft
+- **Status:** approved (2026-10-13)
 - **Depth:** **Standard** — changes an existing module's data model, API contract and page; rewrites three unmerged migrations. No new module, no integration, no deployed data
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Extends / modifies:** `institutional-performance/control-lists` — archived at [`../../archive/2026-10-08-institutional-performance--control-lists/`](../../archive/2026-10-08-institutional-performance--control-lists/). Its requirements are cited as `R-CTL-nnn`; the archive is not edited
