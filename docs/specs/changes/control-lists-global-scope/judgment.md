@@ -105,3 +105,23 @@ Requester decision (2026-10-13): treat **J-1 as severe** and correct it together
 | R2-3 | Same term in both documents ("multi-select shown as a checkbox group") |
 | R2-4 | Other suites create rows above the seeded ranges and never touch seeded rows (stated in §10) |
 | R2-5 | Positive test: A1 with no params passes through the real pipe; P-10 records the default |
+
+## 8. Round 2 scoped re-judgment (on `ff99a0df`) — final
+
+| Item | Judge A | Judge B |
+| --- | --- | --- |
+| R2-1 | RESOLVED (`src/db/seeds` outside every glob; `migration:show` goes through the loader — gate plausible, red not observed) | RESOLVED |
+| R2-2 | **PARTIAL** | **PARTIAL** |
+| R2-3, R2-4 | RESOLVED | RESOLVED |
+| R2-5 | RESOLVED — orchestrator's refutation confirmed correct | RESOLVED — confirmed correct |
+
+| # | Remaining / new | A | B | Severity | Status |
+| --- | --- | --- | --- | --- | --- |
+| R3-1 | A11: `UpdateControlListValueDto` is `PartialType(PickType(…))`; `PartialType` re-applies `@IsOptional` to every picked key, so `portfolioIds: null` is skipped on A11. Design §2.1 "inherits the create DTO's validators" is false; the §10 `null` → 400 on A11 test would fail. Fix: own `@ValidateIf(d => d.portfolioIds !== undefined)` on the update DTO, as `code`/`value`/`displayOrder`/`isActive` already do | A3-1 | B3-1 | HIGH / HIGH | **Confirmed — open** |
+| R3-2 | New `src/db/seeds/` file falls outside the `!**/db/migrations/**` coverage exclusion and is covered only by the integration suite | A3-2 | B3-2 | LOW / LOW | Corroborated · info |
+
+## 9. Terminal receipt
+
+Two fix rounds and two scoped re-judgments used (protocol ceiling). R3-1 remains → **escalated to the requester**; no further automatic round.
+
+JUDGMENT: ESCALATED ⚠️
