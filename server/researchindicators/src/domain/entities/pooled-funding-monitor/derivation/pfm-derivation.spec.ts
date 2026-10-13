@@ -3,6 +3,7 @@ import { PfmMappingStateEnum as M } from '../enum/pfm-mapping-state.enum';
 import { PfmPrmsStatusEnum as P } from '../enum/pfm-prms-status.enum';
 import { PfmStatusFilterEnum as F } from '../enum/pfm-status-filter.enum';
 import {
+  buildSciencePrograms,
   derivePfmRow,
   deriveStarLabel,
   formatPfmDate,
@@ -39,6 +40,48 @@ describe('pfm-derivation', () => {
     });
     it('keeps a missing creator as null', () => {
       expect(derivePfmRow(raw({ creator: null })).creator).toBeNull();
+    });
+  });
+
+  describe('approved label (HITL 22)', () => {
+    it('is "Approved dd Mon yyyy" (UTC) for an approved row with a date', () => {
+      expect(derivePfmRow(raw()).approvedLabel).toBe('Approved 05 Mar 2026');
+    });
+    it('is null when approved but the date is missing', () => {
+      expect(derivePfmRow(raw({ approved_at: null })).approvedLabel).toBeNull();
+    });
+    it('is null for a non-approved row even if a stale approval date exists', () => {
+      expect(
+        derivePfmRow(
+          raw({ result_status_id: 2, result_status_name: 'Submitted' }),
+        ).approvedLabel,
+      ).toBeNull();
+    });
+  });
+
+  describe('buildSciencePrograms (HITL 22)', () => {
+    const ref = (code: string, color: string | null = null) => ({
+      code,
+      name: `${code} name`,
+      color,
+      category: null,
+    });
+    it('lists the primary first (primary=true), then contributing in order', () => {
+      expect(
+        buildSciencePrograms(ref('SP06', '#abc'), [ref('SP01'), ref('SP09')]),
+      ).toEqual([
+        { code: 'SP06', name: 'SP06 name', primary: true, color: '#abc' },
+        { code: 'SP01', name: 'SP01 name', primary: false, color: null },
+        { code: 'SP09', name: 'SP09 name', primary: false, color: null },
+      ]);
+    });
+    it('has no primary entry when there is no primary SP', () => {
+      expect(buildSciencePrograms(null, [ref('SP04')])).toEqual([
+        { code: 'SP04', name: 'SP04 name', primary: false, color: null },
+      ]);
+    });
+    it('is empty when there are no SPs', () => {
+      expect(buildSciencePrograms(null, [])).toEqual([]);
     });
   });
 

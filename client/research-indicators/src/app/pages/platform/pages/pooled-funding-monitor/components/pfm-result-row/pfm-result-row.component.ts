@@ -4,9 +4,9 @@ import { RouterLink } from '@angular/router';
 import { RESULT_ENTRY_SOURCE_QUERY, RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR } from '@shared/constants/result-entry-source';
 import { buildResultLink } from '@shared/utils/result-link.util';
 import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
-import { PfmResultRow } from '../../pfm.interfaces';
+import { PfmMappingState, PfmPrmsStatus, PfmResultRow } from '../../pfm.interfaces';
+import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
-import { PfmStatusBadgeComponent } from '../pfm-status-badge/pfm-status-badge.component';
 
 /**
  * Column template shared by the group's header row and every result row (R-PFM-012 order).
@@ -15,10 +15,31 @@ import { PfmStatusBadgeComponent } from '../pfm-status-badge/pfm-status-badge.co
 export const PFM_ROW_GRID =
   'grid min-w-[70rem] grid-cols-[7.2rem_minmax(8.1rem,2.6fr)_minmax(5.5rem,1fr)_minmax(6rem,0.9fr)_6.5rem_minmax(6.5rem,1.4fr)_minmax(6.5rem,1.3fr)_6rem_6rem_4.2rem] items-start gap-x-2';
 
+/** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
+export interface PfmTagTone {
+  fg: string;
+  border: string;
+}
+const tone = (name: string): PfmTagTone => ({ fg: `var(--ac-pfm-${name}-fg)`, border: `var(--ac-pfm-${name}-fg)` });
+const WARNING_TONE: PfmTagTone = { fg: 'var(--ac-pfm-warning-fg)', border: 'var(--ac-pfm-warning-border)' };
+
+const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
+  Complete: tone('success'),
+  Incomplete: WARNING_TONE,
+  'Not started': tone('neutral'),
+  'No SP contribution': tone('success')
+};
+
+const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
+  'Pending Review': WARNING_TONE,
+  Approved: tone('success'),
+  Rejected: tone('danger')
+};
+
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
 @Component({
   selector: 'app-pfm-result-row',
-  imports: [RouterLink, PfmStatusBadgeComponent, CustomTagComponent],
+  imports: [RouterLink, CustomTagComponent, TooltipModule],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -30,6 +51,11 @@ export class PfmResultRowComponent {
   /** Same padding as the Results Center code chip (formatResultCode). */
   codeNumber = computed(() => String(this.row().official_code ?? '').padStart(3, '0'));
   fullTitle = computed(() => this.row().title || this.row().result_code);
+
+  mappingTone = computed(() => MAPPING_TONES[this.row().mapping_state] ?? tone('neutral'));
+  isPrmsNotSent = computed(() => this.row().prms_status === 'Not sent');
+  prmsTone = computed(() => (PRMS_TONES as Record<string, PfmTagTone>)[this.row().prms_status] ?? tone('neutral'));
+  neutralTone = tone('neutral');
 
   link = computed(() => {
     const r = this.row();

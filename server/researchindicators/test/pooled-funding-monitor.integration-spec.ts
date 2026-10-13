@@ -1,6 +1,9 @@
 import 'dotenv/config';
 import { DataSource, QueryRunner } from 'typeorm';
-import { derivePfmRow } from '../src/domain/entities/pooled-funding-monitor/derivation/pfm-derivation';
+import {
+  buildSciencePrograms,
+  derivePfmRow,
+} from '../src/domain/entities/pooled-funding-monitor/derivation/pfm-derivation';
 import { PfmScopeEnum } from '../src/domain/entities/pooled-funding-monitor/enum/pfm-scope.enum';
 import {
   PfmMonitoredRow,
@@ -207,6 +210,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       await insert('result_status', {
         result_status_id: id,
         name,
+        description: `${name} description`,
         config: id === 6 ? JSON.stringify(APPROVED_STATUS_CONFIG) : null,
       });
     }
@@ -647,6 +651,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       const submitted = rows.find((r) => r.result_official_code === 1002);
       expect(approved?.star_status_config).toEqual(APPROVED_STATUS_CONFIG);
       expect(approved?.star_status_name).toBe('Approved');
+      expect(approved?.star_status_description).toBe('Approved description');
       expect(submitted?.star_status_name).toBe('Submitted');
       expect(submitted?.star_status_config).toBeNull();
     });
@@ -803,6 +808,21 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       expect(byCode(rows, 1002).primary_sp).toBeNull();
     });
 
+    it('science_programs: primary first with its colour, then the contributing SPs (HITL 22)', async () => {
+      const r1001 = byCode(await repo.findMonitoredResults(ALL), 1001);
+      expect(
+        buildSciencePrograms(r1001.primary_sp, r1001.contributing_sps),
+      ).toEqual([
+        {
+          code: 'SP01',
+          name: 'Alpha program',
+          primary: true,
+          color: '#111111',
+        },
+        expect.objectContaining({ name: 'Beta program', primary: false }),
+      ]);
+    });
+
     it('approval date: latest entry into status 6 across versions of the same code+year, as a UTC instant', async () => {
       const rows = await repo.findMonitoredResults(ALL);
       // MAX over the current version (03-05 23:30) and the overwritten version
@@ -835,6 +855,7 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
       const row = byCode(await repo.findMonitoredResults(ALL), 1001);
       const derived = derivePfmRow(row);
       expect(derived.piLine).toBe('Approved 06 Mar 2026');
+      expect(derived.approvedLabel).toBe('Approved 06 Mar 2026');
       expect(derived.updatedLabel).toBe('01 Oct, 10:20');
     });
 

@@ -161,12 +161,13 @@ The server SHALL return, for every monitored result, the states below. The clien
 | State | Rule |
 |---|---|
 | STAR status label | Draft ← status 1 Editing or 4 Draft · Submitted ← 2 · Under review ← 3 · Approved ← 6 · Returned ← 5 or 7 (D-3). Any other status is shown by its own STAR status name. |
-| PI line | *Approved* → "Approved {dd Mon yyyy}", using the date the result last entered status 6 (D-4). *Submitted* → "Awaiting PI sign-off". *Draft* → "Not yet submitted in STAR". *Under review* → "In review". *Returned* → "Returned for revision". |
+| PI line | *Approved* with an approval date → "Approved {dd Mon yyyy}", using the date the result last entered status 6 (D-4), sent as `star_approved_label` and shown under the STAR tag. Other labels show no line (HITL 22, DD-PFM-19). `pi_line` stays on the wire for compatibility only. |
 | Mapping state | *No SP contribution*: alignment declares no contribution. *Not started*: no alignment recorded. *Complete*: the pool-funding-alignment completeness check passes. *Incomplete*: alignment exists but the check fails. |
-| Mapping note | Complete → "Pool funding split recorded" · Incomplete → "Projects or budget shares still missing" · Not started → "Starts after PI approval" · No SP contribution → "PI declared no Science Program contribution · out of PRMS scope" |
+| Mapping note | Complete → "Pool funding split recorded" · Incomplete → "Projects or budget shares still missing" · Not started → "Starts after PI approval" · No SP contribution → "PI declared no Science Program contribution · out of PRMS scope". Shown as the mapping tag's tooltip and as screen-reader text, not as a visible line (DD-PFM-19). |
 | Primary / contributing SPs | From the alignment: the PRIMARY SP (code + name) and the CONTRIBUTING SP names. |
 | PRMS status | *Not sent* if never accepted by PRMS. Otherwise the latest PRMS history status: Pending Review, Approved or Rejected. |
-| PRMS hint (tooltip) | Rejected → PRMS justification if present · Not sent → "Not synced to PRMS yet" · else "PRMS: {status}" |
+| PRMS hint (tooltip) | Rejected → PRMS justification if present · Not sent → "Not synced to PRMS yet" · else "PRMS: {status}". On the Not-sent dash, it is the tooltip and the accessible name. On other statuses, it is the PRMS tag's tooltip and screen-reader text. |
+| STAR status description | `result_status.description`, shown as the STAR tag's tooltip and as screen-reader text; none when unset (DD-PFM-19) |
 | Updated | Last modification timestamp of the result, formatted "dd Mon, HH:mm" |
 
 #### Scenario: Approved result with complete mapping, never sent
@@ -175,12 +176,12 @@ The server SHALL return, for every monitored result, the states below. The clien
 
 #### Scenario: Out of scope
 - GIVEN an alignment declaring no Science Program contribution
-- THEN mapping = *No SP contribution* and the SP line reads "Not reported to PRMS"
+- THEN mapping = *No SP contribution*, the mapping tooltip reads the out-of-scope note, and the Science Programs cell shows "—"
 - AND the result counts as neither *Needs attention* nor *Ready to sync*
 
 #### Scenario: Rejected in PRMS
 - GIVEN a result whose latest PRMS history status is REJECTED
-- THEN PRMS = *Rejected* and the tooltip shows the PRMS justification when one exists
+- THEN PRMS = *Rejected* (tag in danger tokens), and the tag's tooltip and screen-reader text show the PRMS justification when one exists
 
 ---
 
@@ -339,10 +340,10 @@ Each row SHALL show the columns below. Rows inside a group are ordered: needs at
 | Result | title (link). Results Center long-title rule: clamped to 3 lines, 2 lines at ≥ xl (inner `overflow-hidden line-clamp-3 xl:line-clamp-2` inside a block link); full title as tooltip (DD-PFM-16) |
 | Indicator | result type (indicator name) |
 | Creator | creator display name (first + last name of `results.created_by`); "-" when unresolved, as in the Results Center Creator column (DD-PFM-16) |
-| STAR status | Results Center status tag (`app-custom-tag`). The tag shows the raw STAR status name (`star_status_name`, as in the Results Center, not the D-3 derived label) with colours/icon from the status `config` (`star_status_config`); below it, the PI line (DD-PFM-17). Filters and chips still use the D-3 label |
-| Pool funding mapping | colored badge + mapping note. Empty when mapping is *Not started*; "Not reported to PRMS" when out of scope. |
-| Science Programs | SP line "{SP code} {SP name} (primary) · {contributing}" + primary-SP badge; "—" when there is no SP data (DD-PFM-16) |
-| PRMS status | pill; "—" when *Not sent*; tooltip = PRMS hint |
+| STAR status | Results Center status tag (`app-custom-tag`). Shows the raw STAR status name (`star_status_name`) with colours and icon from `star_status_config`; the tooltip and screen-reader text are `star_status_description`. Below the tag, only "Approved {dd Mon yyyy}" when approved. Filters and chips still use the D-3 label (DD-PFM-17, DD-PFM-19) |
+| Pool funding mapping | `app-custom-tag` with the mapping state in `--ac-pfm-*` tokens; tooltip and screen-reader text are the mapping note; nothing below the tag (DD-PFM-19) |
+| Science Programs | One `app-custom-tag` per SP. The tag text is the SP code; the primary comes first and is marked with a ring and screen-reader text ", primary". The tooltip and screen-reader text are the full SP name. "—" when there are none (DD-PFM-19) |
+| PRMS status | `app-custom-tag` in `--ac-pfm-*` tokens; "—" when *Not sent*; the tooltip and accessible text are the PRMS hint, including on the Not-sent dash (DD-PFM-19) |
 | Updated | "dd Mon, HH:mm" |
 | Action | **View** |
 

@@ -1,4 +1,7 @@
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
+import { Tooltip } from 'primeng/tooltip';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { provideRouter } from '@angular/router';
 import { PfmResultRow } from '../../pfm.interfaces';
 import { PfmResultRowComponent } from './pfm-result-row.component';
@@ -16,6 +19,12 @@ const BASE: PfmResultRow = {
   star_status_id: 2,
   star_status_name: null,
   star_status_config: null,
+  star_status_description: 'Waiting for the PI to sign off',
+  star_approved_label: null,
+  science_programs: [
+    { code: 'SP01', name: 'Breeding', primary: true, color: '#112233' },
+    { code: 'SP09', name: 'Climate Action', primary: false, color: null }
+  ],
   pi_line: 'Awaiting PI approval',
   mapping_state: 'Incomplete',
   mapping_note: 'Budget shares missing',
@@ -35,18 +44,47 @@ function render(over: Partial<PfmResultRow> = {}) {
   fixture.componentRef.setInput('row', { ...BASE, ...over });
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
-  return { el, q: (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement };
+  const tipOf = (host: HTMLElement) =>
+    fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .find(d => host.contains(d.nativeElement))
+      ?.injector.get(Tooltip).content;
+  const tagsIn = (host: HTMLElement) =>
+    fixture.debugElement
+      .queryAll(By.directive(CustomTagComponent))
+      .filter(d => host.contains(d.nativeElement))
+      .map(d => d.componentInstance as CustomTagComponent);
+  const sr = (host: HTMLElement) => Array.from(host.querySelectorAll('.sr-only')).map(e => e.textContent?.trim());
+  return { el, tipOf, tagsIn, sr, q: (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement };
 }
 
 describe('PfmResultRowComponent', () => {
-  it('STAR status renders the Results Center tag (app-custom-tag) with the label and the PI line under it, not the PFM badge', () => {
+  it('STAR status renders the Results Center tag (app-custom-tag) with the label, not the PFM badge, and no pi_line text under it (HITL 22)', () => {
     const { q } = render();
     const cell = q('pfm-row-star');
     const tag = cell.querySelector('app-custom-tag');
     expect(tag).not.toBeNull();
     expect(tag?.textContent).toContain('Submitted');
-    expect(cell.querySelector('app-pfm-status-badge')).toBeNull();
-    expect(cell.querySelector('[data-testid="pfm-row-pi-line"]')?.textContent?.trim()).toBe('Awaiting PI approval');
+    expect(cell.querySelector('[data-testid="pfm-row-pi-line"]')).toBeNull();
+    expect(cell.textContent).not.toContain('Awaiting PI approval');
+    expect(cell.querySelector('[data-testid="pfm-row-star-approved"]')).toBeNull();
+  });
+
+  it('STAR tag tooltip is the status description, on the icon (HITL 22)', () => {
+    const { q, tipOf, sr } = render();
+    expect(tipOf(q('pfm-row-star'))).toBe('Waiting for the PI to sign off');
+    // The icon is not focusable: the same text is also available to assistive tech.
+    expect(sr(q('pfm-row-star'))).toEqual(['Waiting for the PI to sign off']);
+  });
+
+  it('STAR cell has no sr-only description when the status has none', () => {
+    const { q, sr } = render({ star_status_description: null });
+    expect(sr(q('pfm-row-star'))).toEqual([]);
+  });
+
+  it('STAR cell shows the approved label under the tag only when present (HITL 22)', () => {
+    const { q } = render({ star_label: 'Approved', star_status_id: 6, star_approved_label: 'Approved 14 Jul 2026' });
+    expect(q('pfm-row-star-approved').textContent?.trim()).toBe('Approved 14 Jul 2026');
   });
 
   it('STAR tag takes colour, border and icon from star_status_config exactly like the Results Center', () => {
@@ -122,22 +160,51 @@ describe('PfmResultRowComponent', () => {
     expect(render({ creator: null }).q('pfm-row-creator').textContent?.trim()).toBe('-');
   });
 
-  it('Science Programs cell holds the SP line and the primary-SP badge; the mapping cell holds neither', () => {
-    const { q } = render();
-    const sp = q('pfm-row-sp');
-    expect(sp.querySelector('[data-testid="pfm-row-sp-line"]')?.textContent?.trim()).toBe('SP01 (primary)');
-    expect(sp.querySelector('app-pfm-status-badge')).not.toBeNull();
-    const mapping = q('pfm-row-mapping');
-    expect(mapping.querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
-    expect(mapping.querySelectorAll('app-pfm-status-badge').length).toBe(1);
-    expect(mapping.querySelector('[data-testid="pfm-row-mapping-note"]')?.textContent?.trim()).toBe('Budget shares missing');
+  it('Science Programs cell renders one custom-tag per program, code as text, primary first with the name + primary tooltip (HITL 22)', () => {
+    const { q, tipOf, sr } = render();
+    const tags = Array.from(q('pfm-row-sp').querySelectorAll('[data-testid="pfm-row-sp-tag"]')) as HTMLElement[];
+    expect(tags.length).toBe(2);
+    expect(tags.map(t => t.querySelector('app-custom-tag span.font-semibold')?.textContent?.trim())).toEqual(['SP01', 'SP09']);
+    const tips = tags.map(t => tipOf(t));
+    expect(tips).toEqual(['Breeding — primary', 'Climate Action']);
+    expect(tags[0].getAttribute('data-primary')).toBe('true');
+    expect(tags[1].getAttribute('data-primary')).toBe('false');
+    expect(tags[0].classList).toContain('ring-2');
+    expect(tags[1].classList).not.toContain('ring-2');
+    expect(sr(q('pfm-row-sp'))).toEqual(['SP01 Breeding, primary', 'SP09 Climate Action']);
+    expect(q('pfm-row-sp').querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
   });
 
-  it('Science Programs cell shows a muted dash when there is no SP data', () => {
-    const { q } = render({ sp_line: '', primary_sp: null });
+  it('SP tag text uses the neutral token (contrast); the DB colour only drives border and icon', () => {
+    const { q, tagsIn } = render();
+    const [primary, other] = tagsIn(q('pfm-row-sp'));
+    expect(primary.statusColor).toBe('var(--ac-pfm-neutral-fg)');
+    expect(primary.statusBorder).toBe('#112233');
+    expect(primary.iconColor).toBe('#112233');
+    expect(other.statusColor).toBe('var(--ac-pfm-neutral-fg)');
+    expect(other.statusBorder).toBe('var(--ac-pfm-neutral-fg)');
+  });
+
+  it('Science Programs cell shows a muted dash when there are no programs', () => {
+    const { q } = render({ science_programs: [] });
     const sp = q('pfm-row-sp');
     expect(sp.textContent?.trim()).toBe('—');
-    expect(sp.querySelector('app-pfm-status-badge')).toBeNull();
+    expect(sp.querySelector('app-custom-tag')).toBeNull();
+  });
+
+  it('mapping cell is an app-custom-tag with the note as tooltip and semantic tokens, nothing below it (HITL 22)', () => {
+    const { q, tipOf, tagsIn, sr } = render();
+    const cell = q('pfm-row-mapping');
+    const tag = cell.querySelector('app-custom-tag') as HTMLElement;
+    expect(tag.textContent?.trim()).toBe('Incomplete');
+    expect(tipOf(cell)).toBe('Budget shares missing');
+    expect(sr(cell)).toEqual(['Budget shares missing']);
+    expect(cell.querySelector('[data-testid="pfm-row-mapping-note"]')).toBeNull();
+    expect(cell.querySelectorAll('p').length).toBe(0);
+    // jsdom drops var() colours from the CSSOM, so assert the inputs the tag receives.
+    const [t] = tagsIn(cell);
+    expect(t.statusColor).toBe('var(--ac-pfm-warning-fg)');
+    expect(t.statusBorder).toBe('var(--ac-pfm-warning-border)');
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
@@ -160,22 +227,30 @@ describe('PfmResultRowComponent', () => {
   it('renders server values as received and no other action', () => {
     const { el, q } = render();
     expect(q('pfm-row-updated').textContent?.trim()).toBe('03 Oct, 14:05');
-    expect(q('pfm-row-pi-line').textContent?.trim()).toBe('Awaiting PI approval');
-    expect(q('pfm-row-mapping-note').textContent?.trim()).toBe('Budget shares missing');
+    expect(q('pfm-row-pi-line')).toBeNull();
+    expect(q('pfm-row-mapping-note')).toBeNull();
     expect(q('pfm-row-meta')).toBeNull();
     expect(el.querySelectorAll('a').length).toBe(2);
     expect(el.querySelector('button')).toBeNull();
     expect(el.textContent).not.toMatch(/Sync|Request approval|Complete mapping/);
   });
 
-  it('PRMS "Not sent" shows an accessible dash with a tooltip; Rejected carries the hint as tooltip', () => {
-    const dash = render().q('pfm-badge-not-sent');
-    expect(dash.getAttribute('aria-label')).toBe('Not sent');
-    // Effective tooltip = the dash's own title, else the nearest titled ancestor (the PRMS cell, bound to prms_hint).
-    expect(dash.closest('[title]')?.getAttribute('title')).toBe('Not synced to PRMS yet');
-    const rej = render({ prms_status: 'Rejected', prms_hint: 'PRMS: Rejected — fix the Theory of Change' });
-    expect(rej.q('pfm-row-prms').getAttribute('title')).toBe('PRMS: Rejected — fix the Theory of Change');
-    expect(rej.q('pfm-row-prms').textContent?.trim()).toBe('Rejected');
+  it('PRMS "Not sent" keeps the dash and carries the hint as tooltip and accessible name (HITL 22, R-PFM-004)', () => {
+    const { q, tipOf } = render();
+    const dash = q('pfm-badge-not-sent');
+    expect(dash.getAttribute('role')).toBe('img');
+    expect(dash.getAttribute('aria-label')).toBe('Not sent: Not synced to PRMS yet');
+    expect(tipOf(q('pfm-row-prms'))).toBe('Not synced to PRMS yet');
+    expect(q('pfm-row-prms').querySelector('app-custom-tag')).toBeNull();
+  });
+
+  it('PRMS Rejected is an app-custom-tag in the danger tokens with the hint as tooltip and sr-only text (HITL 22)', () => {
+    const { q, tipOf, tagsIn, sr } = render({ prms_status: 'Rejected', prms_hint: 'Fix the Theory of Change in PRMS' });
+    const cell = q('pfm-row-prms');
+    expect((cell.querySelector('app-custom-tag') as HTMLElement).textContent).toContain('Rejected');
+    expect(tipOf(cell)).toBe('Fix the Theory of Change in PRMS');
+    expect(sr(cell)).toEqual(['Fix the Theory of Change in PRMS']);
+    expect(tagsIn(cell)[0].statusColor).toBe('var(--ac-pfm-danger-fg)');
   });
 
   it('click on View opens no dialog or drawer', () => {

@@ -16,6 +16,10 @@ import {
   PfmSummary,
   rankPfmRows,
 } from './derivation/pfm-aggregation';
+import {
+  buildSciencePrograms,
+  PfmScienceProgramItem,
+} from './derivation/pfm-derivation';
 import { PfmScopeEnum } from './enum/pfm-scope.enum';
 import {
   PfmFilterOptions,
@@ -44,11 +48,14 @@ export interface PfmResultRow {
   star_label: string;
   star_status_id: number;
   star_status_name: string | null;
+  star_status_description: string | null;
   star_status_config: PfmStarStatusConfig | null;
   pi_line: string;
+  star_approved_label: string | null;
   mapping_state: string;
   mapping_note: string;
   sp_line: string;
+  science_programs: PfmScienceProgramItem[];
   primary_sp: { code: string; name: string; color: string | null } | null;
   contributing: { code: string; name: string; color: string | null }[];
   prms_status: string;
@@ -175,11 +182,17 @@ export class PooledFundingMonitorService {
     star_label: d.starLabel,
     star_status_id: row.result_status_id,
     star_status_name: row.star_status_name ?? null,
+    star_status_description: row.star_status_description ?? null,
     star_status_config: row.star_status_config ?? null,
     pi_line: d.piLine,
+    star_approved_label: d.approvedLabel,
     mapping_state: d.mappingState,
     mapping_note: d.mappingNote,
     sp_line: d.spLine,
+    science_programs: buildSciencePrograms(
+      row.primary_sp,
+      row.contributing_sps,
+    ),
     primary_sp: row.primary_sp ? spRef(row.primary_sp) : null,
     contributing: row.contributing_sps.map(spRef),
     prms_status: d.prmsStatus,

@@ -33,6 +33,8 @@ export interface PfmDerivedRow {
   /** One of PfmStarLabelEnum, or the STAR status name for any other id. */
   starLabel: string;
   piLine: string;
+  /** "Approved dd Mon yyyy" for an approved row with a date; null otherwise. */
+  approvedLabel: string | null;
   mappingState: PfmMappingStateEnum;
   mappingNote: string;
   spLine: string;
@@ -124,6 +126,36 @@ export const derivePiLine = (
   }
 };
 
+export const deriveApprovedLabel = (
+  starLabel: string,
+  approvedAt: Date | null,
+): string | null =>
+  starLabel === PfmStarLabelEnum.APPROVED && approvedAt
+    ? `Approved ${formatPfmDate(approvedAt)}`
+    : null;
+
+export interface PfmScienceProgramItem {
+  code: string;
+  name: string;
+  primary: boolean;
+  color: string | null;
+}
+
+/** One entry per active SP, the primary first; same source as `primary_sp` / `contributing`. */
+export const buildSciencePrograms = (
+  primary: { code: string; name: string; color: string | null } | null,
+  contributing: { code: string; name: string; color: string | null }[],
+): PfmScienceProgramItem[] => [
+  ...(primary ? [{ ...pick(primary), primary: true }] : []),
+  ...contributing.map((sp) => ({ ...pick(sp), primary: false })),
+];
+
+const pick = (sp: { code: string; name: string; color: string | null }) => ({
+  code: sp.code,
+  name: sp.name,
+  color: sp.color,
+});
+
 export const deriveMappingState = (
   row: Pick<
     PfmRawRow,
@@ -198,6 +230,7 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
   return {
     starLabel,
     piLine: derivePiLine(starLabel, row.approved_at),
+    approvedLabel: deriveApprovedLabel(starLabel, row.approved_at),
     mappingState,
     mappingNote: deriveMappingNote(mappingState),
     spLine: deriveSpLine(

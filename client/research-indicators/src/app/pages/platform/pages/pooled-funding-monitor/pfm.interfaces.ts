@@ -143,6 +143,13 @@ export interface PfmSpRef {
   color: string | null;
 }
 
+export interface PfmScienceProgram {
+  code: string;
+  name: string;
+  primary: boolean;
+  color: string | null;
+}
+
 export interface PfmResultRow {
   /** Platform + official code, e.g. 'STAR-1234'. */
   result_code: string;
@@ -161,7 +168,13 @@ export interface PfmResultRow {
   star_status_name: string | null;
   /** result_status.config (same shape the Results Center colours its status tag from); null when unset. */
   star_status_config: StatusConfig | null;
+  /** result_status.description: tooltip text of the STAR status tag; null when unset. */
+  star_status_description: string | null;
   pi_line: string;
+  /** "Approved dd Mon yyyy" when approved with a date; null otherwise. */
+  star_approved_label: string | null;
+  /** Every active SP, primary first; `color` is the SP accent (null when unset). */
+  science_programs: PfmScienceProgram[];
   mapping_state: PfmMappingState;
   mapping_note: string;
   sp_line: string;

@@ -119,6 +119,14 @@ describe('mapMonitoredRow', () => {
     expect(mapMonitoredRow(base).star_status_name).toBeNull();
   });
 
+  it('maps star_status_description from result_status.description, null when missing', () => {
+    expect(
+      mapMonitoredRow({ ...base, star_status_description: 'Approved by PI' })
+        .star_status_description,
+    ).toBe('Approved by PI');
+    expect(mapMonitoredRow(base).star_status_description).toBeNull();
+  });
+
   describe('star_status_config (HITL 20: Results Center status colours)', () => {
     const cfg = {
       color: { border: '#7C9CB9', text: '#153C71', background: '#EEF4FA' },

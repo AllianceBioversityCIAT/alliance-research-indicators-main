@@ -136,6 +136,13 @@ export class PfmSpRefDto {
   @ApiProperty({ nullable: true, type: String }) color: string | null;
 }
 
+export class PfmScienceProgramDto {
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty() primary: boolean;
+  @ApiProperty({ nullable: true, type: String }) color: string | null;
+}
+
 export class PfmResultRowDto {
   @ApiProperty({
     example: 'STAR-1234',
@@ -174,7 +181,27 @@ export class PfmResultRowDto {
       'result_status.config ({ color: { border, text, background }, icon: { color, name } }); null when unset.',
   })
   star_status_config: Record<string, unknown> | null;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      'result_status.description: tooltip text of the STAR status tag; null when unset.',
+  })
+  star_status_description: string | null;
   @ApiProperty() pi_line: string;
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    description:
+      '"Approved dd Mon yyyy" (UTC) when the row is approved and an approval date exists; else null.',
+  })
+  star_approved_label: string | null;
+  @ApiProperty({
+    type: [PfmScienceProgramDto],
+    description:
+      'Every active SP of the result, the primary first (primary=true). `color` is the SP accent, null when unset.',
+  })
+  science_programs: PfmScienceProgramDto[];
   @ApiProperty({ enum: PfmMappingStateEnum }) mapping_state: string;
   @ApiProperty() mapping_note: string;
   @ApiProperty() sp_line: string;

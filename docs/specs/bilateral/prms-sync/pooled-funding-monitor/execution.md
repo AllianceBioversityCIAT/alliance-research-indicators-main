@@ -846,3 +846,43 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - Show "Report year 2026" in the UI, and add a dedicated empty message for *mine* with zero rows.
   - Link the TODO to a tracking issue.
   - Check whether the dedupe should also filter `deleted_at`. This is unconfirmed and was not introduced here.
+
+#### HITL round 22 (owner, 2026-10-13) — the four status cells unified on the house status tag → **PASS (server + client); owner re-check pending**
+
+- **Owner (paraphrased from Spanish):**
+  - STAR status, Pool funding mapping, Science Programs and PRMS status must share the STAR tag design.
+  - STAR: no invented description under the tag; keep only the approved date; the tooltip must work.
+  - Mapping and PRMS: use their descriptions, in the same design.
+  - Science Programs: show "SP06", with the full name as tooltip.
+- **Attempt 1 (sonnet, high, tdd)**
+  - Server adds three fields: `star_status_description` (`rs.description`), `star_approved_label` (`deriveApprovedLabel`, UTC) and `science_programs[{code,name,primary,color}]` (`buildSciencePrograms`, primary first). Compatibility fields are kept.
+  - Client renders all four cells with `app-custom-tag`. Mapping and PRMS use tones from the `--ac-pfm-*` tokens, and descriptions move into the tag tooltip.
+  - Reds observed: server compile errors; client 10 failed.
+- **Reviewer round 1: FAIL**
+  - (1) The R-PFM-004 Not-sent hint was dropped, and its test was inverted to lock the loss in.
+  - (2) The tooltip-only text was unreachable for keyboard and screen-reader users (PRD C-4 / WCAG 2.1.1, 1.3.1).
+- **Attempt 2 (xhigh)**
+  - The Not-sent dash gets `pTooltip=prms_hint` and `aria-label="Not sent: {hint}"`.
+  - Every tag gets `sr-only` text: STAR description, mapping note, PRMS hint, and "{code} {name}, primary" for SPs.
+  - Tests now read `By.directive(Tooltip).content` and `CustomTagComponent` inputs; no more `ng-reflect`.
+  - SP tag text uses the neutral token; the DB colour is used only for border, icon and ring.
+  - `PfmStatusBadgeComponent` was deleted; nothing else imported it.
+  - Reds observed: 6 failed against the old row. `ng build` caught an NG8002 that jest had missed.
+- **Reviewer round 2: PASS.**
+- **Docs**
+  - R-PFM-004 amended: PI line, mapping note, PRMS hint, new STAR description row, Out-of-scope and Rejected scenarios.
+  - R-PFM-012: four rows amended.
+  - **DD-PFM-19** added. It records the house `custom-tag` tooltip as a sighted-keyboard deviation, and the badge removal.
+  - The design.md inventory now marks the badge as removed.
+- **Leader re-measure**
+
+  | Suite | Result |
+  |---|---|
+  | Client PFM | 97/97 (the badge spec was removed) |
+  | Server unit | 135/135 |
+  | Scratch integration | 33/33 |
+
+  The implementer reports tsc 945, eslint and hex grep clean, and builds OK.
+- **ADVISORY**
+  - A screen reader announces "SP01 SP01 Breeding, primary". Fix by setting `aria-hidden` on the visible SP tag, or by dropping the code from the sr text.
+  - Follow-up: make the house tooltip trigger focusable.

@@ -49,6 +49,7 @@ const mk = (
   result_status_id: 6,
   result_status_name: 'Approved',
   star_status_name: null,
+  star_status_description: null,
   star_status_config: null,
   approved_at: new Date('2026-03-05T10:00:00Z'),
   has_alignment: true,

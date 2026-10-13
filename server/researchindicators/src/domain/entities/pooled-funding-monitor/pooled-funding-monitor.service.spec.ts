@@ -180,8 +180,33 @@ describe('PooledFundingMonitorService', () => {
         prms_hint: expect.any(String),
         updated_at: '—',
         star_status_name: null,
+        star_status_description: null,
+        star_approved_label: null,
+        science_programs: [
+          { code: 'SP01', name: 'Alpha', primary: true, color: '#111' },
+        ],
         star_status_config: null,
       });
+    });
+
+    it('passes the STAR status description and the approved label through; science_programs lists primary first', async () => {
+      repo.findMonitoredResults.mockResolvedValue([
+        row({
+          star_status_description: 'PI approved it',
+          contributing_sps: [
+            { code: 'SP00', name: 'Zero', color: null, category: null },
+          ],
+        }),
+      ]);
+      const [r] = await service.getProjectResults(1, 'P-A', {
+        scope: PfmScopeEnum.ALL,
+      });
+      expect(r.star_status_description).toBe('PI approved it');
+      expect(r.star_approved_label).toBe('Approved 05 Mar 2026');
+      expect(r.science_programs.map((s) => [s.code, s.primary])).toEqual([
+        ['SP01', true],
+        ['SP00', false],
+      ]);
     });
 
     it('passes the STAR status name through for the displayed tag text', async () => {

@@ -34,6 +34,8 @@ export type PfmStarStatusConfig = DeepPartial<ResultStatusConfig>;
 export interface PfmMonitoredRow extends PfmRawRow {
   /** `result_status.name`: the text the Results Center shows; null when unresolved. */
   star_status_name: string | null;
+  /** `result_status.description`: the tooltip text of the STAR status tag; null when unset. */
+  star_status_description: string | null;
   /** Status presentation config; null when the column is NULL or unparseable. */
   star_status_config: PfmStarStatusConfig | null;
   result_id: number;
@@ -214,6 +216,8 @@ export const mapMonitoredRow = (
     result_status_id: Number(row.result_status_id),
     result_status_name: String(row.result_status_name ?? ''),
     star_status_name: (row.star_status_name as string | null) ?? null,
+    star_status_description:
+      (row.star_status_description as string | null) ?? null,
     star_status_config: toConfigObject(row.star_status_config),
     updated_at: toDate(row.updated_at_utc),
     approved_at: toDate(row.approved_at_utc),
@@ -273,6 +277,7 @@ export class PooledFundingMonitorRepository {
         r.result_status_id,
         rs.name AS result_status_name,
         rs.name AS star_status_name,
+        rs.description AS star_status_description,
         rs.config AS star_status_config,
         ${utcIso('r.updated_at')} AS updated_at_utc,
         r.is_synced_to_prms,
