@@ -149,6 +149,20 @@ describe('PiDelegatesClientService', () => {
       expect(service.projectsWithoutDelegate()).toHaveLength(1);
       expect(service.projectsWithoutDelegate()[0].project_code).toBe('P002');
     });
+
+    it('hasNoDelegate is the predicate behind projectsWithoutDelegate (chip and counter cannot disagree)', async () => {
+      const withDel = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'A', email: 'a@a.com', is_active: true }] });
+      const withoutDel = makeProjectDelegates({ project_code: 'P002', delegates: [] });
+      mockApi.GET_PIDelegatesByProject
+        .mockResolvedValueOnce(makeOkResponse(withDel))
+        .mockResolvedValueOnce(makeOkResponse(withoutDel));
+
+      await service.loadByProject(['P001', 'P002']);
+
+      expect(service.hasNoDelegate(withDel)).toBe(false);
+      expect(service.hasNoDelegate(withoutDel)).toBe(true);
+      expect(service.byProjectCache().filter(p => service.hasNoDelegate(p))).toEqual(service.projectsWithoutDelegate());
+    });
   });
 
   // ── 2. write → refetch, not optimistic mutation (KZ-015) ──────────────────
