@@ -42,7 +42,7 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ### T-00 — HITL: prepare the local database
 
-- **Status:** todo · **Size:** S · **Dependencies:** none · **Owner:** requester (human decision — root `CLAUDE.md` §4.3)
+- **Status:** done (2026-10-13 — see `execution.md` T-00) · **Size:** S · **Dependencies:** none · **Owner:** requester (human decision — root `CLAUDE.md` §4.3)
 - **Requirements covered:** R-CLG-006 *Old local schema* (the revert half), the "export first" rule of requirements §11
 - **Design refs:** §3.1 (revert by name, one local DB)
 - **Scope:** no code. Run **before** the migration files are rewritten, so each `down` matches what the DB recorded.
@@ -55,9 +55,9 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Consumers:** n/a
 - **Review:** none (human step); the requester pastes the four outputs into `execution.md`.
 - **Done criteria:**
-  - [ ] Hosts confirmed local (quoted, host/name only).
-  - [ ] Export done or "nothing hand-made" stated.
-  - [ ] Three reverts quoted by name; `SHOW TABLES` empty; `migration:show` pending ×3.
+  - [x] Hosts confirmed local (quoted, host/name only).
+  - [x] Export done or "nothing hand-made" stated.
+  - [x] Three reverts quoted by name; `SHOW TABLES` empty; `migration:show` pending ×3. *(Actual: four reverts — `CreatePrmsWebhookDeliveryTable` (id 369, 0 rows) sat between `…001` and `…000` by id; pending ×4. Requester-approved — `execution.md` T-00 D-EX-1.)*
 
 ### T-01 — Slice 1: global lists, reads by key, System admin menu and roles
 
