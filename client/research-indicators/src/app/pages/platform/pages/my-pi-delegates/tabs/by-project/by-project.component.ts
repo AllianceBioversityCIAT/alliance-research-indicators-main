@@ -122,6 +122,19 @@ export class ByProjectComponent {
     this.roleTerm.set(value);
   }
 
+  /** Radiogroup keys: Arrow keys (Right/Down = next, Left/Up = previous) select role (wrapping) and move focus with it. */
+  onRoleKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.roleFilterOptions.length - 1;
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = index === last ? 0 : index + 1;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = index === 0 ? last : index - 1;
+    else return;
+    event.preventDefault();
+    this.selectRoleFilter(this.roleFilterOptions[next].value);
+    const radios = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios?.[next]?.focus();
+  }
+
   // ─── Independent quick-filter toggles ────────────────────────────────────────
   //
   // Unlike the role chips these are not mutually exclusive: each is on or off and

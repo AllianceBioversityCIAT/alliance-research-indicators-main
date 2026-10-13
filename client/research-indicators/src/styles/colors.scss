@@ -74,6 +74,8 @@
   --ac-pfm-neutral-fg: #5a6878;
   --ac-pfm-surface: #ffffff;
   --ac-pfm-surface-border: #e4e9f0;
+  --ac-pfm-neutral-bg: #eef1f5;
+  --ac-pfm-info-fg: #0f4c9a;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -198,4 +200,6 @@ $colors: (
   --ac-pfm-neutral-fg: #aab5c0;
   --ac-pfm-surface: #23272d;
   --ac-pfm-surface-border: #363c45;
+  --ac-pfm-neutral-bg: #2b3037;
+  --ac-pfm-info-fg: #9dc2f2;
 }

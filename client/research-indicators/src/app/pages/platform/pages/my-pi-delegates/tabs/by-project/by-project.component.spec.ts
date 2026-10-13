@@ -978,25 +978,98 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
     }
 
-    it('marks the selected chip with the navy pill surface and weight — never an underline', async () => {
+    it('marks the selected segment with the filled navy surface — never an underline', async () => {
       await createAdminTable();
 
       // No underline: it read as a tab strip, and these filter the table below
       // rather than switching views.
       expect(fixture.nativeElement.querySelectorAll('.by-project__role-filters .absolute')).toHaveLength(0);
 
+      const FILLED = 'bg-[var(--ac-pfm-accent-navy)]';
       const classesOf = (i: number) => chip(i).className;
-      expect(classesOf(0)).toContain('bg-[var(--ac-pfm-info-bg)]');
-      expect(classesOf(0)).toContain('font-semibold');
-      // ★ discriminating: an unselected chip keeps the neutral surface.
-      expect(classesOf(1)).toContain('bg-[var(--ac-pfm-surface)]');
-      expect(classesOf(1)).not.toContain('var(--ac-pfm-info-bg)');
+      expect(classesOf(0)).toContain(FILLED);
+      expect(classesOf(0)).toContain('text-[var(--ac-pfm-surface)]');
+      // ★ discriminating: an unselected segment is transparent, not filled.
+      expect(classesOf(1)).not.toContain(FILLED);
+      expect(classesOf(1)).toContain('bg-transparent');
 
       chip(1).click();
       fixture.detectChanges();
 
-      expect(classesOf(1)).toContain('var(--ac-pfm-info-bg)');
-      expect(classesOf(0)).not.toContain('var(--ac-pfm-info-bg)');
+      expect(classesOf(1)).toContain(FILLED);
+      expect(classesOf(0)).not.toContain(FILLED);
+    });
+
+    it('is a segmented radiogroup: three radios, exactly one checked, roving tabindex', async () => {
+      await createAdminTable();
+
+      const group = fixture.nativeElement.querySelector('[role="radiogroup"]') as HTMLElement;
+      expect(group).not.toBeNull();
+      expect(group.getAttribute('aria-label')).toBe('Your role');
+      const radios = Array.from(group.querySelectorAll('[role="radio"]')) as HTMLElement[];
+      expect(radios).toHaveLength(3);
+      expect(radios.filter(r => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+      expect(radios.map(r => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+      // The check icon is gone: the filled segment is the state marker.
+      expect(group.querySelector('.pi-check')).toBeNull();
+
+      chip(2).click();
+      fixture.detectChanges();
+      expect(radios.map(r => r.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
+      expect(radios.map(r => r.getAttribute('tabindex'))).toEqual(['-1', '-1', '0']);
+    });
+
+    it('ArrowRight selects the next role (wrapping) and moves focus; ArrowLeft goes back', async () => {
+      await createAdminTable();
+      const press = (i: number, key: string) => {
+        chip(i).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+      };
+
+      press(0, 'ArrowRight');
+      expect(component.roleTerm()).toBe('pi');
+      expect(document.activeElement).toBe(chip(1));
+
+      press(1, 'ArrowRight');
+      press(2, 'ArrowRight');
+      expect(component.roleTerm()).toBe('all');
+      expect(document.activeElement).toBe(chip(0));
+
+      press(0, 'ArrowLeft');
+      expect(component.roleTerm()).toBe('delegate');
+      expect(document.activeElement).toBe(chip(2));
+    });
+
+    it('ArrowDown behaves like ArrowRight and ArrowUp like ArrowLeft (WAI-ARIA radiogroup)', async () => {
+      await createAdminTable();
+      const press = (i: number, key: string) => {
+        chip(i).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+      };
+
+      press(0, 'ArrowDown');
+      expect(component.roleTerm()).toBe('pi');
+      expect(document.activeElement).toBe(chip(1));
+
+      press(1, 'ArrowUp');
+      press(0, 'ArrowUp');
+      expect(component.roleTerm()).toBe('delegate');
+      expect(document.activeElement).toBe(chip(2));
+    });
+
+    it('separates the single-choice group from the combinable toggles with a divider', async () => {
+      await createAdminTable();
+
+      const row = fixture.nativeElement.querySelector('.by-project__role-filters') as HTMLElement;
+      const divider = row.querySelector('.by-project__quick-filters-divider') as HTMLElement;
+      expect(divider).not.toBeNull();
+      expect(divider.getAttribute('aria-hidden')).toBe('true');
+      const children = Array.from(row.children);
+      const group = row.querySelector('[role="radiogroup"]') as HTMLElement;
+      const refine = row.querySelector('[role="group"][aria-label="Refine"]') as HTMLElement;
+      expect(refine).not.toBeNull();
+      expect(children.indexOf(group)).toBeLessThan(children.indexOf(divider));
+      expect(children.indexOf(divider)).toBeLessThan(children.indexOf(refine));
     });
 
     it('renders one chip per header counter, in the same order, with All active', async () => {
@@ -1006,7 +1079,7 @@ describe('ByProjectComponent', () => {
         .queryAll(By.css('.by-project__role-filter'))
         .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
       expect(labels).toEqual(['All projects', 'As PI', 'As PI delegate']);
-      expect(chip(0).getAttribute('aria-pressed')).toBe('true');
+      expect(chip(0).getAttribute('aria-checked')).toBe('true');
     });
 
     it('As PI narrows the table to the projects the caller leads', async () => {
@@ -1016,8 +1089,8 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
 
       expect(codesOnScreen()).toEqual(['P-PI']);
-      expect(chip(1).getAttribute('aria-pressed')).toBe('true');
-      expect(chip(0).getAttribute('aria-pressed')).toBe('false');
+      expect(chip(1).getAttribute('aria-checked')).toBe('true');
+      expect(chip(0).getAttribute('aria-checked')).toBe('false');
     });
 
     it('As PI delegate narrows it to actual delegations, not "everything else"', async () => {
@@ -1147,11 +1220,23 @@ describe('ByProjectComponent', () => {
         .queryAll(By.css('.by-project__quick-filter'))
         .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
       expect(labels).toEqual(['Ongoing projects', 'Projects without delegates']);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(quick(ONGOING).getAttribute('data-testid')).toBe('by-project-quick-filter-ongoing');
       expect(quick(WITHOUT).getAttribute('data-testid')).toBe('by-project-quick-filter-without-delegates');
       expect(codes()).toHaveLength(8);
+    });
+
+    it('toggles are checkboxes: role="checkbox" with aria-checked flipping on click', () => {
+      expect(quick(ONGOING).getAttribute('role')).toBe('checkbox');
+      expect(quick(WITHOUT).getAttribute('role')).toBe('checkbox');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      click(quick(ONGOING));
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
+      expect(quick(ONGOING).querySelector('.pi-check-square')).not.toBeNull();
+      click(quick(ONGOING));
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(ONGOING).querySelector('.pi-stop')).not.toBeNull();
     });
 
     it('"Projects without delegates" shows exactly the projects the header counter counts', () => {
@@ -1160,10 +1245,12 @@ describe('ByProjectComponent', () => {
       expect(codes()).toEqual(['P-PI-ONG-NODEL', 'P-PI-DONE-NODEL', 'P-OTH-ONG-NODEL']);
       // The number above and the rows below are the same set.
       expect(codes()).toHaveLength(serviceStub.projectsWithoutDelegate().length);
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('true');
-      // Check icon only while on.
-      expect(quick(WITHOUT).querySelector('.pi-check')).not.toBeNull();
-      expect(quick(ONGOING).querySelector('.pi-check')).toBeNull();
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('true');
+      // Checkbox icon in both states: ticked while on, empty square while off.
+      expect(quick(WITHOUT).querySelector('.pi-check-square')).not.toBeNull();
+      expect(quick(WITHOUT).querySelector('.pi-stop')).toBeNull();
+      expect(quick(ONGOING).querySelector('.pi-stop')).not.toBeNull();
+      expect(quick(ONGOING).querySelector('.pi-check-square')).toBeNull();
     });
 
     it('"Ongoing projects" shows only ongoing projects', () => {
@@ -1175,7 +1262,7 @@ describe('ByProjectComponent', () => {
       //   Status cell, so the chip must not call it ongoing.
       expect(codes()).not.toContain('P-OTH-NULL-DEL');
       expect(codes()).not.toContain('P-OTH-EMPTY-DEL');
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
     });
 
     it('toggling a chip off restores the list', () => {
@@ -1183,7 +1270,7 @@ describe('ByProjectComponent', () => {
       click(quick(ONGOING));
 
       expect(codes()).toHaveLength(8);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
     });
 
     it('the two toggles combine with AND', () => {
@@ -1204,17 +1291,17 @@ describe('ByProjectComponent', () => {
     it('selecting a role keeps the toggles, and a toggle keeps the role', () => {
       click(quick(ONGOING));
       click(role(1));
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual(['P-PI-ONG-NODEL', 'P-PI-ONG-DEL']);
 
       click(quick(WITHOUT));
-      expect(role(1).getAttribute('aria-pressed')).toBe('true');
+      expect(role(1).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual(['P-PI-ONG-NODEL']);
 
       // Switching the role does not drop either toggle.
       click(role(2));
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual([]);
     });
 
@@ -1223,8 +1310,8 @@ describe('ByProjectComponent', () => {
       click(role(1));
       click(role(2));
 
-      expect(role(1).getAttribute('aria-pressed')).toBe('false');
-      expect(role(2).getAttribute('aria-pressed')).toBe('true');
+      expect(role(1).getAttribute('aria-checked')).toBe('false');
+      expect(role(2).getAttribute('aria-checked')).toBe('true');
     });
 
     it('combines with the search box (AND)', () => {
@@ -1245,8 +1332,8 @@ describe('ByProjectComponent', () => {
 
       expect(component.ongoingOnly()).toBe(false);
       expect(component.withoutDelegatesOnly()).toBe(false);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(codes()).toHaveLength(8);
     });
   });
