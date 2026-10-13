@@ -946,3 +946,13 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Gates:**
   - Full client suite: 8045/8045.
   - eslint: clean on `custom-tag` and pfm.
+
+#### HITL round 27 (owner, 2026-10-13): wider STAR status and mapping columns, rows centred vertically → done
+
+- **Owner (paraphrased from Spanish):** STAR status is about 104px; make it about 120. Make Pool funding mapping larger too. When cells have spare space everything sits at the top; centre it vertically.
+- **Change in `PFM_ROW_GRID`:**
+  - STAR status: fixed `6.5rem` (104px) → `7.5rem` (120px).
+  - Mapping minimum: `6.5rem` → `7.5rem`.
+  - `items-start` → `items-center`. This applies to both the header row and the result rows, which share the grid.
+  - `min-w` is now `72rem`: columns 64.5 + gaps 4.5 + padding 3. The arithmetic comment in the code is updated.
+- **Gates:** PFM jest 97/97; eslint clean. Layout is a browser check.

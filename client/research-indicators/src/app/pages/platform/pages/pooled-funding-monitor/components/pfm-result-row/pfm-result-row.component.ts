@@ -10,10 +10,11 @@ import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.com
 
 /**
  * Column template shared by the group's header row and every result row (R-PFM-012 order).
- * Min-width arithmetic (rem): columns 7.2+8.1+5.5+6+6.5+6.5+6.5+6+6+4.2 = 62.5, gaps 9 x 0.5 = 4.5, row padding px-6 = 3 -> 70.
+ * Min-width arithmetic (rem): columns 7.2+8.1+5.5+6+7.5+7.5+6.5+6+6+4.2 = 64.5, gaps 9 x 0.5 = 4.5, row padding px-6 = 3 -> 72.
+ * STAR status and mapping are 7.5rem (120px) minimum; cells are vertically centred (items-center).
  */
 export const PFM_ROW_GRID =
-  'grid min-w-[70rem] grid-cols-[7.2rem_minmax(8.1rem,2.6fr)_minmax(5.5rem,1fr)_minmax(6rem,0.9fr)_6.5rem_minmax(6.5rem,1.4fr)_minmax(6.5rem,1.3fr)_6rem_6rem_4.2rem] items-start gap-x-2';
+  'grid min-w-[72rem] grid-cols-[7.2rem_minmax(8.1rem,2.6fr)_minmax(5.5rem,1fr)_minmax(6rem,0.9fr)_7.5rem_minmax(7.5rem,1.4fr)_minmax(6.5rem,1.3fr)_6rem_6rem_4.2rem] items-center gap-x-2';
 
 /** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
 export interface PfmTagTone {
