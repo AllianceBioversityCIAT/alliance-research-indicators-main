@@ -122,25 +122,60 @@ export class ByProjectComponent {
     this.roleTerm.set(value);
   }
 
-  /** Clear Filters on the shared search control: resets search + status + role. */
+  /** Radiogroup keys: Arrow keys (Right/Down = next, Left/Up = previous) select role (wrapping) and move focus with it. */
+  onRoleKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.roleFilterOptions.length - 1;
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = index === last ? 0 : index + 1;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = index === 0 ? last : index - 1;
+    else return;
+    event.preventDefault();
+    this.selectRoleFilter(this.roleFilterOptions[next].value);
+    const radios = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios?.[next]?.focus();
+  }
+
+  // ─── Independent quick-filter toggles ────────────────────────────────────────
+  //
+  // Unlike the role chips these are not mutually exclusive: each is on or off and
+  // they combine (AND) with any role chip, with each other and with the search.
+
+  readonly ongoingOnly = signal(false);
+  readonly withoutDelegatesOnly = signal(false);
+
+  toggleOngoing(): void {
+    this.ongoingOnly.update(on => !on);
+  }
+
+  toggleWithoutDelegates(): void {
+    this.withoutDelegatesOnly.update(on => !on);
+  }
+
+  /** Clear Filters on the shared search control: resets search + status + role + toggles. */
   clearFilters(): void {
     this.searchTerm.set('');
     this.statusTerm.set('All');
     this.roleTerm.set('all');
+    this.ongoingOnly.set(false);
+    this.withoutDelegatesOnly.set(false);
   }
 
-  /** Derived filtered view: applies role + status + search. Never mutates the cache. */
+  /** Derived filtered view: applies role + toggles + status + search. Never mutates the cache. */
   readonly filteredRows = computed<ProjectRow[]>(() => {
     const query = this.searchTerm().trim().toLowerCase();
     const status = this.statusTerm();
     const role = this.roleTerm();
+    const ongoingOnly = this.ongoingOnly();
+    const withoutDelegatesOnly = this.withoutDelegatesOnly();
     return this.service
       .byProjectCache()
       .filter(row => {
         const matchesRole = this.matchesRole(row, role);
         const matchesStatus = status === 'All' || row.status === status;
         const matchesQuery = !query || this.matchesQuery(row, query);
-        return matchesRole && matchesStatus && matchesQuery;
+        const matchesOngoing = !ongoingOnly || this.isOngoing(row);
+        const matchesWithoutDelegates = !withoutDelegatesOnly || this.service.hasNoDelegate(row);
+        return matchesRole && matchesOngoing && matchesWithoutDelegates && matchesStatus && matchesQuery;
       })
       .map(row => {
         const label = this.roleLabel(row);
@@ -157,6 +192,17 @@ export class ByProjectComponent {
     if (role === 'pi') return this.service.isPiOf(project);
     if (role === 'delegate') return this.service.isDelegateOf(project);
     return true;
+  }
+
+  /**
+   * "Ongoing" is what the Status badge in this table already says: the row's
+   * contract status resolved through ProjectUtilsService (the rule My Projects
+   * uses), so the chip can never disagree with the badge on screen. A row with no
+   * status renders "—" instead of a badge (getStatusDisplay would default it to
+   * Ongoing), so it is NOT ongoing here.
+   */
+  private isOngoing(project: ProjectDelegates): boolean {
+    return !!project.status && this.statusDisplay(project).statusId === 1;
   }
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
