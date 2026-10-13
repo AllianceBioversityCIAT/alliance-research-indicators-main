@@ -920,3 +920,14 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
   - `ng build`: no warnings in custom-tag or pfm.
   - Docs: the R-PFM-012 SP row is updated.
 - **Review:** no separate Reviewer spawn for this additive presentational input. The full suite proves nothing else regressed. Recorded here.
+
+#### HITL round 25 (owner, 2026-10-13): primary star sits right next to the code → done
+
+- **Owner (verbatim):** "pero quedo muy separado no me gusta dejalo cerca".
+- **Cause:** the `custom-tag` label carries `!min-w-[45px]`, which padded "SP06" and pushed the star to the right edge.
+- **Fix:**
+  - The label drops that minimum only when `trailingIconName` is set, so all other usages are unchanged.
+  - The trailing icon is 1px smaller (9/11px).
+  - The spec asserts the label has no `min-w-[45px]` when an icon is present.
+- **K-004:** restoring the unconditional minimum made the new assertion fail; the change was then restored.
+- **Gates:** custom-tag + PFM jest 108/108.

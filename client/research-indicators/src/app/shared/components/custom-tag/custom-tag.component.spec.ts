@@ -34,6 +34,8 @@ describe('CustomTagComponent', () => {
     expect(icon!.style.color).toBe('rgb(1, 2, 3)');
     // after the label span, inside the pill
     expect(icon!.previousElementSibling?.textContent?.trim()).toBe('SP06');
+    // the label drops its 45px minimum so the icon sits right next to it
+    expect((icon!.previousElementSibling as HTMLElement).className).not.toContain('min-w-[45px]');
   });
 
   it('should have default statusId and statusName', () => {
