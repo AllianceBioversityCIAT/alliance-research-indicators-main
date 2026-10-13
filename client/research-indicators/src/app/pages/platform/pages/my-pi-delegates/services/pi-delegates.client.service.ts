@@ -110,8 +110,17 @@ export class PiDelegatesClientService {
     return ids.size;
   });
 
+  /**
+   * True when the project has no delegate. `delegates` already holds only the active
+   * ones, so this is "no active delegate". The header counter and the By-project
+   * quick filter both read this, so the number and the rows behind it cannot disagree.
+   */
+  hasNoDelegate(project: ProjectDelegates): boolean {
+    return project.delegates.length === 0;
+  }
+
   /** Projects that have no assigned delegate. Consumed by the summary header (R-UI-004). */
-  readonly projectsWithoutDelegate = computed(() => this.byProjectCache().filter(p => p.delegates.length === 0));
+  readonly projectsWithoutDelegate = computed(() => this.byProjectCache().filter(p => this.hasNoDelegate(p)));
 
   // ─── Load methods ─────────────────────────────────────────────────────────────
 
