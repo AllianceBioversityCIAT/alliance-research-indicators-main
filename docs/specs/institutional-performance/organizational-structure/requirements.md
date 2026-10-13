@@ -17,7 +17,7 @@
 
 ## 1. Executive summary
 
-Admins get a new page, *Center admin › Portfolio Management › Organizational Structure*. It holds **one Alliance structure that belongs to no portfolio**, in four levels: L1 Division › L2 Department › L3 Office (optional) › L4 Unit.
+Admins get a new page, *Center admin › Organizational Structure* (its own item, outside Portfolio Management — requester, 2026-10-13). It holds **one Alliance structure that belongs to no portfolio**, in four levels: L1 Division › L2 Department › L3 Office (optional) › L4 Unit.
 
 | Concept | Rule |
 | --- | --- |
@@ -54,7 +54,7 @@ Admins get a new page, *Center admin › Portfolio Management › Organizational
 | C-4 | Control Lists ships the nested *Portfolio Management* menu group, the shared `DataTable` (F-7) and the consumer contract (usage registry, `assertValueInList`). | control-lists archive §5 (R-CTL-005, 006, 008, 009) |
 | C-5 | Center admin pages are guarded by `centerAdminGuard`; server admin handlers use `@Roles` + `RolesGuard`, and `SYSTEM_ADMIN` bypasses. | control-lists requirements C-3, C-4 |
 
-**Affected surface (what renders on the route):** the shared sidebar (one new nested child), the new page, the shared `DataTable`, the shared modal host (one new modal name), the control-lists usage registry (one new consumer).
+**Affected surface (what renders on the route):** the shared sidebar (one new *Center admin* item), the new page, the shared `DataTable`, the shared modal host (one new modal name), the control-lists usage registry (one new consumer).
 
 **In scope:** entries, per-year versions, back-dating, year views, inactivate/reactivate with successor, logical delete, change log, read contract for consumers, the `org.level` consumer wiring carried over from Control Lists (F-4 of its archive), the page, seed data.
 
@@ -404,7 +404,7 @@ Admins get a new page, *Center admin › Portfolio Management › Organizational
 - **As an** Admin **I want** a page that shows the structure as a tree and as a table for a chosen year **so that** I can maintain it and check it quickly.
 
 **Details**
-- Menu: *Organizational Structure* appears in the nested *Portfolio Management* group, after *Control Lists* (F-3). Existing items do not change.
+- Menu: *Organizational Structure* is its own item in *Center admin*, **outside** Portfolio Management, after the Portfolio Management group (F-3 as amended 2026-10-13). Existing items do not change.
 - Header: title, description, **Structure year** selector, **+ New entry**, view toggle **Tree / Table**, filter *Show inactive / deleted*.
 - **Tree:** divisions › departments › offices › units, expand/collapse on container rows, the entry's code, name, acronym, director, status and *scheduled* badge.
 - **Table:** R-ORG-014.
@@ -414,7 +414,7 @@ Admins get a new page, *Center admin › Portfolio Management › Organizational
 
 #### Scenario: Menu placement
 - GIVEN an Admin expands *Center admin*
-- THEN *Organizational Structure* appears indented under *Portfolio Management*, after *Control Lists*
+- THEN *Organizational Structure* appears as a *Center admin* item after the *Portfolio Management* group, not indented under it
 - BUT it must NOT change the order, label or link of any existing item
 
 #### Scenario: Empty module
@@ -424,7 +424,7 @@ Admins get a new page, *Center admin › Portfolio Management › Organizational
 - AND IT MUST allow creating the first L1 entry
 
 **Acceptance criteria**
-- [ ] AC.1 — The nested item renders in the expanded and the collapsed sidebar.
+- [ ] AC.1 — The item renders in the expanded and the collapsed sidebar, at *Center admin* level.
 - [ ] AC.2 — Each of the four UI states renders, in both views.
 - [ ] AC.3 — Changing the year reloads both views for that year.
 

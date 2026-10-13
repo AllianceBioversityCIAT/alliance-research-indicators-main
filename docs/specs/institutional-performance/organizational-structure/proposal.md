@@ -1,6 +1,6 @@
 # Proposal — Institutional Performance / Organizational Structure (living, versioned per year)
 
-> **Answer first:** a new page, *Center admin › Portfolio Management › Organizational Structure*, holding **one living Alliance structure that does not belong to any portfolio**. It has four levels: L1 Division › L2 Department › L3 Office (optional) › L4 Unit. Every entry has a **permanent ID**. Names, parents and directors are **versioned per year**: each version applies from a year onward, and the structure of any year can be rebuilt exactly as it was. Nothing that was ever in effect is physically erased, so a unit that was inactivated or deleted later still appears in the structure of every earlier year (for example, *which units were active last year*).
+> **Answer first:** a new page, *Center admin › Organizational Structure* (outside Portfolio Management — 2026-10-13), holding **one living Alliance structure that does not belong to any portfolio**. It has four levels: L1 Division › L2 Department › L3 Office (optional) › L4 Unit. Every entry has a **permanent ID**. Names, parents and directors are **versioned per year**: each version applies from a year onward, and the structure of any year can be rebuilt exactly as it was. Nothing that was ever in effect is physically erased, so a unit that was inactivated or deleted later still appears in the structure of every earlier year (for example, *which units were active last year*).
 
 ## 1. Document Control
 

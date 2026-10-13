@@ -139,4 +139,6 @@ Define each vocabulary once for the whole Alliance and read it by its key. Portf
 | --- | --- | --- |
 | 2026-10-13 (a) | First draft: global by default with optional portfolio scope | requester |
 | 2026-10-13 (b) | All lists read by key; portfolio removed from Control Lists; portfolio conditions decided per screen when needed. Former Q-1 (category scope) and Q-3 (scope change) no longer apply | requester |
+| 2026-10-13 (e) | Values gain an optional *Applies to* set of portfolios (empty = all) and the by-key read an optional portfolio filter — requirements R-CLG-009, design D-CLG-9/10. Lists and categories stay global | requester |
+| 2026-10-13 (d) | Menu moves to *System admin*; access = Admin + Technical Support (Center Admin removed) — requirements R-CLG-008 | requester |
 | 2026-10-13 (c) | Q-1: rewrite the three unmerged migrations instead of adding one; Q-2 accepted; proposal **approved**; `family.md` F-2/F-3 amended | requester |

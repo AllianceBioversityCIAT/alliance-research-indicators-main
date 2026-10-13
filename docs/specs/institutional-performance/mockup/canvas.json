@@ -5,7 +5,7 @@
     "ControlledLists.dc.html": {
       "h": 1120,
       "is_interactive": true,
-      "title": "1 · Control Lists",
+      "title": "1 · Control Lists (System admin, global)",
       "w": 1440,
       "x": 0,
       "y": 0
@@ -55,7 +55,7 @@
     "heading": {
       "kind": "title1",
       "maxW": 4480,
-      "text": "Idea 1 — Control Lists · Organizational Structure · Strategy Framework (Center admin)",
+      "text": "Idea 1 — Control Lists (System admin) · Organizational Structure (Center admin) · Strategy Framework (Center admin › Portfolio Management)",
       "w": 240,
       "x": -1520,
       "y": -300

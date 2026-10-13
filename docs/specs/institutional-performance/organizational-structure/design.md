@@ -32,7 +32,7 @@
 ```mermaid
 flowchart LR
   subgraph Client[STAR client]
-    SB[alliance-sidebar\n+1 nested child] --> RT[route organizational-structure\ncanMatch centerAdminGuard]
+    SB[alliance-sidebar\n+1 Center admin item] --> RT[route organizational-structure\ncanMatch centerAdminGuard]
     RT --> PG[OrgStructurePage]
     PG --> TV[OrgTree\nPrimeNG TreeTable]
     PG --> DT[shared DataTable]
@@ -98,7 +98,7 @@ flowchart LR
 | `…/organizational-structure/utils/org-tree.util.ts` (+spec) | Builds `TreeNode[]` from the flat year view; counts units under each node |
 | `shared/interfaces/org-structure.interface.ts` | Client types |
 | `shared/services/api.service.ts` | Methods for §4 |
-| `shared/components/alliance-sidebar/alliance-sidebar.component.ts` | Add *Organizational Structure* after *Control Lists* in the Portfolio Management `children` (:96-103) |
+| `shared/components/alliance-sidebar/alliance-sidebar.component.ts` | Add *Organizational Structure* as a *Center admin* child after *Portfolio Management* (not nested — F-3 amended 2026-10-13) |
 | `shared/types/modal.types.ts`, `shared/services/cache/all-modals.service.ts` | Register modal name `orgUnitLifecycle` |
 | `app.routes.ts` | Lazy route `administration/center-admin/organizational-structure`, `canMatch: [centerAdminGuard]` (pattern at :332-341) |
 
@@ -242,7 +242,7 @@ None beyond the database: no OpenSearch, sockets or queues. Logs via `LoggerUtil
 ## 6. Frontend — STAR client
 
 ### 6.1 Navigation (R-ORG-013)
-Append `{ label: 'Organizational Structure', link: '/administration/center-admin/organizational-structure', icon: 'pi-sitemap', iconSize: '13px' }` after Control Lists in the Portfolio Management `children` (`alliance-sidebar.component.ts:96-103`). The nested rendering already exists in both sidebar modes (control-lists D-CTL-9).
+Add `{ label: 'Organizational Structure', link: '/administration/center-admin/organizational-structure', icon: 'pi-sitemap', iconSize: '13px' }` to the *Center admin* `children`, after *Portfolio Management* — its own item, outside the Portfolio Management group (requester, 2026-10-13; F-3 amended). Control Lists has moved to *System admin* (`changes/control-lists-global-scope`).
 
 ### 6.2 Page layout
 

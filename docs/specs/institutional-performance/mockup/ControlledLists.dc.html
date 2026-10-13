@@ -47,14 +47,16 @@ a{color:#035BA9}a:hover{color:#074B86}
 <a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Bilateral Mapping</a>
 <a href="PortfolioManagement.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Portfolio Management</a>
 <div role="group" aria-label="Portfolio configuration" style="display: flex; flex-direction: column; gap: 2px; margin-left: 18px; padding-left: 8px; border-left: 2px solid #E8EBED">
-<a href="ControlledLists.dc.html" aria-current="page" style="font-size: 13px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 6px 8px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
-<a href="OrgStructure.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
 <a href="Main.dc.html" style="font-size: 13px; color: #153C71; text-decoration: none; padding: 6px 8px; display: flex; justify-content: space-between; align-items: center">Strategy Framework<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
 </div>
+<a href="OrgStructure.dc.html" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px; display: flex; justify-content: space-between; align-items: center">Organizational Structure<span style="font-size: 10px; font-weight: 600; color: #035BA9; background: #EAF1F8; border-radius: 6px; padding: 1px 6px">New</span></a>
 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: #153C71; padding: 12px 0 4px">
 <span>System admin</span>
-<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#112F5C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>
 </div>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Environment variables</a>
+<a href="#" style="font-size: 13.5px; color: #153C71; text-decoration: none; padding: 7px 10px">Prompt Manager</a>
+<a href="ControlledLists.dc.html" aria-current="page" style="font-size: 13.5px; color: #035BA9; font-weight: 600; text-decoration: none; padding: 7px 10px; background: #F4F7F9; border-radius: 8px; display: flex; justify-content: space-between; align-items: center">Control Lists<span style="font-size: 10px; font-weight: 600; color: #ffffff; background: #035BA9; border-radius: 6px; padding: 1px 6px">New</span></a>
 </aside>
 
 <main style="flex-grow: 1; min-width: 0; padding: 18px 28px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
@@ -62,14 +64,9 @@ a{color:#035BA9}a:hover{color:#074B86}
 <div style="display: flex; justify-content: space-between; align-items: flex-end; gap: 24px">
 <div style="display: flex; flex-direction: column; gap: 2px">
 <h1 style="margin: 0; font-size: 17px; font-weight: 700; color: #112F5C">Control lists</h1>
-<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 820px; line-height: 1.25">Manage the controlled vocabularies of the selected portfolio, grouped by category. They feed the Organizational Structure, the Strategy Framework and the KPI forms. Values in use cannot be deleted; deactivate them instead.</p>
+<p style="margin: 0; font-size: 14px; color: #6B7079; max-width: 820px; line-height: 1.25">Manage the Alliance-wide controlled vocabularies, grouped by category. Every list applies to all portfolios and is read by its key. They feed the Organizational Structure, the Strategy Framework and the KPI forms. Values in use cannot be deleted; deactivate them instead.</p>
 </div>
 <div style="display: flex; gap: 10px; align-items: center">
-<label for="portfolio" style="font-size: 12px; color: #6B7079">Portfolio</label>
-<select id="portfolio" style="height: 30px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #112F5C; background: #ffffff">
-<option>Portfolio 2 · Alliance Strategy 2026–2030</option>
-<option>Portfolio 1 · 2010–2025 (not configured)</option>
-</select>
 <button type="button" onClick="{{newCategory}}" style="height: 30px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 9px; padding: 0 12px; font-family: Barlow, sans-serif; font-size: 13px; cursor: pointer">+ New category</button>
 </div>
 </div>
@@ -106,7 +103,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #112F5C">{{cur.name}}</h2>
 <span style="font-size: 12.5px; color: #4C5158">{{cur.desc}}</span>
 <div style="display: flex; gap: 14px; font-size: 12px; color: #6B7079; flex-wrap: wrap">
-<span>Reference: <strong style="color: #153C71">P2 · {{cur.key}}</strong></span>
+<span>Key: <strong style="color: #153C71">{{cur.key}}</strong></span>
 <span>Used by: <strong style="color: #153C71">{{cur.usedBy}}</strong></span>
 </div>
 </div>
@@ -121,7 +118,11 @@ a{color:#035BA9}a:hover{color:#074B86}
 <div style="padding: 10px 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
 <div style="display: flex; gap: 10px; align-items: center">
 <label for="val-search" style="position: absolute; left: -9999px">Find a value</label>
-<input id="val-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find a value by code, name or description" style="width: 340px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<label for="val-pf" style="font-size: 12.5px; color: #112F5C; font-weight: 600">Show values for</label>
+<select id="val-pf" value="{{pfFilter}}" onChange="{{onPf}}" style="height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 12.5px; color: #112F5C; background: #ffffff">
+<sc-for list="{{pfOpts}}" as="o" hint-placeholder-count="3"><option value="{{o.v}}">{{o.l}}</option></sc-for>
+</select>
+<input id="val-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find a value by code, name or description" style="width: 300px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
 <sc-if value="{{hasToast}}" hint-placeholder-val="{{false}}">
 <span role="status" style="font-size: 12.5px; color: #1F4E24; background: #E6F2E7; border: 1px solid #A8CEAB; border-radius: 8px; padding: 4px 10px">{{toast}}</span>
 </sc-if>
@@ -136,7 +137,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
 <thead>
 <tr>
-<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="7">
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="8">
 <th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
 <sc-if value="{{h.sortable}}" hint-placeholder-val="{{true}}">
 <button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 12px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
@@ -155,6 +156,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: {{r.color}}; font-weight: 600">{{r.value}}</td>
 <td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #6B7079">{{r.desc}}</td>
 <td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2">{{r.order}}</td>
+<td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="font-size: 11.5px; font-weight: 600; color: {{r.pfFg}}; background: {{r.pfBg}}; border-radius: 6px; padding: 2px 8px">{{r.pfLabel}}</span></td>
 <td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2; color: {{r.useColor}}">{{r.inUseLabel}}</td>
 <td style="padding: 9px 12px; border-bottom: 1px solid #EEF0F2"><span style="font-size: 11.5px; font-weight: 600; color: {{r.activeFg}}; background: {{r.activeBg}}; border-radius: 6px; padding: 2px 8px">{{r.activeLabel}}</span></td>
 <td style="padding: 6px 8px; border-bottom: 1px solid #EEF0F2">
@@ -206,7 +208,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <label style="display: flex; gap: 8px; align-items: center; font-size: 13px; color: #112F5C; font-weight: 600; padding-top: 22px"><input type="checkbox" checked="{{f.checked}}" onChange="{{f.toggle}}">{{f.label}}</label>
 </sc-if>
 <sc-if value="{{f.notCheck}}" hint-placeholder-val="{{true}}">
-<label for="{{f.id}}" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.label}}</label>
+<label for="{{f.id}}" id="{{f.lid}}" style="font-size: 12.5px; font-weight: 600; color: #112F5C">{{f.label}}</label>
 </sc-if>
 <sc-if value="{{f.isText}}" hint-placeholder-val="{{true}}">
 <input id="{{f.id}}" type="{{f.inputType}}" value="{{f.value}}" onChange="{{f.onChange}}" disabled="{{f.disabled}}" placeholder="{{f.placeholder}}" style="height: 32px; border: 1px solid {{f.border}}; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; color: #4C5158; box-sizing: border-box; background: {{f.bg}}">
@@ -218,6 +220,11 @@ a{color:#035BA9}a:hover{color:#074B86}
 <select id="{{f.id}}" value="{{f.value}}" onChange="{{f.onChange}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 8px; font-family: Barlow, sans-serif; font-size: 13px; background: #ffffff">
 <sc-for list="{{f.options}}" as="o" hint-placeholder-count="2"><option value="{{o.v}}">{{o.l}}</option></sc-for>
 </select>
+</sc-if>
+<sc-if value="{{f.isMulti}}" hint-placeholder-val="{{false}}">
+<div role="group" aria-labelledby="{{f.lid}}" style="display: flex; flex-wrap: wrap; gap: 8px 16px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 8px 10px">
+<sc-for list="{{f.multi}}" as="o" hint-placeholder-count="2"><label style="display: flex; gap: 6px; align-items: center; font-size: 13px; color: #112F5C"><input type="checkbox" checked="{{o.checked}}" onChange="{{o.toggle}}">{{o.l}}</label></sc-for>
+</div>
 </sc-if>
 <sc-if value="{{f.hasError}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.error}}</span></sc-if>
 <sc-if value="{{f.hasHint}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #6B7079">{{f.hint}}</span></sc-if>
@@ -263,27 +270,30 @@ const SEED = [
       rows: [['L1', 'Division', 'Top level (e.g. Research, Global Support, Regional)', 3], ['L2', 'Department', 'Departments and regions', 19], ['L3', 'Office', 'Optional grouping inside a department (e.g. HR Operations)', 1], ['L4', 'Unit', 'Operational units', 94]] }
   ] }
 ];
+const PORTFOLIOS = [{ id: 1, short: 'P1', name: 'Portfolio 1 · 2010–2025' }, { id: 2, short: 'P2', name: 'Portfolio 2 · 2026–2030' }];
+const RESTRICT = { 'Maintain within range': [2] };
+const applies = (v, pid) => !v.pf.length || v.pf.indexOf(pid) >= 0;
 const FILE = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 function seed() {
   let k = 0;
   return SEED.map(c => ({ id: c.id, name: c.name, desc: c.desc, lists: c.lists.map(l => ({ id: l.id, key: l.key, name: l.name, usedBy: l.usedBy, prefix: l.prefix, desc: l.desc, system: true,
-    values: l.rows ? l.rows.map((r, i) => ({ id: 'v' + (k++), code: r[0], value: r[1], desc: r[2], order: i + 1, active: true, inUse: r[3] }))
-      : l.values.map((v, i) => ({ id: 'v' + (k++), code: l.prefix + '-' + String(i + 1).padStart(2, '0'), value: v, desc: '', order: i + 1, active: true, inUse: 0 })) })) }));
+    values: l.rows ? l.rows.map((r, i) => ({ id: 'v' + (k++), code: r[0], value: r[1], desc: r[2], order: i + 1, active: true, inUse: r[3], pf: [] }))
+      : l.values.map((v, i) => ({ id: 'v' + (k++), code: l.prefix + '-' + String(i + 1).padStart(2, '0'), value: v, desc: '', order: i + 1, active: true, inUse: 0, pf: RESTRICT[v] || [] })) })) }));
 }
 function cmp(a, b) {
   if (typeof a === 'number' && typeof b === 'number') return a - b;
   return String(a == null ? '' : a).localeCompare(String(b == null ? '' : b), undefined, { numeric: true, sensitivity: 'base' });
 }
 const COLS = [
-  { k: 'code', label: 'Code', w: 110 }, { k: 'value', label: 'Value', w: 220 }, { k: 'desc', label: 'Description', w: 340 },
-  { k: 'order', label: 'Order', w: 80 }, { k: 'inUse', label: 'In use', w: 100 }, { k: 'active', label: 'Active', w: 90 }, { k: '_a', label: 'Actions', w: 96, fixed: true }
+  { k: 'code', label: 'Code', w: 110 }, { k: 'value', label: 'Value', w: 200 }, { k: 'desc', label: 'Description', w: 250 },
+  { k: 'order', label: 'Order', w: 80 }, { k: 'pfSort', label: 'Applies to', w: 130 }, { k: 'inUse', label: 'In use', w: 100 }, { k: 'active', label: 'Active', w: 90 }, { k: '_a', label: 'Actions', w: 96, fixed: true }
 ];
 
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { cats: seed(), cur: 'uom', open: { kpi: true, org: true }, sort: 'code', dir: 1, size: 10, page: 0, q: '', modal: null, confirm: null, toast: '', seq: 1 };
+    this.state = { cats: seed(), cur: 'uom', open: { kpi: true, org: true }, sort: 'code', dir: 1, size: 10, page: 0, q: '', modal: null, confirm: null, toast: '', seq: 1, pfFilter: '' };
   }
   find(listId) { for (const c of this.state.cats) for (const l of c.lists) if (l.id === listId) return { cat: c, list: l }; return null; }
   mutateList(listId, fn) { return this.state.cats.map(c => Object.assign({}, c, { lists: c.lists.map(l => l.id === listId ? fn(Object.assign({}, l)) : l) })); }
@@ -293,7 +303,7 @@ class Component extends DCLogic {
     if (type === 'value') {
       const v = mode === 'edit' ? cur.list.values.find(x => x.id === id) : null;
       const n = cur.list.values.length + 1;
-      d = v ? { code: v.code, value: v.value, desc: v.desc, order: String(v.order), active: v.active } : { code: cur.list.prefix + (cur.list.prefix === 'L' ? n : '-' + String(n).padStart(2, '0')), value: '', desc: '', order: String(n), active: true };
+      d = v ? { code: v.code, value: v.value, desc: v.desc, order: String(v.order), active: v.active, pf: v.pf.slice() } : { code: cur.list.prefix + (cur.list.prefix === 'L' ? n : '-' + String(n).padStart(2, '0')), value: '', desc: '', order: String(n), active: true, pf: [] };
     } else if (type === 'list') {
       const l = mode === 'edit' ? cur.list : null;
       d = l ? { name: l.name, key: l.key, desc: l.desc, cat: cur.cat.id } : { name: '', key: '', desc: '', cat: extra };
@@ -314,12 +324,13 @@ class Component extends DCLogic {
       if (!errors.code && others.some(v => v.code.toLowerCase() === d.code.trim().toLowerCase())) errors.code = 'This code already exists in the list';
       if (!errors.value && others.some(v => v.value.toLowerCase() === d.value.trim().toLowerCase())) errors.value = 'This value already exists in the list';
       if (Object.keys(errors).length) { this.setState({ modal: Object.assign({}, m, { errors: errors }) }); return; }
-      const rec = { code: d.code.trim(), value: d.value.trim(), desc: d.desc, order: Number(d.order) || 0, active: !!d.active };
+      const rec = { code: d.code.trim(), value: d.value.trim(), desc: d.desc, order: Number(d.order) || 0, active: !!d.active, pf: (d.pf || []).slice().sort() };
       const cats = this.mutateList(s.cur, l => { l.values = m.mode === 'edit' ? l.values.map(v => v.id === m.id ? Object.assign({}, v, rec) : v) : l.values.concat([Object.assign({ id: 'n' + s.seq, inUse: 0 }, rec)]); return l; });
-      this.setState({ cats: cats, modal: null, seq: s.seq + 1, toast: '“' + rec.value + '” ' + (m.mode === 'edit' ? 'saved.' : 'added.') });
+      this.setState({ cats: cats, modal: null, seq: s.seq + 1, toast: '“' + rec.value + '” ' + (m.mode === 'edit' ? 'saved' : 'added') + (rec.pf.length ? ' — applies to ' + rec.pf.map(id => PORTFOLIOS.find(x => x.id === id).short).join(', ') + ' only.' : ' — applies to all portfolios.') });
     } else if (m.type === 'list') {
       if (!String(d.name).trim()) errors.name = 'Required';
       if (m.mode === 'create' && !/^[a-z0-9_.]+$/.test(String(d.key))) errors.key = 'Use lower case, digits, “_” or “.” (e.g. kpi.data_source)';
+      else if (m.mode === 'create' && s.cats.some(c => c.lists.some(l => l.key === String(d.key)))) errors.key = 'This key is already used by another list';
       if (Object.keys(errors).length) { this.setState({ modal: Object.assign({}, m, { errors: errors }) }); return; }
       let cats;
       if (m.mode === 'edit') {
@@ -348,28 +359,30 @@ class Component extends DCLogic {
     const cur = this.find(s.cur);
     const F = (k, label, o) => {
       const opt = o || {}; const err = m.errors[k] || '';
-      return { id: 'm-' + k, label: label + (opt.req ? ' *' : ''), span: opt.span || 2, isText: !opt.area && !opt.check && !opt.select, isArea: !!opt.area, isCheck: !!opt.check, notCheck: !opt.check, isSelect: !!opt.select,
+      return { id: 'm-' + k, label: label + (opt.req ? ' *' : ''), span: opt.span || 2, isText: !opt.area && !opt.check && !opt.select && !opt.multi, isArea: !!opt.area, isCheck: !!opt.check, notCheck: !opt.check, isSelect: !!opt.select && !opt.multi, isMulti: !!opt.multi,
         inputType: opt.number ? 'number' : 'text', value: m.d[k] == null ? '' : String(m.d[k]), checked: !!m.d[k], disabled: !!opt.disabled, bg: opt.disabled ? '#F4F7F9' : '#ffffff',
         placeholder: opt.ph || '', options: opt.select || [], error: err, hasError: !!err, border: err ? '#B00020' : '#B9C0C5', hint: opt.hint || '', hasHint: !!opt.hint && !err,
+        lid: 'm-' + k + '-label', multi: opt.multi ? PORTFOLIOS.map(o => ({ l: o.name, checked: (m.d[k] || []).indexOf(o.id) >= 0, toggle: () => { const cur = (this.state.modal.d[k] || []).slice(); const i = cur.indexOf(o.id); if (i >= 0) cur.splice(i, 1); else cur.push(o.id); this.setD(k, cur); } })) : [],
         onChange: (e) => this.setD(k, e.target.value), toggle: () => this.setD(k, !m.d[k]) };
     };
     if (m.type === 'value') return { title: m.mode === 'edit' ? 'Edit value' : 'Add value', sub: cur.cat.name + ' › ' + cur.list.name,
-      fields: [F('code', 'Code', { req: true, span: 1, hint: 'Unique in the list; editable.' }), F('order', 'Display order', { span: 1, number: true }), F('value', 'Value', { req: true, ph: 'e.g. Hours' }), F('desc', 'Description', { area: true, ph: 'Optional' }), F('active', 'Active — offered in forms', { check: true })] };
+      fields: [F('code', 'Code', { req: true, span: 1, hint: 'Unique in the list; editable.' }), F('order', 'Display order', { span: 1, number: true }), F('value', 'Value', { req: true, ph: 'e.g. Hours' }), F('desc', 'Description', { area: true, ph: 'Optional' }), F('pf', 'Applies to portfolios', { multi: true, hint: (m.d.pf || []).length ? 'Offered only in the ticked portfolios. Records that already use it stay valid.' : 'None ticked = applies to all portfolios.' }), F('active', 'Active — offered in forms', { check: true })] };
     if (m.type === 'list') return { title: m.mode === 'edit' ? 'Edit list' : 'New list', sub: m.mode === 'edit' ? cur.list.name : 'A new list can be linked to a form field by the development team.',
-      fields: [F('name', 'List name', { req: true }), F('key', 'System key', { req: true, disabled: m.mode === 'edit', span: 1, hint: m.mode === 'edit' ? 'Fixed once created. No portfolio in the key — it is shown as P2 · key.' : 'Fixed once created. Do not add the portfolio; it is stored separately.' }), F('cat', 'Category', { span: 1, select: s.cats.map(c => ({ v: c.id, l: c.name })) }), F('desc', 'Description', { area: true })] };
+      fields: [F('name', 'List name', { req: true }), F('key', 'System key', { req: true, disabled: m.mode === 'edit', span: 1, hint: m.mode === 'edit' ? 'Fixed once created. Consumers read the list by this key.' : 'Unique across all lists and fixed once created. Consumers read the list by this key.' }), F('cat', 'Category', { span: 1, select: s.cats.map(c => ({ v: c.id, l: c.name })) }), F('desc', 'Description', { area: true })] };
     return { title: m.mode === 'edit' ? 'Edit category' : 'New category', sub: 'Categories group lists by the part of the system that uses them.', fields: [F('name', 'Category name', { req: true }), F('desc', 'Description', { area: true })] };
   }
   renderVals() {
     const s = this.state;
     const cur = this.find(s.cur) || { cat: s.cats[0], list: s.cats[0].lists[0] };
     const q = s.q.trim().toLowerCase();
-    let all = cur.list.values.filter(v => !q || (v.code + ' ' + v.value + ' ' + v.desc).toLowerCase().indexOf(q) >= 0);
+    const pfSel = s.pfFilter ? Number(s.pfFilter) : 0;
+    let all = cur.list.values.filter(v => (!q || (v.code + ' ' + v.value + ' ' + v.desc).toLowerCase().indexOf(q) >= 0) && (!pfSel || applies(v, pfSel))).map(v => Object.assign({ pfSort: v.pf.length ? v.pf.join(',') : '' }, v));
     all = all.slice().sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
     const pc = Math.max(1, Math.ceil(all.length / s.size));
     const page = Math.min(s.page, pc - 1);
     const start = page * s.size;
     const rows = all.slice(start, start + s.size).map(v => ({
-      code: v.code, value: v.value, desc: v.desc || '—', order: v.order, inUseLabel: v.inUse ? v.inUse + ' records' : '0', useColor: v.inUse ? '#153C71' : '#6B7079',
+      code: v.code, value: v.value, desc: v.desc || '—', order: v.order, pfLabel: v.pf.length ? v.pf.map(id => PORTFOLIOS.find(x => x.id === id).short).join(', ') + ' only' : 'All', pfFg: v.pf.length ? '#153C71' : '#4C5158', pfBg: v.pf.length ? '#EAF1F8' : '#F4F7F9', inUseLabel: v.inUse ? v.inUse + ' records' : '0', useColor: v.inUse ? '#153C71' : '#6B7079',
       color: v.active ? '#112F5C' : '#6B7079', activeLabel: v.active ? 'Yes' : 'No', activeFg: v.active ? '#1F4E24' : '#4C5158', activeBg: v.active ? '#D3E7D5' : '#E8EBED',
       editLabel: 'Edit ' + v.value, delLabel: 'Delete ' + v.value,
       edit: () => this.openModal('value', 'edit', v.id), del: () => this.setState({ confirm: { kind: 'value', id: v.id } })
@@ -396,6 +409,8 @@ class Component extends DCLogic {
           pick: () => this.setState({ cur: l.id, page: 0, q: '', toast: '' }) })) })),
       cur: { catCaps: cur.cat.name.toUpperCase(), name: cur.list.name, desc: cur.list.desc, key: cur.list.key, usedBy: cur.list.usedBy, canDelete: !cur.list.system },
       q: s.q, onQ: (e) => this.setState({ q: e.target.value, page: 0 }),
+      pfFilter: s.pfFilter, onPf: (e) => this.setState({ pfFilter: e.target.value, page: 0 }),
+      pfOpts: [{ v: '', l: 'All portfolios' }].concat(PORTFOLIOS.map(o => ({ v: String(o.id), l: o.name }))),
       t: { headers: headers, rows: rows, empty: all.length === 0, pages: pages, size: String(s.size), range: all.length ? (start + 1) + '–' + Math.min(start + s.size, all.length) + ' of ' + all.length : '0 values',
         setSize: (e) => this.setState({ size: Number(e.target.value), page: 0 }) },
       hasToast: !!s.toast, toast: s.toast,
