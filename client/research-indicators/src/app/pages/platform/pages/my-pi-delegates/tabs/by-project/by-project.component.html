@@ -32,7 +32,7 @@
       aria-label="Quick views">
       <span
         class="by-project__quick-filters-label text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Quick views</span>
-      <div class="inline-flex gap-0.5 rounded-full border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] p-[2px]"
+      <div class="inline-flex h-7 items-center gap-0.5 rounded-full border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] p-[2px]"
         role="radiogroup" aria-label="Your role">
         @for (option of roleFilterOptions; track option.value; let i = $index) {
         <button type="button" role="radio"
@@ -50,7 +50,7 @@
       <span class="by-project__quick-filters-divider h-5 w-px bg-[var(--ac-pfm-surface-border)]" aria-hidden="true"></span>
       <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Refine">
         <button type="button" data-testid="by-project-quick-filter-ongoing" role="checkbox"
-          class="by-project__quick-filter inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid py-1 pl-3 pr-4 font-['Barlow'] text-[13px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="by-project__quick-filter inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-solid py-0 pl-3 pr-4 font-['Barlow'] text-[13px] leading-[18px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             ongoingOnly()
               ? 'border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
               : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
@@ -64,7 +64,7 @@
           Ongoing projects
         </button>
         <button type="button" data-testid="by-project-quick-filter-without-delegates" role="checkbox"
-          class="by-project__quick-filter inline-flex cursor-pointer items-center gap-2 rounded-full border border-solid py-1 pl-3 pr-4 font-['Barlow'] text-[13px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="by-project__quick-filter inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-solid py-0 pl-3 pr-4 font-['Barlow'] text-[13px] leading-[18px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             withoutDelegatesOnly()
               ? 'border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
               : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
