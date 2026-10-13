@@ -9,7 +9,7 @@
 - **Family rules:** `../../institutional-performance/family.md` F-4 … F-9 apply; **F-1, F-2 and F-3 as amended 2026-10-13** (control lists are global, live under *System admin* and are used by the System admin roles)
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Center Admin tools
 - **Linked tickets:** PARI-258; epic AC-1773 — ticket for this change `<TO CONFIRM>`
-- **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-13 (Q-1 rewrite migrations, Q-2 accepted); this spec stays aligned with it
+- **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-13 (Q-1 rewrite migrations, Q-2 accepted); later requester decisions (menu, roles, value applicability) are folded into its body and revision log (d)–(f)
 - **Approval Mode:** `gated`
 - **Last updated:** 2026-10-13 (requester: values can be restricted to portfolios — R-CLG-009; menu moved to *System admin*, access = System admin roles — R-CLG-008)
 
@@ -17,7 +17,7 @@
 
 ## 1. Executive summary
 
-Control lists stop belonging to a portfolio. **Every category and list is global, and every list is read by its key alone.** Keys and category names become unique across the module. The page loses its portfolio selector. The consumer contract drops the portfolio. The three Control Lists migrations are rewritten, so the schema never had a portfolio. The page moves to the **System admin** menu and is used by the **System admin roles** (Admin and Technical Support) instead of Center Admin (R-CLG-008). Values, codes, permanent ids (1–23), in-use protection and the table standard do not change.
+Control lists stop belonging to a portfolio. **Every category and list is global, and every list is read by its key alone.** Keys and category names become unique across the module. The page loses its portfolio selector. The three Control Lists migrations are rewritten, so categories and lists never had a portfolio; a fourth migration adds the value ↔ portfolio link table. **Portfolios now live on values:** a value applies to all portfolios unless restricted, and the by-key read can filter by portfolio (R-CLG-009). The page moves to the **System admin** menu and is used by the **System admin roles** (Admin and Technical Support) instead of Center Admin (R-CLG-008). Value codes, permanent ids (1–23), ordering, in-use protection and the table standard do not change.
 
 **Portfolios live on the values, not on the lists** (requester, 2026-10-13): a value applies to every portfolio unless an admin restricts it to one or more portfolios, and a consumer can ask for the values that apply to a given portfolio (R-CLG-009). How a screen uses that filter is decided in the screen's own spec.
 
@@ -30,7 +30,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 | **Global** | Not tied to any portfolio. After this change every category and list is global |
 | **Applies to** | The portfolios a value applies to. Empty = all portfolios. A value restricted to P2 is offered only for P2 when a consumer filters by portfolio |
 | **Consumer** | A module that reads a list by key and stores value ids (first: `organizational-structure`) |
-| **Admin** | Center Admin or System Admin (F-1) |
+| **Admin** | For this module: Admin (role 1) or Technical Support (role 7) — R-CLG-008 (family F-1 exception) |
 
 ## 3. System context & scope
 
@@ -51,7 +51,8 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 | Persona | Role here |
 | --- | --- |
-| Center Admin / System Admin | Maintain lists without choosing a portfolio |
+| Admin / Technical Support | Maintain lists without choosing a portfolio; set which portfolios a value applies to |
+| Center Admin | Loses access to this page (R-CLG-008); still benefits as a form user through the consumer read |
 | Consuming modules | Read by key; `organizational-structure` is the first (paused until this is done) |
 | Requester | Approves the seeded result and the mockup update |
 
@@ -65,7 +66,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 **Details**
 - Before: every read and write was filtered by a portfolio. After: no category or list belongs to a portfolio. The only portfolio data left in the module is a value's optional **Applies to** set (R-CLG-009).
-- A request that still sends `portfolioId` to a category or list endpoint (query or body) fails with `400`. The only portfolio inputs accepted are a value's `portfolioIds` (A10, A11) and the consumer filter on the by-key read (A13).
+- A request that still sends `portfolioId` to the categories read or to a category/list create or update (A1 query; A3, A4, A6, A7 bodies) fails with `400`. Deletes and reads by id (A5, A8, A9) take no query DTO, so a stray parameter there is ignored. The only portfolio inputs accepted are a value's `portfolioIds` (A10, A11) and the consumer filter on the by-key read (A13).
 
 #### Scenario: One set of lists for everyone
 - GIVEN the seeded categories and lists exist
@@ -81,7 +82,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 **Acceptance criteria**
 - [ ] AC.1 — Categories and lists have no `portfolio_id` column, FK or index.
-- [ ] AC.2 — `portfolioId` on a category or list endpoint → `400`.
+- [ ] AC.2 — `portfolioId` on A1, A3, A4, A6 or A7 → `400`.
 
 ### R-CLG-002 — Category names unique across the module (modifies R-CTL-002)
 
@@ -131,7 +132,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 - **As a** STAR module **I want** to read and validate a list by its key **so that** I do not need a portfolio I may not have.
 
 **Details**
-- Consumer read: `activeOnly` (default true) is the only parameter besides the key. Ordering unchanged (display order, then natural code). Unknown key → `404`.
+- Consumer read: `activeOnly` (default true) and the optional `portfolioId` filter (R-CLG-009) are the only parameters besides the key. Ordering unchanged (display order, then natural code). Unknown key → `404`.
 - Membership check: takes a value id and a key. It returns the value when it belongs to that list, fails with `400` naming the expected key when it belongs to another list, and fails with `404` for an unknown id. It still does not check *active* (R-CTL-004 *Deactivate*).
 - Consumers keep storing only the value id with a plain FK (D-CTL-15 unchanged).
 
@@ -176,21 +177,21 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 ### R-CLG-006 — Rewritten migrations and seed (modifies R-CTL-010)
 
 **Details**
-- The three existing migrations are rewritten in place (proposal Q-1): same names and order, no portfolio column/FK/index, unique indexes on category name and list key, case-insensitive collation kept.
+- The three existing migrations are rewritten in place (proposal Q-1): same names and order, no portfolio column/FK/index, unique indexes on category name and list key, case-insensitive collation kept. A **fourth** migration (`…003`) creates the value ↔ portfolio link table (R-CLG-009).
 - The seed inserts the same rows as today, with the same explicit ids, without looking up a portfolio: 2 categories (ids 1–2), 6 lists (ids 1–6), 23 values (ids 1–23, `org.level` = 20–23). It stays idempotent.
-- `down` of each migration still drops only its own table (values → lists → categories).
-- **Local database procedure:** a DB that ran the old versions must revert the three migrations and run them again; hand-made local rows are lost unless exported first (proposal §12).
+- `down` of each migration still drops only its own table; reverse order: link table → values → lists → categories.
+- **Database procedure** (design §3.1): any DB that ran the old versions reverts them **by name** until the categories migration is reverted (not by a fixed count, since `…003` may or may not have run) and runs them again with the source config. It runs on the TEST DB before the server integration gate; on the requester's app DB only if it is local, never on the shared Dev DB. Hand-made local rows are lost unless exported first.
 
 #### Scenario: Fresh run
-- GIVEN an empty schema
-- WHEN the migrations run
-- THEN 2 categories, 6 lists and 23 values exist with ids 1–2, 1–6, 1–23
-- AND IT MUST leave no `portfolio_id` column in either table
+- GIVEN a schema without the control-list tables
+- WHEN the four migrations run
+- THEN categories 1–2, lists 1–6 and values 1–23 exist with their seeded keys and codes, and the link table exists empty
+- AND IT MUST leave no `portfolio_id` column in categories or lists
 
 #### Scenario: Run twice
 - GIVEN the migrations ran
-- WHEN the seed logic runs again
-- THEN no row is added
+- WHEN the seed statements run again against the migrated schema
+- THEN no row is added (0 affected rows)
 
 #### Scenario: Old local schema
 - GIVEN a local DB that ran the old migrations
@@ -199,8 +200,8 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 - BUT a DB that skips the revert keeps the old schema, which the task's schema check must detect
 
 **Acceptance criteria**
-- [ ] AC.1 — Counts and ids as above after a fresh run; zero added on a re-run.
-- [ ] AC.2 — `SHOW COLUMNS … LIKE 'portfolio_id'` returns nothing for both tables.
+- [ ] AC.1 — Seeded ids and keys as above after the procedure; a second run of the seed statements affects 0 rows. Checks are on the seeded id ranges, not on table totals (other rows may exist).
+- [ ] AC.2 — `SHOW COLUMNS … LIKE 'portfolio_id'` returns nothing for categories and lists; the link table exists; both unique indexes exist with `Non_unique = 0`.
 
 ### R-CLG-007 — Removed behavior
 
@@ -261,7 +262,9 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 **Details**
 - Each value has an **Applies to** set of portfolios. **Empty = applies to all portfolios** (the default, and the state of every seeded value).
 - Admin: the value form gets an **Applies to** multi-select of portfolios (empty shows *All portfolios*); the values table gets an **Applies to** column (*All* or the portfolio names) and a filter *Show values for: All / <portfolio>* that uses the same rule as the consumer read.
-- Consumer read by key: with `portfolioId`, it returns the values that apply to all portfolios **plus** those restricted to that portfolio; without it, it returns every value, each with its *Applies to* set. `activeOnly` combines with it. An unknown portfolio → `404`.
+- Consumer read by key: with `portfolioId`, it returns the values that apply to all portfolios **plus** those restricted to that portfolio; without it, it returns every value, each with its *Applies to* set (`appliesTo`: active portfolio ids; `appliesToAll`: no restriction at all). `activeOnly` combines with it. An unknown or inactive portfolio → `404`.
+- Writes accept only existing, active, non-repeated portfolio ids; anything else (including `null`) → `400` naming `portfolioIds`. On update, omitting `portfolioIds` keeps the current set, `[]` makes the value apply to all, a list replaces the set. Saving a value and its set is all-or-nothing.
+- **Soft-deleted portfolios:** portfolios are deactivated, not deleted, so a value may still be linked to one. Such links are hidden on read; a value whose only links point to inactive portfolios is offered nowhere and shown as *No active portfolio* (it is not "all").
 - Restricting a value does not touch records that already store it: like deactivation, it only changes what is **offered** for new selections. The membership check (R-CLG-004) does not look at portfolios.
 - The in-use rule, codes, ordering and permanent ids are unchanged. Deleting a value removes its *Applies to* links with it.
 
@@ -288,10 +291,23 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 - WHEN a write sends `portfolioIds: [99]` or a read sends `portfolioId=99` and portfolio 99 does not exist
 - THEN the request fails with `404` (read) or `400` naming `portfolioIds` (write)
 
+#### Scenario: Portfolio deactivated after linking
+- GIVEN *Maintain within range* is restricted to Portfolio 2 only, and Portfolio 2 is then deactivated
+- WHEN an Admin opens `kpi.direction`
+- THEN the value shows *No active portfolio*
+- AND IT MUST NOT be returned by a filtered read for any portfolio, nor shown as applying to all
+
+#### Scenario: Partial save impossible
+- GIVEN an update changes a value's name and its *Applies to* set
+- WHEN storing the new set fails
+- THEN the name change is not saved either
+
 **Acceptance criteria**
 - [ ] AC.1 — The filtered read returns *all-portfolio* values + values linked to the requested portfolio, and nothing else.
 - [ ] AC.2 — The value form and table show and edit *Applies to*; empty means all.
 - [ ] AC.3 — Seeded values apply to all portfolios.
+- [ ] AC.4 — `null`, repeated, unknown or inactive ids → `400`; omitted keeps the set; `[]` clears it.
+- [ ] AC.5 — A forced failure while storing the set leaves the value unchanged.
 
 ---
 
@@ -308,9 +324,10 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 - `control_list_categories`: remove `portfolio_id` (column, FK, both indexes); add unique index on `name`.
 - `control_lists`: remove `portfolio_id` (column, FK, unique and index); unique index on `list_key`.
+- Categories, lists and values: rewritten in `1790900000000…002`.
 - **New** `control_list_value_portfolios` (value id, portfolio id): primary key on the pair; FK to the value `ON DELETE CASCADE`; FK to `portfolios` `ON DELETE RESTRICT` (portfolios are soft-deleted, so it never fires through the app). Created by a new migration `1790900000003`.
 - `control_list_values`: unchanged.
-- Rewritten in `1790900000000…002`; no new migration. No OpenSearch fields.
+- No OpenSearch fields.
 
 ## 8. API surface delta
 
@@ -328,13 +345,16 @@ None outside STAR. Inside STAR: `organizational-structure` design simplifies (it
 | **`portfolioId` still accepted on categories/lists** | Unit tests: query and body with `portfolioId` → `400` on A1, A3, A4, A6, A7 |
 | **Portfolio filter wrong** (restricted value leaks to another portfolio, or all-portfolio values missing) | Unit + integration test with the *Value for one portfolio only* fixture; the filter is asserted on the SQL result from the DB, not on a mocked query builder (KZ-001, KZ-017) |
 | **Applies-to links orphaned** | Integration test: delete a restricted value → its links are gone |
-| **Uniqueness only in code** | Integration test: concurrent/duplicate insert of a key and a category name → `409` from the DB index path |
-| **Seed ids or counts changed** | Integration test on a fresh schema: ids and counts; re-run adds 0 |
-| **Local DB silently keeps old schema** (same migration names) | Schema check `SHOW COLUMNS … LIKE 'portfolio_id'` after the revert-and-rerun step; `migration:show` read with ANSI codes stripped (K-014) |
+| **Uniqueness only in code** | Raw SQL duplicate `INSERT` of a key and of a category name → errno 1062; `SHOW INDEX` → `Non_unique = 0`; unit test with the pre-check stubbed to pass → errno 1062 mapped to `409`. An HTTP duplicate proves only the pre-check. K-004: gate shown red once against a copy without the index |
+| **Seed ids or counts changed / seed not idempotent** | New seed suite: the exported seed functions are called again on the migrated TEST schema → 0 affected rows; seeded ids and keys asserted by id range |
+| **Value and links saved partially** | Integration test forcing the link insert to fail → value row unchanged |
+| **Soft-deleted portfolio shown as "all" or still filterable** | Integration test: deactivate a linked portfolio → A9 hides it, `appliesToAll = false`, A13 for it → `404` |
+| **DB silently keeps old schema** (same migration names; or `migration:execute` running a stale `dist`) | Design §3.1 checks after revert-by-name and rerun with the source config: no `portfolio_id`, link table present, unique indexes present; `migration:show` read with ANSI codes stripped (K-014) |
 | **Membership check wrong** | Unit tests: pass / other list / unknown id |
 | **Regression in unchanged behavior** | Full server `npm test`, `test:integration` control-lists suites, full client `npm test` — compared with the archive baseline (3 known server failures) |
 | **Compile errors hidden by the runner** | `npm run build` (server), `ng build` (client) |
-| **Wrong roles** (Center Admin still allowed, Technical Support denied) | Controller unit test: roles metadata on A1, A3–A12 equals `[SYSTEM_ADMIN, TECHNICAL_SUPPORT]`, absent on A13; client guard test for each role |
+| **Wrong roles** (Center Admin still allowed, Technical Support denied) | Controller unit test: roles metadata on A1, A3–A12 equals `[SYSTEM_ADMIN, TECHNICAL_SUPPORT]`, absent on A13; client guard test with a **real** `RolesService` for role lists `[1]`, `[7]`, `[9]` |
+| **Old route still reachable** | `app.routes.spec.ts`: old path absent; `grep -rn "center-admin/control-lists"` over client `src` → 0 |
 | **Menu regression** (item in both places, other items reordered) | `alliance-sidebar` spec: item only under *System admin*, existing items' order unchanged in both groups; collapsed flyout checked too |
 | **Page still shows a selector or `P<n> ·`** | Client unit test on the rendered page; manual check at the HITL pause |
 | **Mockup drift** | No automated check. Substitute: human side-by-side against artboard 1 (updated in this spec) at the HITL pause |

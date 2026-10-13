@@ -1,6 +1,6 @@
-# Proposal — Control Lists: global lists read by key
+# Proposal — Control Lists: global lists read by key, values applicable per portfolio
 
-> **Answer first:** control lists stop belonging to a portfolio. Every category and list is global, and **every list is read by its key alone** (`org.level`, `kpi.direction`). The key becomes unique across the whole module. Whether a screen needs a different vocabulary per portfolio is decided **screen by screen, when that screen is specified**, not built into Control Lists now. The seeded data keeps its ids. Organizational Structure no longer needs its portfolio workaround (its Q-1 / D-ORG-3).
+> **Answer first:** control lists stop belonging to a portfolio. Every category and list is global, and **every list is read by its key** (`org.level`, `kpi.direction`); the key becomes unique across the module. **Portfolios move to the values:** a value applies to all portfolios unless an admin restricts it to one or more, and a consumer can ask for the values that apply to a portfolio. The page moves to **System admin** and is used by Admin and Technical Support. The seeded data keeps its ids. Organizational Structure no longer needs its portfolio workaround (its Q-1 / D-ORG-3).
 
 ## 1. Document Control
 
@@ -10,19 +10,19 @@
 | **Slug** | `control-lists-global-scope` — derived from the requester's description (2026-10-13) |
 | **Type** | **Change** |
 | **Approval Mode** | `gated` |
-| **Status** | **approved** 2026-10-13 by the requester — Q-1: rewrite the unmerged migrations; Q-2: accepted (see §15) |
+| **Status** | **approved** 2026-10-13 by the requester — Q-1: rewrite the unmerged migrations; Q-2: accepted; body updated with the later requester decisions (d)–(f) (see §15) |
 | **Last updated** | 2026-10-13 |
 | **Branch** | `institutional-kpis` (Control Lists is on this branch, 78 commits ahead of `origin`, not merged to `dev` or `main`) |
 | **Changes** | Delivered spec `institutional-performance/control-lists` (archived: [`../../archive/2026-10-08-institutional-performance--control-lists/`](../../archive/2026-10-08-institutional-performance--control-lists/)). The archive is not edited; this spec records the delta |
 | **Depends on** | `institutional-performance/control-lists` — `done` |
-| **Blocks** | `institutional-performance/organizational-structure` — paused at design approval (commit `7dd94071`); its Q-1 / D-ORG-3 / R-ORG-011 are rewritten once this is approved |
+| **Blocks** | `institutional-performance/organizational-structure` — paused at design approval (commit `7dd94071`); its Q-1 / D-ORG-3 / R-ORG-011 are rewritten once this is done |
 | **Parallel-safe** | no (same module, same tables, same page) |
-| **Family** | Not a child of `institutional-performance/family.md` (closed set). It amends shared rule **F-2** of that family |
+| **Family** | Not a child of `institutional-performance/family.md` (closed set). It amends shared rules **F-1, F-2, F-3** of that family |
 | **JPD / Jira** | PARI-258; Control Lists epic AC-1773 — a ticket for this change is `<TO CONFIRM>` |
 
 ## 2. Intent
 
-Define each vocabulary once for the whole Alliance and read it by its key. Portfolio-specific vocabularies are not modeled now: when a screen needs one, its own spec decides how (for example, by using a different list key), with the requirement in hand.
+Define each vocabulary once for the whole Alliance and read it by its key, while still knowing which values apply in each portfolio. Control Lists becomes a system-wide setting.
 
 ## 3. Problem / Current Behavior
 
@@ -33,100 +33,104 @@ Define each vocabulary once for the whole Alliance and read it by its key. Portf
 | 3.3 | The consumer read and the membership check need a portfolio: `GET /by-key/:listKey/values?portfolioId=` and `assertValueInList(valueId, portfolioId, listKey)`. | archived design §4 A13, §5 rule 10; `control-list-value-lookup.service.ts:39-78` |
 | 3.4 | All 6 seeded lists (5 KPI lists + `org.level`) and both categories live in Portfolio 2. | `1790900000001-createControlLists.ts:94`; archived R-CTL-010 |
 | 3.5 | Organizational Structure is global (decided 2026-10-08), so it had to add a portfolio-agnostic lookup (D-ORG-3) to read `org.level`. | `organizational-structure/design.md` D-ORG-3, P-2 |
-| 3.6 | The requester wants every list read by its key; portfolio conditions will be added per screen when a screen needs them. | requester, 2026-10-13 |
+| 3.6 | The requester wants every list read by its key, and to know which values apply depending on the portfolio. | requester, 2026-10-13 |
 | 3.7 | The Control Lists migrations exist only on this branch and in local databases; they have not been deployed to Dev or Prod. | `git status -sb` → `ahead 78`; `git branch -r --contains 847cda8d` → none |
+| 3.8 | The page sits under *Center admin › Portfolio Management* and is used by Center Admin and System Admin. | archived R-CTL-007, R-CTL-008 |
 
 ## 4. Proposed Outcome
 
 | Given | When | Then |
 | --- | --- | --- |
-| The admin opens Control Lists | — | all categories and lists are shown; there is no portfolio selector |
+| An Admin or Technical Support user | opens *System admin › Control Lists* | all categories and lists are shown; there is no portfolio selector |
+| A Center Admin | looks for Control Lists | it is not in their menu and the route and API deny them |
 | An admin creates a list | with key `kpi.data_source` | it is created; its reference is just the key |
 | A list `kpi.direction` exists | an admin creates another `kpi.direction` | rejected (`409`): keys are unique across the module |
-| A category *KPIs* exists | an admin creates *kpis* | rejected (`409`): category names are unique across the module, any letter case |
-| A consumer reads `org.level` | by key | it gets the list's values, with no portfolio parameter |
+| A value *Maintain within range* | an admin restricts it to Portfolio 2 | a read of `kpi.direction` for Portfolio 1 does not offer it; for Portfolio 2 it does; without a portfolio, all values come back with their *Applies to* set |
 | A consumer validates a stored value | `assertValueInList(valueId, 'org.level')` | it passes for a value of that list, fails (`400`) for another list's value, and fails (`404`) for an unknown id |
-| A request still sends `portfolioId` | to any Control Lists endpoint | rejected (`400`), so no caller keeps assuming a portfolio filter that no longer exists |
-| A screen later needs a portfolio-specific vocabulary | — | its own spec decides the mechanism; Control Lists is not changed in advance |
+| A request sends `portfolioId` to the categories read or a category/list write | — | rejected (`400`) |
 
 ## 5. Scope
 
 | Aspect | Change |
 | --- | --- |
 | Categories | No portfolio; name unique (case-insensitive) across all categories |
-| Lists | No portfolio; **key unique across all lists**; key still immutable after creation |
-| Values | Unchanged (ids, codes, in-use protection) |
-| Consumer contract | `GET /by-key/:listKey/values?activeOnly=` (no `portfolioId`); `assertValueInList(valueId, listKey)` |
-| Admin API | Portfolio parameter removed from every read and write; the portfolio-summaries endpoint (A2) removed |
-| Page | Portfolio selector and *(not configured)* removed; the list header shows the key instead of `P<id> · <key>` |
-| Migrations | **The three existing Control Lists migrations (`1790900000000…002`) are rewritten in place** (Q-1): no `portfolio_id` column, FK or index; unique indexes on category name and list key; the seed inserts the same 2 categories, 6 lists and 23 values with the same ids, without resolving a portfolio. Allowed because they were never merged, pushed, shared or run outside the requester's local DB (fact 3.7). Each local DB that ran them reverts the three (values → lists → categories) and runs them again |
-| Tests | The two-portfolio isolation suite is removed and replaced by key-uniqueness tests; specs that pass `portfolioId` are updated |
+| Lists | No portfolio; **key unique across all lists**; key still immutable |
+| Values | Codes, ids, ordering and in-use protection unchanged; **new optional *Applies to* set of portfolios** (none = all) |
+| Consumer contract | `GET /by-key/:listKey/values?activeOnly=&portfolioId=` (`portfolioId` optional filter); `assertValueInList(valueId, listKey)` |
+| Admin API | Portfolio removed from categories and lists; portfolio-summaries endpoint (A2) removed; value writes accept `portfolioIds` |
+| Page & menu | Selector and *(not configured)* removed; key shown alone; *Applies to* column, filter and form field; item under **System admin**; access Admin + Technical Support |
+| Migrations | **The three existing migrations are rewritten in place** (Q-1) without `portfolio_id`; **one new migration** creates the value ↔ portfolio link table. Each DB that ran the old versions reverts them and runs them again |
+| Tests | Isolation suite removed; key-uniqueness, seed, filter, transaction and role tests added |
 
 ## 6. Non-Goals
-- Any portfolio-specific list mechanism now (scoped lists, overrides, filters). It is added per screen, when needed, in that screen's spec.
-- Copying lists; changing values, codes, permanent ids or the in-use protection.
+- Portfolio on categories or lists; overriding a list per portfolio.
+- Copying lists; changing value codes, permanent ids, ordering or the in-use protection.
 - Any change to tables outside this module.
 
 ## 7. Affected Users, Systems, And Specs
 | Area | Impact |
 | --- | --- |
-| Server | `control-lists` module: 2 entities, service rules, DTOs, controller (A1–A13, A2 removed), lookup service signature; one new migration; unit + integration suites |
-| Client | Control Lists page (selector removed, header reference), `api.service` signatures, interfaces, specs |
-| Specs | `organizational-structure`: Q-1 resolved, D-ORG-3 dropped, R-ORG-011 simplified. `institutional-performance/family.md` F-2 amended (HITL manifest edit). Future `institutional-indicators` reads KPI lists by key |
-| Users | Center Admin / System Admin (same roles, F-1) |
+| Server | `control-lists` module: entities (+1 link entity), service rules, DTOs, controller (A2 removed, roles changed), lookup service signature; three rewritten migrations + one new; unit and integration suites |
+| Client | Control Lists page (moves to the System admin area), `api.service`, interfaces, sidebar, routes, specs |
+| Specs | `organizational-structure`: Q-1 resolved, D-ORG-3 dropped, R-ORG-011 simplified, menu placement. `institutional-performance/family.md` F-1, F-2, F-3 amended. Future `institutional-indicators` reads KPI lists by key, filtered by portfolio |
+| Users | Admin and Technical Support gain/keep access; **Center Admin loses access** (requester, 2026-10-13) |
 
 ## 8. Visual Reference
-- **Source:** generated mockup (claude.ai Design canvas), artboard **1 · Control Lists** — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP (`../../institutional-performance/mockup/ControlledLists.dc.html`).
-- **Drift:** the artboard shows the portfolio selector and `P2 · <key>`. To update during `/akili-specify`: remove the selector, show the key alone.
+- **Source:** generated mockup (claude.ai Design canvas), artboard **1 · Control Lists (System admin, global)** — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP (`../../institutional-performance/mockup/ControlledLists.dc.html`). Updated 2026-10-13: no selector, key alone, *Applies to* column/filter/field, sidebar with the item under *System admin* (all five artboards).
 
 ## 9. Requirement Delta Preview
 
 **MODIFIED**
-- **R-CTL-001** *Portfolio-scoped control lists* → *Global control lists*: no read or write takes a portfolio; a `portfolioId` field is rejected.
+- **R-CTL-001** → global categories and lists; `portfolioId` rejected on category/list endpoints.
 - **R-CTL-002** Categories: name unique across the module.
-- **R-CTL-003** Lists: key unique across the module; the reference shown is the key; the scenario *Same key in two portfolios* is removed.
-- **R-CTL-006** Consumer read by key only; `assertValueInList(valueId, listKey)`.
-- **R-CTL-008** Page without a portfolio selector or *(not configured)*.
-- **R-CTL-010** Seed lives outside any portfolio (same 2 categories, 6 lists, 23 values, same ids).
+- **R-CTL-003** Lists: key unique across the module; the reference shown is the key.
+- **R-CTL-006** Consumer read by key with an optional portfolio filter; `assertValueInList(valueId, listKey)`.
+- **R-CTL-007** Roles: Admin + Technical Support (Center Admin removed).
+- **R-CTL-008** Page without a portfolio selector; menu under *System admin*.
+- **R-CTL-010** Seed outside any portfolio (same 2 categories, 6 lists, 23 values, same ids).
 
 **ADDED**
-- Nothing. The existing migrations are rewritten (Q-1); no new migration.
+- Value *Applies to* portfolios and the filtered read.
+- A link-table migration.
 
 **REMOVED**
-- A2 *portfolio summaries* endpoint; D-CTL-10 *(not configured)*; D-CTL-2's "same key once per portfolio"; the two-portfolio isolation tests.
+- A2 *portfolio summaries*; D-CTL-10 *(not configured)*; D-CTL-2 "same key once per portfolio"; the two-portfolio isolation tests.
 
 ## 10. Approach Options
 
 | Option | Pros | Cons |
 | --- | --- | --- |
-| **A. Remove the portfolio from categories and lists; key unique module-wide** | Matches the requester's rule exactly; simplest reads; nothing ambiguous; portfolio needs are solved per screen with the real requirement | A future per-portfolio need needs its own small change (accepted by the requester) |
-| B. Keep an optional `portfolio_id` on lists as a tag, ignored by reads | Data ready "just in case" | A field nobody reads or validates drifts and misleads; the requester asked to decide per screen |
-| C. Global by default + optional portfolio scope (this proposal's first draft) | Portfolio lists available now | Reads need key + portfolio for scoped lists; more rules and tests for a need no screen has yet — superseded by the requester on 2026-10-13 |
+| **A. Global categories and lists; portfolio applicability on values (many-to-many, none = all)** | One list per key; consumers filter by portfolio when they need it; a value can serve several periods | One link table and a filtered query |
+| B. Portfolio on the list (optional scope) | Simple for whole-list differences | Same key cannot be shared; forces duplicate lists per period — first draft, superseded |
+| C. Keep a nullable `portfolio_id` tag on lists, ignored by reads | No new table | A field nobody reads drifts; does not answer "which values apply" |
 
 ## 11. Recommended Approach
 
-**Option A.** It is the requester's rule and the smallest model: one key, one list. **Migration strategy (requester, Q-1):** rewrite the three unmerged migrations, so the schema history never shows a portfolio that was never deployed. This is not an exception to the append-only rule: that rule protects merged migrations, and these are not merged.
+**Option A.** One key, one list, and the per-portfolio question answered at value level. **Migration strategy (Q-1):** rewrite the three unmerged migrations and add one for the link table.
 
 ## 12. Risks, Dependencies, And Open Questions
 
 | Risk | Mitigation |
 | --- | --- |
-| A local DB that ran the old migrations keeps the old schema; reverting drops its control-list tables, so **rows created by hand in that local DB are lost** | Revert, rerun and re-seed are a documented step of the migration task; anyone who needs hand-made local rows exports them first. Only the requester's local DB is known to have run them |
-| The rewritten migrations diverge from what a local DB recorded as run (same names, new content) | TypeORM tracks by name, so a DB that is not reverted silently keeps the old schema. The task's verification runs `migration:show` and a schema check (`SHOW COLUMNS … LIKE 'portfolio_id'` → empty) on the local DB, per K-014 |
-| Callers still send `portfolioId` | DTO whitelisting rejects it (`400`); client and tests updated in the same change |
-| Organizational Structure design assumes the workaround | Paused; its design is updated right after this proposal is approved (no code written yet) |
-| KZ-017 — the old isolation suite becomes meaningless | Removed with an explicit note; key-uniqueness tests replace it and state what they cannot reach (they do not mount `GlobalExceptions`; the `.global-exceptions.spec.ts` covers the envelope) |
-| KZ-002 — affected surface enumerated by folder | Enumerate by what renders on the route: page, navigator, list header, modal, shared `DataTable`; sidebar untouched |
+| A DB that ran the old migrations keeps the old schema (same names) | Revert by name, rerun with the source config, schema checks (design §3.1, K-014) |
+| Reverting drops hand-made local rows | Export first (documented step) |
+| A consumer forgets the portfolio filter and offers restricted values everywhere | Each consumer spec states its filter; the unfiltered read returns *Applies to* |
+| Portfolios are soft-deleted, so links to them persist | Hidden on read; "no active portfolio" is distinct from "all" |
+| Center Admins lose access | Requester decision; Admin / Technical Support maintain the lists |
+| KZ-017 — gates narrower than the claim | Filter asserted on real SQL; uniqueness by raw insert; seed re-run by exported statements |
+| KZ-002 — affected surface by folder | Enumerated by what renders: page, navigator, header, modal, `DataTable`, **sidebar**, route, guard |
 
-| # | Open question | Recommendation |
+| # | Open question | Decision |
 | --- | --- | --- |
-| **Q-1** | New migration, or rewrite the three unmerged migrations? | **Decided: rewrite** (requester, 2026-10-13) — not shared or run by other team members |
-| **Q-2** | What if data meets duplicates across portfolios? | **Accepted:** stop and list them, never merge automatically. With Q-1 the tables are recreated from the seed, which has no duplicates, so this only applies if hand-made local rows are re-entered |
+| **Q-1** | New migration, or rewrite the three unmerged migrations? | **Rewrite** (requester, 2026-10-13) — not shared or run by other team members; the link table gets its own new migration |
+| **Q-2** | What if data meets duplicates across portfolios? | **Accepted:** stop and list them; with Q-1 the tables are recreated from the seed, which has none |
 
 ## 13. Success Criteria
-- Every list is read by key alone; no Control Lists endpoint or service method takes a portfolio.
-- Two lists can never share a key; two categories can never share a name.
-- After reverting and rerunning the rewritten migrations, the 2 categories, 6 lists and 23 values exist with the same ids and the tables have no `portfolio_id` column.
+- Every list is read by its key; categories and lists carry no portfolio.
+- Two lists never share a key; two categories never share a name.
+- A filtered read returns exactly the values that apply to all portfolios plus those restricted to that portfolio.
+- After the procedure, the 2 categories, 6 lists and 23 values exist with the same ids, and categories/lists have no `portfolio_id` column.
+- Only Admin and Technical Support reach the page and its admin API.
 - Organizational Structure validates `org.level` with `assertValueInList(valueId, 'org.level')`.
 
 ## 14. Next Step
@@ -138,7 +142,8 @@ Define each vocabulary once for the whole Alliance and read it by its key. Portf
 | Date | Change | Source |
 | --- | --- | --- |
 | 2026-10-13 (a) | First draft: global by default with optional portfolio scope | requester |
-| 2026-10-13 (b) | All lists read by key; portfolio removed from Control Lists; portfolio conditions decided per screen when needed. Former Q-1 (category scope) and Q-3 (scope change) no longer apply | requester |
-| 2026-10-13 (e) | Values gain an optional *Applies to* set of portfolios (empty = all) and the by-key read an optional portfolio filter — requirements R-CLG-009, design D-CLG-9/10. Lists and categories stay global | requester |
-| 2026-10-13 (d) | Menu moves to *System admin*; access = Admin + Technical Support (Center Admin removed) — requirements R-CLG-008 | requester |
-| 2026-10-13 (c) | Q-1: rewrite the three unmerged migrations instead of adding one; Q-2 accepted; proposal **approved**; `family.md` F-2/F-3 amended | requester |
+| 2026-10-13 (b) | All lists read by key; portfolio removed from Control Lists | requester |
+| 2026-10-13 (c) | Q-1: rewrite the three unmerged migrations; Q-2 accepted; proposal **approved**; `family.md` F-2/F-3 amended | requester |
+| 2026-10-13 (d) | Menu moves to *System admin*; access = Admin + Technical Support (Center Admin removed) | requester |
+| 2026-10-13 (e) | Values gain an optional *Applies to* set of portfolios (none = all) and the by-key read an optional portfolio filter. Lists and categories stay global | requester |
+| 2026-10-13 (f) | Body rewritten to match (d) and (e) — Judgment Day round 1, J-8 | Judgment Day |
