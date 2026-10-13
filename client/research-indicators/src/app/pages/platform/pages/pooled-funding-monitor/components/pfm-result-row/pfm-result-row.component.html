@@ -64,13 +64,6 @@
   <div class="flex min-w-0 flex-wrap items-start gap-1" data-testid="pfm-row-sp">
     @for (sp of row().science_programs; track sp.code) {
       <span class="inline-flex items-center gap-1" [attr.data-primary]="sp.primary" data-testid="pfm-row-sp-tag">
-        @if (sp.primary) {
-          <i
-            class="pi pi-star-fill !text-[12px]"
-            [style.color]="sp.color || 'var(--ac-pfm-accent-navy)'"
-            aria-hidden="true"
-            data-testid="pfm-row-sp-primary-star"></i>
-        }
         <app-custom-tag
           [statusName]="sp.code"
           [statusColor]="neutralTone.fg"
@@ -78,6 +71,8 @@
           [icon]="true"
           [iconColor]="sp.color || neutralTone.fg"
           [tooltip]="sp.primary ? sp.name + ' — primary' : sp.name"
+          [trailingIconName]="sp.primary ? 'pi-star-fill' : undefined"
+          [trailingIconColor]="sp.color || 'var(--ac-pfm-accent-navy)'"
           [tiny]="true" />
         <span class="sr-only">{{ sp.code }} {{ sp.name }}{{ sp.primary ? ', primary' : '' }}</span>
       </span>

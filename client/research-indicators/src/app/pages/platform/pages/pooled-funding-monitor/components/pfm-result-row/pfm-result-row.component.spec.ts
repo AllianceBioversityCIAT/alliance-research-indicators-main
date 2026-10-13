@@ -170,8 +170,9 @@ describe('PfmResultRowComponent', () => {
     expect(tags[0].getAttribute('data-primary')).toBe('true');
     expect(tags[1].getAttribute('data-primary')).toBe('false');
     // Primary is marked with a star (as in Alliance alignment), not a double border.
-    expect(tags[0].querySelector('[data-testid="pfm-row-sp-primary-star"]')).not.toBeNull();
-    expect(tags[1].querySelector('[data-testid="pfm-row-sp-primary-star"]')).toBeNull();
+    // The star sits inside the tag, after the code.
+    expect(tags[0].querySelector('app-custom-tag [data-testid="custom-tag-trailing-icon"].pi-star-fill')).not.toBeNull();
+    expect(tags[1].querySelector('[data-testid="custom-tag-trailing-icon"]')).toBeNull();
     expect(tags[0].classList).not.toContain('ring-2');
     expect(sr(q('pfm-row-sp'))).toEqual(['SP01 Breeding, primary', 'SP09 Climate Action']);
     expect(q('pfm-row-sp').querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();

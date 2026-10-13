@@ -20,6 +20,22 @@ describe('CustomTagComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('renders no trailing icon by default, and renders it after the label when trailingIconName is set', () => {
+    const trailing = () => fixture.nativeElement.querySelector('[data-testid="custom-tag-trailing-icon"]') as HTMLElement | null;
+    expect(trailing()).toBeNull();
+    fixture.componentRef.setInput('statusName', 'SP06');
+    fixture.componentRef.setInput('trailingIconName', 'pi-star-fill');
+    fixture.componentRef.setInput('trailingIconColor', 'rgb(1, 2, 3)');
+    fixture.detectChanges();
+    const icon = trailing();
+    expect(icon).not.toBeNull();
+    expect(icon!.classList).toContain('pi-star-fill');
+    expect(icon!.getAttribute('aria-hidden')).toBe('true');
+    expect(icon!.style.color).toBe('rgb(1, 2, 3)');
+    // after the label span, inside the pill
+    expect(icon!.previousElementSibling?.textContent?.trim()).toBe('SP06');
+  });
+
   it('should have default statusId and statusName', () => {
     expect(component.statusId).toBe('');
     expect(component.statusName).toBe('');

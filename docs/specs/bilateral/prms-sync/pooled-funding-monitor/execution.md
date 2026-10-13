@@ -902,3 +902,21 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **Gates:** PFM jest 97/97; eslint clean.
 - **Docs:** the R-PFM-012 Science Programs row now says the primary is marked with a star.
 - **Review:** no separate Reviewer spawn for this one-element visual swap. Recorded here.
+
+#### HITL round 24 (owner, 2026-10-13) — primary star moves inside the tag, after the code → **done (code); owner re-check pending**
+
+- **Owner (verbatim):** "si pero dentro del tag y en el otro lado que está vacío".
+- **Change:**
+  - The house `shared/components/custom-tag` gains optional inputs `trailingIconName` / `trailingIconColor`.
+  - When set, the tag renders `<i class="pi {name}">` (`aria-hidden`) after the label, inside the pill.
+  - The change is additive: without the input nothing renders, so the 27 existing usages are unaffected.
+  - The monitor row passes `pi-star-fill` (SP colour) for the primary SP and removes the outside star.
+- **Tests:**
+  - New `custom-tag` spec: no trailing icon by default; when set, it renders after the label with its class, colour and `aria-hidden`.
+  - The row spec now asserts the star inside the tag on the primary and absent on contributing tags.
+  - K-004: renaming the trailing-icon testid caused 2 failures (32 passed); restored.
+- **Gates (Leader, quiet window):**
+  - Full client suite: `npx jest --silent --coverage=false` → 358 suites, 8044/8044 passed.
+  - `ng build`: no warnings in custom-tag or pfm.
+  - Docs: the R-PFM-012 SP row is updated.
+- **Review:** no separate Reviewer spawn for this additive presentational input. The full suite proves nothing else regressed. Recorded here.
