@@ -3,10 +3,10 @@ import { ValidateIf } from 'class-validator';
 import { CreateControlListCategoryDto } from './create-control-list-category.dto';
 
 /**
- * A4: `{name?, description?}`. `portfolioId` is deliberately NOT whitelisted
- * here — categories cannot be moved across portfolios in this slice, and
- * `ValidationPipe({ forbidNonWhitelisted: true })` turns any attempt into a
- * 400 instead of silently reassigning the portfolio.
+ * A4: `{name?, description?}`. Nothing else is whitelisted here, so
+ * `ValidationPipe({ forbidNonWhitelisted: true })` turns a stale
+ * `portfolioId` (the removed list-scope field, R-CLG-001) into a 400 instead
+ * of ignoring it.
  */
 export class UpdateControlListCategoryDto extends PartialType(
   PickType(CreateControlListCategoryDto, ['name', 'description'] as const),
@@ -17,8 +17,8 @@ export class UpdateControlListCategoryDto extends PartialType(
   // list side, a category update runs a duplicate-name pre-check first
   // (`assertCategoryNameAvailable`) — its `findOne({ where: { name: null,
   // ... } })` fell prey to the SAME TypeORM null-key-drop behavior
-  // (`SelectQueryBuilder.js:2468`) and matched the first active category
-  // in the portfolio, so the observed status was a bogus **409** Conflict,
+  // (`SelectQueryBuilder.js:2468`) and matched the first active category,
+  // so the observed status was a bogus **409** Conflict,
   // not the 500 originally hypothesized
   // (`control-lists-categories.integration-spec.ts`, red run) — the
   // predicted P-14 500 is what the *list* side showed instead (see

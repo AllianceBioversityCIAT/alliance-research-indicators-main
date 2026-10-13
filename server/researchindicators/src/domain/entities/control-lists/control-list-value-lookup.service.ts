@@ -9,7 +9,10 @@ import { ControlListValue } from './entities/control-list-value.entity';
 
 /**
  * List-membership check for consumers that store a `control_list_values.id`
- * (design.md §5 rule 10, D-CTL-15; R-CTL-006 "List membership").
+ * (design.md §5 rule 3 of the global-scope change, R-CLG-004; archived
+ * D-CTL-15, R-CTL-006 "List membership"). The check takes a value id and the
+ * list key: the key is unique module-wide, so nothing else identifies the
+ * list.
  *
  * Lives OUTSIDE `ControlListsService` deliberately (tasks.md T-04 forward
  * pointer / P-10 disqualifier): `ControlListsService` injects the
@@ -38,7 +41,6 @@ export class ControlListValueLookupService {
 
   async assertValueInList(
     valueId: number,
-    portfolioId: number,
     listKey: string,
   ): Promise<ControlListValue> {
     const value = await this.valueRepository.findOne({
@@ -59,21 +61,12 @@ export class ControlListValueLookupService {
       throw new NotFoundException(`List ${value.list_id} not found`);
     }
 
-    // Falsifier 3 (tasks.md T-04): checking only the portfolio, not the
-    // key, must fail the cross-list case — checked FIRST, so a value of the
-    // right key's sibling list in the SAME portfolio 400s on "list", not on
-    // "portfolio".
+    // R-CLG-004 "Value from another list": a value of another list fails
+    // with a 400 naming the expected key — it must never pass because the two
+    // lists once shared a scope.
     if (list.list_key !== listKey) {
       throw new BadRequestException(
         `Value ${valueId} belongs to list "${list.list_key}", not "${listKey}"`,
-      );
-    }
-    // Falsifier 4 (tasks.md T-04): checking only the key, not the
-    // portfolio, must fail the cross-portfolio case.
-    // mysql2 may return BIGINT as a string — compare numerically.
-    if (Number(list.portfolio_id) !== Number(portfolioId)) {
-      throw new BadRequestException(
-        `Value ${valueId} belongs to portfolio ${list.portfolio_id}, not portfolio ${portfolioId}`,
       );
     }
 

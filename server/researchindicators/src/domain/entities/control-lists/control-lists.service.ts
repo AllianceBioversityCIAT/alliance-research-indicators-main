@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -16,7 +15,6 @@ import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
 import { ControlListValue } from './entities/control-list-value.entity';
-import { PortfoliosService } from '../portfolios/portfolios.service';
 import {
   CurrentUserUtil,
   SetAuditEnum,
@@ -26,7 +24,6 @@ import {
   ControlListResponse,
   ControlListValueResponse,
   ListSummary,
-  PortfolioCategoriesSummary,
 } from './control-lists.types';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
@@ -46,30 +43,23 @@ export class ControlListsService {
     private readonly categoryRepository: ControlListCategoryRepository,
     private readonly listRepository: ControlListRepository,
     private readonly valueRepository: ControlListValueRepository,
-    private readonly portfoliosService: PortfoliosService,
     private readonly currentUser: CurrentUserUtil,
     private readonly usageRegistry: ControlListUsageRegistry,
   ) {}
 
   // ---------------------------------------------------------------------
-  // A1 — GET /categories?portfolioId=
+  // A1 — GET /categories
   // ---------------------------------------------------------------------
-  async getCategories(
-    portfolioId: number,
-  ): Promise<ControlListCategoryResponse[]> {
-    await this.assertPortfolioExists(portfolioId);
-
+  // Every category with every list: no scope parameter (R-CLG-001).
+  async getCategories(): Promise<ControlListCategoryResponse[]> {
     const categories = await this.categoryRepository.find({
-      where: { portfolio_id: portfolioId, is_active: true },
+      where: { is_active: true },
       order: { display_order: 'ASC', id: 'ASC' },
     });
 
     // T-03: A1's valueCount now counts real rows per list (design §4 A1).
     // `usedBy` stays [] until the T-04 registry exists.
-    const listsWithCounts = await this.loadListEntries({
-      portfolio_id: portfolioId,
-      is_active: true,
-    });
+    const listsWithCounts = await this.loadListEntries({ is_active: true });
 
     return categories.map((category) =>
       this.mapCategory(
@@ -82,32 +72,14 @@ export class ControlListsService {
   }
 
   // ---------------------------------------------------------------------
-  // A2 — GET /portfolios/summary
-  // ---------------------------------------------------------------------
-  async getPortfoliosSummary(): Promise<PortfolioCategoriesSummary[]> {
-    const portfolios = await this.portfoliosService.findAll();
-
-    return Promise.all(
-      portfolios.map(async (portfolio) => ({
-        portfolioId: portfolio.id,
-        categories: await this.categoryRepository.count({
-          where: { portfolio_id: portfolio.id, is_active: true },
-        }),
-      })),
-    );
-  }
-
-  // ---------------------------------------------------------------------
   // A3 — POST /categories
   // ---------------------------------------------------------------------
   async createCategory(
     dto: CreateControlListCategoryDto,
   ): Promise<ControlListCategoryResponse> {
-    await this.assertPortfolioExists(dto.portfolioId);
-    await this.assertCategoryNameAvailable(dto.portfolioId, dto.name);
+    await this.assertCategoryNameAvailable(dto.name);
 
     const newCategory: Partial<ControlListCategory> = {
-      portfolio_id: dto.portfolioId,
       name: dto.name,
       // Leader-adjudicated forward pointer (T-03 rework attempt 2):
       // normalizeDescription() also runs on CREATE, not only on update —
@@ -125,12 +97,7 @@ export class ControlListsService {
       this.rethrowAsConflictIfDuplicate(error, dto.name);
     }
 
-    this.logWrite(
-      'created',
-      'control_list_category',
-      saved.id,
-      saved.portfolio_id,
-    );
+    this.logWrite('created', 'control_list_category', saved.id);
 
     return this.mapCategory(saved);
   }
@@ -145,11 +112,7 @@ export class ControlListsService {
     const category = await this.findActiveCategoryOrFail(id);
 
     if (dto.name !== undefined && dto.name !== category.name) {
-      await this.assertCategoryNameAvailable(
-        category.portfolio_id,
-        dto.name,
-        id,
-      );
+      await this.assertCategoryNameAvailable(dto.name, id);
     }
 
     const update: Partial<ControlListCategory> = {
@@ -168,12 +131,7 @@ export class ControlListsService {
 
     const updated = await this.categoryRepository.findOne({ where: { id } });
 
-    this.logWrite(
-      'updated',
-      'control_list_category',
-      id,
-      category.portfolio_id,
-    );
+    this.logWrite('updated', 'control_list_category', id);
 
     // R-CTL-002: A4 returns the category's real list summaries (A1's shape).
     const listEntries = await this.loadListEntries({
@@ -213,12 +171,7 @@ export class ControlListsService {
     // Physical delete (D-CTL-5).
     await this.categoryRepository.delete(id);
 
-    this.logWrite(
-      'deleted',
-      'control_list_category',
-      id,
-      category.portfolio_id,
-    );
+    this.logWrite('deleted', 'control_list_category', id);
 
     return { id };
   }
@@ -228,10 +181,9 @@ export class ControlListsService {
   // ---------------------------------------------------------------------
   async createList(dto: CreateControlListDto): Promise<ControlListResponse> {
     const category = await this.findActiveCategoryOrFail(dto.categoryId);
-    await this.assertListKeyAvailable(category.portfolio_id, dto.listKey);
+    await this.assertListKeyAvailable(dto.listKey);
 
     const newList: Partial<ControlList> = {
-      portfolio_id: category.portfolio_id,
       category_id: category.id,
       list_key: dto.listKey,
       name: dto.name,
@@ -254,7 +206,7 @@ export class ControlListsService {
       this.rethrowAsListConflictIfDuplicate(error, dto.listKey);
     }
 
-    this.logWrite('created', 'control_list', saved.id, saved.portfolio_id);
+    this.logWrite('created', 'control_list', saved.id);
 
     return this.mapList(saved);
   }
@@ -270,14 +222,9 @@ export class ControlListsService {
 
     let categoryId = list.category_id;
     if (dto.categoryId !== undefined && dto.categoryId !== list.category_id) {
+      // R-CLG-003 "Move to any category": any active category is a valid
+      // target now that categories and lists are global.
       const newCategory = await this.findActiveCategoryOrFail(dto.categoryId);
-      // R-CTL-001 / D-CTL-13 (judgment J-4): moving a list to a category of
-      // another portfolio is a 400, never a silent move and never a 409.
-      if (newCategory.portfolio_id !== list.portfolio_id) {
-        throw new BadRequestException(
-          `Category ${dto.categoryId} belongs to a different portfolio than list ${id}`,
-        );
-      }
       categoryId = newCategory.id;
     }
 
@@ -294,7 +241,7 @@ export class ControlListsService {
 
     const updated = await this.listRepository.findOne({ where: { id } });
 
-    this.logWrite('updated', 'control_list', id, list.portfolio_id);
+    this.logWrite('updated', 'control_list', id);
 
     return this.mapList(updated);
   }
@@ -328,7 +275,7 @@ export class ControlListsService {
 
     await this.listRepository.delete(id);
 
-    this.logWrite('deleted', 'control_list', id, list.portfolio_id);
+    this.logWrite('deleted', 'control_list', id);
 
     return { id };
   }
@@ -356,24 +303,22 @@ export class ControlListsService {
   }
 
   // ---------------------------------------------------------------------
-  // A13 — GET /by-key/:listKey/values?portfolioId=&activeOnly=
+  // A13 — GET /by-key/:listKey/values?activeOnly=
   // ---------------------------------------------------------------------
   // Consumer read (design.md §8): no @Roles — any authenticated user.
   // R-CTL-006 "Ordered read": display order first, then natural code order
   // (`UOM-2` before `UOM-10` at equal order), mirroring the admin table's
   // own ordering semantics (R-CTL-009, client naturalCompare).
   async getValuesByKey(
-    portfolioId: number,
     listKey: string,
     activeOnly: boolean,
   ): Promise<ControlListValueResponse[]> {
+    // R-CLG-004: the key alone selects the list (it is unique module-wide).
     const list = await this.listRepository.findOne({
-      where: { portfolio_id: portfolioId, list_key: listKey, is_active: true },
+      where: { list_key: listKey, is_active: true },
     });
     if (!list) {
-      throw new NotFoundException(
-        `List "${listKey}" not found for portfolio ${portfolioId}`,
-      );
+      throw new NotFoundException(`List "${listKey}" not found`);
     }
 
     const values = await this.valueRepository.find({
@@ -451,7 +396,7 @@ export class ControlListsService {
       this.rethrowAsValueConflictIfDuplicate(error, code, dto.value);
     }
 
-    this.logWrite('created', 'control_list_value', saved.id, list.portfolio_id);
+    this.logWrite('created', 'control_list_value', saved.id);
 
     return this.mapValue(saved);
   }
@@ -464,7 +409,6 @@ export class ControlListsService {
     dto: UpdateControlListValueDto,
   ): Promise<ControlListValueResponse> {
     const value = await this.findValueOrFail(id);
-    const list = await this.findListForValue(value);
 
     if (dto.code !== undefined && dto.code !== value.code) {
       await this.assertCodeAvailable(value.list_id, dto.code, id);
@@ -498,7 +442,7 @@ export class ControlListsService {
 
     const updated = await this.valueRepository.findOne({ where: { id } });
 
-    this.logWrite('updated', 'control_list_value', id, list.portfolio_id);
+    this.logWrite('updated', 'control_list_value', id);
 
     return this.mapValue(updated);
   }
@@ -508,7 +452,6 @@ export class ControlListsService {
   // ---------------------------------------------------------------------
   async removeValue(id: number): Promise<{ id: number }> {
     const value = await this.findValueOrFail(id);
-    const list = await this.findListForValue(value);
 
     // T-04 (design §5 rule 5, R-CTL-005): refuse when the value is
     // referenced by at least one record of a registered consumer. The
@@ -529,7 +472,7 @@ export class ControlListsService {
     // here.
     await this.valueRepository.delete(id);
 
-    this.logWrite('deleted', 'control_list_value', id, list.portfolio_id);
+    this.logWrite('deleted', 'control_list_value', id);
 
     return { id };
   }
@@ -537,13 +480,6 @@ export class ControlListsService {
   // ---------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------
-
-  private async assertPortfolioExists(portfolioId: number): Promise<void> {
-    const portfolio = await this.portfoliosService.findOne(portfolioId);
-    if (!portfolio) {
-      throw new NotFoundException(`Portfolio ${portfolioId} not found`);
-    }
-  }
 
   private async findActiveCategoryOrFail(
     id: number,
@@ -582,44 +518,29 @@ export class ControlListsService {
     return value;
   }
 
-  private async findListForValue(
-    value: ControlListValue,
-  ): Promise<ControlList> {
-    const list = await this.listRepository.findOne({
-      where: { id: value.list_id },
-    });
-    if (!list) {
-      throw new NotFoundException(`List ${value.list_id} not found`);
-    }
-    return list;
-  }
-
   private async assertCategoryNameAvailable(
-    portfolioId: number,
     name: string,
     excludeId?: number,
   ): Promise<void> {
-    // Pre-check for a clean, field-named 409. The column's explicit
-    // utf8mb4_unicode_ci collation makes this `=` comparison already
-    // case-insensitive (design.md §3, Premise Ledger P-4), matching
-    // R-CTL-002's "Duplicate name" case-variant scenario.
+    // Pre-check for a clean, field-named 409, module-wide (R-CLG-002). The
+    // column's explicit utf8mb4_unicode_ci collation makes this `=`
+    // comparison already case-insensitive (design.md §3, Premise Ledger
+    // P-4). It is NOT the uniqueness guarantee: `uq_control_list_categories_name`
+    // is, and a race that slips past this check is mapped from errno 1062.
     const existing = await this.categoryRepository.findOne({
-      where: { portfolio_id: portfolioId, name, is_active: true },
+      where: { name, is_active: true },
     });
     if (existing && existing.id !== excludeId) {
       this.throwDuplicateNameConflict(name);
     }
   }
 
-  private async assertListKeyAvailable(
-    portfolioId: number,
-    listKey: string,
-  ): Promise<void> {
-    // Scoped by portfolio_id only (R-CTL-003 "Same key in two portfolios":
-    // the same key is allowed once per portfolio, so a match in another
-    // portfolio must never block this create).
+  private async assertListKeyAvailable(listKey: string): Promise<void> {
+    // Pre-check for a clean, field-named 409, module-wide (R-CLG-003). Like
+    // the category check, it is not the guarantee: `uq_control_lists_key` is,
+    // and a race that slips past this check is mapped from errno 1062.
     const existing = await this.listRepository.findOne({
-      where: { portfolio_id: portfolioId, list_key: listKey, is_active: true },
+      where: { list_key: listKey, is_active: true },
     });
     if (existing) {
       this.throwDuplicateListKeyConflict(listKey);
@@ -723,7 +644,7 @@ export class ControlListsService {
   private throwDuplicateNameConflict(name: string): never {
     throw new ConflictException({
       message: {
-        description: `A category named "${name}" already exists in this portfolio`,
+        description: `A category named "${name}" already exists`,
         field: 'name',
       },
     });
@@ -732,7 +653,7 @@ export class ControlListsService {
   private throwDuplicateListKeyConflict(listKey: string): never {
     throw new ConflictException({
       message: {
-        description: `A list with key "${listKey}" already exists in this portfolio`,
+        description: `A list with key "${listKey}" already exists`,
         field: 'listKey',
       },
     });
@@ -823,22 +744,19 @@ export class ControlListsService {
   }
 
   // design.md §9: info-level log through LoggerUtil on create/update/delete,
-  // naming the entity, its id, its portfolio and the acting user id.
+  // naming the entity, its id and the acting user id.
   private logWrite(
     action: 'created' | 'updated' | 'deleted',
     entity: string,
     id: number,
-    portfolioId: number,
   ): void {
     this.logger._log(
-      `control_lists.${action} entity=${entity} id=${id} portfolio_id=${portfolioId} user_id=${this.currentUser.user_id}`,
+      `control_lists.${action} entity=${entity} id=${id} user_id=${this.currentUser.user_id}`,
     );
   }
 
   private async loadListEntries(
-    where: Partial<
-      Pick<ControlList, 'portfolio_id' | 'category_id' | 'is_active'>
-    >,
+    where: Partial<Pick<ControlList, 'category_id' | 'is_active'>>,
   ): Promise<{ list: ControlList; valueCount: number }[]> {
     const lists = await this.listRepository.find({
       where,
@@ -860,7 +778,6 @@ export class ControlListsService {
   ): ControlListCategoryResponse {
     return {
       id: category.id,
-      portfolioId: category.portfolio_id,
       name: category.name,
       description: category.description ?? null,
       displayOrder: category.display_order,
@@ -908,7 +825,6 @@ export class ControlListsService {
   private mapList(list: ControlList): ControlListResponse {
     return {
       id: list.id,
-      portfolioId: list.portfolio_id,
       categoryId: list.category_id,
       key: list.list_key,
       name: list.name,

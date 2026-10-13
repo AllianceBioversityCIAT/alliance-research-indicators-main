@@ -6,8 +6,8 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideLocationMocks } from '@angular/common/testing';
 import { routes } from './app.routes';
 import { CacheService } from '@services/cache/cache.service';
-import { RolesService } from '@services/cache/roles.service';
-import { centerAdminGuard } from '@guards/center-admin.guard';
+import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
+import { appConfigurationGuard } from '@guards/app-configuration.guard';
 
 /** Recursively finds a route declaration by its own `path`, independent of nesting depth. */
 function findRouteByPath(routeList: Routes, path: string): Route | undefined {
@@ -78,21 +78,27 @@ describe('app.routes — unauthenticated deep links', () => {
 });
 
 /**
- * institutional-performance/control-lists T-01, judgment J-9 / falsifier 7.
- * R-CTL-007 AC.2 has two clauses — no menu item AND cannot open the route — this
- * covers the second one, which the re-cut tasks.md had dropped. KZ-017: a link that
- * compiles can still 404, so the resolved URL is asserted against the literal path
- * the sidebar uses (`/administration/center-admin/control-lists`, design §6.1),
- * not just "navigation did not throw".
+ * changes/control-lists-global-scope T-01 (R-CLG-008 AC.3, D-CLG-7, KZ-017). Control Lists moved
+ * from Center admin to System admin: a link that compiles can still 404, so the route table is
+ * asserted directly — the new path with `appConfigurationGuard`, and the old path gone — and the
+ * resolved URL is checked against the literal path the sidebar uses
+ * (`/administration/configuration/control-lists`). The guard runs against a REAL `RolesService`
+ * fed with role data, never a boolean stand-in.
  */
-describe('app.routes — control-lists route declares canMatch (J-9)', () => {
-  it('the control-lists route config declares canMatch: [centerAdminGuard]', () => {
-    const route = findRouteByPath(routes, 'administration/center-admin/control-lists');
+describe('app.routes — control-lists route (System admin)', () => {
+  it('declares canMatch: [appConfigurationGuard] on administration/configuration/control-lists', () => {
+    const route = findRouteByPath(routes, 'administration/configuration/control-lists');
     expect(route).toBeTruthy();
-    expect(route?.canMatch).toEqual([centerAdminGuard]);
+    expect(route?.canMatch).toEqual([appConfigurationGuard]);
   });
 
-  const navigateAsCenterAdmin = async (canAccessCenterAdmin: boolean) => {
+  it('no longer declares the old administration/center-admin/control-lists route', () => {
+    expect(findRouteByPath(routes, 'administration/center-admin/control-lists')).toBeUndefined();
+  });
+
+  type RoleEntry = { role_id: number; role?: { focus_id?: number; sec_role_id?: number } };
+
+  const navigateWithRoles = async (roleList: RoleEntry[], url: string) => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -102,21 +108,43 @@ describe('app.routes — control-lists route declares canMatch (J-9)', () => {
         provideLocationMocks(),
         {
           provide: CacheService,
-          useValue: { isLoggedIn: signal(true), isValidatingToken: signal(false), dataCache: signal({}) }
+          useValue: {
+            isLoggedIn: signal(true),
+            isValidatingToken: signal(false),
+            dataCache: signal({ user: { user_role_list: roleList } })
+          }
         },
-        { provide: RolesService, useValue: { canAccessCenterAdmin: () => canAccessCenterAdmin } }
+        { provide: CreateResultManagementService, useValue: { editingOicr: () => false } }
       ]
     });
     const router = TestBed.inject(Router);
-    await router.navigateByUrl('/administration/center-admin/control-lists').catch(() => undefined);
+    await router.navigateByUrl(url).catch(() => undefined);
     return router.url;
   };
 
-  it('rejects a resolved user without center-admin access (falsifier 7: removing canMatch would let this through)', async () => {
-    await expect(navigateAsCenterAdmin(false)).resolves.toBe('/home');
+  const SYSTEM_ADMIN: RoleEntry = { role_id: 1 };
+  const TECHNICAL_SUPPORT: RoleEntry = { role_id: 7 };
+  const CENTER_ADMIN: RoleEntry = { role_id: 9, role: { focus_id: 1, sec_role_id: 9 } };
+
+  it('admits System Admin to the exact path the sidebar link resolves to', async () => {
+    await expect(navigateWithRoles([SYSTEM_ADMIN], '/administration/configuration/control-lists')).resolves.toBe(
+      '/administration/configuration/control-lists'
+    );
   });
 
-  it('admits Center Admin / System Admin to the exact path the sidebar link resolves to', async () => {
-    await expect(navigateAsCenterAdmin(true)).resolves.toBe('/administration/center-admin/control-lists');
+  it('admits Technical Support to the exact path the sidebar link resolves to', async () => {
+    await expect(navigateWithRoles([TECHNICAL_SUPPORT], '/administration/configuration/control-lists')).resolves.toBe(
+      '/administration/configuration/control-lists'
+    );
+  });
+
+  it('sends Center Admin (role 9, focus 1) to /home (R-CLG-008: Center Admin denied)', async () => {
+    await expect(navigateWithRoles([CENTER_ADMIN], '/administration/configuration/control-lists')).resolves.toBe('/home');
+  });
+
+  it('does not serve the old center-admin path to anyone, System Admin included', async () => {
+    await expect(navigateWithRoles([SYSTEM_ADMIN], '/administration/center-admin/control-lists')).resolves.not.toBe(
+      '/administration/center-admin/control-lists'
+    );
   });
 });

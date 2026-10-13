@@ -6,19 +6,11 @@
           <div class="flex flex-col gap-[2px]">
             <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600">Control lists</h1>
             <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] atc-grey-700">
-              Manage the categories, lists and values other STAR modules read by portfolio.
+              Manage the Alliance-wide controlled vocabularies, grouped by category. Every list is global and is read by its key. Values in use cannot be deleted; deactivate them instead.
             </p>
           </div>
 
           <div class="flex flex-wrap items-end gap-3">
-            <div class="flex flex-col gap-1 min-w-[220px]">
-              <label for="controlListsPortfolioSelect" class="text-sm font-medium atc-grey-800">Portfolio</label>
-              <p-select inputId="controlListsPortfolioSelect" [options]="portfolioOptions()" optionLabel="displayLabel"
-                optionValue="portfolioIdValue" [ngModel]="selectedPortfolioId()" (ngModelChange)="selectPortfolio($event)"
-                placeholder="Select a portfolio" aria-label="Select portfolio" data-testid="portfolio-select">
-              </p-select>
-            </div>
-
             <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
               styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]" [style]="{ 'min-width': '140px' }"
               (onClick)="startCreate()" data-testid="new-category-button">
@@ -34,13 +26,16 @@
 
             @if (loadError()) {
             <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state">
-              <p class="m-0 text-sm atc-red-1">We could not load control lists. Please refresh the page.</p>
+              <p class="m-0 text-sm atc-red-1">We could not load control lists. Please try again.</p>
+              <p-button label="Retry" icon="pi pi-refresh !text-[12px]" severity="secondary" size="small"
+                styleClass="!rounded-[9px] !text-[13px]" (onClick)="load()" data-testid="retry-button">
+              </p-button>
             </div>
             } @else if (!loading()) {
             @if (!hasCategories()) {
             <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
               <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
-              <p class="m-0 text-sm atc-grey-700">No categories yet for this portfolio.</p>
+              <p class="m-0 text-sm atc-grey-700">No categories yet.</p>
               <p-button label="New category" icon="pi pi-plus !text-[12px]" severity="info" size="small"
                 styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreate()" data-testid="empty-new-category-button">
               </p-button>
@@ -111,7 +106,7 @@
                 <span class="text-[12.5px] atc-grey-900" data-testid="list-header-description">{{ list.description }}</span>
                 }
                 <span class="text-[12px] atc-grey-700">
-                  Reference: <strong class="atc-light-blue-400" data-testid="list-header-reference">{{ listReference() }}</strong>
+                  Key: <strong class="atc-light-blue-400" data-testid="list-header-key">{{ list.key }}</strong>
                 </span>
                 <span class="text-[12px] atc-grey-700">
                   Used by: <span data-testid="list-header-used-by">{{ usedByLabel() }}</span>
@@ -183,6 +178,9 @@
     <div class="flex flex-col gap-1" data-testid="list-key-field">
       <app-input label="System key" [signal]="listForm" optionValue="listKey" [isRequired]="true" [maxLength]="100"
         [disabled]="isEditingList()" placeholder="e.g. kpi.data_source"></app-input>
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="list-key-hint">
+        Unique across all lists and fixed once created. Consumers read the list by this key.
+      </p>
       @if (listKeyFieldError()) {
       <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="list-key-field-error">{{ listKeyFieldError() }}</p>
       }

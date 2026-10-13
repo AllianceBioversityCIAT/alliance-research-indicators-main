@@ -11,41 +11,44 @@ import { ControlListCategoryRepository } from '../src/domain/entities/control-li
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
 import { ControlListUsageRegistry } from '../src/domain/entities/control-lists/control-list-usage.registry';
-import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
-import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard, ROLES_KEY } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
-import { ResultsUtil } from '../src/domain/shared/utils/results.util';
-import { PortfolioUtil } from '../src/domain/shared/utils/portfolio.util';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
 
 /**
- * T-03 (docs/specs/institutional-performance/control-lists) — server
- * integration, values: the read-only permanent ID (D-CTL-14, falsifier 2),
- * the list-has-values delete block (forward pointer from T-02), and the
- * real DB unique-index backstop (P-4 disqualifier: "a uniqueness fixture
- * must differ in letter case, not only id").
+ * Control Lists — values against a REAL MySQL connection
+ * (docs/specs/changes/control-lists-global-scope, T-01; the original T-03
+ * cases of docs/specs/institutional-performance/control-lists are kept):
+ * the read-only permanent ID (D-CTL-14, falsifier 2), the list-has-values
+ * delete block (forward pointer from T-02), and the real DB unique-index
+ * backstop (P-4 disqualifier: "a uniqueness fixture must differ in letter
+ * case, not only id").
  *
- * Evidence DB (requester, 2026-10-01): the user's local development
- * database `ari_local_mysql`, 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*`
- * resolve there (printed below). This suite assumes the T-03 migration
- * (`1790900000002-createControlListValues.ts`) has already been EXECUTED
- * against this DB, so the seeded `kpi.direction` list and its `DIR-01` value
- * (R-CTL-010) are present — the "real DB check" (disqualifier P-4) needs a
- * row that genuinely exists, not a scratch fixture, to prove the unique
- * index is case-insensitive. Every row THIS file creates (one scratch
- * category/list/value) is deleted in `afterAll`; no existing table is
- * altered; the seeded `DIR-01` row is never written to.
+ * R-CLG-008 on A10/A12: a Technical Support token creates a value (201), a
+ * Center Admin token is denied (403) by the REAL `RolesGuard` and nothing is
+ * written.
+ *
+ * Evidence DB: the requester's local database `ari_local_mysql`,
+ * 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*` resolve there (printed below) —
+ * NOT a disposable schema. This suite assumes the control-list migrations
+ * (`1790900000000-1790900000002`) have been EXECUTED against this DB, so the
+ * seeded `kpi.direction` list and its `DIR-01` value (R-CTL-010) are present
+ * — the "real DB check" (disqualifier P-4) needs a row that genuinely exists,
+ * not a scratch fixture, to prove the unique index is case-insensitive. Every
+ * row THIS file creates (one scratch category/list/value, the values created
+ * through the API) sits ABOVE the seeded id ranges (categories 1-2, lists
+ * 1-6, values 1-23) and is deleted in `afterAll`. This suite NEVER updates or
+ * deletes a seeded row; the seeded `DIR-01` row is only read, or the target of
+ * an INSERT that must fail.
  *
  * Scope note (KZ-017): same as the lists/categories integration suites — a
  * test-only middleware stands in for `JwtMiddleware`; this does not reach
  * `ResponseInterceptor` / `GlobalExceptions` or Swagger.
  */
-describe('Control Lists — values, read-only id and DB uniqueness against real MySQL (T-03)', () => {
+describe('Control Lists — values, roles, read-only id and DB uniqueness against real MySQL (T-01)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
-  let portfolio2Id: number;
   let kpiDirectionListId: number;
   let scratchCategoryId: number;
   let scratchListId: number;
@@ -55,6 +58,9 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   // (code_prefix 'SCR') — cleaned up in `afterAll` alongside the other
   // scratch rows.
   const proposedValueIds: number[] = [];
+  // Values created by the role-matrix tests (A10 as Technical Support / System
+  // Admin), against the same scratch list.
+  const roleValueIds: number[] = [];
 
   const TEST_PREFIX = '__t03_itest__';
 
@@ -86,21 +92,8 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
     });
     await dataSource.initialize();
 
-    const [portfolio2] = await dataSource.query(
-      `SELECT id FROM portfolios WHERE start_year = 2026 AND end_year = 2030 LIMIT 1`,
-    );
-    if (!portfolio2) {
-      throw new Error(
-        'Portfolio 2 (start_year=2026, end_year=2030) was not found on the ' +
-          'resolved DB — this suite requires the pre-existing portfolios ' +
-          'seed to already be applied.',
-      );
-    }
-    portfolio2Id = Number(portfolio2.id);
-
     const [kpiDirection] = await dataSource.query(
-      `SELECT id FROM control_lists WHERE portfolio_id = ? AND list_key = 'kpi.direction' LIMIT 1`,
-      [portfolio2Id],
+      `SELECT id FROM control_lists WHERE list_key = 'kpi.direction' LIMIT 1`,
     );
     if (!kpiDirection) {
       throw new Error(
@@ -124,17 +117,16 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
     // Scratch category + list + value, inserted directly (this suite is
     // about A11/A8 behaviour, not category/list/value creation).
     const categoryInsert = await dataSource.query(
-      `INSERT INTO control_list_categories (portfolio_id, name, display_order, is_active, created_at)
-       VALUES (?, ?, 0, 1, NOW())`,
-      [portfolio2Id, `${TEST_PREFIX}category_${Date.now()}`],
+      `INSERT INTO control_list_categories (name, display_order, is_active, created_at)
+       VALUES (?, 0, 1, NOW())`,
+      [`${TEST_PREFIX}category_${Date.now()}`],
     );
     scratchCategoryId = Number(categoryInsert.insertId);
 
     const listInsert = await dataSource.query(
-      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
-       VALUES (?, ?, ?, ?, 'SCR', 0, 1, NOW())`,
+      `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, 'SCR', 0, 1, NOW())`,
       [
-        portfolio2Id,
         scratchCategoryId,
         `${TEST_PREFIX}key_${Date.now()}`,
         `${TEST_PREFIX}list`,
@@ -165,31 +157,22 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
           provide: ControlListValueRepository,
           useFactory: () => new ControlListValueRepository(dataSource),
         },
-        PortfoliosService,
-        {
-          provide: PortfoliosRepository,
-          useFactory: () => new PortfoliosRepository(dataSource),
-        },
         CurrentUserUtil,
-        // T-04 (consumer per the brief's forward pointer): ControlListsService
-        // now depends on ControlListUsageRegistry. No providers are
-        // registered in this suite, so every inUse stays 0 — the real
-        // in-use-blocks-delete path is exercised by
+        // ControlListsService depends on ControlListUsageRegistry. No
+        // providers are registered in this suite, so every inUse stays 0 —
+        // the real in-use-blocks-delete path is exercised by
         // control-lists-usage.integration-spec.ts.
         ControlListUsageRegistry,
         Reflector,
         RolesGuard,
-        SetUpInterceptor,
-        {
-          provide: ResultsUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
-        {
-          provide: PortfolioUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
       ],
-    }).compile();
+    })
+      // The controller's `@UseInterceptors(SetUpInterceptor)` only primes
+      // per-request context this module never reads; replacing it keeps any
+      // hand-wired provider it would need out of the suite.
+      .overrideInterceptor(SetUpInterceptor)
+      .useValue({ intercept: (_ctx, next) => next.handle() })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.use((req, _res, next) => {
@@ -198,7 +181,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
         sec_user_id: 1,
         roles: rolesHeader
           ? JSON.parse(rolesHeader as string)
-          : [SecRolesEnum.CENTER_ADMIN],
+          : [SecRolesEnum.TECHNICAL_SUPPORT],
       };
       next();
     });
@@ -206,49 +189,125 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   });
 
   afterAll(async () => {
-    for (const id of proposedValueIds) {
-      await dataSource.query(`DELETE FROM control_list_values WHERE id = ?`, [
-        id,
-      ]);
+    // Every cleanup is by an id this suite created or by the unique scratch
+    // prefix, and each statement is bounded above the seeded ranges.
+    for (const id of [...proposedValueIds, ...roleValueIds]) {
+      await dataSource.query(
+        `DELETE FROM control_list_values WHERE id = ? AND id > 23`,
+        [id],
+      );
     }
     if (scratchValueId) {
-      await dataSource.query(`DELETE FROM control_list_values WHERE id = ?`, [
-        scratchValueId,
-      ]);
+      await dataSource.query(
+        `DELETE FROM control_list_values WHERE id = ? AND id > 23`,
+        [scratchValueId],
+      );
     }
     if (scratchListId) {
-      await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
-        scratchListId,
-      ]);
+      await dataSource.query(
+        `DELETE FROM control_list_values WHERE list_id = ? AND id > 23`,
+        [scratchListId],
+      );
+      await dataSource.query(
+        `DELETE FROM control_lists WHERE id = ? AND id > 6`,
+        [scratchListId],
+      );
     }
     if (scratchCategoryId) {
       await dataSource.query(
-        `DELETE FROM control_list_categories WHERE id = ?`,
+        `DELETE FROM control_list_categories WHERE id = ? AND id > 2`,
         [scratchCategoryId],
       );
     }
     await dataSource.query(
-      `DELETE FROM control_list_values WHERE code LIKE '${TEST_PREFIX}%'`,
+      `DELETE FROM control_list_values WHERE code LIKE '${TEST_PREFIX}%' AND id > 23`,
     );
     await dataSource.query(
-      `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%'`,
+      `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%' AND id > 6`,
     );
     await dataSource.query(
-      `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%'`,
+      `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%' AND id > 2`,
     );
     if (app) await app.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
   });
 
-  it('declares @Roles(CENTER_ADMIN, SYSTEM_ADMIN) on DELETE /values/:id (A12, metadata sanity check)', () => {
+  it('declares @Roles(SYSTEM_ADMIN, TECHNICAL_SUPPORT) on DELETE /values/:id (A12, metadata sanity check)', () => {
     const roles = Reflect.getMetadata(
       ROLES_KEY,
       ControlListsController.prototype.removeValue,
     );
     expect(roles).toEqual([
-      SecRolesEnum.CENTER_ADMIN,
       SecRolesEnum.SYSTEM_ADMIN,
+      SecRolesEnum.TECHNICAL_SUPPORT,
     ]);
+  });
+
+  // R-CLG-008 *Technical Support allowed*: a Technical Support token creates
+  // a value through the REAL guard and the REAL database (201), and a System
+  // Admin bypasses the role list.
+  it.each([
+    ['TECHNICAL_SUPPORT', 'ts', SecRolesEnum.TECHNICAL_SUPPORT],
+    ['SYSTEM_ADMIN', 'sa', SecRolesEnum.SYSTEM_ADMIN],
+  ])(
+    'returns 201 for %s on POST /lists/:id/values (A10)',
+    async (name, tag, role) => {
+      // The code stays within the column's 30 characters and outside the
+      // proposal pattern of the scratch list (SCR-nn), so the proposal tests
+      // below keep their deterministic SCR-01 / SCR-02.
+      const response = await request(app.getHttpServer())
+        .post(`/lists/${scratchListId}/values`)
+        .set('x-test-roles', JSON.stringify([role]))
+        .send({
+          code: `${TEST_PREFIX}r_${tag}`,
+          value: `${TEST_PREFIX}role_${name}_${Date.now()}`,
+        });
+
+      // Capture the id for cleanup BEFORE asserting.
+      if (response.body?.data?.id) {
+        roleValueIds.push(Number(response.body.data.id));
+      }
+      expect(response.status).toBe(201);
+      expect(Number(response.body.data.listId)).toBe(scratchListId);
+      expect(Number(response.body.data.id)).toBeGreaterThan(23);
+    },
+  );
+
+  // R-CLG-008 *Center Admin denied* · BUT must NOT change any data, on the
+  // value writes A10 (create), A11 (update) and A12 (delete).
+  it('returns 403 for a Center Admin on A10, A11 and A12, and changes nothing', async () => {
+    const code = `${TEST_PREFIX}center_admin_code`;
+    const centerAdmin = JSON.stringify([SecRolesEnum.CENTER_ADMIN]);
+    const [before] = await dataSource.query(
+      `SELECT value, code FROM control_list_values WHERE id = ?`,
+      [scratchValueId],
+    );
+
+    await request(app.getHttpServer())
+      .post(`/lists/${scratchListId}/values`)
+      .set('x-test-roles', centerAdmin)
+      .send({ code, value: `${TEST_PREFIX}center_admin_value` })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/values/${scratchValueId}`)
+      .set('x-test-roles', centerAdmin)
+      .send({ value: `${TEST_PREFIX}center_admin_rename` })
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete(`/values/${scratchValueId}`)
+      .set('x-test-roles', centerAdmin)
+      .expect(403);
+
+    const created = await dataSource.query(
+      `SELECT id FROM control_list_values WHERE code = ?`,
+      [code],
+    );
+    expect(created).toHaveLength(0);
+    const [after] = await dataSource.query(
+      `SELECT value, code FROM control_list_values WHERE id = ?`,
+      [scratchValueId],
+    );
+    expect(after).toEqual(before);
   });
 
   // Falsifier 2 (tasks.md T-03) / D-CTL-14: whitelisting `id` in the update
@@ -260,7 +319,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 400 (not 200) when the PATCH body includes id, and the id stays unchanged', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/values/${scratchValueId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ id: 999999, value: 'Renamed' })
       .expect(400);
 
@@ -277,7 +336,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 200 and updates the value when the PATCH body omits id', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/values/${scratchValueId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ value: `${TEST_PREFIX}renamed` })
       .expect(200);
 
@@ -294,7 +353,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 409 (not 200) when deleting a list that still has values, and removes nothing', async () => {
     const response = await request(app.getHttpServer())
       .delete(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(409);
 
     expect(response.body?.message ?? response.body?.errors).toBeDefined();
@@ -342,7 +401,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 409 through the real API when creating "dir-01" in the real seeded kpi.direction list', async () => {
     const response = await request(app.getHttpServer())
       .post(`/lists/${kpiDirectionListId}/values`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({
         code: 'dir-01',
         value: `${TEST_PREFIX}api_collision_${Date.now()}`,
@@ -368,7 +427,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 201 with a proposed code when the body sends code: "" (A10, rework attempt 2)', async () => {
     const response = await request(app.getHttpServer())
       .post(`/lists/${scratchListId}/values`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ code: '', value: `${TEST_PREFIX}propose_empty_${Date.now()}` })
       .expect(201);
 
@@ -385,7 +444,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 201 with a proposed code when the body sends code: null (A10, rework attempt 2)', async () => {
     const response = await request(app.getHttpServer())
       .post(`/lists/${scratchListId}/values`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ code: null, value: `${TEST_PREFIX}propose_null_${Date.now()}` })
       .expect(201);
 
@@ -402,7 +461,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('stores description as NULL (not "") when the body sends description: "" (A10, rework attempt 2)', async () => {
     const response = await request(app.getHttpServer())
       .post(`/lists/${scratchListId}/values`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({
         value: `${TEST_PREFIX}propose_desc_${Date.now()}`,
         description: '',
@@ -424,7 +483,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 400 (not 200) when the PATCH body sends code: "" (A11, rework attempt 2)', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/values/${scratchValueId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ code: '' })
       .expect(400);
 
@@ -440,7 +499,7 @@ describe('Control Lists — values, read-only id and DB uniqueness against real 
   it('returns 400 (not 200) when the PATCH body sends displayOrder: null (A11, rework attempt 2)', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/values/${scratchValueId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ displayOrder: null })
       .expect(400);
 

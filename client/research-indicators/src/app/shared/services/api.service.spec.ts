@@ -210,6 +210,15 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/funding-types', {});
     });
 
+    it('should call GET_ControlListCategories with no query params (lists are global, no portfolio)', () => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
+
+      service.GET_ControlListCategories();
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith('control-lists/categories', {});
+      expect(service).not.toHaveProperty('GET_ControlListPortfolioSummaries');
+    });
+
     it('should call GET_ClarisaSdgTargets', () => {
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: [] });
 

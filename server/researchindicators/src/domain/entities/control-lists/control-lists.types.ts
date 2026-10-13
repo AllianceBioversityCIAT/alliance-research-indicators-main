@@ -18,7 +18,6 @@ export interface ListSummary {
 
 export interface ControlListCategoryResponse {
   id: number;
-  portfolioId: number;
   name: string;
   description: string | null;
   displayOrder: number;
@@ -26,14 +25,8 @@ export interface ControlListCategoryResponse {
   lists: ListSummary[];
 }
 
-export interface PortfolioCategoriesSummary {
-  portfolioId: number;
-  categories: number;
-}
-
 export interface ControlListResponse {
   id: number;
-  portfolioId: number;
   categoryId: number;
   key: string;
   name: string;

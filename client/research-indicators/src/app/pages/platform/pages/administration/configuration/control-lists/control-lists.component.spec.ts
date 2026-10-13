@@ -2,14 +2,11 @@ import { Component, Input, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { Select } from 'primeng/select';
 import { DataTableComponent } from '@shared/components/data-table/data-table.component';
 import ControlListsComponent from './control-lists.component';
-import { Portfolio } from '@shared/interfaces/portfolio.interface';
 import {
   ControlList,
   ControlListCategory,
-  ControlListPortfolioSummary,
   ControlListSummary,
   ControlListValue
 } from '@shared/interfaces/control-lists.interface';
@@ -59,14 +56,8 @@ class TextareaStubComponent {
 @Component({ selector: 'app-custom-progress-bar', standalone: true, template: '<div data-testid="progress-bar"></div>' })
 class ProgressBarStubComponent {}
 
-// Wide, non-adjacent ranges so "today" (whenever the suite runs) always resolves to
-// portfolio2 as the default, with no boundary ambiguity (unlike an exact-year edge).
-const portfolio1: Portfolio = { id: 1, name: 'Alliance 2010-2015', description: 'Legacy', start_year: 2000, end_year: 2015 };
-const portfolio2: Portfolio = { id: 2, name: 'Alliance 2026-2030', description: 'Current', start_year: 2016, end_year: 2099 };
-
 const category = (overrides: Partial<ControlListCategory> = {}): ControlListCategory => ({
   id: 1,
-  portfolioId: 2,
   name: 'Key Performance Indicators (KPIs)',
   description: null,
   displayOrder: 0,
@@ -95,7 +86,6 @@ const listSummary = (overrides: Partial<ControlListSummary> = {}): ControlListSu
 // `control-lists.service.ts`), never `null`.
 const controlList = (overrides: Partial<ControlList> = {}): ControlList => ({
   id: 20,
-  portfolioId: 2,
   categoryId: 1,
   key: 'kpi.custom',
   name: 'Custom list',
@@ -166,8 +156,6 @@ describe('ControlListsComponent', () => {
   let actions: { showToast: jest.Mock; showGlobalAlert: jest.Mock };
 
   const api = {
-    GET_Portfolios: jest.fn(),
-    GET_ControlListPortfolioSummaries: jest.fn(),
     GET_ControlListCategories: jest.fn(),
     POST_ControlListCategory: jest.fn(),
     PATCH_ControlListCategory: jest.fn(),
@@ -183,12 +171,7 @@ describe('ControlListsComponent', () => {
     DELETE_ControlListValue: jest.fn()
   };
 
-  const summaries: ControlListPortfolioSummary[] = [
-    { portfolioId: 1, categories: 0 },
-    { portfolioId: 2, categories: 1 }
-  ];
-
-  async function setup(categoriesForPortfolio2: ControlListCategory[] = [category()]): Promise<void> {
+  async function setup(categories: ControlListCategory[] = [category()]): Promise<void> {
     modalConfig = signal<Record<string, any>>({ controlListForm: { isOpen: false, title: 'New category' } });
     modals = {
       modalConfig,
@@ -198,11 +181,7 @@ describe('ControlListsComponent', () => {
     actions = { showToast: jest.fn(), showGlobalAlert: jest.fn() };
 
     jest.clearAllMocks();
-    api.GET_Portfolios.mockResolvedValue(ok([portfolio1, portfolio2]));
-    api.GET_ControlListPortfolioSummaries.mockResolvedValue(ok(summaries));
-    api.GET_ControlListCategories.mockImplementation((portfolioId: number) =>
-      Promise.resolve(ok(portfolioId === 2 ? categoriesForPortfolio2 : []))
-    );
+    api.GET_ControlListCategories.mockResolvedValue(ok(categories));
     api.POST_ControlListCategory.mockResolvedValue(ok(category()));
     api.PATCH_ControlListCategory.mockResolvedValue(ok(category()));
     api.DELETE_ControlListCategory.mockResolvedValue(ok({ id: 1 }));
@@ -233,9 +212,8 @@ describe('ControlListsComponent', () => {
     component = fixture.componentInstance;
     // KZ-015: construct in the initial state (loading=true, nothing resolved yet)
     // before the first detectChanges, then let ngOnInit's async load() settle.
-    // load() is TWO promise-chain levels deep (Promise.all, then loadCategories'
-    // own await) — a single whenStable() only flushes the first level, so this
-    // needs a second round-trip before the fixture is truly idle.
+    // load() awaits loadCategories(), which awaits the API call — two promise-chain levels, so a
+    // single whenStable() can leave the fixture short of idle; settle twice.
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -243,179 +221,110 @@ describe('ControlListsComponent', () => {
     fixture.detectChanges();
   }
 
-  // ─── Default portfolio + "not configured" (R-CTL-001, falsifier 6) ────────────
+  // ─── Global lists, no portfolio selector (R-CLG-001, R-CLG-005) ────────────────
 
-  it('resolves the portfolio whose years contain today as the default, and loads its categories', async () => {
+  it('loads the categories with ONE argument-less call and never calls the removed A2 or the portfolios endpoint', async () => {
     await setup();
 
-    expect(component.selectedPortfolioId()).toBe(2);
-    expect(api.GET_ControlListCategories).toHaveBeenCalledWith(2);
+    expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(1);
+    expect(api.GET_ControlListCategories).toHaveBeenCalledWith();
     expect(component.categories()).toHaveLength(1);
     expect(component.loading()).toBe(false);
     expect(component.loadError()).toBe(false);
+    // A2 no longer exists on ApiService: the mock does not even offer it, so assert on the shape.
+    expect(api).not.toHaveProperty('GET_ControlListPortfolioSummaries');
+    expect(api).not.toHaveProperty('GET_Portfolios');
   });
 
-  // Unit-level check of the derived data only. It does NOT gate falsifier 6 (a mutation to the
-  // RENDERED `p-select` — see the dedicated describe block below) because it reads
-  // `portfolioOptions()` and drives `selectPortfolio()` directly, bypassing the select entirely
-  // (reviewer finding 2).
-  it('computes configured=false and the "(not configured)" label for a 0-category portfolio, true/no suffix otherwise', async () => {
-    await setup();
-
-    const options = component.portfolioOptions();
-    const p1 = options.find(option => option.portfolioIdValue === 1);
-    const p2 = options.find(option => option.portfolioIdValue === 2);
-    expect(p1?.configured).toBe(false);
-    expect(p1?.displayLabel).toBe('Alliance 2010-2015 (not configured)');
-    expect(p2?.configured).toBe(true);
-    expect(p2?.displayLabel).toBe('Alliance 2026-2030');
-
-    await component.selectPortfolio(1);
-
-    expect(api.GET_ControlListCategories).toHaveBeenCalledWith(1);
-    expect(component.selectedPortfolioId()).toBe(1);
-    expect(component.categories()).toEqual([]);
-  });
-
-  it('shows the empty state with + New category for a 0-category portfolio', async () => {
-    await setup();
-    await component.selectPortfolio(1);
+  it('renders no portfolio selector and no `P<n> ·` text anywhere on the page', async () => {
+    await setup([category({ lists: [listSummary()] })]);
+    component.selectList(10);
+    fixture.detectChanges();
+    await fixture.whenStable();
     fixture.detectChanges();
 
-    const empty = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="empty-state"]');
-    expect(empty).toBeTruthy();
-    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="empty-new-category-button"]')).toBeTruthy();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('p-select')).toBeNull();
+    expect(el.querySelector('[data-testid="portfolio-select"]')).toBeNull();
+    expect(el.querySelector('select, [role="combobox"]')).toBeNull();
+    expect(el.textContent).not.toMatch(/P\d+\s*·/);
+    expect(el.textContent).not.toMatch(/not configured/i);
+    expect(el.textContent).not.toMatch(/portfolio/i);
   });
 
-  it('does not reload when the same portfolio is selected again', async () => {
-    await setup();
-    api.GET_ControlListCategories.mockClear();
+  it('shows the list header as `Key: <key>` with no reference prefix', async () => {
+    await setup([category({ lists: [listSummary({ key: 'org.level', name: 'Organizational level' })] })]);
+    component.selectList(10);
+    fixture.detectChanges();
 
-    await component.selectPortfolio(2);
-
-    expect(api.GET_ControlListCategories).not.toHaveBeenCalled();
+    const header = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-header"]');
+    expect(header?.textContent).toMatch(/Key:\s*org\.level/);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-header-key"]')?.textContent?.trim()).toBe('org.level');
+    expect(header?.textContent).not.toContain('Reference');
   });
 
-  // ─── Falsifier 6, run against the RENDERED p-select (reviewer finding 2) ──────
-  //
-  // Attempt 1's falsifier-6 test drove `component.portfolioOptions()` and
-  // `component.selectPortfolio()` directly, so the mutation the spec actually names — binding
-  // `optionDisabled="disabled"` on the `p-select` with `disabled: !configured` added to each
-  // option — left it green. This block opens the real PrimeNG overlay and asserts on the
-  // rendered option (KZ-001).
-  describe('rendered portfolio selector overlay', () => {
-    let originalMatchMedia: PropertyDescriptor | undefined;
+  it('shows the empty state with + New category when the module has no categories', async () => {
+    await setup([]);
 
-    beforeAll(() => {
-      // jsdom has no matchMedia; PrimeNG's Overlay probes it when the panel opens.
-      originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
-      Object.defineProperty(window, 'matchMedia', {
-        writable: true,
-        configurable: true,
-        value: jest.fn().mockImplementation((query: string) => ({
-          matches: false,
-          media: query,
-          onchange: null,
-          addListener: jest.fn(),
-          removeListener: jest.fn(),
-          addEventListener: jest.fn(),
-          removeEventListener: jest.fn(),
-          dispatchEvent: jest.fn()
-        }))
-      });
-    });
-
-    afterAll(() => {
-      if (originalMatchMedia) {
-        Object.defineProperty(window, 'matchMedia', originalMatchMedia);
-      } else {
-        delete (window as Partial<Window>).matchMedia;
-      }
-    });
-
-    afterEach(() => {
-      // The overlay is appended to document.body — drop any leftovers so DOM queries in the
-      // next test never see a stale instance from this one.
-      document.body.querySelectorAll('.p-select-overlay, .p-overlay').forEach(el => el.remove());
-    });
-
-    function portfolioSelect(): Select {
-      const selectDe = fixture.debugElement
-        .queryAll(By.directive(Select))
-        .find(de => (de.nativeElement as HTMLElement).getAttribute('data-testid') === 'portfolio-select');
-      expect(selectDe).toBeDefined();
-      return selectDe!.componentInstance as Select;
-    }
-
-    it('keeps the 0-category portfolio option enabled in the rendered overlay, and clicking it loads the empty state (falsifier 6)', async () => {
-      await setup();
-
-      const select = portfolioSelect();
-      select.show();
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      const renderedOptions = Array.from(document.body.querySelectorAll('.p-select-option'));
-      expect(renderedOptions.length).toBe(2);
-      const notConfigured = renderedOptions.find(el => el.textContent?.includes('(not configured)')) as HTMLElement | undefined;
-      expect(notConfigured).toBeTruthy();
-
-      // The exact DOM the "disable 0-category portfolios" mutation would flip
-      // (SelectItem's template: `[ngClass]="{ 'p-disabled': disabled }"` +
-      // `[attr.data-p-disabled]="disabled"` — primeng-select.mjs:962-975).
-      expect(notConfigured!.classList.contains('p-disabled')).toBe(false);
-      expect(notConfigured!.getAttribute('data-p-disabled')).not.toBe('true');
-
-      notConfigured!.click();
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
-      expect(api.GET_ControlListCategories).toHaveBeenCalledWith(1);
-      expect(component.selectedPortfolioId()).toBe(1);
-      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="empty-state"]')).toBeTruthy();
-    });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-testid="empty-state"]')?.textContent).toContain('No categories yet.');
+    expect(el.querySelector('[data-testid="empty-new-category-button"]')).toBeTruthy();
   });
 
   // ─── Loading / error / success states (R-CTL-008) ─────────────────────────────
 
-  it('sets loadError when portfolios cannot be loaded', async () => {
-    jest.clearAllMocks();
-    // A synchronous throw (not mockRejectedValueOnce) — caught at the `await` call
-    // site itself, with no separately-constructed rejected Promise to leak as an
-    // unhandled rejection into a later test (same technique as portfolio-management
-    // .component.spec.ts's "sets load error" case).
-    api.GET_Portfolios.mockImplementationOnce(() => {
+  it('shows the loading bar while the categories request is pending (loading state)', async () => {
+    await setup();
+    let release!: (value: MainResponse<ControlListCategory[]>) => void;
+    api.GET_ControlListCategories.mockReturnValueOnce(new Promise(resolve => (release = resolve)));
+
+    const pending = component.load();
+    fixture.detectChanges();
+    expect(component.loading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="progress-bar"]')).toBeTruthy();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="empty-state"]')).toBeNull();
+
+    release(ok([category()]));
+    await pending;
+    fixture.detectChanges();
+    expect(component.loading()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="progress-bar"]')).toBeNull();
+  });
+
+  it('sets loadError and shows the error state when the categories request throws', async () => {
+    await setup();
+    // A synchronous throw (not mockRejectedValueOnce) — caught at the `await` call site itself,
+    // with no separately-constructed rejected Promise to leak as an unhandled rejection.
+    api.GET_ControlListCategories.mockImplementationOnce(() => {
       throw new Error('network down');
     });
-    api.GET_ControlListPortfolioSummaries.mockResolvedValue(ok(summaries));
 
-    await TestBed.configureTestingModule({
-      imports: [ControlListsComponent],
-      providers: [
-        provideNoopAnimations(),
-        { provide: ApiService, useValue: api as unknown as ApiService },
-        { provide: AllModalsService, useValue: { modalConfig: signal({ controlListForm: { isOpen: false, title: '' } }), openModal: jest.fn(), closeModal: jest.fn() } as unknown as AllModalsService },
-        { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } as unknown as ActionsService }
-      ]
-    })
-      .overrideComponent(ControlListsComponent, {
-        remove: { imports: [ModalComponent, InputComponent, TextareaComponent, CustomProgressBarComponent] },
-        add: { imports: [ModalStubComponent, InputStubComponent, TextareaStubComponent, ProgressBarStubComponent] }
-      })
-      .compileComponents();
-
-    fixture = TestBed.createComponent(ControlListsComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    await fixture.whenStable();
+    await component.load();
     fixture.detectChanges();
 
     expect(component.loadError()).toBe(true);
+    expect(component.categories()).toEqual([]);
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="error-state"]')).toBeTruthy();
+  });
+
+  it('sets loadError for an unsuccessful categories response, and recovers on a retry (load again)', async () => {
+    await setup();
+    api.GET_ControlListCategories.mockResolvedValueOnce(fail(500, 'boom', 'InternalServerErrorException'));
+
+    await component.load();
+    fixture.detectChanges();
+    expect(component.loadError()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="error-state"]')).toBeTruthy();
+
+    // The error state offers a Retry button wired to load().
+    const retry = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="retry-button"] button') as HTMLButtonElement;
+    expect(retry).toBeTruthy();
+    retry.click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(component.loadError()).toBe(false);
+    expect(component.categories()).toHaveLength(1);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="error-state"]')).toBeNull();
   });
 
   // ─── Category CRUD against real MainResponse shapes ───────────────────────────
@@ -429,8 +338,8 @@ describe('ControlListsComponent', () => {
 
     await component.save();
 
+    // R-CLG-001: the create body carries no portfolio at all — exact shape, not objectContaining.
     expect(api.POST_ControlListCategory).toHaveBeenCalledWith({
-      portfolioId: 2,
       name: 'Key Performance Indicators (KPIs)',
       description: 'KPI lists'
     });
@@ -442,32 +351,6 @@ describe('ControlListsComponent', () => {
     expect(modals.closeModal).toHaveBeenCalledWith('controlListForm');
     expect(component.form().name).toBe('');
     expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(2); // initial load + reload after save
-    expect(api.GET_ControlListPortfolioSummaries).toHaveBeenCalledTimes(2); // initial load + refresh after save
-  });
-
-  // ─── A2 staleness fix (reviewer finding 3 / design D-CTL-10) ───────────────────
-
-  it('refreshes the portfolio summaries after a successful create, so the "(not configured)" label is not stale', async () => {
-    await setup([]);
-    await component.selectPortfolio(1);
-    expect(component.portfolioOptions().find(option => option.portfolioIdValue === 1)?.displayLabel).toBe(
-      'Alliance 2010-2015 (not configured)'
-    );
-
-    api.GET_ControlListPortfolioSummaries.mockClear();
-    api.GET_ControlListPortfolioSummaries.mockResolvedValueOnce(
-      ok<ControlListPortfolioSummary[]>([
-        { portfolioId: 1, categories: 1 },
-        { portfolioId: 2, categories: 1 }
-      ])
-    );
-
-    component.startCreate();
-    component.form.set({ name: 'Key Performance Indicators (KPIs)', description: '' });
-    await component.save();
-
-    expect(api.GET_ControlListPortfolioSummaries).toHaveBeenCalledTimes(1);
-    expect(component.portfolioOptions().find(option => option.portfolioIdValue === 1)?.displayLabel).toBe('Alliance 2010-2015');
   });
 
   it('edits a category and calls PATCH with the category id', async () => {
@@ -520,7 +403,7 @@ describe('ControlListsComponent', () => {
 
   it('shows a field-named 409 duplicate-name error INLINE under the name input, never as a toast and never the exception class name (reviewer finding 1)', async () => {
     await setup([]);
-    const message = 'A category named "Key Performance Indicators (KPIs)" already exists in this portfolio';
+    const message = 'A category named "Key Performance Indicators (KPIs)" already exists';
     // Real GlobalExceptions shape: errorDetail.errors = { description, field: 'name' }.
     // `description` here is "ConflictException" (the exception class) — extractErrorMessage
     // must never read it, only `errorDetail.errors`.
@@ -552,13 +435,12 @@ describe('ControlListsComponent', () => {
     expect(component.nameFieldError()).toBeNull();
   });
 
-  it('shows a 404 (unknown portfolio) as-is — `errors` is a PLAIN STRING here, a third shape alongside the 409 object and 400 array', async () => {
-    // Server contract update (coordinator, parallel server worker — A3's 404 for a since-deleted
-    // portfolio): NotFoundException's body is `{ description: 'NotFoundException', status: 404,
-    // errors: 'Portfolio 999 not found', timestamp, path }` — `errors` is a bare string, not the
+  it('shows a plain-string error as-is — `errors` is a PLAIN STRING here, a third shape alongside the 409 object and 400 array', async () => {
+    // NotFoundException's body is `{ description: 'NotFoundException', status: 404,
+    // errors: 'Category 999 not found', timestamp, path }` — `errors` is a bare string, not the
     // `{ description, field }` shape 409 uses. extractFieldError's string branch must carry this.
     await setup([]);
-    const message = 'Portfolio 999 not found';
+    const message = 'Category 999 not found';
     api.POST_ControlListCategory.mockResolvedValueOnce(fail(404, message, 'NotFoundException'));
     component.form.set({ name: 'Key Performance Indicators (KPIs)', description: '' });
 
@@ -612,39 +494,6 @@ describe('ControlListsComponent', () => {
       detail: 'Category deleted successfully'
     });
     expect(component.deletingId()).toBeNull();
-  });
-
-  it('refreshes the portfolio summaries after a successful delete, so the "(not configured)" label reflects 0 categories again', async () => {
-    const existing = category({ id: 11, portfolioId: 1, name: 'Only category' });
-    await setup([category()]);
-    // Force portfolio 1 into a "has 1 category" state without a network round trip —
-    // GET_ControlListPortfolioSummaries is asserted on its OWN call count below.
-    component.portfolioSummaries.set([
-      { portfolioId: 1, categories: 1 },
-      { portfolioId: 2, categories: 1 }
-    ]);
-    component.selectedPortfolioId.set(1);
-    component.categories.set([existing]);
-    expect(component.portfolioOptions().find(option => option.portfolioIdValue === 1)?.displayLabel).toBe('Alliance 2010-2015');
-
-    api.GET_ControlListPortfolioSummaries.mockClear();
-    api.GET_ControlListPortfolioSummaries.mockResolvedValueOnce(
-      ok<ControlListPortfolioSummary[]>([
-        { portfolioId: 1, categories: 0 },
-        { portfolioId: 2, categories: 1 }
-      ])
-    );
-
-    component.delete(existing);
-    const alertConfig = actions.showGlobalAlert.mock.calls[actions.showGlobalAlert.mock.calls.length - 1][0];
-    alertConfig.confirmCallback.event();
-    await fixture.whenStable();
-    await fixture.whenStable();
-
-    expect(api.GET_ControlListPortfolioSummaries).toHaveBeenCalledTimes(1);
-    expect(component.portfolioOptions().find(option => option.portfolioIdValue === 1)?.displayLabel).toBe(
-      'Alliance 2010-2015 (not configured)'
-    );
   });
 
   it('shows a blocked (409, has lists) delete AS-IS behind a single Close, and does not toast success', async () => {
@@ -727,8 +576,8 @@ describe('ControlListsComponent', () => {
       expect(rows[0].textContent).toContain('3');
     });
 
-    // "selecting a list updates the header" + "the reference reads P2 · kpi.direction"
-    it('selecting a list updates the header, showing its name, description and the qualified reference', async () => {
+    // "selecting a list updates the header" + "the header reads Key: kpi.direction" (R-CLG-003)
+    it('selecting a list updates the header, showing its name, description and its key alone', async () => {
       await setup([kpiCategory]);
       expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-detail-empty"]')).toBeTruthy();
 
@@ -739,7 +588,8 @@ describe('ControlListsComponent', () => {
       expect(el.querySelector('[data-testid="list-detail-empty"]')).toBeFalsy();
       expect(el.querySelector('[data-testid="list-header-name"]')?.textContent?.trim()).toBe('Direction');
       expect(el.querySelector('[data-testid="list-header-description"]')?.textContent?.trim()).toBe(directionList.description);
-      expect(el.querySelector('[data-testid="list-header-reference"]')?.textContent?.trim()).toBe('P2 · kpi.direction');
+      expect(el.querySelector('[data-testid="list-header-key"]')?.textContent?.trim()).toBe('kpi.direction');
+      expect(el.querySelector('[data-testid="list-header"]')?.textContent).toMatch(/Key:\s*kpi\.direction/);
     });
 
     // ─── T-04: "Used by" (design §4 A1 "usedBy", §5 rule 5, R-CTL-003 "Used by") ─────────────
@@ -964,7 +814,7 @@ describe('ControlListsComponent', () => {
 
     it('shows a field-named 409 duplicate-key error INLINE under the key input, never as a toast', async () => {
       await setup([kpiCategory]);
-      const message = 'A list with key "kpi.custom2" already exists in this portfolio';
+      const message = 'A list with key "kpi.custom2" already exists';
       api.POST_ControlList.mockResolvedValueOnce(fail(409, { description: message, field: 'listKey' }));
       component.startCreateList(kpiCategory);
       component.listForm.set({ listKey: 'kpi.custom2', name: 'Custom 2', description: '', codePrefix: '' });
@@ -1041,14 +891,30 @@ describe('ControlListsComponent', () => {
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'List deleted successfully' }));
     });
 
-    it('resets the list id when the portfolio changes, so a stale selection cannot leak across portfolios (R-CTL-001)', async () => {
+    it('shows the key hint "Unique across all lists… consumers read the list by this key" in the list modal', async () => {
       await setup([kpiCategory]);
-      component.selectList(directionList.id);
-      expect(component.selectedListId()).toBe(directionList.id);
+      component.startCreateList(kpiCategory);
+      fixture.detectChanges();
 
-      await component.selectPortfolio(1);
+      const hint = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="list-key-hint"]');
+      expect(hint?.textContent).toContain('Unique across all lists');
+      expect(hint?.textContent).toContain('Consumers read the list by this key');
+    });
 
-      expect(component.selectedListId()).toBeNull();
+    it('create-list payload carries no portfolio and the key stays create-only', async () => {
+      await setup([kpiCategory]);
+      component.startCreateList(kpiCategory);
+      component.listForm.set({ listKey: 'kpi.custom2', name: 'Custom 2', description: '', codePrefix: '' });
+
+      await component.saveList();
+
+      expect(api.POST_ControlList).toHaveBeenCalledWith({
+        categoryId: kpiCategory.id,
+        listKey: 'kpi.custom2',
+        name: 'Custom 2',
+        description: undefined,
+        codePrefix: undefined
+      });
     });
   });
 
@@ -1488,18 +1354,6 @@ describe('ControlListsComponent', () => {
         })
       );
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'Value deleted successfully' }));
-    });
-
-    it('clears the values list and state when the portfolio changes (R-CTL-001 isolation)', async () => {
-      await setup([kpiCategory]);
-      api.GET_ControlListValues.mockResolvedValue(ok(directionValues));
-      component.selectList(directionList.id);
-      await fixture.whenStable();
-      expect(component.values().length).toBe(2);
-
-      await component.selectPortfolio(1);
-
-      expect(component.values()).toEqual([]);
     });
   });
 });

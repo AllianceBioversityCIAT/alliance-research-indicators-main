@@ -37,10 +37,11 @@ import { ResponseUtils } from '../../shared/utils/response.utils';
 import { Roles } from '../../shared/decorators/roles.decorator';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
-// Admin-only module (design.md §8, D-CTL-7): every handler here is
-// CENTER_ADMIN / SYSTEM_ADMIN. TECHNICAL_SUPPORT is deliberately NOT
-// granted, unlike portfolios.controller.ts's broader set. The one exception
-// is A13 (getValuesByKey, T-04): the consumer read, open to any
+// System-admin module (global-scope change, design.md §8, R-CLG-008,
+// D-CLG-8): every admin handler here (A1, A3-A12) is SYSTEM_ADMIN /
+// TECHNICAL_SUPPORT — the same pair as app-config.controller.ts.
+// CENTER_ADMIN is no longer granted (it supersedes D-CTL-7). The one
+// exception is A13 (getValuesByKey): the consumer read, open to any
 // authenticated user — it deliberately has NO @Roles decorator.
 @Controller()
 @ApiTags('Control Lists')
@@ -50,16 +51,12 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 export class ControlListsController {
   constructor(private readonly controlListsService: ControlListsService) {}
 
-  // A1
+  // A1 — no parameters (R-CLG-001). The empty query DTO stays bound so the
+  // ValidationPipe rejects a stale caller's extra parameter with a 400
+  // (D-CLG-3).
   @Get('categories')
-  @ApiOperation({ summary: 'List categories for a portfolio' })
-  @ApiQuery({
-    name: 'portfolioId',
-    type: Number,
-    required: true,
-    description: 'Portfolio id to scope the read',
-  })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @ApiOperation({ summary: 'List all categories with their lists' })
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -67,26 +64,10 @@ export class ControlListsController {
       transform: true,
     }),
   )
-  async getCategories(@Query() query: GetCategoriesQueryDto) {
-    return this.controlListsService
-      .getCategories(query.portfolioId)
-      .then((data) =>
-        ResponseUtils.format({
-          description: 'Categories found',
-          data,
-          status: HttpStatus.OK,
-        }),
-      );
-  }
-
-  // A2
-  @Get('portfolios/summary')
-  @ApiOperation({ summary: 'Category count per portfolio' })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
-  async getPortfoliosSummary() {
-    return this.controlListsService.getPortfoliosSummary().then((data) =>
+  async getCategories(@Query() _query: GetCategoriesQueryDto) {
+    return this.controlListsService.getCategories().then((data) =>
       ResponseUtils.format({
-        description: 'Portfolio category summary found',
+        description: 'Categories found',
         data,
         status: HttpStatus.OK,
       }),
@@ -100,7 +81,7 @@ export class ControlListsController {
     type: CreateControlListCategoryDto,
     description: 'Create a category',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -131,7 +112,7 @@ export class ControlListsController {
     type: UpdateControlListCategoryDto,
     description: 'Update a category',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -161,7 +142,7 @@ export class ControlListsController {
     required: true,
     description: 'Category id',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   async removeCategory(@Param('id', ParseIntPipe) id: number) {
     return this.controlListsService.removeCategory(id).then((data) =>
       ResponseUtils.format({
@@ -179,7 +160,7 @@ export class ControlListsController {
     type: CreateControlListDto,
     description: 'Create a list',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -210,7 +191,7 @@ export class ControlListsController {
     type: UpdateControlListDto,
     description: 'Update a list',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -240,7 +221,7 @@ export class ControlListsController {
     required: true,
     description: 'List id',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   async removeList(@Param('id', ParseIntPipe) id: number) {
     return this.controlListsService.removeList(id).then((data) =>
       ResponseUtils.format({
@@ -260,7 +241,7 @@ export class ControlListsController {
     required: true,
     description: 'List id',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   async getValues(@Param('id', ParseIntPipe) id: number) {
     return this.controlListsService.getValues(id).then((data) =>
       ResponseUtils.format({
@@ -284,7 +265,7 @@ export class ControlListsController {
     type: CreateControlListValueDto,
     description: 'Create a value',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -318,7 +299,7 @@ export class ControlListsController {
     type: UpdateControlListValueDto,
     description: 'Update a value',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -348,7 +329,7 @@ export class ControlListsController {
     required: true,
     description: 'Value id',
   })
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @Roles(SecRolesEnum.SYSTEM_ADMIN, SecRolesEnum.TECHNICAL_SUPPORT)
   async removeValue(@Param('id', ParseIntPipe) id: number) {
     return this.controlListsService.removeValue(id).then((data) =>
       ResponseUtils.format({
@@ -368,19 +349,13 @@ export class ControlListsController {
   @Get('by-key/:listKey/values')
   @ApiOperation({
     summary:
-      "Read a list's values by portfolio and system key (consumer read, any authenticated user)",
+      "Read a list's values by system key (consumer read, any authenticated user)",
   })
   @ApiParam({
     name: 'listKey',
     type: String,
     required: true,
     description: 'List system key',
-  })
-  @ApiQuery({
-    name: 'portfolioId',
-    type: Number,
-    required: true,
-    description: 'Portfolio id to scope the read',
   })
   @ApiQuery({
     name: 'activeOnly',
@@ -400,7 +375,7 @@ export class ControlListsController {
     @Query() query: GetListValuesByKeyQueryDto,
   ) {
     return this.controlListsService
-      .getValuesByKey(query.portfolioId, listKey, query.activeOnly ?? true)
+      .getValuesByKey(listKey, query.activeOnly ?? true)
       .then((data) =>
         ResponseUtils.format({
           description: 'Values found',

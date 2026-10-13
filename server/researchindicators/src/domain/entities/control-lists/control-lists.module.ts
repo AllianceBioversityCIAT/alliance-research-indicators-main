@@ -6,7 +6,6 @@ import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
 import { ControlListValueLookupService } from './control-list-value-lookup.service';
-import { PortfoliosModule } from '../portfolios/portfolios.module';
 
 // T-04: exports the registry (so a consumer module can `register()` a
 // provider, design §5 rule 5) and the lookup service (so a consumer can call
@@ -16,7 +15,6 @@ import { PortfoliosModule } from '../portfolios/portfolios.module';
 // (it injects `CurrentUserUtil`), so a consumer should prefer injecting
 // these two over the service for anything outside the HTTP request path.
 @Module({
-  imports: [PortfoliosModule],
   controllers: [ControlListsController],
   providers: [
     ControlListsService,

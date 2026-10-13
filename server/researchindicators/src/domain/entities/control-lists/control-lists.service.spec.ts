@@ -1,14 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
-import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
 import { ControlListCategory } from './entities/control-list-category.entity';
@@ -68,13 +63,6 @@ describe('ControlListsService', () => {
     delete: mockValueDelete,
   };
 
-  const mockPortfoliosFindOne = jest.fn();
-  const mockPortfoliosFindAll = jest.fn();
-  const mockPortfoliosService = {
-    findOne: mockPortfoliosFindOne,
-    findAll: mockPortfoliosFindAll,
-  };
-
   const mockCurrentUser = {
     audit: jest.fn().mockReturnValue({ created_by: 1 }),
     user_id: 1,
@@ -100,7 +88,6 @@ describe('ControlListsService', () => {
   ): ControlListCategory =>
     ({
       id: 1,
-      portfolio_id: 2,
       name: 'Key Performance Indicators (KPIs)',
       description: null,
       display_order: 1,
@@ -111,7 +98,6 @@ describe('ControlListsService', () => {
   const buildList = (overrides: Partial<ControlList> = {}): ControlList =>
     ({
       id: 1,
-      portfolio_id: 2,
       category_id: 1,
       list_key: 'kpi.direction',
       name: 'Direction',
@@ -171,7 +157,6 @@ describe('ControlListsService', () => {
           provide: ControlListValueRepository,
           useValue: mockValueRepository,
         },
-        { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
       ],
@@ -190,37 +175,26 @@ describe('ControlListsService', () => {
   });
 
   describe('getCategories', () => {
-    it('throws NotFoundException when the portfolio does not exist', async () => {
-      mockPortfoliosFindOne.mockResolvedValue(null);
-
-      await expect(service.getCategories(99)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(mockFind).not.toHaveBeenCalled();
-    });
-
-    it('returns categories for the portfolio with lists: [] when none exist', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
+    it('reads every active category with lists: [] when none exist, with no scope filter (R-CLG-001)', async () => {
       mockFind.mockResolvedValue([
-        buildCategory({ id: 1, portfolio_id: 2, name: 'KPIs' }),
-        buildCategory({ id: 2, portfolio_id: 2, name: 'Org structure' }),
+        buildCategory({ id: 1, name: 'KPIs' }),
+        buildCategory({ id: 2, name: 'Org structure' }),
       ]);
       mockListFind.mockResolvedValue([]);
 
-      const result = await service.getCategories(2);
+      const result = await service.getCategories();
 
       expect(mockFind).toHaveBeenCalledWith({
-        where: { portfolio_id: 2, is_active: true },
+        where: { is_active: true },
         order: { display_order: 'ASC', id: 'ASC' },
       });
       expect(mockListFind).toHaveBeenCalledWith({
-        where: { portfolio_id: 2, is_active: true },
+        where: { is_active: true },
         order: { id: 'ASC' },
       });
       expect(result).toEqual([
         {
           id: 1,
-          portfolioId: 2,
           name: 'KPIs',
           description: null,
           displayOrder: 1,
@@ -228,7 +202,6 @@ describe('ControlListsService', () => {
         },
         {
           id: 2,
-          portfolioId: 2,
           name: 'Org structure',
           description: null,
           displayOrder: 1,
@@ -238,10 +211,9 @@ describe('ControlListsService', () => {
     });
 
     it('attaches each category its own lists as ListSummary[] (A1, T-02)', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
       mockFind.mockResolvedValue([
-        buildCategory({ id: 1, portfolio_id: 2, name: 'KPIs' }),
-        buildCategory({ id: 2, portfolio_id: 2, name: 'Org structure' }),
+        buildCategory({ id: 1, name: 'KPIs' }),
+        buildCategory({ id: 2, name: 'Org structure' }),
       ]);
       mockListFind.mockResolvedValue([
         buildList({
@@ -261,7 +233,7 @@ describe('ControlListsService', () => {
         }),
       ]);
 
-      const result = await service.getCategories(2);
+      const result = await service.getCategories();
 
       expect(result[0].lists).toEqual([
         {
@@ -295,8 +267,7 @@ describe('ControlListsService', () => {
     // registry's consumer names for each list's OWN key — a different key
     // registered elsewhere contributes nothing.
     it("derives each list's usedBy from the registry's consumer names for its own key (A1, T-04)", async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
-      mockFind.mockResolvedValue([buildCategory({ id: 2, portfolio_id: 2 })]);
+      mockFind.mockResolvedValue([buildCategory({ id: 2 })]);
       mockListFind.mockResolvedValue([
         buildList({ id: 6, category_id: 2, list_key: 'org.level' }),
       ]);
@@ -304,7 +275,7 @@ describe('ControlListsService', () => {
         key === 'org.level' ? ['Organizational Structure › Level'] : [],
       );
 
-      const result = await service.getCategories(2);
+      const result = await service.getCategories();
 
       expect(mockGetConsumerNamesForKey).toHaveBeenCalledWith('org.level');
       expect(result[0].lists[0].usedBy).toEqual([
@@ -313,40 +284,20 @@ describe('ControlListsService', () => {
     });
   });
 
-  describe('getPortfoliosSummary', () => {
-    it('returns a category count per active portfolio (A2 drives "not configured")', async () => {
-      mockPortfoliosFindAll.mockResolvedValue([{ id: 1 }, { id: 2 }]);
-      mockCount.mockImplementation(async ({ where }: any) =>
-        where.portfolio_id === 2 ? 2 : 0,
-      );
-
-      const result = await service.getPortfoliosSummary();
-
-      expect(result).toEqual([
-        { portfolioId: 1, categories: 0 },
-        { portfolioId: 2, categories: 2 },
-      ]);
-    });
+  // R-CLG-007: the portfolio-summaries read (A2) is gone from the service.
+  it('no longer exposes the portfolio-summaries read (R-CLG-007)', () => {
+    expect(
+      (service as unknown as Record<string, unknown>).getPortfoliosSummary,
+    ).toBeUndefined();
   });
 
   describe('createCategory', () => {
     const dto: CreateControlListCategoryDto = {
-      portfolioId: 2,
       name: 'Key Performance Indicators (KPIs)',
       description: 'desc',
     };
 
-    it('throws NotFoundException for an unknown portfolio', async () => {
-      mockPortfoliosFindOne.mockResolvedValue(null);
-
-      await expect(service.createCategory(dto)).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(mockSave).not.toHaveBeenCalled();
-    });
-
     it('throws a field-named ConflictException on a pre-checked duplicate name (any letter case)', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
       mockFindOne.mockResolvedValue(
         buildCategory({ name: 'key performance indicators (kpis)' }),
       );
@@ -360,18 +311,20 @@ describe('ControlListsService', () => {
       expect(mockSave).not.toHaveBeenCalled();
     });
 
-    it('maps a simulated errno 1062 on save to a 409 (DB backstop, D-CTL-11)', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
+    // With the pre-check stubbed to pass, the DB unique index
+    // (uq_control_list_categories_name) is the only guard left: errno 1062
+    // must still surface as the field-named 409 (R-CLG-002 AC.1, D-CTL-11).
+    it('maps a simulated errno 1062 on save to a 409 naming `name` (DB backstop, D-CTL-11)', async () => {
       mockFindOne.mockResolvedValue(null); // pre-check passes
       mockSave.mockRejectedValue({ errno: 1062 });
 
-      await expect(service.createCategory(dto)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.createCategory(dto)).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'name' }) },
+      });
     });
 
     it('creates a category and maps the response, auditing created_by', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
       mockFindOne.mockResolvedValue(null);
       mockSave.mockResolvedValue(
         buildCategory({ id: 5, name: dto.name, description: dto.description }),
@@ -381,7 +334,6 @@ describe('ControlListsService', () => {
 
       expect(mockSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          portfolio_id: 2,
           name: dto.name,
           description: dto.description,
           created_by: 1,
@@ -389,23 +341,21 @@ describe('ControlListsService', () => {
       );
       expect(result).toEqual({
         id: 5,
-        portfolioId: 2,
         name: dto.name,
         description: dto.description,
         displayOrder: 1,
         lists: [],
       });
-      // design.md §9: info-level log on create (entity, id, portfolio, user).
+      // design.md §9: info-level log on create (entity, id, user).
       expect(logSpy).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.created entity=control_list_category id=5 portfolio_id=2 user_id=1',
+          'control_lists.created entity=control_list_category id=5 user_id=1',
         ),
       );
     });
 
     it('does NOT log when create fails on a pre-checked duplicate name', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
       mockFindOne.mockResolvedValue(
         buildCategory({ name: 'key performance indicators (kpis)' }),
       );
@@ -416,19 +366,16 @@ describe('ControlListsService', () => {
       expect(logSpy).not.toHaveBeenCalled();
     });
 
-    it('allows the same name in two different portfolios', async () => {
-      mockPortfoliosFindOne.mockResolvedValue({ id: 1 });
-      // Pre-check is scoped by portfolio_id — a match in another portfolio
-      // must not block this create (R-CTL-001 isolation).
+    // R-CLG-002: the name is unique across the whole module, so the
+    // pre-check carries no scope key at all.
+    it('pre-checks the name module-wide (no scope key in the lookup)', async () => {
       mockFindOne.mockResolvedValue(null);
-      mockSave.mockResolvedValue(
-        buildCategory({ id: 9, portfolio_id: 1, name: dto.name }),
-      );
+      mockSave.mockResolvedValue(buildCategory({ id: 9, name: dto.name }));
 
-      await service.createCategory({ ...dto, portfolioId: 1 });
+      await service.createCategory(dto);
 
       expect(mockFindOne).toHaveBeenCalledWith({
-        where: { portfolio_id: 1, name: dto.name, is_active: true },
+        where: { name: dto.name, is_active: true },
       });
     });
 
@@ -442,7 +389,6 @@ describe('ControlListsService', () => {
     ])(
       'normalizes description: %s to a stored NULL on create',
       async (_label, description) => {
-        mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
         mockFindOne.mockResolvedValue(null);
         mockSave.mockResolvedValue(
           buildCategory({ id: 5, name: dto.name, description: null }),
@@ -484,7 +430,7 @@ describe('ControlListsService', () => {
       expect(mockUpdate).not.toHaveBeenCalled();
     });
 
-    it('maps a simulated errno 1062 on update to a 409', async () => {
+    it('maps a simulated errno 1062 on update to a 409 naming `name`', async () => {
       mockFindOne
         .mockResolvedValueOnce(buildCategory({ id: 1, name: 'Old name' }))
         .mockResolvedValueOnce(null); // no name-change pre-check collision
@@ -492,7 +438,24 @@ describe('ControlListsService', () => {
 
       await expect(
         service.updateCategory(1, { name: 'Renamed' }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'name' }) },
+      });
+    });
+
+    it('pre-checks a rename module-wide (no scope key in the lookup)', async () => {
+      mockFindOne
+        .mockResolvedValueOnce(buildCategory({ id: 1, name: 'Old name' }))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(buildCategory({ id: 1, name: 'Renamed' }));
+      mockUpdate.mockResolvedValue({ affected: 1 });
+
+      await service.updateCategory(1, { name: 'Renamed' });
+
+      expect(mockFindOne).toHaveBeenNthCalledWith(2, {
+        where: { name: 'Renamed', is_active: true },
+      });
     });
 
     it('updates name and description and re-reads the row, auditing updated_by', async () => {
@@ -516,11 +479,11 @@ describe('ControlListsService', () => {
         updated_by: 2,
       });
       expect(result.name).toBe('New name');
-      // design.md §9: info-level log on update (entity, id, portfolio, user).
+      // design.md §9: info-level log on update (entity, id, user).
       expect(logSpy).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.updated entity=control_list_category id=1 portfolio_id=2 user_id=1',
+          'control_lists.updated entity=control_list_category id=1 user_id=1',
         ),
       );
     });
@@ -636,11 +599,11 @@ describe('ControlListsService', () => {
 
       expect(mockDelete).toHaveBeenCalledWith(7);
       expect(result).toEqual({ id: 7 });
-      // design.md §9: info-level log on delete (entity, id, portfolio, user).
+      // design.md §9: info-level log on delete (entity, id, user).
       expect(logSpy).toHaveBeenCalledTimes(1);
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.deleted entity=control_list_category id=7 portfolio_id=2 user_id=1',
+          'control_lists.deleted entity=control_list_category id=7 user_id=1',
         ),
       );
     });
@@ -707,13 +670,12 @@ describe('ControlListsService', () => {
       expect(mockListSave).not.toHaveBeenCalled();
     });
 
-    it('copies portfolio_id from the category and creates a non-system list', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+    it('creates a non-system list under the given category', async () => {
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
       mockListFindOne.mockResolvedValue(null); // key pre-check passes
       mockListSave.mockResolvedValue(
         buildList({
           id: 7,
-          portfolio_id: 2,
           category_id: 1,
           list_key: dto.listKey,
           name: dto.name,
@@ -726,7 +688,6 @@ describe('ControlListsService', () => {
 
       expect(mockListSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          portfolio_id: 2,
           category_id: 1,
           list_key: dto.listKey,
           name: dto.name,
@@ -736,7 +697,6 @@ describe('ControlListsService', () => {
       );
       expect(result).toMatchObject({
         id: 7,
-        portfolioId: 2,
         categoryId: 1,
         key: dto.listKey,
         name: dto.name,
@@ -747,9 +707,7 @@ describe('ControlListsService', () => {
     it.each(['', '   '])(
       'treats codePrefix %j as absent and stores the derived prefix (A-1)',
       async (codePrefix) => {
-        mockFindOne.mockResolvedValue(
-          buildCategory({ id: 1, portfolio_id: 2 }),
-        );
+        mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
         mockListFindOne.mockResolvedValue(null);
         mockListSave.mockResolvedValue(buildList({ id: 8 }));
 
@@ -762,7 +720,7 @@ describe('ControlListsService', () => {
     );
 
     it('stores a given codePrefix trimmed (" DIR " -> "DIR")', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
       mockListFindOne.mockResolvedValue(null);
       mockListSave.mockResolvedValue(buildList({ id: 8 }));
 
@@ -774,7 +732,7 @@ describe('ControlListsService', () => {
     });
 
     it('throws a field-named ConflictException (field: listKey) on a pre-checked duplicate key', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
       mockListFindOne.mockResolvedValue(buildList({ list_key: dto.listKey }));
 
       await expect(service.createList(dto)).rejects.toMatchObject({
@@ -784,28 +742,27 @@ describe('ControlListsService', () => {
       expect(mockListSave).not.toHaveBeenCalled();
     });
 
-    it('maps a simulated errno 1062 on save to a 409 (DB backstop)', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+    // With the pre-check stubbed to pass, the DB unique index
+    // (uq_control_lists_key) is the only guard left: errno 1062 must still
+    // surface as the field-named 409 (R-CLG-003 AC.1).
+    it('maps a simulated errno 1062 on save to a 409 naming `listKey` (DB backstop)', async () => {
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
       mockListFindOne.mockResolvedValue(null);
       mockListSave.mockRejectedValue({ errno: 1062 });
 
-      await expect(service.createList(dto)).rejects.toThrow(ConflictException);
+      await expect(service.createList(dto)).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'listKey' }) },
+      });
     });
 
-    // Disqualifier guard (tasks.md T-02): proves isolation with TWO
-    // portfolios holding the SAME key — Portfolio 1 allows `org.level` even
-    // though Portfolio 2 already has it (R-CTL-003 "Same key in two
-    // portfolios").
-    it('allows the same key in two different portfolios', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 3, portfolio_id: 1 }));
+    // R-CLG-003: the key is unique across the whole module, so the
+    // pre-check carries no scope key at all.
+    it('pre-checks the key module-wide (no scope key in the lookup)', async () => {
+      mockFindOne.mockResolvedValue(buildCategory({ id: 3 }));
       mockListFindOne.mockResolvedValue(null);
       mockListSave.mockResolvedValue(
-        buildList({
-          id: 9,
-          portfolio_id: 1,
-          category_id: 3,
-          list_key: 'org.level',
-        }),
+        buildList({ id: 9, category_id: 3, list_key: 'org.level' }),
       );
 
       await service.createList({
@@ -815,20 +772,20 @@ describe('ControlListsService', () => {
       });
 
       expect(mockListFindOne).toHaveBeenCalledWith({
-        where: { portfolio_id: 1, list_key: 'org.level', is_active: true },
+        where: { list_key: 'org.level', is_active: true },
       });
     });
 
     it('logs on successful create', async () => {
-      mockFindOne.mockResolvedValue(buildCategory({ id: 1, portfolio_id: 2 }));
+      mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
       mockListFindOne.mockResolvedValue(null);
-      mockListSave.mockResolvedValue(buildList({ id: 7, portfolio_id: 2 }));
+      mockListSave.mockResolvedValue(buildList({ id: 7 }));
 
       await service.createList(dto);
 
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.created entity=control_list id=7 portfolio_id=2 user_id=1',
+          'control_lists.created entity=control_list id=7 user_id=1',
         ),
       );
     });
@@ -842,13 +799,9 @@ describe('ControlListsService', () => {
     ])(
       'normalizes description: %s to a stored NULL on create',
       async (_label, description) => {
-        mockFindOne.mockResolvedValue(
-          buildCategory({ id: 1, portfolio_id: 2 }),
-        );
+        mockFindOne.mockResolvedValue(buildCategory({ id: 1 }));
         mockListFindOne.mockResolvedValue(null);
-        mockListSave.mockResolvedValue(
-          buildList({ id: 7, portfolio_id: 2, description: null }),
-        );
+        mockListSave.mockResolvedValue(buildList({ id: 7, description: null }));
 
         await service.createList({
           ...dto,
@@ -886,15 +839,13 @@ describe('ControlListsService', () => {
       );
     });
 
-    it('allows moving a list to another category of the SAME portfolio', async () => {
+    // R-CLG-003 "Move to any category": categories no longer belong to a
+    // scope, so any active category is a valid target.
+    it('allows moving a list to any active category', async () => {
       mockListFindOne
-        .mockResolvedValueOnce(
-          buildList({ id: 1, portfolio_id: 2, category_id: 1 }),
-        )
-        .mockResolvedValueOnce(
-          buildList({ id: 1, portfolio_id: 2, category_id: 4 }),
-        );
-      mockFindOne.mockResolvedValue(buildCategory({ id: 4, portfolio_id: 2 }));
+        .mockResolvedValueOnce(buildList({ id: 1, category_id: 1 }))
+        .mockResolvedValueOnce(buildList({ id: 1, category_id: 4 }));
+      mockFindOne.mockResolvedValue(buildCategory({ id: 4 }));
       mockListUpdate.mockResolvedValue({ affected: 1 });
 
       const result = await service.updateList(1, { categoryId: 4 });
@@ -906,33 +857,27 @@ describe('ControlListsService', () => {
       expect(result.categoryId).toBe(4);
     });
 
-    // Falsifier 3 (tasks.md T-02) / D-CTL-13 / judgment J-4: moving a list to
-    // a category of ANOTHER portfolio is 400, never 409, and nothing moves.
-    it('throws BadRequestException (400) when the new category belongs to a different portfolio', async () => {
-      mockListFindOne.mockResolvedValue(
-        buildList({ id: 1, portfolio_id: 2, category_id: 1 }),
-      );
-      mockFindOne.mockResolvedValue(buildCategory({ id: 9, portfolio_id: 1 }));
+    it('throws NotFoundException (404) when the target category does not exist, and moves nothing', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 1, category_id: 1 }));
+      mockFindOne.mockResolvedValue(null);
 
       await expect(service.updateList(1, { categoryId: 9 })).rejects.toThrow(
-        BadRequestException,
+        NotFoundException,
       );
       expect(mockListUpdate).not.toHaveBeenCalled();
     });
 
     it('logs on successful update', async () => {
       mockListFindOne
-        .mockResolvedValueOnce(buildList({ id: 1, portfolio_id: 2 }))
-        .mockResolvedValueOnce(
-          buildList({ id: 1, portfolio_id: 2, name: 'Renamed' }),
-        );
+        .mockResolvedValueOnce(buildList({ id: 1 }))
+        .mockResolvedValueOnce(buildList({ id: 1, name: 'Renamed' }));
       mockListUpdate.mockResolvedValue({ affected: 1 });
 
       await service.updateList(1, { name: 'Renamed' });
 
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.updated entity=control_list id=1 portfolio_id=2 user_id=1',
+          'control_lists.updated entity=control_list id=1 user_id=1',
         ),
       );
     });
@@ -946,10 +891,8 @@ describe('ControlListsService', () => {
       ['a literal null', null],
     ])('normalizes description: %s to a stored NULL', async (_label, value) => {
       mockListFindOne
-        .mockResolvedValueOnce(buildList({ id: 1, portfolio_id: 2 }))
-        .mockResolvedValueOnce(
-          buildList({ id: 1, portfolio_id: 2, description: null }),
-        );
+        .mockResolvedValueOnce(buildList({ id: 1 }))
+        .mockResolvedValueOnce(buildList({ id: 1, description: null }));
       mockListUpdate.mockResolvedValue({ affected: 1 });
 
       await service.updateList(1, { description: value });
@@ -962,10 +905,8 @@ describe('ControlListsService', () => {
 
     it('leaves a non-empty description untouched (no over-normalization)', async () => {
       mockListFindOne
-        .mockResolvedValueOnce(buildList({ id: 1, portfolio_id: 2 }))
-        .mockResolvedValueOnce(
-          buildList({ id: 1, portfolio_id: 2, description: 'Kept' }),
-        );
+        .mockResolvedValueOnce(buildList({ id: 1 }))
+        .mockResolvedValueOnce(buildList({ id: 1, description: 'Kept' }));
       mockListUpdate.mockResolvedValue({ affected: 1 });
 
       await service.updateList(1, { description: 'Kept' });
@@ -995,7 +936,6 @@ describe('ControlListsService', () => {
           is_system: true,
           name: 'Direction',
           list_key: 'kpi.direction',
-          portfolio_id: 2,
         }),
       );
       mockValueCount.mockResolvedValue(0);
@@ -1008,16 +948,14 @@ describe('ControlListsService', () => {
       expect(result).toEqual({ id: 1 });
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.deleted entity=control_list id=1 portfolio_id=2 user_id=1',
+          'control_lists.deleted entity=control_list id=1 user_id=1',
         ),
       );
     });
 
     // R-CTL-003 "List lifecycle" (no-values branch), custom list.
     it('deletes a custom (non-system) list with no values (200) and logs', async () => {
-      mockListFindOne.mockResolvedValue(
-        buildList({ id: 8, is_system: false, portfolio_id: 2 }),
-      );
+      mockListFindOne.mockResolvedValue(buildList({ id: 8, is_system: false }));
       mockValueCount.mockResolvedValue(0);
       mockListDelete.mockResolvedValue({ affected: 1 });
 
@@ -1028,7 +966,7 @@ describe('ControlListsService', () => {
       expect(result).toEqual({ id: 8 });
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.deleted entity=control_list id=8 portfolio_id=2 user_id=1',
+          'control_lists.deleted entity=control_list id=8 user_id=1',
         ),
       );
     });
@@ -1041,7 +979,6 @@ describe('ControlListsService', () => {
         buildList({
           id: 8,
           is_system: false,
-          portfolio_id: 2,
           name: 'Custom source',
           list_key: 'kpi.custom_source',
         }),
@@ -1079,7 +1016,6 @@ describe('ControlListsService', () => {
         buildList({
           id: 6,
           is_system: true,
-          portfolio_id: 2,
           name: 'Organizational level',
           list_key: 'org.level',
         }),
@@ -1325,7 +1261,7 @@ describe('ControlListsService', () => {
     });
 
     it('creates a value, defaulting displayOrder to 0 and isActive to true, and logs', async () => {
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
       mockValueFindOne.mockResolvedValue(null);
       mockValueSave.mockResolvedValue(
         buildValue({ id: 11, list_id: 2, code: 'DIR-09', value: 'Hold' }),
@@ -1342,7 +1278,7 @@ describe('ControlListsService', () => {
       );
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.created entity=control_list_value id=11 portfolio_id=2 user_id=1',
+          'control_lists.created entity=control_list_value id=11 user_id=1',
         ),
       );
     });
@@ -1427,7 +1363,6 @@ describe('ControlListsService', () => {
           buildValue({ id: 1, list_id: 2, code: 'DIR-01' }),
         )
         .mockResolvedValueOnce(buildValue({ id: 5, code: 'DIR-02' }));
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
 
       await expect(
         service.updateValue(1, { code: 'DIR-02' }),
@@ -1449,7 +1384,6 @@ describe('ControlListsService', () => {
         .mockResolvedValueOnce(
           buildValue({ id: 1, list_id: 2, code: 'DIR-01b', value: 'Up' }),
         );
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
       mockValueUpdate.mockResolvedValue({ affected: 1 });
 
       const result = await service.updateValue(1, {
@@ -1467,7 +1401,7 @@ describe('ControlListsService', () => {
       expect(result.code).toBe('DIR-01b');
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.updated entity=control_list_value id=1 portfolio_id=2 user_id=1',
+          'control_lists.updated entity=control_list_value id=1 user_id=1',
         ),
       );
     });
@@ -1480,7 +1414,6 @@ describe('ControlListsService', () => {
         .mockResolvedValueOnce(
           buildValue({ id: 1, list_id: 2, is_active: false }),
         );
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
       mockValueUpdate.mockResolvedValue({ affected: 1 });
 
       const result = await service.updateValue(1, { isActive: false });
@@ -1502,7 +1435,6 @@ describe('ControlListsService', () => {
         .mockResolvedValueOnce(
           buildValue({ id: 1, list_id: 2, description: null }),
         );
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
       mockValueUpdate.mockResolvedValue({ affected: 1 });
 
       await service.updateValue(1, { description: value });
@@ -1527,7 +1459,6 @@ describe('ControlListsService', () => {
     // list-has-values rule lives on A8, not here.
     it('physically deletes the value and returns its id, logging the write', async () => {
       mockValueFindOne.mockResolvedValue(buildValue({ id: 9, list_id: 2 }));
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
       mockValueDelete.mockResolvedValue({ affected: 1 });
 
       const result = await service.removeValue(9);
@@ -1537,7 +1468,7 @@ describe('ControlListsService', () => {
       expect(result).toEqual({ id: 9 });
       expect(logSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          'control_lists.deleted entity=control_list_value id=9 portfolio_id=2 user_id=1',
+          'control_lists.deleted entity=control_list_value id=9 user_id=1',
         ),
       );
     });
@@ -1548,7 +1479,6 @@ describe('ControlListsService', () => {
       mockValueFindOne.mockResolvedValue(
         buildValue({ id: 9, list_id: 2, value: 'Division' }),
       );
-      mockListFindOne.mockResolvedValue(buildList({ id: 2, portfolio_id: 2 }));
       mockGetInUseCount.mockResolvedValue(3);
 
       let thrown: unknown;
@@ -1577,18 +1507,15 @@ describe('ControlListsService', () => {
   });
 
   describe('getValuesByKey (A13, T-04)', () => {
-    it('throws NotFoundException for an unknown key in the portfolio (R-CTL-006 "Ordered read")', async () => {
+    // R-CLG-004: the key alone selects the list - no scope key in the lookup.
+    it('throws NotFoundException for an unknown key (R-CLG-004 AC.1)', async () => {
       mockListFindOne.mockResolvedValue(null);
 
-      await expect(
-        service.getValuesByKey(2, 'kpi.unknown', true),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getValuesByKey('kpi.unknown', true)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(mockListFindOne).toHaveBeenCalledWith({
-        where: {
-          portfolio_id: 2,
-          list_key: 'kpi.unknown',
-          is_active: true,
-        },
+        where: { list_key: 'kpi.unknown', is_active: true },
       });
     });
 
@@ -1604,11 +1531,7 @@ describe('ControlListsService', () => {
         buildValue({ id: 3, list_id: 3, code: 'UOM-1', display_order: 0 }),
       ]);
 
-      const result = await service.getValuesByKey(
-        2,
-        'kpi.unit_of_measure',
-        true,
-      );
+      const result = await service.getValuesByKey('kpi.unit_of_measure', true);
 
       expect(result.map((v) => v.code)).toEqual(['UOM-1', 'UOM-2', 'UOM-10']);
     });
@@ -1617,7 +1540,7 @@ describe('ControlListsService', () => {
       mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
       mockValueFind.mockResolvedValue([]);
 
-      await service.getValuesByKey(2, 'kpi.direction', true);
+      await service.getValuesByKey('kpi.direction', true);
 
       expect(mockValueFind).toHaveBeenCalledWith({
         where: { list_id: 3, is_active: true },
@@ -1630,7 +1553,7 @@ describe('ControlListsService', () => {
       mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
       mockValueFind.mockResolvedValue([]);
 
-      await service.getValuesByKey(2, 'kpi.direction', false);
+      await service.getValuesByKey('kpi.direction', false);
 
       expect(mockValueFind).toHaveBeenCalledWith({
         where: { list_id: 3 },
@@ -1644,7 +1567,7 @@ describe('ControlListsService', () => {
       ]);
       mockGetInUseCounts.mockResolvedValue(new Map([[1, 4]]));
 
-      const result = await service.getValuesByKey(2, 'kpi.direction', true);
+      const result = await service.getValuesByKey('kpi.direction', true);
 
       expect(result[0].inUse).toBe(4);
     });

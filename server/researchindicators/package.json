@@ -138,6 +138,7 @@
       "!**/*.spec.ts",
       "!**/*.entity.ts",
       "!**/db/migrations/**",
+      "!**/db/seeds/**",
       "!**/*.enum.ts"
     ],
     "coverageDirectory": "../coverage",

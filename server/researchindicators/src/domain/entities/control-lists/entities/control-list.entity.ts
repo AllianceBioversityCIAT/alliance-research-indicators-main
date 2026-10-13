@@ -3,20 +3,15 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 
 /**
- * A named set of values within one portfolio, identified by an immutable
- * system key (design.md §3). `control_list_values` (T-03) will FK into this
- * table; no relation is declared here yet because that table does not
- * exist in this slice.
+ * A named set of values, identified by an immutable system key that is unique
+ * across the whole module (`uq_control_lists_key`, R-CLG-003; design.md §3).
+ * `control_list_values` FKs into this table; no relation is declared here.
  */
 @Entity('control_lists')
 export class ControlList extends AuditableEntity {
   @ApiProperty({ type: Number, name: 'id' })
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id: number;
-
-  @ApiProperty({ type: Number, name: 'portfolio_id' })
-  @Column({ name: 'portfolio_id', type: 'bigint' })
-  portfolio_id: number;
 
   @ApiProperty({ type: Number, name: 'category_id' })
   @Column({ name: 'category_id', type: 'bigint' })

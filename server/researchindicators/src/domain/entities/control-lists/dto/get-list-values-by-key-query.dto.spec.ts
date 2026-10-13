@@ -9,6 +9,8 @@ import { GetListValuesByKeyQueryDto } from './get-list-values-by-key-query.dto';
  * `update-control-list-category.dto.spec.ts`. `@Type(() => Boolean)` alone
  * would make `activeOnly=false` resolve to `true` (`Boolean('false') ===
  * true`) — the regression this file pins against.
+ *
+ * R-CLG-004: the read needs no scope parameter, so an empty query is valid.
  */
 const pipe = new ValidationPipe({
   whitelist: true,
@@ -21,39 +23,27 @@ const metadata: ArgumentMetadata = {
 };
 
 describe('GetListValuesByKeyQueryDto (A13 query)', () => {
+  it('accepts an empty query (the key alone selects the list, R-CLG-004)', async () => {
+    const result = await pipe.transform({}, metadata);
+    expect(result).toBeInstanceOf(GetListValuesByKeyQueryDto);
+  });
+
   it('defaults activeOnly to true when the query omits it', async () => {
-    const result = await pipe.transform({ portfolioId: '2' }, metadata);
+    const result = await pipe.transform({}, metadata);
     expect(result.activeOnly).toBe(true);
   });
 
   it('parses the query string "false" as boolean false (NOT Boolean("false") === true)', async () => {
-    const result = await pipe.transform(
-      { portfolioId: '2', activeOnly: 'false' },
-      metadata,
-    );
+    const result = await pipe.transform({ activeOnly: 'false' }, metadata);
     expect(result.activeOnly).toBe(false);
   });
 
   it('parses the query string "true" as boolean true', async () => {
-    const result = await pipe.transform(
-      { portfolioId: '2', activeOnly: 'true' },
-      metadata,
-    );
+    const result = await pipe.transform({ activeOnly: 'true' }, metadata);
     expect(result.activeOnly).toBe(true);
   });
 
-  it('coerces portfolioId from a query string to a number', async () => {
-    const result = await pipe.transform({ portfolioId: '7' }, metadata);
-    expect(result.portfolioId).toBe(7);
-  });
-
-  it('rejects a missing portfolioId with a 400', async () => {
-    await expect(pipe.transform({}, metadata)).rejects.toThrow();
-  });
-
   it('rejects an unknown query field (forbidNonWhitelisted)', async () => {
-    await expect(
-      pipe.transform({ portfolioId: '2', extra: 'x' }, metadata),
-    ).rejects.toThrow();
+    await expect(pipe.transform({ extra: 'x' }, metadata)).rejects.toThrow();
   });
 });

@@ -8,9 +8,10 @@ import { ControlList } from './entities/control-list.entity';
 import { ControlListValue } from './entities/control-list-value.entity';
 
 /**
- * T-04 (docs/specs/institutional-performance/control-lists) — design.md §5
- * rule 10 / D-CTL-15, R-CTL-006 "List membership" + "Value from another
- * list" scenario.
+ * R-CLG-004 (docs/specs/changes/control-lists-global-scope) — the membership
+ * check takes a value id and a list KEY only: pass / 400 naming the expected
+ * key / 404 unknown value. Originally T-04 of the archived control-lists spec
+ * (design.md §5 rule 10 / D-CTL-15, R-CTL-006 "List membership").
  */
 describe('ControlListValueLookupService', () => {
   let service: ControlListValueLookupService;
@@ -21,7 +22,6 @@ describe('ControlListValueLookupService', () => {
   const buildList = (overrides: Partial<ControlList> = {}): ControlList =>
     ({
       id: 3,
-      portfolio_id: 2,
       list_key: 'kpi.direction',
       ...overrides,
     }) as ControlList;
@@ -83,70 +83,46 @@ describe('ControlListValueLookupService', () => {
     mockValueFindOne.mockResolvedValue(null);
 
     await expect(
-      service.assertValueInList(999, 2, 'kpi.direction'),
+      service.assertValueInList(999, 'kpi.direction'),
     ).rejects.toThrow(NotFoundException);
     expect(mockListFindOne).not.toHaveBeenCalled();
   });
 
-  it('returns the value when the key AND the portfolio match', async () => {
+  it('returns the value when it belongs to the list with that key', async () => {
     mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 3 }));
     mockListFindOne.mockResolvedValue(
-      buildList({ id: 3, portfolio_id: 2, list_key: 'kpi.direction' }),
+      buildList({ id: 3, list_key: 'kpi.direction' }),
     );
 
-    const result = await service.assertValueInList(1, 2, 'kpi.direction');
+    const result = await service.assertValueInList(1, 'kpi.direction');
 
     expect(result.id).toBe(1);
     expect(mockValueFindOne).toHaveBeenCalledWith({ where: { id: 1 } });
     expect(mockListFindOne).toHaveBeenCalledWith({ where: { id: 3 } });
   });
 
-  // Falsifier 3 (tasks.md T-04) / R-CTL-006 "Value from another list": a
-  // value of `kpi.direction` checked against `kpi.unit_of_measure` for the
-  // SAME portfolio must 400 naming the expected key, not pass because the
-  // portfolio matched.
-  it('throws BadRequestException naming the expected key for a value of another list in the SAME portfolio', async () => {
+  // R-CLG-004 "Value from another list": a value of `kpi.direction` checked
+  // against `kpi.unit_of_measure` must 400 naming the expected key. There is
+  // no longer any other axis (the former shared scope) that could let it pass.
+  it('throws BadRequestException naming the expected key for a value of another list', async () => {
     mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 3 }));
     mockListFindOne.mockResolvedValue(
-      buildList({ id: 3, portfolio_id: 2, list_key: 'kpi.direction' }),
+      buildList({ id: 3, list_key: 'kpi.direction' }),
     );
 
     await expect(
-      service.assertValueInList(1, 2, 'kpi.unit_of_measure'),
+      service.assertValueInList(1, 'kpi.unit_of_measure'),
     ).rejects.toThrow(BadRequestException);
     await expect(
-      service.assertValueInList(1, 2, 'kpi.unit_of_measure'),
+      service.assertValueInList(1, 'kpi.unit_of_measure'),
     ).rejects.toThrow(/kpi\.direction/);
-  });
-
-  // mysql2 returns BIGINT columns as strings; a strict !== against the
-  // numeric portfolioId would wrongly reject a same-portfolio value.
-  it('accepts the value when list.portfolio_id is a string bigint equal to portfolioId', async () => {
-    mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 3 }));
-    mockListFindOne.mockResolvedValue(
-      buildList({
-        id: 3,
-        portfolio_id: '2' as unknown as number,
-        list_key: 'kpi.direction',
-      }),
-    );
-
-    const result = await service.assertValueInList(1, 2, 'kpi.direction');
-
-    expect(result.id).toBe(1);
-  });
-
-  // Falsifier 4 (tasks.md T-04): a value of the RIGHT key in ANOTHER
-  // portfolio must 400, not pass because the key matched.
-  it('throws BadRequestException for a value of the right key in ANOTHER portfolio', async () => {
-    mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 3 }));
-    mockListFindOne.mockResolvedValue(
-      buildList({ id: 3, portfolio_id: 2, list_key: 'kpi.direction' }),
-    );
-
     await expect(
-      service.assertValueInList(1, 1, 'kpi.direction'),
-    ).rejects.toThrow(BadRequestException);
+      service.assertValueInList(1, 'kpi.unit_of_measure'),
+    ).rejects.toThrow(/kpi\.unit_of_measure/);
+  });
+
+  it('takes exactly two arguments: the value id and the list key', () => {
+    expect(service.assertValueInList.length).toBe(2);
   });
 
   // design §5 rule 10: "does NOT check is_active" — a deactivated value
@@ -157,10 +133,10 @@ describe('ControlListValueLookupService', () => {
       buildValue({ id: 1, list_id: 3, is_active: false }),
     );
     mockListFindOne.mockResolvedValue(
-      buildList({ id: 3, portfolio_id: 2, list_key: 'kpi.direction' }),
+      buildList({ id: 3, list_key: 'kpi.direction' }),
     );
 
-    const result = await service.assertValueInList(1, 2, 'kpi.direction');
+    const result = await service.assertValueInList(1, 'kpi.direction');
 
     expect(result.id).toBe(1);
     // The query by id carries no is_active filter at all.
@@ -171,8 +147,8 @@ describe('ControlListValueLookupService', () => {
     mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 999 }));
     mockListFindOne.mockResolvedValue(null);
 
-    await expect(
-      service.assertValueInList(1, 2, 'kpi.direction'),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.assertValueInList(1, 'kpi.direction')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 });

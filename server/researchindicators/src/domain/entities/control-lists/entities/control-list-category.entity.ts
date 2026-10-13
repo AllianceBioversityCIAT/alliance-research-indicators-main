@@ -3,19 +3,15 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { AuditableEntity } from '../../../shared/global-dto/auditable.entity';
 
 /**
- * A named group of lists within one portfolio (design.md §3).
- * `control_lists` (T-02) will FK into this table; no relation is declared
- * here yet because that table does not exist in this slice.
+ * A named group of lists (design.md §3). Categories are global: the name is
+ * unique across the whole module (`uq_control_list_categories_name`, R-CLG-002).
+ * `control_lists` FKs into this table; no relation is declared here.
  */
 @Entity('control_list_categories')
 export class ControlListCategory extends AuditableEntity {
   @ApiProperty({ type: Number, name: 'id' })
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id: number;
-
-  @ApiProperty({ type: Number, name: 'portfolio_id' })
-  @Column({ name: 'portfolio_id', type: 'bigint' })
-  portfolio_id: number;
 
   @ApiProperty({ type: String, name: 'name' })
   @Column({ name: 'name', type: 'varchar', length: 150 })

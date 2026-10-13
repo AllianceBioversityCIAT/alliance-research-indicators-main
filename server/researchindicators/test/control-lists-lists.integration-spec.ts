@@ -11,41 +11,48 @@ import { ControlListCategoryRepository } from '../src/domain/entities/control-li
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
 import { ControlListUsageRegistry } from '../src/domain/entities/control-lists/control-list-usage.registry';
-import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
-import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
-import { ResultsUtil } from '../src/domain/shared/utils/results.util';
-import { PortfolioUtil } from '../src/domain/shared/utils/portfolio.util';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
 
 /**
- * T-02 (docs/specs/institutional-performance/control-lists) — server
- * integration, A7 immutable-key behaviour against a REAL MySQL connection
- * and the REAL `ValidationPipe`.
+ * Control Lists — lists against a REAL MySQL connection and the REAL
+ * `ValidationPipe` (docs/specs/changes/control-lists-global-scope, T-01; the
+ * original T-02 cases of docs/specs/institutional-performance/control-lists
+ * are kept).
  *
- * Falsifiers 1/2 (tasks.md T-02) are both pipe-level concerns
- * (`forbidNonWhitelisted`), which a controller/service unit test cannot
- * exercise — those tests call the service method directly and never pass
- * through a `ValidationPipe`. This is therefore the ONLY place either
- * falsifier can turn red, per the task's own "Server integration" row.
+ * Falsifiers 1/2 of the original T-02 (accepting `listKey` in the update DTO,
+ * dropping `forbidNonWhitelisted`) are pipe-level concerns a controller or
+ * service unit test cannot exercise — those tests call the service method
+ * directly and never pass through a `ValidationPipe`. This is therefore the
+ * ONLY place either can turn red. The same holds for the stale `portfolioId`
+ * on A6/A7 (R-CLG-001 AC.2).
  *
- * Evidence DB (requester, 2026-10-01): the user's local development
- * database `ari_local_mysql`, 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*`
- * resolve there (printed below). Every row this file creates (one scratch
- * category, one scratch list) is deleted in `afterAll`; no existing table
- * is altered.
+ * It also covers the DATABASE side of R-CLG-003/NFR-CLG-001: no `portfolio_id`
+ * column on `control_lists`, a unique index on `list_key` (`Non_unique =
+ * 0`), and raw duplicate `INSERT`s — a scratch key in another letter case and
+ * the seeded `kpi.direction` key in another letter case — failing with errno
+ * 1062. An HTTP duplicate would only prove the service pre-check, so the
+ * uniqueness proof is the raw insert. R-CLG-003 *Move to any category* is
+ * exercised against the real seeded category 2.
+ *
+ * Evidence DB: the requester's local database `ari_local_mysql`,
+ * 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*` resolve there (printed below) —
+ * NOT a disposable schema. Every row this file creates (scratch categories and
+ * lists, any stray row a missing index would let in) sits ABOVE the seeded id
+ * ranges (categories 1-2, lists 1-6, values 1-23) and is deleted in
+ * `afterAll`. This suite NEVER updates or deletes a seeded row; it only reads
+ * them, or attempts an INSERT that must fail.
  *
  * Scope note (KZ-017): same as `control-lists-categories.integration-spec.ts`
  * — a test-only middleware stands in for `JwtMiddleware` (ROAR-issued JWTs
  * are out of local reach); this does not reach the global
  * `ResponseInterceptor` / `GlobalExceptions` envelope wiring or Swagger.
  */
-describe('Control Lists — lists, immutable key against real MySQL (T-02)', () => {
+describe('Control Lists — lists, immutable key and key uniqueness against real MySQL (T-01)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
-  let portfolio2Id: number;
   let scratchCategoryId: number;
   let scratchListId: number;
   // CR-2 (2026-10-07): scratch lists inserted with `is_system = 1`, used
@@ -54,6 +61,9 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   let scratchSystemEmptyListId: number | null;
   let scratchSystemWithValueListId: number;
   let scratchSystemValueId: number;
+  // Rows created by the uniqueness/API tests below; removed by id in afterAll
+  // (every id is above the seeded range).
+  const createdListIds: number[] = [];
 
   const TEST_PREFIX = '__t02_itest__';
 
@@ -85,32 +95,19 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
     });
     await dataSource.initialize();
 
-    const [portfolio2] = await dataSource.query(
-      `SELECT id FROM portfolios WHERE start_year = 2026 AND end_year = 2030 LIMIT 1`,
-    );
-    if (!portfolio2) {
-      throw new Error(
-        'Portfolio 2 (start_year=2026, end_year=2030) was not found on the ' +
-          'resolved DB — this suite requires the pre-existing portfolios ' +
-          'seed to already be applied.',
-      );
-    }
-    portfolio2Id = Number(portfolio2.id);
-
     // Scratch category + list, inserted directly (this suite is about A7's
     // ValidationPipe behaviour, not category/list creation).
     const categoryInsert = await dataSource.query(
-      `INSERT INTO control_list_categories (portfolio_id, name, display_order, is_active, created_at)
-       VALUES (?, ?, 0, 1, NOW())`,
-      [portfolio2Id, `${TEST_PREFIX}category_${Date.now()}`],
+      `INSERT INTO control_list_categories (name, display_order, is_active, created_at)
+       VALUES (?, 0, 1, NOW())`,
+      [`${TEST_PREFIX}category_${Date.now()}`],
     );
     scratchCategoryId = Number(categoryInsert.insertId);
 
     const listInsert = await dataSource.query(
-      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
-       VALUES (?, ?, ?, ?, 'SCR', 0, 1, NOW())`,
+      `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, 'SCR', 0, 1, NOW())`,
       [
-        portfolio2Id,
         scratchCategoryId,
         `${TEST_PREFIX}key_${Date.now()}`,
         `${TEST_PREFIX}list`,
@@ -122,10 +119,9 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
     // values) and one seeded-style list with one value, both never touched
     // except by the CR-2 tests below.
     const systemEmptyListInsert = await dataSource.query(
-      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
-       VALUES (?, ?, ?, ?, 'SCR', 1, 1, NOW())`,
+      `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, 'SCR', 1, 1, NOW())`,
       [
-        portfolio2Id,
         scratchCategoryId,
         `${TEST_PREFIX}sys_empty_key_${Date.now()}`,
         `${TEST_PREFIX}sys_empty_list`,
@@ -134,10 +130,9 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
     scratchSystemEmptyListId = Number(systemEmptyListInsert.insertId);
 
     const systemWithValueListInsert = await dataSource.query(
-      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
-       VALUES (?, ?, ?, ?, 'SCR', 1, 1, NOW())`,
+      `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, 'SCR', 1, 1, NOW())`,
       [
-        portfolio2Id,
         scratchCategoryId,
         `${TEST_PREFIX}sys_val_key_${Date.now()}`,
         `${TEST_PREFIX}sys_val_list`,
@@ -168,30 +163,21 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
           provide: ControlListValueRepository,
           useFactory: () => new ControlListValueRepository(dataSource),
         },
-        PortfoliosService,
-        {
-          provide: PortfoliosRepository,
-          useFactory: () => new PortfoliosRepository(dataSource),
-        },
         CurrentUserUtil,
-        // T-04 (consumer per the brief's forward pointer): ControlListsService
-        // now depends on ControlListUsageRegistry. No providers are
-        // registered in this suite — it is about the immutable list key,
+        // ControlListsService depends on ControlListUsageRegistry. No
+        // providers are registered in this suite — it is about the list key,
         // not usage.
         ControlListUsageRegistry,
         Reflector,
         RolesGuard,
-        SetUpInterceptor,
-        {
-          provide: ResultsUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
-        {
-          provide: PortfolioUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
       ],
-    }).compile();
+    })
+      // The controller's `@UseInterceptors(SetUpInterceptor)` only primes
+      // per-request context this module never reads; replacing it keeps any
+      // hand-wired provider it would need out of the suite.
+      .overrideInterceptor(SetUpInterceptor)
+      .useValue({ intercept: (_ctx, next) => next.handle() })
+      .compile();
 
     app = moduleRef.createNestApplication();
     app.use((req, _res, next) => {
@@ -200,7 +186,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
         sec_user_id: 1,
         roles: rolesHeader
           ? JSON.parse(rolesHeader as string)
-          : [SecRolesEnum.CENTER_ADMIN],
+          : [SecRolesEnum.TECHNICAL_SUPPORT],
       };
       next();
     });
@@ -208,6 +194,13 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   });
 
   afterAll(async () => {
+    // Every cleanup is by an id this suite created or by the unique scratch
+    // prefix, and each statement is bounded above the seeded ranges.
+    if (createdListIds.length > 0) {
+      await dataSource.query(
+        `DELETE FROM control_lists WHERE id IN (${createdListIds.join(',')}) AND id > 6`,
+      );
+    }
     if (scratchListId) {
       await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
         scratchListId,
@@ -239,13 +232,183 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
       );
     }
     await dataSource.query(
-      `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%'`,
+      `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%' AND id > 6`,
     );
     await dataSource.query(
-      `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%'`,
+      `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%' AND id > 2`,
     );
     if (app) await app.close();
     if (dataSource?.isInitialized) await dataSource.destroy();
+  });
+
+  describe('schema (R-CLG-001 AC.1, R-CLG-003, NFR-CLG-001)', () => {
+    it('has no portfolio_id column on control_lists', async () => {
+      const columns = await dataSource.query(
+        `SHOW COLUMNS FROM control_lists LIKE 'portfolio_id'`,
+      );
+      expect(columns).toHaveLength(0);
+    });
+
+    it('has a unique index on list_key only: uq_control_lists_key, Non_unique = 0', async () => {
+      const rows: Array<{
+        Non_unique: number | string;
+        Column_name: string;
+      }> = await dataSource.query(
+        `SHOW INDEX FROM control_lists WHERE Key_name = 'uq_control_lists_key'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(Number(rows[0].Non_unique)).toBe(0);
+      expect(rows[0].Column_name).toBe('list_key');
+    });
+
+    // Raw INSERTs: the DATABASE refuses the duplicate, whatever the service
+    // pre-check does. A stray row (only possible if the index is missing) is
+    // recorded so afterAll removes it, and the errno assertion then fails.
+    const insertRawList = async (
+      listKey: string,
+    ): Promise<number | undefined> => {
+      try {
+        const result = await dataSource.query(
+          `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+           VALUES (?, ?, ?, 'DUP', 0, 1, NOW())`,
+          [scratchCategoryId, listKey, `${TEST_PREFIX}dup_list`],
+        );
+        createdListIds.push(Number(result.insertId));
+        return undefined;
+      } catch (error) {
+        return (error as { errno?: number }).errno;
+      }
+    };
+
+    it('rejects a raw INSERT of an existing scratch key in another letter case with errno 1062 (ER_DUP_ENTRY)', async () => {
+      const [scratch] = await dataSource.query(
+        `SELECT list_key FROM control_lists WHERE id = ?`,
+        [scratchListId],
+      );
+
+      expect(await insertRawList(String(scratch.list_key).toUpperCase())).toBe(
+        1062,
+      );
+    });
+
+    it('rejects a raw INSERT of the seeded key kpi.direction in another letter case with errno 1062, adding no row', async () => {
+      expect(await insertRawList('KPI.DIRECTION')).toBe(1062);
+
+      const rows = await dataSource.query(
+        `SELECT id FROM control_lists WHERE list_key = 'kpi.direction'`,
+      );
+      expect(rows).toHaveLength(1);
+      expect(Number(rows[0].id)).toBe(2);
+    });
+  });
+
+  // R-CLG-001 AC.2 / *Stale caller* · AND IT MUST NOT create or change any
+  // row: the REAL pipe rejects `portfolioId` on A6 and A7.
+  it('returns 400 (not 201) for a body carrying portfolioId on POST /lists, and creates nothing', async () => {
+    const listKey = `${TEST_PREFIX}stale_${Date.now()}`;
+
+    const response = await request(app.getHttpServer())
+      .post('/lists')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+      .send({
+        categoryId: scratchCategoryId,
+        listKey,
+        name: `${TEST_PREFIX}stale`,
+        portfolioId: 2,
+      })
+      .expect(400);
+
+    expect(response.body?.message ?? response.body?.errors).toBeDefined();
+    const rows = await dataSource.query(
+      `SELECT id FROM control_lists WHERE list_key = ?`,
+      [listKey],
+    );
+    expect(rows).toHaveLength(0);
+  });
+
+  it('returns 400 (not 200) for a body carrying portfolioId on PATCH /lists/:id, and changes nothing', async () => {
+    const [before] = await dataSource.query(
+      `SELECT name FROM control_lists WHERE id = ?`,
+      [scratchListId],
+    );
+
+    await request(app.getHttpServer())
+      .patch(`/lists/${scratchListId}`)
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+      .send({ name: 'Renamed by a stale caller', portfolioId: 2 })
+      .expect(400);
+
+    const [after] = await dataSource.query(
+      `SELECT name FROM control_lists WHERE id = ?`,
+      [scratchListId],
+    );
+    expect(after.name).toBe(before.name);
+  });
+
+  // R-CLG-003 *Duplicate key* through the real API: another letter case of a
+  // seeded key is a 409 naming `listKey`. This proves the SERVICE pre-check
+  // only — the uniqueness guarantee is the raw-INSERT tests above.
+  it('returns 409 for a duplicate of the seeded key kpi.direction in another letter case (pre-check only), creating nothing', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/lists')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+      .send({
+        categoryId: scratchCategoryId,
+        listKey: 'kpi.direction',
+        name: `${TEST_PREFIX}duplicate_key`,
+      });
+
+    if (response.body?.data?.id) {
+      createdListIds.push(Number(response.body.data.id));
+    }
+    expect(response.status).toBe(409);
+
+    const rows = await dataSource.query(
+      `SELECT id FROM control_lists WHERE list_key = 'kpi.direction'`,
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('returns 201 for a new key with no scope parameter (cleaned up)', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/lists')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+      .send({
+        categoryId: scratchCategoryId,
+        listKey: `${TEST_PREFIX}created_${Date.now()}`,
+        name: `${TEST_PREFIX}created`,
+      });
+
+    if (response.body?.data?.id) {
+      createdListIds.push(Number(response.body.data.id));
+    }
+    expect(response.status).toBe(201);
+    expect(Number(response.body.data.id)).toBeGreaterThan(6);
+    expect(Object.keys(response.body.data)).not.toContain('portfolioId');
+  });
+
+  // R-CLG-003 *Move to any category*: the target is the real seeded category
+  // 2, which this test only reads; the scratch list is moved back so the
+  // suite leaves nothing behind.
+  it('returns 200 when a list is moved to any other category (the seeded category 2), then moves it back', async () => {
+    try {
+      await request(app.getHttpServer())
+        .patch(`/lists/${scratchListId}`)
+        .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+        .send({ categoryId: 2 })
+        .expect(200);
+
+      const [moved] = await dataSource.query(
+        `SELECT category_id FROM control_lists WHERE id = ?`,
+        [scratchListId],
+      );
+      expect(Number(moved.category_id)).toBe(2);
+    } finally {
+      await dataSource.query(
+        `UPDATE control_lists SET category_id = ? WHERE id = ? AND id > 6`,
+        [scratchCategoryId, scratchListId],
+      );
+    }
   });
 
   // Falsifiers 1 & 2 (tasks.md T-02): accepting `listKey` in the update DTO,
@@ -258,7 +421,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
 
     const response = await request(app.getHttpServer())
       .patch(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ name: 'Renamed', listKey: 'attempted.override' })
       .expect(400);
 
@@ -275,7 +438,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   it('returns 200 and updates the name when the PATCH body omits listKey', async () => {
     const response = await request(app.getHttpServer())
       .patch(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ name: `${TEST_PREFIX}renamed` })
       .expect(200);
 
@@ -304,7 +467,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
 
     const response = await request(app.getHttpServer())
       .patch(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ categoryId: null })
       .expect(400);
 
@@ -334,7 +497,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
 
     const response = await request(app.getHttpServer())
       .patch(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ name: null })
       .expect(400);
 
@@ -359,7 +522,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
 
     const response = await request(app.getHttpServer())
       .patch(`/lists/${scratchListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .send({ description: '' })
       .expect(200);
 
@@ -380,7 +543,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   it('returns 200 and physically deletes an empty seeded-style list (is_system = 1) — CR-2', async () => {
     const response = await request(app.getHttpServer())
       .delete(`/lists/${scratchSystemEmptyListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(200);
 
     expect(response.body?.data?.id).toBe(scratchSystemEmptyListId);
@@ -403,7 +566,7 @@ describe('Control Lists — lists, immutable key against real MySQL (T-02)', () 
   it('returns 409 and deletes nothing for a seeded-style list (is_system = 1) with values — CR-2', async () => {
     const response = await request(app.getHttpServer())
       .delete(`/lists/${scratchSystemWithValueListId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(409);
 
     expect(response.body?.message ?? response.body?.errors).toBeDefined();

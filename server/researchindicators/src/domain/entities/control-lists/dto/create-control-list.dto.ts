@@ -22,8 +22,9 @@ export class CreateControlListDto {
   @ApiProperty({
     type: String,
     description:
-      'Immutable system key, pattern ^[a-z0-9_.]{2,100}$. Carries no ' +
-      'portfolio segment (design.md D-CTL-2); unique per portfolio',
+      'Immutable system key, pattern ^[a-z0-9_.]{2,100}$. Unique across ' +
+      'all lists (case-insensitive); consumers read the list by this key ' +
+      '(R-CLG-003, R-CLG-004)',
     example: 'kpi.direction',
     pattern: '^[a-z0-9_.]{2,100}$',
   })

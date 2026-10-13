@@ -1,25 +1,16 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional } from 'class-validator';
 
 /**
- * A13 query parameters (design.md §4, R-CTL-006). `@Type(() => Boolean)`
+ * A13 query parameters (design.md §4, R-CLG-004; R-CTL-006). The only
+ * parameter in this slice is `activeOnly`. `@Type(() => Boolean)`
  * alone would turn the query STRING "false" into `true`
  * (`Boolean('false') === true`), so `activeOnly` is normalized from the raw
  * query value before `@IsBoolean()` ever runs; omitted defaults to `true`
  * (R-CTL-006 "Inputs: ... activeOnly (default true)").
  */
 export class GetListValuesByKeyQueryDto {
-  @ApiProperty({
-    type: Number,
-    description: 'Portfolio id to scope the read',
-    example: 2,
-  })
-  @Type(() => Number)
-  @IsInt()
-  @IsNotEmpty()
-  portfolioId!: number;
-
   @ApiPropertyOptional({
     type: Boolean,
     description: 'Omit inactive values when true (default true)',

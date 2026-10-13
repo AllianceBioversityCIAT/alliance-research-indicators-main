@@ -294,76 +294,187 @@ describe('AllianceSidebarComponent', () => {
     );
   });
 
-  // ─── institutional-performance/control-lists T-01 — nested Portfolio Management
-  // group (D-CTL-9, P-9, P-12). The exact array (not arrayContaining) pins the four
-  // existing children's order, labels and links so a future edit cannot silently
-  // move or drop one while only adding Control Lists underneath Portfolio Management.
-  it('keeps the exact four center-admin children, with Control Lists nested under Portfolio Management only', () => {
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
+  // ─── changes/control-lists-global-scope T-01 — Control Lists moved to System admin (D-CLG-7,
+  // R-CLG-008 AC.1). The exact arrays (not arrayContaining) pin every other item's order, label
+  // and link in BOTH groups, so a future edit cannot silently move or drop one, and cannot
+  // render Control Lists in both groups.
+  const CENTER_ADMIN_CHILDREN = [
+    { label: 'Bulk upload', link: '/administration/center-admin/bulk-upload', s3Image: 'images/brain.png' },
+    {
+      label: 'SDG Management',
+      link: '/administration/center-admin/sdg-management',
+      icon: 'pi-bullseye',
+      iconSize: '13px'
+    },
+    {
+      label: 'Bilateral Mapping',
+      link: '/administration/center-admin/bilateral-mapping',
+      icon: 'pi-sitemap',
+      iconSize: '13px'
+    },
+    {
+      label: 'Portfolio Management',
+      link: '/administration/center-admin/portfolio-management',
+      icon: 'pi-briefcase',
+      iconSize: '13px'
+    }
+  ];
+
+  const SYSTEM_ADMIN_CHILDREN = [
+    {
+      label: 'Environment variables',
+      link: '/administration/configuration/variables',
+      icon: 'pi-database',
+      iconSize: '13px'
+    },
+    {
+      label: 'Prompt Manager',
+      link: '/administration/configuration/prompt-manager',
+      icon: 'pi-sparkles',
+      iconSize: '13px'
+    },
+    {
+      label: 'Control Lists',
+      link: '/administration/configuration/control-lists',
+      icon: 'pi-list',
+      iconSize: '13px'
+    }
+  ];
+
+  const CENTER_ADMIN_HREFS = CENTER_ADMIN_CHILDREN.map(child => child.link);
+  const SYSTEM_ADMIN_HREFS = SYSTEM_ADMIN_CHILDREN.map(child => child.link);
+
+  const grantBothAdminGroups = () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessAppConfiguration: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+  };
+
+  const setCollapsed = (collapsed: boolean) => {
+    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
+    cache.isSidebarCollapsed.mockReturnValue(collapsed);
+  };
+
+  it('lists exactly the four center-admin children, flat, with no Control Lists and no nested children', () => {
+    grantBothAdminGroups();
 
     const centerAdmin = component.administrationGroups().find(group => group.id === 'center-admin');
 
-    expect(centerAdmin?.children).toEqual([
-      { label: 'Bulk upload', link: '/administration/center-admin/bulk-upload', s3Image: 'images/brain.png' },
-      {
-        label: 'SDG Management',
-        link: '/administration/center-admin/sdg-management',
-        icon: 'pi-bullseye',
-        iconSize: '13px'
-      },
-      {
-        label: 'Bilateral Mapping',
-        link: '/administration/center-admin/bilateral-mapping',
-        icon: 'pi-sitemap',
-        iconSize: '13px'
-      },
-      {
-        label: 'Portfolio Management',
-        link: '/administration/center-admin/portfolio-management',
-        icon: 'pi-briefcase',
-        iconSize: '13px',
-        children: [
-          {
-            label: 'Control Lists',
-            link: '/administration/center-admin/control-lists',
-            icon: 'pi-list',
-            iconSize: '13px'
-          }
-        ]
-      }
-    ]);
+    expect(centerAdmin?.children).toEqual(CENTER_ADMIN_CHILDREN);
+    expect(centerAdmin?.children.some(child => child.children !== undefined)).toBe(false);
   });
 
-  it('renders Control Lists nested under Portfolio Management in the EXPANDED sidebar (falsifier 5)', () => {
-    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
-    cache.isSidebarCollapsed.mockReturnValue(false);
+  it('lists exactly Environment variables, Prompt Manager, Control Lists under System admin, in that order', () => {
+    grantBothAdminGroups();
+
+    const systemAdmin = component.administrationGroups().find(group => group.id === 'system-admin');
+
+    expect(systemAdmin?.children).toEqual(SYSTEM_ADMIN_CHILDREN);
+  });
+
+  it('shows Control Lists to a System admin / Technical Support user who is not a Center admin', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessAppConfiguration: jest.Mock };
+    roles.canAccessCenterAdmin.mockReturnValue(false);
+    roles.canAccessAppConfiguration.mockReturnValue(true);
+
+    const groups = component.administrationGroups();
+
+    expect(groups.map(group => group.id)).toEqual(['system-admin']);
+    expect(groups[0].children.map(child => child.link)).toContain('/administration/configuration/control-lists');
+  });
+
+  it('does not show Control Lists to a Center admin who cannot access app configuration', () => {
+    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock; canAccessAppConfiguration: jest.Mock };
     roles.canAccessCenterAdmin.mockReturnValue(true);
+    roles.canAccessAppConfiguration.mockReturnValue(false);
+    setCollapsed(false);
+    fixture.detectChanges();
+
+    const groups = component.administrationGroups();
+    expect(groups.map(group => group.id)).toEqual(['center-admin']);
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href*="control-lists"]')).toBeNull();
+  });
+
+  it('renders Control Lists only under System admin in the EXPANDED sidebar, other items unchanged', () => {
+    grantBothAdminGroups();
+    setCollapsed(false);
+    fixture.detectChanges();
+
+    const groupBlocks = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.administration-block > div')
+    ) as HTMLElement[];
+    const hrefsPerGroup = groupBlocks.map(block =>
+      Array.from(block.querySelectorAll('a')).map(anchor => anchor.getAttribute('href'))
+    );
+
+    expect(hrefsPerGroup).toEqual([CENTER_ADMIN_HREFS, SYSTEM_ADMIN_HREFS]);
+    expect((fixture.nativeElement as HTMLElement).querySelectorAll('a[href="/administration/configuration/control-lists"]')).toHaveLength(1);
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href="/administration/center-admin/control-lists"]')).toBeNull();
+  });
+
+  it('renders Control Lists only in the System admin flyout of the COLLAPSED sidebar, other items unchanged', () => {
+    grantBothAdminGroups();
+    setCollapsed(true);
+    fixture.detectChanges();
+
+    const flyoutHrefs = (groupId: string) => {
+      component.administrationFlyoutGroupId.set(null);
+      component.toggleAdministrationFlyout(groupId, { stopPropagation: jest.fn() } as unknown as Event);
+      fixture.detectChanges();
+      return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.admin-center-admin-flyout a')).map(anchor =>
+        anchor.getAttribute('href')
+      );
+    };
+
+    expect(flyoutHrefs('center-admin')).toEqual(CENTER_ADMIN_HREFS);
+    expect(flyoutHrefs('system-admin')).toEqual(SYSTEM_ADMIN_HREFS);
+  });
+
+  // ─── Nested-children rendering (D-CTL-9) is dormant until Strategy Framework uses it (S-3).
+  // No real group nests today, so a SYNTHETIC group keeps both render paths covered.
+  const syntheticNestedGroup = (): AdministrationNavGroup[] => [
+    {
+      id: 'synthetic',
+      label: 'Synthetic group',
+      icon: 'pi-test',
+      children: [
+        {
+          label: 'Parent item',
+          link: '/synthetic/parent',
+          icon: 'pi-folder',
+          iconSize: '13px',
+          children: [{ label: 'Nested item', link: '/synthetic/parent/nested', icon: 'pi-list', iconSize: '13px' }]
+        }
+      ]
+    }
+  ];
+
+  it('renders a nested child under its parent in the EXPANDED sidebar (synthetic group)', () => {
+    grantBothAdminGroups(); // the administration block only renders for an admin role
+    setCollapsed(false);
+    jest.spyOn(component, 'administrationGroups').mockReturnValue(syntheticNestedGroup());
     fixture.detectChanges();
 
     const nestedGroup = (fixture.nativeElement as HTMLElement).querySelector('.option-nested-children');
     expect(nestedGroup).toBeTruthy();
-    const link = nestedGroup?.querySelector('a[href="/administration/center-admin/control-lists"]');
+    expect(nestedGroup?.getAttribute('aria-label')).toBe('Parent item pages');
+    const link = nestedGroup?.querySelector('a[href="/synthetic/parent/nested"]');
     expect(link).toBeTruthy();
-    expect(link?.textContent).toContain('Control Lists');
+    expect(link?.textContent).toContain('Nested item');
   });
 
-  it('renders Control Lists nested under Portfolio Management in the COLLAPSED flyout (falsifier 5)', () => {
-    const cache = TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock };
-    const roles = TestBed.inject(RolesService) as unknown as { canAccessCenterAdmin: jest.Mock };
-    cache.isSidebarCollapsed.mockReturnValue(true);
-    roles.canAccessCenterAdmin.mockReturnValue(true);
+  it('renders a nested child in the COLLAPSED flyout (synthetic group)', () => {
+    grantBothAdminGroups();
+    setCollapsed(true);
+    jest.spyOn(component, 'administrationGroups').mockReturnValue(syntheticNestedGroup());
     fixture.detectChanges();
 
-    component.toggleAdministrationFlyout('center-admin', { stopPropagation: jest.fn() } as unknown as Event);
+    component.toggleAdministrationFlyout('synthetic', { stopPropagation: jest.fn() } as unknown as Event);
     fixture.detectChanges();
 
-    const link = (fixture.nativeElement as HTMLElement).querySelector(
-      'a.admin-flyout-row--nested[href="/administration/center-admin/control-lists"]'
-    );
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a.admin-flyout-row--nested[href="/synthetic/parent/nested"]');
     expect(link).toBeTruthy();
-    expect(link?.textContent).toContain('Control Lists');
+    expect(link?.textContent).toContain('Nested item');
   });
 
   it('should clear flyout id when closeAdministrationFlyout is called', () => {

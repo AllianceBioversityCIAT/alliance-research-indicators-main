@@ -103,7 +103,7 @@
 |---|---|
 | Kind | guide-sync |
 | Target | `server/researchindicators/src/CLAUDE.md` §8 (or a new short subsection after §5) |
-| Edit | *"**Control lists consumers** (`domain/entities/control-lists/`): import `ControlListsModule`; register your in-use provider once from a singleton `onModuleInit` (`register()` does not deduplicate); add an FK `ON DELETE RESTRICT` to `control_list_values.id`; call `ControlListValueLookupService.assertValueInList(valueId, portfolioId, listKey)` before every write that stores a value id (no composite FK exists). Read values via `GET /api/control-lists/by-key/:listKey/values?portfolioId=`."* |
+| Edit | *"**Control lists consumers** (`domain/entities/control-lists/`): import `ControlListsModule`; register your in-use provider once from a singleton `onModuleInit` (`register()` does not deduplicate); add an FK `ON DELETE RESTRICT` to `control_list_values.id`; call `ControlListValueLookupService.assertValueInList(valueId, listKey)` before every write that stores a value id (no composite FK exists). Read values via `GET /api/control-lists/by-key/:listKey/values` (optional `?portfolioId=` filter)."* **Updated 2026-10-13 by `changes/control-lists-global-scope` (T-01):** that change removed the list-level portfolio, so `assertValueInList` no longer takes a portfolio and the by-key read needs none; `?portfolioId=` becomes an optional filter on a value's *Applies to* set (shipped by that spec's T-02, not before). |
 | Severity | High (child 2 depends on it) |
 | Status | pending |
 
@@ -133,7 +133,7 @@
 |---|---|
 | Kind | guide-sync |
 | Target | `docs/trd/trd.md` §4.1 server modules, §4.2 client modules, §5 data model |
-| Edit | §4.1: `entities/control-lists/` — portfolio-scoped categories → lists → values; exports `ControlListUsageRegistry` + `ControlListValueLookupService` for consumers. §4.2: `shared/components/data-table/` (F-7). §5: tables `control_list_categories`, `control_lists`, `control_list_values` (utf8mb4_unicode_ci unique indexes; physical delete; seeded ids 1–2 / 1–6 / 1–23). |
+| Edit | §4.1: `entities/control-lists/` — global categories → lists → values (categories and lists carry no portfolio; names and keys are unique module-wide — `changes/control-lists-global-scope`, 2026-10-13); exports `ControlListUsageRegistry` + `ControlListValueLookupService` for consumers. §4.2: `shared/components/data-table/` (F-7). §5: tables `control_list_categories`, `control_lists`, `control_list_values` (utf8mb4_unicode_ci unique indexes; physical delete; seeded ids 1–2 / 1–6 / 1–23). |
 | Severity | Medium |
 | Status | pending |
 

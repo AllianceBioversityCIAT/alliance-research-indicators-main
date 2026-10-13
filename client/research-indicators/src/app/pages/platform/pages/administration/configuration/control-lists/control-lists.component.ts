@@ -2,18 +2,15 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { SelectModule } from 'primeng/select';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { ModalComponent } from '@shared/components/modal/modal.component';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { CustomProgressBarComponent } from '@shared/components/custom-progress-bar/custom-progress-bar.component';
 import { DataTableColumn, DataTableComponent } from '@shared/components/data-table/data-table.component';
-import { Portfolio } from '@shared/interfaces/portfolio.interface';
 import {
   ControlList,
   ControlListCategory,
-  ControlListPortfolioSummary,
   ControlListSummary,
   ControlListValue
 } from '@shared/interfaces/control-lists.interface';
@@ -64,17 +61,11 @@ interface ControlListFieldError {
   field?: string;
 }
 
-/** A portfolio option for the selector — R-CTL-001 "Default portfolio" / design §6.2. */
-export interface PortfolioOption extends Portfolio {
-  portfolioIdValue: number;
-  configured: boolean;
-  displayLabel: string;
-}
-
 // @akili-spec institutional-performance/control-lists T-01 (client half)
 // design §2.1, §4 (A1–A5), §6.1/§6.2; requirements R-CTL-001, R-CTL-002, R-CTL-007, R-CTL-008.
-// Scope: header + portfolio selector + category navigator + category-mode modal + delete
-// confirm. Lists/values arrive in T-02/T-03 — A1's `lists` is read but not yet rendered.
+// @akili-spec changes/control-lists-global-scope T-01 (client half): lists are global and read by
+// key — no selector, no list-level scope on any payload (design §2.1, §6; R-CLG-001, 005).
+// Scope: header + category navigator + category-mode modal + delete confirm.
 @Component({
   selector: 'app-control-lists',
   standalone: true,
@@ -82,7 +73,6 @@ export interface PortfolioOption extends Portfolio {
     CommonModule,
     FormsModule,
     ButtonModule,
-    SelectModule,
     ToggleSwitchModule,
     ModalComponent,
     InputComponent,
@@ -99,9 +89,6 @@ export default class ControlListsComponent implements OnInit {
   readonly modals = inject(AllModalsService);
   private readonly actions = inject(ActionsService);
 
-  readonly portfolios = signal<Portfolio[]>([]);
-  readonly portfolioSummaries = signal<ControlListPortfolioSummary[]>([]);
-  readonly selectedPortfolioId = signal<number | null>(null);
   readonly categories = signal<ControlListCategory[]>([]);
 
   readonly loading = signal(true);
@@ -129,7 +116,7 @@ export default class ControlListsComponent implements OnInit {
   // it comes from the "add list" icon the admin clicked, design §6.2 navigator row).
   private readonly createListCategoryId = signal<number | null>(null);
   readonly listForm = signal<ListFormValue>({ listKey: '', name: '', description: '', codePrefix: '' });
-  // Design §6.2 Modal row: the field-named 409 for a duplicate key in the portfolio
+  // Design §6.2 Modal row: the field-named 409 for a duplicate key (unique module-wide, R-CLG-003)
   // (`field: 'listKey'`, pinned by the Leader's error contract) is shown inline under the key input.
   readonly listKeyFieldError = signal<string | null>(null);
 
@@ -160,34 +147,11 @@ export default class ControlListsComponent implements OnInit {
     return undefined;
   });
 
-  // D-CTL-2 / falsifier 4: built from the portfolio ID, never the portfolio name.
-  readonly listReference = computed(() => {
-    const list = this.selectedList();
-    const portfolioId = this.selectedPortfolioId();
-    return list && portfolioId !== null ? `P${portfolioId} · ${list.key}` : '';
-  });
-
   // T-04 (design §4 A1 "usedBy: string[]", §5 rule 5, R-CTL-003 "Used by"): consumer names
   // joined, or the fallback copy when no consumer has registered against this list's key yet.
   readonly usedByLabel = computed(() => {
     const usedBy = this.selectedList()?.usedBy ?? [];
     return usedBy.length > 0 ? usedBy.join(', ') : 'Not linked to a form yet';
-  });
-
-  // R-CTL-001 "Default portfolio": every portfolio stays selectable; a 0-category one
-  // is labelled "(not configured)" (A2) and opens on the empty state (design D-CTL-10).
-  readonly portfolioOptions = computed<PortfolioOption[]>(() => {
-    const summaries = this.portfolioSummaries();
-    return this.portfolios().map(portfolio => {
-      const id = this.portfolioId(portfolio);
-      const configured = (summaries.find(summary => summary.portfolioId === id)?.categories ?? 0) > 0;
-      return {
-        ...portfolio,
-        portfolioIdValue: id,
-        configured,
-        displayLabel: configured ? portfolio.name : `${portfolio.name} (not configured)`
-      };
-    });
   });
 
   // ─── T-03: values (design §4 A9–A12, §6.2 values table + modal, §6.3 DataTable) ───────────
@@ -247,56 +211,11 @@ export default class ControlListsComponent implements OnInit {
     void this.load();
   }
 
-  portfolioId(portfolio: Portfolio): number {
-    return Number(portfolio.portfolio_id ?? portfolio.id ?? 0);
-  }
-
   trackByCategoryId = (_: number, category: ControlListCategory): number => category.id;
-  trackByPortfolioId = (_: number, portfolio: PortfolioOption): number => portfolio.portfolioIdValue;
   trackByListId = (_: number, list: ControlListSummary): number => list.id;
 
   async load(): Promise<void> {
-    this.loading.set(true);
-    this.loadError.set(false);
-
-    try {
-      const [portfoliosRes, summariesRes] = await Promise.all([this.api.GET_Portfolios(), this.api.GET_ControlListPortfolioSummaries()]);
-
-      if (portfoliosRes?.successfulRequest === false || summariesRes?.successfulRequest === false) {
-        this.loadError.set(true);
-        this.loading.set(false);
-        return;
-      }
-
-      const portfolioList = Array.isArray(portfoliosRes?.data) ? portfoliosRes.data : [];
-      const summaryList = Array.isArray(summariesRes?.data) ? summariesRes.data : [];
-      this.portfolios.set(portfolioList);
-      this.portfolioSummaries.set(summaryList);
-
-      const defaultId = this.resolveDefaultPortfolioId(portfolioList);
-      this.selectedPortfolioId.set(defaultId);
-
-      if (defaultId === null) {
-        this.categories.set([]);
-        this.loading.set(false);
-        return;
-      }
-
-      await this.loadCategories(defaultId);
-    } catch {
-      this.loadError.set(true);
-      this.loading.set(false);
-    }
-  }
-
-  async selectPortfolio(portfolioId: number | null): Promise<void> {
-    if (portfolioId === null || portfolioId === this.selectedPortfolioId()) return;
-    this.selectedPortfolioId.set(portfolioId);
-    // R-CTL-001 isolation: a list id from the previous portfolio must not stay "selected"
-    // against the new portfolio's categories.
-    this.selectedListId.set(null);
-    this.values.set([]);
-    await this.loadCategories(portfolioId);
+    await this.loadCategories();
   }
 
   selectList(listId: number): void {
@@ -333,12 +252,12 @@ export default class ControlListsComponent implements OnInit {
     }
   }
 
-  private async loadCategories(portfolioId: number): Promise<void> {
+  private async loadCategories(): Promise<void> {
     this.loading.set(true);
     this.loadError.set(false);
 
     try {
-      const response = await this.api.GET_ControlListCategories(portfolioId);
+      const response = await this.api.GET_ControlListCategories();
       if (response?.successfulRequest === false) {
         this.loadError.set(true);
         this.categories.set([]);
@@ -459,8 +378,6 @@ export default class ControlListsComponent implements OnInit {
 
   async save(): Promise<void> {
     if (this.formInvalid() || this.saving()) return;
-    const portfolioId = this.selectedPortfolioId();
-    if (portfolioId === null) return;
 
     this.saving.set(true);
     this.nameFieldError.set(null);
@@ -476,7 +393,6 @@ export default class ControlListsComponent implements OnInit {
       const response =
         editingId === null
           ? await this.api.POST_ControlListCategory({
-              portfolioId,
               name: value.name.trim(),
               description: trimmedDescription || undefined
             })
@@ -494,12 +410,7 @@ export default class ControlListsComponent implements OnInit {
       });
       this.resetForm();
       this.modals.closeModal('controlListForm');
-      await this.loadCategories(portfolioId);
-      // R-CTL-001 Details / D-CTL-10 (reviewer finding 3): a create/edit can change the
-      // portfolio's category count, which the "(not configured)" label is derived from —
-      // refresh A2 so the selector never shows a stale label right after the flow that
-      // changes it.
-      await this.refreshPortfolioSummaries();
+      await this.loadCategories();
     } catch {
       this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'We could not save the category. Please try again.' });
     } finally {
@@ -543,8 +454,7 @@ export default class ControlListsComponent implements OnInit {
   }
 
   private async confirmDelete(category: ControlListCategory): Promise<void> {
-    const portfolioId = this.selectedPortfolioId();
-    if (portfolioId === null || this.deletingId() !== null) return;
+    if (this.deletingId() !== null) return;
 
     this.deletingId.set(category.id);
 
@@ -559,26 +469,11 @@ export default class ControlListsComponent implements OnInit {
       }
 
       this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'Category deleted successfully' });
-      await this.loadCategories(portfolioId);
-      // Same staleness fix as save() — a delete can drop a portfolio back to 0 categories.
-      await this.refreshPortfolioSummaries();
+      await this.loadCategories();
     } catch {
       this.showBlockedDeleteAlert('This category could not be deleted.');
     } finally {
       this.deletingId.set(null);
-    }
-  }
-
-  // Best-effort: A2 drives only the "(not configured)" label text (design D-CTL-10), never a
-  // functional gate, so a failed refresh just leaves the previous summaries in place.
-  private async refreshPortfolioSummaries(): Promise<void> {
-    try {
-      const response = await this.api.GET_ControlListPortfolioSummaries();
-      if (response?.successfulRequest !== false && Array.isArray(response?.data)) {
-        this.portfolioSummaries.set(response.data);
-      }
-    } catch {
-      // best-effort refresh; see comment above
     }
   }
 
@@ -598,8 +493,6 @@ export default class ControlListsComponent implements OnInit {
 
   async saveList(): Promise<void> {
     if (this.listFormInvalid() || this.savingList()) return;
-    const portfolioId = this.selectedPortfolioId();
-    if (portfolioId === null) return;
 
     this.savingList.set(true);
     this.listKeyFieldError.set(null);
@@ -637,7 +530,7 @@ export default class ControlListsComponent implements OnInit {
       const createdId = editingId === null ? (response?.data as ControlList | undefined)?.id : undefined;
       this.resetListForm();
       this.modals.closeModal('controlListForm');
-      await this.loadCategories(portfolioId);
+      await this.loadCategories();
       if (createdId !== undefined) {
         this.selectedListId.set(createdId);
       }
@@ -684,8 +577,7 @@ export default class ControlListsComponent implements OnInit {
   }
 
   private async confirmDeleteList(list: ControlListSummary): Promise<void> {
-    const portfolioId = this.selectedPortfolioId();
-    if (portfolioId === null || this.deletingListId() !== null) return;
+    if (this.deletingListId() !== null) return;
 
     this.deletingListId.set(list.id);
 
@@ -702,7 +594,7 @@ export default class ControlListsComponent implements OnInit {
       this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'List deleted successfully' });
       this.selectedListId.set(null);
       this.values.set([]);
-      await this.loadCategories(portfolioId);
+      await this.loadCategories();
     } catch {
       this.showBlockedDeleteListAlert('This list could not be deleted.');
     } finally {
@@ -727,8 +619,7 @@ export default class ControlListsComponent implements OnInit {
   async saveValue(): Promise<void> {
     if (this.valueFormInvalid() || this.savingValue()) return;
     const list = this.selectedList();
-    const portfolioId = this.selectedPortfolioId();
-    if (!list || portfolioId === null) return;
+    if (!list) return;
 
     this.savingValue.set(true);
     this.valueCodeFieldError.set(null);
@@ -779,8 +670,8 @@ export default class ControlListsComponent implements OnInit {
       await this.loadValues(list.id);
       // Leader's brief: "After value create/delete, the navigator valueCount must update" —
       // A1's `ControlListSummary.valueCount` is stale until categories are reloaded, same
-      // staleness fix as the A2 "(not configured)" label refresh above.
-      await this.loadCategories(portfolioId);
+      // staleness fix as the category reload after a category write.
+      await this.loadCategories();
     } catch {
       this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'We could not save the value. Please try again.' });
     } finally {
@@ -828,8 +719,7 @@ export default class ControlListsComponent implements OnInit {
 
   private async confirmDeleteValue(value: ControlListValue): Promise<void> {
     const list = this.selectedList();
-    const portfolioId = this.selectedPortfolioId();
-    if (!list || portfolioId === null || this.deletingValueId() !== null) return;
+    if (!list || this.deletingValueId() !== null) return;
 
     this.deletingValueId.set(value.id);
 
@@ -845,7 +735,7 @@ export default class ControlListsComponent implements OnInit {
 
       this.actions.showToast({ severity: 'success', summary: 'Control Lists', detail: 'Value deleted successfully' });
       await this.loadValues(list.id);
-      await this.loadCategories(portfolioId);
+      await this.loadCategories();
     } catch {
       this.showBlockedDeleteValueAlert('This value could not be deleted.');
     } finally {
@@ -918,16 +808,6 @@ export default class ControlListsComponent implements OnInit {
     this.valueValueFieldError.set(null);
     this.configureModal();
     this.modals.openModal('controlListForm');
-  }
-
-  // R-CTL-001 "Default portfolio": the portfolio whose start/end years contain the
-  // current year. No match falls back to the first portfolio (judgment call — the
-  // selector must always resolve to SOME portfolio when at least one exists).
-  private resolveDefaultPortfolioId(portfolios: Portfolio[]): number | null {
-    if (!portfolios.length) return null;
-    const year = new Date().getFullYear();
-    const match = portfolios.find(portfolio => Number(portfolio.start_year) <= year && year <= Number(portfolio.end_year));
-    return this.portfolioId(match ?? portfolios[0]);
   }
 
   // The server keeps its payload: a real 409/400 from GlobalExceptions puts the message in

@@ -1,14 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, ValidationPipe } from '@nestjs/common';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
-import { PortfoliosService } from '../portfolios/portfolios.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { GlobalExceptions } from '../../shared/error-management/global.exception';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
+import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
+import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
 
 /**
  * T-01 rework, Risk Reviewer issue 1 (verbatim): "the duplicate-name 409
@@ -17,8 +18,8 @@ import { ControlListUsageRegistry } from './control-list-usage.registry';
  * CLIENT actually receives depends on what `GlobalExceptions` does with
  * that shape, not on what the service intended. This suite throws REAL
  * exceptions from the REAL `ControlListsService` (only the repository/
- * portfolio dependencies are mocked) through the REAL `GlobalExceptions`
- * filter and pins the exact JSON body on the wire.
+ * usage-registry dependencies are mocked) through the REAL
+ * `GlobalExceptions` filter and pins the exact JSON body on the wire.
  *
  * Leader decision: KEEP the server payload as-is (`errors: { description,
  * field }` for the 409). This file is the contract test the Risk Reviewer
@@ -32,14 +33,19 @@ import { ControlListUsageRegistry } from './control-list-usage.registry';
  * the field-named conflicts, minus the `field` key. `GlobalExceptions`
  * therefore puts the OBJECT `{description}` on the wire as `errors` for
  * this case too, never a bare string, so the client can read
- * `errors.description` uniformly for every 409 this module throws. The
- * cross-portfolio list move (400) is the one exception: it is a plain
- * string, like the 404 test below.
+ * `errors.description` uniformly for every 409 this module throws.
  *
  * T-03 extends this with the values contract: duplicate code/value are the
  * SAME {description, field} object shape (field: 'code' | 'value'); a
  * list-has-values delete is a non-field conflict, the same envelope as the
  * T-02 non-field conflicts above, minus the `field` key.
+ *
+ * Global-scope change (docs/specs/changes/control-lists-global-scope, T-01):
+ * the duplicate messages no longer say "in this portfolio" (name and key are
+ * unique module-wide), the cross-portfolio list move (400) is gone, and the
+ * new 400 is the stale-caller rejection a REAL `ValidationPipe` produces for
+ * `portfolioId` (its `errors` is the pipe's message ARRAY, unlike the plain
+ * string of a service-thrown 404).
  *
  * CR-2 (2026-10-07) removes the "system list cannot be deleted" rule
  * entirely: `is_system` has no behavioral effect on A8 `removeList`. An
@@ -93,12 +99,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     save: mockValueSave,
     update: jest.fn(),
     delete: mockValueDelete,
-  };
-
-  const mockPortfoliosFindOne = jest.fn();
-  const mockPortfoliosService = {
-    findOne: mockPortfoliosFindOne,
-    findAll: jest.fn(),
   };
 
   const mockCurrentUser = {
@@ -166,7 +166,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
           provide: ControlListValueRepository,
           useValue: mockValueRepository,
         },
-        { provide: PortfoliosService, useValue: mockPortfoliosService },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
       ],
@@ -177,17 +176,15 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   });
 
   it('409 duplicate name: errors is the OBJECT {description, field: "name"}, description is the exception name', async () => {
-    mockPortfoliosFindOne.mockResolvedValue({ id: 2 });
     mockFindOne.mockResolvedValue({
       id: 9,
-      portfolio_id: 2,
       name: 'KPIs',
       is_active: true,
     });
 
     let thrown: unknown;
     try {
-      await service.createCategory({ portfolioId: 2, name: 'KPIs' });
+      await service.createCategory({ name: 'KPIs' });
     } catch (error) {
       thrown = error;
     }
@@ -203,7 +200,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       description: 'ConflictException',
       status: HttpStatus.CONFLICT,
       errors: {
-        description: 'A category named "KPIs" already exists in this portfolio',
+        description: 'A category named "KPIs" already exists',
         field: 'name',
       },
       timestamp: expect.any(String),
@@ -211,18 +208,21 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     });
   });
 
-  it('404 unknown portfolio: errors is the PLAIN STRING message (asymmetric with the 409 object shape)', async () => {
-    mockPortfoliosFindOne.mockResolvedValue(null);
+  it('404 unknown list key on the by-key read: errors is the PLAIN STRING message (asymmetric with the 409 object shape)', async () => {
+    mockListFindOne.mockResolvedValue(null);
 
     let thrown: unknown;
     try {
-      await service.createCategory({ portfolioId: 999, name: 'KPIs' });
+      await service.getValuesByKey('kpi.unknown', true);
     } catch (error) {
       thrown = error;
     }
     expect(thrown).toBeDefined();
 
-    const request = { url: '/api/control-lists/categories', method: 'POST' };
+    const request = {
+      url: '/api/control-lists/by-key/kpi.unknown/values',
+      method: 'GET',
+    };
     const { host, status, json } = makeHost(request);
 
     filter.catch(thrown, host as any);
@@ -231,21 +231,19 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     expect(json).toHaveBeenCalledWith({
       description: 'NotFoundException',
       status: HttpStatus.NOT_FOUND,
-      errors: 'Portfolio 999 not found',
+      errors: 'List "kpi.unknown" not found',
       timestamp: expect.any(String),
-      path: '/api/control-lists/categories',
+      path: '/api/control-lists/by-key/kpi.unknown/values',
     });
   });
 
   it('409 duplicate list key: errors is the OBJECT {description, field: "listKey"} (T-02)', async () => {
     mockFindOne.mockResolvedValue({
       id: 1,
-      portfolio_id: 2,
       is_active: true,
     });
     mockListFindOne.mockResolvedValue({
       id: 9,
-      portfolio_id: 2,
       list_key: 'kpi.direction',
       is_active: true,
     });
@@ -272,8 +270,7 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       description: 'ConflictException',
       status: HttpStatus.CONFLICT,
       errors: {
-        description:
-          'A list with key "kpi.direction" already exists in this portfolio',
+        description: 'A list with key "kpi.direction" already exists',
         field: 'listKey',
       },
       timestamp: expect.any(String),
@@ -291,7 +288,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   it('409 seeded-style list (is_system = 1) with values, delete: errors is the OBJECT {description} with NO field (non-field conflict, CR-2)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 6,
-      portfolio_id: 2,
       list_key: 'org.level',
       name: 'Organizational level',
       is_system: true,
@@ -329,7 +325,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     mockFindOne.mockResolvedValue({
       id: 2,
       name: 'Organizational structure',
-      portfolio_id: 2,
       is_active: true,
     });
     mockListFind.mockResolvedValue([
@@ -365,41 +360,64 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     });
   });
 
-  it('400 cross-portfolio list move: errors is a PLAIN STRING (D-CTL-13, judgment J-4, T-02)', async () => {
-    mockListFindOne.mockResolvedValue({
-      id: 1,
-      portfolio_id: 2,
-      category_id: 1,
-      is_active: true,
-    });
-    mockFindOne.mockResolvedValue({
-      id: 9,
-      portfolio_id: 1,
-      is_active: true,
-    });
+  // R-CLG-001 "Stale caller": the 400 comes from the REAL pipe, so its
+  // `errors` is the pipe's message ARRAY (one entry per rejected property).
+  // The real exception is produced by the real `ValidationPipe` with the
+  // controller's own options, then serialized by the real filter.
+  it.each([
+    [
+      'POST /categories body',
+      '/api/control-lists/categories',
+      'POST',
+      () =>
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }).transform(
+          { name: 'KPIs', portfolioId: 2 },
+          { type: 'body', metatype: CreateControlListCategoryDto },
+        ),
+    ],
+    [
+      'GET /categories query',
+      '/api/control-lists/categories',
+      'GET',
+      () =>
+        new ValidationPipe({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+          transform: true,
+        }).transform(
+          { portfolioId: '2' },
+          { type: 'query', metatype: GetCategoriesQueryDto },
+        ),
+    ],
+  ])(
+    '400 stale portfolioId on %s: errors is the pipe message ARRAY naming the property',
+    async (_label, url, method, run) => {
+      let thrown: unknown;
+      try {
+        await run();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeDefined();
 
-    let thrown: unknown;
-    try {
-      await service.updateList(1, { categoryId: 9 });
-    } catch (error) {
-      thrown = error;
-    }
-    expect(thrown).toBeDefined();
+      const { host, status, json } = makeHost({ url, method });
 
-    const request = { url: '/api/control-lists/lists/1', method: 'PATCH' };
-    const { host, status, json } = makeHost(request);
+      filter.catch(thrown, host as any);
 
-    filter.catch(thrown, host as any);
-
-    expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
-    expect(json).toHaveBeenCalledWith({
-      description: 'BadRequestException',
-      status: HttpStatus.BAD_REQUEST,
-      errors: 'Category 9 belongs to a different portfolio than list 1',
-      timestamp: expect.any(String),
-      path: '/api/control-lists/lists/1',
-    });
-  });
+      expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+      expect(json).toHaveBeenCalledWith({
+        description: 'BadRequestException',
+        status: HttpStatus.BAD_REQUEST,
+        errors: ['property portfolioId should not exist'],
+        timestamp: expect.any(String),
+        path: url,
+      });
+    },
+  );
 
   // T-03 forward pointer (T-02 execution.md): "a list with values cannot be
   // deleted → 409, non-field body errors: { description } (same shape as
@@ -407,7 +425,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   it('409 list-has-values delete: errors is the OBJECT {description} with NO field (non-field conflict, T-03)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 7,
-      portfolio_id: 2,
       list_key: 'kpi.custom_source',
       name: 'Custom source',
       is_system: false,
@@ -446,7 +463,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   it('409 duplicate value code: errors is the OBJECT {description, field: "code"} (T-03)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 2,
-      portfolio_id: 2,
       is_active: true,
     });
     mockValueFindOne.mockResolvedValue({
@@ -489,7 +505,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
   it('409 duplicate value name: errors is the OBJECT {description, field: "value"} (T-03)', async () => {
     mockListFindOne.mockResolvedValue({
       id: 2,
-      portfolio_id: 2,
       is_active: true,
     });
     mockValueFindOne
@@ -538,7 +553,6 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     });
     mockListFindOne.mockResolvedValue({
       id: 2,
-      portfolio_id: 2,
       is_active: true,
     });
     mockGetInUseCount.mockResolvedValue(3);

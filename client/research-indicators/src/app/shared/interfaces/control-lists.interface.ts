@@ -32,14 +32,13 @@ export interface ControlListSummary {
  * The full list entity returned by A6 (201) / A7 (design §4).
  *
  * Mirrors the server's `ControlListResponse` literally (`control-lists.types.ts`, produced by
- * `mapList()` in `control-lists.service.ts`): `{ id, portfolioId, categoryId, key, name,
+ * `mapList()` in `control-lists.service.ts`): `{ id, categoryId, key, name,
  * description, codePrefix: string, isSystem }`. Reviewer FAIL (T-02 rework): an earlier draft
  * had `listKey` and a nullable `codePrefix` that were never on the wire — do not rename or
  * widen a field here without checking that file first.
  */
 export interface ControlList {
   id: number;
-  portfolioId: number;
   categoryId: number;
   key: string;
   name: string;
@@ -60,7 +59,7 @@ export interface ControlListCreatePayload {
 /**
  * A7 update body: `{name?, description?}` — **`listKey` is never sent** (design §4 A7,
  * §5 rule 3: the update DTO omits it so `forbidNonWhitelisted` returns 400 for a caller that
- * tries). `categoryId` (list move, same portfolio only) is part of the A7 contract but this
+ * tries). `categoryId` (list move, any category) is part of the A7 contract but this
  * slice's UI has no control that reassigns a list's category — not built here (Not Done).
  */
 export interface ControlListUpdatePayload {
@@ -75,27 +74,19 @@ export interface ControlListUpdatePayload {
  */
 export interface ControlListCategory {
   id: number;
-  portfolioId: number;
   name: string;
   description: string | null;
   displayOrder: number;
   lists: ControlListSummary[];
 }
 
-/** A2 — drives the "(not configured)" portfolio-selector label (design §4). */
-export interface ControlListPortfolioSummary {
-  portfolioId: number;
-  categories: number;
-}
-
-/** A3 create body: `{portfolioId, name, description?}`. */
+/** A3 create body: `{name, description?}` — category names are unique module-wide (409 on a duplicate). */
 export interface ControlListCategoryCreatePayload {
-  portfolioId: number;
   name: string;
   description?: string;
 }
 
-/** A4 update body: `{name?, description?}` — no `portfolioId` (categories never move portfolios). */
+/** A4 update body: `{name?, description?}`. */
 export interface ControlListCategoryUpdatePayload {
   name?: string;
   description?: string;

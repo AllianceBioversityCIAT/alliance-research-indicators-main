@@ -61,7 +61,7 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ### T-01 — Slice 1: global lists, reads by key, System admin menu and roles
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-00
+- **Status:** done (2026-10-13 — see `execution.md` T-01) · **Size:** L · **Dependencies:** T-00
 - **Requirements covered:**
   - R-CLG-001 — *One set of lists for everyone* (incl. **BUT** must NOT require or accept a portfolio on A1); *Stale caller* (incl. **AND IT MUST NOT** create or change any row); AC.1, AC.2 (A1, A3, A4, A6, A7).
   - R-CLG-002 — *Duplicate name in any letter case* (incl. **AND IT MUST** be enforced by a DB unique index); AC.1.
@@ -95,11 +95,11 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Review:** `full` — authorization change, schema rewrite, shared sidebar and routes.
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] `migration:test:execute` output quoted; schema checks (columns, indexes) quoted; seed suite green.
-  - [ ] Server: `npm test -- --silent`, `npm run test:integration -- control-lists`, `npx eslint src/domain/entities/control-lists src/db/seeds`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`.
-  - [ ] Falsifiers 1–7 each observed red, then reverted.
-  - [ ] A1, A3–A13 in `/swagger` with the new roles and without `portfolioId` on A1 (local boot; quote what was seen).
-  - [ ] Sweeps quoted with their hit lists.
+  - [x] `migration:test:execute` output quoted; schema checks (columns, indexes) quoted; seed suite green.
+  - [x] Server: `npm test -- --silent`, `npm run test:integration -- control-lists`, `npx eslint src/domain/entities/control-lists src/db/seeds`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`. *(Server full suite: 3 failures = archive baseline.)*
+  - [x] Falsifiers 1–7 each observed red, then reverted. *(F2 red was a PK-duplicate rejection, not an affected-row count — execution.md T-01.)*
+  - [x] A1, A3–A13 in `/swagger` with the new roles and without `portfolioId` on A1 (local boot; quote what was seen). *(Reduced boot: real controller with `main.ts` Swagger config; full `main.ts` would consume the shared RabbitMQ queue — D-EX-4.)*
+  - [x] Sweeps quoted with their hit lists. *(`center-admin/control-lists` = 5 spec-only negative assertions, not 0 — D-EX-3.)*
 
 ### T-02 — Slice 2: values applicable per portfolio
 

@@ -47,7 +47,6 @@ import {
   ControlListCategoryCreatePayload,
   ControlListCategoryUpdatePayload,
   ControlListCreatePayload,
-  ControlListPortfolioSummary,
   ControlListUpdatePayload,
   ControlListValue,
   ControlListValueCreatePayload,
@@ -244,13 +243,8 @@ export class ApiService {
   };
 
   // @akili-spec institutional-performance/control-lists T-01 (A1–A5) — categories only; lists/values follow in T-02/T-03.
-  GET_ControlListCategories = (portfolioId: number): Promise<MainResponse<ControlListCategory[]>> => {
-    const httpParams = new HttpParams().set('portfolioId', String(portfolioId));
-    return this.TP.get('control-lists/categories', { params: httpParams });
-  };
-
-  GET_ControlListPortfolioSummaries = (): Promise<MainResponse<ControlListPortfolioSummary[]>> => {
-    return this.TP.get('control-lists/portfolios/summary', {});
+  GET_ControlListCategories = (): Promise<MainResponse<ControlListCategory[]>> => {
+    return this.TP.get('control-lists/categories', {});
   };
 
   POST_ControlListCategory = (body: ControlListCategoryCreatePayload): Promise<MainResponse<ControlListCategory>> => {

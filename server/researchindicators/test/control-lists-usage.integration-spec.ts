@@ -11,25 +11,32 @@ import { ControlListCategoryRepository } from '../src/domain/entities/control-li
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
 import { ControlListUsageRegistry } from '../src/domain/entities/control-lists/control-list-usage.registry';
-import { PortfoliosService } from '../src/domain/entities/portfolios/portfolios.service';
-import { PortfoliosRepository } from '../src/domain/entities/portfolios/repositories/portfolios.repository';
+import { ControlListValueLookupService } from '../src/domain/entities/control-lists/control-list-value-lookup.service';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard, ROLES_KEY } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
-import { ResultsUtil } from '../src/domain/shared/utils/results.util';
-import { PortfolioUtil } from '../src/domain/shared/utils/portfolio.util';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
 
 /**
- * T-04 (docs/specs/institutional-performance/control-lists) — server
- * integration: the in-use protection (A9 inUse, A12 block, R-CTL-005) and
- * the consumer read (A13, R-CTL-006/007) against a REAL MySQL connection.
+ * Control Lists — usage: the in-use protection (A9 inUse, A12 block,
+ * R-CTL-005) and the consumer contract by key (A13, R-CLG-004; originally
+ * R-CTL-006/007) against a REAL MySQL connection
+ * (docs/specs/changes/control-lists-global-scope, T-01).
  *
- * Evidence DB (requester, 2026-10-01): the user's local development
- * database `ari_local_mysql`, 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*`
- * resolve there (printed below). This suite:
- *  - creates its own scratch category/list/values (TEST_PREFIX below), never
- *    touching a seeded row;
+ * R-CLG-004 on the real database: the consumer read needs no portfolio
+ * (200, ordered values; unknown key 404), is open to an authenticated
+ * Contributor, and the membership check `assertValueInList(valueId, listKey)`
+ * answers pass / 400 naming the expected key / 404 for the seeded `org.level`
+ * and `kpi.direction` lists. Only seeded rows are READ; the ordered-read test
+ * filters to the seeded value ids 20-23 so an extra value an admin may have
+ * added to `org.level` cannot make it fail.
+ *
+ * Evidence DB: the requester's local database `ari_local_mysql`,
+ * 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*` resolve there (printed below) —
+ * NOT a disposable schema. This suite:
+ *  - creates its own scratch category/list/values (TEST_PREFIX below), all
+ *    ABOVE the seeded id ranges (categories 1-2, lists 1-6, values 1-23), and
+ *    never updates or deletes a seeded row;
  *  - creates ONE temporary consumer table with a plain FK to
  *    `control_list_values.id` `ON DELETE RESTRICT` (design §5 rule 5,
  *    D-CTL-3) to prove the DB backstop, and DROPs it in `afterAll` inside a
@@ -38,21 +45,21 @@ import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
  *    `ControlListUsageRegistry` instance resolved from the same module the
  *    controller/service use, reading its count from that temporary table.
  *
- * Scope note (KZ-017): same as the T-01/T-02/T-03 integration suites — a
+ * Scope note (KZ-017): same as the other control-lists integration suites — a
  * test-only middleware stands in for `JwtMiddleware`; this does not reach
  * `ResponseInterceptor` / `GlobalExceptions` or Swagger (those are pinned at
- * the unit layer — `control-lists.global-exceptions.spec.ts`). The A13
- * CONTRIBUTOR test below proves the RBAC contract ("a non-admin role still
- * gets 200 through the real RolesGuard") — it does NOT prove an
- * unauthenticated request gets 401, because the test-only middleware always
- * sets `req.user`; that boundary is `JwtMiddleware`'s, which no T-0x
- * integration suite in this spec exercises.
+ * the unit layer — `control-lists.global-exceptions.spec.ts`,
+ * `control-lists.validation.spec.ts`). The A13 CONTRIBUTOR test below proves
+ * the RBAC contract ("a non-admin role still gets 200 through the real
+ * RolesGuard") — it does NOT prove an unauthenticated request gets 401,
+ * because the test-only middleware always sets `req.user`; that boundary is
+ * `JwtMiddleware`'s, which no integration suite in this spec exercises.
  */
-describe('Control Lists — usage: in-use protection and consumer read against real MySQL (T-04)', () => {
+describe('Control Lists — usage: in-use protection and consumer contract by key against real MySQL (T-01)', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let registry: ControlListUsageRegistry;
-  let portfolio2Id: number;
+  let lookup: ControlListValueLookupService;
   let scratchCategoryId: number;
   let scratchListId: number;
   let scratchListKey: string;
@@ -91,34 +98,22 @@ describe('Control Lists — usage: in-use protection and consumer read against r
     });
     await dataSource.initialize();
 
-    const [portfolio2] = await dataSource.query(
-      `SELECT id FROM portfolios WHERE start_year = 2026 AND end_year = 2030 LIMIT 1`,
-    );
-    if (!portfolio2) {
-      throw new Error(
-        'Portfolio 2 (start_year=2026, end_year=2030) was not found on the ' +
-          'resolved DB — this suite requires the pre-existing portfolios ' +
-          'seed to already be applied.',
-      );
-    }
-    portfolio2Id = Number(portfolio2.id);
-
     // Scratch category + list + 3 values, inserted directly (this suite is
     // about in-use/consumer-read behaviour, not category/list/value CRUD —
     // that is T-01/T-02/T-03's).
     scratchListKey = `${TEST_PREFIX}key_${Date.now()}`;
 
     const categoryInsert = await dataSource.query(
-      `INSERT INTO control_list_categories (portfolio_id, name, display_order, is_active, created_at)
-       VALUES (?, ?, 0, 1, NOW())`,
-      [portfolio2Id, `${TEST_PREFIX}category_${Date.now()}`],
+      `INSERT INTO control_list_categories (name, display_order, is_active, created_at)
+       VALUES (?, 0, 1, NOW())`,
+      [`${TEST_PREFIX}category_${Date.now()}`],
     );
     scratchCategoryId = Number(categoryInsert.insertId);
 
     const listInsert = await dataSource.query(
-      `INSERT INTO control_lists (portfolio_id, category_id, list_key, name, code_prefix, is_system, is_active, created_at)
-       VALUES (?, ?, ?, ?, 'T04', 0, 1, NOW())`,
-      [portfolio2Id, scratchCategoryId, scratchListKey, `${TEST_PREFIX}list`],
+      `INSERT INTO control_lists (category_id, list_key, name, code_prefix, is_system, is_active, created_at)
+       VALUES (?, ?, ?, 'T04', 0, 1, NOW())`,
+      [scratchCategoryId, scratchListKey, `${TEST_PREFIX}list`],
     );
     scratchListId = Number(listInsert.insertId);
 
@@ -180,25 +175,19 @@ describe('Control Lists — usage: in-use protection and consumer read against r
           useFactory: () => new ControlListValueRepository(dataSource),
         },
         ControlListUsageRegistry,
-        PortfoliosService,
-        {
-          provide: PortfoliosRepository,
-          useFactory: () => new PortfoliosRepository(dataSource),
-        },
+        // The singleton membership check consumers call (R-CLG-004).
+        ControlListValueLookupService,
         CurrentUserUtil,
         Reflector,
         RolesGuard,
-        SetUpInterceptor,
-        {
-          provide: ResultsUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
-        {
-          provide: PortfolioUtil,
-          useValue: { setup: jest.fn().mockResolvedValue(undefined) },
-        },
       ],
-    }).compile();
+    })
+      // The controller's `@UseInterceptors(SetUpInterceptor)` only primes
+      // per-request context this module never reads; replacing it keeps any
+      // hand-wired provider it would need out of the suite.
+      .overrideInterceptor(SetUpInterceptor)
+      .useValue({ intercept: (_ctx, next) => next.handle() })
+      .compile();
 
     // The SAME registry instance the controller/service resolve through DI
     // — registering here reaches getCategories/getValues/removeValue inside
@@ -207,6 +196,9 @@ describe('Control Lists — usage: in-use protection and consumer read against r
     // this reach every request).
     registry = moduleRef.get<ControlListUsageRegistry>(
       ControlListUsageRegistry,
+    );
+    lookup = moduleRef.get<ControlListValueLookupService>(
+      ControlListValueLookupService,
     );
     registry.register({
       consumerName: 'T-04 Integration Test Consumer',
@@ -233,7 +225,7 @@ describe('Control Lists — usage: in-use protection and consumer read against r
         sec_user_id: 1,
         roles: rolesHeader
           ? JSON.parse(rolesHeader as string)
-          : [SecRolesEnum.CENTER_ADMIN],
+          : [SecRolesEnum.TECHNICAL_SUPPORT],
       };
       next();
     });
@@ -253,28 +245,30 @@ describe('Control Lists — usage: in-use protection and consumer read against r
         [valueInUseId, valueNotInUseId, valueInactiveId],
       );
       await dataSource.query(`DROP TABLE IF EXISTS ${TEMP_TABLE}`);
+      // Every cleanup below is bounded above the seeded id ranges.
       await dataSource.query(
-        `DELETE FROM control_list_values WHERE list_id = ?`,
+        `DELETE FROM control_list_values WHERE list_id = ? AND id > 23`,
         [scratchListId],
       );
-      await dataSource.query(`DELETE FROM control_lists WHERE id = ?`, [
-        scratchListId,
-      ]);
       await dataSource.query(
-        `DELETE FROM control_list_categories WHERE id = ?`,
+        `DELETE FROM control_lists WHERE id = ? AND id > 6`,
+        [scratchListId],
+      );
+      await dataSource.query(
+        `DELETE FROM control_list_categories WHERE id = ? AND id > 2`,
         [scratchCategoryId],
       );
       // Belt-and-suspenders sweep by prefix, in case any id capture above
       // failed before assignment (mirrors the other T-0x integration
       // suites' final LIKE-prefix cleanup).
       await dataSource.query(
-        `DELETE FROM control_list_values WHERE code LIKE 'T04-%' AND value LIKE '${TEST_PREFIX}%'`,
+        `DELETE FROM control_list_values WHERE code LIKE 'T04-%' AND value LIKE '${TEST_PREFIX}%' AND id > 23`,
       );
       await dataSource.query(
-        `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%'`,
+        `DELETE FROM control_lists WHERE name LIKE '${TEST_PREFIX}%' AND id > 6`,
       );
       await dataSource.query(
-        `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%'`,
+        `DELETE FROM control_list_categories WHERE name LIKE '${TEST_PREFIX}%' AND id > 2`,
       );
     } finally {
       if (dataSource?.isInitialized) await dataSource.destroy();
@@ -294,7 +288,7 @@ describe('Control Lists — usage: in-use protection and consumer read against r
   it('A9 attaches the REAL registered-provider count per value (3 for the referenced value, 0 for the other)', async () => {
     const response = await request(app.getHttpServer())
       .get(`/lists/${scratchListId}/values`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(200);
 
     const values = response.body.data as Array<{ id: number; inUse: number }>;
@@ -310,7 +304,7 @@ describe('Control Lists — usage: in-use protection and consumer read against r
   it('A12 returns 409 naming the count and proposing deactivation for the in-use value, and deletes nothing', async () => {
     const response = await request(app.getHttpServer())
       .delete(`/values/${valueInUseId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(409);
 
     const errors = response.body?.errors ?? response.body?.message;
@@ -345,7 +339,7 @@ describe('Control Lists — usage: in-use protection and consumer read against r
   it('A12 returns 200 and deletes the NOT-in-use value', async () => {
     const response = await request(app.getHttpServer())
       .delete(`/values/${valueNotInUseId}`)
-      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
       .expect(200);
 
     expect(Number(response.body?.data?.id)).toBe(valueNotInUseId);
@@ -364,7 +358,6 @@ describe('Control Lists — usage: in-use protection and consumer read against r
   it('A13 returns 200 for an authenticated CONTRIBUTOR (not an admin role) through the real route/guard/pipe', async () => {
     const response = await request(app.getHttpServer())
       .get(`/by-key/${scratchListKey}/values`)
-      .query({ portfolioId: portfolio2Id })
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]))
       .expect(200);
 
@@ -383,7 +376,7 @@ describe('Control Lists — usage: in-use protection and consumer read against r
   it('A13 includes the inactive value when activeOnly=false', async () => {
     const response = await request(app.getHttpServer())
       .get(`/by-key/${scratchListKey}/values`)
-      .query({ portfolioId: portfolio2Id, activeOnly: 'false' })
+      .query({ activeOnly: 'false' })
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]))
       .expect(200);
 
@@ -393,14 +386,60 @@ describe('Control Lists — usage: in-use protection and consumer read against r
     expect(codes).toContain('T04-03');
   });
 
-  // R-CTL-006 "unknown key for the portfolio → 404".
-  it('A13 returns 404 for an unknown key in the portfolio', async () => {
+  // R-CLG-004 AC.1: an unknown key is a 404.
+  it('A13 returns 404 for an unknown key', async () => {
     const response = await request(app.getHttpServer())
       .get(`/by-key/${TEST_PREFIX}unknown_key/values`)
-      .query({ portfolioId: portfolio2Id })
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]))
       .expect(404);
 
     expect(response.body?.message ?? response.body?.errors).toBeDefined();
+  });
+
+  // R-CLG-004 *Read by key* · AND IT MUST NOT need a portfolio: the seeded
+  // org.level list (values 20-23, display order 1-4) comes back ordered, for a
+  // Contributor, with no parameter at all. Only the seeded ids are compared,
+  // so an extra value an admin added later cannot break this test.
+  it('A13 returns the seeded org.level values L1..L4 in display order with no parameter, for a Contributor', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/by-key/org.level/values')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]))
+      .expect(200);
+
+    const seeded = (
+      response.body.data as Array<{ id: number | string; code: string }>
+    ).filter((v) => Number(v.id) >= 20 && Number(v.id) <= 23);
+    expect(seeded.map((v) => v.code)).toEqual(['L1', 'L2', 'L3', 'L4']);
+  });
+
+  // R-CLG-004 AC.2 against the real seeded rows (value 20 = L1 of org.level,
+  // value 8 = DIR-01 of kpi.direction): pass / 400 naming the expected key /
+  // 404 for an unknown id. The check is read-only.
+  describe('assertValueInList(valueId, listKey) against the seeded lists (R-CLG-004 AC.2)', () => {
+    it('returns the value when it belongs to the list with that key', async () => {
+      const value = await lookup.assertValueInList(20, 'org.level');
+      expect(Number(value.id)).toBe(20);
+      expect(value.code).toBe('L1');
+    });
+
+    it('throws 400 naming the expected key for a value of another list', async () => {
+      await expect(
+        lookup.assertValueInList(8, 'org.level'),
+      ).rejects.toMatchObject({
+        status: 400,
+        message: expect.stringContaining('kpi.direction'),
+      });
+      await expect(
+        lookup.assertValueInList(8, 'org.level'),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('org.level'),
+      });
+    });
+
+    it('throws 404 for an unknown value id', async () => {
+      await expect(
+        lookup.assertValueInList(999999999, 'org.level'),
+      ).rejects.toMatchObject({ status: 404 });
+    });
   });
 });

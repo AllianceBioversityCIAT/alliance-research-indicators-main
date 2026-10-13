@@ -89,18 +89,7 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             label: 'Portfolio Management',
             link: '/administration/center-admin/portfolio-management',
             icon: 'pi-briefcase',
-            iconSize: '13px',
-            // @akili-spec institutional-performance/control-lists — F-3: nested one level
-            // under Portfolio Management. Organizational Structure and Strategy Framework
-            // are added by their own specs (design §6.1).
-            children: [
-              {
-                label: 'Control Lists',
-                link: '/administration/center-admin/control-lists',
-                icon: 'pi-list',
-                iconSize: '13px'
-              }
-            ]
+            iconSize: '13px'
           }
         ]
       });
@@ -122,6 +111,15 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             label: 'Prompt Manager',
             link: '/administration/configuration/prompt-manager',
             icon: 'pi-sparkles',
+            iconSize: '13px'
+          },
+          // @akili-spec changes/control-lists-global-scope T-01 — D-CLG-7: lists are system-wide
+          // settings, so the item lives under System admin; the route uses the same guard
+          // (`appConfigurationGuard`) so menu visibility and route access stay identical.
+          {
+            label: 'Control Lists',
+            link: '/administration/configuration/control-lists',
+            icon: 'pi-list',
             iconSize: '13px'
           }
         ]

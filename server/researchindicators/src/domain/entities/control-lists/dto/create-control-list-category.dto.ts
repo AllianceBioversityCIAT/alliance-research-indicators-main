@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -10,17 +9,9 @@ import {
 
 export class CreateControlListCategoryDto {
   @ApiProperty({
-    type: Number,
-    description: 'Portfolio id the category belongs to',
-    example: 2,
-  })
-  @IsInt()
-  @IsNotEmpty()
-  portfolioId!: number;
-
-  @ApiProperty({
     type: String,
-    description: 'Category name, unique per portfolio (case-insensitive)',
+    description:
+      'Category name, unique across all categories (case-insensitive)',
     example: 'Key Performance Indicators (KPIs)',
     minLength: 1,
     maxLength: 150,
