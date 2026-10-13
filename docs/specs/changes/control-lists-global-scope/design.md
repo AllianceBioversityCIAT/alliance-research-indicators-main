@@ -263,11 +263,11 @@ Triggered: D-CLG-1, 4, 5, 6 remove delivered behavior. Question asked to one rev
 
 | Measure | Estimate |
 | --- | --- |
-| Tasks | 4: **T-00 HITL** §3.1 on the TEST DB (and the app DB if local); T-01 server; T-02 client; T-03 HITL (role/menu check with a Center Admin and a Technical Support user + mockup) |
+| Tasks | 4 (vertical slices, as D-CTL-16): **T-00 HITL** — revert the old migrations on the local DB **before** the files are rewritten (§3.1 steps 1–2); **T-01** slice 1 — global lists, key reads, menu and roles (server + screen; reruns the migrations, §3.1 steps 3–4); **T-02** slice 2 — values applicable per portfolio (server + screen, migration `…003`); **T-03 HITL** — role/menu check with a Center Admin and a Technical Support user + mockup |
 | LOC changed (incl. tests) | ~2,950 changed lines (≈ −900 / +2,050): list-level portfolio removal, menu/role move (~200), *Applies to* (~900), seed module + seed suite + loader check (~200), transaction + atomicity test (~150) |
 | Review rounds | ≤ 2 per task; ≤ 6 total |
 
-Matches **Standard**. One PR (server + client), because the API contract and the page change in lock-step.
+Matches **Standard**. One PR per slice (T-01, T-02), each with server + client because the API contract and the page change in lock-step; both slices may also ship as one PR.
 
 ## 15. Open questions
 None.
