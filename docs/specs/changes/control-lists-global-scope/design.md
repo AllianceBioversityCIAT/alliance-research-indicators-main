@@ -9,7 +9,7 @@
 - **Modifies:** archived Control Lists design ([`design.md`](../../archive/2026-10-08-institutional-performance--control-lists/design.md)); its decisions are cited as `D-CTL-n`
 - **Visual reference:** artboard *1 · Control Lists (System admin, global)*, updated 2026-10-13 — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP · [`../../institutional-performance/mockup/ControlledLists.dc.html`](../../institutional-performance/mockup/ControlledLists.dc.html)
 - **Exploration:** direct `grep`/reads (§13), one reversion-challenge scout (§12.1), Judgment Day round 1 (two judges, `judgment.md`)
-- **Last updated:** 2026-10-13 (JD round 1: J-1…J-14, S-1…S-7)
+- **Last updated:** 2026-10-13 (JD round 1: J-1…J-14, S-1…S-7; round 2: R2-1…R2-5; requester-approved after escalation: R3-1, R3-2)
 
 ---
 
@@ -61,7 +61,7 @@ flowchart LR
 | `…/dto/get-categories-query.dto.ts` | Becomes an **empty** query DTO, kept on purpose so `forbidNonWhitelisted` rejects a stale `portfolioId` (D-CLG-3). An empty DTO with no params passes, because Nest's `ValidationPipe` defaults `forbidUnknownValues` to `false` (`@nestjs/common` 10.4.19 `validation.pipe.js:25`) — pinned by a positive test (§10) |
 | `…/dto/get-list-values-by-key-query.dto.ts` | `portfolioId` becomes **optional** (`@IsOptional @Type(() => Number) @IsInt @Min(1)`); keep `activeOnly` |
 | `…/dto/create-control-list-value.dto.ts` | Add optional `portfolioIds?: number[]` with `@ValidateIf(o => o.portfolioIds !== undefined)` **and no `@IsOptional`** (on one class class-validator ANDs conditional validators, so `@IsOptional` would let `null` through), then `@IsArray @ArrayUnique @IsInt({each}) @Min(1,{each})`, `@ApiPropertyOptional({ type: [Number] })` |
-| `…/dto/update-control-list-value.dto.ts` | Add `'portfolioIds'` to the explicit `PickType([...])` list (`:12-19`), otherwise `forbidNonWhitelisted` rejects it on A11; it inherits the create DTO's validators (no `@IsOptional` to override) |
+| `…/dto/update-control-list-value.dto.ts` | Add `'portfolioIds'` to the explicit `PickType([...])` list (`:12-19`), otherwise `forbidNonWhitelisted` rejects it on A11. **Also re-declare `@ValidateIf((d) => d.portfolioIds !== undefined) portfolioIds?: number[]` in the class**: `PartialType` re-applies `@IsOptional` to every picked key, which would let `null` through; an own `@ValidateIf` replaces it, exactly as `code`, `value`, `displayOrder` and `isActive` already do (`:21-62`) — R3-1 |
 | `…/dto/create-control-list.dto.ts` | Swagger text: key unique module-wide (remove the D-CTL-2 wording) |
 | `…/control-lists.types.ts` | Drop `portfolioId` from category/list shapes; delete `PortfolioCategoriesSummary`; `ControlListValueResponse` gains `appliesTo: number[]` and `appliesToAll: boolean` (§4) |
 | `…/control-lists.service.ts` | Remove `getPortfoliosSummary`, `assertPortfolioExists` (404) and the cross-portfolio checks (D-CTL-13). Inject `DataSource` and the link repository. New private `assertPortfolioIdsValid(ids)` → **400** naming `portfolioIds` (batch lookup of **active** portfolios); new `assertFilterPortfolio(id)` → **404** for A13 (S-5). Duplicate checks module-wide; errno 1062 mapping kept (D-CTL-11). `mapValue` attaches `appliesTo`/`appliesToAll` for A9, A10, A11 and A13 |
@@ -72,6 +72,7 @@ flowchart LR
 | `test/control-lists-isolation.integration-spec.ts` | **Deleted** (its subject no longer exists — R-CLG-007) |
 | `test/control-lists-{categories,lists,values,usage}.integration-spec.ts` | Drop portfolio fixtures and `portfolioId` params; drop the hand-wired `PortfoliosService`/`PortfoliosRepository`/`PortfolioUtil` providers; rename "unknown key in the portfolio"; add the §10 integration cases |
 | `test/control-lists-seed.integration-spec.ts` | **New:** seed idempotency and seeded-id checks (§10, J-1) |
+| `package.json` (jest `collectCoverageFrom`) | Add `!**/db/seeds/**`, as `db/migrations` already is: the seed module is exercised only by the integration suite, which the unit coverage run does not include — R3-2 |
 | `docs/specs/kaizen/institutional-performance--control-lists.md` (:106, :136) | Consumer-guide text updated to `assertValueInList(valueId, listKey)` and `by-key/:listKey/values?portfolioId=`(optional); dated note that this change removed the list-level portfolio |
 
 **Client** — `client/research-indicators/src/app/`
@@ -118,6 +119,8 @@ The migrations change content under the same names, so any DB that ran the old v
 | --- | --- | --- |
 | **TEST** — the one the integration suites use | `ARI_TEST_MYSQL_*` (`orm.test.config.ts`) | `npm run migration:test:revert` until `1790900000000-createControlListCategories` has been reverted (run `npm run typeorm migration:show -- -d ./src/db/config/mysql/orm.test.config.ts` after each, ANSI codes stripped — K-014), then `npm run migration:test:execute` |
 | **Requester's app DB** (`ARI_MYSQL_*`) | `orm.config.ts` | **Only if `ARI_MYSQL_HOST` is local.** If it points at the shared Dev DB, stop: Dev never ran these migrations (proposal fact 3.7) and will get them through the pipeline after merge (root `CLAUDE.md` §4.3). Local: `npm run migration:revert` until `…000` is reverted, then `npm run migration:dev:execute` (`src` config — **not** `migration:execute`, which runs the stale `dist` build) |
+
+**Requester's setup (checked 2026-10-13 in `server/researchindicators/.env`, host/name only):** `ARI_MYSQL_*` and `ARI_TEST_MYSQL_*` both point at the same local DB (`127.0.0.1`, `stardb`), so the procedure runs **once** and covers both rows of the table above; the shared Dev DB is not involved.
 
 Steps: (1) export any hand-made control-list rows to keep; (2) revert as above — the number of reverts depends on whether `…003` already ran, so revert **by name, not by count**; (3) execute; (4) check: `SHOW COLUMNS FROM control_list_categories LIKE 'portfolio_id'` and the same for `control_lists` → empty; `SHOW TABLES LIKE 'control_list_value_portfolios'` → 1 row; `SHOW INDEX … WHERE Key_name IN ('uq_control_list_categories_name','uq_control_lists_key')` → `Non_unique = 0`; seeded ids present (`id <= 2`, `id <= 6`, `id <= 23`).
 
@@ -183,7 +186,7 @@ Log lines drop the portfolio field from category/list writes; value writes log t
 
 | Layer | Tests | Fails when (falsifier) |
 | --- | --- | --- |
-| Server unit — validation | Real `ValidationPipe({whitelist, forbidNonWhitelisted, transform})`: A1 with **no** params → passes (200 path); `portfolioId` → 400 on A1 query, A3/A4/A6/A7 bodies; `portfolioIds: null`, `[1,1]`, `["a"]`, `[0]` → 400 on A10 **and** A11; `portfolioIds` omitted and `[]` accepted on both | `'portfolioIds'` missing from the `PickType` list; `@IsOptional` added to the create DTO (`null` passes on A10); an empty A1 DTO that rejects everything |
+| Server unit — validation | Real `ValidationPipe({whitelist, forbidNonWhitelisted, transform})`: A1 with **no** params → passes (200 path); `portfolioId` → 400 on A1 query, A3/A4/A6/A7 bodies; `portfolioIds: null`, `[1,1]`, `["a"]`, `[0]` → 400 on A10 **and** A11; `portfolioIds` omitted and `[]` accepted on both | `'portfolioIds'` missing from the `PickType` list; `@IsOptional` added to the create DTO (`null` passes on A10); the update DTO without its own `@ValidateIf` (`null` passes on A11); an empty A1 DTO that rejects everything |
 | Server unit — service | *Applies to* create/replace/clear/omitted-unchanged; inactive or unknown id → **400** (not 404); A13 filter rule incl. `activeOnly`; duplicate name/key → 409 via pre-check **and**, with the pre-check stubbed to pass, via a simulated errno 1062; lookup pass / other list 400 / unknown 404 | Reusing the old 404 check; mapping only on the pre-check path |
 | Server unit — controller | Envelope per handler; roles metadata `[SYSTEM_ADMIN, TECHNICAL_SUPPORT]` on A1, A3–A12, absent on A13; route inventory has no A2 | A handler keeps `CENTER_ADMIN` |
 | Global exceptions | Envelope of the new 400s and 409 through real `GlobalExceptions` | — |

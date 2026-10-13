@@ -125,3 +125,14 @@ Requester decision (2026-10-13): treat **J-1 as severe** and correct it together
 Two fix rounds and two scoped re-judgments used (protocol ceiling). R3-1 remains → **escalated to the requester**; no further automatic round.
 
 JUDGMENT: ESCALATED ⚠️
+
+## 10. Post-escalation decision (requester, 2026-10-13)
+
+The requester chose to correct R3-1 and R3-2 in the design and continue, outside the Judgment Day lineage (no further judgment round).
+
+| Item | Correction |
+| --- | --- |
+| R3-1 | `UpdateControlListValueDto` re-declares `@ValidateIf((d) => d.portfolioIds !== undefined) portfolioIds?: number[]` (design §2.1); the §10 falsifier lists the missing override |
+| R3-2 | `!**/db/seeds/**` added to jest `collectCoverageFrom` (design §2.1) |
+
+The lineage stays **ESCALATED**; these corrections are the requester's decision, not a judgment verdict.
