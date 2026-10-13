@@ -68,6 +68,12 @@
   // docs/specs/project-dashboard/indicator-metadata-charts/design.md §7.6.
   --ac-chip-blue-bg: #e8f0f7;
   --ac-chip-blue-fg: #345b8f;
+  // Pill chips (role filters, quick views): tokens shared with the Pooled Funding Monitor (--ac-pfm-*)
+  --ac-pfm-accent-navy: #0d2b4e;
+  --ac-pfm-info-bg: #e7eefa;
+  --ac-pfm-neutral-fg: #5a6878;
+  --ac-pfm-surface: #ffffff;
+  --ac-pfm-surface-border: #e4e9f0;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -187,4 +193,9 @@ $colors: (
   --ac-pool-funding-border: #66bb6a;
   --ac-chip-blue-bg: #253448;
   --ac-chip-blue-fg: #b0c4dd;
+  --ac-pfm-accent-navy: #7c9cb9;
+  --ac-pfm-info-bg: #1b2b46;
+  --ac-pfm-neutral-fg: #aab5c0;
+  --ac-pfm-surface: #23272d;
+  --ac-pfm-surface-border: #363c45;
 }
