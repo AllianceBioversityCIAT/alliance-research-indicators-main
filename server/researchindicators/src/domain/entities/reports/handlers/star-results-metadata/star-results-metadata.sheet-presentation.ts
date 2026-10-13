@@ -20,64 +20,16 @@ export const STAR_RAW_LOGO_EXT_PX = {
   height: Math.round((76 * 96) / 72),
 };
 
-/**
- * Fallback column groups if `report_workbook_column_group` has no rows (e.g. migration pending).
- */
-export const STAR_RAW_COLUMN_GROUP_FALLBACK: Array<{
-  fromCol: number;
-  toCol: number;
-  label: string;
-  fillArgb: string;
-}> = [
-  { fromCol: 1, toCol: 14, label: 'GENERAL INFORMATION', fillArgb: 'FF203C61' },
-  { fromCol: 15, toCol: 22, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
-  { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
-  { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
-  { fromCol: 28, toCol: 29, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
-  {
-    fromCol: 30,
-    toCol: 30,
-    label: 'LINK TO RESULT',
-    fillArgb: 'FF7E57C2',
-  },
-  { fromCol: 31, toCol: 35, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
-  {
-    fromCol: 36,
-    toCol: 56,
-    label: 'CAPSHARING DETAILS',
-    fillArgb: 'FF4D7C31',
-  },
-  {
-    fromCol: 57,
-    toCol: 60,
-    label: 'POLICY DETAILS',
-    fillArgb: 'FFDA7842',
-  },
-  {
-    fromCol: 61,
-    toCol: 87,
-    label: 'INNOVATION DETAILS',
-    fillArgb: 'FF00897B',
-  },
-  {
-    fromCol: 88,
-    toCol: 101,
-    label: 'OICR DETAILS',
-    fillArgb: 'FFD9A041',
-  },
-];
-
-/** Preamble without column groups (groups come from DB or fallback in the handler). */
+/** Preamble without column groups or banner end (both are set by the handler). */
 export const STAR_RAW_SHEET_PREAMBLE_BASE: Omit<
   ExcelSheetPreamble,
-  'columnGroups'
+  'columnGroups' | 'bannerTitleMergeToCol'
 > = {
   bannerTitle: 'ALLIANCE RESULTS',
   bannerTitleHorizontalAlign: 'left',
   bannerTitleFillArgb: STAR_RAW_BANNER_TITLE_FILL_ARGB,
   bannerTitleFontArgb: STAR_RAW_BANNER_TITLE_FONT_ARGB,
   bannerTitleMergeFromCol: 3,
-  bannerTitleMergeToCol: 101,
   logoMergeFromCol: 1,
   logoMergeToCol: 2,
   /** Row 1 only so row 2 subtitle merge does not overlap the logo merge. */
