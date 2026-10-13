@@ -151,7 +151,7 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
     counters made clickable, and `matchesRole()` calls the very same `isPiOf()` / `isDelegateOf()`
     those counters use. Re-deriving the rule inside the filter is how a chip ends up showing a
     different set than the number it sits under. They combine with the search box (AND) and
-    `clearFilters()` resets them. Beside them, under a "Quick filters" label, sit two **independent toggles**
+    `clearFilters()` resets them. Beside them, under the "Quick views" label, sit two **independent toggles**
     (`ongoingOnly`, `withoutDelegatesOnly`) that AND with any role chip, each other and the search:
     *Ongoing projects* uses the Status badge's own rule (`statusDisplay().statusId === 1`; a missing
     status, rendered "—", is not ongoing) and

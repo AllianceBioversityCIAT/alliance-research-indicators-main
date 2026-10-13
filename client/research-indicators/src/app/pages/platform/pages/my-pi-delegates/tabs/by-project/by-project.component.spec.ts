@@ -1131,10 +1131,10 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
     });
 
-    it('renders the "Quick filters" label in the Quick-views style', () => {
+    it('renders the "Quick views" label in the Quick-views style', () => {
       const label = fixture.nativeElement.querySelector('.by-project__quick-filters-label') as HTMLElement;
       expect(label).not.toBeNull();
-      expect(label.textContent?.trim()).toBe('Quick filters');
+      expect(label.textContent?.trim()).toBe('Quick views');
       expect(label.className).toContain('text-[11px]');
       expect(label.className).toContain('uppercase');
       expect(label.className).toContain('tracking-[0.08em]');
