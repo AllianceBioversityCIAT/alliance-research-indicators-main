@@ -36,7 +36,7 @@
         role="radiogroup" aria-label="Your role">
         @for (option of roleFilterOptions; track option.value; let i = $index) {
         <button type="button" role="radio"
-          class="by-project__role-filter cursor-pointer rounded-full border-0 px-4 py-0.5 font-['Barlow'] text-[13px] leading-[18px] font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+          class="by-project__role-filter cursor-pointer rounded-full border-0 px-4 py-1 font-['Barlow'] text-[13px] leading-[18px] font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
             roleTerm() === option.value
               ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]'
               : 'bg-transparent text-[var(--ac-pfm-accent-navy)]'
@@ -59,7 +59,7 @@
           @if (ongoingOnly()) {
           <i class="pi pi-check-square !text-[12px] leading-none" aria-hidden="true"></i>
           } @else {
-          <i class="pi pi-stop leading-none" aria-hidden="true"></i>
+          <i class="pi pi-stop !text-[12px] leading-none" aria-hidden="true"></i>
           }
           Ongoing projects
         </button>
@@ -73,7 +73,7 @@
           @if (withoutDelegatesOnly()) {
           <i class="pi pi-check-square !text-[12px] leading-none" aria-hidden="true"></i>
           } @else {
-          <i class="pi pi-stop leading-none" aria-hidden="true"></i>
+          <i class="pi pi-stop !text-[12px] leading-none" aria-hidden="true"></i>
           }
           Projects without delegates
         </button>
