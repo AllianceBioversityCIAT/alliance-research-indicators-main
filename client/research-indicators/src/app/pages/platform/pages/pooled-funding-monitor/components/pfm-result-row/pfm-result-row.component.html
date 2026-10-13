@@ -63,13 +63,14 @@
   </div>
   <div class="flex min-w-0 flex-wrap items-start gap-1" data-testid="pfm-row-sp">
     @for (sp of row().science_programs; track sp.code) {
-      <span
-        class="inline-flex rounded-[16px]"
-        [class.ring-2]="sp.primary"
-        [class.ring-offset-1]="sp.primary"
-        [style.--tw-ring-color]="sp.primary ? sp.color || 'var(--ac-pfm-accent-navy)' : null"
-        [attr.data-primary]="sp.primary"
-        data-testid="pfm-row-sp-tag">
+      <span class="inline-flex items-center gap-1" [attr.data-primary]="sp.primary" data-testid="pfm-row-sp-tag">
+        @if (sp.primary) {
+          <i
+            class="pi pi-star-fill !text-[12px]"
+            [style.color]="sp.color || 'var(--ac-pfm-accent-navy)'"
+            aria-hidden="true"
+            data-testid="pfm-row-sp-primary-star"></i>
+        }
         <app-custom-tag
           [statusName]="sp.code"
           [statusColor]="neutralTone.fg"

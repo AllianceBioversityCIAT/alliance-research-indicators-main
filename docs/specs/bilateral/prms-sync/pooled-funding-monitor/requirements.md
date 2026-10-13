@@ -342,7 +342,7 @@ Each row SHALL show the columns below. Rows inside a group are ordered: needs at
 | Creator | creator display name (first + last name of `results.created_by`); "-" when unresolved, as in the Results Center Creator column (DD-PFM-16) |
 | STAR status | Results Center status tag (`app-custom-tag`). Shows the raw STAR status name (`star_status_name`) with colours and icon from `star_status_config`; the tooltip and screen-reader text are `star_status_description`. Below the tag, only "Approved {dd Mon yyyy}" when approved. Filters and chips still use the D-3 label (DD-PFM-17, DD-PFM-19) |
 | Pool funding mapping | `app-custom-tag` with the mapping state in `--ac-pfm-*` tokens; tooltip and screen-reader text are the mapping note; nothing below the tag (DD-PFM-19) |
-| Science Programs | One `app-custom-tag` per SP. The tag text is the SP code; the primary comes first and is marked with a ring and screen-reader text ", primary". The tooltip and screen-reader text are the full SP name. "—" when there are none (DD-PFM-19) |
+| Science Programs | One `app-custom-tag` per SP. The tag text is the SP code; the primary comes first and is marked with a star icon (`pi-star-fill`, as in Alliance alignment) and screen-reader text ", primary". The tooltip and screen-reader text are the full SP name. "—" when there are none (DD-PFM-19) |
 | PRMS status | `app-custom-tag` in `--ac-pfm-*` tokens; "—" when *Not sent*; the tooltip and accessible text are the PRMS hint, including on the Not-sent dash (DD-PFM-19) |
 | Updated | "dd Mon, HH:mm" |
 | Action | **View** |

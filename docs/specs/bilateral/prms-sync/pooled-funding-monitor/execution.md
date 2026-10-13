@@ -886,3 +886,19 @@ Parallel-safe per root guide §4.3: different packages, separate `node_modules`,
 - **ADVISORY**
   - A screen reader announces "SP01 SP01 Breeding, primary". Fix by setting `aria-hidden` on the visible SP tag, or by dropping the code from the sr text.
   - Follow-up: make the house tooltip trigger focusable.
+
+#### HITL round 23 (owner, 2026-10-13): primary Science Program marked with a star, not a double border → **done (code); owner re-check pending**
+
+- **Owner request (verbatim):** "cuando el science program sea el primary no quiero que tenga doble borde como está ahí, quiero que tenga un ícono adicional de estrella así como en alliance alignment en projects".
+- **Precondition, noted:** the owner's earlier report ("hover en star status no funciona, no veo información en Science Programs") was not a code defect. Their running backend (`dist/main`) had started 2026-10-09 14:26, so it predated the round-22 server fields, and `nest --watch` had not reloaded. The data was confirmed read-only on the local DB:
+  - descriptions exist for statuses 2, 4, 5, 6 and 7;
+  - 41 results from 2026 have SP rows.
+  - The owner restarted the backend, and the screenshot confirms SP tags now render.
+- **Change (Leader inline, 1 template + 1 spec):**
+  - Removed `ring-2` / `ring-offset-1` from the primary SP wrapper.
+  - Added `<i class="pi pi-star-fill !text-[12px]">` before the primary tag, matching the markup in `alliance-alignment.component.html:113`. It uses the SP colour (fallback: the navy token), is `aria-hidden`, and the sr-only ", primary" is kept.
+  - The spec's ring assertions were replaced by star-present-on-primary / absent-on-contributing assertions.
+- **K-004:** renaming the star testid made the test fail (1 failed / 22 passed); restored afterwards.
+- **Gates:** PFM jest 97/97; eslint clean.
+- **Docs:** the R-PFM-012 Science Programs row now says the primary is marked with a star.
+- **Review:** no separate Reviewer spawn for this one-element visual swap. Recorded here.
