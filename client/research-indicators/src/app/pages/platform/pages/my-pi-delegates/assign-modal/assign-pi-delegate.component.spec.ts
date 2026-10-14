@@ -1228,7 +1228,7 @@ describe('AssignPiDelegateComponent', () => {
       // block and no repeated removal summary.
       expect(detail).toContain('<strong>D514</strong>');
       // the block opts out of the dialog's centred text
-      expect(detail).toContain('class="alert-detail-left"');
+      expect(detail).toContain('class="alert-detail-left alert-detail-scroll"');
       // lead sentence naming the project, then exactly one blank line
       expect(detail).toContain(
         '<div>The following changes were made in project <strong>D514</strong> — Project D514</div><div>&nbsp;</div>'
@@ -1242,6 +1242,30 @@ describe('AssignPiDelegateComponent', () => {
       expect(detail).not.toContain('Removal:');
       // Manuel was already a delegate — unchanged, so he is not listed
       expect(detail).not.toContain('Manuel Almanzar');
+    });
+
+    it('summarises unchanged projects in one line instead of a block each', async () => {
+      piService.byProjectCache.set([
+        buildProject('D514', [
+          { delegate_user_id: 1, name: 'Manuel Almanzar', email: 'manuel@test.org' }
+        ])
+      ]);
+      modalService.assignPiDelegateContext.set({ source: 'byProject', projectCode: 'D514' });
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      component.peopleSignal.set({
+        selected_people: [{ delegate_user_id: 1, name: 'Manuel Almanzar', email: 'manuel@test.org' }]
+      });
+
+      component.onConfirm();
+
+      const detail = actionsService.showGlobalAlertCalls[0].detail;
+      expect(detail).toContain('No changes for the selected projects.');
+      expect(detail).not.toContain('No changes for this project.');
+      expect(detail).not.toContain('<strong>D514</strong>');
     });
   });
   // ── Footer buttons live inside the content (Environment variables pattern) ──
