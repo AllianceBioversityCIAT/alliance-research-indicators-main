@@ -138,3 +138,66 @@ describe('UpdateControlListValueDto — read-only id and null rejection on code/
     },
   );
 });
+
+/**
+ * T-02 (changes/control-lists-global-scope) — R-CLG-009 AC.4 on A11, and the
+ * R3-1 correction of the Judgment Day review: `UpdateControlListValueDto` is
+ * `PartialType(PickType(...))`, and `PartialType` re-applies `@IsOptional()`
+ * to every picked key, which would let `portfolioIds: null` through. Two
+ * things must therefore hold, and each has its own falsifier:
+ *  - `'portfolioIds'` is in the explicit `PickType` list (otherwise
+ *    `forbidNonWhitelisted` rejects the field outright, even for a valid
+ *    array);
+ *  - the class re-declares `@ValidateIf(d => d.portfolioIds !== undefined)`,
+ *    which REPLACES the inherited `@IsOptional()` (same mechanism as `code`,
+ *    `value`, `displayOrder`, `isActive`).
+ * Omitted keeps the current set, `[]` clears it, a list replaces it.
+ */
+describe('UpdateControlListValueDto — portfolioIds (R-CLG-009, R3-1, T-02)', () => {
+  const rejectedWith = async (portfolioIds: unknown): Promise<string[]> => {
+    try {
+      await pipe.transform({ portfolioIds }, metadata);
+    } catch (error) {
+      return (error as { response: { message: string[] } }).response.message;
+    }
+    throw new Error('expected the pipe to reject');
+  };
+
+  it.each([
+    ['null', null],
+    ['a repeated id', [1, 1]],
+    ['a non-numeric id', ['a']],
+    ['zero', [0]],
+    ['a negative id', [-1]],
+    ['a non-integer id', [1.5]],
+    ['a non-array value', 1],
+  ])(
+    'rejects portfolioIds: %s with a 400 naming portfolioIds',
+    async (_label, portfolioIds) => {
+      const messages = await rejectedWith(portfolioIds);
+      expect(messages.length).toBeGreaterThan(0);
+      for (const message of messages) {
+        expect(message).toContain('portfolioIds');
+        // A property that is not whitelisted is ALSO a 400 naming it, so the
+        // assertion above alone cannot tell "field not declared" from "field
+        // declared and its value rejected": only the latter is the contract.
+        expect(message).not.toContain('should not exist');
+      }
+    },
+  );
+
+  it('accepts portfolioIds when OMITTED entirely (the current set is kept)', async () => {
+    const result = await pipe.transform({ description: 'unchanged' }, metadata);
+    expect(result.portfolioIds).toBeUndefined();
+  });
+
+  it('accepts an empty array (clears the set: the value applies to all)', async () => {
+    const result = await pipe.transform({ portfolioIds: [] }, metadata);
+    expect(result.portfolioIds).toEqual([]);
+  });
+
+  it('accepts a list of distinct positive integers (replaces the set)', async () => {
+    const result = await pipe.transform({ portfolioIds: [2, 1] }, metadata);
+    expect(result.portfolioIds).toEqual([2, 1]);
+  });
+});

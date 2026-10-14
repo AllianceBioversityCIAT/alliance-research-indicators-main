@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
+import { SelectModule } from 'primeng/select';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { ModalComponent } from '@shared/components/modal/modal.component';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
@@ -14,6 +15,7 @@ import {
   ControlListSummary,
   ControlListValue
 } from '@shared/interfaces/control-lists.interface';
+import { Portfolio } from '@shared/interfaces/portfolio.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -50,7 +52,24 @@ interface ValueFormValue {
   // level while still letting it happen at runtime. `saveValue()` normalises it before sending.
   displayOrder: number | null;
   isActive: boolean;
+  /** R-CLG-009 Applies to: the ticked portfolio ids; `[]` (none ticked) = all portfolios. */
+  portfolioIds: number[];
 }
+
+/** A values-table row: the A9 value plus the text of its Applies to column (also what the export writes). */
+interface ControlListValueRow extends ControlListValue {
+  appliesToLabel: string;
+}
+
+/** One entry of the *Show values for* filter. `0` is the *All portfolios* sentinel (no real portfolio has id 0). */
+interface PortfolioFilterOption {
+  label: string;
+  value: number;
+}
+
+const ALL_PORTFOLIOS_FILTER = 0;
+const PORTFOLIOS_UNAVAILABLE_NOTE =
+  'Portfolios could not be loaded, so Applies to cannot be edited and values cannot be filtered by portfolio. Reload the page to try again.';
 
 /**
  * A resolved client-side error: `message` is always display-safe text (never the exception
@@ -65,6 +84,8 @@ interface ControlListFieldError {
 // design §2.1, §4 (A1–A5), §6.1/§6.2; requirements R-CTL-001, R-CTL-002, R-CTL-007, R-CTL-008.
 // @akili-spec changes/control-lists-global-scope T-01 (client half): lists are global and read by
 // key — no selector, no list-level scope on any payload (design §2.1, §6; R-CLG-001, 005).
+// @akili-spec changes/control-lists-global-scope T-02 (client half): values can be restricted to
+// portfolios — Applies to column + filter + modal checkbox group (design §4 A9–A11, A13, §6; R-CLG-009).
 // Scope: header + category navigator + category-mode modal + delete confirm.
 @Component({
   selector: 'app-control-lists',
@@ -74,6 +95,7 @@ interface ControlListFieldError {
     FormsModule,
     ButtonModule,
     ToggleSwitchModule,
+    SelectModule,
     ModalComponent,
     InputComponent,
     TextareaComponent,
@@ -90,6 +112,12 @@ export default class ControlListsComponent implements OnInit {
   private readonly actions = inject(ActionsService);
 
   readonly categories = signal<ControlListCategory[]>([]);
+
+  // R-CLG-009 / design §6 Load: the ACTIVE portfolios, loaded with A1 and used only for Applies to
+  // (the column labels, the filter, the modal checkboxes). A failure degrades those three, never the page (S-4).
+  readonly portfolios = signal<Portfolio[]>([]);
+  readonly portfoliosLoadFailed = signal(false);
+  readonly portfoliosUnavailableNote = PORTFOLIOS_UNAVAILABLE_NOTE;
 
   readonly loading = signal(true);
   readonly loadError = signal(false);
@@ -161,7 +189,13 @@ export default class ControlListsComponent implements OnInit {
   readonly savingValue = signal(false);
   readonly deletingValueId = signal<number | null>(null);
   readonly editingValueId = signal<number | null>(null);
-  readonly valueForm = signal<ValueFormValue>({ code: '', value: '', description: '', displayOrder: 0, isActive: true });
+  readonly valueForm = signal<ValueFormValue>({ code: '', value: '', description: '', displayOrder: 0, isActive: true, portfolioIds: [] });
+  // True while editing a value that is linked ONLY to inactive portfolios (`appliesToAll = false`,
+  // `appliesTo = []`, D-CLG-14). Such a value shows no ticks, and sending `portfolioIds: []` for it
+  // would turn it into "all" without the admin asking — so an untouched empty selection is omitted.
+  private readonly editingNoActivePortfolio = signal(false);
+  // `0` = All portfolios (see PortfolioFilterOption). Reset whenever another list is selected.
+  readonly pfFilter = signal<number>(ALL_PORTFOLIOS_FILTER);
   // Design §6.2 Modal row: a field-named 409 on 'code' or 'value' (duplicate, R-CTL-004) is
   // shown inline under its own input — two separate signals because both fields can conflict
   // independently.
@@ -183,16 +217,37 @@ export default class ControlListsComponent implements OnInit {
   // Description, Order, In use, Active, Actions. "In use" (T-04, design §6.2 values table: "ID ·
   // Code · Value · Description · Order · In use · Active · Actions") sits between Order and
   // Active, sourced from A9's required `inUse` (design §4 A9, §5 rule 5).
-  readonly valueColumns: DataTableColumn<ControlListValue>[] = [
+  readonly valueColumns: DataTableColumn<ControlListValueRow>[] = [
     { field: 'id', header: 'ID', type: 'text', sortable: false },
     { field: 'code', header: 'Code', type: 'code', sortable: true },
     { field: 'value', header: 'Value', type: 'text', sortable: true },
     { field: 'description', header: 'Description', type: 'text', sortable: false },
     { field: 'displayOrder', header: 'Order', type: 'number', sortable: true },
+    { field: 'appliesToLabel', header: 'Applies to', type: 'text', sortable: true },
     { field: 'inUse', header: 'In use', type: 'number', sortable: false },
     { field: 'isActive', header: 'Active', type: 'badge', sortable: false }
   ];
-  readonly valueSearchFields: (keyof ControlListValue & string)[] = ['code', 'value', 'description'];
+  readonly valueSearchFields: (keyof ControlListValueRow & string)[] = ['code', 'value', 'description'];
+
+  readonly portfolioFilterOptions = computed<PortfolioFilterOption[]>(() => [
+    { label: 'All portfolios', value: ALL_PORTFOLIOS_FILTER },
+    ...this.portfolios().map(portfolio => ({ label: portfolio.name, value: this.portfolioId(portfolio) }))
+  ]);
+
+  // The A13 rule, applied client-side to the loaded values (design §6 / R-CLG-009): no filter → every
+  // value; portfolio P → values with no restriction (`appliesToAll`) + values whose `appliesTo`
+  // includes P. A value linked only to inactive portfolios (`appliesToAll = false`, `appliesTo = []`)
+  // matches no P, so it is never shown for any portfolio — and is NOT treated as "all".
+  readonly visibleValues = computed<ControlListValue[]>(() => {
+    const portfolioFilter = this.pfFilter();
+    const values = this.values();
+    if (portfolioFilter === ALL_PORTFOLIOS_FILTER) return values;
+    return values.filter(value => value.appliesToAll || value.appliesTo.includes(portfolioFilter));
+  });
+
+  readonly valueRows = computed<ControlListValueRow[]>(() =>
+    this.visibleValues().map(value => ({ ...value, appliesToLabel: this.appliesToLabel(value) }))
+  );
 
   // design §6.3 "Export … with the list name in the file name".
   readonly valuesExportFileName = computed(() => {
@@ -214,12 +269,14 @@ export default class ControlListsComponent implements OnInit {
   trackByCategoryId = (_: number, category: ControlListCategory): number => category.id;
   trackByListId = (_: number, list: ControlListSummary): number => list.id;
 
+  // design §6 Load: A1 and the active portfolios start together; neither waits for the other.
   async load(): Promise<void> {
-    await this.loadCategories();
+    await Promise.all([this.loadCategories(), this.loadPortfolios()]);
   }
 
   selectList(listId: number): void {
     this.selectedListId.set(listId);
+    this.pfFilter.set(ALL_PORTFOLIOS_FILTER);
     void this.loadValues(listId);
   }
 
@@ -270,6 +327,55 @@ export default class ControlListsComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  // Never rejects: a failure only sets `portfoliosLoadFailed` (the page keeps working, S-4). The
+  // portfolios endpoint lists active portfolios; `is_active === false` is filtered anyway so an
+  // inactive one can never be offered.
+  private async loadPortfolios(): Promise<void> {
+    this.portfoliosLoadFailed.set(false);
+
+    try {
+      const response = await this.api.GET_Portfolios();
+      if (response?.successfulRequest === false) {
+        this.portfoliosLoadFailed.set(true);
+        this.portfolios.set([]);
+        return;
+      }
+      const list = Array.isArray(response?.data) ? response.data : [];
+      this.portfolios.set(list.filter(portfolio => portfolio.is_active !== false));
+    } catch {
+      this.portfoliosLoadFailed.set(true);
+      this.portfolios.set([]);
+    }
+  }
+
+  portfolioId(portfolio: Portfolio): number {
+    return Number(portfolio.portfolio_id ?? portfolio.id ?? 0);
+  }
+
+  trackByPortfolioId = (_: number, portfolio: Portfolio): number => this.portfolioId(portfolio);
+
+  // Applies to column text (design §6): *All*, the portfolio names, or *No active portfolio*. With
+  // the portfolios call failed (or an id not in the active list) the id is shown instead.
+  private appliesToLabel(value: ControlListValue): string {
+    if (value.appliesToAll) return 'All';
+    if (value.appliesTo.length === 0) return 'No active portfolio';
+    const namesById = new Map(this.portfolios().map(portfolio => [this.portfolioId(portfolio), portfolio.name]));
+    return value.appliesTo.map(id => namesById.get(id) ?? String(id)).join(', ');
+  }
+
+  appliesToHint(): string {
+    return this.valueForm().portfolioIds.length > 0
+      ? 'Offered only in the ticked portfolios. Records that already use it stay valid.'
+      : 'None ticked = applies to all portfolios. Records that already use it stay valid.';
+  }
+
+  togglePortfolio(portfolioId: number, checked: boolean): void {
+    this.valueForm.update(current => {
+      const withoutId = current.portfolioIds.filter(id => id !== portfolioId);
+      return { ...current, portfolioIds: checked ? [...withoutId, portfolioId] : withoutId };
+    });
   }
 
   startCreate(): void {
@@ -330,8 +436,10 @@ export default class ControlListsComponent implements OnInit {
       value: value.value,
       description: value.description ?? '',
       displayOrder: value.displayOrder,
-      isActive: value.isActive
+      isActive: value.isActive,
+      portfolioIds: [...value.appliesTo]
     });
+    this.editingNoActivePortfolio.set(!value.appliesToAll && value.appliesTo.length === 0);
     this.openModal();
   }
 
@@ -636,6 +744,13 @@ export default class ControlListsComponent implements OnInit {
     // cleared Order sends a safe default of 0; on EDIT, the key is omitted entirely so a value
     // the admin otherwise left untouched is not silently reset to 0.
     const hasValidDisplayOrder = typeof formValue.displayOrder === 'number' && Number.isFinite(formValue.displayOrder);
+    // R-CLG-009: `[]` (none ticked) is sent as `[]` — it means "all portfolios". It is omitted only
+    // when the admin could not see or change the field: portfolios failed to load (S-4), or an
+    // untouched value whose links are all inactive (`editingNoActivePortfolio`) — in both cases an
+    // omitted key keeps the stored set (A11), whereas `[]` would silently clear it.
+    const sendPortfolioIds =
+      !this.portfoliosLoadFailed() && !(editingId !== null && this.editingNoActivePortfolio() && formValue.portfolioIds.length === 0);
+    const portfolioPayload = sendPortfolioIds ? { portfolioIds: formValue.portfolioIds } : {};
 
     try {
       const response =
@@ -645,14 +760,16 @@ export default class ControlListsComponent implements OnInit {
               value: trimmedValue,
               description: trimmedDescription || undefined,
               displayOrder: hasValidDisplayOrder ? (formValue.displayOrder as number) : 0,
-              isActive: formValue.isActive
+              isActive: formValue.isActive,
+              ...portfolioPayload
             })
           : await this.api.PATCH_ControlListValue(editingId, {
               code: trimmedCode,
               value: trimmedValue,
               description: trimmedDescription,
               ...(hasValidDisplayOrder ? { displayOrder: formValue.displayOrder as number } : {}),
-              isActive: formValue.isActive
+              isActive: formValue.isActive,
+              ...portfolioPayload
             });
 
       if (response?.successfulRequest === false) {
@@ -770,7 +887,8 @@ export default class ControlListsComponent implements OnInit {
 
   private resetValueForm(): void {
     this.editingValueId.set(null);
-    this.valueForm.set({ code: '', value: '', description: '', displayOrder: 0, isActive: true });
+    this.valueForm.set({ code: '', value: '', description: '', displayOrder: 0, isActive: true, portfolioIds: [] });
+    this.editingNoActivePortfolio.set(false);
     this.valueCodeFieldError.set(null);
     this.valueValueFieldError.set(null);
   }

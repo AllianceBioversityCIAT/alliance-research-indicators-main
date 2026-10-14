@@ -349,7 +349,7 @@ export class ControlListsController {
   @Get('by-key/:listKey/values')
   @ApiOperation({
     summary:
-      "Read a list's values by system key (consumer read, any authenticated user)",
+      "Read a list's values by system key, optionally filtered by portfolio (consumer read, any authenticated user)",
   })
   @ApiParam({
     name: 'listKey',
@@ -363,6 +363,13 @@ export class ControlListsController {
     required: false,
     description: 'Omit inactive values when true (default true)',
   })
+  @ApiQuery({
+    name: 'portfolioId',
+    type: Number,
+    required: false,
+    description:
+      'Optional filter (R-CLG-009): only the values that apply to this portfolio — those with no "Applies to" restriction plus those linked to it. Omit for every value. An unknown or inactive portfolio answers 404',
+  })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -375,7 +382,7 @@ export class ControlListsController {
     @Query() query: GetListValuesByKeyQueryDto,
   ) {
     return this.controlListsService
-      .getValuesByKey(listKey, query.activeOnly ?? true)
+      .getValuesByKey(listKey, query.activeOnly ?? true, query.portfolioId)
       .then((data) =>
         ResponseUtils.format({
           description: 'Values found',

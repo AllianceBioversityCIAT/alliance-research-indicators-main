@@ -98,6 +98,11 @@ export interface ControlListCategoryUpdatePayload {
 // listId, code, value, description, displayOrder, isActive, inUse }`. `inUse` is REQUIRED
 // (T-04, design §4 A9 "each with inUse: number") — A9 always sends it, summed across every
 // registered consumer (design §5 rule 5); it drives the values table's "In use" column.
+//
+// `appliesTo` / `appliesToAll` (changes/control-lists-global-scope T-02, design §4 A9–A11, A13,
+// D-CLG-9, D-CLG-14): `appliesTo` holds only ACTIVE portfolio ids; `appliesToAll` is true only when
+// the value has no restriction at all. `appliesToAll = false` with `appliesTo = []` therefore means
+// "linked only to inactive portfolios" — offered nowhere, never to be read as "all".
 export interface ControlListValue {
   id: number;
   listId: number;
@@ -107,6 +112,8 @@ export interface ControlListValue {
   displayOrder: number;
   isActive: boolean;
   inUse: number;
+  appliesTo: number[];
+  appliesToAll: boolean;
 }
 
 /**
@@ -121,6 +128,8 @@ export interface ControlListValueCreatePayload {
   description?: string;
   displayOrder?: number;
   isActive?: boolean;
+  /** Applies to (A10): omitted or `[]` = all portfolios; a list restricts the value. */
+  portfolioIds?: number[];
 }
 
 /**
@@ -133,4 +142,6 @@ export interface ControlListValueUpdatePayload {
   description?: string;
   displayOrder?: number;
   isActive?: boolean;
+  /** Applies to (A11): omitted = unchanged, `[]` = all portfolios, a list replaces the set. */
+  portfolioIds?: number[];
 }

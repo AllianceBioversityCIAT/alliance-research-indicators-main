@@ -1,11 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
+import { ControlListValuePortfolioRepository } from './repositories/control-list-value-portfolio.repository';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { UpdateControlListCategoryDto } from './dto/update-control-list-category.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
@@ -15,6 +19,8 @@ import { UpdateControlListValueDto } from './dto/update-control-list-value.dto';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
 import { ControlListValue } from './entities/control-list-value.entity';
+import { ControlListValuePortfolio } from './entities/control-list-value-portfolio.entity';
+import { Portfolio } from '../portfolios/entities/portfolio.entity';
 import {
   CurrentUserUtil,
   SetAuditEnum,
@@ -35,6 +41,16 @@ import { controlListNaturalCompare } from './control-list-natural-compare.util';
 // — no `.driverError` indirection needed.
 const MYSQL_DUPLICATE_ENTRY_ERRNO = 1062;
 
+// R-CLG-009 "Applies to" of one value, as the reads expose it (see
+// `ControlListValueResponse`). A value with no entry in the batch map has no
+// link rows, i.e. it applies to every portfolio.
+interface ValueAppliesTo {
+  appliesTo: number[];
+  appliesToAll: boolean;
+}
+
+const APPLIES_TO_ALL: ValueAppliesTo = { appliesTo: [], appliesToAll: true };
+
 @Injectable()
 export class ControlListsService {
   private readonly logger = new LoggerUtil({ name: ControlListsService.name });
@@ -45,6 +61,16 @@ export class ControlListsService {
     private readonly valueRepository: ControlListValueRepository,
     private readonly currentUser: CurrentUserUtil,
     private readonly usageRegistry: ControlListUsageRegistry,
+    // R-CLG-009: the value <-> portfolio link table (read here; written
+    // through the transaction's own manager, see `createValue`/`updateValue`).
+    private readonly linkRepository: ControlListValuePortfolioRepository,
+    // D-CLG-13: portfolios are read directly (active ones only) to validate an
+    // "Applies to" set and the A13 filter. `PortfoliosService.findOne` throws
+    // a 404, which is the wrong answer for a write, and importing
+    // `PortfoliosModule` would re-couple this module to portfolios.
+    @InjectRepository(Portfolio)
+    private readonly portfolioRepository: Repository<Portfolio>,
+    private readonly dataSource: DataSource,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -293,25 +319,39 @@ export class ControlListsService {
 
     // T-04 (design §5 rule 5): inUse is the sum of every registered
     // provider's count for each value id — 0 when none is registered yet.
-    const counts = await this.usageRegistry.getInUseCounts(
-      values.map((value) => value.id),
-    );
+    const valueIds = values.map((value) => value.id);
+    const counts = await this.usageRegistry.getInUseCounts(valueIds);
+    const appliesTo = await this.loadAppliesTo(valueIds);
 
     return values.map((value) =>
-      this.mapValue(value, counts.get(value.id) ?? 0),
+      this.mapValue(
+        value,
+        counts.get(value.id) ?? 0,
+        appliesTo.get(Number(value.id)),
+      ),
     );
   }
 
   // ---------------------------------------------------------------------
-  // A13 — GET /by-key/:listKey/values?activeOnly=
+  // A13 — GET /by-key/:listKey/values?activeOnly=&portfolioId=
   // ---------------------------------------------------------------------
   // Consumer read (design.md §8): no @Roles — any authenticated user.
   // R-CTL-006 "Ordered read": display order first, then natural code order
   // (`UOM-2` before `UOM-10` at equal order), mirroring the admin table's
   // own ordering semantics (R-CTL-009, client naturalCompare).
+  //
+  // R-CLG-009: with `portfolioId` it returns the values that apply to ALL
+  // portfolios (no link rows) plus those linked to that portfolio, and it
+  // combines with `activeOnly`. The filter is ONE query whose portfolio
+  // condition is a `Brackets` group, so its `OR` can never widen the
+  // surrounding `AND`s (design §5 rule 5; KZ-017 precedent: `A OR B AND C`
+  // read as `(A OR B) AND C`). That property lives in the generated SQL, so it
+  // is proven against a real MySQL (`test/control-lists-applies-to.integration-spec.ts`),
+  // never on this call sequence.
   async getValuesByKey(
     listKey: string,
     activeOnly: boolean,
+    portfolioId?: number,
   ): Promise<ControlListValueResponse[]> {
     // R-CLG-004: the key alone selects the list (it is unique module-wide).
     const list = await this.listRepository.findOne({
@@ -321,11 +361,31 @@ export class ControlListsService {
       throw new NotFoundException(`List "${listKey}" not found`);
     }
 
-    const values = await this.valueRepository.find({
-      where: activeOnly
-        ? { list_id: list.id, is_active: true }
-        : { list_id: list.id },
-    });
+    if (portfolioId !== undefined) {
+      await this.assertFilterPortfolio(portfolioId);
+    }
+
+    const query = this.valueRepository
+      .createQueryBuilder('cv')
+      .where('cv.list_id = :listId', { listId: list.id });
+    if (activeOnly) {
+      query.andWhere('cv.is_active = :isActive', { isActive: true });
+    }
+    if (portfolioId !== undefined) {
+      query.andWhere(
+        new Brackets((applies) => {
+          applies
+            .where(
+              `NOT EXISTS (SELECT 1 FROM control_list_value_portfolios cvp WHERE cvp.value_id = cv.id)`,
+            )
+            .orWhere(
+              `EXISTS (SELECT 1 FROM control_list_value_portfolios cvp WHERE cvp.value_id = cv.id AND cvp.portfolio_id = :portfolioId)`,
+              { portfolioId },
+            );
+        }),
+      );
+    }
+    const values = await query.getMany();
 
     const sorted = [...values].sort((a, b) => {
       if (a.display_order !== b.display_order) {
@@ -334,12 +394,16 @@ export class ControlListsService {
       return controlListNaturalCompare(a.code, b.code);
     });
 
-    const counts = await this.usageRegistry.getInUseCounts(
-      sorted.map((value) => value.id),
-    );
+    const sortedIds = sorted.map((value) => value.id);
+    const counts = await this.usageRegistry.getInUseCounts(sortedIds);
+    const appliesTo = await this.loadAppliesTo(sortedIds);
 
     return sorted.map((value) =>
-      this.mapValue(value, counts.get(value.id) ?? 0),
+      this.mapValue(
+        value,
+        counts.get(value.id) ?? 0,
+        appliesTo.get(Number(value.id)),
+      ),
     );
   }
 
@@ -351,6 +415,11 @@ export class ControlListsService {
     dto: CreateControlListValueDto,
   ): Promise<ControlListValueResponse> {
     const list = await this.findActiveListOrFail(listId);
+
+    // R-CLG-009: reject unknown/inactive "Applies to" ids (400 naming
+    // `portfolioIds`) before anything is read or written. Omitted and `[]`
+    // both mean "all portfolios" and need no check.
+    await this.assertPortfolioIdsValid(dto.portfolioIds);
 
     // Rework attempt 2 (Reviewer risk-lens FAIL, Leader decision A10):
     // attempt 1 only proposed when `dto.code === undefined`, so `''`,
@@ -389,16 +458,36 @@ export class ControlListsService {
       ...this.currentUser.audit(SetAuditEnum.NEW),
     };
 
+    // design §5 rule 4: the value and its "Applies to" links are one unit of
+    // work — a failure while storing the links rolls the value back too
+    // (R-CLG-009 "Partial save impossible"). Only the transaction's own
+    // manager is used inside the callback. The errno-1062 mapping wraps the
+    // WHOLE transaction call, so a duplicate code/value still becomes the
+    // named 409 and nothing is committed.
     let saved: ControlListValue;
     try {
-      saved = await this.valueRepository.save(newValue);
+      saved = await this.dataSource.transaction(async (manager) => {
+        const created = await manager
+          .getRepository(ControlListValue)
+          .save(newValue);
+        if (dto.portfolioIds?.length) {
+          await this.replaceLinks(manager, created.id, dto.portfolioIds);
+        }
+        return created;
+      });
     } catch (error) {
       this.rethrowAsValueConflictIfDuplicate(error, code, dto.value);
     }
 
-    this.logWrite('created', 'control_list_value', saved.id);
+    this.logWrite(
+      'created',
+      'control_list_value',
+      saved.id,
+      this.describePortfolioIds(dto.portfolioIds ?? []),
+    );
 
-    return this.mapValue(saved);
+    const appliesTo = await this.loadAppliesTo([saved.id]);
+    return this.mapValue(saved, 0, appliesTo.get(Number(saved.id)));
   }
 
   // ---------------------------------------------------------------------
@@ -409,6 +498,10 @@ export class ControlListsService {
     dto: UpdateControlListValueDto,
   ): Promise<ControlListValueResponse> {
     const value = await this.findValueOrFail(id);
+
+    // R-CLG-009: omitted keeps the current set (nothing to check), `[]`
+    // clears it, a list replaces it and must name active portfolios only.
+    await this.assertPortfolioIdsValid(dto.portfolioIds);
 
     if (dto.code !== undefined && dto.code !== value.code) {
       await this.assertCodeAvailable(value.list_id, dto.code, id);
@@ -430,8 +523,19 @@ export class ControlListsService {
       ...this.currentUser.audit(SetAuditEnum.UPDATE),
     };
 
+    // design §5 rule 4 / D-CLG-12: the value row is ALWAYS saved here, even
+    // for a links-only PATCH — `update` then carries just the audit fields, so
+    // the value's `updated_by`/`updated_at` record who changed its "Applies
+    // to" (the link table has no audit columns of its own). Value and links
+    // commit together or not at all; the errno-1062 mapping wraps the whole
+    // transaction call.
     try {
-      await this.valueRepository.update(id, update);
+      await this.dataSource.transaction(async (manager) => {
+        await manager.getRepository(ControlListValue).update(id, update);
+        if (dto.portfolioIds !== undefined) {
+          await this.replaceLinks(manager, id, dto.portfolioIds);
+        }
+      });
     } catch (error) {
       this.rethrowAsValueConflictIfDuplicate(
         error,
@@ -442,9 +546,17 @@ export class ControlListsService {
 
     const updated = await this.valueRepository.findOne({ where: { id } });
 
-    this.logWrite('updated', 'control_list_value', id);
+    this.logWrite(
+      'updated',
+      'control_list_value',
+      id,
+      dto.portfolioIds === undefined
+        ? 'portfolioIds=unchanged'
+        : this.describePortfolioIds(dto.portfolioIds),
+    );
 
-    return this.mapValue(updated);
+    const appliesTo = await this.loadAppliesTo([id]);
+    return this.mapValue(updated, 0, appliesTo.get(Number(id)));
   }
 
   // ---------------------------------------------------------------------
@@ -516,6 +628,122 @@ export class ControlListsService {
       throw new NotFoundException(`Value ${id} not found`);
     }
     return value;
+  }
+
+  // R-CLG-009 (write side): every id must be an existing, ACTIVE portfolio —
+  // anything else is a 400 naming `portfolioIds`, not a 404 (D-CLG-13, S-5):
+  // the portfolio is a field of the request body, not the resource asked for.
+  // One batch lookup for the whole set. Uniqueness and positivity are the
+  // DTO's job; omitted/`[]` need no database round trip.
+  private async assertPortfolioIdsValid(
+    portfolioIds: number[] | undefined,
+  ): Promise<void> {
+    if (!portfolioIds || portfolioIds.length === 0) {
+      return;
+    }
+    const active = await this.portfolioRepository.find({
+      where: { id: In(portfolioIds), is_active: true },
+      select: { id: true },
+    });
+    const activeIds = new Set(active.map((portfolio) => Number(portfolio.id)));
+    const rejected = portfolioIds.filter((id) => !activeIds.has(Number(id)));
+    if (rejected.length > 0) {
+      throw new BadRequestException({
+        message: {
+          description: `portfolioIds contains unknown or inactive portfolios: ${rejected.join(', ')}`,
+          field: 'portfolioIds',
+        },
+      });
+    }
+  }
+
+  // R-CLG-009 (read side, A13): the `portfolioId` filter must name an existing
+  // ACTIVE portfolio — otherwise 404 (the portfolio is the thing the read is
+  // scoped to, unlike the write where it is a body field).
+  private async assertFilterPortfolio(portfolioId: number): Promise<void> {
+    const portfolio = await this.portfolioRepository.findOne({
+      where: { id: portfolioId, is_active: true },
+      select: { id: true },
+    });
+    if (!portfolio) {
+      throw new NotFoundException(`Portfolio ${portfolioId} not found`);
+    }
+  }
+
+  // R-CLG-009: make the value's link rows exactly `portfolioIds`. Runs on the
+  // TRANSACTION's manager (never `this.linkRepository`, which is bound to its
+  // own connection and would escape the transaction). `[]` leaves no rows,
+  // i.e. "applies to all".
+  private async replaceLinks(
+    manager: EntityManager,
+    valueId: number,
+    portfolioIds: number[],
+  ): Promise<void> {
+    const linkRepository = manager.getRepository(ControlListValuePortfolio);
+    await linkRepository.delete({ value_id: valueId });
+    if (portfolioIds.length > 0) {
+      await linkRepository.insert(
+        portfolioIds.map((portfolioId) => ({
+          value_id: valueId,
+          portfolio_id: portfolioId,
+        })),
+      );
+    }
+  }
+
+  // R-CLG-009 (read side, A9/A10/A11/A13): loads the "Applies to" of a whole
+  // batch of values in two constant queries (the link rows, then which of the
+  // linked portfolios are still active) — never one query per value. Ids are
+  // coerced with `Number()` because MySQL BIGINT can arrive as a string
+  // (design §4). `appliesToAll` is "no link rows at all"; `appliesTo` keeps only
+  // ACTIVE portfolios, so a value linked solely to deactivated portfolios is
+  // `appliesToAll: false, appliesTo: []` (D-CLG-14). Values absent from the
+  // returned map have no links and apply to all.
+  private async loadAppliesTo(
+    valueIds: number[],
+  ): Promise<Map<number, ValueAppliesTo>> {
+    const result = new Map<number, ValueAppliesTo>();
+    if (valueIds.length === 0) {
+      return result;
+    }
+
+    const links = await this.linkRepository.find({
+      where: { value_id: In(valueIds) },
+    });
+    if (links.length === 0) {
+      return result;
+    }
+
+    const linkedPortfolioIds = [
+      ...new Set(links.map((link) => Number(link.portfolio_id))),
+    ];
+    const active = await this.portfolioRepository.find({
+      where: { id: In(linkedPortfolioIds), is_active: true },
+      select: { id: true },
+    });
+    const activeIds = new Set(active.map((portfolio) => Number(portfolio.id)));
+
+    for (const link of links) {
+      const valueId = Number(link.value_id);
+      const entry = result.get(valueId) ?? {
+        appliesTo: [],
+        appliesToAll: false,
+      };
+      const portfolioId = Number(link.portfolio_id);
+      if (activeIds.has(portfolioId)) {
+        entry.appliesTo.push(portfolioId);
+      }
+      result.set(valueId, entry);
+    }
+    for (const entry of result.values()) {
+      entry.appliesTo.sort((a, b) => a - b);
+    }
+    return result;
+  }
+
+  // design §9: the value write logs name the "Applies to" set that was sent.
+  private describePortfolioIds(portfolioIds: number[]): string {
+    return `portfolioIds=${JSON.stringify(portfolioIds)}`;
   }
 
   private async assertCategoryNameAvailable(
@@ -749,9 +977,10 @@ export class ControlListsService {
     action: 'created' | 'updated' | 'deleted',
     entity: string,
     id: number,
+    detail?: string,
   ): void {
     this.logger._log(
-      `control_lists.${action} entity=${entity} id=${id} user_id=${this.currentUser.user_id}`,
+      `control_lists.${action} entity=${entity} id=${id} user_id=${this.currentUser.user_id}${detail ? ` ${detail}` : ''}`,
     );
   }
 
@@ -809,6 +1038,7 @@ export class ControlListsService {
   private mapValue(
     value: ControlListValue,
     inUse = 0,
+    appliesTo: ValueAppliesTo = APPLIES_TO_ALL,
   ): ControlListValueResponse {
     return {
       id: value.id,
@@ -819,6 +1049,9 @@ export class ControlListsService {
       displayOrder: value.display_order,
       isActive: value.is_active,
       inUse,
+      // Copied so the shared default is never handed out by reference.
+      appliesTo: [...appliesTo.appliesTo],
+      appliesToAll: appliesTo.appliesToAll,
     };
   }
 

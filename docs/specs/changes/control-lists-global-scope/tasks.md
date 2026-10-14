@@ -103,7 +103,7 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ### T-02 — Slice 2: values applicable per portfolio
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01
+- **Status:** done (2026-10-14 — see `execution.md` T-02) · **Size:** L · **Dependencies:** T-01
 - **Requirements covered:**
   - R-CLG-009 — *Value for one portfolio only* (**BUT** must NOT return the restricted value for Portfolio 1); *No filter*; *Restricting a value already in use* (**AND IT MUST** keep those records valid); *Unknown portfolio*; *Portfolio deactivated after linking* (**AND IT MUST NOT** be returned for any portfolio nor shown as "all"); *Partial save impossible*; AC.1–AC.5.
   - R-CLG-004 AC.1 — the optional `portfolioId` filter on A13.
@@ -129,10 +129,10 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Review:** `full` — new table, transaction, filter semantics.
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] `migration:test:execute` output and `SHOW CREATE TABLE control_list_value_portfolios` quoted.
-  - [ ] Same command set as T-01, all green; falsifiers 1–5 observed red, then reverted.
-  - [ ] A9–A11, A13 in `/swagger` with `portfolioIds` / optional `portfolioId`.
-  - [ ] Final leftover sweep: only *Applies to* / filter hits, each listed.
+  - [x] `migration:test:execute` output and `SHOW CREATE TABLE control_list_value_portfolios` quoted.
+  - [x] Same command set as T-01, all green; falsifiers 1–5 observed red, then reverted. *(Server full suite: 3 failures = archive baseline. F1 failed on a different case than predicted — the prediction was wrong; see execution.md T-02.)*
+  - [x] A9–A11, A13 in `/swagger` with `portfolioIds` / optional `portfolioId`. *(Reduced boot as D-EX-4; full-app `/swagger` owed at T-03.)*
+  - [x] Final leftover sweep: only *Applies to* / filter hits, each listed.
 
 ### T-03 — HITL: roles, menu and mockup
 

@@ -82,3 +82,70 @@ describe('CreateControlListValueDto — code propose-vs-reject and trim (T-03 re
     expect(result.code).toBe(thirty);
   });
 });
+
+/**
+ * T-02 (changes/control-lists-global-scope) — R-CLG-009 AC.4: the value's
+ * optional `portfolioIds` ("Applies to") on A10. Omitted and `[]` are valid
+ * (apply to all portfolios); `null`, a repeated id, a non-integer or an id
+ * below 1 is a 400 naming `portfolioIds`.
+ *
+ * `null` is the case that needs the DTO's own `@ValidateIf(o => o.portfolioIds
+ * !== undefined)` WITHOUT `@IsOptional()`: class-validator ANDs the two
+ * conditional validators on one class, and `@IsOptional()` skips every
+ * validator for `null` — so adding it back lets `null` through (falsifier 2 in
+ * tasks.md T-02).
+ */
+describe('CreateControlListValueDto — portfolioIds (R-CLG-009, T-02)', () => {
+  const rejectedWith = async (portfolioIds: unknown): Promise<string[]> => {
+    try {
+      await pipe.transform({ value: 'Decrease', portfolioIds }, metadata);
+    } catch (error) {
+      return (error as { response: { message: string[] } }).response.message;
+    }
+    throw new Error('expected the pipe to reject');
+  };
+
+  it.each([
+    ['null', null],
+    ['a repeated id', [1, 1]],
+    ['a non-numeric id', ['a']],
+    ['zero', [0]],
+    ['a negative id', [-1]],
+    ['a non-integer id', [1.5]],
+    ['a non-array value', 1],
+  ])(
+    'rejects portfolioIds: %s with a 400 naming portfolioIds',
+    async (_label, portfolioIds) => {
+      const messages = await rejectedWith(portfolioIds);
+      expect(messages.length).toBeGreaterThan(0);
+      for (const message of messages) {
+        expect(message).toContain('portfolioIds');
+        // A property that is not whitelisted is ALSO a 400 naming it, so the
+        // assertion above alone cannot tell "field not declared" from "field
+        // declared and its value rejected": only the latter is the contract.
+        expect(message).not.toContain('should not exist');
+      }
+    },
+  );
+
+  it('accepts portfolioIds when OMITTED entirely', async () => {
+    const result = await pipe.transform({ value: 'Decrease' }, metadata);
+    expect(result.portfolioIds).toBeUndefined();
+  });
+
+  it('accepts an empty array (applies to all portfolios)', async () => {
+    const result = await pipe.transform(
+      { value: 'Decrease', portfolioIds: [] },
+      metadata,
+    );
+    expect(result.portfolioIds).toEqual([]);
+  });
+
+  it('accepts a list of distinct positive integers', async () => {
+    const result = await pipe.transform(
+      { value: 'Decrease', portfolioIds: [1, 2] },
+      metadata,
+    );
+    expect(result.portfolioIds).toEqual([1, 2]);
+  });
+});

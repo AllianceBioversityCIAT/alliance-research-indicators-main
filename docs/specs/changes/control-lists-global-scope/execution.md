@@ -176,3 +176,103 @@ Rulings: (a) the portfolios load and `portfolios` signal removed entirely, altho
 2. Re-add the active-portfolios load (`GET_Portfolios`) in parallel with A1, failure disabling the field (design §6, S-4).
 3. A13's `portfolioId` becomes optional; the T-01 tests that pin "A13 has only `activeOnly`" must be updated, not deleted.
 4. The local DB has PrmsWebhook + `…000–…002` applied; T-02 adds `…003` only. `migration:show` currently reports pending 0.
+
+---
+
+### T-02 — Slice 2: values applicable per portfolio
+
+- **Final status:** PASS (attempt 1 of 3)
+- **Date:** 2026-10-13 → 2026-10-14
+- **Requirements covered:** R-CLG-009 (all scenarios, AC.1–AC.5), R-CLG-004 AC.1 (optional filter), R-CLG-005 AC.2, R-CLG-006 AC.2 (link table).
+- **Dispatch:** two Implementers in parallel (`akili-implementer`/sonnet). Server + DB: effort `xhigh`; client: effort `high`. **Skill deviation:** `tdd` was added to both (filter rule and validators; expected values from the R-CLG-009 scenarios). The T-01 forward pointers 1–4 were copied into the briefs.
+- **Review mode:** parallel lens reviewers (`akili-reviewer`/opus), A = server/DB, B = client. Diff given as validated files (`t02-server.diff` 3,612 lines, `Brackets` ×7; `t02-client.diff` 959 lines, `appliesTo` ×38). Both Reviewers read them in full.
+
+#### Attempt 1 — files changed (29; `git diff --cached --stat`: +3,442 / −77)
+- **DB:** **new** `src/db/migrations/1790900000003-createControlListValuePortfolios.ts`.
+- **Server:**
+  - New: `entities/control-list-value-portfolio.entity.ts`, `repositories/control-list-value-portfolio.repository.ts` (+spec).
+  - Modified: service, types, controller, module, DTOs (create value, update value, by-key query) and their specs (service, controller, validation, global-exceptions, 3 DTO specs).
+  - New integration suites: `test/control-lists-applies-to.integration-spec.ts` (30 tests), `test/control-lists-module-wiring.integration-spec.ts` (beyond the brief, accepted), `test/support/control-lists-providers.ts`. The four T-01 suites change only their provider wiring.
+- **Client:** page component (ts, html, spec), `control-lists.interface.ts`.
+
+#### Database evidence (server Implementer; host `127.0.0.1`/`stardb` checked before every command)
+```
+Migration CreateControlListValuePortfolios1790900000003 has been executed successfully.
+(down proven: revert → DROP TABLE control_list_value_portfolios → re-executed)
+CREATE TABLE `control_list_value_portfolios` (
+  `value_id` bigint NOT NULL,
+  `portfolio_id` bigint NOT NULL,
+  PRIMARY KEY (`value_id`,`portfolio_id`),
+  KEY `idx_control_list_value_portfolios_portfolio` (`portfolio_id`),
+  CONSTRAINT `FK_control_list_value_portfolios_portfolio_id` FOREIGN KEY (`portfolio_id`) REFERENCES `portfolios` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `FK_control_list_value_portfolios_value_id` FOREIGN KEY (`value_id`) REFERENCES `control_list_values` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+```
+`migration:show` (test config, ANSI stripped): exit 0, applied 349, pending 0, error lines 0. After the integration runs: portfolios 1 and 2 `is_active=1` with `updated_at` unchanged; rows 2/6/23; 0 link rows.
+
+#### Verification
+| Check | Who | Result |
+| --- | --- | --- |
+| `npx jest src/domain/entities/control-lists` + entities.module + main.routes `--silent` | server Implementer | 18 suites / 289 tests passed |
+| `npm run test:integration -- control-lists` | server Implementer | 7 suites / 104 tests passed, run twice |
+| `npx eslint …control-lists src/db/seeds src/db/migrations/17909000000*.ts test/control-lists-*.ts test/support/control-lists-providers.ts` | server Implementer | exit 0 (probed red once) |
+| `npm run build` (server) | server Implementer | exit 0 |
+| Targeted client jest (page + data-table) | client Implementer | 2 suites / 91 tests passed; red-first 22/81 before implementing |
+| `npm run lint -- --quiet` (client) | client Implementer | All files pass (probed red once) |
+| `npx ng build` | client Implementer | exit 0, pre-existing warnings only |
+| **Server `npm test -- --silent` (full)** | **Leader, serial, after both reported** | `Test Suites: 2 failed, 433 passed, 435 total` · `Tests: 3 failed, 4250 passed, 4253 total`. The 3 failures are the archive baseline (`capdev-bulk-summary.template` byte-equality; `entity-metadata` ×2), unchanged |
+| **Client `npm test -- --silent` (full)** | **Leader, after the server run** | `Test Suites: 345 passed, 345 total` · `Tests: 7973 passed, 7973 total` |
+| **Client `npx tsc -p tsconfig.spec.json --noEmit`** (Reviewer B ADVISORY 2; client guide K-002) | **Leader** | exit 2 with **945** `error TS` lines, equal to the pre-existing total recorded in root `CLAUDE.md` §4.3. **0** in the control-lists page spec. 13 in `alliance-sidebar.component.spec.ts` (282, 491–531) and `api.service.spec.ts` (69–70, 2256), on lines outside the blocks this spec changed. **Inference, not a measured before/after set:** the per-file baseline at `0d3dbacf` was not taken. |
+
+#### Falsifiers (each observed red on its own assertion, then reverted byte-identical)
+1. A13 without `Brackets` (`.andWhere(NOT EXISTS).orWhere(EXISTS)`) → real MySQL, 5 failed. P1 + `activeOnly=true`: `Expected - 0 / Received + 2`, `Array [74, +81, 78, +79, 80]` (79 = inactive P1-restricted value, 81 = a P1-restricted value of **another list**). P1 + `activeOnly=false` leaks 81. **Differs from the tasks.md prediction** ("P1 + `activeOnly=false` returns an inactive restricted value"), which was itself wrong: with `activeOnly=false` inactive values are legitimate. The observed red is on the row-set assertion and is stronger. Reviewer A accepted it.
+2. `@IsOptional` on the create DTO → DTO spec `expected the pipe to reject`; A10 `null` `expected 400 "Bad Request", got 201 "Created"`.
+3. Update DTO's own `@ValidateIf` removed → A11 `null` `expected 400 "Bad Request", got 500 "Internal Server Error"`.
+4. Writes outside the transaction → A11 `Expected: "atom-original" Received: "atom-renamed"`; A10 `Expected length: 0 Received length: 1`.
+5. "No active links" = all → SQL: `Expected value: not 103 Received array: [101,…,107]`; read side: `- "appliesToAll": false + true` (unit + integration). Portfolio restored after each run.
+- Extra server reds: omitted `portfolioIds` clears links; links-only PATCH skips the value row (`updated_by Expected: 1 Received: 0`); A13 lookup without `is_active` (`expected 404, got 200`); write validation without `is_active` (`expected 400, got 201`); module without `forFeature([Portfolio])` → wiring suite red.
+- Client reds: filter "no active links = all" → 3 failures (`+ "Legacy band"`); `portfolioIds: undefined` when none ticked → 4 failures; *No active portfolio* branch removed → 3 failures; forced `sendPortfolioIds = true` → 2 failures.
+
+#### Sweeps (final leftover)
+- Server: migrations `…000–…002` 0 · seed 0 · `test/control-lists-values` 0. Every other hit in the module, `…003` and `test/` is *Applies to* / filter / link-table code, or a T-01 stale-caller / A2-absence test (per-file table in the Implementer report: service 72, module 8, controller 4, DTOs 10/6/6, link entity 9, `…003` 15, applies-to suite 126, wiring suite 22).
+- Client: page non-spec hits are all *Applies to* / filter (filter `p-select`, `portfoliosLoadFailed` note, modal fieldset, `portfolioIds`); interface: the `appliesTo` doc comment + `portfolioIds?` on the payloads; control-list methods of `api.service.ts` 0.
+
+#### Swagger (NFR-CLG-003)
+Reduced boot, as D-EX-4: the real controller under `main.ts`'s DocumentBuilder with a stub service. A10/A11 bodies have `portfolioIds: array<number>` (example `[2]`). A13 has `portfolioId` query (number, `required: false`), summary "Read a list's values by system key, optionally filtered by portfolio…". The full-app `/swagger` is still owed at T-03.
+
+#### Reviewer A (server/DB) — `STATUS: PASS`
+> The server and database half of T-02 matches design §2.1, §3, §4 and §5 rules 4–5, D-CLG-12/13/14 and R-CLG-009 AC.1–AC.5. The migration was executed and its `down` proven, the filter and atomicity are proven on real MySQL with a fixture that can tell a filter from no filter, and falsifiers 1–5 were observed red.
+
+Rulings: (b) service 400 shape `{description, field:'portfolioIds'}` → accepted; (c) A13 always one QueryBuilder, with unit tests that check only the call wiring → accepted (precedence is proven on SQL); (e) extra module-wiring suite → accepted.
+
+**ADVISORY (A, not gating):**
+1. RELIABILITY — `assertPortfolioIdsValid` runs before `dataSource.transaction(...)`, not inside it. A portfolio deactivated between the check and the commit can be linked, and D-CLG-14 hides it on read. Harmless.
+2. RESILIENCE — two concurrent A11 PATCHes with `portfolioIds` on a link-less value can deadlock (errno 1213), which surfaces as a bare 500. Not executed; low impact on an admin screen.
+3. RISK — the applies-to suite toggles `is_active` on the two lowest-id portfolios of local `stardb` (restored in `finally`/`afterAll`, with a precondition). Suggest failing fast on a non-local `ARI_TEST_MYSQL_HOST` instead of only printing it.
+
+#### Reviewer B (client) — `STATUS: PASS`
+> The client half meets T-02's screen scope and R-CLG-009 AC.2: Applies to column, A13-equivalent filter on a fixture that can tell filtering from no filtering, checkbox group, export column, and a degraded mode when portfolios fail to load. Omitting `portfolioIds` in two cases is a sound, data-preserving reading of A11's "omitted = unchanged" that the Leader must record as a D-EX.
+
+Rulings: (b) omission → in scope, acceptable gap-fill (D-EX-5); (a) `name` instead of short names → acceptable, the design text should change (D-EX-6); (g) both 400 shapes reach the admin through `extractFieldError` / the toast fallback → not a violation.
+
+**ADVISORY (B, not gating):**
+1. RELIABILITY (reachable) — a value linked only to inactive portfolios can never be made "all" from the page. Tick then untick P1 and save: `[]` plus `editingNoActivePortfolio` means the key is omitted, so the value stays *No active portfolio*, while the hint says "None ticked = applies to all portfolios". **Surfaced to the requester; not added to this spec.**
+2. VERIFICATION GAP — spec type-check missing from the evidence. **Closed by the Leader** (Verification table above).
+3. RESILIENCE — `portfolioId()` falls back to `0`, the same as the "All portfolios" sentinel. Not reachable (`GET_Portfolios` always returns `id`).
+4. A11Y — the hint and unavailable note are not linked with `aria-describedby`; the filter's `aria-label` duplicates its `<label>`.
+5. TEST GAP — no test for a 400 naming `portfolioIds` in either server shape.
+6. DOC DRIFT — design §6 says "portfolio short names"; the field is `name`.
+
+#### Decisions
+- D-EX-5 — the client **omits** `portfolioIds` (instead of `[]`) in two states: (1) the portfolios call failed and the field is disabled; (2) editing a value linked only to inactive portfolios with the selection untouched. Reason: under A11 `[]` = "all", so sending it would clear a restriction the admin cannot see, or turn a *No active portfolio* value into "all", which R-CLG-009 forbids. Create sends `[]` whenever the field is available. Departs from the literal tasks.md wording "(`[]` when none)" in those two states only. Reviewer B: sound.
+- D-EX-6 — portfolios are labelled by `name`; `Portfolio` has no short-name field. Design §6 wording ("short names") is drift, to be fixed at archive.
+- D-EX-7 — `tdd` added to both T-02 Implementers (Leader skill selection).
+
+#### Issues
+- tasks.md T-02 falsifier 1 predicted the wrong failing case (see above). The prediction is now known to be wrong; the gate is proven anyway.
+- Implementer: the parallel integration suites first collided on a shared `LIKE` cleanup prefix (`__t02_itest__`); the new suite uses `__ap_itest__`. Two clean runs after the fix.
+
+#### Forward pointers → T-03 (HITL)
+1. Step 3 (`kpi.direction`, restrict *Maintain within range* to P2): the column shows the portfolio **name** (D-EX-6), not "P2 only".
+2. The full-app `/swagger` view (D-EX-4) is still owed. Check A1 (no `portfolioId`), A2 absent, A10/A11 `portfolioIds`, A13 optional `portfolioId`. Booting the full app attaches a RabbitMQ consumer to the shared queue, so do it only with an MQ setting the requester approves.
+3. Optional observation for Reviewer B ADVISORY 1: edit a value linked only to an inactive portfolio and check whether it can be set back to "all".

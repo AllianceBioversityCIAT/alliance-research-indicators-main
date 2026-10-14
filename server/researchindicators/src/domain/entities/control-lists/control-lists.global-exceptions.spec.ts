@@ -1,15 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus, ValidationPipe } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
+import { ControlListValuePortfolioRepository } from './repositories/control-list-value-portfolio.repository';
+import { Portfolio } from '../portfolios/entities/portfolio.entity';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { GlobalExceptions } from '../../shared/error-management/global.exception';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
+import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
 
 /**
  * T-01 rework, Risk Reviewer issue 1 (verbatim): "the duplicate-name 409
@@ -53,6 +58,14 @@ import { GetCategoriesQueryDto } from './dto/get-categories-query.dto';
  * exception); a seeded-style list WITH values is blocked by the SAME
  * list-has-values non-field conflict as a custom list — see the test
  * below, which replaces the former pinned system-list-delete 409 body.
+ *
+ * T-02 (R-CLG-009) extends this with the "Applies to" contract: an unknown or
+ * inactive `portfolioIds` entry is a SERVICE-thrown 400 whose `errors` is the
+ * OBJECT `{description, field: 'portfolioIds'}` (the same shape as the 409s, so
+ * the client binds it to the field), while a malformed `portfolioIds` (`null`,
+ * repeated, non-numeric) is a PIPE-thrown 400 whose `errors` is the message
+ * ARRAY; an unknown or inactive A13 `portfolioId` is a 404 with the plain
+ * string.
  *
  * T-04 extends this with the in-use contract (design §5 rule 5, R-CTL-005):
  * a value delete blocked by the registry is ALSO a non-field conflict, the
@@ -105,6 +118,17 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
     audit: jest.fn().mockReturnValue({ created_by: 1 }),
     user_id: 1,
   };
+
+  // R-CLG-009 (T-02): portfolio lookups, the link table and the transaction.
+  // Only the validation branches are reached here, so none of them writes.
+  const mockPortfolioFind = jest.fn();
+  const mockPortfolioFindOne = jest.fn();
+  const mockPortfolioRepository = {
+    find: mockPortfolioFind,
+    findOne: mockPortfolioFindOne,
+  };
+  const mockLinkRepository = { find: jest.fn() };
+  const mockDataSource = { transaction: jest.fn() };
 
   const mockGetInUseCount = jest.fn();
   const mockUsageRegistry = {
@@ -168,6 +192,15 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
         },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
+        {
+          provide: ControlListValuePortfolioRepository,
+          useValue: mockLinkRepository,
+        },
+        {
+          provide: getRepositoryToken(Portfolio),
+          useValue: mockPortfolioRepository,
+        },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
@@ -418,6 +451,118 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       });
     },
   );
+
+  // R-CLG-009: a service-thrown 400 for an unknown/inactive "Applies to" id
+  // keeps the field-named OBJECT shape (same as the 409s above), NOT a plain
+  // string and NOT the pipe's array, so the client reads `errors.field`.
+  it('400 unknown or inactive portfolioIds on create: errors is the OBJECT {description, field: "portfolioIds"} (R-CLG-009)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 2,
+      list_key: 'kpi.direction',
+      is_active: true,
+    });
+    mockPortfolioFind.mockResolvedValue([]);
+
+    let thrown: unknown;
+    try {
+      await service.createValue(2, {
+        value: 'Hold',
+        portfolioIds: [99],
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/lists/2/values',
+      method: 'POST',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(json).toHaveBeenCalledWith({
+      description: 'BadRequestException',
+      status: HttpStatus.BAD_REQUEST,
+      errors: {
+        description: 'portfolioIds contains unknown or inactive portfolios: 99',
+        field: 'portfolioIds',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/2/values',
+    });
+    expect(mockDataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('400 malformed portfolioIds (null): errors is the pipe message ARRAY naming portfolioIds (R-CLG-009)', async () => {
+    let thrown: unknown;
+    try {
+      await new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }).transform(
+        { value: 'Hold', portfolioIds: null },
+        { type: 'body', metatype: CreateControlListValueDto },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/lists/2/values',
+      method: 'POST',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(json).toHaveBeenCalledWith({
+      description: 'BadRequestException',
+      status: HttpStatus.BAD_REQUEST,
+      errors: expect.arrayContaining(['portfolioIds must be an array']),
+      timestamp: expect.any(String),
+      path: '/api/control-lists/lists/2/values',
+    });
+  });
+
+  it('404 unknown or inactive portfolioId on the by-key read: errors is the PLAIN STRING message (R-CLG-009)', async () => {
+    mockListFindOne.mockResolvedValue({
+      id: 3,
+      list_key: 'kpi.direction',
+      is_active: true,
+    });
+    mockPortfolioFindOne.mockResolvedValue(null);
+
+    let thrown: unknown;
+    try {
+      await service.getValuesByKey('kpi.direction', true, 99);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = {
+      url: '/api/control-lists/by-key/kpi.direction/values',
+      method: 'GET',
+    };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+    expect(json).toHaveBeenCalledWith({
+      description: 'NotFoundException',
+      status: HttpStatus.NOT_FOUND,
+      errors: 'Portfolio 99 not found',
+      timestamp: expect.any(String),
+      path: '/api/control-lists/by-key/kpi.direction/values',
+    });
+  });
 
   // T-03 forward pointer (T-02 execution.md): "a list with values cannot be
   // deleted → 409, non-field body errors: { description } (same shape as

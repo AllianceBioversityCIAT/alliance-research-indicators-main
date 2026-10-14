@@ -3,7 +3,7 @@ import { IsNotEmpty, ValidateIf } from 'class-validator';
 import { CreateControlListValueDto } from './create-control-list-value.dto';
 
 /**
- * A11: `{code?, value?, description?, displayOrder?, isActive?}`. `id` is
+ * A11: `{code?, value?, description?, displayOrder?, isActive?, portfolioIds?}`. `id` is
  * deliberately NOT whitelisted here (D-CTL-14) — the value's own PK is its
  * permanent reference, shown read-only in the table and the modal, and
  * `ValidationPipe({ forbidNonWhitelisted: true })` turns any attempt to send
@@ -16,6 +16,7 @@ export class UpdateControlListValueDto extends PartialType(
     'description',
     'displayOrder',
     'isActive',
+    'portfolioIds',
   ] as const),
 ) {
   // Same technique as UpdateControlListDto.categoryId/.name (T-02 rework,
@@ -60,4 +61,17 @@ export class UpdateControlListValueDto extends PartialType(
 
   @ValidateIf((dto: UpdateControlListValueDto) => dto.isActive !== undefined)
   isActive?: boolean;
+  // R-CLG-009 / R3-1: `portfolioIds` is picked above (otherwise
+  // `forbidNonWhitelisted` would reject the field outright) and re-declared
+  // here, for the same reason as `code`/`value`/`displayOrder`/`isActive`:
+  // `PartialType` re-applies `@IsOptional()` to every picked key, which skips
+  // the inherited `@IsArray()`/`@ArrayUnique()`/`@IsInt()` for `null` and would
+  // let `portfolioIds: null` reach the service. The class's own
+  // `@ValidateIf` REPLACES that inherited `@IsOptional()`: omitted -> skipped
+  // (the current set is kept), `null` -> 400. `[]` clears the set (the value
+  // then applies to all); a list replaces it.
+  @ValidateIf(
+    (dto: UpdateControlListValueDto) => dto.portfolioIds !== undefined,
+  )
+  portfolioIds?: number[];
 }

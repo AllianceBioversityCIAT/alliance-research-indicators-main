@@ -38,6 +38,12 @@ export interface ControlListResponse {
 // T-03 (A9–A12). `inUse` is summed across registered consumer providers
 // (design §5 rule 5) — the registry does not exist until T-04, so it stays
 // 0 here.
+//
+// R-CLG-009 "Applies to" (A9, A10, A11, A13): `appliesTo` holds the ids of the
+// ACTIVE portfolios the value is linked to (links to a deactivated portfolio
+// are hidden, D-CLG-14); `appliesToAll` is true only when the value has NO link
+// rows at all — so a value linked solely to inactive portfolios is
+// `appliesToAll: false, appliesTo: []` (offered nowhere), never "all".
 export interface ControlListValueResponse {
   id: number;
   listId: number;
@@ -47,4 +53,6 @@ export interface ControlListValueResponse {
   displayOrder: number;
   isActive: boolean;
   inUse: number;
+  appliesTo: number[];
+  appliesToAll: boolean;
 }

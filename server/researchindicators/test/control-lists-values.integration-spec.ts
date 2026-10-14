@@ -15,6 +15,7 @@ import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard, ROLES_KEY } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
+import { appliesToProviders } from './support/control-lists-providers';
 
 /**
  * Control Lists — values against a REAL MySQL connection
@@ -157,6 +158,7 @@ describe('Control Lists — values, roles, read-only id and DB uniqueness agains
           provide: ControlListValueRepository,
           useFactory: () => new ControlListValueRepository(dataSource),
         },
+        ...appliesToProviders(dataSource),
         CurrentUserUtil,
         // ControlListsService depends on ControlListUsageRegistry. No
         // providers are registered in this suite, so every inUse stays 0 —

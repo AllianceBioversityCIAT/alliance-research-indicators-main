@@ -2,7 +2,7 @@
   <div class="flex w-full flex-col gap-[18px]">
     <div class="content-section w-full">
       <section class="flex w-full min-w-0 flex-col gap-[18px]">
-        <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="flex flex-wrap items-start justify-between gap-4" data-testid="page-header">
           <div class="flex flex-col gap-[2px]">
             <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600">Control lists</h1>
             <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] atc-grey-700">
@@ -128,7 +128,18 @@
                 <p class="m-0 text-sm atc-red-1">We could not load values. Please refresh the page.</p>
               </div>
               } @else {
-              <app-data-table [columns]="valueColumns" [rows]="values()" [loading]="valuesLoading()"
+              <div class="mb-3 flex flex-wrap items-center gap-3" data-testid="values-portfolio-filter-bar">
+                <label for="controlListsPortfolioFilter" class="text-sm font-medium atc-grey-800">Show values for</label>
+                <p-select inputId="controlListsPortfolioFilter" [options]="portfolioFilterOptions()" optionLabel="label"
+                  optionValue="value" [ngModel]="pfFilter()" (ngModelChange)="pfFilter.set($event)"
+                  [disabled]="portfoliosLoadFailed()" styleClass="min-w-[200px]" aria-label="Show values for portfolio"
+                  data-testid="values-portfolio-filter">
+                </p-select>
+                @if (portfoliosLoadFailed()) {
+                <p class="m-0 text-[12px] atc-grey-700" data-testid="portfolios-unavailable-note">{{ portfoliosUnavailableNote }}</p>
+                }
+              </div>
+              <app-data-table [columns]="valueColumns" [rows]="valueRows()" [loading]="valuesLoading()"
                 [searchFields]="valueSearchFields" [exportFileName]="valuesExportFileName()"
                 searchPlaceholder="Search code, value or description" emptyMessage="No values yet for this list."
                 data-testid="values-table">
@@ -147,6 +158,12 @@
                   </div>
                 </ng-template>
                 <ng-template #emptyState>
+                  @if (values().length > 0) {
+                  <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="values-filtered-empty">
+                    <i class="pi pi-filter !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                    <p class="m-0 text-sm atc-grey-700">No values apply to this portfolio.</p>
+                  </div>
+                  } @else {
                   <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="values-empty-state">
                     <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
                     <p class="m-0 text-sm atc-grey-700">No values yet for this list.</p>
@@ -154,6 +171,7 @@
                       styleClass="!rounded-[9px] !text-[13px]" (onClick)="startCreateValue()" data-testid="add-value-empty-button">
                     </p-button>
                   </div>
+                  }
                 </ng-template>
               </app-data-table>
               }
@@ -217,6 +235,22 @@
     <app-textarea label="Description" [signal]="valueForm" optionValue="description" placeholder="Optional description"
       [rows]="4" [maxLength]="500"></app-textarea>
     <app-input label="Order" type="number" [signal]="valueForm" optionValue="displayOrder" [min]="0"></app-input>
+    <fieldset class="m-0 flex min-w-0 flex-col gap-2 border-0 p-0" [disabled]="portfoliosLoadFailed()" data-testid="value-applies-to-field">
+      <legend class="mb-1 p-0 text-sm font-medium atc-grey-800">Applies to</legend>
+      @for (portfolio of portfolios(); track trackByPortfolioId($index, portfolio)) {
+      <label class="flex cursor-pointer items-center gap-2 text-[13px] atc-grey-900">
+        <input type="checkbox" class="h-4 w-4 cursor-pointer" [checked]="valueForm().portfolioIds.includes(portfolioId(portfolio))"
+          (change)="togglePortfolio(portfolioId(portfolio), $any($event.target).checked)"
+          [attr.data-testid]="'value-applies-to-' + portfolioId(portfolio)" />
+        {{ portfolio.name }}
+      </label>
+      }
+      @if (portfoliosLoadFailed()) {
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-unavailable">{{ portfoliosUnavailableNote }}</p>
+      } @else {
+      <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-hint">{{ appliesToHint() }}</p>
+      }
+    </fieldset>
     <div class="flex items-center gap-3">
       <p-toggleswitch inputId="valueActiveToggle" [ngModel]="valueForm().isActive" (ngModelChange)="updateValueFormActive($event)"
         data-testid="value-active-toggle"></p-toggleswitch>

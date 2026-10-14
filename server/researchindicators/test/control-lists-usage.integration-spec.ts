@@ -16,6 +16,7 @@ import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard, ROLES_KEY } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
+import { appliesToProviders } from './support/control-lists-providers';
 
 /**
  * Control Lists — usage: the in-use protection (A9 inUse, A12 block,
@@ -177,6 +178,7 @@ describe('Control Lists — usage: in-use protection and consumer contract by ke
         ControlListUsageRegistry,
         // The singleton membership check consumers call (R-CLG-004).
         ControlListValueLookupService,
+        ...appliesToProviders(dataSource),
         CurrentUserUtil,
         Reflector,
         RolesGuard,

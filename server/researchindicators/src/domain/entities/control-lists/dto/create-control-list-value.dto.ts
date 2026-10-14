@@ -1,6 +1,8 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsInt,
   IsNotEmpty,
@@ -9,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateControlListValueDto {
@@ -80,4 +83,30 @@ export class CreateControlListValueDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+  // R-CLG-009 "Applies to": the portfolios this value applies to. Omitted or
+  // `[]` = every portfolio. Validated with `@ValidateIf(... !== undefined)`
+  // and deliberately WITHOUT `@IsOptional()`: on one class, class-validator
+  // ANDs conditional validators, and `@IsOptional()` skips every validator for
+  // `null` as well as `undefined`, so it would let `portfolioIds: null`
+  // through (design §2.1; tasks.md T-02 falsifier 2). With `@ValidateIf`
+  // alone, only an omitted field is skipped and `null` hits `@IsArray()` -> 400.
+  // Whether the ids exist and are active is the service's check (400 naming
+  // `portfolioIds`), because it needs the database.
+  @ApiPropertyOptional({
+    type: [Number],
+    description:
+      'Ids of the portfolios this value applies to ("Applies to"). Omit or send ' +
+      '[] for every portfolio. Ids must be distinct, positive integers of ' +
+      'active portfolios; anything else (including null) is a 400 naming ' +
+      'portfolioIds',
+    example: [2],
+  })
+  @ValidateIf(
+    (dto: CreateControlListValueDto) => dto.portfolioIds !== undefined,
+  )
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  portfolioIds?: number[];
 }

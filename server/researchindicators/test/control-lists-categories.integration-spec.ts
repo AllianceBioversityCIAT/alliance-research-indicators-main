@@ -15,6 +15,7 @@ import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard, ROLES_KEY } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
+import { appliesToProviders } from './support/control-lists-providers';
 
 /**
  * Control Lists — categories against a REAL MySQL connection
@@ -121,6 +122,7 @@ describe('Control Lists — categories, roles and uniqueness against real MySQL 
           provide: ControlListValueRepository,
           useFactory: () => new ControlListValueRepository(dataSource),
         },
+        ...appliesToProviders(dataSource),
         CurrentUserUtil,
         // ControlListsService depends on ControlListUsageRegistry. No
         // providers are registered in this suite, so A1 usedBy / A9 inUse stay
@@ -133,7 +135,8 @@ describe('Control Lists — categories, roles and uniqueness against real MySQL 
       // The controller's `@UseInterceptors(SetUpInterceptor)` only primes
       // per-request result/portfolio context that this module never reads;
       // replacing it keeps the hand-wired providers it would need out of the
-      // suite (no portfolio provider of any kind is wired here).
+      // suite (the only portfolio provider wired here is the read handle the
+      // service itself injects, see `appliesToProviders`).
       .overrideInterceptor(SetUpInterceptor)
       .useValue({ intercept: (_ctx, next) => next.handle() })
       .compile();

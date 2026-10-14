@@ -15,6 +15,7 @@ import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
+import { appliesToProviders } from './support/control-lists-providers';
 
 /**
  * Control Lists — lists against a REAL MySQL connection and the REAL
@@ -163,6 +164,7 @@ describe('Control Lists — lists, immutable key and key uniqueness against real
           provide: ControlListValueRepository,
           useFactory: () => new ControlListValueRepository(dataSource),
         },
+        ...appliesToProviders(dataSource),
         CurrentUserUtil,
         // ControlListsService depends on ControlListUsageRegistry. No
         // providers are registered in this suite — it is about the list key,

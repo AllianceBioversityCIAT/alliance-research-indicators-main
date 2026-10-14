@@ -1,14 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Brackets, DataSource, FindOperator } from 'typeorm';
 import { ControlListsService } from './control-lists.service';
 import { ControlListCategoryRepository } from './repositories/control-list-category.repository';
 import { ControlListRepository } from './repositories/control-list.repository';
 import { ControlListValueRepository } from './repositories/control-list-value.repository';
+import { ControlListValuePortfolioRepository } from './repositories/control-list-value-portfolio.repository';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { ControlListUsageRegistry } from './control-list-usage.registry';
 import { ControlListCategory } from './entities/control-list-category.entity';
 import { ControlList } from './entities/control-list.entity';
 import { ControlListValue } from './entities/control-list-value.entity';
+import { ControlListValuePortfolio } from './entities/control-list-value-portfolio.entity';
+import { Portfolio } from '../portfolios/entities/portfolio.entity';
 import { CreateControlListCategoryDto } from './dto/create-control-list-category.dto';
 import { CreateControlListDto } from './dto/create-control-list.dto';
 import { CreateControlListValueDto } from './dto/create-control-list-value.dto';
@@ -54,6 +63,8 @@ describe('ControlListsService', () => {
   const mockValueUpdate = jest.fn();
   const mockValueDelete = jest.fn();
 
+  const mockValueCreateQueryBuilder = jest.fn();
+
   const mockValueRepository = {
     find: mockValueFind,
     findOne: mockValueFindOne,
@@ -61,7 +72,53 @@ describe('ControlListsService', () => {
     save: mockValueSave,
     update: mockValueUpdate,
     delete: mockValueDelete,
+    createQueryBuilder: mockValueCreateQueryBuilder,
   };
+
+  // R-CLG-009 (T-02): A13's single query. This chainable double records the
+  // calls and returns canned rows; it can show PLUMBING (which clauses are
+  // added, in which situations) but NEVER the operator precedence of the
+  // generated SQL — that is proven on a real MySQL in
+  // `test/control-lists-applies-to.integration-spec.ts` (KZ-001, KZ-017).
+  const mockQbWhere = jest.fn();
+  const mockQbAndWhere = jest.fn();
+  const mockQbGetMany = jest.fn();
+  const queryBuilder = {
+    where: mockQbWhere,
+    andWhere: mockQbAndWhere,
+    getMany: mockQbGetMany,
+  };
+
+  // The link table, read through its own repository (A9/A10/A11/A13 batch).
+  const mockLinkFind = jest.fn();
+  const mockLinkRepository = { find: mockLinkFind };
+
+  // Portfolios are read directly (D-CLG-13): `find` for the batch lookups,
+  // `findOne` for the A13 filter.
+  const mockPortfolioFind = jest.fn();
+  const mockPortfolioFindOne = jest.fn();
+  const mockPortfolioRepository = {
+    find: mockPortfolioFind,
+    findOne: mockPortfolioFindOne,
+  };
+
+  // design §5 rule 4: value + links are written through the TRANSACTION's
+  // manager. The double runs the callback against a manager whose
+  // `getRepository(ControlListValue)` is the value-repository double (so the
+  // existing save/update assertions keep reading the same jest.fn()s) and whose
+  // `getRepository(ControlListValuePortfolio)` is its own pair of fns, so a
+  // test can tell a write made INSIDE the transaction from one that was not.
+  const mockTxLinkDelete = jest.fn();
+  const mockTxLinkInsert = jest.fn();
+  const mockTxManager = {
+    getRepository: jest.fn((entity: unknown) =>
+      entity === ControlListValuePortfolio
+        ? { delete: mockTxLinkDelete, insert: mockTxLinkInsert }
+        : mockValueRepository,
+    ),
+  };
+  const mockTransaction = jest.fn();
+  const mockDataSource = { transaction: mockTransaction };
 
   const mockCurrentUser = {
     audit: jest.fn().mockReturnValue({ created_by: 1 }),
@@ -135,6 +192,22 @@ describe('ControlListsService', () => {
     mockGetConsumerNamesForKey.mockReturnValue([]);
     mockGetInUseCounts.mockResolvedValue(new Map());
     mockGetInUseCount.mockResolvedValue(0);
+    // R-CLG-009 defaults: no link rows (every value applies to all), no
+    // portfolio found unless a test says so, and a transaction that simply
+    // runs its callback on the manager double.
+    mockLinkFind.mockResolvedValue([]);
+    mockPortfolioFind.mockResolvedValue([]);
+    mockPortfolioFindOne.mockResolvedValue(null);
+    mockTxLinkDelete.mockResolvedValue({ affected: 0 });
+    mockTxLinkInsert.mockResolvedValue({});
+    mockTransaction.mockImplementation(
+      async (callback: (manager: unknown) => unknown) =>
+        callback(mockTxManager),
+    );
+    mockValueCreateQueryBuilder.mockReturnValue(queryBuilder);
+    mockQbWhere.mockReturnValue(queryBuilder);
+    mockQbAndWhere.mockReturnValue(queryBuilder);
+    mockQbGetMany.mockResolvedValue([]);
     logSpy = jest
       .spyOn(LoggerUtil.prototype, '_log')
       .mockImplementation(() => undefined);
@@ -159,6 +232,15 @@ describe('ControlListsService', () => {
         },
         { provide: CurrentUserUtil, useValue: mockCurrentUser },
         { provide: ControlListUsageRegistry, useValue: mockUsageRegistry },
+        {
+          provide: ControlListValuePortfolioRepository,
+          useValue: mockLinkRepository,
+        },
+        {
+          provide: getRepositoryToken(Portfolio),
+          useValue: mockPortfolioRepository,
+        },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 
@@ -1078,6 +1160,8 @@ describe('ControlListsService', () => {
           displayOrder: 1,
           isActive: false,
           inUse: 0,
+          appliesTo: [],
+          appliesToAll: true,
         },
         {
           id: 8,
@@ -1088,6 +1172,8 @@ describe('ControlListsService', () => {
           displayOrder: 1,
           isActive: true,
           inUse: 0,
+          appliesTo: [],
+          appliesToAll: true,
         },
       ]);
     });
@@ -1112,6 +1198,93 @@ describe('ControlListsService', () => {
       expect(mockGetInUseCounts).toHaveBeenCalledWith([9, 10]);
       expect(result.find((v) => v.id === 9)?.inUse).toBe(5);
       expect(result.find((v) => v.id === 10)?.inUse).toBe(0);
+    });
+
+    // R-CLG-009 AC.3: no link rows = applies to all. Neither the link table
+    // nor the portfolios are asked about a value with no links beyond the one
+    // batch link read.
+    it('marks a value with no link rows as appliesToAll with an empty appliesTo', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([buildValue({ id: 8, list_id: 2 })]);
+      mockLinkFind.mockResolvedValue([]);
+
+      const [value] = await service.getValues(2);
+
+      expect(value.appliesToAll).toBe(true);
+      expect(value.appliesTo).toEqual([]);
+      expect(mockPortfolioFind).not.toHaveBeenCalled();
+    });
+
+    // R-CLG-009 *No filter* / D-CLG-14: only ACTIVE portfolios are listed;
+    // `appliesToAll` is "no link rows at all", so a value linked ONLY to an
+    // inactive portfolio is { appliesTo: [], appliesToAll: false }.
+    it('lists only ACTIVE linked portfolios and never reads a value linked to an inactive one as "all" (D-CLG-14)', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 8, list_id: 2, code: 'DIR-01' }),
+        buildValue({ id: 9, list_id: 2, code: 'DIR-02' }),
+        buildValue({ id: 10, list_id: 2, code: 'DIR-03' }),
+      ]);
+      mockLinkFind.mockResolvedValue([
+        // value 9: P2 (active) and P1 (active), unsorted on purpose
+        { value_id: 9, portfolio_id: 2 },
+        { value_id: 9, portfolio_id: 1 },
+        // value 10: only P3, which is inactive
+        { value_id: 10, portfolio_id: 3 },
+      ]);
+      mockPortfolioFind.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+
+      const result = await service.getValues(2);
+
+      expect(result.map((v) => [v.id, v.appliesTo, v.appliesToAll])).toEqual([
+        [8, [], true],
+        [9, [1, 2], false],
+        [10, [], false],
+      ]);
+    });
+
+    it("loads every value's links in ONE query and the linked portfolios in ONE query (no per-value reads)", async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([
+        buildValue({ id: 8, list_id: 2, code: 'DIR-01' }),
+        buildValue({ id: 9, list_id: 2, code: 'DIR-02' }),
+        buildValue({ id: 10, list_id: 2, code: 'DIR-03' }),
+      ]);
+      mockLinkFind.mockResolvedValue([
+        { value_id: 8, portfolio_id: 1 },
+        { value_id: 9, portfolio_id: 1 },
+        { value_id: 10, portfolio_id: 2 },
+      ]);
+      mockPortfolioFind.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+
+      await service.getValues(2);
+
+      expect(mockLinkFind).toHaveBeenCalledTimes(1);
+      const linkWhere = mockLinkFind.mock.calls[0][0].where;
+      expect(linkWhere.value_id).toBeInstanceOf(FindOperator);
+      expect(linkWhere.value_id.value).toEqual([8, 9, 10]);
+      expect(mockPortfolioFind).toHaveBeenCalledTimes(1);
+      const portfolioWhere = mockPortfolioFind.mock.calls[0][0].where;
+      expect(portfolioWhere.is_active).toBe(true);
+      expect(portfolioWhere.id.value).toEqual([1, 2]);
+    });
+
+    // design §4: MySQL BIGINT can arrive as a string; the ids leave the
+    // service as numbers.
+    it('coerces link ids that arrive as strings (BIGINT) to numbers', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFind.mockResolvedValue([buildValue({ id: 9, list_id: 2 })]);
+      mockLinkFind.mockResolvedValue([
+        { value_id: '9', portfolio_id: '2' },
+        { value_id: '9', portfolio_id: '1' },
+      ]);
+      mockPortfolioFind.mockResolvedValue([{ id: '1' }, { id: '2' }]);
+
+      const [value] = await service.getValues(2);
+
+      expect(value.appliesTo).toEqual([1, 2]);
+      expect(value.appliesTo.every((id) => typeof id === 'number')).toBe(true);
+      expect(value.appliesToAll).toBe(false);
     });
   });
 
@@ -1347,6 +1520,166 @@ describe('ControlListsService', () => {
     );
   });
 
+  // R-CLG-009 "Applies to" on A10 (design §5 rule 4, D-CLG-12/13/14).
+  describe('createValue (A10) — Applies to (R-CLG-009)', () => {
+    const arrange = (portfolioIdsActive: number[] = []) => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 2 }));
+      mockValueFindOne.mockResolvedValue(null);
+      mockValueSave.mockResolvedValue(
+        buildValue({ id: 11, list_id: 2, code: 'DIR-09', value: 'Hold' }),
+      );
+      mockPortfolioFind.mockResolvedValue(
+        portfolioIdsActive.map((id) => ({ id })),
+      );
+    };
+
+    it('writes no links and asks no portfolio question when portfolioIds is omitted (applies to all)', async () => {
+      arrange();
+
+      const result = await service.createValue(2, {
+        code: 'DIR-09',
+        value: 'Hold',
+      });
+
+      expect(mockPortfolioFind).not.toHaveBeenCalled();
+      expect(mockTxLinkInsert).not.toHaveBeenCalled();
+      expect(mockTxLinkDelete).not.toHaveBeenCalled();
+      expect(result.appliesToAll).toBe(true);
+      expect(result.appliesTo).toEqual([]);
+    });
+
+    it('writes no links for portfolioIds: [] (applies to all)', async () => {
+      arrange();
+
+      const result = await service.createValue(2, {
+        code: 'DIR-09',
+        value: 'Hold',
+        portfolioIds: [],
+      });
+
+      expect(mockPortfolioFind).not.toHaveBeenCalled();
+      expect(mockTxLinkInsert).not.toHaveBeenCalled();
+      expect(result.appliesToAll).toBe(true);
+    });
+
+    it('validates the whole set with ONE active-portfolio lookup, then saves the value and inserts its links INSIDE one transaction', async () => {
+      arrange([1, 2]);
+      mockLinkFind.mockResolvedValue([
+        { value_id: 11, portfolio_id: 1 },
+        { value_id: 11, portfolio_id: 2 },
+      ]);
+
+      const result = await service.createValue(2, {
+        code: 'DIR-09',
+        value: 'Hold',
+        portfolioIds: [1, 2],
+      });
+
+      expect(mockPortfolioFind).toHaveBeenCalledWith({
+        where: { id: expect.any(FindOperator), is_active: true },
+        select: { id: true },
+      });
+      expect(mockPortfolioFind.mock.calls[0][0].where.id.value).toEqual([1, 2]);
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      expect(mockTxManager.getRepository).toHaveBeenCalledWith(
+        ControlListValue,
+      );
+      expect(mockTxManager.getRepository).toHaveBeenCalledWith(
+        ControlListValuePortfolio,
+      );
+      expect(mockTxLinkInsert).toHaveBeenCalledWith([
+        { value_id: 11, portfolio_id: 1 },
+        { value_id: 11, portfolio_id: 2 },
+      ]);
+      expect(result.appliesTo).toEqual([1, 2]);
+      expect(result.appliesToAll).toBe(false);
+    });
+
+    // R-CLG-009 AC.4 / D-CLG-13: an unknown or inactive id is a 400 naming
+    // `portfolioIds` - NOT a 404 - and nothing is written.
+    it('answers 400 naming portfolioIds (not 404) when an id is unknown or inactive, and opens no transaction', async () => {
+      arrange([1]); // portfolio 99 is not among the active ones
+
+      let thrown: unknown;
+      try {
+        await service.createValue(2, {
+          code: 'DIR-09',
+          value: 'Hold',
+          portfolioIds: [1, 99],
+        });
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      expect(thrown).toMatchObject({
+        status: 400,
+        response: {
+          message: {
+            field: 'portfolioIds',
+            description: expect.stringContaining('99'),
+          },
+        },
+      });
+      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockValueSave).not.toHaveBeenCalled();
+    });
+
+    // design §5 rule 4: a failure while storing the links is NOT swallowed or
+    // re-mapped (a link FK failure is errno 1452, not 1062) - it propagates
+    // out of the transaction call, which is what makes the real rollback happen
+    // (proved on MySQL in the integration suite; this double cannot roll back).
+    it('lets a link-insert failure propagate unchanged out of the transaction (no conflict mapping)', async () => {
+      arrange([1]);
+      const fkFailure = {
+        errno: 1452,
+        message: 'a foreign key constraint fails',
+      };
+      mockTxLinkInsert.mockRejectedValue(fkFailure);
+
+      await expect(
+        service.createValue(2, {
+          code: 'DIR-09',
+          value: 'Hold',
+          portfolioIds: [1],
+        }),
+      ).rejects.toBe(fkFailure);
+    });
+
+    // design §5 rule 4: the errno-1062 mapping wraps the WHOLE transaction
+    // call. Here the pre-check passes and the failure comes out of
+    // `dataSource.transaction` itself.
+    it('maps errno 1062 raised by the transaction call to the field-named 409', async () => {
+      arrange();
+      mockTransaction.mockRejectedValue({
+        errno: 1062,
+        sqlMessage:
+          "Duplicate entry '2-DIR-09' for key 'uq_control_list_values_list_code'",
+      });
+
+      await expect(
+        service.createValue(2, { code: 'DIR-09', value: 'Hold' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'code' }) },
+      });
+    });
+
+    it('logs the Applies to set that was written (design §9)', async () => {
+      arrange([1, 2]);
+
+      await service.createValue(2, {
+        code: 'DIR-09',
+        value: 'Hold',
+        portfolioIds: [1, 2],
+      });
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'control_lists.created entity=control_list_value id=11 user_id=1 portfolioIds=[1,2]',
+      );
+    });
+  });
+
   describe('updateValue (A11)', () => {
     it('throws NotFoundException when the value does not exist', async () => {
       mockValueFindOne.mockResolvedValue(null);
@@ -1446,6 +1779,147 @@ describe('ControlListsService', () => {
     });
   });
 
+  // R-CLG-009 "Applies to" on A11: omitted keeps the set, `[]` clears it, a
+  // list replaces it; the value row is always saved so its audit fields move
+  // (D-CLG-12); everything commits together.
+  describe('updateValue (A11) — Applies to (R-CLG-009)', () => {
+    const arrange = (portfolioIdsActive: number[] = []) => {
+      mockCurrentUser.audit.mockReturnValue({ updated_by: 2 });
+      mockValueFindOne.mockResolvedValue(buildValue({ id: 1, list_id: 2 }));
+      mockValueUpdate.mockResolvedValue({ affected: 1 });
+      mockPortfolioFind.mockResolvedValue(
+        portfolioIdsActive.map((id) => ({ id })),
+      );
+    };
+
+    it('keeps the current set when portfolioIds is omitted: no link delete or insert, no portfolio lookup', async () => {
+      arrange();
+
+      await service.updateValue(1, { description: 'd' });
+
+      expect(mockTxLinkDelete).not.toHaveBeenCalled();
+      expect(mockTxLinkInsert).not.toHaveBeenCalled();
+      expect(mockPortfolioFind).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        'control_lists.updated entity=control_list_value id=1 user_id=1 portfolioIds=unchanged',
+      );
+    });
+
+    it('clears the set for portfolioIds: [] - deletes the links, inserts none, asks no portfolio question', async () => {
+      arrange();
+
+      await service.updateValue(1, { portfolioIds: [] });
+
+      expect(mockTxLinkDelete).toHaveBeenCalledWith({ value_id: 1 });
+      expect(mockTxLinkInsert).not.toHaveBeenCalled();
+      expect(mockPortfolioFind).not.toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalledWith(
+        'control_lists.updated entity=control_list_value id=1 user_id=1 portfolioIds=[]',
+      );
+    });
+
+    it('replaces the set for a list: validates it, then deletes the old links BEFORE inserting the new ones', async () => {
+      arrange([2]);
+      mockLinkFind.mockResolvedValue([{ value_id: 1, portfolio_id: 2 }]);
+
+      const result = await service.updateValue(1, { portfolioIds: [2] });
+
+      expect(mockTxLinkDelete).toHaveBeenCalledWith({ value_id: 1 });
+      expect(mockTxLinkInsert).toHaveBeenCalledWith([
+        { value_id: 1, portfolio_id: 2 },
+      ]);
+      expect(mockTxLinkDelete.mock.invocationCallOrder[0]).toBeLessThan(
+        mockTxLinkInsert.mock.invocationCallOrder[0],
+      );
+      expect(result.appliesTo).toEqual([2]);
+      expect(result.appliesToAll).toBe(false);
+    });
+
+    // D-CLG-12: the link table has no audit columns, so a PATCH that changes
+    // ONLY the set must still save the value row - `update` then carries just
+    // the audit stamp. Skipping the value update would leave nobody on record
+    // as having changed it.
+    it("stamps the value's audit fields on a links-only PATCH (D-CLG-12)", async () => {
+      arrange([1]);
+
+      await service.updateValue(1, { portfolioIds: [1] });
+
+      expect(mockValueUpdate).toHaveBeenCalledTimes(1);
+      expect(mockValueUpdate).toHaveBeenCalledWith(1, { updated_by: 2 });
+    });
+
+    it('answers 400 naming portfolioIds (not 404) for an unknown or inactive id, writing and opening nothing', async () => {
+      arrange([]); // none of the requested ids is an active portfolio
+
+      await expect(
+        service.updateValue(1, { portfolioIds: [99] }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          message: expect.objectContaining({ field: 'portfolioIds' }),
+        },
+      });
+      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockValueUpdate).not.toHaveBeenCalled();
+    });
+
+    // design §5 rule 4: the value write and the link replacement are the SAME
+    // transaction. A call-sequence double cannot prove a rollback; this proves
+    // neither write happens outside the unit of work (the real rollback is the
+    // integration suite's atomicity test).
+    it('performs the value update and the link replacement only INSIDE the transaction', async () => {
+      arrange([1]);
+      let depth = 0;
+      const insideTransaction: Record<string, boolean> = {};
+      mockTransaction.mockImplementation(
+        async (callback: (manager: unknown) => unknown) => {
+          depth += 1;
+          try {
+            return await callback(mockTxManager);
+          } finally {
+            depth -= 1;
+          }
+        },
+      );
+      mockValueUpdate.mockImplementation(async () => {
+        insideTransaction.valueUpdate = depth > 0;
+        return { affected: 1 };
+      });
+      mockTxLinkDelete.mockImplementation(async () => {
+        insideTransaction.linkDelete = depth > 0;
+        return { affected: 1 };
+      });
+      mockTxLinkInsert.mockImplementation(async () => {
+        insideTransaction.linkInsert = depth > 0;
+        return {};
+      });
+
+      await service.updateValue(1, { portfolioIds: [1] });
+
+      expect(insideTransaction).toEqual({
+        valueUpdate: true,
+        linkDelete: true,
+        linkInsert: true,
+      });
+    });
+
+    it('maps errno 1062 raised by the transaction call to the field-named 409', async () => {
+      arrange();
+      mockTransaction.mockRejectedValue({
+        errno: 1062,
+        sqlMessage:
+          "Duplicate entry '2-Hold' for key 'uq_control_list_values_list_value'",
+      });
+
+      await expect(
+        service.updateValue(1, { description: 'd' }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { message: expect.objectContaining({ field: 'value' }) },
+      });
+    });
+  });
+
   describe('removeValue (A12)', () => {
     it('throws NotFoundException when the value does not exist', async () => {
       mockValueFindOne.mockResolvedValue(null);
@@ -1506,9 +1980,9 @@ describe('ControlListsService', () => {
     });
   });
 
-  describe('getValuesByKey (A13, T-04)', () => {
+  describe('getValuesByKey (A13, T-04, R-CLG-009)', () => {
     // R-CLG-004: the key alone selects the list - no scope key in the lookup.
-    it('throws NotFoundException for an unknown key (R-CLG-004 AC.1)', async () => {
+    it('throws NotFoundException for an unknown key (R-CLG-004 AC.1) without building a query', async () => {
       mockListFindOne.mockResolvedValue(null);
 
       await expect(service.getValuesByKey('kpi.unknown', true)).rejects.toThrow(
@@ -1517,6 +1991,7 @@ describe('ControlListsService', () => {
       expect(mockListFindOne).toHaveBeenCalledWith({
         where: { list_key: 'kpi.unknown', is_active: true },
       });
+      expect(mockValueCreateQueryBuilder).not.toHaveBeenCalled();
     });
 
     // R-CTL-006 "Ordered read" + the natural-sort tie-break (same family as
@@ -1525,7 +2000,7 @@ describe('ControlListsService', () => {
       mockListFindOne.mockResolvedValue(
         buildList({ id: 3, list_key: 'kpi.unit_of_measure' }),
       );
-      mockValueFind.mockResolvedValue([
+      mockQbGetMany.mockResolvedValue([
         buildValue({ id: 1, list_id: 3, code: 'UOM-10', display_order: 1 }),
         buildValue({ id: 2, list_id: 3, code: 'UOM-2', display_order: 1 }),
         buildValue({ id: 3, list_id: 3, code: 'UOM-1', display_order: 0 }),
@@ -1536,33 +2011,84 @@ describe('ControlListsService', () => {
       expect(result.map((v) => v.code)).toEqual(['UOM-1', 'UOM-2', 'UOM-10']);
     });
 
-    it('reads with is_active: true when activeOnly is true (default)', async () => {
+    // KZ-017: the next four tests pin PLUMBING on a chainable double - which
+    // clauses are added in which situation. They do NOT, and cannot, show the
+    // operator precedence of the generated SQL: that property (the `OR` of the
+    // portfolio condition never widening the surrounding `AND`s) is asserted on
+    // a real MySQL in `test/control-lists-applies-to.integration-spec.ts`.
+    it('restricts to the list and, when activeOnly is true (default), to active values', async () => {
       mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
-      mockValueFind.mockResolvedValue([]);
 
       await service.getValuesByKey('kpi.direction', true);
 
-      expect(mockValueFind).toHaveBeenCalledWith({
-        where: { list_id: 3, is_active: true },
+      expect(mockQbWhere).toHaveBeenCalledWith('cv.list_id = :listId', {
+        listId: 3,
+      });
+      expect(mockQbAndWhere).toHaveBeenCalledWith('cv.is_active = :isActive', {
+        isActive: true,
       });
     });
 
-    // R-CTL-004 "Deactivate": the consumer read with activeOnly=true omits
-    // inactive values; activeOnly=false includes them.
-    it('reads without an is_active filter when activeOnly is false', async () => {
+    // R-CTL-004 "Deactivate": activeOnly=false includes inactive values.
+    it('adds no active clause when activeOnly is false', async () => {
       mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
-      mockValueFind.mockResolvedValue([]);
 
       await service.getValuesByKey('kpi.direction', false);
 
-      expect(mockValueFind).toHaveBeenCalledWith({
-        where: { list_id: 3 },
+      expect(mockQbWhere).toHaveBeenCalledWith('cv.list_id = :listId', {
+        listId: 3,
       });
+      expect(mockQbAndWhere).not.toHaveBeenCalled();
+    });
+
+    // R-CLG-009 *No filter*: without portfolioId every value is returned, and
+    // no portfolio is even looked up.
+    it('adds no portfolio condition and asks no portfolio question without portfolioId', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+
+      await service.getValuesByKey('kpi.direction', true);
+
+      expect(mockPortfolioFindOne).not.toHaveBeenCalled();
+      const conditions = mockQbAndWhere.mock.calls.map((call) => call[0]);
+      expect(conditions.some((c) => c instanceof Brackets)).toBe(false);
+    });
+
+    it('adds the portfolio condition as ONE Brackets group when portfolioId names an active portfolio', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockPortfolioFindOne.mockResolvedValue({ id: 2 });
+
+      await service.getValuesByKey('kpi.direction', true, 2);
+
+      expect(mockPortfolioFindOne).toHaveBeenCalledWith({
+        where: { id: 2, is_active: true },
+        select: { id: true },
+      });
+      const brackets = mockQbAndWhere.mock.calls
+        .map((call) => call[0])
+        .filter((c) => c instanceof Brackets);
+      expect(brackets).toHaveLength(1);
+    });
+
+    // R-CLG-009 *Unknown portfolio*: 404 on the read; the lookup asks for an
+    // ACTIVE portfolio, so an inactive one is the same 404.
+    it('answers 404 for an unknown or inactive portfolioId and reads no values', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockPortfolioFindOne.mockResolvedValue(null);
+
+      await expect(
+        service.getValuesByKey('kpi.direction', true, 99),
+      ).rejects.toMatchObject({
+        status: 404,
+        message: 'Portfolio 99 not found',
+      });
+      expect(mockPortfolioFindOne.mock.calls[0][0].where.is_active).toBe(true);
+      expect(mockValueCreateQueryBuilder).not.toHaveBeenCalled();
+      expect(mockQbGetMany).not.toHaveBeenCalled();
     });
 
     it('attaches the summed in-use count per value, same as A9', async () => {
       mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
-      mockValueFind.mockResolvedValue([
+      mockQbGetMany.mockResolvedValue([
         buildValue({ id: 1, list_id: 3, code: 'DIR-01', display_order: 0 }),
       ]);
       mockGetInUseCounts.mockResolvedValue(new Map([[1, 4]]));
@@ -1570,6 +2096,24 @@ describe('ControlListsService', () => {
       const result = await service.getValuesByKey('kpi.direction', true);
 
       expect(result[0].inUse).toBe(4);
+    });
+
+    // R-CLG-009 *No filter*: each value carries its Applies to set.
+    it('attaches appliesTo / appliesToAll to every value', async () => {
+      mockListFindOne.mockResolvedValue(buildList({ id: 3 }));
+      mockQbGetMany.mockResolvedValue([
+        buildValue({ id: 1, list_id: 3, code: 'DIR-01', display_order: 0 }),
+        buildValue({ id: 3, list_id: 3, code: 'DIR-03', display_order: 2 }),
+      ]);
+      mockLinkFind.mockResolvedValue([{ value_id: '3', portfolio_id: '2' }]);
+      mockPortfolioFind.mockResolvedValue([{ id: 2 }]);
+
+      const result = await service.getValuesByKey('kpi.direction', true);
+
+      expect(result.map((v) => [v.id, v.appliesTo, v.appliesToAll])).toEqual([
+        [1, [], true],
+        [3, [2], false],
+      ]);
     });
   });
 });

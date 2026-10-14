@@ -2,6 +2,7 @@ import { Component, Input, WritableSignal, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { Select } from 'primeng/select';
 import { DataTableComponent } from '@shared/components/data-table/data-table.component';
 import ControlListsComponent from './control-lists.component';
 import {
@@ -11,6 +12,8 @@ import {
   ControlListValue
 } from '@shared/interfaces/control-lists.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
+import { Portfolio } from '@shared/interfaces/portfolio.interface';
+import { buildExportRows } from '@shared/utils/xlsx-export.util';
 import { ApiService } from '@shared/services/api.service';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { ActionsService } from '@shared/services/actions.service';
@@ -107,8 +110,25 @@ const controlListValue = (overrides: Partial<ControlListValue> = {}): ControlLis
   displayOrder: 1,
   isActive: true,
   inUse: 0,
+  // R-CLG-009 / AC.3: every value applies to all portfolios unless restricted (A9 `appliesTo`/`appliesToAll`).
+  appliesTo: [],
+  appliesToAll: true,
   ...overrides
 });
+
+// GET_Portfolios returns ACTIVE portfolios (`PortfoliosService.findAll`: `is_active: true`); the
+// shape is the portfolio-management page's `Portfolio` (snake_case, no short-name field).
+const portfolio = (id: number, name: string, overrides: Partial<Portfolio> = {}): Portfolio => ({
+  id,
+  name,
+  description: '',
+  start_year: 2021,
+  end_year: 2025,
+  is_active: true,
+  ...overrides
+});
+const PORTFOLIO_1 = portfolio(1, 'Portfolio 1');
+const PORTFOLIO_2 = portfolio(2, 'Portfolio 2', { start_year: 2026, end_year: 2030 });
 
 function ok<T>(data: T): MainResponse<T> {
   return {
@@ -157,6 +177,8 @@ describe('ControlListsComponent', () => {
 
   const api = {
     GET_ControlListCategories: jest.fn(),
+    // R-CLG-009: active portfolios, loaded in parallel with A1 for the Applies to field.
+    GET_Portfolios: jest.fn(),
     POST_ControlListCategory: jest.fn(),
     PATCH_ControlListCategory: jest.fn(),
     DELETE_ControlListCategory: jest.fn(),
@@ -171,7 +193,22 @@ describe('ControlListsComponent', () => {
     DELETE_ControlListValue: jest.fn()
   };
 
-  async function setup(categories: ControlListCategory[] = [category()]): Promise<void> {
+  // Every ApiService member the page reaches for that the mock does not define lands here — the
+  // mock object itself cannot answer "was a removed method (A2) called?", this can (T-01 advisory:
+  // `expect(api).not.toHaveProperty(...)` only inspected the test's own object).
+  let unknownApiAccess: string[] = [];
+
+  async function setup(
+    categories: ControlListCategory[] = [category()],
+    portfoliosCall: () => Promise<unknown> = () => Promise.resolve(ok([PORTFOLIO_1, PORTFOLIO_2]))
+  ): Promise<void> {
+    unknownApiAccess = [];
+    const apiProxy = new Proxy(api, {
+      get: (target, key) => {
+        if (typeof key === 'string' && /^(GET|POST|PATCH|DELETE|PUT)_/.test(key) && !(key in target)) unknownApiAccess.push(key);
+        return (target as Record<string | symbol, unknown>)[key];
+      }
+    });
     modalConfig = signal<Record<string, any>>({ controlListForm: { isOpen: false, title: 'New category' } });
     modals = {
       modalConfig,
@@ -182,6 +219,7 @@ describe('ControlListsComponent', () => {
 
     jest.clearAllMocks();
     api.GET_ControlListCategories.mockResolvedValue(ok(categories));
+    api.GET_Portfolios.mockImplementation(portfoliosCall);
     api.POST_ControlListCategory.mockResolvedValue(ok(category()));
     api.PATCH_ControlListCategory.mockResolvedValue(ok(category()));
     api.DELETE_ControlListCategory.mockResolvedValue(ok({ id: 1 }));
@@ -197,7 +235,7 @@ describe('ControlListsComponent', () => {
       imports: [ControlListsComponent],
       providers: [
         provideNoopAnimations(),
-        { provide: ApiService, useValue: api as unknown as ApiService },
+        { provide: ApiService, useValue: apiProxy as unknown as ApiService },
         { provide: AllModalsService, useValue: modals as unknown as AllModalsService },
         { provide: ActionsService, useValue: actions as unknown as ActionsService }
       ]
@@ -223,20 +261,47 @@ describe('ControlListsComponent', () => {
 
   // ─── Global lists, no portfolio selector (R-CLG-001, R-CLG-005) ────────────────
 
-  it('loads the categories with ONE argument-less call and never calls the removed A2 or the portfolios endpoint', async () => {
+  it('loads the categories with ONE argument-less call and the active portfolios once; never calls the removed A2', async () => {
     await setup();
 
     expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(1);
     expect(api.GET_ControlListCategories).toHaveBeenCalledWith();
+    expect(api.GET_Portfolios).toHaveBeenCalledTimes(1);
     expect(component.categories()).toHaveLength(1);
     expect(component.loading()).toBe(false);
     expect(component.loadError()).toBe(false);
-    // A2 no longer exists on ApiService: the mock does not even offer it, so assert on the shape.
-    expect(api).not.toHaveProperty('GET_ControlListPortfolioSummaries');
-    expect(api).not.toHaveProperty('GET_Portfolios');
+    // A2 was removed from ApiService (T-01): any `GET_ControlListPortfolioSummaries` access on the
+    // proxied mock is recorded, so a regression that calls it makes this list non-empty.
+    expect(unknownApiAccess).toEqual([]);
   });
 
-  it('renders no portfolio selector and no `P<n> ·` text anywhere on the page', async () => {
+  // R-CLG-005 AC.2 / design §6 Load: the two requests start together (KZ-015: the TRANSITION —
+  // both pending, then both settle — not an end state).
+  it('starts the portfolios request in parallel with A1, before either has resolved', async () => {
+    await setup();
+    api.GET_ControlListCategories.mockClear();
+    api.GET_Portfolios.mockClear();
+    let releaseCategories!: (value: MainResponse<ControlListCategory[]>) => void;
+    let releasePortfolios!: (value: MainResponse<Portfolio[]>) => void;
+    api.GET_ControlListCategories.mockReturnValueOnce(new Promise(resolve => (releaseCategories = resolve)));
+    api.GET_Portfolios.mockReturnValueOnce(new Promise(resolve => (releasePortfolios = resolve)));
+
+    const pending = component.load();
+
+    expect(api.GET_ControlListCategories).toHaveBeenCalledTimes(1);
+    expect(api.GET_Portfolios).toHaveBeenCalledTimes(1);
+
+    releasePortfolios(ok([PORTFOLIO_2]));
+    releaseCategories(ok([category({ name: 'Loaded after both' })]));
+    await pending;
+    fixture.detectChanges();
+
+    expect(component.categories()[0].name).toBe('Loaded after both');
+    expect(component.portfolios().map(entry => entry.name)).toEqual(['Portfolio 2']);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loaded after both');
+  });
+
+  it('renders no portfolio selector, no `P<n> ·` text and no *(not configured)* in the page header, the navigator or the list header', async () => {
     await setup([category({ lists: [listSummary()] })]);
     component.selectList(10);
     fixture.detectChanges();
@@ -244,12 +309,25 @@ describe('ControlListsComponent', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('p-select')).toBeNull();
+    // Portfolio text is legitimate now ONLY inside the values panel and the value modal
+    // (R-CLG-009: Applies to column, filter, modal field) — so the old whole-page assertion is
+    // narrowed to the regions that must stay portfolio-free (T-01 forward pointer), not deleted.
+    const portfolioFreeRegions = ['page-header', 'navigator-panel', 'list-header'].map(testId => {
+      const region = el.querySelector(`[data-testid="${testId}"]`);
+      expect(region).toBeTruthy();
+      return region as HTMLElement;
+    });
+    for (const region of portfolioFreeRegions) {
+      expect(region.querySelector('p-select')).toBeNull();
+      expect(region.querySelector('select, [role="combobox"]')).toBeNull();
+      expect(region.textContent).not.toMatch(/portfolio/i);
+      expect(region.textContent).not.toMatch(/P\d+\s*·/);
+    }
     expect(el.querySelector('[data-testid="portfolio-select"]')).toBeNull();
-    expect(el.querySelector('select, [role="combobox"]')).toBeNull();
-    expect(el.textContent).not.toMatch(/P\d+\s*·/);
     expect(el.textContent).not.toMatch(/not configured/i);
-    expect(el.textContent).not.toMatch(/portfolio/i);
+    // The one select on the page is the values filter, inside the values panel.
+    expect(el.querySelectorAll('p-select')).toHaveLength(1);
+    expect(el.querySelector('[data-testid="values-panel"] p-select')).toBeTruthy();
   });
 
   it('shows the list header as `Key: <key>` with no reference prefix', async () => {
@@ -1182,7 +1260,7 @@ describe('ControlListsComponent', () => {
       await fixture.whenStable();
 
       component.startCreateValue();
-      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: 'Hold steady', displayOrder: 3, isActive: true });
+      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: 'Hold steady', displayOrder: 3, isActive: true, portfolioIds: [] });
       api.GET_ControlListCategories.mockClear();
 
       await component.saveValue();
@@ -1192,7 +1270,8 @@ describe('ControlListsComponent', () => {
         value: 'Maintain',
         description: 'Hold steady',
         displayOrder: 3,
-        isActive: true
+        isActive: true,
+        portfolioIds: []
       });
       expect(actions.showToast).toHaveBeenCalledWith({
         severity: 'success',
@@ -1217,7 +1296,7 @@ describe('ControlListsComponent', () => {
       await fixture.whenStable();
 
       component.startCreateValue();
-      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: '', displayOrder: null, isActive: true });
+      component.valueForm.set({ code: 'DIR-03', value: 'Maintain', description: '', displayOrder: null, isActive: true, portfolioIds: [] });
 
       await component.saveValue();
 
@@ -1260,7 +1339,8 @@ describe('ControlListsComponent', () => {
         value: 'Increase sharply',
         description: '',
         displayOrder: 1,
-        isActive: true
+        isActive: true,
+        portfolioIds: []
       });
       const [, patchBody] = api.PATCH_ControlListValue.mock.calls[0];
       expect(patchBody).not.toHaveProperty('id');
@@ -1354,6 +1434,365 @@ describe('ControlListsComponent', () => {
         })
       );
       expect(actions.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'Value deleted successfully' }));
+    });
+  });
+  // ─── changes/control-lists-global-scope T-02: values applicable per portfolio (R-CLG-009) ───────
+  //
+  // What these cannot reach (KZ-017): jsdom has no layout, so the rendered width/overflow of the
+  // new column is checked only at the HITL pause (design §10); the API is mocked, so the server's
+  // own A13 SQL rule is proven by the server integration suite, not here — this file proves the
+  // CLIENT-side copy of that rule against literals taken from the R-CLG-009 scenarios.
+  describe('applies to (R-CLG-009)', () => {
+    const directionList = listSummary({ id: 10, key: 'kpi.direction', name: 'Direction', isSystem: true, valueCount: 6 });
+    const kpiCategory = category({ id: 1, name: 'KPIs', lists: [directionList] });
+
+    // ONE shared fixture for the column labels AND the filter rule. It must mix every case the
+    // rule distinguishes (design §10 / tasks T-02 disqualifier): unrestricted, restricted-to-P2,
+    // restricted to a SET containing P2, linked only to INACTIVE portfolios, and an inactive value.
+    const increase = controlListValue({ id: 1, code: 'DIR-01', value: 'Increase', displayOrder: 1 });
+    const maintain = controlListValue({ id: 2, code: 'DIR-02', value: 'Maintain within range', displayOrder: 2, appliesTo: [2], appliesToAll: false });
+    const legacy = controlListValue({ id: 3, code: 'DIR-03', value: 'Legacy band', displayOrder: 3, appliesTo: [], appliesToAll: false });
+    const both = controlListValue({ id: 4, code: 'DIR-04', value: 'Both portfolios', displayOrder: 4, appliesTo: [1, 2], appliesToAll: false });
+    const retired = controlListValue({ id: 5, code: 'DIR-05', value: 'Retired value', displayOrder: 5, isActive: false });
+    const fixtureValues = [increase, maintain, legacy, both, retired];
+
+    // A synchronous throw (not a pre-built rejected Promise): it is caught at the `await` call site
+    // inside the component, with no separately-constructed rejection to leak as unhandled (same
+    // reason as the categories-failure test above).
+    const portfoliosDown = (): Promise<unknown> => {
+      throw new Error('portfolios down');
+    };
+
+    let originalMatchMedia: PropertyDescriptor | undefined;
+
+    beforeAll(() => {
+      // jsdom has no matchMedia; PrimeNG's Overlay probes it when the filter panel opens.
+      originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: jest.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          onchange: null,
+          addListener: jest.fn(),
+          removeListener: jest.fn(),
+          addEventListener: jest.fn(),
+          removeEventListener: jest.fn(),
+          dispatchEvent: jest.fn()
+        }))
+      });
+    });
+
+    afterAll(() => {
+      if (originalMatchMedia) {
+        Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+      } else {
+        delete (window as Partial<Window>).matchMedia;
+      }
+    });
+
+    afterEach(() => {
+      document.body.querySelectorAll('.p-select-overlay, .p-overlay').forEach(el => el.remove());
+    });
+
+    async function openList(values: ControlListValue[] = fixtureValues, portfoliosCall?: () => Promise<unknown>): Promise<void> {
+      await setup([kpiCategory], portfoliosCall);
+      api.GET_ControlListValues.mockResolvedValue(ok(values));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    const root = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+    function renderedColumn(testId: string): string[] {
+      return Array.from(root().querySelectorAll(`[data-testid="${testId}"]`)).map(cell => (cell.textContent ?? '').trim());
+    }
+
+    function filterSelect(): Select {
+      const selectDe = fixture.debugElement
+        .queryAll(By.directive(Select))
+        .find(de => (de.nativeElement as HTMLElement).getAttribute('data-testid') === 'values-portfolio-filter');
+      expect(selectDe).toBeDefined();
+      return selectDe!.componentInstance as Select;
+    }
+
+    /** Opens the REAL PrimeNG overlay and clicks the option whose text matches — the rendered binding, not `pfFilter.set()`. */
+    async function chooseFilterOption(label: string): Promise<void> {
+      filterSelect().show();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const option = Array.from(document.body.querySelectorAll('.p-select-option')).find(el => (el.textContent ?? '').trim() === label) as
+        | HTMLElement
+        | undefined;
+      expect(option).toBeTruthy();
+      option!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    // ─── Applies to column ─────────────────────────────────────────────────────────────────────
+
+    it('labels each row All / the portfolio names / No active portfolio in the rendered Applies to column', async () => {
+      await openList();
+
+      const headers = Array.from(root().querySelectorAll('[data-testid^="column-header-"]')).map(node => node.getAttribute('data-testid'));
+      expect(headers.indexOf('column-header-appliesToLabel')).toBeGreaterThan(headers.indexOf('column-header-displayOrder'));
+      expect(headers.indexOf('column-header-appliesToLabel')).toBeLessThan(headers.indexOf('column-header-inUse'));
+      expect(root().querySelector('[data-testid="column-header-appliesToLabel"]')?.textContent).toContain('Applies to');
+
+      // Rows are DIR-01..DIR-05 (default sort: code ascending).
+      expect(renderedColumn('cell-appliesToLabel')).toEqual([
+        'All', // increase: appliesToAll
+        'Portfolio 2', // maintain: restricted to P2
+        'No active portfolio', // legacy: appliesToAll = false and appliesTo = [] — NOT "All"
+        'Portfolio 1, Portfolio 2', // both
+        'All' // retired: an inactive VALUE is still unrestricted
+      ]);
+    });
+
+    it('shows the ids instead of names in the column when the portfolios call failed (design §6, S-4)', async () => {
+      await openList(fixtureValues, portfoliosDown);
+
+      expect(renderedColumn('cell-appliesToLabel')).toEqual(['All', '2', 'No active portfolio', '1, 2', 'All']);
+    });
+
+    it('includes the Applies to column in the export rows, with the same labels the table shows', async () => {
+      await openList();
+
+      const table = fixture.debugElement.query(By.directive(DataTableComponent)).componentInstance as DataTableComponent<Record<string, unknown>>;
+      const exported = buildExportRows({ columns: table.columns, rows: table.displayRows() });
+
+      const appliesToIndex = exported[0].indexOf('Applies to');
+      expect(appliesToIndex).toBeGreaterThan(-1);
+      expect(exported.slice(1).map(row => row[appliesToIndex])).toEqual(['All', 'Portfolio 2', 'No active portfolio', 'Portfolio 1, Portfolio 2', 'All']);
+    });
+
+    // ─── Show values for: filter (same rule as A13, client-side) ───────────────────────────────
+    //
+    // Expected lists are literals worked out from R-CLG-009 (*Value for one portfolio only*,
+    // *Portfolio deactivated after linking*), not recomputed with the component's own rule.
+
+    it('shows every value when no portfolio is chosen, including the one linked only to inactive portfolios', async () => {
+      await openList();
+
+      expect(renderedColumn('cell-value')).toEqual(['Increase', 'Maintain within range', 'Legacy band', 'Both portfolios', 'Retired value']);
+    });
+
+    it('filtered to Portfolio 1: unrestricted + P1-linked values only; the P2-only and the inactive-links values are NOT shown', async () => {
+      await openList();
+
+      await chooseFilterOption('Portfolio 1');
+
+      expect(renderedColumn('cell-value')).toEqual(['Increase', 'Both portfolios', 'Retired value']);
+    });
+
+    it('filtered to Portfolio 2: unrestricted + P2-linked values; the value linked only to inactive portfolios is still never shown', async () => {
+      await openList();
+
+      await chooseFilterOption('Portfolio 2');
+
+      expect(renderedColumn('cell-value')).toEqual(['Increase', 'Maintain within range', 'Both portfolios', 'Retired value']);
+      expect(renderedColumn('cell-value')).not.toContain('Legacy band');
+    });
+
+    it('returns to every value when All portfolios is chosen again', async () => {
+      await openList();
+      await chooseFilterOption('Portfolio 1');
+
+      await chooseFilterOption('All portfolios');
+
+      expect(renderedColumn('cell-value')).toHaveLength(5);
+    });
+
+    it('tells a filter that excludes every value apart from a list with no values (no "Add value" prompt)', async () => {
+      await openList([maintain]); // only restricted to P2
+
+      await chooseFilterOption('Portfolio 1');
+
+      expect(root().querySelector('[data-testid="values-filtered-empty"]')?.textContent).toContain('No values apply to this portfolio');
+      expect(root().querySelector('[data-testid="values-empty-state"]')).toBeNull();
+      expect(root().querySelector('[data-testid="add-value-empty-button"]')).toBeNull();
+    });
+
+    it('resets the filter when another list is selected', async () => {
+      const otherList = listSummary({ id: 11, key: 'kpi.type', name: 'KPI type', codePrefix: 'KTY' });
+      await setup([category({ id: 1, name: 'KPIs', lists: [directionList, otherList] })]);
+      api.GET_ControlListValues.mockResolvedValue(ok(fixtureValues));
+      component.selectList(directionList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      await chooseFilterOption('Portfolio 1');
+      expect(renderedColumn('cell-value')).toHaveLength(3);
+
+      component.selectList(otherList.id);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(renderedColumn('cell-value')).toHaveLength(5);
+    });
+
+    // ─── Value modal: Applies to checkbox group ────────────────────────────────────────────────
+
+    function checkbox(portfolioId: number): HTMLInputElement {
+      return root().querySelector(`[data-testid="value-applies-to-${portfolioId}"]`) as HTMLInputElement;
+    }
+
+    it('renders one checkbox per ACTIVE portfolio, all unticked, with the "none ticked = all portfolios" hint on create', async () => {
+      await openList();
+
+      component.startCreateValue();
+      fixture.detectChanges();
+
+      expect(root().querySelectorAll('[data-testid^="value-applies-to-"][type="checkbox"]')).toHaveLength(2);
+      expect(checkbox(1).checked).toBe(false);
+      expect(checkbox(2).checked).toBe(false);
+      expect(root().querySelector('[data-testid="value-applies-to-hint"]')?.textContent).toContain('None ticked = applies to all portfolios');
+      expect(root().querySelector('[data-testid="value-applies-to-hint"]')?.textContent).toContain('Records that already use it stay valid');
+    });
+
+    it('does not offer an inactive portfolio (is_active = false) in the checkbox group', async () => {
+      await openList(fixtureValues, () => Promise.resolve(ok([PORTFOLIO_1, portfolio(3, 'Portfolio 0', { is_active: false })])));
+
+      component.startCreateValue();
+      fixture.detectChanges();
+
+      expect(checkbox(1)).toBeTruthy();
+      expect(checkbox(3)).toBeNull();
+    });
+
+    it('creates with portfolioIds: [] when no checkbox is ticked (empty = all portfolios, never undefined)', async () => {
+      await openList();
+      component.startCreateValue();
+      component.valueForm.update(current => ({ ...current, value: 'Maintain' }));
+      fixture.detectChanges();
+
+      await component.saveValue();
+
+      const [, body] = api.POST_ControlListValue.mock.calls[0];
+      expect(body.portfolioIds).toEqual([]);
+      expect(body).toEqual({ code: 'DIR-06', value: 'Maintain', description: undefined, displayOrder: 0, isActive: true, portfolioIds: [] });
+    });
+
+    it('creates with the ticked portfolios, driven through the rendered checkboxes', async () => {
+      await openList();
+      component.startCreateValue();
+      component.valueForm.update(current => ({ ...current, value: 'Maintain' }));
+      fixture.detectChanges();
+
+      checkbox(2).click();
+      fixture.detectChanges();
+      expect(checkbox(2).checked).toBe(true);
+      expect(root().querySelector('[data-testid="value-applies-to-hint"]')?.textContent).toContain('Offered only in the ticked portfolios');
+
+      await component.saveValue();
+
+      expect(api.POST_ControlListValue.mock.calls[0][1].portfolioIds).toEqual([2]);
+    });
+
+    it('pre-ticks the saved Applies to set on edit and sends the edited set (untick -> [], tick -> list)', async () => {
+      await openList();
+
+      component.startEditValue(maintain); // restricted to [2]
+      fixture.detectChanges();
+      expect(checkbox(1).checked).toBe(false);
+      expect(checkbox(2).checked).toBe(true);
+
+      checkbox(1).click();
+      fixture.detectChanges();
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[0][1].portfolioIds).toEqual([2, 1]);
+
+      component.startEditValue(both); // [1, 2]
+      fixture.detectChanges();
+      expect(checkbox(1).checked).toBe(true);
+      expect(checkbox(2).checked).toBe(true);
+      checkbox(1).click();
+      checkbox(2).click();
+      fixture.detectChanges();
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[1][1].portfolioIds).toEqual([]);
+    });
+
+    it('re-opening the modal on a different value does not carry the previous ticks over', async () => {
+      await openList();
+      component.startEditValue(maintain);
+      fixture.detectChanges();
+      expect(checkbox(2).checked).toBe(true);
+
+      component.startCreateValue();
+      fixture.detectChanges();
+
+      expect(checkbox(1).checked).toBe(false);
+      expect(checkbox(2).checked).toBe(false);
+    });
+
+    it('does not send an empty set for a value linked only to inactive portfolios that the admin did not touch (it would silently turn it into "all")', async () => {
+      await openList();
+
+      component.startEditValue(legacy); // appliesToAll = false, appliesTo = []
+      fixture.detectChanges();
+      expect(checkbox(1).checked).toBe(false);
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[0][1]).not.toHaveProperty('portfolioIds');
+
+      // Ticking a portfolio is an explicit choice, so it IS sent.
+      component.startEditValue(legacy);
+      fixture.detectChanges();
+      checkbox(1).click();
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[1][1].portfolioIds).toEqual([1]);
+    });
+
+    // ─── Portfolios call failure (design §6, S-4) ──────────────────────────────────────────────
+
+    it('disables the Applies to field and the filter, with an inline note, when the portfolios call fails — and the page still works', async () => {
+      await openList(fixtureValues, portfoliosDown);
+
+      // Page otherwise works: categories + values rendered, no page-level error state.
+      expect(root().querySelector('[data-testid="error-state"]')).toBeNull();
+      expect(root().querySelectorAll('[data-testid="data-table-row"]')).toHaveLength(5);
+
+      // Filter: rendered disabled, with the note beside it.
+      expect(filterSelect().disabled).toBe(true);
+      expect((fixture.debugElement.query(By.directive(Select)).nativeElement as HTMLElement).className).toMatch(/p-disabled/);
+      expect(root().querySelector('[data-testid="portfolios-unavailable-note"]')?.textContent).toContain('could not be loaded');
+
+      // Modal field: the fieldset is disabled and carries the note.
+      component.startEditValue(maintain);
+      fixture.detectChanges();
+      const field = root().querySelector('[data-testid="value-applies-to-field"]') as HTMLFieldSetElement;
+      expect(field.disabled).toBe(true);
+      expect(root().querySelector('[data-testid="value-applies-to-unavailable"]')?.textContent).toContain('could not be loaded');
+    });
+
+    it('treats an unsuccessful portfolios response like a failure, and a successful one that lists none as an empty group (not a failure)', async () => {
+      await openList(fixtureValues, () => Promise.resolve(fail(500, 'boom', 'InternalServerErrorException')));
+      expect(component.portfoliosLoadFailed()).toBe(true);
+      expect(filterSelect().disabled).toBe(true);
+
+      TestBed.resetTestingModule();
+      await openList(fixtureValues, () => Promise.resolve(ok([])));
+      expect(component.portfoliosLoadFailed()).toBe(false);
+      expect(filterSelect().disabled).toBeFalsy();
+    });
+
+    it('omits portfolioIds from create and edit payloads when the field is unavailable, so an edit can never wipe a restriction it could not show', async () => {
+      await openList(fixtureValues, portfoliosDown);
+
+      component.startEditValue(maintain);
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[0][1]).not.toHaveProperty('portfolioIds');
+
+      component.startCreateValue();
+      component.valueForm.update(current => ({ ...current, value: 'New one' }));
+      await component.saveValue();
+      expect(api.POST_ControlListValue.mock.calls[0][1]).not.toHaveProperty('portfolioIds');
     });
   });
 });

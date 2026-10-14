@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus, RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { ControlListsController } from './control-lists.controller';
 import { ControlListsService } from './control-lists.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -351,7 +352,7 @@ describe('ControlListsController', () => {
     });
   });
 
-  describe('getValuesByKey (A13, T-04)', () => {
+  describe('getValuesByKey (A13, T-04, R-CLG-009)', () => {
     it('reads listKey from the param and activeOnly from the query, returning the envelope', async () => {
       const query = { activeOnly: true };
       const data = [{ id: 1, listId: 3, code: 'DIR-01', value: 'Increase' }];
@@ -363,6 +364,7 @@ describe('ControlListsController', () => {
       expect(mockService.getValuesByKey).toHaveBeenCalledWith(
         'kpi.direction',
         true,
+        undefined,
       );
       expect(ResponseUtils.format).toHaveBeenCalledWith({
         description: 'Values found',
@@ -381,7 +383,47 @@ describe('ControlListsController', () => {
       expect(mockService.getValuesByKey).toHaveBeenCalledWith(
         'kpi.direction',
         true,
+        undefined,
       );
+    });
+
+    // R-CLG-009: the optional portfolio filter reaches the service as the
+    // third argument, alongside activeOnly.
+    it('passes the optional portfolioId filter through to the service', async () => {
+      const query = { activeOnly: false, portfolioId: 2 };
+      mockService.getValuesByKey.mockResolvedValue([]);
+      mockFormat.mockReturnValue({ ok: true });
+
+      await controller.getValuesByKey('kpi.direction', query);
+
+      expect(mockService.getValuesByKey).toHaveBeenCalledWith(
+        'kpi.direction',
+        false,
+        2,
+      );
+    });
+
+    // NFR-CLG-003 / R-CLG-009: Swagger documents `portfolioId` as an OPTIONAL
+    // query parameter next to `activeOnly`, and the summary says it filters.
+    it('documents portfolioId as an optional query parameter and says so in the summary (Swagger)', () => {
+      const handler = ControlListsController.prototype.getValuesByKey;
+      const parameters: Array<{
+        name: string;
+        in: string;
+        required: boolean;
+      }> = Reflect.getMetadata(DECORATORS.API_PARAMETERS, handler);
+      const operation: { summary: string } = Reflect.getMetadata(
+        DECORATORS.API_OPERATION,
+        handler,
+      );
+
+      const query = parameters.filter((p) => p.in === 'query');
+      expect(query.map((p) => p.name).sort()).toEqual([
+        'activeOnly',
+        'portfolioId',
+      ]);
+      expect(query.find((p) => p.name === 'portfolioId')?.required).toBe(false);
+      expect(operation.summary).toContain('optionally filtered by portfolio');
     });
 
     // Falsifier 5 (tasks.md T-04): adding @Roles to A13 must fail this test
