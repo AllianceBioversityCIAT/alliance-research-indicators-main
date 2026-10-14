@@ -2,7 +2,7 @@
 
 - **Module:** control-lists — server + client
 - **Spec id:** 2026-10-control-lists-global-scope
-- **Status:** not-started
+- **Status:** executed (T-00…T-03 done, 2026-10-14)
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — ESCALATED; R3-1/R3-2 corrected by requester decision, §10)
@@ -136,7 +136,7 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ### T-03 — HITL: roles, menu and mockup
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-02 · **Owner:** requester
+- **Status:** done (2026-10-14 — see `execution.md` T-03) · **Size:** S · **Dependencies:** T-02 · **Owner:** requester
 - **Requirements covered:** R-CLG-008 *Center Admin denied* / *Technical Support allowed* in a real browser; R-CLG-005 / R-CLG-009 UI against the mockup; requirements §10 *Mockup drift*
 - **Design refs:** §6, §10 *Manual*
 - **Scope:** local app (`docker compose` or native, pointing at the local DB):
@@ -147,8 +147,8 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Falsifier:** n/a (human observation).
 - **Disqualifier:** a check done as Admin for step 1 (Admin bypasses); quoting "it works" without saying which step and which user (KZ-002 — quote what was observed).
 - **Done criteria:**
-  - [ ] Each step quoted with the user role used and what was seen.
-  - [ ] Mockup differences listed (or "none").
+  - [x] Each step quoted with the user role used and what was seen.
+  - [x] Mockup differences listed (or "none"). *(Requester: minor differences, accepted, not itemized — execution.md T-03.)*
 
 ---
 
@@ -192,14 +192,14 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-10-13 | Judgment Day ended ESCALATED; R3-1/R3-2 corrected by requester decision without a third judgment | T-02 falsifiers 2–3 make the `null` rule observable red | Leader | open |
-| RB-2 | 2026-10-13 | `migration:show` loader gate reasoned from TypeORM source, red not observed (K-004) | T-01 falsifier 1 | Leader | open |
+| RB-1 | 2026-10-13 | Judgment Day ended ESCALATED; R3-1/R3-2 corrected by requester decision without a third judgment | T-02 falsifiers 2–3 make the `null` rule observable red | Leader | closed 2026-10-14 — T-02 falsifiers 2–3 observed red |
+| RB-2 | 2026-10-13 | `migration:show` loader gate reasoned from TypeORM source, red not observed (K-004) | T-01 falsifier 1 | Leader | closed 2026-10-13 — T-01 falsifier 1 observed red |
 | RB-3 | 2026-10-13 | `organizational-structure` waits on this spec | After T-03: update its design (Q-1, D-ORG-3, R-ORG-011, P-2, P-12) and resume it | Leader | open |
 
 ## 5. Done definition
 
-- [ ] T-00…T-03 done.
-- [ ] T-03 human check done **before** `/akili-validate` (KZ-007).
+- [x] T-00…T-03 done.
+- [x] T-03 human check done **before** `/akili-validate` (KZ-007).
 - [ ] Every row of §3 closed with evidence in `execution.md`.
 - [ ] Coverage thresholds green; Swagger updated.
 - [ ] RB-3 follow-up done.

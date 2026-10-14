@@ -276,3 +276,42 @@ Rulings: (b) omission → in scope, acceptable gap-fill (D-EX-5); (a) `name` ins
 1. Step 3 (`kpi.direction`, restrict *Maintain within range* to P2): the column shows the portfolio **name** (D-EX-6), not "P2 only".
 2. The full-app `/swagger` view (D-EX-4) is still owed. Check A1 (no `portfolioId`), A2 absent, A10/A11 `portfolioIds`, A13 optional `portfolioId`. Booting the full app attaches a RabbitMQ consumer to the shared queue, so do it only with an MQ setting the requester approves.
 3. Optional observation for Reviewer B ADVISORY 1: edit a value linked only to an inactive portfolio and check whether it can be set back to "all".
+
+#### Budget tripwire (design §14)
+After T-02 the Leader stopped and reported the overrun to the requester: about 2,950 changed lines estimated vs about 8,360 actual (T-01 +2,759/−2,085; T-02 +3,442/−77; mostly new and rewritten test suites). Tasks (4) and review rounds (1 per task, ≤ 2 budgeted) stayed within budget. The requester went ahead with T-03.
+
+---
+
+### T-03 — HITL: roles, menu and mockup
+
+- **Final status:** PASS (HITL — requester observation; the task has no Reviewer)
+- **Date:** 2026-10-14
+- **Requirements covered:** R-CLG-008 *Center Admin denied* / *Technical Support allowed* in a real browser; R-CLG-005 / R-CLG-009 UI against the mockup; requirements §10 *Mockup drift*.
+- **Run by:** the requester (Hector F. Tobón) on the local app pointing at the local DB. Statement: "realicé las pruebas y funcionó todo correctamente". Per step, from the requester's answers to the Leader (KZ-002 — the role and what was seen are named):
+
+| Step | User role used | What the requester reports seeing |
+| --- | --- | --- |
+| 1 | **Center Admin only** (not Admin, so the Admin bypass does not apply) | The *System admin* group did not show; `/administration/configuration/control-lists` redirected |
+| 2 | Technical Support | *Control Lists* after *Prompt Manager*; lists load; `Key:` shown; duplicate key → inline 409 |
+| 3 | Admin / Technical Support | On `kpi.direction`, *Maintain within range* restricted to P2: the P1 filter hides it, the P2 filter shows it, the column shows the portfolio name, the export has the column; set back to all |
+| Swagger (D-EX-4 owed) | — | Full-app `/swagger` checked: A1 without `portfolioId`, A2 absent, `portfolioIds` on A10/A11, optional `portfolioId` on A13 |
+| 4 | — | **Minor differences** from artboard 1, accepted by the requester. **Not itemized** |
+
+**What this evidence covers (KZ-017):** the requester's own observation as reported to the Leader. Nothing here was captured by the Leader (no screenshots or console output). Reviewer B ADVISORY 1 (a value linked only to inactive portfolios cannot be set back to "all") was not reported either way.
+
+---
+
+## Summary
+
+- **Tasks:** T-00 (HITL), T-01, T-02, T-03 (HITL), all PASS. T-01 and T-02 each passed on the first attempt (1 review round each, two parallel lens Reviewers).
+- **Commits:** `0d3dbacf` (T-00), `f0da74b3` (T-01), `e081da56` (T-02), plus this closing commit.
+- **Suites (Leader, last run after T-02):** server 4,250 passed / 3 failed (archive baseline, unchanged); client 7,973/7,973; integration 7 suites / 104 tests (server Implementer).
+- **Execution decisions:** D-EX-1 (four reverts in T-00), D-EX-2 (portfolios load moved to T-02), D-EX-3 (spec-only hits in the route sweep), D-EX-4 (reduced Swagger boot; full app checked at T-03), D-EX-5 (`portfolioIds` omitted in two states), D-EX-6 (`name` instead of short names), D-EX-7 (`tdd` added in T-02).
+- **Open for the requester, outside this spec (advisories, never tasks):**
+  - kaizen doc P8 (`docs/specs/kaizen/institutional-performance--control-lists.md:125-126`) still describes the old route;
+  - a value linked only to inactive portfolios cannot be set back to "all" from the page;
+  - mockup differences are not itemized.
+- **For `/akili-archive`:**
+  - doc drift: design §6 "short names" → `name`; the T-02 falsifier 1 prediction was wrong;
+  - RB-3: update `organizational-structure`;
+  - CodeGraph re-index (page folder moved; new link entity).
