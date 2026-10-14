@@ -121,6 +121,24 @@ export class ToPromiseService {
     );
   };
 
+  postBlob = <B>(url: string, body: B, config?: Config): Promise<Blob> => {
+    let headers = new HttpHeaders();
+
+    if (config?.useResultInterceptor) {
+      headers = headers.set('X-Use-Year', 'true');
+    }
+    if (config?.platform) {
+      headers = headers.set('X-Platform', config.platform);
+    }
+    if (config?.noAuthInterceptor) {
+      headers = headers.set('no-auth-interceptor', 'true');
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
+    return firstValueFrom(this.http.post(this.getEnv(config?.isAuth) + url, body, { headers, responseType: 'blob' }));
+  };
+
   getBlob = (url: string, config?: Config): Promise<Blob> => {
     let headers = new HttpHeaders();
 
