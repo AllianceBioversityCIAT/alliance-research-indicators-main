@@ -91,6 +91,15 @@
         (searchChange)="searchTerm.set($event)"
         (clear)="clearFilters()"
       ></app-search-export-controls>
+
+      <div class="ml-auto">
+        <app-filters-action-buttons
+          [showExportButton]="true"
+          exportLabel="Export projects"
+          [isExportLoading]="isExporting()"
+          (export)="exportTable()"
+        ></app-filters-action-buttons>
+      </div>
     </div>
 
     <p-table
@@ -123,8 +132,8 @@
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="is_pool_funding_contributor">
             <div class="by-project__th-inner">Pool funding <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
           </th>
-          <th scope="col" class="by-project__th atc-primary-blue-600">
-            <div class="by-project__th-inner">PI Delegates</div>
+          <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="delegateCount">
+            <div class="by-project__th-inner">PI Delegates <p-sortIcon field="delegateCount"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600">
             <div class="by-project__th-inner by-project__th-inner--centered">Actions</div>

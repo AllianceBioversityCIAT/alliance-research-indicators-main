@@ -13,7 +13,8 @@
 //
 // KZ-001: assert on argument values passed to the service, not bare call count.
 
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, StreamableFile } from '@nestjs/common';
+import { PiDelegatesExportService } from './pi-delegates-export.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PiDelegatesController } from './pi-delegates.controller';
 import { PiDelegatesService } from './pi-delegates.service';
@@ -100,6 +101,11 @@ function makeMockService() {
 
 async function makeController() {
   const mockService = makeMockService();
+  const mockExport = {
+    buildByProjectWorkbook: jest.fn().mockResolvedValue(Buffer.from('p')),
+    buildByPersonWorkbook: jest.fn().mockResolvedValue(Buffer.from('q')),
+    buildFilename: jest.fn((kind: string) => `STAR_pi_delegates_${kind}.xlsx`),
+  };
 
   const module: TestingModule = await Test.createTestingModule({
     controllers: [PiDelegatesController],
@@ -108,11 +114,12 @@ async function makeController() {
         provide: PiDelegatesService,
         useValue: mockService,
       },
+      { provide: PiDelegatesExportService, useValue: mockExport },
     ],
   }).compile();
 
   const controller = module.get<PiDelegatesController>(PiDelegatesController);
-  return { controller, mockService };
+  return { controller, mockService, mockExport };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -434,5 +441,44 @@ describe('PiDelegatesController.getHistory() — GET /pi-delegates/history', () 
     await expect(
       controller.getHistory({ project_id: 'PROJ-DENIED' }),
     ).rejects.toThrow(ForbiddenException);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Excel export handlers
+// ─────────────────────────────────────────────────────────────────────────────
+describe('PiDelegatesController export handlers', () => {
+  const XLSX =
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  it('exportByProject delegates to the export service and streams an xlsx attachment', async () => {
+    const { controller, mockExport } = await makeController();
+    const dto = { user_id: 7, project_codes: ['A', 'B'] };
+
+    const file = await controller.exportByProject(dto);
+
+    expect(mockExport.buildByProjectWorkbook).toHaveBeenCalledWith(dto);
+    expect(mockExport.buildFilename).toHaveBeenCalledWith('by_project');
+    expect(file).toBeInstanceOf(StreamableFile);
+    expect(file.getHeaders()).toEqual({
+      type: XLSX,
+      disposition: 'attachment; filename="STAR_pi_delegates_by_project.xlsx"',
+      length: 1,
+    });
+  });
+
+  it('exportByPerson delegates to the export service and streams an xlsx attachment', async () => {
+    const { controller, mockExport } = await makeController();
+    const dto = { user_id: 7, delegate_user_ids: [3, 1] };
+
+    const file = await controller.exportByPerson(dto);
+
+    expect(mockExport.buildByPersonWorkbook).toHaveBeenCalledWith(dto);
+    expect(mockExport.buildFilename).toHaveBeenCalledWith('by_person');
+    expect(file).toBeInstanceOf(StreamableFile);
+    expect(file.getHeaders().type).toBe(XLSX);
+    expect(file.getHeaders().disposition).toBe(
+      'attachment; filename="STAR_pi_delegates_by_person.xlsx"',
+    );
   });
 });

@@ -76,6 +76,8 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() hideSelected = false;
   @Input() hideTemplate = false;
   @Input() disabledSelectedScroll = false;
+  /** Overrides the 380px cap of the scrollable selected-items list (e.g. two pickers in one modal). */
+  @Input() selectedItemsMaxHeight = '';
   @Input() flagAttributes: { isoAlpha2: string; institution_location_name: string } = { isoAlpha2: '', institution_location_name: '' };
   @Input() removeCondition: (item: any) => boolean = () => true;
   @Input() removeTooltip = '';
@@ -328,6 +330,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
       )
     );
     this.destroyRef.onDestroy(() => this.listSyncEffect?.destroy());
+    this.destroyRef.onDestroy(() => this.stopTriggerTracking());
   }
 
   private readParentModel(): any {
@@ -513,6 +516,42 @@ export class MultiselectComponent implements OnInit, OnChanges {
     this.ngZone.runOutsideAngular(() => {
       requestAnimationFrame(() => this.applyMultiselectPanelMaxWidth());
     });
+    this.startTriggerTracking();
+  }
+
+  private trackingFrame: number | null = null;
+
+  /**
+   * The panel is appended to body, so PrimeNG positions it once on open. When the
+   * host layout moves the trigger while the panel is open (e.g. a centred modal grows
+   * as selected-item cards render), the panel would stay behind, detached from the
+   * select. Follow the trigger each frame while open and realign when it moves.
+   */
+  private startTriggerTracking(): void {
+    this.stopTriggerTracking();
+    const trigger = this.hostEl.nativeElement.querySelector('.p-multiselect') as HTMLElement | null;
+    if (!trigger) {
+      return;
+    }
+    let last = trigger.getBoundingClientRect();
+    const tick = () => {
+      const rect = trigger.getBoundingClientRect();
+      if (rect.top !== last.top || rect.left !== last.left || rect.width !== last.width || rect.height !== last.height) {
+        last = rect;
+        this.primeMultiSelect?.overlayViewChild?.alignOverlay();
+      }
+      this.trackingFrame = requestAnimationFrame(tick);
+    };
+    this.ngZone.runOutsideAngular(() => {
+      this.trackingFrame = requestAnimationFrame(tick);
+    });
+  }
+
+  private stopTriggerTracking(): void {
+    if (this.trackingFrame !== null) {
+      cancelAnimationFrame(this.trackingFrame);
+      this.trackingFrame = null;
+    }
   }
 
   onMultiselectPanelHide(): void {
@@ -522,6 +561,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    this.stopTriggerTracking();
     this.clearMultiselectPanelMaxWidth();
   }
 
