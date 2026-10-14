@@ -14,13 +14,14 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { By } from '@angular/platform-browser';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { provideRouter } from '@angular/router';
-import { ByProjectComponent } from './by-project.component';
+import { ByProjectComponent, type ProjectRow } from './by-project.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { computed, signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import type { ProjectDelegates } from '@interfaces/pi-delegates.interface';
 import type { GlobalAlert } from '@interfaces/global-alert.interface';
+import { CacheService } from '@services/cache/cache.service';
 
 // ─── Test data ────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number |
     loading: signal(false),
     error: signal<string | null>(null),
     revokePair: jest.fn().mockResolvedValue(undefined),
+    exportByProject: jest.fn().mockResolvedValue(new Blob(['x'])),
     currentUserId: signal(currentUserId),
     // Mirrors the real service: PI when the project's pi_user_id is the caller.
     isPiOf,
@@ -99,7 +101,7 @@ function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number |
 }
 
 function buildActionsStub() {
-  return { showGlobalAlert: jest.fn() };
+  return { showGlobalAlert: jest.fn(), showToast: jest.fn() };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,7 +137,8 @@ describe('ByProjectComponent', () => {
         // the project cell is a routerLink now
         provideRouter([]),
         { provide: PiDelegatesClientService, useValue: serviceStub },
-        { provide: ActionsService, useValue: actionsStub }
+        { provide: ActionsService, useValue: actionsStub },
+        { provide: CacheService, useValue: { dataCache: signal({ user: { first_name: 'Ana', last_name: 'Lopez' } }) } }
       ]
     }).compileComponents();
 
@@ -613,9 +616,20 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
     });
 
-    it('renders a sort icon on Project, Role, Status and Pool funding', () => {
+    it('renders a sort icon on Project, Role, Status, Pool funding and PI Delegates', () => {
       const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
-      expect(sortable.length).toBe(4);
+      expect(sortable.length).toBe(5);
+    });
+
+    it('sorts by PI Delegates ascending with projects without delegates first', () => {
+      const header = fixture.debugElement
+        .queryAll(By.css('th[pSortableColumn]'))
+        .find(th => th.attributes['pSortableColumn'] === 'delegateCount');
+      header!.nativeElement.click();
+      fixture.detectChanges();
+      const counts = (component.table()!.processedData as ProjectRow[]).map(r => r.delegateCount);
+      expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      expect(component.filteredRows().every(r => r.delegateCount === r.delegates.length)).toBe(true);
     });
 
 
@@ -1335,6 +1349,93 @@ describe('ByProjectComponent', () => {
       expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
       expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(codes()).toHaveLength(8);
+    });
+  });
+
+  // ── Excel export ───────────────────────────────────────────────────────
+
+  describe('Excel export', () => {
+    let clickSpy: jest.SpyInstance;
+
+    beforeEach(async () => {
+      (globalThis.URL as unknown as { createObjectURL: jest.Mock }).createObjectURL = jest.fn().mockReturnValue('blob:x');
+      (globalThis.URL as unknown as { revokeObjectURL: jest.Mock }).revokeObjectURL = jest.fn();
+      clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+    });
+
+    afterEach(() => clickSpy.mockRestore());
+
+    it('renders the "Export projects" button', () => {
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Export projects');
+    });
+
+    it('sends the filtered keys and the current filters', async () => {
+      component.searchTerm.set(' beta ');
+      component.roleTerm.set('delegate');
+      component.ongoingOnly.set(true);
+      component.withoutDelegatesOnly.set(true);
+      fixture.detectChanges();
+      await component.exportTable();
+      expect(serviceStub.exportByProject).toHaveBeenCalledWith(
+        component.filteredRows().map(r => r.project_code),
+        { search: 'beta', role: 'delegate', ongoing_only: true, without_delegates_only: true }
+      );
+    });
+
+    it('omits search when empty and sends only the narrowed keys', async () => {
+      component.withoutDelegatesOnly.set(true);
+      fixture.detectChanges();
+      await component.exportTable();
+      expect(serviceStub.exportByProject).toHaveBeenCalledWith(['PRJ-002'], {
+        role: 'all',
+        ongoing_only: false,
+        without_delegates_only: true
+      });
+    });
+
+    it('honours the p-table processed (sorted) order', async () => {
+      const table = component.table();
+      expect(table).toBeDefined();
+      Object.defineProperty(table, 'processedData', {
+        configurable: true,
+        get: () => [
+        { project_code: 'PRJ-003' },
+        { project_code: 'PRJ-001' }
+      ]
+      });
+      await component.exportTable();
+      expect(serviceStub.exportByProject.mock.calls[0][0]).toEqual(['PRJ-003', 'PRJ-001']);
+    });
+
+    it('downloads STAR_pi_delegates_by_project_..._AL.xlsx and toggles isExporting', async () => {
+      let resolve!: (b: Blob) => void;
+      serviceStub.exportByProject.mockReturnValue(new Promise<Blob>(r => (resolve = r)));
+      const first = component.exportTable();
+      expect(component.isExporting()).toBe(true);
+      await component.exportTable(); // double click ignored
+      expect(serviceStub.exportByProject).toHaveBeenCalledTimes(1);
+      resolve(new Blob(['x']));
+      await first;
+      expect(component.isExporting()).toBe(false);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the file with prefix and initials', async () => {
+      const links: HTMLAnchorElement[] = [];
+      clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
+        links.push(this);
+      });
+      await component.exportTable();
+      expect(links[0].download).toMatch(/^STAR_pi_delegates_by_project_\d{8}_\d{4}_AL\.xlsx$/);
+    });
+
+    it('shows an error toast and re-enables the button on failure', async () => {
+      serviceStub.exportByProject.mockRejectedValue(new Error('boom'));
+      await component.exportTable();
+      expect(actionsStub.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+      expect(component.isExporting()).toBe(false);
+      expect(clickSpy).not.toHaveBeenCalled();
     });
   });
 });

@@ -291,3 +291,11 @@ textarea::placeholder {
   display: block;
   text-align: left;
 }
+
+// Long change summaries (e.g. a PI Delegate sync over many projects) scroll
+// inside the dialog instead of growing it past the viewport.
+.alert .detail .alert-detail-scroll {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}

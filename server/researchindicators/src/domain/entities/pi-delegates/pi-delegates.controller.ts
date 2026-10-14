@@ -4,8 +4,10 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   HttpStatus,
   Post,
+  StreamableFile,
   Query,
   UseGuards,
   UsePipes,
@@ -34,6 +36,11 @@ import { ListManagedDto } from './dto/list-managed.query.dto';
 import { HistoryQueryDto } from './dto/history.query.dto';
 import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
 import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
+import { PiDelegatesExportService } from './pi-delegates-export.service';
+import {
+  ExportByPersonDto,
+  ExportByProjectDto,
+} from './dto/export-pi-delegates.dto';
 
 // ⚠ No @Roles(...) is applied here (R-PID-007 / DD-B).
 // RolesGuard.canActivate() returns true when no @Roles metadata is present,
@@ -52,7 +59,71 @@ import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
 @UseGuards(RolesGuard)
 @Controller()
 export class PiDelegatesController {
-  constructor(private readonly piDelegatesService: PiDelegatesService) {}
+  constructor(
+    private readonly piDelegatesService: PiDelegatesService,
+    private readonly piDelegatesExportService: PiDelegatesExportService,
+  ) {}
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // POST /pi-delegates/export/by-project/xlsx and /export/by-person/xlsx
+  //
+  // Static multi-segment POST paths: they never collide with POST /pi-delegates
+  // (root). Authorization is the same own-or-admin + scope=all gate as the
+  // by-user reads, enforced inside the service re-fetch.
+  // ─────────────────────────────────────────────────────────────────────────
+  @Post('export/by-project/xlsx')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Export the "By project" tab to Excel',
+    description:
+      'Re-fetches the caller authorized projects (same own-or-admin + scope rules as ' +
+      'GET /pi-delegates/by-user/projects), keeps only the requested project_codes in the ' +
+      'given order and returns an .xlsx attachment. Unauthorized codes are silently dropped. ' +
+      '`filters` only feeds the human-readable banner subtitle.',
+  })
+  @ApiBody({ type: ExportByProjectDto })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async exportByProject(@Body() dto: ExportByProjectDto) {
+    const buffer =
+      await this.piDelegatesExportService.buildByProjectWorkbook(dto);
+    return new StreamableFile(buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${this.piDelegatesExportService.buildFilename('by_project')}"`,
+    });
+  }
+
+  @Post('export/by-person/xlsx')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Export the "By person" tab to Excel',
+    description:
+      'Re-fetches the caller authorized delegates (same own-or-admin + scope rules as ' +
+      'GET /pi-delegates/by-user/people), keeps only the requested delegate_user_ids in the ' +
+      'given order and returns an .xlsx attachment. Unauthorized ids are silently dropped. ' +
+      '`filters` only feeds the human-readable banner subtitle.',
+  })
+  @ApiBody({ type: ExportByPersonDto })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async exportByPerson(@Body() dto: ExportByPersonDto) {
+    const buffer =
+      await this.piDelegatesExportService.buildByPersonWorkbook(dto);
+    return new StreamableFile(buffer, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      disposition: `attachment; filename="${this.piDelegatesExportService.buildFilename('by_person')}"`,
+    });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // POST /pi-delegates — per-project bulk sync (R-PID-011 / v4)
