@@ -25,6 +25,7 @@ graph TD
   T00[T-00 HITL: export + revert old migrations on the local DB] --> T01[T-01 Slice 1: global lists, key reads, System admin menu and roles]
   T01 --> T02[T-02 Slice 2: values applicable per portfolio]
   T02 --> T03[T-03 HITL: role, menu and mockup check]
+  T03 --> T04[T-04 Validation follow-up: W-1, W-2, W-3]
 ```
 
 | PR | Task | What a user can do after it |
@@ -149,6 +150,34 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Done criteria:**
   - [x] Each step quoted with the user role used and what was seen.
   - [x] Mockup differences listed (or "none"). *(Requester: minor differences, accepted, not itemized — execution.md T-03.)*
+
+### T-04 — Validation follow-up: W-1, W-2, W-3
+
+- **Status:** todo · **Size:** S · **Dependencies:** T-03 · **Origin:** `validation-report.md` §11, requester decision 2026-10-14 ("1 — fix all")
+- **Requirements covered:** R-CLG-009 AC.2 ("empty means all") for a value linked only to inactive portfolios (W-1); R-CLG-009 *Restricting a value already in use* "THEN the change is saved (200)" + "AND IT MUST keep those records valid" (W-2); design §10 *Migration loading* "lists the four control-list migrations" (W-3).
+- **Design refs:** §6 *Value modal* (2026-10-14 sub-bullet), §10, D-EX-5.
+- **Scope — client (W-1):** in the value modal, when editing a value with `appliesToAll = false` and `appliesTo = []`:
+  - show a state-specific hint, and no "none ticked = all" text;
+  - add an explicit **Apply to all portfolios** action that sends `portfolioIds: []`;
+  - keep the D-EX-5 omission when the selection is untouched.
+  - Specs assert on rendered DOM: the hint text in that state; the action → PATCH body `portfolioIds: []`; untouched save → key omitted (existing test kept); ticking a portfolio → that set. No change to other states.
+- **Scope — server (W-2, W-3):**
+  - **W-2:** one integration test in `test/control-lists-usage.integration-spec.ts`. On a value with `inUse > 0` from the registered provider, PATCH `portfolioIds` → 200, links replaced, and `assertValueInList` still passes for that value.
+  - **W-3:** widen the migration-loader test in `test/control-lists-seed.integration-spec.ts` to `…000–…003`, with an expected list of four, and fix its header/comment (including T-01 A-ADV-4: both error forms named).
+- **Falsifier:**
+  1. Restore the W-1 omission for the explicit action (send nothing) → the `[]` body test fails.
+  2. Show the generic hint in the inactive-only state → the hint test fails.
+  3. Make `updateValue` reject an in-use value's `portfolioIds` (temporary 409) → the W-2 test fails.
+  4. Drop `…003` from the expected loader list while the glob includes it → the loader test fails.
+- **Red run:** each falsifier observed failing on its own assertion, then reverted.
+- **Disqualifier:** a component-instance assertion instead of DOM/payload (KZ-001); a W-2 fixture whose value is not actually in use (`inUse = 0`); any non-local DB host.
+- **Consumers:** `control-lists.component.spec.ts` (`applies to (R-CLG-009)` block), `test/control-lists-usage.integration-spec.ts`, `test/control-lists-seed.integration-spec.ts`.
+- **Review:** `light` — one Reviewer over the combined diff.
+- **Skills:** angular-developer, ui-ux-pro-max (client); nestjs-expert (server); systematic-debugging on failure.
+- **Done criteria:**
+  - [ ] Client targeted specs + `npm run lint -- --quiet` + `ng build` green; falsifiers 1–2 red then reverted.
+  - [ ] Server `npm run test:integration -- control-lists` + eslint green; falsifiers 3–4 red then reverted.
+  - [ ] Leader full suites (server, client) match the baseline.
 
 ---
 

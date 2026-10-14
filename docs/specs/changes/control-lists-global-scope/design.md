@@ -168,6 +168,7 @@ Link ids are coerced with `Number()` before they leave the service (MySQL BIGINT
 - **List header:** `Key: <key>`.
 - **Values table:** column **Applies to** — *All* (`appliesToAll`), portfolio short names, or *No active portfolio*; filter *Show values for: All portfolios / <portfolio>* applying the A13 rule client-side; export includes the column.
 - **Value modal:** **Applies to** multi-select rendered as a checkbox group of active portfolios; none ticked = all; hint explains that records already using the value stay valid.
+  - *(Added 2026-10-14, validation W-1, T-04.)* **Value linked only to inactive portfolios** (`appliesToAll = false`, `appliesTo = []`): the hint says the value is linked only to inactive portfolios and is offered for none, and must NOT say "none ticked = all". An explicit **Apply to all portfolios** action sends `portfolioIds: []`. Ticking portfolios sends that set. Saving with the selection untouched still omits `portfolioIds` (D-EX-5), so the links stay as they are.
 - **List modal:** key hint "Unique across all lists… consumers read the list by this key"; a 409 on `listKey` shows inline.
 - Mockup artboard 1 matches.
 
