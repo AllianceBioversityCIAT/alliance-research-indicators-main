@@ -201,5 +201,5 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - [x] T-00…T-03 done.
 - [x] T-03 human check done **before** `/akili-validate` (KZ-007).
 - [ ] Every row of §3 closed with evidence in `execution.md`.
-- [ ] Coverage thresholds green; Swagger updated.
+- [x] Coverage thresholds green; Swagger updated. *(validation-report.md §5: server 90.49% stmts; Swagger seen at T-03.)*
 - [ ] RB-3 follow-up done.
