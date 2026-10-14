@@ -76,6 +76,8 @@ export class MultiselectComponent implements OnInit, OnChanges {
   @Input() hideSelected = false;
   @Input() hideTemplate = false;
   @Input() disabledSelectedScroll = false;
+  /** Overrides the 380px cap of the scrollable selected-items list (e.g. two pickers in one modal). */
+  @Input() selectedItemsMaxHeight = '';
   @Input() flagAttributes: { isoAlpha2: string; institution_location_name: string } = { isoAlpha2: '', institution_location_name: '' };
   @Input() removeCondition: (item: any) => boolean = () => true;
   @Input() removeTooltip = '';
