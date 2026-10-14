@@ -22,10 +22,11 @@ import {
  *    values seed whose join silently matches nothing turns it red too;
  *  - no portfolio column exists on categories or lists, and the next id any
  *    admin-created row receives sits above the seeded range;
- *  - the three migration files export only their migration class: a
+ *  - the four migration files export only their migration class: a
  *    `showMigrations()` over exactly those files fails with the TypeORM
- *    "migration name is wrong" error when a non-class export (such as a
- *    `seed...` function) is left in a migration file.
+ *    "migration name is wrong" error (constructible function) or "someClass
+ *    is not a constructor" (arrow/async export) when a non-class export is
+ *    left in a migration file.
  *
  * Evidence DB: the requester's local database `ari_local_mysql`,
  * 127.0.0.1:3306/stardb. `ARI_TEST_MYSQL_*` resolve there (printed below) —
@@ -281,12 +282,14 @@ describe('Control Lists — seed idempotency and seeded rows against real MySQL 
   });
 
   // K-006 / design §10 "Migration loading": TypeORM treats EVERY exported
-  // function of a file under `migrations/**` as a migration and rejects a name
-  // without a 13-digit timestamp. `showMigrations()` loads the files through
-  // the same loader and validates their names, so a `seed...` function left
-  // exported from a migration file fails here with "migration name is wrong".
+  // function of a file under `migrations/**` as a migration. `showMigrations()`
+  // loads the files through the same loader, so a non-class export left in a
+  // migration file fails here. Two error forms were observed: a constructible
+  // function (e.g. a `seed...` function) fails with "migration name is wrong";
+  // an arrow/async export fails with "someClass is not a constructor"
+  // (T-01 A-ADV-4).
   describe('migration files export only their class (D-CLG-11)', () => {
-    it('lists the three control-list migrations with no loader error', async () => {
+    it('lists the four control-list migrations with no loader error', async () => {
       const loader = new DataSource({
         type: 'mysql',
         host: process.env.ARI_TEST_MYSQL_HOST,
@@ -300,7 +303,7 @@ describe('Control Lists — seed idempotency and seeded rows against real MySQL 
         logging: false,
         migrationsTableName: 'migrations',
         migrations: [
-          `${__dirname}/../src/db/migrations/17909000000{00,01,02}-*{.ts,.js}`,
+          `${__dirname}/../src/db/migrations/17909000000{00,01,02,03}-*{.ts,.js}`,
         ],
         extra: { connectionLimit: 3, namedPlaceholders: true },
       });
@@ -309,11 +312,13 @@ describe('Control Lists — seed idempotency and seeded rows against real MySQL 
         expect(loader.migrations.map((m) => m.constructor.name).sort()).toEqual(
           [
             'CreateControlListCategories1790900000000',
+            'CreateControlListValuePortfolios1790900000003',
             'CreateControlListValues1790900000002',
             'CreateControlLists1790900000001',
           ],
         );
-        // Throws "... migration name is wrong ..." for a non-class export.
+        // Throws "migration name is wrong" (constructible function) or
+        // "someClass is not a constructor" (arrow/async) for a non-class export.
         // Resolves to `true` only when a listed migration is still pending,
         // which would mean the schema above was not migrated.
         await expect(loader.showMigrations()).resolves.toBe(false);

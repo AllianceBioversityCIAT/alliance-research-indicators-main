@@ -249,6 +249,10 @@
       <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-unavailable">{{ portfoliosUnavailableNote }}</p>
       } @else {
       <p class="m-0 text-[12px] atc-grey-700" data-testid="value-applies-to-hint">{{ appliesToHint() }}</p>
+      @if (showApplyToAll()) {
+      <p-button label="Apply to all portfolios" severity="secondary" size="small" [outlined]="true" type="button"
+        (onClick)="applyToAllPortfolios()" data-testid="value-apply-to-all"></p-button>
+      }
       }
     </fieldset>
     <div class="flex items-center gap-3">

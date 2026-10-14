@@ -1749,6 +1749,31 @@ describe('ControlListsComponent', () => {
       expect(api.PATCH_ControlListValue.mock.calls[1][1].portfolioIds).toEqual([1]);
     });
 
+    it('shows a state-specific hint and an Apply to all action for a value linked only to inactive portfolios (W-1)', async () => {
+      await openList();
+      component.startEditValue(legacy);
+      fixture.detectChanges();
+      const hint = () => root().querySelector('[data-testid="value-applies-to-hint"]')?.textContent ?? '';
+      expect(hint()).toContain('Linked only to inactive portfolios');
+      expect(hint()).not.toContain('None ticked');
+
+      const btn = () => root().querySelector('[data-testid="value-apply-to-all"] button') as HTMLButtonElement;
+      expect(btn()).not.toBeNull();
+      btn().click();
+      fixture.detectChanges();
+      expect(hint()).toContain('None ticked = applies to all');
+      await component.saveValue();
+      expect(api.PATCH_ControlListValue.mock.calls[0][1].portfolioIds).toEqual([]);
+    });
+
+    it('does not show the Apply to all action for values in other states (W-1)', async () => {
+      await openList();
+      component.startEditValue(maintain);
+      fixture.detectChanges();
+      expect(root().querySelector('[data-testid="value-apply-to-all"]')).toBeNull();
+      expect(root().querySelector('[data-testid="value-applies-to-hint"]')?.textContent).not.toContain('inactive portfolios');
+    });
+
     // ─── Portfolios call failure (design §6, S-4) ──────────────────────────────────────────────
 
     it('disables the Applies to field and the filter, with an inline note, when the portfolios call fails — and the page still works', async () => {

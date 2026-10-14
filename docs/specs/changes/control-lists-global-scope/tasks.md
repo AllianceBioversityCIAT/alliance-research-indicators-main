@@ -2,7 +2,7 @@
 
 - **Module:** control-lists — server + client
 - **Spec id:** 2026-10-control-lists-global-scope
-- **Status:** executed (T-00…T-03 done, 2026-10-14)
+- **Status:** executed (T-00…T-04 done, 2026-10-14)
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — ESCALATED; R3-1/R3-2 corrected by requester decision, §10)
@@ -153,7 +153,7 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ### T-04 — Validation follow-up: W-1, W-2, W-3
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-03 · **Origin:** `validation-report.md` §11, requester decision 2026-10-14 ("1 — fix all")
+- **Status:** done (2026-10-14 — see `execution.md` T-04) · **Size:** S · **Dependencies:** T-03 · **Origin:** `validation-report.md` §11, requester decision 2026-10-14 ("1 — fix all")
 - **Requirements covered:** R-CLG-009 AC.2 ("empty means all") for a value linked only to inactive portfolios (W-1); R-CLG-009 *Restricting a value already in use* "THEN the change is saved (200)" + "AND IT MUST keep those records valid" (W-2); design §10 *Migration loading* "lists the four control-list migrations" (W-3).
 - **Design refs:** §6 *Value modal* (2026-10-14 sub-bullet), §10, D-EX-5.
 - **Scope — client (W-1):** in the value modal, when editing a value with `appliesToAll = false` and `appliesTo = []`:
@@ -175,9 +175,9 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Review:** `light` — one Reviewer over the combined diff.
 - **Skills:** angular-developer, ui-ux-pro-max (client); nestjs-expert (server); systematic-debugging on failure.
 - **Done criteria:**
-  - [ ] Client targeted specs + `npm run lint -- --quiet` + `ng build` green; falsifiers 1–2 red then reverted.
-  - [ ] Server `npm run test:integration -- control-lists` + eslint green; falsifiers 3–4 red then reverted.
-  - [ ] Leader full suites (server, client) match the baseline.
+  - [x] Client targeted specs + `npm run lint -- --quiet` + `ng build` green; falsifiers 1–2 red then reverted. *(F1 red on the `[]` body at attempt 2.)*
+  - [x] Server `npm run test:integration -- control-lists` + eslint green; falsifiers 3–4 red then reverted.
+  - [x] Leader full suites (server, client) match the baseline.
 
 ---
 
@@ -227,8 +227,8 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 
 ## 5. Done definition
 
-- [x] T-00…T-03 done.
+- [x] T-00…T-04 done.
 - [x] T-03 human check done **before** `/akili-validate` (KZ-007).
-- [ ] Every row of §3 closed with evidence in `execution.md`.
+- [x] Every row of §3 closed with evidence in `execution.md`. *(validation-report.md §6; W-1/W-2 closed by T-04.)*
 - [x] Coverage thresholds green; Swagger updated. *(validation-report.md §5: server 90.49% stmts; Swagger seen at T-03.)*
 - [ ] RB-3 follow-up done.

@@ -366,12 +366,26 @@ export default class ControlListsComponent implements OnInit {
   }
 
   appliesToHint(): string {
+    if (this.showApplyToAll()) {
+      return 'Linked only to inactive portfolios, so it is offered for none. Tick portfolios to restrict it, or apply it to all portfolios. Records that already use it stay valid.';
+    }
     return this.valueForm().portfolioIds.length > 0
       ? 'Offered only in the ticked portfolios. Records that already use it stay valid.'
       : 'None ticked = applies to all portfolios. Records that already use it stay valid.';
   }
 
+  // The value is linked only to inactive portfolios and the admin has not yet chosen a selection (W-1).
+  showApplyToAll(): boolean {
+    return this.editingNoActivePortfolio() && this.valueForm().portfolioIds.length === 0;
+  }
+
+  // Explicit "all portfolios": the selection is now a deliberate choice, so `portfolioIds: []` IS sent.
+  applyToAllPortfolios(): void {
+    this.editingNoActivePortfolio.set(false);
+  }
+
   togglePortfolio(portfolioId: number, checked: boolean): void {
+    this.editingNoActivePortfolio.set(false);
     this.valueForm.update(current => {
       const withoutId = current.portfolioIds.filter(id => id !== portfolioId);
       return { ...current, portfolioIds: checked ? [...withoutId, portfolioId] : withoutId };

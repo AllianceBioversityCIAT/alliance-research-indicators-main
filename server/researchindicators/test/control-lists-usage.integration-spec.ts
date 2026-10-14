@@ -414,6 +414,52 @@ describe('Control Lists — usage: in-use protection and consumer contract by ke
     expect(seeded.map((v) => v.code)).toEqual(['L1', 'L2', 'L3', 'L4']);
   });
 
+  // R-CLG-009 *Restricting a value already in use*: THEN the change is saved
+  // (200) AND the records already using the value stay valid. The fixture is
+  // the value the registered provider counts as in use (inUse = 3, asserted
+  // before the PATCH so a fixture that is not in use cannot pass).
+  it('R-CLG-009 saves a restriction of an in-use value (200), replaces the link rows, and the value stays valid for assertValueInList', async () => {
+    const [portfolio] = await dataSource.query(
+      `SELECT id FROM portfolios WHERE is_active = 1 ORDER BY id LIMIT 1`,
+    );
+    expect(portfolio).toBeDefined();
+    const portfolioId = Number(portfolio.id);
+
+    try {
+      const before = await request(app.getHttpServer())
+        .get(`/lists/${scratchListId}/values`)
+        .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+        .expect(200);
+      const beforeRow = (
+        before.body.data as Array<{ id: number; inUse: number }>
+      ).find((v) => Number(v.id) === valueInUseId);
+      expect(beforeRow?.inUse).toBeGreaterThan(0);
+
+      await request(app.getHttpServer())
+        .patch(`/values/${valueInUseId}`)
+        .set('x-test-roles', JSON.stringify([SecRolesEnum.TECHNICAL_SUPPORT]))
+        .send({ portfolioIds: [portfolioId] })
+        .expect(200);
+
+      const links = await dataSource.query(
+        `SELECT portfolio_id FROM control_list_value_portfolios WHERE value_id = ?`,
+        [valueInUseId],
+      );
+      expect(links.map((l) => Number(l.portfolio_id))).toEqual([portfolioId]);
+
+      const still = await lookup.assertValueInList(
+        valueInUseId,
+        scratchListKey,
+      );
+      expect(Number(still.id)).toBe(valueInUseId);
+    } finally {
+      await dataSource.query(
+        `DELETE FROM control_list_value_portfolios WHERE value_id = ?`,
+        [valueInUseId],
+      );
+    }
+  });
+
   // R-CLG-004 AC.2 against the real seeded rows (value 20 = L1 of org.level,
   // value 8 = DIR-01 of kpi.direction): pass / 400 naming the expected key /
   // 404 for an unknown id. The check is read-only.

@@ -315,3 +315,61 @@ After T-02 the Leader stopped and reported the overrun to the requester: about 2
   - doc drift: design §6 "short names" → `name`; the T-02 falsifier 1 prediction was wrong;
   - RB-3: update `organizational-structure`;
   - CodeGraph re-index (page folder moved; new link entity).
+
+---
+
+### T-04 — Validation follow-up: W-1, W-2, W-3
+
+- **Origin:** `validation-report.md` §11. Requester chose "1 — fix all" on 2026-10-14. Scope added to tasks.md T-04 and design §6 (commit `2709033d`) before dispatch.
+- **Dispatch:** two Implementers in parallel (`akili-implementer`/sonnet), effort `medium`: client = W-1, server = W-2 + W-3 (test-only). Review mode `light`: one Reviewer (`akili-reviewer`/opus), diff inline (5 files, +104/−10).
+
+#### Attempt 1 — FAIL
+- **Files:**
+  - client `control-lists.component.{ts,html,spec.ts}`: `showApplyToAll()`, `applyToAllPortfolios()`, state-specific hint, and `togglePortfolio` clears `editingNoActivePortfolio`;
+  - server `test/control-lists-usage.integration-spec.ts` (W-2 test);
+  - server `test/control-lists-seed.integration-spec.ts` (W-3 loader `{00,01,02,03}`, four names, both error forms).
+- **Implementer verification:**
+  - client control-lists suite 83/83, lint clean, `ng build` ok;
+  - server integration 7 suites / 105 tests, eslint clean;
+  - F2 red (`Expected substring: "Linked only to inactive portfolios"`), F3 red (`expected 200 "OK", got 409 "Conflict"`), F4 red (`+ "CreateControlListValuePortfolios1790900000003"`);
+  - F1 red only on the post-click **hint** assertion, before the PATCH-body assertion (the Implementer said so).
+- **Reviewer verdict: `STATUS: FAIL`** (verbatim):
+  > **Discovered Issue:** The `[]` body assertion for the explicit action (spec :1766, `expect(...calls[0][1].portfolioIds).toEqual([])`) has never been seen red. F1 turned `applyToAllPortfolios()` into a no-op, which leaves the flag set. That stopped the test earlier, on the post-click hint assertion (:1764), so the PATCH-body assertion never ran. The Implementer reports this openly. As it stands, nothing proves the payload assertion can catch a regression where the hint updates but the request still omits the key, for example a change to the `sendPortfolioIds` condition. That is exactly the property W-1 exists to protect.
+  > **Violated Rule:** docs/specs/changes/control-lists-global-scope/tasks.md T-04, "Red run: each falsifier observed failing on its own assertion, then reverted" (L172), with falsifier 1 "→ the `[]` body test fails" (L168). Also CLAUDE.md §4.3 K-004 / KZ-014 ("If the red has not been *seen*, it may not be asserted").
+  > **Remediation Suggestion:** No production or test code needs to change; only the evidence. Run a falsifier that leaves the hint path alone and only drops the payload. For example, temporarily change the condition at component.ts:766 to `!this.portfoliosLoadFailed() && !(editingId !== null && formValue.portfolioIds.length === 0)`, so every empty edit selection is omitted. Confirm the W-1 test fails at the `toEqual([])` line (:1766) with `Received: undefined` and that the hint assertions before it pass. Revert, and record the verbatim red in execution.md. The :1719 test will also go red under this mutation; that is expected, so note it.
+- **Reviewer conformance notes (attempt 1):**
+  - W-1 behavior conforms to design §6 sub-bullet and R-CLG-009 AC.2; D-EX-5 still holds.
+  - tick → untick → `[]` is consistent with the spec (the generic hint shows and matches the payload).
+  - W-2 fixture is really in use (`inUse > 0` asserted first). W-3 conforms.
+- **ADVISORY (attempt 1):**
+  - W-2 shows "replaced" from an empty starting set only.
+  - The W-1 tests save via `component.saveValue()` rather than a DOM click.
+
+#### Leader re-measure (after attempt 1; code then identical to the final code)
+- Server `npm test -- --silent`: `Tests: 3 failed, 4250 passed, 4253 total` (archive baseline, unchanged).
+- Client `npm test -- --silent`: `Test Suites: 345 passed` · `Tests: 7975 passed, 7975 total`.
+- `npx ng build`: exit 0, 0 control-lists mentions.
+
+#### Attempt 2 — PASS (effort bumped `medium` → `high`; evidence only, no code change)
+- **Brief:** the Reviewer's FAIL report verbatim, plus "attempt 1 made `applyToAllPortfolios()` a no-op and stopped on the hint — do not repeat".
+- **Mutation** (payload only; hint path untouched), `control-lists.component.ts:766`: drop the `this.editingNoActivePortfolio()` conjunct from `sendPortfolioIds`.
+- **Red** (`npx jest --config jest.config.ts --coverage=false src/app/pages/platform/pages/administration/configuration/control-lists --silent` → `Tests: 3 failed, 80 passed, 83 total`):
+```
+ControlListsComponent › applies to (R-CLG-009) › shows a state-specific hint and an Apply to all action for a value linked only to inactive portfolios (W-1)
+expect(received).toEqual(expected) // deep equality
+Expected: []
+Received: undefined
+> 1766 |       expect(api.PATCH_ControlListValue.mock.calls[0][1].portfolioIds).toEqual([]);
+```
+  - Hint assertions :1757, :1758, :1764 passed first.
+  - Collateral reds, same effect: `pre-ticks the saved Applies to set…` (:1719) and `values › edits a value and never sends id…` (:1337).
+- **Restore:** `cmp` identical to backup; re-run `Tests: 83 passed, 83 total`.
+- **Leader check:** staged diff byte-identical to attempt 1 (`diff -q`); no unstaged code change.
+- **Reviewer verdict: `STATUS: PASS`**
+  > The attempt-1 issue is resolved. A payload-only mutation made the W-1 test fail at :1766 on its own `[]` PATCH-body assertion after all its hint assertions passed, and restoring the code brought it back to green. The code is the same as the attempt-1 diff whose conformance I already confirmed.
+
+#### T-04 final
+- **Final status:** PASS (attempt 2 of 3).
+- **Requirements covered:** R-CLG-009 AC.2 for the inactive-only state (W-1); R-CLG-009 *Restricting a value already in use* (W-2); design §10 loader over four migrations (W-3); T-01 A-ADV-4 closed.
+- **Decision:** D-EX-8 — tick → untick → save now sends `[]` (previously omitted). The admin has made a choice, and the generic "None ticked = applies to all" hint is the one shown at that moment, so payload and hint agree. Reviewer: consistent with the spec.
+- **Budget:** review rounds 2 for T-04 (≤ 2 per task); total rounds 1 + 1 + 2 = 4 (≤ 6).

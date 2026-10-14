@@ -1,7 +1,9 @@
 # Validation Report — Control Lists: global lists read by key, values applicable per portfolio
 
-> **Verdict: PASS WITH WARNINGS. Archive-ready once the requester decides W-1.**
-> Every requirement scenario and every `BUT it must NOT` / `AND IT MUST` clause is implemented and evidenced. No FAIL. 7 open WARNs: 1 behavior gap (W-1), 2 test gaps, 4 document-drift items for `/akili-archive`.
+> **Verdict: PASS WITH WARNINGS. Archive-ready.**
+> Every requirement scenario and every `BUT it must NOT` / `AND IT MUST` clause is implemented and evidenced. No FAIL.
+>
+> **Update 2026-10-14:** the requester chose "fix all". W-1, W-2 and W-3 are **resolved by T-04** (PASS on attempt 2, `execution.md` T-04). Four document-drift WARNs remain (W-4…W-7); all belong to `/akili-archive`.
 
 ## 1. Document Control
 
@@ -153,9 +155,9 @@ No `## Constitution Impact` block was written during execution. The auditors fou
 
 | ID | Severity | Finding | Recommended action | Owner / when |
 | --- | --- | --- | --- | --- |
-| **W-1** | WARN (behavior) | A value linked only to inactive portfolios cannot be set back to "all" from the page, while the modal hint says "None ticked = applies to all portfolios" (`control-lists.component.ts:368-372`, `:751-752`). Conflicts with R-CLG-009 AC.2 for that state | **Requester decides:** (a) follow-up fix — distinct hint for this state + explicit "Apply to all portfolios" that sends `[]`, with tests; or (b) accept and record the limitation in requirements R-CLG-009 + design §6 | Requester, before archive |
-| W-2 | WARN (test) | *Restricting a value already in use* → 200 has no test with `inUse > 0` | Add one usage-int test: PATCH `portfolioIds` on the in-use value → 200, links replaced | Follow-up (small) |
-| W-3 | WARN (test/doc) | Committed loader regression covers `…000–…002`, design §10 says four | Widen the seed-int glob to `{00,01,02,03}`, or amend design §10 | Follow-up or archive |
+| **W-1** | **RESOLVED (T-04)** — was WARN (behavior) | A value linked only to inactive portfolios cannot be set back to "all" from the page, while the modal hint says "None ticked = applies to all portfolios" (`control-lists.component.ts:368-372`, `:751-752`). Conflicts with R-CLG-009 AC.2 for that state | **Requester decides:** (a) follow-up fix — distinct hint for this state + explicit "Apply to all portfolios" that sends `[]`, with tests; or (b) accept and record the limitation in requirements R-CLG-009 + design §6 | Requester, before archive |
+| W-2 | **RESOLVED (T-04)** — was WARN (test) | *Restricting a value already in use* → 200 has no test with `inUse > 0` | Add one usage-int test: PATCH `portfolioIds` on the in-use value → 200, links replaced | Follow-up (small) |
+| W-3 | **RESOLVED (T-04)** — was WARN (test/doc) | Committed loader regression covers `…000–…002`, design §10 says four | Widen the seed-int glob to `{00,01,02,03}`, or amend design §10 | Follow-up or archive |
 | W-4 | WARN (doc) | §5 rule 4 places validation inside the transaction; code validates before | Amend design §5 rule 4 (behavior is acceptable per D-CLG-14) | `/akili-archive` |
 | W-5 | WARN (constitution) | Baseline docs and child guides stale (§10) | Constitution & Graph Sync | `/akili-archive` |
 | W-6 | WARN (doc) | Kaizen P8 (`:125-126`) points at the removed route | Rewrite P8 to *System admin*, `/administration/configuration/control-lists` before it is applied | `/akili-archive` |
@@ -164,16 +166,22 @@ No `## Constitution Impact` block was written during execution. The auditors fou
 
 ## 12. Archive Readiness Recommendation
 
-**Ready for `/akili-archive` after the requester decides W-1.**
+**Ready for `/akili-archive`.** W-1…W-3 are resolved by T-04. W-4…W-7 are document drift that the archive's correction and constitution sync close.
+
+**T-04 evidence (2026-10-14):**
+- **W-1:** the inactive-only hint plus the *Apply to all portfolios* action, which sends `[]`. Falsifier seen red on the `[]` body assertion at :1766.
+- **W-2:** in-use restriction → 200, links replaced, still valid for `assertValueInList`. Falsifier seen red (`got 409`).
+- **W-3:** loader over four migrations. Falsifier seen red.
+- **Suites:** server full `3 failed / 4250 passed` (baseline); client `7975/7975`; `ng build` exit 0.
 
 - [x] All tasks `[x]` with evidence
 - [x] No FAIL findings
 - [x] Key requirements and scenarios covered by automated tests (+ HITL for UI/roles)
 - [x] Build, lint, types and coverage green (3 known baseline failures, unchanged)
 - [x] Implementation drift recorded (D-EX-1…7); remaining doc drift listed for archive (W-4…W-7)
-- [ ] W-1 accepted or scheduled as a follow-up
-- [ ] W-2 / W-3 accepted or scheduled
-- [ ] Requester has reviewed this summary
+- [x] W-1 resolved (T-04)
+- [x] W-2 / W-3 resolved (T-04)
+- [x] Requester has reviewed this summary (chose "fix all", 2026-10-14)
 
 Next command, once the boxes above are settled:
 
