@@ -8,7 +8,7 @@
 - **Linked design:** [`./design.md`](design.md) (judgment: [`./judgment.md`](judgment.md) — ESCALATED; R3-1/R3-2 corrected by requester decision, §10)
 - **Branch:** `institutional-kpis`
 - **Jira:** epic AC-1773 — sub-tasks `<TO CONFIRM>`
-- **Last updated:** 2026-10-13
+- **Last updated:** 2026-10-15
 
 > **Legend.** *Falsifier* = the concrete input or mutation that must turn the gate red. *Red run* = what must be observed failing, and on which assertion. *Disqualifier* = what makes a green reading worthless. *Consumers* = existing files that pin a symbol the task changes. An absent value reads `n/a`, never blank.
 
@@ -113,13 +113,13 @@ T-02 depends on T-01 (same files, the link migration `…003` follows `…002`).
 - **Design refs:** §2.1 *Applies to* rows (link entity/repository, value DTOs incl. update `@ValidateIf` — R3-1, service validators, A13 DTO/controller), §3 link table and soft-delete rules, §4 A9–A11, A13, §5 rules 4–5, §6 values table / value modal / load, §10, D-CLG-9, 10, 12, 13, 14
 - **Scope — database:** new `src/db/migrations/1790900000003-createControlListValuePortfolios.ts` (link table, CASCADE to values, RESTRICT to portfolios, PK pair, portfolio index); `migration:test:execute`.
 - **Scope — server:** link entity + repository; create DTO `portfolioIds` with `@ValidateIf` (no `@IsOptional`); update DTO `'portfolioIds'` in `PickType` **and** its own `@ValidateIf`; A13 DTO optional `portfolioId`; types `appliesTo`/`appliesToAll`; service: `DataSource` injected, `assertPortfolioIdsValid` (400, active ids), `assertFilterPortfolio` (404), transactional value write + link replace, A9 batch link load (active only), A13 `QueryBuilder` with `Brackets`, `Number()` coercion; controller A13 `@ApiQuery required:false` + summary; module registers the link entity and a read-only portfolio lookup.
-- **Scope — screen:** load active portfolios in parallel with A1 (failure disables the field); values table **Applies to** column (*All* / names / *No active portfolio*) and *Show values for* filter (same rule as A13); value modal **Applies to** checkbox group, sending `portfolioIds` (`[]` when none); export includes the column; interfaces gain `appliesTo`, `appliesToAll`, `portfolioIds`.
+- **Scope — screen:** load active portfolios in parallel with A1 (failure disables the field); values table **Applies to** column (*All* / names / *No active portfolio*) and *Show values for* filter (same rule as A13); value modal **Applies to** checkbox group, sending `portfolioIds` (`[]` when none; omitted in the two states of D-EX-5, and `[]` again through *Apply to all portfolios* — T-04); export includes the column; interfaces gain `appliesTo`, `appliesToAll`, `portfolioIds`.
 - **Tests:**
   - **Server unit (real `ValidationPipe`):** `portfolioIds` `null`, `[1,1]`, `["a"]`, `[0]` → 400 on **A10 and A11**; omitted and `[]` accepted on both; inactive / unknown id → 400 naming `portfolioIds`; A13 unknown or inactive portfolio → 404; create / replace / clear / omitted-unchanged link behavior; a links-only A11 stamps the value's audit fields.
   - **Server integration (local DB):** `SHOW TABLES LIKE 'control_list_value_portfolios'` → 1; *Value for one portfolio only* fixture on real SQL — `portfolioId=1`, `=2`, none, each with `activeOnly` true/false; deleting a restricted value removes its links; atomicity — force the link insert to fail inside the transaction → value row unchanged; deactivate a linked portfolio (`is_active = 0`, restored after) → A9 omits it, `appliesToAll = false`, A13 for it → 404.
   - **Client unit:** column labels for all / restricted / no-active; filter result equals the A13 rule on a shared fixture; modal sends `portfolioIds` (`[]` when none ticked) and pre-ticks on edit; portfolios-call failure disables field and filter with the note; export rows include *Applies to*.
 - **Falsifier:**
-  1. Write the A13 condition without `Brackets` (`… AND activeOnly OR link`) → the P1 + `activeOnly=false` case returns an inactive restricted value.
+  1. Write the A13 condition without `Brackets` (`… AND activeOnly OR link`) → the P1 + `activeOnly=true` case returns an inactive restricted value and a restricted value of another list. *(Corrected 2026-10-15: the original prediction named `activeOnly=false`, where inactive values are legitimate — `execution.md` T-02.)*
   2. Add `@IsOptional` to the create DTO → `null` on A10 passes.
   3. Remove the update DTO's own `@ValidateIf` → `null` on A11 passes.
   4. Save value and links outside the transaction → atomicity test finds the value changed.

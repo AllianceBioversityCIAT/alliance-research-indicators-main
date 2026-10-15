@@ -9,7 +9,7 @@
 - **Modifies:** archived Control Lists design ([`design.md`](../../archive/2026-10-08-institutional-performance--control-lists/design.md)); its decisions are cited as `D-CTL-n`
 - **Visual reference:** artboard *1 · Control Lists (System admin, global)*, updated 2026-10-13 — https://claude.ai/artifact/EPtLbFVhaEQb3Vgq7kuyRP · [`../../institutional-performance/mockup/ControlledLists.dc.html`](../../institutional-performance/mockup/ControlledLists.dc.html)
 - **Exploration:** direct `grep`/reads (§13), one reversion-challenge scout (§12.1), Judgment Day round 1 (two judges, `judgment.md`)
-- **Last updated:** 2026-10-13 (JD round 1: J-1…J-14, S-1…S-7; round 2: R2-1…R2-5; requester-approved after escalation: R3-1, R3-2)
+- **Last updated:** 2026-10-15 (archive corrections: §5 rule 4, §6, §14 — validation W-4/W-7; 2026-10-14: §6 W-1 sub-bullet). Earlier: 2026-10-13 (JD round 1: J-1…J-14, S-1…S-7; round 2: R2-1…R2-5; requester-approved after escalation: R3-1, R3-2)
 
 ---
 
@@ -155,7 +155,7 @@ Link ids are coerced with `Number()` before they leave the service (MySQL BIGINT
 1. **Portfolio integrity (archived rule 1) — removed** for categories and lists.
 2. **Uniqueness (rule 2)** — same pre-check + errno 1062 → `ConflictException`, now on `name` and `list_key` module-wide.
 3. **Membership (rule 10)** — `assertValueInList(valueId, listKey)`: 404 unknown value or list; 400 naming the expected key when `list.list_key ≠ listKey`. Ignores `is_active` and *Applies to* (D-CLG-10). Still a singleton.
-4. **Applies to — writes (R-CLG-009, J-2).** A10/A11 run `dataSource.transaction(manager => …)`: validate `portfolioIds` (active, unique) → save the value through `manager.getRepository(ControlListValue)` → if `portfolioIds` was sent, delete the value's link rows and insert the new ones through `manager.getRepository(ControlListValuePortfolio)`. The errno-1062 mapping wraps the whole transaction call, so a duplicate code/value still maps to the named 409 and nothing is committed. A failure on any step rolls back the value change too. **This retires archived rule 8 ("no multi-row transaction is needed") for value writes only**; other writes still touch one row.
+4. **Applies to — writes (R-CLG-009, J-2).** A10/A11 validate `portfolioIds` (active, unique) and then run `dataSource.transaction(manager => …)` → save the value through `manager.getRepository(ControlListValue)` → if `portfolioIds` was sent, delete the value's link rows and insert the new ones through `manager.getRepository(ControlListValuePortfolio)`. The errno-1062 mapping wraps the whole transaction call, so a duplicate code/value still maps to the named 409 and nothing is committed. A failure on any step rolls back the value change too. *(As built, 2026-10-15: the `portfolioIds` validation runs just before the transaction, not inside it. A portfolio deactivated between the check and the commit can still be linked; D-CLG-14 hides such a link on read — validation W-4.)* **This retires archived rule 8 ("no multi-row transaction is needed") for value writes only**; other writes still touch one row.
 5. **Applies to — reads.** A9 loads links for the listed values in one query and keeps only active portfolios. A13 with `portfolioId` is one `QueryBuilder` query: `value.list_id = :list AND (<activeOnly clause>) AND (NOT EXISTS link OR EXISTS link with portfolio_id = :pid)` — the portfolio condition built with `Brackets`, so the `OR` can never widen the `AND` (KZ-017 precedent).
 6. Rules 3–9 of the archive otherwise unchanged (immutable key, code proposal, in-use, delete rules, audit, side effects).
 
@@ -166,7 +166,7 @@ Link ids are coerced with `Number()` before they leave the service (MySQL BIGINT
 - **Header:** title, description ("Alliance-wide vocabularies… read by its key"), **+ New category**. No selector.
 - **Load:** on init, A1 (categories) and `GET_Portfolios` (active portfolios, for *Applies to*) in parallel. If the portfolios call fails, the page still works: the *Applies to* column shows ids, the filter and the modal field are disabled with an inline note (S-4). Error/empty states otherwise as before.
 - **List header:** `Key: <key>`.
-- **Values table:** column **Applies to** — *All* (`appliesToAll`), portfolio short names, or *No active portfolio*; filter *Show values for: All portfolios / <portfolio>* applying the A13 rule client-side; export includes the column.
+- **Values table:** column **Applies to** — *All* (`appliesToAll`), portfolio names (`Portfolio.name` — there is no short-name field, D-EX-6), or *No active portfolio*; filter *Show values for: All portfolios / <portfolio>* applying the A13 portfolio rule client-side with `activeOnly=false` (the admin table keeps inactive values); export includes the column.
 - **Value modal:** **Applies to** multi-select rendered as a checkbox group of active portfolios; none ticked = all; hint explains that records already using the value stay valid.
   - *(Added 2026-10-14, validation W-1, T-04.)* **Value linked only to inactive portfolios** (`appliesToAll = false`, `appliesTo = []`): the hint says the value is linked only to inactive portfolios and is offered for none, and must NOT say "none ticked = all". An explicit **Apply to all portfolios** action sends `portfolioIds: []`. Ticking portfolios sends that set. Saving with the selection untouched still omits `portfolioIds` (D-EX-5), so the links stay as they are.
 - **List modal:** key hint "Unique across all lists… consumers read the list by this key"; a 409 on `listKey` shows inline.
@@ -265,7 +265,7 @@ Triggered: D-CLG-1, 4, 5, 6 remove delivered behavior. Question asked to one rev
 | Measure | Estimate |
 | --- | --- |
 | Tasks | 4 (vertical slices, as D-CTL-16): **T-00 HITL** — revert the old migrations on the local DB **before** the files are rewritten (§3.1 steps 1–2); **T-01** slice 1 — global lists, key reads, menu and roles (server + screen; reruns the migrations, §3.1 steps 3–4); **T-02** slice 2 — values applicable per portfolio (server + screen, migration `…003`); **T-03 HITL** — role/menu check with a Center Admin and a Technical Support user + mockup |
-| LOC changed (incl. tests) | ~2,950 changed lines (≈ −900 / +2,050): list-level portfolio removal, menu/role move (~200), *Applies to* (~900), seed module + seed suite + loader check (~200), transaction + atomicity test (~150) |
+| LOC changed (incl. tests) | ~2,950 changed lines (≈ −900 / +2,050): list-level portfolio removal, menu/role move (~200), *Applies to* (~900), seed module + seed suite + loader check (~200), transaction + atomicity test (~150). **Actual: ≈ 8,360 changed lines** (T-01 +2,759/−2,085, T-02 +3,442/−77, plus T-04). Most of the difference is new and rewritten test suites. The overrun was reported at the tripwire and accepted by the requester (`execution.md` T-02) |
 | Review rounds | ≤ 2 per task; ≤ 6 total |
 
 Matches **Standard**. One PR per slice (T-01, T-02), each with server + client because the API contract and the page change in lock-step; both slices may also ship as one PR.

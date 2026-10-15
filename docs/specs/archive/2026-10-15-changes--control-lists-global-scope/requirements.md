@@ -11,7 +11,7 @@
 - **Linked tickets:** PARI-258; epic AC-1773 — ticket for this change `<TO CONFIRM>`
 - **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-13 (Q-1 rewrite migrations, Q-2 accepted); later requester decisions (menu, roles, value applicability) are folded into its body and revision log (d)–(f)
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-10-13 (requester: values can be restricted to portfolios — R-CLG-009; menu moved to *System admin*, access = System admin roles — R-CLG-008)
+- **Last updated:** 2026-10-15 (archive correction: §8 handler lists — validation W-7). Earlier: 2026-10-13 (requester: values can be restricted to portfolios — R-CLG-009; menu moved to *System admin*, access = System admin roles — R-CLG-008)
 
 ---
 
@@ -331,7 +331,7 @@ Control lists stop belonging to a portfolio. **Every category and list is global
 
 ## 8. API surface delta
 
-Base `/api/control-lists` (unversioned). Every portfolio parameter removed from A1, A3, A6, A7; A2 removed. A9–A11 gain the value's `portfolioIds`; A13 gains an optional `portfolioId` filter (R-CLG-009). Exact shapes in `design.md`.
+Base `/api/control-lists` (unversioned). Every portfolio parameter removed from A1, A3, A4, A6, A7 (a stale `portfolioId` → `400`); A2 removed. A10–A11 gain the value's `portfolioIds`; A9–A11 and A13 return `appliesTo`/`appliesToAll`; A13 gains an optional `portfolioId` filter (R-CLG-009). Exact shapes in `design.md`.
 
 ## 9. Cross-system impact
 
