@@ -127,3 +127,17 @@ Scope note (KZ-017): the reduced boot does not reach `EntitiesModule` under a fu
 - **New client page:** `client/research-indicators/src/app/pages/platform/pages/administration/center-admin/organizational-structure/` + sidebar item + route.
 - **Child guides:** no new child `CLAUDE.md` needed; the server child guide may need a line on `src/db/helpers/` (helpers imported by append-only migrations are frozen — Reviewer B advisory). `## Module Guides` index unchanged.
 - **CodeGraph:** re-index pending (new module, page, helper).
+
+## RB-5 measurement (2026-10-16, requester, *testing* environment)
+
+Read-only queries run by the requester:
+```
+"CHARACTER_SET_NAME","COLLATION_NAME"
+utf8mb4,utf8mb4_0900_ai_ci
+
+"VERSION()"
+"8.0.46-0ubuntu0.22.04.4"
+```
+- The D-ORG-16 helper will emit `CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci` there — the same pair proven locally. MySQL 8.0.46 accepts the explicit form.
+- `baseline.sql` (dumped 2026-08-14, `utf8mb3`) is **stale** for this server: the table was converted at some point after that dump, or *testing* is not the dumped host. Invalidating condition (K-013): a later conversion of `alliance_user_staff`.
+- RB-5 stays **open for Prod** (`main`).
