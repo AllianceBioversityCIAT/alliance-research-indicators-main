@@ -82,6 +82,8 @@ export interface ProjectDelegates {
   pi_name: string | null;
   /** agresso_contracts.contract_status. */
   status: string | null;
+  /** agresso_contracts.funding_type — Agresso short code (BLR, BLU, W3R, W3U, …). */
+  funding_type: string | null;
   /** agresso_contracts.start_date. */
   start_date: Date | null;
   /** agresso_contracts.end_date. */
@@ -167,7 +169,7 @@ export interface PiDelegatesExportByProjectBody {
   filters?: {
     search?: string;
     role?: 'all' | 'pi' | 'delegate';
-    ongoing_only?: boolean;
+    ongoing_w3_bilateral_only?: boolean;
     without_delegates_only?: boolean;
   };
 }
