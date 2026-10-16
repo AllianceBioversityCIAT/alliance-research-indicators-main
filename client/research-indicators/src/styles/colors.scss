@@ -91,6 +91,8 @@
   --ac-pfm-month-4: #6192cc;
   --ac-pfm-month-5: #3f74b8;
   --ac-pfm-month-6: #234a94;
+  --ac-pfm-neutral-bg: #eef1f5;
+  --ac-pfm-info-fg: #0f4c9a;
 }
 
 // Mixin to dynamically generate background and text color classes
@@ -239,4 +241,6 @@ $colors: (
   --ac-pfm-month-4: #5b8dc7;
   --ac-pfm-month-5: #6ea3de;
   --ac-pfm-month-6: #8bbcf0;
+  --ac-pfm-neutral-bg: #2b3037;
+  --ac-pfm-info-fg: #9dc2f2;
 }

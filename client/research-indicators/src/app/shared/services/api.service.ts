@@ -7,6 +7,8 @@ import {
   DelegateProjects,
   PiDelegateHistoryEntry,
   PiDelegateScope,
+  PiDelegatesExportByPersonBody,
+  PiDelegatesExportByProjectBody,
   piDelegateScopeParam,
   ProjectDelegates
 } from '../interfaces/pi-delegates.interface';
@@ -1381,6 +1383,22 @@ export class ApiService {
     return firstValueFrom(
       this.TP.http.delete<MainResponse<unknown>>(url, { body })
     );
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-project/xlsx → xlsx blob.
+   * `project_codes` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByProjectXlsx = (body: PiDelegatesExportByProjectBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-project/xlsx', body, {});
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-person/xlsx → xlsx blob.
+   * `delegate_user_ids` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByPersonXlsx = (body: PiDelegatesExportByPersonBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-person/xlsx', body, {});
   };
 
   /**

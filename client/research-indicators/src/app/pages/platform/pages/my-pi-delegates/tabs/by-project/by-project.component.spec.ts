@@ -14,13 +14,14 @@ import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testin
 import { By } from '@angular/platform-browser';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { provideRouter } from '@angular/router';
-import { ByProjectComponent } from './by-project.component';
+import { ByProjectComponent, type ProjectRow } from './by-project.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
 import { computed, signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import type { ProjectDelegates } from '@interfaces/pi-delegates.interface';
 import type { GlobalAlert } from '@interfaces/global-alert.interface';
+import { CacheService } from '@services/cache/cache.service';
 
 // ─── Test data ────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number |
     loading: signal(false),
     error: signal<string | null>(null),
     revokePair: jest.fn().mockResolvedValue(undefined),
+    exportByProject: jest.fn().mockResolvedValue(new Blob(['x'])),
     currentUserId: signal(currentUserId),
     // Mirrors the real service: PI when the project's pi_user_id is the caller.
     isPiOf,
@@ -99,7 +101,7 @@ function buildServiceStub(rows: ProjectDelegates[] = [], currentUserId: number |
 }
 
 function buildActionsStub() {
-  return { showGlobalAlert: jest.fn() };
+  return { showGlobalAlert: jest.fn(), showToast: jest.fn() };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -135,7 +137,8 @@ describe('ByProjectComponent', () => {
         // the project cell is a routerLink now
         provideRouter([]),
         { provide: PiDelegatesClientService, useValue: serviceStub },
-        { provide: ActionsService, useValue: actionsStub }
+        { provide: ActionsService, useValue: actionsStub },
+        { provide: CacheService, useValue: { dataCache: signal({ user: { first_name: 'Ana', last_name: 'Lopez' } }) } }
       ]
     }).compileComponents();
 
@@ -613,9 +616,20 @@ describe('ByProjectComponent', () => {
       await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
     });
 
-    it('renders a sort icon on Project, Role, Status and Pool funding', () => {
+    it('renders a sort icon on Project, Role, Status, Pool funding and PI Delegates', () => {
       const sortable = fixture.nativeElement.querySelectorAll('th[pSortableColumn] p-sorticon');
-      expect(sortable.length).toBe(4);
+      expect(sortable.length).toBe(5);
+    });
+
+    it('sorts by PI Delegates ascending with projects without delegates first', () => {
+      const header = fixture.debugElement
+        .queryAll(By.css('th[pSortableColumn]'))
+        .find(th => th.attributes['pSortableColumn'] === 'delegateCount');
+      header!.nativeElement.click();
+      fixture.detectChanges();
+      const counts = (component.table()!.processedData as ProjectRow[]).map(r => r.delegateCount);
+      expect(counts).toEqual([...counts].sort((a, b) => a - b));
+      expect(component.filteredRows().every(r => r.delegateCount === r.delegates.length)).toBe(true);
     });
 
 
@@ -978,25 +992,98 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
     }
 
-    it('marks the selected chip with the navy pill surface and weight — never an underline', async () => {
+    it('marks the selected segment with the filled navy surface — never an underline', async () => {
       await createAdminTable();
 
       // No underline: it read as a tab strip, and these filter the table below
       // rather than switching views.
       expect(fixture.nativeElement.querySelectorAll('.by-project__role-filters .absolute')).toHaveLength(0);
 
+      const FILLED = 'bg-[var(--ac-pfm-accent-navy)]';
       const classesOf = (i: number) => chip(i).className;
-      expect(classesOf(0)).toContain('bg-[var(--ac-pfm-info-bg)]');
-      expect(classesOf(0)).toContain('font-semibold');
-      // ★ discriminating: an unselected chip keeps the neutral surface.
-      expect(classesOf(1)).toContain('bg-[var(--ac-pfm-surface)]');
-      expect(classesOf(1)).not.toContain('var(--ac-pfm-info-bg)');
+      expect(classesOf(0)).toContain(FILLED);
+      expect(classesOf(0)).toContain('text-[var(--ac-pfm-surface)]');
+      // ★ discriminating: an unselected segment is transparent, not filled.
+      expect(classesOf(1)).not.toContain(FILLED);
+      expect(classesOf(1)).toContain('bg-transparent');
 
       chip(1).click();
       fixture.detectChanges();
 
-      expect(classesOf(1)).toContain('var(--ac-pfm-info-bg)');
-      expect(classesOf(0)).not.toContain('var(--ac-pfm-info-bg)');
+      expect(classesOf(1)).toContain(FILLED);
+      expect(classesOf(0)).not.toContain(FILLED);
+    });
+
+    it('is a segmented radiogroup: three radios, exactly one checked, roving tabindex', async () => {
+      await createAdminTable();
+
+      const group = fixture.nativeElement.querySelector('[role="radiogroup"]') as HTMLElement;
+      expect(group).not.toBeNull();
+      expect(group.getAttribute('aria-label')).toBe('Your role');
+      const radios = Array.from(group.querySelectorAll('[role="radio"]')) as HTMLElement[];
+      expect(radios).toHaveLength(3);
+      expect(radios.filter(r => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+      expect(radios.map(r => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+      // The check icon is gone: the filled segment is the state marker.
+      expect(group.querySelector('.pi-check')).toBeNull();
+
+      chip(2).click();
+      fixture.detectChanges();
+      expect(radios.map(r => r.getAttribute('aria-checked'))).toEqual(['false', 'false', 'true']);
+      expect(radios.map(r => r.getAttribute('tabindex'))).toEqual(['-1', '-1', '0']);
+    });
+
+    it('ArrowRight selects the next role (wrapping) and moves focus; ArrowLeft goes back', async () => {
+      await createAdminTable();
+      const press = (i: number, key: string) => {
+        chip(i).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+      };
+
+      press(0, 'ArrowRight');
+      expect(component.roleTerm()).toBe('pi');
+      expect(document.activeElement).toBe(chip(1));
+
+      press(1, 'ArrowRight');
+      press(2, 'ArrowRight');
+      expect(component.roleTerm()).toBe('all');
+      expect(document.activeElement).toBe(chip(0));
+
+      press(0, 'ArrowLeft');
+      expect(component.roleTerm()).toBe('delegate');
+      expect(document.activeElement).toBe(chip(2));
+    });
+
+    it('ArrowDown behaves like ArrowRight and ArrowUp like ArrowLeft (WAI-ARIA radiogroup)', async () => {
+      await createAdminTable();
+      const press = (i: number, key: string) => {
+        chip(i).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+        fixture.detectChanges();
+      };
+
+      press(0, 'ArrowDown');
+      expect(component.roleTerm()).toBe('pi');
+      expect(document.activeElement).toBe(chip(1));
+
+      press(1, 'ArrowUp');
+      press(0, 'ArrowUp');
+      expect(component.roleTerm()).toBe('delegate');
+      expect(document.activeElement).toBe(chip(2));
+    });
+
+    it('separates the single-choice group from the combinable toggles with a divider', async () => {
+      await createAdminTable();
+
+      const row = fixture.nativeElement.querySelector('.by-project__role-filters') as HTMLElement;
+      const divider = row.querySelector('.by-project__quick-filters-divider') as HTMLElement;
+      expect(divider).not.toBeNull();
+      expect(divider.getAttribute('aria-hidden')).toBe('true');
+      const children = Array.from(row.children);
+      const group = row.querySelector('[role="radiogroup"]') as HTMLElement;
+      const refine = row.querySelector('[role="group"][aria-label="Refine"]') as HTMLElement;
+      expect(refine).not.toBeNull();
+      expect(children.indexOf(group)).toBeLessThan(children.indexOf(divider));
+      expect(children.indexOf(divider)).toBeLessThan(children.indexOf(refine));
     });
 
     it('renders one chip per header counter, in the same order, with All active', async () => {
@@ -1006,7 +1093,7 @@ describe('ByProjectComponent', () => {
         .queryAll(By.css('.by-project__role-filter'))
         .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
       expect(labels).toEqual(['All projects', 'As PI', 'As PI delegate']);
-      expect(chip(0).getAttribute('aria-pressed')).toBe('true');
+      expect(chip(0).getAttribute('aria-checked')).toBe('true');
     });
 
     it('As PI narrows the table to the projects the caller leads', async () => {
@@ -1016,8 +1103,8 @@ describe('ByProjectComponent', () => {
       fixture.detectChanges();
 
       expect(codesOnScreen()).toEqual(['P-PI']);
-      expect(chip(1).getAttribute('aria-pressed')).toBe('true');
-      expect(chip(0).getAttribute('aria-pressed')).toBe('false');
+      expect(chip(1).getAttribute('aria-checked')).toBe('true');
+      expect(chip(0).getAttribute('aria-checked')).toBe('false');
     });
 
     it('As PI delegate narrows it to actual delegations, not "everything else"', async () => {
@@ -1147,11 +1234,23 @@ describe('ByProjectComponent', () => {
         .queryAll(By.css('.by-project__quick-filter'))
         .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
       expect(labels).toEqual(['Ongoing projects', 'Projects without delegates']);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(quick(ONGOING).getAttribute('data-testid')).toBe('by-project-quick-filter-ongoing');
       expect(quick(WITHOUT).getAttribute('data-testid')).toBe('by-project-quick-filter-without-delegates');
       expect(codes()).toHaveLength(8);
+    });
+
+    it('toggles are checkboxes: role="checkbox" with aria-checked flipping on click', () => {
+      expect(quick(ONGOING).getAttribute('role')).toBe('checkbox');
+      expect(quick(WITHOUT).getAttribute('role')).toBe('checkbox');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      click(quick(ONGOING));
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
+      expect(quick(ONGOING).querySelector('.pi-check-square')).not.toBeNull();
+      click(quick(ONGOING));
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(ONGOING).querySelector('.pi-stop')).not.toBeNull();
     });
 
     it('"Projects without delegates" shows exactly the projects the header counter counts', () => {
@@ -1160,10 +1259,12 @@ describe('ByProjectComponent', () => {
       expect(codes()).toEqual(['P-PI-ONG-NODEL', 'P-PI-DONE-NODEL', 'P-OTH-ONG-NODEL']);
       // The number above and the rows below are the same set.
       expect(codes()).toHaveLength(serviceStub.projectsWithoutDelegate().length);
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('true');
-      // Check icon only while on.
-      expect(quick(WITHOUT).querySelector('.pi-check')).not.toBeNull();
-      expect(quick(ONGOING).querySelector('.pi-check')).toBeNull();
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('true');
+      // Checkbox icon in both states: ticked while on, empty square while off.
+      expect(quick(WITHOUT).querySelector('.pi-check-square')).not.toBeNull();
+      expect(quick(WITHOUT).querySelector('.pi-stop')).toBeNull();
+      expect(quick(ONGOING).querySelector('.pi-stop')).not.toBeNull();
+      expect(quick(ONGOING).querySelector('.pi-check-square')).toBeNull();
     });
 
     it('"Ongoing projects" shows only ongoing projects', () => {
@@ -1175,7 +1276,7 @@ describe('ByProjectComponent', () => {
       //   Status cell, so the chip must not call it ongoing.
       expect(codes()).not.toContain('P-OTH-NULL-DEL');
       expect(codes()).not.toContain('P-OTH-EMPTY-DEL');
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
     });
 
     it('toggling a chip off restores the list', () => {
@@ -1183,7 +1284,7 @@ describe('ByProjectComponent', () => {
       click(quick(ONGOING));
 
       expect(codes()).toHaveLength(8);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
     });
 
     it('the two toggles combine with AND', () => {
@@ -1204,17 +1305,17 @@ describe('ByProjectComponent', () => {
     it('selecting a role keeps the toggles, and a toggle keeps the role', () => {
       click(quick(ONGOING));
       click(role(1));
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual(['P-PI-ONG-NODEL', 'P-PI-ONG-DEL']);
 
       click(quick(WITHOUT));
-      expect(role(1).getAttribute('aria-pressed')).toBe('true');
+      expect(role(1).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual(['P-PI-ONG-NODEL']);
 
       // Switching the role does not drop either toggle.
       click(role(2));
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('true');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('true');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('true');
       expect(codes()).toEqual([]);
     });
 
@@ -1223,8 +1324,8 @@ describe('ByProjectComponent', () => {
       click(role(1));
       click(role(2));
 
-      expect(role(1).getAttribute('aria-pressed')).toBe('false');
-      expect(role(2).getAttribute('aria-pressed')).toBe('true');
+      expect(role(1).getAttribute('aria-checked')).toBe('false');
+      expect(role(2).getAttribute('aria-checked')).toBe('true');
     });
 
     it('combines with the search box (AND)', () => {
@@ -1245,9 +1346,96 @@ describe('ByProjectComponent', () => {
 
       expect(component.ongoingOnly()).toBe(false);
       expect(component.withoutDelegatesOnly()).toBe(false);
-      expect(quick(ONGOING).getAttribute('aria-pressed')).toBe('false');
-      expect(quick(WITHOUT).getAttribute('aria-pressed')).toBe('false');
+      expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
+      expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(codes()).toHaveLength(8);
+    });
+  });
+
+  // ── Excel export ───────────────────────────────────────────────────────
+
+  describe('Excel export', () => {
+    let clickSpy: jest.SpyInstance;
+
+    beforeEach(async () => {
+      (globalThis.URL as unknown as { createObjectURL: jest.Mock }).createObjectURL = jest.fn().mockReturnValue('blob:x');
+      (globalThis.URL as unknown as { revokeObjectURL: jest.Mock }).revokeObjectURL = jest.fn();
+      clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES, PROJECT_INACTIVE_DELEGATE]);
+    });
+
+    afterEach(() => clickSpy.mockRestore());
+
+    it('renders the "Export projects" button', () => {
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Export projects');
+    });
+
+    it('sends the filtered keys and the current filters', async () => {
+      component.searchTerm.set(' beta ');
+      component.roleTerm.set('delegate');
+      component.ongoingOnly.set(true);
+      component.withoutDelegatesOnly.set(true);
+      fixture.detectChanges();
+      await component.exportTable();
+      expect(serviceStub.exportByProject).toHaveBeenCalledWith(
+        component.filteredRows().map(r => r.project_code),
+        { search: 'beta', role: 'delegate', ongoing_only: true, without_delegates_only: true }
+      );
+    });
+
+    it('omits search when empty and sends only the narrowed keys', async () => {
+      component.withoutDelegatesOnly.set(true);
+      fixture.detectChanges();
+      await component.exportTable();
+      expect(serviceStub.exportByProject).toHaveBeenCalledWith(['PRJ-002'], {
+        role: 'all',
+        ongoing_only: false,
+        without_delegates_only: true
+      });
+    });
+
+    it('honours the p-table processed (sorted) order', async () => {
+      const table = component.table();
+      expect(table).toBeDefined();
+      Object.defineProperty(table, 'processedData', {
+        configurable: true,
+        get: () => [
+        { project_code: 'PRJ-003' },
+        { project_code: 'PRJ-001' }
+      ]
+      });
+      await component.exportTable();
+      expect(serviceStub.exportByProject.mock.calls[0][0]).toEqual(['PRJ-003', 'PRJ-001']);
+    });
+
+    it('downloads STAR_pi_delegates_by_project_..._AL.xlsx and toggles isExporting', async () => {
+      let resolve!: (b: Blob) => void;
+      serviceStub.exportByProject.mockReturnValue(new Promise<Blob>(r => (resolve = r)));
+      const first = component.exportTable();
+      expect(component.isExporting()).toBe(true);
+      await component.exportTable(); // double click ignored
+      expect(serviceStub.exportByProject).toHaveBeenCalledTimes(1);
+      resolve(new Blob(['x']));
+      await first;
+      expect(component.isExporting()).toBe(false);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the file with prefix and initials', async () => {
+      const links: HTMLAnchorElement[] = [];
+      clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
+        links.push(this);
+      });
+      await component.exportTable();
+      expect(links[0].download).toMatch(/^STAR_pi_delegates_by_project_\d{8}_\d{4}_AL\.xlsx$/);
+    });
+
+    it('shows an error toast and re-enables the button on failure', async () => {
+      serviceStub.exportByProject.mockRejectedValue(new Error('boom'));
+      await component.exportTable();
+      expect(actionsStub.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+      expect(component.isExporting()).toBe(false);
+      expect(clickSpy).not.toHaveBeenCalled();
     });
   });
 });

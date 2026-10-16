@@ -18,21 +18,25 @@ import {
   inject,
   input,
   linkedSignal,
-  signal
+  signal,
+  viewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { TableModule } from 'primeng/table';
+import { Table, TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
 import { PopoverModule } from 'primeng/popover';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
+import { FiltersActionButtonsComponent } from '@components/filters-action-buttons/filters-action-buttons.component';
 import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
 import { ProjectUtilsService, type ProjectType } from '@services/project-utils.service';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
+import { CacheService } from '@services/cache/cache.service';
+import { buildPiDelegatesExportFileName, downloadBlob } from '../../utils/pi-delegates-export.util';
 import type { DelegateSummary, ProjectDelegates } from '@interfaces/pi-delegates.interface';
 
 /** Which of the header counters the table is narrowed to. */
@@ -49,6 +53,8 @@ export interface ProjectRow extends ProjectDelegates {
   role: string;
   /** True for the admin-only "listed by role, not by involvement" case. */
   hasNoRole: boolean;
+  /** Sort key for the PI Delegates column: ascending puts projects without delegates first. */
+  delegateCount: number;
 }
 
 /** Shown in Role when the caller is neither PI nor delegate of a listed project. */
@@ -67,6 +73,7 @@ export const NO_ROLE_LABEL = 'No role (admin)';
     TooltipModule,
     PopoverModule,
     SearchExportControlsComponent,
+    FiltersActionButtonsComponent,
     CustomTagComponent
   ],
   templateUrl: './by-project.component.html',
@@ -79,6 +86,7 @@ export class ByProjectComponent {
   readonly service = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
   private readonly projectUtils = inject(ProjectUtilsService);
+  private readonly cache = inject(CacheService);
 
   // ─── Assign output (T-UI-07 wires the actual modal) ─────────────────────────
   // Assign button emits the project code; the parent/page shell opens the modal.
@@ -120,6 +128,19 @@ export class ByProjectComponent {
 
   selectRoleFilter(value: RoleFilter): void {
     this.roleTerm.set(value);
+  }
+
+  /** Radiogroup keys: Arrow keys (Right/Down = next, Left/Up = previous) select role (wrapping) and move focus with it. */
+  onRoleKeydown(event: KeyboardEvent, index: number): void {
+    const last = this.roleFilterOptions.length - 1;
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = index === last ? 0 : index + 1;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = index === 0 ? last : index - 1;
+    else return;
+    event.preventDefault();
+    this.selectRoleFilter(this.roleFilterOptions[next].value);
+    const radios = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll<HTMLElement>('[role="radio"]');
+    radios?.[next]?.focus();
   }
 
   // ─── Independent quick-filter toggles ────────────────────────────────────────
@@ -166,7 +187,7 @@ export class ByProjectComponent {
       })
       .map(row => {
         const label = this.roleLabel(row);
-        return { ...row, role: label, hasNoRole: label === NO_ROLE_LABEL };
+        return { ...row, role: label, hasNoRole: label === NO_ROLE_LABEL, delegateCount: row.delegates.length };
       });
   });
 
@@ -190,6 +211,44 @@ export class ByProjectComponent {
    */
   private isOngoing(project: ProjectDelegates): boolean {
     return !!project.status && this.statusDisplay(project).statusId === 1;
+  }
+
+  // ─── Excel export ─────────────────────────────────────────────────────────────
+  //
+  // Exports exactly the rows the table shows. The keys are read from the p-table's
+  // own processedData so a column sort the user applied is honoured; if the table
+  // is not rendered yet (empty/loading state) filteredRows() order is used.
+
+  readonly table = viewChild(Table);
+  readonly isExporting = signal(false);
+
+  private currentProjectCodes(): string[] {
+    const processed = this.table()?.processedData as ProjectRow[] | undefined;
+    return (processed ?? this.filteredRows()).map(row => row.project_code);
+  }
+
+  async exportTable(): Promise<void> {
+    if (this.isExporting()) return;
+    this.isExporting.set(true);
+    try {
+      const search = this.searchTerm().trim();
+      const blob = await this.service.exportByProject(this.currentProjectCodes(), {
+        ...(search && { search }),
+        role: this.roleTerm(),
+        ongoing_only: this.ongoingOnly(),
+        without_delegates_only: this.withoutDelegatesOnly()
+      });
+      if (!blob?.size) throw new Error('Empty export file');
+      downloadBlob(blob, buildPiDelegatesExportFileName('by_project', new Date(), this.cache.dataCache().user));
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Export failed',
+        detail: 'The projects could not be exported. Please try again.'
+      });
+    } finally {
+      this.isExporting.set(false);
+    }
   }
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────
