@@ -17,6 +17,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
@@ -45,6 +46,8 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
     result_official_code: 19792,
     result_status_id: 1,
     version_id: 1,
+    // Current reporting year, so the R-PRY-004 lock does not mask lever checks.
+    report_year_id: 2026,
     is_synced_to_prms: false,
     is_pool_funding_contributor: true,
     agresso_agreement_id: 'D527',
@@ -139,6 +142,10 @@ describe('BilateralService.normalizeLeverCodes — PATCH validation (T-15.1)', (
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: jest.fn().mockResolvedValue(2026) },
+        },
         { provide: TocIntegrationService, useValue: {} },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],

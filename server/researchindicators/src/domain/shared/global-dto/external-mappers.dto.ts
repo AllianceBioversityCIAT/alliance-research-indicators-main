@@ -20,6 +20,8 @@ export class ExternalMappersDto {
   is_version_applied?: boolean;
   official_code: number;
   resultOfficialCode: number;
+  prms_result_code?: number;
+  prms_phase_id?: number;
   external_link: string;
   public_link: string;
   status_id: ResultStatusEnum;

@@ -7,6 +7,7 @@ import { InputComponent } from '../custom-fields/input/input.component';
 import { SelectModule } from 'primeng/select';
 import { FormsModule } from '@angular/forms';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
+import { ExcludeYearsPipe } from '@shared/pipes/exclude-years.pipe';
 import { GetYear } from '@shared/interfaces/get-year.interface';
 interface ListService {
   list(): GetYear[];
@@ -14,7 +15,7 @@ interface ListService {
 
 @Component({
   selector: 'app-global-alert',
-  imports: [ButtonModule, InputComponent, FormsModule, SelectModule],
+  imports: [ButtonModule, InputComponent, FormsModule, SelectModule, ExcludeYearsPipe],
   templateUrl: './global-alert.component.html',
   standalone: true,
   styleUrls: ['./global-alert.component.scss'],
@@ -125,6 +126,22 @@ export class GlobalAlertComponent implements OnInit, OnDestroy {
 
     this.actions.hideGlobalAlert(index);
     this.body.update(body => ({ ...body, commentValue: '', selectValue: null }));
+  }
+
+  onCancel(alert: GlobalAlert, index: number) {
+    alert.cancelCallback?.event?.();
+    if (!alert.cancelSwapsTo) {
+      this.closeAlert(index);
+      return;
+    }
+
+    if (this.autoHideTimeouts[index]) {
+      window.clearTimeout(this.autoHideTimeouts[index]);
+      this.autoHideTimeouts[index] = 0;
+    }
+    this.actions.replaceGlobalAlert(index, alert.cancelSwapsTo);
+    this.body.update(body => ({ ...body, commentValue: '', selectValue: null }));
+    this.showReportedWarning = false;
   }
 
   onDetailLinkClick(event: MouseEvent | KeyboardEvent, index: number) {

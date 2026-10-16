@@ -210,6 +210,9 @@ export class ResultResponseMapper {
   public result_code: string;
   public status_id: string;
   public year: string;
+  // PRMS reporting phase id (not a year). The STAR import stores it on the
+  // result version, never on the live row.
+  public phase_id?: number;
   public pdf_link: string;
   public prms_link: string;
   public last_update_at: string;
@@ -373,6 +376,19 @@ export class PolicyStageMapper {
   public name: string;
   public definition: string;
 }
+
+export type PrmsSearchParams = Partial<
+  Record<
+    | 'year'
+    | 'centerAcronym'
+    | 'resultType'
+    | 'resultCode'
+    | 'source'
+    | 'fundingType'
+    | 'statusId',
+    string | number
+  >
+>;
 
 export class PrmsTemporalResponseMapper {
   public code: number;

@@ -5,7 +5,7 @@ import {
   NotFoundException,
   NotImplementedException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import {
   PoolFundingAlignmentContext,
@@ -44,7 +44,6 @@ import {
 } from '../../tools/toc-integration/dto/toc-integration.types';
 import {
   allowedLevelsFor,
-  MAPPABLE_LIVE_VERSION,
   resolveResultTypeKey,
 } from './utils/toc-level-rules.util';
 import {
@@ -52,6 +51,7 @@ import {
   SpMappingRowLike,
 } from './utils/sp-mapping.predicate';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { ENV } from '../../shared/utils/env.utils';
 import {
   IndicatorGroupResponse,
@@ -166,6 +166,7 @@ export class BilateralService {
     private readonly tocIntegrationService: TocIntegrationService,
     // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092
     private readonly tocAlignmentRepository: ResultPoolFundingTocAlignmentRepository,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
   /**
@@ -343,7 +344,8 @@ export class BilateralService {
    *   2. `result_type` + `allowed_levels` from `toc-level-rules.util.ts`
    *      (single source of truth, D-V2-3) off the result's indicator type.
    *   3. `version_locked` = live version year (`context.report_year_id`,
-   *      literal year per D-V2-7) ≠ `MAPPABLE_LIVE_VERSION` (2026).
+   *      literal year per D-V2-7) ≠ the configured reporting year
+   *      (`app_config.ARI_PRMS_SYNC`).
    *   4. SP chain UNCHANGED: result → AGRESSO → bilateral_project_mapping
    *      → CLARISA project → `deriveSciencePrograms`. Unmapped at any step
    *      ⇒ `mapping_status: 'unmapped'`, `catalogs: []`, zero upstream ToC
@@ -367,6 +369,7 @@ export class BilateralService {
   ): Promise<BilateralHlosIndicatorsResponse> {
     const resolution = await this.resolveMappedProject(resultId);
     const { context } = resolution;
+    const year = await this.reportingYearResolver.resolve();
 
     const resultType = resolveResultTypeKey(context.indicator_id);
     const allowedLevels = allowedLevelsFor(resultType);
@@ -376,7 +379,7 @@ export class BilateralService {
       result_type: resultType,
       allowed_levels: allowedLevels,
       // D-V2-7: `report_year_id` carries the literal report year (e.g. 2026).
-      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
+      version_locked: Number(context.report_year_id) !== year,
     };
 
     if (resolution.status === 'unmapped' || resolution.status === 'stale') {
@@ -407,6 +410,7 @@ export class BilateralService {
       await this.tocIntegrationService.getTocResultsForSps(
         spCodes,
         allowedLevels,
+        year,
       );
 
     // One catalogs[] entry per SP (deriveSciencePrograms order), each with
@@ -417,7 +421,7 @@ export class BilateralService {
       levels: allowedLevels.map((level) => ({
         level,
         toc_results: (tocResultsByKey.get(`${spCode}:${level}`) ?? []).map(
-          (tocResult) => this.toWireTocResult(tocResult, level),
+          (tocResult) => this.toWireTocResult(tocResult, level, year),
         ),
       })),
     }));
@@ -439,6 +443,7 @@ export class BilateralService {
   private toWireTocResult(
     tocResult: TocResult,
     level: TocLevel,
+    year: number,
   ): BilateralTocCatalogResult {
     return {
       toc_result_id: tocResult.toc_result_id,
@@ -446,7 +451,7 @@ export class BilateralService {
       description: tocResult.description ?? '',
       aow_code: level === 'EOI' ? null : (tocResult.wp_short_name ?? null),
       indicators: (tocResult.indicators ?? []).map((indicator) =>
-        this.toWireTocIndicator(indicator),
+        this.toWireTocIndicator(indicator, year),
       ),
     };
   }
@@ -456,35 +461,42 @@ export class BilateralService {
    *
    * Upstream `TocIndicator` → frozen wire shape: `unit_messurament` →
    * `unit_of_measurement` (D-V2-4); `targets[]` resolved to the single
-   * `MAPPABLE_LIVE_VERSION` entry — `(target_value, 2026)` when an upstream
-   * target with `target_date == '2026'` exists, `(null, 2026)` otherwise.
-   * The raw targets array never reaches the wire (R-BIL-090 AC.3).
-   * `type_value` passes through unfiltered (OQ-V2-2).
+   * configured-reporting-year entry — `(target_value, year)` when an
+   * upstream target with `target_date == String(year)` exists,
+   * `(null, year)` otherwise. The raw targets array never reaches the
+   * wire (R-BIL-090 AC.3). `type_value` passes through unfiltered
+   * (OQ-V2-2). The year is the caller's resolved reporting year
+   * (`app_config.ARI_PRMS_SYNC`).
    */
   private toWireTocIndicator(
     indicator: TocIndicator,
+    year: number,
   ): BilateralTocCatalogIndicator {
     return {
       indicator_id: indicator.indicator_id,
       indicator_description: indicator.indicator_description,
       unit_of_measurement: indicator.unit_messurament ?? '',
       type_value: indicator.type_value ?? '',
-      target_value: this.resolveLiveTargetValue(indicator),
-      target_year: MAPPABLE_LIVE_VERSION,
+      target_value: this.resolveLiveTargetValue(indicator, year),
+      target_year: year,
     };
   }
 
   /**
    * @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-03 + T-06 / R-BIL-090, R-BIL-095
    *
-   * Shared target resolution for the live version: the upstream `targets[]`
-   * entry with `target_date == '2026'` wins, else null. Used by both the
-   * catalog read wire mapping and the write-path snapshot copy so saved
-   * snapshots always match what the FE was shown.
+   * Shared target resolution for the configured reporting year: the
+   * upstream `targets[]` entry with `target_date == String(year)` wins,
+   * else null. Used by both the catalog read wire mapping and the
+   * write-path snapshot copy so saved snapshots always match what the FE
+   * was shown. `year` is the caller's resolved reporting year.
    */
-  private resolveLiveTargetValue(indicator: TocIndicator): string | null {
+  private resolveLiveTargetValue(
+    indicator: TocIndicator,
+    year: number,
+  ): string | null {
     const liveTarget = (indicator.targets ?? []).find(
-      (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+      (target) => target.target_date === String(year),
     );
     return liveTarget?.target_value ?? null;
   }
@@ -604,7 +616,17 @@ export class BilateralService {
   async getAlignment(
     resultId: number,
     resultCode: string,
+    user: User,
+  ): Promise<AlignmentResponse> {
+    const year = await this.reportingYearResolver.resolve();
+    return this.buildAlignment(resultId, resultCode, user, year);
+  }
+
+  private async buildAlignment(
+    resultId: number,
+    resultCode: string,
     _user: User,
+    year: number,
   ): Promise<AlignmentResponse> {
     const [context, alignment, tocAlignmentRows] = await Promise.all([
       this.resultRepository.findPoolFundingAlignmentContext(resultId),
@@ -627,7 +649,15 @@ export class BilateralService {
     // surfaces regardless of sync state. Unions with the existing R-BIL-015
     // synced gate so the FE only needs to read `is_read_only`.
     const isPrmsSourced = this.isPrmsSourced(context.platform_code);
-    const visibleAlignment = eligible ? alignment : null;
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
+    // A non-eligible result that still carries a record (snapshot, synced, or
+    // PRMS code) is shown read-only. `eligible` stays the raw contract fact.
+    const displayOnly =
+      !eligible &&
+      (this.toBoolean(context.is_snapshot) ||
+        isSyncedToPrms ||
+        context.prms_result_code != null);
+    const visibleAlignment = eligible || displayOnly ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
     // Read off `visibleAlignment`, NEVER the raw `alignment` — mirrors the
@@ -654,14 +684,22 @@ export class BilateralService {
         context.prms_result_code == null
           ? null
           : Number(context.prms_result_code),
-      is_read_only: isPrmsSourced || isSyncedToPrms,
+      is_read_only: isPrmsSourced || isSyncedToPrms || displayOnly,
+      display_only: displayOnly,
       // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-07 / R-BIL-096, R-BIL-097
       // Same Number(...) comparison as the hlos-indicators read (D-V2-7);
       // `toc_alignments` follows the same eligibility visibility gate as
       // the rest of the alignment payload (mirrors `visibleAlignment`).
-      version_locked: Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION,
-      toc_alignments: (eligible ? tocAlignmentRows : []).map((row) =>
-        this.toTocAlignmentReadback(row),
+      version_locked: Number(context.report_year_id) !== year,
+      // Answered contribution (including an explicit false), a completed
+      // PRMS sync, or a PRMS result code. Sync history alone does not count.
+      has_pool_funding_data:
+        (visibleAlignment?.has_contribution ?? null) !== null ||
+        isSyncedToPrms ||
+        context.prms_result_code != null,
+      reporting_year: year,
+      toc_alignments: (eligible || displayOnly ? tocAlignmentRows : []).map(
+        (row) => this.toTocAlignmentReadback(row),
       ),
     };
   }
@@ -739,6 +777,8 @@ export class BilateralService {
       throw new NotFoundException('Result not found');
     }
 
+    const year = await this.reportingYearResolver.resolve();
+
     // R-BIL-071: architectural source gate runs first — PRMS owns the data
     // regardless of contributor status or sync state, so reject before any
     // domain-eligibility check fires (avoids leaking "not a contributor"
@@ -749,6 +789,11 @@ export class BilateralService {
     // check above (platform codes are mutually exclusive) and uses its own,
     // distinctly-worded rejection — see assertNonPrmsExternalSourceWritable.
     this.assertNonPrmsExternalSourceWritable(context.platform_code);
+
+    // R-PRY-004: other-year results are read-only on every body. Source
+    // gates stay first; the contributor and already-synced checks come
+    // after, and nothing is written or emitted on this path.
+    this.assertReportingYearWritable(context, year);
 
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(
@@ -769,25 +814,12 @@ export class BilateralService {
       resultCode,
     );
 
-    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
-    //
-    // Version gate extracted from `validateTocAlignments` (design.md §4 step
-    // 2) so it keeps firing before Primary validation (T-06 step 3) is
-    // inserted below. Trigger condition is unchanged from the original
-    // inline check: fires ONLY when `toc_alignments` is present, so legacy
-    // bodies still bypass it entirely (R-BIL-097 AC.3).
-    if (dto.toc_alignments) {
-      this.assertTocMappingVersionUnlocked(context);
-    }
-
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06 / R-BIL-120..122, D-C2-15
     //
     // Primary resolution (design.md §4 step 3, §5.1) runs BEFORE the
-    // transaction opens too, so a rejection here observes no partial write
-    // (R-BIL-121's atomicity clause) — same reasoning as the version gate
-    // above. Positioned after it (R-BIL-130) and before
-    // `validateTocAlignments`, which is passed the resolved Primary below
-    // for the T-07 restriction (R-BIL-124).
+    // transaction opens, so a rejection here observes no partial write
+    // (R-BIL-121's atomicity clause). Other-year bodies never reach it:
+    // the reporting-year guard above already returned 409.
     const primarySpCode = this.resolvePrimarySpCode(
       dto,
       leverCodes,
@@ -809,6 +841,7 @@ export class BilateralService {
           context,
           resultId,
           primarySpCode,
+          year,
         )
       : null;
 
@@ -828,86 +861,17 @@ export class BilateralService {
     const now = new Date();
 
     await this.dataSource.transaction(async (manager) => {
-      if (previousAlignment) {
-        await manager.getRepository(ResultPoolFundingAlignmentSp).update(
-          {
-            alignment_id: previousAlignment.id,
-            is_active: true,
-          },
-          {
-            is_active: false,
-            deleted_at: now,
-            updated_by: actorUserId,
-          },
-        );
-        await manager.getRepository(ResultPoolFundingAlignment).update(
-          {
-            id: previousAlignment.id,
-            is_active: true,
-          },
-          {
-            is_active: false,
-            deleted_at: now,
-            updated_by: actorUserId,
-          },
-        );
-      }
-
-      const newAlignment = await manager
-        .getRepository(ResultPoolFundingAlignment)
-        .save({
-          result_id: resultId,
-          has_contribution: dto.has_contribution,
-          created_by: actorUserId,
-          updated_by: actorUserId,
-        });
-
-      if (leverCodes.length) {
-        await manager.getRepository(ResultPoolFundingAlignmentSp).save(
-          leverCodes.map((spCode) => ({
-            alignment_id: newAlignment.id,
-            // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
-            // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
-            sp_code: spCode,
-            // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
-            // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
-            // Primary and STORED explicitly on every row (never transmitted
-            // per-row on the wire). `satisfies SpRole` ties this literal to
-            // the same shared union the read-back carrier and the DTO use
-            // (design.md §4, D-C2-14) — they agree by type, not convention.
-            sp_role: (spCode === primarySpCode
-              ? 'PRIMARY'
-              : 'CONTRIBUTING') satisfies SpRole,
-            created_by: actorUserId,
-            updated_by: actorUserId,
-          })),
-        );
-      }
-
-      // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-093, R-BIL-095
-      //
-      // Independent per-SP upsert (design §6.3 step 4): each validated entry
-      // updates/creates ONLY its own (result, sp_code) row — SPs absent from
-      // `toc_alignments` are never touched (R-BIL-092 AC.1). Then the
-      // cascade (step 5) deactivates rows for deselected SPs.
-      if (tocUpserts) {
-        for (const upsert of tocUpserts) {
-          await this.tocAlignmentRepository.upsertForSp(
-            upsert,
-            actorUserId,
-            manager,
-          );
-        }
-      }
-
-      if (tocSpCodesToDeactivate.length) {
-        await this.tocAlignmentRepository.deactivateForSps(
-          resultId,
-          tocSpCodesToDeactivate,
-          actorUserId,
-          manager,
-        );
-      }
+      await this.persistAlignment(manager, {
+        resultId,
+        previousAlignmentId: previousAlignment?.id ?? null,
+        hasContribution: dto.has_contribution,
+        spCodes: leverCodes,
+        primarySpCode,
+        tocUpserts,
+        tocSpCodesToDeactivate,
+        actorUserId,
+        now,
+      });
 
       await manager.getRepository(ResultReviewHistory).save({
         result_id: resultId,
@@ -944,7 +908,12 @@ export class BilateralService {
       });
     });
 
-    const response = await this.getAlignment(resultId, resultCode, user);
+    const response = await this.buildAlignment(
+      resultId,
+      resultCode,
+      user,
+      year,
+    );
     this.serverGateway.emitPoolFundingAlignmentChanged({
       result_code: response.result_code,
       by_user_id: actorUserId,
@@ -955,29 +924,229 @@ export class BilateralService {
   }
 
   /**
-   * @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-04 / R-BIL-130, D-C2-13
+   * Writes the pool-funding alignment and ToC a PRMS result already has in
+   * PRMS. ONLY for `fetch-prms-data-as-star`, a one-off import: the data is
+   * PRMS's own record of the result, not a user's choice, so none of the
+   * gates `updateAlignment` applies to a user's save run here (PRMS
+   * read-only source, the reporting-year lock, contributor and
+   * already-synced checks, catalog validation). The write itself is the
+   * same `persistAlignment`. No review-history entry and no socket event:
+   * nobody is editing the result.
    *
-   * Version gate: live version (`report_year_id`, literal year per D-V2-7)
-   * ≠ `MAPPABLE_LIVE_VERSION` (2026) → 409 `toc_mapping_version_locked`
-   * (R-BIL-097). Extracted from `validateTocAlignments` — where it used to
-   * be the first statement — so it keeps firing BEFORE Primary validation
-   * (T-06), which the call site inserts after this check. Left inside
-   * `validateTocAlignments`, a new `400 primary_sp_required` would move in
-   * front of this shipped `409`, displacing a tested contract (R-BIL-097
-   * AC.2). The trigger condition (only when `toc_alignments` is present,
-   * R-BIL-097 AC.3) lives at the call site, not here, so it stays visible
-   * next to the other pre-transaction steps instead of being duplicated.
+   * `toc_result_id` is looked up in the lambda-toc catalog by title. When
+   * it is not there, or the catalog is down, the row keeps PRMS's title and
+   * level with a null id.
    */
-  private assertTocMappingVersionUnlocked(context: {
-    report_year_id?: number | string;
-  }): void {
-    if (Number(context.report_year_id) !== MAPPABLE_LIVE_VERSION) {
+  async importAlignmentFromPrms(
+    resultId: number,
+    input: {
+      primarySpCode: string;
+      contributingSpCodes: string[];
+      toc: { level: TocLevel | null; title: string } | null;
+    },
+    actorUserId: number | null,
+  ): Promise<void> {
+    const year = await this.reportingYearResolver.resolve();
+    const spCodes = [
+      input.primarySpCode,
+      ...input.contributingSpCodes.filter(
+        (code) => code !== input.primarySpCode,
+      ),
+    ].filter((code, index, all) => all.indexOf(code) === index);
+
+    const tocUpserts: TocAlignmentUpsertInput[] = input.toc
+      ? [
+          {
+            result_id: resultId,
+            sp_code: input.primarySpCode,
+            aligns_with_toc: true,
+            level: input.toc.level,
+            toc_result_id: await this.findTocResultIdByTitle(
+              input.primarySpCode,
+              input.toc.level,
+              input.toc.title,
+              year,
+            ),
+            toc_result_title: input.toc.title,
+          },
+        ]
+      : [];
+
+    const [previousAlignment, activeToc] = await Promise.all([
+      this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+      this.tocAlignmentRepository.findActiveByResultId(resultId),
+    ]);
+    const keptSps = new Set(tocUpserts.map((upsert) => upsert.sp_code));
+    const tocSpCodesToDeactivate = activeToc
+      .map((row) => row.sp_code)
+      .filter((spCode) => !keptSps.has(spCode));
+
+    await this.dataSource.transaction((manager) =>
+      this.persistAlignment(manager, {
+        resultId,
+        previousAlignmentId: previousAlignment?.id ?? null,
+        hasContribution: true,
+        spCodes,
+        primarySpCode: input.primarySpCode,
+        tocUpserts,
+        tocSpCodesToDeactivate,
+        actorUserId,
+        now: new Date(),
+      }),
+    );
+  }
+
+  private async findTocResultIdByTitle(
+    spCode: string,
+    level: TocLevel | null,
+    title: string,
+    year: number,
+  ): Promise<number | null> {
+    if (!level) return null;
+    const normalize = (value: string | null | undefined) =>
+      (value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+    try {
+      const catalog = await this.tocIntegrationService.getTocResults(
+        spCode,
+        level,
+        year,
+      );
+      const match = catalog.find(
+        (candidate) => normalize(candidate.title) === normalize(title),
+      );
+      return match?.toc_result_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The pool-funding alignment write shared by `updateAlignment` (a user's
+   * save) and `importAlignmentFromPrms` (the one-off PRMS import): replaces
+   * the active alignment and its SP rows, upserts the ToC rows and
+   * deactivates the ToC of SPs no longer selected. Runs inside the caller's
+   * transaction; every gate and validation is the caller's job.
+   */
+  private async persistAlignment(
+    manager: EntityManager,
+    args: {
+      resultId: number;
+      previousAlignmentId: number | null;
+      hasContribution: boolean;
+      spCodes: string[];
+      primarySpCode: string | null;
+      tocUpserts: TocAlignmentUpsertInput[] | null;
+      tocSpCodesToDeactivate: string[];
+      actorUserId: number | null;
+      now: Date;
+    },
+  ): Promise<void> {
+    if (args.previousAlignmentId !== null) {
+      await manager.getRepository(ResultPoolFundingAlignmentSp).update(
+        {
+          alignment_id: args.previousAlignmentId,
+          is_active: true,
+        },
+        {
+          is_active: false,
+          deleted_at: args.now,
+          updated_by: args.actorUserId,
+        },
+      );
+      await manager.getRepository(ResultPoolFundingAlignment).update(
+        {
+          id: args.previousAlignmentId,
+          is_active: true,
+        },
+        {
+          is_active: false,
+          deleted_at: args.now,
+          updated_by: args.actorUserId,
+        },
+      );
+    }
+
+    const newAlignment = await manager
+      .getRepository(ResultPoolFundingAlignment)
+      .save({
+        result_id: args.resultId,
+        has_contribution: args.hasContribution,
+        created_by: args.actorUserId,
+        updated_by: args.actorUserId,
+      });
+
+    if (args.spCodes.length) {
+      await manager.getRepository(ResultPoolFundingAlignmentSp).save(
+        args.spCodes.map((spCode) => ({
+          alignment_id: newAlignment.id,
+          // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.3
+          // / R-BIL-073 — entity property renamed `lever_code` → `sp_code`.
+          sp_code: spCode,
+          // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-06/T-08
+          // / R-BIL-120 AC.1, D-C2-4 — role is DERIVED from the resolved
+          // Primary and STORED explicitly on every row (never transmitted
+          // per-row on the wire). `satisfies SpRole` ties this literal to
+          // the same shared union the read-back carrier and the DTO use
+          // (design.md §4, D-C2-14) — they agree by type, not convention.
+          sp_role: (spCode === args.primarySpCode
+            ? 'PRIMARY'
+            : 'CONTRIBUTING') satisfies SpRole,
+          created_by: args.actorUserId,
+          updated_by: args.actorUserId,
+        })),
+      );
+    }
+
+    // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-092, R-BIL-093, R-BIL-095
+    //
+    // Independent per-SP upsert (design §6.3 step 4): each validated entry
+    // updates/creates ONLY its own (result, sp_code) row — SPs absent from
+    // `toc_alignments` are never touched (R-BIL-092 AC.1). Then the
+    // cascade (step 5) deactivates rows for deselected SPs.
+    if (args.tocUpserts) {
+      for (const upsert of args.tocUpserts) {
+        await this.tocAlignmentRepository.upsertForSp(
+          upsert,
+          args.actorUserId,
+          manager,
+        );
+      }
+    }
+
+    if (args.tocSpCodesToDeactivate.length) {
+      await this.tocAlignmentRepository.deactivateForSps(
+        args.resultId,
+        args.tocSpCodesToDeactivate,
+        args.actorUserId,
+        manager,
+      );
+    }
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-04 / R-PRY-004, D-8
+   *
+   * Other-year results are read-only. `report_year_id` (literal year) differs
+   * from the reporting year resolved by the caller → 409
+   * `pool_funding_year_locked`. Replaces the ToC version gate, which only
+   * fired when `toc_alignments` was present. Callers run this after the
+   * source gates and before the contributor and already-synced checks, and
+   * before any transaction or socket emit.
+   */
+  private assertReportingYearWritable(
+    context: {
+      report_year_id?: number | string | null;
+    },
+    year: number,
+  ): void {
+    const resultYear = Number(context.report_year_id);
+    if (resultYear !== year) {
       // GlobalExceptions surfaces `exception.response.message` into the
-      // envelope's `errors` field — same packing as the unknown_sp_codes 400.
+      // envelope's `errors` field — same packing as the other object 409s.
       throw new ConflictException({
         message: {
-          description: `ToC mapping is locked to live version ${MAPPABLE_LIVE_VERSION}`,
-          code: 'toc_mapping_version_locked',
+          description: `Pool Funding is read-only: result year ${resultYear} is not the reporting year ${year}`,
+          code: 'pool_funding_year_locked',
         },
       });
     }
@@ -988,10 +1157,9 @@ export class BilateralService {
    *
    * Resolves the Primary SP for this save. `design.md` §5.1 is normative —
    * the five steps below map 1:1 onto it. Runs BEFORE the transaction opens
-   * (called from the pre-transaction block in `updateAlignment`, right after
-   * the T-04 version gate), so a rejection here observes no partial write
-   * (R-BIL-121's atomicity clause) — same reasoning as the version gate.
-   * Positioned after it (R-BIL-130: the shipped 409 keeps winning) and
+   * (called from the pre-transaction block in `updateAlignment`, after the
+   * reporting-year guard), so a rejection here observes no partial write
+   * (R-BIL-121). Other-year bodies never reach it (R-PRY-004). It runs
    * before `validateTocAlignments`, which is handed the resolved Primary as
    * a parameter for the T-07 restriction (R-BIL-124).
    *
@@ -1080,9 +1248,9 @@ export class BilateralService {
    * resolved from the validated catalog entries, so the transaction only
    * persists — it never re-reads upstream.
    *
-   * The version gate (former step "a" here) has been EXTRACTED to the call
-   * site as `assertTocMappingVersionUnlocked`, invoked before this method
-   * runs — see design.md §4 step 2 and R-BIL-130.
+   * The live-version lock that used to be step "a" here is gone.
+   * `assertReportingYearWritable` rejects every other-year write before
+   * this method runs (R-PRY-004, D-8).
    *
    *   a. Structural validation — `duplicate_sp_code`, `sp_not_selected`,
    *      `toc_alignment_not_primary_sp` (T-07 / R-BIL-124: a selected SP
@@ -1111,7 +1279,7 @@ export class BilateralService {
    *
    * Snapshots (R-BIL-095): "Yes" rows copy `toc_result_title`,
    * `indicator_description`, `unit_messurament` (verbatim upstream spelling,
-   * D-V2-4) and the 2026-resolved `(target_value, target_year)` from the
+   * D-V2-4) and the configured-year `(target_value, target_year)` from the
    * validated catalog entry. "No" rows null every ToC/snapshot column.
    */
   private async validateTocAlignments(
@@ -1125,6 +1293,7 @@ export class BilateralService {
     // when `has_contribution` is false, in which case `effectiveSpCodes` is
     // already empty and every entry is caught by `sp_not_selected` first.
     primarySpCode: string | null,
+    year: number,
   ): Promise<TocAlignmentUpsertInput[]> {
     const errors: TocAlignmentValidationError[] = [];
     const effective = new Set(effectiveSpCodes);
@@ -1240,7 +1409,11 @@ export class BilateralService {
     const catalogs = await Promise.all(
       comboKeys.map((key) => {
         const combo = combos.get(key);
-        return this.tocIntegrationService.getTocResults(combo.sp, combo.level);
+        return this.tocIntegrationService.getTocResults(
+          combo.sp,
+          combo.level,
+          year,
+        );
       }),
     );
     const catalogByKey = new Map(
@@ -1332,8 +1505,10 @@ export class BilateralService {
         unit_messurament: indicator
           ? (indicator.unit_messurament ?? null)
           : null,
-        target_value: indicator ? this.resolveLiveTargetValue(indicator) : null,
-        target_year: indicator ? MAPPABLE_LIVE_VERSION : null,
+        target_value: indicator
+          ? this.resolveLiveTargetValue(indicator, year)
+          : null,
+        target_year: indicator ? year : null,
       };
     });
   }
@@ -1344,7 +1519,13 @@ export class BilateralService {
     query: ListIndicatorsQueryDto,
     user: User,
   ): Promise<IndicatorGroupResponse[]> {
-    const alignment = await this.getAlignment(resultId, resultCode, user);
+    const year = await this.reportingYearResolver.resolve();
+    const alignment = await this.buildAlignment(
+      resultId,
+      resultCode,
+      user,
+      year,
+    );
 
     if (!alignment.has_contribution) {
       return [];
@@ -1406,7 +1587,8 @@ export class BilateralService {
     user: User,
     leverCode: string,
   ): Promise<MappingResponse> {
-    const context = await this.getEditableContributionContext(resultId);
+    const year = await this.reportingYearResolver.resolve();
+    const context = await this.getEditableContributionContext(resultId, year);
     const alignment = await this.getActiveAlignmentForLever(
       resultId,
       leverCode,
@@ -1494,7 +1676,8 @@ export class BilateralService {
     user: User,
     leverCode: string,
   ): Promise<void> {
-    const context = await this.getEditableContributionContext(resultId);
+    const year = await this.reportingYearResolver.resolve();
+    const context = await this.getEditableContributionContext(resultId, year);
     await this.getActiveAlignmentForLever(resultId, leverCode);
     const previousMapping =
       await this.mappingRepository.findActiveMappingByResultLeverIndicator(
@@ -1645,7 +1828,7 @@ export class BilateralService {
     };
   }
 
-  private async getEditableContributionContext(resultId: number) {
+  private async getEditableContributionContext(resultId: number, year: number) {
     const context =
       await this.resultRepository.findPoolFundingAlignmentContext(resultId);
 
@@ -1656,6 +1839,8 @@ export class BilateralService {
     // R-BIL-071: same architectural source gate as updateAlignment — runs
     // first so PRMS-sourced results always return the locked 409 wording.
     this.assertPrmsSourceWritable(context.platform_code);
+    // R-PRY-004: year lock after the PRMS gate, before contributor / synced.
+    this.assertReportingYearWritable(context, year);
 
     if (!this.toBoolean(context.is_pool_funding_contributor)) {
       throw new BadRequestException(

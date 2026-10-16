@@ -1,3 +1,4 @@
+import { formatDate } from '@angular/common';
 import { Component, effect, inject, signal, OnDestroy, EffectRef } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { TransformResultCodeResponse } from '@shared/interfaces/get-transform-result-code.interface';
@@ -5,6 +6,8 @@ import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { GetMetadataService } from '@shared/services/get-metadata.service';
+import { GetYearsByCodeService } from '@shared/services/control-list/get-years-by-code.service';
+import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { DividerModule } from 'primeng/divider';
 import { TooltipModule } from 'primeng/tooltip';
 import { filter, Subscription } from 'rxjs';
@@ -29,10 +32,12 @@ export class VersionSelectorComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly actions = inject(ActionsService);
   private readonly metadata = inject(GetMetadataService);
+  private readonly yearsService = inject(GetYearsByCodeService);
 
   selectedResultId = signal<number | null>(null);
   liveVersion = signal<TransformResultCodeResponse | null>(null);
   approvedVersions = signal<TransformResultCodeResponse[]>([]);
+  updating = signal(false);
 
   prmsUrl: string = environment.prmsUrl;
   tipUrl: string = environment.tipUrl;
@@ -190,57 +195,106 @@ export class VersionSelectorComponent implements OnDestroy {
     return this.liveVersion()!;
   }
 
-  updateResult() {
+  // @akili-spec docs/specs/changes/update-result-year-prompt
+  async updateResult() {
+    if (this.updating()) return;
+    this.updating.set(true);
+    try {
+      await this.yearsService.main();
+    } finally {
+      this.updating.set(false);
+    }
+
+    const versions = this.approvedVersions();
+    const offered =
+      versions.find(v => v.result_id === this.selectedResultId()) ??
+      versions.reduce<TransformResultCodeResponse | undefined>((max, v) => (!max || v.report_year_id > max.report_year_id ? v : max), undefined);
+
+    if (!offered || !this.yearsService.list().some(y => y.report_year === offered.report_year_id)) {
+      this.showPicker([]);
+      return;
+    }
+    this.showPrompt(offered);
+  }
+
+  private showPrompt(offered: TransformResultCodeResponse) {
+    const year = offered.report_year_id;
+    const isLatest = year === Math.max(...this.approvedVersions().map(v => v.report_year_id));
+    const updatedAt = offered.updated_at;
+    const hasValidDate = typeof updatedAt === 'string' && updatedAt !== '' && !isNaN(new Date(updatedAt).getTime());
+    const caption = (isLatest ? 'Latest reporting version' : 'Reporting version') + (hasValidDate ? ` · last updated ${formatDate(updatedAt, 'd MMM y', 'en-US')}` : '');
+
     this.actions.showGlobalAlert({
+      severity: 'confirm',
+      summary: 'CONFIRM UPDATING',
+      detail: isLatest ? `Do you want to update the most recent version of this result (${year})?` : `Do you want to update the ${year} version of this result?`,
+      infoCard: { badge: `${year} VERSION`, caption },
+      cancelCallback: { label: 'No, choose another year' },
+      cancelSwapsTo: this.pickerAlert([year]),
+      confirmCallback: { label: `Yes, update ${year}`, event: () => this.submitReportingCycle(String(year)) },
+      buttonColor: 'var(--ac-light-blue-400)'
+    });
+  }
+
+  // Built fresh on every call: alert configs are single-use (alertList mutates them)
+  private pickerAlert(exclude: number[]): GlobalAlert {
+    return {
       severity: 'confirm',
       summary: 'CONFIRM UPDATING',
       detail: 'Please confirm the reporting year associated with this update:',
       selectorLabel: 'Reporting year',
       serviceName: 'getYearsByCode',
       selectorRequired: true,
+      selectorExcludeValues: exclude,
       confirmCallback: {
         label: 'Confirm',
-        event: (data?: { comment?: string; selected?: string }) => {
-          (async () => {
-            const response = await this.api.PATCH_ReportingCycle(this.cache.getCurrentNumericResultId(), data?.selected ?? '');
-
-            if (!response.successfulRequest) {
-              this.actions.showToast({ severity: 'error', summary: 'Error', detail: response.errorDetail.errors });
-            } else {
-              // clear the cache to force a complete reload
-              this.cache.lastResultId.set(null);
-              this.cache.lastVersionParam.set(null);
-              this.cache.liveVersionData.set(null);
-              this.cache.versionsList.set([]);
-
-              // Force metadata update
-              this.metadata.update(this.cache.getCurrentNumericResultId());
-
-              // Navigate to the current route without parameters to stay in live version
-              const currentPath = this.router.url.split('?')[0];
-              this.router
-                .navigate([currentPath], {
-                  queryParams: { version: null, ...this.entrySourceQueryParamRecord() },
-                  queryParamsHandling: 'merge',
-                  replaceUrl: true
-                })
-                .then(() => {
-                  // After navigating, reload the versions
-                  this.loadVersions();
-                });
-
-              this.actions.showGlobalAlert({
-                severity: 'success',
-                hasNoButton: true,
-                summary: 'RESULT UPDATED',
-                detail: 'The result was updated successfully.'
-              });
-            }
-          })();
-        }
+        event: (data?: { comment?: string; selected?: string }) => this.submitReportingCycle(data?.selected ?? '')
       },
       buttonColor: '#035BA9'
-    });
+    };
+  }
+
+  private showPicker(exclude: number[]) {
+    this.actions.showGlobalAlert(this.pickerAlert(exclude));
+  }
+
+  private submitReportingCycle(year: string) {
+    (async () => {
+      const response = await this.api.PATCH_ReportingCycle(this.cache.getCurrentNumericResultId(), year);
+
+      if (!response.successfulRequest) {
+        this.actions.showToast({ severity: 'error', summary: 'Error', detail: response.errorDetail.errors });
+      } else {
+        // clear the cache to force a complete reload
+        this.cache.lastResultId.set(null);
+        this.cache.lastVersionParam.set(null);
+        this.cache.liveVersionData.set(null);
+        this.cache.versionsList.set([]);
+
+        // Force metadata update
+        this.metadata.update(this.cache.getCurrentNumericResultId());
+
+        // Navigate to the current route without parameters to stay in live version
+        const currentPath = this.router.url.split('?')[0];
+        this.router
+          .navigate([currentPath], {
+            queryParams: { version: null, ...this.entrySourceQueryParamRecord() },
+            queryParamsHandling: 'merge',
+            replaceUrl: true
+          })
+          .then(() => {
+            // After navigating, reload the versions
+            this.loadVersions();
+          });
+
+        this.actions.showGlobalAlert({
+          severity: 'success',
+          hasNoButton: true,
+          summary: 'RESULT UPDATED',
+          detail: 'The result was updated successfully.'
+        });
+      }
+    })();
   }
 
   editInPlatform() {
