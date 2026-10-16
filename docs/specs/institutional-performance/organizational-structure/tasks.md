@@ -116,7 +116,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-02 — Slice 2: save engine, form and staff picker
 
-- **Status:** in progress (2026-10-16; P-14 settled) · **Size:** L · **Dependencies:** T-01
+- **Status:** done (2026-10-16, Reviewer PASS ×2 on attempt 2 — execution.md) · **Size:** L · **Dependencies:** T-01
 - **Requirements covered:**
   - R-ORG-001 — *No portfolio anywhere*: **AND IT MUST** reject (`400`) any write that sends `portfolioId` (B9, B10); AC.2.
   - R-ORG-002 — *Code proposed and unique*: pre-filled `ORG-118`; **AND IT MUST** reject `org-050` with `409` naming `code` because a deleted entry still owns it (fixture row with `status = deleted`). *ID is read-only*: `id` in a body → 400; **BUT** must NOT change the stored ID. AC.1, AC.2. Code not versioned (`code_change`, no version).
@@ -195,9 +195,9 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `full` — temporal engine, transaction, PII field.
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns, tdd (timeline util) (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] P-14 query output quoted with date; design §4 B4 updated before code.
-  - [ ] Same command set as T-01, all green; falsifiers 1–7 observed red, then reverted.
-  - [ ] B3, B4, B9, B10 in `/swagger`, observation quoted.
+  - [x] P-14 query output quoted with date; design §4 B4 updated before code.
+  - [x] Same command set as T-01, all green; falsifiers 1–7 observed red, then reverted. *(1–9 observed; server full suite: the 2 pre-existing suites — execution.md)*
+  - [x] B3, B4, B9, B10 in `/swagger`, observation quoted. *(execution.md → T-02 verbatim evidence)*
 
 ### T-03 — Slice 3: lifecycle, delete, change log and history
 
@@ -471,6 +471,7 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
 | RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main`. **Measured 2026-10-16 by the requester on *testing*:** `alliance_user_staff.carnet` = `utf8mb4` / `utf8mb4_0900_ai_ci`, `VERSION()` = `8.0.46-0ubuntu0.22.04.4` — the baseline dump's `utf8mb3` is stale for that server. Still owed: Prod (`main`) | Requester | open — testing measured, Prod pending |
+| RB-6 | 2026-10-16 | Cross-entry race (T-02 Reviewer A advisory, reasoned): `FOR UPDATE` locks only the saved entry and the hierarchy graph is read unlocked, so two concurrent saves on different entries (e.g. P L2→L3 while an L3 is created under P) can each pass validation and leave an I-3 violation | Either lock the parent/child rows the check reads, or accept (≈ 500 entries, few admins). **Requester decision pending** | Requester | open |
 
 ---
 

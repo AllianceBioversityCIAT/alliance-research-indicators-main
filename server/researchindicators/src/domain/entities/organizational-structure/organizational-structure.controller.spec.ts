@@ -3,17 +3,25 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { OrganizationalStructureController } from './organizational-structure.controller';
 import { OrgStructureReadService } from './org-structure-read.service';
+import { OrgStructureService } from './organizational-structure.service';
 import { ROLES_KEY } from '../../shared/guards/roles.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
-describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
+describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10)', () => {
   const readService = {
     getYearView: jest.fn(),
     getYearRange: jest.fn(),
     getUnitDetail: jest.fn(),
   };
+  const service = {
+    proposeCode: jest.fn(),
+    searchStaff: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
   const controller = new OrganizationalStructureController(
     readService as unknown as OrgStructureReadService,
+    service as unknown as OrgStructureService,
   );
 
   const proto =
@@ -30,8 +38,16 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
   beforeEach(() => jest.clearAllMocks());
 
   describe('roles metadata (R-ORG-012, NFR-ORG-004)', () => {
-    it('discovers exactly the three read handlers of T-01', () => {
-      expect(handlerNames).toEqual(['getYearView', 'getYears', 'getUnit']);
+    it('discovers exactly the handlers of T-01 and T-02', () => {
+      expect(handlerNames).toEqual([
+        'getYearView',
+        'getCodeProposal',
+        'searchStaff',
+        'getYears',
+        'getUnit',
+        'createUnit',
+        'updateUnit',
+      ]);
     });
 
     it.each(handlerNames)(
@@ -54,6 +70,27 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
     });
   });
 
+  describe('validation pipes (R-ORG-001, 002, 016, 017)', () => {
+    // Read from the handler metadata, NOT rebuilt in the test: a handler that
+    // loses `forbidNonWhitelisted` would let `portfolioId`, `id` or a director
+    // name through, and only this reads the pipe the route really runs.
+    it.each(['getYearView', 'searchStaff', 'createUnit', 'updateUnit'])(
+      '%s runs a ValidationPipe with whitelist, forbidNonWhitelisted and transform',
+      (handlerName) => {
+        const pipes: Array<{
+          validatorOptions?: Record<string, unknown>;
+          isTransformEnabled?: boolean;
+        }> = Reflect.getMetadata('__pipes__', proto[handlerName]) ?? [];
+        expect(pipes).toHaveLength(1);
+        expect(pipes[0].validatorOptions).toMatchObject({
+          whitelist: true,
+          forbidNonWhitelisted: true,
+        });
+        expect(pipes[0].isTransformEnabled).toBe(true);
+      },
+    );
+  });
+
   describe('route inventory', () => {
     const routes = handlerNames.map((name) => ({
       name,
@@ -64,19 +101,25 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
       path: Reflect.getMetadata(PATH_METADATA, proto[name]) as string,
     }));
 
-    it('exposes only GET routes, with the design paths', () => {
+    it('exposes exactly B1-B5 reads, B9 and B10 on the design paths (no PUT, no DELETE)', () => {
       expect(routes.map((r) => [r.method, r.path])).toEqual([
         [RequestMethod.GET, 'units'],
+        [RequestMethod.GET, 'units/code-proposal'],
+        [RequestMethod.GET, 'staff'],
         [RequestMethod.GET, 'years'],
         [RequestMethod.GET, 'units/:id'],
+        [RequestMethod.POST, 'units'],
+        [RequestMethod.PATCH, 'units/:id'],
       ]);
     });
 
-    it('declares the literal routes before the `:id` route', () => {
-      const idIndex = routes.findIndex((r) => r.path.includes(':'));
+    it('declares the literal GET routes before the GET `:id` route (B3 would otherwise be read as an id)', () => {
+      const idIndex = routes.findIndex(
+        (r) => r.method === RequestMethod.GET && r.path.includes(':'),
+      );
       expect(idIndex).toBeGreaterThan(-1);
       routes
-        .filter((r) => !r.path.includes(':'))
+        .filter((r) => r.method === RequestMethod.GET && !r.path.includes(':'))
         .forEach((literal) =>
           expect(routes.indexOf(literal)).toBeLessThan(idIndex),
         );
@@ -84,10 +127,10 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
 
     it('declares no portfolio parameter on any handler (R-ORG-001 AC.1)', () => {
       for (const handlerName of handlerNames) {
-        const params: Array<{ name: string }> =
+        const params: Array<{ name?: string }> =
           Reflect.getMetadata(DECORATORS.API_PARAMETERS, proto[handlerName]) ??
           [];
-        expect(params.map((p) => p.name.toLowerCase())).not.toContain(
+        expect(params.map((p) => (p.name ?? '').toLowerCase())).not.toContain(
           'portfolioid',
         );
       }
@@ -121,6 +164,46 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
         proto.getUnit,
       );
       expect(b5.map((p) => p.name)).toEqual(['id']);
+    });
+  });
+
+  describe('Swagger for the T-02 handlers (NFR-ORG-006)', () => {
+    it('B4 documents the required search query', () => {
+      const params: Array<{ name: string; required: boolean }> =
+        Reflect.getMetadata(DECORATORS.API_PARAMETERS, proto.searchStaff);
+      expect(params).toEqual([
+        expect.objectContaining({ name: 'search', required: true }),
+      ]);
+    });
+
+    it('B9 (201) and B10 (200) document `data.outcome` through the OrgSaveOutcomeDto schema', () => {
+      for (const [handler, status] of [
+        ['createUnit', '201'],
+        ['updateUnit', '200'],
+      ]) {
+        const responses = Reflect.getMetadata(
+          DECORATORS.API_RESPONSE,
+          proto[handler],
+        );
+        expect(
+          JSON.stringify(
+            responses[status].schema.properties.data.properties.outcome,
+          ),
+        ).toContain('OrgSaveOutcomeDto');
+      }
+    });
+
+    it('B9 and B10 document a body; B10 also the id param', () => {
+      const b9: Array<{ in: string }> = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        proto.createUnit,
+      );
+      expect(b9.map((p) => p.in)).toEqual(['body']);
+      const b10: Array<{ in: string; name: string }> = Reflect.getMetadata(
+        DECORATORS.API_PARAMETERS,
+        proto.updateUnit,
+      );
+      expect(b10.map((p) => p.in).sort()).toEqual(['body', 'path']);
     });
   });
 
@@ -160,6 +243,47 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5)', () => {
       expect(result).toMatchObject({
         status: HttpStatus.OK,
         data: { id: 5 },
+      });
+    });
+  });
+
+  describe('envelope of the T-02 handlers', () => {
+    it('B3 wraps the proposal with status 200', async () => {
+      service.proposeCode.mockResolvedValue({ code: 'ORG-118' });
+      expect(await controller.getCodeProposal()).toMatchObject({
+        status: HttpStatus.OK,
+        data: { code: 'ORG-118' },
+      });
+    });
+
+    it('B4 passes the search term and wraps the rows with status 200', async () => {
+      service.searchStaff.mockResolvedValue([{ carnet: 'A1' }]);
+      const result = await controller.searchStaff({ search: 'pe' });
+      expect(service.searchStaff).toHaveBeenCalledWith('pe');
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: [{ carnet: 'A1' }],
+      });
+    });
+
+    it('B9 wraps the created entry with status 201', async () => {
+      service.create.mockResolvedValue({ id: 9 });
+      const body = { levelId: 20, name: 'N', appliesFromYear: 2026 };
+      const result = await controller.createUnit(body);
+      expect(service.create).toHaveBeenCalledWith(body);
+      expect(result).toMatchObject({
+        status: HttpStatus.CREATED,
+        data: { id: 9 },
+      });
+    });
+
+    it('B10 passes the numeric id and wraps the entry with status 200', async () => {
+      service.update.mockResolvedValue({ id: 9 });
+      const result = await controller.updateUnit(9, { name: 'N2' });
+      expect(service.update).toHaveBeenCalledWith(9, { name: 'N2' });
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: { id: 9 },
       });
     });
   });

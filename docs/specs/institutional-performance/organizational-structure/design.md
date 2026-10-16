@@ -181,6 +181,8 @@ Admin = `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`. Consumer = any authenticated user 
 | C2 | `GET /units/:id/ancestors?year=` | Consumer | — | chain to L1 for that year | 404 · 400 not covered that year |
 | C3 | `GET /units/:id/successors` | Consumer | — | successor chain in order | 404 |
 
+**B9/B10 response `outcome` (added 2026-10-16, T-02 review — Reviewers A and B):** `data` is the B5 shape plus an additive `outcome` object: `action` — one of `create`, `edit_in_place`, `new_version`, `code_change`, `delegates_change`, or `null` (no-op, nothing written) — the action the service actually logged; `appliesFromYear` (number or `null`); `backdated` (boolean). The client's success toast (§6.5) is derived **only** from `outcome`; deriving it from the viewed version misreports in-place edits of a scheduled later version.
+
 Exported in-process API (`OrgStructureReadService`): `getYearView`, `resolve`, `ancestors`, `successors`, `assertExists(ids)`. `OrgUnitUsageRegistry.register({ consumerName, countByUnitIds })`.
 
 ---

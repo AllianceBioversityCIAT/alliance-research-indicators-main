@@ -21,6 +21,8 @@ export class OrgTreeComponent {
   @Input({ required: true }) year = 0;
   @Input() selectedId: number | null = null;
   @Output() unitSelected = new EventEmitter<number>();
+  /** Row **+** (T-02): add a child under this entry; the page pre-fills parent and next level. */
+  @Output() childRequested = new EventEmitter<OrgYearViewRow>();
   @ViewChild(TreeTable) private readonly treeTable?: TreeTable;
 
   levelLabel(row: OrgYearViewRow): string {
@@ -37,6 +39,16 @@ export class OrgTreeComponent {
 
   select(row: OrgYearViewRow): void {
     this.unitSelected.emit(row.id);
+  }
+
+  /** Hidden on L4 and on ended entries (design §6.3). */
+  canAddChild(row: OrgYearViewRow): boolean {
+    return row.version.levelCode !== 'L4' && this.endedBadge(row) === null;
+  }
+
+  addChild(row: OrgYearViewRow, event: Event): void {
+    event.stopPropagation();
+    this.childRequested.emit(row);
   }
 
   // Own expander instead of `p-treeTableToggler`: PrimeNG 19's toggler reads `rowNode.expanded`, which

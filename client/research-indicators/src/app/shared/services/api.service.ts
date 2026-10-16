@@ -41,7 +41,15 @@ import { GlobalTarget } from '../interfaces/global-target.interface';
 import { GetResultsByContract } from '../interfaces/get-results-by-contract.interface';
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
-import { OrgYearRange, OrgYearViewRow } from '../interfaces/org-structure.interface';
+import {
+  OrgCodeProposal,
+  OrgStaffOption,
+  OrgUnitCreatePayload,
+  OrgUnitSaved,
+  OrgUnitUpdatePayload,
+  OrgYearRange,
+  OrgYearViewRow
+} from '../interfaces/org-structure.interface';
 import {
   ControlList,
   ControlListCategory,
@@ -256,6 +264,30 @@ export class ApiService {
 
   GET_OrgStructureUnit = (id: number): Promise<MainResponse<unknown>> => {
     return this.TP.get(`organizational-structure/units/${id}`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-02 (B3, B4, B9, B10) — write half.
+  GET_OrgStructureCodeProposal = (): Promise<MainResponse<OrgCodeProposal>> => {
+    return this.TP.get('organizational-structure/units/code-proposal', {});
+  };
+
+  GET_OrgStaff = (search: string): Promise<MainResponse<OrgStaffOption[]>> => {
+    const httpParams = new HttpParams().set('search', search);
+    return this.TP.get('organizational-structure/staff', { params: httpParams });
+  };
+
+  POST_OrgStructureUnit = (body: OrgUnitCreatePayload): Promise<MainResponse<OrgUnitSaved>> => {
+    return this.TP.post('organizational-structure/units', body, {});
+  };
+
+  PATCH_OrgStructureUnit = (id: number, body: OrgUnitUpdatePayload): Promise<MainResponse<OrgUnitSaved>> => {
+    return this.TP.patch(`organizational-structure/units/${id}`, body, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-02 (design §2.1) — by-key list values.
+  GET_ControlListValuesByKey = (listKey: string, activeOnly: boolean): Promise<MainResponse<ControlListValue[]>> => {
+    const httpParams = new HttpParams().set('activeOnly', String(activeOnly));
+    return this.TP.get(`control-lists/by-key/${encodeURIComponent(listKey)}/values`, { params: httpParams });
   };
 
   // @akili-spec institutional-performance/control-lists T-01 (A1–A5) — categories only; lists/values follow in T-02/T-03.

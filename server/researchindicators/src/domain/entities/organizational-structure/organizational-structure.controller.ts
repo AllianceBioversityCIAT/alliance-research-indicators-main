@@ -1,9 +1,12 @@
 import {
+  Body,
   Controller,
   Get,
   HttpStatus,
   Param,
   ParseIntPipe,
+  Patch,
+  Post,
   Query,
   UseGuards,
   UseInterceptors,
@@ -12,12 +15,22 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiExtraModels,
+  ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiQuery,
   ApiTags,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { OrgStructureReadService } from './org-structure-read.service';
+import { OrgStructureService } from './organizational-structure.service';
+import { CreateOrgUnitDto } from './dto/create-org-unit.dto';
+import { UpdateOrgUnitDto } from './dto/update-org-unit.dto';
+import { OrgSaveOutcomeDto } from './dto/org-save-outcome.dto';
+import { SearchStaffQueryDto } from './dto/search-staff-query.dto';
 import { GetYearViewQueryDto } from './dto/get-year-view-query.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
@@ -31,15 +44,20 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 // is NOT granted (D-CTL-7). Mounted at `/api/organizational-structure`,
 // unversioned. LITERAL routes are declared before the `:id` route.
 //
-// T-01 holds the read half: B1, B2, B5. This controller declares no portfolio
-// parameter anywhere (R-ORG-001 AC.1).
+// T-01 holds the read half (B1, B2, B5); T-02 adds the save engine (B9, B10),
+// the code proposal (B3) and the staff search (B4). No portfolio parameter
+// anywhere (R-ORG-001 AC.1); a write body that sends `portfolioId` is a 400.
 @Controller()
 @ApiTags('Organizational Structure')
 @ApiBearerAuth()
+@ApiExtraModels(OrgSaveOutcomeDto)
 @UseInterceptors(SetUpInterceptor)
 @UseGuards(RolesGuard)
 export class OrganizationalStructureController {
-  constructor(private readonly readService: OrgStructureReadService) {}
+  constructor(
+    private readonly readService: OrgStructureReadService,
+    private readonly service: OrgStructureService,
+  ) {}
 
   // B1
   @Get('units')
@@ -80,6 +98,52 @@ export class OrganizationalStructureController {
       );
   }
 
+  // B3 — literal route, declared before `units/:id`.
+  @Get('units/code-proposal')
+  @ApiOperation({
+    summary: 'Proposed code for a new entry: ORG- plus the next free number',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async getCodeProposal() {
+    return this.service.proposeCode().then((data) =>
+      ResponseUtils.format({
+        description: 'Code proposed',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // B4
+  @Get('staff')
+  @ApiOperation({
+    summary:
+      'Staff picker for director and delegates: active staff only, at most 20',
+  })
+  @ApiQuery({
+    name: 'search',
+    type: String,
+    required: true,
+    description: 'Name or email fragment, at least 2 characters; otherwise 400',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async searchStaff(@Query() query: SearchStaffQueryDto) {
+    return this.service.searchStaff(query.search).then((data) =>
+      ResponseUtils.format({
+        description: 'Staff found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
   // B2
   @Get('years')
   @ApiOperation({
@@ -112,6 +176,95 @@ export class OrganizationalStructureController {
     return this.readService.getUnitDetail(id).then((data) =>
       ResponseUtils.format({
         description: 'Organizational unit found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // B9
+  @Post('units')
+  @ApiOperation({
+    summary:
+      'Create an entry with its first version (a first year before the current one needs backdate=true)',
+  })
+  @ApiBody({ type: CreateOrgUnitDto })
+  @ApiCreatedResponse({
+    description:
+      'data = the B5 shape (entry, versions, delegates) plus `outcome`: what the save actually did',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            outcome: { $ref: getSchemaPath(OrgSaveOutcomeDto) },
+          },
+        },
+      },
+    },
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async createUnit(@Body() body: CreateOrgUnitDto) {
+    return this.service.create(body).then((data) =>
+      ResponseUtils.format({
+        description: 'Organizational unit created',
+        data,
+        status: HttpStatus.CREATED,
+      }),
+    );
+  }
+
+  // B10
+  @Patch('units/:id')
+  @ApiOperation({
+    summary:
+      'Change an entry: edits a version in place, splits one, back-dates, changes the code and/or replaces the delegates',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Permanent entry id',
+  })
+  @ApiBody({ type: UpdateOrgUnitDto })
+  @ApiOkResponse({
+    description:
+      'data = the B5 shape (entry, versions, delegates) plus `outcome`: what the save actually did',
+    schema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          properties: {
+            outcome: { $ref: getSchemaPath(OrgSaveOutcomeDto) },
+          },
+        },
+      },
+    },
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async updateUnit(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateOrgUnitDto,
+  ) {
+    return this.service.update(id, body).then((data) =>
+      ResponseUtils.format({
+        description: 'Organizational unit updated',
         data,
         status: HttpStatus.OK,
       }),

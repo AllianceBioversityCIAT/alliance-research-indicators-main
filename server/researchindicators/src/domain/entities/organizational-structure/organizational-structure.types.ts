@@ -94,3 +94,26 @@ export interface OrgUnitDetailResponse {
   versions: OrgUnitVersionResponse[];
   delegates: OrgStaffRef[];
 }
+
+/**
+ * What a B9/B10 save actually did (design 4, "B9/B10 response outcome"): the
+ * action the service logged, `null` when nothing was written. When one save
+ * logs a version action together with a code or delegates change, the version
+ * action is reported.
+ */
+export interface OrgSaveOutcome {
+  action:
+    | 'create'
+    | 'edit_in_place'
+    | 'new_version'
+    | 'code_change'
+    | 'delegates_change'
+    | null;
+  appliesFromYear: number | null;
+  backdated: boolean;
+}
+
+/** B9 / B10 `data`: the B5 shape plus `outcome`. */
+export type OrgUnitSaveResponse = OrgUnitDetailResponse & {
+  outcome: OrgSaveOutcome;
+};

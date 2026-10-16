@@ -8,6 +8,8 @@ import { DataTableColumn, DataTableComponent } from '@shared/components/data-tab
 import { OrgTableRow, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { ApiService } from '@shared/services/api.service';
 import { OrgTreeComponent } from './components/org-tree/org-tree.component';
+import { OrgUnitFormComponent, OrgUnitFormPrefill } from './components/org-unit-form/org-unit-form.component';
+import { nextLevelId } from './utils/org-form.util';
 import { ORG_LEVEL_LABELS, OrgLevelCounts, buildOrgTree, countByLevel, toTableRows, visibleRows } from './utils/org-tree.util';
 
 type OrgView = 'tree' | 'table';
@@ -19,7 +21,16 @@ type OrgView = 'tree' | 'table';
 @Component({
   selector: 'app-organizational-structure',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, SelectModule, CustomProgressBarComponent, DataTableComponent, OrgTreeComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ButtonModule,
+    SelectModule,
+    CustomProgressBarComponent,
+    DataTableComponent,
+    OrgTreeComponent,
+    OrgUnitFormComponent
+  ],
   templateUrl: './organizational-structure.component.html',
   styleUrl: './organizational-structure.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -37,8 +48,13 @@ export default class OrganizationalStructureComponent implements OnInit {
   readonly loading = signal(true);
   readonly loadError = signal(false);
   readonly selectedId = signal<number | null>(null);
-  /** *+ New entry* opens an empty form placeholder in the right panel; the form itself is T-02. */
+  /** *+ New entry* (or a row **+**) opens the empty form in the right panel (T-02). */
   readonly creating = signal(false);
+  /** Parent and level a row **+** pre-fills; `null` for the header button. */
+  readonly prefill = signal<OrgUnitFormPrefill | null>(null);
+  /** Bumped on every open and every save so the form is rebuilt from the freshly loaded rows. */
+  readonly formVersion = signal(0);
+  readonly formKey = computed(() => `${this.creating() ? 'new' : this.selectedId()}-${this.formVersion()}`);
 
   // Guards a slow response for a year the admin has already left (same technique as control-lists).
   private loadToken = 0;
@@ -132,11 +148,40 @@ export default class OrganizationalStructureComponent implements OnInit {
   selectUnit(id: number): void {
     this.creating.set(false);
     this.selectedId.set(id);
+    this.formVersion.update(v => v + 1);
   }
 
-  startCreate(): void {
+  startCreate(prefill: OrgUnitFormPrefill | null = null): void {
     this.selectedId.set(null);
+    this.prefill.set(prefill);
     this.creating.set(true);
+    this.formVersion.update(v => v + 1);
+  }
+
+  startCreateChild(parent: OrgYearViewRow): void {
+    this.startCreate({ parentId: parent.id, levelId: nextLevelId(parent.version.levelCode) });
+  }
+
+  closeForm(): void {
+    this.creating.set(false);
+    this.selectedId.set(null);
+  }
+
+  /**
+   * After a save the selectable years can have grown (B2) and the year view has changed (B1): both
+   * are reloaded, the viewed year is kept, and the saved entry is selected when it is still listed.
+   */
+  async onSaved(id: number | null): Promise<void> {
+    try {
+      const years = await this.api.GET_OrgStructureYears();
+      if (years?.successfulRequest !== false && years?.data) this.years.set(years.data);
+    } catch {
+      // The year list keeps its previous range; the rows reload below.
+    }
+    await this.loadUnits();
+    this.creating.set(false);
+    this.selectedId.set(id !== null && this.rows().some(row => row.id === id) ? id : null);
+    this.formVersion.update(v => v + 1);
   }
 
   private async loadUnits(): Promise<void> {

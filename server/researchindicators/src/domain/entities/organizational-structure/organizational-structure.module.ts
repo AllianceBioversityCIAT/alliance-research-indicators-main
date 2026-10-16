@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
 import { OrganizationalStructureController } from './organizational-structure.controller';
+import { OrgStructureService } from './organizational-structure.service';
+import { OrgStructureWriteRepository } from './repositories/org-structure-write.repository';
+import { ControlListsModule } from '../control-lists/control-lists.module';
 import { OrgStructureReadService } from './org-structure-read.service';
 import {
   OrgStructureClock,
@@ -10,15 +13,19 @@ import { OrgUnitVersionRepository } from './repositories/org-unit-version.reposi
 import { OrgUnitDelegateRepository } from './repositories/org-unit-delegate.repository';
 import { OrgUnitChangeLogRepository } from './repositories/org-unit-change-log.repository';
 
-// T-01: the read half. `OrgStructureReadService` is exported and stays a
-// singleton (repositories + clock only, no request-scoped dependency), so a
-// consumer module can inject it without being forced into request scope
-// (design 2.1, "Why two services"). The write service, the usage registry and
-// the control-lists wiring join this module in T-02..T-04.
+// `OrgStructureReadService` is exported and stays a singleton (repositories +
+// clock only, no request-scoped dependency), so a consumer module can inject
+// it without being forced into request scope (design 2.1, "Why two services").
+// T-02 adds the request-scoped write service (save engine, code proposal, staff
+// search); it imports ControlListsModule for `ControlListValueLookupService`
+// (a singleton). The usage registry and the control-lists wiring join in T-04.
 @Module({
+  imports: [ControlListsModule],
   controllers: [OrganizationalStructureController],
   providers: [
     OrgStructureReadService,
+    OrgStructureService,
+    OrgStructureWriteRepository,
     { provide: OrgStructureClock, useClass: SystemOrgStructureClock },
     OrgUnitRepository,
     OrgUnitVersionRepository,

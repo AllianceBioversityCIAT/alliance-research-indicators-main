@@ -15,6 +15,8 @@ import { DataSource } from 'typeorm';
  */
 
 export const ORG_FIXTURE_PREFIX = '__T01_';
+/** T-02 suites create entries through the HTTP write path with this code prefix. */
+export const ORG_T02_PREFIX = '__T02_';
 
 /** Refuse to run against anything that is not the local database. */
 export const assertLocalTestDatabase = (label: string): void => {
@@ -162,8 +164,8 @@ export class OrgFixtures {
         this.unitIds,
       );
       await this.dataSource.query(
-        `DELETE FROM org_units WHERE id IN (${ids}) AND code LIKE ?`,
-        [...this.unitIds, `${ORG_FIXTURE_PREFIX}%`],
+        `DELETE FROM org_units WHERE id IN (${ids}) AND (code LIKE ? OR code LIKE ?)`,
+        [...this.unitIds, `${ORG_FIXTURE_PREFIX}%`, `${ORG_T02_PREFIX}%`],
       );
     }
     if (this.staffCarnets.length > 0) {

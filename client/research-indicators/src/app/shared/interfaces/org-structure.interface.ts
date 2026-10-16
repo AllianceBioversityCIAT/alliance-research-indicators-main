@@ -61,3 +61,58 @@ export interface OrgTableRow {
   status: string;
   since: string;
 }
+
+// @akili-spec institutional-performance/organizational-structure T-02 (client half) — design §4 B3, B4,
+// B9, B10. Write shapes carry staff by `carnet` ONLY: names and emails are never sent (R-ORG-016, 017).
+
+/** B4 row: an ACTIVE staff member (P-14). `isActiveStaff` is only present on already-stored people (B1). */
+export interface OrgStaffOption {
+  carnet: string;
+  name: string | null;
+  email: string | null;
+  isActiveStaff?: boolean;
+}
+
+/** B3 `data`. */
+export interface OrgCodeProposal {
+  code: string;
+}
+
+/** B9 body. `id`, `portfolioId`, director name/email and delegate names/emails are never part of it. */
+export interface OrgUnitCreatePayload {
+  code?: string;
+  levelId: number;
+  name: string;
+  acronym?: string;
+  parentId?: number;
+  directorCarnet?: string;
+  delegateCarnets?: string[];
+  appliesFromYear: number;
+  backdate?: boolean;
+}
+
+/** B10 body: only what changed. `appliesFromYear` is sent only with a versioned-field change. */
+export interface OrgUnitUpdatePayload {
+  code?: string;
+  name?: string;
+  acronym?: string;
+  levelId?: number;
+  parentId?: number | null;
+  directorCarnet?: string | null;
+  delegateCarnets?: string[];
+  appliesFromYear?: number;
+  backdate?: boolean;
+}
+
+/** What the server actually did (design §4 "B9/B10 response `outcome`"); `action: null` = nothing written. */
+export interface OrgSaveOutcome {
+  action: 'create' | 'edit_in_place' | 'new_version' | 'code_change' | 'delegates_change' | null;
+  appliesFromYear: number | null;
+  backdated: boolean;
+}
+
+/** B9 / B10 `data`: `id` reselects the entry; `outcome` drives the success toast. */
+export interface OrgUnitSaved {
+  id: number;
+  outcome?: OrgSaveOutcome;
+}

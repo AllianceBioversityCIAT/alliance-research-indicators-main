@@ -57,6 +57,16 @@
         }
       </td>
       <td>
+        @if (canAddChild(rowData.row)) {
+          <button
+            type="button"
+            class="org-tree-add cursor-pointer"
+            [attr.aria-label]="'Add an entry under ' + rowData.row.version.name"
+            (click)="addChild(rowData.row, $event)"
+            data-testid="org-tree-add">
+            <i class="pi pi-plus atc-light-blue-400 !text-[12px]" aria-hidden="true"></i>
+          </button>
+        }
         @if (endedBadge(rowData.row); as ended) {
           <span class="org-badge org-badge--ended" data-testid="ended-badge">{{ ended }}</span>
         }

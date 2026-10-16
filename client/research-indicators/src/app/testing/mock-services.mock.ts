@@ -550,6 +550,11 @@ export const apiServiceMock = {
   GET_FindContracts: jest.fn().mockImplementation(() => Promise.resolve({ data: [] })),
   GET_OrgStructureYears: jest.fn().mockImplementation(() => Promise.resolve({ data: { min: 2026, max: 2026, current: 2026 }, successfulRequest: true })),
   GET_OrgStructureUnits: jest.fn().mockImplementation(() => Promise.resolve({ data: [], successfulRequest: true })),
+  GET_OrgStructureCodeProposal: jest.fn().mockImplementation(() => Promise.resolve({ data: { code: 'ORG-1' }, successfulRequest: true })),
+  GET_OrgStaff: jest.fn().mockImplementation(() => Promise.resolve({ data: [], successfulRequest: true })),
+  POST_OrgStructureUnit: jest.fn().mockImplementation(() => Promise.resolve({ data: { id: 1 }, successfulRequest: true })),
+  PATCH_OrgStructureUnit: jest.fn().mockImplementation(() => Promise.resolve({ data: { id: 1 }, successfulRequest: true })),
+  GET_ControlListValuesByKey: jest.fn().mockImplementation(() => Promise.resolve({ data: [], successfulRequest: true })),
   GET_OrgStructureUnit: jest.fn().mockImplementation(() => Promise.resolve({ data: null, successfulRequest: true })),
   indicatorTabs: {
     lazy: jest.fn().mockReturnValue({

@@ -1,0 +1,169 @@
+<form class="flex flex-col gap-3" (ngSubmit)="save()" data-testid="org-unit-form" aria-label="Entry details form">
+  <app-input label="Code" [signal]="fields" optionValue="code" [isRequired]="true" [maxLength]="30" data-testid="field-code"></app-input>
+
+  <div class="flex flex-col gap-1">
+    <label for="orgUnitLevel" class="text-sm font-medium atc-grey-800">Level<span class="text-red-500">*</span></label>
+    <p-select
+      inputId="orgUnitLevel"
+      [options]="levels()"
+      optionLabel="label"
+      optionValue="id"
+      [ngModel]="levelId()"
+      [ngModelOptions]="{ standalone: true }"
+      (onChange)="onLevelChange($event.value)"
+      placeholder="Select a level"
+      appendTo="body"
+      fluid
+      data-testid="field-level">
+    </p-select>
+  </div>
+
+  <app-input label="Name" [signal]="fields" optionValue="name" [isRequired]="true" [maxLength]="150" data-testid="field-name"></app-input>
+  <app-input label="Acronym" [signal]="fields" optionValue="acronym" [maxLength]="30" data-testid="field-acronym"></app-input>
+
+  @if (showParent()) {
+    <div class="flex flex-col gap-1" data-testid="field-parent">
+      <label for="orgUnitParent" class="text-sm font-medium atc-grey-800">Parent<span class="text-red-500">*</span></label>
+      <p-select
+        inputId="orgUnitParent"
+        [options]="parentChoices()"
+        optionLabel="label"
+        optionValue="id"
+        [ngModel]="parentId()"
+        [ngModelOptions]="{ standalone: true }"
+        (ngModelChange)="parentId.set($event)"
+        placeholder="Select a parent"
+        [filter]="true"
+        appendTo="body"
+        fluid>
+      </p-select>
+    </div>
+  }
+
+  <div class="flex flex-col gap-1" data-testid="field-director">
+    <label for="orgUnitDirector" class="text-sm font-medium atc-grey-800">Responsible director</label>
+    <p-autoComplete
+      inputId="orgUnitDirector"
+      [ngModel]="director()"
+      [ngModelOptions]="{ standalone: true }"
+      (ngModelChange)="onDirectorChange($event)"
+      [suggestions]="directorSuggestions()"
+      (completeMethod)="searchDirector($event.query)"
+      optionLabel="name"
+      [delay]="300"
+      [minLength]="2"
+      placeholder="Search staff by name, email or ID"
+      appendTo="body"
+      fluid>
+      <ng-template let-person pTemplate="item">
+        <span class="flex flex-col text-[13px]">
+          <span class="atc-grey-900">{{ person.name }}</span>
+          <span class="atc-grey-700">{{ person.email }}</span>
+        </span>
+      </ng-template>
+    </p-autoComplete>
+    @if (director(); as picked) {
+      <input
+        type="text"
+        readonly
+        class="w-full rounded-[8px] border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-3 py-1.5 text-[13px] atc-grey-700"
+        aria-label="Director email (read-only)"
+        [value]="picked.email ?? ''"
+        data-testid="director-email" />
+      @if (picked.isActiveStaff === false) {
+        <span class="org-badge org-badge--ended w-fit" data-testid="director-inactive">Inactive staff</span>
+      }
+    }
+  </div>
+
+  <div class="flex flex-col gap-1" data-testid="field-delegates">
+    <label for="orgUnitDelegates" class="text-sm font-medium atc-grey-800">Delegates (current)</label>
+    <p-autoComplete
+      inputId="orgUnitDelegates"
+      [ngModel]="delegates()"
+      [ngModelOptions]="{ standalone: true }"
+      (ngModelChange)="onDelegatesChange($event)"
+      [suggestions]="delegateSuggestions()"
+      (completeMethod)="searchDelegates($event.query)"
+      optionLabel="name"
+      [multiple]="true"
+      [delay]="300"
+      [minLength]="2"
+      placeholder="Search staff to add"
+      appendTo="body"
+      fluid>
+      <ng-template let-person pTemplate="item">
+        <span class="flex flex-col text-[13px]">
+          <span class="atc-grey-900">{{ person.name }}</span>
+          <span class="atc-grey-700">{{ person.email }}</span>
+        </span>
+      </ng-template>
+      <ng-template let-person pTemplate="selecteditem">
+        <span class="text-[13px]" data-testid="delegate-chip">
+          {{ person.name }}
+          <span class="atc-grey-700" data-testid="delegate-chip-email">{{ person.email }}</span>
+          @if (person.isActiveStaff === false) {
+            <span class="org-badge org-badge--ended" data-testid="delegate-inactive">Inactive staff</span>
+          }
+        </span>
+      </ng-template>
+    </p-autoComplete>
+    <small class="text-[12px] atc-grey-700" data-testid="delegates-hint">
+      Up to {{ maxDelegates }}. Delegates are the current list and are not tied to a year.
+    </small>
+    @if (delegateLimitHit()) {
+      <small class="text-[12px] atc-red-1" role="alert" data-testid="delegates-limit">A unit can have at most {{ maxDelegates }} delegates.</small>
+    }
+  </div>
+
+  @if (showAppliesFrom()) {
+    <fieldset class="m-0 flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] p-3" data-testid="applies-from-group">
+      <legend class="px-1 text-sm font-medium atc-grey-800">Applies from year</legend>
+      <p-select
+        inputId="orgUnitAppliesFrom"
+        [options]="yearOptions()"
+        [ngModel]="appliesFromYear()"
+        [ngModelOptions]="{ standalone: true }"
+        (onChange)="onAppliesFromChange($event.value)"
+        ariaLabel="Applies from year"
+        appendTo="body"
+        data-testid="field-applies-from">
+      </p-select>
+      <label class="flex cursor-pointer items-center gap-2 text-sm atc-grey-800">
+        <input
+          type="checkbox"
+          class="h-4 w-4 cursor-pointer"
+          [checked]="backdate()"
+          (change)="onBackdateChange($any($event.target).checked)"
+          data-testid="field-backdate" />
+        Back-date (apply to a year before {{ range.current }})
+      </label>
+      @if (showBackdateWarning()) {
+        <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="backdate-warning">
+          Back-dating changes how past years look and is recorded in the change log.
+        </p>
+      }
+    </fieldset>
+  }
+
+  <div class="flex justify-end gap-2">
+    <p-button
+      label="Cancel"
+      severity="secondary"
+      size="small"
+      styleClass="!rounded-[9px] !text-[13px]"
+      (onClick)="cancel()"
+      data-testid="cancel-button">
+    </p-button>
+    <p-button
+      label="Save"
+      severity="info"
+      size="small"
+      styleClass="!rounded-[9px] !text-[13px]"
+      [disabled]="!canSave()"
+      [loading]="saving()"
+      (onClick)="save()"
+      data-testid="save-button">
+    </p-button>
+  </div>
+</form>

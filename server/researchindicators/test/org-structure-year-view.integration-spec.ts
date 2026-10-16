@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { OrganizationalStructureController } from '../src/domain/entities/organizational-structure/organizational-structure.controller';
+import { OrgStructureService } from '../src/domain/entities/organizational-structure/organizational-structure.service';
 import { OrgStructureReadService } from '../src/domain/entities/organizational-structure/org-structure-read.service';
 import { OrgStructureClock } from '../src/domain/entities/organizational-structure/org-structure.clock';
 import { isYearCovered } from '../src/domain/entities/organizational-structure/org-version-timeline.util';
@@ -140,6 +141,9 @@ describe('Organizational Structure — year view, years and one entry against re
       controllers: [OrganizationalStructureController],
       providers: [
         OrgStructureReadService,
+        // T-02: the controller also takes the write service; these suites only
+        // call the read handlers, so it gets inert collaborators.
+        { provide: OrgStructureService, useValue: {} },
         { provide: OrgStructureClock, useValue: { currentYear: () => today } },
         {
           provide: OrgUnitRepository,

@@ -7,8 +7,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { DataSource } from 'typeorm';
 import { OrganizationalStructureModule } from '../src/domain/entities/organizational-structure/organizational-structure.module';
+import { ControlListsModule } from '../src/domain/entities/control-lists/control-lists.module';
+import { OrgStructureWriteRepository } from '../src/domain/entities/organizational-structure/repositories/org-structure-write.repository';
 import { OrgStructureReadService } from '../src/domain/entities/organizational-structure/org-structure-read.service';
 import { OrgStructureClock } from '../src/domain/entities/organizational-structure/org-structure.clock';
+import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
 import { route } from '../src/domain/routes/main.routes';
@@ -36,8 +39,14 @@ import { assertLocalTestDatabase } from './support/org-structure-fixtures';
  * of the task covers it on a reduced boot); and `JwtMiddleware` is replaced by
  * a middleware that sets `req.user`. It writes nothing.
  */
+// T-02: the write service injects the request-scoped `CurrentUserUtil` (audit
+// fields), which the real app provides globally and needs an HTTP request; a
+// global stub stands in for it. Everything else is the real module.
 @Global()
-@Module({})
+@Module({
+  providers: [{ provide: CurrentUserUtil, useValue: { user_id: 1 } }],
+  exports: [CurrentUserUtil],
+})
 class NoopGlobalModule {}
 
 describe('Organizational Structure — real module + real route tree on a booted app (T-01)', () => {
@@ -115,6 +124,27 @@ describe('Organizational Structure — real module + real route tree on a booted
       OrganizationalStructureModule,
     );
     expect(exportsMeta).toContain(OrgStructureReadService);
+  });
+
+  it('T-02: the write service and its repository resolve from the real module (imports ControlListsModule)', () => {
+    expect(
+      moduleRef.get(OrgStructureWriteRepository, { strict: false }),
+    ).toBeInstanceOf(OrgStructureWriteRepository);
+    expect(
+      Reflect.getMetadata('imports', OrganizationalStructureModule),
+    ).toContain(ControlListsModule);
+  });
+
+  it('T-02: B3 and B4 are reachable on the real route tree (a bad B4 search is a 400 from the real pipe)', async () => {
+    const proposal = await request(app.getHttpServer()).get(
+      '/api/organizational-structure/units/code-proposal',
+    );
+    expect(proposal.status).toBe(200);
+    expect(proposal.body.data.code).toMatch(/^ORG-\d{3,}$/);
+    const staff = await request(app.getHttpServer()).get(
+      '/api/organizational-structure/staff?search=a',
+    );
+    expect(staff.status).toBe(400);
   });
 
   it('GET /api/organizational-structure/years is reachable and answers from the database', async () => {

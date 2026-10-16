@@ -5,6 +5,7 @@ import { Select } from 'primeng/select';
 import OrganizationalStructureComponent from './organizational-structure.component';
 import { OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
+import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
 import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
 import { row, staff } from '../../../../../../testing/org-structure.fixture';
@@ -41,7 +42,12 @@ const ROWS_2025: OrgYearViewRow[] = [row({ id: 77, code: 'ORG-77', levelCode: 'L
 describe('OrganizationalStructureComponent', () => {
   let fixture: ComponentFixture<OrganizationalStructureComponent>;
   let component: OrganizationalStructureComponent;
-  let api: { GET_OrgStructureYears: jest.Mock; GET_OrgStructureUnits: jest.Mock };
+  let api: {
+    GET_OrgStructureYears: jest.Mock;
+    GET_OrgStructureUnits: jest.Mock;
+    GET_ControlListValuesByKey: jest.Mock;
+    [method: string]: jest.Mock;
+  };
 
   const root = () => fixture.nativeElement as HTMLElement;
   const q = (testId: string) => root().querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
@@ -77,10 +83,18 @@ describe('OrganizationalStructureComponent', () => {
   const codeCells = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(c => c.textContent?.trim());
 
   beforeEach(async () => {
-    api = { GET_OrgStructureYears: jest.fn(), GET_OrgStructureUnits: jest.fn() };
+    api = {
+      GET_OrgStructureYears: jest.fn(),
+      GET_OrgStructureUnits: jest.fn(),
+      GET_OrgStructureCodeProposal: jest.fn().mockResolvedValue(ok({ code: 'ORG-118' })),
+      GET_OrgStaff: jest.fn().mockResolvedValue(ok([])),
+      GET_ControlListValuesByKey: jest.fn().mockResolvedValue(ok([])),
+      POST_OrgStructureUnit: jest.fn().mockResolvedValue(ok({ id: 99 })),
+      PATCH_OrgStructureUnit: jest.fn().mockResolvedValue(ok({ id: 2 }))
+    };
     await TestBed.configureTestingModule({
       imports: [OrganizationalStructureComponent],
-      providers: [provideNoopAnimations(), { provide: ApiService, useValue: api }]
+      providers: [provideNoopAnimations(), { provide: ApiService, useValue: api }, { provide: ActionsService, useValue: { showToast: jest.fn() } }]
     }).compileComponents();
   });
 
@@ -183,7 +197,7 @@ describe('OrganizationalStructureComponent', () => {
 
       innerButton('empty-new-entry-button').click();
       await settle();
-      expect(q('new-entry-placeholder')).toBeTruthy();
+      expect(q('org-unit-form')).toBeTruthy();
     });
 
     it('year empty: the message names the year, in both views', async () => {
@@ -343,13 +357,72 @@ describe('OrganizationalStructureComponent', () => {
       expect(q('selected-summary')?.textContent).toContain('ORG-2');
     });
 
-    it('+ New entry opens the empty form placeholder', async () => {
+    it('+ New entry opens the empty form in the right panel', async () => {
       await create();
 
       innerButton('new-entry-button').click();
       await settle();
 
-      expect(q('new-entry-placeholder')).toBeTruthy();
+      expect(q('org-unit-form')).toBeTruthy();
+    });
+    it('row + pre-fills the parent and the next level, and is hidden on a Unit and on an ended entry (design §6.3)', async () => {
+      const rows = [
+        row({ id: 10, code: 'ORG-10', levelCode: 'L1', name: 'Division Ten' }),
+        row({ id: 2, code: 'ORG-2', levelCode: 'L2', name: 'Data Department', parentId: 10, parentCode: 'ORG-10', parentName: 'Division Ten' }),
+        row({ id: 5, code: 'ORG-5', levelCode: 'L4', name: 'Child Unit', parentId: 2, parentCode: 'ORG-2', parentName: 'Data Department' }),
+        row({ id: 6, code: 'ORG-6', levelCode: 'L2', name: 'Gone Department', parentId: 10, status: 'inactive', statusFromYear: 2026 })
+      ];
+      api.GET_ControlListValuesByKey.mockResolvedValue(
+        ok([
+          { id: 20, value: 'Division' },
+          { id: 21, value: 'Department' },
+          { id: 22, value: 'Office' },
+          { id: 23, value: 'Unit' }
+        ])
+      );
+      await create(RANGE, rows);
+      (root().querySelector('[data-testid="include-ended"]') as HTMLInputElement).click();
+      await settle();
+      const rowFor = (name: string) =>
+        (Array.from(root().querySelectorAll('[data-testid="org-tree-row"]')) as HTMLElement[]).find(r => r.textContent?.includes(name));
+      // Expand the L1 and L2 so the L2 and L4 rows are rendered.
+      const expandAll = async () => {
+        for (let i = 0; i < 3; i++) {
+          (root().querySelectorAll('[data-testid="org-tree-toggle"]') as NodeListOf<HTMLElement>).forEach(t => {
+            if (t.getAttribute('aria-expanded') === 'false' && t.style.visibility !== 'hidden') t.click();
+          });
+          await settle();
+        }
+      };
+      await expandAll();
+
+      expect(rowFor('Child Unit')?.querySelector('[data-testid="org-tree-add"]')).toBeNull();
+      expect(rowFor('Gone Department')?.querySelector('[data-testid="org-tree-add"]')).toBeNull();
+
+      (rowFor('Division Ten')?.querySelector('[data-testid="org-tree-add"]') as HTMLButtonElement).click();
+      await settle();
+
+      expect(q('org-unit-form')).toBeTruthy();
+      expect(component.prefill()).toEqual({ parentId: 10, levelId: 21 });
+      expect(root().textContent).toContain('L2 Department');
+    });
+
+    it('after a save B2 and B1 are reloaded so the new year becomes selectable (T-01 advisory)', async () => {
+      await create(RANGE, ROWS_2026);
+      (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
+      await settle();
+      api.GET_OrgStructureYears.mockResolvedValue(ok({ min: 2025, max: 2028, current: 2026 }));
+      api.GET_OrgStructureYears.mockClear();
+      api.GET_OrgStructureUnits.mockClear();
+
+      await component.onSaved(2);
+      await settle();
+
+      expect(api.GET_OrgStructureYears).toHaveBeenCalledTimes(1);
+      expect(api.GET_OrgStructureUnits).toHaveBeenCalledTimes(1);
+      expect(component.yearOptions()).toEqual([2025, 2026, 2027, 2028]);
+      expect(component.year()).toBe(2026);
+      expect(component.selectedId()).toBe(2);
     });
   });
 });
