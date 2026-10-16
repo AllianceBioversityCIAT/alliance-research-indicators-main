@@ -90,6 +90,15 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
             link: '/administration/center-admin/portfolio-management',
             icon: 'pi-briefcase',
             iconSize: '13px'
+          },
+          // @akili-spec institutional-performance/organizational-structure T-01 — R-ORG-013: its own
+          // flat item right after Portfolio Management (never nested inside it). The link must equal
+          // the route path in app.routes.ts exactly (KZ-017).
+          {
+            label: 'Organizational Structure',
+            link: '/administration/center-admin/organizational-structure',
+            icon: 'pi-sitemap',
+            iconSize: '13px'
           }
         ]
       });

@@ -41,6 +41,7 @@ import { GlobalTarget } from '../interfaces/global-target.interface';
 import { GetResultsByContract } from '../interfaces/get-results-by-contract.interface';
 import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
+import { OrgYearRange, OrgYearViewRow } from '../interfaces/org-structure.interface';
 import {
   ControlList,
   ControlListCategory,
@@ -240,6 +241,21 @@ export class ApiService {
 
   DELETE_Portfolio = (portfolioId: number): Promise<MainResponse<unknown>> => {
     return this.TP.delete(`portfolios/${portfolioId}`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-01 (B1, B2, B5) — read half; no
+  // portfolio parameter anywhere (R-ORG-001).
+  GET_OrgStructureYears = (): Promise<MainResponse<OrgYearRange>> => {
+    return this.TP.get('organizational-structure/years', {});
+  };
+
+  GET_OrgStructureUnits = (year: number, includeEnded: boolean): Promise<MainResponse<OrgYearViewRow[]>> => {
+    const httpParams = new HttpParams().set('year', String(year)).set('includeEnded', String(includeEnded));
+    return this.TP.get('organizational-structure/units', { params: httpParams });
+  };
+
+  GET_OrgStructureUnit = (id: number): Promise<MainResponse<unknown>> => {
+    return this.TP.get(`organizational-structure/units/${id}`, {});
   };
 
   // @akili-spec institutional-performance/control-lists T-01 (A1–A5) — categories only; lists/values follow in T-02/T-03.

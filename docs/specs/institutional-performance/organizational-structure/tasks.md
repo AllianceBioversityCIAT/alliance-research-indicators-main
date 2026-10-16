@@ -2,7 +2,7 @@
 
 - **Module:** institutional-performance — server `domain/entities/organizational-structure/` + client Center admin page
 - **Spec id:** 2026-10-organizational-structure
-- **Status:** not-started
+- **Status:** in-progress (T-01 started 2026-10-16)
 - **Owner:** Hector F. Tobón (requester); implementers assigned by `/akili-execute`
 - **Linked requirements:** [`./requirements.md`](requirements.md)
 - **Linked design:** [`./design.md`](design.md) — approved 2026-10-16 after the RB-3 update
@@ -22,7 +22,7 @@
 > - Tests clean up every row they create, and never touch seeded rows (control lists ids ≤ 23; org units ids ≤ the seed's N, after T-05).
 > - The shared Dev DB is never evidence (root `CLAUDE.md` §4.3).
 
-> **Budget tripwire (design §14).** About 9,700 LOC including tests (delegates included); ≤ 2 review rounds per task. A slice that passes **2,500 LOC**, or a third review round, stops execution and goes to the requester.
+> **Budget tripwire (design §14, re-based 2026-10-16 at T-01).** About **20,000** LOC including tests (was 9,700); ≤ 2 review rounds per task. A slice that passes **4,500 LOC** (was 2,500), or a third review round, stops execution and goes to the requester.
 
 ---
 
@@ -54,7 +54,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-01 — Slice 1: schema, year view, page shell and menu
 
-- **Status:** todo · **Size:** L · **Dependencies:** none
+- **Status:** done (2026-10-16, Reviewer PASS ×2 on attempt 2 — execution.md) · **Size:** L · **Dependencies:** none
 - **Requirements covered:**
   - R-ORG-001 — *No portfolio anywhere*: THEN same structure whatever portfolio is current; **BUT** must NOT show a portfolio selector; AC.1 (no `portfolio_id` column; no read endpoint declares a portfolio parameter). The write half (`portfolioId` → 400) is T-02.
   - R-ORG-004 — AC.1 (unique index on `(org_unit_id, valid_from_year)`). *Three years without change*, read half: the three year views return the same version (the "one row" clause is T-02).
@@ -109,10 +109,10 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `full` — new schema, new routes, shared sidebar.
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] `migration:test:execute` output quoted; `SHOW INDEX` / `SHOW CREATE TABLE` results quoted.
-  - [ ] Server: `npm test -- --silent`, `npm run test:integration -- org-structure`, `npx eslint src/domain/entities/organizational-structure src/db/migrations/1791*`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`.
-  - [ ] Falsifiers 1–6 observed red, then reverted.
-  - [ ] B1, B2, B5 seen in `/swagger` on a local reduced boot (D-EX-4 of the global-scope spec); the observation is quoted.
+  - [x] `migration:test:execute` output quoted; `SHOW INDEX` / `SHOW CREATE TABLE` results quoted. *(execution.md → T-01 verbatim evidence)*
+  - [x] Server: `npm test -- --silent`, `npm run test:integration -- org-structure`, `npx eslint src/domain/entities/organizational-structure src/db/migrations/1791*`, `npm run build`. Client: `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`. *(server full suite: 2 red suites pre-existing, proven on a clean HEAD — execution.md)*
+  - [x] Falsifiers 1–6 observed red, then reverted.
+  - [x] B1, B2, B5 seen in `/swagger` on a local reduced boot (D-EX-4 of the global-scope spec); the observation is quoted.
 
 ### T-02 — Slice 2: save engine, form and staff picker
 
@@ -470,6 +470,7 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | RB-2 | 2026-10-16 | P-14: which staff column means "active" is not documented | T-02 first step: measured query, rule written into design before code; stop if it does not separate current staff from people who left | Leader | open |
 | RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
+| RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main` | Requester | open |
 
 ---
 

@@ -97,6 +97,7 @@ import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 import { BilateralProjectMappingModule } from './bilateral-project-mapping/bilateral-project-mapping.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { ControlListsModule } from './control-lists/control-lists.module';
+import { OrganizationalStructureModule } from './organizational-structure/organizational-structure.module';
 import { StrategicObjectivesModule } from './strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from './impact-outcomes/impact-outcomes.module';
 import { ResultImpactOutcomesModule } from './result-impact-outcomes/result-impact-outcomes.module';
@@ -208,6 +209,7 @@ import { ImpersonationModule } from './impersonation/impersonation.module';
     UsersModule,
     PortfoliosModule,
     ControlListsModule,
+    OrganizationalStructureModule,
     StrategicObjectivesModule,
     ImpactOutcomesModule,
     ResultImpactOutcomesModule,

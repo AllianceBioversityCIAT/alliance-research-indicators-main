@@ -5,6 +5,7 @@ import { EntitiesModule } from './entities.module';
 import { ResultInnovationUseModule } from './result-innovation-use/result-innovation-use.module';
 import { ResultPrmsSyncModule } from './result-prms-sync/result-prms-sync.module';
 import { ControlListsModule } from './control-lists/control-lists.module';
+import { OrganizationalStructureModule } from './organizational-structure/organizational-structure.module';
 import { PrmsWebhookModule } from './prms-webhook/prms-webhook.module';
 
 /**
@@ -152,5 +153,18 @@ describe('EntitiesModule — T-05 boot-order invariant (R-8)', () => {
     expect(resultsAt).toBeGreaterThanOrEqual(0);
     expect(innovUseAt).toBeGreaterThanOrEqual(0);
     expect(resultsAt).toBeLessThan(innovUseAt);
+  });
+});
+
+/**
+ * T-01 (docs/specs/institutional-performance/organizational-structure), KZ-017.
+ * The module-graph half of the registration gate: a route node alone is a
+ * silent 404 when the module is missing from this module's imports.
+ */
+describe('EntitiesModule — organizational-structure registration (T-01)', () => {
+  it('lists OrganizationalStructureModule in its own imports metadata', () => {
+    const imports: unknown[] = Reflect.getMetadata('imports', EntitiesModule);
+
+    expect(imports).toContain(OrganizationalStructureModule);
   });
 });

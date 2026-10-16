@@ -327,6 +327,20 @@ export const routes: Routes = [
           isLoggedIn: true
         }
       },
+      // @akili-spec institutional-performance/organizational-structure T-01 — R-ORG-012/013; path must
+      // match the sidebar link in alliance-sidebar.component.ts exactly (KZ-017).
+      {
+        path: 'administration/center-admin/organizational-structure',
+        loadComponent: () =>
+          import('@platform/pages/administration/center-admin/organizational-structure/organizational-structure.component').then(
+            m => m.default
+          ),
+        canMatch: [centerAdminGuard],
+        data: {
+          title: 'Organizational Structure',
+          isLoggedIn: true
+        }
+      },
       {
         path: 'administration/configuration/prompt-manager',
         loadComponent: () =>

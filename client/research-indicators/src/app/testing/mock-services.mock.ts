@@ -548,6 +548,9 @@ export const apiServiceMock = {
   GET_AllResultStatus: jest.fn(),
   GET_UserStaff: jest.fn().mockImplementation(() => Promise.resolve({ data: [] })),
   GET_FindContracts: jest.fn().mockImplementation(() => Promise.resolve({ data: [] })),
+  GET_OrgStructureYears: jest.fn().mockImplementation(() => Promise.resolve({ data: { min: 2026, max: 2026, current: 2026 }, successfulRequest: true })),
+  GET_OrgStructureUnits: jest.fn().mockImplementation(() => Promise.resolve({ data: [], successfulRequest: true })),
+  GET_OrgStructureUnit: jest.fn().mockImplementation(() => Promise.resolve({ data: null, successfulRequest: true })),
   indicatorTabs: {
     lazy: jest.fn().mockReturnValue({
       isLoading: signal(false),

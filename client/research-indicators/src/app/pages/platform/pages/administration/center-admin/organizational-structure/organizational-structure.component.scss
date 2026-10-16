@@ -1,0 +1,17 @@
+// institutional-performance/organizational-structure — design §6.8 (tokens only, no hex literals).
+:host {
+  display: block;
+  width: 100%;
+}
+
+.view-toggle__button {
+  border: 1px solid var(--ac-grey-200);
+  background: var(--ac-white-1);
+  color: var(--ac-grey-700);
+}
+
+.view-toggle__button--active {
+  background: var(--ac-grey-100);
+  color: var(--ac-primary-blue-600);
+  font-weight: 600;
+}

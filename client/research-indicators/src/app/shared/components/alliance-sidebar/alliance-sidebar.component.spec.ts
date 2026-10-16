@@ -317,6 +317,12 @@ describe('AllianceSidebarComponent', () => {
       link: '/administration/center-admin/portfolio-management',
       icon: 'pi-briefcase',
       iconSize: '13px'
+    },
+    {
+      label: 'Organizational Structure',
+      link: '/administration/center-admin/organizational-structure',
+      icon: 'pi-sitemap',
+      iconSize: '13px'
     }
   ];
 
@@ -355,7 +361,7 @@ describe('AllianceSidebarComponent', () => {
     cache.isSidebarCollapsed.mockReturnValue(collapsed);
   };
 
-  it('lists exactly the four center-admin children, flat, with no Control Lists and no nested children', () => {
+  it('lists exactly the five center-admin children, flat, with no Control Lists and no nested children', () => {
     grantBothAdminGroups();
 
     const centerAdmin = component.administrationGroups().find(group => group.id === 'center-admin');

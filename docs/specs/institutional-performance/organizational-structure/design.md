@@ -113,7 +113,7 @@ Client: `DataTable` (F-7) + `natural-compare` + `xlsx-export`, `ApiService` + `M
 
 ## 3. Data model
 
-All four tables: `utf8mb4`, collation `utf8mb4_unicode_ci` declared explicitly (case-insensitive unique code — control-lists P-4). No `portfolio_id` anywhere (R-ORG-001).
+All four tables: `utf8mb4`, collation `utf8mb4_unicode_ci` declared explicitly (case-insensitive unique code — control-lists P-4). No `portfolio_id` anywhere (R-ORG-001). **Exception (D-ORG-16):** the two staff-reference columns (`org_unit_versions.director_carnet`, `org_unit_delegates.staff_carnet`) take the character set **and** collation of `alliance_user_staff.carnet`, read at migration time — a string FK needs both to match, and that column is `utf8mb3` on Dev (baseline dump) but `utf8mb4_0900_ai_ci` locally.
 
 ### 3.1 Tables
 
@@ -164,7 +164,7 @@ Admin = `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`. Consumer = any authenticated user 
 
 | # | Method + path | Roles | Input | Response `data` | Errors |
 | --- | --- | --- | --- | --- | --- |
-| B1 | `GET /units?year=&includeEnded=` | Admin | `year` default current; `includeEnded` default false | `YearViewRow[]`: id, code, status, statusFromYear, version (from, to, name, acronym, levelId, levelCode, parentId, parentCode, parentName, director {carnet, name, email, isActiveStaff}), `delegates` {carnet, name, email, isActiveStaff}[] (current), `scheduledFromYear` (next version start after `year`, if any) | 400 year out of range |
+| B1 | `GET /units?year=&includeEnded=` | Admin | `year` default current; `includeEnded` default false | `YearViewRow[]`: id, code, status, statusFromYear, version (from, to, name, acronym, levelId, levelCode — derived from `levelId` via `ORG_LEVEL_BY_ID`, `null` outside 20–23 (D-ORG-4), levelName — the list value's editable display name, parentId, parentCode, parentName, director {carnet, name, email, isActiveStaff}), `delegates` {carnet, name, email, isActiveStaff}[] (current), `scheduledFromYear` (next version start after `year`, if any) | 400 year out of range |
 | B2 | `GET /years` | Admin | — | `{ min, max, current }` for the selector (R-ORG-006) | — |
 | B3 | `GET /units/code-proposal` | Admin | — | `{ code: 'ORG-118' }` (§5.6) | — |
 | B4 | `GET /staff?search=` | Admin | `search` ≥ 2 chars | `{carnet, name, email}[]`, active staff only, max 20 (D-ORG-8) | 400 short search |
@@ -341,6 +341,7 @@ Same mapping as Control Lists (control-lists design §6.4): `--ac-primary-blue-6
 | D-ORG-15 | 2026-10-16 | Delegates as one current list per entry in `org_unit_delegates` (entry + `carnet`, RESTRICT to staff), not versioned; history only in the log; no permissions granted here | Requester, 2026-10-16: not versioned, director excluded, record only. A child table keeps the FK to staff per person (a JSON column could not hold one) | Delegates inside each version (rejected by the requester); a JSON array of carnets |
 | D-ORG-14 | 2026-10-16 | Seed SQL in `src/db/seeds/org-structure.seed.ts`; the migration imports it and exports only its class | `orm.config.ts` loads every exported function under `migrations/**` as a migration and rejects names without a 13-digit timestamp, so a `seed…` export breaks every `migration:*` command (global-scope D-CLG-11, `control-lists.seed.ts:7-12`) | Exporting the seed from the migration file |
 | D-ORG-13 | 2026-10-08 | Physical delete allowed for an entry whose first year is the current year or later (not only future ones); logical end year must be after the first year | Otherwise an entry created by mistake this year could not be removed at all; it was never in a past year view, and the log keeps the record (found while building the mockup) | Physical delete only for future entries |
+| D-ORG-16 | 2026-10-16 | Staff-reference columns inherit `alliance_user_staff.carnet`'s character set and collation (read from `information_schema` in the migration, whitelisted); every other column keeps `utf8mb4_unicode_ci` | MySQL requires the same charset and collation on both sides of a string FK; the staff table is `utf8mb3` on Dev (`baseline.sql:3`, `:928-946`) and `utf8mb4` locally, so a fixed value breaks one of them. Raised by T-01 review (Reviewer A, issue 1). **Measured 2026-10-16 (MySQL 8.4.11, local probe schema with the Dev DDL):** the attempt-1 form (`COLLATE` only) did **not** fail — MySQL inferred `CHARACTER SET utf8mb3` from the collation; the explicit `CHARACTER SET … COLLATE …` form also runs up and down there. Kept for explicitness; the predicted Dev failure is **not demonstrated**, and the Dev server's MySQL version was not measured (RB-5). **Requester to acknowledge at the T-01 gate** | Hard-coding either collation; converting `alliance_user_staff` (shared table, out of scope) |
 
 **Reversion challenge (Step 2.3):** not triggered (re-checked for D-ORG-15: it adds a field) — no decision removes, disables or inverts shipped behavior. The one Control Lists change turns a would-be `500` into `409` (re-checked 2026-10-16: dropping D-ORG-3 removes planned work, not shipped behavior).
 
@@ -370,12 +371,14 @@ Same mapping as Control Lists (control-lists design §6.4): `--ac-primary-blue-6
 | Measure | Estimate |
 | --- | --- |
 | Tasks | 6: five vertical slices (read model + page; save engine + form; lifecycle + history; consumers + Control Lists wiring + linked data; seed) and one manual HITL check |
-| LOC (incl. tests) | **~9,700** with delegates (server ~5,900, client ~3,800); ~9,000 before them. Re-based on Control Lists actuals (estimated 2,250, delivered ~13,500, mostly tests): this module has fewer CRUD surfaces but a harder engine |
+| LOC (incl. tests) | **~20,000** (re-based 2026-10-16 at T-01, see below; was ~9,700) with delegates (server ~5,900, client ~3,800); ~9,000 before them. Re-based on Control Lists actuals (estimated 2,250, delivered ~13,500, mostly tests): this module has fewer CRUD surfaces but a harder engine |
 | Review rounds | ≤ 2 per task; ≤ 12 in total |
 
-The estimate matches **Full** depth. One PR per slice (5 PRs + HITL), each 1,200–2,500 lines with tests.
+The estimate matches **Full** depth. One PR per slice (5 PRs + HITL), each up to ~4,500 lines with tests (re-based 2026-10-16; was 1,200–2,500).
 
 **Re-checked 2026-10-16 (RB-3):** dropping D-ORG-3 removes ~150 LOC from Control Lists; the client by-key method adds ~40. Net unchanged at ~9,000. **Delegates (D-ORG-15):** +1 migration, +1 entity, validation in the save path, multi-select in the form, one column — about **+700 LOC** with tests, so **~9,700**; still 6 tasks and Full depth. Second data point: `control-lists-global-scope` delivered ≈ 8,360 against a 2,950 budget (2.8×, mostly tests), and Control Lists 6×. This estimate already includes tests at that ratio. If a slice passes **2,500 LOC**, the Leader stops at the tripwire and reports.
+
+**Re-based 2026-10-16 at the T-01 tripwire (requester decision):** slice 1 measured **4,427 LOC** (2,498 tests / 1,929 prod; `git diff --numstat`, new files intent-added) against the 2,500 tripwire. New figures: **slice tripwire ~4,500 LOC**, whole-spec estimate **~20,000 LOC** incl. tests; review-round cap unchanged (≤ 2). Record: `execution.md` → *Budget Tripwire: T-01*.
 
 ## 15. Open questions
 

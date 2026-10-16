@@ -1,0 +1,167 @@
+<div class="app-page-wrapper pt-3">
+  <div class="flex w-full flex-col gap-[18px]">
+    <div class="content-section w-full">
+      <section class="flex w-full min-w-0 flex-col gap-[18px]">
+        <div class="flex flex-wrap items-start justify-between gap-4" data-testid="page-header">
+          <div class="flex flex-col gap-[2px]">
+            <h1 class="m-0 font-['Barlow'] text-[17px] font-bold leading-normal atc-primary-blue-600">Organizational Structure</h1>
+            <p class="m-0 max-w-3xl font-['Barlow'] text-[14px] leading-[1.2] atc-grey-700">
+              One Alliance structure in four levels: Division, Department, Office (optional) and Unit. Each entry keeps a permanent ID, and the
+              structure year shows how it looked in that year.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-3">
+            <div class="flex flex-col gap-1">
+              <label for="orgStructureYear" class="text-sm font-medium atc-grey-800">Structure year</label>
+              <p-select
+                inputId="orgStructureYear"
+                [options]="yearOptions()"
+                [ngModel]="year()"
+                (onChange)="onYearChange($event.value)"
+                [disabled]="years() === null"
+                styleClass="min-w-[120px]"
+                aria-label="Structure year"
+                data-testid="year-select">
+              </p-select>
+            </div>
+
+            <div class="flex items-center gap-2" role="group" aria-label="View" data-testid="view-toggle">
+              <button
+                type="button"
+                class="view-toggle__button cursor-pointer rounded-[9px] px-3 py-1.5 text-[13px]"
+                [class.view-toggle__button--active]="view() === 'tree'"
+                [attr.aria-pressed]="view() === 'tree'"
+                (click)="setView('tree')"
+                data-testid="view-tree">
+                Tree
+              </button>
+              <button
+                type="button"
+                class="view-toggle__button cursor-pointer rounded-[9px] px-3 py-1.5 text-[13px]"
+                [class.view-toggle__button--active]="view() === 'table'"
+                [attr.aria-pressed]="view() === 'table'"
+                (click)="setView('table')"
+                data-testid="view-table">
+                Table
+              </button>
+            </div>
+
+            <label class="flex cursor-pointer items-center gap-2 text-sm atc-grey-800">
+              <input
+                type="checkbox"
+                class="h-4 w-4 cursor-pointer"
+                [checked]="includeEnded()"
+                (change)="onIncludeEndedChange($any($event.target).checked)"
+                data-testid="include-ended" />
+              Show inactive / deleted
+            </label>
+
+            <p-button
+              label="New entry"
+              icon="pi pi-plus !text-[12px]"
+              severity="info"
+              size="small"
+              styleClass="!rounded-[9px] !max-h-[27px] !text-[13px]"
+              [style]="{ 'min-width': '120px' }"
+              (onClick)="startCreate()"
+              data-testid="new-entry-button">
+            </p-button>
+          </div>
+        </div>
+
+        @if (!loadError() && shownRows().length > 0) {
+          <ul class="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="Entries per level" data-testid="count-chips">
+            <li class="rounded-full bg-[var(--ac-grey-100)] px-3 py-1 text-[13px] atc-grey-800" data-testid="chip-L1">{{ counts().L1 }} Divisions</li>
+            <li class="rounded-full bg-[var(--ac-grey-100)] px-3 py-1 text-[13px] atc-grey-800" data-testid="chip-L2">
+              {{ counts().L2 }} Departments
+            </li>
+            <li class="rounded-full bg-[var(--ac-grey-100)] px-3 py-1 text-[13px] atc-grey-800" data-testid="chip-L3">{{ counts().L3 }} Offices</li>
+            <li class="rounded-full bg-[var(--ac-grey-100)] px-3 py-1 text-[13px] atc-grey-800" data-testid="chip-L4">{{ counts().L4 }} Units</li>
+          </ul>
+        }
+
+        <div class="flex min-h-[320px] w-full gap-4">
+          <div class="flex min-w-0 basis-[60%] flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="structure-panel">
+            @if (loading()) {
+              <app-custom-progress-bar></app-custom-progress-bar>
+            }
+
+            @if (loadError()) {
+              <div class="flex flex-col items-center justify-center gap-2 p-8" data-testid="error-state" role="alert">
+                <p class="m-0 text-sm atc-red-1">We could not load the organizational structure. Please try again.</p>
+                <p-button
+                  label="Retry"
+                  icon="pi pi-refresh !text-[12px]"
+                  severity="secondary"
+                  size="small"
+                  styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="load()"
+                  data-testid="retry-button">
+                </p-button>
+              </div>
+            } @else if (!loading() && moduleEmpty()) {
+              <div class="flex flex-col items-center justify-center gap-3 p-10" data-testid="empty-state">
+                <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                <p class="m-0 text-sm atc-grey-700">No entries yet.</p>
+                <p-button
+                  label="New entry"
+                  icon="pi pi-plus !text-[12px]"
+                  severity="info"
+                  size="small"
+                  styleClass="!rounded-[9px] !text-[13px]"
+                  (onClick)="startCreate()"
+                  data-testid="empty-new-entry-button">
+                </p-button>
+              </div>
+            } @else if (!loading() && yearEmpty()) {
+              <div class="flex flex-col items-center justify-center gap-2 p-10" data-testid="empty-year-state">
+                <i class="pi pi-inbox !text-[28px] atc-grey-700" aria-hidden="true"></i>
+                <p class="m-0 text-sm atc-grey-700">No entries in {{ year() }}.</p>
+              </div>
+            } @else if (!loading()) {
+              @if (view() === 'tree') {
+                <app-org-tree
+                  [nodes]="treeNodes()"
+                  [year]="year() ?? 0"
+                  [selectedId]="selectedId()"
+                  (unitSelected)="selectUnit($event)"
+                  data-testid="tree-view"></app-org-tree>
+              } @else {
+                <app-data-table
+                  [columns]="tableColumns"
+                  [rows]="tableRows()"
+                  [loading]="false"
+                  [searchFields]="tableSearchFields"
+                  [exportFileName]="tableExportFileName()"
+                  searchPlaceholder="Search code, name, acronym, director or delegates"
+                  emptyMessage="No entries found."
+                  data-testid="table-view">
+                </app-data-table>
+              }
+            }
+          </div>
+
+          <aside
+            class="flex min-w-0 basis-[40%] flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white p-4"
+            aria-label="Entry details"
+            data-testid="detail-panel">
+            @if (creating()) {
+              <p class="m-0 text-sm atc-grey-700" data-testid="new-entry-placeholder">The new entry form will be available here soon.</p>
+            } @else {
+              @if (selectedRow(); as selected) {
+                <div class="flex flex-col gap-1" data-testid="selected-summary">
+                  <span class="font-mono text-[12.5px] atc-light-blue-400">{{ selected.code }}</span>
+                  <span class="text-[15px] font-semibold atc-primary-blue-600">{{ selected.version.name }}</span>
+                  <span class="text-[13px] atc-grey-700">{{ selected.version.levelCode }} {{ levelLabels[selected.version.levelCode] }}</span>
+                </div>
+              } @else {
+                <p class="m-0 text-sm atc-grey-700" data-testid="detail-empty">Select an entry to see its details.</p>
+              }
+            }
+          </aside>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

@@ -8,6 +8,7 @@ import { routes } from './app.routes';
 import { CacheService } from '@services/cache/cache.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
+import { centerAdminGuard } from '@guards/center-admin.guard';
 
 /** Recursively finds a route declaration by its own `path`, independent of nesting depth. */
 function findRouteByPath(routeList: Routes, path: string): Route | undefined {
@@ -146,5 +147,68 @@ describe('app.routes — control-lists route (System admin)', () => {
     await expect(navigateWithRoles([SYSTEM_ADMIN], '/administration/center-admin/control-lists')).resolves.not.toBe(
       '/administration/center-admin/control-lists'
     );
+  });
+});
+
+/**
+ * institutional-performance/organizational-structure T-01 (R-ORG-012 AC.2, R-ORG-013, KZ-017).
+ * The new Center admin item is its own route under the `path: ''` shell. The sidebar link is a
+ * literal string, so the route table is asserted directly AND the router is asked to resolve that
+ * exact link — a link that compiles can still 404 (NG04002). The guard runs against a REAL
+ * `RolesService` fed with role data, never a boolean stand-in.
+ */
+describe('app.routes — organizational-structure route (Center admin)', () => {
+  const SIDEBAR_LINK = '/administration/center-admin/organizational-structure';
+
+  type RoleEntry = { role_id: number; role?: { focus_id?: number; sec_role_id?: number } };
+
+  const navigateWithRoles = async (roleList: RoleEntry[], url: string) => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(routes),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideLocationMocks(),
+        {
+          provide: CacheService,
+          useValue: {
+            isLoggedIn: signal(true),
+            isValidatingToken: signal(false),
+            dataCache: signal({ user: { user_role_list: roleList } })
+          }
+        },
+        { provide: CreateResultManagementService, useValue: { editingOicr: () => false } }
+      ]
+    });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl(url).catch(() => undefined);
+    return router.url;
+  };
+
+  const SYSTEM_ADMIN: RoleEntry = { role_id: 1 };
+  const CENTER_ADMIN: RoleEntry = { role_id: 9, role: { focus_id: 1, sec_role_id: 9 } };
+  const CONTRIBUTOR_ONLY: RoleEntry = { role_id: 2 };
+
+  it('declares canMatch: [centerAdminGuard] on administration/center-admin/organizational-structure', () => {
+    const route = findRouteByPath(routes, 'administration/center-admin/organizational-structure');
+    expect(route).toBeTruthy();
+    expect(route?.canMatch).toEqual([centerAdminGuard]);
+  });
+
+  it('keeps the sidebar link equal to the declared route path', () => {
+    expect(SIDEBAR_LINK).toBe(`/${findRouteByPath(routes, 'administration/center-admin/organizational-structure')?.path}`);
+  });
+
+  it('admits a Center Admin (role 9) to the exact path the sidebar link resolves to', async () => {
+    await expect(navigateWithRoles([CENTER_ADMIN], SIDEBAR_LINK)).resolves.toBe(SIDEBAR_LINK);
+  });
+
+  it('admits a System Admin (role 1)', async () => {
+    await expect(navigateWithRoles([SYSTEM_ADMIN], SIDEBAR_LINK)).resolves.toBe(SIDEBAR_LINK);
+  });
+
+  it('closes the route to a Contributor-only user (sent to /home)', async () => {
+    await expect(navigateWithRoles([CONTRIBUTOR_ONLY], SIDEBAR_LINK)).resolves.toBe('/home');
   });
 });

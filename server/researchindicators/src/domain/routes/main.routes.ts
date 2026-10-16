@@ -74,6 +74,7 @@ import { PRMS_CALLBACK_PATH } from '../shared/utils/prms-callback.constants';
 import { RESULT_CODE } from '../shared/utils/results.util';
 import { PortfoliosModule } from '../entities/portfolios/portfolios.module';
 import { ControlListsModule } from '../entities/control-lists/control-lists.module';
+import { OrganizationalStructureModule } from '../entities/organizational-structure/organizational-structure.module';
 import { StrategicObjectivesModule } from '../entities/strategic-objectives/strategic-objectives.module';
 import { ImpactOutcomesModule } from '../entities/impact-outcomes/impact-outcomes.module';
 import { PiDelegatesModule } from '../entities/pi-delegates/pi-delegates.module';
@@ -268,6 +269,10 @@ const children: Routes = [
   {
     path: 'control-lists',
     module: ControlListsModule,
+  },
+  {
+    path: 'organizational-structure',
+    module: OrganizationalStructureModule,
   },
   {
     path: 'configuration',

@@ -1,0 +1,69 @@
+<p-treeTable [value]="nodes" styleClass="p-treetable-gridlines table-custom-styles" data-testid="org-tree" aria-label="Organizational structure tree">
+  <ng-template pTemplate="header">
+    <tr>
+      <th class="text-[13px] font-medium atc-grey-800">Name</th>
+      <th class="text-[13px] font-medium atc-grey-800">Code</th>
+      <th class="text-[13px] font-medium atc-grey-800">Level</th>
+      <th class="text-[13px] font-medium atc-grey-800">Responsible director</th>
+      <th class="text-[13px] font-medium atc-grey-800">Status</th>
+    </tr>
+  </ng-template>
+
+  <ng-template pTemplate="body" let-rowNode let-rowData="rowData">
+    <tr
+      [ttRow]="rowNode"
+      class="org-tree-row cursor-pointer"
+      [class.org-tree-row--selected]="rowData.row.id === selectedId"
+      [class.org-tree-row--ended]="rowData.ended"
+      (click)="select(rowData.row)"
+      (keydown.enter)="select(rowData.row)"
+      data-testid="org-tree-row">
+      <td>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="p-treetable-toggler org-tree-toggle"
+            tabindex="-1"
+            [style.margin-left.px]="rowNode.level * 16"
+            [style.visibility]="hasChildren(rowNode.node) ? 'visible' : 'hidden'"
+            [attr.aria-hidden]="hasChildren(rowNode.node) ? null : 'true'"
+            [attr.aria-label]="expanderLabel(rowNode.node)"
+            [attr.aria-expanded]="rowNode.node.expanded ? 'true' : 'false'"
+            (click)="toggle(rowNode, $event)"
+            data-testid="org-tree-toggle">
+            <i class="pi atc-grey-700" [ngClass]="rowNode.node.expanded ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true"></i>
+          </button>
+          <span class="text-[13.5px] atc-grey-900" data-testid="org-tree-name"
+            >{{ rowData.row.version.name }}
+            @if (rowData.row.version.acronym) {
+              <span class="atc-grey-700">({{ rowData.row.version.acronym }})</span>
+            }
+          </span>
+          @if (rowData.unitCount > 0) {
+            <span class="text-[12px] atc-grey-700" data-testid="org-tree-count">{{ rowData.unitCount }} units</span>
+          }
+        </div>
+      </td>
+      <td>
+        <span class="font-mono text-[12.5px] atc-light-blue-400">{{ rowData.row.code }}</span>
+      </td>
+      <td class="text-[13px] atc-grey-900">{{ rowData.row.version.levelCode }} {{ levelLabel(rowData.row) }}</td>
+      <td class="text-[13px] atc-grey-900">
+        @if (rowData.row.version.director; as director) {
+          {{ director.name ?? director.carnet }}
+          @if (!director.isActiveStaff) {
+            <span class="org-badge org-badge--ended" data-testid="inactive-staff-badge">Inactive staff</span>
+          }
+        }
+      </td>
+      <td>
+        @if (endedBadge(rowData.row); as ended) {
+          <span class="org-badge org-badge--ended" data-testid="ended-badge">{{ ended }}</span>
+        }
+        @if (scheduledBadge(rowData.row); as scheduled) {
+          <span class="org-badge org-badge--scheduled" data-testid="scheduled-badge">{{ scheduled }}</span>
+        }
+      </td>
+    </tr>
+  </ng-template>
+</p-treeTable>
