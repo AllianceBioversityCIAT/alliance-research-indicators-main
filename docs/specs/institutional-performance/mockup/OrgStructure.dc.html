@@ -139,12 +139,12 @@ a{color:#035BA9}a:hover{color:#074B86}
 <sc-if value="{{isTable}}" hint-placeholder-val="{{false}}">
 <div style="padding: 10px 12px 0">
 <label for="org-search" style="position: absolute; left: -9999px">Find an entry</label>
-<input id="org-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name, acronym or director" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
+<input id="org-search" type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Find by code, name, acronym, director or delegate" style="width: 380px; height: 28px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; box-sizing: border-box">
 </div>
 <div style="flex-grow: 1; min-height: 0; overflow: auto; margin: 10px 12px 0; border: 1px solid #E8EBED; border-radius: 6px">
 <table style="width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px">
 <thead><tr>
-<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="9">
+<sc-for list="{{t.headers}}" as="h" hint-placeholder-count="10">
 <th scope="col" aria-sort="{{h.aria}}" style="width: {{h.w}}px; resize: horizontal; overflow: hidden; background: #F4F7F9; border-bottom: 1px solid #E8EBED; border-right: 1px solid #E8EBED; padding: 0; text-align: left; position: sticky; top: 0">
 <button type="button" onClick="{{h.sort}}" style="width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; padding: 9px 10px; font-family: Barlow, sans-serif; font-size: 13px; font-weight: 600; color: #112F5C; cursor: pointer; text-align: left">{{h.label}}<span style="font-size: 11px; color: {{h.iconColor}}">{{h.icon}}</span></button>
 </th>
@@ -160,6 +160,7 @@ a{color:#035BA9}a:hover{color:#074B86}
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.acr}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.parentName}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dir}}</td>
+<td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.dels}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">{{r.status}}</td>
 <td style="padding: 8px 10px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">{{r.from}}</td>
 </tr>
@@ -254,6 +255,32 @@ a{color:#035BA9}a:hover{color:#074B86}
 </sc-if>
 <sc-if value="{{f.dirNoHits}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B7079">No active staff match “{{f.dirQ}}”.</span></sc-if>
 </sc-if>
+<sc-if value="{{f.hasDirErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.dirErr}}</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px; grid-column: span 2">
+<label for="o-dels" style="font-size: 12.5px; font-weight: 600; color: #112F5C">Delegates <span style="font-weight: 400; color: #6B7079">· current list, not tied to a year · Alliance staff (Agresso)</span></label>
+<sc-if value="{{f.hasDels}}" hint-placeholder-val="{{true}}">
+<ul aria-label="Delegates" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid #B9C0C5; border-radius: 8px">
+<sc-for list="{{f.dels}}" as="d" hint-placeholder-count="2">
+<li style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #EEF0F2">
+<div style="display: flex; flex-direction: column; min-width: 0"><span style="font-size: 13px; color: #112F5C; font-weight: 600">{{d.name}}<sc-if value="{{d.inactive}}" hint-placeholder-val="{{false}}"><span style="font-size: 10px; font-weight: 600; color: #4C5158; background: #E8EBED; border-radius: 5px; padding: 0 5px; margin-left: 6px">Inactive staff</span></sc-if></span><span style="font-size: 12px; color: #6B7079">{{d.email}} · ID {{d.carnet}}</span></div>
+<button type="button" onClick="{{d.remove}}" disabled="{{f.locked}}" aria-label="{{d.removeLabel}}" style="height: 26px; border: 1px solid #B9C0C5; background: #ffffff; color: #112F5C; border-radius: 7px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 12px; cursor: pointer">Remove</button>
+</li>
+</sc-for>
+</ul>
+</sc-if>
+<sc-if value="{{f.noDels}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B7079">No delegates yet.</span></sc-if>
+<input id="o-dels" type="search" value="{{f.delQ}}" onChange="{{on.delQ}}" disabled="{{f.delDisabled}}" placeholder="{{f.delPh}}" style="height: 32px; border: 1px solid #B9C0C5; border-radius: 8px; padding: 0 10px; font-family: Barlow, sans-serif; font-size: 13px; box-sizing: border-box">
+<sc-if value="{{f.hasDelHits}}" hint-placeholder-val="{{false}}">
+<div role="listbox" aria-label="Staff matches for delegates" style="display: flex; flex-direction: column; border: 1px solid #E8EBED; border-radius: 8px">
+<sc-for list="{{f.delHits}}" as="h" hint-placeholder-count="3">
+<button type="button" role="option" onClick="{{h.pick}}" style="border: 0; border-bottom: 1px solid #EEF0F2; background: #ffffff; padding: 7px 10px; text-align: left; cursor: pointer; font-family: Barlow, sans-serif; display: flex; justify-content: space-between; gap: 10px"><span style="font-size: 13px; color: #112F5C">{{h.name}}</span><span style="font-size: 12px; color: #6B7079">{{h.email}}</span></button>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{f.delNoHits}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #6B7079">No active staff match “{{f.delQ}}” (the director and current delegates are not offered).</span></sc-if>
+<sc-if value="{{f.hasDelErr}}" hint-placeholder-val="{{false}}"><span style="font-size: 11.5px; color: #B00020; font-weight: 600">{{f.delErr}}</span></sc-if>
+<span style="font-size: 12px; color: #6B7079; line-height: 1.4">Every year view shows this same list; earlier lists stay in the change log. Up to 20 people. The director cannot be a delegate. Delegates get no permissions yet.</span>
 </div>
 </div>
 <sc-if value="{{f.showYear}}" hint-placeholder-val="{{false}}">
@@ -381,8 +408,11 @@ const STAFF = [
   { carnet: 'A0110', name: 'Maya Rajasekharan', email: 'm.rajasekharan@cgiar.org', active: true },
   { carnet: 'A0111', name: 'Juan Lucas Restrepo', email: 'j.l.restrepo@cgiar.org', active: true },
   { carnet: 'A0112', name: 'Ana Pérez', email: 'a.perez@cgiar.org', active: true },
-  { carnet: 'A0113', name: 'Luis Gómez', email: 'l.gomez@cgiar.org', active: true }
+  { carnet: 'A0113', name: 'Luis Gómez', email: 'l.gomez@cgiar.org', active: true },
+  { carnet: 'A0114', name: 'Marta Ruiz', email: 'm.ruiz@cgiar.org', active: true }
 ];
+const MAX_DELS = 20;
+function names(list) { return list.length ? list.map(c => staff(c) ? staff(c).name : c).join(', ') : 'none'; }
 function U(names) { return names.map(n => ({ name: n, level: 'L4' })); }
 const TREE = [
   { id: 'research', name: 'Research', level: 'L1', kids: [
@@ -426,7 +456,7 @@ function seed() {
   (function walk(list, parent) {
     list.forEach(n => {
       const id = n.id || ('e' + k);
-      E[id] = { id: id, pid: 'OU-' + pad(k), code: 'ORG-' + pad(k), status: 'active', endYear: null, succ: '',
+      E[id] = { id: id, pid: 'OU-' + pad(k), code: 'ORG-' + pad(k), status: 'active', endYear: null, succ: '', dels: [],
         versions: [{ from: FIRST, to: null, name: n.name, acr: n.acr || '', parent: parent, dir: n.dir || '', level: n.level }],
         log: [{ when: '2026-01-15 09:00', who: 'System seed', title: 'Created as ' + SHORT[n.level] + ' (seed)', lines: [{ t: 'Applies from ' + FIRST }] }] };
       k++; ids.push(id);
@@ -440,6 +470,10 @@ function seed() {
   ca.log.unshift({ when: '2027-01-08 10:12', who: 'Hector Tobón', title: 'Deleted from 2027', lines: [{ t: 'Still shown in 2026 and earlier' }] });
   const fl = E.flar; fl.versions[0].to = 2027; fl.status = 'inactive'; fl.endYear = 2027; fl.succ = 'rice';
   fl.log.unshift({ when: '2027-01-08 10:20', who: 'Hector Tobón', title: 'Inactivated from 2027', lines: [{ t: 'Successor: Rice' }] });
+  // Delegates: one current list per entry, not versioned (R-ORG-017).
+  E.bof.dels = ['A0112', 'A0113'];
+  E.treasury.dels = ['A0114', 'A0103'];
+  E.treasury.log.unshift({ when: '2027-02-20 09:30', who: 'Hector Tobón', title: 'Delegates changed (current list)', lines: [{ t: 'Delegates: Luis Gómez → Marta Ruiz, Franck Erick Kalla' }] });
   const di = E.digital; di.versions = [Object.assign({}, di.versions[0], { to: 2028 }), Object.assign({}, di.versions[0], { from: 2028, to: null, name: 'Digital Inclusion and AI' })];
   di.log.unshift({ when: '2027-02-02 16:40', who: 'Hector Tobón', title: 'New version from 2028', lines: [{ t: 'Renamed: “Digital Inclusion” → “Digital Inclusion and AI”' }] });
   return { E: E, ids: ids, next: k };
@@ -450,7 +484,7 @@ class Component extends DCLogic {
     super(props);
     const s = seed();
     this.state = { E: s.E, ids: s.ids, next: s.next, year: CUR, view: 'tree', open: { global: true, bof: true, research: true }, sel: 'treasury', mode: 'edit', createParent: '',
-      draft: {}, applies: CUR, backdate: false, dirQ: '', errors: {}, tab: 'details', dlg: null, toast: '', showEnded: false, q: '', sort: 'code', dir: 1, size: 25, page: 0 };
+      draft: {}, delDraft: null, delQ: '', applies: CUR, backdate: false, dirQ: '', errors: {}, tab: 'details', dlg: null, toast: '', showEnded: false, q: '', sort: 'code', dir: 1, size: 25, page: 0 };
   }
   ver(e, y) { return e.versions.find(v => v.from <= y && (v.to == null || v.to > y)) || null; }
   last(e) { return e.versions[e.versions.length - 1]; }
@@ -474,8 +508,11 @@ class Component extends DCLogic {
   }
   val(k) { const d = this.state.draft; if (d[k] !== undefined) return d[k]; const b = this.base(); return b ? b[k] : ''; }
   set(k, v) { const d = Object.assign({}, this.state.draft); d[k] = v; this.setState({ draft: d, errors: {}, toast: '' }); }
-  pick(id) { this.setState({ sel: id, mode: 'edit', draft: {}, errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '' }); }
-  startCreate(pid) { const o = Object.assign({}, this.state.open); if (pid) o[pid] = true; this.setState({ mode: 'create', createParent: pid, draft: {}, errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '', open: o }); }
+  dels() { const s = this.state; if (s.delDraft) return s.delDraft; const e = s.mode === 'edit' ? s.E[s.sel] : null; return e ? e.dels : []; }
+  delsChanged() { const s = this.state; if (!s.delDraft) return false; const e = s.mode === 'edit' ? s.E[s.sel] : null; const o = e ? e.dels : []; return o.join('|') !== s.delDraft.join('|'); }
+  setDels(list) { this.setState({ delDraft: list, delQ: '', errors: {}, toast: '' }); }
+  pick(id) { this.setState({ sel: id, mode: 'edit', draft: {}, delDraft: null, delQ: '', errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '' }); }
+  startCreate(pid) { const o = Object.assign({}, this.state.open); if (pid) o[pid] = true; this.setState({ mode: 'create', createParent: pid, draft: {}, delDraft: null, delQ: '', errors: {}, applies: Math.max(CUR, this.state.year), backdate: false, dirQ: '', tab: 'details', toast: '', open: o }); }
   changedKeys() { const b = this.base(); if (!b) return []; return VKEYS.filter(k => this.state.draft[k] !== undefined && this.state.draft[k] !== b[k]); }
   stamp() { return '2027-03-10 11:' + String(10 + (this.state.next % 40)).padStart(2, '0'); }
   save() {
@@ -493,22 +530,29 @@ class Component extends DCLogic {
     const e0 = s.mode === 'edit' ? s.E[s.sel] : null;
     if (Y < CUR && !s.backdate) errors.year = 'Tick Back-date to apply from a year before ' + CUR;
     if (e0 && changed.length && Y < e0.versions[0].from) errors.year = 'The entry starts in ' + e0.versions[0].from;
+    const dl = this.dels();
+    const dirsAhead = (e0 ? e0.versions.filter(x => x.to == null || x.to > CUR).map(x => x.dir) : []).concat([v.dir]).filter(Boolean);
+    const clash = dl.find(c => dirsAhead.indexOf(c) >= 0);
+    if (clash) { if (s.draft.dir !== undefined && s.draft.dir === clash) errors.dir = staff(clash).name + ' is a delegate of this entry. Remove them from Delegates first.'; else errors.dels = staff(clash).name + ' is the director of this entry, so they cannot be a delegate.'; }
+    if (dl.length > MAX_DELS) errors.dels = 'Up to ' + MAX_DELS + ' delegates.';
     if (Object.keys(errors).length) { this.setState({ errors: errors }); return; }
     const E = Object.assign({}, s.E);
     const rec = { name: v.name.trim(), acr: v.acr, parent: v.parent, dir: v.dir, level: v.level };
     const dname = rec.dir ? staff(rec.dir).name : '—';
     if (s.mode === 'create') {
       const id = 'n' + s.next;
-      E[id] = { id: id, pid: 'OU-' + pad(s.next), code: v.code.trim(), status: 'active', endYear: null, succ: '', versions: [Object.assign({ from: Y, to: null }, rec)],
-        log: [{ when: this.stamp(), who: 'You', title: 'Created as ' + SHORT[rec.level] + (s.backdate && Y < CUR ? ' (back-dated)' : ''), lines: [{ t: 'Applies from ' + Y }, { t: 'Director: ' + dname }] }] };
+      E[id] = { id: id, pid: 'OU-' + pad(s.next), code: v.code.trim(), status: 'active', endYear: null, succ: '', dels: dl.slice(), versions: [Object.assign({ from: Y, to: null }, rec)],
+        log: [{ when: this.stamp(), who: 'You', title: 'Created as ' + SHORT[rec.level] + (s.backdate && Y < CUR ? ' (back-dated)' : ''), lines: [{ t: 'Applies from ' + Y }, { t: 'Director: ' + dname }, { t: 'Delegates: ' + names(dl) }] }] };
       const o = Object.assign({}, s.open); if (v.parent) o[v.parent] = true;
-      this.setState({ E: E, ids: s.ids.concat([id]), next: s.next + 1, sel: id, mode: 'edit', draft: {}, open: o, year: Math.max(s.year, Y), toast: '“' + rec.name + '” created, applies from ' + Y + '.' });
+      this.setState({ E: E, ids: s.ids.concat([id]), next: s.next + 1, sel: id, mode: 'edit', draft: {}, delDraft: null, open: o, year: Math.max(s.year, Y), toast: '“' + rec.name + '” created, applies from ' + Y + '.' });
       return;
     }
     const e = Object.assign({}, e0, { code: v.code.trim(), log: e0.log.slice() });
     let msg = 'Code saved.';
     const lines = [];
     if (e0.code !== e.code) lines.push({ t: 'Code: ' + e0.code + ' → ' + e.code + ' (all years)' });
+    const dch = this.delsChanged();
+    if (dch) { e.dels = dl.slice(); lines.push({ t: 'Delegates (current list): ' + names(e0.dels) + ' → ' + names(dl) }); }
     if (changed.length) {
       const vs = e0.versions.map(x => Object.assign({}, x));
       let idx = vs.findIndex(x => x.from === Y); let kind = 'in place';
@@ -529,9 +573,13 @@ class Component extends DCLogic {
       msg = kind === 'in place' ? 'Updated the version that starts in ' + Y + ' — no new version.' : 'New version from ' + Y + '. ' + (Y - 1) + ' and earlier keep the previous values.';
       if (changed.indexOf('parent') >= 0) msg += ' Its records count under the new parent from ' + Y + '.';
       if (back) msg += ' Back-dated: reports from ' + Y + ' are recalculated.';
-    } else if (lines.length) e.log.unshift({ when: this.stamp(), who: 'You', title: 'Code changed', lines: lines });
+      if (dch) msg += ' Delegates saved (current list, all years).';
+    } else if (lines.length) {
+      e.log.unshift({ when: this.stamp(), who: 'You', title: dch ? (e0.code !== e.code ? 'Code and delegates changed' : 'Delegates changed (current list)') : 'Code changed', lines: lines });
+      if (dch) msg = 'Delegates saved. They apply to every year: no version was created.';
+    }
     E[s.sel] = e;
-    this.setState({ E: E, draft: {}, errors: {}, backdate: false, toast: msg });
+    this.setState({ E: E, draft: {}, delDraft: null, delQ: '', errors: {}, backdate: false, toast: msg });
   }
   doLife(kind) {
     const s = this.state; const e = s.E[s.sel]; const Y = Number(s.dlg.year); const E = Object.assign({}, s.E);
@@ -583,11 +631,11 @@ class Component extends DCLogic {
 
     const q = s.q.trim().toLowerCase();
     let flat = s.ids.map(i => s.E[i]).filter(e => this.disp(e, y)).map(e => { const v = this.disp(e, y); const pe = s.E[v.parent]; const pv = pe ? (this.ver(pe, y) || this.last(pe)) : null; const st = staff(v.dir); const ended = !this.alive(e, y);
-      return { id: e.id, pid: e.pid, code: e.code, level: v.level, levelLabel: LEVELS[v.level], name: v.name, acr: v.acr, parentName: pv ? (pe.code + ' · ' + pv.name) : '—', dir: st ? st.name + (st.active ? '' : ' (inactive staff)') : '', status: ended ? (e.status === 'deleted' ? 'Deleted' : 'Inactive') + ' from ' + e.endYear : 'Active', from: v.from + (v.to ? '–' + (v.to - 1) : ' →') }; })
-      .filter(r => !q || (r.code + ' ' + r.name + ' ' + r.acr + ' ' + r.dir).toLowerCase().indexOf(q) >= 0);
+      return { id: e.id, pid: e.pid, code: e.code, level: v.level, levelLabel: LEVELS[v.level], name: v.name, acr: v.acr, parentName: pv ? (pe.code + ' · ' + pv.name) : '—', dir: st ? st.name + (st.active ? '' : ' (inactive staff)') : '', dels: e.dels.map(c => staff(c).name).join('; '), status: ended ? (e.status === 'deleted' ? 'Deleted' : 'Inactive') + ' from ' + e.endYear : 'Active', from: v.from + (v.to ? '–' + (v.to - 1) : ' →') }; })
+      .filter(r => !q || (r.code + ' ' + r.name + ' ' + r.acr + ' ' + r.dir + ' ' + r.dels).toLowerCase().indexOf(q) >= 0);
     flat.sort((a, b) => cmp(a[s.sort], b[s.sort]) * s.dir);
     const pc = Math.max(1, Math.ceil(flat.length / s.size)); const page = Math.min(s.page, pc - 1); const start = page * s.size;
-    const COLS = [['pid', 'ID', 80], ['code', 'Code', 95], ['level', 'Level', 140], ['name', 'Name', 240], ['acr', 'Acronym', 95], ['parentName', 'Parent', 220], ['dir', 'Director', 160], ['status', 'Status', 140], ['from', 'Since', 95]];
+    const COLS = [['pid', 'ID', 80], ['code', 'Code', 95], ['level', 'Level', 140], ['name', 'Name', 240], ['acr', 'Acronym', 95], ['parentName', 'Parent', 220], ['dir', 'Director', 160], ['dels', 'Delegates', 190], ['status', 'Status', 140], ['from', 'Since', 95]];
     const t = { headers: COLS.map(c => { const on = s.sort === c[0]; return { label: c[1], w: c[2], icon: on ? (s.dir === 1 ? '▲' : '▼') : '↕', iconColor: on ? '#035BA9' : '#A2A9AF', aria: on ? (s.dir === 1 ? 'ascending' : 'descending') : 'none', sort: () => this.setState({ sort: c[0], dir: on ? -s.dir : 1, page: 0 }) }; }),
       rows: flat.slice(start, start + s.size).map(r => Object.assign({}, r, { bg: s.mode === 'edit' && s.sel === r.id ? '#E3ECF6' : '#ffffff', pick: () => this.pick(r.id) })),
       pages: Array.from({ length: pc }, (x, i) => ({ n: i + 1, aria: 'Page ' + (i + 1), bg: i === page ? '#035BA9' : '#ffffff', fg: i === page ? '#ffffff' : '#112F5C', go: () => this.setState({ page: i }) })),
@@ -600,13 +648,18 @@ class Component extends DCLogic {
     const changed = this.changedKeys();
     const dirC = this.val('dir'); const dSt = staff(dirC); const dq = s.dirQ.trim().toLowerCase();
     const hits = dq.length >= 2 ? STAFF.filter(x => x.active && (x.name + ' ' + x.email).toLowerCase().indexOf(dq) >= 0).slice(0, 6).map(x => ({ name: x.name, email: x.email, pick: () => { const d = Object.assign({}, this.state.draft); d.dir = x.carnet; this.setState({ draft: d, dirQ: '' }); } })) : [];
+    const dl = this.dels(); const lq = s.delQ.trim().toLowerCase();
+    const delHits = lq.length >= 2 ? STAFF.filter(x => x.active && x.carnet !== dirC && dl.indexOf(x.carnet) < 0 && (x.name + ' ' + x.email).toLowerCase().indexOf(lq) >= 0).slice(0, 6).map(x => ({ name: x.name, email: x.email, pick: () => this.setDels(this.dels().concat([x.carnet])) })) : [];
     const minY = s.backdate ? FIRST : CUR;
     const covering = e ? e.versions.find(x => x.from === Y) : null;
     const f = hasForm ? { code: this.val('code'), level: lvl, name: this.val('name'), acr: this.val('acr'), parent: this.val('parent'), locked: locked,
       parents: parents, parentLabel: need.length ? 'Parent *' : 'Parent', parentEmpty: need.length ? 'Select a ' + need.map(l => SHORT[l]).join(' or ') + ' active in ' + Y : 'None — Divisions are top level', parentDisabled: !need.length || locked, parentBg: need.length ? '#ffffff' : '#F4F7F9',
       codeErr: s.errors.code || '', hasCodeErr: !!s.errors.code, codeBorder: s.errors.code ? '#B00020' : '#B9C0C5', hasNameErr: !!s.errors.name, nameBorder: s.errors.name ? '#B00020' : '#B9C0C5',
       parentErr: s.errors.parent || '', hasParentErr: !!s.errors.parent, parentBorder: s.errors.parent ? '#B00020' : '#B9C0C5',
-      dir: dirC, hasDir: !!dSt, noDir: !dSt, dirName: dSt ? dSt.name : '', dirEmail: dSt ? dSt.email : '', dirInactive: !!dSt && !dSt.active, dirQ: s.dirQ, dirHits: hits, hasDirHits: hits.length > 0, dirNoHits: dq.length >= 2 && !hits.length,
+      dir: dirC, hasDir: !!dSt, noDir: !dSt, dirName: dSt ? dSt.name : '', dirEmail: dSt ? dSt.email : '', dirInactive: !!dSt && !dSt.active, dirQ: s.dirQ, dirHits: hits, hasDirHits: hits.length > 0, dirNoHits: dq.length >= 2 && !hits.length, dirErr: s.errors.dir || '', hasDirErr: !!s.errors.dir,
+      dels: dl.map(c => { const st = staff(c); return { carnet: c, name: st.name, email: st.email, inactive: !st.active, removeLabel: 'Remove ' + st.name + ' from delegates', remove: () => this.setDels(this.dels().filter(x => x !== c)) }; }),
+      hasDels: dl.length > 0, noDels: dl.length === 0, delQ: s.delQ, delHits: delHits, hasDelHits: delHits.length > 0, delNoHits: lq.length >= 2 && !delHits.length,
+      delDisabled: locked || dl.length >= MAX_DELS, delPh: dl.length >= MAX_DELS ? 'Limit of ' + MAX_DELS + ' delegates reached' : 'Add a delegate: search staff by name or email (2+ letters)', delErr: s.errors.dels || '', hasDelErr: !!s.errors.dels,
       showYear: !locked && (s.mode === 'create' || changed.length > 0), yearStr: String(Y), yearOpts: yearsFrom(minY).map(x => ({ v: String(x), l: String(x) + (x === CUR ? ' (current)' : '') })),
       yearHint: s.mode === 'create' ? 'The entry exists from ' + Y + '. Earlier years will not show it.' : (covering ? 'A version already starts in ' + Y + ': it is updated in place (use this to fix typos).' : 'A new version starts in ' + Y + '. ' + (Y - 1) + ' and earlier keep the current values.' + (changed.indexOf('parent') >= 0 ? ' Linked records count under the new parent from ' + Y + '.' : '')),
       backdate: !!s.backdate, yearErr: s.errors.year || '', hasYearErr: !!s.errors.year, yearBorder: s.errors.year ? '#B00020' : '#B9C0C5' } : {};
@@ -671,10 +724,10 @@ class Component extends DCLogic {
       versions: versions, log: e ? e.log : [], linked: linked,
       f: f,
       on: { code: (ev) => this.set('code', ev.target.value), level: (ev) => this.set('level', ev.target.value), name: (ev) => this.set('name', ev.target.value), acr: (ev) => this.set('acr', ev.target.value),
-        parent: (ev) => this.set('parent', ev.target.value), dirQ: (ev) => this.setState({ dirQ: ev.target.value }), clearDir: () => this.set('dir', ''),
+        parent: (ev) => this.set('parent', ev.target.value), dirQ: (ev) => this.setState({ dirQ: ev.target.value }), clearDir: () => this.set('dir', ''), delQ: (ev) => this.setState({ delQ: ev.target.value }),
         year: (ev) => this.setState({ applies: Number(ev.target.value), errors: {} }), backdate: () => { const nb = !this.state.backdate; this.setState({ backdate: nb, applies: nb ? this.state.applies : Math.max(CUR, this.state.applies), errors: {} }); } },
       hasToast: !!s.toast, toast: s.toast,
-      save: () => this.save(), cancel: () => this.setState({ mode: 'edit', draft: {}, errors: {}, dirQ: '', toast: '' }),
+      save: () => this.save(), cancel: () => this.setState({ mode: 'edit', draft: {}, delDraft: null, delQ: '', errors: {}, dirQ: '', toast: '' }),
       askDelete: () => this.setState({ dlg: { kind: 'delete', year: CUR, backdate: false, err: '' } }), askLife: () => this.setState({ dlg: { kind: e && e.status === 'inactive' ? 'reactivate' : 'inactivate', year: Math.max(CUR, e && e.endYear ? e.endYear : CUR), succ: '', backdate: false, err: '' } }),
       hasConfirm: !!s.dlg, c: c, closeConfirm: () => this.setState({ dlg: null })
     };

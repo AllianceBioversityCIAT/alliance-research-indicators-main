@@ -36,7 +36,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 | 3.5 | The structure must not be scoped to a portfolio. It is one tree that lives across portfolios. | requester, 2026-10-08 |
 | 3.6 | Even after units are deleted or inactivated, it must be possible to know which ones were active in a past period (e.g. one year ago). | requester, 2026-10-08 |
 | 3.7 | Versioning per **year** is enough; day and time are more detail than needed. | requester, 2026-10-08 |
-| 3.8 | The `org.level` control list is portfolio-scoped today (`portfolio_id` NOT NULL, seeded under Portfolio 2, value ids 20–23). | `server/…/db/migrations/1790900000001-createControlLists.ts:34,94`; `1790900000002-createControlListValues.ts:142-148` |
+| 3.8 | The `org.level` control list is portfolio-scoped today (`portfolio_id` NOT NULL, seeded under Portfolio 2, value ids 20–23). **Superseded 2026-10-13:** `changes/control-lists-global-scope` made every list global and read by key; ids 20–23 kept (RB-3). | `server/…/db/migrations/1790900000001-createControlLists.ts:34,94`; `1790900000002-createControlListValues.ts:142-148` |
 
 ## 4. Proposed Outcome
 
@@ -119,7 +119,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 
 | # | Open question | Recommendation |
 | --- | --- | --- |
-| **Q-1** | The tree is global but `org.level` is a Portfolio 2 control list (fact 3.8). Which list does it read? | Store the level as the **control-list value's permanent ID** (ids 20–23 are fixed across environments) and treat that one `org.level` list as the source regardless of portfolio. Promote it to a global list when global control lists are decided (F-2). No schema change in `control-lists` now |
+| **Q-1** | The tree is global but `org.level` is a Portfolio 2 control list (fact 3.8). Which list does it read? | Store the level as the **control-list value's permanent ID** (ids 20–23 are fixed across environments) and treat that one `org.level` list as the source regardless of portfolio. Promote it to a global list when global control lists are decided (F-2). No schema change in `control-lists` now. **Closed 2026-10-13:** lists became global (`changes/control-lists-global-scope`), so the check is `assertValueInList(valueId, 'org.level')` with no workaround |
 | **Q-2** | Which year decides the structure for a linked record (e.g. a result)? | The record's reporting year. The mapping module confirms the exact field |
 | **Q-3** | Should this page still show the *Manages institutional KPIs* flag? | Read-only, for a portfolio chosen in a side panel, only once `institutional-indicators` exists. Until then, not shown |
 | **Q-4** | When a unit is inactivated with a successor, should the successor's KPI history also show the predecessor's years? | Yes as an optional *Include predecessors* view, following the successor chain; stored values are never moved. Decide in `institutional-indicators` |

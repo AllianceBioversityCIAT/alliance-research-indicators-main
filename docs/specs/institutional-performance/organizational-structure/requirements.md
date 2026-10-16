@@ -2,16 +2,16 @@
 
 - **Module:** institutional-performance — server + client
 - **Spec id:** 2026-10-organizational-structure
-- **Status:** draft
+- **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate)
 - **Depth:** **Full** — new module with temporal (per-year) data, an append-only log, cross-module contracts (control lists in, future consumers out), migrations + seed. A wrong year resolution corrupts every later report silently
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Parent spec:** [`../family.md`](../family.md) — child 2 of 5. Shared rules **F-1, F-3 … F-9** apply and are cited, not restated. **F-2 does not apply** (family exception, 2026-10-08)
-- **Depends on:** `institutional-performance/control-lists` — `done`, archived at [`../../archive/2026-10-08-institutional-performance--control-lists/`](../../archive/2026-10-08-institutional-performance--control-lists/)
+- **Depends on:** `institutional-performance/control-lists` — `done`, archived at [`../../archive/2026-10-08-institutional-performance--control-lists/`](../../archive/2026-10-08-institutional-performance--control-lists/) · `changes/control-lists-global-scope` — `done`, archived at [`../../archive/2026-10-15-changes--control-lists-global-scope/`](../../archive/2026-10-15-changes--control-lists-global-scope/) (its RB-3 follow-up is applied here)
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — Center Admin tools
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-08 with Q-1…Q-4 as recommended; this spec stays aligned with it
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
+- **Last updated:** 2026-10-16 — requester: delegates per entry from Agresso staff, one current list, not versioned (R-ORG-017). Also 2026-10-16 — RB-3 of `changes/control-lists-global-scope`: `org.level` is global and read by key (C-3, C-4, R-ORG-011, §11). Previous: 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
 
 ---
 
@@ -41,6 +41,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 | **Successor** | The entry that takes over an inactivated entry (used for merges) |
 | **Change log** | Append-only record of every write: who, when (timestamp), what, the year it applies from, old → new values |
 | **Director** | The responsible person, chosen from the Alliance staff table synced from Agresso (`alliance_user_staff`) and stored by staff ID (`carnet`). Name and email are read from that table, never typed |
+| **Delegate** | A staff member who acts for the director of an entry. Chosen from the same staff table and stored by `carnet`. One current list per entry, not versioned (R-ORG-017) |
 | **Associated information** | Records in other modules that store an entry's ID and are registered with this module (none at ship time) |
 | **Admin** | A user who passes F-1: Center Admin or System Admin |
 
@@ -50,13 +51,13 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 | --- | --- | --- |
 | C-1 | The structure exists only in a PDF and a sheet with no IDs and no dates. | proposal fact 3.1 |
 | C-2 | The org chart changes often: renames, moves, creations, removals. | proposal fact 3.2 |
-| C-3 | The `org.level` control list (L1 Division, L2 Department, L3 Office, L4 Unit; value ids 20–23) exists, belongs to Portfolio 2, and has no consumer yet. | `server/…/db/migrations/1790900000001-createControlLists.ts:94`; `1790900000002-createControlListValues.ts:142-148`; control-lists archive §9 F-4 |
-| C-4 | Control Lists ships the nested *Portfolio Management* menu group, the shared `DataTable` (F-7) and the consumer contract (usage registry, `assertValueInList`). | control-lists archive §5 (R-CTL-005, 006, 008, 009) |
+| C-3 | The `org.level` control list (L1 Division, L2 Department, L3 Office, L4 Unit; value ids 20–23) exists, is **global** (no portfolio, read by its key since 2026-10-13), and has no consumer yet. | `server/…/db/seeds/control-lists.seed.ts:319-350`; global-scope archive §5 R-CLG-001, R-CLG-004; control-lists archive §9 F-4 |
+| C-4 | Control Lists ships the shared `DataTable` (F-7) and the consumer contract (usage registry, `assertValueInList(valueId, listKey)`, the open read `GET /api/control-lists/by-key/:listKey/values`). Its page now sits under *System admin*; *Portfolio Management* is again a single *Center admin* item with no children. | control-lists archive §5 (R-CTL-005, 006, 009); global-scope archive §5 (R-CLG-004, R-CLG-008); `alliance-sidebar.component.ts:88-93,120` |
 | C-5 | Center admin pages are guarded by `centerAdminGuard`; server admin handlers use `@Roles` + `RolesGuard`, and `SYSTEM_ADMIN` bypasses. | control-lists requirements C-3, C-4 |
 
 **Affected surface (what renders on the route):** the shared sidebar (one new *Center admin* item), the new page, the shared `DataTable`, the shared modal host (one new modal name), the control-lists usage registry (one new consumer).
 
-**In scope:** entries, per-year versions, back-dating, year views, inactivate/reactivate with successor, logical delete, change log, read contract for consumers, the `org.level` consumer wiring carried over from Control Lists (F-4 of its archive), the page, seed data.
+**In scope:** entries, per-year versions, back-dating, year views, inactivate/reactivate with successor, logical delete, delegates per entry, change log, read contract for consumers, the `org.level` consumer wiring carried over from Control Lists (F-4 of its archive), the page, seed data.
 
 **Not changing:** existing Center admin items and pages; Control Lists behavior (only a consumer is registered); existing tables; any portfolio data.
 
@@ -322,7 +323,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - **As an** Admin or auditor **I want** every change recorded **so that** I can see who changed what and when, even inside a year.
 
 **Details**
-- Every write — create, in-place edit, new version, back-date, inactivate, reactivate, delete (logical or physical) — appends one log entry with: entry ID, action, user, timestamp, *Applies from year*, back-date flag, and old → new values of each changed field.
+- Every write — create, in-place edit, new version, back-date, delegates change, inactivate, reactivate, delete (logical or physical) — appends one log entry with: entry ID, action, user, timestamp, *Applies from year*, back-date flag, and old → new values of each changed field.
 - The log is **append-only**: there is no endpoint to edit or delete it, and it survives a physical delete of its entry.
 - The form's **History** tab shows the entry's versions (one row per year range) and its log, newest first.
 
@@ -342,7 +343,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 **Details**
 - A consumer stores the entry's permanent ID and nothing else from it.
 - The module exposes (to other server modules, and as an authenticated read endpoint):
-  - **resolve(ids, year)** → for each ID, the version covering that year (name, acronym, level, parent ID, director staff ID with name and email) and its status that year;
+  - **resolve(ids, year)** → for each ID, the version covering that year (name, acronym, level, parent ID, director staff ID with name and email), its status that year, and its **current** delegates (staff ID, name, email — R-ORG-017);
   - **ancestors(id, year)** → the chain up to L1 as of that year (for roll-ups by department or division);
   - **successor chain(id)** → successors in order (for an optional *include predecessors* view, Q-4);
   - **existence check(id)** → for consumers to validate before storing an ID.
@@ -369,7 +370,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - add a database FK from the stored level to the control-list value with `ON DELETE RESTRICT`;
 - call `assertValueInList` before every write that stores a level;
 - a value delete blocked by that FK returns `409`, not `500` (map the FK error on the Control Lists delete path).
-- The `org.level` list is read **regardless of portfolio** (Q-1): this module uses the value's permanent ID and the list it belongs to, not a portfolio.
+- The `org.level` list is global (`changes/control-lists-global-scope`, R-CLG-004): the check is `assertValueInList(valueId, 'org.level')` with no portfolio, and the form reads the values by key. Q-1 is closed.
 
 #### Scenario: Level in use
 - GIVEN 94 entries use level value `L4 Unit`
@@ -404,17 +405,17 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - **As an** Admin **I want** a page that shows the structure as a tree and as a table for a chosen year **so that** I can maintain it and check it quickly.
 
 **Details**
-- Menu: *Organizational Structure* is its own item in *Center admin*, **outside** Portfolio Management, after the Portfolio Management group (F-3 as amended 2026-10-13). Existing items do not change.
+- Menu: *Organizational Structure* is its own item in *Center admin*, **outside** Portfolio Management, right after the *Portfolio Management* item (F-3 as amended 2026-10-13). Existing items do not change.
 - Header: title, description, **Structure year** selector, **+ New entry**, view toggle **Tree / Table**, filter *Show inactive / deleted*.
 - **Tree:** divisions › departments › offices › units, expand/collapse on container rows, the entry's code, name, acronym, director, status and *scheduled* badge.
 - **Table:** R-ORG-014.
-- **Form** (modal or side panel): Code*, Level*, Name*, Acronym, Parent*, Responsible director (staff search, R-ORG-016; its email shown read-only), **Applies from year***, **Back-date** checkbox with its warning. Actions: only **Cancel**, **Save** and, in edit mode, **Delete** (F-4); *Inactivate* / *Reactivate* sit next to Delete. Tabs: **Details**, **History** (R-ORG-009), **Linked data** (counts per registered consumer, or *No linked data yet*).
+- **Form** (modal or side panel): Code*, Level*, Name*, Acronym, Parent*, Responsible director (staff search, R-ORG-016; its email shown read-only), **Delegates (current)** (multi-select staff search, R-ORG-017; not tied to *Applies from year*), **Applies from year***, **Back-date** checkbox with its warning. Actions: only **Cancel**, **Save** and, in edit mode, **Delete** (F-4); *Inactivate* / *Reactivate* sit next to Delete. Tabs: **Details**, **History** (R-ORG-009), **Linked data** (counts per registered consumer, or *No linked data yet*).
 - Parent picker offers only entries of an allowed level that are active in *Applies from year*.
 - UI states: **loading** (progress bar), **empty** (no entries: call to action *+ New entry*; no entries in the chosen year: message naming the year), **error** (inline message, retry), **success** (toast after each save, inactivate, reactivate or delete).
 
 #### Scenario: Menu placement
 - GIVEN an Admin expands *Center admin*
-- THEN *Organizational Structure* appears as a *Center admin* item after the *Portfolio Management* group, not indented under it
+- THEN *Organizational Structure* appears as a *Center admin* item right after *Portfolio Management*, at the same indent
 - BUT it must NOT change the order, label or link of any existing item
 
 #### Scenario: Empty module
@@ -434,7 +435,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 **Details**
 - Reuse the shared `DataTable` from Control Lists: rows per page 10/25/50/100, resizable columns, sort with indicator, **default sort by code ascending, natural order** (`ORG-2` before `ORG-10`), search over code, name, acronym and director, **Export .xlsx** of the filtered and sorted rows for the chosen year. The file name includes the year.
-- Columns: ID · Code · Level · Name · Acronym · Parent (code + name, as of the year) · Director · Status · Since (year of the version shown).
+- Columns: ID · Code · Level · Name · Acronym · Parent (code + name, as of the year) · Director · Delegates (current, names) · Status · Since (year of the version shown).
 
 #### Scenario: Export of a past year
 - GIVEN the year selector is on 2026 and the search is `data`
@@ -452,6 +453,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 **Details**
 - 3 divisions · 19 departments/regions · 1 office · 94 units from Master Monitoring Framework sheet *04. ORG structure*; DT = Technology Integration; the three units with no parent in the sheet are placed under the parent they appear with. Every entry has one version `[2026, open)`. Seeded entries carry fixed IDs, so they are the same in every environment.
 - Directors are matched to `alliance_user_staff` by email, else by exact first + last name. With no single match the director stays empty and the entry is listed in a seed report for the requester to complete.
+- No delegates are seeded; the requester adds them after review.
 - The seed is idempotent and logged as one *seed* entry per entry in the change log.
 - The module also works with no entries (R-ORG-013 *Empty module*).
 
@@ -495,6 +497,50 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - [ ] AC.2 — Unknown staff ID → `400`; director name or email in the body → `400`.
 - [ ] AC.3 — Past versions keep their director after the staff row changes.
 
+### R-ORG-017 — Delegates from Agresso staff
+
+- **As an** Admin **I want** to record a list of delegates for each entry, besides its director **so that** the people who act for the director are known and can later be given edit rights (requester, 2026-10-16).
+
+**Details**
+- Delegates are chosen from `alliance_user_staff`, like the director (R-ORG-016). The entry stores staff IDs (`carnet`) only. Name and email are read from the staff table whenever the entry is shown or exported.
+- **One current list per entry, not versioned per year** (requester, 2026-10-16). A change applies immediately and needs no *Applies from year*. Every year view shows the entry's current delegates, and the UI labels them *current*. Earlier lists are kept only in the change log (R-ORG-009).
+- The list is optional, holds at most 20 people, and has no duplicates.
+- **The director cannot be a delegate of the same entry.** A save fails with `400` when a delegate is the director of the version covering the current year or of any later version. The rule holds in both directions: adding the director as a delegate fails (naming `delegates`), and so does making a delegate the director (naming `director`).
+- The picker offers only active staff. A delegate who later becomes inactive stays in the list with the *Inactive staff* mark. An unknown staff ID or an inactive one being newly added fails with `400` naming `delegates`. Write bodies accept only staff IDs; names or emails for delegates are rejected (`400`).
+- A write sends the **whole list** (replace). Omitted = unchanged; empty = cleared.
+- Delegates grant **no permission** in this spec. Consumers read them through `resolve` (R-ORG-010); `institutional-indicators` decides what they may do.
+- A deleted entry rejects delegate changes (`409`), like any other write. An inactive entry accepts them.
+
+#### Scenario: Add delegates
+- GIVEN active staff *Luis Gómez* (`B2001`) and *Marta Ruiz* (`B2002`), and `ORG-057` with director `A1234`
+- WHEN an Admin adds both as delegates of `ORG-057` and saves
+- THEN the entry stores `[B2001, B2002]` and the panel shows their names and emails
+- AND IT MUST write one log row with the old and the new list
+- BUT it must NOT create a version or ask for *Applies from year*
+
+#### Scenario: Director as delegate
+- GIVEN `ORG-057`'s current version has director `A1234`
+- WHEN an Admin adds `A1234` as a delegate
+- THEN the request fails with `400` naming `delegates`
+- AND IT MUST NOT change the list
+
+#### Scenario: Delegate made director
+- GIVEN `B2001` is a delegate of `ORG-057`
+- WHEN an Admin sets `B2001` as director from the current year
+- THEN the request fails with `400` naming `director`
+
+#### Scenario: Delegates shown in a past year
+- GIVEN `ORG-057`'s delegates were changed from `[B2001]` to `[B2002]` this year
+- WHEN an Admin views last year's structure
+- THEN `ORG-057` shows `[B2002]`, labelled *current*
+- AND the History tab shows the change from `[B2001]` to `[B2002]` with its date and user
+
+**Acceptance criteria**
+- [ ] AC.1 — Only staff IDs are stored; name and email come from the staff table.
+- [ ] AC.2 — Duplicate, unknown, newly-added inactive, or more than 20 → `400` naming `delegates`; name or email in the body → `400`.
+- [ ] AC.3 — Director/delegate overlap rejected in both directions.
+- [ ] AC.4 — A delegates-only save writes one `delegates_change` log row and no version.
+
 ---
 
 ## 6. Non-functional requirements
@@ -511,9 +557,9 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 ## 7. Data requirements
 
-- New tables (no `portfolio_id`): entries (permanent ID, code, status, status-from year, successor), versions (entry, from year, to year, name, acronym, level value ID, parent entry ID, director staff ID), change log (append-only).
-- Unique indexes: entry code; version `(entry, from year)`.
-- FKs: version → entry; version parent → entry; version level → control-list value (`ON DELETE RESTRICT`, R-ORG-011); version director → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-016); entry successor → entry.
+- New tables (no `portfolio_id`): entries (permanent ID, code, status, status-from year, successor), versions (entry, from year, to year, name, acronym, level value ID, parent entry ID, director staff ID), delegates (entry, staff ID; not versioned), change log (append-only).
+- Unique indexes: entry code; version `(entry, from year)`; delegate `(entry, staff ID)`.
+- FKs: version → entry; version parent → entry; version level → control-list value (`ON DELETE RESTRICT`, R-ORG-011); version director → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-016); delegate → entry; delegate staff ID → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-017); entry successor → entry.
 - Migrations are append-only; the seed ships in a migration with fixed IDs.
 - No OpenSearch fields.
 
@@ -539,6 +585,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 | **Authorization leak** | Unit tests per handler: allowed and denied roles |
 | **Level from the wrong list / level value deleted while used** | Unit test with `assertValueInList` failing; integration test: value delete → `409` via FK mapping |
 | **Director not a staff member / name typed by hand** | Unit test: unknown `carnet` → `400`; DTO rejects name/email fields |
+| **Delegate overlap with the director, duplicate or unknown delegate; delegates versioned by mistake** | Unit tests for each rule in both directions; integration: a delegates-only save adds no version row and one `delegates_change` log row |
 | **Director of a past version lost when staff data changes** | Integration test: change the staff row's status; past versions still resolve the same staff ID with current name/email |
 | **Consumer contract wrong** (resolve/ancestors) | Unit + integration tests with a registered test consumer |
 | **Seed counts wrong or not idempotent** | Migration run twice on the local development database; counts 117 / 117 / 3-19-1-94 |
@@ -553,18 +600,17 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 
 | Item | Note |
 | --- | --- |
-| Dependency | Control Lists (`org.level`, registry, `assertValueInList`, `DataTable`, nested menu) — done |
+| Dependency | Control Lists (`org.level`, registry, `assertValueInList`, by-key read, `DataTable`) and its global-scope change — both done |
 | Assumption | "Current year" is the server's calendar year (UTC) |
 | Assumption | Agresso staff rows are updated by the staff sync but never deleted (`base-control-list-save.ts:39-41` saves/upserts; `agresso-staff-tools.service.ts:34-46`), so a stored director ID keeps resolving. The FK (R-ORG-016) is the backstop if that ever changes |
 | Risk | Director names in the source sheet may not match staff records. Mitigation: the seed matches by email or exact name, leaves the director empty when there is no single match, and lists the unmatched ones for the requester (R-ORG-015) |
 | Risk | Mid-year reorganisations appear only from the year chosen (accepted by the requester, proposal §12) |
 | Risk | A consumer forgets to register → an entry with linked records becomes deletable. Mitigation: consumers also add an FK to the entry ID; each consumer spec cites R-ORG-010 |
 | Risk | Back-dates change published totals. Mitigation: explicit flag, warning, log |
-| Risk | Q-1: `org.level` belongs to Portfolio 2. If Portfolio 2's list is deleted or replaced, levels break. Mitigation: FK RESTRICT on the value; global lists later (F-2) |
 
 ## 12. Open questions
 
-None blocking. Q-1…Q-4 were accepted as recommended (proposal §12, 2026-10-08). Q-2 leaves the exact year field to each consumer spec.
+None blocking. Q-1…Q-4 were accepted as recommended (proposal §12, 2026-10-08). Q-1 is now moot: `org.level` is global (2026-10-13). Q-2 leaves the exact year field to each consumer spec. P-11 (94 vs 95 seeded units) is settled in the seed task.
 
 ## 13. Requirement ID index
 
@@ -586,6 +632,7 @@ None blocking. Q-1…Q-4 were accepted as recommended (proposal §12, 2026-10-08
 | R-ORG-014 | Table standard (F-7) |
 | R-ORG-015 | Seed data |
 | R-ORG-016 | Responsible director from Agresso staff |
+| R-ORG-017 | Delegates from Agresso staff |
 | NFR-ORG-001…006 | Performance, integrity ×2, security, a11y, dx |
 
 ## 14. Sign-off
