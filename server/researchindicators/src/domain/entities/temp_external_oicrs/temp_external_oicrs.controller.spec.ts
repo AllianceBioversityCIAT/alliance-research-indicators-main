@@ -3,6 +3,7 @@ import { HttpStatus } from '@nestjs/common';
 import { TempExternalOicrsController } from './temp_external_oicrs.controller';
 import { TempExternalOicrsService } from './temp_external_oicrs.service';
 import { ResponseUtils } from '../../shared/utils/response.utils';
+import { ExternalOicrSourceEnum } from './enum/external-oicr-source.enum';
 
 jest.mock('../../shared/utils/response.utils');
 
@@ -45,6 +46,23 @@ describe('TempExternalOicrsController', () => {
     mockService.mappingExternalOicrs.mockResolvedValue(meta);
     mockFormat.mockReturnValue({});
     await controller.findMetadata(9);
-    expect(mockService.mappingExternalOicrs).toHaveBeenCalledWith(9);
+    expect(mockService.mappingExternalOicrs).toHaveBeenCalledWith(9, undefined);
+  });
+
+  it('findMetadata passes the source through', async () => {
+    mockService.mappingExternalOicrs.mockResolvedValue([]);
+    mockFormat.mockReturnValue({});
+    await controller.findMetadata(9, ExternalOicrSourceEnum.RESULT);
+    expect(mockService.mappingExternalOicrs).toHaveBeenCalledWith(
+      9,
+      ExternalOicrSourceEnum.RESULT,
+    );
+  });
+
+  it('findMetadata rejects an unknown source', async () => {
+    await expect(
+      controller.findMetadata(9, 'nope' as ExternalOicrSourceEnum),
+    ).rejects.toThrow('Invalid source: nope');
+    expect(mockService.mappingExternalOicrs).not.toHaveBeenCalled();
   });
 });

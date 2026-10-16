@@ -7,6 +7,8 @@ import {
   DelegateProjects,
   PiDelegateHistoryEntry,
   PiDelegateScope,
+  PiDelegatesExportByPersonBody,
+  PiDelegatesExportByProjectBody,
   piDelegateScopeParam,
   ProjectDelegates
 } from '../interfaces/pi-delegates.interface';
@@ -126,7 +128,7 @@ import {
 } from '@shared/interfaces/app-config.interface';
 import { GetTags } from '@shared/interfaces/get-tags.interface';
 import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interface';
-import { LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { ExistingOicrSource, LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetApi, PatchLeverSdgTargetsRequest } from '@shared/interfaces/lever-sdg-target.interface';
 import { MaturityLevel } from '@shared/interfaces/maturity-level.interface';
 import { InteractionFeedbackPayload } from '@shared/interfaces/feedback-interaction.interface';
@@ -1176,8 +1178,8 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  GET_OICRMetadata = (resultCode: number): Promise<MainResponse<OicrCreation>> => {
-    const url = () => `temp/oicrs/${resultCode}/metadata`;
+  GET_OICRMetadata = (resultCode: number, source?: ExistingOicrSource): Promise<MainResponse<OicrCreation>> => {
+    const url = () => `temp/oicrs/${resultCode}/metadata${source ? `?source=${source}` : ''}`;
     return this.TP.get(url(), {});
   };
 
@@ -1359,6 +1361,22 @@ export class ApiService {
     return firstValueFrom(
       this.TP.http.delete<MainResponse<unknown>>(url, { body })
     );
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-project/xlsx → xlsx blob.
+   * `project_codes` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByProjectXlsx = (body: PiDelegatesExportByProjectBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-project/xlsx', body, {});
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-person/xlsx → xlsx blob.
+   * `delegate_user_ids` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByPersonXlsx = (body: PiDelegatesExportByPersonBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-person/xlsx', body, {});
   };
 
   /**

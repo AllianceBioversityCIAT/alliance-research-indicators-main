@@ -79,7 +79,9 @@ export class Portfolio2AlignmentHandler implements AlignmentSectionHandler {
       payload?.research_areas ?? []
     ).map((researchArea) => ({
       lever_id: parseInt(researchArea?.lever_id) as unknown as string,
-      is_primary: true,
+      // OICRs split Research Areas into primary and contributing (Create OICR step 2);
+      // keep that flag on a round trip. Anything newly picked here is primary.
+      is_primary: researchArea?.is_primary ?? true,
       custom_lever_name: researchArea?.custom_lever_name,
     }));
 

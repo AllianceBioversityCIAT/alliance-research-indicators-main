@@ -31,6 +31,8 @@ import { ResultOicrRepository } from './repositories/result-oicr.repository';
 import { TempExternalOicrsService } from '../temp_external_oicrs/temp_external_oicrs.service';
 import { UpdateOicrDto } from './dto/update-oicr.dto';
 import { TempResultExternalOicr } from '../temp_external_oicrs/entities/temp_result_external_oicr.entity';
+import { ExternalOicrSourceEnum } from '../temp_external_oicrs/enum/external-oicr-source.enum';
+import { PortfolioIdEnum } from '../results/portfolio-handlers/enum/portfolio-id.enum';
 import { cleanName, isEmpty } from '../../shared/utils/object.utils';
 import { LeverRolesEnum } from '../lever-roles/enum/lever-roles.enum';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
@@ -130,16 +132,24 @@ export class ResultOicrService {
           result_status_id: ResultStatusEnum.REQUESTED,
         },
       );
-      const lever = await this.resultLeversService.find(
+      // The contract lever is a Portfolio 1 lever: it is only a valid primary
+      // choice when step 2 holds levers, not Research Areas (Portfolio 2).
+      const stepTwoRole = await this.findStepTwoLeverRole(
         result.result_id,
-        LeverRolesEnum.ALIGNMENT,
+        manager,
       );
-      const fullLevers = mergeArraysWithPriority<ResultLever>(
-        data?.step_two?.primary_lever,
-        lever,
-        'lever_id',
-      );
-      data.step_two.primary_lever = fullLevers as ResultLever[];
+      if (stepTwoRole === LeverRolesEnum.ALIGNMENT) {
+        const lever = await this.resultLeversService.find(
+          result.result_id,
+          LeverRolesEnum.ALIGNMENT,
+        );
+        const fullLevers = mergeArraysWithPriority<ResultLever>(
+          data?.step_two?.primary_lever,
+          lever,
+          'lever_id',
+        );
+        data.step_two.primary_lever = fullLevers as ResultLever[];
+      }
     } else {
       result = await this.dataSource.getRepository(Result).findOne({
         where: {
@@ -236,13 +246,21 @@ export class ResultOicrService {
     const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
       data?.link_result,
     )
-      ? [{ external_oicr_id: data.link_result?.external_oicr_id }]
+      ? [
+          {
+            external_oicr_id: data.link_result?.external_oicr_id,
+            source: resolveExternalOicrSource(data.link_result?.source),
+          },
+        ]
       : [];
 
     await this.tempExternalOicrsService.create(
       resultId,
       saveLinkedResults,
       'external_oicr_id',
+      undefined,
+      undefined,
+      ['source'],
     );
 
     await this.resultQuantificationsService.upsertByCompositeKeys(
@@ -441,10 +459,27 @@ export class ResultOicrService {
       resultId,
       datalever,
       'lever_id',
-      LeverRolesEnum.ALIGNMENT,
+      await this.findStepTwoLeverRole(resultId, manager),
       manager,
       ['is_primary', 'custom_lever_name'],
     );
+  }
+
+  /**
+   * Step 2 holds levers (ALIGNMENT) for Portfolio 1 results and Research Areas
+   * (RESEARCH_AREAS_ALIGNMENT) for Portfolio 2 — the same role `alignment_validation`
+   * and the Alliance Alignment section read for that portfolio.
+   */
+  private async findStepTwoLeverRole(
+    resultId: number,
+    manager?: EntityManager,
+  ): Promise<LeverRolesEnum> {
+    const rows: { portfolio_id: number | string | null }[] = await (
+      manager ?? this.dataSource.manager
+    ).query('SELECT get_portfolio_id_by_result(?) AS portfolio_id', [resultId]);
+    return Number(rows?.[0]?.portfolio_id) === PortfolioIdEnum.PORTFOLIO_2
+      ? LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT
+      : LeverRolesEnum.ALIGNMENT;
   }
 
   async stepOneOicr(
@@ -484,7 +519,12 @@ export class ResultOicrService {
       const saveLinkedResults: Partial<TempResultExternalOicr>[] = !isEmpty(
         createdTags,
       )
-        ? [data?.link_result]
+        ? [
+            {
+              ...data?.link_result,
+              source: resolveExternalOicrSource(data?.link_result?.source),
+            },
+          ]
         : [];
       await this.tempExternalOicrsService.create(
         resultId,
@@ -492,6 +532,7 @@ export class ResultOicrService {
         'external_oicr_id',
         undefined,
         manager,
+        ['source'],
       );
     }
 
@@ -567,7 +608,7 @@ export class ResultOicrService {
   private async findStepTwoOicr(resultId: number): Promise<StepTwoOicrDto> {
     const allLevers = await this.resultLeversService.find(
       resultId,
-      LeverRolesEnum.ALIGNMENT,
+      await this.findStepTwoLeverRole(resultId),
     );
 
     const leverId =
@@ -697,4 +738,11 @@ export class ResultOicrService {
       handle_link: firstRow.handle_link ?? '',
     };
   }
+}
+
+/** Anything but an explicit `result` is a TEMP_external_oicrs link (the only source before 2026). */
+function resolveExternalOicrSource(source?: string): ExternalOicrSourceEnum {
+  return source === ExternalOicrSourceEnum.RESULT
+    ? ExternalOicrSourceEnum.RESULT
+    : ExternalOicrSourceEnum.EXTERNAL;
 }

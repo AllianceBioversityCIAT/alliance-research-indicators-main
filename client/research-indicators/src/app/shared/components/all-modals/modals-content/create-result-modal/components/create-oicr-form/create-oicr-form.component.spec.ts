@@ -18,6 +18,8 @@ import { GetContractsService } from '@shared/services/control-list/get-contracts
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ProjectResultsTableService } from '@shared/components/project-results-table/project-results-table.service';
 import { CurrentResultService } from '@shared/services/cache/current-result.service';
+import { GetLeversService } from '@shared/services/control-list/get-levers.service';
+import { GetLevers } from '@shared/interfaces/get-levers.interface';
 
 describe('CreateOicrFormComponent', () => {
   let component: CreateOicrFormComponent;
@@ -3049,6 +3051,68 @@ describe('CreateOicrFormComponent', () => {
       expect(mockRouter.navigate).toHaveBeenCalledWith(['/result', 'STAR-42', 'oicr-details'], {
         queryParams: { oicrFullEdit: '1' }
       });
+    });
+  });
+
+  // Step 2 switches from levers to Research Areas for Portfolio 2 OICRs.
+  describe('step 2 Research Areas', () => {
+    const option = (id: number, portfolio_id: number) => ({ id, lever_id: id, portfolio_id }) as unknown as GetLevers;
+
+    const arrange = (year: number, options: GetLevers[], primary: number[], contributing: number[]) => {
+      mockCreateResultManagementService.createOicrBody.update((body: any) => ({
+        ...body,
+        base_information: { ...body.base_information, year },
+        step_two: {
+          primary_lever: primary.map(lever_id => ({ lever_id })),
+          contributor_lever: contributing.map(lever_id => ({ lever_id }))
+        }
+      }));
+      TestBed.inject(GetLeversService).getList({ reportYear: year }).set(options);
+      fixture.detectChanges();
+    };
+
+    it('keeps lever labels and selections for a Portfolio 1 year', () => {
+      arrange(2025, [option(3, 1), option(9, 1)], [3], [9]);
+
+      expect(component.isResearchAreaMode()).toBe(false);
+      expect(component.stepTwoLabels().primary).toBe('Primary Levers');
+      const stepTwo = mockCreateResultManagementService.createOicrBody().step_two;
+      expect(stepTwo.primary_lever.map((l: any) => l.lever_id)).toEqual([3]);
+      expect(stepTwo.contributor_lever.map((l: any) => l.lever_id)).toEqual([9]);
+    });
+
+    it('uses Research Area labels and drops Portfolio 1 levers (contract lever, prefilled levers)', () => {
+      expect(component.isResearchAreaMode()).toBe(false);
+
+      arrange(2026, [option(12, 2), option(13, 2), option(18, 2)], [3, 12], [2, 13]);
+
+      expect(component.isResearchAreaMode()).toBe(true);
+      expect(component.stepTwoLabels()).toEqual(
+        expect.objectContaining({ primary: 'Primary Research Areas', contributing: 'Contributing Research Areas' })
+      );
+      const stepTwo = mockCreateResultManagementService.createOicrBody().step_two;
+      expect(stepTwo.primary_lever.map((l: any) => l.lever_id)).toEqual([12]);
+      expect(stepTwo.contributor_lever.map((l: any) => l.lever_id)).toEqual([13]);
+    });
+
+    it('treats Research Area 18 as "Other": a team name is required to complete step 2', () => {
+      arrange(2026, [option(12, 2), option(18, 2)], [18], []);
+      const other = mockCreateResultManagementService.createOicrBody().step_two.primary_lever[0];
+
+      expect(component.isOtherLever(other)).toBe(true);
+      expect(component.isCompleteStepTwo).toBe(false);
+
+      component.getLeverCustomNameSignal(other).set({ custom_lever_name: 'Seed systems team' });
+      expect(component.isCompleteStepTwo).toBe(true);
+    });
+
+    it('locks the step for review statuses only', () => {
+      mockCreateResultManagementService.statusId.set(9);
+      expect(component.isStatusLocked()).toBe(false);
+      mockCreateResultManagementService.statusId.set(12);
+      expect(component.isStatusLocked()).toBe(true);
+      mockCreateResultManagementService.statusId.set(null);
+      expect(component.isStatusLocked()).toBe(false);
     });
   });
 });

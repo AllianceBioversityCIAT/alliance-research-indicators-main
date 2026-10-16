@@ -511,6 +511,10 @@ export class AssignPiDelegateComponent implements OnInit {
     // ── Confirmation text: only what changes, per project ────────────────────
     const deltaBlocks: string[] = [];
     let hasRevoke = false;
+    // Projects whose delegates do not change are summarised in one line, not
+    // listed one by one — a 30-project sync otherwise filled the screen with
+    // "No changes" blocks.
+    let unchangedCount = 0;
 
     // Names inline, comma-separated: a bullet per person turned a 20-delegate
     // change into a screenful.
@@ -524,6 +528,11 @@ export class AssignPiDelegateComponent implements OnInit {
       const added = desired.filter(p => !currentIds.has(p.delegate_user_id));
       const removed = (entry?.delegates ?? []).filter(d => !desiredIds.has(d.delegate_user_id));
       if (removed.length > 0) hasRevoke = true;
+
+      if (added.length === 0 && removed.length === 0) {
+        unchangedCount++;
+        continue;
+      }
 
       const projectName =
         entry?.project_name ??
@@ -543,15 +552,19 @@ export class AssignPiDelegateComponent implements OnInit {
       if (removed.length > 0) {
         sections.push(`<div><strong>Removed:</strong> ${nameList(removed.map(d => d.name))}</div>`);
       }
-      if (added.length === 0 && removed.length === 0) {
-        sections.push('<div>No changes for this project.</div>');
-      }
       deltaBlocks.push(sections.join(''));
     }
 
     // alert-detail-left opts this detail out of the dialog's centred text.
+    if (unchangedCount > 0) {
+      deltaBlocks.push(
+        deltaBlocks.length === 0
+          ? '<div>No changes for the selected projects.</div>'
+          : `<div>No changes for the other ${unchangedCount} selected project${unchangedCount === 1 ? '' : 's'}.</div>`
+      );
+    }
     const deltaDetail =
-      `<div class="alert-detail-left">` +
+      `<div class="alert-detail-left alert-detail-scroll">` +
       deltaBlocks.join('<div>&nbsp;</div>') +
       (!isPersonMode && selectedPeople.length === 0 && hasRevoke
         ? '<div>&nbsp;</div><div><strong>No people selected — every delegate above loses access.</strong></div>'

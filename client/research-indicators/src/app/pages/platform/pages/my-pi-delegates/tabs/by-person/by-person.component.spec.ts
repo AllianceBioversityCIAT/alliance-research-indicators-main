@@ -20,6 +20,7 @@ import { signal } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import type { DelegateProjects } from '@interfaces/pi-delegates.interface';
 import type { GlobalAlert } from '@interfaces/global-alert.interface';
+import { CacheService } from '@services/cache/cache.service';
 
 // ─── Test data ────────────────────────────────────────────────────────────────
 
@@ -64,13 +65,14 @@ function buildServiceStub(people: DelegateProjects[] = []) {
     error: signal<string | null>(null),
     revokePair: jest.fn().mockResolvedValue(undefined),
     revokeDelegate: jest.fn().mockResolvedValue(undefined),
+    exportByPerson: jest.fn().mockResolvedValue(new Blob(['x'])),
     // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
     isAdminView: signal(false)
   };
 }
 
 function buildActionsStub() {
-  return { showGlobalAlert: jest.fn() };
+  return { showGlobalAlert: jest.fn(), showToast: jest.fn() };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -104,7 +106,8 @@ describe('ByPersonComponent', () => {
       imports: [ByPersonComponent, NoopAnimationsModule],
       providers: [
         { provide: PiDelegatesClientService, useValue: serviceStub },
-        { provide: ActionsService, useValue: actionsStub }
+        { provide: ActionsService, useValue: actionsStub },
+        { provide: CacheService, useValue: { dataCache: signal({ user: { first_name: 'Ana', last_name: 'Lopez' } }) } }
       ]
     }).compileComponents();
 
@@ -799,4 +802,71 @@ describe('ByPersonComponent', () => {
     });
   });
 
+
+  // ── Excel export ───────────────────────────────────────────────────────
+
+  describe('Excel export', () => {
+    let clickSpy: jest.SpyInstance;
+
+    beforeEach(async () => {
+      (globalThis.URL as unknown as { createObjectURL: jest.Mock }).createObjectURL = jest.fn().mockReturnValue('blob:x');
+      (globalThis.URL as unknown as { revokeObjectURL: jest.Mock }).revokeObjectURL = jest.fn();
+      clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      await createComponent([ALICE, BOB, CAROL_INACTIVE]);
+    });
+
+    afterEach(() => clickSpy.mockRestore());
+
+    it('renders the "Export people" button', () => {
+      expect((fixture.nativeElement as HTMLElement).textContent).toContain('Export people');
+    });
+
+    it('sends filtered ids and the search term', async () => {
+      component.searchTerm.set(' carol ');
+      fixture.detectChanges();
+      await component.exportTable();
+      expect(serviceStub.exportByPerson).toHaveBeenCalledWith([3], { search: 'carol' });
+    });
+
+    it('sends all ids and empty filters when nothing is applied', async () => {
+      await component.exportTable();
+      expect(serviceStub.exportByPerson).toHaveBeenCalledWith([1, 2, 3], {});
+    });
+
+    it('honours the p-table processed (sorted) order', async () => {
+      Object.defineProperty(component.table(), 'processedData', {
+        configurable: true,
+        get: () => [
+        { delegate_user_id: 3 },
+        { delegate_user_id: 1 }
+      ]
+      });
+      await component.exportTable();
+      expect(serviceStub.exportByPerson.mock.calls[0][0]).toEqual([3, 1]);
+    });
+
+    it('ignores a second click while exporting, downloads, and resets the flag', async () => {
+      let resolve!: (b: Blob) => void;
+      serviceStub.exportByPerson.mockReturnValue(new Promise<Blob>(r => (resolve = r)));
+      const links: HTMLAnchorElement[] = [];
+      clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
+        links.push(this);
+      });
+      const first = component.exportTable();
+      expect(component.isExporting()).toBe(true);
+      await component.exportTable();
+      expect(serviceStub.exportByPerson).toHaveBeenCalledTimes(1);
+      resolve(new Blob(['x']));
+      await first;
+      expect(component.isExporting()).toBe(false);
+      expect(links[0].download).toMatch(/^STAR_pi_delegates_by_person_\d{8}_\d{4}_AL\.xlsx$/);
+    });
+
+    it('shows an error toast on failure', async () => {
+      serviceStub.exportByPerson.mockRejectedValue(new Error('boom'));
+      await component.exportTable();
+      expect(actionsStub.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+      expect(component.isExporting()).toBe(false);
+    });
+  });
 });

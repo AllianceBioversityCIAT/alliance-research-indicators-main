@@ -12,7 +12,13 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { ApiService } from '@services/api.service';
 import { RolesService } from '@services/cache/roles.service';
-import type { DelegateProjects, PiDelegateScope, ProjectDelegates } from '@interfaces/pi-delegates.interface';
+import type {
+  DelegateProjects,
+  PiDelegateScope,
+  PiDelegatesExportByPersonBody,
+  PiDelegatesExportByProjectBody,
+  ProjectDelegates
+} from '@interfaces/pi-delegates.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -110,8 +116,53 @@ export class PiDelegatesClientService {
     return ids.size;
   });
 
+  /**
+   * True when the project has no delegate. `delegates` already holds only the active
+   * ones, so this is "no active delegate". The header counter and the By-project
+   * quick filter both read this, so the number and the rows behind it cannot disagree.
+   */
+  hasNoDelegate(project: ProjectDelegates): boolean {
+    return project.delegates.length === 0;
+  }
+
   /** Projects that have no assigned delegate. Consumed by the summary header (R-UI-004). */
-  readonly projectsWithoutDelegate = computed(() => this.byProjectCache().filter(p => p.delegates.length === 0));
+  readonly projectsWithoutDelegate = computed(() => this.byProjectCache().filter(p => this.hasNoDelegate(p)));
+
+  // ─── Excel export ────────────────────────────────────────────────────────────
+  //
+  // Sends the SAME user_id and scope the tables were loaded with, plus the keys of
+  // the rows the tab is showing, so the file matches the screen.
+
+  /** Exports the given projects (display order) as xlsx. */
+  exportByProject(
+    projectCodes: string[],
+    filters: PiDelegatesExportByProjectBody['filters']
+  ): Promise<Blob> {
+    return this.api.POST_PiDelegatesExportByProjectXlsx({
+      ...this.exportContext(),
+      project_codes: projectCodes,
+      filters
+    });
+  }
+
+  /** Exports the given people (display order) as xlsx. */
+  exportByPerson(
+    delegateUserIds: number[],
+    filters: PiDelegatesExportByPersonBody['filters']
+  ): Promise<Blob> {
+    return this.api.POST_PiDelegatesExportByPersonXlsx({
+      ...this.exportContext(),
+      delegate_user_ids: delegateUserIds,
+      filters
+    });
+  }
+
+  private exportContext(): { user_id: number; scope?: PiDelegateScope } {
+    const userId = this._userId();
+    if (userId == null) throw new Error('Cannot export before the delegates have loaded');
+    const scope = this.scope();
+    return scope ? { user_id: userId, scope } : { user_id: userId };
+  }
 
   // ─── Load methods ─────────────────────────────────────────────────────────────
 
