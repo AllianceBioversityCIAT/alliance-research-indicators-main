@@ -120,7 +120,7 @@ describe('PiDelegatesExportService.buildByProjectWorkbook', () => {
       'Project code',
       'Project name',
       'Status',
-      'Pool funding contributor',
+      'Contributing to CGIAR Portfolio',
       'Principal Investigator',
       'Number of delegates',
       'Delegates',

@@ -43,7 +43,7 @@ export const BY_PROJECT_COLUMNS: ExcelColumnSpec[] = [
   { key: 'project_code', header: 'Project code', width: 16 },
   { key: 'project_name', header: 'Project name', width: 50 },
   { key: 'status', header: 'Status', width: 16 },
-  { key: 'pool_funding', header: 'Pool funding contributor', width: 22 },
+  { key: 'pool_funding', header: 'Contributing to CGIAR Portfolio', width: 30 },
   { key: 'pi_name', header: 'Principal Investigator', width: 28 },
   {
     key: 'delegate_count',
