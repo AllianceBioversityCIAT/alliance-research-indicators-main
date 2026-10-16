@@ -79,7 +79,8 @@ export function buildByProjectFiltersText(
   const parts: string[] = [];
   if (filters?.role === 'pi') parts.push('Role: Principal Investigator');
   if (filters?.role === 'delegate') parts.push('Role: PI Delegate');
-  if (filters?.ongoing_only) parts.push('Ongoing projects');
+  if (filters?.ongoing_w3_bilateral_only)
+    parts.push('Ongoing W3 & Bilateral only');
   if (filters?.without_delegates_only) parts.push('Projects without delegates');
   const q = clean(filters?.search);
   if (q) parts.push(`Search: "${q}"`);

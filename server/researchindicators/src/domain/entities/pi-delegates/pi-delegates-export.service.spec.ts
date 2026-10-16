@@ -23,6 +23,7 @@ const project = (
   pi_user_id: 99,
   pi_name: 'Pi Person',
   status: 'ACTIVE',
+  funding_type: null,
   start_date: new Date('2025-01-01T00:00:00Z'),
   end_date: null,
   delegates: [],
@@ -139,13 +140,13 @@ describe('PiDelegatesExportService.buildByProjectWorkbook', () => {
       project_codes: [],
       filters: {
         role: 'pi',
-        ongoing_only: true,
+        ongoing_w3_bilateral_only: true,
         without_delegates_only: true,
         search: 'abc',
       },
     });
     expect(sheetOf(builder).presentation.bannerSubtitle).toContain(
-      'Filters applied: Role: Principal Investigator · Ongoing projects · Projects without delegates · Search: "abc"',
+      'Filters applied: Role: Principal Investigator · Ongoing W3 & Bilateral only · Projects without delegates · Search: "abc"',
     );
   });
 });
