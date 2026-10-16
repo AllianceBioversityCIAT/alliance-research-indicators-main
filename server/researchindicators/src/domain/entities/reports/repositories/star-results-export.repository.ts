@@ -7,6 +7,7 @@ import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import { ResultSortEnum } from '../../results/enum/result-sort.enum';
 import { ResultRepository } from '../../results/repositories/result.repository';
+import { STAR_INNOVATION_DEV_RAW_COLUMNS } from '../handlers/star-results-metadata/star-results-metadata.innovation-dev.columns';
 
 /**
  * Excel “Raw data” rows (`report_*` views).
@@ -24,7 +25,13 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *    - `sortOrderV2WithSearchRelevance` in the `ORDER BY`
  * 2. **Query on `report_general_information gi`**: only `WHERE gi.result_id IN (…)` with the
  *    `result_id` values that already passed phase 1, and `ORDER BY FIELD(…)` to **repeat the same order**
- *    returned by `findResultsV2` (does not re-implement filters in the view).
+ *    returned by `findResultsV2` (does not re-implement filters in the view). The select list includes
+ *    `gi.result_id AS result_id` so Phase 3 can merge onto that key.
+ * 3. **Phase 3** on `report_innovation_dev`: `SELECT result_id, <32 innovation_dev_* aliases>
+ *    FROM report_innovation_dev WHERE result_id IN (…)` (one placeholder per id), on the same
+ *    pinned connection and transaction as Phase 2. Rows merge by `String(result_id)`. Phase 2's
+ *    order is kept. A Phase 2 row with no Phase 3 row gets `Not applicable` on every
+ *    Innovation Development column.
  *
  * **Front pagination (`page` / `limit` on the DTO):** does not cap the Excel file; phase 1 walks
  * every internal page of `findResultsV2` until all rows are fetched (fixed chunk size in code).
@@ -34,7 +41,7 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
  * report_capacity_sharing_development, report_policy_change, report_oicr,
- * report_link_result.
+ * report_link_result, report_innovation_use, report_innovation_dev.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -49,6 +56,9 @@ export class StarResultsExportRepository {
    * are not truncated at the default 1024-byte limit. `SET LOCAL` reverts on commit/rollback.
    */
   private static readonly GROUP_CONCAT_MAX_LEN = 4_194_304;
+
+  /** DD-1: a Phase 2 row with no Phase 3 row must not leave a blank Innovation Development cell. */
+  private static readonly INNOVATION_DEV_NOT_APPLICABLE = 'Not applicable';
 
   constructor(
     private readonly dataSource: DataSource,
@@ -67,6 +77,7 @@ export class StarResultsExportRepository {
   ): Promise<Record<string, unknown>[]> {
     const selectBody = `
       SELECT
+        gi.result_id AS result_id,
         gi.result_code AS result_code,
         gi.platform_code AS platform_code,
         gi.public_link AS public_link,
@@ -141,7 +152,14 @@ export class StarResultsExportRepository {
         oc.for_external_use_description AS for_external_use_description,
         oc.existing_oicr AS existing_oicr,
         oc.cgspace_link AS cgspace_link,
-        lkr.link_results AS link_results
+        lkr.link_results AS link_results,
+        iu.innovation_use_level AS innovation_use_level,
+        iu.innovation_use_level_explanation AS innovation_use_level_explanation,
+        iu.innovation_use_linked_dev AS innovation_use_linked_dev,
+        CONCAT('${this.appConfig.ARI_CLIENT_HOST}/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url,
+        iu.innovation_use_actors AS innovation_use_actors,
+        iu.innovation_use_organizations AS innovation_use_organizations,
+        iu.innovation_use_quantifications AS innovation_use_quantifications
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
@@ -151,7 +169,8 @@ export class StarResultsExportRepository {
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
       LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
-      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id`;
+      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id
+      LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';
@@ -175,16 +194,18 @@ export class StarResultsExportRepository {
       WHERE gi.result_id IN (${ph})
       ORDER BY FIELD(gi.result_id, ${ph})`;
     const params = [...orderedIds, ...orderedIds];
-    return this.queryPhase2WithGroupConcatLimit(sql, params);
+    return this.queryPhase2WithGroupConcatLimit(sql, params, orderedIds);
   }
 
   /**
    * Pins one pool connection, raises `group_concat_max_len` for the transaction only, then runs
-   * the export SELECT (views rely on nested `GROUP_CONCAT`).
+   * Phase 2 and Phase 3 (views rely on nested `GROUP_CONCAT`). Phase 3 failure rolls the
+   * transaction back with Phase 2.
    */
   private async queryPhase2WithGroupConcatLimit(
     sql: string,
     params: unknown[],
+    orderedIds: number[],
   ): Promise<Record<string, unknown>[]> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -193,18 +214,51 @@ export class StarResultsExportRepository {
       await queryRunner.query(
         `SET LOCAL group_concat_max_len = ${StarResultsExportRepository.GROUP_CONCAT_MAX_LEN}`,
       );
-      const rows = (await queryRunner.query(sql, params)) as Record<
+      const phase2Rows = (await queryRunner.query(sql, params)) as Record<
         string,
         unknown
       >[];
+      const placeholders = orderedIds.map(() => '?').join(',');
+      const innovationDevKeys = STAR_INNOVATION_DEV_RAW_COLUMNS.map(
+        (column) => column.key,
+      ).join(', ');
+      const phase3Sql = `SELECT result_id, ${innovationDevKeys} FROM report_innovation_dev WHERE result_id IN (${placeholders})`;
+      const phase3Rows = (await queryRunner.query(
+        phase3Sql,
+        orderedIds,
+      )) as Record<string, unknown>[];
       await queryRunner.commitTransaction();
-      return rows;
+      return this.mergeInnovationDevRows(phase2Rows, phase3Rows);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * DD-1 merge: `String(result_id)` on both sides, Phase 2 order, every Innovation Development
+   * key filled with `Not applicable` when Phase 3 has no row for that id.
+   */
+  private mergeInnovationDevRows(
+    phase2Rows: Record<string, unknown>[],
+    phase3Rows: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of phase3Rows) {
+      byId.set(String(row.result_id), row);
+    }
+    return phase2Rows.map((row) => {
+      const devRow = byId.get(String(row.result_id));
+      const merged: Record<string, unknown> = { ...row };
+      for (const column of STAR_INNOVATION_DEV_RAW_COLUMNS) {
+        merged[column.key] = devRow
+          ? devRow[column.key]
+          : StarResultsExportRepository.INNOVATION_DEV_NOT_APPLICABLE;
+      }
+      return merged;
+    });
   }
 
   private mapReportDtoToFindResultsV2Filters(dto: FullFiltersReportDto): {
