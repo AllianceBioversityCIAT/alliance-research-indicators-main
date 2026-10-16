@@ -141,3 +141,20 @@ utf8mb4,utf8mb4_0900_ai_ci
 - The D-ORG-16 helper will emit `CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci` there — the same pair proven locally. MySQL 8.0.46 accepts the explicit form.
 - `baseline.sql` (dumped 2026-08-14, `utf8mb3`) is **stale** for this server: the table was converted at some point after that dump, or *testing* is not the dumped host. Invalidating condition (K-013): a later conversion of `alliance_user_staff`.
 - RB-5 stays **open for Prod** (`main`).
+- **Requester gate (2026-10-16):** "ok, continua" — D-ORG-16 acknowledged (design.md decision row updated); proceed to T-02.
+
+### T-02 — Slice 2: save engine, form and staff picker
+
+- **Status:** blocked at the first step (P-14), before any code.
+- **P-14 measurement (Leader, 2026-10-16, local `127.0.0.1:3306/stardb`):**
+  ```
+  status  is_active  n
+  N       1          3046
+  NULL    1          39
+  MIN(updated_at) 2024-11-14 20:51:05   MAX(updated_at) 2026-09-30 13:27:19
+  ```
+  - Every row is `is_active = 1`; `status` holds only `'N'` and `NULL`.
+  - **Sync code read:** `AgressoStaffToolsService.cloneAllAgressoStaff()` pages `ErpEmploymentServices/api/v1/employees` and upserts through `allianceStaffMapper`, which copies `status` raw and never writes `is_active`. Nothing in the sync marks a leaver: either the endpoint returns only current employees (and leavers keep their last row), or leavers come back with an unchanged status.
+  - **Verdict:** the output does **not** separate current staff from people who left → T-02's rule: *stop and ask the requester*. No code written.
+- **P-14 decision (requester, 2026-10-16):** active staff = **`is_active = 1`** (option chosen over measuring on *testing* first and over `status = 'N'`). Written into design §4 B4 and the P-14 row (settled, accepted risk: the picker offers everyone currently in the table; invalidating condition recorded) **before any code**, as T-02 requires. RB-2 can close with this.
+- **Dispatch attempt 1 (2026-10-16):** two fresh Implementers in parallel — server (effort `xhigh`; skills nestjs-expert, api-design-principles, error-handling-patterns, tdd) and client (effort `medium`; angular-developer, ui-ux-pro-max). Skills = task defaults. Per-half LOC tripwires in the briefs: server ~2,600, client ~1,900 (slice ~4,500). Forward pointers copied from the T-01 advisories, scoped "only inside T-02's approved scope": write path rejects level ids outside 20–23; B2 refresh after a save; client `levelCode` nullability; `levelName` optional; `staff-carnet-column.ts` not to be edited.

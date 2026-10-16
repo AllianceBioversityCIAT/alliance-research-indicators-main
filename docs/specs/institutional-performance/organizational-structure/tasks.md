@@ -116,7 +116,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-02 — Slice 2: save engine, form and staff picker
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01
+- **Status:** in progress (2026-10-16; P-14 settled) · **Size:** L · **Dependencies:** T-01
 - **Requirements covered:**
   - R-ORG-001 — *No portfolio anywhere*: **AND IT MUST** reject (`400`) any write that sends `portfolioId` (B9, B10); AC.2.
   - R-ORG-002 — *Code proposed and unique*: pre-filled `ORG-118`; **AND IT MUST** reject `org-050` with `409` naming `code` because a deleted entry still owns it (fixture row with `status = deleted`). *ID is read-only*: `id` in a body → 400; **BUT** must NOT change the stored ID. AC.1, AC.2. Code not versioned (`code_change`, no version).
@@ -467,7 +467,7 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-10-16 | P-11: the mockup `TREE` has 95 units, the proposal says 94 | T-05 first step: per-group list, requester decides before the seed is written | Leader / requester | open |
-| RB-2 | 2026-10-16 | P-14: which staff column means "active" is not documented | T-02 first step: measured query, rule written into design before code; stop if it does not separate current staff from people who left | Leader | open |
+| RB-2 | 2026-10-16 | P-14: which staff column means "active" is not documented | T-02 first step: measured query, rule written into design before code; stop if it does not separate current staff from people who left | Leader | **closed 2026-10-16** — measured (no separation); requester chose `is_active = 1`, accepted risk (design P-14, §4 B4) |
 | RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
 | RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main`. **Measured 2026-10-16 by the requester on *testing*:** `alliance_user_staff.carnet` = `utf8mb4` / `utf8mb4_0900_ai_ci`, `VERSION()` = `8.0.46-0ubuntu0.22.04.4` — the baseline dump's `utf8mb3` is stale for that server. Still owed: Prod (`main`) | Requester | open — testing measured, Prod pending |
