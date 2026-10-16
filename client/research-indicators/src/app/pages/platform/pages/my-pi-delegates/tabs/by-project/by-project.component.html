@@ -130,7 +130,7 @@
             <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="is_pool_funding_contributor">
-            <div class="by-project__th-inner">Pool funding <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
+            <div class="by-project__th-inner">Contributing to CGIAR Portfolio <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="delegateCount">
             <div class="by-project__th-inner">PI Delegates <p-sortIcon field="delegateCount"></p-sortIcon></div>
@@ -214,7 +214,7 @@
                  Like there, a project that does not contribute shows nothing. -->
             @if (project.is_pool_funding_contributor) {
             <div class="by-project__pool-tag flex w-fit items-center" data-testid="pool-funding-tag">
-              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding"
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to CGIAR Portfolio"
                 [tiny]="true"></app-custom-tag>
             </div>
             }
