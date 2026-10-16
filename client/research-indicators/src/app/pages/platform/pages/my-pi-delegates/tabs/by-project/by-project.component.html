@@ -49,19 +49,19 @@
       </div>
       <span class="by-project__quick-filters-divider h-5 w-px bg-[var(--ac-pfm-surface-border)]" aria-hidden="true"></span>
       <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Refine">
-        <button type="button" data-testid="by-project-quick-filter-ongoing" role="checkbox"
+        <button type="button" data-testid="by-project-quick-filter-ongoing-w3-bilateral" role="checkbox"
           class="by-project__quick-filter inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-solid py-0 pl-3 pr-4 font-['Barlow'] text-[13px] leading-[18px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
-            ongoingOnly()
+            ongoingW3BilateralOnly()
               ? 'border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] font-semibold text-[var(--ac-pfm-accent-navy)]'
               : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
           }}"
-          [attr.aria-checked]="ongoingOnly()" (click)="toggleOngoing()">
-          @if (ongoingOnly()) {
+          [attr.aria-checked]="ongoingW3BilateralOnly()" (click)="toggleOngoingW3Bilateral()">
+          @if (ongoingW3BilateralOnly()) {
           <i class="pi pi-check-square !text-[12px] leading-none" aria-hidden="true"></i>
           } @else {
           <i class="pi pi-stop !text-[12px] leading-none" aria-hidden="true"></i>
           }
-          Ongoing projects
+          Ongoing W3 &amp; Bilateral only
         </button>
         <button type="button" data-testid="by-project-quick-filter-without-delegates" role="checkbox"
           class="by-project__quick-filter inline-flex h-7 cursor-pointer items-center gap-2 rounded-full border border-solid py-0 pl-3 pr-4 font-['Barlow'] text-[13px] leading-[18px] transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
@@ -130,7 +130,7 @@
             <div class="by-project__th-inner">Status <p-sortIcon field="status"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="is_pool_funding_contributor">
-            <div class="by-project__th-inner">Pool funding <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
+            <div class="by-project__th-inner">Contributing to CGIAR Portfolio <p-sortIcon field="is_pool_funding_contributor"></p-sortIcon></div>
           </th>
           <th scope="col" class="by-project__th atc-primary-blue-600" pSortableColumn="delegateCount">
             <div class="by-project__th-inner">PI Delegates <p-sortIcon field="delegateCount"></p-sortIcon></div>
@@ -214,7 +214,7 @@
                  Like there, a project that does not contribute shows nothing. -->
             @if (project.is_pool_funding_contributor) {
             <div class="by-project__pool-tag flex w-fit items-center" data-testid="pool-funding-tag">
-              <app-custom-tag statusId="pool-funding" statusName="Contributing to Pool Funding"
+              <app-custom-tag statusId="pool-funding" statusName="Contributing to CGIAR Portfolio"
                 [tiny]="true"></app-custom-tag>
             </div>
             }

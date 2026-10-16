@@ -3717,6 +3717,7 @@ describe('scope=all — administrator view (listManagedProjects / listManagedDel
           pi_user_id: 888,
           pi_name: 'Jane Doe',
           status: 'ACTIVE',
+          funding_type: null,
           start_date: null,
           end_date: null,
           delegates: [],
