@@ -328,6 +328,7 @@ export class PrmsOpenSearchService
         counters,
         statusMapper: ResultPrmsStatusMapper,
       });
+      await this.importPrmsResultAlignments(dataProcessed, prmsResults);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
@@ -572,6 +573,49 @@ export class PrmsOpenSearchService
   }
 
   /**
+   * `fetch-prms-data` counterpart of the alignment step in
+   * `finalizeImportedResults`: only the pool-funding alignment and ToC, no
+   * history, versioning or phase. The row is found with the same keys
+   * `bulkSaveAllSections` matched it on for the PRMS platform.
+   */
+  private async importPrmsResultAlignments(
+    results: ExternalMappersDto[],
+    prmsData: PrmsTemporalResponseMapper[],
+  ): Promise<void> {
+    const sources = new Map<number, ResultResponseMapper>();
+    for (const data of prmsData) {
+      if (isEmpty(data?.data)) continue;
+      sources.set(parseInt(data.data.result_code), data.data);
+    }
+
+    for (const result of results) {
+      const source = sources.get(result.official_code);
+      // Skips the lookup for results PRMS sends without a ToC alignment.
+      if (!mapPrmsAlignment(source)) continue;
+      // Missing when the save failed.
+      const saved = await this.dataSource
+        .getRepository(Result)
+        .findOne({
+          where: {
+            result_official_code: result.official_code,
+            platform_code: ReportingPlatformEnum.PRMS,
+            report_year_id: result.createResult.year,
+          },
+          select: { result_id: true },
+        })
+        .catch((error) => {
+          this.logger.error(
+            `Error finding PRMS result ${result.official_code}: ${(error as Error).message}`,
+          );
+          return null;
+        });
+      if (!saved) continue;
+
+      await this.importAlignment(result, source, saved.result_id);
+    }
+  }
+
+  /**
    * Saves the pool-funding alignment and ToC PRMS has for the result, when
    * PRMS sends them. Goes before the version so the version carries them.
    */
@@ -591,7 +635,7 @@ export class PrmsOpenSearchService
     } catch (error) {
       const errorMessage = (error as Error).message ?? 'Unknown error';
       this.logger.error(
-        `Error saving the ToC alignment of PRMS result ${result.prms_result_code}: ${errorMessage}`,
+        `Error saving the ToC alignment of PRMS result ${result.prms_result_code ?? result.official_code}: ${errorMessage}`,
       );
     }
   }

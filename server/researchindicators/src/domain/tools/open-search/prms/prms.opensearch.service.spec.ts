@@ -441,6 +441,113 @@ describe('PrmsOpenSearchService', () => {
     });
   });
 
+  describe('getData ToC alignment', () => {
+    const run = async (overrides: Partial<ResultResponseMapper>) => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({ result_id: 34105 });
+      await service.getData(2025);
+    };
+
+    const alignedSource = {
+      toc_alignment: [
+        {
+          entity: { official_code: 'SP06', name: 'Climate Action' },
+          initiative_role: 'Primary submitter',
+          toc_results: [
+            {
+              level: 'High Level Output',
+              sub_entity: { official_code: 'SP06', description: null },
+              result_name: 'HLO 3.1.1',
+            },
+          ],
+        },
+      ],
+    } as Partial<ResultResponseMapper>;
+
+    it('saves the alignment on the PRMS-platform row the save matched', async () => {
+      await run(alignedSource);
+
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          result_official_code: 28731,
+          platform_code: ReportingPlatformEnum.PRMS,
+          report_year_id: 2025,
+        },
+        select: { result_id: true },
+      });
+      expect(bilateralService.importAlignmentFromPrms).toHaveBeenCalledWith(
+        34105,
+        {
+          primarySpCode: 'SP06',
+          contributingSpCodes: [],
+          toc: { level: 'OUTPUT', title: 'HLO 3.1.1' },
+        },
+        null,
+      );
+      expect(
+        bilateralService.importAlignmentFromPrms.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(
+        saveResultService.bulkSaveAllSections.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does nothing when PRMS sends no ToC alignment', async () => {
+      await run({ toc_alignment: [] });
+
+      expect(resultRepoHandle.findOne).not.toHaveBeenCalled();
+      expect(bilateralService.importAlignmentFromPrms).not.toHaveBeenCalled();
+    });
+
+    it('skips the alignment when the result was not saved', async () => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          year: '2025',
+          ...alignedSource,
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(null);
+
+      await service.getData(2025);
+
+      expect(bilateralService.importAlignmentFromPrms).not.toHaveBeenCalled();
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+    });
+
+    it('still closes the sync log when the alignment fails', async () => {
+      bilateralService.importAlignmentFromPrms.mockRejectedValueOnce(
+        new Error('db down'),
+      );
+
+      await run(alignedSource);
+
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+    });
+
+    it('does not write sync history, versions or the PRMS phase', async () => {
+      await run(alignedSource);
+
+      expect(
+        prmsHistoryRepository.replaceImportedHistory,
+      ).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getDataAsStar', () => {
     const onePage = () =>
       httpService.get.mockReturnValue(

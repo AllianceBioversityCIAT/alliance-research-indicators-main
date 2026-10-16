@@ -925,7 +925,8 @@ export class BilateralService {
 
   /**
    * Writes the pool-funding alignment and ToC a PRMS result already has in
-   * PRMS. ONLY for `fetch-prms-data-as-star`, a one-off import: the data is
+   * PRMS. ONLY for the PRMS imports (`fetch-prms-data-as-star`, and
+   * `fetch-prms-data` for PRMS-platform results): the data is
    * PRMS's own record of the result, not a user's choice, so none of the
    * gates `updateAlignment` applies to a user's save run here (PRMS
    * read-only source, the reporting-year lock, contributor and
