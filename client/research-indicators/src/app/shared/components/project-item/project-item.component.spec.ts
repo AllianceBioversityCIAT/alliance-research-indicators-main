@@ -323,7 +323,7 @@ describe('ProjectItemComponent', () => {
 
       const badge: HTMLElement | null = fixture.nativeElement.querySelector('[data-testid="pool-funding-tag"]');
       expect(badge).not.toBeNull();
-      expect(badge?.textContent).toContain('Pool Funding');
+      expect(badge?.textContent).toContain('Contributing to CGIAR Portfolio');
     });
 
     it('toggles the badge off when isPoolFunding flips back to false', () => {

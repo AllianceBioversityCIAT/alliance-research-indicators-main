@@ -6,8 +6,11 @@
           <label class="project-id" for="username">{{ project.agreement_id }}</label>
           @if (isHeader && isPoolFunding) {
             <span aria-hidden="true" style="color: var(--ac-grey-500);">·</span>
-            <span class="contributing-to-pool-funding"
-                  data-testid="pool-funding-inline-label">CONTRIBUTING TO POOL FUNDING</span>
+            <span class="contributing-to-pool-funding inline-flex items-center gap-1 uppercase"
+                  data-testid="pool-funding-inline-label">
+              <i class="pi pi-exclamation-circle rotate-180 !text-[12px]" aria-hidden="true"
+                 [pTooltip]="poolFundingTooltip" tooltipPosition="right"></i>
+              {{ poolFundingLabel }}</span>
           }
         </div>
         <label class="project-name" for="username">{{ project.projectDescription && project.projectDescription + ' - '
