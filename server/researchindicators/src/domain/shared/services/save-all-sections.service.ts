@@ -35,6 +35,8 @@ import { ResultPolicyChangeService } from '../../entities/result-policy-change/r
 import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
 import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
 import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
+import { ResultInnovationUseService } from '../../entities/result-innovation-use/result-innovation-use.service';
+import { ResultInnovationUse } from '../../entities/result-innovation-use/entities/result-innovation-use.entity';
 
 /**
  * Persists externally-synced result sections (PRMS, TIP) into the `results` table.
@@ -59,6 +61,7 @@ export class SaveResultService {
     private readonly _resultCapacitySharingService: ResultCapacitySharingService,
     private readonly _resultInnovationDevService: ResultInnovationDevService,
     private readonly _resultIpRightsService: ResultIpRightsService,
+    private readonly _resultInnovationUseService: ResultInnovationUseService,
   ) {}
 
   public async bulkSaveAllSections(
@@ -326,6 +329,22 @@ export class SaveResultService {
         }
         if (!isEmpty(result.ipRights)) {
           await this._resultIpRightsService.update(resultId, result.ipRights);
+        }
+        break;
+      case IndicatorsEnum.INNOVATION_USE:
+        if (!isEmpty(result.innovationUse)) {
+          // Results imported before the detail row was created on result
+          // creation have none, and `update` refuses a result without it.
+          const hasDetailRow = await this.dataSource
+            .getRepository(ResultInnovationUse)
+            .exists({ where: { result_id: resultId, is_active: true } });
+          if (!hasDetailRow) {
+            await this._resultInnovationUseService.create(resultId);
+          }
+          await this._resultInnovationUseService.update(
+            resultId,
+            result.innovationUse,
+          );
         }
         break;
       default:

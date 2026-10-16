@@ -3,6 +3,8 @@ import {
   CapacityDevelopmentSummaryMapper,
   InnovationDevelopmentQuestionnaireMapper,
   InnovationDevelopmentSummaryMapper,
+  InnovationUseLinkedResultMapper,
+  InnovationUseSummaryMapper,
   PrmsKnowledgeProductDto,
   PrmsSearchParams,
   PrmsTemporalResponseMapper,
@@ -87,6 +89,16 @@ import { UpdateIpRightDto } from '../../../entities/result-ip-rights/dto/update-
 import { CreateResultActorDto } from '../../../entities/result-actors/dto/create-result-actor.dto';
 import { CreateResultInstitutionTypeDto } from '../../../entities/result-institution-types/dto/create-result-institution-type.dto';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import {
+  CreateResultInnovationUseDto,
+  InnovationUseActorDto,
+  InnovationUseOrganizationDto,
+  InnovationUseQuantificationDto,
+} from '../../../entities/result-innovation-use/dto/create-result-innovation-use.dto';
+import { ClarisaInstitutionType } from '../../clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
+import { ClarisaInnovationUseLevel } from '../../clarisa/entities/clarisa-innovation-use-levels/entities/clarisa-innovation-use-level.entity';
+import { ClarisaActorTypesEnum } from '../../clarisa/entities/clarisa-actor-types/enum/clarisa-actor-types.enum';
+import { homologateInnovationUseActorType } from './homologation/innovation-use-actor-type.homologation';
 import { PolicyTypeHomologation } from './homologation/policy-type.homologation';
 import { PolicyStageHomologation } from './homologation/policy-stage.homologation';
 import { DeliveryModalityHomologation } from './homologation/delivery-modality.homologation';
@@ -154,6 +166,9 @@ const validDate = (value: unknown): Date | null => {
 /** A decision can never be dated before the submission it answers. */
 const laterOf = (candidate: Date | null, floor: Date): Date =>
   candidate && candidate.getTime() >= floor.getTime() ? candidate : floor;
+
+/** PRMS `result_type_id` of an Innovation Development result. */
+const PRMS_INNOVATION_DEVELOPMENT_TYPE_ID = 7;
 
 @Injectable()
 export class PrmsOpenSearchService
@@ -320,6 +335,11 @@ export class PrmsOpenSearchService
         );
 
       const dataProcessed = await this.processData(prmsResults);
+      // A PRMS-platform row uses the PRMS code as its official code; it is
+      // also kept in `prms_result_code`, the column STAR looks PRMS codes up by.
+      for (const result of dataProcessed) {
+        result.prms_result_code = result.official_code;
+      }
 
       await this.saveResultService.bulkSaveAllSections(dataProcessed, {
         platformCode: ReportingPlatformEnum.PRMS,
@@ -1004,6 +1024,208 @@ export class PrmsOpenSearchService
     return { innovationDev, ipRights };
   }
 
+  /**
+   * Maps PRMS `innovation_use_summary` into the STAR Innovation Use section.
+   *
+   * STAR holds only the current use: the 2030 section, the budgets, the
+   * scaling studies and the to-be-determined core numbers have no column and
+   * are dropped. When PRMS marks the current use as to be determined it sends
+   * no `current_section`, so the actors, organizations and measures are
+   * cleared. Rows that do not resolve to a STAR catalog are skipped: the save
+   * service rejects the whole result for one bad row.
+   */
+  private async mapInnovationUse(
+    summary: InnovationUseSummaryMapper | null | undefined,
+    year: number,
+  ): Promise<CreateResultInnovationUseDto | undefined> {
+    if (isEmpty(summary)) return undefined;
+
+    const innovationUse = new CreateResultInnovationUseDto();
+
+    if (!isEmpty(summary.innovation_use_level?.level)) {
+      const level = await this.dataSource
+        .getRepository(ClarisaInnovationUseLevel)
+        .findOne({
+          where: {
+            level: Number(summary.innovation_use_level.level),
+            is_active: true,
+          },
+        });
+      innovationUse.innovation_use_level_id = level?.id;
+    }
+    const explanation = summary.readiness_level_explanation?.trim();
+    // The save service stores it only for levels 6 and above.
+    innovationUse.innovation_use_level_explanation = explanation || undefined;
+
+    const section = summary.current_section;
+    innovationUse.actors = this.mapInnovationUseActors(section?.actors ?? []);
+    innovationUse.organizations = await this.mapInnovationUseOrganizations(
+      section?.organizations ?? [],
+    );
+    innovationUse.quantifications = (section?.other_quantitative ?? [])
+      .filter((measure) => typeof measure?.quantity === 'number')
+      .map((measure) => {
+        const dto = new InnovationUseQuantificationDto();
+        dto.quantification_number = measure.quantity;
+        dto.unit = measure.unit_of_measure?.trim() || undefined;
+        return dto;
+      });
+
+    innovationUse.innovation_dev_result_id =
+      await this.resolveLinkedInnovationDev(summary.linked_results ?? [], year);
+
+    return innovationUse;
+  }
+
+  private mapInnovationUseActors(
+    actors: InnovationUseSummaryMapper['current_section']['actors'],
+  ): InnovationUseActorDto[] {
+    const seen = new Set<string>();
+    const mapped: InnovationUseActorDto[] = [];
+    for (const actor of actors) {
+      const actorTypeId = homologateInnovationUseActorType(
+        actor?.actor_type_name,
+      );
+      if (!actorTypeId) {
+        this.logger.warn(
+          `Skipping PRMS innovation use actor type "${actor?.actor_type_name}": not homologated.`,
+        );
+        continue;
+      }
+      const isOther = actorTypeId === ClarisaActorTypesEnum.OTHER;
+      const customName = isOther ? actor.other_actor_type?.trim() : undefined;
+      if (isOther && !customName) continue;
+
+      // STAR refuses a repeated actor type (or a repeated "Other" name).
+      const key = `${actorTypeId}:${customName?.toLowerCase() ?? ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const dto = new InnovationUseActorDto();
+      dto.actor_type_id = actorTypeId;
+      dto.actor_type_custom_name = customName;
+      // PRMS `true` = only the total is known, which is STAR's "not apply".
+      dto.sex_age_disaggregation_not_apply = !!actor.sex_and_age_disaggregation;
+      if (dto.sex_age_disaggregation_not_apply) {
+        dto.actors_count = actor.how_many ?? undefined;
+      } else {
+        const womenYouth = actor.women_youth ?? 0;
+        const menYouth = actor.men_youth ?? 0;
+        dto.women_youth_count = womenYouth;
+        dto.women_not_youth_count = Math.max(
+          (actor.women ?? 0) - womenYouth,
+          0,
+        );
+        dto.men_youth_count = menYouth;
+        dto.men_not_youth_count = Math.max((actor.men ?? 0) - menYouth, 0);
+      }
+      mapped.push(dto);
+    }
+    return mapped;
+  }
+
+  /**
+   * PRMS can list one organization type twice. An exact repeat is dropped;
+   * different counts for the same type are added up, because the save
+   * service keeps only one row per type.
+   */
+  private async mapInnovationUseOrganizations(
+    organizations: InnovationUseSummaryMapper['current_section']['organizations'],
+  ): Promise<InnovationUseOrganizationDto[]> {
+    const byKey = new Map<
+      string,
+      { dto: InnovationUseOrganizationDto; counts: Set<number | null> }
+    >();
+    for (const org of organizations) {
+      const typeName = org?.institution_type_name?.trim();
+      if (!typeName) continue;
+      const institutionType = await this.dataSource
+        .getRepository(ClarisaInstitutionType)
+        .findOne({ where: { name: typeName, is_active: true } });
+      if (isEmpty(institutionType?.code)) {
+        this.logger.warn(
+          `Skipping PRMS innovation use organization type "${typeName}": not in the STAR catalog.`,
+        );
+        continue;
+      }
+      const customName = org.other_institution?.trim() || undefined;
+      const key = `${institutionType.code}:${customName?.toLowerCase() ?? ''}`;
+      const count = org.how_many ?? null;
+
+      const existing = byKey.get(key);
+      if (existing) {
+        if (existing.counts.has(count)) continue;
+        existing.counts.add(count);
+        if (count !== null) {
+          existing.dto.organization_count =
+            (existing.dto.organization_count ?? 0) + count;
+        }
+        continue;
+      }
+
+      const dto = new InnovationUseOrganizationDto();
+      dto.institution_type_id = Number(institutionType.code);
+      dto.institution_type_custom_name = customName;
+      dto.is_organization_known = false;
+      dto.organization_count = count ?? undefined;
+      byKey.set(key, { dto, counts: new Set([count]) });
+    }
+    return [...byKey.values()].map(({ dto }) => dto);
+  }
+
+  /**
+   * STAR links an Innovation Use to one Innovation Development. Takes the
+   * first PRMS linked Innovation Development already in STAR, found by its
+   * `prms_result_code` (or, for a PRMS-platform row, its official code),
+   * preferring the same year. `undefined` when none is
+   * there yet, so an existing link is kept and a later sync can fill it.
+   */
+  private async resolveLinkedInnovationDev(
+    linkedResults: InnovationUseLinkedResultMapper[],
+    year: number,
+  ): Promise<number | undefined> {
+    const codes = linkedResults
+      .filter(
+        (linked) =>
+          linked?.result_type_id === PRMS_INNOVATION_DEVELOPMENT_TYPE_ID &&
+          !isEmpty(linked.result_id),
+      )
+      .map((linked) => Number(linked.result_id))
+      .filter((code) => Number.isInteger(code));
+
+    const repository = this.dataSource.getRepository(Result);
+    const base = {
+      indicator_id: IndicatorsEnum.INNOVATION_DEV,
+      is_active: true,
+      is_snapshot: false,
+    };
+    for (const code of codes) {
+      // A STAR row keeps the PRMS code in `prms_result_code`; a row the
+      // PRMS fetch saved IS the PRMS code, as its official code.
+      for (const where of [
+        { ...base, prms_result_code: code },
+        {
+          ...base,
+          result_official_code: code,
+          platform_code: ReportingPlatformEnum.PRMS,
+        },
+      ]) {
+        const target =
+          (await repository.findOne({
+            where: { ...where, report_year_id: year },
+            select: { result_id: true },
+          })) ??
+          (await repository.findOne({
+            where,
+            select: { result_id: true },
+            order: { report_year_id: 'DESC' },
+          }));
+        if (target) return target.result_id;
+      }
+    }
+    return undefined;
+  }
+
   private mapIpRightsFromQuestionnaire(
     questionnaire?: InnovationDevelopmentQuestionnaireMapper | null,
   ): UpdateIpRightDto | undefined {
@@ -1195,6 +1417,13 @@ export class PrmsOpenSearchService
         );
         result.innovationDev = mapped.innovationDev;
         result.ipRights = mapped.ipRights;
+      }
+
+      if (indicator === IndicatorsEnum.INNOVATION_USE) {
+        result.innovationUse = await this.mapInnovationUse(
+          item.innovation_use_summary,
+          parseInt(item.year),
+        );
       }
 
       results.push(result);

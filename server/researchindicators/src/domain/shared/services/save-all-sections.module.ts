@@ -7,6 +7,7 @@ import { ResultsModule } from '../../entities/results/results.module';
 import { ResultPolicyChangeModule } from '../../entities/result-policy-change/result-policy-change.module';
 import { ResultCapacitySharingModule } from '../../entities/result-capacity-sharing/result-capacity-sharing.module';
 import { ResultInnovationDevModule } from '../../entities/result-innovation-dev/result-innovation-dev.module';
+import { ResultInnovationUseModule } from '../../entities/result-innovation-use/result-innovation-use.module';
 import { ResultIpRightsModule } from '../../entities/result-ip-rights/result-ip-rights.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { ResultIpRightsModule } from '../../entities/result-ip-rights/result-ip-
     ResultCapacitySharingModule,
     ResultInnovationDevModule,
     ResultIpRightsModule,
+    ResultInnovationUseModule,
   ],
   providers: [SaveResultService],
   exports: [SaveResultService],

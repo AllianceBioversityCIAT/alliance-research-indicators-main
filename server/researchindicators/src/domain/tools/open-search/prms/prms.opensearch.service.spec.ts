@@ -42,6 +42,8 @@ import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/
 import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
 import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import { ClarisaInnovationUseLevel } from '../../clarisa/entities/clarisa-innovation-use-levels/entities/clarisa-innovation-use-level.entity';
+import { ClarisaInstitutionType } from '../../clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
 
 jest.mock('typeorm', () => {
   const actual = jest.requireActual('typeorm');
@@ -438,6 +440,24 @@ describe('PrmsOpenSearchService', () => {
 
       const url = httpService.get.mock.calls[0][0] as string;
       expect(url).not.toContain('&year=');
+    });
+  });
+
+  describe('getData prms_result_code', () => {
+    it('saves the PRMS code in prms_result_code as well as the official code', async () => {
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({ result_code: '28731', year: '2025' }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(null);
+
+      await service.getData(2025);
+
+      const [saved] = saveResultService.bulkSaveAllSections.mock.calls[0][0];
+      expect(saved.official_code).toBe(28731);
+      expect(saved.prms_result_code).toBe(28731);
     });
   });
 
@@ -1066,6 +1086,311 @@ describe('PrmsOpenSearchService', () => {
         5001,
         2025,
       );
+    });
+  });
+
+  describe('processData innovation use', () => {
+    const institutionTypes: Record<string, number> = {
+      'Government (National)': 68,
+      'Research organizations and universities International (CGIAR)': 54,
+      Other: 78,
+    };
+    let useLevelRepo: { findOne: jest.Mock };
+    let institutionTypeRepo: { findOne: jest.Mock };
+    let linkRepo: { findOne: jest.Mock };
+
+    beforeEach(() => {
+      useLevelRepo = {
+        findOne: jest.fn(async ({ where }) => ({ id: where.level + 1 })),
+      };
+      institutionTypeRepo = {
+        findOne: jest.fn(async ({ where }) =>
+          institutionTypes[where.name] === undefined
+            ? null
+            : { code: institutionTypes[where.name] },
+        ),
+      };
+      linkRepo = { findOne: jest.fn().mockResolvedValue(null) };
+      dataSource.getRepository.mockImplementation((entity) => {
+        if (entity === ClarisaInnovationUseLevel) return useLevelRepo;
+        if (entity === ClarisaInstitutionType) return institutionTypeRepo;
+        if (entity === Result) return linkRepo;
+        return allianceStaffRepoHandle;
+      });
+    });
+
+    const summary = (overrides: Record<string, unknown> = {}) =>
+      ({
+        has_innovation_link: false,
+        linked_results: [],
+        innov_use_to_be_determined: false,
+        current_core_innovation_use_supported_by_evidence: null,
+        current_section: {
+          actors: [],
+          organizations: [],
+          other_quantitative: [],
+        },
+        innovation_use_level: null,
+        readiness_level_explanation: null,
+        has_scaling_studies: false,
+        scaling_study_urls: [],
+        innov_use_2030_to_be_determined: true,
+        innovation_use_2030_section: null,
+        initiative_budget: [],
+        bilateral_project_budget: [],
+        partner_budget: [],
+        ...overrides,
+      }) as any;
+
+    const run = async (innovationUseSummary: unknown) => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          year: '2026',
+          indicator_category: {
+            code: String(ResultTypeEnum.INNOVATION_USE),
+            name: 'Innovation use',
+          },
+          innovation_use_summary: innovationUseSummary as any,
+        }),
+      ]);
+      return out[0].innovationUse;
+    };
+
+    it('maps the use level by its catalog level, and the explanation', async () => {
+      const mapped = await run(
+        summary({
+          innovation_use_level: {
+            id: '10',
+            level: 9,
+            name: 'x',
+            definition: 'y',
+          },
+          readiness_level_explanation: '  Widely used  ',
+        }),
+      );
+
+      expect(useLevelRepo.findOne).toHaveBeenCalledWith({
+        where: { level: 9, is_active: true },
+      });
+      expect(mapped.innovation_use_level_id).toBe(10);
+      expect(mapped.innovation_use_level_explanation).toBe('Widely used');
+    });
+
+    it('maps aggregate and disaggregated actors, homologating the type names', async () => {
+      const mapped = await run(
+        summary({
+          current_section: {
+            actors: [
+              {
+                actor_type_name: 'Farmers/ (agro)pastoralist/ herders/ fishers',
+                sex_and_age_disaggregation: true,
+                how_many: 149757,
+              },
+              {
+                actor_type_name: 'Agricultural extension agents',
+                sex_and_age_disaggregation: false,
+                women: 10,
+                women_youth: 4,
+                men: 7,
+                men_youth: null,
+              },
+              {
+                actor_type_name: 'Other',
+                other_actor_type: ' Consumers ',
+                sex_and_age_disaggregation: true,
+                how_many: 5,
+              },
+              {
+                actor_type_name: 'Researchers',
+                sex_and_age_disaggregation: true,
+                how_many: 1,
+              },
+              {
+                actor_type_name: 'Researchers',
+                sex_and_age_disaggregation: true,
+                how_many: 2,
+              },
+              { actor_type_name: 'Unknown', sex_and_age_disaggregation: true },
+            ],
+            organizations: [],
+            other_quantitative: [],
+          },
+        }),
+      );
+
+      expect(mapped.actors).toEqual([
+        expect.objectContaining({
+          actor_type_id: 1,
+          sex_age_disaggregation_not_apply: true,
+          actors_count: 149757,
+        }),
+        expect.objectContaining({
+          actor_type_id: 3,
+          sex_age_disaggregation_not_apply: false,
+          women_youth_count: 4,
+          women_not_youth_count: 6,
+          men_youth_count: 0,
+          men_not_youth_count: 7,
+        }),
+        expect.objectContaining({
+          actor_type_id: 5,
+          actor_type_custom_name: 'Consumers',
+          actors_count: 5,
+        }),
+        expect.objectContaining({ actor_type_id: 2, actors_count: 1 }),
+      ]);
+    });
+
+    it('maps organizations by exact CLARISA type name, merging repeated types', async () => {
+      const mapped = await run(
+        summary({
+          current_section: {
+            actors: [],
+            organizations: [
+              { institution_type_name: 'Government (National)', how_many: 1 },
+              { institution_type_name: 'Government (National)', how_many: 15 },
+              {
+                institution_type_name:
+                  'Research organizations and universities International (CGIAR)',
+                how_many: 10,
+                graduate_students: 0,
+              },
+              {
+                institution_type_name:
+                  'Research organizations and universities International (CGIAR)',
+                how_many: 10,
+                graduate_students: null,
+              },
+              {
+                institution_type_name: 'Other',
+                other_institution: 'Self Help Groups',
+                how_many: 168,
+              },
+              { institution_type_name: 'Not in CLARISA', how_many: 3 },
+            ],
+            other_quantitative: [],
+          },
+        }),
+      );
+
+      expect(institutionTypeRepo.findOne).toHaveBeenCalledWith({
+        where: { name: 'Government (National)', is_active: true },
+      });
+      expect(mapped.organizations).toEqual([
+        expect.objectContaining({
+          institution_type_id: 68,
+          is_organization_known: false,
+          organization_count: 16,
+        }),
+        expect.objectContaining({
+          institution_type_id: 54,
+          organization_count: 10,
+        }),
+        expect.objectContaining({
+          institution_type_id: 78,
+          institution_type_custom_name: 'Self Help Groups',
+          organization_count: 168,
+        }),
+      ]);
+    });
+
+    it('maps other quantitative measures to quantifications', async () => {
+      const mapped = await run(
+        summary({
+          current_section: {
+            actors: [],
+            organizations: [],
+            other_quantitative: [
+              { quantity: 4.285, unit_of_measure: ' HA ' },
+              { quantity: null, unit_of_measure: 'skipped' },
+            ],
+          },
+        }),
+      );
+
+      expect(mapped.quantifications).toEqual([
+        expect.objectContaining({ quantification_number: 4.285, unit: 'HA' }),
+      ]);
+    });
+
+    it('clears the current numbers when PRMS marks them as to be determined', async () => {
+      const mapped = await run(
+        summary({
+          innov_use_to_be_determined: true,
+          current_section: null,
+          current_core_innovation_use_supported_by_evidence: {
+            female_using: 1,
+            male_using: 6,
+          },
+        }),
+      );
+
+      expect(mapped.actors).toEqual([]);
+      expect(mapped.organizations).toEqual([]);
+      expect(mapped.quantifications).toEqual([]);
+    });
+
+    it('links the first PRMS Innovation Development found by prms_result_code', async () => {
+      linkRepo.findOne.mockImplementation(async ({ where }) =>
+        where.prms_result_code === 23543 ? { result_id: 501 } : null,
+      );
+
+      const mapped = await run(
+        summary({
+          linked_results: [
+            {
+              result_id: '111',
+              result_type_id: 2,
+              result_type_name: 'Innovation use',
+            },
+            { result_id: '23000', result_type_id: 7 },
+            { result_id: '23543', result_type_id: 7 },
+          ],
+        }),
+      );
+
+      expect(linkRepo.findOne).toHaveBeenCalledWith({
+        where: {
+          indicator_id: IndicatorsEnum.INNOVATION_DEV,
+          is_active: true,
+          is_snapshot: false,
+          prms_result_code: 23543,
+          report_year_id: 2026,
+        },
+        select: { result_id: true },
+      });
+      expect(mapped.innovation_dev_result_id).toBe(501);
+    });
+
+    it('falls back to the PRMS-platform row whose official code is the PRMS code', async () => {
+      linkRepo.findOne.mockImplementation(async ({ where }) =>
+        where.platform_code === ReportingPlatformEnum.PRMS &&
+        where.result_official_code === 23543
+          ? { result_id: 777 }
+          : null,
+      );
+
+      const mapped = await run(
+        summary({
+          linked_results: [{ result_id: '23543', result_type_id: 7 }],
+        }),
+      );
+
+      expect(mapped.innovation_dev_result_id).toBe(777);
+    });
+
+    it('leaves the link untouched when the Innovation Development is not in STAR yet', async () => {
+      const mapped = await run(
+        summary({
+          linked_results: [{ result_id: '23543', result_type_id: 7 }],
+        }),
+      );
+
+      expect(mapped.innovation_dev_result_id).toBeUndefined();
+    });
+
+    it('does not map innovation use when PRMS sends no summary', async () => {
+      expect(await run(null)).toBeUndefined();
     });
   });
 
