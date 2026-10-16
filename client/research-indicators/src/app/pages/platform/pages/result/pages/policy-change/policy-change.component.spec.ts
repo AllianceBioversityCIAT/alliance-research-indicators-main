@@ -238,6 +238,58 @@ describe('PolicyChangeComponent', () => {
     expect(setLoadingSpy).toHaveBeenCalledWith(false);
   });
 
+  it('shows USD Amount and Status fields only for Program/Budget/Investment (type 3)', () => {
+    component.body.set({ policy_type_id: 1 } as any);
+    expect(component.isProgramBudgetOrInvestment()).toBe(false);
+
+    component.body.set({ policy_type_id: 3 } as any);
+    expect(component.isProgramBudgetOrInvestment()).toBe(true);
+  });
+
+  it('clears amount fields when policy type changes away from type 3', () => {
+    component.body.set({
+      policy_type_id: 3,
+      usd_amount: 100,
+      amount_status: 'Confirmed'
+    } as any);
+
+    component.onPolicyTypeChange(1);
+
+    expect(component.body().usd_amount).toBeNull();
+    expect(component.body().amount_status).toBeNull();
+  });
+
+  it('initializes a missing USD amount to zero for Program/Budget/Investment', async () => {
+    mockApiService.GET_PolicyChange.mockResolvedValue({
+      data: { policy_type_id: 3, usd_amount: null, amount_status: null }
+    });
+
+    await component.getData();
+
+    expect(component.body().usd_amount).toBe(0);
+  });
+
+  it('keeps a saved zero amount', async () => {
+    mockApiService.GET_PolicyChange.mockResolvedValue({
+      data: { policy_type_id: 3, usd_amount: 0, amount_status: 'Confirmed' }
+    });
+
+    await component.getData();
+
+    expect(component.body().usd_amount).toBe(0);
+  });
+
+  it('saves type 3 without a warning when status is still empty', async () => {
+    component.body.set({ policy_type_id: 3, usd_amount: 0 } as any);
+    mockApiService.PATCH_PolicyChange.mockResolvedValue({ successfulRequest: true });
+    mockApiService.GET_PolicyChange.mockResolvedValue({ data: { policy_type_id: 3, usd_amount: 0 } });
+
+    await component.saveData();
+
+    expect(mockApiService.PATCH_PolicyChange).toHaveBeenCalled();
+    expect(mockActionsService.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
+  });
+
   it('should test navigateTo function directly', async () => {
     // Test the navigateTo function by calling saveData with different page values
     mockApiService.PATCH_PolicyChange.mockResolvedValue({ successfulRequest: true });

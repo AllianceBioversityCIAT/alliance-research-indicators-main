@@ -1,0 +1,388 @@
+# Execution Log — Changes / Profile Simulation
+
+## Document Control
+
+| Field | Value |
+| --- | --- |
+| **Spec path** | `changes/profile-simulation` |
+| **Spec id** | 2026-08-profile-simulation |
+| **Approval Mode** | gated |
+| **Leader** | Claude (fable) — T1 |
+| **Implementer / Reviewer** | `.claude/agents/akili-implementer.md` (sonnet) / `.claude/agents/akili-reviewer.md` (opus, read-only) |
+| **Budget (design §13)** | 13 tasks · ≈ 1,700 LOC · 2 review rounds — tripwire > 15 / > 2,200 / > 3 |
+| **Branch** | `JuankCadavid/PARI-242` (worktree) |
+| **Environment pre-check (2026-08-25)** | Docker up; `.env` symlinked from the main checkout; client `environment*.ts` symlinked; `node_modules` installed fresh in both packages (worktree); no `mysql` CLI — DB reachability via the typeorm passthrough |
+| **Started** | 2026-08-25 |
+
+## Task Execution History
+
+_(entries appended per task)_
+
+---
+
+## T-01 — Schema, entities, migration, enums
+
+- **Status:** **PASS** — Reviewer PASS (attempt 2) + RB-2 human gate satisfied → task **`[x]`**
+- **Date:** 2026-08-25
+- **Attempts:** 2 (Implementer `akili-implementer`/sonnet; Reviewers `akili-reviewer`/opus ×2 in parallel on attempt 1 — migration surface → lens split: A readability/reliability, B risk/resilience; scoped re-audit by A on attempt 2)
+- **Requirements covered:** requirements §5 (data), R-IMP-002/004/005 data columns, OQ-5 (closed)
+
+### Attempt 1 — effort high
+- Files: `src/domain/entities/impersonation/entities/impersonation-{session,action}.entity.ts`, `…/enum/impersonation-{end-reason,error-code}.enum.ts`, `src/db/migrations/1787699586530-createImpersonationTables.ts`, `.env.example`
+- Implementer verification: `npx eslint <paths>` clean · `npx tsc -p tsconfig.build.json --noEmit` 0 errors · `migration:show` (ANSI-stripped) exactly 1 pending `[ ] CreateImpersonationTables1787699586530` · migration **not** applied (K-015) · `DESCRIBE sec_roles / sec_user_roles / sec_users` captured (read-only ts-node script, deleted afterwards)
+- **Environment finding:** `npm run migration:generate` fails on dev — `QueryFailedError: Table 'alliancereportingdb.orm_metadata' doesn't exist` (TypeORM bookkeeping for stored generated columns; pre-existing, caused by `result_pool_funding_alignment_sp.active_primary_alignment`). Migration hand-authored to the generator's format; Reviewer B byte-matched the `AuditableEntity` DDL prefix against `1782400514019-CreateStrategicObjectivesTable.ts`. Creating `orm_metadata` on dev = human decision (recorded in design §14).
+- Reviewer A — **FAIL**: (1) OQ-5 not recorded in design §4/§14, RB-1 open; (2) `impersonation_actions.method/route_pattern/path/status_code` nullable in entity + migration while design §3 / requirements §5 mark only `result_official_code` NULL. Uncovered (human): migration unexecuted (K-006/RB-2).
+- Reviewer B — **FAIL**: (1) OQ-5 not recorded (same); (2) migration unexecuted — human-owned, not chargeable. Verified DDL column-for-column, `down` order, no `namedPlaceholders` trap; FK sha1 name "unverified".
+- Leader adjudication: OQ-5 = Leader doc edit (Implementer delivered the `DESCRIBE` in its report) → written into design §4/§14, RB-1 closed, not charged. Nullability = real conformance defect → attempt 2. FK-name advisory adopted as D-imp-15 (design §3 does not name the FK).
+
+### Attempt 2 — effort xhigh
+- Files: `impersonation-action.entity.ts` (four columns `nullable: false`/`!`; `@JoinColumn({ foreignKeyConstraintName: 'fk_impersonation_actions_session' })` — option confirmed at `node_modules/typeorm/decorator/options/JoinColumnOptions.d.ts:16`; append-only comment), migration (four `NOT NULL`; FK renamed in `up`/`down`)
+- Implementer verification: eslint clean · tsc build 0 errors · `grep -n NULL` on migration → only `result_official_code` bare NULL in the actions table · `migration:show` still exactly one pending
+- Reviewer A — **PASS**: "Both blocking issues are closed … entity and DDL agree column-for-column; delta touched exactly the two files claimed (blob hashes), no collateral edits; `namedPlaceholders` trap still untripped."
+
+### ADVISORY (recorded, non-gating)
+- **Forward pointer → T-05:** `route_pattern` is now `NOT NULL` but design §3 sources it from `req.route?.path` (undefined on unmatched routes) → `logAction` would silently drop the row. T-05 must coalesce (`req.route?.path ?? req.originalUrl`) and cover `req.route === undefined`.
+- **Forward pointer → T-12:** `sec_roles.focus_id` is `NOT NULL` on dev, so the "Center Admin with `focus_id = null`" failing input is only constructible in the unit spec (fabricated DTO), not e2e.
+- **Forward pointer → T-02:** clamp/parse `IMPERSONATION_TTL_MINUTES` (a ms value pasted as minutes overflows `TIMESTAMP` 2038 ceiling); pick one clock (Node) for `expires_at` write and comparison and state it.
+- **Forward pointer → T-13:** `package.json` `migration:scan` script vs `src/CLAUDE.md` §7 claim that the scanner "was withdrawn" — one is stale.
+- `action_id` typed `number` for a bigint PK (safe: `bigNumberStrings: false`), sibling exemplar uses `string` — cosmetic.
+- Design §3 `impersonation_actions` rows now carry explicit `NOT NULL` markers (Leader edit after PASS).
+
+### RB-2 — human-approved migration apply on dev (user approved option 1, 2026-08-25 18:13 COT; executed by the Leader)
+- [x] `npm run migration:dev:execute` → `1 migrations are new migrations must be executed` … `Migration CreateImpersonationTables1787699586530 has been executed successfully` (6 DDL statements logged: 2 CREATE TABLE, 3 CREATE INDEX, 1 ADD CONSTRAINT `fk_impersonation_actions_session`) → `migration:show`: `[X] 383 CreateImpersonationTables1787699586530`
+- [x] `npm run migration:revert` → FK, 3 indexes, both tables dropped in reverse order; `Migration … has been reverted successfully` → `migration:show`: `[ ] CreateImpersonationTables1787699586530`
+- [x] `npm run migration:dev:execute` (re-apply) → the shell wrapper hit a 5-min cap during output capture, so the final state was **re-measured separately**: `migration:show` → `[X] 384 CreateImpersonationTables1787699586530`; `INFORMATION_SCHEMA.TABLES` → `impersonation_actions`, `impersonation_sessions` both present. Forward and backward paths proven (K-006).
+- Disqualifier check: no `error` line in any of the three runs' stripped output.
+
+---
+
+## T-02 — Repository + `ImpersonationService`
+
+- **Status:** **PASS** (attempt 1) → `[x]`
+- **Date:** 2026-08-25
+- **Attempts:** 1 (Implementer `akili-implementer`/sonnet, effort high; Reviewer `akili-reviewer`/opus, lenses reliability + risk)
+- **Requirements covered:** R-IMP-001 (search rules), R-IMP-002 (all clauses), R-IMP-004 (end/expiry/current), R-IMP-005 (`logAction`); T-01 forward pointers (TTL clamp, single Node clock) discharged
+- **Files (9 new/changed, +1,294):** `impersonation/{impersonation.service.ts,+spec, impersonation.module.ts, repositories/impersonation-user.repository.ts,+spec, types/impersonation.types.ts, errors/impersonation-service.error.ts}`, `shared/utils/app-config.util.ts` (+spec) `IMPERSONATION_TTL_MINUTES` clamp [1,1440] default 240
+- **Implementer verification:** `npx jest src/domain/entities/impersonation src/domain/shared/utils/app-config.util.spec.ts --silent` → 3 suites / 41 tests green · mutation proof: supersede block removed → `expect(queryBuilder.set).toHaveBeenCalledWith(...) — Number of calls: 0` (spec:258), restored · `npx eslint` over both paths clean (after `prettier --write`, a fixer not a gate) · `tsc -p tsconfig.build.json --noEmit` 0 errors
+- **Leader full-suite re-measure (isolated):** `npm test -- --silent` → 340 suites / 2,449 tests passed
+- **Reviewer verdict:** PASS — "every acceptance item implemented and proven at the level the task's disqualifier permits; DI constraints hold exactly (no `CurrentUserUtil`, repository = `EntityManager` only, no cache); `?`+array parameterization is the exempted case in `src/CLAUDE.md` §7; all four recorded deviations defensible." Deviations accepted: no `roleName` (client computes), `blocked_reason` precedence self > system_admin > inactive, plain `@Injectable` repository (no local entity for `sec_*`), `ImpersonationServiceError extends HttpException` keeps `errors` a string (verified against `global.exception.ts:29`).
+- **Decisions (Leader, recorded in design):** D-imp-16 — `TargetProfileDto` without `roleName`; middleware derives `req.user.roles` from active `user_role_list`; null target ⇒ `SESSION_INVALID`. NFR-IMP-003 wording corrected (PK read + profile join, ≤ 15 ms).
+
+### ADVISORY (recorded, non-gating)
+- **→ T-03:** derive `roles[]` on swap (D-imp-16); guard `resolve()` returning `valid` with `target: null` → `403 SESSION_INVALID`.
+- **→ T-04:** coerce `is_active` tinyint `1/0` → boolean in the DTO mapping (client `RolesService` may compare `=== true`); LIKE wildcards `%`/`_` in `search` are not escaped (parameterized, admin-only, capped at 20) — escape in the DTO/service if desired.
+- **→ T-05:** `impersonation.service.ts` added to the file list — `warn` lines for `end` and lazy `expired` (NFR-IMP-004).
+- **→ T-06:** assert on `is_active` wire type; the ownership check (`findOne` `where` with `actor_user_id` + `is_active`) is only falsifiable there (KZ-001 — the unit suite drives `findOne` by return value; a `resolve` that dropped the actor filter stays green).
+- Test hygiene: TTL mutated in a test body rather than `beforeEach`; supersede-before-insert ordering not asserted. Recorded; no task change.
+
+---
+
+## T-03 — Middleware `applyImpersonation`, exception + header, CORS
+
+- **Status:** **PASS** (attempt 3 of 3 — ceiling reached, passed on final) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 3 (Implementer sonnet, xhigh; Reviewers opus ×2 parallel lenses on attempt 1: security PASS / resilience FAIL; scoped re-audits by the resilience reviewer)
+- **Requirements covered:** R-IMP-003 (all steps + scenarios + AC.1/2), R-IMP-002 nested 409, R-IMP-001 nested 403, R-IMP-004 foreign `/end` 403, NFR-IMP-001/002
+
+### Attempt 1 — logic correct, evidence FAIL
+- `applyImpersonation(req,res,credential)` called from all 3 credential branches; 15 new spec cases; security reviewer PASS ("no path reaches next() with a header but no ownership check; tolerance unreachable by a foreign session — verified in the service source; CORS additive-only").
+- Resilience reviewer FAIL: the claimed K-004 red (`{state:'valid'}` stub swap) could not have produced the pasted output — the stub carries no `target`, so the null-target reject keeps the test green; also not the mandated middleware mutation (KZ-014).
+
+### Attempt 2 — evidence fixed, new FAIL (Leader-induced)
+- Real middleware mutation (tolerate `invalid` on `/end` inside step 5) → verbatim red `Received promise resolved instead of rejected`, restore proven by line-count stat + green re-run. Reviewer closed issue 1 and **withdrew** its own step-6 mutation suggestion (TS2367 dead code).
+- Leader-directed additions: human messages per code (R-IMP-003 verbatim), `resolve()` failure → 503. FAIL on the Leader's own directive: `X-Impersonation-Error: RESOLVE_FAILED` extended design §4's closed vocabulary and, with §2.2's presence-based client rule, a DB blip would silently end a valid simulation.
+
+### Attempt 3 — PASS
+- Header + enum member removed (`grep -rn RESOLVE_FAILED src` → 0); `applyImpersonation` moved out of the JWT `try` (catch reverted to original narrow form — pre-existing auth path now byte-equivalent in behaviour); `actorId` declared after step 3; 503 spec case asserts the header is NOT set.
+- Reviewer PASS: "impersonation rejections escape `use` structurally; no behavioural change to the pre-existing auth path; 11-case matrix + header-on-every-rejection contract intact." 22/22 green · eslint clean · tsc 0 errors.
+
+### ADVISORY (recorded)
+- `Logger` vs `LoggerUtil` (3 call sites) — accepted whole-file convention deviation from design §9; normalize only as its own task.
+- `RequestWithUser.user/credential` non-optional though unset on JwtMiddleware-excluded routes.
+- Rejection `warn` lines unasserted → owned by T-05 (spy on the middleware logger).
+- Session-id shape guard (uuid-v4 precheck) and role-definition `is_active` question (does real login filter `sec_roles.is_active`? verify at T-06) — recorded for T-06.
+- Boot-level DI proof (middleware ← ImpersonationService via EntitiesModule) → T-06.
+
+---
+
+## T-04 — Controller, DTOs, module wiring, Swagger
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet, medium→high; Reviewer opus full 4R)
+- **Requirements covered:** R-IMP-001 (400/403/≤20/simulable + LIKE escaping), R-IMP-002 (201 payload, 404/409), R-IMP-004 (`/end` 400-without-header/idempotent, `/current` both states), §6 Swagger
+
+### Attempt 1 — code conformant, evidence FAIL
+- Reviewer: all endpoints/DTOs/wiring/filter conform (filter scoping verified against Nest's router-exception-filters source; `is_active` coercion at all 3 levels; LIKE escaping correct end-to-end). FAIL: acceptance box #2 (runtime route enumeration) substituted by a decorator grep — a presence count; the spec's testing module had no RouterModule/prefix, so a wrong mount would stay green.
+- **Reviewer discovery, repo-wide:** this app registers **no `/v1` segment** — live paths are `/api/impersonation/*`. Spec docs corrected (requirements §6, design §4, tasks acceptance filter), recorded as **D-imp-17**; TRD §6.2 drift flagged for T-13/archive.
+
+### Attempt 2 — PASS
+- New `impersonation.routes.spec.ts`: static assertion over the real `route` array + live HTTP proof (`RouterModule.register` + real `ImpersonationModule` with mocked providers + `setGlobalPrefix('api')`): users 200 / start 201 / end-no-header 400 / current 200 / `GET /api/v1/...` 404. K-004: deleting the routes node → 6/6 red (`impersonationRouteEntry … Received: undefined`; live block cascades in `RouterModule.deepCloneRoutes`), restored byte-identical.
+- Shared `RequestWithUser` imported (local stand-in deleted); `actorId()` throws `UnauthorizedException` when unresolvable (+test); live `GET /users?search=ro` → 400 proves the pipe is attached. 5 suites / 60 tests green · eslint clean · tsc 0 errors. Leader fixed two stray `/api/v1` docstrings inline.
+- Reviewer PASS; also verified the working tree already had both docstring fixes and the three spec docs clean of `/api/v1/impersonation`.
+
+### ADVISORY (recorded)
+- routes.spec `/v1` 404 test cannot fail for its stated reason (harness never enables versioning) — the four positive assertions carry the box; retitle when convenient.
+- `/end` returns `ImpersonationSessionSummary` (superset of design §4's `{session_id, ended_at, end_reason}`) — **T-07 must write the client contract against what ships.**
+- `end`/`current` accept an unvalidated inline body (unknown `reason` → 'manual', tested) — matches exemplar convention.
+- Middleware spec fixtures still use `/v1` URLs — harmless (matcher is version-agnostic); T-03's file.
+
+**Leader full-suite re-measure after T-03+T-04 (isolated):** `npm test -- --silent` →
+Test Suites: 343 passed, 343 total
+Tests:       2496 passed, 2496 total
+
+---
+
+## Budget tripwire — fired after T-04, resolved
+
+- Design §13 budget: ≈1,700 LOC, tripwire >2,200. Actual server-only at T-04: **3,413 insertions** (prod 1,541 / tests 1,872; `git diff 701821be..HEAD --numstat -- server/`).
+- Cause: test volume ~55% of insertions (T-03/T-04 security matrices, review-mandated proofs); no scope creep (all files within task lists).
+- User decision 2026-08-26: **continue** — budget revised in design §13 to ≈4,500 (trip >6,000), rounds unchanged.
+
+---
+
+## T-07 — Client foundation: token, interfaces, ApiService, ImpersonationService
+
+- **Status:** **PASS** (attempt 1) → `[x]` (client full-suite re-measure recorded below, after the concurrent server worker finished)
+- **Date:** 2026-08-26
+- **Attempts:** 1 (Implementer sonnet, high; Reviewer opus, full 4R)
+- **Requirements covered:** R-IMP-009 storage rule, R-IMP-010 (`BUT` tokens untouched, AC.4), NFR-IMP-005 token value; D-imp-8/13/16/17
+- **Files (6, +548):** `styles/colors.scss` (`--ac-orange-2 #b3561a` ×3 sites incl. `$colors` map → `.abc-/.atc-orange-2`), `shared/interfaces/impersonation.interface.ts`, `api.service.ts` (4 methods, no version segment), `shared/services/impersonation.service.ts` (+spec), `to-promise.service.ts` (additive `headers?` Config — Leader-delegated choice so T-07 is self-contained; isolation proven: spec-tsc baseline 936→934 with the change, no new error category)
+- **Implementer verification:** scoped jest 9/9 · mutation: removing `localStorage.setItem('data', …)` from `end()` → 5 red, restored 9/9 · bare eslint clean (3 files; `to-promise.service.ts` is in eslint's `ignores` by repo config — recorded as excluded-by-config, not lint-clean) · `tsc -p tsconfig.app.json --noEmit` clean
+- **Reviewer verdict:** PASS — contract checked against the built server DTOs; tokens structurally untouched (`{...prev, user}` only); 3 s race leak-free; JSON clone lossless for `UserCache`; **`restore()` retaining the full actor snapshot judged a refinement the spec text must adopt** (done — design §5 amended); `end('server-invalid')` skipping the API call judged correct (foreign/unknown `/end` would just 403 again).
+
+### ADVISORY (recorded)
+- **→ T-08:** stale `impersonation` key + different admin logs in → boot-restore's 403 path would write admin A's snapshot into admin B's `data.user` (server authority unaffected). Mitigate in T-08: clear the key on login, or drop (not apply) the snapshot when `/current` rejects as foreign.
+- `getBlob`/`getWithParams` ignore `config.headers` (unused by impersonation) — symmetry note.
+- Signals exported writable; `.asReadonly()` would harden ownership — style only.
+
+---
+
+## T-05 — Audit interceptor + log attribution + reader re-enumeration
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, reliability + risk)
+- **Requirements covered:** R-IMP-005 (all clauses), R-IMP-003 AC.4 (re-enumeration), NFR-IMP-004
+- **Files (13, +796/−27):** `Interceptors/impersonation-audit.interceptor.ts` (+spec), `app.module.ts` (APP_INTERCEPTOR + honest position comment), `logging/response` interceptors + `global.exception` (+specs — `actorId`/`impersonationSessionId` fields), `logger.util.ts` (DTO extension), `impersonation.service.ts` (+spec — NFR-IMP-004 warns for `end`/`expired`), `jwr.middleware.spec.ts` (rejection-warn spy)
+
+### Attempt 1 — FAIL (2 findings)
+- (1) `result_official_code` gated on route pattern containing `'results'` — a stale clause from the Leader's own brief (the corrected spec has no filter); reviewer found real mutating routes losing the code (`green-checks/new-reporting-cycle/:resultCode`, `result-user/author-contact/...:resultCode`), unrecoverable in an append-only table. (2) K-004 red was mechanical (`getResponse is not a function`), not a value-red.
+
+### Attempt 2 — PASS
+- Filter removed; `parseInt` + `Number.isSafeInteger`; red-first proof: flipped case + green-checks-pinned case → `Tests: 2 failed` on the old code, 13/13 after. Value-red for the mutation: `Expected {"status_code": 409} / Received {…"status_code": 200…}`, restored, green. Advisories adopted (non-string route.path guard, sync-throw wrap, honest comments).
+- Reviewer PASS: "both findings genuinely closed; other 11 files byte-identical; K-004 satisfied on its own terms."
+- **Enumeration (R-IMP-003 AC.4):** 43 literal hits / 0 in `test/`; literal grep undercounts optional-chained readers (design §2.4 updated with the widened pattern); new reader `impersonation.controller.ts` `actorId()` added to the table.
+- **Leader full-suite re-measure (isolated):**
+Test Suites: 344 passed, 344 total
+Tests:       2518 passed, 2518 total
+
+### ADVISORY (recorded)
+- **Design-level accepted gap (added to design §5):** guard-level denials (`RolesGuard`/`ResultStatusGuard`) produce no `impersonation_actions` row — Nest runs guards before interceptors; the audit trail records what reached a handler. Carried as OQ-6 for product.
+- `ResponseInterceptor.isError()` returned-not-thrown 500-rewrite records the DTO's pre-rewrite status — accepted, documented in the code comment.
+- Stored `route_pattern` carries the Express regex + global prefix — audit SQL should expect it.
+
+**Leader client full-suite re-measure after T-07 (serial, after the server run):**
+Test Suites: 312 passed, 312 total
+Tests:       6545 passed, 6545 total
+
+---
+
+## T-08 — Client interceptors, auth plumbing, restore
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, security/correctness + reliability)
+- **Requirements covered:** R-IMP-009 (header MUST incl. post-401 retry, BUT not on ROAR calls, Reload), R-IMP-010 (`logOut` order, AC.3 one toast, AC.4), R-IMP-004 client use; D-imp-12; T-07 forward pointer (stale key on login) discharged
+- **Attempt 1 — FAIL:** the `X-Ari-Auth-Call` strip was host-gated (only inside the four-host branch), so with `managementApiUrl ≠ mainApiUrl` login/current-user would reach ROAR with the marker intact (CORS break); all attempt-1 marker tests ran at the equal-hosts case and could not see it.
+- **Attempt 2 — PASS:** capture+strip once at the top of the interceptor before any branching; new unequal-hosts test, red-first `Expected: false / Received: true` on `headers.has('X-Ari-Auth-Call')`, restored 27/27. Leader-adopted: auto-end value-matched to `SESSION_INVALID` only (design §2.2 reconciled with R-IMP-010; `NESTED` suppresses the generic toast without ending); `active()` short-circuit → one end+toast across concurrent 403s; rejection handlers on `end()`/bootstrap `restore()`; `applyAuthMarker` in `getBlob`.
+- Reviewer PASS: strip at the right layer; the short-circuit test models production faithfully (`end('server-invalid')` is synchronous to `active.set(false)`); J-10 retry clones the decorated request on both flows; refresh persists tokens only (payload-level assertion); `rolesGuard.decide()` byte-equivalent.
+- Per-file runs: 27/30/46/8/79/21 = **211 green** · eslint 0 errors (spec files + `to-promise.service.ts` are in eslint `ignores` — pre-existing scope gap, disclosed) · `tsc -p tsconfig.app.json` clean.
+- ADVISORY recorded: marker strip sits after the `no-auth-interceptor` early return (unreachable combination today — zero production `no-auth-interceptor` call sites; one-line hoist if that changes); env-restore tidiness in the new spec.
+
+---
+
+## T-09 — Modal registration + SimulateProfileModal + UserSearchStep
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet high→xhigh; Reviewer opus, readability + reliability)
+- **Requirements covered:** R-IMP-007 (all clauses, six states, AC.1 KZ-015 transitions, AC.2), NFR-IMP-005 (Escape; focus trap = wrapper's Tab trap)
+- **Attempt 1 — FAIL (3):** envelope description read from `res?.description` (always undefined — lives in `errorDetail.description`) with a fixture the pipeline never emits; Escape asserted as wrapper-handled but `modal.component.ts` implements the Tab trap only (K-004 unseen assertion); tooltip on a `disabled` button (unreachable) with a `??`-tautology assertion.
+- **Attempt 2 — PASS:** all three fixed with red-first proofs (`Expected substring "Server unavailable"…`; `closeModal Number of calls: 0`; `aria-disabled Expected "true" / Received null`); five advisories adopted with their own red-firsts: reopen-reset gated on the `false→true` edge of `computed(isOpen)` (a write to ANY modal key no longer bounces the step), post-debounce current-query `filter`, monotonic stale-response guard, "20+ matches" cap label, duplicate title removed (D-imp-18).
+- Reviewer PASS: fixes at the root; the edge-gate fixture genuinely exercises the unrelated-key write; debounce contract preserved.
+- 22/22 green (both spec files) · eslint clean · `tsc -p tsconfig.app.json` clean · hex-grep 0 · scss ≤ 414 B.
+- **Forward pointers → T-12 (HITL/axe):** tooltip reachable by hover but not keyboard (span lacks `tabindex`; native `disabled` removes the button from tab order — add `tabindex="0"` or drop native disabled for `aria-disabled`); no `aria-live` region announcing loading→results/error; wrapper-title 16/500 vs mockup 18/600 visual delta (D-imp-18).
+- **Forward pointer → T-11:** navbar entry point opens `allModals.openModal('simulateProfile')`.
+
+**Leader client full-suite re-measure after T-08+T-09 (isolated):**
+Test Suites: 314 passed, 314 total
+Tests:       6593 passed, 6593 total
+
+---
+
+## T-10 — ConfirmStepComponent
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 2 (Implementer sonnet medium→high; Reviewer opus, reliability + correctness)
+- **Requirements covered:** R-IMP-008 (all clauses + AC.1), design §5 client-start orchestration (D-imp-13 caller side)
+- **Files (7, ≈500):** `confirm-step/` (4 files) + wiring in `simulate-profile-modal.component.{ts,html,spec}`
+- **Attempt 1 — FAIL (evidence-only):** the "zero `/start` calls on Escape" test never dispatched Escape (construction-only placebo, K-004). Everything else verified clean on attempt 1, incl. the critical `successfulRequest:false` guard (a 409 lands on the error path, `res.data` never dereferenced) and the real call-order log (`impersonation.start → closeModal → configUser → navigate → toast`).
+- **Attempt 2 — PASS:** Escape assertion moved to the parent spec's real Escape test (rendered ConfirmStep, genuine document keydown) — red proof via a temp Escape→`start()` HostListener: `Expected 0 / Received 1 — {"target_user_id": 1042}` at spec:193, byte-identical restore; placeholder test deleted (32→31). Advisories adopted: `try/finally` pending reset (also fixes a stuck-pending on a rejecting promise), class-doc sentence on in-flight-close semantics (continuation completes deliberately — dropping it would orphan the server session).
+- Reviewer PASS — verified the red-proof line arithmetic against the hunk headers; `try/finally` regression-checked (double-click mutation still red).
+- **Decisions:** Cancel closes the modal (mockup has no third step; `back` output kept, parent wires to `closeModal`) · callout copy names admin AND target (deliberate mockup deviation, R-IMP-008 requires the names) · `reason?` not collected (optional per R-IMP-002, recorded).
+- **Forward pointers → T-12:** `role="alert"`/`aria-live` on the error line + `aria-busy` on the pending button (axe/HITL); in-flight-close behaviour worth a manual sanity check.
+
+---
+
+## T-11 — SimulationBanner, navbar changes, platform offset
+
+- **Status:** **PASS** → `[x]`
+- **Date:** 2026-08-26
+- **Attempts:** 1 implementer run + 1 resume (the first worker died mid-task on a session limit — runtime failure per K-009, NOT a work FAIL; a resume worker verified the inherited tree per K-011 and completed it); Reviewer opus (reliability + risk) PASS
+- **Requirements covered:** R-IMP-006 (three clauses + AC.1), R-IMP-009 banner/avatar/panel/responsive/a11y + AC.3 unit half (pixel measurement owed to T-12), R-IMP-010 AC.1; D-imp-14/16/18
+- **Files (9, +727/−16):** `simulation-banner/` (new ×4), `alliance-navbar/` (×4), `platform.component.html`
+- **Resume findings (recorded):** two false-passing tests in the inherited spec fixed — an undrained 4-hop chained-await under `fakeAsync`+`tick` (→ real macrotask hop) and an OnPush dirty-marking no-op in `openDropdown()` that made three dropdown assertions vacuous (→ click the real `[dropdown-button]`); avatar-swap case added; K-004 mutation re-run first-hand (dropping `!active()` → RED with the button rendered, restored). Also surfaced a Leader bookkeeping bug: a bulk status edit had collided T-09's and T-11's identical status lines (corrected in tasks.md).
+- **Verification:** 66/66 green (both suites) · eslint clean · `tsc -p tsconfig.app.json` clean · `ng build --configuration production` exit 0, no warnings naming these components (navbar css under budget minified) · no new hex literals · both `pt-*` constants gone.
+- **Reviewer PASS** — verbatim copy match vs requirements + mockups; `navbarHeight`'s four consumers verified conceptually sound with the banner included; both resume fixes judged sound ("the vacuity is proven gone, not argued").
+
+### ADVISORY (recorded; #1–#3 join T-12's HITL checklist)
+1. New stacking context: navbar `:host` z-index 3 caps the dropdown's `z-[9999]` — check dropdown over sidebar/popovers in the browser (T-12).
+2. `:host { display: block }` missing on the banner — measure the host height in the browser (T-12); one line if it misbehaves.
+3. Cold-load offset flash (padding-top 0 for ~1 frame until the first ResizeObserver delivery) — eyeball at T-12.
+4. No double-submit guard on `endSimulation()` — harmless today (`/end` is idempotent 200).
+5. Focus effect re-fires when `hasSmallScreen()` flips while active (focus steal on resize) — recorded.
+6. TZ-fragile started-time assertion (`/^\d{2}:32$/` vs UTC fixture) — breaks under half-hour offsets; pin TZ if CI ever moves.
+7–10. Readability notes (unreachable fallback, test title overstatement, duplicated `endSimulation` helper — spec-conformant per §5 caller rule, pre-existing platform ternary).
+
+**Leader client full-suite re-measure after T-10+T-11 (isolated):**
+Tests: 6620 passed, 6620 total (all suites green)
+
+---
+
+## T-12 — Role-model specs + socket orchestration + HITL visual check
+
+- **Status:** unit half **PASS** (attempt 2) · task **`[~]`** — HITL browser half (screenshots, measured padding, real-browser axe, tab order) still owed
+- **Date:** 2026-08-26
+- **Attempts (unit half):** 2 (Implementer sonnet medium→high; Reviewer opus)
+- **Files:** `roles.service.spec.ts` only (+23/−1); socket/nav/toast orchestration was delivered under T-10/T-11
+- **Attempt 1 — FAIL (evidence):** the mutation run (`if (false && …)`) only loosens the guard — the new positive case could never redden; acceptance names the DTO-drop mutation.
+- **Attempt 2 — PASS:** DTO-drop mutation on the new fixture → red at spec:141 (`Expected: true / Received: false`), byte-identical restore, 24/24. **1 red, not the Reviewer's predicted 2 — worker reported the deviation honestly; Reviewer confirmed the 2-red prediction was its own K-004 error** (a predicted, unobserved count carried from a different mutation) — logged here against the reviewer, per its own request. Case-3 comment trimmed (null-vs-absent claim removed).
+- Three cases: simulated Contributor → `isSystemAdmin()`/`canAccessCenterAdmin()` false · simulated Center Admin (full role shape) → true · `focus_id: null` input-shape guard.
+
+### Owed before `[x]` (HITL half — Leader + human, real browser)
+- [ ] App running THIS worktree's code (docker decision pending: the running `ari_*` containers belong to `bilateral-visual-improvements`)
+- [ ] Two screenshots vs mockup artboards 1/4 · measured `#content` padding = navbar+banner host height · axe: 0 contrast violations on banner + both dialog steps · tab-order + Escape note
+- [ ] T-11 advisories #1–3 (dropdown z-index over sidebar/popovers; banner `:host` display; cold-load offset flash) · T-09/T-10 aria advisories eyeballed
+
+---
+
+## T-06 — Server e2e · IN PROGRESS `[~]` (two runtime failures; code written, evidence pending)
+
+- **Date:** 2026-08-26
+- **State:** `test/impersonation.e2e-spec.ts` written complete per the work order (R-IMP-001..005 e2e clauses, NFR-IMP-003 latency block, Center Admin read-only case); `npx eslint` clean; `tsc --noEmit` clean. **No run evidence exists** — the suite has never been observed green or red (K-004: nothing may be asserted from it yet).
+- **Runtime failure 1:** the worker's background jest run was killed externally with zero output (`[killed]` was the entire log; not an auth failure — no output at all).
+- **Runtime failure 2:** the worker died on the account's weekly usage limit (resets 03:00 America/Bogota) before the foreground re-run; the admin JWT also expired.
+- **Fixtures agreed with the human:** targets `sec_user_id 105` (Contributor, writes, cleanup owed) and `15` (Center Admin, read-only start/end only); actor `sec_user_id 1`. Token supplied per-run via `ARI_E2E_ADMIN_TOKEN` env var, never written to the repo.
+- **Next:** fresh token from the human + explicit approval for the Leader-inline execution fallback (run + evidence collection only; the spec authorship is the dead worker's, and the review gate stays independent), or a fresh worker after the limit reset. Latency block to run at 25 samples (recorded deviation).
+
+## T-12 HITL half — handed to the human 2026-08-26
+
+Checklist delivered (stack swap to this worktree, 2 screenshots vs artboards 1/4, DevTools offset snippet, Lighthouse/axe contrast on banner + dialog, focus/Escape notes, T-11 advisories #1–3, role-visibility checks, end + logout paths). Evidence pending.
+
+---
+
+## T-06 — Server e2e — **PASS (Leader-inline evidence battery; user-approved runtime-failure fallback)** → `[x]`
+
+- **Date:** 2026-08-27
+- **Provenance:** the authored jest suite (`test/impersonation.e2e-spec.ts`, eslint/tsc clean) **hangs at AppModule bootstrap in this environment and has never produced output** (two attempts; unresolved — recorded as a known issue for CI, do not cite that file as evidence). After two worker runtime failures (background kill; weekly account limit) the user approved the Leader-inline fallback ("adelante"), and the acceptance evidence was collected by the Leader against the **production bundle** (`npm run build` + `node dist/main.js`, the exact deployed commit) on `localhost:3005`, dev MySQL + dev ROAR (`management-allianceindicatorstest.ciat.cgiar.org`), `ARI_LOCAL_AUTH_BYPASS=false`, real admin JWT (sec_user_id 1). Scripts: scratchpad `t06-evidence.mjs` + `t06-fix.mjs` (HTTP + SQL interleaved; token via env, never written to the repo).
+- **Fixtures (user-approved):** target 105 (Contributor, writes, cleaned up), target 15 (Center Admin, read-only start/end), actor 1.
+
+### Evidence (verbatim outputs in the session log)
+| Case | Result |
+| --- | --- |
+| No token | 401 |
+| `users?search=test` | 200 — rows 140/105 `simulable:true`; `search=ro` → 400; self → `simulable:false, blocked_reason:'self'` |
+| `/api/v1/...` | 404 (D-imp-17) |
+| `start {105}` | 201, session + `role.focus_id` present; DB row `actor=1, target=105, ended_at NULL, created_by=1` |
+| Nested `start` under header | 409 + `X-Impersonation-Error: NESTED` |
+| `users` under header | 403 + NESTED |
+| Forged uuid | 403 + SESSION_INVALID |
+| Foreign session (inserted actor 999999) | 403 + SESSION_INVALID (row cleaned) |
+| **Write attribution** | `POST /result-user/author-contact/save-by-result/19943` as 105 → 201; **DB readback `result_user_id 12741, created_by = 105`**; row deleted afterwards |
+| **Audit** | `impersonation_actions` row per non-GET with real status — including a **500** logged during a failed attempt (`status_code:500, route_pattern, result_official_code 19943`) and the final `status_code:201`; GETs produce no rows. Fire-and-forget insert lands ~1 s after the response (a same-millisecond SELECT races it — evidence note, not a defect) |
+| `end` / idempotent | 200, 200; header on a plain route after end → 403 SESSION_INVALID; `current` → `{active:false}` |
+| Expired (Node-clock fixture) | plain route → 403 SESSION_INVALID; DB `end_reason='expired', ended=1` |
+| Center Admin 15 | 201 — `user_role_list` carries `{role_id:9, sec_role_id:9, focus_id:1}`; ended immediately, zero writes |
+| Log attribution (T-05 in prod) | error/verbose lines carry `[USER_ID:105] [ACTOR_ID:1] [IMPERSONATION_SESSION_ID:…]` |
+| NFR-IMP-003 | middleware `resolve` debug samples n=33: median **91 ms**, min 34.6, max 199.8 — **vantage-dominated** (laptop→VPN→on-prem MySQL round-trips); max > 2× median ⇒ per the disqualifier this number is the spread report, not a pass. Deployment-local measurement owed once the test env is back |
+
+### Evidence notes (fixture artifacts found and fixed during the run — not code defects)
+- A fixture writing `expires_at` via MySQL `NOW()` reads back +5 h through the driver's local-time interpretation → fixtures must compute expiry with the Node clock (as production writes do). First run's "expired → 200" was this artifact.
+- `result_users.user_id` is a **carnet** FK to `alliance_user_staff(carnet)`, not a `sec_users` id.
+- The dev `.env` points `ARI_ROAR_MANAGEMENT_HOST` at `localhost:3002` (a locally-run management service); the deployed test ROAR is `management-allianceindicatorstest.ciat.cgiar.org` and validated the token (`isValid:true, roles:[3,9,1]`). The cloud `management-star` host rejects test tokens (different signing secret).
+
+### Environment incident (open, not a spec item)
+Deployed test backend (`main-allianceindicatorstest`) has been 503 behind Apache since the 2026-08-27 06:39 deploy; Jenkins reports success; the same commit builds and boots clean locally on the prod path. Browser CORS/PNA errors are downstream noise. **RESOLVED 2026-08-27 13:50 UTC** — see the root-cause block below; backend answering after `ae38b052` deployed (build #73).
+
+### Environment incident — findings from the Jenkins console (build #72, 2026-08-27)
+- Deploy = Docker images built on Jenkins (Node 22.12-alpine, `npm ci` + `npm run build`) → ECR → `docker run --restart=always -p 3000:3000` on the on-prem host via SSH. **No health check after `docker run`** — a crash-looping container yields Apache 503 with Jenkins SUCCESS.
+- Build #72 was a duplicate trigger of the same commit: every layer CACHED, image digest identical to the already-running one (#71 shipped our code).
+- **`migration:execute` RUNS on every deploy inside the container with the host env** ("No migrations are pending") — the constitutional K-015 claim ("pipeline does not apply migrations") is stale for this repo and flagged for T-13/archive. That run also proves host-env DB connectivity from inside the image.
+- FIX-PRMS-sync (previous deploy) changed one OpenSearch service line — not boot-relevant. No evidence test was up between that deploy (Aug 26 20:37 UTC) and ours.
+- Pending (DevOps/host): `docker ps -a` status + `docker logs --tail 120 roar-main-application-server-dev`.
+
+### Environment incident — ROOT CAUSE AND FIX (2026-08-27)
+- **Root cause (Leader error, T-03/T-04→dev merge resolution):** while deduplicating the conflicted `exports` block in `entities.module.ts`, the Leader misread the two hits as imports+exports and deleted the only `imports` entry for `ImpersonationModule` — leaving it exported but not imported. Nest rejects that at module scan; the **microservice bootstrap** (`createMicroservice(AppMicroserviceModule)` → EntitiesModule) hit it first, the container crash-looped behind `--restart=always`, Apache answered 503, Jenkins reported SUCCESS (no health check).
+- **Why local verification missed it (KZ-017):** every "boots clean" run was executed on branch `JuankCadavid/PARI-242` (whose file was correct), not on the merged dev tree — the merge's own artifact was never booted, and no gate in the pipeline or locally scans the microservice graph.
+- **Fix:** `ae38b052` on dev — one line (`ImpersonationModule` into `imports`). Red reproduced on the dev tree first (same error verbatim), then green: `Nest microservice successfully started` + HTTP app started + live 200 on `/api/impersonation/users`; full server suite 3,259 green. Pushed → Jenkins redeploys.
+- **Lessons for kaizen (candidate):** (1) after any merge-conflict resolution in a composition root, boot BOTH bootstraps from the *merged* tree, not the source branch; (2) the deploy pipeline needs a post-`docker run` health check — Jenkins SUCCESS is currently compatible with a dead backend.
+
+---
+
+## T-12 — HITL half closed → task **PASS** → `[x]` (2026-08-27)
+
+- **Human evidence (user, on the deployed test env):** screenshot of the admin account menu with "Simulate another profile"; screenshot of a **live simulation by a second admin** (Santiago Sanchez Correa simulating Fabio Catini — banner with identity/started-by/End simulation, "Account · Simulated" panel, target dashboard data). User verdict after the z-index fix: "todo good".
+- **Visual defect found by the user and fixed during this half:** the section-header template's `!z-10` painted over the dropdown (capped at host z:3 by D-imp-14) — root-caused with `elementsFromPoint` in a real browser against localhost:4300 (red observed), fixed by raising the navbar host to `z-index: 1001` (`ae9e975d`), re-probed green, deployed (`c5d28369`). This was T-11 review advisory #1 materializing.
+- **Recorded gaps (accepted):** the numeric padding measurement and a formal axe run were not captured — layout and contrast confirmed visually by the user on the live env; banner contrast was design-verified at #b3561a ≈ 4.9:1 (D-imp-7). Escape/focus behaviours are covered by unit specs (T-09/T-10/T-11).
+- Playwright note: local browser verification required copying (not symlinking) the client `environment*.ts` files — Angular's esbuild does not follow out-of-root symlinks; the Aug-25 "materialized" copies had duplicate keys and were replaced with clean copies from the main checkout.
+
+---
+
+## Rollout note
+
+- **Migration:** `1787699586530-createImpersonationTables` (`impersonation_sessions`, `impersonation_actions`) applied to On-Premise Dev **2026-08-25** under human approval (T-01, RB-2). It is now **re-run automatically by the Dev deploy pipeline** on every subsequent deploy (`npm run migration:execute` inside the container, no-op once applied — "No migrations are pending"; Jenkins build #72 console, T-06 environment-incident block). Prod (`main`) parity was not measured in this spec — verify before assuming the AWS pipeline behaves identically.
+- **Env var:** `ARI_IMPERSONATION_TTL_MINUTES` (optional; server validates it and falls back to `240` if unset or out of the accepted `[1, 1440]` range — `app-config.util.ts`, T-02; TSDoc wording there still says "clamp," flagged for a later code pass, not corrected here). **Recommendation:** add `ARI_IMPERSONATION_TTL_MINUTES=240` explicitly to the `dev/app/backend/roar/main` secret so the effective TTL is visible in configuration rather than implicit in code.
+- **Feature gating:** no feature flag. Access is role-gated — only `SYSTEM_ADMIN` can reach `GET /api/impersonation/users` / `POST /api/impersonation/start` (`RolesGuard` + `@Roles(SYSTEM_ADMIN)`); every other authenticated user can only `end`/read `current` a session that is already theirs.
+- **Backout:** revert PR 1 (server) and PR 2 (client), then `npm run migration:revert` — the migration's `down` drops `impersonation_actions` then `impersonation_sessions` (FK-then-table order); both tables carry only audit/session data, no data belonging to another feature, so the revert is non-destructive to the rest of the schema.
+- **Deployment history:** deployed to On-Premise Dev across Jenkins builds **#71–#73**, plus the `c5d28369` deploy carrying the `ae9e975d` z-index fix (2026-08-27). Build #71 shipped the code; #72 was a duplicate trigger of the same cached image; the container crash-looped between #71/#72 and #73 on an unrelated composition-root defect (`ImpersonationModule` exported but not imported after a merge-conflict resolution — see the T-06 "Environment incident — ROOT CAUSE AND FIX" block above), fixed by `ae38b052`, redeployed and verified booting in build #73; the live z-index fix (`ae9e975d`) shipped via the `c5d28369` deploy (see T-12 HITL close, above) — no Jenkins build number is recorded for that deploy in this execution log.
+- **Verified live:** a real SYSTEM_ADMIN-to-user simulation session was observed on the deployed Dev environment by a human (T-12 HITL close, 2026-08-27) — banner, "Account · Simulated" panel, and target-scoped dashboard data all confirmed working end-to-end, not just in unit/e2e evidence.
+
+---
+
+## T-13 — Docs, baseline sync, rollout note
+
+- **Status:** **PASS** (attempt 2) → `[x]`
+- **Date:** 2026-08-27
+- **Attempts:** 2 (Implementer sonnet medium→xhigh; Reviewer opus)
+- **Files:** `docs/ux-ui/design.md` (§7.1 token, §8.1 components, §12.2 decisions, §3.2/§5.2/:409/D-2 versioning sweep), `docs/trd/trd.md` (§10.1 impersonation, §10.2 client mirror, §6.2 + ADR-3 three-state versioning, ), root `CLAUDE.md` (§4.3 K-015 dated correction; §4.1 routing three-state), `docs/prd.md` (AC-API-Surface — reviewer-endorsed scope addition), spec `design.md` (D-imp-17 narrowed), `execution.md` (rollout note)
+- **Attempt 1 — FAIL (6):** headline — the `/v1` correction over-generalized into a false platform claim: `@Version('1')` ×8 (`bilateral.controller.ts`) + ×1 (`agresso-contract.controller.ts`) and `@Version('2')` ×1 (`GET /api/v2/results`) are live; the truth is three-state (no `defaultVersion`; unversioned majority; per-handler opt-in). Plus: GET-vs-POST typo, wrong D-imp citation, unevidenced "#74", header attributed to the wrong class, and design.md still carrying the old grammar.
+- **Attempt 2 — PASS:** reviewer verified the three-state text handler-by-handler at source across all five landing sites; the only surviving `/api/v1` assertions in the baseline are the two genuinely versioned route families + point-in-time records. D-imp-17's own over-broad wording narrowed. `docs/prd.md` addition endorsed ("reverting it would re-open the drift the task exists to close").
+- **ADVISORY:** cross-reference wording fixed by the Leader post-PASS; `docs/pr-staging-to-main.md` carries 12 stale `/api/v1` mentions — point-in-time PR write-up, left as-is, flagged for whoever consults it; `app-config.util.ts` TSDoc still says "clamp" (one word, next code touch).
+
+---
+
+## Summary — all 13 tasks complete (2026-08-27)
+
+13/13 `[x]` with Reviewer PASS evidence per task. Rework totals: T-01×2, T-03×3, T-04×2, T-05×2, T-08×2, T-09×2, T-10×2, T-12×2, T-13×2 (others first-attempt). Two worker runtime failures (session/weekly limits) recovered by resume/inline fallbacks. Two production incidents during rollout, both root-caused and fixed same-day: the EntitiesModule import drop (`ae38b052`) and the dropdown z-index (`ae9e975d`). Feature verified live on On-Prem Dev, including a real simulation session by a second admin. Constitutional corrections shipped: K-015 (pipeline runs migrations), three-state URI versioning. Ready for `/akili-archive` (kaizen candidates recorded in the incident block).
+
+---
+
+## Post-delivery fix (2026-08-28) — layout offsets under the simulation banner
+
+Two user-reported defects, both traced to the D-imp-14 offset logic, fixed together:
+1. **Results Center filters hidden by the section-header (pre-existing regression from D-imp-14).** The section-header floats `position: fixed` (measured: top 70, height 42, bottom 112), but D-imp-14 set the content `paddingTop` to `navbarHeight()` (71) alone — 41px of the page (indicator chips, tabs, Apply/Clear Filters) sat under the header. Present with OR without the banner. Fix: content `paddingTop = navbarHeight() + headerHeight()` (both measured signals) → first row now starts at the header's bottom.
+2. **Sidebar + section-header not shifted by the banner.** Both used a hardcoded `mt-[70px]/[50px]` that ignores the 44px banner, so the navbar overlapped the sidebar's first items and the header overlapped the filters when simulating. Fix: both bind `[style.marginTop.px]="cache.navbarHeight()"` (navbar host height, which includes the banner when active). `navbarHeight()` measured 71 ≈ the old 70, so the non-simulating layout is unchanged.
+- **Verified in a real browser (Playwright, 1280px), normal AND banner-active states** (banner forced via the `active` signal): normal → content clears header at 113; banner → navbar/sidebar/header all shift to 115, content to 157, nothing overlaps (screenshots taken). 120/120 specs green across the three touched components (three CacheService mocks gained the `navbarHeight`/`headerHeight` signals); `tsc -p tsconfig.app.json` clean.
+- This corrects the original D-imp-14 (which used `navbarHeight()` where it needed `navbarHeight() + headerHeight()`), logged against design §12 D-imp-14 as the 2026-08-28 amendment.

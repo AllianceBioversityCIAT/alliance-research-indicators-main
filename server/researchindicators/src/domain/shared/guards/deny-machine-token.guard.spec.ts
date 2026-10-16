@@ -44,6 +44,7 @@ describe('DenyMachineTokenGuard — driven through the real JwtMiddleware', () =
       roarManagementService as never,
       {} as ResultsUtil,
       appSecretsService as never,
+      {} as never,
     );
     guard = new DenyMachineTokenGuard();
   });

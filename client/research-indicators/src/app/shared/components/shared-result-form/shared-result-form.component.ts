@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { GetContracts } from '@shared/interfaces/get-contracts.interface';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
+import { CustomTagComponent } from '../custom-tag/custom-tag.component';
 
 @Component({
   selector: 'app-shared-result-form',
-  imports: [SelectModule, TooltipModule, FormsModule, DatePipe],
+  imports: [SelectModule, TooltipModule, FormsModule, DatePipe, CustomTagComponent],
   templateUrl: './shared-result-form.component.html',
   styleUrls: ['./shared-result-form.component.scss']
 })

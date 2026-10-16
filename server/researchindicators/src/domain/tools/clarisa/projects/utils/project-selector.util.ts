@@ -1,4 +1,5 @@
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-01 / R-BAS-001, R-BAS-002, R-BAS-003
+// @sdd-spec docs/specs/bugfix/w3-bilateral-funding-filter — T-01 / R-W3B-001
 //
 // Pure constants + functions only — no Nest injectables, no framework imports, no I/O.
 // Single source of truth for bilateral project selection predicates (DD-1, DD-2, DD-3).
@@ -6,6 +7,16 @@
 import { ClarisaProject } from '../dto/clarisa-project.types';
 
 export const BILATERAL_FUNDING_PREFIX = 'BILATERAL';
+/**
+ * W3-family funding pattern (R-W3B-001, D-W3B-1).
+ * Anchored so 'W3' does not admit 'W3X': stem WINDOW / WINDOWS / W, immediately
+ * followed by '3' (optional single space before the digit — whitespace is
+ * already collapsed by normalizeToken), then either end-of-string or a
+ * RESTRICTED suffix separated by a dash with free spacing (mirrors the
+ * existing BILATERAL- RESTRICTED suffix form).
+ */
+export const W3_FUNDING_PATTERN =
+  /^(?:WINDOWS|WINDOW|W)\s?3(?:\s*-\s*RESTRICTED)?$/;
 export const ALLIANCE_LEAD_ACRONYM_PREFIX = 'ABC';
 export const ALLIANCE_CENTRE_ACRONYMS = ['CIAT', 'BIOVERSITY'] as const;
 export const ALLIANCE_CENTRE_SET: ReadonlySet<string> = new Set(
@@ -27,8 +38,9 @@ export function normalizeToken(raw: string | null | undefined): string {
 }
 
 /**
- * Checks whether a funding source is Bilateral (R-BAS-001, DD-2).
- * True when the upper-cased, whitespace-collapsed string starts with 'BILATERAL'.
+ * Checks whether a funding source is Bilateral or W3 (R-BAS-001, R-W3B-001, DD-2, D-W3B-1).
+ * True when the upper-cased, whitespace-collapsed string starts with 'BILATERAL',
+ * or matches the anchored W3-family pattern (see W3_FUNDING_PATTERN).
  * Null, undefined, or blank returns false.
  */
 export function isBilateralFunding(
@@ -38,7 +50,10 @@ export function isBilateralFunding(
   if (!normalized) {
     return false;
   }
-  return normalized.startsWith(BILATERAL_FUNDING_PREFIX);
+  return (
+    normalized.startsWith(BILATERAL_FUNDING_PREFIX) ||
+    W3_FUNDING_PATTERN.test(normalized)
+  );
 }
 
 /**

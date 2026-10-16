@@ -18,6 +18,7 @@ import {
   Matches,
   IsEnum,
   IsBoolean,
+  IsEmail,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { UpdateIpRightDto } from '../../result-ip-rights/dto/update-ip-right.dto';
@@ -34,6 +35,8 @@ export class ResultAiDto {
   evidences?: CreateResultEvidenceDto;
   sdgs?: ResultSdg[];
   ipRights?: UpdateIpRightDto;
+  strategic_objectives?: number[];
+  primary_levers?: number[];
 }
 
 export class CountryAreas {
@@ -364,6 +367,28 @@ export class ResultRawAi {
   @IsArray()
   @IsNumber({}, { each: true })
   regions: number[];
+
+  @ApiProperty({
+    type: Number,
+    isArray: true,
+    description: 'Strategic objectives associated with the result',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  strategic_objectives?: number[];
+
+  @ApiProperty({
+    type: Number,
+    isArray: true,
+    description: 'Primary levers associated with the result',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
+  primary_levers?: number[];
 
   @ApiProperty({
     type: String,
@@ -804,6 +829,51 @@ export class ResultRawAi {
   metadata: ResultMetadata;
 }
 
+export enum AiContactRole {
+  REPORTING_LEADER = 'reporting_leader',
+  CONTACT_PERSON = 'contact_person',
+  OTHER = 'other',
+}
+
+export class AiContactDto {
+  @ApiProperty({
+    type: String,
+    description: 'Email address of the file-sourced contact',
+    example: 'contact@example.org',
+  })
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty({
+    type: String,
+    description: 'Name of the file-sourced contact',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({
+    enum: AiContactRole,
+    description: 'Role of the file-sourced contact',
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(AiContactRole)
+  role?: AiContactRole;
+
+  @ApiProperty({
+    type: String,
+    description:
+      'Contract code scoping the contact to one project group; absent scopes it to every group in the batch',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  contract_code?: string;
+}
+
 export class ProcessMedatada {
   @ApiProperty({
     type: String,
@@ -820,6 +890,19 @@ export class ProcessMedatada {
   @IsString()
   @IsNotEmpty()
   ai_interaction_id: string;
+
+  @ApiProperty({
+    type: AiContactDto,
+    isArray: true,
+    description:
+      'Reporting leaders and main contact persons declared inside the CapDev source file',
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AiContactDto)
+  contacts?: AiContactDto[];
 }
 
 export class RootAi {

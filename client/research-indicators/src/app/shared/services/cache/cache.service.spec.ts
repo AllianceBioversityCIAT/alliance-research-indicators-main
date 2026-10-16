@@ -42,6 +42,9 @@ describe('CacheService', () => {
     expect(service.currentResultIndicatorSectionPath()).toBe('policy-change');
     service.currentMetadata.set({ indicator_id: 5 } as any);
     expect(service.currentResultIndicatorSectionPath()).toBe('oicr-details');
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    service.currentMetadata.set({ indicator_id: 6 } as any);
+    expect(service.currentResultIndicatorSectionPath()).toBe('innovation-use-details');
     service.currentMetadata.set({ indicator_id: 999 } as any);
     expect(service.currentResultIndicatorSectionPath()).toBe('');
   });
@@ -102,9 +105,9 @@ describe('CacheService', () => {
 
   it('allGreenChecksAreTrue and isMyResult computed branches', () => {
     const service = TestBed.inject(CacheService);
-    service.greenChecks.set({ a: true, b: true } as any);
+    service.greenChecks.set({ a: true, b: true, completness: 1 } as any);
     expect(service.allGreenChecksAreTrue()).toBe(true);
-    service.greenChecks.set({ a: true, b: false } as any);
+    service.greenChecks.set({ a: true, b: false, completness: 0 } as any);
     expect(service.allGreenChecksAreTrue()).toBe(false);
 
     service.dataCache.set({ user: { sec_user_id: 5 } } as any);
@@ -286,33 +289,56 @@ describe('CacheService', () => {
     expect(mockLocalStorage['isSidebarCollapsed']).toBe('true');
   });
 
-  it('should compute allGreenChecksAreTrue correctly', () => {
-    // Test when all checks are true
+  it('should compute allGreenChecksAreTrue from the backend completness flag', () => {
+    // The server owns completeness: green-checks.service.ts excludes
+    // VISUAL_ONLY_GREEN_CHECKS from `completness` before sending it. The client
+    // reads that flag instead of re-deriving it over every key, which is what
+    // let an OPTIONAL section block Submit.
     service.greenChecks.set({
       general_information: 1,
       alignment: 1,
-      geo_location: 1
+      geo_location: 1,
+      completness: 1
     });
     expect(service.allGreenChecksAreTrue()).toBe(true);
 
-    // Test when some checks are false
+    // A mandatory section incomplete -> the server reports completness 0
     service.greenChecks.set({
       general_information: 1,
       alignment: 0,
-      geo_location: 1
+      geo_location: 1,
+      completness: 0
     });
     expect(service.allGreenChecksAreTrue()).toBe(false);
 
-    // Test when all checks are false
     service.greenChecks.set({
       general_information: 0,
       alignment: 0,
-      geo_location: 0
+      geo_location: 0,
+      completness: 0
     });
     expect(service.allGreenChecksAreTrue()).toBe(false);
 
-    // Test with empty object
+    // Empty payload = not loaded yet. Previously this was VACUOUSLY TRUE
+    // (`[].every()`), which briefly enabled Submit during the load window;
+    // to-promise.service.ts:18 resets the signal to {} on every result change.
+    // Now it is false, matching SubmissionService's existing `length > 0` guard.
     service.greenChecks.set({});
+    expect(service.allGreenChecksAreTrue()).toBe(false);
+  });
+
+  it('allGreenChecksAreTrue ignores an incomplete OPTIONAL section (pool funding) when completness is 1', () => {
+    // Regression pin: pool_funding_alignment is a VISUAL_ONLY_GREEN_CHECKS entry
+    // server-side ("Optional sections must never block submit",
+    // green-checks/dto/find-green-checks.dto.ts). Re-deriving the gate over
+    // every key made this OPTIONAL section disable Submit Result.
+    service.greenChecks.set({
+      general_information: 1,
+      alignment: 1,
+      geo_location: 1,
+      pool_funding_alignment: 0,
+      completness: 1
+    } as any);
     expect(service.allGreenChecksAreTrue()).toBe(true);
   });
 
@@ -376,6 +402,11 @@ describe('CacheService', () => {
     // Test indicator_id = 4
     service.currentMetadata.set({ indicator_id: 4 });
     expect(service.currentResultIndicatorSectionPath()).toBe('policy-change');
+
+    // Test indicator_id = 6
+    // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+    service.currentMetadata.set({ indicator_id: 6 });
+    expect(service.currentResultIndicatorSectionPath()).toBe('innovation-use-details');
 
     // Test other indicator_id
     service.currentMetadata.set({ indicator_id: 3 });

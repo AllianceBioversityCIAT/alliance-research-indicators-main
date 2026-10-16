@@ -15,26 +15,34 @@ export class RolesService {
   createResultManagementService = inject(CreateResultManagementService);
   cache = inject(CacheService);
 
-  isSystemAdmin = computed(() => this.cache.dataCache().user.user_role_list.some(r => r.role_id === this.adminRoleId));
+  /**
+   * The signed-in user's roles, or an empty list while the cache is still being
+   * populated. Reading `user.user_role_list` directly THROWS on the window before
+   * the session is hydrated, and a role check that throws takes its whole caller
+   * down with it — a page that only wanted to know whether to show a button ends
+   * up in an error state.
+   */
+  private readonly roleList = computed(() => this.cache.dataCache().user?.user_role_list ?? []);
+
+  isSystemAdmin = computed(() => this.roleList().some(r => r.role_id === this.adminRoleId));
 
   isAdmin = computed(() =>
-    this.cache.dataCache().user.user_role_list.some(r => r.role_id === this.adminRoleId || r.role_id === this.centerAdminRoleId)
+    this.roleList().some(r => r.role_id === this.adminRoleId || r.role_id === this.centerAdminRoleId)
   );
 
-  isMelRegionalExpert = computed(() => this.cache.dataCache().user.user_role_list.some(r => r.role_id === this.melRegionalExpertRoleId));
+  isMelRegionalExpert = computed(() => this.roleList().some(r => r.role_id === this.melRegionalExpertRoleId));
 
   canEditAnyResult = computed(() =>
-    this.cache
-      .dataCache()
-      .user.user_role_list.some(
+    this.roleList()
+      .some(
         r => r.role_id === this.adminRoleId || r.role_id === this.centerAdminRoleId || r.role_id === this.melRegionalExpertRoleId
       )
   );
 
-  canAccessCenterAdmin = computed(() => this.cache.dataCache().user.user_role_list.some(e => this.userHasCenterAdminAccess(e)));
+  canAccessCenterAdmin = computed(() => this.roleList().some(e => this.userHasCenterAdminAccess(e)));
 
   canAccessAppConfiguration = computed(() =>
-    this.cache.dataCache().user.user_role_list.some(
+    this.roleList().some(
       r => r.role_id === this.adminRoleId || r.role_id === this.technicalSupportRoleId
     )
   );

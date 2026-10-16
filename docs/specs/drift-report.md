@@ -155,7 +155,7 @@ Nothing in this report was edited. Remediation direction is stated per finding.
 
 - **L-3 — Spec taxonomy says "exactly three files"; active specs carry five.** `CLAUDE.md` §2 mandates `requirements.md` / `design.md` / `task.md` and nothing else. Live specs carry `proposal.md` and `judgment.md` (produced by `/akili-propose`): `bilateral/primary-contributing-sp/` has requirements + design + proposal + judgment (no `task.md` yet — normal mid-flight), `bilateral/mapping-adjustments/` has proposal only. `docs/specs/` also holds `kaizen-log.md` and `quick/quick-log.md`, neither described by the §2 tree.
   - **Affected Spec File:** [CLAUDE.md §2](file:///Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/CLAUDE.md)
-  - **Affected Code File:** [docs/specs/bilateral/primary-contributing-sp/](file:///Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/docs/specs/bilateral/primary-contributing-sp/)
+  - **Affected Code File:** [docs/specs/archive/2026-08-13-bilateral--primary-contributing-sp/](file:///Users/jcadavid/orca/workspaces/alliance-research-indicators-main/AC-1676/docs/specs/archive/2026-08-13-bilateral--primary-contributing-sp/)
   - **Remediation:** **Update the guide** — describe the full lifecycle file set and the log files.
 
 - **L-4 — PRD still points at the two legacy doc paths its own guide says moved.** `prd.md:9` reads "Technical detail lives in `docs/detailed-design/`; UX system rules live in `docs/system-design/`" — both superseded by `docs/trd/` and `docs/ux-ui/` per `CLAUDE.md`'s legacy-path note. Neither legacy directory exists.

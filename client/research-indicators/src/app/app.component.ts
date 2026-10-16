@@ -8,6 +8,7 @@ import { GlobalAlertComponent } from './shared/components/global-alert/global-al
 import { GlobalToastComponent } from './shared/components/global-toast/global-toast.component';
 import { CopyTokenComponent } from './shared/components/copy-token/copy-token.component';
 import { BugHerdService } from './shared/services/bug-herd.service';
+import { ImpersonationService } from './shared/services/impersonation.service';
 
 @Component({
   selector: 'app-root',
@@ -18,6 +19,7 @@ export class AppComponent {
   cache = inject(CacheService);
   actions = inject(ActionsService);
   bugHerd = inject(BugHerdService);
+  impersonation = inject(ImpersonationService);
   title = 'research-indicators';
   name = environment.name;
   route = inject(ActivatedRoute);
@@ -35,5 +37,15 @@ export class AppComponent {
         }
       }
     });
+
+    // @akili-spec changes/profile-simulation
+    // Design §5 "Client restore": after CacheService's field-initializer hydration runs (above),
+    // re-validate a persisted simulation with `/current`. Fire-and-forget — never block rendering.
+    // `.catch` guards against an unhandled promise rejection surfacing as a runtime error.
+    if (localStorage.getItem('impersonation')) {
+      this.impersonation.restore().catch((error: unknown) => {
+        console.error('Failed to restore impersonation session at bootstrap', error);
+      });
+    }
   }
 }

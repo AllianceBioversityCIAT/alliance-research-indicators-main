@@ -4,6 +4,10 @@ import { Component, computed, inject, OnInit, signal, WritableSignal } from '@an
 import { RouterLink } from '@angular/router';
 import { ApiService } from '@shared/services/api.service';
 import { S3ImageUrlPipe } from '@shared/pipes/s3-image-url.pipe';
+import {
+  INDICATOR_ID_TO_SLUG,
+  STATUS_ID_TO_SLUG
+} from '@platform/pages/results-center/url/results-center-url.vocabulary';
 
 interface Indicator {
   indicator_id: number;
@@ -85,10 +89,30 @@ export class DataOverviewComponent implements OnInit {
     this.showChart.set(this.chartLegend().length > 0);
   }
 
-  statusRowQueryParams(item: ChartLegendItem) {
-    return {
-      statusTab: item.result_status_id,
-      statusLabel: item.label
-    };
+  /**
+   * Canonical Results Center link params for the "My results by status" card
+   * (R-RCU-007 AC.1, AC.1b). Resolves the slug from the frozen vocabulary
+   * (`STATUS_ID_TO_SLUG`) rather than hard-coding a string, so this producer
+   * cannot drift from the codec that parses it. `tab=my` is mandatory: this
+   * card's My-scope used to come from an unconditional `loadMyResults(true)`
+   * that the URL read path no longer performs, and without `tab=my` the
+   * scope would resolve to the pinned preference, which defaults to `all`.
+   * An id absent from the vocabulary (drift) degrades to an unfiltered
+   * My-Results link rather than emitting an invalid token.
+   */
+  statusRowQueryParams(item: ChartLegendItem): Record<string, string> {
+    const slug = STATUS_ID_TO_SLUG.get(item.result_status_id);
+    return slug ? { status: slug, tab: 'my' } : { tab: 'my' };
+  }
+
+  /**
+   * Canonical Results Center link params for the "My results by indicator"
+   * card (R-RCU-007 AC.1, AC.1b) — see `statusRowQueryParams` above for the
+   * `tab=my` rationale (R2-4 / JD-5 regression guard) and the drift-fallback
+   * behavior.
+   */
+  indicatorRowQueryParams(indicator: Indicator): Record<string, string> {
+    const slug = INDICATOR_ID_TO_SLUG.get(indicator.indicator_id);
+    return slug ? { indicator: slug, tab: 'my' } : { tab: 'my' };
   }
 }

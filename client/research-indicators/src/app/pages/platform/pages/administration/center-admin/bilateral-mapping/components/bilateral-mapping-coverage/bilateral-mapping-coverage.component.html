@@ -1,0 +1,127 @@
+<!-- @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-06 / R-CAM-004 AC.4, design.md §6.1, DD-6 -->
+<div class="bil-coverage-strip flex flex-col gap-3 rounded-[10px] p-4 abc-grey-100 border border-[var(--ac-grey-200)]" data-testid="coverage-strip">
+  <!-- Header: title + actions -->
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-2">
+      <h2 class="m-0 text-sm font-semibold atc-primary-blue-600">
+        Mapping Coverage
+      </h2>
+      <span class="text-xs atc-grey-600" data-testid="coverage-freshness">
+        (CLARISA cache: 5-min TTL)
+      </span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        pButton
+        type="button"
+        icon="pi pi-refresh"
+        class="p-button-text p-button-sm !h-[28px] !w-[28px]"
+        (click)="loadCoverage()"
+        [disabled]="loading()"
+        aria-label="Refresh coverage metrics"
+        data-testid="coverage-refresh-btn">
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State: PrimeNG skeleton (Hard Requirement 3: skeleton, NEVER a zero) -->
+  @if (loading()) {
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="coverage-loading" aria-live="polite">
+      <div class="flex flex-col gap-2 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)]" data-testid="coverage-skeleton">
+        <p-skeleton width="60%" height="14px"></p-skeleton>
+        <p-skeleton width="40%" height="24px"></p-skeleton>
+      </div>
+      <div class="flex flex-col gap-2 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)]" data-testid="coverage-skeleton">
+        <p-skeleton width="60%" height="14px"></p-skeleton>
+        <p-skeleton width="40%" height="24px"></p-skeleton>
+      </div>
+      <div class="flex flex-col gap-2 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)]" data-testid="coverage-skeleton">
+        <p-skeleton width="60%" height="14px"></p-skeleton>
+        <p-skeleton width="40%" height="24px"></p-skeleton>
+      </div>
+    </div>
+    <div class="flex justify-center">
+      <p-skeleton width="50%" height="16px"></p-skeleton>
+    </div>
+
+  } @else if (error()) {
+    <!-- Error State: reports unavailability while parent table still renders (Hard Requirement 4) -->
+    <div
+      class="flex items-center justify-between gap-3 rounded-[8px] border border-[var(--ac-red-1)] p-3 abc-white-1"
+      role="alert"
+      aria-live="assertive"
+      data-testid="coverage-error">
+      <div class="flex items-center gap-2 text-sm font-medium atc-red-1">
+        <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+        <span>Coverage data is currently unavailable.</span>
+      </div>
+      <button
+        pButton
+        type="button"
+        label="Retry"
+        icon="pi pi-refresh"
+        class="p-button-sm p-button-outlined"
+        (click)="loadCoverage()"
+        data-testid="coverage-retry-btn">
+      </button>
+    </div>
+
+  } @else if (coverage()) {
+    @let cov = coverage()!;
+    @if (cov.reachable === 0) {
+      <!-- Empty State: reachable 0 explains the feed has no eligible projects (Hard Requirement 5) -->
+      <div class="flex flex-col items-center gap-1 py-4 text-center abc-white-1 rounded-[8px] border border-[var(--ac-grey-200)]" data-testid="coverage-empty">
+        <i class="pi pi-info-circle text-2xl atc-grey-500" aria-hidden="true"></i>
+        <p class="m-0 text-sm font-medium atc-grey-800">
+          No eligible CLARISA projects found for phase {{ phase() }}.
+        </p>
+        <p class="m-0 text-xs atc-grey-600">
+          Coverage cannot be computed when the eligible cohort is empty.
+        </p>
+      </div>
+    } @else {
+      <!-- EXACTLY THREE CARDS (Hard Requirement 2, DD-6): Mapped, Pending, Reachable -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="coverage-cards-container">
+        <!-- Card 1: Mapped -->
+        <div
+          class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-mapped"
+          data-testid="coverage-card"
+          data-card-type="mapped">
+          <span class="text-xs font-medium uppercase tracking-wide atc-grey-600">Mapped</span>
+          <span class="text-2xl font-bold atc-green-600" data-testid="coverage-mapped-val">
+            {{ cov.mapped }}
+          </span>
+        </div>
+
+        <!-- Card 2: Pending -->
+        <div
+          class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-pending"
+          data-testid="coverage-card"
+          data-card-type="pending">
+          <span class="text-xs font-medium uppercase tracking-wide atc-grey-600">Pending</span>
+          <span class="text-2xl font-bold atc-orange-1" data-testid="coverage-pending-val">
+            {{ cov.pending }}
+          </span>
+        </div>
+
+        <!-- Card 3: Reachable -->
+        <div
+          class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-reachable"
+          data-testid="coverage-card"
+          data-card-type="reachable">
+          <span class="text-xs font-medium uppercase tracking-wide atc-grey-600">Reachable</span>
+          <span class="text-2xl font-bold atc-primary-blue-600" data-testid="coverage-reachable-val">
+            {{ cov.reachable }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Denominator statement printed on screen (Hard Requirement 1 / R-CAM-004 AC.4) -->
+      <div class="flex justify-center text-center">
+        <p class="m-0 text-xs sm:text-sm font-semibold atc-primary-blue-600" data-testid="coverage-denominator">
+          {{ denominatorText() }}
+        </p>
+      </div>
+    }
+  }
+</div>

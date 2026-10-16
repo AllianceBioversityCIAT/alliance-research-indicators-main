@@ -145,6 +145,31 @@ describe('PartnersComponent', () => {
     );
   });
 
+  // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+  // R-IUP-003 AC.4 / c6's call-site half: delegates to the REAL CacheService's
+  // `currentResultIndicatorSectionPath` (not a hand-rolled stub) so that deleting
+  // `case 6` from cache.service.ts makes THIS assertion fail, not only the
+  // cache.service.spec.ts presence assertion.
+  it('Back navigates to innovation-use-details for an indicator-6 result, never to the empty path', async () => {
+    mockSubmission.isEditableStatus.mockReturnValue(false);
+    (component as any).route = makeRoute('1.0') as any;
+    const realCache = new CacheService();
+    realCache.currentMetadata.set({ indicator_id: 6 });
+    mockCache.currentResultIndicatorSectionPath.mockImplementation(() => realCache.currentResultIndicatorSectionPath());
+
+    await component.saveData('back');
+
+    expect(mockRouter.navigate).toHaveBeenCalledWith(['result', 'ROAR-7', 'innovation-use-details'], {
+      queryParams: { version: '1.0' },
+      replaceUrl: true
+    });
+    expect(mockRouter.navigate).not.toHaveBeenCalledWith(['result', 'ROAR-7', ''], { queryParams: { version: '1.0' }, replaceUrl: true });
+
+    // mockCache is a module-level const shared across tests (not recreated per-test) — restore
+    // the default stub so this override doesn't leak into unrelated tests below.
+    mockCache.currentResultIndicatorSectionPath.mockReturnValue('general-information');
+  });
+
   it('setSectionAndOpenModal should set section and open modal', () => {
     component.setSectionAndOpenModal('partners');
     expect(mockModals.setPartnerRequestSection).toHaveBeenCalledWith('partners');

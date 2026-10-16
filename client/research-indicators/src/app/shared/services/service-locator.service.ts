@@ -7,6 +7,7 @@ import { GetCountriesService } from './control-list/get-countries.service';
 import { GetClarisaLanguagesService } from './control-list/get-clarisa-languages.service';
 import { PolicyTypesService } from './short-control-list/policy-types.service';
 import { PolicyStagesService } from './short-control-list/policy-stages.service';
+import { PolicyAmountStatusService } from './short-control-list/policy-amount-status.service';
 import { CapSharingGendersService } from './short-control-list/cap-sharing-genders.service';
 import { CapSharingFormatsService } from './short-control-list/cap-sharing-formats.service';
 import { CapSharingTypesService } from './short-control-list/cap-sharing-types.service';
@@ -66,6 +67,14 @@ import { ImpactAreaScoresService } from './short-control-list/impact-area-scores
 import { ImpactAreasService } from './short-control-list/impact-areas.service';
 import { SourceFilterOptionsService } from './short-control-list/source-filter-options.service';
 import { GetClarisaSdgTargetsService } from './control-list/get-clarisa-sdg-targets.service';
+// T-UI-08: PI Delegates picker stubs — single swap point (DD-UI-STUB / DD-UI-E).
+// TODO(user endpoint): when real endpoints exist, replace these two imports with
+// the real service classes and update the switch cases below — no other file changes needed.
+import {
+  PiDelegatePeoplePickerStubService,
+  PiDelegateProjectsPickerStubService
+} from '@platform/pages/my-pi-delegates/services/pi-delegate-picker-stub.service';
+import { Portfolio2026SdgTargetsService } from './control-list/portfolio-2026-sdg-targets.service';
 
 @Injectable({
   providedIn: 'root'
@@ -181,6 +190,8 @@ export class ServiceLocatorService {
         return this.getFromInjector(PolicyTypesService);
       case 'policyStages':
         return this.getFromInjector(PolicyStagesService);
+      case 'policyAmountStatus':
+        return this.getFromInjector(PolicyAmountStatusService);
       case 'geoFocus':
         return this.getFromInjector(GetGeoFocusService);
       case 'innResults':
@@ -263,6 +274,8 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetLeverSdgTargetsService);
       case 'clarisaSdgTargets':
         return this.getFromInjector(GetClarisaSdgTargetsService);
+      case 'portfolio2026SdgTargets':
+        return this.getFromInjector(Portfolio2026SdgTargetsService);
       case 'projectStatus':
         return this.getFromInjector(GetProjectStatusService);
       case 'fundingTypes':
@@ -271,6 +284,12 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetAllianceStaffByGroupService);
       case 'sourceFilterOptions':
         return this.getFromInjector(SourceFilterOptionsService);
+      // T-UI-08: PI Delegates picker stubs.
+      // TODO(user endpoint): swap these two cases to the real service classes when endpoints exist.
+      case 'piDelegatePeople':
+        return this.getFromInjector(PiDelegatePeoplePickerStubService);
+      case 'piDelegateProjects':
+        return this.getFromInjector(PiDelegateProjectsPickerStubService);
       default:
         console.warn(`Service ${serviceName} not found`);
         return null;

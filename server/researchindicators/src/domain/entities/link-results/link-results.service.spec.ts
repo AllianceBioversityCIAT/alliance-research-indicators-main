@@ -100,6 +100,26 @@ describe('LinkResultsService', () => {
         { result_id: 200, contract: 'B' },
       ]);
     });
+
+    // Non-regression guard — docs/specs/innovation-use/dev-card-details, T-05.
+    // `findAndDetails` is shared by ResultPolicyChangeService.findOne,
+    // LinkResultsController and ResultInnovationUseService (DD-1, non-goal:
+    // widening it). This asserts against the REAL options object the real,
+    // unmocked `findAndDetails` builds and passes to the repository mock —
+    // not a mock of `findAndDetails` itself, which would pass with any
+    // relation set. Falsifier (R-IUC-005 / K-012): adding `geo_scope: true`
+    // to the service's `relations` must turn this assertion red.
+    it('should request exactly { indicator, result_status } as the relation set on other_result — no more, no fewer', async () => {
+      find.mockResolvedValue([]);
+      getPrincipalContractByResultsIds.mockResolvedValue([]);
+
+      await service.findAndDetails(1, LinkResultRolesEnum.POLICY_CHANGE);
+
+      const actualOptions = find.mock.calls[0][0];
+      expect(actualOptions.relations).toEqual({
+        other_result: { indicator: true, result_status: true },
+      });
+    });
   });
 
   describe('saveLinkResults', () => {

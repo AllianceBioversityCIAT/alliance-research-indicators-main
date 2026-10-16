@@ -6,6 +6,7 @@ import { ApiService } from './api.service';
 import { signal, WritableSignal } from '@angular/core';
 import { UserCache } from '../interfaces/cache.interface';
 import { ServiceLocatorService } from './service-locator.service';
+import { ImpersonationService } from './impersonation.service';
 
 describe('ActionsService', () => {
   let service: ActionsService;
@@ -1331,5 +1332,140 @@ describe('ActionsService', () => {
 
     setItemSpy.mockRestore();
     updateSpy.mockRestore();
+  });
+
+  // Design §5 storage rule / R-IMP-009 — refresh must never rewrite `data.user`.
+  it('should persist ONLY access_token/exp on refresh — never rewrite data.user (design §5 storage rule)', () => {
+    const targetUser: UserCache = { ...mockUser, sec_user_id: 999, first_name: 'Target' };
+    const dataCacheSignal: WritableSignal<any> = signal({
+      access_token: 'old-token',
+      refresh_token: 'refresh',
+      exp: 1111,
+      user: targetUser
+    }) as WritableSignal<any>;
+    const localCacheMock = {
+      dataCache: dataCacheSignal,
+      isLoggedIn: Object.assign(signal(false), { set: jest.fn() }),
+      windowHeight: signal(0)
+    };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: CacheService, useValue: localCacheMock },
+        { provide: Router, useValue: routerMock },
+        { provide: ApiService, useValue: apiMock },
+        { provide: ServiceLocatorService, useValue: serviceLocatorMock }
+      ]
+    });
+    const localService = TestBed.inject(ActionsService);
+
+    // The `user` in a refresh's login response is irrelevant — the code path must never read it.
+    const loginResponse = {
+      data: {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjEyMzR9.signature',
+        user: mockUser
+      },
+      successfulRequest: true
+    };
+
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+    localService.updateLocalStorage(loginResponse as any, true);
+
+    const lastCall = setItemSpy.mock.calls[setItemSpy.mock.calls.length - 1];
+    expect(lastCall[0]).toBe('data');
+    const storedPayload = JSON.parse(lastCall[1] as string);
+
+    // Only access_token/exp changed — the target's user object survives verbatim.
+    expect(storedPayload.user).toEqual(targetUser);
+    expect(storedPayload.access_token).toBe(loginResponse.data.access_token);
+    expect(storedPayload.exp).toBe(1234);
+    expect(dataCacheSignal().user).toEqual(targetUser);
+
+    setItemSpy.mockRestore();
+  });
+
+  // T-07 review forward pointer — a stale key from a crashed session must not leak another
+  // admin's snapshot into a fresh login.
+  it('should remove a stale localStorage impersonation key on a fresh (non-refresh) login', () => {
+    const loginResponse = {
+      data: {
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjEyMzR9.signature',
+        user: mockUser
+      },
+      successfulRequest: true
+    };
+
+    const removeItemSpy = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {});
+
+    service.updateLocalStorage(loginResponse as any, false);
+
+    expect(removeItemSpy).toHaveBeenCalledWith('impersonation');
+    expect(setItemSpy).toHaveBeenCalledWith('data', expect.any(String));
+
+    removeItemSpy.mockRestore();
+    setItemSpy.mockRestore();
+  });
+
+  // R-IMP-010 AC.2 — logOut awaits impersonation.end('logout') before clearing localStorage.
+  describe('logOut with impersonation (R-IMP-010 AC.2)', () => {
+    it('awaits impersonation.end("logout") BEFORE removing "data" from localStorage when a simulation is active', async () => {
+      const callOrder: string[] = [];
+      const impersonationMock = {
+        active: jest.fn().mockReturnValue(true),
+        end: jest.fn().mockImplementation(async () => {
+          callOrder.push('end');
+          return { actor: null };
+        })
+      };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: CacheService, useValue: cacheMock },
+          { provide: Router, useValue: routerMock },
+          { provide: ApiService, useValue: apiMock },
+          { provide: ServiceLocatorService, useValue: serviceLocatorMock },
+          { provide: ImpersonationService, useValue: impersonationMock }
+        ]
+      });
+      const localService = TestBed.inject(ActionsService);
+
+      const removeItemSpy = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
+        callOrder.push(`removeItem:${key}`);
+      });
+
+      await localService.logOut();
+
+      expect(impersonationMock.end).toHaveBeenCalledWith('logout');
+      expect(callOrder.indexOf('end')).toBeGreaterThanOrEqual(0);
+      expect(callOrder.indexOf('removeItem:data')).toBeGreaterThan(callOrder.indexOf('end'));
+
+      removeItemSpy.mockRestore();
+    });
+
+    it('does NOT call impersonation.end when no simulation is active', async () => {
+      const impersonationMock = {
+        active: jest.fn().mockReturnValue(false),
+        end: jest.fn()
+      };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          { provide: CacheService, useValue: cacheMock },
+          { provide: Router, useValue: routerMock },
+          { provide: ApiService, useValue: apiMock },
+          { provide: ServiceLocatorService, useValue: serviceLocatorMock },
+          { provide: ImpersonationService, useValue: impersonationMock }
+        ]
+      });
+      const localService = TestBed.inject(ActionsService);
+      const removeItemSpy = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {});
+
+      await localService.logOut();
+
+      expect(impersonationMock.end).not.toHaveBeenCalled();
+
+      removeItemSpy.mockRestore();
+    });
   });
 });

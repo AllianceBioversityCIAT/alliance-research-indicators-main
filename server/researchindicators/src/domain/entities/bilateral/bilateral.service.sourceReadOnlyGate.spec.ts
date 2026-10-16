@@ -141,6 +141,7 @@ describe('BilateralService source-based read-only gate (T-15.2)', () => {
         {
           code: 'SP01',
           name: 'n',
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,

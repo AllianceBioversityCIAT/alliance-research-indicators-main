@@ -1,0 +1,8 @@
+// @akili-spec changes/profile-simulation — T-09
+// Styling lives on token utility classes in the template (root CLAUDE.md
+// §4.2); this file only holds the one rule Tailwind arbitrary values can't
+// express cleanly: hiding the native placeholder color override so the
+// input matches the mockup's neutral placeholder tone via the grey token.
+#user-search-input::placeholder {
+  color: var(--ac-grey-500);
+}

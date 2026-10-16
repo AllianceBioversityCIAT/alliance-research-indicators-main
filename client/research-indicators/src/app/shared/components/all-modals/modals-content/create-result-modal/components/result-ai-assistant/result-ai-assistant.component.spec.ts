@@ -74,6 +74,8 @@ describe('ResultAiAssistantComponent', () => {
     createResultManagementServiceMock = {
       items: signal<[]>([]),
       resultPageStep: signal(0),
+      carriedContractId: signal<string | null>(null),
+      setCarriedContractId: jest.fn(),
       resetModal: jest.fn()
     } as Partial<CreateResultManagementService>;
 
@@ -640,6 +642,94 @@ describe('ResultAiAssistantComponent', () => {
 
     expect(component.contractId).toBe(newContractId);
     expect(component.body().contract_id).toBe(newContractId);
+  });
+
+  it('onContractIdChange should carry the selection back to the create-result form', () => {
+    component.onContractIdChange('A1048');
+
+    expect(createResultManagementServiceMock.setCarriedContractId).toHaveBeenCalledWith('A1048');
+  });
+
+  // The Reporting Project picked on the create-result form must survive the jump to this step.
+  // These arrange the TRANSITION the product performs (KZ-015): the fixture is built with the
+  // modal closed on step 0 — the only state it is ever constructed in, since the modal's @switch
+  // creates this component on step change — and only then is step 1 entered.
+  describe('ResultAiAssistantComponent — carried Reporting Project', () => {
+    const enterUploadStep = async (fixture: ComponentFixture<ResultAiAssistantComponent>) => {
+      allModalsServiceMock.isModalOpen = jest.fn().mockReturnValue({ isOpen: true });
+      createResultManagementServiceMock.resultPageStep.set(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      // The seeding lands in a promise callback; this is the change-detection pass Angular
+      // runs itself once the zone task settles, and it is what propagates `body()` down to
+      // the shared form's `[contractId]` input.
+      fixture.detectChanges();
+    };
+
+    it('re-selects the carried project when it survived the exclude-pooled-funding filter', async () => {
+      expect(component.body().contract_id).toBeNull();
+
+      getContractsServiceMock.aiAssistantList.set([{ agreement_id: 'A1048', description: 'CIFOR Hosted - HQ' }]);
+      createResultManagementServiceMock.carriedContractId.set('A1048');
+      await enterUploadStep(fixture);
+
+      expect(component.contractId).toBe('A1048');
+      expect(component.body().contract_id).toBe('A1048');
+      // The seeded value must reach the shared form's validity output too, or the field
+      // would look filled while "Analyze file" stayed disabled.
+      expect(component.sharedFormValid).toBe(true);
+    });
+
+    it('fills the field before the contracts request resolves, not after it', () => {
+      // The regression this guards: seeding used to run inside the `mainForAiAssistant()`
+      // continuation, so the project appeared only once that round trip came back.
+      let releaseContracts!: () => void;
+      getContractsServiceMock.mainForAiAssistant = jest.fn(
+        () =>
+          new Promise<void>(resolve => {
+            releaseContracts = resolve;
+          })
+      );
+      createResultManagementServiceMock.carriedContractId.set('A1048');
+
+      allModalsServiceMock.isModalOpen = jest.fn().mockReturnValue({ isOpen: true });
+      createResultManagementServiceMock.resultPageStep.set(1);
+      fixture.detectChanges();
+
+      // Request still in flight.
+      expect(getContractsServiceMock.mainForAiAssistant).toHaveBeenCalled();
+      expect(component.body().contract_id).toBe('A1048');
+
+      releaseContracts();
+    });
+
+    it('leaves the field empty when the carried project is not selectable here (pooled-funded)', async () => {
+      getContractsServiceMock.aiAssistantList.set([{ agreement_id: 'A1048', description: 'CIFOR Hosted - HQ' }]);
+      createResultManagementServiceMock.carriedContractId.set('A9999');
+      await enterUploadStep(fixture);
+
+      expect(component.body().contract_id).toBeNull();
+    });
+
+    it('leaves the field empty when nothing was selected on the create-result form', async () => {
+      getContractsServiceMock.aiAssistantList.set([{ agreement_id: 'A1048', description: 'CIFOR Hosted - HQ' }]);
+      createResultManagementServiceMock.carriedContractId.set(null);
+      await enterUploadStep(fixture);
+
+      expect(component.body().contract_id).toBeNull();
+    });
+
+    it('does not overwrite a project already chosen on this step', async () => {
+      getContractsServiceMock.aiAssistantList.set([
+        { agreement_id: 'A1048', description: 'CIFOR Hosted - HQ' },
+        { agreement_id: 'A1065', description: 'Other project' }
+      ]);
+      component.onContractIdChange('A1065');
+      createResultManagementServiceMock.carriedContractId.set('A1048');
+      await enterUploadStep(fixture);
+
+      expect(component.body().contract_id).toBe('A1065');
+    });
   });
 
   it('onContractIdChange should handle null contractId', () => {

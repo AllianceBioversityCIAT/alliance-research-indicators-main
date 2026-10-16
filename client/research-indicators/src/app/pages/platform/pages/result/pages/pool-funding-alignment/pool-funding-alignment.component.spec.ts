@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
 import { WebsocketService } from '@sockets/websocket.service';
+import { AllModalsService } from '@services/cache/all-modals.service';
 
 import PoolFundingAlignmentComponent from './pool-funding-alignment.component';
 import { SpTocAlignmentBlockComponent } from './components/sp-toc-alignment-block/sp-toc-alignment-block.component';
@@ -13,6 +14,7 @@ import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
 import { SubmissionService } from '@shared/services/submission.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import {
   AlignmentResponse,
   BilateralTocCatalogResponse,
@@ -73,6 +75,7 @@ describe('PoolFundingAlignmentComponent', () => {
   let editable: ReturnType<typeof signal<boolean>>;
   let sciencePrograms: ReturnType<typeof signal<PoolFundingScienceProgram[]>>;
   let mappingStatus: ReturnType<typeof signal<PoolFundingMappingStatus | null>>;
+  let loadingSciencePrograms: ReturnType<typeof signal<boolean>>;
   let tocCatalog: ReturnType<typeof signal<BilateralTocCatalogResponse | null>>;
   let loadingTocCatalog: ReturnType<typeof signal<boolean>>;
   let tocCatalogError: ReturnType<typeof signal<boolean>>;
@@ -86,6 +89,8 @@ describe('PoolFundingAlignmentComponent', () => {
   let socketEvents$: Subject<unknown>;
   let listenMock: jest.Mock;
   let trackEventMock: jest.Mock;
+  let versionChangeCallbacks: Array<(version: string | null) => void>;
+  let isEditableStatus: ReturnType<typeof signal<boolean>>;
 
   const codes = (form: { selected_sps: { official_code: string }[] }) => form.selected_sps.map(sp => sp.official_code);
   const sp = (official_code: string) => ({ official_code });
@@ -111,6 +116,7 @@ describe('PoolFundingAlignmentComponent', () => {
     editable = signal<boolean>(true);
     sciencePrograms = signal<PoolFundingScienceProgram[]>([]);
     mappingStatus = signal<PoolFundingMappingStatus | null>(null);
+    loadingSciencePrograms = signal<boolean>(false);
     tocCatalog = signal<BilateralTocCatalogResponse | null>(null);
     loadingTocCatalog = signal<boolean>(false);
     tocCatalogError = signal<boolean>(false);
@@ -124,6 +130,8 @@ describe('PoolFundingAlignmentComponent', () => {
     socketEvents$ = new Subject<unknown>();
     listenMock = jest.fn().mockReturnValue(socketEvents$.asObservable());
     trackEventMock = jest.fn();
+    versionChangeCallbacks = [];
+    isEditableStatus = signal(true);
 
     const bilateralServiceMock = {
       currentAlignment,
@@ -132,6 +140,7 @@ describe('PoolFundingAlignmentComponent', () => {
       editable,
       sciencePrograms,
       mappingStatus,
+      loadingSciencePrograms,
       tocCatalog,
       loadingTocCatalog,
       tocCatalogError,
@@ -159,6 +168,9 @@ describe('PoolFundingAlignmentComponent', () => {
       snapshot: {
         paramMap: {
           get: (k: string) => (k === 'id' ? 'RES-001' : null)
+        },
+        queryParamMap: {
+          get: (_k: string) => null as string | null
         }
       }
     };
@@ -171,9 +183,19 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActivatedRoute, useValue: routeMock },
         { provide: Router, useValue: { navigate: routerNavigate } },
         { provide: ActionsService, useValue: { showToast: showToastMock, showGlobalAlert: showGlobalAlertMock } },
-        { provide: SubmissionService, useValue: { isEditableStatus: signal(true) } },
+        { provide: SubmissionService, useValue: { isEditableStatus } },
         { provide: WebsocketService, useValue: { listen: listenMock } },
-        { provide: ClarityService, useValue: { trackEvent: trackEventMock } }
+        { provide: ClarityService, useValue: { trackEvent: trackEventMock } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => {
+              versionChangeCallbacks.push(cb);
+              cb(null);
+            })
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -187,12 +209,62 @@ describe('PoolFundingAlignmentComponent', () => {
     expect(getAlignmentMock).toHaveBeenCalledWith('RES-001');
   });
 
-  it('renders the section title info icon aligned with tooltip text matching the info banner', () => {
+  // Regression: `[showBack]="true"` was rendered with NO `(back)` binding — the
+  // shared NavigationButtonsComponent only emits an @Output, so the button was
+  // inert. Clicking the real DOM button (not calling onBack() directly) is what
+  // makes this test able to fail if the template binding is dropped again.
+  describe('Back button (dead-button regression)', () => {
+    const clickBack = (): void => {
+      fixture.detectChanges();
+      const icon = fixture.nativeElement.querySelector('button i.pi-arrow-left') as HTMLElement | null;
+      expect(icon).not.toBeNull();
+      (icon as HTMLElement).closest('button')!.click();
+    };
+
+    it('navigates to the previous section when clicked', () => {
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'evidence'], {
+        queryParams: undefined,
+        replaceUrl: true
+      });
+    });
+
+    it('targets ip-rights for indicator_id 1 (the section directly above the optional one)', () => {
+      TestBed.inject(CacheService).currentMetadata.set({ result_title: 'Test Title', indicator_id: 1 } as never);
+
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'ip-rights'], {
+        queryParams: undefined,
+        replaceUrl: true
+      });
+    });
+
+    it('preserves the version query param', () => {
+      const route = TestBed.inject(ActivatedRoute);
+      jest.spyOn(route.snapshot.queryParamMap, 'get').mockImplementation((k: string) => (k === 'version' ? '2026' : null));
+
+      clickBack();
+
+      expect(routerNavigate).toHaveBeenCalledWith(['/result', 'RES-001', 'evidence'], {
+        queryParams: { version: '2026' },
+        replaceUrl: true
+      });
+    });
+
+    it('does not attempt a save (canSave() may be blocking it)', () => {
+      clickBack();
+
+      expect(patchAlignmentMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it('renders the section title help button aligned with tooltip text', () => {
     fixture.detectChanges();
-    const icon = fixture.nativeElement.querySelector('[data-testid="pf-alignment-title-info-icon"]') as HTMLElement;
-    expect(icon).not.toBeNull();
-    expect(icon.getAttribute('aria-label')).toBe(component.INFO_BANNER);
-    expect(icon.classList.contains('pf-alignment-section-heading__icon')).toBe(true);
+    const btn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]') as HTMLElement;
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute('aria-label')).toBe('Learn more about Pool Funding and Theory of Change alignment');
   });
 
   it('falls back to cache.getCurrentNumericResultId when route param is absent', async () => {
@@ -237,7 +309,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -296,7 +375,14 @@ describe('PoolFundingAlignmentComponent', () => {
         { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
         // The poisoned record: truthy, but no `listen` function on it.
         { provide: WebsocketService, useValue: {} },
-        { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+        { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+        {
+          provide: VersionWatcherService,
+          useValue: {
+            version: signal<string | null>(null),
+            onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+          }
+        }
       ],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -594,7 +680,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: ActivatedRoute, useValue: route },
           { provide: Router, useValue: { navigate } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
-          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } }
+          { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -670,7 +763,14 @@ describe('PoolFundingAlignmentComponent', () => {
           { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } },
           { provide: WebsocketService, useValue: { listen: jest.fn().mockReturnValue(new Subject().asObservable()) } },
-          { provide: ClarityService, useValue: { trackEvent: jest.fn() } }
+          { provide: ClarityService, useValue: { trackEvent: jest.fn() } },
+          {
+            provide: VersionWatcherService,
+            useValue: {
+              version: signal<string | null>(null),
+              onVersionChange: jest.fn((cb: (version: string | null) => void) => cb(null))
+            }
+          }
         ],
         schemas: [NO_ERRORS_SCHEMA]
       }).compileComponents();
@@ -992,44 +1092,33 @@ describe('PoolFundingAlignmentComponent', () => {
     // property, and the given root cause is testable by anyone who prefers to
     // verify rather than take it on faith (create the row with disabled=true in
     // one pass and watch componentInstance.disabled read false).
-    it('R-BIL-127 AC.5 — the rendered Primary radio reflects primaryControlDisabled in the DOM', () => {
+    it('R-BIL-127 AC.5 — primaryControlDisabled is true when alignment is read-only or version-locked', () => {
       mappingStatus.set('mapped');
       selectTwo();
       component.onPrimaryChange('SP01');
-      fixture.detectChanges();
-      let de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
-      expect(de).not.toBeNull();
-      expect((de.componentInstance as { disabled?: boolean }).disabled).toBeFalsy();
+      expect(component.primaryControlDisabled()).toBe(false);
 
       currentAlignment.set({ ...baseAlignment, has_contribution: true, is_read_only: true });
-      fixture.detectChanges();
-      de = fixture.debugElement.query(By.css('[data-testid="pf-alignment-primary-radio-SP01"]'));
-      expect((de.componentInstance as { disabled?: boolean }).disabled).toBe(true);
+      expect(component.primaryControlDisabled()).toBe(true);
     });
 
-    // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-127 AC.6
-    // Presence-assertion ONLY (tasks.md §7 / design.md D-5): proves the text-label
-    // + icon markup is IN the DOM for both roles, which is necessary for AC.6's
-    // non-colour-only cue but not sufficient — jsdom cannot measure rendered
-    // colour, contrast, or layout, and no assertion in this file can. AC.6 is
-    // NOT discharged by this or any other test here; see the design.md §12.2
-    // decision entry and tasks.md §7 for the explicit record.
-    it('R-BIL-127 AC.6 (presence-assertion only, NOT a visual discharge) — Primary and Contributing each carry a distinct text label; only Primary carries the star icon', () => {
+    it('R-BIL-127 AC.6 (presence-assertion only) — Primary carries a distinct badge with star icon and Contributing carries Make Primary action', () => {
       mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Breeding', icon_key: 'SP01', allocation: 50 },
+        { code: 'SP03', name: 'Agronomy', icon_key: 'SP03', allocation: 50 }
+      ]);
       selectTwo();
       component.onPrimaryChange('SP01');
       fixture.detectChanges();
 
       const root: HTMLElement = fixture.nativeElement;
       const primaryBadge = root.querySelector('[data-testid="pf-alignment-role-primary-SP01"]');
-      const contributingBadge = root.querySelector('[data-testid="pf-alignment-role-contributing-SP03"]');
+      const makePrimaryBtn = root.querySelector('[data-testid="pf-alignment-set-primary-SP03"]');
       expect(primaryBadge).not.toBeNull();
-      expect(contributingBadge).not.toBeNull();
-      expect(primaryBadge!.textContent?.trim()).toContain(component.PRIMARY_ROLE_LABEL);
-      expect(contributingBadge!.textContent?.trim()).toContain(component.CONTRIBUTING_ROLE_LABEL);
-      // Icon present on Primary only — the non-colour-only cue's second channel.
+      expect(makePrimaryBtn).not.toBeNull();
+      expect(primaryBadge!.textContent?.trim()).toContain('Primary');
       expect(primaryBadge!.querySelector('.pi-star-fill')).not.toBeNull();
-      expect(contributingBadge!.querySelector('.pi-star-fill')).toBeNull();
     });
 
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16 / R-BIL-128 AC.5
@@ -1110,6 +1199,10 @@ describe('PoolFundingAlignmentComponent', () => {
     // endorsed; see design.md §12.2 for the decision record.
     it('5d — a read-only legacy alignment (role: null on every row) renders "Contributing" on every SP, not a neutral state', () => {
       mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'A', icon_key: 'SP01', allocation: 50 },
+        { code: 'SP03', name: 'B', icon_key: 'SP03', allocation: 50 }
+      ]);
       currentAlignment.set({
         ...baseAlignment,
         has_contribution: true,
@@ -1239,6 +1332,147 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  // QA 2026-08-25 — Bug 1c. `readOnlyTocSummaries` fed off the SERVER snapshot
+  // only, so a DESELECTED SP kept its read-only card until the next save, which
+  // contradicted the removal modal ("Removing it will discard that alignment").
+  // The pair below is the point of these tests: the deselected card must go, and
+  // the DEMOTED card must stay (R-BIL-129 / R-BIL-125, OQ-3 — the BA's call, not
+  // ours). A fix that dropped both would pass the first test and fail the second.
+  describe('QA Bug 1c — a deselected SP withdraws its read-only card immediately', () => {
+    const savedRow = (spCode: string): SavedTocAlignment => ({
+      sp_code: spCode,
+      aligns_with_toc: true,
+      level: 'OUTPUT',
+      toc_result_id: 5187,
+      indicator_id: 5973,
+      quantitative_contribution: 3,
+      toc_result_title: 'HLO1.AOW1.IO1 Steer to impact',
+      indicator_description: 'An indicator',
+      unit_of_measurement: 'Number',
+      target_value: '10',
+      target_year: 2026
+    });
+
+    const seedTwoSpsWithSavedRowForSp03 = (): void => {
+      mappingStatus.set('mapped');
+      tocCatalog.set(TOC_CATALOG_TWO_SP_FIXTURE);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'A', role: 'PRIMARY' },
+          { code: 'SP03', name: 'B', role: 'CONTRIBUTING' }
+        ],
+        toc_alignments: [savedRow('SP03')]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+    };
+
+    it('withdraws the card as soon as the removal is confirmed — no save, no reload', async () => {
+      seedTwoSpsWithSavedRowForSp03();
+      const root: HTMLElement = fixture.nativeElement;
+      // Pin the pre-condition: without it a fix that hid the card unconditionally
+      // would pass this test for the wrong reason.
+      expect(root.querySelector('[data-orphaned="true"]')).not.toBeNull();
+
+      component.formData.update(f => ({ ...f, selected_sps: [sp('SP01')] }));
+      component.onSpSelectionChange();
+      await Promise.resolve();
+      showGlobalAlertMock.mock.calls[0][0].confirmCallback.event();
+      fixture.detectChanges();
+
+      expect(component.readOnlyTocSummaries()).toEqual([]);
+      expect(root.querySelector('[data-orphaned="true"]')).toBeNull();
+    });
+
+    it('keeps the card for a merely DEMOTED SP — R-BIL-129 / OQ-3 is untouched', () => {
+      seedTwoSpsWithSavedRowForSp03();
+
+      // SP03 stays selected; only the Primary moves. This is the case the spec
+      // mandates keeping, and the case QA asked to delete (deferred to the BA).
+      component.onPrimaryChange('SP03');
+      component.onPrimaryChange('SP01');
+      fixture.detectChanges();
+
+      expect(component.readOnlyTocSummaries().map(r => r.alignment.sp_code)).toEqual(['SP03']);
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-orphaned="true"]')).not.toBeNull();
+    });
+  });
+
+  // QA 2026-08-25 — Bugs 2 and 3. Both are the same user-facing failure: Save
+  // goes grey with no stated reason. Asserted in the DOM, not on the computed —
+  // Bug 3 existed precisely because `primaryRequiredMessage` was unit-tested as
+  // a computed while being rendered nowhere.
+  describe('QA Bugs 2 & 3 — the disabled Save states name what is missing', () => {
+    const twoSpOptions: PoolFundingScienceProgram[] = [
+      { code: 'SP01', name: 'A', category: null, color: '#000000', allocation: 50, icon_key: null },
+      { code: 'SP03', name: 'B', category: null, color: '#000000', allocation: 50, icon_key: null }
+    ];
+
+    it('Bug 2 — "Yes" with zero SPs selected renders the select-an-SP message', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({ ...baseAlignment, has_contribution: true, selected_science_programs: [] });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.canSave()).toBe(false);
+      const el = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-sp-required"]');
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toContain(component.SP_REQUIRED_MESSAGE);
+    });
+
+    it('Bug 3 — an SP selected with no Primary renders the Primary-required message', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        // No role: 'PRIMARY' anywhere ⇒ primary_sp_code seeds to null (R-BIL-126).
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: null } as never]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect(component.canSave()).toBe(false);
+      const el = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-primary-required"]');
+      expect(el).not.toBeNull();
+      expect(el!.textContent).toContain(component.PRIMARY_SP_REQUIRED_MESSAGE);
+    });
+
+    it('neither message renders once an SP and a Primary are both chosen', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [{ code: 'SP01', name: 'A', role: 'PRIMARY' }]
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-sp-required"]')).toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-primary-required"]')).toBeNull();
+    });
+
+    it('stays silent when the section is read-only — no action to demand', () => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set(twoSpOptions);
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        is_read_only: true,
+        selected_science_programs: []
+      });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="pf-alignment-sp-required"]')).toBeNull();
+    });
+  });
+
   // R-BIL-115 — regression (already implemented): the selected-SP chip renders
   // through the `#rows` ng-template of `app-multiselect` (pool-funding-alignment
   // .component.html :151), driven by `findScienceProgram()` resolving the chip's
@@ -1256,7 +1490,7 @@ describe('PoolFundingAlignmentComponent', () => {
 
     const renderSelectedChip = async (option: PoolFundingScienceProgram) => {
       mappingStatus.set('mapped');
-      sciencePrograms.set([option]);
+      sciencePrograms.set([option, spOption({ code: 'SP02', name: 'Other SP', icon_key: 'SP02' })]);
       currentAlignment.set({ ...baseAlignment, has_contribution: false });
       component.seedFromServer(currentAlignment()!);
       component.onContributionChange(true);
@@ -1271,19 +1505,19 @@ describe('PoolFundingAlignmentComponent', () => {
 
     it('AC.1 — renders the selected SP as "<code> — <allocation>% - <name>"', async () => {
       await renderSelectedChip(spOption());
-      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
-      expect(chip).not.toBeNull();
-      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — 10% - Climate Action');
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP06"]') as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(card!.textContent?.replace(/\s+/g, ' ').trim()).toContain('SP06 — 10% - Climate Action');
     });
 
     it('AC.2 — a null allocation renders the existing "—" placeholder, never the literal "null"', async () => {
       // Runtime data can carry a null allocation even though the wire type is
       // declared non-nullable (`?? '—'` in the template is the actual guard).
       await renderSelectedChip(spOption({ allocation: null as unknown as number }));
-      const chip = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-chip-SP06"]') as HTMLElement | null;
-      expect(chip).not.toBeNull();
-      expect(chip!.textContent?.replace(/\s+/g, ' ').trim()).toBe('SP06 — —% - Climate Action');
-      expect(chip!.textContent).not.toMatch(/\bnull\b/);
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP06"]') as HTMLElement | null;
+      expect(card).not.toBeNull();
+      expect(card!.textContent?.replace(/\s+/g, ' ').trim()).toContain('SP06 — —% - Climate Action');
+      expect(card!.textContent).not.toMatch(/\bnull\b/);
     });
   });
 
@@ -1312,7 +1546,7 @@ describe('PoolFundingAlignmentComponent', () => {
 
       expect(showGlobalAlertMock).toHaveBeenCalledTimes(1);
       const alertArg = showGlobalAlertMock.mock.calls[0][0];
-      expect(alertArg.severity).toBe('delete');
+      expect(alertArg.severity).toBe('secondary');
       expect(alertArg.confirmCallback.label).toBe('Remove');
       expect(alertArg.cancelCallback.label).toBe('Cancel');
       // Chip restored while the dialog is open.
@@ -1796,6 +2030,19 @@ describe('PoolFundingAlignmentComponent', () => {
     });
   });
 
+  describe('Save override on a version (R-PFV-005)', () => {
+    const saveButton = (root: HTMLElement) =>
+      Array.from(root.querySelectorAll('button')).find(b => b.textContent?.includes('Save'));
+
+    it('with is_read_only true the override is false even on a version — Save absent', () => {
+      isEditableStatus.set(false);
+      editable.set(true);
+      currentAlignment.set({ ...baseAlignment, is_read_only: true });
+      fixture.detectChanges();
+      expect(saveButton(fixture.nativeElement)).toBeUndefined();
+    });
+  });
+
   describe('read-only DOM (banners + badge + Save visibility) — regression', () => {
     it('renders synced badge + synced banner when is_read_only && is_synced_to_prms; Save absent', () => {
       currentAlignment.set({ ...baseAlignment, is_read_only: true, is_synced_to_prms: true });
@@ -1938,6 +2185,17 @@ describe('PoolFundingAlignmentComponent', () => {
       component.onContributionChange(true);
     };
 
+    it('shows the SP loading skeleton when loadingSciencePrograms is true and mappingStatus is null', () => {
+      showPickerSection();
+      loadingSciencePrograms.set(true);
+      mappingStatus.set(null);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelector('[data-testid="pf-alignment-sps-loading"]')).not.toBeNull();
+      expect(root.textContent).toContain('Loading Science Programs from CLARISA...');
+      expect(component.showSpPicker()).toBe(false);
+    });
+
     it('AC-01.2 — unmapped renders the contact-ops message and hides the picker', () => {
       showPickerSection();
       mappingStatus.set('unmapped');
@@ -1962,11 +2220,87 @@ describe('PoolFundingAlignmentComponent', () => {
     it('AC-01.1 — mapped + SPs renders the picker bound to the per-result control-list source', () => {
       showPickerSection();
       mappingStatus.set('mapped');
-      sciencePrograms.set([spOption]);
+      sciencePrograms.set([spOption, { ...spOption, code: 'SP02', icon_key: 'SP02' }]);
       fixture.detectChanges();
       const root: HTMLElement = fixture.nativeElement;
-      expect(root.querySelector('app-multiselect')).not.toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-multi-sp-grid"]')).not.toBeNull();
       expect(component.showSpPicker()).toBe(true);
+    });
+
+    it('T-09 / R-PSP-004 — stale renders the reconcile-ops message, hides the picker, and does not tell user to register mapping (KZ-015)', () => {
+      showPickerSection();
+      fixture.detectChanges(); // KZ-015: arrange transition after initial detectChanges
+
+      mappingStatus.set('stale');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const staleEl = root.querySelector('[data-testid="pf-alignment-stale-message"]');
+      expect(staleEl).not.toBeNull();
+      expect(staleEl?.textContent?.trim()).toContain(
+        'The linked CLARISA project could not be found in the current feed. Contact the bilateral operations team to reconcile the project mapping.'
+      );
+      expect(staleEl?.textContent).not.toContain('register');
+      expect(root.querySelector('[data-testid="pf-alignment-unmapped-message"]')).toBeNull();
+      expect(root.querySelector('[data-testid="pf-alignment-multi-sp-grid"]')).toBeNull();
+      expect(component.isStale()).toBe(true);
+      expect(component.showSpPicker()).toBe(false);
+    });
+
+    it('T-09 / R-PSP-004 — all three empty-state messages are pairwise distinct on rendered DOM', () => {
+      showPickerSection();
+      fixture.detectChanges();
+
+      // 1. Unmapped state
+      mappingStatus.set('unmapped');
+      sciencePrograms.set([]);
+      fixture.detectChanges();
+      const root: HTMLElement = fixture.nativeElement;
+      const unmappedText = root.querySelector('[data-testid="pf-alignment-unmapped-message"]')?.textContent?.trim();
+
+      // 2. Stale state
+      mappingStatus.set('stale');
+      fixture.detectChanges();
+      const staleText = root.querySelector('[data-testid="pf-alignment-stale-message"]')?.textContent?.trim();
+
+      // 3. No SPs defined state
+      mappingStatus.set('mapped');
+      fixture.detectChanges();
+      const noSpsText = root.querySelector('[data-testid="pf-alignment-no-sps-message"]')?.textContent?.trim();
+
+      expect(unmappedText).toBeTruthy();
+      expect(staleText).toBeTruthy();
+      expect(noSpsText).toBeTruthy();
+
+      expect(staleText).not.toEqual(unmappedText);
+      expect(staleText).not.toEqual(noSpsText);
+      expect(unmappedText).not.toEqual(noSpsText);
+    });
+
+    it('T-09 / R-PFU-003 — does NOT render Pending qualifier chip anywhere in result pool funding alignment view', () => {
+      currentAlignment.set({
+        ...baseAlignment,
+        has_contribution: true,
+        selected_science_programs: [
+          { code: 'SP01', name: 'Science Program 1', role: 'PRIMARY' },
+          { code: 'SP02', name: 'Science Program 2', role: 'CONTRIBUTING' }
+        ]
+      });
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Science Program 1', icon_key: 'SP01', allocation: 50, mapping_status: 'Pending' },
+        { code: 'SP02', name: 'Science Program 2', icon_key: 'SP02', allocation: 50, mapping_status: 'Confirmed' }
+      ]);
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+
+      const root: HTMLElement = fixture.nativeElement;
+      const pendingTagSp01 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP01"]');
+      const pendingTagSp02 = root.querySelector('[data-testid="pf-alignment-pending-tag-SP02"]');
+
+      expect(pendingTagSp01).toBeNull();
+      expect(pendingTagSp02).toBeNull();
+      expect(root.textContent).not.toContain('Pending');
     });
   });
 
@@ -2286,10 +2620,423 @@ describe('PoolFundingAlignmentComponent', () => {
         await Promise.resolve();
 
         expect(showGlobalAlertMock).toHaveBeenCalledTimes(1);
-        expect(showGlobalAlertMock.mock.calls[0][0].severity).toBe('delete');
+        expect(showGlobalAlertMock.mock.calls[0][0].severity).toBe('secondary');
         // Chip restored while the confirm dialog is open.
         expect(codes(component.formData())).toContain('SP03');
       });
     });
   });
+
+  describe('Single Science Program Auto-Selection (R-PFU-001)', () => {
+    const singleSpOption: PoolFundingScienceProgram = {
+      code: 'SP06',
+      name: 'Climate Action',
+      category: null,
+      color: '#4caf50',
+      icon_key: 'SP06',
+      allocation: 100,
+      mapping_status: 'Confirmed'
+    };
+
+    beforeEach(() => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([singleSpOption]);
+      currentAlignment.set({ ...baseAlignment, has_contribution: false });
+      component.seedFromServer(currentAlignment()!);
+      fixture.detectChanges();
+    });
+
+    it('clicking "Yes" when 1 SP is mapped automatically sets selected_sps, primary_sp_code, and toc_drafts', () => {
+      expect(component.isSingleSp()).toBe(true);
+      expect(component.singleSp()).toEqual(singleSpOption);
+
+      component.onContributionChange(true);
+
+      expect(component.formData().has_contribution).toBe(true);
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP06');
+      expect(component.formData().primary_sp_code).toBe('SP06');
+      expect(component.formData().toc_drafts.length).toBe(1);
+      expect(component.formData().toc_drafts[0].sp_code).toBe('SP06');
+    });
+
+    it('renders Single-SP Card in the DOM with icon, code, allocation, title, Primary badge, and a11y attributes', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const card = fixture.nativeElement.querySelector('[data-testid="pf-alignment-single-sp-card"]') as HTMLElement;
+      expect(card).toBeTruthy();
+      expect(card.getAttribute('tabindex')).toBe('0');
+      expect(card.getAttribute('role')).toBe('region');
+      expect(card.getAttribute('aria-label')).toBe('Selected Science Program');
+      expect(card.textContent).toContain('SP06');
+      expect(card.textContent).toContain('100%');
+      expect(card.textContent).toContain('Climate Action');
+
+      const badge = fixture.nativeElement.querySelector('[data-testid="single-sp-primary-badge"]');
+      expect(badge).toBeTruthy();
+      expect(badge.textContent).toContain('Primary');
+    });
+
+    it('does NOT render multi-select dropdown when sciencePrograms().length === 1', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const multiselect = fixture.nativeElement.querySelector('app-multiselect');
+      expect(multiselect).toBeFalsy();
+    });
+
+    it('does NOT render separate primary radio question when sciencePrograms().length === 1', async () => {
+      component.onContributionChange(true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const primarySection = fixture.nativeElement.querySelector('[data-testid="pf-alignment-primary-section"]');
+      expect(primarySection).toBeFalsy();
+    });
+
+    it('clicking "No" resets the selection, primary_sp_code, and drafts', () => {
+      component.onContributionChange(true);
+      expect(component.formData().selected_sps.length).toBe(1);
+
+      component.onContributionChange(false);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(component.formData().selected_sps).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+      expect(component.formData().toc_drafts).toEqual([]);
+    });
+  });
+
+  describe('Multi-SP Interactive Cards & Inline Primary Toggle (R-PFU-002, R-PFU-003)', () => {
+    beforeEach(() => {
+      mappingStatus.set('mapped');
+      sciencePrograms.set([
+        { code: 'SP01', name: 'Science Program 1', icon_key: 'SP01', allocation: 60, mapping_status: 'Confirmed' },
+        { code: 'SP02', name: 'Science Program 2', icon_key: 'SP02', allocation: 40, mapping_status: 'Pending' }
+      ]);
+      component.onContributionChange(true);
+      fixture.detectChanges();
+    });
+
+    it('renders interactive cards grid for multi-SP project with keyboard a11y', async () => {
+      const grid = fixture.nativeElement.querySelector('[data-testid="pf-alignment-multi-sp-grid"]');
+      expect(grid).toBeTruthy();
+
+      const card1 = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP01"]') as HTMLElement;
+      const card2 = fixture.nativeElement.querySelector('[data-testid="pf-alignment-sp-card-SP02"]') as HTMLElement;
+      expect(card1).toBeTruthy();
+      expect(card2).toBeTruthy();
+      expect(card1.getAttribute('tabindex')).toBe('0');
+      expect(card1.getAttribute('role')).toBe('checkbox');
+      expect(card1.getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('selecting first SP auto-designates it as Primary', () => {
+      const sp1 = sciencePrograms()[0];
+      component.toggleSp(sp1);
+
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP01');
+      expect(component.formData().primary_sp_code).toBe('SP01');
+      expect(component.isPrimary('SP01')).toBe(true);
+    });
+
+    it('selecting a second SP retains the first as Primary and renders "Make Primary" button on the second', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.formData().selected_sps.length).toBe(2);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+
+      const primaryBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-primary-SP01"]');
+      const contributingBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-contributing-SP02"]');
+      const makePrimaryBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-set-primary-SP02"]');
+      expect(primaryBadge).toBeTruthy();
+      expect(primaryBadge.textContent).toContain('Primary');
+      expect(contributingBadge).toBeTruthy();
+      expect(contributingBadge.textContent).toContain('Contributing');
+      expect(makePrimaryBtn).toBeTruthy();
+      expect(makePrimaryBtn.textContent).toContain('Make Primary');
+    });
+
+    it('clicking "Make Primary" sets the new primary SP and updates badges', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+
+      component.setPrimarySp('SP02');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(component.formData().primary_sp_code).toBe('SP02');
+      expect(component.isPrimary('SP02')).toBe(true);
+      expect(component.isPrimary('SP01')).toBe(false);
+
+      const primaryBadge = fixture.nativeElement.querySelector('[data-testid="pf-alignment-role-primary-SP02"]');
+      const makePrimaryBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-set-primary-SP01"]');
+      expect(primaryBadge).toBeTruthy();
+      expect(makePrimaryBtn).toBeTruthy();
+    });
+
+    it('deselecting primary SP when 1 SP remains auto-promotes the remaining SP to Primary', () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      expect(component.formData().primary_sp_code).toBe('SP01');
+
+      // Deselect SP01 (which was primary)
+      component.toggleSp(sp1);
+      expect(component.formData().selected_sps.length).toBe(1);
+      expect(component.formData().selected_sps[0].code).toBe('SP02');
+      expect(component.formData().primary_sp_code).toBe('SP02');
+    });
+
+    it('does NOT render the separate Primary radio question or any "Pending" status badge in DOM (R-PFU-003)', async () => {
+      const [sp1, sp2] = sciencePrograms();
+      component.toggleSp(sp1);
+      component.toggleSp(sp2);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const primarySection = fixture.nativeElement.querySelector('[data-testid="pf-alignment-primary-section"]');
+      expect(primarySection).toBeFalsy();
+
+      const pendingBadge = fixture.nativeElement.querySelector('[data-testid*="pending"]');
+      expect(pendingBadge).toBeFalsy();
+      expect(fixture.nativeElement.textContent).not.toContain('Pending');
+    });
+  });
+
+  describe('Help & Workflow Guide Modal', () => {
+    it('renders the help button in the section header and help link in the banner', () => {
+      fixture.detectChanges();
+      const helpBtn = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      const bannerLink = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+
+      expect(helpBtn).not.toBeNull();
+      expect(bannerLink).not.toBeNull();
+      expect(bannerLink.textContent).toContain('Learn more & view workflow');
+    });
+
+    it('both triggers open the help panel', () => {
+      const modals = TestBed.inject(AllModalsService);
+      fixture.detectChanges();
+      expect(component.showHelpModal()).toBe(false);
+
+      const helpBtn: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-help-button"]');
+      helpBtn.click();
+      expect(component.showHelpModal()).toBe(true);
+
+      // Closed the way the shell closes it, not by poking a local signal — the
+      // open state lives in AllModalsService now.
+      modals.closeModal('poolFundingHelp');
+      expect(component.showHelpModal()).toBe(false);
+
+      const bannerLink: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="pf-alignment-banner-help-link"]');
+      bannerLink.click();
+      expect(component.showHelpModal()).toBe(true);
+    });
+
+    it('registers a title with the shared service so the shell can render it', () => {
+      const config = TestBed.inject(AllModalsService).isModalOpen('poolFundingHelp');
+      expect(config.title).toContain('Pool Funding');
+    });
+
+    // It used to be a bare <p-dialog>, which is why it did not look like any
+    // other modal in the app.
+    it('renders through the shared app-modal shell, not a bare p-dialog', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      expect(template).toContain('<app-modal modalName="poolFundingHelp"');
+      // ★ discriminating: the old shell is gone, header and footer included.
+      expect(template).not.toContain('<p-dialog');
+      expect(template).not.toContain('#footer');
+    });
+
+    it('carries no colour token that colors.scss does not define', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const helpPanel = template.slice(template.indexOf('<app-modal modalName="poolFundingHelp"'));
+
+      // ★ discriminating: these four are still used elsewhere in this file but are
+      //   NOT in colors.scss, so every rule using them rendered with no colour.
+      for (const phantom of [
+        'var(--ac-primary-blue-50)',
+        'var(--ac-primary-blue-800)',
+        'var(--ac-primary-blue-900)',
+        'var(--ac-grey-50)'
+      ]) {
+        expect(helpPanel).not.toContain(phantom);
+      }
+    });
+  });
+
+  describe('version change refetch (R-PFV-004)', () => {
+    const liveAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: false,
+      selected_science_programs: []
+    };
+    const versionAlignment: AlignmentResponse = {
+      ...baseAlignment,
+      has_contribution: true,
+      selected_science_programs: [{ code: 'SP06', name: 'Climate action', role: 'PRIMARY' }]
+    };
+
+    it('refetches on version change, again on return to live, and does not serve the previous payload', async () => {
+      fixture.detectChanges();
+      expect(versionChangeCallbacks).toHaveLength(1);
+      getAlignmentMock.mockClear();
+
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(versionAlignment);
+      versionChangeCallbacks[0]('2026');
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(true);
+      expect(codes(component.formData())).toEqual(['SP06']);
+      expect(component.formData().primary_sp_code).toBe('SP06');
+
+      getAlignmentMock.mockClear();
+      getAlignmentMock.mockResolvedValue(liveAlignment);
+      versionChangeCallbacks[0](null);
+      await fixture.whenStable();
+      expect(getAlignmentMock).toHaveBeenCalledTimes(1);
+      expect(component.formData().has_contribution).toBe(false);
+      expect(codes(component.formData())).toEqual([]);
+      expect(component.formData().primary_sp_code).toBeNull();
+    });
+  });
+
+  // @sdd-spec docs/specs/bilateral — section-opening banner matches GEOGRAPHIC SCOPE
+  describe('info banner follows the Geographic Scope recipe', () => {
+    it('uses the shared banner shape, not a rounded blue card', () => {
+      const banner = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"]'
+      ) as HTMLElement;
+      expect(banner).toBeTruthy();
+
+      // Geographic Scope: grey ground, 5px light-blue left rule, square corners.
+      expect(banner.className).toContain('bg-[color:var(--ac-grey-100)]');
+      expect(banner.className).toContain('border-l-[5px]');
+      expect(banner.className).toContain('border-l-[color:var(--ac-light-blue-500)]');
+      expect(banner.className).toContain('mb-[30px]');
+
+      // ★ discriminating: the old design was a rounded primary-blue card.
+      expect(banner.className).not.toContain('rounded-r-[8px]');
+      expect(banner.className).not.toContain('bg-[var(--ac-primary-blue-50)]');
+    });
+
+    it('sets the copy in Barlow 14/17 grey-700, like the reference section', () => {
+      const text = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-info-banner"] h3'
+      ) as HTMLElement;
+
+      expect(text.className).toContain("font-['Barlow']");
+      expect(text.className).toContain('text-[14px]');
+      expect(text.className).toContain('leading-[17px]');
+      expect(text.className).toContain('text-[color:var(--ac-grey-700)]');
+      // ★ discriminating: it used to be text-xs with a relaxed leading.
+      expect(text.className).not.toContain('text-xs');
+    });
+
+    it('keeps the 20px gap under the section title that every other section has', () => {
+      const title = fixture.nativeElement.querySelector(
+        '[data-testid="pf-alignment-title"]'
+      ) as HTMLElement;
+      // title → .pf-alignment-section-heading → the flex row that owns the gap
+      const titleRow = title.closest('.pf-alignment-section-heading')?.parentElement as HTMLElement;
+
+      // .section-title carries margin-bottom: 20px, which `m-0` removes here.
+      expect(title.className).toContain('m-0');
+      expect(titleRow.className).toContain('mb-5');
+    });
+  });
+
+
+  // The section used to spell its validation messages in red, while every shared
+  // field component (input, multiselect, radio-button, textarea) spells them amber
+  // with a warning glyph. Red now means "something failed", not "you still have
+  // to fill this in".
+  describe('validation messages use the shared amber recipe', () => {
+    const VALIDATION_TESTIDS = [
+      'pf-alignment-error-has_contribution',
+      'pf-alignment-error-sp_codes',
+      'pf-alignment-sp-required',
+      'pf-alignment-primary-required'
+    ];
+
+    it.each(VALIDATION_TESTIDS)('%s is amber, never red', testid => {
+      // Read from the template source: these render behind several signals, and
+      // this test is about the treatment they carry, not about when they appear.
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      const block = template.slice(
+        template.lastIndexOf('<small', template.indexOf(testid)),
+        template.indexOf('</small>', template.indexOf(testid))
+      );
+
+      expect(block).toContain('text-[var(--ac-warning-1)]');
+      // ★ discriminating: every one of these carried text-red-700 before.
+      expect(block).not.toContain('text-red-700');
+    });
+
+    it.each(VALIDATION_TESTIDS)('%s carries the warning glyph in its own row', testid => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+      const start = template.lastIndexOf('<small', template.indexOf(testid));
+      const block = template.slice(start, template.indexOf('</small>', start));
+
+      expect(block).toContain('material-symbols-rounded');
+      expect(block).toContain('warning');
+      expect(block).toContain('<span>');
+    });
+
+    it('leaves the FAILURE banners red — they report a break, not a missing answer', () => {
+      const template = require('fs').readFileSync(
+        require('path').join(__dirname, 'pool-funding-alignment.component.html'),
+        'utf8'
+      ) as string;
+
+      for (const testid of [
+        'pf-alignment-load-failed',
+        'pf-alignment-hlo-catalog-error',
+        'pf-alignment-error-global'
+      ]) {
+        const start = template.lastIndexOf('<', template.indexOf(testid) - 200);
+        const block = template.slice(start, template.indexOf(testid) + 200);
+        expect(block).toContain('red');
+      }
+    });
+  });
+
 });

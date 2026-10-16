@@ -2,6 +2,7 @@ import { GetSdgs } from './get-sdgs.interface';
 import { GetLevers } from './get-levers.interface';
 import { Lever } from './oicr-creation.interface';
 import { PortfolioConfigItem } from './portfolio-config.interface';
+import { ResultLeverSdgTargetPayload } from './lever-sdg-target.interface';
 
 export interface GetAllianceAlignment {
   contracts: Contract[];
@@ -11,6 +12,8 @@ export interface GetAllianceAlignment {
   research_areas?: GetLevers[];
   strategic_objectives?: PortfolioConfigItem[];
   impact_outcomes?: PortfolioConfigItem[];
+  /** Portfolio 2026 OICR SDG targets. Independent of research areas. */
+  result_sdg_targets?: ResultLeverSdgTargetPayload[];
 }
 
 export interface AlignmentRequestParams {

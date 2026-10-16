@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Mockup — Alliance Alignment / Innovation Use</title>
+<style>
+  :root {
+    --ac-primary-blue-100: #b0c4dd;
+    --ac-primary-blue-200: #7c9cb9;
+    --ac-primary-blue-300: #345b8f;
+    --ac-primary-blue-400: #153c71;
+    --ac-grey-100: #f4f5f6;
+    --ac-grey-200: #e8ebed;
+    --ac-grey-700: #4c5158;
+    --ac-orange-1: #f58220;
+    --ac-white-1: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', 'Space Grotesk', Arial, sans-serif;
+    background: #f6f7f8;
+    color: var(--ac-grey-700);
+  }
+  .annotation-banner {
+    background: #fff4e5;
+    border-bottom: 2px solid var(--ac-orange-1);
+    padding: 12px 24px;
+    font-size: 13px;
+    color: #7a4a10;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .annotation-banner b { color: #7a4a10; }
+  .annotation-banner code {
+    background: #ffe6c7;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .app-shell { display: flex; min-height: calc(100vh - 54px); }
+  .sidebar {
+    width: 260px;
+    background: #ffffff;
+    border-right: 1px solid var(--ac-grey-200);
+    padding: 20px 16px;
+    flex-shrink: 0;
+  }
+  .breadcrumb {
+    font-size: 12px;
+    color: #8d9299;
+    padding: 14px 24px 0;
+  }
+  .breadcrumb span:last-child { color: var(--ac-primary-blue-300); }
+  .result-header {
+    padding: 4px 24px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .result-title { font-size: 20px; font-weight: 600; color: var(--ac-grey-700); }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--ac-primary-blue-300);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 6px 12px;
+    border-radius: 20px;
+    margin-top: 6px;
+  }
+  .sidebar-progress { font-size: 12px; color: var(--ac-orange-1); font-weight: 600; margin-bottom: 14px; }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13.5px;
+    color: #4c5158;
+    padding: 10px 10px;
+    border-radius: 8px;
+    margin-bottom: 2px;
+  }
+  .sidebar-item.active { background: #eef2f7; color: var(--ac-primary-blue-300); font-weight: 600; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #d7dbdf; flex-shrink: 0; }
+  .dot.done { background: #3fb17a; }
+  .dot.active { background: var(--ac-primary-blue-300); }
+  .main { flex: 1; padding: 24px 32px 40px; }
+  .content-card {
+    background: #ffffff;
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 13px;
+    padding: 30px;
+    max-width: 900px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #8d9299;
+    margin-bottom: 20px;
+  }
+  .field-block { margin-bottom: 24px; }
+  .field-label { font-size: 14px; font-weight: 600; color: #4c5158; margin-bottom: 8px; }
+  .field-label .req { color: var(--ac-orange-1); margin-left: 2px; }
+  .select-box {
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #b3b8bd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .checklist-box {
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .checklist-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--ac-grey-200);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #b3b8bd;
+  }
+  .checklist-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #4c5158;
+    padding: 6px 2px;
+  }
+  .checklist-row input { accent-color: var(--ac-primary-blue-300); }
+  .field-required-note {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ac-orange-1);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .new-field {
+    border: 2px dashed var(--ac-primary-blue-300);
+    border-radius: 10px;
+    padding: 14px;
+    position: relative;
+    background: #f5f8fc;
+  }
+  .new-tag {
+    position: absolute;
+    top: -11px;
+    left: 12px;
+    background: var(--ac-primary-blue-300);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 3px 9px;
+    border-radius: 10px;
+  }
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    max-width: 900px;
+    margin-top: 20px;
+  }
+  .btn {
+    padding: 9px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--ac-grey-200);
+    background: #fff;
+    color: #4c5158;
+  }
+  .btn.primary { background: #2f9e5e; color: #fff; border-color: #2f9e5e; }
+  .icon-check::before { content: "✓"; }
+  .icon-warn::before { content: "⚠"; }
+</style>
+</head>
+<body>
+
+  <div class="annotation-banner">
+    <span class="icon-warn"></span>
+    <div>
+      <b>Mockup — not final visual design.</b> Self-contained HTML sketch generated in place of a Figma/Stitch export
+      (no Figma link provided; Stitch/Claude Design MCPs unavailable in this session).
+      It reproduces the <b>existing</b>, already-shipped Alliance Alignment screen and layout — <b>no new component or visual
+      style is introduced.</b> The only change is the box outlined in blue and tagged <b>NEW</b>: today "Impact Outcomes" renders
+      only for <code>indicator_id 4 (Policy Change)</code> and <code>5 (OICR)</code>; this mockup shows it rendering identically
+      for <code>indicator_id 6 (Innovation Use)</code>, per
+      <code>docs/specs/changes/add-strategic-outcomes-field/proposal.md</code>.
+    </div>
+  </div>
+
+  <div class="breadcrumb"><span>Results Center</span> &nbsp;›&nbsp; <span>Result STAR-24102</span></div>
+  <div class="result-header">
+    <div>
+      <div class="result-title">Farmer-adopted drought-tolerant maize variety — scaling in Nariño</div>
+      <div class="status-badge">INNOVATION USE ▾</div>
+    </div>
+  </div>
+
+  <div class="app-shell">
+    <div class="sidebar">
+      <div class="sidebar-progress">3 / 6 sections completed</div>
+      <div class="sidebar-item"><span class="dot done"></span> General information</div>
+      <div class="sidebar-item active"><span class="dot active"></span> Alliance alignment</div>
+      <div class="sidebar-item"><span class="dot"></span> Innovation details</div>
+      <div class="sidebar-item"><span class="dot"></span> Results partners</div>
+      <div class="sidebar-item"><span class="dot"></span> Geographic scope</div>
+      <div class="sidebar-item"><span class="dot"></span> Evidence</div>
+    </div>
+
+    <div class="main">
+      <div class="content-card">
+        <div class="section-title">ALLIANCE ALIGNMENT</div>
+
+        <div class="field-block">
+          <div class="field-label">Contributing projects <span class="req">*</span></div>
+          <div class="select-box"><span>2 projects selected</span><span>⌄</span></div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-label">Research Areas <span class="req">*</span></div>
+          <div class="checklist-box">
+            <div class="checklist-search">🔍 &nbsp;Search research areas…</div>
+            <div class="checklist-row"><input type="checkbox" checked disabled /> Future-proofed Farms and Landscapes</div>
+            <div class="checklist-row"><input type="checkbox" disabled /> Healthy Diets for All</div>
+            <div class="checklist-row"><input type="checkbox" disabled /> Inclusive Food Economies</div>
+            <div class="checklist-row"><input type="checkbox" disabled /> Leveraged Financing and Investment for Impact</div>
+            <div class="checklist-row"><input type="checkbox" disabled /> Unleashed Agrobiodiversity for Food, Climate and Nature</div>
+          </div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-label">Strategic Objectives <span class="req">*</span></div>
+          <div class="select-box"><span>Select the strategic objectives</span><span>⌄</span></div>
+        </div>
+
+        <div class="field-block new-field">
+          <span class="new-tag">NEW — for Innovation Use</span>
+          <div class="field-label">Impact Outcomes <span class="req">*</span></div>
+          <div class="select-box"><span>Select the impact outcomes</span><span>⌄</span></div>
+          <div class="field-required-note"><span class="icon-warn"></span> This field is required</div>
+        </div>
+
+        <div class="field-block">
+          <div class="field-label">Contribution to SDG <span class="req">*</span></div>
+          <div class="select-box"><span>Select the SDG</span><span>⌄</span></div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn">← Back</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn primary"><span class="icon-check"></span> Save</button>
+          <button class="btn">Next →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

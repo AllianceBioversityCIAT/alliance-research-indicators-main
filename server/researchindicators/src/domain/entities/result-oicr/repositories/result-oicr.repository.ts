@@ -32,7 +32,8 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
                     INNER JOIN agresso_contracts ac ON ac.agreement_id = rc.contract_id 
                     LEFT JOIN result_levers rl ON rl.result_id = r.result_id 
                                                 AND rl.is_primary = TRUE
-                                                AND rl.lever_role_id = 1
+                                                -- Portfolio 2 keeps step 2 as Research Areas (role 3)
+                                                AND rl.lever_role_id = IF(get_portfolio_id_by_result(r.result_id) = 2, 3, 1)
                     LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
                     LEFT JOIN result_users ru ON ru.result_id = r.result_id 
                                                 AND ru.is_active = TRUE
@@ -61,10 +62,11 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
         t.name as tag_name,
         ro.outcome_impact_statement,
         cl_main.id as main_lever_id,
-        cl_main.short_name as main_lever,
+        -- Research Areas (Portfolio 2) have no short_name
+        COALESCE(cl_main.short_name, cl_main.full_name) as main_lever,
         cl_main.full_name as main_lever_name,
         cl.id as lever_id,
-        cl.short_name as lever,
+        COALESCE(cl.short_name, cl.full_name) as lever,
         cl.full_name as lever_name,
         cgs.name as geographic_scope,
         cr.um49Code as region_code,
@@ -72,7 +74,7 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
         cc.isoAlpha2 as country_code,
         cc.name as country_name,
         r.comment_geo_scope,
-        teo.handle_link
+        COALESCE(teo.handle_link, ro_linked.cgspace_link) AS handle_link
       FROM results r
       INNER JOIN result_oicrs ro ON ro.result_id = r.result_id
       INNER JOIN result_contracts rc_main 
@@ -88,12 +90,13 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN agresso_contracts ac 
         ON ac.agreement_id = rc.contract_id
       LEFT JOIN result_levers rl_main ON rl_main.result_id = r.result_id 
-        AND rl_main.lever_role_id = 1
+        -- Portfolio 2 keeps step 2 as Research Areas (role 3)
+        AND rl_main.lever_role_id = IF(get_portfolio_id_by_result(r.result_id) = 2, 3, 1)
         AND rl_main.is_active = TRUE 
         AND rl_main.is_primary = 1
       LEFT JOIN clarisa_levers cl_main ON cl_main.id = rl_main.lever_id
       LEFT JOIN result_levers rl ON rl.result_id = r.result_id 
-        AND rl.lever_role_id = 1
+        AND rl.lever_role_id = IF(get_portfolio_id_by_result(r.result_id) = 2, 3, 1)
         AND rl.is_active = TRUE 
         AND rl.is_primary = 0
       LEFT JOIN clarisa_levers cl ON cl.id = rl.lever_id 
@@ -111,6 +114,9 @@ export class ResultOicrRepository extends Repository<ResultOicr> {
       LEFT JOIN TEMP_result_external_oicrs treo on treo.result_id = r.result_id
         AND treo.is_active = TRUE
       LEFT JOIN TEMP_external_oicrs teo on teo.id = treo.external_oicr_id
+        AND treo.source = 'external'
+      LEFT JOIN result_oicrs ro_linked on ro_linked.result_id = treo.external_oicr_id
+        AND treo.source = 'result'
       WHERE r.result_id = ?
         AND r.is_active = TRUE;
     `;

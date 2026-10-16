@@ -42,13 +42,16 @@ describe('AllModalsComponent', () => {
     const clearOicrBodyMock: any = jest.fn();
     const presetFromProjectResultsTableMock: any = jest.fn().mockReturnValue(false);
     const contractIdMock: any = jest.fn().mockReturnValue(null);
+    const carriedContractIdMock: any = jest.fn().mockReturnValue(null);
     const mockCreateResultManagementService: Partial<CreateResultManagementService> = {
       resultPageStep: resultPageStepMock,
       currentRequestedResultCode: currentRequestedResultCodeMock,
       editingOicr: editingOicrMock,
       clearOicrBody: clearOicrBodyMock,
       presetFromProjectResultsTable: presetFromProjectResultsTableMock,
-      contractId: contractIdMock
+      contractId: contractIdMock,
+      carriedContractId: carriedContractIdMock,
+      setCarriedContractId: jest.fn()
     } as any;
     
     await TestBed.configureTestingModule({

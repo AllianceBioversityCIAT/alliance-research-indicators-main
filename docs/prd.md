@@ -247,7 +247,7 @@ Always-on bars that cut across modules. Each module-level spec under `docs/specs
 - **(server)** Evidence references persist across result versions/snapshots.
 
 ### AC-API-Surface (server)
-- All HTTP endpoints mounted under `/api` with URI versioning (`/api/v1/...`, `/api/v2/...`).
+- All HTTP endpoints mounted under `/api`; URI versioning is enabled but opt-in per handler (no `defaultVersion`) — most endpoints mount unversioned at `/api/<resource>`, while `bilateral`/`agresso-contract` opt into `/api/v1/...` and one `results` route opts into `/api/v2/results` (see `docs/trd/trd.md` §6.2 for the full breakdown).
 - All responses pass through `ResponseInterceptor` and emit `ServerResponseDto` (`{ data, status, description, errors, timestamp, path }`); the client relies on a consistent `MainResponse<T>` envelope (`successfulRequest`, `status`, `data`, `errorDetail`).
 - All errors flow through `GlobalExceptions` with the same envelope shape and a non-2xx `status`.
 - Swagger UI at `/swagger` documents all controllers with `@ApiTags`, `@ApiOperation`, `@ApiQuery`, `@ApiBody`, `@ApiBearerAuth`.

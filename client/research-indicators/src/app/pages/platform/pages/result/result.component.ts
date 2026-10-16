@@ -51,10 +51,14 @@ export default class ResultComponent {
       // BilateralService.currentAlignment never populates until the user
       // navigates to the tab — which they can't see. See bilateral-module
       // alignment-section spec, AC-01.x.
-      const alignmentCode = (typeof idParam === 'string' && idParam.length > 0) ? idParam : (id > 0 ? String(id) : null);
-      if (alignmentCode && this.lastAlignmentResultCode !== alignmentCode) {
-        this.lastAlignmentResultCode = alignmentCode;
-        void this.bilateralService.getAlignment(alignmentCode);
+      const alignmentCode = typeof idParam === 'string' && idParam.length > 0 ? idParam : id > 0 ? String(id) : null;
+      const version = this.versionWatcher.version();
+      if (alignmentCode) {
+        const alignmentMemoKey = `${alignmentCode}?version=${version ?? ''}`;
+        if (this.lastAlignmentResultCode !== alignmentMemoKey) {
+          this.lastAlignmentResultCode = alignmentMemoKey;
+          void this.bilateralService.getAlignment(alignmentCode);
+        }
       }
     });
 

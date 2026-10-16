@@ -1,0 +1,630 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    .ari-app {
+      font-family: 'Barlow', system-ui, sans-serif;
+      color: #4c5158;
+      background: #f2f4f6;
+      width: 1180px;
+      min-height: 860px;
+    }
+    .ari-heading { font-family: 'Space Grotesk', sans-serif; }
+    a { color: #345b8f; }
+    a:hover { color: #153c71; }
+    .ari-breadcrumb {
+      font-family: 'Barlow', sans-serif;
+      font-size: 12px;
+      color: #8d9299;
+      padding: 16px 28px 0 28px;
+    }
+    .ari-breadcrumb .cur { color: #345b8f; font-weight: 500; }
+    .ari-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 6px 28px 18px 28px;
+    }
+    .ari-title { font-size: 19px; font-weight: 600; color: #4c5158; margin: 0 0 8px 0; }
+    .ari-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #345b8f;
+      color: #ffffff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+    .ari-shell { display: flex; gap: 0; align-items: flex-start; }
+    .ari-sidebar {
+      width: 236px;
+      flex-shrink: 0;
+      background: #ffffff;
+      border: 1px solid #e8ebed;
+      border-radius: 13px;
+      margin: 0 0 0 28px;
+      padding: 18px 14px;
+    }
+    .ari-progress { font-family: 'Barlow', sans-serif; font-size: 12px; font-weight: 600; color: #f58220; padding: 2px 8px 14px 8px; }
+    .ari-sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      color: #4c5158;
+      padding: 9px 10px;
+      border-radius: 8px;
+      margin-bottom: 2px;
+    }
+    .ari-sidebar-item.active { background: #eef2f7; color: #345b8f; font-weight: 600; }
+    .ari-dot { width: 8px; height: 8px; border-radius: 50%; background: #d7dbdf; flex-shrink: 0; }
+    .ari-dot.done { background: #358540; }
+    .ari-dot.active { background: #345b8f; }
+    .ari-main { flex: 1; padding: 0 28px 28px 24px; }
+    .ari-card {
+      background: #ffffff;
+      border: 1px solid #e8ebed;
+      border-radius: 13px;
+      padding: 30px;
+    }
+    .ari-section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.09em;
+      color: #8d9299;
+      margin-bottom: 22px;
+    }
+    .ari-field { margin-bottom: 22px; }
+    .ari-label {
+      font-family: 'Barlow', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: #4c5158;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .ari-req { color: #f58220; }
+    .ari-select {
+      border: 1px solid #e8ebed;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: #4c5158;
+      background: #ffffff;
+      user-select: none;
+    }
+    .ari-select:hover { border-color: #345b8f; }
+    .ari-select .ph { color: #b3b8bd; }
+    .ari-select .chev { color: #8d9299; display: flex; }
+    .ari-panel {
+      border: 1px solid #e8ebed;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      padding: 6px 6px 8px 6px;
+      max-height: 190px;
+      overflow-y: auto;
+    }
+    .ari-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #4c5158;
+      padding: 7px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .ari-row:hover { background: #f4f6f8; }
+    .ari-row input { accent-color: #345b8f; width: 15px; height: 15px; cursor: pointer; }
+    .ari-checklist {
+      border: 1px solid #e8ebed;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .ari-search {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #e8ebed;
+      padding-bottom: 9px;
+      margin-bottom: 6px;
+    }
+    .ari-search svg { color: #b3b8bd; flex-shrink: 0; }
+    .ari-search input {
+      border: none;
+      outline: none;
+      font-size: 13px;
+      font-family: 'Barlow', sans-serif;
+      width: 100%;
+      color: #4c5158;
+    }
+    .ari-search input::placeholder { color: #b3b8bd; }
+    .ari-warn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #f58220;
+      font-size: 12px;
+      font-family: 'Barlow', sans-serif;
+      margin-top: 7px;
+    }
+    .ari-new-field {
+      border: 2px dashed #345b8f;
+      border-radius: 10px;
+      padding: 16px 14px 14px 14px;
+      background: #f5f8fc;
+      position: relative;
+    }
+    .ari-new-tag {
+      position: absolute;
+      top: -11px;
+      left: 12px;
+      background: #345b8f;
+      color: #ffffff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 3px 10px;
+      border-radius: 10px;
+    }
+    .ari-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 22px;
+    }
+    .ari-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 22px;
+      border-radius: 20px;
+      font-family: 'Barlow', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid #e8ebed;
+      background: #ffffff;
+      color: #4c5158;
+      cursor: pointer;
+    }
+    .ari-btn:hover { border-color: #345b8f; color: #345b8f; }
+    .ari-btn.primary {
+      background: #358540;
+      border-color: #358540;
+      color: #ffffff;
+    }
+    .ari-btn.primary:hover { background: #235b2d; border-color: #235b2d; }
+    .ari-btn-group { display: flex; gap: 10px; }
+  </style>
+</helmet>
+
+<div class="ari-app">
+  <div class="ari-breadcrumb">Results Center &nbsp;›&nbsp; <span class="cur">Result STAR-24102</span></div>
+
+  <div class="ari-header">
+    <div>
+      <p class="ari-title ari-heading">Farmer-adopted drought-tolerant maize variety — scaling in Nariño</p>
+      <span class="ari-badge">{{ badgeText }}</span>
+    </div>
+  </div>
+
+  <div class="ari-shell">
+    <div class="ari-sidebar">
+      <div class="ari-progress">3 / 6 sections completed</div>
+      <div class="ari-sidebar-item"><span class="ari-dot done"></span> General information</div>
+      <div class="ari-sidebar-item active"><span class="ari-dot active"></span> Alliance alignment</div>
+      <div class="ari-sidebar-item"><span class="ari-dot"></span> Indicator details</div>
+      <div class="ari-sidebar-item"><span class="ari-dot"></span> Results partners</div>
+      <div class="ari-sidebar-item"><span class="ari-dot"></span> Geographic scope</div>
+      <div class="ari-sidebar-item"><span class="ari-dot"></span> Evidence</div>
+    </div>
+
+    <div class="ari-main">
+      <div class="ari-card">
+        <div class="ari-section-title">ALLIANCE ALIGNMENT</div>
+
+        <!-- Contributing projects -->
+        <div class="ari-field">
+          <div class="ari-label">Contributing projects <span class="ari-req">*</span></div>
+          <div class="ari-select" onClick="{{ toggleProjectsPanel }}">
+            <sc-if value="{{ projectsHasSelection }}" hint-placeholder-val="{{ true }}">
+              <span>{{ projectsSummary }}</span>
+            </sc-if>
+            <sc-if value="{{ projectsEmpty }}" hint-placeholder-val="{{ false }}">
+              <span class="ph">Select the contributing projects</span>
+            </sc-if>
+            <span class="chev">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </span>
+          </div>
+          <sc-if value="{{ projectsOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="ari-panel">
+              <sc-for list="{{ projectsList }}" as="item" hint-placeholder-count="3">
+                <label class="ari-row">
+                  <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                  <span><b>{{ item.code }}</b> — {{ item.title }}</span>
+                </label>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ projectsEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="ari-warn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              This field is required
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Research areas -->
+        <div class="ari-field">
+          <div class="ari-label">Research Areas <span class="ari-req">*</span></div>
+          <div class="ari-checklist">
+            <div class="ari-search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" placeholder="Search research areas…" value="{{ researchSearchValue }}" onInput="{{ onResearchSearch }}" />
+            </div>
+            <sc-for list="{{ researchList }}" as="item" hint-placeholder-count="5">
+              <label class="ari-row">
+                <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                <span>{{ item.label }}</span>
+              </label>
+            </sc-for>
+          </div>
+          <sc-if value="{{ researchEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="ari-warn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              This field is required
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Strategic objectives -->
+        <div class="ari-field">
+          <div class="ari-label">Strategic Objectives <span class="ari-req">*</span></div>
+          <div class="ari-select" onClick="{{ toggleStrategicPanel }}">
+            <sc-if value="{{ strategicHasSelection }}" hint-placeholder-val="{{ true }}">
+              <span>{{ strategicSummary }}</span>
+            </sc-if>
+            <sc-if value="{{ strategicEmpty }}" hint-placeholder-val="{{ false }}">
+              <span class="ph">Select the strategic objectives</span>
+            </sc-if>
+            <span class="chev">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </span>
+          </div>
+          <sc-if value="{{ strategicOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="ari-panel">
+              <sc-for list="{{ strategicList }}" as="item" hint-placeholder-count="3">
+                <label class="ari-row">
+                  <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                  <span>{{ item.label }}</span>
+                </label>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ strategicEmpty }}" hint-placeholder-val="{{ false }}">
+            <div class="ari-warn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              This field is required
+            </div>
+          </sc-if>
+        </div>
+
+        <!-- Impact Outcomes — the proposed field -->
+        <sc-if value="{{ showImpact }}" hint-placeholder-val="{{ true }}">
+          <div class="ari-field">
+            <sc-if value="{{ isNew }}" hint-placeholder-val="{{ true }}">
+              <div class="ari-new-field">
+                <span class="ari-new-tag">NEW — Innovation Use</span>
+                <div class="ari-label">Impact Outcomes <span class="ari-req">*</span></div>
+                <div class="ari-select" onClick="{{ toggleImpactPanel }}">
+                  <sc-if value="{{ impactHasSelection }}" hint-placeholder-val="{{ true }}">
+                    <span>{{ impactSummary }}</span>
+                  </sc-if>
+                  <sc-if value="{{ impactEmpty }}" hint-placeholder-val="{{ false }}">
+                    <span class="ph">Select the impact outcomes</span>
+                  </sc-if>
+                  <span class="chev">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </span>
+                </div>
+                <sc-if value="{{ impactOpen }}" hint-placeholder-val="{{ false }}">
+                  <div class="ari-panel">
+                    <sc-for list="{{ impactList }}" as="item" hint-placeholder-count="3">
+                      <label class="ari-row">
+                        <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                        <span>{{ item.label }}</span>
+                      </label>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ impactEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div class="ari-warn">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    This field is required
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+            <sc-if value="{{ isExisting }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div class="ari-label">Impact Outcomes <span class="ari-req">*</span></div>
+                <div class="ari-select" onClick="{{ toggleImpactPanel }}">
+                  <sc-if value="{{ impactHasSelection }}" hint-placeholder-val="{{ true }}">
+                    <span>{{ impactSummary }}</span>
+                  </sc-if>
+                  <sc-if value="{{ impactEmpty }}" hint-placeholder-val="{{ false }}">
+                    <span class="ph">Select the impact outcomes</span>
+                  </sc-if>
+                  <span class="chev">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </span>
+                </div>
+                <sc-if value="{{ impactOpen }}" hint-placeholder-val="{{ false }}">
+                  <div class="ari-panel">
+                    <sc-for list="{{ impactList }}" as="item" hint-placeholder-count="3">
+                      <label class="ari-row">
+                        <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                        <span>{{ item.label }}</span>
+                      </label>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ impactEmpty }}" hint-placeholder-val="{{ false }}">
+                  <div class="ari-warn">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    This field is required
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <!-- Contribution to SDG -->
+        <sc-if value="{{ showSdg }}" hint-placeholder-val="{{ true }}">
+          <div class="ari-field">
+            <div class="ari-label">Contribution to SDG <span class="ari-req">*</span></div>
+            <div class="ari-select" onClick="{{ toggleSdgPanel }}">
+              <sc-if value="{{ sdgHasSelection }}" hint-placeholder-val="{{ true }}">
+                <span>{{ sdgSummary }}</span>
+              </sc-if>
+              <sc-if value="{{ sdgEmpty }}" hint-placeholder-val="{{ false }}">
+                <span class="ph">Select the SDG</span>
+              </sc-if>
+              <span class="chev">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </span>
+            </div>
+            <sc-if value="{{ sdgOpen }}" hint-placeholder-val="{{ false }}">
+              <div class="ari-panel">
+                <sc-for list="{{ sdgList }}" as="item" hint-placeholder-count="3">
+                  <label class="ari-row">
+                    <input type="checkbox" checked="{{ item.checked }}" onChange="{{ item.onToggle }}" />
+                    <span>{{ item.label }}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ sdgEmpty }}" hint-placeholder-val="{{ false }}">
+              <div class="ari-warn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                This field is required
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+      </div>
+
+      <div class="ari-nav">
+        <button class="ari-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          Back
+        </button>
+        <div class="ari-btn-group">
+          <button class="ari-btn primary" onClick="{{ onSave }}">
+            <sc-if value="{{ saved }}" hint-placeholder-val="{{ false }}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </sc-if>
+            {{ saveLabel }}
+          </button>
+          <button class="ari-btn">
+            Next
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{"indicator":{"editor":"enum","default":"Innovation Use","options":["OICR","Policy Change","Innovation Use","Innovation Development","Capacity Sharing"],"section":"Indicator (switch me)"}}'>
+var PROJECTS = [
+  { id: 'agr-2201', code: 'AGR-2201', title: 'Drought-tolerant maize scaling — Nariño' },
+  { id: 'agr-2299', code: 'AGR-2299', title: 'Community seed systems strengthening' },
+  { id: 'agr-2340', code: 'AGR-2340', title: 'Digital advisory services for smallholders' }
+];
+var RESEARCH_AREAS = [
+  { id: 'fpfl', label: 'Future-proofed Farms and Landscapes' },
+  { id: 'hdfa', label: 'Healthy Diets for All' },
+  { id: 'ife', label: 'Inclusive Food Economies' },
+  { id: 'lfii', label: 'Leveraged Financing and Investment for Impact' },
+  { id: 'uafcn', label: 'Unleashed Agrobiodiversity for Food, Climate and Nature' }
+];
+var STRATEGIC_OBJECTIVES = [
+  { id: 'so1', label: 'Strengthen resilience to climate shocks' },
+  { id: 'so2', label: 'Expand inclusive seed and input systems' },
+  { id: 'so3', label: 'Increase productivity of priority value chains' }
+];
+var IMPACT_OUTCOMES = [
+  { id: 'io1', label: 'Farmers adopting climate-resilient practices (sample)' },
+  { id: 'io2', label: 'Institutions applying evidence-based policy tools (sample)' },
+  { id: 'io3', label: 'Enterprises scaling validated innovations (sample)' }
+];
+var SDGS = [
+  { id: 'sdg2', label: 'SDG 2 - Zero Hunger' },
+  { id: 'sdg5', label: 'SDG 5 - Gender Equality' },
+  { id: 'sdg13', label: 'SDG 13 - Climate Action' }
+];
+var IMPACT_OUTCOME_INDICATORS = ['OICR', 'Policy Change', 'Innovation Use'];
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      openPanel: null,
+      saved: false,
+      researchSearch: '',
+      projects: { 'agr-2201': true },
+      research: { fpfl: true, uafcn: true },
+      strategic: {},
+      impact: {},
+      sdg: {}
+    };
+    this.togglePanel = this.togglePanel.bind(this);
+    this.onResearchSearch = this.onResearchSearch.bind(this);
+    this.onSave = this.onSave.bind(this);
+  }
+
+  togglePanel(name) {
+    var self = this;
+    return function () {
+      self.setState({ openPanel: self.state.openPanel === name ? null : name });
+    };
+  }
+
+  toggleIn(groupKey, id) {
+    var self = this;
+    return function () {
+      var next = Object.assign({}, self.state[groupKey]);
+      next[id] = !next[id];
+      var patch = {};
+      patch[groupKey] = next;
+      self.setState(patch);
+    };
+  }
+
+  onResearchSearch(e) {
+    this.setState({ researchSearch: e.target.value });
+  }
+
+  onSave() {
+    var self = this;
+    this.setState({ saved: true });
+    setTimeout(function () {
+      self.setState({ saved: false });
+    }, 1600);
+  }
+
+  countSelected(map) {
+    var n = 0;
+    for (var k in map) { if (map[k]) n++; }
+    return n;
+  }
+
+  summary(map, noun) {
+    var n = this.countSelected(map);
+    return n + ' ' + noun + (n === 1 ? '' : 's') + ' selected';
+  }
+
+  buildList(source, groupKey) {
+    var self = this;
+    return source.map(function (item) {
+      return Object.assign({}, item, {
+        checked: !!self.state[groupKey][item.id],
+        onToggle: self.toggleIn(groupKey, item.id)
+      });
+    });
+  }
+
+  renderVals() {
+    var indicator = this.props.indicator || 'Innovation Use';
+    var showImpact = IMPACT_OUTCOME_INDICATORS.indexOf(indicator) !== -1;
+    var showSdg = indicator !== 'OICR';
+    var isNew = indicator === 'Innovation Use';
+
+    var projectsCount = this.countSelected(this.state.projects);
+    var strategicCount = this.countSelected(this.state.strategic);
+    var impactCount = this.countSelected(this.state.impact);
+    var sdgCount = this.countSelected(this.state.sdg);
+
+    var search = (this.state.researchSearch || '').toLowerCase();
+    var filteredResearch = RESEARCH_AREAS.filter(function (a) {
+      return a.label.toLowerCase().indexOf(search) !== -1;
+    });
+
+    return {
+      badgeText: indicator.toUpperCase() + ' · DRAFT',
+      showImpact: showImpact,
+      showSdg: showSdg,
+      isNew: isNew,
+      isExisting: showImpact && !isNew,
+
+      toggleProjectsPanel: this.togglePanel('projects'),
+      projectsOpen: this.state.openPanel === 'projects',
+      projectsList: this.buildList(PROJECTS, 'projects'),
+      projectsCount: projectsCount,
+      projectsEmpty: projectsCount === 0,
+      projectsHasSelection: projectsCount > 0,
+      projectsSummary: this.summary(this.state.projects, 'project'),
+
+      researchList: this.buildList(filteredResearch, 'research'),
+      researchSearchValue: this.state.researchSearch,
+      onResearchSearch: this.onResearchSearch,
+      researchEmpty: this.countSelected(this.state.research) === 0,
+
+      toggleStrategicPanel: this.togglePanel('strategic'),
+      strategicOpen: this.state.openPanel === 'strategic',
+      strategicList: this.buildList(STRATEGIC_OBJECTIVES, 'strategic'),
+      strategicCount: strategicCount,
+      strategicEmpty: strategicCount === 0,
+      strategicHasSelection: strategicCount > 0,
+      strategicSummary: this.summary(this.state.strategic, 'objective'),
+
+      toggleImpactPanel: this.togglePanel('impact'),
+      impactOpen: this.state.openPanel === 'impact',
+      impactList: this.buildList(IMPACT_OUTCOMES, 'impact'),
+      impactCount: impactCount,
+      impactEmpty: impactCount === 0,
+      impactHasSelection: impactCount > 0,
+      impactSummary: this.summary(this.state.impact, 'impact outcome'),
+
+      toggleSdgPanel: this.togglePanel('sdg'),
+      sdgOpen: this.state.openPanel === 'sdg',
+      sdgList: this.buildList(SDGS, 'sdg'),
+      sdgCount: sdgCount,
+      sdgEmpty: sdgCount === 0,
+      sdgHasSelection: sdgCount > 0,
+      sdgSummary: this.summary(this.state.sdg, 'SDG target'),
+
+      saved: this.state.saved,
+      saveLabel: this.state.saved ? 'Saved' : 'Save',
+      onSave: this.onSave
+    };
+  }
+}
+</script>
+</body>
+</html>

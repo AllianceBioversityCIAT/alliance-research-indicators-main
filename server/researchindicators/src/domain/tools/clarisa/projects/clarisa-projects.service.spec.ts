@@ -130,7 +130,7 @@ describe('ClarisaProjectsService', () => {
       expect(service.hasSciencePrograms(project)).toBe(true);
     });
 
-    it('returns false when mapping is Pending or Draft even if entity code is 22', () => {
+    it('returns true when mapping is Pending and entity code is 22 (R-PSP-003)', () => {
       const project: ClarisaProject = {
         id: 2,
         short_name: 'P-PENDING-SP',
@@ -142,6 +142,34 @@ describe('ClarisaProjectsService', () => {
             program_id: 20,
             allocation: 50,
             status: 'Pending',
+            global_unit_object: {
+              id: 20,
+              name: 'Plant Health',
+              smo_code: 'SP01',
+              cgiar_entity_type_object: {
+                code: 22,
+                name: 'Science programs',
+              },
+            },
+          },
+        ],
+      };
+
+      expect(service.hasSciencePrograms(project)).toBe(true);
+    });
+
+    it('returns false when mapping is Draft or Rejected even if entity code is 22', () => {
+      const project: ClarisaProject = {
+        id: 2,
+        short_name: 'P-REJECTED-SP',
+        source_of_funding: 'Bilateral',
+        project_mappings_array: [
+          {
+            id: 11,
+            project_id: 2,
+            program_id: 20,
+            allocation: 50,
+            status: 'Rejected',
             global_unit_object: {
               id: 20,
               name: 'Plant Health',
@@ -224,9 +252,11 @@ describe('ClarisaProjectsService', () => {
   });
 
   describe('listBilateralProjects', () => {
-    it('filters to source_of_funding === "Bilateral" led by the Alliance (ABC)', async () => {
+    it('filters to bilateral-family funding led by the Alliance (ABC); the Window 3 row is dropped for lacking Alliance affiliation, not for its funding', async () => {
       connectionGet.mockResolvedValueOnce([
         bilateralProject(1, 'T-PJ-003262'),
+        // Window 3 funding is now bilateral-family (R-W3B-001); this row stays
+        // ineligible only because it carries no Alliance affiliation.
         window3Project(2, 'N-303008'),
         bilateralProject(3, '1078-CHI0'),
       ]);
@@ -271,7 +301,7 @@ describe('ClarisaProjectsService', () => {
       expect(connectionGet).toHaveBeenCalledTimes(1);
     });
 
-    it('bug-mode regression: returns all 25 eligible production-shaped projects across all 11 observed funding spellings without phase or source_center_acronym', async () => {
+    it('bug-mode regression: returns all 30 eligible production-shaped projects across all 11 observed funding spellings without phase or source_center_acronym (R-W3B-001 admits 5 more W3 rows)', async () => {
       const allianceInstitution = {
         id: 49,
         name: 'Alliance of Bioversity and CIAT',
@@ -318,8 +348,7 @@ describe('ClarisaProjectsService', () => {
           project_mappings_array: [],
         },
 
-        // --- NEGATIVE ROWS (Must be excluded) ---
-        // Window 3 spellings (all 6 observed spellings)
+        // --- W3-FAMILY ROWS (eligible since R-W3B-001) ---
         {
           id: 501,
           short_name: 'PROD-W3-1',
@@ -355,6 +384,7 @@ describe('ClarisaProjectsService', () => {
           lead_institution_object: allianceInstitution,
           project_mappings_array: [],
         },
+        // --- NEGATIVE ROWS (Must be excluded) ---
         {
           id: 506,
           short_name: 'PROD-SRV',
@@ -468,7 +498,7 @@ describe('ClarisaProjectsService', () => {
 
       const out = await service.listBilateralProjects();
 
-      expect(out).toHaveLength(25);
+      expect(out).toHaveLength(30);
     });
 
     it('attaches has_science_programs boolean to each returned project (R-BAS-004)', async () => {
@@ -592,7 +622,9 @@ describe('ClarisaProjectsService', () => {
         .mockImplementation(() => {});
 
       connectionGet.mockResolvedValueOnce([
-        window3Project(2, 'N-303008'), // non-bilateral
+        // Window 3 funding is now bilateral-family (R-W3B-001); this row stays
+        // ineligible only because it carries no Alliance affiliation.
+        window3Project(2, 'N-303008'),
       ]);
 
       const out = await service.listBilateralProjects();
@@ -635,14 +667,15 @@ describe('ClarisaProjectsService', () => {
           phase: 2025,
           project_mappings_array: [],
         },
-        // Ineligible (Window 3) but carries phase 2026. If the derivation
-        // were circular (i.e. read from listBilateralProjects(), which
-        // already applies matchesPhase) or derived from the FULL payload
-        // instead of the eligible cohort, 2026 would leak into the result.
+        // Ineligible (SRV funding — Window 3 no longer qualifies as ineligible
+        // after R-W3B-001) but carries phase 2026. If the derivation were
+        // circular (i.e. read from listBilateralProjects(), which already
+        // applies matchesPhase) or derived from the FULL payload instead of
+        // the eligible cohort, 2026 would leak into the result.
         {
           id: 3,
           short_name: 'INELIGIBLE-2026',
-          source_of_funding: 'Window 3',
+          source_of_funding: 'SRV',
           source_center_acronym: 'CIAT',
           phase: 2026,
           project_mappings_array: [],
@@ -669,7 +702,7 @@ describe('ClarisaProjectsService', () => {
         {
           id: 11,
           short_name: 'NON-BILATERAL-2026',
-          source_of_funding: 'Window 3', // not bilateral funding
+          source_of_funding: 'SRV', // not bilateral funding (Window 3 no longer qualifies after R-W3B-001)
           source_center_acronym: 'CIAT',
           phase: 2026,
           project_mappings_array: [],
@@ -774,6 +807,58 @@ describe('ClarisaProjectsService', () => {
     });
   });
 
+  describe('findProjectByExternalCode (T-06, R-PSP-005, D-PSP-6)', () => {
+    it('returns the project when found by exact external_code', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+        { ...bilateralProject(2, 'B'), external_code: 'D527' },
+      ]);
+
+      const out = await service.findProjectByExternalCode('A1676');
+
+      expect(out?.id).toBe(1);
+      expect(out?.short_name).toBe('A');
+    });
+
+    it('returns the project when searching with prefix-stripped code ({B-, C-})', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(10, 'Proj 10'), external_code: 'B-A1676' },
+      ]);
+
+      const out1 = await service.findProjectByExternalCode('A1676');
+      expect(out1?.id).toBe(10);
+
+      const out2 = await service.findProjectByExternalCode('B-A1676');
+      expect(out2?.id).toBe(10);
+    });
+
+    it('does NOT resolve X-A1676 to A1676 (closed set {B-, C-}, Named Red Input)', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+      ]);
+
+      const out = await service.findProjectByExternalCode('X-A1676');
+
+      expect(out).toBeNull();
+    });
+
+    it('returns null when not found in feed', async () => {
+      connectionGet.mockResolvedValueOnce([
+        { ...bilateralProject(1, 'A'), external_code: 'A1676' },
+      ]);
+
+      expect(await service.findProjectByExternalCode('NONEXISTENT')).toBeNull();
+    });
+
+    it('returns null for null, undefined, or empty string', async () => {
+      expect(await service.findProjectByExternalCode(null)).toBeNull();
+      expect(await service.findProjectByExternalCode(undefined)).toBeNull();
+      expect(await service.findProjectByExternalCode('')).toBeNull();
+      expect(await service.findProjectByExternalCode('   ')).toBeNull();
+      expect(connectionGet).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resilience (NFR-BIL-073)', () => {
     it('serves stale cache on upstream error if cache is warm', async () => {
       // Warm the cache.
@@ -819,7 +904,7 @@ describe('ClarisaProjectsService', () => {
         {
           id: 102,
           short_name: 'P-LEGACY-02',
-          source_of_funding: 'Window 3',
+          source_of_funding: 'SRV', // Window 3 no longer qualifies as ineligible after R-W3B-001
           project_mappings_array: [],
           lead_institution_object: {
             id: 49,
@@ -1178,6 +1263,50 @@ describe('ClarisaProjectsService', () => {
       expect(result.slice).toHaveLength(1);
       expect(result.slice.map((p) => p.id)).toEqual([80]);
       expect(result.phaseUsed).toBe(2026);
+    });
+  });
+
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 rework /
+  // design.md §7, K-016. The falsifier this whole block exists to kill:
+  // `getCacheFetchedAt() { return Date.now(); }` — every run report would
+  // then claim a perfectly fresh feed regardless of the real cache age,
+  // exactly the staleness lie K-016/RB-6 exist to surface. A Date.now()
+  // stand-in also passes a naive "returns a number" test, so the gate here
+  // is that the SAME stored value comes back across repeated calls (a
+  // live Date.now() would drift), and that it is a timestamp from the
+  // PAST relative to a later real Date.now() call.
+  describe('getCacheFetchedAt (T-05 §7, K-016)', () => {
+    it('returns null on a cold cache', () => {
+      expect(service.getCacheFetchedAt()).toBeNull();
+    });
+
+    it('returns the recorded fetch time after the cache fills, unchanged across repeated calls within the TTL, and strictly before a later real Date.now()', async () => {
+      const fetchTime = 1_700_000_000_000;
+      connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+
+      // Pin Date.now() ONLY for the duration of the cache-filling call, so
+      // both listBilateralProjects()'s own Date.now() read and any ambient
+      // phase-resolution Date.now() read see the same fixed instant —
+      // avoids coupling this test to which of the two calls Date.now()
+      // first internally. try/finally: if the awaited call ever throws
+      // while the spy is installed, Date.now must not stay pinned for
+      // every later test in this file (T-05 rework, closer #3).
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(fetchTime);
+      try {
+        await service.listBilateralProjects();
+      } finally {
+        nowSpy.mockRestore();
+      }
+
+      const first = service.getCacheFetchedAt();
+      const second = service.getCacheFetchedAt();
+
+      // A live Date.now() stand-in would return a DIFFERENT value on each
+      // call (real wall-clock time keeps advancing); the real cache-backed
+      // getter returns the SAME stored fetchedAt both times.
+      expect(first).toBe(fetchTime);
+      expect(second).toBe(fetchTime);
+      expect(second).toBeLessThan(Date.now());
     });
   });
 

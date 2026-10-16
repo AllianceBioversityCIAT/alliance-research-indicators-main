@@ -8,6 +8,8 @@ import { RolesService } from '@services/cache/roles.service';
 import { ResultsCenterService } from '../results-center/results-center.service';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { GetContractStaffService } from '@shared/services/get-contract-staff.service';
+import { GetResultsService } from '@shared/services/control-list/get-results.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 
 describe('ProjectDetailComponent', () => {
   let component: ProjectDetailComponent;
@@ -483,6 +485,170 @@ describe('ProjectDetailComponent', () => {
       });
 
       expect(applyFiltersSpy).toHaveBeenCalled();
+    });
+  });
+
+  // ===========================================================================
+  // T-12 — Shared-consumer isolation (NFR-RCU-005). Every `it` above provides
+  // `ResultsCenterService` as a hand-rolled mock (KZ-001) whose `applyFilters`/
+  // `resetState` are `jest.fn()` no-ops — there is no real signal state and no
+  // real `userFilterMutations` counter for a URL write effect to react to, so
+  // that harness cannot observe URL leakage even in principle. This block
+  // swaps in the REAL `ResultsCenterService` for exactly the two user-facing
+  // mutators this route reaches (design.md §6.2's consumer table):
+  // `onIndicatorClick` -> `applyFilters()`, and `ngOnInit` (via
+  // `activateProjectResultsState`) -> `resetState()` -> `clearAllFilters()`.
+  //
+  // Both mutators DO advance the real `userFilterMutations` counter (design.md
+  // §6.2's "Corrected 2026-08-12" note: `resetState`/`clearAllFilters` is the
+  // exact case the note names — its only caller is this component, a
+  // different route from Results Center). That is expected and NOT the
+  // guarantee under test. The guarantee is the structural one: this component
+  // never constructs `ResultsCenterComponent`, so the URL write effect (which
+  // lives only in that component's injector) cannot exist here, and
+  // `router.navigate` must therefore be zero regardless of what the counter
+  // does. `component.onTabClick` is deliberately never called in this block —
+  // it legitimately calls `router.navigate` itself (already covered above) and
+  // would contaminate the very count this block exists to isolate.
+  //
+  // Rework attempt 2 (NFR-RCU-005 reliability fix): both `it`s below now call
+  // `TestBed.flushEffects()` between the mutation and `expect(navigateSpy)
+  // .not.toHaveBeenCalled()`, so a `urlWriteEffect` relocated onto the
+  // root-provided `ResultsCenterService` (the exact inversion D-URL-9
+  // forbids) would actually run before the assertion, instead of sitting
+  // queued and unobserved. Deliberately NOT using `realFixture.detectChanges()`
+  // here: `ProjectDetailComponent.ngOnInit()` is not idempotent (it re-runs
+  // `activateProjectResultsState()` -> `resetState()`/`restorePersistedState()`
+  // on every invocation), and Angular's own first-`detectChanges()` lifecycle
+  // hook execution does not know the first `it` already called
+  // `realComponent.ngOnInit()` manually — it would fire `ngOnInit()` a SECOND
+  // time and double the very mutation these tests assert as `mutationsBefore
+  // + 1`, corrupting the positive control rather than proving the guarantee.
+  // `TestBed.flushEffects()` flushes root effects only, without touching this
+  // component's lifecycle, which is exactly the surface the mutant targets.
+  // Both blocks bump `userFilterMutations` (unlike project-dashboard /
+  // links-to-result), so BOTH the counter-gated and the unconditional
+  // structural mutant go RED here — see the task report's mutant table.
+  // ===========================================================================
+  describe('shared-consumer isolation (NFR-RCU-005, T-12, real ResultsCenterService)', () => {
+    let realFixture: ComponentFixture<ProjectDetailComponent>;
+    let realComponent: ProjectDetailComponent;
+    let realResultsCenterService: ResultsCenterService;
+    let navigateSpy: jest.Mock;
+
+    beforeEach(async () => {
+      sessionStorage.clear();
+      const sharedApiMock = {
+        GET_ResultsCount: jest.fn().mockResolvedValue({ data: {} }),
+        indicatorTabs: {
+          lazy: jest.fn().mockReturnValue({ isLoading: signal(false), hasValue: signal(false), list: signal<any[]>([]) })
+        }
+      } as unknown as jest.Mocked<ApiService>;
+      const getResultsServiceMock = { fetchPaginated: jest.fn().mockResolvedValue({ results: [], total: 0 }) };
+      const cacheServiceMock = { dataCache: signal({ user: { sec_user_id: 1 } }) } as unknown as jest.Mocked<CacheService>;
+      navigateSpy = jest.fn().mockResolvedValue(true);
+      const routerDouble = {
+        url: '/projects/mock-id/project-results',
+        events: new Subject<NavigationEnd>(),
+        navigate: navigateSpy,
+        parseUrl: jest.fn((url: string) => parseUrlWithSegments(...url.split('/').filter(Boolean)))
+      } as unknown as jest.Mocked<Router>;
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [ProjectDetailComponent],
+        providers: [
+          // REAL service — explicitly listed so DI constructs an actual
+          // instance, mirroring the T-11 exemplar's technique
+          // (results-center.component.spec.ts) for the same class.
+          ResultsCenterService,
+          { provide: ApiService, useValue: sharedApiMock },
+          { provide: GetResultsService, useValue: getResultsServiceMock },
+          { provide: CacheService, useValue: cacheServiceMock },
+          { provide: ActivatedRoute, useValue: { snapshot: { params: { id: 'mock-id' } } } },
+          { provide: Router, useValue: routerDouble },
+          { provide: BilateralService, useValue: { currentContract: signal(null), getContract: jest.fn().mockResolvedValue(null) } },
+          { provide: RolesService, useValue: { canAccessCenterAdmin: signal(false) } }
+        ]
+      })
+        .overrideComponent(ProjectDetailComponent, {
+          set: {
+            imports: [],
+            providers: [
+              {
+                provide: GetContractStaffService,
+                useValue: { staff: signal([]), loading: signal(false), loadError: signal(false), main: jest.fn() }
+              }
+            ],
+            template: `<div class="w-full"></div>`
+          }
+        })
+        .compileComponents();
+
+      realFixture = TestBed.createComponent(ProjectDetailComponent);
+      realComponent = realFixture.componentInstance;
+      realResultsCenterService = TestBed.inject(ResultsCenterService);
+      jest.spyOn(realComponent, 'getProjectDetail').mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+      sessionStorage.clear();
+      TestBed.resetTestingModule();
+    });
+
+    it('fires zero router.navigate while ngOnInit resets the REAL service state on entry (no persisted state)', () => {
+      // Seed a non-default value so clearing it is an observable, not
+      // vacuous, positive control.
+      realResultsCenterService.resultsFilter.set({
+        'indicator-codes': [],
+        'lever-codes': [],
+        'indicator-codes-tabs': [],
+        'indicator-codes-filter': [],
+        'status-codes': [],
+        'contract-codes': ['STALE-FROM-ANOTHER-ROUTE'],
+        'platform-code': [],
+        years: [],
+        'create-user-codes': []
+      });
+      const mutationsBefore = realResultsCenterService.userFilterMutations();
+
+      realComponent.ngOnInit();
+
+      // Root-effect flush between the mutation above and the assertions below
+      // (see block comment) — does not touch this component's own lifecycle.
+      TestBed.flushEffects();
+
+      // Positive control — `resetState()` -> `clearAllFilters()` really ran
+      // against the REAL service: the stale filter is gone and the intent
+      // counter advanced (design.md §6.2's own documented behavior for this
+      // exact call path).
+      expect(realResultsCenterService.resultsFilter()['contract-codes']).toEqual([]);
+      expect(realResultsCenterService.userFilterMutations()).toBe(mutationsBefore + 1);
+
+      // Negative control — the actual T-12 guarantee. This component never
+      // constructs `ResultsCenterComponent`, so its injector-scoped write
+      // effect cannot exist on this route.
+      expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('fires zero router.navigate while onIndicatorClick drives a REAL applyFilters mutation', () => {
+      const mutationsBefore = realResultsCenterService.userFilterMutations();
+
+      realComponent.onIndicatorClick({ indicator_id: 7, name: 'Innovation Development' });
+
+      // Root-effect flush between the mutation above and the assertions below
+      // (see block comment) — does not touch this component's own lifecycle.
+      TestBed.flushEffects();
+
+      // Positive control — `applyFilters()` really ran against the REAL
+      // service: the clicked indicator is reflected in `resultsFilter` and
+      // the intent counter advanced exactly once.
+      expect(realResultsCenterService.resultsFilter()['indicator-codes-filter']).toEqual([7]);
+      expect(realResultsCenterService.tableFilters().indicators).toEqual([{ indicator_id: 7, name: 'Innovation Development' }]);
+      expect(realResultsCenterService.userFilterMutations()).toBe(mutationsBefore + 1);
+
+      // Negative control.
+      expect(navigateSpy).not.toHaveBeenCalled();
     });
   });
 });

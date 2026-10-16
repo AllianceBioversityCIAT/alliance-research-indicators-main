@@ -8,10 +8,20 @@
   </div>
   <div id="content" class="content">
     <app-section-header></app-section-header>
+    <!-- @akili-spec changes/profile-simulation — D-imp-14 (corrected 2026-08-28): the hardcoded pt-[88px]/[109px]
+         offset is replaced by the MEASURED navbar height PLUS the fixed section-header height. The section-header
+         floats `position: fixed` above this content, so the offset must clear navbar + banner + header — using
+         navbarHeight() alone (the original D-imp-14 value) left the page's first rows (e.g. Results Center filters)
+         hidden under the header. navbarHeight = navbar + simulation banner (measured on the navbar host);
+         headerHeight = the section-header's own height (measured on #section-sidebar). Must stay measured, not
+         re-hardcoded, or a taller banner/header variant clips again. -->
     <div [ngStyle]="{
         paddingLeft: hss ? (cache.isSidebarCollapsed() ? '64px' : '250px') : cache.isSidebarCollapsed() ? '64px' : '250px'
-      }" class="{{ hss ? 'pt-[88px]' : 'pt-[109px]' }}">
-      <router-outlet></router-outlet>
+      }" [style.paddingTop.px]="cache.navbarHeight() + cache.headerHeight()">
+      <!-- Remount current page when profile simulation starts/ends (CacheService.bumpContentReload). -->
+      @for (_ of [cache.contentReloadKey()]; track _) {
+        <router-outlet></router-outlet>
+      }
     </div>
   </div>
 </div>

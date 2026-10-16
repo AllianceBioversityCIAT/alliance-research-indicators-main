@@ -3,6 +3,7 @@ import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpHeaders } from '@ang
 import { of } from 'rxjs';
 import { Router } from '@angular/router';
 import { resultInterceptor } from './result.interceptor';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('resultInterceptor', () => {
@@ -64,6 +65,33 @@ describe('resultInterceptor', () => {
     const calledRequest = mockHandler.mock.calls[0][0];
     expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
     expect(calledRequest.url).toBe('http://test.com/api/data?reportYear=2023');
+  });
+
+  // Raised only by the create-result flow while the router moves to the newly
+  // created result; see CacheService.skipResultVersionParam.
+  describe('skipResultVersionParam', () => {
+    const yearRequest = () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      return new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+    };
+
+    it('omits reportYear while the create-result flow holds the flag up', () => {
+      TestBed.inject(CacheService).skipResultVersionParam.set(true);
+      mockRouter.parseUrl.mockReturnValue({ queryParams: { version: '2026' } });
+
+      interceptor(yearRequest(), mockHandler);
+
+      expect(mockHandler.mock.calls[0][0].url).toBe('http://test.com/api/data');
+    });
+
+    it('sends reportYear as usual while the flag is down', () => {
+      TestBed.inject(CacheService).skipResultVersionParam.set(false);
+      mockRouter.parseUrl.mockReturnValue({ queryParams: { version: '2026' } });
+
+      interceptor(yearRequest(), mockHandler);
+
+      expect(mockHandler.mock.calls[0][0].url).toBe('http://test.com/api/data?reportYear=2026');
+    });
   });
 
   it('should add year parameter to URL with & separator when URL already has query parameters', () => {
@@ -429,6 +457,35 @@ describe('resultInterceptor', () => {
       const calledRequest = mockHandler.mock.calls[0][0];
       expect(calledRequest.headers.has('X-Use-Year')).toBe(false);
       expect(calledRequest.url).toBe('http://test.com/api/data?param1=value1&reportYear=2023&reportingPlatforms=PRMS');
+    });
+
+    // Attempt-2 rework — Reviewer FAIL: the T-01 refactor to platform-code.util.ts
+    // must not widen this interceptor's URL matcher. Added, not editing the
+    // existing PLATFORM_CODES enumeration above (DD-4's safety net stays intact).
+    it('should not add a platform for an unrecognized prefix (does not widen the matcher)', () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+      mockRouter.url = '/result/FOO-123/general-information';
+      mockRouter.parseUrl.mockReturnValue({ queryParams: {} });
+
+      interceptor(request, mockHandler);
+
+      const calledRequest = mockHandler.mock.calls[0][0];
+      expect(calledRequest.url).toBe('http://test.com/api/data');
+    });
+
+    it('should not add a platform for a lowercase prefix (case-sensitivity preserved)', () => {
+      const headers = new HttpHeaders().set('X-Use-Year', 'true');
+      const request = new HttpRequest('GET', 'http://test.com/api/data', null, { headers });
+
+      mockRouter.url = '/result/tip-123/general-information';
+      mockRouter.parseUrl.mockReturnValue({ queryParams: {} });
+
+      interceptor(request, mockHandler);
+
+      const calledRequest = mockHandler.mock.calls[0][0];
+      expect(calledRequest.url).toBe('http://test.com/api/data');
     });
   });
 });

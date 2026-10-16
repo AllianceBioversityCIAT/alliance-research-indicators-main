@@ -1,0 +1,18 @@
+// @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-06
+// Design tokens only (var(--ac-*)) — no hex literals
+
+.bil-coverage-strip {
+  border: 1px solid var(--ac-grey-200);
+}
+
+.bil-card-mapped {
+  border-left: 4px solid var(--ac-green-600);
+}
+
+.bil-card-pending {
+  border-left: 4px solid var(--ac-orange-1);
+}
+
+.bil-card-reachable {
+  border-left: 4px solid var(--ac-primary-blue-600);
+}

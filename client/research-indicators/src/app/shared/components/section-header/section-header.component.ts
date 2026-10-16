@@ -24,6 +24,10 @@ import {
   isStarPdfReportEligibleFromResultId,
   openStarPdfReportInNewTab
 } from '@shared/utils/star-pdf-report.util';
+import { isOicrTemplateDownloadHidden } from '@shared/utils/oicr-template-download.util';
+
+/** Outcome Impact Case Report. */
+const OICR_INDICATOR_ID = 5;
 
 export interface BreadcrumbItem {
   label: string;
@@ -64,6 +68,11 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     return isStarPdfReportEligibleFromResultId(this.cache.currentMetadata()?.indicator_id, resultId);
   });
   starPdfReportDisabled = computed(() => isStarInnDevPdfTemporarilyDisabled(this.cache.currentMetadata()?.indicator_id));
+  /** OICR results only, and not Portfolio 2 — that portfolio has no template yet. */
+  showOicrTemplateDownload = computed(() => {
+    const metadata = this.cache.currentMetadata();
+    return metadata?.indicator_id === OICR_INDICATOR_ID && !isOicrTemplateDownloadHidden(metadata);
+  });
   resultTitle = signal('');
   items = computed((): MenuItem[] => {
     const deleteOption: MenuItem = {

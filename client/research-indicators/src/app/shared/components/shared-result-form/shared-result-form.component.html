@@ -18,6 +18,17 @@
             [class]="getContractStatusClasses(item?.contract_status)">
             {{ item?.contract_status }}
           </button>
+          <!-- Same tag, same tokens and same copy as the projects table
+               (my-projects.component.html) and the project card
+               (project-item.component.html), so one concept reads identically in
+               all three places. Placed beside the contract status exactly as
+               project-item does, and marked shrink-0 so a long project title can
+               never squeeze it out. -->
+          @if (item?.is_pool_funding_contributor) {
+          <app-custom-tag class="inline-flex align-middle shrink-0" statusId="pool-funding"
+            statusName="Contributing to Pool Funding" [tiny]="true"
+            data-testid="contract-pool-funding-tag"></app-custom-tag>
+          }
           Principal investigator <i class="pi pi-arrow-right !text-[7px] text-[#777C83] pl-1"></i>
           <span class="text-[#345B8F]">{{ item?.project_lead_description }}</span>
           <span class="text-[#B9C0C5]">|</span>

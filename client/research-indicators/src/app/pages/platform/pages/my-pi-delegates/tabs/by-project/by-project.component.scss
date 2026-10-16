@@ -1,0 +1,369 @@
+// @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-05)
+// NFR-UI-001: STAR tokens only — all colours via var(--ac-*) or .abc-*/.atc-* utility classes.
+// No hex literals in this file.
+
+.by-project {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  // ── Table wrapper — white card on the grey well (project-detail parity) ──
+  &__table-wrapper {
+    background-color: var(--ac-white-1);
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    overflow: hidden auto;
+  }
+
+
+  &__th--project {
+    width: 34%;
+  }
+
+  &__th {
+    padding: 14px 16px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
+    white-space: nowrap;
+    background-color: var(--ac-white-1);
+  }
+
+  // Header cell content: label + sort icon on one line (platform convention)
+  &__th-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    // Actions has no sort control, so its label centres over the buttons
+    &--centered {
+      justify-content: center;
+    }
+  }
+
+  &__row {
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    color: var(--ac-grey-800);
+    transition: background-color 0.15s ease;
+  }
+
+  // A project with no delegate gets the amber counterpart of the red accent
+  // By person uses for an inactive account: light wash + a bar down the left.
+  &__row--no-delegate {
+    background-color: color-mix(in srgb, #e69f00 5%, var(--ac-white-1));
+
+    td:first-child {
+      box-shadow: inset 3px 0 0 0 #e69f00;
+    }
+  }
+
+  &__td {
+    vertical-align: middle;
+    padding: 12px 16px;
+
+    &--project {
+      min-width: 200px;
+      width: 34%;
+    }
+
+    &--role {
+      min-width: 150px;
+      white-space: nowrap;
+    }
+
+    &--status {
+      min-width: 120px;
+      white-space: nowrap;
+    }
+
+    &--pool {
+      min-width: 100px;
+      white-space: nowrap;
+    }
+
+    &--delegates {
+      min-width: 260px;
+    }
+
+    &--actions {
+      min-width: 90px;
+      white-space: nowrap;
+      text-align: center;
+    }
+  }
+
+  // ── Project cell: "CODE - Title" over the labelled dates ────────────────
+  &__project {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.35;
+
+    &__name {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 18px;
+    }
+
+    &__code {
+      font-weight: 700;
+    }
+
+    // The title is a link, but it reads as text until you hover it.
+    &__link {
+      display: inline-block;
+      color: inherit;
+      text-decoration: none;
+      cursor: pointer;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    &__meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      line-height: 16px;
+    }
+
+    &__label {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    &__arrow {
+      font-size: 7px;
+    }
+
+    &__date {
+      font-family: 'Space Grotesk', sans-serif;
+      color: var(--ac-primary-blue-300);
+    }
+
+    &__sep {
+      color: var(--ac-grey-400);
+    }
+  }
+
+  // ── Role — plain text, same treatment as Pool funding ──────────────────
+  &__role {
+    font-size: 14px;
+  }
+
+  // ── Delegate chips ───────────────────────────────────────────────────
+  &__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  // ── Delegate chip: name over email on a grey band, no border, no tooltip.
+  &__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 7px 5px 9px;
+    border-radius: 6px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid var(--ac-grey-200);
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--ac-grey-900);
+
+    // Borderless — the tint and the name colour carry the state; the email
+    // line stays grey so it reads as secondary in both states.
+    // Inside the "+N more" panel every chip is a full-width row, so the remove
+    // button sits flush right instead of hugging the name.
+    &--block {
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    // Inactive delegate — soft red hairline, mirroring the amber outline the
+    // "No PI Delegate assigned" chip uses, instead of the neutral grey border.
+    &--inactive {
+      background-color: color-mix(in srgb, var(--ac-red-1) 8%, var(--ac-white-1));
+      border: 1px solid color-mix(in srgb, var(--ac-red-1) 10%, transparent);
+      color: var(--ac-red-1);
+    }
+
+    &__inactive-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+      cursor: help;
+      color: var(--ac-red-1);
+    }
+
+    // "No PI Delegate assigned" — amber hairline and amber text on a ground one
+    // step darker than the row wash, so the chip reads above its own row.
+    &--warning {
+      background-color: color-mix(in srgb, #e69f00 12%, var(--ac-white-1));
+      border: 1px solid #e69d008f;
+      color: #a55b0c;
+    }
+
+    // The warning cue keeps its leading icon (there is no email line there)
+    &__icon {
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    &__info {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+    }
+
+    &__name {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 17px;
+      white-space: nowrap;
+    }
+
+    &__email {
+      font-size: 12px;
+      line-height: 16px;
+      white-space: nowrap;
+      color: var(--ac-grey-700);
+    }
+
+    &__remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: none;
+      padding: 0;
+      background-color: color-mix(in srgb, currentcolor 12%, transparent);
+      color: inherit;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background-color 0.15s ease;
+
+      // primeicons declares `.pi { font-size: 1rem }`, so sizing the button is
+      // not enough — the glyph itself has to be targeted.
+      .pi {
+        font-size: 9px;
+      }
+
+      &:hover {
+        background-color: color-mix(in srgb, currentcolor 25%, transparent);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--ac-light-blue-400);
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  // ── "+N more" trigger and its panel ────────────────────────────────────
+  &__more {
+    align-self: center;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ac-light-blue-400);
+    cursor: pointer;
+    font-size: 12px;
+    text-decoration: underline;
+  }
+
+  &__more-title {
+    margin-bottom: 10px;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+    color: var(--ac-primary-blue-600);
+  }
+
+  &__more-list {
+    display: flex;
+    max-height: 260px;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+  }
+
+  // ── Actions cell ─────────────────────────────────────────────────────
+  // Actions sit centred in their column, in both tables
+  &__actions {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  // ── Action buttons — the soft square icon button used by Environment
+  //    variables, wearing the chips' own ground and border: blue glyph.
+  &__history-btn,
+  &__assign-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 27px;
+    height: 27px;
+    padding: 2px;
+    border: 1px solid var(--ac-grey-200);
+    border-radius: 8px;
+    background-color: var(--ac-white-1);
+    color: var(--ac-light-blue-400);
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+
+    &:focus-visible {
+      outline: 2px solid var(--ac-light-blue-400);
+      outline-offset: 2px;
+    }
+  }
+
+  // ── Empty state ──────────────────────────────────────────────────────
+  &__empty {
+    padding: 32px 16px;
+    text-align: center;
+  }
+
+  &__empty-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__empty__icon {
+    font-size: 32px;
+  }
+
+  &__empty__text {
+    margin: 0;
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+  }
+
+  // ── Error state (NFR-UI-003) ─────────────────────────────────────────
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background-color: var(--ac-grey-100);
+    border: 1px solid var(--ac-grey-200);
+    font-family: Barlow, sans-serif;
+    font-size: 14px;
+  }
+
+  &__error__icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+}

@@ -27,6 +27,7 @@ export interface Portfolio2AlignmentCatalogs {
   strategicObjectives?: PortfolioConfigItem[];
   impactOutcomes?: PortfolioConfigItem[];
   sdgs?: GetSdgs[];
+  sdgTargets?: LeverSdgTargetOption[];
 }
 
 export interface Portfolio2AlignmentContractPayload {
@@ -40,6 +41,7 @@ export interface Portfolio2AlignmentPatchBody {
   research_areas: { lever_id: string | number }[];
   strategic_objectives: { strategic_objective_id: number }[];
   impact_outcomes?: { impact_outcome_id: number }[];
+  result_sdg_targets?: { sdg_target_id: number }[];
 }
 
 const normalizeSdgs = (sdgs: GetSdgs[] | undefined): GetSdgs[] =>
@@ -283,6 +285,21 @@ export const enrichPortfolio2Contracts = (
         description,
         contract_id: catalogMatch.contract_id ?? agreementId,
         is_primary: Boolean(flattened.is_primary),
+        // Pinned AFTER the spreads on purpose -- `flattened` would otherwise win and it
+        // carries the WRONG value. The two sources disagree BY DESIGN:
+        //   * the catalog (GET agresso/contracts/find-contracts) selects the EFFECTIVE
+        //     predicate `effectivePoolFundingContributorSql` -- the raw column OR an
+        //     active row in `bilateral_project_mapping`;
+        //   * the alignment payload arrives through the TypeORM `agresso_contract`
+        //     relation, i.e. the RAW `agresso_contracts.is_pool_funding_contributor`
+        //     column (`default: false`), with no bilateral-mapping term at all.
+        // A contract that contributes VIA ITS BILATERAL MAPPING -- the normal case, e.g.
+        // D514 -- is therefore `true` in the catalog and `false` in the alignment
+        // payload, and the plain spread order silently kept the false one. The catalog
+        // is the authority (it is also what the dropdown itself renders); the raw value
+        // is the fallback only when the catalog carries none.
+        is_pool_funding_contributor:
+          catalogMatch.is_pool_funding_contributor ?? flattened.is_pool_funding_contributor,
         select_label: catalogMatch.select_label ?? (description ? `${agreementId} - ${description}` : agreementId),
         levers: normalizeContractLevers({ ...catalogMatch, ...flattened })
       } as GetAllianceAlignment['contracts'][number];
@@ -331,13 +348,15 @@ export const normalizePortfolio2AlignmentGet = (
     catalogs.strategicObjectives,
     'strategic_objective_id'
   ),
-  impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id')
+  impact_outcomes: enrichPortfolioConfigItems(data?.impact_outcomes, catalogs.impactOutcomes, 'impact_outcome_id'),
+  result_sdg_targets: enrichAlignmentSdgTargets(data?.result_sdg_targets, catalogs.sdgTargets)
 });
 
 export const buildPortfolio2AlignmentPatch = (
   body: GetAllianceAlignment,
   includeImpactOutcomes: boolean,
-  includeResultSdgs = true
+  includeResultSdgs = true,
+  includeResultSdgTargets = false
 ): Portfolio2AlignmentPatchBody => {
   const payload: Portfolio2AlignmentPatchBody = {
     contracts: (body.contracts ?? [])
@@ -369,6 +388,12 @@ export const buildPortfolio2AlignmentPatch = (
         impact_outcome_id: Number((item as PortfolioConfigItem & { impact_outcome_id?: number }).impact_outcome_id ?? item.id)
       }))
       .filter(item => Number.isFinite(item.impact_outcome_id) && item.impact_outcome_id > 0);
+  }
+
+  if (includeResultSdgTargets) {
+    payload.result_sdg_targets = (body.result_sdg_targets ?? [])
+      .map(target => ({ sdg_target_id: Number(target.sdg_target_id) }))
+      .filter(target => Number.isFinite(target.sdg_target_id) && target.sdg_target_id > 0);
   }
 
   return payload;

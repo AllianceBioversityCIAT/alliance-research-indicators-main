@@ -8,6 +8,15 @@ import {
 export const STAR_RAW_BANNER_SUBTITLE_PREFIX =
   'This file contains the results generated from the selected filters in STAR';
 
+/**
+ * In-file warning notice rendered on its own highlighted row so users know that the
+ * Innovation Development and Innovation Use sections are not yet part of the export.
+ */
+export const STAR_RAW_COMING_SOON_NOTICE =
+  'Note: The Innovation Development section (readiness level, innovation nature, ' +
+  'innovation type, and related fields) and the Innovation Use section are not yet ' +
+  'included in this export — these sections are coming soon.';
+
 function trimOrEmpty(s: string | undefined): string {
   return (s ?? '').trim();
 }

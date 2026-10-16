@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
+import { APPLICATION_CONFIGURATION_KEY } from '@shared/constants/application-configuration-keys';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
@@ -18,6 +20,15 @@ import { ClarisaProjectPhaseCount } from '@interfaces/bilateral/bilateral-projec
 // nobody has designed yet.
 export const CLARISA_PHASE_CONFIG_KEY = 'ARI_CLARISA_PROJECTS_PHASE';
 
+// @akili-spec docs/specs/bilateral/pool-funding-feature-toggles — T-06 / R-PFT-005, D-6
+// Client-side keys selecting the boolean toggle branch. The control's two
+// positions write exactly 'true' and 'false'; the fail-open parser disables
+// the feature only on the exact string 'false'.
+export const POOL_FUNDING_FLAG_KEYS = [
+  APPLICATION_CONFIGURATION_KEY.POOL_FUNDING_SECTION_ENABLED,
+  APPLICATION_CONFIGURATION_KEY.POOL_FUNDING_PRMS_SYNC_BUTTON_ENABLED
+] as const;
+
 interface PhaseSelectOption {
   value: string;
   label: string;
@@ -26,7 +37,7 @@ interface PhaseSelectOption {
 @Component({
   selector: 'app-edit-environment-variable-modal',
   standalone: true,
-  imports: [InputComponent, TextareaComponent, VariableConfigurationJsonRowComponent, FormsModule, SelectModule],
+  imports: [InputComponent, TextareaComponent, VariableConfigurationJsonRowComponent, FormsModule, SelectModule, ToggleSwitchModule],
   templateUrl: './edit-environment-variable-modal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -59,6 +70,10 @@ export class EditEnvironmentVariableModalComponent {
 
   isClarisaPhaseKey(key: string): boolean {
     return key === CLARISA_PHASE_CONFIG_KEY;
+  }
+
+  isPoolFundingFlagKey(key: string): boolean {
+    return (POOL_FUNDING_FLAG_KEYS as readonly string[]).includes(key);
   }
 
   /**
@@ -99,6 +114,11 @@ export class EditEnvironmentVariableModalComponent {
 
   onPhaseValueChange(value: string): void {
     this.service.editForm.update(form => ({ ...form, simple_value: value }));
+  }
+
+  onPoolFundingFlagChange(value: string): void {
+    const simple_value = value === 'false' ? 'false' : 'true';
+    this.service.editForm.update(form => ({ ...form, simple_value }));
   }
 
   onSave(): void {

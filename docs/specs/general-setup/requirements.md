@@ -34,6 +34,8 @@ A short (≤ 200 words) statement of:
 
 Do NOT restate the PRD. Link to it.
 
+**Enumerate the affected surface by *what renders on the route*, not by the feature folder** — include the shared shell and shared field components. **This reaches inside a single component too: two controls writing two different state keys are two filters, however the design doc names them.** *(Kaizen KZ-002, recurrence 4)*
+
 ---
 
 ## 2. Requirement numbering
@@ -80,6 +82,8 @@ Rules:
 - ACs MUST reference the `ServerResponseDto` envelope shape (status + description + data shape).
 - For role-restricted handlers, ACs MUST cover both "allowed role" and "denied role" cases.
 - For status-guarded handlers, ACs MUST cover at least one allowed and one denied result-status transition.
+- **If a review finds behavior pinned only by a test, that is a requirement gap** — escalate it to the spec owner as an open decision; never let the test stand as the rule. *(Kaizen KZ-005)*
+- **When correcting a requirement, derive the sweep pattern from the claim being corrected, not from the citation that surfaced it** (grep `/v1`, not `api/v1`), and sweep sibling documents for the same figure. *(Kaizen KZ-006)*
 
 ---
 
@@ -102,6 +106,8 @@ Common categories the ARI server enforces by default (you may inherit without re
 - All exceptions flow through `GlobalExceptions` (PRD AC-API-Surface).
 
 State an NFR only if it differs from the inherited defaults.
+
+**Packaging is a defect class (K-017).** If the spec produces a runtime artifact that must exist in the *build output* — a fixture, template, asset or seed read at run time — name a **packaging** defect class and gate it with a post-build existence check (e.g. `npm run build && ls dist/<path>`). A unit suite runs over `src`, so it structurally **cannot** see that the artifact never reached `dist`: every test passes over a file that will not be there in the field.
 
 ---
 

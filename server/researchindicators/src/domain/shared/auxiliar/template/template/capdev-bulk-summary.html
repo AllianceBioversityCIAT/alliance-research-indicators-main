@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CapDev Bulk Upload — Training Results Recorded</title>
+  </head>
+  <body>
+    <p>Dear {{projectLeadName}},</p>
+    <p>
+      The team is most pleased to inform you that your training results have
+      been duly entered and confirmed within the institutional reporting
+      system.
+    </p>
+    <p>
+      The records encompass {{trainingsCount}} trainings conducted{{#if countries}} across {{countries}}{{/if}}{{#if startDate}} during the period from {{startDate}} to {{endDate}}{{/if}}{{#if participantsCount}}, in which {{participantsCount}} participants took part{{#if percentageWomen}} — {{percentageWomen}} of whom were women{{/if}}{{/if}}.
+    </p>
+    <p>
+      You may review the uploaded Capacity Development activities at the
+      following link:<br />
+      <a href="{{{starLink}}}">{{{starLink}}}</a>
+    </p>
+    <p>
+      Copied herein are the delegates who form part of the joint activities.
+      Should any questions or requests arise, contact direct them to
+      {{tokenOwnerName}} ({{tokenOwnerEmail}}), who shall be happy to assist.
+    </p>
+    <p>Best regards,<br />The Alliance of Bioversity and CIAT</p>
+  </body>
+</html>

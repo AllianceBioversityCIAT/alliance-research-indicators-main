@@ -15,6 +15,9 @@ import {
   matchesPhase,
   normalizeToken,
 } from './utils/project-selector.util';
+import { isAcceptedSpStatus } from '../../../entities/bilateral/utils/sp-mapping.predicate';
+import { normalizeExternalCode } from '../../../entities/bilateral-project-mapping/utils/external-code.util';
+import { ENV } from '../../../shared/utils/env.utils';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
@@ -53,14 +56,16 @@ export class ClarisaProjectsService {
   }
 
   /**
-   * Checks whether a project carries at least one Confirmed Science Program mapping (R-BAS-004).
+   * Checks whether a project carries at least one accepted Science Program mapping (R-BAS-004, R-PSP-003).
    * Computed once here and used by both the opt-in filter and the controller DTO mapping.
+   * Preserves code === 22 narrowing per D-PSP-8.
    */
   hasSciencePrograms(project: ClarisaProject): boolean {
+    const acceptedStatuses = ENV.BILATERAL_ACCEPTED_SP_STATUSES;
     return (
       project.project_mappings_array?.some(
         (m) =>
-          m.status === 'Confirmed' &&
+          isAcceptedSpStatus(m.status, acceptedStatuses) &&
           m.global_unit_object?.cgiar_entity_type_object?.code === 22,
       ) ?? false
     );
@@ -152,6 +157,20 @@ export class ClarisaProjectsService {
     return all.find((p) => p.id === id) ?? null;
   }
 
+  // @sdd-spec docs/specs/bugfix/pool-funding-sp-picker-empty — T-06 / R-PSP-005 (D-PSP-6)
+  async findProjectByExternalCode(
+    externalCode: string | null | undefined,
+  ): Promise<ClarisaProject | null> {
+    const { normalized } = normalizeExternalCode(externalCode);
+    if (!normalized) return null;
+    const all = await this.getCachedAll();
+    return (
+      all.find(
+        (p) => normalizeExternalCode(p.external_code).normalized === normalized,
+      ) ?? null
+    );
+  }
+
   // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-02 / R-CPA-002
   async listProjectsForCoverage(phase?: number | string): Promise<{
     all: ClarisaProject[];
@@ -179,6 +198,18 @@ export class ClarisaProjectsService {
     });
 
     return { all, slice, phaseUsed: targetPhase };
+  }
+
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / §7, K-016
+  //
+  // Read-only accessor for the current cache's fetch timestamp (ms epoch),
+  // or null on a cold cache. Consumed by AutomapperService's run report so
+  // an admin can tell whether a run read a fresh CLARISA cohort or one up
+  // to 5 minutes stale (the TTL above) — a run immediately after a feed
+  // change can still read the cached cohort. Purely additive: does not
+  // touch getCachedAll()'s cache/refresh/staleness logic.
+  getCacheFetchedAt(): number | null {
+    return this.cache?.fetchedAt ?? null;
   }
 
   /**

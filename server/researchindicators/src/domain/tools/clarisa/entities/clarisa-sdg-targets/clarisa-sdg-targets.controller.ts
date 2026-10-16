@@ -11,7 +11,8 @@ export class ClarisaSdgTargetsController {
 
   @Get()
   async findAll() {
-    return this.sdgTargetsService.findAll().then((data) =>
+    // Load the parent SDG so clients can render its icon next to each target.
+    return this.sdgTargetsService.findAll({ clarisa_sdg: true }).then((data) =>
       ResponseUtils.format({
         data: data,
         description: 'SDG Targets found',

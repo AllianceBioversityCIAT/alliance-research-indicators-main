@@ -42,6 +42,8 @@ export class ToPromiseService {
       headers = headers.set('X-Use-Year', 'true');
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.delete<T>(this.getEnv(config?.isAuth) + url, { headers }));
   };
 
@@ -63,6 +65,14 @@ export class ToPromiseService {
       headers = headers.set('X-API-Key', environment.clarisaApiKey);
     }
 
+    if (config?.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        headers = headers.set(key, value);
+      });
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.post<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -72,6 +82,9 @@ export class ToPromiseService {
     if (config?.useResultInterceptor) {
       headers = headers.set('X-Use-Year', 'true');
     }
+
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.put<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -88,6 +101,14 @@ export class ToPromiseService {
       headers = headers.set('no-auth-interceptor', 'true');
     }
 
+    if (config?.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        headers = headers.set(key, value);
+      });
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
     const fullUrl = this.getEnv(config?.isAuth) + url;
 
     return this.TP(
@@ -98,6 +119,24 @@ export class ToPromiseService {
       }),
       config?.loadingTrigger
     );
+  };
+
+  postBlob = <B>(url: string, body: B, config?: Config): Promise<Blob> => {
+    let headers = new HttpHeaders();
+
+    if (config?.useResultInterceptor) {
+      headers = headers.set('X-Use-Year', 'true');
+    }
+    if (config?.platform) {
+      headers = headers.set('X-Platform', config.platform);
+    }
+    if (config?.noAuthInterceptor) {
+      headers = headers.set('no-auth-interceptor', 'true');
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
+    return firstValueFrom(this.http.post(this.getEnv(config?.isAuth) + url, body, { headers, responseType: 'blob' }));
   };
 
   getBlob = (url: string, config?: Config): Promise<Blob> => {
@@ -112,6 +151,8 @@ export class ToPromiseService {
     if (config?.noAuthInterceptor) {
       headers = headers.set('no-auth-interceptor', 'true');
     }
+
+    headers = this.applyAuthMarker(headers, config);
 
     const fullUrl = this.getEnv(config?.isAuth) + url;
 
@@ -136,6 +177,8 @@ export class ToPromiseService {
       headers = headers.set('X-Use-Year', 'true');
     }
 
+    headers = this.applyAuthMarker(headers, config);
+
     return this.TP(this.http.patch<T>(this.getEnv(config?.isAuth) + url, body, { headers }));
   };
 
@@ -144,6 +187,20 @@ export class ToPromiseService {
     return isAuth ? environment.managementApiUrl : environment.mainApiUrl;
   };
 
+  /**
+   * // @akili-spec changes/profile-simulation
+   * Design §5 "Client start" / D-imp-12. `config.isAuth === true` (strict —
+   * not the string overrides used by unrelated external services like
+   * `saveErrorsUrl`) identifies a ROAR-bound call (login / refresh-token /
+   * current-user). `jWtInterceptor` reads this marker to decide never to
+   * attach `X-Impersonation-Session`, instead of comparing hosts — the
+   * local env has `mainApiUrl === managementApiUrl`, which makes a
+   * host-based check unfalsifiable (J-17).
+   */
+  private applyAuthMarker(headers: HttpHeaders, config?: Config): HttpHeaders {
+    return config?.isAuth === true ? headers.set('X-Ari-Auth-Call', '1') : headers;
+  }
+
   getGreenChecks = (): Promise<MainResponse<GreenChecks>> => {
     const url = () => `results/green-checks/${this.cacheService.getCurrentNumericResultId()}`;
     return this.get(url(), { useResultInterceptor: true });
@@ -151,7 +208,14 @@ export class ToPromiseService {
 
   async updateGreenChecks() {
     const response = await this.getGreenChecks();
-    this.cacheService.greenChecks.set(response.data);
+    // `greenChecks` is read as an object by every consumer — most directly by
+    // ResultSidebarComponent's `greenChecks()[option.greenCheckKey]`. A failed
+    // request resolves with `data: undefined` (see the catchError above, which
+    // maps the error body through), and storing that turned the whole sidebar
+    // into `TypeError: Cannot read properties of undefined`, taking the section
+    // list and the "sections completed" counter down with it. An empty object is
+    // the honest value: nothing is known to be complete.
+    this.cacheService.greenChecks.set(response?.data ?? {});
   }
 }
 
@@ -166,4 +230,6 @@ interface Config {
   noCache?: boolean;
   noAuthInterceptor?: boolean;
   clarisaApiKey?: boolean;
+  /** Extra raw headers to set on the request (e.g. `X-Impersonation-Session`). */
+  headers?: Record<string, string>;
 }

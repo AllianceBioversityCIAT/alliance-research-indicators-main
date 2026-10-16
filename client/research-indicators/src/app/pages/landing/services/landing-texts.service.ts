@@ -80,7 +80,7 @@ export class LandingTextsService {
         <span class="font-[600]">1. Technical Support:</span> The TI team will provide technical support. They will handle any technical issues or questions related to the platform's functionality and performance.
         <br /><br />
 
-        <span class="font-[600]">2. Knowledge Support: </span> The SPRM team will offer knowledge support. They will assist with understanding the platform's features and how to effectively use them. To ensure comprehensive assistance, there will be dedicated training sessions delivered systematically or on an ad-hoc basis
+        <span class="font-[600]">2. Knowledge Support: </span> The MELP team will offer knowledge support. They will assist with understanding the platform's features and how to effectively use them. To ensure comprehensive assistance, there will be dedicated training sessions delivered systematically or on an ad-hoc basis
         <br /><br />
 
         Additionally, in-platform guidance materials, such as short informative videos and frequently asked questions (FAQs), will be available. A ticketing system will also be in place to manage and resolve user queries efficiently.

@@ -1,0 +1,13 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": ".fixture-spec.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "globalSetup": "<rootDir>/fixtures/global-setup.ts",
+  "_comment_maxWorkers": "Fixture specs all execute against the SAME disposable scratch schema (ari_scratch_test). Parallel FILE execution let two specs race over shared real catalog rows -- measured 3 spurious FK failures in 9 runs, 2026-09-07 (T-19). The observed failures all threw rather than passing, so they produced false REDS, never false greens -- but a gate that fails 1 in 3 gets ignored. One schema means one worker.",
+  "maxWorkers": 1,
+  "testTimeout": 30000
+}

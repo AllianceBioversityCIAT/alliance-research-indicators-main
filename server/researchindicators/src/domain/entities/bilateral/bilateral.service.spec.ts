@@ -274,6 +274,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           },
         ],
         is_synced_to_prms: false,
+        // Null until the result syncs; the field is ALWAYS present on the response.
+        prms_result_code: null,
         is_read_only: false,
         // T-07 (R-BIL-096): both fields ALWAYS present on the response.
         version_locked: false,
@@ -857,6 +859,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP01', 'SP03'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,
@@ -984,6 +987,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP06', 'SP09'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,
@@ -1357,6 +1361,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         science_programs: ['SP06', 'SP09'].map((code) => ({
           code,
           name: `name-of-${code}`,
+          mapping_status: 'Confirmed',
           category: null,
           color: null,
           icon_key: null,

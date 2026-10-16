@@ -12,6 +12,7 @@ export enum TemplateEnum {
   OICR_REJECTED = 'oicr-rejected-result',
   DIRECTLY_APPROVED = 'directly-approved',
   INNOVATION_LEVEL_SEVEN = 'innovation-level-seven',
+  CAPDEV_BULK_UPLOAD_SUMMARY = 'capdev-bulk-upload-summary',
 }
 
 export type WelcomeEmailTemplate = {

@@ -29,7 +29,9 @@ export class IndicatorsService {
     itemLabelKey: keyof Indicator,
     itemValueKey: keyof Indicator
   ) {
-    const targetIndicatorIds = [1, 2, 4, 5];
+    // @akili-spec docs/specs/innovation-use/details-page (T-13 Pivot — PV-T13-1)
+    // Gates the create-result Indicator dropdown; 6 = Innovation Use.
+    const targetIndicatorIds = [1, 2, 4, 5, 6];
     const filteredData = data.filter(parent => parent.indicators.some(item => targetIndicatorIds.includes(item.indicator_id)));
 
     return filteredData.map(parent => ({

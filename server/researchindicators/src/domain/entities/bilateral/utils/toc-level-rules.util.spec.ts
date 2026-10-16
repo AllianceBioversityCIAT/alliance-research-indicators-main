@@ -68,10 +68,13 @@ describe('toc-level-rules.util', () => {
       expect(allowedLevelsFor('policy_change')).toEqual(['OUTCOME', 'EOI']);
     });
 
+    it('innovation_use → [OUTCOME]', () => {
+      expect(allowedLevelsFor('innovation_use')).toEqual(['OUTCOME']);
+    });
+
     it('any other type → [] (pending OQ-V2-5)', () => {
       expect(allowedLevelsFor('knowledge_product')).toEqual([]);
       expect(allowedLevelsFor('oicr')).toEqual([]);
-      expect(allowedLevelsFor('innovation_use')).toEqual([]);
       expect(allowedLevelsFor('unknown')).toEqual([]);
       expect(allowedLevelsFor('')).toEqual([]);
     });

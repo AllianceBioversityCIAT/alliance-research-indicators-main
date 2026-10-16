@@ -1,0 +1,34 @@
+{
+  "tenant": "prms.result-management.api",
+  "op": "dataset.ingest.requested",
+  "results": [
+    {
+      "type": "knowledge_product",
+      "data": {
+        "external_reference": "ARI-SPIKE-KP-10855",
+        "keep_editing": false,
+        "created_date": "2026-09-16T12:00:00.000Z",
+        "created_by": { "email": "ari-spike-tester@cgiar.org", "name": "ARI Spike Tester" },
+        "submitted_by": {
+          "email": "ari-spike-tester@cgiar.org",
+          "name": "ARI Spike Tester",
+          "submitted_date": "2026-09-16T12:00:00.000Z",
+          "comment": "ARI KP-scope spike. Synthetic, do not process."
+        },
+        "lead_contact_person": { "email": "ari-spike-tester@cgiar.org", "name": "ARI Spike Tester" },
+        "lead_center": {
+          "institution_id": 46,
+          "acronym": "ABC RH - CIAT (Alliance)",
+          "name": "Alliance of Bioversity and CIAT - Regional Hub"
+        },
+        "toc_mapping": { "science_program_id": "SP01" },
+        "contributing_bilateral_projects": [
+          { "grant_title": "D-000000-ARI SPIKE Contract Title Test", "is_lead": true }
+        ],
+        "knowledge_product": {
+          "handle": "https://hdl.handle.net/10568/148990"
+        }
+      }
+    }
+  ]
+}

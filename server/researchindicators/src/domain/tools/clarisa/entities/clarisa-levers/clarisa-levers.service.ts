@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { ClarisaLever } from './entities/clarisa-lever.entity';
 import { ControlListBaseService } from '../../../../shared/global-dto/clarisa-base-service';
 import {
@@ -50,6 +50,31 @@ export class ClarisaLeversService extends ControlListBaseService<
       },
     });
   }
+  /**
+   * Narrow finder for portfolio-scoped id validation (AI-formalize primary
+   * levers path, design.md DD-4). Returns only the rows matching every one
+   * of: `id IN (ids)`, `portfolio_id = portfolioId`, `is_active = true` — a
+   * single predicate that covers "unknown", "inactive" and "foreign
+   * portfolio" discard causes at once. Guarded against `IN ()`: an empty
+   * `ids` array short-circuits to `[]` without querying.
+   */
+  async findActiveByIdsForPortfolio(
+    ids: number[],
+    portfolioId: number,
+  ): Promise<ClarisaLever[]> {
+    if (!ids?.length) {
+      return [];
+    }
+
+    return this.mainRepo.find({
+      where: {
+        id: In(ids),
+        portfolio_id: portfolioId,
+        is_active: true,
+      },
+    });
+  }
+
   async create(
     createClarisaLeverDto: CreateClarisaLeverDto,
   ): Promise<ClarisaLever> {

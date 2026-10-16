@@ -73,6 +73,8 @@ Each task uses this structure:
 - **Status:** todo | in-progress | done | blocked
 ```
 
+**One clause per row (KZ-011).** Never bundle two independently-justified instructions in one table cell or bullet. When execution retires one of them, the siblings inherit the retirement silently and the worker is blamed for the omission — split them, so each can be retired on its own evidence.
+
 ---
 
 ## 4. Standard task categories
@@ -103,12 +105,19 @@ Per task, declare:
 - Which `*.spec.ts` files are added or updated.
 - Coverage target if differing from the global 60% threshold.
 - E2E test cases (happy path + at least one auth failure + at least one role/status denial when applicable).
+- A **`Disqualifies` clause**: what would make the evidence inconclusive. **A fixture whose N units are built from identical defaults cannot distinguish per-unit scoping from a batch-wide bug — vary at least one discriminating field per unit.** *(Kaizen KZ-004)*
 
 **Bug Mode — where the regression test belongs.** The red-before-green test MUST be owned by the task that **changes the buggy code path**, never by a task that creates new code. A test over a newly-created function is green from the moment it compiles and could never have been red, so assigning the evidence there closes Bug Mode without producing the one artifact Bug Mode exists for. A new unit still owes a gate **proven able to fail** — demonstrate it by mutation — but that is a different claim from reproducing the defect.
 
 **Name the concrete input that makes the gate red, in the task, before the test is written (K-012).** Red-before-green checks falsifiability *after* the test exists; naming the input makes a non-falsifiable assertion obvious *while it is being authored*. Measured on one spec, same methodology throughout: the task whose brief omitted it shipped **3** tests that passed on `HEAD`, the next shipped **1**, the one that named the input verbatim shipped **0**.
 
+**A refactor declared behaviour-preserving needs an explicit old-vs-new comparison over a fixed input set as its pass condition (K-019).** The existing suite was written for the old behaviour's *known* inputs, so it is structurally blind to a change in what the code **accepts** — it can report green while the acceptance set has moved. Name the inputs, run both versions, require zero divergences.
+
+**When a task realigns existing expectations, derive its site list from the failing suite, not from a grep (K-018).** Grep enumerates *mentions* of the value you are changing; only the run enumerates *breakages*. A list built by grep fails in three directions at once — it names sites that are already green for an unrelated reason, misses genuinely red ones, and can skip a whole file. Apply the change, run the suite, and let the failures write the list.
+
 A task is NOT done until:
+- **If the task delivers a harness, fixture, or any verification mechanism:** at least one criterion exercises the mechanism **end to end** (KZ-006). Per-piece checks can all pass while the mechanism cannot run at all.
+- **If a criterion is discharged by a human observation, quote what the observation actually covered** (KZ-002). A human's answer is the hardest proxy to spot, because it is genuine evidence — of something. Tick the criterion only if the quoted words cover the clause; if they cover an adjacent property, say which and re-class the criterion as blocked on whatever would cover it. Precedent: a criterion asserting a live `200` in a `ServerResponseDto` was ticked because a `/swagger` observation "released" it, and that observation covered the page *rendering*.
 - `npm run lint` passes.
 - `npm test` passes locally.
 - New endpoints appear correctly in `/swagger`.
@@ -140,6 +149,7 @@ Append-only table for the lifetime of the spec.
 
 The spec is complete when:
 - [ ] All `T-<NN>` tasks are `done`.
+- [ ] **Someone has exercised the feature in the running product, BEFORE `/akili-validate` issues a verdict — not after.** Automated gates verify the system against the spec's own description of itself; only a human at the screen can falsify that description. Where a manual gate is named as a substitute control for a known coverage gap, it is the first check, not the last. *(Kaizen KZ-007)*
 - [ ] All requirement-level ACs are checked.
 - [ ] Coverage thresholds are still green.
 - [ ] Swagger documents every new endpoint.

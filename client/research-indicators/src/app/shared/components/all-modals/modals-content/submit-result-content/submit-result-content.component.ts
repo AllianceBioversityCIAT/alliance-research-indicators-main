@@ -415,7 +415,7 @@ export class SubmitResultContentComponent {
         severity: 'success',
         summary: 'Review submitted successfully',
         hasNoCancelButton: true,
-        detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the PISA-SPRM team.',
+        detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.',
         confirmCallback: {
           label: 'Done',
           event: () => {

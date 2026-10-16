@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsInt,
+  IsNotIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -38,12 +39,24 @@ export class CreateBilateralProjectMappingDto {
   @MaxLength(500)
   clarisa_project_short_name?: string;
 
+  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 Finding 2
+  // (execution.md T-00 forward pointer). DERIVED is written exclusively by
+  // AutomapperService, directly against the entity (never through this
+  // DTO) — see automapper.service.ts's file header. Widening @IsEnum to
+  // accept it here would let any admin caller hand-write a DERIVED row,
+  // weakening the Source column as a provenance signal DD-2 relies on.
   @ApiPropertyOptional({
     enum: MappingSourceEnum,
     default: MappingSourceEnum.MANUAL,
+    description:
+      'MANUAL, AI_SUGGESTED, or AI_AUTO. DERIVED is reserved for the CLARISA automapper and is rejected on this endpoint.',
   })
   @IsOptional()
   @IsEnum(MappingSourceEnum)
+  @IsNotIn([MappingSourceEnum.DERIVED], {
+    message:
+      'source DERIVED is reserved for the automapper and cannot be submitted directly',
+  })
   source?: MappingSourceEnum;
 
   @ApiPropertyOptional({

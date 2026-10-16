@@ -10,16 +10,22 @@ export const EXCEL_WORKSHEET_ROW_LIMIT = 1_048_576;
  */
 export const EXCEL_RESERVED_ROWS_WITH_PRESENTATION = 4;
 
+/** One extra reserved row when the preamble renders a warning-notice row. */
+export const EXCEL_RESERVED_ROWS_WITH_PRESENTATION_AND_NOTICE = 5;
+
 /** Single header row when the sheet has no preamble. */
 export const EXCEL_RESERVED_ROWS_WITHOUT_PRESENTATION = 1;
 
-export function maxDataRowsForExcelSheet(hasPresentation: boolean): number {
-  return (
-    EXCEL_WORKSHEET_ROW_LIMIT -
-    (hasPresentation
-      ? EXCEL_RESERVED_ROWS_WITH_PRESENTATION
-      : EXCEL_RESERVED_ROWS_WITHOUT_PRESENTATION)
-  );
+export function maxDataRowsForExcelSheet(
+  hasPresentation: boolean,
+  hasNotice = false,
+): number {
+  const reserved = hasPresentation
+    ? hasNotice
+      ? EXCEL_RESERVED_ROWS_WITH_PRESENTATION_AND_NOTICE
+      : EXCEL_RESERVED_ROWS_WITH_PRESENTATION
+    : EXCEL_RESERVED_ROWS_WITHOUT_PRESENTATION;
+  return EXCEL_WORKSHEET_ROW_LIMIT - reserved;
 }
 
 /**
@@ -28,7 +34,8 @@ export function maxDataRowsForExcelSheet(hasPresentation: boolean): number {
 export function validateExcelWorkbookRowLimits(spec: ExcelWorkbookSpec): void {
   for (const sheet of spec.sheets) {
     const hasPresentation = !!sheet.presentation;
-    const maxData = maxDataRowsForExcelSheet(hasPresentation);
+    const hasNotice = !!sheet.presentation?.bannerNotice;
+    const maxData = maxDataRowsForExcelSheet(hasPresentation, hasNotice);
     const n = sheet.rows.length;
     if (n > maxData) {
       throw new PayloadTooLargeException(

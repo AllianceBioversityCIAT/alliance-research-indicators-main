@@ -15,6 +15,7 @@ import {
   SpAlignmentDraft
 } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import { SAVED_TOC_ALIGNMENTS_FIXTURE, TOC_CATALOG_CAPSHARING_FIXTURE, TOC_CATALOG_TWO_SP_FIXTURE } from '../../testing/toc-catalog.fixture';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('BilateralService', () => {
   let service: BilateralService;
@@ -25,6 +26,7 @@ describe('BilateralService', () => {
     PATCH_PoolFundingAlignment: jest.Mock;
     GET_PoolFundingSciencePrograms: jest.Mock;
     GET_PoolFundingHlosIndicators: jest.Mock;
+    TP: { updateGreenChecks: jest.Mock };
   };
   let canAccessCenterAdminSignal: ReturnType<typeof signal<boolean>>;
   let isCurrentUserOwnerSignal: ReturnType<typeof signal<boolean>>;
@@ -37,7 +39,8 @@ describe('BilateralService', () => {
       GET_PoolFundingAlignment: jest.fn(),
       PATCH_PoolFundingAlignment: jest.fn(),
       GET_PoolFundingSciencePrograms: jest.fn(),
-      GET_PoolFundingHlosIndicators: jest.fn()
+      GET_PoolFundingHlosIndicators: jest.fn(),
+      TP: { updateGreenChecks: jest.fn().mockResolvedValue(undefined) }
     };
     canAccessCenterAdminSignal = signal<boolean>(false);
     isCurrentUserOwnerSignal = signal<boolean>(false);
@@ -283,6 +286,66 @@ describe('BilateralService', () => {
       mockApi.GET_PoolFundingAlignment.mockRejectedValue(new Error('network down'));
 
       await expect(service.getAlignment('RES-001')).rejects.toThrow('network down');
+
+      expect(service.loadingAlignment()).toBe(false);
+    });
+
+    // R-PFG-001 AC.1 — Bug Mode repro. Opening a non-alignment-capable result must
+    // issue ZERO calls to the alignment endpoint. Red on HEAD (today the request is
+    // always issued and the server 404s).
+    it('a TIP-prefixed result issues zero alignment requests', async () => {
+      const result = await service.getAlignment('TIP-31288');
+
+      expect(mockApi.GET_PoolFundingAlignment).not.toHaveBeenCalled();
+      expect(result).toBeNull();
+    });
+
+    // R-PFG-001 AC.3 / R-PFG-002 AC.2 — enumerated over PLATFORM_CODES, never a
+    // literal list (D-2: the AICCRA precedent at result.interceptor.ts:50-53).
+    it.each(Object.values(PLATFORM_CODES).filter(code => code !== PLATFORM_CODES.STAR))(
+      '%s is not capable — zero alignment requests',
+      async platformCode => {
+        const result = await service.getAlignment(`${platformCode}-31288`);
+
+        expect(mockApi.GET_PoolFundingAlignment).not.toHaveBeenCalled();
+        expect(result).toBeNull();
+      }
+    );
+
+    // D-1 — the over-suppression guard. A bare-numeric (STAR) result must still
+    // issue exactly one call, unchanged URL/argument. Green both before and after.
+    it('a bare-numeric result still issues exactly one call, unchanged', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(baseAlignment));
+
+      await service.getAlignment('31288');
+
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledTimes(1);
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledWith('31288');
+    });
+
+    // AC.0 — the D-6 stale-state-leak guard. Green BOTH before and after on HEAD:
+    // pre-fix, the ineligible call still reaches the network and the (simulated)
+    // 404 is what nulls the state today; post-fix, the guard clears it without a
+    // request. NOT red-before evidence — it is the proof that DD-3's clearing
+    // survives either mechanism (falsified separately, see execution.md).
+    it('AC.0 — after an eligible fetch populates state, an ineligible code clears it', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok<AlignmentResponse>(baseAlignment));
+      await service.getAlignment('STAR-31288');
+      expect(service.currentAlignment()).toEqual(baseAlignment);
+
+      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(
+        err<AlignmentResponse>(404, 'not found', undefined as unknown as AlignmentResponse)
+      );
+      const result = await service.getAlignment('TIP-99999');
+
+      expect(service.currentAlignment()).toBeNull();
+      expect(result).toBeNull();
+    });
+
+    // §5 — loadingAlignment must never be left true on the ineligible path (there is
+    // nothing to await, and a flag raised before an early return sticks true).
+    it('loadingAlignment stays false on the ineligible path', async () => {
+      await service.getAlignment('PRMS-31288');
 
       expect(service.loadingAlignment()).toBe(false);
     });
@@ -545,6 +608,38 @@ describe('BilateralService', () => {
 
       await expect(service.patchAlignment('RES-001', { has_contribution: false })).rejects.toThrow('network down');
 
+      expect(service.savingAlignment()).toBe(false);
+    });
+
+    // Regression: the sidebar green check and the PRMS SYNC gate read
+    // `cache.greenChecks()`, refreshed only by ToPromiseService's
+    // `loadingTrigger` finalize hook — which no PATCH goes through. Before this
+    // fix the check stayed stale until a full result reload.
+    it('200 — refreshes the green checks so the sidebar check and PRMS SYNC gate update', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(successAlignment));
+
+      await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(mockApi.TP.updateGreenChecks).toHaveBeenCalledTimes(1);
+    });
+
+    it('non-200 — does NOT refresh the green checks (nothing changed server-side)', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(
+        err<AlignmentResponse>(500, 'Internal Server Error', undefined as unknown as AlignmentResponse)
+      );
+
+      await service.patchAlignment('RES-001', { has_contribution: false });
+
+      expect(mockApi.TP.updateGreenChecks).not.toHaveBeenCalled();
+    });
+
+    it('200 — a green-check refresh failure never turns a successful save into an error', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(successAlignment));
+      mockApi.TP.updateGreenChecks.mockRejectedValue(new Error('green checks down'));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect(result).toEqual({ ok: true, data: successAlignment });
       expect(service.savingAlignment()).toBe(false);
     });
   });

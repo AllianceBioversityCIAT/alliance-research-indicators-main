@@ -27,6 +27,9 @@ describe('AllianceAlignmentP2Component', () => {
             @if (shouldShowImpactOutcomes()) {
               <span>Impact Outcomes</span>
             }
+            @if (isOicrIndicator()) {
+              <span>SDG Targets</span>
+            }
             @if (!isOicrIndicator()) {
               <span>Contribution to SDG</span>
             }
@@ -46,10 +49,18 @@ describe('AllianceAlignmentP2Component', () => {
     expect(text).toContain('Research Areas');
     expect(text).toContain('Strategic Objectives');
     expect(text).toContain('Impact Outcomes');
+    expect(text).toContain('SDG Targets');
   });
 
   it('should render impact outcomes for Policy Change and Investments', () => {
     metadata.set({ indicator_id: 4 });
+    fixture.detectChanges();
+    expect(component.shouldShowImpactOutcomes()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
+  });
+
+  it('should render impact outcomes for Innovation Use', () => {
+    metadata.set({ indicator_id: 6 });
     fixture.detectChanges();
     expect(component.shouldShowImpactOutcomes()).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
@@ -69,7 +80,14 @@ describe('AllianceAlignmentP2Component', () => {
     fixture.detectChanges();
     expect(component.isOicrIndicator()).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Impact Outcomes');
+    expect(fixture.nativeElement.textContent).toContain('SDG Targets');
     expect(fixture.nativeElement.textContent).not.toContain('Contribution to SDG');
+  });
+
+  it('filters the "Other" Research Area (18) out of the options, and nothing else', () => {
+    expect(component.researchAreaOptionFilter({ lever_id: 18 })).toBe(false);
+    expect(component.researchAreaOptionFilter({ id: '18' })).toBe(false);
+    expect(component.researchAreaOptionFilter({ lever_id: 12 })).toBe(true);
   });
 
   it('should use default input callbacks', () => {

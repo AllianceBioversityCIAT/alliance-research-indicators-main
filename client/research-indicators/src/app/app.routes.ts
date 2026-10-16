@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { piDelegatesGuard } from '@guards/pi-delegates.guard';
 import { rolesGuard } from '@guards/roles.guard';
 import { centerAdminGuard } from '@guards/center-admin.guard';
 import { appConfigurationGuard } from '@guards/app-configuration.guard';
@@ -148,6 +149,12 @@ export const routes: Routes = [
             loadComponent: () => import('@platform/pages/result/pages/innovation-details/innovation-details.component'),
             data: createResultData()
           },
+          // @akili-spec docs/specs/innovation-use/details-page (T-10 — reachability wiring)
+          {
+            path: 'innovation-use-details',
+            loadComponent: () => import('@platform/pages/result/pages/innovation-use-details/innovation-use-details.component'),
+            data: createResultData()
+          },
           {
             path: 'geographic-scope',
             loadComponent: () => import('@platform/pages/result/pages/geographic-scope/geographic-scope.component'),
@@ -208,6 +215,16 @@ export const routes: Routes = [
             }
           }
         ]
+      },
+      {
+        path: 'my-pi-delegates',
+        loadComponent: () =>
+          import('@pages/platform/pages/my-pi-delegates/my-pi-delegates.component').then(m => m.default),
+        canMatch: [rolesGuard, piDelegatesGuard],
+        data: {
+          title: 'My PI Delegates',
+          isLoggedIn: true
+        }
       },
       {
         path: 'about',
@@ -307,6 +324,16 @@ export const routes: Routes = [
         canMatch: [centerAdminGuard],
         data: {
           title: 'Portfolio Management',
+          isLoggedIn: true
+        }
+      },
+      {
+        path: 'administration/configuration/prompt-manager',
+        loadComponent: () =>
+          import('@platform/pages/administration/configuration/prompt-manager/prompt-manager.component').then(m => m.default),
+        canMatch: [appConfigurationGuard],
+        data: {
+          title: 'Prompt Manager',
           isLoggedIn: true
         }
       },

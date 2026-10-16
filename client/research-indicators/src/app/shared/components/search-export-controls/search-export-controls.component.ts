@@ -15,6 +15,8 @@ export class SearchExportControlsComponent implements OnInit, OnDestroy {
   @Input() badge?: string | number;
   @Input() showOverlayDot = false;
   @Input() showClear = true;
+  /** Hides the Apply Filters button for tables that filter in place (no filters sidebar). */
+  @Input() showApply = true;
   @Input() searchValue = '';
   @Input() searchPlaceholder = 'Find a result by code, title or creator';
 

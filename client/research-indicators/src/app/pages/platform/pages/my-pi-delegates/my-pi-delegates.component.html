@@ -1,0 +1,201 @@
+<!-- @akili-spec docs/specs/changes/my-pi-delegates-ui (T-UI-04) -->
+<!-- R-UI-002 AC.1: By-project is the FIRST tab (default active). -->
+<!-- NFR-UI-001: STAR tokens only (var(--ac-*), .abc-*, .atc-*) — no hex literals. -->
+<!-- NFR-UI-002: Non-colour cues for every status (icon + text). -->
+<!-- NFR-UI-003: Loading / error / empty states. -->
+<!-- Layout is Tailwind; the only SCSS left is the ::ng-deep PrimeNG overrides. -->
+<!-- Page gutters follow project-detail: px-[24px], px-[28px] from md up. -->
+
+<div class="pi-delegates-page flex flex-col bg-[color:var(--ac-white-1)] pt-[8px] sm:pt-[12px] md:pt-[20px]">
+
+  <!-- ── Page header block ───────────────────────────────────────────── -->
+  <!-- The description, the Administrator notice and the stat cards all share ONE
+       max-width, declared here. Setting it per block let the cards grow past the
+       text and the three edges stepped down the page like a staircase.
+       60rem, not the 52rem the prose used to have: five cards at their minimum
+       width do not fit in 52rem and would wrap to a second row. -->
+  <header
+    class="pi-delegates-header flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[18px] pt-[9px] md:px-[28px]">
+    <h1 class="pi-delegates-title atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
+      My PI Delegates
+    </h1>
+    <p class="pi-delegates-description atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
+      PI Delegate lets someone approve, reject or request changes to the results of a project on your
+      behalf. It applies only to the projects you select here, and you can revoke it at any time.
+      Roles coming from <strong class="font-semibold">Agresso</strong> are not affected.
+    </p>
+
+    <!-- Administrator notice — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope -->
+    @if (isAdminView()) {
+    <!-- Same amber notice as the inactive-delegate warning in the Assign modal
+         (assign-pi-delegate.component.html): left rule, warning surface, amber
+         foreground. items-center keeps the icon on the block's mid-line whether
+         the sentence wraps to one line or two. -->
+    <div
+      class="pi-delegates-admin-notice flex items-center gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+      role="note">
+      <i class="pi pi-shield shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
+      <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+        <strong class="font-semibold">Administrator view.</strong>
+        You are seeing every project and every PI Delegate on the platform, not only your own, and you
+        can assign or revoke delegates on any of them.
+      </p>
+    </div>
+    }
+
+    <!-- Stat cards — same treatment as the project-detail indicator tiles.
+         The numbers share a baseline because each value is mt-auto inside a
+         stretched flex column, NOT because the labels reserve a fixed height:
+         reserving two lines aligned them, but paid for it with an empty line in
+         every card whose label fits on one — which is all of them at this width.
+         Widths are NOT equal: the two long-labelled cards take ~1.6× the share of
+         the three short ones, so "PROJECTS WITHOUT PI DELEGATE" gets room while
+         "PI DELEGATES" stops holding whitespace it has no use for. The row still
+         fills the shared header width exactly, because every card grows. -->
+    <div class="pi-delegates-stats mt-[14px] flex flex-row flex-wrap gap-3" role="list"
+      aria-label="PI Delegates summary statistics">
+      @if (isAdminView()) {
+      <div
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-globe atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">ALL
+            PROJECTS</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.totalProjects() }}</span>
+      </div>
+      }
+
+      <div
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-briefcase atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            AS PI</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsAsPi().length }}</span>
+      </div>
+
+      <div class="pi-delegates-stats__counter flex flex-[1.6_1_185px] min-w-[160px] flex-col items-start gap-1 rounded-lg border border-[var(--ac-grey-200)] bg-[var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            AS PI DELEGATE</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsAsDelegate().length }}</span>
+      </div>
+
+      <div
+        class="pi-delegates-stats__counter flex flex-[1_1_120px] min-w-[120px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-users atc-primary-blue-300 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PI
+            DELEGATES</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-primary-blue-600 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.totalDistinctDelegates() }}</span>
+      </div>
+
+      <div
+        class="pi-delegates-stats__counter flex flex-[1.6_1_185px] min-w-[160px] flex-col items-start gap-1 rounded-lg border border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-2.5 py-1.5"
+        role="listitem">
+        <span class="flex items-start gap-[5px]">
+          <i class="pi pi-exclamation-triangle atc-orange-1 shrink-0 !text-[13px] leading-4" aria-hidden="true"></i>
+          <span
+            class="pi-delegates-stats__counter-label atc-grey-600 font-['Space_Grotesk'] text-[11px] font-medium uppercase leading-4">PROJECTS
+            WITHOUT PI DELEGATE</span>
+        </span>
+        <span
+          class="pi-delegates-stats__counter-value mt-auto atc-orange-1 font-['Space_Grotesk'] text-[18px] font-semibold leading-5 tabular-nums">{{
+          service.projectsWithoutDelegate().length }}</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Loading state (NFR-UI-003) ─────────────────────────────────── -->
+  @if (loading()) {
+  <div
+    class="pi-delegates-state--loading mb-4 flex items-center gap-3 border-y border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    role="status" aria-live="polite">
+    <i class="pi pi-spin pi-spinner atc-primary-blue-400 shrink-0 !text-[18px]" aria-hidden="true"></i>
+    <span class="atc-grey-800">Loading PI delegates data…</span>
+  </div>
+  }
+
+  <!-- ── Error state (NFR-UI-003) ───────────────────────────────────── -->
+  @else if (error()) {
+  <div
+    class="pi-delegates-state--error mb-4 flex items-center gap-3 border-y border-[color:var(--ac-grey-200)] bg-[color:var(--ac-grey-100)] px-[24px] py-[14px] font-['Barlow'] text-[14px] md:px-[28px]"
+    role="alert">
+    <i class="pi pi-exclamation-circle atc-red-1 shrink-0 !text-[18px]" aria-hidden="true"></i>
+    <span class="atc-red-1">
+      Could not load PI delegates data. Please refresh the page and try again.
+    </span>
+  </div>
+  }
+
+  <!-- ── Tabs + content ─────────────────────────────────────────────── -->
+  <!-- Plain buttons + a grey content well: the project-detail tab pattern, so
+       the whole strip is Tailwind and nothing needs ::ng-deep. Both panels stay
+       mounted (toggled with [hidden]) to keep each table's search and sort. -->
+  @else {
+  <div class="flex items-end gap-0 border-b border-[color:var(--ac-grey-200)] px-2" role="tablist"
+    aria-label="PI Delegates views">
+    <button type="button" role="tab" id="pi-delegates-tab-by-project"
+      class="flex cursor-pointer items-center border-0 border-b-2 bg-transparent px-5 py-3 transition-all duration-200 hover:bg-white/60"
+      [class]="activeTabIndex() === 0
+        ? '-mb-px border-b-[color:var(--ac-light-blue-400)] bg-[color:var(--ac-white-1)]'
+        : 'border-b-[color:transparent]'"
+      [attr.aria-selected]="activeTabIndex() === 0" (click)="onTabChange({ index: 0 })">
+      <span class="font-['Barlow'] text-[14px] font-semibold leading-none transition-colors duration-200"
+        [class]="activeTabIndex() === 0 ? 'text-[color:var(--ac-light-blue-400)]' : 'text-[color:var(--ac-grey-600)]'">
+        By project
+      </span>
+    </button>
+
+    <button type="button" role="tab" id="pi-delegates-tab-by-person"
+      class="flex cursor-pointer items-center border-0 border-b-2 bg-transparent px-5 py-3 transition-all duration-200 hover:bg-white/60"
+      [class]="activeTabIndex() === 1
+        ? '-mb-px border-b-[color:var(--ac-light-blue-400)] bg-[color:var(--ac-white-1)]'
+        : 'border-b-[color:transparent]'"
+      [attr.aria-selected]="activeTabIndex() === 1" (click)="onTabChange({ index: 1 })">
+      <span class="font-['Barlow'] text-[14px] font-semibold leading-none transition-colors duration-200"
+        [class]="activeTabIndex() === 1 ? 'text-[color:var(--ac-light-blue-400)]' : 'text-[color:var(--ac-grey-600)]'">
+        By person
+      </span>
+    </button>
+  </div>
+
+  <div class="border border-t-0 border-[color:var(--ac-grey-200)] bg-[color:var(--ac-background)] p-4">
+
+    <!-- Tab 0: By project (DEFAULT — R-UI-002 AC.1) -->
+    <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-project" [hidden]="activeTabIndex() !== 0">
+      <app-by-project (assignRequested)="onAssignFromProject($event)"
+        (historyRequested)="onHistoryFromProject($event)"></app-by-project>
+    </div>
+
+    <!-- Tab 1: By person (T-UI-06) -->
+    <div role="tabpanel" aria-labelledby="pi-delegates-tab-by-person" [hidden]="activeTabIndex() !== 1">
+      <app-by-person (assignRequested)="onAssignFromPerson($event)"
+        (assignNewRequested)="onAssignNewDelegate()"
+        (historyRequested)="onHistoryFromPerson($event)"></app-by-person>
+    </div>
+  </div>
+  }
+
+</div>

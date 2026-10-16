@@ -4,11 +4,12 @@
 // `mapping_status` distinguishes "no active mapping" (200 with empty list)
 // from "mapped but no Confirmed SPs in active portfolio" (200 with empty
 // list too — the FE can tell the difference by also reading `clarisa_project`).
-export type MappingStatus = 'mapped' | 'unmapped';
+export type MappingStatus = 'mapped' | 'unmapped' | 'stale';
 
 export interface BilateralScienceProgramItem {
   code: string; // e.g. "SP09" (from CLARISA global_unit_object.smo_code)
   name: string; // CLARISA global_unit_object.name (trimmed)
+  mapping_status: string | null; // CLARISA mapping status that admitted this SP (R-PSP-002, design §4)
   category: string | null; // CLARISA cgiar_entity_type_object.name OR catalog fallback
   color: string | null; // local clarisa_science_programs fallback
   icon_key: string | null; // local clarisa_science_programs fallback

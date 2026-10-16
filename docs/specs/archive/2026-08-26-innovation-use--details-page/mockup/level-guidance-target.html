@@ -1,0 +1,107 @@
+<!doctype html>
+<!-- @akili-spec docs/specs/innovation-use/details-page — proposal-amendment-01-level-guidance.md
+     Copy-review mockup. NOT production markup: it exists so the exact strings, the bullet order,
+     the two link targets and the block placement can be reviewed in one place at the specify gate.
+     Tokens are inlined as literal hex here ONLY because this file is standalone; the real
+     implementation must use the var(--ac-*) tokens named in each comment (DD-7 forbids hex in the
+     component files). Colours updated 2026-08-26 at the /akili-specify gate to the contrast-verified
+     set in design.md DD-17 / §5.8 — the first draft copied the neighbouring callouts, whose text
+     colours measure 2.91:1 and 3.91:1 against WCAG AA's 4.5:1. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Innovation Use — level guidance copy (target)</title>
+    <style>
+      body { font-family: Barlow, system-ui, sans-serif; background: #fff; color: #4c5158; margin: 0; padding: 32px; }
+      .card { max-width: 1100px; border: 1px solid #e8ebed; border-radius: 13px; padding: 30px; }
+      .section-title { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 14px; text-transform: uppercase; color: #8d9299; letter-spacing: .04em; margin: 0 0 20px; }
+      .label { display: block; font-weight: 600; font-size: 14px; color: #4c5158; margin-bottom: 12px; }
+      .req { color: #e11d48; }
+      /* callout: bg var(--ac-grey-100), left border var(--ac-light-blue-300) — mirrors the ACTORS
+         info callout already in innovation-use-details.component.html */
+      /* bg var(--ac-grey-100) · left border var(--ac-light-blue-300) (decorative, not text) */
+      .callout { background: #f4f7f9; border-left: 5px solid #1689ca; padding: 12px 16px; margin-bottom: 20px; }
+      .callout ul { margin: 0; padding-left: 20px; }
+      /* DD-17: var(--ac-grey-800) = 7.44:1. NOT grey-600 (2.91:1) or grey-700 (3.91:1) — both fail AA */
+      .callout li { font-size: 14px; line-height: 20px; color: #4c5158; font-style: italic; margin: 4px 0; }
+      .stepper { display: flex; align-items: center; justify-content: space-between; max-width: 900px; margin: 24px auto; }
+      .step { width: 32px; height: 32px; border-radius: 999px; border: 2px solid #1689ca; color: #1689ca; display: flex; align-items: center; justify-content: center; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 16px; }
+      .step.on { background: #1689ca; color: #fff; }
+      .rail { flex: 1; height: 2.5px; background: #e8ebed; min-width: 24px; }
+      .defbox { border: 2px solid #00b6ff; border-radius: 8px; padding: 20px; margin-top: 12px; }
+      .defbox .t { font-weight: 700; font-size: 14px; display: block; margin-bottom: 8px; }
+      .defbox p { margin: 0; font-size: 14px; color: #777c83; }
+      /* DD-17: var(--ac-light-blue-400) = 6.35:1. NOT light-blue-300 #1689ca (3.57:1) — fails AA */
+      a { color: #035ba9; text-decoration: underline; }
+      .deflink { display: block; margin-top: 12px; font-size: 14px; }
+      .evidence { background: #f4f7f9; border-left: 5px solid #1689ca; padding: 16px; margin-top: 20px; }
+      .evidence p { font-size: 14px; line-height: 20px; color: #4c5158; margin: 0 0 12px; }
+      .evidence p:last-child { margin-bottom: 0; }
+      textarea { width: 100%; box-sizing: border-box; margin-top: 20px; padding: 12px; border: 1px solid #e8ebed; border-radius: 8px; font-family: inherit; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2 class="section-title">Innovation use details</h2>
+
+      <!-- MODIFIED label (R-IUP-005 AC label clause) -->
+      <span class="label">How would you assess the current use level of the innovation?<span class="req">*</span></span>
+
+      <!-- ADDED: guidance callout ABOVE the stepper (new R-IUP-020) -->
+      <div class="callout">
+        <ul>
+          <li>In case the innovation use level differs across countries or regions, we advise to assign the highest current innovation use level that can be supported by the evidence provided.</li>
+          <li>Be realistic in assessing the use level of the innovation and keep in mind that the claimed use level needs to be supported by evidence documentation.</li>
+          <li>The innovation use level will be quality assessed.</li>
+          <li><strong>YOUR USE LEVEL IN JUST 3 CLICKS:</strong>
+            <a href="https://www.scalingreadiness.org/calculator-use-headless/" target="_blank" rel="noopener noreferrer">TRY THE NEW INNOVATION USE CALCULATOR</a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- UNCHANGED: existing app-innovation-use-level-stepper (T-04) -->
+      <div class="stepper">
+        <div class="step">0</div><div class="rail"></div>
+        <div class="step">1</div><div class="rail"></div>
+        <div class="step">2</div><div class="rail"></div>
+        <div class="step">3</div><div class="rail"></div>
+        <div class="step on">4</div><div class="rail"></div>
+        <div class="step">5</div><div class="rail"></div>
+        <div class="step">6</div><div class="rail"></div>
+        <div class="step">7</div><div class="rail"></div>
+        <div class="step">8</div><div class="rail"></div>
+        <div class="step">9</div>
+      </div>
+      <div class="defbox">
+        <span class="t">4 - Connected next-user</span>
+        <p>Innovation is used by some organizations connected to partners involved in the initial innovation development.</p>
+      </div>
+
+      <!-- ADDED: definitions link, external (Google Drive PDF supplied by the user 2026-08-26) -->
+      <span class="deflink">
+        <a href="https://drive.google.com/file/d/1RFDAx3m5ziisZPcFgYdyBYH9oTzOYLvC/view" target="_blank" rel="noopener noreferrer">Click here</a>
+        to see the definition of all use levels
+      </span>
+
+      <!-- ADDED: evidence guidance block BELOW the stepper (new R-IUP-021).
+           Paragraph 1: user-approved copy, adapted to Use terminology.
+           "Click here to go there" is an IN-APP router link to /result/:id/evidence,
+           preserving the version + from query params (see result-sidebar navigateTo). -->
+      <div class="evidence">
+        <p>
+          Please provide a brief explanation justifying the selected Innovation Use Level. Make sure you provide the
+          necessary evidence/documentation that support the current innovation use level in the &lsquo;Evidence&rsquo;
+          section of the form (<a href="#" data-router-link="/result/:id/evidence">Click here to go there</a>)
+        </p>
+        <!-- Paragraph 2: verbatim from the guide image, user-approved -->
+        <p>
+          Documentation may include idea-notes, concept-notes, technical report, pilot testing report, experimental data
+          paper, newsletter, etc. It may be project reports, scientific publications, book chapters, communication
+          materials that provide evidence of the current development/ maturity stage of the innovation.
+        </p>
+      </div>
+
+      <textarea rows="4" placeholder="Explain the use of this innovation at this level"></textarea>
+    </div>
+  </body>
+</html>

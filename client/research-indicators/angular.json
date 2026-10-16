@@ -37,7 +37,8 @@
               "src/styles/colors.scss",
               "src/styles/font.scss",
               "src/styles/custom-fields.scss",
-              "src/styles/custom-prime-force-styles.scss"
+              "src/styles/custom-prime-force-styles.scss",
+              "src/styles/responsive-size.scss"
             ],
             "scripts": [
               "./public/go/wasm_exec.js"

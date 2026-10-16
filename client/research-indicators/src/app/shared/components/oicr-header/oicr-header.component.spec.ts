@@ -1,7 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Component, Input } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { DatePipe } from '@angular/common';
+import { ButtonModule } from 'primeng/button';
 import { OicrHeaderComponent } from './oicr-header.component';
 import { OicrHeaderData } from '@shared/interfaces/oicr-header-data.interface';
 import { SubmissionService } from '@shared/services/submission.service';
+import { CustomTagComponent } from '../custom-tag/custom-tag.component';
+import { OicrWorkflowStatusComponent } from '../oicr-workflow-status/oicr-workflow-status.component';
+import { CacheService } from '@services/cache/cache.service';
+
+/** Stands in for the real download button so the header's own template can render. */
+@Component({ selector: 'app-download-oicr-template', standalone: true, template: '' })
+class StubDownloadOicrTemplateComponent {
+  @Input() onlyIcon = false;
+}
 
 describe('OicrHeaderComponent', () => {
   let component: OicrHeaderComponent;
@@ -240,6 +253,7 @@ describe('OicrHeaderComponent', () => {
       component.cgspaceLink = 'https://hdl.handle.net/10568/182058';
       fixture.detectChanges();
       expect(component.showHandleLinkButton()).toBe(true);
+      expect(component.canDownloadTemplate()).toBe(false);
       expect(component.showDownloadTemplate()).toBe(false);
     });
 
@@ -249,6 +263,8 @@ describe('OicrHeaderComponent', () => {
       component.cgspaceLink = 'https://hdl.handle.net/10568/182058';
       fixture.detectChanges();
       expect(component.showHandleLinkButton()).toBe(false);
+      expect(component.canDownloadTemplate()).toBe(true);
+      // No portfolio in the cache, so the Portfolio 2 rule does not apply.
       expect(component.showDownloadTemplate()).toBe(true);
     });
 
@@ -258,7 +274,33 @@ describe('OicrHeaderComponent', () => {
       component.cgspaceLink = null;
       fixture.detectChanges();
       expect(component.showHandleLinkButton()).toBe(false);
+      expect(component.canDownloadTemplate()).toBe(false);
       expect(component.showDownloadTemplate()).toBe(false);
+    });
+
+    it('hides the download for a Portfolio 2 OICR, in every status the rule would allow', () => {
+      const cache = TestBed.inject(CacheService);
+      cache.currentMetadata.set({ portfolio: { id: 2 } });
+
+      for (const statusId of ['10', '11', '12', '13']) {
+        component.showDownload = true;
+        component.data = { status_id: statusId } as OicrHeaderData;
+        fixture.detectChanges();
+        expect(component.canDownloadTemplate()).toBe(true);
+        expect(component.isTemplateDownloadHidden()).toBe(true);
+        expect(component.showDownloadTemplate()).toBe(false);
+      }
+    });
+
+    it('keeps the download for a Portfolio 1 OICR', () => {
+      const cache = TestBed.inject(CacheService);
+      cache.currentMetadata.set({ portfolio: { id: 1 } });
+      component.showDownload = true;
+      component.data = { status_id: '11' } as OicrHeaderData;
+      fixture.detectChanges();
+
+      expect(component.isTemplateDownloadHidden()).toBe(false);
+      expect(component.showDownloadTemplate()).toBe(true);
     });
 
     it('openHandleLink should open cgspace link in a new tab', () => {
@@ -291,4 +333,66 @@ describe('OicrHeaderComponent', () => {
   });
 });
 
+/**
+ * The button is temporarily hidden (DOWNLOAD_TEMPLATE_VISIBLE). These render the header's
+ * REAL template — the suite above replaces it with '<div></div>', which cannot prove
+ * anything about what the template puts on the page.
+ */
+describe('OicrHeaderComponent — Download OICR Template button visibility', () => {
+  let fixture: ComponentFixture<OicrHeaderComponent>;
+  let component: OicrHeaderComponent;
 
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [OicrHeaderComponent],
+      providers: [{ provide: SubmissionService, useValue: { getStatusNameById: jest.fn() } }]
+    })
+      .overrideComponent(OicrHeaderComponent, {
+        set: {
+          imports: [
+            DatePipe,
+            ButtonModule,
+            StubDownloadOicrTemplateComponent,
+            CustomTagComponent,
+            OicrWorkflowStatusComponent
+          ]
+        }
+      })
+      .compileComponents();
+
+    fixture = TestBed.createComponent(OicrHeaderComponent);
+    component = fixture.componentInstance;
+  });
+
+  const downloadButtons = () => fixture.debugElement.queryAll(By.directive(StubDownloadOicrTemplateComponent));
+
+  it('renders no app-download-oicr-template for a Portfolio 2 OICR', () => {
+    TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 2 } });
+    component.showDownload = true;
+    component.data = { status_id: '11' } as OicrHeaderData;
+    fixture.detectChanges();
+
+    expect(component.canDownloadTemplate()).toBe(true);
+    expect(downloadButtons().length).toBe(0);
+  });
+
+  it('still renders app-download-oicr-template for a Portfolio 1 OICR', () => {
+    TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 1 } });
+    component.showDownload = true;
+    component.data = { status_id: '11' } as OicrHeaderData;
+    fixture.detectChanges();
+
+    expect(downloadButtons().length).toBeGreaterThan(0);
+  });
+
+  it('still renders the CGSpace link button for a published Portfolio 2 OICR', () => {
+    TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 2 } });
+    component.showDownload = true;
+    component.data = { status_id: '14' } as OicrHeaderData;
+    component.cgspaceLink = 'https://hdl.handle.net/10568/182058';
+    fixture.detectChanges();
+
+    expect(downloadButtons().length).toBe(0);
+    expect(fixture.nativeElement.textContent).toContain('CGSpace link');
+  });
+});

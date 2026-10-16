@@ -298,6 +298,7 @@ describe('T-13 — Bilateral primary/contributing SP: PATCH -> read-back integra
       science_programs: codes.map((code) => ({
         code,
         name: `name-${code}`,
+        mapping_status: 'Confirmed',
         category: 'cat',
         color: null,
         icon_key: null,

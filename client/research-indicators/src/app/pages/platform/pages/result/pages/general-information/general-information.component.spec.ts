@@ -145,6 +145,73 @@ describe('GeneralInformationComponent', () => {
     expect((getResultsService as any).updateList).toHaveBeenCalled();
   });
 
+  // --- Pool Funding sidebar visibility refresh -------------------------------
+  // The reporting year is edited HERE, and it gates the sidebar's Pool Funding
+  // block through the server-computed `version_locked`. Nothing else re-fetches
+  // the alignment on a section save, so without this call the block keeps its
+  // pre-save visibility until a full page reload.
+
+  const arrangeSuccessfulSave = () => {
+    const mockData: GeneralInformation = {
+      title: 'Test Title',
+      description: 'Test Description',
+      year: '2025',
+      keywords: ['test'],
+      user_id: '1',
+      main_contact_person: { user_id: '1' }
+    };
+    component.body.set(mockData);
+    (submissionService as any).isEditableStatus = jest.fn().mockReturnValue(true);
+    (cacheService as any).currentResultId = jest.fn().mockReturnValue(123);
+    (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: mockData });
+    return mockData;
+  };
+
+  it('re-reads the pool funding alignment after a successful save, so the sidebar re-evaluates visibility', async () => {
+    const mockData = arrangeSuccessfulSave();
+    (apiService as any).PATCH_GeneralInformation = jest.fn().mockResolvedValue({
+      successfulRequest: true,
+      status: 200,
+      data: mockData
+    });
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).toHaveBeenCalledWith('123');
+  });
+
+  it('does NOT re-read the pool funding alignment when the save failed', async () => {
+    arrangeSuccessfulSave();
+    (apiService as any).PATCH_GeneralInformation = jest.fn().mockResolvedValue({
+      successfulRequest: false,
+      status: 500,
+      errorDetail: { detail: 'boom' }
+    });
+    const getAlignment = jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+
+    await component.saveData();
+
+    expect(getAlignment).not.toHaveBeenCalled();
+  });
+
+  it('still reports the save as successful when the alignment refresh throws', async () => {
+    const mockData = arrangeSuccessfulSave();
+    (apiService as any).PATCH_GeneralInformation = jest.fn().mockResolvedValue({
+      successfulRequest: true,
+      status: 200,
+      data: mockData
+    });
+    jest.spyOn(component.bilateralService, 'getAlignment').mockRejectedValue(new Error('network'));
+
+    // A refresh failure must not turn a successful save into a rejected promise
+    // or an error toast -- the save already committed on the server.
+    await expect(component.saveData()).resolves.toBeUndefined();
+    expect((actionsService as any).showToast).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'success' })
+    );
+  });
+
   it('should not call PATCH_GeneralInformation if not editable', async () => {
     (submissionService as any).isEditableStatus = jest.fn().mockReturnValue(false);
     (apiService as any).PATCH_GeneralInformation = jest.fn().mockResolvedValue({

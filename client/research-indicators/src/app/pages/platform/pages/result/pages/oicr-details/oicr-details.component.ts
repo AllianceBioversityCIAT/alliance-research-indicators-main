@@ -10,7 +10,7 @@ import { FormHeaderComponent } from '@shared/components/form-header/form-header.
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { OicrFormFieldsComponent } from '@shared/components/custom-fields/oicr-form-fields/oicr-form-fields.component';
 import { PatchOicr, QuantificationPayload } from '@shared/interfaces/oicr-creation.interface';
-import { QuantificationItemComponent, QuantificationItemData } from './components/quantification-item/quantification-item.component';
+import { QuantificationItemComponent, QuantificationItemData } from '@components/quantification-item/quantification-item.component';
 import { CheckboxModule } from 'primeng/checkbox';
 import { AccordionModule } from 'primeng/accordion';
 import { AuthorsContactPersonsTableComponent } from './components/authors-contact-persons-table/authors-contact-persons-table.component';
@@ -22,6 +22,17 @@ import { ImpactAreasComponent } from './components/impact-areas/impact-areas.com
 import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { ServiceLocatorService } from '@shared/services/service-locator.service';
+import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
+
+// OICR quantification number field bounds — mirrors Innovation Use's signed-decimal
+// extension (2026-09-24). Scale 4 matches the `DECIMAL(24,4)` column; max/min are
+// derived from the scale so they cannot drift apart.
+const OICR_QUANTIFICATION_SCALE = 4;
+const OICR_QUANTIFICATION_MAX = deriveMaxForScale(OICR_QUANTIFICATION_SCALE);
+const OICR_QUANTIFICATION_MIN = -OICR_QUANTIFICATION_MAX;
+/** Placeholder copy for OICR Number fields — signed values are allowed. */
+const OICR_QUANTIFICATION_PLACEHOLDER = 'Enter a number';
+
 
 @Component({
   selector: 'app-oicr-details',
@@ -45,6 +56,13 @@ export default class OicrDetailsComponent {
     for_external_use: false,
     for_external_use_description: ''
   });
+
+  // OICR quantification number field config — exposed as readonly properties so
+  // the template can bind them; values come from the module-level constants above.
+  readonly oicrQuantificationMin = OICR_QUANTIFICATION_MIN;
+  readonly oicrQuantificationMax = OICR_QUANTIFICATION_MAX;
+  readonly oicrQuantificationScale = OICR_QUANTIFICATION_SCALE;
+  readonly oicrQuantificationPlaceholder = OICR_QUANTIFICATION_PLACEHOLDER;
 
   quantifications = signal<QuantificationItemData[]>([]);
   extrapolatedEstimates = signal<QuantificationItemData[]>([]);

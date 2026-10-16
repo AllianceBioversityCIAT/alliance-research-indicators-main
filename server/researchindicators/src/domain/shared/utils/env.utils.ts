@@ -1,3 +1,5 @@
+import { parseAcceptedSpStatuses } from '../../entities/bilateral/utils/sp-mapping.predicate';
+
 export class ENV {
   static get IS_PRODUCTION(): boolean {
     return ENV.validateEnvBoolean(process.env.ARI_IS_PRODUCTION);
@@ -36,6 +38,19 @@ export class ENV {
   }
 
   /**
+   * @sdd-spec bugfix/pool-funding-sp-picker-empty — T-02 / R-PSP-001 / D-PSP-2 / D-PSP-3 / K-005
+   *
+   * Accepted CLARISA mapping statuses for Science Programs in the bilateral
+   * picker and ToC catalog. Single-source default `Confirmed,Pending` derived
+   * from DEFAULT_ACCEPTED_SP_STATUSES in sp-mapping.predicate.ts.
+   */
+  static get BILATERAL_ACCEPTED_SP_STATUSES(): Set<string> {
+    return parseAcceptedSpStatuses(
+      process.env.ARI_BILATERAL_ACCEPTED_SP_STATUSES,
+    );
+  }
+
+  /**
    * @sdd-spec bugfix/bilateral-alliance-selector — T-02 / R-BAS-003
    *
    * Fallback phase for CLARISA project mapping when app_config has no value.
@@ -68,6 +83,24 @@ export class ENV {
    */
   static get TOC_INTEGRATION_HOST(): string {
     return process.env.ARI_TOC_INTEGRATION_HOST?.trim() || '';
+  }
+
+  /**
+   * Reporting year sent to the lambda-toc catalog as `?year=`.
+   *
+   * A variable rather than a constant on purpose: the reporting year rolls, and
+   * nothing else in STAR holds it — there is no app_config row and no ENV var for
+   * the PRMS reporting year (verified against the Dev database 2026-09-21;
+   * `ARI_CLARISA_PROJECTS_PHASE` is the CLARISA project phase, a different thing,
+   * and every `report_years` row is `is_active = 1`, so that flag is a
+   * soft-delete, not a window).
+   *
+   * Empty string when unset, mirroring the hosts above. `TocIntegrationService`
+   * then OMITS the query param rather than sending `year=`, so an unset value
+   * leaves the upstream call exactly as it was before this parameter existed.
+   */
+  static get PRMS_SYNC_YEAR(): string {
+    return process.env.ARI_PRMS_SYNC?.trim() || '';
   }
 
   /**

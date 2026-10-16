@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between w-full">
       <label class="label inline-block flex items-center" for="username">
         {{ label }}
-        @if (isRequired) {
+        @if (isRequired || requiredMode !== 'off') {
           <span class="text-red-500">*</span>
         }
       </label>
@@ -27,7 +27,7 @@
           class="text-[14px]"
           [placeholder]="placeholder"
           [class]="this.inputValid().class"
-          [style]="(!this.inputValid().valid || showMaxReachedMessage()) ? { border: '2px solid #E69F00' } : {}"
+          [style]="!this.inputValid().valid || showMaxReachedMessage() ? { border: '2px solid var(--ac-warning-1)' } : {}"
           aria-describedby="username-help"
           [disabled]="disabled"
           [(ngModel)]="this.body().value"
@@ -41,32 +41,33 @@
           [autocomplete]="autoComplete"
           (ngModelChange)="setValue($event)" />
       } @else if (type === 'number') {
+        <!-- @akili-spec docs/specs/innovation-use/details-page (T-02 — maxFractionDigits passthrough) -->
         <p-inputNumber
           [min]="min"
           [max]="max"
-          class="w-full {{ isInvalid() || showMaxReachedMessage() ? 'border-2 rounded-[8px] border-[#E69F00]' : '' }}"
+          [maxFractionDigits]="maxFractionDigits"
+          class="w-full {{ isInvalid() || showMaxReachedMessage() ? 'border-2 rounded-[8px] border-[var(--ac-warning-1)]' : '' }}"
           [placeholder]="placeholder"
           [(ngModel)]="this.body().value"
           (ngModelChange)="setValue($event)"
           [disabled]="disabled"
           [showButtons]="true"
-          [style]="isInvalid() || showMaxReachedMessage() ? { border: '2px solid #E69F00 !important' } : {}"
           inputId="minmax-buttons" />
       }
       @if (helperText) {
-        <div class="flex items-center gap-1 mt-1 text-[#8D9299] text-[14px]">
+        <div class="flex items-center gap-1 mt-1 text-[var(--ac-grey-600)] text-[14px]">
           <span class="leading-4" [innerHTML]="helperText"></span>
         </div>
       }
 
       @if (!this.inputValid().valid) {
-        <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+        <div class="flex items-center gap-1 mt-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]">
           <i class="material-symbols-rounded !text-base">warning</i>
           <span>{{ this.inputValid().message }}</span>
         </div>
       }
       @if (showMaxReachedMessage()) {
-        <div class="flex items-center gap-1 mt-1 text-[#E69F00] text-sm">
+        <div class="flex items-center gap-1 mt-1 text-[var(--ac-warning-1)] fs-[14] leading-[1.25rem]">
           <i class="material-symbols-rounded !text-base">warning</i>
           <span>Maximum reached</span>
         </div>

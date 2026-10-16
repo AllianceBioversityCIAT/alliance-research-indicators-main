@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ResultInstitution } from '../../result-institutions/entities/result-institution.entity';
+import { PolicyAmountStatusEnum } from '../enum/policy-amount-status.enum';
 
 export class CreateResultPolicyChangeDto {
   @ApiProperty({
@@ -47,4 +48,22 @@ export class CreateResultPolicyChangeDto {
     type: Number,
   })
   public innovation_use: number;
+
+  @ApiPropertyOptional({
+    name: 'usd_amount',
+    description:
+      'USD amount for Program, Budget, or Investment. Zero is valid. Completeness is enforced by the green check, not by save.',
+    example: 0,
+    type: Number,
+  })
+  public usd_amount?: number | null;
+
+  @ApiPropertyOptional({
+    name: 'amount_status',
+    description:
+      'Amount status for Program, Budget, or Investment. Completeness is enforced by the green check, not by save.',
+    enum: PolicyAmountStatusEnum,
+    example: PolicyAmountStatusEnum.ESTIMATED,
+  })
+  public amount_status?: PolicyAmountStatusEnum | string | null;
 }

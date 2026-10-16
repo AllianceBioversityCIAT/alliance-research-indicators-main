@@ -85,11 +85,62 @@ describe('ResultStatusWorkflowRepository', () => {
     expect(generalData.customData.url).toContain('/result/STAR-55/');
   });
 
-  it('isPi returns boolean from query length', async () => {
+  // @akili-spec docs/specs/changes/my-pi-delegates — T-09
+  // ─── isPi() — original behaviour (unchanged; NFR-PID-002) ────────────────
+
+  it('isPi returns true when the PI query returns a row (R-PID-002 AC.1)', async () => {
     dataSourceQueryMock.mockResolvedValueOnce([{ sec_user_id: 1 }]);
-    await expect(repository.isPi(1, 2)).resolves.toBe(true);
+    await expect(repository.isPi(10, 1)).resolves.toBe(true);
+  });
+
+  it('isPi returns false when neither PI query nor delegate query returns a row (R-PID-002 AC.3)', async () => {
+    // first call = PI query → empty; second call = delegate query → empty
+    dataSourceQueryMock.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    await expect(repository.isPi(10, 999)).resolves.toBe(false);
+  });
+
+  // ─── isPi() — delegate-fallback cases (T-07 / R-PID-002 AC.2) ────────────
+
+  // Scenario 1 (AC from R-PID-002 AC.1): PI → true AND pi_delegates NOT queried
+  // The PI query returns a row → dataSource.query must be called exactly once.
+  it('Sc-1: isPi — PI returns a row → true; dataSource.query called exactly ONCE (pi_delegates NOT queried)', async () => {
+    dataSourceQueryMock.mockResolvedValueOnce([{ sec_user_id: 10 }]);
+    const result = await repository.isPi(11, 10);
+    expect(result).toBe(true);
+    expect(dataSourceQueryMock).toHaveBeenCalledTimes(1);
+  });
+
+  // Scenario 2 (R-PID-002 AC.2): active delegate of the result's project → true
+  it('Sc-2: isPi — delegate of the result project → true (PI query empty, delegate query returns a row)', async () => {
+    // PI query → empty (user is not the PI)
     dataSourceQueryMock.mockResolvedValueOnce([]);
-    await expect(repository.isPi(1, 2)).resolves.toBe(false);
+    // delegate query → returns a row (user is an active delegate of this result's project)
+    dataSourceQueryMock.mockResolvedValueOnce([{ 1: 1 }]);
+    const result = await repository.isPi(12, 20);
+    expect(result).toBe(true);
+  });
+
+  // Scenario 3 (R-PID-002 AC.3): neither PI nor delegate → false
+  it('Sc-3: isPi — neither PI nor delegate → false', async () => {
+    dataSourceQueryMock.mockResolvedValueOnce([]); // PI query → empty
+    dataSourceQueryMock.mockResolvedValueOnce([]); // delegate query → empty
+    const result = await repository.isPi(13, 30);
+    expect(result).toBe(false);
+  });
+
+  // Scenario 10 (R-PID-002 AC.4): delegate of a DIFFERENT project → false (no cross-project leak)
+  // Discriminating: the delegate's projectId (in pi_delegates) differs from the
+  // result's primary project (resolved via result_contracts → agresso_contracts).
+  // The delegate query is scoped to the result's project — a delegate of project B
+  // cannot see a result belonging to project A.
+  it('Sc-10: isPi — delegate of a DIFFERENT project → false (no cross-project leak)', async () => {
+    // PI query → empty (user is not the PI of result 14's project)
+    dataSourceQueryMock.mockResolvedValueOnce([]);
+    // Delegate query is result-scoped; this user has NO row for result 14's project,
+    // even though they ARE a delegate of a different project → empty
+    dataSourceQueryMock.mockResolvedValueOnce([]);
+    const result = await repository.isPi(14, 40);
+    expect(result).toBe(false);
   });
 
   it('getOicrGeneralData merges query row into generalData', async () => {

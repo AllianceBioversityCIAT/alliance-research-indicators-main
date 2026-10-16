@@ -53,10 +53,15 @@ describe('TocIntegrationService', () => {
   let service: TocIntegrationService;
   let httpGet: jest.Mock;
   const originalHost = process.env.ARI_TOC_INTEGRATION_HOST;
+  const originalYear = process.env.ARI_PRMS_SYNC;
 
   beforeEach(async () => {
     process.env.ARI_TOC_INTEGRATION_HOST =
       'https://lambda-toc.clarisa.cgiar.org';
+    // Cleared EXPLICITLY. The URL assertions below expect no `?year=`, and
+    // without this they would pass only because the variable happens to be unset
+    // in this runner -- a machine or CI step that exports it would flip them.
+    delete process.env.ARI_PRMS_SYNC;
     httpGet = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -73,6 +78,11 @@ describe('TocIntegrationService', () => {
     jest.clearAllMocks();
     jest.useRealTimers();
     process.env.ARI_TOC_INTEGRATION_HOST = originalHost;
+    if (originalYear === undefined) {
+      delete process.env.ARI_PRMS_SYNC;
+    } else {
+      process.env.ARI_PRMS_SYNC = originalYear;
+    }
   });
 
   describe('getTocResults', () => {
@@ -90,6 +100,53 @@ describe('TocIntegrationService', () => {
       expect(out).toHaveLength(1);
       expect(out[0].toc_result_id).toBe(5187);
       expect(out[0].indicators[0].unit_messurament).toBe('Number');
+    });
+
+    // --- `?year=` from ARI_PRMS_SYNC (2026-09-21) ---------------------------
+    // The reporting year is held nowhere else in STAR: no app_config row, no other
+    // ENV var, and every report_years row is is_active = 1 (verified against the
+    // Dev database), so it had to become a variable of its own.
+
+    it('appends ?year= from ARI_PRMS_SYNC when it is set', async () => {
+      process.env.ARI_PRMS_SYNC = '2026';
+      httpGet.mockReturnValueOnce(
+        of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
+      );
+
+      await service.getTocResults('SP01', 'OUTPUT');
+
+      expect(httpGet).toHaveBeenCalledWith(
+        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01?year=2026',
+      );
+    });
+
+    it('OMITS the param entirely when ARI_PRMS_SYNC is unset -- never sends `year=`', async () => {
+      // An empty `year=` is a different request from no `year` at all, and the
+      // upstream is entitled to treat it differently. Unset must leave the URL
+      // byte-identical to what it was before this parameter existed.
+      delete process.env.ARI_PRMS_SYNC;
+      httpGet.mockReturnValueOnce(
+        of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
+      );
+
+      await service.getTocResults('SP01', 'OUTPUT');
+
+      const calledWith = httpGet.mock.calls[0][0] as string;
+      expect(calledWith).not.toContain('year');
+      expect(calledWith).toBe(
+        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01',
+      );
+    });
+
+    it('omits the param when ARI_PRMS_SYNC is blank or whitespace', async () => {
+      process.env.ARI_PRMS_SYNC = '   ';
+      httpGet.mockReturnValueOnce(
+        of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
+      );
+
+      await service.getTocResults('SP01', 'OUTPUT');
+
+      expect(httpGet.mock.calls[0][0]).not.toContain('year');
     });
 
     it('serves from cache within TTL and refetches after TTL expiry (fake timers)', async () => {

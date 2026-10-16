@@ -4,14 +4,31 @@ import { inject } from '@angular/core';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
+import { ImpersonationService } from '../services/impersonation.service';
 import { PostError } from '../interfaces/post-error.interface';
 import { Router } from '@angular/router';
+
+// @akili-spec changes/profile-simulation
+/** Server-set on any response that rejects an impersonation session (design §4/§5). */
+const IMPERSONATION_ERROR_HEADER = 'X-Impersonation-Error';
+/** First human-readable message an error envelope offers, never blank. */
+const errorDetailMessage = (error: HttpErrorResponse): string => {
+  const body = error.error as { errors?: unknown; description?: unknown } | null | undefined;
+  const candidates = [body?.errors, body?.description, error.message];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim() !== '') {
+      return candidate;
+    }
+  }
+  return 'Something went wrong, please try again.';
+};
 
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const actions = inject(ActionsService);
   const cache = inject(CacheService);
   const api = inject(ApiService);
   const router = inject(Router);
+  const impersonation = inject(ImpersonationService);
 
   // Skip timeout check for error endpoint to avoid infinite loop
   if (req.url.includes('ciat-errors.yecksin.workers.dev')) {
@@ -54,14 +71,47 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // Send error to tracking endpoint
         from(api.saveErrors(errorObj)).subscribe();
 
-        const isAiFormalizeError =
-          error.status === 502 && req.url.includes('results/ai/formalize');
+        // R-IMP-010 AC.3: only X-Impersonation-Error === 'SESSION_INVALID' auto-ends the
+        // simulation locally, with exactly ONE toast, suppressing the generic error toast
+        // (design §2.2). Other values (e.g. 'NESTED') suppress the generic toast but do
+        // NOT end the session — this branch only reacts to SESSION_INVALID.
+        const impersonationErrorValue = error.headers?.get(IMPERSONATION_ERROR_HEADER);
+        if (impersonationErrorValue === 'SESSION_INVALID') {
+          // Toast burst: short-circuit if a concurrent 403 already ended the session, so
+          // N concurrent SESSION_INVALID responses produce exactly one end + one toast.
+          if (impersonation.active()) {
+            from(impersonation.end('server-invalid'))
+              .subscribe({
+                next: () => {
+                  actions.showToast({ severity: 'warning', summary: 'Simulation expired', detail: 'Simulation expired' });
+                },
+                error: (endError: unknown) => {
+                  console.error('Failed to end impersonation session after SESSION_INVALID', endError);
+                }
+              });
+          }
+          return throwError(() => error);
+        }
+        if (impersonationErrorValue) {
+          // Non-SESSION_INVALID values (e.g. NESTED): suppress the generic toast, no end.
+          return throwError(() => error);
+        }
 
-        const isPoolFundingTagValidationError =
-          error.status === 400 && req.url.includes('/pool-funding-tag');
+        
+        const isAiFormalizeError = error.status === 502 && req.url.includes('results/ai/formalize');
 
-        const isPoolFundingAlignmentValidationError =
-          error.status === 400 && req.url.includes('/pool-funding-alignment');
+        const isPoolFundingTagValidationError = error.status === 400 && req.url.includes('/pool-funding-tag');
+
+        const isPoolFundingAlignmentValidationError = error.status === 400 && req.url.includes('/pool-funding-alignment');
+
+        // The PRMS sync endpoint owns its own error UX: `result-sidebar` shows a
+        // friendly modal for EVERY failure. Without this the interceptor stacked a
+        // second, technical toast on top of that modal.
+        // Suppressed by URL alone, not by status, deliberately: the component
+        // handles the whole failure surface (422 refused/rejected, 502/503
+        // transport), so any status-narrowing here would let one of them leak a
+        // toast back. 401 and 409 are already excluded globally below.
+        const isPrmsSyncError = req.url.includes('/prms-sync');
 
         if (
           cache.isLoggedIn() &&
@@ -70,9 +120,20 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !req.url.includes('refresh-token') &&
           !isAiFormalizeError &&
           !isPoolFundingTagValidationError &&
-          !isPoolFundingAlignmentValidationError
+          !isPoolFundingAlignmentValidationError &&
+          !isPrmsSyncError
         ) {
-          actions.showToast({ detail: error.error.errors, severity: 'error', summary: 'Error' });
+          // `error.error.errors` alone silently produced a blank toast for every
+          // endpoint whose envelope carries `description` instead of `errors`
+          // (measured 2026-09-16: the PRMS sync 502/503 bodies have no `errors`
+          // key at all), and it THREW a TypeError inside this catchError whenever
+          // a true network failure left `error.error` null — losing the message
+          // entirely, which is the worst case: a failed request that looks silent.
+          actions.showToast({
+            detail: errorDetailMessage(error),
+            severity: 'error',
+            summary: 'Error'
+          });
         }
 
         return throwError(() => error);

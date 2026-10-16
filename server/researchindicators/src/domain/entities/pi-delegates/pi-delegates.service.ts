@@ -1,0 +1,1056 @@
+// @akili-spec docs/specs/changes/my-pi-delegates — T-17/T-19/T-20
+//
+// Service contract (design.md §11.3 / requirements.md §12):
+//
+//   assign()     — R-PID-011 (per-project sync, Model B) + R-PID-012 (history).
+//                  Wraps ALL work in ONE dataSource.transaction (R-PID-011 AC.4).
+//                  Steps inside the tx:
+//                    1. Auth per assignment.project_id (assertCanManageProject) —
+//                       fail-fast 403 (R-PID-011 AC.4).
+//                    2. Resolve + deduplicate delegates ONCE across ALL assignments
+//                       (R-PID-011 AC.4 — provision new sec_user inside the tx,
+//                        reuse across projects; DD-L).
+//                    3. PI-exclusion (isPiOfProject) per (project, delegate) pair —
+//                       fail-fast BadRequestException (R-PID-008 / R-PID-011 AC.4).
+//                    4. Per-assignment SYNC diff:
+//                         - desired may be EMPTY → revoke-all (R-PID-011 AC.3).
+//                         - for each created delegate: insertDelegate then recordHistory('assign').
+//                         - for each revoked delegate: fetch active rows to get full context,
+//                           recordHistory('revoke') per row, then softDeleteDelegatePairs.
+//                    5. Return per-project summary { project_id, created, revoked, kept } (R-PID-011 AC.4).
+//
+//   bulkRevoke() — R-PID-010 (targeted bulk revoke, NOT a sync) + R-PID-013 (history).
+//                  Ambiguity guard: exactly one shape must be present — Shape A
+//                  (pi_delegate_ids) OR Shape B (project_ids + delegate_user_ids).
+//                  Both present, Shape B partial, or neither → BadRequestException (400).
+//                  Auth per row's/project's project_id (R-PID-010 AC.3). Transactional.
+//                  Each revoked row writes recordHistory('revoke') in the same tx (R-PID-013 AC.2).
+//
+//   list()       — unchanged from v2 (R-PID-004 AC.1).
+//   verify()     — unchanged from v2 (R-PID-004 AC.1).
+//   assertCanManageProject() — unchanged from v2 (R-PID-007).
+//
+// Authorization contract (R-PID-007 / DD-B):
+//   Three cases decide whether a caller may manage a project's delegations:
+//     1. Platform admin — SYSTEM_ADMIN (1) or CENTER_ADMIN (9) — allowed
+//        unconditionally, via isPlatformAdmin(). Checked directly on user.roles
+//        (not via validateRoles, which throws for non-admins and would prevent
+//        the PI/delegate path from running at all).
+//     2. PI or active delegate of project_id — allowed.
+//        Checked via PiDelegatesRepository.isPiOrActiveDelegateOfProject()
+//        (agresso_contracts PI join UNION pi_delegates active row).
+//     3. Neither — ForbiddenException (403).
+//
+// Read scope (scope=all) — @akili-spec docs/specs/changes/my-pi-delegates-admin-scope:
+//   The three by-user reads and the history delegate branch accept an optional
+//   `scope`. The default, MANAGED, is the historical behaviour and is untouched.
+//   ALL drops the managed-project filter entirely — every contract, every active
+//   delegation, the delegate's full history — and is gated by assertAdminScope(),
+//   so a non-admin asking for it gets a 403 rather than a widened result set.
+//
+// pi_user_id removed (redundant with created_by) — Product decision 2026-09-11
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { DataSource, EntityManager, In } from 'typeorm';
+import { PiDelegatesRepository } from './repositories/pi-delegates.repository';
+import { DelegateInput } from './repositories/pi-delegates.repository';
+import { VerifyPiDelegateDto } from './dto/verify-pi-delegate.dto';
+import {
+  BulkAssignPiDelegatesDto,
+  DelegateInputDto,
+} from './dto/bulk-assign-pi-delegates.dto';
+import { BulkRevokePiDelegatesDto } from './dto/bulk-revoke-pi-delegates.dto';
+import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { PiDelegate } from './entities/pi-delegate.entity';
+import { PiDelegateHistoryActionEnum } from './enum/pi-delegate-history-action.enum';
+import {
+  ProjectDelegatesResponseDto,
+  DelegateProjectsResponseDto,
+} from './dto/pi-delegate-response.dto';
+import { PiDelegateHistoryEntryDto } from './dto/pi-delegate-history-response.dto';
+import { HistoryQueryDto } from './dto/history.query.dto';
+import { PiDelegateScopeEnum } from './enum/pi-delegate-scope.enum';
+import { UserStatusEnum } from '../users/enum/user-status.enum';
+// sec_users stores names in whatever case the source system used ("MAYESSE DA
+// SILVA", "juan cadavid"). Every name this module returns goes through
+// formatPersonName so consumers render one consistent casing.
+import { formatPersonName } from '../../shared/utils/name-format.util';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Response shapes
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Per-project sync summary returned by assign() (R-PID-011 AC.4). */
+export interface ProjectSyncSummary {
+  project_id: string;
+  created: number[];
+  revoked: number[];
+  kept: number[];
+}
+
+/** Summary returned by bulkRevoke() (R-PID-010). */
+export interface BulkRevokeSummary {
+  revoked_count: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mapping helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Maps a DelegateInputDto (DTO shape) to the repo DelegateInput union
+ * (repository shape).
+ *
+ * DelegateInputDto:  { delegate_user_id?, delegate?: { email, first_name, last_name }, carnet? }
+ * DelegateInput:     DelegateByUserId | DelegateNewUserIdentity
+ *
+ * Preference: delegate_user_id wins when present (mirrors v2 create() logic).
+ * When absent, flatten delegate + carnet into DelegateNewUserIdentity.
+ */
+function toDelegateInput(dto: DelegateInputDto): DelegateInput {
+  if (dto.delegate_user_id != null) {
+    return { delegate_user_id: dto.delegate_user_id };
+  }
+  // delegate must be present (DTO validation guarantees at least one).
+  return {
+    email: dto.delegate!.email,
+    first_name: dto.delegate!.first_name,
+    last_name: dto.delegate!.last_name,
+    carnet: dto.carnet,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Set arithmetic helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function setDifference(a: Set<number>, b: Set<number>): number[] {
+  return [...a].filter((x) => !b.has(x));
+}
+
+function setIntersection(a: Set<number>, b: Set<number>): number[] {
+  return [...a].filter((x) => b.has(x));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Service
+// ─────────────────────────────────────────────────────────────────────────────
+
+@Injectable()
+export class PiDelegatesService {
+  constructor(
+    private readonly piDelegatesRepository: PiDelegatesRepository,
+    private readonly currentUserUtil: CurrentUserUtil,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Authorization helper
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope — admin scope=all
+  /**
+   * True when the caller holds a platform-wide administration role.
+   *
+   * SYSTEM_ADMIN and CENTER_ADMIN both administer delegations across the whole
+   * platform, so every "…or an admin" decision in this service reads from here
+   * rather than re-listing the roles — a role added to the set is added once.
+   *
+   * Tested via a direct roles-array check, never through validateRoles: that
+   * one throws for non-admins and would short-circuit the PI/delegate paths
+   * that must still be evaluated afterwards.
+   */
+  private isPlatformAdmin(): boolean {
+    const roles = this.currentUserUtil.roles ?? [];
+    return (
+      roles.includes(SecRolesEnum.SYSTEM_ADMIN) ||
+      roles.includes(SecRolesEnum.CENTER_ADMIN)
+    );
+  }
+
+  /**
+   * Gate for `scope=all`: the platform-wide read that ignores the managed-project
+   * filter entirely. Anything but an admin asking for it is a 403 — the parameter
+   * must never be able to widen an ordinary user's result set.
+   */
+  private assertAdminScope(): void {
+    if (!this.isPlatformAdmin()) {
+      throw new ForbiddenException(
+        'Access denied: scope=all is reserved for SYSTEM_ADMIN and CENTER_ADMIN.',
+      );
+    }
+  }
+
+  /**
+   * The own-or-admin gate shared by every `by-user` read: the caller may ask
+   * about themselves, and an admin may ask about anyone.
+   *
+   * @param userId  the user_id being queried
+   * @param subject what the 403 message calls the data ("managed projects", …)
+   */
+  private assertCanQueryUser(userId: number, subject: string): void {
+    const isSelf = userId === this.currentUserUtil.user_id;
+
+    if (!isSelf && !this.isPlatformAdmin()) {
+      throw new ForbiddenException(
+        `Access denied: you may only query your own ${subject}, or you must be an administrator.`,
+      );
+    }
+  }
+
+  /**
+   * Throws ForbiddenException (403) unless the current user is a platform admin
+   * or is the PI / an active delegate of the given project (R-PID-007).
+   */
+  private async assertCanManageProject(projectId: string): Promise<void> {
+    const userId = this.currentUserUtil.user_id;
+
+    // Case 1 — platform-admin bypass (SYSTEM_ADMIN or CENTER_ADMIN).
+    if (this.isPlatformAdmin()) {
+      return;
+    }
+
+    // Case 2 — PI or active delegate of the project.
+    const authorized =
+      await this.piDelegatesRepository.isPiOrActiveDelegateOfProject(
+        projectId,
+        userId,
+      );
+    if (authorized) {
+      return;
+    }
+
+    // Case 3 — Neither: 403.
+    throw new ForbiddenException(
+      'Access denied: caller is not the PI, an active delegate, or an administrator for this project.',
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // v4 — Bulk assign (per-project sync) — R-PID-011 + R-PID-012
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Bulk assign delegates to one or more projects (per-project sync / Model B).
+   *
+   * Each assignment carries its own project_id and desired delegate list (DD-L).
+   * No cross-project cartesian: each project is synced to its own list.
+   * An empty delegates list for a project revokes ALL its active delegates (R-PID-011 AC.3).
+   *
+   * Every movement (create AND revoke) writes one history row in the SAME transaction
+   * (R-PID-012 AC.3).  A rolled-back operation leaves no history rows.
+   *
+   * Everything runs in ONE transaction (R-PID-011 AC.4) — any error rolls back
+   * all projects and all history rows.
+   *
+   * Order of operations inside the transaction:
+   *   1. Auth per project — fail-fast 403 if any project is unauthorized (R-PID-011 AC.4).
+   *   2. Resolve + de-duplicate delegates ONCE across ALL assignments → Map<key, id>
+   *      (R-PID-011 AC.4 — provision new sec_user inside the tx, reuse across projects).
+   *   3. PI-exclusion — fail-fast BadRequestException for any (project, delegate)
+   *      where the delegate is the PI of that project (R-PID-008 / R-PID-011 AC.4).
+   *   4. Per-assignment SYNC diff (R-PID-011 AC.2):
+   *        - desired may be EMPTY → revoke-all (R-PID-011 AC.3).
+   *        - For each created delegate: insertDelegate → recordHistory('assign').
+   *        - For each revoked delegate: fetch active rows for full context →
+   *          recordHistory('revoke') per row → softDeleteDelegatePairs.
+   *   5. Return per-project summary (R-PID-011 AC.4).
+   *
+   * @param dto  BulkAssignPiDelegatesDto with assignments[] shape
+   * @returns    Array of ProjectSyncSummary, one entry per project assignment.
+   */
+  async assign(dto: BulkAssignPiDelegatesDto): Promise<ProjectSyncSummary[]> {
+    const callerUserId = this.currentUserUtil.user_id;
+
+    return this.dataSource.transaction(
+      async (manager: EntityManager): Promise<ProjectSyncSummary[]> => {
+        // ── Step 1: Auth per project (fail-fast) ──────────────────────────
+        for (const a of dto.assignments) {
+          await this.assertCanManageProject(a.project_id);
+        }
+
+        // ── Step 2: Resolve + de-duplicate delegates ONCE across ALL assignments ─
+        //
+        // Collect every DelegateInput from every assignment's delegates list,
+        // de-dupe by identity key (id:<uid> or email:<email>), then resolve
+        // each unique input to a sec_user_id exactly once (provision-once AC.4).
+        // The result is a Map<inputKey, delegate_user_id> for fast lookup.
+        //
+        // This prevents double-inserting the same sec_user when the same new
+        // delegate appears in multiple assignments.
+        const inputMap = new Map<string, DelegateInput>();
+        for (const a of dto.assignments) {
+          for (const dtoEntry of a.delegates) {
+            const input = toDelegateInput(dtoEntry);
+            const key =
+              'delegate_user_id' in input
+                ? `id:${input.delegate_user_id}`
+                : `email:${input.email}`;
+            if (!inputMap.has(key)) {
+              inputMap.set(key, input);
+            }
+          }
+        }
+
+        // Resolve each unique input to a sec_user_id (provisions absent users).
+        const resolvedMap = new Map<string, number>();
+        for (const [key, input] of inputMap.entries()) {
+          const resolvedId =
+            await this.piDelegatesRepository.resolveDelegateUserId(
+              input,
+              manager,
+            );
+          resolvedMap.set(key, resolvedId);
+        }
+
+        // Build a helper that converts a DelegateInputDto to its resolved id.
+        const resolveId = (dtoEntry: DelegateInputDto): number => {
+          const input = toDelegateInput(dtoEntry);
+          const key =
+            'delegate_user_id' in input
+              ? `id:${input.delegate_user_id}`
+              : `email:${input.email}`;
+          return resolvedMap.get(key)!;
+        };
+
+        // ── Step 3: PI-exclusion (fail-fast) — R-PID-008 / R-PID-011 AC.4 ─
+        for (const a of dto.assignments) {
+          // Compute this assignment's resolved delegate ids.
+          const assignmentResolvedIds = [
+            ...new Set(a.delegates.map(resolveId)),
+          ];
+          for (const delegateUserId of assignmentResolvedIds) {
+            const isPI = await this.piDelegatesRepository.isPiOfProject(
+              a.project_id,
+              delegateUserId,
+            );
+            if (isPI) {
+              throw new BadRequestException(
+                `PI-exclusion violation: user ${delegateUserId} is the PI of project "${a.project_id}" and cannot be a delegate of the same project (R-PID-008).`,
+              );
+            }
+          }
+        }
+
+        // ── Step 4: Per-assignment SYNC diff (R-PID-011 AC.2) + History ──
+        const summaries: ProjectSyncSummary[] = [];
+
+        for (const a of dto.assignments) {
+          // Desired set for THIS assignment (may be EMPTY → revoke-all AC.3).
+          const desiredIds = [...new Set(a.delegates.map(resolveId))];
+          const desiredSet = new Set<number>(desiredIds);
+
+          // Current active set for this project (read inside the tx).
+          const currentIds =
+            await this.piDelegatesRepository.listActiveDelegateUserIds(
+              a.project_id,
+              manager,
+            );
+          const currentSet = new Set<number>(currentIds);
+
+          const toCreate = setDifference(desiredSet, currentSet);
+          const toRevoke = setDifference(currentSet, desiredSet);
+          const kept = setIntersection(desiredSet, currentSet);
+
+          // ── Creates: insertDelegate → recordHistory('assign') ──────────
+          for (const delegateUserId of toCreate) {
+            const row = await this.piDelegatesRepository.insertDelegate(
+              a.project_id,
+              delegateUserId,
+              callerUserId,
+              manager,
+            );
+            await this.piDelegatesRepository.recordHistory(
+              {
+                pi_delegate_id: row.pi_delegate_id,
+                project_id: a.project_id,
+                delegate_user_id: delegateUserId,
+                action: PiDelegateHistoryActionEnum.ASSIGN,
+              },
+              callerUserId,
+              manager,
+            );
+          }
+
+          // ── Revokes: fetch row context → recordHistory('revoke') → soft-delete ─
+          //
+          // softDeleteDelegatePairs only needs delegate_user_ids, but history
+          // requires the full row context (pi_delegate_id, delegate_user_id).
+          // Fetch the active rows BEFORE deleting to capture that context.
+          if (toRevoke.length > 0) {
+            const rowsToRevoke = await manager.getRepository(PiDelegate).find({
+              where: {
+                project_id: a.project_id,
+                delegate_user_id: In([...toRevoke]),
+                is_active: true,
+              },
+            });
+
+            for (const revokedRow of rowsToRevoke) {
+              await this.piDelegatesRepository.recordHistory(
+                {
+                  pi_delegate_id: revokedRow.pi_delegate_id,
+                  project_id: revokedRow.project_id,
+                  delegate_user_id: revokedRow.delegate_user_id,
+                  action: PiDelegateHistoryActionEnum.REVOKE,
+                },
+                callerUserId,
+                manager,
+              );
+            }
+
+            await this.piDelegatesRepository.softDeleteDelegatePairs(
+              a.project_id,
+              toRevoke,
+              callerUserId,
+              manager,
+            );
+          }
+
+          summaries.push({
+            project_id: a.project_id,
+            created: toCreate,
+            revoked: toRevoke,
+            kept,
+          });
+        }
+
+        return summaries;
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // v3/v4 — Bulk targeted revoke — R-PID-010 + R-PID-013
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Bulk targeted revoke (NOT a sync — does NOT touch delegations not named).
+   *
+   * Accepts exactly ONE complete shape:
+   *   Shape A — { pi_delegate_ids: number[] }
+   *   Shape B — { project_ids: string[], delegate_user_ids: number[] }
+   *
+   * Ambiguity guard (before any DB work):
+   *   Both shapes present         → 400 (ambiguous payload).
+   *   Shape B with only one field → 400 (incomplete Shape B).
+   *   Neither shape present       → 400 (no targets named; DTO validation
+   *                                       normally catches this first, but guard
+   *                                       also fires for safety).
+   *
+   * Auth is enforced per each row's project_id (R-PID-007 / R-PID-010 AC.3).
+   * Every revoked row records a 'revoke' history row in the same tx (R-PID-013 AC.2).
+   * All writes run in one transaction.
+   *
+   * @param dto  BulkRevokePiDelegatesDto
+   * @returns    BulkRevokeSummary { revoked_count }
+   */
+  async bulkRevoke(dto: BulkRevokePiDelegatesDto): Promise<BulkRevokeSummary> {
+    const callerUserId = this.currentUserUtil.user_id;
+
+    // ── Ambiguity guard ───────────────────────────────────────────────────
+    const hasShapeA =
+      dto.pi_delegate_ids != null && dto.pi_delegate_ids.length > 0;
+    const hasProjectIds = dto.project_ids != null && dto.project_ids.length > 0;
+    const hasDelegateUserIds =
+      dto.delegate_user_ids != null && dto.delegate_user_ids.length > 0;
+    const hasShapeB = hasProjectIds && hasDelegateUserIds;
+    const hasPartialShapeB = hasProjectIds !== hasDelegateUserIds; // XOR
+
+    if (hasShapeA && (hasProjectIds || hasDelegateUserIds)) {
+      throw new BadRequestException(
+        'Ambiguous payload: provide either pi_delegate_ids (Shape A) OR (project_ids + delegate_user_ids) (Shape B) — not both.',
+      );
+    }
+
+    if (hasPartialShapeB) {
+      throw new BadRequestException(
+        'Incomplete Shape B: both project_ids and delegate_user_ids must be provided together.',
+      );
+    }
+
+    if (!hasShapeA && !hasShapeB) {
+      throw new BadRequestException(
+        'No revoke targets: provide pi_delegate_ids (Shape A) OR (project_ids + delegate_user_ids) (Shape B).',
+      );
+    }
+
+    // ── Transaction ───────────────────────────────────────────────────────
+    return this.dataSource.transaction(
+      async (manager: EntityManager): Promise<BulkRevokeSummary> => {
+        let totalRevoked = 0;
+
+        if (hasShapeA) {
+          // ── Shape A: revoke by primary key ─────────────────────────────
+          //
+          // Resolve each row to obtain its project_id, then authorize.
+          // Fetch full row context so history can be written (R-PID-013 AC.2).
+          // Rows that are already revoked or not found are skipped (no error).
+          const idsToRevoke: number[] = [];
+
+          for (const piDelegateId of dto.pi_delegate_ids!) {
+            const row = await this.piDelegatesRepository.findOne({
+              where: { pi_delegate_id: piDelegateId, is_active: true },
+            });
+
+            if (!row) {
+              // Already revoked or never existed — skip silently.
+              continue;
+            }
+
+            await this.assertCanManageProject(row.project_id);
+
+            // Write history before the soft-delete (R-PID-013 AC.2 / R-PID-012 AC.3).
+            await this.piDelegatesRepository.recordHistory(
+              {
+                pi_delegate_id: row.pi_delegate_id,
+                project_id: row.project_id,
+                delegate_user_id: row.delegate_user_id,
+                action: PiDelegateHistoryActionEnum.REVOKE,
+              },
+              callerUserId,
+              manager,
+            );
+
+            idsToRevoke.push(piDelegateId);
+          }
+
+          if (idsToRevoke.length > 0) {
+            totalRevoked =
+              await this.piDelegatesRepository.softDeleteDelegateIds(
+                idsToRevoke,
+                callerUserId,
+                manager,
+              );
+          }
+        } else {
+          // ── Shape B: revoke by (project × delegate) pairs ──────────────
+          //
+          // Fetch full row context per project before soft-deleting so history
+          // can be written with pi_delegate_id and delegate_user_id (R-PID-013 AC.2).
+          for (const projectId of dto.project_ids!) {
+            await this.assertCanManageProject(projectId);
+
+            // Fetch the active rows to revoke for history context.
+            const rowsToRevoke = await manager.getRepository(PiDelegate).find({
+              where: {
+                project_id: projectId,
+                delegate_user_id: In(dto.delegate_user_ids!),
+                is_active: true,
+              },
+            });
+
+            for (const revokedRow of rowsToRevoke) {
+              await this.piDelegatesRepository.recordHistory(
+                {
+                  pi_delegate_id: revokedRow.pi_delegate_id,
+                  project_id: revokedRow.project_id,
+                  delegate_user_id: revokedRow.delegate_user_id,
+                  action: PiDelegateHistoryActionEnum.REVOKE,
+                },
+                callerUserId,
+                manager,
+              );
+            }
+
+            const affected =
+              await this.piDelegatesRepository.softDeleteDelegatePairs(
+                projectId,
+                dto.delegate_user_ids!,
+                callerUserId,
+                manager,
+              );
+            totalRevoked += affected;
+          }
+        }
+
+        return { revoked_count: totalRevoked };
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Unchanged from v2 — R-PID-004 AC.1
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * List active delegations for a project, enriched with project + person details
+   * (GET /pi-delegates?projectId — my-pi-delegates-ui spec).
+   *
+   * Auth is enforced: only PI, active delegate, or SYSTEM_ADMIN may list
+   * (R-PID-007 / R-PID-004 AC.1).
+   *
+   * Returns a single ProjectDelegatesResponseDto that embeds:
+   *   - Project fields from agresso_contracts (project_code, project_name,
+   *     is_pool_funding_contributor, status, start_date, end_date).
+   *   - delegates[] from pi_delegates JOIN sec_users (id, name, email).
+   *
+   * @param projectId  agresso_contracts.agreement_id
+   */
+  async list(projectId: string): Promise<ProjectDelegatesResponseDto> {
+    await this.assertCanManageProject(projectId);
+
+    const [project, delegates] = await Promise.all([
+      this.piDelegatesRepository.findProjectSummary(projectId),
+      this.piDelegatesRepository.findActiveDelegatesWithUser(projectId),
+    ]);
+
+    return {
+      project_code: project?.agreement_id ?? projectId,
+      project_name: project?.description ?? null,
+      is_pool_funding_contributor: Boolean(
+        project?.is_pool_funding_contributor,
+      ),
+      pi_user_id:
+        project?.pi_user_id != null ? Number(project.pi_user_id) : null,
+      pi_name: formatPersonName(project?.pi_name) || null,
+      status: project?.contract_status ?? null,
+      start_date: project?.start_date ?? null,
+      end_date: project?.end_date ?? null,
+      delegates: delegates.map((d) => ({
+        delegate_user_id: Number(d.delegate_user_id),
+        name: formatPersonName(`${d.first_name} ${d.last_name}`),
+        email: d.email,
+        first_name: formatPersonName(d.first_name) || null,
+        last_name: formatPersonName(d.last_name) || null,
+        carnet: d.carnet ?? null,
+        status_id: d.status_id != null ? Number(d.status_id) : null,
+        is_active: [
+          UserStatusEnum.ACCEPTED,
+          UserStatusEnum.EXTERNAL_ACCEPTED,
+        ].includes(Number(d.status_id)),
+      })),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-delegate — inverse list (projects for a delegate)
+  // @akili-spec docs/specs/changes/my-pi-delegates — active_delegate_key removal + by-delegate endpoint (2026-09-11)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * List active project assignments for a delegate, enriched with person + project
+   * details (GET /pi-delegates/by-delegate — my-pi-delegates-ui spec).
+   *
+   * Authorization (own-or-admin — unchanged from v2):
+   *   - The caller may query their own delegate_user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any delegate_user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * assertCanManageProject is deliberately NOT used here — this query is
+   * cross-project; there is no single project_id to gate on.
+   *
+   * Returns a single DelegateProjectsResponseDto that embeds:
+   *   - Person fields from sec_users (delegate_user_id, name, email).
+   *   - projects[] from pi_delegates JOIN agresso_contracts
+   *     (project_code, project_name).
+   *
+   * @param delegateUserId  sec_users.sec_user_id of the delegate to query
+   */
+  async listByDelegate(
+    delegateUserId: number,
+  ): Promise<DelegateProjectsResponseDto> {
+    const callerUserId = this.currentUserUtil.user_id;
+
+    const isSelf = delegateUserId === callerUserId;
+
+    if (!isSelf && !this.isPlatformAdmin()) {
+      throw new ForbiddenException(
+        'Access denied: you may only query your own delegate assignments, or you must be an administrator.',
+      );
+    }
+
+    const [user, projects] = await Promise.all([
+      this.piDelegatesRepository.findUserSummary(delegateUserId),
+      this.piDelegatesRepository.findDelegateProjects(delegateUserId),
+    ]);
+
+    return {
+      delegate_user_id: delegateUserId,
+      name: user
+        ? formatPersonName(`${user.first_name} ${user.last_name}`) || null
+        : null,
+      email: user?.email ?? null,
+      first_name: formatPersonName(user?.first_name) || null,
+      last_name: formatPersonName(user?.last_name) || null,
+      carnet: user?.carnet ?? null,
+      status_id: user?.status_id != null ? Number(user.status_id) : null,
+      is_active: [
+        UserStatusEnum.ACCEPTED,
+        UserStatusEnum.EXTERNAL_ACCEPTED,
+      ].includes(Number(user?.status_id)),
+      projects: projects.map((p) => ({
+        project_code: p.agreement_id,
+        project_name: p.description,
+      })),
+    };
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — by-user endpoints
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/projects — projects the user manages (PI or delegate)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns all projects the given user manages — either as PI or as an active
+   * delegate — each enriched with its active delegates list.
+   *
+   * Fills the "By project" tab of the My PI Delegates UI for a whole user.
+   *
+   * Authorization (own-or-admin):
+   *   - The caller may query their own user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * @param userId  sec_users.sec_user_id of the user whose managed projects to list
+   */
+  /**
+   * Cheap membership check: does this user manage ANY project, as PI or as an
+   * active delegate? The UI hides the whole My PI Delegates module when it does
+   * not, and a boolean avoids shipping the enriched list just to ask.
+   *
+   * Authorization (own-or-admin) mirrors listManagedProjects.
+   */
+  async hasManagedProjects(
+    userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
+  ): Promise<{ has_access: boolean }> {
+    // scope=all — an admin administers every project, so the answer is yes by
+    // role alone. Counting contracts to say so would be a table scan on a
+    // question the role has already settled.
+    if (scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      return { has_access: true };
+    }
+
+    this.assertCanQueryUser(userId, 'managed projects');
+
+    const projectIds =
+      await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+    return { has_access: projectIds.length > 0 };
+  }
+
+  async listManagedProjects(
+    userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
+  ): Promise<ProjectDelegatesResponseDto[]> {
+    const isAllScope = scope === PiDelegateScopeEnum.ALL;
+
+    if (isAllScope) {
+      this.assertAdminScope();
+    } else {
+      this.assertCanQueryUser(userId, 'managed projects');
+    }
+
+    // scope=all skips findManagedProjectIds entirely: there is no id list to
+    // build and no empty-set short-circuit, because every contract qualifies.
+    const projectIds = isAllScope
+      ? []
+      : await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+    if (!isAllScope && !projectIds.length) {
+      return [];
+    }
+
+    const [projects, delegates] = isAllScope
+      ? await Promise.all([
+          this.piDelegatesRepository.findAllProjectSummaries(),
+          this.piDelegatesRepository.findAllActiveDelegates(),
+        ])
+      : await Promise.all([
+          this.piDelegatesRepository.findProjectSummariesByIds(projectIds),
+          this.piDelegatesRepository.findActiveDelegatesForProjects(projectIds),
+        ]);
+
+    // Index delegates by project_id for O(1) lookup during assembly.
+    const delegatesByProject = new Map<
+      string,
+      Array<{
+        delegate_user_id: number;
+        first_name: string;
+        last_name: string;
+        email: string;
+        carnet: string | null;
+        status_id: number | null;
+        is_active: number;
+      }>
+    >();
+    for (const d of delegates) {
+      const projectId = d.project_id;
+      if (!delegatesByProject.has(projectId)) {
+        delegatesByProject.set(projectId, []);
+      }
+      delegatesByProject.get(projectId)!.push(d);
+    }
+
+    return projects.map((p) => ({
+      project_code: p.agreement_id,
+      project_name: p.description ?? null,
+      is_pool_funding_contributor: Boolean(p.is_pool_funding_contributor),
+      pi_user_id: p.pi_user_id != null ? Number(p.pi_user_id) : null,
+      pi_name: formatPersonName(p.pi_name) || null,
+      status: p.contract_status ?? null,
+      start_date: p.start_date ?? null,
+      end_date: p.end_date ?? null,
+      delegates: (delegatesByProject.get(p.agreement_id) ?? []).map((d) => ({
+        delegate_user_id: Number(d.delegate_user_id),
+        name: formatPersonName(`${d.first_name} ${d.last_name}`),
+        email: d.email,
+        first_name: formatPersonName(d.first_name) || null,
+        last_name: formatPersonName(d.last_name) || null,
+        carnet: d.carnet ?? null,
+        status_id: d.status_id != null ? Number(d.status_id) : null,
+        is_active: [
+          UserStatusEnum.ACCEPTED,
+          UserStatusEnum.EXTERNAL_ACCEPTED,
+        ].includes(Number(d.status_id)),
+      })),
+    }));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/by-user/people — distinct delegates across the user's managed projects
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the distinct delegates across all projects the given user manages,
+   * each with the subset of managed projects they are assigned to.
+   *
+   * Fills the "By person" tab of the My PI Delegates UI for a whole user.
+   *
+   * Projects the user does NOT manage are excluded: even if a delegate is
+   * assigned to other projects, only assignments in the caller's managed set
+   * are returned.
+   *
+   * Authorization (own-or-admin — same as listManagedProjects):
+   *   - The caller may query their own user_id unconditionally.
+   *   - A SYSTEM_ADMIN may query any user_id.
+   *   - Any other combination → ForbiddenException (403).
+   *
+   * @param userId  sec_users.sec_user_id of the user whose managed delegates to list
+   */
+  async listManagedDelegates(
+    userId: number,
+    scope: PiDelegateScopeEnum = PiDelegateScopeEnum.MANAGED,
+  ): Promise<DelegateProjectsResponseDto[]> {
+    let rows: Awaited<
+      ReturnType<PiDelegatesRepository['findDelegatesForProjects']>
+    >;
+
+    if (scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      rows = await this.piDelegatesRepository.findAllDelegatesWithProjects();
+    } else {
+      this.assertCanQueryUser(userId, 'managed delegates');
+
+      const projectIds =
+        await this.piDelegatesRepository.findManagedProjectIds(userId);
+
+      if (!projectIds.length) {
+        return [];
+      }
+
+      rows =
+        await this.piDelegatesRepository.findDelegatesForProjects(projectIds);
+    }
+
+    // Group rows by delegate_user_id, collecting the distinct projects per delegate.
+    const byDelegate = new Map<
+      number,
+      {
+        first_name: string;
+        last_name: string;
+        email: string;
+        carnet: string | null;
+        status_id: number | null;
+        is_active: number;
+        projects: Array<{ agreement_id: string; description: string | null }>;
+      }
+    >();
+
+    for (const row of rows) {
+      const delegateId = Number(row.delegate_user_id);
+      if (!byDelegate.has(delegateId)) {
+        byDelegate.set(delegateId, {
+          first_name: row.first_name,
+          last_name: row.last_name,
+          email: row.email,
+          carnet: row.carnet ?? null,
+          status_id: row.status_id != null ? Number(row.status_id) : null,
+          is_active: row.is_active,
+          projects: [],
+        });
+      }
+      byDelegate.get(delegateId)!.projects.push({
+        agreement_id: row.agreement_id,
+        description: row.description,
+      });
+    }
+
+    return Array.from(byDelegate.entries()).map(([delegateId, info]) => ({
+      delegate_user_id: delegateId,
+      name: formatPersonName(`${info.first_name} ${info.last_name}`),
+      email: info.email,
+      first_name: formatPersonName(info.first_name) || null,
+      last_name: formatPersonName(info.last_name) || null,
+      carnet: info.carnet ?? null,
+      status_id: info.status_id,
+      is_active: [
+        UserStatusEnum.ACCEPTED,
+        UserStatusEnum.EXTERNAL_ACCEPTED,
+      ].includes(Number(info.status_id)),
+      projects: info.projects.map((p) => ({
+        project_code: p.agreement_id,
+        project_name: p.description ?? null,
+      })),
+    }));
+  }
+
+  // @akili-spec docs/specs/changes/my-pi-delegates-ui — history endpoint
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /pi-delegates/history — delegation history (project OR delegate)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Returns delegation history rows, newest-first, for either a project OR a
+   * delegate (mutually exclusive, exactly one required).
+   *
+   * project_id branch:
+   *   - assertCanManageProject(project_id) → 403 if caller is not PI / active
+   *     delegate / SYSTEM_ADMIN of that project.
+   *   - Returns ALL history rows for the project (no scope restriction on whose
+   *     actions appear; the PI sees the full audit trail).
+   *
+   * delegate_user_id branch:
+   *   - No single project to gate on → scope to the CALLER's managed projects.
+   *   - findManagedProjectIds(caller.user_id): if empty → return [] immediately
+   *     without a history query (consistent with R-UI-003 AC.2).
+   *   - Returns history WHERE delegate_user_id = ? AND project_id IN (managed ids),
+   *     so a PI only sees history on projects they manage.
+   *
+   * @param query  HistoryQueryDto — exactly one of project_id / delegate_user_id
+   */
+  async getHistory(
+    query: HistoryQueryDto,
+  ): Promise<PiDelegateHistoryEntryDto[]> {
+    const hasProject = query.project_id != null && query.project_id !== '';
+    const hasDelegate = query.delegate_user_id != null;
+
+    if (hasProject && hasDelegate) {
+      throw new BadRequestException(
+        'Provide exactly one of project_id or delegate_user_id, not both.',
+      );
+    }
+
+    if (!hasProject && !hasDelegate) {
+      throw new BadRequestException(
+        'Provide exactly one of project_id or delegate_user_id.',
+      );
+    }
+
+    // ── Helper: map raw rows → PiDelegateHistoryEntryDto[] ──────────────────
+    type RawHistoryRow = {
+      pi_delegate_history_id: number;
+      action: string;
+      created_at: Date;
+      actor_user_id: number | null;
+      actor_first: string | null;
+      actor_last: string | null;
+      delegate_user_id: number;
+      target_first: string | null;
+      target_last: string | null;
+      project_id: string;
+      project_name: string | null;
+    };
+
+    const mapRow = (r: RawHistoryRow): PiDelegateHistoryEntryDto => {
+      const actorName =
+        r.actor_first || r.actor_last
+          ? formatPersonName(`${r.actor_first ?? ''} ${r.actor_last ?? ''}`) ||
+            null
+          : null;
+      const delegateName =
+        r.target_first || r.target_last
+          ? formatPersonName(
+              `${r.target_first ?? ''} ${r.target_last ?? ''}`,
+            ) || null
+          : null;
+
+      return {
+        pi_delegate_history_id: Number(r.pi_delegate_history_id),
+        action: r.action as PiDelegateHistoryEntryDto['action'],
+        actor: {
+          user_id: r.actor_user_id != null ? Number(r.actor_user_id) : null,
+          name: actorName,
+        },
+        delegate: {
+          user_id: Number(r.delegate_user_id),
+          name: delegateName,
+        },
+        project: {
+          project_code: r.project_id,
+          project_name: r.project_name ?? null,
+        },
+        created_at: r.created_at,
+      };
+    };
+
+    // ── project_id branch ────────────────────────────────────────────────────
+    if (hasProject) {
+      await this.assertCanManageProject(query.project_id!);
+      const rows = await this.piDelegatesRepository.findProjectHistory(
+        query.project_id!,
+      );
+      return rows.map(mapRow);
+    }
+
+    // ── delegate_user_id branch ──────────────────────────────────────────────
+    // scope=all — an admin sees the delegate's complete trail, unnarrowed by
+    // which projects the admin happens to manage themselves.
+    if (query.scope === PiDelegateScopeEnum.ALL) {
+      this.assertAdminScope();
+      const allRows = await this.piDelegatesRepository.findAllDelegateHistory(
+        query.delegate_user_id!,
+      );
+      return allRows.map(mapRow);
+    }
+
+    const callerUserId = this.currentUserUtil.user_id;
+    const managedIds =
+      await this.piDelegatesRepository.findManagedProjectIds(callerUserId);
+
+    if (!managedIds.length) {
+      return [];
+    }
+
+    const rows = await this.piDelegatesRepository.findDelegateHistory(
+      query.delegate_user_id!,
+      managedIds,
+    );
+    return rows.map(mapRow);
+  }
+
+  /**
+   * Verify whether an active delegation exists for the given
+   * (project_id, delegate_user_id) pair (R-PID-004 AC.1).
+   * Auth is enforced: only PI, active delegate, or SYSTEM_ADMIN may query.
+   */
+  async verify(dto: VerifyPiDelegateDto): Promise<{ exists: boolean }> {
+    await this.assertCanManageProject(dto.project_id);
+
+    const row = await this.piDelegatesRepository.findOne({
+      where: {
+        project_id: dto.project_id,
+        delegate_user_id: dto.delegate_user_id,
+        is_active: true,
+      },
+    });
+
+    return { exists: row != null };
+  }
+}

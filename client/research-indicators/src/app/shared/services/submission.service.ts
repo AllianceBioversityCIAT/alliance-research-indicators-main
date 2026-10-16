@@ -32,10 +32,7 @@ export class SubmissionService {
     );
   });
 
-  meetsStatusChangeValidationRequirements = computed(() => {
-    const checks = this.cache.greenChecks();
-    return Object.values(checks).length > 0 && Object.values(checks).every(Boolean);
-  });
+  meetsStatusChangeValidationRequirements = computed(() => Boolean(this.cache.greenChecks()?.completness));
   submissionStatuses = signal<SubmissionStatus[]>([
     { id: 1, name: 'Editing' },
     { id: 2, name: 'Submitted' },

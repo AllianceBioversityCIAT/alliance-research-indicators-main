@@ -64,7 +64,19 @@ export class TocIntegrationService {
 
     try {
       const host = this.assertHost();
-      const url = `${host.replace(/\/$/, '')}/api/toc-integration/toc/results/category/${normalizedLevel}/initiative/${normalizedSp}`;
+      // `year` comes from ENV.PRMS_SYNC_YEAR (`ARI_PRMS_SYNC`). Appended only when
+      // set: an unset value leaves the URL byte-identical to what it was before
+      // this parameter existed, rather than sending an empty `year=`.
+      //
+      // Deliberately NOT part of the cache key: the key `${sp}:${level}` is the
+      // public shape of the Map `getTocResultsForSps` returns and that
+      // `bilateral.service` indexes by, so widening it would be a contract change.
+      // It is safe here because the year is process-constant — it comes from the
+      // environment, so a change to it arrives with a restart, which empties the
+      // cache anyway.
+      const year = ENV.PRMS_SYNC_YEAR;
+      const base = `${host.replace(/\/$/, '')}/api/toc-integration/toc/results/category/${normalizedLevel}/initiative/${normalizedSp}`;
+      const url = year ? `${base}?year=${encodeURIComponent(year)}` : base;
       const { data } = await firstValueFrom(
         this.http.get<TocIntegrationEnvelope>(url),
       );

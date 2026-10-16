@@ -1,0 +1,52 @@
+// @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-06
+// Design tokens only (var(--ac-*)) — no hex literals
+
+.bil-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ac-grey-700);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: var(--ac-grey-200);
+    color: var(--ac-grey-900);
+  }
+
+  &--active {
+    background-color: var(--ac-primary-blue-100);
+    color: var(--ac-primary-blue-600);
+    font-weight: 600;
+  }
+}
+
+.bil-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+  background-color: var(--ac-grey-300);
+  color: var(--ac-grey-800);
+
+  &--green {
+    background-color: var(--ac-green-200);
+    color: var(--ac-green-700);
+  }
+
+  &--orange {
+    background-color: var(--ac-orange-1);
+    color: var(--ac-white-1);
+  }
+}

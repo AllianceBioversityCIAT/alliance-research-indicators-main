@@ -26,6 +26,7 @@ export type ControlListServices =
   | 'expansionPotential'
   | 'policyTypes'
   | 'policyStages'
+  | 'policyAmountStatus'
   | 'geoFocus'
   | 'regions'
   | 'ipOwners'
@@ -56,6 +57,7 @@ export type ControlListServices =
   | 'leverStrategicOutcomes'
   | 'leverSdgTargets'
   | 'clarisaSdgTargets'
+  | 'portfolio2026SdgTargets'
   | 'projectStatus'
   | 'fundingTypes'
   | 'initiatives'
@@ -68,4 +70,9 @@ export type ControlListServices =
   | 'impactAreas'
   | 'allianceStaffByGroup'
   | 'sourceFilterOptions'
+  // T-UI-08: PI Delegates picker stubs — swap point in PiDelegatePeoplePickerStubService /
+  // PiDelegateProjectsPickerStubService. Replace the service registrations in
+  // ServiceLocatorService when the real endpoints are available.
+  | 'piDelegatePeople'
+  | 'piDelegateProjects'
   | '';

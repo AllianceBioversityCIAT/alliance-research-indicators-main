@@ -10,12 +10,18 @@ import {
   SetAuditEnum,
 } from '../../shared/utils/current-user.util';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
+import { LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 
 @Injectable()
 export class PortfoliosService {
   private readonly logger: CgiarLogger = new CgiarLogger(
     PortfoliosService.name,
   );
+
+  // Per-request memo of year -> resolved portfolio (or null). PortfoliosService
+  // is request-scoped via CurrentUserUtil bubbling, so this cache cannot
+  // outlive the request or leak between users/batches (design.md §2.3, DD-2).
+  private readonly portfolioByYear = new Map<number, Portfolio | null>();
 
   constructor(
     private readonly mainRepo: PortfoliosRepository,
@@ -59,6 +65,32 @@ export class PortfoliosService {
         is_active: true,
       },
     });
+  }
+
+  /**
+   * Resolves the active portfolio whose year range covers `year`, mirroring
+   * the `get_portfolio_id_by_result` SQL predicate: `start_year <= year AND
+   * end_year >= year AND is_active = true`, ordered by `id`, first row only.
+   * Never throws — an unresolvable year returns null, matching `findOne`'s
+   * "return null, don't throw" posture (not `validatePortfolio`'s).
+   * Memoized per year on the instance for the lifetime of the request.
+   */
+  async findByYear(year: number): Promise<Portfolio | null> {
+    if (this.portfolioByYear.has(year)) {
+      return this.portfolioByYear.get(year);
+    }
+
+    const portfolio = await this.mainRepo.findOne({
+      where: {
+        start_year: LessThanOrEqual(year),
+        end_year: MoreThanOrEqual(year),
+        is_active: true,
+      },
+      order: { id: 'ASC' },
+    });
+
+    this.portfolioByYear.set(year, portfolio ?? null);
+    return portfolio ?? null;
   }
 
   async validatePortfolio(portfolio_id: number) {

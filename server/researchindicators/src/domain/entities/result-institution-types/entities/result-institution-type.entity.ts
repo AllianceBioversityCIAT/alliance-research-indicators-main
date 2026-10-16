@@ -68,6 +68,18 @@ export class ResultInstitutionType extends AuditableEntity {
   })
   institution_id?: number;
 
+  /**
+   * T-08 (R-IU-004, DD-6) — Innovation Use organization count. Additive,
+   * nullable, `int` (not `bigint` — counts never approach 2.1B). Applies
+   * when `institution_type_role_id` marks the row as Innovation Use.
+   */
+  @Column({
+    name: 'organization_count',
+    type: 'int',
+    nullable: true,
+  })
+  organization_count?: number;
+
   @ManyToOne(
     () => ClarisaInstitution,
     (institution) => institution.result_institution_types,

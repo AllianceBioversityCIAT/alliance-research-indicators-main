@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, LOCALE_ID, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, LOCALE_ID, signal } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
@@ -22,6 +22,7 @@ import { SelectModule } from 'primeng/select';
 import localeEs from '@angular/common/locales/es';
 import { NgTemplateOutlet, registerLocaleData } from '@angular/common';
 import { GetYearsService } from '@shared/services/control-list/get-years.service';
+import { OicrReportingYearService } from '@shared/services/oicr-reporting-year.service';
 import { SharedResultFormComponent } from '@shared/components/shared-result-form/shared-result-form.component';
 import { WordCountService } from '@shared/services/word-count.service';
 import { getContractStatusClasses } from '@shared/constants/status-classes.constants';
@@ -55,6 +56,7 @@ export class CreateResultFormComponent {
   allModalsService = inject(AllModalsService);
   indicatorsService = inject(IndicatorsService);
   yearsService = inject(GetYearsService);
+  oicrReportingYear = inject(OicrReportingYearService);
   getContractsService = inject(GetContractsService);
   getResultsService = inject(GetResultsService);
   createResultManagementService = inject(CreateResultManagementService);
@@ -67,6 +69,13 @@ export class CreateResultFormComponent {
   // External links by environment
   prmsUrl: string = environment.prmsUrl;
   tipUrl: string = environment.tipUrl;
+
+  /** OICRs are reported for a single, configurable year (OICR.REPORTING_YEAR). */
+  oicrYearOptions = computed(() => [{ report_year: this.oicrReportingYear.year() }]);
+
+  constructor() {
+    void this.oicrReportingYear.load();
+  }
 
   body = signal<{ indicator_id: number | null; title: string | null; contract_id: string | null; year: number | null }>({
     indicator_id: null,
@@ -85,16 +94,25 @@ export class CreateResultFormComponent {
     () => {
       const shouldPreset = this.createResultManagementService.presetFromProjectResultsTable();
       const presetId = this.createResultManagementService.contractId();
-      if (shouldPreset && presetId !== null) {
-        this.contractId = presetId;
-        this.body.update(b => ({ ...b, contract_id: presetId }));
-      } else {
-        this.contractId = null;
-        this.body.update(b => ({ ...b, contract_id: null }));
-      }
+      // The project-results preset still wins; otherwise fall back to whatever the user
+      // had selected before stepping into the AI upload, so Back does not clear the field.
+      const carriedId = this.createResultManagementService.carriedContractId();
+      const nextContractId = shouldPreset && presetId !== null ? presetId : carriedId;
+
+      this.contractId = nextContractId;
+      this.body.update(b => ({ ...b, contract_id: nextContractId }));
     },
     { allowSignalWrites: true }
   );
+
+  /**
+   * "Upload file" hands the currently selected Reporting Project to the AI step before
+   * navigating, because this component is destroyed by the modal's @switch on step change.
+   */
+  goToAiAssistant() {
+    this.createResultManagementService.setCarriedContractId(this.body().contract_id ?? null);
+    this.createResultManagementService.resultPageStep.set(1);
+  }
 
   private buildW1W2RestrictionHtml(): string {
     const agreementId = this.body()?.contract_id;
@@ -116,7 +134,7 @@ export class CreateResultFormComponent {
       `You selected “<em><strong>${projectFirst || ''}</strong>${projectSecond ? ' - ' + projectSecond : ''}</em>” with the “<em>${indicatorName}</em>” indicator. ` +
       `Results from Science Programs and Accelerators (W1/W2 pooled funding) using this indicator cannot be reported in STAR. ` +
       `Please report directly in PRMS.<br/><br/>` +
-      `If you have any questions, please contact the SPRM team at: ` +
+      `If you have any questions, please contact the MELP team at: ` +
       `<a class="text-[#1689CA] hover:underline" href="mailto:Alliance-SPRM@cgiar.org">Alliance-SPRM@cgiar.org</a>`
     );
   }
@@ -178,9 +196,9 @@ export class CreateResultFormComponent {
   onIndicatorChange(newIndicatorId: number | null) {
     this.body.update(b => {
       const updatedBody = { ...b, indicator_id: newIndicatorId };
-      // If indicator is OICR (5), preselect year 2025
+      // If indicator is OICR (5), preselect its configured reporting year
       if (newIndicatorId === 5) {
-        updatedBody.year = 2025;
+        updatedBody.year = this.oicrReportingYear.year();
       }
       return updatedBody;
     });
@@ -368,7 +386,16 @@ export class CreateResultFormComponent {
         this.allModalsService.openModal('resultInformation');
       } else {
         const resultCode = `${platformCode}-${result.data.result_official_code}`;
-        this.router.navigate(['result', resultCode], { replaceUrl: true });
+        // Hold back the `version` query param until the router has actually
+        // moved. Until then the URL is still the one the user was standing on
+        // — possibly a versioned result — and `resultInterceptor` would stamp
+        // that year onto every request for the result just created, which has
+        // no versions yet. Cleared on failure too, so a rejected navigation
+        // cannot leave the flag raised.
+        this.cache.skipResultVersionParam.set(true);
+        void this.router.navigate(['result', resultCode], { replaceUrl: true }).finally(() => {
+          this.cache.skipResultVersionParam.set(false);
+        });
       }
 
       this.allModalsService.closeModal('createResult');

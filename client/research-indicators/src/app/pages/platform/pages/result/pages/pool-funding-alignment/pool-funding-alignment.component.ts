@@ -5,15 +5,18 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RadioButtonModule } from 'primeng/radiobutton';
 import { TooltipModule } from 'primeng/tooltip';
+import { SkeletonModule } from 'primeng/skeleton';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { ClarityService } from '@shared/services/clarity.service';
+import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { WebsocketService } from '@sockets/websocket.service';
-import { MultiselectComponent } from '@shared/components/custom-fields/multiselect/multiselect.component';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
+import { ModalComponent } from '@shared/components/modal/modal.component';
+import { AllModalsService } from '@services/cache/all-modals.service';
 import { SpTocAlignmentBlockComponent } from './components/sp-toc-alignment-block/sp-toc-alignment-block.component';
 import {
   AlignmentChangedEvent,
@@ -30,6 +33,9 @@ interface SelectedScienceProgram {
   name?: string;
   category?: string | null;
   color?: string | null;
+  code?: string;
+  allocation?: number | string | null;
+  icon_key?: string | null;
 }
 
 interface AlignmentFormData {
@@ -62,7 +68,8 @@ interface ReadOnlyTocSummary {
     FormsModule,
     RadioButtonModule,
     TooltipModule,
-    MultiselectComponent,
+    SkeletonModule,
+    ModalComponent,
     FormHeaderComponent,
     NavigationButtonsComponent,
     CustomTagComponent,
@@ -74,6 +81,21 @@ interface ReadOnlyTocSummary {
 })
 export default class PoolFundingAlignmentComponent {
   readonly bilateralService = inject(BilateralService);
+  private readonly allModalsService = inject(AllModalsService);
+
+  /**
+   * Help panel open state. It lives in AllModalsService like every other modal —
+   * the local signal it used to be could not drive app-modal, which reads its
+   * own config. Kept as a read-only view so callers (and tests) keep one name
+   * for "is the help open".
+   */
+  readonly showHelpModal = computed<boolean>(
+    () => this.allModalsService.isModalOpen('poolFundingHelp')?.isOpen ?? false
+  );
+
+  openHelpModal(): void {
+    this.allModalsService.openModal('poolFundingHelp');
+  }
   private readonly cache = inject(CacheService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -98,6 +120,7 @@ export default class PoolFundingAlignmentComponent {
     try { return inject(ClarityService); } catch { return null; }
   })();
   private readonly destroyRef = inject(DestroyRef);
+  private readonly versionWatcher = inject(VersionWatcherService);
 
   readonly loadFailed = signal(false);
   readonly inlineErrors = signal<Record<string, string> | null>(null);
@@ -125,7 +148,8 @@ export default class PoolFundingAlignmentComponent {
   readonly PRMS_SOURCED_BANNER = 'This result is owned by PRMS. Bilateral alignment is read-only in STAR.';
   // Locked backend 409 description that signals the PRMS-sourced read-only cause.
   readonly PRMS_SOURCED_409_DESCRIPTION = 'Result is PRMS-sourced; bilateral alignment is read-only in STAR';
-  readonly INFO_BANNER = 'Select the High-Level Outputs (HLO) and related indicators this result contributes to.';
+  readonly INFO_BANNER =
+    'Align this result with a Science Program and specify its contribution to the Theory of Change (Outputs, Outcomes) and related indicators.';
   readonly CONTRIBUTION_QUESTION = 'Does this result contribute to a Science Program or Accelerator?';
   readonly SP_PICKER_LABEL = 'Select the Science Program(s) this is related to';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-14 / R-BIL-127
@@ -135,15 +159,25 @@ export default class PoolFundingAlignmentComponent {
   // AC.3 — inline message naming what is missing; computed client-side (primaryRequiredMessage
   // below) so canSave() never relies on the server 400 for this.
   readonly PRIMARY_SP_REQUIRED_MESSAGE = 'Select a Primary Science Program before saving.';
+  // QA 2026-08-25 (Bug 2) — canSave()'s `hasMinimalSelection` clause blocks save
+  // on has_contribution === true with zero SPs, and `primaryRequiredMessage`
+  // returns null in exactly that case, so Save went grey with no explanation and
+  // no route out. Names both ways out, since answering "No" is as valid as
+  // picking an SP.
+  readonly SP_REQUIRED_MESSAGE =
+    "Select at least one Science Program, or answer 'No' if this result does not contribute to a Science Program.";
   readonly PRIMARY_ROLE_LABEL = 'Primary';
   readonly CONTRIBUTING_ROLE_LABEL = 'Contributing';
   readonly UNMAPPED_SP_MESSAGE =
     "This result isn't linked to a CLARISA project yet. Contact the bilateral operations team to register the project mapping.";
-  readonly NO_SP_DEFINED_MESSAGE = 'The linked CLARISA project has no Science Programs defined.';
+  readonly STALE_SP_MESSAGE =
+    'The linked CLARISA project could not be found in the current feed. Contact the bilateral operations team to reconcile the project mapping.';
+  readonly NO_SP_DEFINED_MESSAGE = 'The linked CLARISA project has no Science Programs available for alignment.';
+  readonly PENDING_SP_TAG = 'Pending';
   // REQ-BIL-ASR-03 — AC-03.3 inline message naming the rejected SP codes.
   readonly REJECTED_SP_MESSAGE_PREFIX = 'These Science Programs are no longer valid for this result: ';
   readonly REJECTED_SP_MESSAGE_SUFFIX = '. Remove them and save again.';
-  readonly HLO_SECTION_LABEL = 'Map HLOs and/or indicators';
+  readonly HLO_SECTION_LABEL = 'Map Theory of Change results and indicators';
   // AC-09.1 — live-version gate notice (2026-only ToC mapping).
   readonly VERSION_LOCKED_BANNER =
     'Theory of Change alignment is only editable on the live 2026 version of this result. The alignment below is read-only.';
@@ -153,6 +187,14 @@ export default class PoolFundingAlignmentComponent {
   // Read-only orphan tag (display-only) — reuses the stale tag's `.pf-stale-tag`
   // visual treatment verbatim (D-C2-10); only the copy differs.
   readonly ORPHANED_TOC_TAG = 'Not the current Primary — read-only';
+  // The tag above states WHAT the row is; this states WHY it is still on screen.
+  // R-BIL-129's own rationale — "data that is still stored — and still bound for
+  // PRMS — does not vanish from the screen" — was never surfaced in the UI, and
+  // three independent reviewers (QA Bug 1a, twice, and a product review
+  // 2026-08-25) each read the retained row as a defect. Copy only: the row, its
+  // retention, and OQ-3 are all untouched.
+  readonly ORPHANED_TOC_EXPLANATION =
+    'Retained for PRMS. This Science Program is submitted as Contributing, without Theory of Change mapping.';
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-16, applying T-15's
   // Reviewer finding (design.md §12.2, superseded-string record kept there). The
   // row this labels holds an explicit saved "No" answer — data that IS stored —
@@ -183,20 +225,25 @@ export default class PoolFundingAlignmentComponent {
     return null;
   });
 
-  // Per-result SP picker source + empty-state discriminators (REQ-BIL-ASR-01).
+  // Per-result SP picker source + empty-state discriminators (REQ-BIL-ASR-01, R-PSP-004).
   readonly sciencePrograms = this.bilateralService.sciencePrograms;
   readonly mappingStatus = this.bilateralService.mappingStatus;
   readonly loadingSciencePrograms = this.bilateralService.loadingSciencePrograms;
   // AC-01.2 — unmapped: picker empty + contact-ops message; no 13-SP fallback.
   readonly isUnmapped = computed(() => this.mappingStatus() === 'unmapped');
+  // R-PSP-004 / D-PSP-5 — stale: active mapping exists but CLARISA project unresolvable in feed.
+  readonly isStale = computed(() => this.mappingStatus() === 'stale');
   // AC-01.3 — mapped but the CLARISA project carries no SPs (distinct message).
   readonly hasNoSciencePrograms = computed(() => this.mappingStatus() === 'mapped' && this.sciencePrograms().length === 0);
+  // R-PFU-001 / DD-1 — Single-SP project detection for streamlined auto-selection & card view
+  readonly isSingleSp = computed(() => this.mappingStatus() === 'mapped' && this.sciencePrograms().length === 1);
+  readonly singleSp = computed<PoolFundingScienceProgram | null>(() => (this.isSingleSp() ? this.sciencePrograms()[0] : null));
   // Single named gate for the picker (used directly in the template). Renders only
   // once the per-result source has resolved (mappingStatus non-null) AND the
-  // project is mapped with ≥1 SP. The null guard prevents an empty-picker flash
+  // project is mapped with ≥1 SP and not stale. The null guard prevents an empty-picker flash
   // while getSciencePrograms is still in flight.
   readonly showSpPicker = computed(
-    () => this.mappingStatus() !== null && !this.isUnmapped() && !this.hasNoSciencePrograms()
+    () => this.mappingStatus() !== null && !this.isUnmapped() && !this.isStale() && !this.hasNoSciencePrograms()
   );
 
   readonly showHloSection = computed(() => {
@@ -265,7 +312,7 @@ export default class PoolFundingAlignmentComponent {
 
   readonly contributingSps = computed(() => {
     const primary = this.primarySpCode();
-    return this.formData().selected_sps.filter(sp => sp.official_code !== primary);
+    return this.formData().selected_sps.filter(sp => (sp.official_code || sp.code) !== primary);
   });
 
   // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-15 / R-BIL-128 AC.1/AC.4/AC.5
@@ -280,7 +327,7 @@ export default class PoolFundingAlignmentComponent {
   readonly primarySelectedSp = computed<SelectedScienceProgram | null>(() => {
     const primary = this.primarySpCode();
     if (!primary) return null;
-    return this.formData().selected_sps.find(sp => sp.official_code === primary) ?? null;
+    return this.formData().selected_sps.find(sp => (sp.official_code || sp.code) === primary) ?? null;
   });
 
   // AC.5 — read-only and version-locked states disable the Primary control
@@ -291,6 +338,16 @@ export default class PoolFundingAlignmentComponent {
   readonly primaryControlDisabled = computed(
     () => !this.editable() || this.isReadOnly() || this.versionLocked()
   );
+
+  // QA 2026-08-25 (Bug 2) — sibling of `primaryRequiredMessage` for the step
+  // before it: nothing selected at all. Same read-only/version-lock suppression,
+  // for the same reason (do not demand an action a disabled control forbids).
+  readonly spRequiredMessage = computed<string | null>(() => {
+    if (!this.editable() || this.isReadOnly() || this.versionLocked()) return null;
+    const form = this.formData();
+    if (form.has_contribution !== true) return null;
+    return form.selected_sps.length === 0 ? this.SP_REQUIRED_MESSAGE : null;
+  });
 
   // AC.3 — inline message naming what is missing, computed client-side so
   // canSave() never relies on the server 400 for it (design.md §6.1). Shown
@@ -402,7 +459,28 @@ export default class PoolFundingAlignmentComponent {
   // only one of the two, concat and union are indistinguishable — which is
   // exactly `tasks.md`'s stated disqualifier, and exactly why this is a Map,
   // not a list append.
+  //
+  // QA 2026-08-25 (Bug 1c) — BOTH source computeds read the SERVER snapshot
+  // (`alignment()?.toc_alignments`) and neither consults `formData()`, so a row
+  // whose SP the user has just DESELECTED kept rendering its read-only card
+  // until the next save. That contradicted the removal modal's promise
+  // ("Removing it will discard that alignment") and showed a card for an SP
+  // that no longer had a chip on screen.
+  //
+  // R-BIL-129 modelled only two reasons for a read-only row — not the current
+  // Primary, or stale — and "its SP is no longer selected" is a THIRD state it
+  // never considered. The selection gate lives here, at the single union point,
+  // rather than in each source computed: one filter cannot drift out of sync
+  // with itself, and `staleSnapshots` keeps its existing meaning for its own
+  // pinned assertion.
+  //
+  // This does NOT touch R-BIL-125/R-BIL-129's retain-on-DEMOTION behaviour
+  // (OQ-3, owned by the BA): a demoted SP is still selected, so it still
+  // renders. Only a deselected SP's card is withdrawn — and the server
+  // deactivates exactly those rows on the next PATCH (R-BIL-125 AC.3), so the
+  // screen now leads that cascade instead of contradicting it.
   readonly readOnlyTocSummaries = computed<ReadOnlyTocSummary[]>(() => {
+    const selected = new Set(this.formData().selected_sps.map(sp => sp.official_code || sp.code));
     const bySp = new Map<string, ReadOnlyTocSummary>();
     for (const row of this.orphanedTocAlignments()) {
       bySp.set(row.sp_code, { alignment: row, isOrphaned: true, isStale: false });
@@ -411,17 +489,34 @@ export default class PoolFundingAlignmentComponent {
       const existing = bySp.get(row.sp_code);
       bySp.set(row.sp_code, existing ? { ...existing, isStale: true } : { alignment: row, isOrphaned: false, isStale: true });
     }
-    return [...bySp.values()];
+    return [...bySp.values()].filter(row => selected.has(row.alignment.sp_code));
   });
 
   constructor() {
+    this.versionWatcher.onVersionChange(() => {
+      this.loadAlignment();
+    });
+
+    this.websocketService
+      ?.listen('result.pool-funding-alignment.changed')
+      .pipe(
+        filter((evt): evt is AlignmentChangedEvent =>
+          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
+        ),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe(() => this.handleRemoteChange());
+  }
+
+  private loadAlignment(): void {
     const resultCode = this.resultCode();
     void this.bilateralService.getAlignment(resultCode).then(alignment => {
       if (!alignment) {
         this.loadFailed.set(true);
         return;
       }
-      if (alignment.eligible === false) {
+      this.loadFailed.set(false);
+      if (alignment.eligible === false || this.cache.currentMetadata()?.indicator_id === 5) {
         void this.router.navigate(['/result', resultCode, 'general-information'], { replaceUrl: true });
         return;
       }
@@ -439,16 +534,6 @@ export default class PoolFundingAlignmentComponent {
         is_read_only: alignment.is_read_only
       });
     });
-
-    this.websocketService
-      ?.listen('result.pool-funding-alignment.changed')
-      .pipe(
-        filter((evt): evt is AlignmentChangedEvent =>
-          !!evt && typeof evt === 'object' && (evt as AlignmentChangedEvent).result_code === this.resultCode()
-        ),
-        takeUntilDestroyed(this.destroyRef)
-      )
-      .subscribe(() => this.handleRemoteChange());
   }
 
   handleRemoteChange(): void {
@@ -470,18 +555,51 @@ export default class PoolFundingAlignmentComponent {
   }
 
   onContributionChange(value: boolean | null): void {
-    this.formData.update(form => ({
-      ...form,
-      has_contribution: value,
-      selected_sps: value === false ? [] : form.selected_sps,
-      // R-BIL-127 — no selected set, no Primary; ignored server-side anyway
-      // when has_contribution is false (R-BIL-014), but the form must not
-      // carry a stale value into a later "Yes" flip.
-      primary_sp_code: value === false ? null : form.primary_sp_code,
-      toc_drafts: value === false ? [] : form.toc_drafts
-    }));
-    // Flipping to "No" clears the selection, so any rejected-code state is stale.
-    if (value === false) {
+    const sps = this.sciencePrograms();
+    const isSingleSp = this.isSingleSp();
+
+    this.formData.update(form => {
+      if (value === true && isSingleSp && sps.length === 1) {
+        const sp = sps[0];
+        const spCode = sp.code;
+        const selected: SelectedScienceProgram = {
+          code: sp.code,
+          name: sp.name,
+          official_code: sp.code,
+          allocation: sp.allocation,
+          color: sp.color,
+          icon_key: sp.icon_key
+        };
+        return {
+          ...form,
+          has_contribution: true,
+          selected_sps: [selected],
+          primary_sp_code: spCode,
+          toc_drafts: [this.emptyDraft(spCode)]
+        };
+      }
+
+      return {
+        ...form,
+        has_contribution: value,
+        selected_sps: value === false ? [] : form.selected_sps,
+        // R-BIL-127 — no selected set, no Primary; ignored server-side anyway
+        // when has_contribution is false (R-BIL-014), but the form must not
+        // carry a stale value into a later "Yes" flip.
+        primary_sp_code: value === false ? null : form.primary_sp_code,
+        toc_drafts: value === false ? [] : form.toc_drafts
+      };
+    });
+
+    if (value === true) {
+      const errors = this.inlineErrors();
+      if (errors?.['has_contribution']) {
+        const rest = { ...errors };
+        delete rest['has_contribution'];
+        this.inlineErrors.set(Object.keys(rest).length > 0 ? rest : null);
+      }
+    } else if (value === false) {
+      // Flipping to "No" clears the selection, so any rejected-code state is stale.
       this.clearRejectedSpError();
       this.blockErrors.set({});
     }
@@ -499,6 +617,67 @@ export default class PoolFundingAlignmentComponent {
       delete rest['primary_sp_code'];
       this.inlineErrors.set(Object.keys(rest).length > 0 ? rest : null);
     }
+  }
+
+  // R-PFU-002 / DD-2 — Multi-SP Card Selection & Inline Primary Toggle
+  isSelectedSp(code: string): boolean {
+    return this.formData().selected_sps.some(s => (s.official_code || s.code) === code);
+  }
+
+  toggleSp(sp: PoolFundingScienceProgram): void {
+    if (!this.editable() || this.isReadOnly()) return;
+    const spCode = sp.code;
+    const isSelected = this.isSelectedSp(spCode);
+
+    if (isSelected) {
+      if (this.hasMeaningfulAlignment(spCode)) {
+        this.confirmDestructiveRemoval(spCode);
+        return;
+      }
+      this.formData.update(form => {
+        const remaining = form.selected_sps.filter(s => (s.official_code || s.code) !== spCode);
+        let nextPrimary = form.primary_sp_code;
+        if (form.primary_sp_code === spCode) {
+          nextPrimary = remaining.length === 1 ? (remaining[0].official_code || remaining[0].code || null) : (remaining.length > 0 ? (remaining[0].official_code || remaining[0].code || null) : null);
+        }
+        return {
+          ...form,
+          selected_sps: remaining,
+          primary_sp_code: nextPrimary,
+          toc_drafts: form.toc_drafts.filter(d => d.sp_code !== spCode)
+        };
+      });
+    } else {
+      const selected: SelectedScienceProgram = {
+        code: sp.code,
+        name: sp.name,
+        official_code: sp.code,
+        allocation: sp.allocation,
+        color: sp.color,
+        icon_key: sp.icon_key
+      };
+      this.formData.update(form => {
+        const newSelected = [...form.selected_sps, selected];
+        const nextPrimary = form.primary_sp_code ?? spCode;
+        const existingDraft = form.toc_drafts.find(d => d.sp_code === spCode);
+        const newDrafts = existingDraft ? form.toc_drafts : [...form.toc_drafts, this.emptyDraft(spCode)];
+        return {
+          ...form,
+          selected_sps: newSelected,
+          primary_sp_code: nextPrimary,
+          toc_drafts: newDrafts
+        };
+      });
+    }
+
+    this.clearRejectedSpError();
+    this.ensureTocCatalogLoaded();
+  }
+
+  setPrimarySp(spCode: string, event?: Event): void {
+    event?.stopPropagation();
+    if (!this.editable() || this.isReadOnly()) return;
+    this.onPrimaryChange(spCode);
   }
 
   // REQ-BIL-ASR-03 (AC-03.4) — any change to the SP selection clears the inline
@@ -575,7 +754,7 @@ export default class PoolFundingAlignmentComponent {
     });
 
     this.actions.showGlobalAlert({
-      severity: 'delete',
+      severity: 'secondary',
       summary: this.DESELECT_CONFIRM_SUMMARY,
       detail: this.DESELECT_CONFIRM_DETAIL,
       confirmCallback: {
@@ -707,6 +886,33 @@ export default class PoolFundingAlignmentComponent {
 
   retryCatalog(): void {
     void this.bilateralService.getTocCatalog(this.resultCode());
+  }
+
+  // Wired explicitly instead of reusing the shared linear `saveData('back')`
+  // pattern, for two reasons:
+  //   1. Pool Funding Alignment is the sidebar's only OPTIONAL section and sits
+  //      last in `allOptions` (result-sidebar.component.ts), so "back" means the
+  //      section rendered immediately above it, not a step in the linear flow.
+  //   2. Back must not attempt a save: `canSave()` blocks on an unanswered ToC
+  //      question, so a save-then-navigate Back would silently do nothing — the
+  //      exact dead-button symptom this fixes. links-to-result makes the same
+  //      choice (navigate('back') never saves).
+  onBack(): void {
+    const version = this.route.snapshot.queryParamMap.get('version');
+    const queryParams = version ? { version } : undefined;
+    void this.router.navigate(['/result', this.resultCode(), this.previousSectionPath()], {
+      queryParams,
+      replaceUrl: true
+    });
+  }
+
+  // `ip-rights` renders only for indicator_id 1 and 2 (result-sidebar.component.ts
+  // `allOptions`); for every other indicator the section directly above Pool
+  // Funding Alignment is `evidence`, which is unconditional. indicator_id 5
+  // never reaches this page — the constructor redirects it out.
+  private previousSectionPath(): string {
+    const indicatorId = this.cache.currentMetadata()?.indicator_id;
+    return indicatorId === 1 || indicatorId === 2 ? 'ip-rights' : 'evidence';
   }
 
   async onSave(): Promise<void> {

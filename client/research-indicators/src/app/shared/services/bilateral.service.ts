@@ -17,6 +17,7 @@ import { CurrentResultService } from './cache/current-result.service';
 import { CacheService } from './cache/cache.service';
 import { ErrorResponse } from '@shared/interfaces/responses.interface';
 import { hasActivePooledFundingContract, isBilateralFundingType } from '@shared/constants/agresso-funding.constants';
+import { isPoolFundingCapable } from '@shared/utils/platform-code.util';
 
 export type PatchTagResult =
   | { ok: true; data: PoolFundingTagPatchResponse }
@@ -147,7 +148,16 @@ export class BilateralService {
     return !hasActivePooledFundingContract(contract);
   }
 
+  // R-PFG-001 — the guard lives here (DD-1), covering all 5 call sites in one
+  // change. The ineligible path CLEARS state rather than merely skipping the
+  // fetch (DD-3): `currentAlignment` is a root-scoped singleton with no reset on
+  // navigation, and today the failing request is the only thing that nulls it.
+  // `loadingAlignment` is never raised on this path — there is nothing to await.
   async getAlignment(resultCode: string): Promise<AlignmentResponse | null> {
+    if (!isPoolFundingCapable(resultCode)) {
+      this.currentAlignment.set(null);
+      return null;
+    }
     this.loadingAlignment.set(true);
     try {
       const res = await this.api.GET_PoolFundingAlignment(resultCode);
@@ -212,6 +222,19 @@ export class BilateralService {
       const res = await this.api.PATCH_PoolFundingAlignment(resultCode, body);
       if (res?.successfulRequest) {
         this.currentAlignment.set(res.data);
+        // The sidebar green check AND the PRMS SYNC gate both read
+        // `cache.greenChecks()`, which is refreshed ONLY by ToPromiseService's
+        // `loadingTrigger` finalize hook — a hook no PATCH goes through. Without
+        // this the check stays stale until a full result reload; the required
+        // sections avoid it by re-GETting after their PATCH (ip-rights ->
+        // getData() -> GET_IpOwner, which carries loadingTrigger: true).
+        // Best-effort: a refresh failure must never turn a successful save into
+        // an error.
+        try {
+          await this.api.TP.updateGreenChecks();
+        } catch {
+          /* green checks are display state; the save already succeeded */
+        }
         return { ok: true, data: res.data };
       }
       const fieldErrors = this.extractFieldErrors(res?.errorDetail);
