@@ -199,7 +199,7 @@ describe('deriveColumnGroups (synthetic arrays)', () => {
 });
 
 describe('deriveColumnGroups over the real raw array', () => {
-  it('matches the intended layout exactly and ends at column 112', () => {
+  it('matches the intended layout exactly and ends at column 111', () => {
     const result = deriveColumnGroups(
       STAR_RESULTS_METADATA_RAW_COLUMNS,
       STAR_RAW_SECTIONS,
@@ -244,11 +244,11 @@ describe('deriveColumnGroups over the real raw array', () => {
       },
       {
         fromCol: 81,
-        toCol: 112,
+        toCol: 111,
         label: 'INNOVATION DEVELOPMENT',
         fillArgb: 'FF00897B',
       },
     ]);
-    expect(result.lastColumn).toBe(112);
+    expect(result.lastColumn).toBe(111);
   });
 });

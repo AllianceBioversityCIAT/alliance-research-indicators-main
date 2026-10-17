@@ -3,8 +3,8 @@ import { STAR_INNOVATION_DEV_RAW_COLUMNS } from './star-results-metadata.innovat
 import type { StarRawSectionColumn } from './star-results-metadata.sections';
 
 /**
- * Raw data sheet columns A–DH (112 columns). Innovation Development is appended
- * at 81–112; columns 1–80 stay in place.
+ * Raw data sheet columns A–DG (111 columns). Innovation Development is appended
+ * at 81–111; columns 1–80 stay in place.
  */
 export const STAR_RESULTS_METADATA_RAW_COLUMNS: StarRawSectionColumn[] = [
   {

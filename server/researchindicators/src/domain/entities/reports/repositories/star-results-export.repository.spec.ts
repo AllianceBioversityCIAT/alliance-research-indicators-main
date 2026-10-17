@@ -6,7 +6,7 @@ import { ResultSortEnum } from '../../results/enum/result-sort.enum';
 import { ResultRepository } from '../../results/repositories/result.repository';
 import { StarResultsExportRepository } from './star-results-export.repository';
 
-/** Design §3.2 aliases, column order 81–112. */
+/** Design §3.2 aliases, column order 81–111. */
 const INNOVATION_DEV_ALIASES = [
   'innovation_dev_short_title',
   'innovation_dev_nature',
@@ -16,7 +16,6 @@ const INNOVATION_DEV_ALIASES = [
   'innovation_dev_readiness_level',
   'innovation_dev_readiness_explanation',
   'innovation_dev_anticipated_users',
-  'innovation_dev_no_sex_age_disaggregation',
   'innovation_dev_actors',
   'innovation_dev_organizations',
   'innovation_dev_beneficiaries',

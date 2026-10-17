@@ -3,8 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import ExcelJS from 'exceljs';
 import { ExcelWorkbookBuilder } from '../../core/excel-workbook.builder';
 import { WorkbookSheetOrderResolver } from '../../core/workbook-sheet-order.resolver';
-import { ReportLayoutRepository } from '../../repositories/report-layout.repository';
 import { StarResultsExportRepository } from '../../repositories/star-results-export.repository';
+import { STAR_RESULTS_METADATA_DICTIONARY_ROWS } from './star-results-metadata.dictionary';
 import {
   STAR_RESULTS_METADATA_SHEET_KEYS,
   STAR_RESULTS_METADATA_SHEET_ORDER_ENV,
@@ -45,13 +45,13 @@ const INTENDED_RAW_BANDS = [
   { fromCol: 75, toCol: 80, label: 'INNOVATION USE', fillArgb: 'FF6A1B9A' },
   {
     fromCol: 81,
-    toCol: 112,
+    toCol: 111,
     label: 'INNOVATION DEVELOPMENT',
     fillArgb: 'FF00897B',
   },
 ] as const;
 
-/** Design §3.2a labels for columns 81–112. Literals, not taken from the column module. */
+/** Design §3.2a labels for columns 81–111. Literals, not taken from the column module. */
 const INNOVATION_DEV_HEADERS = [
   'Short title',
   'Innovation nature',
@@ -61,7 +61,6 @@ const INNOVATION_DEV_HEADERS = [
   'Innovation readiness level',
   'Readiness explanation',
   'Anticipated users',
-  'Sex and age disaggregation not applicable',
   'Actors',
   'Organizations',
   'Intended beneficiaries/users elaborated',
@@ -149,7 +148,6 @@ async function withSheetOrder(
 
 describe('StarResultsMetadataWorkbookHandler', () => {
   let handler: StarResultsMetadataWorkbookHandler;
-  const findDataDictionaryRows = jest.fn();
   const findStarResultsMetadataRows = jest.fn();
   const fetchMock = jest.fn();
 
@@ -171,20 +169,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     jest.clearAllMocks();
     global.fetch = fetchMock as unknown as typeof fetch;
     delete process.env[STAR_RESULTS_METADATA_SHEET_ORDER_ENV];
-    findDataDictionaryRows.mockResolvedValue([
-      {
-        section: 'S',
-        field_label: 'F',
-        explanation: 'E',
-        section_fill_argb: 'FF111111',
-      },
-      {
-        section: null,
-        field_label: 'F2',
-        explanation: null,
-        section_fill_argb: null,
-      },
-    ]);
     findStarResultsMetadataRows.mockResolvedValue([{ result_code: 'RC' }]);
     existsSync.mockReturnValue(false);
 
@@ -192,12 +176,6 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       providers: [
         StarResultsMetadataWorkbookHandler,
         WorkbookSheetOrderResolver,
-        {
-          provide: ReportLayoutRepository,
-          useValue: {
-            findDataDictionaryRows,
-          },
-        },
         {
           provide: StarResultsExportRepository,
           useValue: { findStarResultsMetadataRows },
@@ -239,8 +217,8 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       'This file contains the results generated from the selected filters in STAR.',
     );
     expect(raw?.presentation?.bannerNotice).toBeUndefined();
-    expect(raw?.presentation?.bannerTitleMergeToCol).toBe(112);
-    expect(raw?.columns).toHaveLength(112);
+    expect(raw?.presentation?.bannerTitleMergeToCol).toBe(111);
+    expect(raw?.columns).toHaveLength(111);
   });
 
   it('builds Raw data then Data dictionary and does not read layout tables', async () => {
@@ -271,7 +249,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(raw?.columns[30]?.headerFillArgb).toBe('FF35749A');
   });
 
-  it('puts findDataDictionaryRows onto the Data dictionary sheet', async () => {
+  it('builds the Data dictionary sheet from the in-code rows', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -281,23 +259,25 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const dictionary = spec.sheets.find(
       (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
     );
-    expect(dictionary?.rows).toEqual([
-      {
-        section: 'S',
-        field_label: 'F',
-        explanation: 'E',
-        _rowFillArgb: 'FF111111',
-      },
-      {
-        section: '',
-        field_label: 'F2',
-        explanation: '',
-        _rowFillArgb: 'FF111111',
-      },
-    ]);
+    const rows = dictionary?.rows ?? [];
+    expect(rows).toHaveLength(STAR_RESULTS_METADATA_DICTIONARY_ROWS.length);
+    expect(rows[0]).toMatchObject({
+      section: 'Section',
+      field_label: 'Field',
+      _rowFillArgb: 'FF455A64',
+    });
+    // A row without its own fill inherits the band above it.
+    expect(rows[2]).toMatchObject({
+      section: '',
+      field_label: 'Platform',
+      _rowFillArgb: 'FF203C61',
+    });
+    expect(rows.map((r) => r.field_label)).not.toContain(
+      'Sex and age disaggregation not applicable',
+    );
   });
 
-  it('reads back the twelve section bands and the C1:DH1 banner', async () => {
+  it('reads back the twelve section bands and the C1:DG1 banner', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -311,7 +291,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(ws).toBeDefined();
     const merges = ws!.model.merges;
     const banner = merges.find((m) => m.startsWith('C1:'));
-    expect(banner).toBe('C1:DH1');
+    expect(banner).toBe('C1:DG1');
     expect(sheetContainsComingSoon(ws!)).toBe(false);
     for (const band of INTENDED_RAW_BANDS) {
       let located: ExcelJS.Cell | undefined;
@@ -399,7 +379,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(112);
+    expect(raw!.columns).toHaveLength(111);
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');
@@ -527,7 +507,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const merges = ws!.model.merges;
     const headerRowNumber = rowContaining(ws!, 'Innovation use level');
     const groupRowNumber = headerRowNumber - 1;
-    expect(merges).toContain('C1:DH1');
+    expect(merges).toContain('C1:DG1');
     expect(merges).toContain(
       `${letter(75)}${groupRowNumber}:${letter(80)}${groupRowNumber}`,
     );
@@ -752,7 +732,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(spec.sheets.length).toBeGreaterThan(0);
   });
 
-  it('reads Innovation Development headers by content at columns 81-112', async () => {
+  it('reads Innovation Development headers by content at columns 81-111', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -794,14 +774,14 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     ).toBe('FF00897B');
     const devData = ws!.getRow(headerRowNumber + 1);
     expect(devData.getCell(81).value).toBe('cell-0');
-    expect(devData.getCell(112).value).toBe('cell-31');
+    expect(devData.getCell(111).value).toBe('cell-30');
     const otherData = ws!.getRow(headerRowNumber + 2);
     expect(otherData.getCell(81).value).toBe('Not applicable');
-    expect(otherData.getCell(112).value).toBe('Not applicable');
+    expect(otherData.getCell(111).value).toBe('Not applicable');
     const merges = ws!.model.merges;
     const groupRowNumber = headerRowNumber - 1;
     expect(merges).toContain(
-      `${excelColumnLetter(81)}${groupRowNumber}:${excelColumnLetter(112)}${groupRowNumber}`,
+      `${excelColumnLetter(81)}${groupRowNumber}:${excelColumnLetter(111)}${groupRowNumber}`,
     );
     expect(ws!.getRow(groupRowNumber).getCell(81).value).toBe(
       'INNOVATION DEVELOPMENT',

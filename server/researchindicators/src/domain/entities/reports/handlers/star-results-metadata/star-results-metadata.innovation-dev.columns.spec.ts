@@ -2,7 +2,7 @@ import { STAR_RESULTS_METADATA_RAW_COLUMNS } from './star-results-metadata.colum
 import { STAR_INNOVATION_DEV_RAW_COLUMNS } from './star-results-metadata.innovation-dev.columns';
 
 /**
- * Design §3.2 aliases and §3.2a dictionary labels, in column order 81–112.
+ * Design §3.2 aliases and §3.2a dictionary labels, in column order 81–111.
  * Literals, not read back from the column module's own construction.
  */
 const INNOVATION_DEV_DICTIONARY = [
@@ -17,10 +17,6 @@ const INNOVATION_DEV_DICTIONARY = [
   ['innovation_dev_readiness_level', 'Innovation readiness level'],
   ['innovation_dev_readiness_explanation', 'Readiness explanation'],
   ['innovation_dev_anticipated_users', 'Anticipated users'],
-  [
-    'innovation_dev_no_sex_age_disaggregation',
-    'Sex and age disaggregation not applicable',
-  ],
   ['innovation_dev_actors', 'Actors'],
   ['innovation_dev_organizations', 'Organizations'],
   ['innovation_dev_beneficiaries', 'Intended beneficiaries/users elaborated'],
@@ -77,10 +73,10 @@ const INNOVATION_DEV_DICTIONARY = [
 ] as const;
 
 describe('STAR_INNOVATION_DEV_RAW_COLUMNS', () => {
-  it('appends 32 Innovation Development columns after the existing 80', () => {
-    expect(INNOVATION_DEV_DICTIONARY).toHaveLength(32);
-    expect(STAR_INNOVATION_DEV_RAW_COLUMNS).toHaveLength(32);
-    expect(STAR_RESULTS_METADATA_RAW_COLUMNS).toHaveLength(112);
+  it('appends 31 Innovation Development columns after the existing 80', () => {
+    expect(INNOVATION_DEV_DICTIONARY).toHaveLength(31);
+    expect(STAR_INNOVATION_DEV_RAW_COLUMNS).toHaveLength(31);
+    expect(STAR_RESULTS_METADATA_RAW_COLUMNS).toHaveLength(111);
     expect(STAR_RESULTS_METADATA_RAW_COLUMNS[74]?.key).toBe(
       'innovation_use_level',
     );

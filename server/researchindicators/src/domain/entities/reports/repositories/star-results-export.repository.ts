@@ -27,7 +27,7 @@ import { STAR_INNOVATION_DEV_RAW_COLUMNS } from '../handlers/star-results-metada
  *    `result_id` values that already passed phase 1, and `ORDER BY FIELD(…)` to **repeat the same order**
  *    returned by `findResultsV2` (does not re-implement filters in the view). The select list includes
  *    `gi.result_id AS result_id` so Phase 3 can merge onto that key.
- * 3. **Phase 3** on `report_innovation_dev`: `SELECT result_id, <32 innovation_dev_* aliases>
+ * 3. **Phase 3** on `report_innovation_dev`: `SELECT result_id, <31 innovation_dev_* aliases>
  *    FROM report_innovation_dev WHERE result_id IN (…)` (one placeholder per id), on the same
  *    pinned connection and transaction as Phase 2. Rows merge by `String(result_id)`. Phase 2's
  *    order is kept. A Phase 2 row with no Phase 3 row gets `Not applicable` on every

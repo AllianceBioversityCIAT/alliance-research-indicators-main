@@ -11,13 +11,15 @@ import type {
 
 import { deriveColumnGroups } from '../../core/excel-workbook.column-groups';
 import { WorkbookSheetOrderResolver } from '../../core/workbook-sheet-order.resolver';
-import type { ReportDataDictionaryRow } from '../../repositories/report-layout.repository';
-import { ReportLayoutRepository } from '../../repositories/report-layout.repository';
 import { StarResultsExportRepository } from '../../repositories/star-results-export.repository';
 import {
   STAR_RESULTS_METADATA_DICTIONARY_COLUMNS,
   STAR_RESULTS_METADATA_RAW_COLUMNS,
 } from './star-results-metadata.columns';
+import {
+  STAR_RESULTS_METADATA_DICTIONARY_ROWS,
+  type StarDictionaryRow,
+} from './star-results-metadata.dictionary';
 import {
   STAR_RESULTS_METADATA_HEADER_LOGO_URL,
   STAR_RESULTS_METADATA_SHEET_KEYS,
@@ -48,7 +50,6 @@ export class StarResultsMetadataWorkbookHandler
   readonly sheetOrderEnvVarName = STAR_RESULTS_METADATA_SHEET_ORDER_ENV;
 
   constructor(
-    private readonly layoutRepository: ReportLayoutRepository,
     private readonly starExportRepository: StarResultsExportRepository,
     private readonly sheetOrderResolver: WorkbookSheetOrderResolver,
   ) {}
@@ -64,9 +65,6 @@ export class StarResultsMetadataWorkbookHandler
       csvOverride,
     );
 
-    const dictionaryRows = await this.layoutRepository.findDataDictionaryRows(
-      this.workbookKey,
-    );
     const rawRows =
       await this.starExportRepository.findStarResultsMetadataRows(filters);
 
@@ -83,7 +81,7 @@ export class StarResultsMetadataWorkbookHandler
       sheetKey: STAR_RESULTS_METADATA_SHEET_KEYS.DATA_DICTIONARY,
       name: 'Data dictionary',
       columns: STAR_RESULTS_METADATA_DICTIONARY_COLUMNS.map((c) => ({ ...c })),
-      rows: this.mapDictionaryRows(dictionaryRows),
+      rows: this.mapDictionaryRows(STAR_RESULTS_METADATA_DICTIONARY_ROWS),
       rowFillArgbField: DICTIONARY_ROW_FILL,
     };
 
@@ -171,7 +169,7 @@ export class StarResultsMetadataWorkbookHandler
   }
 
   private mapDictionaryRows(
-    rows: ReportDataDictionaryRow[],
+    rows: readonly StarDictionaryRow[],
   ): Record<string, unknown>[] {
     let current = 'FFECEFF1';
     return rows.map((r) => {
