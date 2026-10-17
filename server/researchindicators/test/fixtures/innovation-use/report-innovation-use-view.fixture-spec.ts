@@ -203,8 +203,9 @@ function orgUnknown(
   return `${BULLET} ${typeName}${subPart} ${EM} Number of organizations: ${count}`;
 }
 
-function measureLine(number: string, unit: string, comment: string): string {
-  return `${BULLET} Number: ${number}, Unit: ${unit}, Comment: ${comment}`;
+// The form has no comment field, so a stored description never reaches the cell.
+function measureLine(number: string, unit: string): string {
+  return `${BULLET} Number: ${number}, Unit: ${unit}`;
 }
 
 function devLabel(
@@ -882,7 +883,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
           INSTITUTION_KNOWN_ACRONYM,
           INSTITUTION_KNOWN_NAME,
         ),
-        innovation_use_quantifications: measureLine('12.5', 'kg', 'field note'),
+        innovation_use_quantifications: measureLine('12.5', 'kg'),
         ...link,
       }),
       [],
@@ -1119,7 +1120,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
   it('rule 10: a quantification number of 0', async () => {
     const { id, link } = await seedUseBase();
     await insertMeasure(id, 0, 'kg', null);
-    const quants = measureLine(NP, 'kg', NM);
+    const quants = measureLine(NP, 'kg');
     expect(quants).toContain(`Number: ${NP}`);
     await expectCase(
       'rule-10-zero',
@@ -1132,7 +1133,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
   it('rule 10: a negative number stays in the cell and the function is true', async () => {
     const { id, link } = await seedUseBase();
     await insertMeasure(id, -3, 'kg', null);
-    const quants = measureLine('-3', 'kg', NM);
+    const quants = measureLine('-3', 'kg');
     expect(quants).toContain('Number: -3');
     expect(quants).not.toContain(NP);
     await expectCase(
@@ -1146,7 +1147,7 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
   it('rule 11: a blank unit', async () => {
     const { id, link } = await seedUseBase();
     await insertMeasure(id, 12.5, null, null);
-    const quants = measureLine('12.5', NP, NM);
+    const quants = measureLine('12.5', NP);
     expect(quants).toContain(`Unit: ${NP}`);
     await expectCase(
       'rule-11',
@@ -1546,8 +1547,8 @@ describe('report_innovation_use view (T-02 excel-export)', () => {
       orgUnknown(ORG_ROOT_WITH_CHILD_NAME, ORG_CHILD_NAME, '3'),
     ]);
     const quants = joinLines([
-      measureLine('12.5', 'kg', 'field note'),
-      measureLine('-3', 'ha', NM),
+      measureLine('12.5', 'kg'),
+      measureLine('-3', 'ha'),
     ]);
     await expectCase(
       'two-links',
