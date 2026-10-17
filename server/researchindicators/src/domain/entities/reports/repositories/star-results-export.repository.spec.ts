@@ -336,6 +336,26 @@ describe('StarResultsExportRepository', () => {
     expect(sql).toContain('https://app.example/result/STAR-');
   });
 
+  it('selects the group-session organizations on behalf from result_institutions role 2', async () => {
+    findResultsV2.mockResolvedValueOnce({
+      data: [{ result_id: 1 }],
+      pagination: { hasNextPage: false },
+    });
+    queryRunnerQuery.mockResolvedValue([]);
+    await repo.findStarResultsMetadataRows(baseFilters);
+    const [sql] = queryRunnerQuery.mock.calls[1];
+    expect(sql).toContain(
+      'oob.organizations_on_behalf AS organizations_on_behalf',
+    );
+    expect(sql).toContain('LEFT JOIN LATERAL');
+    expect(sql).toContain('WHERE ri.result_id = gi.result_id');
+    expect(sql).toContain('AND ri.institution_role_id = 2');
+    expect(sql).toContain('AND rcs.session_format_id = 2');
+    expect(sql).toContain('AND rcs.is_attending_organization = TRUE');
+    expect(sql).toContain('r.indicator_id = 1');
+    expect(sql).toContain(') oob ON TRUE');
+  });
+
   it('rolls back and rethrows when phase-2 query fails', async () => {
     findResultsV2.mockResolvedValueOnce({
       data: [{ result_id: 1 }],

@@ -6,12 +6,12 @@ export type StarDictionaryRow = {
 };
 
 /**
- * Data dictionary sheet rows, in sheet order. Moved out of the
- * `report_data_dictionary` table so the whole workbook layout lives in code;
- * the export no longer reads that table. Content copied verbatim from the Dev
- * table on 2026-10-16, minus the result-level Innovation Development row
- * "Sex and age disaggregation not applicable" (no form field; the answer is
- * per actor, inside Actors).
+ * Data dictionary sheet rows, in sheet order: the header row, then one row
+ * per Raw data column, labelled with that column's header and in column
+ * order (star-results-metadata.dictionary.spec.ts enforces it). Moved out of
+ * the `report_data_dictionary` table so the whole workbook layout lives in
+ * code; the export no longer reads that table. Section names, fills and the
+ * explanations that existed were taken from the Dev table on 2026-10-16.
  *
  * A row with `section_fill_argb` starts a new fill band; rows without one
  * inherit the previous fill.
@@ -35,14 +35,14 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Platform',
+      field_label: 'Source Platform',
       explanation:
         'The reporting platform where the result was registered, shown as its platform code (for example STAR).',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Link to pdf',
+      field_label: 'Public link',
       explanation:
         'A clickable link to the public PDF of the result. Reads Not available when the result has no public link.',
       section_fill_argb: null,
@@ -58,6 +58,13 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       section: null,
       field_label: 'Indicator',
       explanation: 'The indicator name the result was reported under.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Status',
+      explanation:
+        'The current status of the result, shown as the status name (for example Editing, Submitted or Approved).',
       section_fill_argb: null,
     },
     {
@@ -103,15 +110,15 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Main contact person',
-      explanation:
-        'The full name of the main contact person of the result. A missing contact reads Not provided.',
+      field_label: 'Creation date',
+      explanation: 'The date the result was created, in YYYY-MM-DD format.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Creation date',
-      explanation: 'The date the result was created, in YYYY-MM-DD format.',
+      field_label: 'Main contact person',
+      explanation:
+        'The full name of the main contact person of the result. A missing contact reads Not provided.',
       section_fill_argb: null,
     },
     {
@@ -123,9 +130,23 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Primary project - principal investigator',
+      field_label: 'Primary project: principal investigator',
       explanation:
         'The principal investigator (project lead) of the primary project. A missing value reads Not provided.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Primary project: Start date',
+      explanation:
+        'The start date of the primary project, in YYYY-MM-DD format. A missing date reads Not provided.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Primary project: End date',
+      explanation:
+        'The end date of the primary project, in YYYY-MM-DD format. A missing date reads Not provided.',
       section_fill_argb: null,
     },
     {
@@ -137,21 +158,21 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Primary lever',
+      field_label: 'Primary lever(s)',
       explanation:
         'The short name of the primary lever of the result. A missing primary lever reads Not provided.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Contributing lever',
+      field_label: 'Contributing lever(s)',
       explanation:
         'The short names of the contributing levers, separated by commas. Optional: none reads Not mandatory.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Contibution to SDG targets',
+      field_label: 'Contribution to SDG targets',
       explanation:
         'One bullet line per SDG target, as (lever) - target code - target text. A missing selection reads Not provided.',
       section_fill_argb: null,
@@ -199,7 +220,7 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       section_fill_argb: 'FF5C7EC4',
     },
     {
-      section: '',
+      section: null,
       field_label: 'Notable references',
       explanation:
         'Notable references for the result (reference type and link). Only populated for Outcome/Impact Case Report (OICR) results.',
@@ -277,7 +298,7 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Total participants ',
+      field_label: 'Total participants',
       explanation:
         'The total number of participants in a group session. Required for group sessions and Not applicable for individual ones.',
       section_fill_argb: null,
@@ -328,7 +349,7 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       section: null,
       field_label: 'Organizations on behalf',
       explanation:
-        'The organizations the group trainees attended on behalf of, when the previous answer is YES.',
+        'One bullet line per organization the group trainees attended on behalf of, shown as [id: code] acronym - (HQ: country) name. Required when the previous answer is YES; Not applicable otherwise.',
       section_fill_argb: null,
     },
     {
@@ -423,32 +444,11 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       section_fill_argb: null,
     },
     {
-      section: null,
-      field_label: 'Link to Innovation Dev',
-      explanation:
-        'The Innovation Development results linked to this policy change. This field is read-only in the form and is not exported in Raw data.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Link to Innovation Use',
-      explanation:
-        'The Innovation Use results linked to this policy change. This field is read-only in the form and is not exported in Raw data.',
-      section_fill_argb: null,
-    },
-    {
       section: 'OICRS',
-      field_label: 'Strategic outcomes',
-      explanation:
-        'The strategic outcomes the OICR contributes to, one bullet line per outcome as (lever) - outcome.',
-      section_fill_argb: 'FFD9A041',
-    },
-    {
-      section: null,
       field_label: 'MEL Regional Expert',
       explanation:
         'Full name of the MEL Regional Expert assigned to the OICR. Required on OICR results.',
-      section_fill_argb: null,
+      section_fill_argb: 'FFD9A041',
     },
     {
       section: null,
@@ -458,28 +458,35 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       section_fill_argb: null,
     },
     {
-      section: '',
-      field_label: 'CGSpace link',
-      explanation: 'Link to the OICR publication in CGSpace.',
-      section_fill_argb: null,
-    },
-    {
       section: null,
-      field_label: 'OICR No ',
+      field_label: 'OICR No',
       explanation:
         'Internal code that MELP assigns to the OICR. Required on OICR results.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Tagging ',
+      field_label: 'Tagging',
       explanation:
         'The tag chosen for the OICR, shown as the tag name. Required on OICR results.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Maturity of change ',
+      field_label: 'Existing OICR',
+      explanation:
+        'The existing OICR this case updates, shown as code - title with its link. Required when the tag is an Updated Outcome Impact Case; Not applicable otherwise.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'CGSpace link',
+      explanation: 'Link to the OICR publication in CGSpace.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Maturity of change',
       explanation:
         'The maturity of change reported for the OICR, shown as the maturity level name. Required on OICR results.',
       section_fill_argb: null,
@@ -493,7 +500,7 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Short Outcome/Impact Statement ',
+      field_label: 'Short Outcome/Impact Statement',
       explanation:
         'Short version of the outcome or impact statement, up to 80 characters. Required on OICR results.',
       section_fill_argb: null,
@@ -521,72 +528,16 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Nutrition, Health and Food Security score',
+      field_label: 'Further communication opportunities description',
       explanation:
-        'The score given to the Nutrition, Health and Food Security impact area, shown in the Impact Areas cell as the area followed by Score: (n) score name.',
+        'Free-text details of the further communication opportunities. Optional.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Nutrition, Health and Food Security global target',
+      field_label: 'Impact Areas',
       explanation:
-        'The global targets selected for the Nutrition, Health and Food Security impact area, one line each as SMO code - target, under that area in the Impact Areas cell.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Poverty Reduction, Livelihoods and Jobs score',
-      explanation:
-        'The score given to the Poverty Reduction, Livelihoods and Jobs impact area, shown in the Impact Areas cell as the area followed by Score: (n) score name.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Poverty Reduction, Livelihoods and Jobs global target',
-      explanation:
-        'The global targets selected for the Poverty Reduction, Livelihoods and Jobs impact area, one line each as SMO code - target, under that area in the Impact Areas cell.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Gender Equality, Youth and Social Inclusion scroe',
-      explanation:
-        'The score given to the Gender Equality, Youth and Social Inclusion impact area, shown in the Impact Areas cell as the area followed by Score: (n) score name.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Gender Equality, Youth and Social Inclusion global target',
-      explanation:
-        'The global targets selected for the Gender Equality, Youth and Social Inclusion impact area, one line each as SMO code - target, under that area in the Impact Areas cell.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Climate Adaptation and Mitigation score',
-      explanation:
-        'The score given to the Climate Adaptation and Mitigation impact area, shown in the Impact Areas cell as the area followed by Score: (n) score name.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Climate Adaptation and Mitigation global target',
-      explanation:
-        'The global targets selected for the Climate Adaptation and Mitigation impact area, one line each as SMO code - target, under that area in the Impact Areas cell.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Environmental Health and Biodiversity score',
-      explanation:
-        'The score given to the Environmental Health and Biodiversity impact area, shown in the Impact Areas cell as the area followed by Score: (n) score name.',
-      section_fill_argb: null,
-    },
-    {
-      section: null,
-      field_label: 'Environmental Health and Biodiversity global target',
-      explanation:
-        'The global targets selected for the Environmental Health and Biodiversity impact area, one line each as SMO code - target, under that area in the Impact Areas cell.',
+        'One bullet line per scored impact area, as area - Score: (n) score name, followed by one line per selected global target as SMO code - target. Required on OICR results.',
       section_fill_argb: null,
     },
     {
@@ -601,35 +552,35 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
       field_label: 'Use level justification',
       explanation:
         'Free-text justification of the chosen use level. Required when the level is 6 or higher.',
-      section_fill_argb: 'FF6A1B9A',
+      section_fill_argb: null,
     },
     {
       section: null,
       field_label: 'Linked innovation development',
       explanation:
         'The linked innovation-development result, shown as platform code, official code, and title. Required on an Innovation Use result.',
-      section_fill_argb: 'FF6A1B9A',
+      section_fill_argb: null,
     },
     {
       section: null,
       field_label: 'Actors',
       explanation:
         'One bullet line per actor type, including an optional custom name and either sex and age counts or an aggregate total.',
-      section_fill_argb: 'FF6A1B9A',
+      section_fill_argb: null,
     },
     {
       section: null,
       field_label: 'Organizations',
       explanation:
         'One bullet line per organization, either a known institution or a type with an optional sub-type and a count.',
-      section_fill_argb: 'FF6A1B9A',
+      section_fill_argb: null,
     },
     {
       section: null,
       field_label: 'Quantifications',
       explanation:
         'One bullet line per measure, with the number and the unit. A negative number is valid.',
-      section_fill_argb: 'FF6A1B9A',
+      section_fill_argb: null,
     },
     {
       section: 'Innovation Development',

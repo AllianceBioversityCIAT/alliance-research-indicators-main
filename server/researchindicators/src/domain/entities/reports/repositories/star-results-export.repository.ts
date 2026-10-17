@@ -3,9 +3,11 @@ import { DataSource } from 'typeorm';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FullFiltersReportDto } from '../dto/filters-report.dto';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import { ResultSortEnum } from '../../results/enum/result-sort.enum';
+import { SessionFormatEnum } from '../../session-formats/enums/session-format.enum';
 import { ResultRepository } from '../../results/repositories/result.repository';
 import { STAR_INNOVATION_DEV_RAW_COLUMNS } from '../handlers/star-results-metadata/star-results-metadata.innovation-dev.columns';
 
@@ -124,6 +126,7 @@ export class StarResultsExportRepository {
         csd.group_session_participants_non_binary AS number_people_trained_non_binary,
         csd.group_session_purpose_name AS group_session_purpose_name,
         csd.group_is_attending_organization AS group_is_attending_organization,
+        oob.organizations_on_behalf AS organizations_on_behalf,
         csd.individual_trainee_affiliation AS individual_trainee_affiliation,
         csd.individual_trainee_name AS individual_trainee_name,
         csd.individual_trainee_nationality AS individual_trainee_nationality,
@@ -167,6 +170,39 @@ export class StarResultsExportRepository {
       LEFT JOIN report_evidences ev ON ev.result_id = gi.result_id
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
+      LEFT JOIN LATERAL (
+        SELECT report_field(
+          (
+            SELECT GROUP_CONCAT(
+              IF(
+                ci.code IS NULL,
+                CONCAT('• Unknown (id ', ri.institution_id, ')'),
+                CONCAT_WS('', '• [id: ', ci.code, '] ', ci.acronym, ' - (HQ:', cil.name, ') ', ci.name)
+              )
+              ORDER BY ri.result_institution_id
+              SEPARATOR '\n'
+            )
+            FROM result_institutions ri
+            LEFT JOIN clarisa_institutions ci ON ci.code = ri.institution_id
+            LEFT JOIN clarisa_institution_locations cil
+              ON cil.institution_id = ci.code AND cil.isHeadquarter = TRUE
+            WHERE ri.result_id = gi.result_id
+              AND ri.institution_role_id = ${InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE}
+              AND ri.is_active = TRUE
+          ),
+          TRUE,
+          COALESCE(
+            r.indicator_id = ${IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}
+              AND rcs.session_format_id = ${SessionFormatEnum.GROUP}
+              AND rcs.is_attending_organization = TRUE,
+            FALSE
+          )
+        ) AS organizations_on_behalf
+        FROM results r
+        LEFT JOIN result_capacity_sharing rcs
+          ON rcs.result_id = r.result_id AND rcs.is_active = TRUE
+        WHERE r.result_id = gi.result_id
+      ) oob ON TRUE
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
       LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
       LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id

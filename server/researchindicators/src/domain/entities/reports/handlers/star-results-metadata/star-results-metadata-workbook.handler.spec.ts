@@ -269,7 +269,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     // A row without its own fill inherits the band above it.
     expect(rows[2]).toMatchObject({
       section: '',
-      field_label: 'Platform',
+      field_label: 'Source Platform',
       _rowFillArgb: 'FF203C61',
     });
     expect(rows.map((r) => r.field_label)).not.toContain(
