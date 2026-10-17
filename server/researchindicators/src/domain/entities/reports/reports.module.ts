@@ -7,7 +7,6 @@ import { ResultCapacitySharingModule } from '../result-capacity-sharing/result-c
 import { ExcelWorkbookBuilder } from './core/excel-workbook.builder';
 import { WorkbookSheetOrderResolver } from './core/workbook-sheet-order.resolver';
 import { StarResultsMetadataWorkbookHandler } from './handlers/star-results-metadata/star-results-metadata-workbook.handler';
-import { ReportLayoutRepository } from './repositories/report-layout.repository';
 import { StarResultsExportRepository } from './repositories/star-results-export.repository';
 import { ReportHandlerRegistry } from './report-handler.registry';
 import { ReportsGenerationService } from './reports-generation.service';
@@ -34,7 +33,6 @@ import { ReportMsApp } from '../../tools/broker/report-ms.app';
   providers: [
     ExcelWorkbookBuilder,
     WorkbookSheetOrderResolver,
-    ReportLayoutRepository,
     StarResultsExportRepository,
     StarResultsMetadataWorkbookHandler,
     ReportHandlerRegistry,

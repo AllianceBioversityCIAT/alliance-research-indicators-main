@@ -145,6 +145,9 @@ const CELL_KEYS = [
 ] as const;
 
 type CellKey = (typeof CELL_KEYS)[number];
+
+// No form field: the sex and age answer is per actor, inside Actors.
+const UNEXPORTED_KEY: CellKey = 'innovation_dev_no_sex_age_disaggregation';
 type Cells = Record<CellKey, string>;
 
 const LATERAL_ALIASES = ['ra', 'rit', 'ritf', 'lr'] as const;
@@ -2299,7 +2302,9 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
       const phase3Params = phase3Call?.params ?? [];
       expect(phase3Params).toEqual(bulkIds);
       expect((phase3.match(/\?/g) ?? []).length).toBe(bulkIds.length);
-      for (const key of CELL_KEYS) {
+      // The view keeps this alias; the export no longer selects it.
+      expect(phase3).not.toContain(UNEXPORTED_KEY);
+      for (const key of CELL_KEYS.filter((k) => k !== UNEXPORTED_KEY)) {
         expect(phase3).toContain(key);
       }
       const plan = planText(

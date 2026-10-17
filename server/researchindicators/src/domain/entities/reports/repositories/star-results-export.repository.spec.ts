@@ -6,7 +6,7 @@ import { ResultSortEnum } from '../../results/enum/result-sort.enum';
 import { ResultRepository } from '../../results/repositories/result.repository';
 import { StarResultsExportRepository } from './star-results-export.repository';
 
-/** Design §3.2 aliases, column order 81–112. */
+/** Design §3.2 aliases, column order 81–111. */
 const INNOVATION_DEV_ALIASES = [
   'innovation_dev_short_title',
   'innovation_dev_nature',
@@ -16,7 +16,6 @@ const INNOVATION_DEV_ALIASES = [
   'innovation_dev_readiness_level',
   'innovation_dev_readiness_explanation',
   'innovation_dev_anticipated_users',
-  'innovation_dev_no_sex_age_disaggregation',
   'innovation_dev_actors',
   'innovation_dev_organizations',
   'innovation_dev_beneficiaries',
@@ -335,6 +334,26 @@ describe('StarResultsExportRepository', () => {
     await repo.findStarResultsMetadataRows(baseFilters);
     const [sql] = queryRunnerQuery.mock.calls[1];
     expect(sql).toContain('https://app.example/result/STAR-');
+  });
+
+  it('selects the group-session organizations on behalf from result_institutions role 2', async () => {
+    findResultsV2.mockResolvedValueOnce({
+      data: [{ result_id: 1 }],
+      pagination: { hasNextPage: false },
+    });
+    queryRunnerQuery.mockResolvedValue([]);
+    await repo.findStarResultsMetadataRows(baseFilters);
+    const [sql] = queryRunnerQuery.mock.calls[1];
+    expect(sql).toContain(
+      'oob.organizations_on_behalf AS organizations_on_behalf',
+    );
+    expect(sql).toContain('LEFT JOIN LATERAL');
+    expect(sql).toContain('WHERE ri.result_id = gi.result_id');
+    expect(sql).toContain('AND ri.institution_role_id = 2');
+    expect(sql).toContain('AND rcs.session_format_id = 2');
+    expect(sql).toContain('AND rcs.is_attending_organization = TRUE');
+    expect(sql).toContain('r.indicator_id = 1');
+    expect(sql).toContain(') oob ON TRUE');
   });
 
   it('rolls back and rethrows when phase-2 query fails', async () => {

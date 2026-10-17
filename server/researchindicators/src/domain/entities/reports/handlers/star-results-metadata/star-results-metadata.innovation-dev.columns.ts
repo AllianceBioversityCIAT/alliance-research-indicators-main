@@ -1,7 +1,8 @@
 import type { StarRawSectionColumn } from './star-results-metadata.sections';
 
 /**
- * Innovation Development columns 81–112.
+ * Innovation Development columns 81–111.
+ * No result-level sex and age column: the form asks it per actor, inside Actors.
  * Header text is the dictionary `field_label` (design §3.2a), byte for byte.
  * Keys are the `report_innovation_dev` aliases.
  *
@@ -55,12 +56,6 @@ export const STAR_INNOVATION_DEV_RAW_COLUMNS: StarRawSectionColumn[] = [
     section: 'INNOVATION_DEVELOPMENT',
     header: 'Anticipated users',
     width: 28,
-  },
-  {
-    key: 'innovation_dev_no_sex_age_disaggregation',
-    section: 'INNOVATION_DEVELOPMENT',
-    header: 'Sex and age disaggregation not applicable',
-    width: 40,
   },
   {
     key: 'innovation_dev_actors',
