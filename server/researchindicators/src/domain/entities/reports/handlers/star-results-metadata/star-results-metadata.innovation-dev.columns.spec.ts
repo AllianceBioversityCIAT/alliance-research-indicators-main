@@ -73,24 +73,24 @@ const INNOVATION_DEV_DICTIONARY = [
 ] as const;
 
 describe('STAR_INNOVATION_DEV_RAW_COLUMNS', () => {
-  it('appends 31 Innovation Development columns after the existing 80', () => {
+  it('appends 31 Innovation Development columns after the existing 84', () => {
     expect(INNOVATION_DEV_DICTIONARY).toHaveLength(31);
     expect(STAR_INNOVATION_DEV_RAW_COLUMNS).toHaveLength(31);
-    expect(STAR_RESULTS_METADATA_RAW_COLUMNS).toHaveLength(111);
-    expect(STAR_RESULTS_METADATA_RAW_COLUMNS[74]?.key).toBe(
+    expect(STAR_RESULTS_METADATA_RAW_COLUMNS).toHaveLength(115);
+    expect(STAR_RESULTS_METADATA_RAW_COLUMNS[78]?.key).toBe(
       'innovation_use_level',
     );
-    expect(STAR_RESULTS_METADATA_RAW_COLUMNS[79]).toMatchObject({
+    expect(STAR_RESULTS_METADATA_RAW_COLUMNS[83]).toMatchObject({
       key: 'innovation_use_quantifications',
       section: 'INNOVATION_USE',
       header: 'Quantifications',
     });
     expect(
-      STAR_RESULTS_METADATA_RAW_COLUMNS.slice(0, 80).some((column) =>
+      STAR_RESULTS_METADATA_RAW_COLUMNS.slice(0, 84).some((column) =>
         column.key.startsWith('innovation_dev_'),
       ),
     ).toBe(false);
-    expect(STAR_RESULTS_METADATA_RAW_COLUMNS.slice(80)).toEqual(
+    expect(STAR_RESULTS_METADATA_RAW_COLUMNS.slice(84)).toEqual(
       STAR_INNOVATION_DEV_RAW_COLUMNS,
     );
   });
