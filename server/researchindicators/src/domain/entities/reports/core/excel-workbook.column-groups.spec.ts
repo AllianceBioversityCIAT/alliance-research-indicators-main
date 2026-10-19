@@ -199,7 +199,7 @@ describe('deriveColumnGroups (synthetic arrays)', () => {
 });
 
 describe('deriveColumnGroups over the real raw array', () => {
-  it('matches the intended layout exactly and ends at column 111', () => {
+  it('matches the intended layout exactly and ends at column 115', () => {
     const result = deriveColumnGroups(
       STAR_RESULTS_METADATA_RAW_COLUMNS,
       STAR_RAW_SECTIONS,
@@ -214,41 +214,41 @@ describe('deriveColumnGroups over the real raw array', () => {
       },
       {
         fromCol: 15,
-        toCol: 22,
+        toCol: 25,
         label: 'ALLIANCE ALIGNMENT',
         fillArgb: 'FF2A4783',
       },
-      { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
+      { fromCol: 26, toCol: 26, label: 'PARTNERS', fillArgb: 'FF325B94' },
       {
-        fromCol: 24,
-        toCol: 27,
+        fromCol: 27,
+        toCol: 30,
         label: 'GEOGRAPHIC SCOPE',
         fillArgb: 'FF5A91D3',
       },
-      { fromCol: 28, toCol: 29, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
-      { fromCol: 30, toCol: 30, label: 'LINK TO RESULT', fillArgb: 'FF7E57C2' },
-      { fromCol: 31, toCol: 35, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
+      { fromCol: 31, toCol: 32, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
+      { fromCol: 33, toCol: 33, label: 'LINK TO RESULT', fillArgb: 'FF7E57C2' },
+      { fromCol: 34, toCol: 38, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
       {
-        fromCol: 36,
-        toCol: 56,
+        fromCol: 39,
+        toCol: 59,
         label: 'CAPSHARING DETAILS',
         fillArgb: 'FF4D7C31',
       },
-      { fromCol: 57, toCol: 60, label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
-      { fromCol: 61, toCol: 74, label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
+      { fromCol: 60, toCol: 63, label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
+      { fromCol: 64, toCol: 78, label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
       {
-        fromCol: 75,
-        toCol: 80,
+        fromCol: 79,
+        toCol: 84,
         label: 'INNOVATION USE',
         fillArgb: 'FF6A1B9A',
       },
       {
-        fromCol: 81,
-        toCol: 111,
+        fromCol: 85,
+        toCol: 115,
         label: 'INNOVATION DEVELOPMENT',
         fillArgb: 'FF00897B',
       },
     ]);
-    expect(result.lastColumn).toBe(111);
+    expect(result.lastColumn).toBe(115);
   });
 });

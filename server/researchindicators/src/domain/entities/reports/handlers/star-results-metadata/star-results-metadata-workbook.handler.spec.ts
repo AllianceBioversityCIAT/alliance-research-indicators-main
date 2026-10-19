@@ -28,30 +28,30 @@ const readFileSync = fs.readFileSync as jest.MockedFunction<
 /** Requirements §1 intended layout. Literals, not derived. */
 const INTENDED_RAW_BANDS = [
   { fromCol: 1, toCol: 14, label: 'GENERAL INFORMATION', fillArgb: 'FF203C61' },
-  { fromCol: 15, toCol: 22, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
-  { fromCol: 23, toCol: 23, label: 'PARTNERS', fillArgb: 'FF325B94' },
-  { fromCol: 24, toCol: 27, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
-  { fromCol: 28, toCol: 29, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
-  { fromCol: 30, toCol: 30, label: 'LINK TO RESULT', fillArgb: 'FF7E57C2' },
-  { fromCol: 31, toCol: 35, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
+  { fromCol: 15, toCol: 25, label: 'ALLIANCE ALIGNMENT', fillArgb: 'FF2A4783' },
+  { fromCol: 26, toCol: 26, label: 'PARTNERS', fillArgb: 'FF325B94' },
+  { fromCol: 27, toCol: 30, label: 'GEOGRAPHIC SCOPE', fillArgb: 'FF5A91D3' },
+  { fromCol: 31, toCol: 32, label: 'EVIDENCES', fillArgb: 'FF64B1DD' },
+  { fromCol: 33, toCol: 33, label: 'LINK TO RESULT', fillArgb: 'FF7E57C2' },
+  { fromCol: 34, toCol: 38, label: 'IP RIGHTS', fillArgb: 'FF35749A' },
   {
-    fromCol: 36,
-    toCol: 56,
+    fromCol: 39,
+    toCol: 59,
     label: 'CAPSHARING DETAILS',
     fillArgb: 'FF4D7C31',
   },
-  { fromCol: 57, toCol: 60, label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
-  { fromCol: 61, toCol: 74, label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
-  { fromCol: 75, toCol: 80, label: 'INNOVATION USE', fillArgb: 'FF6A1B9A' },
+  { fromCol: 60, toCol: 63, label: 'POLICY DETAILS', fillArgb: 'FFDA7842' },
+  { fromCol: 64, toCol: 78, label: 'OICR DETAILS', fillArgb: 'FFD9A041' },
+  { fromCol: 79, toCol: 84, label: 'INNOVATION USE', fillArgb: 'FF6A1B9A' },
   {
-    fromCol: 81,
-    toCol: 111,
+    fromCol: 85,
+    toCol: 115,
     label: 'INNOVATION DEVELOPMENT',
     fillArgb: 'FF00897B',
   },
 ] as const;
 
-/** Design §3.2a labels for columns 81–111. Literals, not taken from the column module. */
+/** Design §3.2a labels for columns 85–115. Literals, not taken from the column module. */
 const INNOVATION_DEV_HEADERS = [
   'Short title',
   'Innovation nature',
@@ -217,8 +217,8 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       'This file contains the results generated from the selected filters in STAR.',
     );
     expect(raw?.presentation?.bannerNotice).toBeUndefined();
-    expect(raw?.presentation?.bannerTitleMergeToCol).toBe(111);
-    expect(raw?.columns).toHaveLength(111);
+    expect(raw?.presentation?.bannerTitleMergeToCol).toBe(115);
+    expect(raw?.columns).toHaveLength(115);
   });
 
   it('builds Raw data then Data dictionary and does not read layout tables', async () => {
@@ -236,7 +236,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     });
   });
 
-  it('fills Raw data column 31 header with FF35749A', async () => {
+  it('fills Raw data column 34 header with FF35749A', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -246,7 +246,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const raw = spec.sheets.find(
       (s) => s.sheetKey === STAR_RESULTS_METADATA_SHEET_KEYS.RAW_DATA,
     );
-    expect(raw?.columns[30]?.headerFillArgb).toBe('FF35749A');
+    expect(raw?.columns[33]?.headerFillArgb).toBe('FF35749A');
   });
 
   it('builds the Data dictionary sheet from the in-code rows', async () => {
@@ -277,7 +277,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     );
   });
 
-  it('reads back the twelve section bands and the C1:DG1 banner', async () => {
+  it('reads back the twelve section bands and the C1:DK1 banner', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -291,7 +291,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(ws).toBeDefined();
     const merges = ws!.model.merges;
     const banner = merges.find((m) => m.startsWith('C1:'));
-    expect(banner).toBe('C1:DG1');
+    expect(banner).toBe('C1:DK1');
     expect(sheetContainsComingSoon(ws!)).toBe(false);
     for (const band of INTENDED_RAW_BANDS) {
       let located: ExcelJS.Cell | undefined;
@@ -325,7 +325,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     }
     const headerCell = ws!
       .getRow(rowContaining(ws!, 'Who owns IP rights?'))
-      .getCell(31);
+      .getCell(34);
     expect(
       (headerCell.fill as ExcelJS.FillPattern).fgColor?.argb?.toUpperCase(),
     ).toBe('FF35749A');
@@ -379,7 +379,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(byKey.get('start_date')?.cellDataType).toBe('date');
     expect(byKey.get('end_date')?.cellDataType).toBe('date');
     expect(byKey.get('result_code')?.cellDataType).toBeUndefined();
-    expect(raw!.columns).toHaveLength(111);
+    expect(raw!.columns).toHaveLength(115);
     expect(
       raw!.columns.find((c) => c.key === 'training_engagement_report')?.header,
     ).toBe('Training type');
@@ -440,7 +440,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(d.getUTCDate()).toBe(15);
   });
 
-  it('reads Innovation Use values back under headers 75–80', async () => {
+  it('reads Innovation Use values back under headers 79–84', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -507,19 +507,19 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const merges = ws!.model.merges;
     const headerRowNumber = rowContaining(ws!, 'Innovation use level');
     const groupRowNumber = headerRowNumber - 1;
-    expect(merges).toContain('C1:DG1');
+    expect(merges).toContain('C1:DK1');
     expect(merges).toContain(
-      `${letter(75)}${groupRowNumber}:${letter(80)}${groupRowNumber}`,
+      `${letter(79)}${groupRowNumber}:${letter(84)}${groupRowNumber}`,
     );
     expect(merges).toContain(
-      `${letter(61)}${groupRowNumber}:${letter(74)}${groupRowNumber}`,
+      `${letter(64)}${groupRowNumber}:${letter(78)}${groupRowNumber}`,
     );
-    expect(ws!.getRow(groupRowNumber).getCell(75).value).toBe('INNOVATION USE');
-    expect(ws!.getRow(headerRowNumber).getCell(74).value).toBe('Impact Areas');
+    expect(ws!.getRow(groupRowNumber).getCell(79).value).toBe('INNOVATION USE');
+    expect(ws!.getRow(headerRowNumber).getCell(78).value).toBe('Impact Areas');
     const headerRow = ws!.getRow(headerRowNumber);
     const dataRow = ws!.getRow(headerRowNumber + 1);
     headers.forEach((header, index) => {
-      const col = 75 + index;
+      const col = 79 + index;
       expect(headerRow.getCell(col).value).toBe(header);
       if (keys[index] === 'innovation_use_linked_dev') {
         expect(dataRow.getCell(col).value).toEqual({
@@ -530,10 +530,10 @@ describe('StarResultsMetadataWorkbookHandler', () => {
       }
       expect(dataRow.getCell(col).value).toBe(innovationUseRow[keys[index]]);
     });
-    const unlinked = ws!.getRow(headerRowNumber + 2).getCell(77);
+    const unlinked = ws!.getRow(headerRowNumber + 2).getCell(81);
     expect(unlinked.value).toBe('Not provided');
     expect(typeof unlinked.value).toBe('string');
-    const actorsCol = 75 + headers.indexOf('Actors');
+    const actorsCol = 79 + headers.indexOf('Actors');
     expect(headerRow.getCell(actorsCol).value).toBe('Actors');
     expect(dataRow.getCell(actorsCol).value).toBe(actors);
   });
@@ -732,7 +732,7 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     expect(spec.sheets.length).toBeGreaterThan(0);
   });
 
-  it('reads Innovation Development headers by content at columns 81-111', async () => {
+  it('reads Innovation Development headers by content at columns 85-115', async () => {
     fetchMock.mockResolvedValue({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1]).buffer,
@@ -763,27 +763,27 @@ describe('StarResultsMetadataWorkbookHandler', () => {
     const headerRowNumber = rowContaining(ws!, 'Short title');
     expect(headerRowNumber).toBeGreaterThan(0);
     const headerRow = ws!.getRow(headerRowNumber);
-    expect(headerRow.getCell(80).value).toBe('Quantifications');
+    expect(headerRow.getCell(84).value).toBe('Quantifications');
     INNOVATION_DEV_HEADERS.forEach((header, index) => {
-      expect(headerRow.getCell(81 + index).value).toBe(header);
+      expect(headerRow.getCell(85 + index).value).toBe(header);
     });
     expect(
       (
-        headerRow.getCell(81).fill as ExcelJS.FillPattern
+        headerRow.getCell(85).fill as ExcelJS.FillPattern
       ).fgColor?.argb?.toUpperCase(),
     ).toBe('FF00897B');
     const devData = ws!.getRow(headerRowNumber + 1);
-    expect(devData.getCell(81).value).toBe('cell-0');
-    expect(devData.getCell(111).value).toBe('cell-30');
+    expect(devData.getCell(85).value).toBe('cell-0');
+    expect(devData.getCell(115).value).toBe('cell-30');
     const otherData = ws!.getRow(headerRowNumber + 2);
-    expect(otherData.getCell(81).value).toBe('Not applicable');
-    expect(otherData.getCell(111).value).toBe('Not applicable');
+    expect(otherData.getCell(85).value).toBe('Not applicable');
+    expect(otherData.getCell(115).value).toBe('Not applicable');
     const merges = ws!.model.merges;
     const groupRowNumber = headerRowNumber - 1;
     expect(merges).toContain(
-      `${excelColumnLetter(81)}${groupRowNumber}:${excelColumnLetter(111)}${groupRowNumber}`,
+      `${excelColumnLetter(85)}${groupRowNumber}:${excelColumnLetter(115)}${groupRowNumber}`,
     );
-    expect(ws!.getRow(groupRowNumber).getCell(81).value).toBe(
+    expect(ws!.getRow(groupRowNumber).getCell(85).value).toBe(
       'INNOVATION DEVELOPMENT',
     );
   });

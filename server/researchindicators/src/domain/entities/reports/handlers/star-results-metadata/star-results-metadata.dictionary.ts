@@ -158,23 +158,44 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Primary lever(s)',
+      field_label: 'Primary Lever / Research Area',
       explanation:
-        'The short name of the primary lever of the result. A missing primary lever reads Not provided.',
+        'The short name of the primary lever or research area of the result. A missing one reads Not provided.',
       section_fill_argb: null,
     },
     {
       section: null,
-      field_label: 'Contributing lever(s)',
+      field_label: 'Contributing Levers / Research Areas',
       explanation:
-        'The short names of the contributing levers, separated by commas. Optional: none reads Not mandatory.',
+        'The short names of the contributing levers or research areas, separated by commas. Optional: none reads Not mandatory.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Strategic Objectives',
+      explanation:
+        'One bullet line per strategic objective. Required on Portfolio 2 results; Not applicable on Portfolio 1.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Impact Outcomes',
+      explanation:
+        'One bullet line per impact outcome. Required on Portfolio 2 Policy Change, OICR and Innovation Use results; Not applicable otherwise.',
       section_fill_argb: null,
     },
     {
       section: null,
       field_label: 'Contribution to SDG targets',
       explanation:
-        'One bullet line per SDG target, as (lever) - target code - target text. A missing selection reads Not provided.',
+        'One bullet line per SDG target: (lever) - target code - target text on Portfolio 1, target code - target text on Portfolio 2. Required on OICR results; Not applicable on every other indicator.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Contribution to SDG',
+      explanation:
+        'One bullet line per SDG the result is linked to. Required on every indicator except OICR, which reports SDG targets instead.',
       section_fill_argb: null,
     },
     {
@@ -507,9 +528,16 @@ export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[]
     },
     {
       section: null,
-      field_label: 'Quantification',
+      field_label: 'Quantification - Actual count',
       explanation:
-        'Actual counts followed by extrapolated estimates, one bullet line each as Number, Unit and Comment. Optional.',
+        'Actual counts, one bullet line each as Number, Unit and Comment. Optional.',
+      section_fill_argb: null,
+    },
+    {
+      section: null,
+      field_label: 'Quantification - Extrapolated estimates',
+      explanation:
+        'Extrapolated estimates, one bullet line each as Number, Unit and Comment. Optional.',
       section_fill_argb: null,
     },
     {
