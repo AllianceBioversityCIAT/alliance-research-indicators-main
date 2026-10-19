@@ -1,0 +1,316 @@
+import { DataSource } from 'typeorm';
+import { PfmScopeEnum } from '../enum/pfm-scope.enum';
+import {
+  mapMonitoredRow,
+  PFM_MONITORED_INDICATOR_IDS,
+  PFM_REPORT_YEAR,
+  PooledFundingMonitorRepository,
+  splitSciencePrograms,
+} from './pooled-funding-monitor.repository';
+
+// @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-02
+//
+// Scope of this file: the PURE parts of the repository (row mapping, DD-PFM-7,
+// scope guard). It deliberately says nothing about what the SQL returns - a
+// mocked DataSource cannot represent SQL (KZ-017). The SQL is asserted on real
+// rows in `test/pooled-funding-monitor.integration-spec.ts`.
+
+const sp = (
+  code: string,
+  role: string | null,
+  extra: Partial<{ name: string | null; color: string; category: string }> = {},
+) => ({
+  code,
+  role,
+  name: 'name' in extra ? extra.name : `${code} name`,
+  color: extra.color ?? null,
+  category: extra.category ?? null,
+});
+
+describe('splitSciencePrograms (DD-PFM-7)', () => {
+  it('uses the PRIMARY row and lists every other SP as contributing, ordered by code', () => {
+    const { primary, contributing } = splitSciencePrograms([
+      sp('SP09', 'CONTRIBUTING'),
+      sp('SP02', 'PRIMARY', { color: '#123456', category: 'Accelerators' }),
+      sp('SP05', null),
+    ]);
+    expect(primary).toEqual({
+      code: 'SP02',
+      name: 'SP02 name',
+      color: '#123456',
+      category: 'Accelerators',
+    });
+    expect(contributing.map((c) => c.code)).toEqual(['SP05', 'SP09']);
+  });
+
+  it('promotes the ONLY active SP when its role is NULL (legacy rows)', () => {
+    const { primary, contributing } = splitSciencePrograms([sp('SP07', null)]);
+    expect(primary?.code).toBe('SP07');
+    expect(contributing).toEqual([]);
+  });
+
+  it('does NOT guess a primary among several NULL-role SPs', () => {
+    const { primary, contributing } = splitSciencePrograms([
+      sp('SP01', null),
+      sp('SP02', null),
+    ]);
+    expect(primary).toBeNull();
+    expect(contributing.map((c) => c.code)).toEqual(['SP01', 'SP02']);
+  });
+
+  it('falls back to the code when CLARISA has no name for the program', () => {
+    const { primary } = splitSciencePrograms([
+      sp('SP11', 'PRIMARY', { name: null }),
+    ]);
+    expect(primary?.name).toBe('SP11');
+  });
+
+  it('returns no primary and no contributing for an empty alignment', () => {
+    expect(splitSciencePrograms([])).toEqual({
+      primary: null,
+      contributing: [],
+    });
+  });
+});
+
+describe('mapMonitoredRow', () => {
+  const base = {
+    result_id: '10',
+    result_official_code: '1001',
+    report_year: 2026,
+    platform_code: 'STAR',
+    title: 'T',
+    indicator_id: '1',
+    indicator_name: 'Knowledge Product',
+    result_status_id: '6',
+    result_status_name: 'Approved',
+    updated_at_utc: '2026-03-05T23:30:00Z',
+    approved_at_utc: '2026-03-06T00:15:00Z',
+    is_synced_to_prms: 1,
+    project_code: 'P-A',
+    project_name: 'Alpha',
+    donor: 'D',
+    lead_pi: 'L',
+    creator_name: 'Ana Perez',
+    has_alignment: 1,
+    has_contribution: 1,
+    mapping_complete: 0,
+    sp_rows: [sp('SP02', 'PRIMARY'), sp('SP05', null)],
+    snapshot_years: [2024, 2025],
+    prms_latest: { status: 'REJECTED', justification: 'no' },
+  };
+
+  it('turns UTC strings into the same instant, whatever the process time zone', () => {
+    const row = mapMonitoredRow(base);
+    expect(row.approved_at.toISOString()).toBe('2026-03-06T00:15:00.000Z');
+    expect(row.updated_at.toISOString()).toBe('2026-03-05T23:30:00.000Z');
+  });
+
+  it('maps the creator name, null when the user is missing', () => {
+    expect(mapMonitoredRow(base).creator).toBe('Ana Perez');
+    expect(mapMonitoredRow({ ...base, creator_name: null }).creator).toBeNull();
+  });
+
+  it('maps star_status_name from result_status.name, null when missing', () => {
+    expect(
+      mapMonitoredRow({ ...base, star_status_name: 'Rejected' })
+        .star_status_name,
+    ).toBe('Rejected');
+    expect(mapMonitoredRow(base).star_status_name).toBeNull();
+  });
+
+  it('maps star_status_description from result_status.description, null when missing', () => {
+    expect(
+      mapMonitoredRow({ ...base, star_status_description: 'Approved by PI' })
+        .star_status_description,
+    ).toBe('Approved by PI');
+    expect(mapMonitoredRow(base).star_status_description).toBeNull();
+  });
+
+  describe('star_status_config (HITL 20: Results Center status colours)', () => {
+    const cfg = {
+      color: { border: '#7C9CB9', text: '#153C71', background: '#EEF4FA' },
+      icon: { color: '#153C71', name: 'pi-check' },
+    };
+
+    it('parses a JSON string (driver returns JSON columns as text) into an object', () => {
+      expect(
+        mapMonitoredRow({ ...base, star_status_config: JSON.stringify(cfg) })
+          .star_status_config,
+      ).toEqual(cfg);
+    });
+
+    it('passes an already-parsed object through', () => {
+      expect(
+        mapMonitoredRow({ ...base, star_status_config: cfg })
+          .star_status_config,
+      ).toEqual(cfg);
+    });
+
+    it('is null for NULL, empty, malformed JSON, or a non-object', () => {
+      for (const bad of [null, undefined, '', '{not json', '"str"', '[1]', 5]) {
+        expect(
+          mapMonitoredRow({ ...base, star_status_config: bad })
+            .star_status_config,
+        ).toBeNull();
+      }
+    });
+  });
+
+  it('keeps null dates null and parses a JSON string payload', () => {
+    const row = mapMonitoredRow({
+      ...base,
+      approved_at_utc: null,
+      sp_rows: JSON.stringify([sp('SP02', 'PRIMARY')]),
+      snapshot_years: null,
+    });
+    expect(row.approved_at).toBeNull();
+    expect(row.primary_sp?.code).toBe('SP02');
+    expect(row.snapshot_years).toEqual([]);
+  });
+
+  it('coerces tinyint flags to booleans and keeps NULL as NULL', () => {
+    const row = mapMonitoredRow({
+      ...base,
+      has_alignment: 0,
+      has_contribution: null,
+      mapping_complete: null,
+      is_synced_to_prms: '0',
+    });
+    expect(row.has_alignment).toBe(false);
+    expect(row.has_contribution).toBeNull();
+    expect(row.mapping_complete).toBeNull();
+    expect(row.is_synced_to_prms).toBe(false);
+  });
+
+  it('orders snapshot years newest first and exposes contributing names for T-01', () => {
+    const row = mapMonitoredRow(base);
+    expect(row.snapshot_years).toEqual([2025, 2024]);
+    expect(row.contributing_sp_names).toEqual(['SP05 name']);
+    expect(row.result_id).toBe(10);
+    expect(row.indicator_id).toBe(1);
+  });
+});
+
+describe('PooledFundingMonitorRepository scope guard', () => {
+  const dataSource = { query: jest.fn() } as unknown as DataSource;
+  const repository = new PooledFundingMonitorRepository(dataSource);
+
+  beforeEach(() => (dataSource.query as jest.Mock).mockReset());
+
+  it.each([undefined, null, NaN, '7' as unknown as number, 1.5])(
+    'refuses the PI scope without an integer user id (%p) instead of falling back to the portfolio',
+    async (userId) => {
+      await expect(
+        repository.findMonitoredResults({
+          scope: PfmScopeEnum.MINE,
+          userId,
+        }),
+      ).rejects.toThrow('PI scope requires the authenticated sec_user_id');
+      expect(dataSource.query).not.toHaveBeenCalled();
+    },
+  );
+
+  it('binds the user id twice (carnet + delegate branches) and never inlines it', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([]);
+    await repository.findMonitoredResults({
+      scope: PfmScopeEnum.MINE,
+      userId: 4242,
+    });
+    const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params.filter((p: unknown) => p === 4242)).toHaveLength(2);
+    expect(sql).not.toContain('4242');
+  });
+
+  it('adds no user binding for the portfolio scope', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([]);
+    await repository.findMonitoredResults({ scope: PfmScopeEnum.ALL });
+    const [, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params).toEqual([6, 'STAR', 2026]);
+  });
+
+  describe('HITL 21: report year 2026 and no OICR in every monitored query', () => {
+    const scope = { scope: PfmScopeEnum.ALL } as const;
+    const calls = async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([]);
+      await repository.findMonitoredResults(scope);
+      await repository.findMonthlySyncs(scope);
+      await repository.countSyncedThisYear(scope);
+      await repository.findFilterOptions(scope);
+      return (dataSource.query as jest.Mock).mock.calls as [
+        string,
+        unknown[],
+      ][];
+    };
+
+    it('PFM_REPORT_YEAR is 2026', () => {
+      expect(PFM_REPORT_YEAR).toBe(2026);
+    });
+
+    it('binds the year (never interpolates it) in every query that selects results', async () => {
+      const all = await calls();
+      expect(all).toHaveLength(6); // base, monthly, synced-this-year, 3 filter-option queries
+      for (const [sql, params] of all) {
+        expect(sql).toContain('r.report_year_id = ?');
+        expect(params).toContain(2026);
+        expect(sql).not.toContain('2026');
+      }
+    });
+
+    it('excludes OICR (indicator 5) in every query that selects results', async () => {
+      for (const [sql] of await calls()) {
+        expect(sql).toContain('r.indicator_id IN (1, 2, 3, 4, 6)');
+      }
+      expect(PFM_MONITORED_INDICATOR_IDS).not.toContain(5);
+    });
+
+    it('the portfolio denominator counts projects, not results: no year predicate', async () => {
+      (dataSource.query as jest.Mock).mockResolvedValue([{ total: '2' }]);
+      await repository.countContributingProjects();
+      const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+      expect(sql).not.toContain('report_year');
+      expect(params).toBeUndefined();
+    });
+  });
+
+  it('sums window months into the epoch bound the monthly query binds', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      { month: '2026-05', synced: '2' },
+    ]);
+    const out = await repository.findMonthlySyncs(
+      { scope: PfmScopeEnum.ALL },
+      new Date('2026-10-08T12:00:00Z'),
+    );
+    expect(out).toEqual([{ month: '2026-05', synced: 2 }]);
+    const [, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    // min(six-month start 2026-05-01, year start 2026-01-01) = 2026-01-01T00:00:00Z
+    expect(params[0]).toBe(Date.UTC(2026, 0, 1) / 1000);
+  });
+
+  it('counts synced-this-year over the UTC calendar year of `now`, bound as epochs', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([{ synced: '3' }]);
+    const out = await repository.countSyncedThisYear(
+      { scope: PfmScopeEnum.MINE, userId: 4242 },
+      new Date('2026-10-08T12:00:00Z'),
+    );
+    expect(out).toBe(3);
+    const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params.slice(0, 2)).toEqual([
+      Date.UTC(2026, 0, 1) / 1000,
+      Date.UTC(2027, 0, 1) / 1000,
+    ]);
+    expect(params.filter((p: unknown) => p === 4242)).toHaveLength(2);
+    expect(sql).toContain('COUNT(DISTINCT r.result_id)');
+    expect(sql).not.toContain('4242');
+  });
+
+  it('isPiOfAnyContributingProject binds the user id and reads row presence', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([{ ok: 1 }]);
+    expect(await repository.isPiOfAnyContributingProject(7)).toBe(true);
+    const [sql, params] = (dataSource.query as jest.Mock).mock.calls[0];
+    expect(params).toEqual([7, 7]);
+    expect(sql).not.toContain('= 7');
+    (dataSource.query as jest.Mock).mockResolvedValueOnce([]);
+    expect(await repository.isPiOfAnyContributingProject(7)).toBe(false);
+  });
+});

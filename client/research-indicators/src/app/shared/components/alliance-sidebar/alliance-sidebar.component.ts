@@ -20,6 +20,7 @@ import { RolesService } from '@services/cache/roles.service';
 import { ActionsService } from '@services/actions.service';
 import { AccountSidebarOption, AdministrationNavChild, AdministrationNavGroup } from '@interfaces/administration-nav.interface';
 import { ApiService } from '@services/api.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 
@@ -36,6 +37,7 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
   rolesService = inject(RolesService);
   actions = inject(ActionsService);
   private readonly api = inject(ApiService);
+  private readonly poolFundingFlags = inject(PoolFundingFlagsService);
 
   /**
    * My PI Delegates only makes sense for someone who is the PI of a project or
@@ -59,9 +61,22 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
 
   // ─── Principal Investigator options (R-UI-001 / design §9) ──────────────────
   // Flat, direct links (no collapsible parent). Rendered only when
-  // canSeePiDelegates() is true — see the check in ngOnInit.
+  // each option's own condition; the section renders when the list is non-empty.
+  // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor T-10 (DD-PFM-11/12)
   piOptions(): AdministrationNavChild[] {
-    return [{ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-users', iconSize: '13px' }];
+    const options: AdministrationNavChild[] = [];
+    if (this.canSeePiDelegates()) {
+      options.push({ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-users', iconSize: '13px' });
+    }
+    if (this.rolesService.canAccessPooledFundingMonitor() && this.poolFundingFlags.sectionEnabled()) {
+      options.push({
+        label: 'Pooled Funding Contribution Monitor',
+        link: '/pooled-funding-contribution-monitor',
+        icon: 'pi-chart-bar',
+        iconSize: '13px'
+      });
+    }
+    return options;
   }
 
   administrationGroups(): AdministrationNavGroup[] {

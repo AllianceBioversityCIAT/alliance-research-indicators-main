@@ -1,0 +1,164 @@
+<!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09 -->
+<!-- Read-only page (R-PFM-014): no sync controls, no "PRMS sync" label, two tabs only. Tokens only (NFR-PFM-003). -->
+<div class="flex flex-col pb-8" data-testid="pfm-page">
+  <!-- White band (as My PI Delegates): header, scope, KPIs and tab strip on the surface; panels below on the page background -->
+  <div class="flex flex-col bg-[var(--ac-pfm-surface)] pt-[8px] sm:pt-[12px] md:pt-[20px]" data-testid="pfm-band">
+  <header class="flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[10px] pt-[9px] md:px-[28px]">
+    <h1 class="atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
+      Pooled Funding Contribution Monitor
+    </h1>
+    <p class="atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
+      Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
+    </p>
+  </header>
+
+  <div class="flex flex-col gap-4 px-[24px] pb-4 md:px-[28px]">
+  <div class="flex flex-wrap items-center gap-4 pb-2">
+    <span class="text-[var(--ac-pfm-neutral-fg)] font-['Barlow'] text-[11px] font-semibold uppercase tracking-[0.12em]" id="pfm-scope-label">Viewing</span>
+    <div
+      class="inline-flex gap-0.5 rounded-full border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] p-[3px]"
+      role="group"
+      aria-labelledby="pfm-scope-label">
+      @for (s of scopes; track s.value) {
+        <button
+          type="button"
+          class="cursor-pointer rounded-full border-0 px-4 py-1 font-['Barlow'] text-[13px] font-semibold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+            store.scope() === s.value
+              ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]'
+              : 'bg-transparent text-[var(--ac-pfm-accent-navy)]'
+          }}"
+          [attr.aria-pressed]="store.scope() === s.value"
+          [attr.data-testid]="'pfm-scope-' + s.value"
+          (click)="selectScope(s.value)">
+          {{ s.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (!piEmpty()) {
+    <!-- KPI cards: share the summary request, so they share its loading / error state -->
+    @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
+      <div class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="h-[92px] animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]"></div>
+        }
+      </div>
+    } @else if (store.summaryState().error) {
+      <div
+        class="flex items-center gap-3 rounded-lg bg-[var(--ac-pfm-danger-bg)] px-4 py-3 text-[13px] text-[var(--ac-pfm-danger-fg)]"
+        role="alert"
+        data-testid="pfm-summary-error">
+        <span>The summary could not be loaded.</span>
+        <button
+          type="button"
+          class="cursor-pointer rounded-md border border-solid border-[color:var(--ac-pfm-danger-fg)] bg-transparent px-2.5 py-1 text-[12.5px] font-semibold text-[var(--ac-pfm-danger-fg)]"
+          data-testid="pfm-summary-retry"
+          (click)="store.retrySummary()">
+          Retry
+        </button>
+      </div>
+    } @else {
+      @if (store.summary(); as summary) {
+        <app-pfm-kpi-cards [kpis]="summary.kpis" [scope]="store.scope()" />
+      }
+    }
+  }
+  </div>
+
+  @if (!piEmpty()) {
+
+    <div class="flex items-end gap-0 border-0 border-b border-solid border-[color:var(--ac-grey-200)] px-2" role="tablist" aria-label="Monitor sections">
+      @for (t of tabs; track t.value; let i = $index) {
+        <button
+          type="button"
+          role="tab"
+          class="-mb-px flex cursor-pointer items-center border-0 border-b-2 border-solid bg-transparent px-5 py-3 font-['Barlow'] text-[14px] font-semibold leading-none transition-all duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+            store.tab() === t.value
+              ? 'border-b-[color:var(--ac-pfm-info-fg)] text-[color:var(--ac-pfm-info-fg)]'
+              : 'border-b-transparent text-[color:var(--ac-pfm-neutral-fg)]'
+          }}"
+          [id]="'pfm-tab-' + t.value"
+          [attr.aria-selected]="store.tab() === t.value"
+          [attr.aria-controls]="store.tab() === t.value ? 'pfm-panel-' + t.value : null"
+          [attr.tabindex]="store.tab() === t.value ? 0 : -1"
+          [attr.data-testid]="'pfm-tab-' + t.value"
+          (click)="selectTab(t.value)"
+          (keydown)="onTabKeydown($event, i)">
+          {{ t.label }}
+        </button>
+      }
+    </div>
+
+  }
+  </div>
+
+  @if (piEmpty()) {
+    <!-- PI-empty notice: content area below the white band, same padding as the tab panels -->
+    <div class="p-4">
+      <div
+        class="flex items-start gap-2 border-solid border-l-[4px] border-l-[color:var(--ac-warning-1)] bg-[color:var(--ac-warning-surface)] px-3 py-2.5"
+        role="note"
+        data-testid="pfm-pi-empty">
+        <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
+        <div class="flex flex-col items-start">
+          <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
+            You are not PI of any project contributing to Pool funding
+          </p>
+          <button
+            type="button"
+            class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
+            data-testid="pfm-pi-empty-switch"
+            (click)="selectScope('all')">
+            View whole portfolio
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+  @if (!piEmpty()) {
+  <div class="border border-t-0 border-solid border-[color:var(--ac-grey-200)] p-4">
+    @if (store.tab() === 'coverage') {
+      <div role="tabpanel" id="pfm-panel-coverage" aria-labelledby="pfm-tab-coverage" tabindex="0" data-testid="pfm-panel-coverage">
+        @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
+          <div class="h-48 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-coverage-skeleton" aria-busy="true"></div>
+        } @else if (store.summaryState().error) {
+          <div class="text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-coverage-error">
+            Portfolio coverage could not be loaded.
+            <button
+              type="button"
+              class="cursor-pointer border-0 bg-transparent font-semibold text-[var(--ac-pfm-danger-fg)] underline"
+              (click)="store.retrySummary()">
+              Retry
+            </button>
+          </div>
+        } @else {
+          @if (store.summary(); as summary) {
+            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" />
+          }
+        }
+      </div>
+    } @else {
+      <div role="tabpanel" id="pfm-panel-queue" aria-labelledby="pfm-tab-queue" tabindex="0" data-testid="pfm-panel-queue">
+        @if (store.queueState().error) {
+          <div class="text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-queue-error">
+            The results queue could not be loaded.
+            <button
+              type="button"
+              class="cursor-pointer border-0 bg-transparent font-semibold text-[var(--ac-pfm-danger-fg)] underline"
+              (click)="store.retryQueue()">
+              Retry
+            </button>
+          </div>
+        }
+        <!-- Only the very first load shows the full-panel skeleton; later refetches skeleton the groups area only -->
+        @if (store.queue()) {
+          <app-pfm-queue-tab />
+        } @else if (!store.queueState().error) {
+          <div class="h-48 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-queue-skeleton" aria-busy="true"></div>
+        }
+      </div>
+    }
+  </div>
+  }
+</div>

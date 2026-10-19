@@ -11,6 +11,7 @@ export class RolesService {
   private readonly melRegionalExpertRoleId = 10;
 
   private readonly technicalSupportRoleId = 7;
+  private readonly contributorRoleId = 3;
 
   createResultManagementService = inject(CreateResultManagementService);
   cache = inject(CacheService);
@@ -48,6 +49,12 @@ export class RolesService {
   );
 
   canEditAppConfiguration = computed(() => this.canAccessAppConfiguration());
+
+  /**
+   * Pooled Funding Contribution Monitor: any role other than Contributor (3) may view it
+   * (@akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor DD-PFM-11). No roles = no access.
+   */
+  canAccessPooledFundingMonitor = computed(() => this.roleList().some(r => r.role_id !== this.contributorRoleId));
 
   canEditOicr = computed(() => {
     if (!this.createResultManagementService.editingOicr()) {

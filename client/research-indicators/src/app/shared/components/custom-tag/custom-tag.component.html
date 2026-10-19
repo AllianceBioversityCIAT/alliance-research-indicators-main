@@ -9,9 +9,13 @@
     tooltipPosition="right"></i>
   }
   <span
-    class="font-semibold {{+statusId === 12 || +statusId === 13 ? '!min-w-[58px]' : ''}} {{statusId !== 4 ? '!min-w-[45px]' : ''}}"
+    class="font-semibold {{+statusId === 12 || +statusId === 13 ? '!min-w-[58px]' : ''}} {{statusId !== 4 && !trailingIconName && !fitContent ? '!min-w-[45px]' : ''}}"
     [class.leading-4]="!multiline" [class.leading-snug]="multiline" [class.min-w-0]="!!maxWidth || multiline"
     [class.truncate]="!!maxWidth && !multiline" [class.whitespace-nowrap]="!multiline"
     [class.whitespace-normal]="multiline" [class.break-words]="multiline"
-    [class.text-left]="multiline" [class.line-clamp-2]="multiline && !!maxWidth">{{ displayName() }}</span>
+    [class.text-left]="multiline" [class.line-clamp-2]="multiline && !!maxWidth">{{ statusName }}</span>
+  @if (trailingIconName) {
+  <i class="pi {{ trailingIconName }} shrink-0 xl:!text-[11px] !text-[9px] pl-1" [style.color]="trailingIconColor ?? statusColor"
+    aria-hidden="true" data-testid="custom-tag-trailing-icon"></i>
+  }
 </div>

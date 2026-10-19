@@ -9,6 +9,7 @@ import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { RolesService } from '@services/cache/roles.service';
 import { ActionsService } from '@services/actions.service';
 import { ApiService } from '@services/api.service';
+import { PoolFundingFlagsService } from '@shared/services/pool-funding-flags.service';
 
 // The sidebar asks a boolean endpoint whether to show My PI Delegates.
 class MockApiService {
@@ -40,7 +41,8 @@ describe('AllianceSidebarComponent', () => {
       canAccessCenterAdmin: jest.fn().mockReturnValue(false),
       canAccessAppConfiguration: jest.fn().mockReturnValue(false),
       // Admins ask the access endpoint with scope='all' — see the scope test below.
-      isAdmin: jest.fn().mockReturnValue(false)
+      isAdmin: jest.fn().mockReturnValue(false),
+      canAccessPooledFundingMonitor: jest.fn().mockReturnValue(false)
     } as unknown as RolesService;
     const mockActionsService = {
       logOut: jest.fn()
@@ -196,7 +198,7 @@ describe('AllianceSidebarComponent', () => {
     expect(fixture.nativeElement.querySelector('a[href="/my-pi-delegates"]')).not.toBeNull();
   });
 
-  it('hides the whole PI section when the user manages none (negative discriminator)', async () => {
+  it('hides the whole PI section when no PI option is visible (negative discriminator)', async () => {
     (TestBed.inject(ApiService) as unknown as MockApiService).hasAccess = false;
 
     const f = TestBed.createComponent(AllianceSidebarComponent);
@@ -208,6 +210,59 @@ describe('AllianceSidebarComponent', () => {
     const text = (f.nativeElement as HTMLElement).textContent ?? '';
     expect(text).not.toContain('PRINCIPAL INVESTIGATOR');
     expect(f.nativeElement.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
+  });
+
+  // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor T-10 (R-PFM-001, DD-PFM-11/12)
+  describe('Pooled Funding Contribution Monitor entry', () => {
+    const MONITOR_HREF = 'a[href="/pooled-funding-contribution-monitor"]';
+
+    async function render(opts: { piAccess: boolean; monitorAccess: boolean; flagOn?: boolean; collapsed?: boolean }) {
+      (TestBed.inject(ApiService) as unknown as MockApiService).hasAccess = opts.piAccess;
+      (TestBed.inject(RolesService) as unknown as { canAccessPooledFundingMonitor: jest.Mock }).canAccessPooledFundingMonitor.mockReturnValue(
+        opts.monitorAccess
+      );
+      (TestBed.inject(CacheService) as unknown as { isSidebarCollapsed: jest.Mock }).isSidebarCollapsed.mockReturnValue(!!opts.collapsed);
+      TestBed.inject(PoolFundingFlagsService).sectionEnabled.set(opts.flagOn ?? true);
+      const f = TestBed.createComponent(AllianceSidebarComponent);
+      f.detectChanges();
+      await f.whenStable();
+      f.detectChanges();
+      return f.nativeElement as HTMLElement;
+    }
+
+    it('(a) PI-delegate access + admin role shows both items, monitor second', async () => {
+      const el = await render({ piAccess: true, monitorAccess: true });
+      expect(el.textContent).toContain('PRINCIPAL INVESTIGATOR');
+      const hrefs = Array.from(el.querySelectorAll('a.option')).map(a => a.getAttribute('href'));
+      expect(hrefs.indexOf('/my-pi-delegates')).toBeGreaterThanOrEqual(0);
+      expect(hrefs.indexOf('/pooled-funding-contribution-monitor')).toBe(hrefs.indexOf('/my-pi-delegates') + 1);
+      expect(el.textContent).toContain('Pooled Funding Contribution Monitor');
+    });
+
+    it('(b) no PI-delegate access + admin role shows the section with the monitor only', async () => {
+      const el = await render({ piAccess: false, monitorAccess: true });
+      expect(el.textContent).toContain('PRINCIPAL INVESTIGATOR');
+      expect(el.querySelector(MONITOR_HREF)).not.toBeNull();
+      expect(el.textContent).toContain('Pooled Funding Contribution Monitor');
+      expect(el.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
+    });
+
+    it('(b) also renders the monitor in the collapsed sidebar', async () => {
+      const el = await render({ piAccess: false, monitorAccess: true, collapsed: true });
+      expect(el.querySelector(MONITOR_HREF)).not.toBeNull();
+    });
+
+    it('(c) contributor-only without PI access renders no section', async () => {
+      const el = await render({ piAccess: false, monitorAccess: false });
+      expect(el.textContent).not.toContain('PRINCIPAL INVESTIGATOR');
+      expect(el.querySelector(MONITOR_HREF)).toBeNull();
+    });
+
+    it('(d) flag off removes the monitor, keeps My PI Delegates', async () => {
+      const el = await render({ piAccess: true, monitorAccess: true, flagOn: false });
+      expect(el.querySelector(MONITOR_HREF)).toBeNull();
+      expect(el.querySelector('a[href="/my-pi-delegates"]')).not.toBeNull();
+    });
   });
 
   // @akili-spec docs/specs/changes/my-pi-delegates-admin-scope
@@ -425,7 +480,8 @@ describe('AllianceSidebarComponent coverage (document listener + destroy)', () =
           useValue: {
             canAccessCenterAdmin: jest.fn().mockReturnValue(true),
             canAccessAppConfiguration: jest.fn().mockReturnValue(false),
-            isAdmin: jest.fn().mockReturnValue(false)
+            isAdmin: jest.fn().mockReturnValue(false),
+            canAccessPooledFundingMonitor: jest.fn().mockReturnValue(false)
           }
         },
         { provide: ActionsService, useValue: { logOut: jest.fn() } }
