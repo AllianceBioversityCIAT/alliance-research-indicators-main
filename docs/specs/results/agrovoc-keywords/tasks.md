@@ -127,7 +127,7 @@ graph TD
 
 ## T-03 — Cancellable GET + API method + interceptor exclusion (client)
 
-- **Status:** todo · **Size:** S · **Dependencies:** none (contract fixed in design §4)
+- **Status:** done (PASS attempt 2, 2026-10-19, see execution.md) · **Size:** S · **Dependencies:** none (contract fixed in design §4)
 - **Requirements:** R-AGV-004 *Typing again cancels* (transport half: abort on unsubscribe) · R-AGV-005 *Error* (no stacked generic toast) · R-AGV-002 contract (client side)
 - **Design refs:** §2.2, DD-5, DD-7; P-10, P-11
 - **Scope:**
@@ -156,12 +156,12 @@ graph TD
   - `shared/testing/mock-services.mock.ts` — check whether it mocks `ApiService`/`ToPromiseService` by shape; extend it if a spec needs `GET_AgrovocSearch$`
 - **Review:** `full`. It touches a global interceptor and a root HTTP service (shared state).
 - **Done criteria:**
-  - [ ] Tests green
-  - [ ] Falsifiers observed red
-  - [ ] `npm run lint -- --quiet` clean
-  - [ ] `npm run build` green
-  - [ ] Spec type-check count for the 2 touched specs not increased
-  - [ ] Full client suite re-run by the Leader
+  - [x] Tests green
+  - [x] Falsifiers observed red
+  - [x] `npm run lint -- --quiet` clean
+  - [x] `npm run build` green
+  - [x] Spec type-check count for the 2 touched specs not increased
+  - [x] Full client suite re-run by the Leader
 - **Skills:** `angular-developer`, `error-handling-patterns`
 
 ---

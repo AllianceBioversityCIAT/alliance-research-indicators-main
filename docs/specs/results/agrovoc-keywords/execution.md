@@ -16,7 +16,7 @@
 
 ## 2. Task Execution History
 
-### T-03 — Cancellable GET + API method + interceptor exclusion (client) — IN PROGRESS
+### T-03 — Cancellable GET + API method + interceptor exclusion (client) — PASS (attempt 2)
 
 - **Date:** 2026-10-19 · **Skills:** `angular-developer`, `error-handling-patterns` (task defaults, unchanged) · **Effort:** attempt 1 `grok-4.7-high`; attempt 2 bumped to `grok-4.7-xhigh` (rework rule)
 - **Orca:** run `run_a18f8e8bbdd2`, task `task_fd02933e6a25`
@@ -42,7 +42,27 @@
 - **ADVISORY (attempt 1, labelled advisory):** RELIABILITY `catchError` spreads `HttpErrorResponse` into the envelope (inherited from `TP`) · READABILITY duplicated header builder between `get`/`getObservable` · RISK `includes('tools/agrovoc')` covers future `tools/agrovoc/*` routes (intended, DD-7) · `loadingTrigger` silently ignored by `getObservable` (JSDoc note suggested)
 - **Decisions made:**
   - Leader path correction in the brief: Consumers' `shared/testing/mock-services.mock.ts` is actually `src/app/testing/mock-services.mock.ts`
-  - Execute-time spec edit (no change of requirement meaning): `design.md` §10 row `to-promise.service.spec.ts` amended 2026-10-19 to name the fast-call/no-pending-log case that §9 already states. Carried as a named conformance check in the attempt-2 Reviewer brief and the next task's
+  - Execute-time spec edit (no change of requirement meaning): `design.md` §10 row `to-promise.service.spec.ts` amended 2026-10-19 to name the fast-call/no-pending-log case that §9 already states. Carried as a named conformance check in the attempt-2 Reviewer brief and the next task's (T-04)
+
+#### Attempt 2 — PASS
+
+- **Implementer:** same Cursor worker (`term_7be7a3f3-…`), new dispatch `ctx_550bb0377028` (task `task_60585409f1ad`); kept alive through the FAIL per owner rule (worker holds the investigation). Effort bump to xhigh given **in-brief only** — a reused Orca terminal cannot change `--model`, so the model stayed `grok-4.7-high`
+- **Feedback passed:** the Reviewer FAIL report verbatim + attempt history ("attempt 1 built `getObservable` without completing after the first value — do not repeat that")
+- **Files changed:** `client/research-indicators/src/app/shared/services/to-promise.service.ts` (`take(1)` before `map`; JSDoc that `loadingTrigger` is ignored), `…/to-promise.service.spec.ts` (new `describe` running the real `httpErrorInterceptor`)
+- **runtime events:** none
+- **Implementer verification (reported):** `npm test -- --silent --coverage=false` on to-promise, http-error, api.service → 3 suites, 333 passed (incl. the existing cancellation test) · lint clean · build exit 0 · spec tsc count 3 (baseline 3; TS1005 0) · Not Done / Assumptions: none
+- **Red run (verbatim):** removed `take(1)` → test (a) "completes a fast response and does not log a pending error": `expect(jest.fn()).not.toHaveBeenCalledWith(...expected) / Expected: not ObjectContaining {"status": "pending"} / Received call 0 with status "pending", message "Request is taking longer than 5 seconds to respond" … / Number of calls: 1` at `to-promise.service.spec.ts:530`. Control (b) "logs a pending error when the request is still open at 5 s" green with and without `take(1)`
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** from `client/research-indicators`, with no worker active: `npm test -- --silent --coverage=false <to-promise, http-error, api.service specs>` → `Test Suites: 3 passed` / `Tests: 333 passed` · `npm run lint -- --quiet` → "All files pass linting." · `npm run build` → exit 0 · `npx tsc -p tsconfig.spec.json --noEmit | grep -E 'to-promise.service.spec|http-error.interceptor.spec' | wc -l` → 3 (= baseline) · TS1005 count 0
+- **Full suites (Leader, sequential, no worker active — done criterion "Full client suite re-run by the Leader"):**
+  - server `npm test -- --silent` → `Test Suites: 424 passed, 424 total` / `Tests: 4035 passed, 4035 total`
+  - client `npm test -- --silent` run 1 → `Test Suites: 2 failed, 341 passed` / `Tests: 7935 passed` — both failures `A jest worker process … was terminated by another process: signal=SIGSEGV` (`my-projects.component.spec.ts`, `result-ai-item.component.spec.ts`; neither touched by this spec). Isolated re-run of the two → `2 passed / 18 tests`. Full run 2 → `Test Suites: 343 passed, 343 total` / `Tests: 7953 passed, 7953 total`. Note: `jest.config.ts` no longer carries the `workerIdleMemoryLimit` mitigation recorded 2026-09-22 — out of scope here, flagged for the owner
+- **Reviewer** (`akili-reviewer`, opus, attempt 2): **`STATUS: PASS`** — "Attempt 2 fixes the attempt-1 FAIL and matches the amended `design.md` §10 row for `to-promise.service.spec.ts`. `getObservable` now has `take(1)` before `map`, so the stream finishes on its first value, the same way `firstValueFrom` does in `TP`. That stops the interceptor's 5 s timer, so a fast AGROVOC call no longer logs a false "pending" error (design §9: only slow calls log). Requests that are cancelled or still open behave as before." Checked mapping, cancellation (Disqualifier still met), fast-call no-log test fails without the fix and passes for the right reason, slow-call control; `get`/`TP`, interceptor exclusion, `GET_AgrovocSearch$`, `AgrovocTerm` unchanged since attempt 1. Scope note: T-04's §10 tests use Subject stubs and cannot exercise the interceptor — expected, the fix lives in the primitive
+- **ADVISORY (attempt 2, labelled advisory):** READABILITY the interceptor-backed `describe` builds its own mocks for `CacheService`/`ActionsService`/`Router`/`ImpersonationService` — client guide prefers shared mocks in `app/testing/` · READABILITY duplicated header builder `get`/`getObservable` · RELIABILITY test (a) asserts no `pending` log only, not "no `saveErrors` at all" (the spec asks for the former) · RISK `includes('tools/agrovoc')` covers the whole prefix (DD-7 intends it)
+- **spawns:** Implementer Cursor/grok-4.7-high attempt 1 — not reported by host, ended complete (spawn failure before it: `ctx_4990b2af3ab8`, ended died) · Implementer attempt 2 — not reported by host, ended complete · Reviewer akili-reviewer/opus: attempt-1 verdict 8 calls / 55 787 tokens, re-adjudication 10 calls / 63 871 tokens, attempt-2 verdict 2 calls / 72 747 tokens, all ended complete
+- **Requirements covered:** R-AGV-004 *Typing again cancels* (transport half) · R-AGV-005 *Error* (no stacked generic toast) · R-AGV-002 contract (client side) · design §9 (pending log only for slow calls)
+- **Final verification:** VERIFIED (above)
+- **Budget:** review rounds so far 4 of 7 (T-01 ×1, T-03 ×3 verdicts incl. re-adjudication); tasks 2 of 5 — within budget
+- **Gate:** auto-continue per owner's standing direction
 
 
 ### T-01 — AGROVOC config, mapper and service (server) — PASS

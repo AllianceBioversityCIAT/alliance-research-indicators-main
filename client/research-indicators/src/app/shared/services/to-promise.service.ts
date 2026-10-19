@@ -1,6 +1,6 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, firstValueFrom, map, catchError, finalize } from 'rxjs';
+import { Observable, firstValueFrom, map, catchError, finalize, of, take } from 'rxjs';
 import { MainResponse } from '../interfaces/responses.interface';
 import { environment } from '../../../environments/environment';
 import { CacheService } from './cache/cache.service';
@@ -119,6 +119,53 @@ export class ToPromiseService {
       }),
       config?.loadingTrigger
     );
+  };
+
+  /**
+   * Cold GET. Same headers and URL as `get`, but the caller keeps the
+   * Observable so unsubscribing aborts the request. `take(1)` finishes on
+   * the first value, the same way `firstValueFrom` does inside `TP`, so the
+   * error interceptor's 5 s pending timer is torn down. Errors are mapped
+   * onto the `MainResponse` shape and never reach the error channel.
+   * `loadingTrigger` is ignored.
+   */
+  getObservable = <T>(url: string, config?: Config): Observable<MainResponse<T>> => {
+    let headers = config?.params instanceof HttpHeaders ? config.params : new HttpHeaders();
+
+    if (config?.useResultInterceptor) {
+      headers = headers.set('X-Use-Year', 'true');
+    }
+    if (config?.platform) {
+      headers = headers.set('X-Platform', config.platform);
+    }
+    if (config?.noAuthInterceptor) {
+      headers = headers.set('no-auth-interceptor', 'true');
+    }
+
+    if (config?.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        headers = headers.set(key, value);
+      });
+    }
+
+    headers = this.applyAuthMarker(headers, config);
+
+    const fullUrl = this.getEnv(config?.isAuth) + url;
+
+    return this.http
+      .get<MainResponse<T>>(fullUrl, {
+        headers,
+        params: config?.params,
+        ...(config?.noCache && { cache: 'no-store' })
+      })
+      .pipe(
+        take(1),
+        map(data => ({ ...data, successfulRequest: true })),
+        catchError(error => {
+          console.error(error);
+          return of({ ...error, successfulRequest: false, errorDetail: error?.error } as MainResponse<T>);
+        })
+      );
   };
 
   postBlob = <B>(url: string, body: B, config?: Config): Promise<Blob> => {
