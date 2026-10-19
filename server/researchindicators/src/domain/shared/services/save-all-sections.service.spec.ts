@@ -25,6 +25,8 @@ import {
 } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import { LinkResult } from '../../entities/link-results/entities/link-result.entity';
 import { PublicationIdentitySource } from '../utils/publication-identity.util';
+import { ResultInnovationUseService } from '../../entities/result-innovation-use/result-innovation-use.service';
+import { ResultInnovationUse } from '../../entities/result-innovation-use/entities/result-innovation-use.entity';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -53,6 +55,10 @@ describe('SaveResultService', () => {
     Pick<ResultInnovationDevService, 'update'>
   >;
   let resultIpRightsService: jest.Mocked<Pick<ResultIpRightsService, 'update'>>;
+  let resultInnovationUseService: jest.Mocked<
+    Pick<ResultInnovationUseService, 'create' | 'update'>
+  >;
+  let innovationUseRepoHandle: { exists: jest.Mock };
   let queryService: jest.Mocked<QueryService>;
   let duplicateCandidates: any;
   let resolutionRunner: any;
@@ -117,8 +123,12 @@ describe('SaveResultService', () => {
     linkResultRepoHandle = {
       find: jest.fn().mockResolvedValue([]),
     };
+    innovationUseRepoHandle = {
+      exists: jest.fn().mockResolvedValue(true),
+    };
     getRepository = jest.fn((entity) => {
       if (entity === LinkResult) return linkResultRepoHandle;
+      if (entity === ResultInnovationUse) return innovationUseRepoHandle;
       return resultRepoHandle;
     });
 
@@ -225,6 +235,13 @@ describe('SaveResultService', () => {
             clearSystemUser: jest.fn(),
           },
         },
+        {
+          provide: ResultInnovationUseService,
+          useValue: {
+            create: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -237,6 +254,7 @@ describe('SaveResultService', () => {
     resultCapacitySharingService = module.get(ResultCapacitySharingService);
     resultInnovationDevService = module.get(ResultInnovationDevService);
     resultIpRightsService = module.get(ResultIpRightsService);
+    resultInnovationUseService = module.get(ResultInnovationUseService);
     queryService = module.get(QueryService);
     duplicateCandidates = module.get(DuplicateCandidateRepository);
     resolutionRunner = module.get(DuplicateResolutionRunner);
@@ -613,6 +631,60 @@ describe('SaveResultService', () => {
         dto.knowledgeProduct,
       );
       expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should save innovationUse when indicator is INNOVATION_USE', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 95,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+      dto.innovationUse = { innovation_use_level_id: 3, actors: [] } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationUseService.create).not.toHaveBeenCalled();
+      expect(resultInnovationUseService.update).toHaveBeenCalledWith(
+        95,
+        dto.innovationUse,
+      );
+    });
+
+    it('should create the missing innovation use detail row before updating it', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 96,
+        result_official_code: 7001,
+      } as any);
+      innovationUseRepoHandle.exists.mockResolvedValue(false);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+      dto.innovationUse = { actors: [] } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(innovationUseRepoHandle.exists).toHaveBeenCalledWith({
+        where: { result_id: 96, is_active: true },
+      });
+      expect(resultInnovationUseService.create).toHaveBeenCalledWith(96);
+      expect(
+        resultInnovationUseService.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        resultInnovationUseService.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('should not touch innovation use when the DTO carries none', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 97,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationUseService.update).not.toHaveBeenCalled();
     });
 
     it('should merge STAR primary levers before updating alignment', async () => {
