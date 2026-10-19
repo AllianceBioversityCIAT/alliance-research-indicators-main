@@ -15,6 +15,10 @@ import {
   DelegateStaffRawRow,
   OrgUnitDelegateRepository,
 } from './repositories/org-unit-delegate.repository';
+import {
+  ChangeLogRawRow,
+  OrgUnitChangeLogRepository,
+} from './repositories/org-unit-change-log.repository';
 import { OrgStructureClock } from './org-structure.clock';
 import {
   ORG_LEVEL_BY_ID,
@@ -22,9 +26,12 @@ import {
   ORG_MIN_YEAR,
 } from './org-structure.constants';
 import {
+  OrgChangeAction,
+  OrgChangeLogRow,
   OrgLevelCode,
   OrgStaffRef,
   OrgUnitDetailResponse,
+  OrgUnitHistoryResponse,
   OrgUnitVersionResponse,
   YearRange,
   YearViewRow,
@@ -44,6 +51,7 @@ export class OrgStructureReadService {
     private readonly versionRepository: OrgUnitVersionRepository,
     private readonly delegateRepository: OrgUnitDelegateRepository,
     private readonly clock: OrgStructureClock,
+    private readonly changeLogRepository: OrgUnitChangeLogRepository,
   ) {}
 
   /** Accepted years: 2000 to current + 10 (design 5.1); anything else is a 400 naming `year`. */
@@ -121,6 +129,32 @@ export class OrgStructureReadService {
     };
   }
 
+  /**
+   * B6 (R-ORG-009, R-ORG-017 History half): the versions table, then the log
+   * newest first. 404 for an id that does not exist, including a physically
+   * deleted one: its log is reachable through B7.
+   */
+  async getUnitHistory(id: number): Promise<OrgUnitHistoryResponse> {
+    const unit = await this.unitRepository.findOne({ where: { id } });
+    if (!unit) {
+      throw new NotFoundException(`Organizational unit ${id} not found`);
+    }
+    const [versions, log] = await Promise.all([
+      this.versionRepository.findDetailedByUnit(id),
+      this.changeLogRepository.findRowsByUnit(id),
+    ]);
+    return {
+      versions: versions.map((row) => this.toVersionResponse(row)),
+      log: log.map((row) => this.toLogRow(row)),
+    };
+  }
+
+  /** B7: the log of one entry, newest first. No existence check: it outlives a physical delete. */
+  async getChangeLog(unitId: number): Promise<OrgChangeLogRow[]> {
+    const rows = await this.changeLogRepository.findRowsByUnit(unitId);
+    return rows.map((row) => this.toLogRow(row));
+  }
+
   private async delegatesByUnit(
     unitIds: number[],
   ): Promise<Map<number, OrgStaffRef[]>> {
@@ -181,6 +215,29 @@ export class OrgStructureReadService {
       parentCode: row.parent_code ?? null,
       parentName: row.parent_name ?? null,
       director: this.toDirector(row),
+    };
+  }
+
+  private toLogRow(row: ChangeLogRawRow): OrgChangeLogRow {
+    const changes =
+      typeof row.changes === 'string' ? JSON.parse(row.changes) : row.changes;
+    const name = [row.user_first_name, row.user_last_name]
+      .filter((part) => !!part && part.trim().length > 0)
+      .map((part) => part.trim())
+      .join(' ');
+    return {
+      id: Number(row.id),
+      unitId: Number(row.org_unit_id),
+      action: row.action as OrgChangeAction,
+      appliesFromYear: row.applies_from_year ?? null,
+      backdated: Number(row.backdated) === 1 || row.backdated === true,
+      changes: changes ?? {},
+      createdAt: new Date(row.created_at).toISOString(),
+      createdBy: {
+        id: row.created_by === null ? null : Number(row.created_by),
+        name: name.length > 0 ? name : null,
+        email: row.user_email ?? null,
+      },
     };
   }
 

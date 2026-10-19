@@ -177,6 +177,7 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
   const readService = {
     getUnitDetail: jest.fn(async (id: number) => ({ id })),
   };
+  const registry = { getBreakdown: jest.fn().mockResolvedValue([]) };
   const lookup = {
     assertValueInList: jest.fn(async (id: number, key: string) => {
       const lists: Record<number, string> = {
@@ -226,6 +227,7 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
       lookup as never,
       { currentYear: () => today },
       { user_id: 42 } as never,
+      registry as never,
     );
   });
 
@@ -282,6 +284,7 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
         lookup as never,
         { currentYear: () => 2026 },
         {} as never,
+        registry as never,
       );
       expect(await svc.searchStaff('pe')).toEqual([
         { carnet: 'A1', name: 'Ana Pérez', email: 'a@x.org' },
@@ -300,6 +303,7 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
         lookup as never,
         { currentYear: () => 2026 },
         { user_id: 42 } as never,
+        registry as never,
       );
       await service.create({
         levelId: L1,

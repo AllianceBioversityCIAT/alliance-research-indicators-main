@@ -147,27 +147,17 @@
             class="flex min-w-0 basis-[40%] flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white p-4"
             aria-label="Entry details"
             data-testid="detail-panel">
-            @if (creating() || selectedRow()) {
-              @if (selectedRow(); as selected) {
-                <div class="mb-3 flex flex-col gap-1" data-testid="selected-summary">
-                  <span class="font-mono text-[12.5px] atc-light-blue-400">{{ selected.code }}</span>
-                  <span class="text-[15px] font-semibold atc-primary-blue-600">{{ selected.version.name }}</span>
-                  <span class="text-[13px] atc-grey-700">{{ selected.version.levelCode }} {{ levelLabels[selected.version.levelCode] }}</span>
-                </div>
-              } @else {
-                <h2 class="m-0 mb-3 text-[15px] font-semibold atc-primary-blue-600" data-testid="new-entry-title">New entry</h2>
-              }
-              @if (years(); as range) {
-                @for (key of [formKey()]; track key) {
-                  <app-org-unit-form
-                    [row]="creating() ? null : selectedRow()"
-                    [rows]="rows()"
-                    [range]="range"
-                    [prefill]="creating() ? prefill() : null"
-                    (saved)="onSaved($event)"
-                    (cancelled)="closeForm()"></app-org-unit-form>
-                }
-              }
+            @if (years(); as range) {
+              <app-org-unit-panel
+                [row]="creating() ? null : selectedRow()"
+                [rows]="rows()"
+                [range]="range"
+                [creating]="creating()"
+                [prefill]="prefill()"
+                [formKey]="formKey()"
+                (saved)="onSaved($event)"
+                (cancelled)="closeForm()"
+                (lifecycleDone)="onLifecycleDone($event)"></app-org-unit-panel>
             } @else {
               <p class="m-0 text-sm atc-grey-700" data-testid="detail-empty">Select an entry to see its details.</p>
             }

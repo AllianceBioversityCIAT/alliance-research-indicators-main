@@ -169,16 +169,48 @@ export const changedVersions = (
   return { inserts, updates };
 };
 
+/** The years `[from, to)` between two consecutive versions where the entry had no version (D-ORG-17). */
+export interface TimelineGap {
+  from: number;
+  to: number;
+}
+
+/** Every gap of a timeline, ordered. A version that is open-ended or contiguous with the next leaves none. */
+export const gapsOf = (
+  versions: Array<Pick<TimelineVersion, 'from' | 'to'>>,
+): TimelineGap[] =>
+  versions.flatMap((v, index) => {
+    const next = versions[index + 1];
+    return next && v.to !== null && v.to < next.from
+      ? [{ from: v.to, to: next.from }]
+      : [];
+  });
+
+const sameGaps = (a: TimelineGap[], b: TimelineGap[]): boolean =>
+  a.length === b.length &&
+  a.every((gap, i) => gap.from === b[i].from && gap.to === b[i].to);
+
+const describeGaps = (gaps: TimelineGap[]): string =>
+  gaps.length === 0
+    ? 'none'
+    : gaps.map((g) => `[${g.from}, ${g.to})`).join(' ');
+
 /**
  * I-1 / I-2: at least one version, strictly ascending starts (so one version
  * per start year), no empty range, each version ends exactly where the next
  * starts, and an open-ended version is only the last one, only for an entry
  * that has not ended. Throws `OrgTimelineInvariantError` (a bug, so a 500 and
  * a rollback, never a 400).
+ *
+ * `gaps` (D-ORG-17) is the EXACT set of gaps the result must have: the gaps of
+ * the input (a gap is an inactive period and no write may fill, shrink or move
+ * it), plus the one a reactivation adds. Default none. A gap the result lacks
+ * or has extra is a bug, which also catches an end that stretches the version
+ * before a gap across it.
  */
 export const assertTimeline = (
   versions: Array<Pick<TimelineVersion, 'from' | 'to'>>,
-  options: { ended: boolean },
+  options: { ended: boolean; gaps?: TimelineGap[] },
 ): void => {
   if (versions.length === 0) {
     throw new OrgTimelineInvariantError('an entry needs at least one version');
@@ -196,9 +228,9 @@ export const assertTimeline = (
           `versions are not strictly ordered (${v.from} then ${next.from})`,
         );
       }
-      if (v.to !== next.from) {
+      if (v.to === null || v.to > next.from) {
         throw new OrgTimelineInvariantError(
-          `version [${v.from}, ${v.to}) is not contiguous with the one from ${next.from}`,
+          `version [${v.from}, ${v.to}) overlaps the one from ${next.from}`,
         );
       }
     } else if (options.ended && v.to === null) {
@@ -207,4 +239,119 @@ export const assertTimeline = (
       );
     }
   });
+  const expected = options.gaps ?? [];
+  const actual = gapsOf(versions);
+  if (!sameGaps(actual, expected)) {
+    throw new OrgTimelineInvariantError(
+      `gaps are ${describeGaps(actual)}, expected ${describeGaps(expected)}`,
+    );
+  }
+};
+
+// ---------------------------------------------------------------------------
+// T-03: lifecycle operations (design 5.4, 5.5; D-ORG-11). Pure, no I/O.
+// @akili-spec institutional-performance/organizational-structure
+// ---------------------------------------------------------------------------
+
+/** A rule of the lifecycle the caller broke: always a 400 naming `field`. */
+export interface TimelineRuleViolation {
+  field: string;
+  description: string;
+}
+
+export type EndTimelineResult =
+  | { ok: true; versions: TimelineVersion[]; dropped: TimelineVersion[] }
+  | { ok: false; violation: TimelineRuleViolation };
+
+/**
+ * Ends an entry from year `endYear` (inactivate and logical delete).
+ * `endYear` must be later than the first year (R-ORG-008: it cannot end before
+ * it existed). A version that starts AFTER `endYear` is a scheduled change and
+ * rejects the request (D-ORG-11). A version that starts exactly AT `endYear`
+ * would cover no year, so it is dropped (and returned, so the log keeps it).
+ * The last remaining version then gets `to = endYear`. Never mutates its input.
+ */
+export const endTimeline = (
+  versions: TimelineVersion[],
+  endYear: number,
+): EndTimelineResult => {
+  const ordered = versions
+    .map((v) => ({ ...v }))
+    .sort((a, b) => a.from - b.from);
+  const first = ordered[0];
+  if (!first) {
+    throw new OrgTimelineInvariantError('an entry needs at least one version');
+  }
+  if (endYear <= first.from) {
+    return {
+      ok: false,
+      violation: {
+        field: 'fromYear',
+        description: `fromYear ${endYear} must be later than the first year of the entry (${first.from})`,
+      },
+    };
+  }
+  const scheduled = ordered.find((v) => v.from > endYear);
+  if (scheduled) {
+    return {
+      ok: false,
+      violation: {
+        field: 'fromYear',
+        description: `The entry has a change scheduled from ${scheduled.from}, after ${endYear}; remove or move the scheduled change first`,
+      },
+    };
+  }
+  const dropped = ordered.filter((v) => v.from === endYear);
+  const kept = ordered.filter((v) => v.from < endYear);
+  const lastKept = kept[kept.length - 1];
+  // The version before E already ends earlier: E is where the entry came back
+  // after an inactive period (D-ORG-17). Stretching it to E would fill the gap.
+  if (lastKept.to !== null && lastKept.to !== endYear) {
+    return {
+      ok: false,
+      violation: {
+        field: 'fromYear',
+        description: `The entry is active again only from ${endYear} (it was inactive from ${lastKept.to}); end it from a later year`,
+      },
+    };
+  }
+  lastKept.to = endYear;
+  return { ok: true, versions: kept, dropped };
+};
+
+export type ReopenTimelineResult =
+  | { ok: true; versions: TimelineVersion[]; added: TimelineVersion }
+  | { ok: false; violation: TimelineRuleViolation };
+
+/**
+ * Reactivates an entry from year `year` (R-ORG-007 AC.2): the last version's
+ * values become a new open-ended version `[year, null)`. `year` must not be
+ * before the year the entry ended (`endedFrom`); later than it leaves the years
+ * in between without a version (the entry was inactive then). Never mutates its
+ * input.
+ */
+export const reopenTimeline = (
+  versions: TimelineVersion[],
+  year: number,
+  endedFrom: number,
+): ReopenTimelineResult => {
+  const ordered = versions
+    .map((v) => ({ ...v }))
+    .sort((a, b) => a.from - b.from);
+  const last = ordered[ordered.length - 1];
+  if (!last) {
+    throw new OrgTimelineInvariantError('an entry needs at least one version');
+  }
+  if (year < endedFrom) {
+    return {
+      ok: false,
+      violation: {
+        field: 'fromYear',
+        description: `fromYear ${year} is before the year the entry ended (${endedFrom})`,
+      },
+    };
+  }
+  const added: TimelineVersion = { ...last, from: year, to: null };
+  delete added.id;
+  return { ok: true, versions: [...ordered, added], added };
 };

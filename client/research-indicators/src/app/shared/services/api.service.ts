@@ -43,6 +43,9 @@ import { GetProjectDetail } from '../interfaces/get-project-detail.interface';
 import { Portfolio, PortfolioPayload } from '../interfaces/portfolio.interface';
 import {
   OrgCodeProposal,
+  OrgDeleteResult,
+  OrgHistory,
+  OrgLifecyclePayload,
   OrgStaffOption,
   OrgUnitCreatePayload,
   OrgUnitSaved,
@@ -282,6 +285,26 @@ export class ApiService {
 
   PATCH_OrgStructureUnit = (id: number, body: OrgUnitUpdatePayload): Promise<MainResponse<OrgUnitSaved>> => {
     return this.TP.patch(`organizational-structure/units/${id}`, body, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-03 (B6, B11, B12, B13) — lifecycle and history.
+  GET_OrgStructureHistory = (id: number): Promise<MainResponse<OrgHistory>> => {
+    return this.TP.get(`organizational-structure/units/${id}/history`, {});
+  };
+
+  POST_OrgStructureInactivate = (id: number, body: OrgLifecyclePayload): Promise<MainResponse<unknown>> => {
+    return this.TP.post(`organizational-structure/units/${id}/inactivate`, body, {});
+  };
+
+  POST_OrgStructureReactivate = (id: number, body: OrgLifecyclePayload): Promise<MainResponse<unknown>> => {
+    return this.TP.post(`organizational-structure/units/${id}/reactivate`, body, {});
+  };
+
+  // `ToPromiseService.delete` takes no params, so the query string is part of the path.
+  DELETE_OrgStructureUnit = (id: number, fromYear: number | null, backdate: boolean): Promise<MainResponse<OrgDeleteResult>> => {
+    const httpParams = new HttpParams().set('backdate', String(backdate));
+    const query = (fromYear === null ? httpParams : httpParams.set('fromYear', String(fromYear))).toString();
+    return this.TP.delete(`organizational-structure/units/${id}?${query}`, {});
   };
 
   // @akili-spec institutional-performance/organizational-structure T-02 (design §2.1) — by-key list values.

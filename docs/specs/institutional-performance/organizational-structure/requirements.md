@@ -164,7 +164,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - **As an** Admin **I want** changes to apply from a year **so that** each year has one clear structure and reports for a year stay stable.
 
 **Details**
-- An entry has **at most one version per year**. Versions are contiguous: an entry has no gap between its first year and its end year.
+- An entry has **at most one version per year**. Versions are contiguous: an entry has no gap between its first year and its end year, **except an inactive period**: a reactivation from a year later than the year the entry ended (R-ORG-007) leaves the years in between with no version, and the entry is absent from those year views (requester, 2026-10-19 — D-ORG-17).
 - **A version is created only when that entry changes.** If nothing changes for several years, the entry keeps one open-ended version. Other entries are never touched by a change to one entry.
 - Every save carries **Applies from year** (default: the current year). Let *Y* be that year:
   - a version of the entry **starts in *Y*** → that version is updated in place (this is how typos are fixed);
@@ -203,7 +203,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 **Acceptance criteria**
 - [ ] AC.1 — The database rejects two versions of one entry starting in the same year (unique index).
-- [ ] AC.2 — After any sequence of saves, an entry's versions are contiguous, non-overlapping and ordered (service invariant, tested).
+- [ ] AC.2 — After any sequence of saves, an entry's versions are contiguous (except an inactive period between an inactivation and a later reactivation — D-ORG-17), non-overlapping and ordered (service invariant, tested).
 - [ ] AC.3 — A save on one entry changes no row of any other entry.
 
 ### R-ORG-005 — Back-dating
@@ -548,7 +548,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 | ID | Category | Target | How verified |
 | --- | --- | --- | --- |
 | NFR-ORG-001 | performance | Year view of ≤ 500 entries: p95 ≤ 300 ms on Dev; `resolve` of 100 IDs ≤ 100 ms | integration timing, 3 runs; inconclusive if runs vary more than 30 % |
-| NFR-ORG-002 | integrity | One version per entry per year enforced by a DB unique index; no overlaps or gaps, enforced by the service inside one transaction per save | migration review + integration duplicate insert + invariant test after random save sequences |
+| NFR-ORG-002 | integrity | One version per entry per year enforced by a DB unique index; no overlaps or gaps (except an inactive period between an inactivation and a later reactivation — D-ORG-17), enforced by the service inside one transaction per save | migration review + integration duplicate insert + invariant test after random save sequences |
 | NFR-ORG-003 | integrity | Change log append-only: no update/delete route; the entry ID in the log has no FK cascade | controller route inventory test + physical-delete integration test |
 | NFR-ORG-004 | security | Every write declares `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`; no write reachable by machine tokens | unit tests per handler (allowed + denied) |
 | NFR-ORG-005 | a11y | Tree is keyboard-navigable (arrow keys expand/collapse); icon buttons have `aria-label`; sort headers expose `aria-sort`; modals trap focus | component tests + manual keyboard pass at HITL |
@@ -576,7 +576,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 | Defect class | Gate |
 | --- | --- |
 | **Wrong year resolution** (off-by-one on `[from, to)`, open-ended `to`) | Service unit tests on boundary years (`from`, `to − 1`, `to`, open) + integration year-view test on seeded and edited data |
-| **Version overlap, gap or duplicate year** after a sequence of saves | DB unique index + invariant check run after every save in a table-driven unit test of save sequences (split, in place, back-date, inactivate, reactivate) |
+| **Version overlap, gap (other than an inactive period, D-ORG-17) or duplicate year** after a sequence of saves | DB unique index + invariant check run after every save in a table-driven unit test of save sequences (split, in place, back-date, inactivate, reactivate) |
 | **Later deliberate change overwritten** by an earlier save | Unit test: *A later deliberate change is kept* scenario |
 | **Another entry touched** by a save | Integration test: row checksum of all other entries unchanged |
 | **Cycle / invalid parent level / inactive parent** accepted | Unit tests per rule, including a cycle that only appears in a later scheduled version |

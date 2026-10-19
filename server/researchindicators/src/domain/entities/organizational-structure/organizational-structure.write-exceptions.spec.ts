@@ -34,6 +34,7 @@ describe('Organizational Structure — real GlobalExceptions contract for writes
     lookup as never,
     { currentYear: () => 2026 },
     { user_id: 1 } as never,
+    { getBreakdown: jest.fn().mockResolvedValue([]) } as never,
   );
   const dto = (over: Partial<CreateOrgUnitDto> = {}) =>
     ({

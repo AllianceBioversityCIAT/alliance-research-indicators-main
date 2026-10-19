@@ -136,7 +136,7 @@ All four tables: `utf8mb4`, collation `utf8mb4_unicode_ci` declared explicitly (
 | # | Invariant | Enforced by |
 | --- | --- | --- |
 | I-1 | One version per entry per start year | DB unique index (backstop) + timeline util |
-| I-2 | An entry's versions are contiguous and non-overlapping, ordered by `from`; only the last may be open-ended, and only if the entry is active | `org-version-timeline.util` `assertTimeline` run before commit |
+| I-2 | An entry's versions are contiguous and non-overlapping, ordered by `from` — except one gap per inactive period, left by a reactivation from a year later than the end year (D-ORG-17); no save or lifecycle end fills or shrinks a gap (`appliesFromYear` inside one → 400; an end at the version that follows a gap → 400); only the last may be open-ended, and only if the entry is active | `org-version-timeline.util` `assertTimeline` run before commit |
 | I-3 | Every version's parent obeys the level rules and is active for every year the version covers | §5.3 |
 | I-4 | No entry is its own ancestor in any year from the first changed year onward | §5.3 |
 | I-5 | Exactly one log row per write action | service writes the log in the same transaction |
@@ -176,7 +176,7 @@ Admin = `@Roles(CENTER_ADMIN, SYSTEM_ADMIN)`. Consumer = any authenticated user 
 | B10 | `PATCH /units/:id` | Admin | `{ code?, name?, acronym?, levelId?, parentId?, directorCarnet?, delegateCarnets?, appliesFromYear?, backdate? }` — `appliesFromYear` required unless only `code` and/or `delegateCarnets` are sent; `delegateCarnets` replaces the list (omitted = unchanged, `[]` = clear) | entry with versions | 400 · 404 · 409 code · 409 entry deleted |
 | B11 | `POST /units/:id/inactivate` | Admin | `{ fromYear, successorId?, backdate? }` | entry | 400 successor/back-date · 404 · 409 active children |
 | B12 | `POST /units/:id/reactivate` | Admin | `{ fromYear, backdate? }` | entry | 400 · 404 · 409 deleted or already active |
-| B13 | `DELETE /units/:id?fromYear=&backdate=` | Admin | `fromYear` ignored for a physical delete | `{ id, mode: 'physical' \| 'logical' }` | 404 · 409 children / linked data |
+| B13 | `DELETE /units/:id?fromYear=&backdate=` | Admin | `fromYear` ignored for a physical delete and for an already-inactive entry | `{ id, mode: 'physical' \| 'logical', fromYear }` — `fromYear` = the end year actually applied (`null` for a physical delete; for an already-inactive entry, its existing end year) | 404 · 409 children / linked data |
 | C1 | `GET /resolve?ids=&year=` | Consumer | ≤ 200 ids | `ResolvedUnit[]` (version for the year + status that year + current delegates; ended entries resolved for years before their end) | 400 |
 | C2 | `GET /units/:id/ancestors?year=` | Consumer | — | chain to L1 for that year | 404 · 400 not covered that year |
 | C3 | `GET /units/:id/successors` | Consumer | — | successor chain in order | 404 |
@@ -220,13 +220,13 @@ No other entry is read for writing, so no other entry's rows change (R-ORG-004 A
 ### 5.4 Inactivate / reactivate — R-ORG-007
 
 - Inactivate from *E*: back-date gate (§5.2 step 2); active children from *E* → 409 naming them; successor must be active in *E* with the same level id → else 400. *E* must be later than the entry's first year (else 400). A version that starts **after** *E* is scheduled, and the request is rejected (400 — remove or move the scheduled change first). A version that starts **exactly at** *E* is dropped (it would cover no year; the log keeps it). Then the last remaining version gets `to = E`, and the entry gets `status = inactive`, `status_from_year = E`, `successor_id`.
-- Reactivate from *R* ≥ `status_from_year`: copy the last version's values into `[R, NULL)`; clear status fields and successor. Deleted → 409.
+- Reactivate from *R* ≥ `status_from_year`: copy the last version's values into `[R, NULL)`; clear status fields and successor. Deleted → 409. When *R* is later than the year it ended, the years in between keep no version (an inactive period, D-ORG-17).
 
 ### 5.5 Delete — R-ORG-008
 
 - **Blockers first:** active children (any year ≥ the delete year) or registry count > 0 → 409 with names / count, proposing *Inactivate*.
 - **Physical** when the first version starts in the current year or later (the entry was never in a past year view): log `delete_physical` with the last values, then delete the entry (versions cascade). The log row has no FK, so it survives.
-- **Logical** otherwise: as inactivate, with `status = deleted`, no successor; log `delete_logical`.
+- **Logical** otherwise: as inactivate, with `status = deleted`, no successor; log `delete_logical`. An entry that is already **inactive** keeps its end year (`fromYear` and `backdate` are ignored) and its successor is cleared; B13 returns that year (T-03 review, 2026-10-19).
 - A deleted entry rejects every write (409).
 
 ### 5.6 Code proposal — R-ORG-002
@@ -344,6 +344,7 @@ Same mapping as Control Lists (control-lists design §6.4): `--ac-primary-blue-6
 | D-ORG-14 | 2026-10-16 | Seed SQL in `src/db/seeds/org-structure.seed.ts`; the migration imports it and exports only its class | `orm.config.ts` loads every exported function under `migrations/**` as a migration and rejects names without a 13-digit timestamp, so a `seed…` export breaks every `migration:*` command (global-scope D-CLG-11, `control-lists.seed.ts:7-12`) | Exporting the seed from the migration file |
 | D-ORG-13 | 2026-10-08 | Physical delete allowed for an entry whose first year is the current year or later (not only future ones); logical end year must be after the first year | Otherwise an entry created by mistake this year could not be removed at all; it was never in a past year view, and the log keeps the record (found while building the mockup) | Physical delete only for future entries |
 | D-ORG-16 | 2026-10-16 | Staff-reference columns inherit `alliance_user_staff.carnet`'s character set and collation (read from `information_schema` in the migration, whitelisted); every other column keeps `utf8mb4_unicode_ci` | MySQL requires the same charset and collation on both sides of a string FK; the staff table is `utf8mb3` on Dev (`baseline.sql:3`, `:928-946`) and `utf8mb4` locally, so a fixed value breaks one of them. Raised by T-01 review (Reviewer A, issue 1). **Measured 2026-10-16 (MySQL 8.4.11, local probe schema with the Dev DDL):** the attempt-1 form (`COLLATE` only) did **not** fail — MySQL inferred `CHARACTER SET utf8mb3` from the collation; the explicit `CHARACTER SET … COLLATE …` form also runs up and down there. Kept for explicitness; the predicted Dev failure is **not demonstrated**, and the Dev server's MySQL version was not measured (RB-5). **Acknowledged by the requester 2026-10-16** (T-01 gate) | Hard-coding either collation; converting `alliance_user_staff` (shared table, out of scope) |
+| D-ORG-17 | 2026-10-19 | A reactivation from a year later than the year the entry ended leaves the years in between with **no version** (an inactive period); the entry is absent from those year views. `assertTimeline` allows such a gap only where the entry was ended and reopened; a save never creates or fills one (`appliesFromYear` inside a gap → 400), and neither does a lifecycle end: inactivating or logically deleting from a year *E* where the version starting at *E* follows a gap → 400 `fromYear` (the earlier version is never stretched across the gap — T-03 review, 2026-10-19) | R-ORG-007 lets the admin pick any reactivation year ≥ the end year, while R-ORG-004 / NFR-ORG-002 said "no gap" — contradiction found by the T-03 server Implementer; requester chose to allow the gap (2026-10-19). Amended: R-ORG-004 Details + AC.2, NFR-ORG-002, the risk row, I-2, §5.4 | Reactivating only from the end year (loses the year choice); showing the gap as *Inactive* in the year view (more work in §5.7) |
 
 **Reversion challenge (Step 2.3):** not triggered (re-checked for D-ORG-15: it adds a field) — no decision removes, disables or inverts shipped behavior. The one Control Lists change turns a would-be `500` into `409` (re-checked 2026-10-16: dropping D-ORG-3 removes planned work, not shipped behavior).
 

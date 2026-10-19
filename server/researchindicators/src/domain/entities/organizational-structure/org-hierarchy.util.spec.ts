@@ -1,5 +1,6 @@
 import {
   describeChildLevelConflicts,
+  findActiveChildren,
   findChildLevelConflicts,
   findHierarchyViolation,
   GraphVersion,
@@ -158,5 +159,36 @@ describe('findChildLevelConflicts (I-3 for children, R-ORG-003)', () => {
   it('ignores a child that ended before the first changed year and children of other entries', () => {
     expect(run([gv(2, L1, null)], [gv(3, L3, 2, 2024, 2026)])).toEqual([]);
     expect(run([gv(2, L1, null)], [gv(3, L3, 7)])).toEqual([]);
+  });
+});
+
+describe('findActiveChildren (design 5.3 children rule, D-ORG-11)', () => {
+  // Entry 2 has: child 3 (open from 2026), child 4 (under 2 only in [2026,2027)),
+  // child 5 (under 2 only from 2028), child 6 (under 2 in [2024,2026)).
+  const graph = [
+    gv(3, L4, 2),
+    gv(4, L4, 2, 2026, 2027),
+    gv(4, L4, 7, 2027),
+    gv(5, L4, 7, 2026, 2028),
+    gv(5, L4, 2, 2028),
+    gv(6, L4, 2, 2024, 2026),
+    gv(2, L2, 1),
+  ];
+
+  it('from 2027: the open child and the child that moves in from 2028 count; the ones that left earlier do not', () => {
+    expect(findActiveChildren(graph, 2, 2027)).toEqual([3, 5]);
+  });
+
+  it('from 2026: the child under the entry only in [2026, 2027) counts as well; one that ended at 2026 does not', () => {
+    expect(findActiveChildren(graph, 2, 2026)).toEqual([3, 4, 5]);
+  });
+
+  it('from the first year of the entry every version that ever referenced it is found (physical delete)', () => {
+    expect(findActiveChildren(graph, 2, 2024)).toEqual([3, 4, 5, 6]);
+  });
+
+  it('is empty for an entry nobody names as parent, and never returns the entry itself', () => {
+    expect(findActiveChildren(graph, 99, 2026)).toEqual([]);
+    expect(findActiveChildren([gv(2, L2, 2)], 2, 2026)).toEqual([]);
   });
 });

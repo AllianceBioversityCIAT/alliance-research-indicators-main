@@ -7,17 +7,22 @@ import { OrgStructureService } from './organizational-structure.service';
 import { ROLES_KEY } from '../../shared/guards/roles.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
-describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10)', () => {
+describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10; T-03: B6, B7, B11, B12, B13)', () => {
   const readService = {
     getYearView: jest.fn(),
     getYearRange: jest.fn(),
     getUnitDetail: jest.fn(),
+    getUnitHistory: jest.fn(),
+    getChangeLog: jest.fn(),
   };
   const service = {
     proposeCode: jest.fn(),
     searchStaff: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    inactivate: jest.fn(),
+    reactivate: jest.fn(),
+    remove: jest.fn(),
   };
   const controller = new OrganizationalStructureController(
     readService as unknown as OrgStructureReadService,
@@ -38,15 +43,20 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
   beforeEach(() => jest.clearAllMocks());
 
   describe('roles metadata (R-ORG-012, NFR-ORG-004)', () => {
-    it('discovers exactly the handlers of T-01 and T-02', () => {
+    it('discovers exactly the handlers of T-01, T-02 and T-03', () => {
       expect(handlerNames).toEqual([
         'getYearView',
         'getCodeProposal',
         'searchStaff',
         'getYears',
+        'getChangeLog',
         'getUnit',
+        'getUnitHistory',
         'createUnit',
         'updateUnit',
+        'inactivateUnit',
+        'reactivateUnit',
+        'deleteUnit',
       ]);
     });
 
@@ -74,7 +84,16 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
     // Read from the handler metadata, NOT rebuilt in the test: a handler that
     // loses `forbidNonWhitelisted` would let `portfolioId`, `id` or a director
     // name through, and only this reads the pipe the route really runs.
-    it.each(['getYearView', 'searchStaff', 'createUnit', 'updateUnit'])(
+    it.each([
+      'getYearView',
+      'searchStaff',
+      'getChangeLog',
+      'createUnit',
+      'updateUnit',
+      'inactivateUnit',
+      'reactivateUnit',
+      'deleteUnit',
+    ])(
       '%s runs a ValidationPipe with whitelist, forbidNonWhitelisted and transform',
       (handlerName) => {
         const pipes: Array<{
@@ -101,16 +120,45 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       path: Reflect.getMetadata(PATH_METADATA, proto[name]) as string,
     }));
 
-    it('exposes exactly B1-B5 reads, B9 and B10 on the design paths (no PUT, no DELETE)', () => {
+    it('exposes exactly B1-B7, B9-B13 on the design paths (no PUT; DELETE only on `units/:id`)', () => {
       expect(routes.map((r) => [r.method, r.path])).toEqual([
         [RequestMethod.GET, 'units'],
         [RequestMethod.GET, 'units/code-proposal'],
         [RequestMethod.GET, 'staff'],
         [RequestMethod.GET, 'years'],
+        [RequestMethod.GET, 'change-log'],
         [RequestMethod.GET, 'units/:id'],
+        [RequestMethod.GET, 'units/:id/history'],
         [RequestMethod.POST, 'units'],
         [RequestMethod.PATCH, 'units/:id'],
+        [RequestMethod.POST, 'units/:id/inactivate'],
+        [RequestMethod.POST, 'units/:id/reactivate'],
+        [RequestMethod.DELETE, 'units/:id'],
       ]);
+      expect(routes.some((r) => r.method === RequestMethod.PUT)).toBe(false);
+    });
+
+    // NFR-ORG-003, R-ORG-009 AC.2: the log is append-only, so the only way to
+    // reach it over HTTP is a read. Discovered from the metadata, not typed.
+    it('has NO PATCH, PUT or DELETE (and no POST) under `change-log`: its only route is a GET', () => {
+      const underLog = routes.filter((r) => r.path.startsWith('change-log'));
+      expect(underLog.length).toBeGreaterThan(0);
+      for (const route of underLog) {
+        expect(route.method).toBe(RequestMethod.GET);
+      }
+      expect(
+        routes.filter(
+          (r) =>
+            r.path.includes('change-log') && r.method !== RequestMethod.GET,
+        ),
+      ).toEqual([]);
+    });
+
+    it('declares the literal `change-log` route before every `units/:id` route', () => {
+      const logIndex = routes.findIndex((r) => r.path === 'change-log');
+      const firstId = routes.findIndex((r) => r.path.startsWith('units/:id'));
+      expect(logIndex).toBeGreaterThan(-1);
+      expect(logIndex).toBeLessThan(firstId);
     });
 
     it('declares the literal GET routes before the GET `:id` route (B3 would otherwise be read as an id)', () => {
@@ -207,6 +255,46 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
     });
   });
 
+  describe('Swagger for the T-03 handlers (NFR-ORG-006)', () => {
+    const paramsOf = (handler: string) =>
+      (Reflect.getMetadata(DECORATORS.API_PARAMETERS, proto[handler]) ??
+        []) as Array<{ name?: string; in: string; required?: boolean }>;
+
+    it('B6 documents the id path param; B7 documents the REQUIRED unitId query', () => {
+      expect(paramsOf('getUnitHistory').map((p) => [p.in, p.name])).toEqual([
+        ['path', 'id'],
+      ]);
+      expect(paramsOf('getChangeLog')).toEqual([
+        expect.objectContaining({
+          in: 'query',
+          name: 'unitId',
+          required: true,
+        }),
+      ]);
+    });
+
+    it('B11 and B12 document the id param and a body; B13 documents id, fromYear and backdate', () => {
+      for (const handler of ['inactivateUnit', 'reactivateUnit']) {
+        expect(
+          paramsOf(handler)
+            .map((p) => p.in)
+            .sort(),
+        ).toEqual(['body', 'path']);
+      }
+      expect(
+        paramsOf('deleteUnit')
+          .map((p) => `${p.in}:${p.name}`)
+          .sort(),
+      ).toEqual(['path:id', 'query:backdate', 'query:fromYear']);
+    });
+
+    it('B11 and B12 answer 200 (not the POST default 201)', () => {
+      for (const handler of ['inactivateUnit', 'reactivateUnit']) {
+        expect(Reflect.getMetadata('__httpCode__', proto[handler])).toBe(200);
+      }
+    });
+  });
+
   describe('envelope per handler', () => {
     it('B1 wraps the year view with status 200', async () => {
       readService.getYearView.mockResolvedValue([{ id: 1 }]);
@@ -284,6 +372,58 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       expect(result).toMatchObject({
         status: HttpStatus.OK,
         data: { id: 9 },
+      });
+    });
+  });
+
+  describe('envelope of the T-03 handlers', () => {
+    it('B6 passes the numeric id and wraps the history with status 200', async () => {
+      readService.getUnitHistory.mockResolvedValue({ versions: [], log: [] });
+      const result = await controller.getUnitHistory(7);
+      expect(readService.getUnitHistory).toHaveBeenCalledWith(7);
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: { versions: [], log: [] },
+      });
+    });
+
+    it('B7 passes unitId and wraps the rows with status 200', async () => {
+      readService.getChangeLog.mockResolvedValue([{ id: 1 }]);
+      const result = await controller.getChangeLog({ unitId: 118 });
+      expect(readService.getChangeLog).toHaveBeenCalledWith(118);
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: [{ id: 1 }],
+      });
+    });
+
+    it('B11 and B12 pass id and body and wrap the entry with status 200', async () => {
+      service.inactivate.mockResolvedValue({ id: 61 });
+      service.reactivate.mockResolvedValue({ id: 61 });
+      const inactivateBody = { fromYear: 2027, successorId: 60 };
+      const reactivateBody = { fromYear: 2028 };
+      expect(await controller.inactivateUnit(61, inactivateBody)).toMatchObject(
+        { status: HttpStatus.OK, data: { id: 61 } },
+      );
+      expect(service.inactivate).toHaveBeenCalledWith(61, inactivateBody);
+      expect(await controller.reactivateUnit(61, reactivateBody)).toMatchObject(
+        { status: HttpStatus.OK, data: { id: 61 } },
+      );
+      expect(service.reactivate).toHaveBeenCalledWith(61, reactivateBody);
+    });
+
+    it('B13 passes id and query and wraps `{ id, mode }` with status 200', async () => {
+      service.remove.mockResolvedValue({
+        id: 90,
+        mode: 'logical',
+        fromYear: 2027,
+      });
+      const query = { fromYear: 2027 };
+      const result = await controller.deleteUnit(90, query);
+      expect(service.remove).toHaveBeenCalledWith(90, query);
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: { id: 90, mode: 'logical', fromYear: 2027 },
       });
     });
   });

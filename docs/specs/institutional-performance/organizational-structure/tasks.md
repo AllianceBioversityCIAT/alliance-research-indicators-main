@@ -201,7 +201,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-03 — Slice 3: lifecycle, delete, change log and history
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-02
+- **Status:** done (2026-10-19, Reviewer PASS ×2 on attempt 2 — execution.md) · **Size:** L · **Dependencies:** T-02
 - **Requirements covered:**
   - R-ORG-004 — bound "*Y* not on or after the year the entry ends" (save on an ended entry → 400; on a deleted one → 409).
   - R-ORG-005 — back-date gate on inactivate, reactivate and logical delete.
@@ -215,7 +215,7 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-013 — *Inactivate* / *Reactivate* next to *Delete*; the lifecycle dialog; a 409 shows the server's description and a single *Close*.
   - NFR-ORG-003 (route inventory + physical-delete survival), NFR-ORG-004, NFR-ORG-005 (dialog focus trap), NFR-ORG-006 (B6, B7, B11–B13).
 - **Design refs:** §2.1 (`org-unit-usage.registry.ts`, `org-lifecycle-dialog`, History tab, modal name `orgUnitLifecycle`), §4 B6, B7, B11, B12, B13, §5.3 children rule, §5.4, §5.5, §6.2 dialog row, §6.6 History, D-ORG-5, 10, 11, 13
-- **Scope — server:** inactivate / reactivate / delete in the service, using the T-02 transaction and log path. `OrgUnitUsageRegistry` (singleton, **deduplicated by `consumerName`**, `countByUnitIds`) feeds the delete and inactivate blocker. B6, B7, B11, B12, B13 with Swagger. Warn logs on every blocked action.
+- **Scope — server:** inactivate / reactivate / delete in the service, using the T-02 transaction and log path. `OrgUnitUsageRegistry` (singleton, **deduplicated by `consumerName`**, `countByUnitIds`) feeds the **delete** blocker (inactivate is blocked by active children only — R-ORG-007, design §5.4; corrected 2026-10-19 at T-03). B6, B7, B11, B12, B13 with Swagger. Warn logs on every blocked action.
 - **Scope — screen:** `org-lifecycle-dialog` (Inactivate: *From year*, *Successor* limited to the same level and active that year, back-date + warning; Delete: physical vs logical text plus "stays visible in earlier years"; Reactivate: year); modal registration in `modal.types.ts` + `all-modals.service.ts`; History tab (versions table, then the log timeline newest first with field diffs); action buttons per status (no edit on a deleted entry).
 - **Tests:**
   - **Server unit:**
@@ -257,8 +257,8 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `full` — irreversible delete path, history guarantees.
 - **Skills:** nestjs-expert, error-handling-patterns (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] Same command set as T-01, all green; falsifiers 1–5 observed red, then reverted.
-  - [ ] B6, B7, B11–B13 in `/swagger`, observation quoted.
+  - [x] Same command set as T-01, all green; falsifiers 1–5 observed red, then reverted. *(server full suite: the 2 pre-existing suites; integration without `--runInBand` — execution.md)*
+  - [x] B6, B7, B11–B13 in `/swagger`, observation quoted. *(execution.md → T-03 verbatim evidence; attempt-2 B13 texts pinned by metadata tests, not re-observed on a boot)*
 
 ### T-04 — Slice 4: consumer contract, Control Lists wiring and linked data
 
@@ -471,7 +471,7 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
 | RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main`. **Measured 2026-10-16 by the requester on *testing*:** `alliance_user_staff.carnet` = `utf8mb4` / `utf8mb4_0900_ai_ci`, `VERSION()` = `8.0.46-0ubuntu0.22.04.4` — the baseline dump's `utf8mb3` is stale for that server. Still owed: Prod (`main`) | Requester | open — testing measured, Prod pending |
-| RB-6 | 2026-10-16 | Cross-entry race (T-02 Reviewer A advisory, reasoned): `FOR UPDATE` locks only the saved entry and the hierarchy graph is read unlocked, so two concurrent saves on different entries (e.g. P L2→L3 while an L3 is created under P) can each pass validation and leave an I-3 violation | Either lock the parent/child rows the check reads, or accept (≈ 500 entries, few admins). **Requester decision pending** | Requester | open |
+| RB-6 | 2026-10-16 | Cross-entry race (T-02 Reviewer A advisory, reasoned): `FOR UPDATE` locks only the saved entry and the hierarchy graph is read unlocked, so two concurrent saves on different entries (e.g. P L2→L3 while an L3 is created under P) can each pass validation and leave an I-3 violation | Either lock the parent/child rows the check reads, or accept (≈ 500 entries, few admins). **Requester decision pending** | Requester | open — **widened 2026-10-19 (T-03 Reviewer A, constructed, not executed):** inactivate / logical delete can now shorten a parent's coverage while a concurrent child move or reactivate under it reads the parent unlocked → I-3 break; a physical delete is backstopped by the RESTRICT FK (surfaces as a 500) |
 
 ---
 

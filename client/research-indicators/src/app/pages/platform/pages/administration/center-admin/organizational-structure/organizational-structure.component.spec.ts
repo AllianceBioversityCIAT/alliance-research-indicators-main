@@ -407,6 +407,45 @@ describe('OrganizationalStructureComponent', () => {
       expect(root().textContent).toContain('L2 Department');
     });
 
+    it('a selected entry shows its header, the History tab and the lifecycle actions in the right panel (T-03)', async () => {
+      await create(RANGE, ROWS_2026);
+
+      (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
+      await settle();
+
+      expect(q('summary-id')?.textContent).toContain('Permanent ID 2');
+      expect(q('tab-history')).toBeTruthy();
+      expect(q('delete-button')).toBeTruthy();
+      expect(q('inactivate-button')).toBeTruthy();
+    });
+
+    it('after a lifecycle action B2 and B1 reload and the entry stays selected while it is still listed', async () => {
+      await create(RANGE, ROWS_2026);
+      (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
+      await settle();
+      api.GET_OrgStructureYears.mockClear();
+      api.GET_OrgStructureUnits.mockClear();
+
+      await component.onLifecycleDone({ action: 'inactivate', id: 2 });
+      await settle();
+
+      expect(api.GET_OrgStructureYears).toHaveBeenCalledTimes(1);
+      expect(api.GET_OrgStructureUnits).toHaveBeenCalledTimes(1);
+      expect(component.selectedId()).toBe(2);
+    });
+
+    it('a PHYSICAL delete clears the selection even though the id was listed before (R-ORG-008)', async () => {
+      await create(RANGE, ROWS_2026);
+      (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
+      await settle();
+
+      await component.onLifecycleDone({ action: 'delete', id: 2, mode: 'physical' });
+      await settle();
+
+      expect(component.selectedId()).toBeNull();
+      expect(q('detail-empty')).toBeTruthy();
+    });
+
     it('after a save B2 and B1 are reloaded so the new year becomes selectable (T-01 advisory)', async () => {
       await create(RANGE, ROWS_2026);
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();

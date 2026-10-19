@@ -116,3 +116,67 @@ export interface OrgUnitSaved {
   id: number;
   outcome?: OrgSaveOutcome;
 }
+
+// @akili-spec institutional-performance/organizational-structure T-03 (client half) — design §4 B6,
+// B11, B12, B13. Contract coded against the design table; the server half may name log fields
+// differently, in which case only this block and `org-history.util.ts` change.
+
+export type OrgLifecycleAction = 'inactivate' | 'reactivate' | 'delete';
+
+/** B11 / B12 body. `successorId` exists on inactivate only. */
+export interface OrgLifecyclePayload {
+  fromYear: number;
+  successorId?: number;
+  backdate?: boolean;
+}
+
+/** B13 `data`: the server decides physical vs logical (§5.5). */
+export interface OrgDeleteResult {
+  id: number;
+  mode: 'physical' | 'logical';
+  /** The end year actually applied: `null` for a physical delete; an inactive entry keeps its own end year. */
+  fromYear: number | null;
+}
+
+export type OrgChangeLogAction =
+  | 'seed'
+  | 'create'
+  | 'edit_in_place'
+  | 'new_version'
+  | 'code_change'
+  | 'delegates_change'
+  | 'inactivate'
+  | 'reactivate'
+  | 'delete_logical'
+  | 'delete_physical';
+
+/** One changed field of a log row: `{ old, new }` (design §3.1). Lists (delegates) are carnets; objects (`newVersion`) are plain records. */
+export interface OrgChangeLogDiffEntry {
+  old: unknown;
+  new: unknown;
+}
+
+/** Who wrote the row; any part may be null (seed rows, deleted users). */
+export interface OrgChangeLogActor {
+  id: number | null;
+  name: string | null;
+  email: string | null;
+}
+
+/** B6 `log[]` / B7 row (R-ORG-009), as the server returns it. */
+export interface OrgChangeLogRow {
+  id: number;
+  unitId: number;
+  action: OrgChangeLogAction;
+  appliesFromYear: number | null;
+  backdated: boolean;
+  changes: Record<string, OrgChangeLogDiffEntry>;
+  createdAt: string;
+  createdBy: OrgChangeLogActor;
+}
+
+/** B6 `data`: every version of the entry (oldest first) and its log (newest first). */
+export interface OrgHistory {
+  versions: OrgUnitVersionView[];
+  log: OrgChangeLogRow[];
+}

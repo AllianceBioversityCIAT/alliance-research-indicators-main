@@ -167,6 +167,65 @@ export class OrgStructureWriteRepository {
     );
   }
 
+  /** Versions removed by a lifecycle change (a version that would cover no year, design 5.4). */
+  async deleteVersions(
+    manager: EntityManager,
+    unitId: number,
+    versionIds: number[],
+  ): Promise<void> {
+    if (versionIds.length === 0) return;
+    const placeholders = versionIds.map(() => '?').join(',');
+    await manager.query(
+      `DELETE FROM org_unit_versions WHERE org_unit_id = ? AND id IN (${placeholders})`,
+      [unitId, ...versionIds],
+    );
+  }
+
+  /** Inactivate, reactivate and logical delete: the entry's status fields (design 3.1). */
+  async updateUnitStatus(
+    manager: EntityManager,
+    id: number,
+    fields: {
+      status: 'active' | 'inactive' | 'deleted';
+      statusFromYear: number | null;
+      successorId: number | null;
+    },
+    userId: number,
+  ): Promise<void> {
+    await manager.update(
+      OrgUnit,
+      { id },
+      {
+        status: fields.status,
+        status_from_year: fields.statusFromYear,
+        successor_id: fields.successorId,
+        updated_by: userId,
+      },
+    );
+  }
+
+  /**
+   * Physical delete (design 5.5). Versions and delegates go with the entry
+   * through their `ON DELETE CASCADE` foreign keys; the change log has NO foreign
+   * key and survives (NFR-ORG-003).
+   */
+  async deleteUnit(manager: EntityManager, id: number): Promise<void> {
+    await manager.query(`DELETE FROM org_units WHERE id = ?`, [id]);
+  }
+
+  /** Entries that name this one as their successor (`successor_id` is RESTRICT, so they block a physical delete). */
+  async findSuccessorReferrers(
+    manager: EntityManager,
+    id: number,
+  ): Promise<Array<{ id: number; code: string }>> {
+    const rows: Array<{ id: number | string; code: string }> =
+      await manager.query(
+        `SELECT id, code FROM org_units WHERE successor_id = ? ORDER BY id`,
+        [id],
+      );
+    return rows.map((row) => ({ id: Number(row.id), code: row.code }));
+  }
+
   /** Current delegates of an entry in insertion order (R-ORG-017). */
   async loadDelegateCarnets(
     manager: EntityManager,

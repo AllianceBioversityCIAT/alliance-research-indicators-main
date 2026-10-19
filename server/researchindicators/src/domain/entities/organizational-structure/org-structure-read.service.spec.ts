@@ -22,6 +22,7 @@ describe('OrgStructureReadService', () => {
   };
   const versionRepo = { findDetailedByUnit: jest.fn() };
   const delegateRepo = { findStaffByUnitIds: jest.fn() };
+  const changeLogRepo = { findRowsByUnit: jest.fn() };
   const clock: OrgStructureClock = { currentYear: () => year };
 
   const rawRow = (over: Partial<YearViewRawRow> = {}): YearViewRawRow => ({
@@ -58,6 +59,7 @@ describe('OrgStructureReadService', () => {
       versionRepo as never,
       delegateRepo as never,
       clock,
+      changeLogRepo as never,
     );
   });
 
@@ -349,6 +351,79 @@ describe('OrgStructureReadService', () => {
       expect(detail.versions[0].director.carnet).toBe('A1234');
       expect(detail.versions[0].levelCode).toBe('L4');
       expect(detail.delegates).toHaveLength(1);
+    });
+  });
+
+  describe('B6 history and B7 change log (T-03, R-ORG-009, R-ORG-017)', () => {
+    const logRaw = (over: Record<string, unknown> = {}) => ({
+      id: '9',
+      org_unit_id: '57',
+      action: 'delegates_change',
+      applies_from_year: null,
+      backdated: 0,
+      changes: JSON.stringify({
+        delegates: { old: ['B2001'], new: ['B2002'] },
+      }),
+      created_at: new Date('2026-10-19T10:00:00.000Z'),
+      created_by: '4242',
+      user_first_name: 'Hector',
+      user_last_name: 'Tobon',
+      user_email: 'h@example.org',
+      ...over,
+    });
+
+    it('B6 returns the versions and the log rows mapped (parsed changes, who, when)', async () => {
+      unitRepo.findOne.mockResolvedValue({ id: 57 });
+      versionRepo.findDetailedByUnit.mockResolvedValue([]);
+      changeLogRepo.findRowsByUnit.mockResolvedValue([logRaw()]);
+
+      const history = await service.getUnitHistory(57);
+
+      expect(history.versions).toEqual([]);
+      expect(history.log).toEqual([
+        {
+          id: 9,
+          unitId: 57,
+          action: 'delegates_change',
+          appliesFromYear: null,
+          backdated: false,
+          changes: { delegates: { old: ['B2001'], new: ['B2002'] } },
+          createdAt: '2026-10-19T10:00:00.000Z',
+          createdBy: { id: 4242, name: 'Hector Tobon', email: 'h@example.org' },
+        },
+      ]);
+    });
+
+    it('B6 for an id that does not exist (also a physically deleted one) is the same 404 string as B5, and reads no log', async () => {
+      unitRepo.findOne.mockResolvedValue(null);
+      await expect(service.getUnitHistory(118)).rejects.toThrow(
+        new NotFoundException('Organizational unit 118 not found'),
+      );
+      expect(changeLogRepo.findRowsByUnit).not.toHaveBeenCalled();
+    });
+
+    it('B7 reads the log with NO existence check, and passes already-parsed JSON and a missing user through', async () => {
+      changeLogRepo.findRowsByUnit.mockResolvedValue([
+        logRaw({
+          action: 'delete_physical',
+          changes: { name: { old: 'X', new: null } },
+          created_by: null,
+          user_first_name: null,
+          user_last_name: null,
+          user_email: null,
+          backdated: 1,
+        }),
+      ]);
+
+      const rows = await service.getChangeLog(118);
+
+      expect(unitRepo.findOne).not.toHaveBeenCalled();
+      expect(rows[0]).toMatchObject({
+        action: 'delete_physical',
+        backdated: true,
+        changes: { name: { old: 'X', new: null } },
+        createdBy: { id: null, name: null, email: null },
+      });
     });
   });
 });

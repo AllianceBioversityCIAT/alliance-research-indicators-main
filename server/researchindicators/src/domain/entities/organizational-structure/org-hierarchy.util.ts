@@ -197,3 +197,31 @@ export const describeChildLevelConflicts = (
   `A ${label(newLevelId)} cannot be the parent of: ${conflicts
     .map((c) => `${codeOf(c.childId)} (${formatRange(c.from, c.to ?? INF)})`)
     .join(', ')}. Move or change those entries first`;
+
+/**
+ * Children rule of the lifecycle (design 5.3, last bullet; D-ORG-11): an entry
+ * has ACTIVE CHILDREN FROM YEAR `fromYear` when any version with
+ * `parentId = unitId` covers a year >= `fromYear`, which is `to == null` or
+ * `to > fromYear`. It is NOT "a child active at `fromYear`": a child that moves
+ * under the entry from a later year blocks too. Returns the distinct child
+ * entry ids, ascending.
+ *
+ * @akili-spec institutional-performance/organizational-structure
+ */
+export const findActiveChildren = (
+  versions: GraphVersion[],
+  unitId: number,
+  fromYear: number,
+): number[] =>
+  [
+    ...new Set(
+      versions
+        .filter(
+          (v) =>
+            v.parentId === unitId &&
+            v.unitId !== unitId &&
+            (v.to === null || v.to > fromYear),
+        )
+        .map((v) => v.unitId),
+    ),
+  ].sort((a, b) => a - b);

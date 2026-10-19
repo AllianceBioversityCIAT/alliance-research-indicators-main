@@ -20,4 +20,6 @@ export type ModalName =
   | 'poolFundingHelp'
   // @akili-spec institutional-performance/control-lists — T-01: category mode only;
   // the mode switch stays extensible for list/value modes in T-02/T-03.
-  | 'controlListForm';
+  | 'controlListForm'
+  // @akili-spec institutional-performance/organizational-structure — T-03: inactivate / reactivate / delete dialog.
+  | 'orgUnitLifecycle';

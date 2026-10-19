@@ -1,0 +1,138 @@
+<app-modal modalName="orgUnitLifecycle" [clearModal]="clearModal">
+  <div
+    #dialogRoot
+    tabindex="-1"
+    class="flex w-[min(520px,80vw)] flex-col gap-4 px-10 py-8 outline-none"
+    role="group"
+    [attr.aria-label]="title()"
+    data-testid="lifecycle-dialog">
+    <p class="m-0 text-[14px] atc-grey-900" data-testid="lifecycle-entry">
+      <span class="font-mono atc-light-blue-400">{{ row.code }}</span> {{ row.version.name }}
+    </p>
+
+    @if (blocked(); as message) {
+      <p class="m-0 text-[14px] atc-red-1" role="alert" data-testid="lifecycle-blocked">{{ message }}</p>
+      <div class="flex justify-end">
+        <p-button
+          label="Close"
+          severity="secondary"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="close()"
+          data-testid="lifecycle-close">
+        </p-button>
+      </div>
+    } @else {
+      @switch (action) {
+        @case ('inactivate') {
+          <p class="m-0 text-[13px] atc-grey-700" data-testid="lifecycle-text">
+            The entry ends from the chosen year: it stays visible in earlier years and is hidden from that year on. Its records are not rewritten.
+          </p>
+        }
+        @case ('reactivate') {
+          <p class="m-0 text-[13px] atc-grey-700" data-testid="lifecycle-text">
+            Reactivating creates one new version from the chosen year, with the entry's last values. The successor link is cleared.
+          </p>
+        }
+        @default {
+          @if (mode() === 'physical') {
+            <p class="m-0 text-[13px] atc-grey-700" data-testid="lifecycle-text-physical">
+              This entry was created in {{ firstFrom() }} and has never been part of a past year, so it is erased for good and its code becomes free.
+              No earlier year view is affected. The change log keeps a record of the deletion.
+            </p>
+          } @else if (mode() === 'logical') {
+            <p class="m-0 text-[13px] atc-grey-700" data-testid="lifecycle-text-logical">
+              @if (keepsEndYear()) {
+                The entry is already inactive, so it is marked Deleted from {{ row.statusFromYear }}, the year it ended.
+              } @else {
+                The entry is marked Deleted from the chosen year.
+              }
+              It stays visible in earlier years. A deleted entry cannot be edited or reactivated.
+            </p>
+          } @else {
+            <p class="m-0 text-[13px] atc-grey-700" data-testid="lifecycle-text-unknown">
+              An entry that already existed before {{ range.current }} is marked Deleted from the chosen year and stays visible in earlier years; an
+              entry created this year is erased for good.
+            </p>
+          }
+        }
+      }
+
+      @if (showYear()) {
+        <div class="flex flex-col gap-1">
+          <label for="orgLifecycleYear" class="text-sm font-medium atc-grey-800">From year</label>
+          <p-select
+            inputId="orgLifecycleYear"
+            [options]="yearOptions()"
+            [ngModel]="fromYear()"
+            (onChange)="onYearChange($event.value)"
+            appendTo="body"
+            fluid
+            data-testid="lifecycle-year">
+          </p-select>
+        </div>
+
+        <label class="flex cursor-pointer items-center gap-2 text-sm atc-grey-800">
+          <input
+            type="checkbox"
+            class="h-4 w-4 cursor-pointer"
+            [checked]="backdate()"
+            (change)="onBackdateChange($any($event.target).checked)"
+            data-testid="lifecycle-backdate" />
+          Back-date (apply to a year before {{ range.current }})
+        </label>
+        @if (showBackdateWarning()) {
+          <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="lifecycle-backdate-warning">
+            Back-dating changes how past years look and is recorded in the change log.
+          </p>
+        }
+      }
+
+      @if (action === 'inactivate') {
+        <div class="flex flex-col gap-1">
+          <label for="orgLifecycleSuccessor" class="text-sm font-medium atc-grey-800">Successor (optional)</label>
+          <p-select
+            inputId="orgLifecycleSuccessor"
+            [options]="successorChoices()"
+            optionLabel="label"
+            optionValue="id"
+            [ngModel]="successorId()"
+            (ngModelChange)="successorId.set($event)"
+            placeholder="No successor"
+            [showClear]="true"
+            [filter]="true"
+            appendTo="body"
+            fluid
+            data-testid="lifecycle-successor">
+          </p-select>
+          <small class="text-[12px] atc-grey-700">Same level as this entry, active in the chosen year.</small>
+        </div>
+      }
+
+      @if (error(); as message) {
+        <p class="m-0 text-[13px] atc-red-1" role="alert" data-testid="lifecycle-error">{{ message }}</p>
+      }
+
+      <div class="flex justify-end gap-2">
+        <p-button
+          label="Cancel"
+          severity="secondary"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="close()"
+          data-testid="lifecycle-cancel">
+        </p-button>
+        <p-button
+          [label]="confirmLabel()"
+          [severity]="action === 'delete' ? 'danger' : 'info'"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          [disabled]="!canConfirm()"
+          [loading]="submitting()"
+          (onClick)="confirm()"
+          data-testid="lifecycle-confirm">
+        </p-button>
+      </div>
+    }
+  </div>
+</app-modal>

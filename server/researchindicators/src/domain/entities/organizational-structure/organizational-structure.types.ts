@@ -117,3 +117,30 @@ export interface OrgSaveOutcome {
 export type OrgUnitSaveResponse = OrgUnitDetailResponse & {
   outcome: OrgSaveOutcome;
 };
+
+/** One change-log row as B6 and B7 return it (R-ORG-009). `createdBy` joins `sec_users`. */
+export interface OrgChangeLogRow {
+  id: number;
+  unitId: number;
+  action: OrgChangeAction;
+  appliesFromYear: number | null;
+  backdated: boolean;
+  /** `{ field: { old, new } }`; for a physical delete, the last values. */
+  changes: Record<string, { old: unknown; new: unknown }>;
+  createdAt: string;
+  createdBy: { id: number | null; name: string | null; email: string | null };
+}
+
+/** B6: the entry's versions (oldest first) and its log (newest first). */
+export interface OrgUnitHistoryResponse {
+  versions: OrgUnitVersionResponse[];
+  log: OrgChangeLogRow[];
+}
+
+/** B13. */
+export interface OrgDeleteResult {
+  id: number;
+  mode: 'physical' | 'logical';
+  /** The end year actually applied: null for a physical delete; for an already-inactive entry, its existing end year. */
+  fromYear: number | null;
+}

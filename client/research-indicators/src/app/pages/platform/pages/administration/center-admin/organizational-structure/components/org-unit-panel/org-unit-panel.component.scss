@@ -1,0 +1,38 @@
+// institutional-performance/organizational-structure T-03 — design §6.8 (tokens only, no hex literals).
+.org-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ac-grey-700);
+}
+
+.org-tab--active {
+  border-bottom-color: var(--ac-light-blue-400);
+  color: var(--ac-primary-blue-600);
+  font-weight: 600;
+}
+
+.org-history-table {
+  th,
+  td {
+    padding: 4px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--ac-grey-200);
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--ac-grey-700);
+    font-weight: 600;
+  }
+}
+
+.org-log-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--ac-grey-100);
+  color: var(--ac-grey-700);
+}

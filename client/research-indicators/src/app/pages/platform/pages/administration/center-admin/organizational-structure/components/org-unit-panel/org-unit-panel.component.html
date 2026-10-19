@@ -1,0 +1,184 @@
+@if (creating) {
+  <h2 class="m-0 mb-3 text-[15px] font-semibold atc-primary-blue-600" data-testid="new-entry-title">New entry</h2>
+  @for (key of [formKey]; track key) {
+    <app-org-unit-form [row]="null" [rows]="rows" [range]="range" [prefill]="prefill" (saved)="saved.emit($event)" (cancelled)="cancelled.emit()">
+    </app-org-unit-form>
+  }
+} @else {
+  @if (row; as selected) {
+    <div class="mb-3 flex flex-col gap-1" data-testid="selected-summary">
+      <span class="font-mono text-[12.5px] atc-light-blue-400" data-testid="summary-code">{{ selected.code }}</span>
+      <span class="text-[15px] font-semibold atc-primary-blue-600">{{ selected.version.name }}</span>
+      <span class="text-[12px] font-medium uppercase tracking-wide atc-grey-700" data-testid="summary-level">
+        {{ selected.version.levelCode }} {{ levelLabels[selected.version.levelCode] }}
+      </span>
+      <span class="text-[13px] atc-grey-700" data-testid="summary-path">{{ path(selected) }}</span>
+      <span class="text-[12px] atc-grey-700" data-testid="summary-id">Permanent ID {{ selected.id }}</span>
+    </div>
+
+    @if (selected.status !== 'deleted') {
+      <div class="mb-3 flex flex-wrap gap-2" data-testid="lifecycle-actions">
+        <p-button
+          label="Delete"
+          icon="pi pi-trash !text-[12px]"
+          severity="danger"
+          [outlined]="true"
+          size="small"
+          styleClass="!rounded-[9px] !text-[13px]"
+          (onClick)="openLifecycle('delete')"
+          data-testid="delete-button">
+        </p-button>
+        @if (selected.status === 'active') {
+          <p-button
+            label="Inactivate"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="openLifecycle('inactivate')"
+            data-testid="inactivate-button">
+          </p-button>
+        } @else {
+          <p-button
+            label="Reactivate"
+            severity="secondary"
+            size="small"
+            styleClass="!rounded-[9px] !text-[13px]"
+            (onClick)="openLifecycle('reactivate')"
+            data-testid="reactivate-button">
+          </p-button>
+        }
+      </div>
+    }
+
+    <div class="mb-3 flex gap-1 border-b border-[var(--ac-grey-200)]" role="tablist" aria-label="Entry sections">
+      <button
+        type="button"
+        role="tab"
+        id="orgTabDetails"
+        class="org-tab cursor-pointer px-3 py-1.5 text-[13px]"
+        [class.org-tab--active]="tab() === 'details'"
+        [attr.aria-selected]="tab() === 'details'"
+        aria-controls="orgPanelDetails"
+        (click)="selectTab('details')"
+        data-testid="tab-details">
+        Details
+      </button>
+      <button
+        type="button"
+        role="tab"
+        id="orgTabHistory"
+        class="org-tab cursor-pointer px-3 py-1.5 text-[13px]"
+        [class.org-tab--active]="tab() === 'history'"
+        [attr.aria-selected]="tab() === 'history'"
+        aria-controls="orgPanelHistory"
+        (click)="selectTab('history')"
+        data-testid="tab-history">
+        History
+      </button>
+    </div>
+
+    @if (tab() === 'details') {
+      <div role="tabpanel" id="orgPanelDetails" aria-labelledby="orgTabDetails" data-testid="panel-details">
+        @if (selected.status === 'deleted') {
+          <p class="m-0 text-sm atc-grey-700" data-testid="deleted-notice">
+            This entry is deleted from {{ selected.statusFromYear }}. It stays visible in earlier years and cannot be edited or reactivated.
+          </p>
+        } @else {
+          @for (key of [formKey]; track key) {
+            <app-org-unit-form
+              [row]="selected"
+              [rows]="rows"
+              [range]="range"
+              [prefill]="null"
+              (saved)="saved.emit($event)"
+              (cancelled)="cancelled.emit()">
+            </app-org-unit-form>
+          }
+        }
+      </div>
+    } @else {
+      <div role="tabpanel" id="orgPanelHistory" aria-labelledby="orgTabHistory" class="flex flex-col gap-4" data-testid="panel-history">
+        @if (historyLoading() && !history()) {
+          <p class="m-0 text-sm atc-grey-700" data-testid="history-loading">Loading history...</p>
+        } @else if (historyError()) {
+          <div class="flex flex-col items-start gap-2" role="alert" data-testid="history-error">
+            <p class="m-0 text-sm atc-red-1">We could not load the history. Please try again.</p>
+            <p-button
+              label="Retry"
+              icon="pi pi-refresh !text-[12px]"
+              severity="secondary"
+              size="small"
+              styleClass="!rounded-[9px] !text-[13px]"
+              (onClick)="loadHistory(selected.id)"
+              data-testid="history-retry">
+            </p-button>
+          </div>
+        } @else {
+          @if (history(); as h) {
+            <section aria-labelledby="orgVersionsTitle">
+              <h3 id="orgVersionsTitle" class="m-0 mb-1 text-[13px] font-semibold atc-primary-blue-600">Versions</h3>
+              <table class="org-history-table w-full border-collapse text-[12.5px] atc-grey-900" data-testid="history-versions">
+                <thead>
+                  <tr>
+                    <th scope="col">Years</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Level</th>
+                    <th scope="col">Parent</th>
+                    <th scope="col">Director</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (v of versions(); track $index) {
+                    <tr data-testid="version-row">
+                      <td>{{ v.years }}</td>
+                      <td>{{ v.name }}</td>
+                      <td>{{ v.level }}</td>
+                      <td>{{ v.parent }}</td>
+                      <td>{{ v.director }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </section>
+
+            <section aria-labelledby="orgLogTitle">
+              <h3 id="orgLogTitle" class="m-0 mb-1 text-[13px] font-semibold atc-primary-blue-600">Change log</h3>
+              @if (h.log.length === 0) {
+                <p class="m-0 text-sm atc-grey-700" data-testid="log-empty">No changes recorded.</p>
+              } @else {
+                <ol class="m-0 flex list-none flex-col gap-3 p-0" data-testid="history-log">
+                  @for (entry of h.log; track entry.id) {
+                    <li class="flex flex-col gap-1 border-l-2 border-[var(--ac-grey-200)] pl-3" data-testid="log-entry">
+                      <span class="text-[13px] font-medium atc-grey-900" data-testid="log-action">{{ actionLabels[entry.action] }}</span>
+                      <span class="text-[12px] atc-grey-700" data-testid="log-meta">
+                        {{ actorLabel(entry.createdBy) }} · {{ formatLogTime(entry.createdAt) }}
+                        @if (entry.appliesFromYear !== null) {
+                          · applies from {{ entry.appliesFromYear }}
+                        }
+                      </span>
+                      @if (entry.backdated) {
+                        <span class="org-log-badge w-fit" data-testid="log-backdated">Back-dated</span>
+                      }
+                      @for (line of diffOf(entry); track line.field) {
+                        <span class="text-[12.5px] atc-grey-900" data-testid="log-diff">
+                          {{ line.label }}: {{ line.before }} &rarr; {{ line.after }}
+                        </span>
+                      }
+                    </li>
+                  }
+                </ol>
+              }
+            </section>
+          }
+        }
+      </div>
+    }
+
+    @if (lifecycle(); as action) {
+      <app-org-lifecycle-dialog [action]="action" [row]="selected" [range]="range" (done)="onLifecycleDone($event)" (closed)="closeLifecycle()">
+      </app-org-lifecycle-dialog>
+    }
+  } @else {
+    <p class="m-0 text-sm atc-grey-700" data-testid="detail-empty">Select an entry to see its details.</p>
+  }
+}

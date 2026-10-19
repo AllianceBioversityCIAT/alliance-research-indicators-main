@@ -13,6 +13,8 @@ import { isYearCovered } from '../src/domain/entities/organizational-structure/o
 import { OrgUnitRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit.repository';
 import { OrgUnitVersionRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-version.repository';
 import { OrgUnitDelegateRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-delegate.repository';
+import { OrgUnitChangeLogRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-change-log.repository';
+import { OrgUnitUsageRegistry } from '../src/domain/entities/organizational-structure/org-unit-usage.registry';
 import { RolesGuard } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
@@ -157,6 +159,11 @@ describe('Organizational Structure — year view, years and one entry against re
           provide: OrgUnitDelegateRepository,
           useFactory: () => new OrgUnitDelegateRepository(dataSource),
         },
+        {
+          provide: OrgUnitChangeLogRepository,
+          useFactory: () => new OrgUnitChangeLogRepository(dataSource),
+        },
+        OrgUnitUsageRegistry,
         Reflector,
         RolesGuard,
       ],

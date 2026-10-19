@@ -8,9 +8,11 @@ import { DataTableColumn, DataTableComponent } from '@shared/components/data-tab
 import { OrgTableRow, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { ApiService } from '@shared/services/api.service';
 import { OrgTreeComponent } from './components/org-tree/org-tree.component';
-import { OrgUnitFormComponent, OrgUnitFormPrefill } from './components/org-unit-form/org-unit-form.component';
+import { OrgLifecycleDone } from './components/org-lifecycle-dialog/org-lifecycle-dialog.component';
+import { OrgUnitFormPrefill } from './components/org-unit-form/org-unit-form.component';
+import { OrgUnitPanelComponent } from './components/org-unit-panel/org-unit-panel.component';
 import { nextLevelId } from './utils/org-form.util';
-import { ORG_LEVEL_LABELS, OrgLevelCounts, buildOrgTree, countByLevel, toTableRows, visibleRows } from './utils/org-tree.util';
+import { OrgLevelCounts, buildOrgTree, countByLevel, toTableRows, visibleRows } from './utils/org-tree.util';
 
 type OrgView = 'tree' | 'table';
 
@@ -29,7 +31,7 @@ type OrgView = 'tree' | 'table';
     CustomProgressBarComponent,
     DataTableComponent,
     OrgTreeComponent,
-    OrgUnitFormComponent
+    OrgUnitPanelComponent
   ],
   templateUrl: './organizational-structure.component.html',
   styleUrl: './organizational-structure.component.scss',
@@ -37,8 +39,6 @@ type OrgView = 'tree' | 'table';
 })
 export default class OrganizationalStructureComponent implements OnInit {
   private readonly api = inject(ApiService);
-
-  readonly levelLabels = ORG_LEVEL_LABELS;
 
   readonly years = signal<OrgYearRange | null>(null);
   readonly year = signal<number | null>(null);
@@ -182,6 +182,14 @@ export default class OrganizationalStructureComponent implements OnInit {
     this.creating.set(false);
     this.selectedId.set(id !== null && this.rows().some(row => row.id === id) ? id : null);
     this.formVersion.update(v => v + 1);
+  }
+
+  /**
+   * After inactivate / reactivate / delete the year view is reloaded exactly as after a save (B2, then B1).
+   * A physical delete leaves nothing to reselect, so the selection is cleared (R-ORG-008).
+   */
+  async onLifecycleDone(done: OrgLifecycleDone): Promise<void> {
+    await this.onSaved(done.mode === 'physical' ? null : done.id);
   }
 
   private async loadUnits(): Promise<void> {

@@ -396,6 +396,26 @@ describe('AllModalsService', () => {
     });
   });
 
+  // @akili-spec institutional-performance/organizational-structure T-03: modal name `orgUnitLifecycle`.
+  describe('orgUnitLifecycle modal', () => {
+    it('is registered closed, with no footer actions (the dialog renders its own Close / Confirm)', () => {
+      const config = service.modalConfig().orgUnitLifecycle;
+
+      expect(config.isOpen).toBe(false);
+      expect(config.cancelAction).toBeUndefined();
+      expect(config.confirmAction).toBeUndefined();
+    });
+
+    it('opens and is closed by closeAllModals', () => {
+      service.openModal('orgUnitLifecycle');
+      expect(service.isModalOpen('orgUnitLifecycle').isOpen).toBe(true);
+
+      service.closeAllModals();
+
+      expect(service.modalConfig().orgUnitLifecycle.isOpen).toBe(false);
+    });
+  });
+
   describe('setModalWidth', () => {
     it('should set modal width', () => {
       service.setModalWidth('createResult', true);

@@ -32,7 +32,7 @@ export function nextLevelId(parentLevel: OrgLevelCode): number | null {
 }
 
 /** Path of an entry in the viewed rows, root first: `Division / Department / Office`. */
-function pathOf(row: OrgYearViewRow, byId: Map<number, OrgYearViewRow>): string {
+export function pathOf(row: OrgYearViewRow, byId: Map<number, OrgYearViewRow>): string {
   const names: string[] = [];
   const seen = new Set<number>();
   let cursor: OrgYearViewRow | undefined = row;

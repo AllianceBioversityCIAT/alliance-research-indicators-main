@@ -13,6 +13,8 @@ import { OrgStructureWriteRepository } from '../src/domain/entities/organization
 import { OrgUnitRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit.repository';
 import { OrgUnitVersionRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-version.repository';
 import { OrgUnitDelegateRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-delegate.repository';
+import { OrgUnitChangeLogRepository } from '../src/domain/entities/organizational-structure/repositories/org-unit-change-log.repository';
+import { OrgUnitUsageRegistry } from '../src/domain/entities/organizational-structure/org-unit-usage.registry';
 import { ControlListValueLookupService } from '../src/domain/entities/control-lists/control-list-value-lookup.service';
 import { ControlListRepository } from '../src/domain/entities/control-lists/repositories/control-list.repository';
 import { ControlListValueRepository } from '../src/domain/entities/control-lists/repositories/control-list-value.repository';
@@ -104,11 +106,25 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
         [id],
       )
     ).map((r: any) => r.c);
-  const count = async (table: string) =>
-    Number((await query(`SELECT COUNT(*) AS n FROM ${table}`))[0].n);
+  // Scoped to the rows THIS suite owns (codes `__T02_%`, minus the lifecycle
+  // suite's `__T02_LIF%`): suites run in parallel on one database, so a global
+  // COUNT(*) or a checksum over every row would see another suite's writes.
+  const OWN = `u.code LIKE '__T02_%' AND u.code NOT LIKE '__T02_LIF%'`;
+  const count = async (table: string) => {
+    const from: Record<string, string> = {
+      org_units: `org_units u`,
+      org_unit_versions: `org_unit_versions t JOIN org_units u ON u.id = t.org_unit_id`,
+      org_unit_change_log: `org_unit_change_log t JOIN org_units u ON u.id = t.org_unit_id`,
+    };
+    return Number(
+      (await query(`SELECT COUNT(*) AS n FROM ${from[table]} WHERE ${OWN}`))[0]
+        .n,
+    );
+  };
   const otherRows = (except: number) =>
     query(
-      `SELECT * FROM org_unit_versions WHERE org_unit_id <> ? ORDER BY id`,
+      `SELECT v.* FROM org_unit_versions v JOIN org_units u ON u.id = v.org_unit_id
+        WHERE ${OWN} AND v.org_unit_id <> ? ORDER BY v.id`,
       [except],
     );
   const yearView = async (year: number) => {
@@ -149,6 +165,11 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
           provide: OrgUnitDelegateRepository,
           useFactory: () => new OrgUnitDelegateRepository(dataSource),
         },
+        {
+          provide: OrgUnitChangeLogRepository,
+          useFactory: () => new OrgUnitChangeLogRepository(dataSource),
+        },
+        OrgUnitUsageRegistry,
         {
           provide: ControlListRepository,
           useFactory: () => new ControlListRepository(dataSource),
