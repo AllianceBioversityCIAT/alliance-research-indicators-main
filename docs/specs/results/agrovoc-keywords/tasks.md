@@ -39,7 +39,7 @@ graph TD
 
 ## T-01 — AGROVOC config, mapper and service
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done (PASS 2026-10-19, see execution.md) · **Size:** M · **Dependencies:** none
 - **Requirements:** R-AGV-001 (both scenarios, AC.1, AC.2) · R-AGV-002 (scenarios *Matches found*, *No matches*, *Upstream failure*, *Query too short* — service level) · NFR-AGV-001 · NFR-AGV-003 (logging)
 - **Design refs:** §2.1, §4 (errors table), §5 (URL, mapping, logging), DD-2, DD-3, DD-4; Premise Ledger P-5, P-6, P-7, P-9
 - **Scope:**
@@ -82,11 +82,11 @@ graph TD
 - **Consumers:** none. New symbols only. `AppConfig` gains a getter; there are 43 injecting files, and an added getter changes none of them.
 - **Review:** `full`. It holds the error-mapping decision (DD-2) and ranking logic that every user sees.
 - **Done criteria:**
-  - [ ] All tests above green
-  - [ ] Falsifiers (b), (c) and (d) observed red and quoted
-  - [ ] `npx eslint src/domain/tools/agrovoc src/domain/shared/utils/app-config.util.ts` clean
-  - [ ] `npm run build` green
-  - [ ] `.env.example` line present; `.env` untouched (`git status` does not list it)
+  - [x] All tests above green
+  - [x] Falsifiers (b), (c) and (d) observed red and quoted
+  - [x] `npx eslint src/domain/tools/agrovoc src/domain/shared/utils/app-config.util.ts` clean
+  - [x] `npm run build` green
+  - [x] `.env.example` line present; `.env` untouched (`git status` does not list it)
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`
 
 ---
