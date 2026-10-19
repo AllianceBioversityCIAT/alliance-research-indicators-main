@@ -146,20 +146,38 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: StarRawSectionColumn[] = [
   {
     key: 'primary_lever',
     section: 'ALLIANCE_ALIGNMENT',
-    header: 'Primary lever(s)',
+    header: 'Primary Lever / Research Area',
     width: 28,
   },
   {
     key: 'contributor_lever',
     section: 'ALLIANCE_ALIGNMENT',
-    header: 'Contributing lever(s)',
+    header: 'Contributing Levers / Research Areas',
     width: 28,
+  },
+  {
+    key: 'strategic_objectives',
+    section: 'ALLIANCE_ALIGNMENT',
+    header: 'Strategic Objectives',
+    width: 48,
+  },
+  {
+    key: 'impact_outcomes',
+    section: 'ALLIANCE_ALIGNMENT',
+    header: 'Impact Outcomes',
+    width: 56,
   },
   {
     key: 'sdg_targets',
     section: 'ALLIANCE_ALIGNMENT',
     header: 'Contribution to SDG targets',
     width: 72,
+  },
+  {
+    key: 'sdgs',
+    section: 'ALLIANCE_ALIGNMENT',
+    header: 'Contribution to SDG',
+    width: 48,
   },
   {
     key: 'partners',
@@ -449,9 +467,15 @@ export const STAR_RESULTS_METADATA_RAW_COLUMNS: StarRawSectionColumn[] = [
     width: 40,
   },
   {
-    key: 'quantification',
+    key: 'quantification_actual_count',
     section: 'OICR_DETAILS',
-    header: 'Quantification',
+    header: 'Quantification - Actual count',
+    width: 56,
+  },
+  {
+    key: 'quantification_extrapolated_estimates',
+    section: 'OICR_DETAILS',
+    header: 'Quantification - Extrapolated estimates',
     width: 56,
   },
   {

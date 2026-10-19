@@ -158,13 +158,20 @@ describe('StarResultsExportRepository', () => {
     expect(sql).toContain(
       'LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id',
     );
+    expect(sql).toContain('aa.strategic_objectives AS strategic_objectives');
+    expect(sql).toContain('aa.impact_outcomes AS impact_outcomes');
+    expect(sql).toContain('aa.sdgs AS sdgs');
     expect(sql).toContain('oc.impact_area AS impact_area');
     expect(sql).toContain('oc.cgspace_link AS cgspace_link');
     expect(sql).toContain('oc.for_external_use AS for_external_use');
     expect(sql).toContain(
       'oc.for_external_use_description AS for_external_use_description',
     );
-    expect(sql).toContain(') AS quantification');
+    expect(sql).toContain('oc.quantifications AS quantification_actual_count');
+    expect(sql).toContain(
+      'oc.extrapolated_estimates AS quantification_extrapolated_estimates',
+    );
+    expect(sql).not.toContain(') AS quantification');
     expect(sql).toContain(
       'LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id',
     );
