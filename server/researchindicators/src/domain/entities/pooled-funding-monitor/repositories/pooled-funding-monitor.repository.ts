@@ -116,6 +116,15 @@ const utcIso = (column: string): string =>
 /** `result_prms_sync_*` store the official code as VARCHAR; `results` as BIGINT. */
 const CODE_AS_TEXT_SQL = `(CAST(r.result_official_code AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_520_ci)`;
 
+/**
+ * `result_pool_funding_alignment_sp.sp_code` is utf8mb4_0900_ai_ci while
+ * `clarisa_science_programs.official_code` is utf8mb4_unicode_520_ci; a bare `=`
+ * between them fails with ER 1267 (illegal mix of collations). The explicit
+ * COLLATE goes on the alignment side so the CLARISA lookup can still use its index.
+ */
+const SP_CATALOG_JOIN_SQL = `LEFT JOIN clarisa_science_programs csp
+            ON csp.official_code = (sp.sp_code COLLATE utf8mb4_unicode_520_ci)`;
+
 const toDate = (value: unknown): Date | null => {
   if (value == null || value === '') return null;
   if (value instanceof Date) return value;
@@ -298,7 +307,7 @@ export class PooledFundingMonitorRepository {
             'category', csp.category
           ))
           FROM result_pool_funding_alignment_sp sp
-          LEFT JOIN clarisa_science_programs csp ON csp.official_code = sp.sp_code
+          ${SP_CATALOG_JOIN_SQL}
           WHERE sp.alignment_id = pfa.id
             AND sp.is_active = 1
         ) AS sp_rows,
@@ -493,7 +502,7 @@ export class PooledFundingMonitorRepository {
            INNER JOIN result_pool_funding_alignment_sp sp
              ON sp.alignment_id = pfa.id
             AND sp.is_active = 1
-           LEFT JOIN clarisa_science_programs csp ON csp.official_code = sp.sp_code
+           ${SP_CATALOG_JOIN_SQL}
            ${where.sql}`,
           where.params,
         ),
