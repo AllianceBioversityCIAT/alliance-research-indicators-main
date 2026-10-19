@@ -66,6 +66,8 @@ describe('PiDelegatesClientService', () => {
       | 'GET_PIDelegatesByUserPeople'
       | 'POST_PIDelegates'
       | 'DELETE_PIDelegates'
+      | 'POST_PiDelegatesExportByProjectXlsx'
+      | 'POST_PiDelegatesExportByPersonXlsx'
     >
   >;
 
@@ -77,7 +79,9 @@ describe('PiDelegatesClientService', () => {
       GET_PIDelegatesByUserProjects: jest.fn(),
       GET_PIDelegatesByUserPeople: jest.fn(),
       POST_PIDelegates: jest.fn(),
-      DELETE_PIDelegates: jest.fn()
+      DELETE_PIDelegates: jest.fn(),
+      POST_PiDelegatesExportByProjectXlsx: jest.fn(),
+      POST_PiDelegatesExportByPersonXlsx: jest.fn()
     };
 
     TestBed.configureTestingModule({
@@ -148,6 +152,20 @@ describe('PiDelegatesClientService', () => {
 
       expect(service.projectsWithoutDelegate()).toHaveLength(1);
       expect(service.projectsWithoutDelegate()[0].project_code).toBe('P002');
+    });
+
+    it('hasNoDelegate is the predicate behind projectsWithoutDelegate (chip and counter cannot disagree)', async () => {
+      const withDel = makeProjectDelegates({ project_code: 'P001', delegates: [{ delegate_user_id: 1, name: 'A', email: 'a@a.com', is_active: true }] });
+      const withoutDel = makeProjectDelegates({ project_code: 'P002', delegates: [] });
+      mockApi.GET_PIDelegatesByProject
+        .mockResolvedValueOnce(makeOkResponse(withDel))
+        .mockResolvedValueOnce(makeOkResponse(withoutDel));
+
+      await service.loadByProject(['P001', 'P002']);
+
+      expect(service.hasNoDelegate(withDel)).toBe(false);
+      expect(service.hasNoDelegate(withoutDel)).toBe(true);
+      expect(service.byProjectCache().filter(p => service.hasNoDelegate(p))).toEqual(service.projectsWithoutDelegate());
     });
   });
 
@@ -523,6 +541,36 @@ describe('PiDelegatesClientService', () => {
       expect(mockApi.GET_PIDelegatesByUserPeople).toHaveBeenCalledTimes(2);
       // And the project cache reflects the reloaded (empty delegates) state.
       expect(service.byProjectCache()[0].delegates).toHaveLength(0);
+    });
+  });
+
+  describe('export', () => {
+    it('sends user_id, no scope for a managed user, and the keys + filters (by project)', async () => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([]));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+      mockApi.POST_PiDelegatesExportByProjectXlsx.mockResolvedValue(new Blob(['x']));
+      await service.loadByUser(7);
+      await service.exportByProject(['P2', 'P1'], { role: 'pi' });
+      expect(mockApi.POST_PiDelegatesExportByProjectXlsx).toHaveBeenCalledWith({
+        user_id: 7,
+        project_codes: ['P2', 'P1'],
+        filters: { role: 'pi' }
+      });
+    });
+
+    it('sends the SAME scope the tables loaded with (by person)', async () => {
+      mockApi.GET_PIDelegatesByUserProjects.mockResolvedValue(makeOkResponse([]));
+      mockApi.GET_PIDelegatesByUserPeople.mockResolvedValue(makeOkResponse([]));
+      mockApi.POST_PiDelegatesExportByPersonXlsx.mockResolvedValue(new Blob(['x']));
+      await service.loadByUser(7);
+      const scope = service.scope();
+      await service.exportByPerson([3, 1], { search: 'a' });
+      const body = mockApi.POST_PiDelegatesExportByPersonXlsx.mock.calls[0][0];
+      expect(body).toEqual({ user_id: 7, ...(scope && { scope }), delegate_user_ids: [3, 1], filters: { search: 'a' } });
+    });
+
+    it('rejects when called before the user context is loaded', () => {
+      expect(() => service.exportByPerson([1], {})).toThrow();
     });
   });
 });

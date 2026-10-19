@@ -157,3 +157,26 @@ export type PiDelegateScope = 'managed' | 'all';
 export function piDelegateScopeParam(scope?: PiDelegateScope): string {
   return scope ? `&scope=${encodeURIComponent(scope)}` : '';
 }
+
+/** Body of POST /pi-delegates/export/by-project/xlsx. */
+export interface PiDelegatesExportByProjectBody {
+  user_id: number;
+  scope?: PiDelegateScope;
+  /** Codes of the rows currently shown, in display order. */
+  project_codes: string[];
+  filters?: {
+    search?: string;
+    role?: 'all' | 'pi' | 'delegate';
+    ongoing_only?: boolean;
+    without_delegates_only?: boolean;
+  };
+}
+
+/** Body of POST /pi-delegates/export/by-person/xlsx. */
+export interface PiDelegatesExportByPersonBody {
+  user_id: number;
+  scope?: PiDelegateScope;
+  /** Ids of the rows currently shown, in display order. */
+  delegate_user_ids: number[];
+  filters?: { search?: string };
+}
