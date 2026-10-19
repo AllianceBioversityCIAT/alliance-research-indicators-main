@@ -93,7 +93,7 @@ graph TD
 
 ## T-02 — Endpoint, module and route wiring
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-01
+- **Status:** done (PASS 2026-10-19, see execution.md) · **Size:** S · **Dependencies:** T-01
 - **Requirements:** R-AGV-001 *Missing host* (503 in envelope, no crash) · R-AGV-002 AC.1 (registration part), AC.2, AC.3, *No matches* (200 envelope), *Query too short* (400 envelope) · NFR-AGV-003 (envelope)
 - **Design refs:** §2.1, §4, §8, DD-1; P-8, P-15, P-16
 - **Scope:**
@@ -116,11 +116,11 @@ graph TD
 - **Consumers:** `src/app.module.spec.ts` (pins the exclude list in its header comment, which must be updated if the list text changes); `src/domain/routes/main.routes.ts`.
 - **Review:** `checklist`. Wiring plus Swagger; the risk is captured by the module-graph falsifiers.
 - **Done criteria:**
-  - [ ] Tests green
-  - [ ] Falsifiers observed red
-  - [ ] `npx eslint` on touched files clean
-  - [ ] `npm run build` green
-  - [ ] Swagger lists `GET /api/tools/agrovoc/search` under **AGROVOC** with the bearer lock and the `query` param (checked on a local boot, or deferred to T-05 and stated so)
+  - [x] Tests green
+  - [x] Falsifiers observed red
+  - [x] `npx eslint` on touched files clean
+  - [x] `npm run build` green
+  - [x] Swagger lists `GET /api/tools/agrovoc/search` under **AGROVOC** with the bearer lock and the `query` param (checked on a local boot, or deferred to T-05 and stated so)
 - **Skills:** `nestjs-expert`, `api-design-principles`
 
 ---

@@ -89,3 +89,27 @@
 - **Requirements covered:** R-AGV-001 (both scenarios, AC.1, AC.2) · R-AGV-002 *Matches found*, *No matches*, *Upstream failure*, *Query too short* (service level) · NFR-AGV-001 · NFR-AGV-003 (logging)
 - **Final verification:** VERIFIED (above)
 - **Gate:** auto-continue per owner's standing direction (stop only on FATAL_FAIL / HALT / Pivot / tripwire)
+
+### T-02 — Endpoint, module and route wiring (server) — PASS
+
+- **Final status:** PASS (attempt 1) · **Date:** 2026-10-19
+- **Skills:** `nestjs-expert`, `api-design-principles` (task defaults) · **Effort:** `grok-4.7-high` (S, wiring)
+- **Orca:** task `task_631ae43de10a`, dispatch `ctx_b97310ee5b04` (fresh worker; released after PASS) — ran in parallel with T-04 (cross-package)
+- **Attempts:** 1 · **runtime events:** none
+- **Files changed:** `server/researchindicators/src/domain/tools/agrovoc/agrovoc.controller.ts` (new), `…/agrovoc.module.ts` (new), `…/agrovoc.controller.spec.ts` (new), `src/app.module.ts` (`AgrovocModule` in `imports`), `src/domain/routes/main.routes.ts` (`{ path: 'agrovoc', module: AgrovocModule }` in `toolsChildren`), `src/app.module.spec.ts` (membership, route-tree, JwtMiddleware-exclude assertions)
+- **Implementer verification (reported):** `npm test -- --silent src/domain/tools/agrovoc src/app.module.spec.ts` → 4 suites / 24 tests · `npx eslint …` exit 0 · `npm run build` exit 0
+- **Red run (verbatim, reverted):**
+  - F1 remove `AgrovocModule` from `AppModule.imports` → `expect(imports).toContain(AgrovocModule);` "Expected value: [Function AgrovocModule]" (`app.module.spec.ts:66`). The worker omitted the received-array dump because Jest printed `TypeOrmModule.forRoot` options including a datasource password — correct handling
+  - F2 remove the route node → `expect(agrovocNode).toBeDefined();` "Received: undefined" (`:81`)
+  - F3 (optional) add `tools/agrovoc/(.*)` to the exclude list → `.toBe(false)` "Expected: false / Received: true" (`:103`)
+- **Swagger:** deferred to T-05 (app not booted against the shared Dev DB); a unit test reads decorator metadata (tag `AGROVOC`, bearer security, summary, required `query`, path `search`, GET, no `__version__`)
+- **Not Done / Assumptions (verbatim, no owed item):** "Live HTTP reachability and a live `401` are not proved. The unit tier has no booted, authenticated seam (task disqualifier, KZ-017). Owned by T-05." · "Envelope description `'AGROVOC terms found'` and `@ApiOperation` summary `'Search AGROVOC terms'` are not pinned verbatim in the design … The real `ResponseUtils.format` is called (not mocked)."
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** after T-04's worker reported (no worker active): `npm test -- --silent src/domain/tools/agrovoc src/app.module.spec.ts` → `Test Suites: 4 passed` / `Tests: 24 passed` · `npx eslint src/domain/tools/agrovoc src/domain/routes/main.routes.ts src/app.module.ts src/app.module.spec.ts` → exit 0 · `npm run build` → exit 0
+- **Full server suite (Leader):** `npm test -- --silent` → `Test Suites: 425 passed, 425 total` / `Tests: 4044 passed, 4044 total`
+- **Reviewer** (`akili-reviewer`, opus, checklist): **`STATUS: PASS`** — "The T-02 diff matches tasks.md `## T-02` and design §2.1/§4/§8/§10, and it fully covers P-8, P-15 and P-16. Both registration steps are in place and each is pinned by a test that can fail (KZ-017). The endpoint resolves to `/api/tools/agrovoc/search`, unversioned. Swagger, the envelope and exception propagation all match the spec." Red-run line numbers counted against the diff hunk. Design §10 amendment (carried): client-only, no conflict
+- **ADVISORY (labelled advisory):** RISK the AC.3 assertion checks `entry.path.includes('tools/agrovoc')` and cannot catch a broader exclusion (`tools/(.*)`, `(.*)`) that would also make the endpoint public — the live 401 at T-05 item 9 is the real gate · READABILITY description `'AGROVOC terms found'` also returned for `data: []` · READABILITY `.then(...)` vs the guide's usual `async`/`await` · READABILITY `@ApiQuery` lacks `type`/`description` documenting the 3–100 chars rule
+- **spawns:** Implementer Cursor/grok-4.7-high — not reported by host, ended complete · Reviewer akili-reviewer/opus 10 calls / 63 664 tokens, ended complete
+- **Requirements covered:** R-AGV-001 *Missing host* (envelope) · R-AGV-002 AC.1 (registration part), AC.2, AC.3 (exclude list), *No matches* (200 envelope), *Query too short* (400 envelope) · NFR-AGV-003 (envelope)
+- **Final verification:** VERIFIED
+- **Budget:** review rounds 5 of 7 after this verdict; tasks 3 of 5
+- **Gate:** auto-continue per owner's standing direction
