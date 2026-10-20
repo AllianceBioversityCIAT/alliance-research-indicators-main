@@ -12,6 +12,16 @@ function row(statusId: number): Result {
   } as Result;
 }
 
+type ResultsPayload = { successfulRequest: boolean; data?: { results: Result[] } };
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 describe('GetPolicyChangeLinkableResultsService', () => {
   let service: GetPolicyChangeLinkableResultsService;
   let apiMock: { GET_Results: jest.Mock };
@@ -84,5 +94,81 @@ describe('GetPolicyChangeLinkableResultsService', () => {
 
   it('isOpenSearch returns false', () => {
     expect(service.isOpenSearch()).toBe(false);
+  });
+
+  it('issues one GET_Results when two main(2) calls overlap, and both resolve with the same list', async () => {
+    const gate = deferred<ResultsPayload>();
+    apiMock.GET_Results.mockReturnValue(gate.promise);
+    const expected = [row(4)];
+
+    const first = service.main(2);
+    const second = service.main(2);
+
+    expect(apiMock.GET_Results).toHaveBeenCalledTimes(1);
+    expect(second).toBe(first);
+
+    gate.resolve({ successfulRequest: true, data: { results: expected } });
+    await Promise.all([first, second]);
+
+    expect(service.getList(2)()).toEqual(expected);
+  });
+
+  it('clears a forced error and fills the list when a later main(2) succeeds after a failure', async () => {
+    apiMock.GET_Results.mockResolvedValueOnce({
+      successfulRequest: false,
+      data: { results: [row(4)] }
+    });
+
+    await service.main(2);
+
+    expect(service.getError(2)()).toBe(true);
+    expect(service.getList(2)()).toEqual([]);
+
+    const gate = deferred<ResultsPayload>();
+    apiMock.GET_Results.mockImplementationOnce(() => gate.promise);
+
+    const pending = service.main(2);
+    // Forced state: not reachable via main() once requests are deduped and the
+    // error is cleared at start. This isolates the success-path reset (defense
+    // in depth) so its removal is detectable.
+    service.getError(2).set(true);
+    gate.resolve({ successfulRequest: true, data: { results: [row(4)] } });
+    await pending;
+
+    expect(service.getError(2)()).toBe(false);
+    expect(service.getList(2)()).toEqual([row(4)]);
+  });
+
+  it('keeps an overlapping main(6) independent of an in-flight main(2)', async () => {
+    const gate2 = deferred<ResultsPayload>();
+    const gate6 = deferred<ResultsPayload>();
+    apiMock.GET_Results.mockImplementation((params: { 'indicator-codes': number[] }) =>
+      params['indicator-codes'][0] === 2 ? gate2.promise : gate6.promise
+    );
+
+    const development = service.main(2);
+    const use = service.main(6);
+
+    expect(apiMock.GET_Results).toHaveBeenCalledTimes(2);
+    expect(apiMock.GET_Results.mock.calls.map(call => call[0])).toEqual([
+      { 'indicator-codes': [2] },
+      { 'indicator-codes': [6] }
+    ]);
+
+    gate2.resolve({ successfulRequest: true, data: { results: [row(4)] } });
+    gate6.resolve({ successfulRequest: true, data: { results: [row(6)] } });
+    await Promise.all([development, use]);
+
+    expect(service.getList(2)()).toEqual([row(4)]);
+    expect(service.getList(6)()).toEqual([row(6)]);
+  });
+
+  it('issues a new GET_Results when main(2) is called again after the previous call settles', async () => {
+    apiMock.GET_Results.mockResolvedValue({ successfulRequest: true, data: { results: [row(4)] } });
+
+    await service.main(2);
+    await service.main(2);
+
+    expect(apiMock.GET_Results).toHaveBeenCalledTimes(2);
   });
 });

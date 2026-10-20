@@ -124,6 +124,39 @@
   - [x] Human check passed and recorded in `execution.md`
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
+### T-04 — Client: one in-flight request per indicator; clear the error on success
+
+- **Status:** [x] done
+- **Size:** XS
+- **Origin:** T-03 Reviewer advisory 1, approved by the owner as new scope on 2026-10-20 (*"sí, arréglalo"*)
+- **Requirements covered:** R-PCIL-003, the error row of design §5.1. The error state must reflect the latest load, not a superseded duplicate
+- **Files touched (intended):** `client/research-indicators/src/app/shared/services/control-list/get-policy-change-linkable-results.service.ts` + `.spec.ts`
+- **Scope:**
+  - Keep one in-flight promise per indicator. A `main(id)` call made while that indicator's request is pending returns the same promise and issues no second `GET_Results`.
+  - A later call made after the request settles fetches again.
+  - On a successful response, set `error` to `false`.
+- **Must NOT:** change the request object, the 7/8 filter, `select.component.ts`, or `GetInnoDevOutputService` / `GetInnoUseOutputService`.
+- **Tests:**
+  1. Two overlapping `main(2)` calls → `GET_Results` is called once, and both resolve with the same list.
+  2. `main(2)` fails (error `true`), then a later `main(2)` succeeds → error `false` and the list filled.
+  3. The in-flight requests for `2` and `6` stay independent: an overlapping `main(6)` still issues its own call.
+  4. Once a call settles, another `main(2)` issues a new request.
+- **Falsifier:**
+  - (a) Remove the dedupe → test 1 goes red on the call count.
+  - (b) Remove the error reset on success → test 2 goes red.
+  - Quote both reds, then revert.
+- **Consumers:** `policy-change.component.spec.ts` uses the real service. Run it.
+- **Review:** `checklist`
+- **Verification:** from `client/research-indicators/`:
+  - `npx jest get-policy-change-linkable-results policy-change --silent --coverage=false`
+  - the K-002 tsc gate
+  - `npm run lint -- --quiet`
+  - `npm run build`
+- **Done:**
+  - [x] Tests green; both falsifiers observed red and quoted
+  - [x] Full client suite green (Leader); build exit 0; lint clean
+- **Skills:** `angular-developer`, `tdd`
+
 ## 4. Coverage closure (clause level)
 
 | Requirement clause | Task |

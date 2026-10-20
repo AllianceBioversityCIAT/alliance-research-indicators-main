@@ -308,3 +308,77 @@ The owner checked it in the running app after follow-up 1 and confirmed: *"ya qu
   - a "no tag on the closed value" assertion in the read-only tests;
   - the strength of the service-spec assertion.
 - Design §13 known limitation: a saved link whose target later became status 7 or 8 shows the placeholder.
+
+### T-04 — Client: one in-flight request per indicator; clear the error on success → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-20 |
+| Origin | T-03 Reviewer advisory 1. The owner approved it as new scope (*"sí, arréglalo"*), and the Leader added it to `tasks.md` before dispatch |
+| Final status | PASS (attempt 2 of 3) |
+| Orca task / dispatch | attempt 1 `task_7af1c028d36d` / `ctx_2b4bbc0dcef6`; attempt 2 `task_c188a79c3a34` / `ctx_b8848047b81c` (same worker) |
+| Implementer | Cursor · `grok-4.7-high`, effort medium → high on rework, skills `angular-developer`, `tdd` |
+| Reviewer | Claude `akili-reviewer` — attempt 1 **FAIL** (test comment), attempt 2 **PASS** |
+| Requirements covered | R-PCIL-003, the design §5.1 error row: the error state reflects the latest load |
+
+**Files changed (2):** `client/research-indicators/src/app/shared/services/control-list/get-policy-change-linkable-results.service.{ts,spec.ts}`
+
+**What changed:**
+- `main(id)` returns the in-flight promise for that indicator when one exists.
+- `finally` removes only its own map entry.
+- The body moved to a private `load()`.
+- `errorSig.set(false)` was added on success.
+- The clear at call start is kept, so §5.1 shows no message while loading.
+
+#### Attempt 1
+
+**Implementer verification (as reported):**
+- jest → 2 suites, 48 tests.
+- **Falsifier (a)**, no dedupe: `Expected number of calls: 1, Received number of calls: 2`.
+- **Falsifier (b)**, no reset on success: `Expected: false, Received: true` on `getError(2)`.
+- tsc → 945 = HEAD `5c4e6fa13`, 0 in the service. Probe TS2322 945 → 946, reverted.
+- lint and build → green.
+
+**Evidence re-run (Leader inline): VERIFIED.**
+- jest → 2 suites, 48 tests.
+- tsc → 945 total, 0 in the touched files.
+- lint → 0. build → 0.
+- Full `npm test -- --silent`:
+  - run 1 → `2 failed, 343 passed`, 0 failed tests (runner flake: `all-modals.component.spec.ts`, `roartheme.spec.ts`).
+  - run 2 → `Test Suites: 345 passed, 345 total` · `Tests: 8038 passed, 8038 total`.
+
+**Reviewer FAIL (verbatim):**
+1. **Discovered Issue:** the comment in `get-policy-change-linkable-results.service.spec.ts` (test 2, before `service.getError(2).set(true)`) reads "A superseded duplicate sets error after this call cleared it at start." That describes the race that existed before T-04. The dedupe in this same diff makes it impossible, so the committed comment claims a product path that doesn't exist. A reader will take the falsifier (b) failure as proof of reachable behaviour when it only proves a synthetic state.
+   * **Violated Rule:** CLAUDE.md §4.3, K-004/KZ-014: "If the red has not been *seen*, it may not be asserted — not in a code comment…"
+   * **Remediation Suggestion:** reword the comment as "Forced state: not reachable via main() once requests are deduped and the error is cleared at start. This isolates the success-path reset (defense in depth) so its removal is detectable." Record the same note next to falsifier (b) in `execution.md`. Keep the code and test logic as they are.
+
+**ADVISORY (attempt 1):**
+- Do not stage `.codegraph/.gitignore` with this task (honoured).
+- Tests 3 and 4 also passed before the change. They are **regression guards** for the in-flight map, not proof of new behaviour.
+- **Spec gap:** T-04 Test 2 as written in `tasks.md` cannot tell whether the reset-on-success is present, because the clear at call start masks it.
+
+#### Attempt 2
+
+Only the test-2 title and comment changed. The product code and the test logic are identical to attempt 1.
+- **New title:** "clears a forced error and fills the list when a later main(2) succeeds after a failure"
+- **New comment:** "Forced state: not reachable via main() once requests are deduped and the error is cleared at start. This isolates the success-path reset (defense in depth) so its removal is detectable."
+
+**Implementer verification (as reported):**
+- jest → 2 suites, 48 tests.
+- **Falsifier (b)** re-run: `Expected: false, Received: true` on `getError(2)`, spec line 138, reverted.
+- tsc → 0 lines for the touched file. lint → 0.
+
+**Note beside falsifier (b), required by the FAIL:** the red proves that the success-path reset exists, using a **forced** state. With dedupe and the clear at call start, that state is not reachable through `main()`. The reset is defense in depth. The bug the owner asked to fix is closed by the **dedupe**, and falsifier (a) proves that.
+
+**Evidence re-run (Leader inline): VERIFIED.**
+- jest → 2 suites, 48 tests.
+- tsc → 0 lines for the touched file.
+- lint → exit 0.
+- The full suite carries over from attempt 1, since the product code is byte-identical.
+
+**Reviewer: PASS.** The FAIL is resolved. The comment and title now match the code, and the forced state has a real job: it unmasks the reset. Scope, Must NOT, and Tests 1–4 conform.
+
+**Run accounting:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer(grok) ×2 not reported by host, ended complete; reviewer(claude) 12 calls, 53166 tokens, ended fail; reviewer(claude) not reported by host, ended complete`
+- **Budget:** review rounds now total 7 against the expected 4. The overrun is the owner-requested design follow-up plus this owner-approved T-04.

@@ -17,6 +17,7 @@ export class GetPolicyChangeLinkableResultsService {
   private readonly loadingStore = new Map<number, ReturnType<typeof signal<boolean>>>();
   private readonly listStore = new Map<number, ReturnType<typeof signal<Result[]>>>();
   private readonly errorStore = new Map<number, ReturnType<typeof signal<boolean>>>();
+  private readonly inflight = new Map<number, Promise<void>>();
 
   loading = signal(false);
   list = signal<Result[]>([]);
@@ -42,7 +43,20 @@ export class GetPolicyChangeLinkableResultsService {
   }
 
   /** Loads GET /api/results for one indicator (see ApiService.GET_Results). */
-  async main(indicatorId: number) {
+  main(indicatorId: number): Promise<void> {
+    const existing = this.inflight.get(indicatorId);
+    if (existing) return existing;
+
+    const request = this.load(indicatorId).finally(() => {
+      if (this.inflight.get(indicatorId) === request) {
+        this.inflight.delete(indicatorId);
+      }
+    });
+    this.inflight.set(indicatorId, request);
+    return request;
+  }
+
+  private async load(indicatorId: number): Promise<void> {
     const loadingSig = this.getLoading(indicatorId);
     const listSig = this.getList(indicatorId);
     const errorSig = this.getError(indicatorId);
@@ -55,6 +69,7 @@ export class GetPolicyChangeLinkableResultsService {
         listSig.set([]);
         return;
       }
+      errorSig.set(false);
       const rows = Array.isArray(res.data?.results) ? res.data.results : [];
       listSig.set(rows.filter(row => !isExcludedResultStatus(row.result_status_id)));
     } catch {
