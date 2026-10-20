@@ -71,3 +71,83 @@ The controller was not changed: it declares no `@ApiResponse` (confirmed by the 
 
 - `runtime events: spawn failure ×2 → rung 1 (retry; user login)`
 - `spawns: implementer(grok) not reported by host, ended complete; reviewer(claude) 14 calls, 67053 tokens, ended complete`
+
+### T-02 — Client: Policy-Change-only list service for linkable results → **PASS**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-20 |
+| Final status | PASS (attempt 2 of 3) |
+| Orca task / dispatch | attempt 1 `task_87a63e071bc9` / `ctx_f99b28c6e120`; attempt 2 `task_c5dff8e7ba1c` / `ctx_4dc7ecad86a4` (same worker terminal, kept alive through the FAIL) |
+| Implementer | Cursor · `grok-4.7-high`, effort medium → high on rework, skills `angular-developer`, `tdd` (Leader added `tdd`: the filter is a business rule with a falsifier matrix) |
+| Reviewer | Claude `akili-reviewer` — attempt 1 **FAIL** (evidence gap), attempt 2 **PASS** (fresh context) |
+| Requirements covered | R-PCIL-001 (request indicator `2` only, leave out 7/8, request half of "BUT not other types"); R-PCIL-002 (same for `6`); R-PCIL-003 loading/error inputs and "BUT not affected by the other list"; NFR-PCIL-001 |
+
+**Files changed (6):**
+- `client/research-indicators/src/app/shared/services/control-list/get-policy-change-linkable-results.service.ts` (new)
+- `client/research-indicators/src/app/shared/services/control-list/get-policy-change-linkable-results.service.spec.ts` (new)
+- `client/research-indicators/src/app/shared/services/service-locator.service.ts` and `service-locator.service.spec.ts`
+- `client/research-indicators/src/app/shared/interfaces/services.interface.ts` — adds `'policyChangeLinkableResults'`
+- `client/research-indicators/src/app/shared/interfaces/result/result.interface.ts` — adds `result_status_id?: number`
+
+#### Attempt 1
+
+**Implementer verification (as reported):**
+- `npx jest get-policy-change-linkable-results service-locator --silent` → 89/89 passed. The run exits 1 only on the global coverage floors, because the run is narrow. With `--coverage=false` it exits 0.
+- `npm run lint -- --quiet` → "All files pass linting".
+- `npm run build` → exit 0.
+
+**Red run and falsifiers, all at the status test `spec.ts:49` `toEqual` unless noted, each reverted:**
+- **Red run** (filter-less draft): fails with the extra rows `result_status_id 7` (`result_id 107`) and `8` (`result_id 108`).
+- **Falsifier (a)**, filter dropped: same red, extra 7 and 8.
+- **Falsifier (b)**, only 7 excluded: same assertion, extra `result_status_id 8` only.
+- **Falsifier (c)**, `[2]` hard-coded: the `main(6)` test fails with `Expected indicator-codes [6], Received [2]`.
+
+**Reviewer: FAIL (verbatim):**
+1. **Discovered Issue:** the verification evidence contains no spec type-check. The new `get-policy-change-linkable-results.service.spec.ts` and the edited `service-locator.service.spec.ts` were run only through jest, lint and build, and none of those type-checks spec code. Jest uses isolatedModules, ESLint ignores `*.spec.ts`, and `tsconfig.app.json` covers only `main.ts`.
+   * **Violated Rule:** client/research-indicators/src/CLAUDE.md, "Test code is neither linted nor type-checked (K-002)": "This gate is not optional and nothing else substitutes for it"; the bar is no new errors in the files you touched. Also .agents/reviewer.md §5 (verification must have actually run).
+   * **Remediation Suggestion:** from `client/research-indicators/`, run `npx tsc -p tsconfig.spec.json --noEmit 2>&1 | grep -E 'get-policy-change-linkable-results|service-locator.service.spec'`. Compare the normalized set (positions stripped, sorted) against the pre-change baseline. The new file must have zero errors, and the set for service-locator.service.spec.ts must be unchanged.
+
+**ADVISORY on attempt 1 (non-gating):**
+- RELIABILITY: two overlapping `main(id)` calls for the same indicator interact. app-select calls `initializeService()` from both `ngOnChanges` and `ngOnInit`, so every mount fires `main(id)` twice. The first call's `finally` turns loading off while the second is still in flight. Both calls send the same query, so the final state is consistent. Every per-param app-select service already behaves this way.
+- RISK, feeds T-03: `selectedOption` (`select.component.ts:82`, template line 122) reads the global `service.list()`, which this service never fills. So the selected-row block under the picker never renders. T-03 must check in the running app that the current value still shows when the picker is disabled (§5.1 read-only row).
+- RESILIENCE, feeds T-03: `main` and `getList` take a `number` with no coercion. T-03 must bind the literal numbers `2` and `6`, never strings.
+- READABILITY: the global `error`, `list` and `loading` signals exist only for app-select's fallback and `selectedOption`. A one-line comment would explain why.
+
+**Evidence re-run, attempt 1:** not run. The Reviewer FAIL came first, and the re-run was folded into attempt 2.
+
+#### Attempt 2
+
+Effort was raised to high. The FAIL report went to the same worker verbatim, with the attempt history. **No code changed:** the diff is byte-identical to attempt 1 (Leader `cmp`, ignoring index lines).
+
+**Implementer verification (as reported):**
+- `npx tsc -p tsconfig.spec.json --noEmit` ran on the current tree and on a throwaway detached worktree at HEAD `87f64af58` (the baseline; the worktree was removed afterward). Both exit 2 with **945** `error TS` lines.
+- The position-stripped, sorted grep for the touched files is empty on both sides, and the locator sets are identical.
+- Falsifier, reverted afterward: adding `const t02GateFalsifier: number = 'not-a-number'` made tsc report `src/app/shared/services/control-list/get-policy-change-linkable-results.service.spec.ts(6,7): error TS2322: Type 'string' is not assignable to type 'number'.`, and the total went 945 → 946.
+- jest 89/89; lint clean.
+
+**Evidence re-run (Leader inline, non-author): VERIFIED.**
+- `npx tsc -p tsconfig.spec.json --noEmit` → exit 2, 945 total, **0** lines matching the touched files.
+- `npx jest get-policy-change-linkable-results service-locator --silent --coverage=false` → 2 suites, 89 tests passed.
+- `npm run lint -- --quiet` → "All files pass linting".
+- `npm run build` → exit 0.
+- Full `npm test -- --silent` (from `client/research-indicators/`):
+  - run 1 → `Test Suites: 1 failed, 344 passed` · `Tests: 8001 passed`, 0 failed. The failed suite was a jest worker `SIGSEGV` in the unrelated `result.component.spec.ts`; run alone it passes 18/18. This is the known runner flake (`workerIdleMemoryLimit` mitigation still absent).
+  - run 2 → `Test Suites: 345 passed, 345 total` · `Tests: 8019 passed, 8019 total`.
+
+**Reviewer: PASS.** The attempt-1 FAIL is resolved, and the K-002 bar is met at its source (`client/.../src/CLAUDE.md` lines 268–289):
+- the normalized sets match;
+- both totals are equal (945), so there was no parse abort;
+- the falsifier proves the gate sees the new file.
+
+Code conformance re-checked against Scope, Tests, Disqualifier, §5.2, DD-1, DD-2, P-7 and P-8. ADVISORY: none.
+
+**Decisions made:** brief narrowing, as in T-01: the worker ran scoped tests only, and the Leader ran the full suite.
+
+**Issues encountered:**
+- The worker's first evidence omitted a gate the client guide makes mandatory (K-002), which cost one rework attempt.
+
+**Run accounting:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer(grok) attempt 1 not reported by host, ended complete; reviewer(claude) 9 calls, 54355 tokens, ended fail; implementer(grok) attempt 2 not reported by host, ended complete; reviewer(claude) not reported by host, ended complete`
+- **Budget:** 3 of 4 review rounds used after T-02, with T-03 still to go. A T-03 rework would exceed the design §11 tripwire.

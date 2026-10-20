@@ -58,7 +58,7 @@
 
 ### T-02 — Client: Policy-Change-only list service for linkable results
 
-- **Status:** [ ] todo
+- **Status:** [x] done
 - **Size:** S
 - **Requirements covered:** R-PCIL-001 "MUST request indicator `2` only", "MUST leave out 7/8"; R-PCIL-002 same for `6`; R-PCIL-001 "BUT must NOT show other types" (request half — the server filter is existing, P-4); R-PCIL-003 loading/error inputs; R-PCIL-003 "BUT not affected by the other list" (state is kept per indicator); NFR-PCIL-001
 - **Design refs:** §2.1, §5.2, DD-1, DD-2, P-3, P-4, P-7, P-8
@@ -82,8 +82,8 @@
 - **Review:** `checklist`
 - **Verification:** from `client/research-indicators/`: `npx jest get-policy-change-linkable-results service-locator --silent`, `npm run lint -- --quiet`, `npm run build`.
 - **Done:**
-  - [ ] Tests green; three falsifiers observed red and quoted
-  - [ ] `npm run build` exit 0; lint clean
+  - [x] Tests green; three falsifiers observed red and quoted
+  - [x] `npm run build` exit 0; lint clean
 - **Skills:** `angular-developer`
 
 ### T-03 — Client: enable and wire the two pickers

@@ -59,6 +59,7 @@ import { OicrResultsService } from './short-control-list/oicr-results.service';
 import { GetMaturityLevelsService } from './control-list/get-maturity-levels.service';
 import { GetAllianceStaffByGroupService } from './control-list/get-alliance-staff-by-group.service';
 import { GetLeverStrategicOutcomesService } from './control-list/get-lever-strategic-outcomes.service';
+import { GetPolicyChangeLinkableResultsService } from './control-list/get-policy-change-linkable-results.service';
 import { GetLeverSdgTargetsService } from './control-list/get-lever-sdg-targets.service';
 import { NotableReferenceTypesService } from './short-control-list/notable-reference-types.service';
 import { InformativeRolesService } from './short-control-list/informative-roles.service';
@@ -270,6 +271,8 @@ export class ServiceLocatorService {
         return this.getFromInjector(GetImpactOutcomesService);
       case 'leverStrategicOutcomes':
         return this.getFromInjector(GetLeverStrategicOutcomesService);
+      case 'policyChangeLinkableResults':
+        return this.getFromInjector(GetPolicyChangeLinkableResultsService);
       case 'leverSdgTargets':
         return this.getFromInjector(GetLeverSdgTargetsService);
       case 'clarisaSdgTargets':
