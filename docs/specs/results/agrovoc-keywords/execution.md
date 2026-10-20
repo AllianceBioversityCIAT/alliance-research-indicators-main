@@ -113,3 +113,121 @@
 - **Final verification:** VERIFIED
 - **Budget:** review rounds 5 of 7 after this verdict; tasks 3 of 5
 - **Gate:** auto-continue per owner's standing direction
+
+### T-04 — `app-agrovoc-keywords` field component (client) — PASS
+
+- **Final status:** PASS (attempt 1) · **Date:** 2026-10-19 · **Commit:** held — UI change, not committed until the owner sees it working at T-05 (standing owner rule: no commit before visual approval)
+- **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd` (task defaults) · **Effort:** `grok-4.7-xhigh` (concurrency logic — debounce/cancel race)
+- **Orca:** task `task_a683559a5786`, dispatch `ctx_3555b8dadea1` (fresh worker; released after PASS) — ran in parallel with T-02 (cross-package)
+- **Attempts:** 1 · **runtime events:** none
+- **Files changed (all new):** `client/research-indicators/src/app/shared/components/custom-fields/agrovoc-keywords/agrovoc-keywords.component.{ts,html,scss,spec.ts}`
+- **Implementer verification (reported):** `npm test -- --silent --coverage=false src/app/shared/components/custom-fields/agrovoc-keywords` → 10 passed · lint "All files pass linting." · `npm run build` exit 0 · spec tsc grep 0, TS1005 0 · hex grep no matches · retention check (component temporarily imported from `app.component` so the app build compiled it; exit 0; import reverted, `git diff` on `app.component.*` empty) · SCSS compiled 940 B (source 942 B)
+- **Case map:** 1 `b, e, a, n 100ms apart settle into one search for bean` · 2 `a stale bean response is unsubscribed and never rendered` · 3 `fewer than 3 characters sends no request and shows the hint` · 4 `the same settled text searches once, and again after an error` · 5 `picking beans stores the label and resets the select` · 6 `Beans already selected disables beans and does not add a second chip` · 7 `Enter in the search box with no results leaves keywords unchanged` · 8 `legacy keywords render as chips and one can be removed` · 9 `a disabled field cannot search or remove chips` · 10 `loading hides the empty text, then empty, error, and matched_label`. HTTP stubbed with deferred `Subject`s
+- **Red run (verbatim, reverted):**
+  - `switchMap` → `mergeMap`, case 2: `Expected value: not "URANIUM_STALE" / Received array: ["URANIUM_STALE"]` at `expect(optionLabels()).not.toContain('URANIUM_STALE');` (`:173`; reads `.agrovoc-keywords__label` in the opened panel)
+  - remove `debounceTime(500)`, case 1: `+ "bea",` received alongside `"bean"` at `expect(queries).toEqual(['bean']);` (`:147`) — 2 calls, not the 4 the task predicted (below-3 gate inside `switchMap`)
+  - case-insensitive check → `keyword === label`, case 6: `"chips": 2, "disabled": false, keywords ["Beans","beans"]` vs expected `chips: 1, disabled: true` (`:269`)
+  - drop the post-error distinct reset, case 4: expected `['bean','bean']`, received `['bean']` (`:232`)
+- **Not Done / Assumptions (verbatim, no owed item):** helper copy and the "Max. 4" hint are page chrome placed by T-05 · "The picker does not use `ngModel`. PrimeNG `Select.setDisabledState` runs from `NgModel` and clears `[disabled]`, so case 9 stayed enabled. After a pick, `ViewChild(Select).writeValue(null)` resets the field." · chip remove `aria-label` copied by an `afterRenderEffect` onto `[data-pc-section="removeicon"]` · visual fidelity not provable in jsdom (KZ-017), owned by T-05 HITL · delivered `npm run build` does not type-check a component nothing imports
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** with no worker active: `npm test -- --silent --coverage=false src/app/shared/components/custom-fields/agrovoc-keywords` → `Test Suites: 1 passed` / `Tests: 10 passed` · `npm run lint -- --quiet` exit 0, "All files pass linting." · `npm run build` exit 0 · `tsc -p tsconfig.spec.json` grep `agrovoc-keywords.component` → 0, TS1005 → 0 · hex grep → exit 1 (no matches) · SCSS 942 B. **Scope limit (KZ-017):** the app build does not compile this component until T-05 imports it — the spec tsc grep and the worker's reverted retention build are the only type gates so far; T-05's build is the first real one
+- **Review:** parallel lens mode (effort xhigh) — two `akili-reviewer` (opus) contexts
+  - Lens A (conformance + reliability/resilience): **`STATUS: PASS`** — "T-04 matches the spec. The search stream follows design §5 in order … All 10 cases are present, and the race tests meet the Disqualifier clauses." `GET_AgrovocSearch$` consumed as-is; the design §10 `to-promise.service.spec.ts` amendment (carried check) is not undone. The remove-`debounceTime` result (2 calls) is correct under §5 and still goes red
+  - Lens B (conformance + readability/risk): **`STATUS: PASS`** — "T-04 matches `design.md` §5 and §6, `requirements.md` R-AGV-003 (component part), the R-AGV-005 state table, and §10 OQ-1/3/4." Header mirrors `select.component.html:42-53`; tokens `--ac-grey-200/700/800` (dark variants exist) map to the old chip colours; only the four component files touched; DOM assertions use the real overlay in `document.body`
+- **ADVISORY (labelled advisory, not gating):**
+  - Lens A RELIABILITY (reachable): close the panel and reopen + retype the same text within 500 ms → `distinctUntilChanged` drops it and the panel shows "Type at least 3 characters" with 4 chars in the box until the text changes. Code follows design §5 (reset only after an error) → **design gap, raised to the owner, not a task**
+  - Lens A: 500 ms not pinned from below (`tick(499)` → no call) · no >12 s *Slow upstream* test (holds by construction) · Enter cannot pick a highlighted option (satisfies "Enter on free text: ignored"; keyboard-picking cost)
+  - Lens B RISK: chip remove `aria-label` untested and overwritable by PrimeNG on a locale change · chips row `aria-label` on a role-less `div` is ignored (add `role="group"`) · the `aria-live` row lives in PrimeNG's `empty` template, so result arrival is not announced (§6 does not require it) · `pi-search` icon lacks `aria-hidden` · no test for `disabled` turning on after first render (KZ-015) — **relevant to T-05**, whose binding may resolve after render · `text-transform: capitalize` shows `Beans` while `beans` is stored (inherited look)
+- **Decisions made:** execute-time spec edit — `tasks.md` §T-04 falsifier note "(4 calls)" corrected to "2 calls (`bea`, `bean`)" (wrong prediction in the task text; no change of requirement meaning)
+- **spawns:** Implementer Cursor/grok-4.7-xhigh — not reported by host, ended complete · Reviewer A opus 10 calls / 62 651 tokens, ended complete · Reviewer B opus 15 calls / 76 303 tokens, ended complete
+- **Requirements covered:** R-AGV-003 *Pick a term* (chip), *Free text is not accepted*, *Duplicate pick*, *Legacy keywords stay* (render/remove), *Read-only result*, AC.2 · R-AGV-004 all four scenarios · R-AGV-005 every state row + *Slow upstream* · NFR-AGV-002
+- **Final verification:** VERIFIED
+- **Budget:** review rounds 7 of 7 after these two verdicts (T-01 ×1, T-03 ×3, T-02 ×1, T-04 ×2); tasks 4 of 5. T-05 will need at least one more round → **budget tripwire reached** (see below)
+
+## Budget tripwire — before T-05 (2026-10-19)
+
+| Metric | Budget (design §13) | Actual after T-04 | Projected with T-05 |
+|---|---|---|---|
+| Tasks | 5 | 4 done | 5 |
+| Review rounds | 7 | 7 | ≥ 8 |
+| LOC | ~700 | server ~1 060 incl. ~340 lines of captured JSON fixtures; client ~1 060 (T-03 ~370 + T-04 ~700) | + T-05 |
+
+**Cause:** T-03 took 3 verdicts (PASS → Leader-requested re-adjudication → FAIL → PASS) for the interceptor-timer defect, and T-04 was reviewed by two parallel lens reviewers because it ran at `xhigh`. Tests and fixtures, not production code, drive the LOC overrun.
+
+**Status:** stopped for the owner. T-05 also opens with a mandatory owner step (settle P-4: run the app with the owner's `.env` and confirm a search returns terms), so execution is paused regardless.
+
+**Owner decision (2026-10-19):** "dale, lanza T-05" — budget overrun accepted; proceed to T-05. The owner had just observed that General Information still shows the old free-text input (expected: wiring is T-05's scope). P-4 (`ARI_AGROVOC_URL` set, search returns terms) was **not** confirmed before dispatch — T-05's "first step" moves to the start of the HITL check; if the live search fails there, T-05 stops before any commit.
+
+### T-05 — Wire into General Information, clean up, live HITL check (client) — CODE PASS, HITL PENDING
+
+- **Status:** `[~]` — code part PASS (attempt 1); P-4 and HITL items 1–10 pending with the owner; no commit (T-04 + T-05 held for visual approval) · **Date:** 2026-10-19
+- **Skills:** `angular-developer`, `ui-ux-pro-max` (task defaults) · **Effort:** `grok-4.7-high` (S, wiring)
+- **Orca:** task `task_311474466ea9`, dispatch `ctx_d0e0e6bfa15b` (fresh worker; released after code PASS — a HITL finding will go to a fresh worker with the finding verbatim)
+- **Brief narrowing (Leader):** the worker owned code + tests + gates only; P-4's "first step" and the HITL check are run by the Leader with the owner after the code report (owner launched T-05 before confirming P-4). One `[advisory-grade]` item offered: a disabled-after-first-render sub-case (T-04 Lens B advisory) — the worker added it
+- **Attempts:** 1 · **runtime events:** none
+- **Files changed:** `client/research-indicators/src/app/pages/platform/pages/result/pages/general-information/general-information.component.{html,ts,spec.ts}`, `client/research-indicators/src/styles/styles.scss` (`.keywords-autocomplete` block removed). `create-result-form.component.ts` untouched (keeps its own `AutoCompleteModule`, `:18,49`). Note: `npx prettier --write` also reflowed the rest of the GI template and re-indented one comment block in `saveData` — formatting only (Reviewer-verified)
+- **Implementer verification (reported):** targeted `npm test -- --silent --coverage=false` GI + agrovoc-keywords → 2 suites / 45 tests · `grep -rn "keywords-autocomplete\|multiple-ac-2" src` → 0 · lint exit 0 · `npm run build` exit 0, no budget warning for `agrovoc-keywords.component.scss` (942 B) · spec tsc set for `general-information.component.spec.ts` identical before/after (two pre-existing `TS2322`), TS1005 0
+- **Red run (verbatim, reverted):**
+  - one-way binding `[keywords]` → `Expected: 123, ObjectContaining {"keywords": ["beans"]} / Received: 123, {"description": "Test Description", "keywords": [], …}` at `expect((apiService as any).PATCH_GeneralInformation).toHaveBeenCalledWith(123, expect.objectContaining({ keywords: ['beans'] }));` (`general-information.component.spec.ts:821`)
+  - old `<p-autocomplete inputId="multiple-ac-2" />` left in place → `expect(received).toBeNull() / Received: <p-autocomplete inputid="multiple-ac-2" />` (`:800`)
+- **Not Done / Assumptions (verbatim):** "P-4 (`UNVERIFIED`) was not settled. This worker did not start the app and did not read `.env`." · "HITL items 1–10 were not observed. None are discharged. They remain for the Leader with the owner. No commit was made." · "Binding used is the task's banana form `[(keywords)]="body().keywords"`. `saveData()` reads the mutated signal object; the beans PATCH assertion is the proof." · sibling templates (input, textarea, select, form-header, navigation-buttons) overridden to `''`; `app-agrovoc-keywords` is real · added the optional disabled-after-first-render sub-case · legacy test loads `['In-Person']` via `getData()` and saves unedited
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** targeted run → `Test Suites: 2 passed` / `Tests: 45 passed` · grep → exit 1 (0 lines) · lint exit 0 · `npm run build` exit 0 (first build that compiles `app-agrovoc-keywords`; no agrovoc lines in the log — closes the T-04 build-scope limit) · spec tsc grep `general-information.component.spec` → 2, TS1005 → 0 · **full client suite** `npm test -- --silent` → `Test Suites: 344 passed, 344 total` / `Tests: 7967 passed, 7967 total`. Full server suite: last run after T-02 (`425/425`, `4044/4044`); no server file changed since
+- **Reviewer** (`akili-reviewer`, opus, checklist, code part): **`STATUS: PASS`** — "The T-05 code is correct. `app-agrovoc-keywords` is wired into General Information with a two-way binding that writes back into what `saveData()` sends. The helper text matches the copy in design §6 exactly, and the "Max. 4 keywords" hint is still there. Every DD-8 cleanup item was done and nothing outside it was touched." Prettier reflow compared element by element: same attributes/bindings, no behavior change. Carried spec edits (§10 amendment, T-04 "2 calls"): no conflict
+- **ADVISORY (labelled advisory):** RELIABILITY two-way binding mutates the object inside `body()` without notifying the signal — no reactive reader of `keywords` exists today (`:65`, `:113`); switch to `(keywordsChange)` + `body.update(...)` if one is added · READABILITY ~80 % of the template diff is Prettier formatting; consider a separate formatting-only commit
+- **spawns:** Implementer Cursor/grok-4.7-high — not reported by host, ended complete · Reviewer akili-reviewer/opus 7 calls / 46 610 tokens, ended complete
+- **Budget:** review rounds 8 (owner-approved overrun, see above)
+- **HITL record (P-4 + items 1–10):** pending — to be filled with the owner's own words, one line per item; an item the owner did not cover stays open
+
+#### T-05 HITL — item 1 (visual) — FINDING → T-04 attempt 2
+
+- **Owner, verbatim (2026-10-19):** "en el componente del agno la lupa esta a la derecha y por dentro … comoe sta en el componente del agno y el que tu hiciste esta … a la izquierda revisa comoe sta en el agno" (with screenshots of both)
+- **Root cause (Leader, verified at source — KZ-007):** Reporting year is `app-select serviceName="getYears"`, not OpenSearch, so `select.component.html:29` enables `[filter]` and PrimeNG renders its built-in filter — `p-iconfield` → `input.p-select-filter` → `p-inputicon` (`primeng-select.mjs:2671-2696`, PrimeNG 19.0.6): icon inside, right. Design §6 and P-14 had pointed at the `isOpenSearch` header (`select.component.html:40-54`, `p-input-icon-left`): icon outside, left. T-04 followed the design faithfully — **design defect, not implementation defect**
+- **Execute-time spec edit (no change of requirement meaning — R-AGV-003 already says "looks like the Reporting year selector"):** `design.md` §6 component tree (header line) + "Visual reference" bullet, and §14 P-14, amended 2026-10-19. Sweep: `grep -rn "isOpenSearch\` header\|:40-54" docs/specs/results/agrovoc-keywords/` → only the amended, self-describing lines remain
+- **Action:** T-04 reopened as attempt 2 (override e — rework), fresh Cursor/grok-4.7-high worker, task `task_082d6b7f0736`, dispatch `ctx_1c880154e45e`. Scope: the component's header markup + one DOM assertion with a falsifier; `aria-hidden` on the icon (Lens B advisory, tagged in the brief as cheap). T-04's `[x]` status stands only after attempt 2 passes review
+- **HITL items 0, 2–10:** not yet reported by the owner — open
+
+#### T-04 attempt 2 — PASS (header matches the Reporting-year built-in filter)
+
+- **Implementer:** fresh Cursor/grok-4.7-high, task `task_082d6b7f0736`, dispatch `ctx_1c880154e45e` (released after PASS) · runtime events: none
+- **Feedback passed:** the owner's HITL finding verbatim + Leader root cause + amended design §6/P-14
+- **Files changed:** `agrovoc-keywords.component.{html,ts,spec.ts}` (SCSS unchanged — held no rules for the old header)
+- **Change:** header rebuilt as `div.p-select-header` (click-stop) → `p-iconfield` → `input #filter pInputText type="text" role="searchbox" autocomplete="off" class="p-select-filter"` → `p-inputicon` with `<SearchIcon />` (`aria-hidden`); imports `IconField, InputIcon, InputText, SearchIcon`; `placeholder="Search..."` dropped (the year filter binds `filterPlaceholder`, which `app-select` leaves unset → no placeholder)
+- **Red run (verbatim):** icon moved before the input → `Expected: < 0 / Received: 1` (`agrovoc-keywords.component.spec.ts:343`); restored → green
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** `npm test -- --silent --coverage=false <agrovoc-keywords, general-information>` → `Test Suites: 2 passed` / `Tests: 46 passed` · lint exit 0 · `npm run build` exit 0, no agrovoc lines · spec tsc grep `agrovoc-keywords.component.spec` → 0, TS1005 → 0 · hex grep → none
+- **Reviewer** (`akili-reviewer`, opus, checklist): **`STATUS: PASS`** — "The attempt-2 change is limited to the panel header, the four standalone imports it needs, `aria-hidden` on the icon, the header `div` click-stop, and one new DOM test. No stream or state logic changed. The new header matches the PrimeNG built-in filter that design §6 and P-14 (amended 2026-10-19) now name as the visual reference." Diff-vs-diff comparison: `.ts` identical except `imports`; SCSS and the ten cases untouched
+- **Scope limit (owed to T-05 HITL):** the DOM test proves structure/order only; jsdom does no layout, so "icon inside, right" is confirmed only by the owner in the running app
+- **ADVISORY:** none (single checklist pass, < 50 lines)
+- **spawns:** Implementer — not reported by host, ended complete · Reviewer opus 10 calls / 52 467 tokens, ended complete
+- **Budget:** review rounds 9 (owner-approved overrun)
+
+#### T-05 HITL — item 1 re-check
+
+- First re-check showed the OLD header: the running `ng serve` (pid 90255, started 15:19) had not rebuilt after the worker's edit — Leader confirmed by fetching the served chunk (`chunk-WZEG6VE4.js`: `p-input-icon-left` 1, `p-select-filter` 0, `Search...` 1); `touch` on the component files made it rebuild (`chunk-BAWITY7G.js`: 0 / 1 / 0)
+- **Owner, verbatim:** "tenia que parar el cli y cargarlo de nuevo y ya funciona" — recorded as: after restarting the dev server, the owner reports the field works. Item 1 (looks like Reporting year) accepted on that statement; the owner has not yet reported items 0, 2–10
+
+#### T-05 HITL — item 1 (visual) — FINDING 2 → T-04 attempt 3
+
+- **Owner, verbatim (2026-10-19):** "el drop down del agno tiene algo y es que cuando el dropdown es mas largo que el espacio enpantalla si hacia abajo es muy poco se despliega hacia arriba" (screenshots: ours cut off at the bottom; the year dropdown opening downward when it fits and upward when it does not)
+- **Root cause (Leader, at source):** PrimeNG 19.0.6 `Select` only places the overlay at open; its re-align-on-options-change path never fires (`optionsChanged` declared at `primeng-select.mjs:1623`, read at `:1814`, never assigned). Year: full list at open → flips. Ours: small at open (hint), grows on results → stays below, cut off
+- **Execute-time spec edit (no change of requirement meaning — part of "looks/behaves like the Reporting year selector"):** `design.md` §6 new bullet "Panel placement", 2026-10-19
+- **Action:** T-04 attempt 3 (override e), fresh worker
+- **Also observed in the screenshot (owner had not reported it as an issue):** a search for `bean` returned terms (`bean anthracnose`, `bean common mosaic virus`) — evidence toward items 0/2, still to be confirmed by the owner in words
+
+#### T-04 attempt 3 — PASS (panel re-aligns while open)
+
+- **Implementer:** fresh Cursor/grok-4.7-high, task `task_5e7e8992b746`, dispatch `ctx_3b6224af439e` (released after PASS) · runtime events: none
+- **Files changed:** `agrovoc-keywords.component.{ts,spec.ts}` (HTML/SCSS unchanged)
+- **Change:** a second `afterRenderEffect` tracks `state()` and calls `realignOpenPanel()`; guard: only when the `ViewChild` `Select` has `overlayVisible` and `overlayViewChild`. `alignOverlay()` is wrapped so only a `ReferenceError` whose message contains "origin" is swallowed; anything else is rethrown
+- **Red run (verbatim):** realign call removed → `Expected number of calls: 1 / Received number of calls: 0` at `expect(align).toHaveBeenCalledTimes(callsBeforeResults + 1);` (`agrovoc-keywords.component.spec.ts:424`); restored → green
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** `<agrovoc-keywords, general-information specs>` → `Test Suites: 2 passed` / `Tests: 47 passed` · lint exit 0 · build exit 0 · spec tsc grep `agrovoc-keywords.component` → 0, TS1005 → 0
+- **Reviewer** (`akili-reviewer`, opus, checklist): **`STATUS: PASS`** — "The attempt-3 change does what design.md §6 "Panel placement" asks: after each state change renders while the panel is open, it calls the overlay's `alignOverlay()`. The change stays inside the scope you set, and the effect cannot loop." (effect tracks only `state()`; `overlayVisible` is a plain field; `alignOverlay` writes only `element.style`)
+- **Correction record (KZ-007) — the "origin" error:** `primeng-dom.mjs:160/:190` reads a bare `origin` after writing `transformOrigin`/`top`/`left`. The worker measured a `ReferenceError` **in jsdom**, and the Leader told the owner the error "always" fires and also hits the year selector. **That was overstated.** Per the Reviewer (not run): in a real browser a bare `origin` resolves to the global `window.origin` (a string), so it does not throw there — the comparison is just false and the downward-gutter `marginTop` is applied, the same few pixels the year dropdown shows. The catch is therefore most likely jsdom-only and harmless in production. Corrected to the owner in the next message
+- **Scope limit (owed to T-05 HITL):** the real up/down flip is not provable in jsdom; only the owner's view settles it
+- **ADVISORY:** none (delta < 50 LOC)
+- **spawns:** Implementer — not reported by host, ended complete · Reviewer opus 10 calls / 57 659 tokens, ended complete
+- **Budget:** review rounds 10 (owner-approved overrun)
+
+#### T-04 + T-05 client commit — owner instruction
+
+- **Owner, verbatim (2026-10-20):** "haz commit"
+- **Scope:** T-04 component (attempts 1–3) + T-05 General Information wiring + spec docs, committed together. No push
+- **Still open:** T-05 stays in progress — HITL items 0, 2–10 and P-4 have not been confirmed by the owner in words, so T-05 is not marked done

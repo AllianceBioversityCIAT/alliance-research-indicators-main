@@ -168,7 +168,7 @@ graph TD
 
 ## T-04 — `app-agrovoc-keywords` field component
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-03
+- **Status:** done (PASS 2026-10-19, see execution.md) — committed with T-05 on the owner's instruction ("haz commit", 2026-10-20) · **Size:** M · **Dependencies:** T-03
 - **Requirements:**
   - R-AGV-003: *Pick a term* (chip part), *Free text is not accepted*, *Duplicate pick*, *Legacy keywords stay* (render and remove), *Read-only result*, AC.2
   - R-AGV-004: all four scenarios (settle, cancel → stale never rendered, below minimum, same text)
@@ -194,7 +194,7 @@ graph TD
   10. States: loading visible while the subject is pending, and the empty text is **absent** while pending; empty after `data: []`; error after `successfulRequest:false`, with existing chips intact; `matched_label` rendered as secondary text
 - **Falsifier:**
   - replace `switchMap` with `mergeMap` → case 2 goes red (a stale render)
-  - remove `debounceTime` → case 1 goes red (4 calls)
+  - remove `debounceTime` → case 1 goes red (2 calls, `bea` and `bean`: `b`/`be` stop at the < 3 gate inside `switchMap`. Corrected 2026-10-19 at execute; the task text said 4)
   - remove the case-insensitive check → case 6 goes red
   - drop the post-error reset of `distinctUntilChanged` → case 4b goes red
 - **Red run:** execute the `mergeMap`, `debounceTime` and case-insensitivity mutations; quote the failing assertions. A red from a missing provider or a template error is not a red.
@@ -205,18 +205,18 @@ graph TD
 - **Consumers:** none (new component).
 - **Review:** `full`. It holds the concurrency logic (the debounce/cancel race).
 - **Done criteria:**
-  - [ ] 10 cases green
-  - [ ] 3 falsifiers observed red and quoted
-  - [ ] `npm run lint -- --quiet` clean
-  - [ ] `npm run build` green; component SCSS under the 4 kB warning budget
-  - [ ] Spec type-check grep for the new spec = 0 errors
+  - [x] 10 cases green
+  - [x] 3 falsifiers observed red and quoted
+  - [x] `npm run lint -- --quiet` clean
+  - [x] `npm run build` green; component SCSS under the 4 kB warning budget
+  - [x] Spec type-check grep for the new spec = 0 errors
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
 
 ---
 
 ## T-05 — Wire into General Information, clean up, live HITL check
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-02, T-04
+- **Status:** in progress — code PASS 2026-10-19; P-4 + HITL items 1–10 pending with the owner · **Size:** S · **Dependencies:** T-02, T-04
 - **Requirements:**
   - R-AGV-003: *Pick a term* (PATCH body unchanged), *Legacy keywords stay* (save keeps them), AC.1 (helper text)
   - R-AGV-002 AC.1 (live reachability), AC.3 (live 401)
