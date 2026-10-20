@@ -110,7 +110,7 @@ describe('PrmsSyncCardComponent', () => {
       expectDeletedChrome(host);
       expectBox(host, 'neutral');
       expect(text(host.querySelector('[data-testid="prms-sync-eyebrow"]') as HTMLElement)).toBe('PRMS sync #1');
-      expectTag(host, 'Pending Review', 'var(--ac-warning-1)', fixture);
+      expectTag(host, 'Pending Review', 'var(--ac-status-prms-pending)', fixture);
 
       const actor = host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement;
       expect(text(actor)).toBe(`by David Casañas · ${when}`);
@@ -151,7 +151,7 @@ describe('PrmsSyncCardComponent', () => {
     expectDeletedChrome(host);
     expectBox(host, 'approved');
     expect(text(host.querySelector('[data-testid="prms-sync-eyebrow"]') as HTMLElement)).toBe('PRMS sync #2');
-    expectTag(host, 'Approved', 'var(--ac-green-300)', fixture);
+    expectTag(host, 'Approved', 'var(--ac-status-prms-approved)', fixture);
     const actor = host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement;
     expect(text(actor)).toContain('by Daniel Okoth ·');
     expect(actor.getAttribute('title')).toBe('Daniel Okoth');
@@ -166,7 +166,7 @@ describe('PrmsSyncCardComponent', () => {
 
     expectDeletedChrome(host);
     expectBox(host, 'rejected');
-    expectTag(host, 'Rejected', 'var(--ac-red-1)', fixture);
+    expectTag(host, 'Rejected', 'var(--ac-status-prms-rejected)', fixture);
     expect(text(host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement)).toContain('by Lucía Fernández ·');
   });
 
@@ -175,7 +175,7 @@ describe('PrmsSyncCardComponent', () => {
 
     expectDeletedChrome(host);
     expectBox(host, 'neutral');
-    expectTag(host, 'Pending Review', 'var(--ac-warning-1)', fixture);
+    expectTag(host, 'Pending Review', 'var(--ac-status-prms-pending)', fixture);
     expect(host.textContent).not.toContain('WEIRD');
   });
 

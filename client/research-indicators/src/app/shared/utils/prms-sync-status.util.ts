@@ -1,4 +1,5 @@
 import { PrmsSyncHistoryEvent } from '@shared/interfaces/prms-sync-history.interface';
+import { PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
 
 export type SyncStatusTone = 'success' | 'warning' | 'danger';
 
@@ -12,13 +13,13 @@ const APPROVED: SyncStatusLabel = { label: 'Approved', tone: 'success' };
 const REJECTED: SyncStatusLabel = { label: 'Rejected', tone: 'danger' };
 
 /**
- * Sidebar palette, resolved to tokens that match those hex values:
- * pending #E69F00, approved #7CB580, rejected #CF0808.
+ * PRMS status colours, shared with the CGIAR Portfolio monitor table
+ * (shared/constants/pfm-status-colors.ts): the same status must look the same in both.
  */
 export const SYNC_TAG_COLOR: Record<SyncStatusTone, string> = {
-  warning: 'var(--ac-warning-1)',
-  success: 'var(--ac-green-300)',
-  danger: 'var(--ac-red-1)'
+  warning: PRMS_STATUS_COLOR.pending,
+  success: PRMS_STATUS_COLOR.approved,
+  danger: PRMS_STATUS_COLOR.rejected
 };
 
 function isApprove(value: string | null): boolean {
