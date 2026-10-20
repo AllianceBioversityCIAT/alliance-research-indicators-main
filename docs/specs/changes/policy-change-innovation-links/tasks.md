@@ -24,7 +24,7 @@
 
 ### T-01 — Server: reject a link of the wrong result type
 
-- **Status:** [ ] todo
+- **Status:** [x] done
 - **Size:** S
 - **Requirements covered:** R-PCIL-005 (both fields, `400`, nothing written, `null`/absent accepted); R-PCIL-004 "Clear one" BUT clause (server half)
 - **Design refs:** §4, §5.3, DD-3, DD-5, P-2, P-6
@@ -51,9 +51,9 @@
 - **Review:** `checklist` — small guard; the falsifiers carry the proof.
 - **Verification:** from `server/researchindicators/`: `npm test -- --silent result-policy-change`, then the full `npm test -- --silent`, `npx eslint src/domain/entities/result-policy-change`, `npm run build`.
 - **Done:**
-  - [ ] P-6 outcome recorded (writes found: none / list)
-  - [ ] All 7 tests green; falsifiers (a) and (b) observed red and quoted
-  - [ ] Full server suite green; eslint (bare) clean; build exit 0
+  - [x] P-6 outcome recorded (writes found: none — versioning copies the value; see execution.md)
+  - [x] All 7 tests green; falsifiers (a) and (b) observed red and quoted
+  - [x] Full server suite green; eslint (bare) clean; build exit 0
 - **Skills:** `nestjs-expert`, `error-handling-patterns`
 
 ### T-02 — Client: Policy-Change-only list service for linkable results
