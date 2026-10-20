@@ -228,15 +228,17 @@ export const routes: Routes = [
         }
       },
       {
-        path: 'pooled-funding-contribution-monitor',
+        path: 'cgiar-portfolio-contribution-monitor',
         loadComponent: () =>
           import('@pages/platform/pages/pooled-funding-monitor/pooled-funding-monitor.component').then(m => m.default),
         canMatch: [rolesGuard, pooledFundingMonitorGuard],
         data: {
-          title: 'Pooled Funding Contribution Monitor',
+          title: 'CGIAR Portfolio Contribution Monitor',
           isLoggedIn: true
         }
       },
+      // Old URL of the monitor (renamed from Pooled Funding): keeps bookmarks and shared links working.
+      { path: 'pooled-funding-contribution-monitor', redirectTo: 'cgiar-portfolio-contribution-monitor' },
       {
         path: 'about',
         loadComponent: () => import('@platform/pages/about/about.component'),

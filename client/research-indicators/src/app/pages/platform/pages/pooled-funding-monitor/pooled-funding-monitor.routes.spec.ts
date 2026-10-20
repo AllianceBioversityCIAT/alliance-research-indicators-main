@@ -17,8 +17,8 @@ function find(list: Route[], path: string): Route | undefined {
   return undefined;
 }
 
-describe('pooled-funding-contribution-monitor route', () => {
-  const route = find(routes, 'pooled-funding-contribution-monitor');
+describe('cgiar-portfolio-contribution-monitor route', () => {
+  const route = find(routes, 'cgiar-portfolio-contribution-monitor');
 
   it('is registered', () => {
     expect(route).toBeDefined();
@@ -31,5 +31,13 @@ describe('pooled-funding-contribution-monitor route', () => {
   it('lazy-loads the page component', async () => {
     const loaded = await (route?.loadComponent as () => Promise<unknown>)();
     expect(loaded).toBe(PooledFundingMonitorComponent);
+  });
+});
+
+describe('old pooled-funding-contribution-monitor URL', () => {
+  it('redirects to the CGIAR Portfolio monitor so bookmarks keep working', () => {
+    const old = find(routes, 'pooled-funding-contribution-monitor');
+    expect(old?.redirectTo).toBe('cgiar-portfolio-contribution-monitor');
+    expect(old?.loadComponent).toBeUndefined();
   });
 });
