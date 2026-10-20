@@ -216,7 +216,7 @@ graph TD
 
 ## T-05 — Wire into General Information, clean up, live HITL check
 
-- **Status:** in progress — code PASS 2026-10-19; P-4 + HITL items 1–10 pending with the owner · **Size:** S · **Dependencies:** T-02, T-04
+- **Status:** done (code PASS 2026-10-19, HITL approved by the owner 2026-10-20, see execution.md) · **Size:** S · **Dependencies:** T-02, T-04
 - **Requirements:**
   - R-AGV-003: *Pick a term* (PATCH body unchanged), *Legacy keywords stay* (save keeps them), AC.1 (helper text)
   - R-AGV-002 AC.1 (live reachability), AC.3 (live 401)
@@ -255,12 +255,12 @@ graph TD
   - `create-result-form.component.ts` keeps its own `AutoCompleteModule` import — must stay untouched
 - **Review:** `checklist`. Wiring and cleanup; behavior is proven in T-04 and by the HITL check.
 - **Done criteria:**
-  - [ ] Tests green
-  - [ ] Falsifier observed red
-  - [ ] `grep -rn "keywords-autocomplete\|multiple-ac-2" client/research-indicators/src` → 0
-  - [ ] `npm run lint -- --quiet` and `npm run build` green
-  - [ ] HITL items 1–10 each recorded with the user's words
-  - [ ] Full server and client suites re-run by the Leader
+  - [x] Tests green
+  - [x] Falsifier observed red
+  - [x] `grep -rn "keywords-autocomplete\|multiple-ac-2" client/research-indicators/src` → 0
+  - [x] `npm run lint -- --quiet` and `npm run build` green
+  - [x] HITL items 1–10 each recorded with the user's words
+  - [x] Full server and client suites re-run by the Leader
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ---

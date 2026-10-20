@@ -231,3 +231,21 @@
 - **Owner, verbatim (2026-10-20):** "haz commit"
 - **Scope:** T-04 component (attempts 1–3) + T-05 General Information wiring + spec docs, committed together. No push
 - **Still open:** T-05 stays in progress — HITL items 0, 2–10 and P-4 have not been confirmed by the owner in words, so T-05 is not marked done
+
+#### T-05 HITL — owner approval — PASS
+
+- **Owner, verbatim (2026-10-20):** "ya se abre hacia arriba, todo funciona bien" — in reply to the Leader's message that listed the panel flip plus items 0, 2–10 (search with `bean`, cancellation in DevTools, chips and duplicates, save and reload, legacy keywords, read-only, offline without toast, 401 without token, Swagger)
+- **Item 1 (look + panel placement):** confirmed specifically ("ya se abre hacia arriba"; earlier: icon right/inside re-checked "ya funciona")
+- **Items 0 (P-4), 2–10:** covered by the owner's blanket "todo funciona bien" in reply to the itemized list. Recorded as such (KZ-002): the owner did not describe each item separately, so items 3, 8 and 9 rest on that blanket confirmation, not on an individually quoted observation. P-4 also has screenshot evidence (`bean` returned `bean anthracnose`, `bean common mosaic virus`)
+- **Leader full-suite re-run (after T-04 attempt 3, no workers active):** client `npm test -- --silent` → `Test Suites: 344 passed, 344 total` / `Tests: 7969 passed, 7969 total`. Server: last full run after T-02 (`425/425`, `4044/4044`); no server file changed since
+- **Status:** T-05 `[x]`
+
+## 3. Summary
+
+- **Result:** all 5 tasks PASS (T-01, T-02, T-03, T-04, T-05). Commits: `1e9827a35` (T-01), `3f3ed10ac` (T-03), `1e4a61e91` (T-02), `e3ba7f8ee` (T-04 + T-05). Not pushed
+- **Rework:** T-03 attempt 2 (`take(1)` — interceptor merge-timer false "pending" log); T-04 attempts 2 and 3, both from owner HITL findings traced to design gaps (wrong visual reference in §6/P-14; PrimeNG 19.0.6 never re-aligns an open overlay), design amended at execute time
+- **Budget:** 5/5 tasks; review rounds 10 vs. 7 budgeted (owner-approved overrun, "dale, lanza T-05")
+- **Corrections recorded:** KZ-007 — the Leader overstated the PrimeNG bare-`origin` `ReferenceError` as always firing; it is jsdom-only. Corrected to the owner
+- **Open owner decisions (not blocking):** (a) the close/reopen-within-500 ms "Type at least 3 characters" glitch (needs a design §5 amendment); (b) restore `workerIdleMemoryLimit: '1GB'` in `client/research-indicators/jest.config.ts` (SIGSEGV on unrelated suites returned once at T-03)
+- **Reviewer advisories carried:** two-way binding mutates `body().keywords` without signal notification (no reactive reader today); Prettier reflow of the GI template could be a separate formatting commit
+- **Kaizen/persona drift (advisory):** `.agents/implementer.md` still places the CodeGraph index in `server/researchindicators/.codegraph/`; the root guide says the repo root
