@@ -2,7 +2,7 @@
 
 - **Module:** tip-integration (server) + bilateral
 - **Spec id:** 2026-10-tip-kp-project-pool-funding
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
@@ -33,7 +33,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 
 ### T-01 — DTOs and pure `mapTipProjects` mapper
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none
+- [x] **Status:** done (2026-10-20, PASS attempt 1 — see `execution.md`) · **Size:** S · **Dependencies:** none
 - **Requirements covered:**
   - R-TIP-001 — scenarios *Three projects, one primary* (mapper half), *Two projects flagged primary* incl. AND IT MUST (one primary, never zero), *Legacy payload without flags*, *Legacy payload whose first project is unknown*; clauses "`createResult.contract_id` SHALL be …" and "Repeated `agreement_id`s SHALL be saved once".
   - R-TIP-002 — scenario *One unknown non-primary project* (contract dropped + warn naming `ZZ999`), scenario *Unknown primary* (`A171` non-primary, `createResult.contract_id = A171`, `poolFunding = null`), clause "When **no** project is known … a `warn` names the TIP id".
@@ -52,9 +52,9 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 - **Consumers:** `TipProjectDto` — `response-year-tip.dto.ts:9, 41` only (design P-15). No test file pins it.
 - **Review:** `full` — the mapper encodes every primary/unknown rule the rest depends on.
 - **Done criteria:**
-  - [ ] All listed fixtures green; both mutations observed red and reverted.
-  - [ ] `npm run build` green; build falsifier observed red and reverted.
-  - [ ] `npx eslint` clean on the folder.
+  - [x] All listed fixtures green; both mutations observed red and reverted.
+  - [x] `npm run build` green; build falsifier observed red and reverted.
+  - [x] `npx eslint` clean on the folder.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
