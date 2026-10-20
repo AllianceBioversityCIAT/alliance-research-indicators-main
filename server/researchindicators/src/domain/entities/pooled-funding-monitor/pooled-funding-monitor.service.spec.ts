@@ -124,6 +124,11 @@ describe('PooledFundingMonitorService', () => {
 
   describe('queue', () => {
     it('adds filter_options from the repository and applies the chip after counting', async () => {
+      // Ready to sync = mapping complete, so P-B's row needs an incomplete mapping here.
+      repo.findMonitoredResults.mockResolvedValueOnce([
+        row(),
+        row({ result_id: 2, project_code: 'P-B', mapping_complete: false }),
+      ]);
       const q = await service.getQueue(1, {
         scope: PfmScopeEnum.ALL,
         chip: PfmChipEnum.READY_TO_SYNC,

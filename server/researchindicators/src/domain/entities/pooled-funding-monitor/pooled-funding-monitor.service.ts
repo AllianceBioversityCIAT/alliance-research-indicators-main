@@ -211,7 +211,7 @@ export class PooledFundingMonitorService {
   ): PfmRepositoryScope {
     if (!Number.isInteger(userId)) {
       throw new ForbiddenException(
-        'Pooled Funding Monitor requires an authenticated user',
+        'CGIAR Portfolio Contribution Monitor requires an authenticated user',
       );
     }
     return scope === PfmScopeEnum.ALL
@@ -223,7 +223,6 @@ export class PooledFundingMonitorService {
     const filters: PfmQueueFilters = {};
     if (query.project) filters.project = query.project;
     if (query.sp) filters.sp = query.sp;
-    if (query.status) filters.status = query.status;
     if (query.type != null) filters.type = query.type;
     if (query.chip) filters.chip = query.chip;
     return filters;
