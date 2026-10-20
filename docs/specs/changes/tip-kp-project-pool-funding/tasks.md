@@ -95,7 +95,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 
 ### T-03 — TIP `processing`, per-result save and import step
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02
+- [x] **Status:** done (2026-10-20, PASS attempt 2 after Pivot T-03 — see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-02
 - **First step (settles P-18, owner T-03):** run read-only on Dev: `SELECT public_link, report_year_id, COUNT(*) FROM results WHERE platform_code='TIP' AND is_active=1 GROUP BY 1,2 HAVING COUNT(*)>1;` and record the raw output in `execution.md`. Non-empty → stop and raise to the user (design P-18 *If false*: add `is_snapshot` to both sides) before building on it. If Dev is unreachable, record `not run` and mark P-18 still UNVERIFIED for T-04.
 - **Requirements covered:**
   - R-TIP-001 — scenario *Three projects, one primary* end to end incl. BUT (not only the first project): `processing` output; scenario *Re-sync moves the primary* (payload half: `A171` primary, `A132` non-primary in `alignments.contracts`; DB half via P-3 → T-04).
@@ -121,10 +121,10 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 - **Consumers:** `processing()` / `getKnowledgeProductsByYear` — `tip-integration.controller.ts:41, 96, 107`, `tip-integration.controller.spec.ts`, `tip-integration.service.spec.ts` (P-15); `SaveResultService.saveAllSections` called directly (P-19), its own spec `save-all-sections.service.spec.ts` must stay green unchanged.
 - **Review:** `full` — changes the live sync loop.
 - **Done criteria:**
-  - [ ] P-18 query output recorded (or `not run` with reason).
-  - [ ] Updated + new specs green; falsifiers observed red and reverted.
-  - [ ] `save-all-sections.service.spec.ts` and controller spec green unchanged.
-  - [ ] Build, eslint, boot smoke green.
+  - [x] P-18 query output recorded (or `not run` with reason).
+  - [x] Updated + new specs green; falsifiers observed red and reverted.
+  - [x] `save-all-sections.service.spec.ts` and controller spec green unchanged.
+  - [x] Build, eslint, boot smoke green.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`.
 
 ---
@@ -141,6 +141,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 - **Verification:**
   - `npm test -- --silent` (full server unit suite) · `npm run build` · `npx eslint src/domain/tools/tip-integration src/domain/entities/bilateral`.
   - Human, on Dev after deploy: trigger TIP sync for 2026; open a result from agreement `A132` (e.g. TIP id 19191) → Alignment tab lists `A132` (primary), `A171`, `A1824`; Pool Funding tab shows `SP01`, ToC result `HLO1.AOW1.IO1 Steer to impact`, a non-null level and indicator, contribution `1`, read-only.
+  - Human, on Dev (added by Pivot T-03): run a **full no-year** TIP sync twice; for a publication TIP returns in two years, `SELECT result_id, report_year_id, is_snapshot FROM results WHERE platform_code='TIP' AND public_link=<link>` shows no new rows after the second run, and the earlier year's row carries its own pool funding. A single-year run never exercises `is_version`.
 - **Falsifier:** the human check fails when the Pool Funding tab is hidden, level/indicator show empty (P-16 false), or only one contract is listed.
 - **Red run:** n/a — observation, not a test.
 - **Disqualifier:** the human observation covers only what it quotes (KZ-002): a screenshot of the Alignment tab does not discharge the Pool Funding checks; a result whose TIP data has no `toc_mapping` cannot settle P-16. Catalog changes may take one 5-min TTL window (K-016) — re-check before calling level/indicator missing.

@@ -11,8 +11,14 @@ import {
   CounterResults,
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
+  TipMappedResult,
   TipRegionDto,
 } from './dto/response-year-tip.dto';
+import { mapTipProjects } from './mapper/tip-projects.mapper';
+import { AgressoContract } from '../../entities/agresso-contract/entities/agresso-contract.entity';
+import { Result } from '../../entities/results/entities/result.entity';
+import { BilateralService } from '../../entities/bilateral/bilateral.service';
+import { TocResult } from '../toc-integration/dto/toc-integration.types';
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
 import { IndicatorsEnum } from '../../entities/indicators/enum/indicators.enum';
 import { ResultRepository } from '../../entities/results/repositories/result.repository';
@@ -29,7 +35,7 @@ import { ClarisaRegion } from '../clarisa/entities/clarisa-regions/entities/clar
 import { ClarisaCountry } from '../clarisa/entities/clarisa-countries/entities/clarisa-country.entity';
 import { ResultEvidence } from '../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
-import { DataSource, Like } from 'typeorm';
+import { DataSource, In, Like } from 'typeorm';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
@@ -39,7 +45,6 @@ import { TipIntegrationRepository } from './repository/tip-integration.repositor
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
-import { ExternalMappersDto } from '../../shared/global-dto/external-mappers.dto';
 import { v4 as uuidv4 } from 'uuid';
 import { SyncStagingRecordsEntity } from '../open-search/prms/entities/sync-staging-records.entity';
 import { PrmsRepository } from '../open-search/prms/repositories/prms.repository';
@@ -67,6 +72,7 @@ export class TipIntegrationService extends BaseApi {
     private readonly saveResultService: SaveResultService,
     private readonly prmsRepository: PrmsRepository,
     private readonly clarisaSdgsService: ClarisaSdgsService,
+    private readonly bilateralService: BilateralService,
   ) {
     super(
       httpService,
@@ -193,15 +199,52 @@ export class TipIntegrationService extends BaseApi {
           executionCode,
         );
       const dataProcessed = await this.processing(tipResults);
-      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+      const catalogMemo = new Map<string, TocResult[] | null>();
+      const extraData = {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved,
         counters,
         manageOfficialCode: true,
         findOptions: {
-          public_link: 'public_link',
+          public_link: 'public_link' as const,
+          is_snapshot: 'is_version_applied' as const,
         },
-      });
+      };
+      for (const result of dataProcessed) {
+        const savedBefore = counters.createdRecords + counters.updatedRecords;
+        await this.saveResultService.saveAllSections(result, extraData);
+        const savedNow = counters.createdRecords + counters.updatedRecords;
+        if (savedNow === savedBefore) continue;
+        if (result.poolFunding == null) continue;
+        try {
+          const saved = await this.dataSource.getRepository(Result).findOne({
+            where: {
+              public_link: result.public_link,
+              platform_code: ReportingPlatformEnum.TIP,
+              report_year_id: result.createResult.year,
+              is_snapshot: result.is_version_applied,
+            },
+            select: { result_id: true },
+          });
+          if (!saved?.result_id) {
+            throw new Error('saved result not found');
+          }
+          await this.bilateralService.importAlignmentFromTip(
+            saved.result_id,
+            result.poolFunding,
+            result.createResult.year,
+            result.userData?.sec_user_id ?? null,
+            catalogMemo,
+          );
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Unknown error';
+          const tipId = result.knowledgeProduct?.tip_id;
+          this.logger.error(
+            `Error importing TIP pool funding for TIP ${tipId} ${result.public_link} (${result.createResult.year}): ${message}`,
+          );
+        }
+      }
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
@@ -214,13 +257,16 @@ export class TipIntegrationService extends BaseApi {
     }
   }
 
-  async processing(results: TemportalDataResponse<TipKnowledgeProductDto>[]) {
-    const resultsMapped: ExternalMappersDto[] = [];
+  async processing(
+    results: TemportalDataResponse<TipKnowledgeProductDto>[],
+  ): Promise<TipMappedResult[]> {
+    const knownAgreementIds = await this.loadKnownAgreementIds(results);
+    const resultsMapped: TipMappedResult[] = [];
     for (const data of results) {
       const year = data?.year;
       if (isEmpty(data?.data)) continue;
       const result = data.data;
-      const resultMapped: ExternalMappersDto = new ExternalMappersDto();
+      const resultMapped = new TipMappedResult();
       // TIP API no longer returns id — blocked until TIP restores the field
       resultMapped.official_code = null;
       resultMapped.is_version_applied = data.is_version ?? false;
@@ -228,20 +274,19 @@ export class TipIntegrationService extends BaseApi {
       resultMapped.created_at = new Date(result.created_at);
       resultMapped.status_id = ResultStatusEnum.COMPLETED_IN_TIP;
 
-      let projectId: string = null;
-      if (Array.isArray(result.project)) {
-        projectId =
-          result.project.length > 0 ? result.project[0].agreement_id : null;
-      } else {
-        projectId = result.project ? result.project.agreement_id : null;
-      }
+      const mappedProjects = mapTipProjects(
+        result.project,
+        knownAgreementIds,
+        result.id,
+        this.logger,
+      );
 
       resultMapped.createResult = {
         title: result.name,
         year: year,
         description: result.abstract,
         indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        contract_id: projectId,
+        contract_id: mappedProjects.createContractId,
       };
       let allianceUserStaff: AllianceUserStaff = null;
       if (!isEmpty(result?.submitter)) {
@@ -322,12 +367,7 @@ export class TipIntegrationService extends BaseApi {
               lever_id: lever.id,
             }) as unknown as ResultLever,
         ),
-        contracts: [
-          {
-            contract_id: projectId,
-            is_primary: true,
-          },
-        ] as ResultContract[],
+        contracts: mappedProjects.contracts as ResultContract[],
         contributor_levers: [],
         result_sdgs: sdgs as ResultSdg[],
       };
@@ -374,9 +414,36 @@ export class TipIntegrationService extends BaseApi {
         tip_id: result.id,
       } as ResultKnowledgeProduct;
 
+      resultMapped.poolFunding = mappedProjects.poolFunding;
       resultsMapped.push(resultMapped);
     }
     return resultsMapped;
+  }
+
+  private async loadKnownAgreementIds(
+    results: TemportalDataResponse<TipKnowledgeProductDto>[],
+  ): Promise<Set<string>> {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const data of results) {
+      if (isEmpty(data?.data)) continue;
+      const project = data.data.project;
+      const items =
+        project == null ? [] : Array.isArray(project) ? project : [project];
+      for (const item of items) {
+        const agreementId = item?.agreement_id;
+        if (agreementId == null || agreementId === '' || seen.has(agreementId))
+          continue;
+        seen.add(agreementId);
+        ids.push(agreementId);
+      }
+    }
+    if (ids.length === 0) return new Set();
+    const rows = await this.dataSource.getRepository(AgressoContract).find({
+      where: { agreement_id: In(ids) },
+      select: { agreement_id: true },
+    });
+    return new Set(rows.map((row) => row.agreement_id));
   }
 
   private setGeoScopeId(regions: ClarisaRegion[], countries: ClarisaCountry[]) {

@@ -52,7 +52,7 @@ sequenceDiagram
   loop each mapped result
     Tip->>Save: saveAllSections(mapped, TIP extraData)
     alt created/updated counter moved
-      Tip->>Tip: find Result {public_link, TIP, report_year_id} (save's keys)
+      Tip->>Tip: find Result {public_link, TIP, report_year_id, is_snapshot = is_version_applied} (save's keys)
       Tip->>Bil: importAlignmentFromTip(resultId, poolFunding, year, actor, memo)
       Bil->>Toc: getTocResults(sp, level, year) per level, each try/catch, per-run memo
       Bil->>Bil: unchanged? skip : persistAlignment (transaction)
@@ -118,7 +118,7 @@ Rules, in order:
 
 - `processing()` collects every `agreement_id` across the batch, loads the known ones with **one** `AgressoContract` query (`In(ids)`, `agreement_id` only, no `is_active` filter — the FK does not filter either), and calls `mapTipProjects` per result: `createResult.contract_id = createContractId`, `alignments.contracts = contracts`, `poolFunding` on the object.
 - `getKnowledgeProductsByYear()` replaces the single `bulkSaveAllSections` call with the same loop it performs (`for … saveAllSections(result, extraData)`, P-19) followed, per result, by the import step. `extraData` is the same object as today.
-- Import step per result: it runs only when `counters.createdRecords + counters.updatedRecords` grew across that `saveAllSections` call — an omitted duplicate returns before any counter moves and a failure moves `errorRecords` (P-20). Then `findOne(Result, { public_link, platform_code: TIP, report_year_id: createResult.year })` — the exact where-clause `saveAllSections` built from `findOptions: { public_link }` (P-18), so it returns the row the save wrote — and `importAlignmentFromTip`. Each import in its own try/catch → `error` log with the TIP id; counters untouched (R-TIP-007).
+- Import step per result: it runs only when `counters.createdRecords + counters.updatedRecords` grew across that `saveAllSections` call — an omitted duplicate returns before any counter moves and a failure moves `errorRecords` (P-20). Then `findOne(Result, { public_link, platform_code: TIP, report_year_id: createResult.year, is_snapshot: mapped.is_version_applied })` — the exact where-clause `saveAllSections` builds once `extraData.findOptions` also carries `is_snapshot: 'is_version_applied'` (P-18), so it returns the row the save wrote — and `importAlignmentFromTip`. **Amended 2026-10-20 (execute, owner-approved, P-18 refuted on Dev; first amendment superseded by Pivot T-03):** the save writes `is_snapshot = is_version_applied` on create and update, and a no-year TIP run marks every earlier year as a version, so both sides key on that same flag — the PRMS precedent (`prms.opensearch.service.ts` `findOptions: { …, is_snapshot: 'is_version_applied' }`). The flag is a boolean on every mapped object (`data.is_version ?? false`), never `undefined` (P-21). `SaveResultService` and TIP versioning are unchanged. Each import in its own try/catch → `error` log with the TIP id; counters untouched (R-TIP-007).
 - Actor: `mapped.userData?.sec_user_id ?? null`, as the PRMS precedent (`prms.opensearch.service.ts:650-654`).
 - A per-run `Map<'year:sp:level', TocResult[] | null>` memo is created in `getKnowledgeProductsByYear` and passed down (NFR-TIP-001).
 
@@ -171,7 +171,7 @@ No client change. The sidebar shows the tab when `eligible || display_only` (`re
 
 ## 11. Premise Ledger
 
-Verified: 20 · UNVERIFIED: 3 (High 1, Low 2)
+Verified: 20 · Refuted: 1 (P-18, If-false applied) · UNVERIFIED: 2 (High 1, Low 1)
 Blast-radius triggers: `live-path` (sync trigger → changed code, P-13), `shared-state` (`display_only` readers, P-14), `consumer` (`TipProjectDto`, `processing()` / `getKnowledgeProductsByYear`, P-15).
 
 | # | Claim | Class | Citation (as run) | Verified at | If false | Settled by |
@@ -198,14 +198,14 @@ Blast-radius triggers: `live-path` (sync trigger → changed code, P-13), `share
 | P-23 | `tipIntegrationMapper` reads `result_contracts?.[0]` | consumer | `tools/tip-integration/mapper/tip-integration.mapper.ts:36-42` | 3ee449e41 | R-0 moot (Low) | — |
 | P-16 | TIP `science_program_id` codes equal STAR/lambda-toc SP codes and `toc_result_id` is lambda-toc's id | data-env | `UNVERIFIED — confirm at source before relying on it` (repo has SP01…SP03 seeded in `1779190000010-createClarisaScienceProgramsAndSeed.ts`; nothing links TIP ids to lambda-toc) | — | `level` / `indicator_id` always null (**High** — data saved but incomplete) | user-stated (sample payload); HITL Dev run in T-04 |
 | P-17 | lambda-toc serves the TIP publication years (2021+) for SP codes | data-env | `UNVERIFIED — confirm at source before relying on it` | — | Older results get `level null` (Low — D-4 alternative) | T-04 HITL Dev run |
-| P-18 | The import's `findOne` on `{public_link, TIP, report_year_id}` returns the row the save just wrote — no two TIP rows (e.g. live + snapshot) share link and year | data-env | `UNVERIFIED — confirm at source before relying on it` | — | Mapping lands on a sibling row; add `is_snapshot` to both sides (Low) | T-03 first step: `SELECT public_link, report_year_id, COUNT(*) FROM results WHERE platform_code='TIP' AND is_active=1 GROUP BY 1,2 HAVING COUNT(*)>1` on Dev (read-only) |
+| P-18 | The import's `findOne` on `{public_link, TIP, report_year_id}` returns the row the save just wrote — no two TIP rows (e.g. live + snapshot) share link and year | data-env | **REFUTED 2026-10-20** — Dev query (T-03 first step) returned 3 live+snapshot pairs (official codes 21156, 21780, 21870, year 2025); *If false* branch applied: `is_snapshot` on both sides, valued from `is_version_applied` (§7.3; the literal-`false` variant was wrong — Pivot T-03) | T-03 | Mapping lands on a sibling row; add `is_snapshot` to both sides (Low) | T-03 first step: `SELECT public_link, report_year_id, COUNT(*) FROM results WHERE platform_code='TIP' AND is_active=1 GROUP BY 1,2 HAVING COUNT(*)>1` on Dev (read-only) |
 
 ## 12. Observability
 
 - `warn`: `TIP <id>: agreement <x> not found in agresso_contracts, contract skipped`.
 - `warn`: `TIP <id>: flagged primary <x> unknown, no primary contract`.
 - `warn`: `TIP result <resultId>: ToC result <id> / indicator <uuid> not found (or multiple matches) in catalog <sp> <year>`.
-- `error`: `Error importing TIP pool funding for <public_link> (<year>): <message>`.
+- `error`: `Error importing TIP pool funding for TIP <id> <public_link> (<year>): <message>` (TIP id added 2026-10-20, Pivot T-03, so the line meets R-TIP-007).
 - No new `sync_process_log` fields.
 
 ## 13. Testing strategy

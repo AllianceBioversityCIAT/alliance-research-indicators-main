@@ -8,7 +8,7 @@ import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clari
 import { ClarisaCountriesService } from '../clarisa/entities/clarisa-countries/clarisa-countries.service';
 import { QueryService } from '../../shared/utils/query.service';
 import { HttpService } from '@nestjs/axios';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import * as mapperModule from './mapper/tip-integration.mapper';
@@ -17,7 +17,13 @@ import { SyncProcessLogService } from '../../entities/sync-process-log/sync-proc
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
 import { BadRequestException } from '@nestjs/common';
-import { TipKnowledgeProductDto } from './dto/response-year-tip.dto';
+import {
+  TipKnowledgeProductDto,
+  TipMappedResult,
+  TipTocMappingDto,
+} from './dto/response-year-tip.dto';
+import { BilateralService } from '../../entities/bilateral/bilateral.service';
+import { AgressoContract } from '../../entities/agresso-contract/entities/agresso-contract.entity';
 import { of, throwError } from 'rxjs';
 import { PrmsRepository } from '../open-search/prms/repositories/prms.repository';
 import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
@@ -36,10 +42,27 @@ describe('TipIntegrationService', () => {
   let saveResultService: jest.Mocked<SaveResultService>;
   let prmsRepository: jest.Mocked<PrmsRepository>;
   let clarisaSdgsService: jest.Mocked<ClarisaSdgsService>;
+  let bilateralService: { importAlignmentFromTip: jest.Mock };
 
   const mockResultRepo = {
     findOne: jest.fn(),
     update: jest.fn(),
+  };
+
+  const mockAgressoRepo = {
+    find: jest.fn(),
+  };
+
+  const echoKnownAgreements = (options?: {
+    where?: { agreement_id?: { _value?: string | string[] } };
+  }) => {
+    const value = options?.where?.agreement_id?._value ?? [];
+    const ids = Array.isArray(value) ? value : [value];
+    return Promise.resolve(
+      ids
+        .filter((id) => id != null && id !== '')
+        .map((agreement_id) => ({ agreement_id })),
+    );
   };
 
   const mockStagingRepo = {
@@ -128,6 +151,9 @@ describe('TipIntegrationService', () => {
               if (entity === SyncStagingRecordsEntity) {
                 return mockStagingRepo;
               }
+              if (entity === AgressoContract) {
+                return mockAgressoRepo;
+              }
               return mockResultRepo;
             }),
           },
@@ -173,6 +199,13 @@ describe('TipIntegrationService', () => {
           provide: SaveResultService,
           useValue: {
             bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
+            saveAllSections: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: BilateralService,
+          useValue: {
+            importAlignmentFromTip: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -202,6 +235,12 @@ describe('TipIntegrationService', () => {
     saveResultService = module.get(SaveResultService);
     prmsRepository = module.get(PrmsRepository);
     clarisaSdgsService = module.get(ClarisaSdgsService);
+    bilateralService = module.get(BilateralService);
+
+    mockAgressoRepo.find.mockReset();
+    mockAgressoRepo.find.mockImplementation(echoKnownAgreements);
+    mockResultRepo.findOne.mockReset();
+    mockResultRepo.findOne.mockResolvedValue({ result_id: 42 });
 
     jest
       .spyOn(mapperModule, 'tipIntegrationMapper')
@@ -310,7 +349,13 @@ describe('TipIntegrationService', () => {
       jest
         .spyOn(service as any, 'getRequest')
         .mockReturnValue(of({ data: mockResponse }));
-      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      const mapped = {
+        public_link: 'http://link.example',
+        is_version_applied: false,
+        createResult: { year: 2025 },
+        poolFunding: null,
+      } as TipMappedResult;
+      jest.spyOn(service, 'processing').mockResolvedValue([mapped]);
       prmsRepository.findTemporalResults.mockResolvedValue([]);
 
       await service.getKnowledgeProductsByYear(2025);
@@ -320,13 +365,18 @@ describe('TipIntegrationService', () => {
         expect.any(String),
       );
       expect(service.processing).toHaveBeenCalledWith([]);
-      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith([], {
+      expect(saveResultService.bulkSaveAllSections).not.toHaveBeenCalled();
+      expect(saveResultService.saveAllSections).toHaveBeenCalledWith(mapped, {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved: expect.any(Array),
         counters: expect.any(Object),
         manageOfficialCode: true,
-        findOptions: { public_link: 'public_link' },
+        findOptions: {
+          public_link: 'public_link',
+          is_snapshot: 'is_version_applied',
+        },
       });
+      expect(mapped.is_version_applied).toBe(false);
       expect(syncProcessLogService.update).toHaveBeenCalledWith(
         1,
         expect.any(Object),
@@ -374,7 +424,8 @@ describe('TipIntegrationService', () => {
       expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
       expect((service as any).sleep).toHaveBeenCalledTimes(1);
       expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
-      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledTimes(1);
+      expect(saveResultService.saveAllSections).toHaveBeenCalledTimes(1);
+      expect(saveResultService.bulkSaveAllSections).not.toHaveBeenCalled();
     });
 
     it('should stage each record using the TIP product id as code', async () => {
@@ -547,6 +598,355 @@ describe('TipIntegrationService', () => {
       ]);
 
       expect(results).toEqual([]);
+    });
+
+    const a132Mapping: TipTocMappingDto = {
+      science_program_id: 'SP01',
+      toc_result_id: 7033,
+      toc_result_indicator_id: 'f3706ba2-0000-4000-8000-000000000001',
+      target_contribution: 1,
+      result_title: 'HLO1.AOW1.IO1 Steer to impact',
+    };
+
+    it('maps three projects with A132 primary and that project pool funding', async () => {
+      const product = wrapTemporal({
+        ...baseProduct,
+        project: [
+          {
+            agreement_id: 'A171',
+            description: 'second',
+            is_primary: false,
+          },
+          {
+            agreement_id: 'A132',
+            description: 'primary',
+            is_primary: true,
+            is_contributing_to_pool_funding: true,
+            toc_mapping: a132Mapping,
+          },
+          {
+            agreement_id: 'A1824',
+            description: 'third',
+            is_primary: false,
+          },
+        ],
+      });
+
+      const results = await service.processing([product]);
+
+      expect(results[0].alignments.contracts).toEqual([
+        { contract_id: 'A171', is_primary: false },
+        { contract_id: 'A132', is_primary: true },
+        { contract_id: 'A1824', is_primary: false },
+      ]);
+      expect(results[0].createResult.contract_id).toBe('A132');
+      expect(results[0].poolFunding).toEqual(a132Mapping);
+    });
+
+    it('moves the primary to the flagged project on a re-sync payload', async () => {
+      const product = wrapTemporal({
+        ...baseProduct,
+        project: [
+          {
+            agreement_id: 'A132',
+            description: 'was primary',
+            is_primary: false,
+          },
+          {
+            agreement_id: 'A171',
+            description: 'now primary',
+            is_primary: true,
+          },
+        ],
+      });
+
+      const results = await service.processing([product]);
+
+      expect(results[0].alignments.contracts).toEqual([
+        { contract_id: 'A132', is_primary: false },
+        { contract_id: 'A171', is_primary: true },
+      ]);
+      expect(results[0].createResult.contract_id).toBe('A171');
+    });
+
+    it('drops an unknown non-primary agreement so the save payload cannot hit the FK', async () => {
+      mockAgressoRepo.find.mockResolvedValue([{ agreement_id: 'A132' }]);
+      const product = wrapTemporal({
+        ...baseProduct,
+        project: [
+          {
+            agreement_id: 'A132',
+            description: 'known',
+            is_primary: true,
+            is_contributing_to_pool_funding: true,
+            toc_mapping: a132Mapping,
+          },
+          { agreement_id: 'ZZ999', description: 'unknown', is_primary: false },
+        ],
+      });
+
+      const results = await service.processing([product]);
+
+      expect(
+        results[0].alignments.contracts.map((contract) => contract.contract_id),
+      ).toEqual(['A132']);
+      expect(results[0].createResult.contract_id).toBe('A132');
+    });
+
+    it('keeps a known non-primary and writes no pool funding when the flagged primary is unknown', async () => {
+      mockAgressoRepo.find.mockResolvedValue([{ agreement_id: 'A171' }]);
+      const product = wrapTemporal({
+        ...baseProduct,
+        project: [
+          {
+            agreement_id: 'ZZ999',
+            description: 'unknown primary',
+            is_primary: true,
+            is_contributing_to_pool_funding: true,
+            toc_mapping: a132Mapping,
+          },
+          { agreement_id: 'A171', description: 'known', is_primary: false },
+        ],
+      });
+
+      const results = await service.processing([product]);
+
+      expect(results[0].alignments.contracts).toEqual([
+        { contract_id: 'A171', is_primary: false },
+      ]);
+      expect(results[0].createResult.contract_id).toBe('A171');
+      expect(results[0].poolFunding).toBeNull();
+    });
+
+    it('loads known agreement ids once for a two-result batch', async () => {
+      await service.processing([
+        wrapTemporal({
+          ...baseProduct,
+          project: { agreement_id: 'AGR-A', description: 'a' },
+        }),
+        wrapTemporal({
+          ...baseProduct,
+          id: 556,
+          link: 'http://other.example',
+          project: { agreement_id: 'AGR-B', description: 'b' },
+        }),
+      ]);
+
+      expect(mockAgressoRepo.find).toHaveBeenCalledTimes(1);
+      expect(mockAgressoRepo.find).toHaveBeenCalledWith({
+        where: { agreement_id: In(['AGR-A', 'AGR-B']) },
+        select: { agreement_id: true },
+      });
+    });
+
+    it('does not query agresso contracts when no project has an agreement id', async () => {
+      await service.processing([wrapTemporal({ ...baseProduct, project: [] })]);
+
+      expect(mockAgressoRepo.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pool-funding import step', () => {
+    const runYear = async (processed: TipMappedResult[]) => {
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: { data: [], data_count: 0 } }));
+      jest.spyOn(service, 'processing').mockResolvedValue(processed);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+      await service.getKnowledgeProductsByYear(2025);
+    };
+
+    const mapping = (
+      scienceProgramId: string,
+      tocResultId: number,
+    ): TipTocMappingDto => ({
+      science_program_id: scienceProgramId,
+      toc_result_id: tocResultId,
+    });
+
+    const row = (
+      publicLink: string,
+      year: number,
+      poolFunding: TipTocMappingDto | null,
+      userData: { sec_user_id: number } | null = null,
+      isVersionApplied = false,
+      tipId = 555,
+    ): TipMappedResult =>
+      ({
+        public_link: publicLink,
+        is_version_applied: isVersionApplied,
+        createResult: { year },
+        poolFunding,
+        userData,
+        knowledgeProduct: { tip_id: tipId },
+      }) as TipMappedResult;
+
+    const savedRows: {
+      result_id: number;
+      where: Record<string, unknown>;
+    }[] = [];
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      savedRows.length = 0;
+      let nextId = 100;
+      saveResultService.saveAllSections.mockImplementation(
+        async (result, extra) => {
+          const where: Record<string, unknown> = {
+            platform_code: extra?.platformCode,
+            report_year_id: result.createResult?.year,
+          };
+          for (const key of Object.keys(extra?.findOptions ?? {})) {
+            where[key] = result[extra.findOptions[key]];
+          }
+          savedRows.push({ result_id: nextId++, where });
+          const link = result.public_link ?? '';
+          if (link.endsWith('/created')) extra.counters.createdRecords += 1;
+          else if (link.endsWith('/updated'))
+            extra.counters.updatedRecords += 1;
+          else if (link.endsWith('/error')) extra.counters.errorRecords += 1;
+        },
+      );
+      mockResultRepo.findOne.mockImplementation(async (options) => {
+        const where = options?.where ?? {};
+        const match = savedRows.find((saved) =>
+          Object.entries(where).every(
+            ([key, value]) => saved.where[key] === value,
+          ),
+        );
+        return match ? { result_id: match.result_id } : null;
+      });
+    });
+
+    it('imports only results whose created or updated counter moved', async () => {
+      await runYear([
+        row('http://batch/created', 2025, mapping('SP01', 1)),
+        row('http://batch/updated', 2025, mapping('SP01', 2)),
+        row('http://batch/omit', 2025, mapping('SP01', 3)),
+        row('http://batch/error', 2025, mapping('SP01', 4)),
+      ]);
+
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(2);
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map(
+          (call) => call[1].toc_result_id,
+        ),
+      ).toEqual([1, 2]);
+    });
+
+    it('imports each year of one link on the snapshot flag the save keyed', async () => {
+      await runYear([
+        row(
+          'http://same.example/created',
+          2025,
+          mapping('SP01', 7033),
+          null,
+          true,
+          9001,
+        ),
+        row(
+          'http://same.example/created',
+          2026,
+          mapping('SP02', 8001),
+          null,
+          false,
+          9001,
+        ),
+      ]);
+
+      const versioned = savedRows.find(
+        (saved) => saved.where.report_year_id === 2025,
+      );
+      const live = savedRows.find(
+        (saved) => saved.where.report_year_id === 2026,
+      );
+      expect(versioned?.where.is_snapshot).toBe(true);
+      expect(live?.where.is_snapshot).toBe(false);
+      expect(
+        saveResultService.saveAllSections.mock.calls[0][1].findOptions,
+      ).toEqual({
+        public_link: 'public_link',
+        is_snapshot: 'is_version_applied',
+      });
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenNthCalledWith(
+        1,
+        versioned?.result_id,
+        expect.objectContaining({
+          science_program_id: 'SP01',
+          toc_result_id: 7033,
+        }),
+        2025,
+        null,
+        expect.any(Map),
+      );
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenNthCalledWith(
+        2,
+        live?.result_id,
+        expect.objectContaining({
+          science_program_id: 'SP02',
+          toc_result_id: 8001,
+        }),
+        2026,
+        null,
+        expect.any(Map),
+      );
+      const firstMemo =
+        bilateralService.importAlignmentFromTip.mock.calls[0][4];
+      const secondMemo =
+        bilateralService.importAlignmentFromTip.mock.calls[1][4];
+      expect(firstMemo).toBe(secondMemo);
+    });
+
+    it('passes a null actor when userData is null and the submitter id when resolved', async () => {
+      await runYear([
+        row('http://actor/created', 2025, mapping('SP01', 1), null),
+        row('http://actor/created', 2025, mapping('SP01', 2), {
+          sec_user_id: 77,
+        }),
+      ]);
+
+      expect(bilateralService.importAlignmentFromTip.mock.calls[0][3]).toBe(
+        null,
+      );
+      expect(bilateralService.importAlignmentFromTip.mock.calls[1][3]).toBe(77);
+    });
+
+    it('keeps going when the first import throws and logs that TIP id', async () => {
+      bilateralService.importAlignmentFromTip
+        .mockRejectedValueOnce(new Error('write failed'))
+        .mockResolvedValueOnce(undefined);
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+      await runYear([
+        row('http://first/created', 2025, mapping('SP01', 1), null, false, 111),
+        row(
+          'http://second/created',
+          2025,
+          mapping('SP02', 2),
+          null,
+          false,
+          222,
+        ),
+      ]);
+
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(2);
+      expect(bilateralService.importAlignmentFromTip.mock.calls[1][1]).toEqual(
+        expect.objectContaining({ science_program_id: 'SP02' }),
+      );
+      const counters = syncProcessLogService.update.mock.calls[0][1];
+      expect(counters.createdRecords).toBe(2);
+      expect(counters.updatedRecords).toBe(0);
+      expect(counters.errorRecords).toBe(0);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error importing TIP pool funding for TIP 111 http://first/created (2025): write failed',
+      );
+    });
+
+    it('does not find or import when poolFunding is null', async () => {
+      await runYear([row('http://gone/created', 2025, null)]);
+
+      expect(mockResultRepo.findOne).not.toHaveBeenCalled();
+      expect(bilateralService.importAlignmentFromTip).not.toHaveBeenCalled();
     });
   });
 
