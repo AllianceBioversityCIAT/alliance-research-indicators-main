@@ -89,7 +89,6 @@ export class PfmChipCountsDto {
   @ApiProperty() attention: number;
   @ApiProperty() mapping: number;
   @ApiProperty() ready: number;
-  @ApiProperty() pending: number;
   @ApiProperty() prms_rejected: number;
   @ApiProperty() synced: number;
 }

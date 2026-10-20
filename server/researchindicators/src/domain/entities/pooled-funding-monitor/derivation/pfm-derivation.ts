@@ -2,7 +2,6 @@ import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmMappingStateEnum } from '../enum/pfm-mapping-state.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
-import { PfmStatusFilterEnum } from '../enum/pfm-status-filter.enum';
 
 /**
  * One monitored result as projected by the base query (design.md §3.2).
@@ -162,16 +161,16 @@ export const deriveMappingState = (
     'has_alignment' | 'has_contribution' | 'mapping_complete'
   >,
 ): PfmMappingStateEnum => {
-  if (!row.has_alignment) return PfmMappingStateEnum.NOT_STARTED;
+  if (!row.has_alignment) return PfmMappingStateEnum.PENDING;
   if (!row.has_contribution) return PfmMappingStateEnum.NO_SP_CONTRIBUTION;
   if (row.mapping_complete) return PfmMappingStateEnum.COMPLETE;
   return PfmMappingStateEnum.INCOMPLETE;
 };
 
 const MAPPING_NOTES: Record<PfmMappingStateEnum, string> = {
-  [PfmMappingStateEnum.COMPLETE]: 'Pool funding split recorded',
+  [PfmMappingStateEnum.COMPLETE]: 'CGIAR Portfolio split recorded',
   [PfmMappingStateEnum.INCOMPLETE]: 'Projects or budget shares still missing',
-  [PfmMappingStateEnum.NOT_STARTED]: 'Starts after PI approval',
+  [PfmMappingStateEnum.PENDING]: 'Starts after PI approval',
   [PfmMappingStateEnum.NO_SP_CONTRIBUTION]:
     'PI declared no Science Program contribution · out of PRMS scope',
 };
@@ -184,7 +183,7 @@ export const deriveSpLine = (
   primary: PfmRawRow['primary_sp'],
   contributing: string[],
 ): string => {
-  if (state === PfmMappingStateEnum.NOT_STARTED) return '';
+  if (state === PfmMappingStateEnum.PENDING) return '';
   if (state === PfmMappingStateEnum.NO_SP_CONTRIBUTION)
     return 'Not reported to PRMS';
   const parts: string[] = [];
@@ -243,37 +242,10 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     prmsHint: derivePrmsHint(prmsStatus, row.prms_justification),
     updatedLabel: row.updated_at ? formatPfmDateTime(row.updated_at) : '—',
     isOutOfScope,
-    isReady:
-      starLabel === PfmStarLabelEnum.APPROVED &&
-      mappingState === PfmMappingStateEnum.COMPLETE &&
-      notSent,
-    needsAttention: !isOutOfScope && notSent,
+    // Ready to sync = mapping complete AND nothing in PRMS yet; Need attention = nothing in PRMS yet.
+    isReady: mappingState === PfmMappingStateEnum.COMPLETE && notSent,
+    needsAttention: notSent,
   };
-};
-
-export const matchesStatusFilter = (
-  d: PfmDerivedState,
-  filter: PfmStatusFilterEnum,
-): boolean => {
-  switch (filter) {
-    case PfmStatusFilterEnum.READY_TO_SYNC:
-      return d.isReady;
-    case PfmStatusFilterEnum.MAPPING_PENDING:
-      return (
-        d.starLabel === PfmStarLabelEnum.APPROVED &&
-        d.mappingState !== PfmMappingStateEnum.COMPLETE
-      );
-    case PfmStatusFilterEnum.SYNCED:
-      return d.prmsStatus !== PfmPrmsStatusEnum.NOT_SENT;
-    case PfmStatusFilterEnum.AWAITING_PI:
-      return d.starLabel === PfmStarLabelEnum.SUBMITTED;
-    case PfmStatusFilterEnum.UNDER_REVIEW:
-      return d.starLabel === PfmStarLabelEnum.UNDER_REVIEW;
-    case PfmStatusFilterEnum.DRAFT:
-      return d.starLabel === PfmStarLabelEnum.DRAFT;
-    default:
-      return true;
-  }
 };
 
 export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
@@ -288,8 +260,6 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
       );
     case PfmChipEnum.READY_TO_SYNC:
       return d.isReady;
-    case PfmChipEnum.AWAITING_PI:
-      return d.starLabel !== PfmStarLabelEnum.APPROVED;
     case PfmChipEnum.REJECTED:
       return d.prmsStatus === PfmPrmsStatusEnum.REJECTED;
     case PfmChipEnum.SYNCED:
@@ -302,9 +272,13 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
   }
 };
 
-/** Needs attention -> out of scope -> PRMS Pending Review -> PRMS Approved -> others. */
+/**
+ * Needs attention (in PRMS scope) -> out of scope -> PRMS Pending Review ->
+ * PRMS Approved -> others. Out-of-scope rows also have nothing in PRMS, but
+ * there is nothing to act on, so they rank after the actionable ones.
+ */
 export const rowRank = (d: PfmDerivedState): number => {
-  if (d.needsAttention) return 0;
+  if (d.needsAttention && !d.isOutOfScope) return 0;
   if (d.isOutOfScope) return 1;
   if (d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW) return 2;
   if (d.prmsStatus === PfmPrmsStatusEnum.APPROVED) return 3;

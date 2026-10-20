@@ -1,7 +1,6 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmMappingStateEnum as M } from '../enum/pfm-mapping-state.enum';
 import { PfmPrmsStatusEnum as P } from '../enum/pfm-prms-status.enum';
-import { PfmStatusFilterEnum as F } from '../enum/pfm-status-filter.enum';
 import {
   buildSciencePrograms,
   derivePfmRow,
@@ -9,7 +8,6 @@ import {
   formatPfmDate,
   formatPfmDateTime,
   matchesChip,
-  matchesStatusFilter,
   PfmRawRow,
   rowRank,
 } from './pfm-derivation';
@@ -125,7 +123,7 @@ describe('pfm-derivation', () => {
       [
         'no alignment',
         { has_alignment: 0, has_contribution: null, mapping_complete: null },
-        M.NOT_STARTED,
+        M.PENDING,
         'Starts after PI approval',
         '',
       ],
@@ -147,7 +145,7 @@ describe('pfm-derivation', () => {
         'check passes',
         { has_alignment: 1, has_contribution: 1, mapping_complete: 1 },
         M.COMPLETE,
-        'Pool funding split recorded',
+        'CGIAR Portfolio split recorded',
         'SP05 Climate (primary) · Water, Soils',
       ],
     ])('%s', (_n, flags, mapping, note, spLine) => {
@@ -208,22 +206,23 @@ describe('pfm-derivation', () => {
       expect(d.isOutOfScope).toBe(false);
     });
 
-    // Red input: no contribution with complete mapping flag.
-    it('has_contribution=0 + mapping_complete=1 -> No SP contribution, not needsAttention, not ready', () => {
+    // Red input: no contribution with complete mapping flag. Nothing in PRMS
+    // -> needs attention; the mapping is not Complete -> not ready.
+    it('has_contribution=0 + mapping_complete=1 -> No SP contribution, needsAttention, not ready', () => {
       const d = derivePfmRow(raw({ has_contribution: 0, mapping_complete: 1 }));
       expect(d.mappingState).toBe(M.NO_SP_CONTRIBUTION);
       expect(d.isOutOfScope).toBe(true);
-      expect(d.needsAttention).toBe(false);
+      expect(d.needsAttention).toBe(true);
       expect(d.isReady).toBe(false);
     });
 
-    // Red input: mapping Complete but STAR status 2 is not ready.
-    it('mapping Complete + status 2 -> not ready', () => {
+    // Ready to sync reads the mapping and PRMS, not the STAR status.
+    it('mapping Complete + status 2 -> ready', () => {
       const d = derivePfmRow(
         raw({ result_status_id: 2, result_status_name: 'Submitted' }),
       );
       expect(d.mappingState).toBe(M.COMPLETE);
-      expect(d.isReady).toBe(false);
+      expect(d.isReady).toBe(true);
       expect(d.needsAttention).toBe(true);
     });
 
@@ -233,12 +232,24 @@ describe('pfm-derivation', () => {
       expect(d.needsAttention).toBe(true);
     });
 
-    it('already sent -> not ready, not needs attention', () => {
+    // Red input: a complete mapping already in PRMS is NOT ready to sync.
+    it('already sent with a complete mapping -> not ready, not needs attention', () => {
       const d = derivePfmRow(
         raw({ is_synced_to_prms: 1, prms_history_status: 'APPROVED' }),
       );
       expect(d.isReady).toBe(false);
       expect(d.needsAttention).toBe(false);
+    });
+
+    it('no PRMS status at all -> needs attention, whatever the mapping', () => {
+      for (const flags of [
+        { has_alignment: 0, has_contribution: null, mapping_complete: null },
+        { mapping_complete: 0 },
+        { has_contribution: 0 },
+        { result_status_id: 4, result_status_name: 'Draft' },
+      ]) {
+        expect(derivePfmRow(raw(flags)).needsAttention).toBe(true);
+      }
     });
   });
 
@@ -255,40 +266,6 @@ describe('pfm-derivation', () => {
 
     it('a null updated_at renders the em dash and does not throw', () => {
       expect(derivePfmRow(raw({ updated_at: null })).updatedLabel).toBe('—');
-    });
-  });
-
-  describe('matchesStatusFilter (R-PFM-009)', () => {
-    const rows = {
-      ready: derivePfmRow(raw()),
-      mappingPending: derivePfmRow(raw({ mapping_complete: 0 })),
-      noSp: derivePfmRow(raw({ has_contribution: 0 })),
-      synced: derivePfmRow(raw({ is_synced_to_prms: 1 })),
-      submitted: derivePfmRow(
-        raw({ result_status_id: 2, result_status_name: 'Submitted' }),
-      ),
-      review: derivePfmRow(
-        raw({ result_status_id: 3, result_status_name: 'Accepted' }),
-      ),
-      draft: derivePfmRow(
-        raw({ result_status_id: 4, result_status_name: 'Draft' }),
-      ),
-    };
-    const matching = (f: F) =>
-      Object.entries(rows)
-        .filter(([, d]) => matchesStatusFilter(d, f))
-        .map(([k]) => k);
-
-    it.each([
-      [F.ALL, Object.keys(rows)],
-      [F.READY_TO_SYNC, ['ready']],
-      [F.MAPPING_PENDING, ['mappingPending', 'noSp']],
-      [F.SYNCED, ['synced']],
-      [F.AWAITING_PI, ['submitted']],
-      [F.UNDER_REVIEW, ['review']],
-      [F.DRAFT, ['draft']],
-    ])('%s', (filter, expected) => {
-      expect(matching(filter)).toEqual(expected);
     });
   });
 
@@ -315,10 +292,9 @@ describe('pfm-derivation', () => {
 
     it.each([
       [PfmChipEnum.ALL, Object.keys(rows)],
-      [PfmChipEnum.NEED_ATTENTION, ['ready', 'incomplete', 'draft']],
+      [PfmChipEnum.NEED_ATTENTION, ['ready', 'incomplete', 'noSp', 'draft']],
       [PfmChipEnum.MAPPING_INCOMPLETE, ['incomplete']],
-      [PfmChipEnum.READY_TO_SYNC, ['ready']],
-      [PfmChipEnum.AWAITING_PI, ['draft']],
+      [PfmChipEnum.READY_TO_SYNC, ['ready', 'draft']],
       [PfmChipEnum.REJECTED, ['rejected']],
       [PfmChipEnum.SYNCED, ['pending', 'approvedPrms']],
     ])('%s', (chip, expected) => {
