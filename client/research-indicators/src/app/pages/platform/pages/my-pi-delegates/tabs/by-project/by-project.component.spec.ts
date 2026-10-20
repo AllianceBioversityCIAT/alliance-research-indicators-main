@@ -36,6 +36,7 @@ const PROJECT_WITH_DELEGATES: ProjectDelegates = {
   pi_user_id: null,
   pi_name: 'Mayesse Da Silva',
   status: 'Ongoing',
+  funding_type: 'BLR',
   start_date: '2024-01-15' as unknown as Date,
   end_date: '2026-12-31' as unknown as Date,
   delegates: [DELEGATE_A, DELEGATE_B]
@@ -48,6 +49,7 @@ const PROJECT_NO_DELEGATES: ProjectDelegates = {
   pi_user_id: null,
   pi_name: null,
   status: 'Completed',
+  funding_type: 'BLR',
   start_date: null,
   end_date: null,
   delegates: []
@@ -60,6 +62,7 @@ const PROJECT_INACTIVE_DELEGATE: ProjectDelegates = {
   pi_user_id: null,
   pi_name: null,
   status: 'Ongoing',
+  funding_type: 'BLR',
   start_date: null,
   end_date: null,
   delegates: [DELEGATE_INACTIVE]
@@ -127,7 +130,11 @@ describe('ByProjectComponent', () => {
   let serviceStub: ReturnType<typeof buildServiceStub>;
   let actionsStub: ReturnType<typeof buildActionsStub>;
 
-  async function createComponent(rows: ProjectDelegates[] = [], currentUserId: number | null = 99) {
+  async function createComponent(
+    rows: ProjectDelegates[] = [],
+    currentUserId: number | null = 99,
+    { keepDefaultFilter = false }: { keepDefaultFilter?: boolean } = {}
+  ) {
     serviceStub = buildServiceStub(rows, currentUserId);
     actionsStub = buildActionsStub();
 
@@ -144,6 +151,9 @@ describe('ByProjectComponent', () => {
 
     fixture = TestBed.createComponent(ByProjectComponent);
     component = fixture.componentInstance;
+    // "Ongoing W3 & Bilateral only" is on by default; most suites test the
+    // unfiltered table, so they start with it off unless they opt in.
+    if (!keepDefaultFilter) component.ongoingW3BilateralOnly.set(false);
     // K-015: initial state then detectChanges
     fixture.detectChanges();
     await fixture.whenStable();
@@ -1233,10 +1243,10 @@ describe('ByProjectComponent', () => {
       const labels = fixture.debugElement
         .queryAll(By.css('.by-project__quick-filter'))
         .map(el => (el.nativeElement as HTMLElement).textContent?.trim());
-      expect(labels).toEqual(['Ongoing projects', 'Projects without delegates']);
+      expect(labels).toEqual(['Ongoing W3 & Bilateral only', 'Projects without delegates']);
       expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
       expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
-      expect(quick(ONGOING).getAttribute('data-testid')).toBe('by-project-quick-filter-ongoing');
+      expect(quick(ONGOING).getAttribute('data-testid')).toBe('by-project-quick-filter-ongoing-w3-bilateral');
       expect(quick(WITHOUT).getAttribute('data-testid')).toBe('by-project-quick-filter-without-delegates');
       expect(codes()).toHaveLength(8);
     });
@@ -1267,7 +1277,7 @@ describe('ByProjectComponent', () => {
       expect(quick(ONGOING).querySelector('.pi-check-square')).toBeNull();
     });
 
-    it('"Ongoing projects" shows only ongoing projects', () => {
+    it('"Ongoing W3 & Bilateral only" shows only ongoing projects', () => {
       click(quick(ONGOING));
 
       // ★ discriminating: Completed and Suspended rows are excluded.
@@ -1277,6 +1287,32 @@ describe('ByProjectComponent', () => {
       expect(codes()).not.toContain('P-OTH-NULL-DEL');
       expect(codes()).not.toContain('P-OTH-EMPTY-DEL');
       expect(quick(ONGOING).getAttribute('aria-checked')).toBe('true');
+    });
+
+    it('"Ongoing W3 & Bilateral only" keeps only BLR, BLU, W3R and W3U funding', async () => {
+      const funded = (code: string, funding_type: string | null): ProjectDelegates => ({
+        ...PROJECT_NO_DELEGATES,
+        project_code: code,
+        status: 'Ongoing',
+        funding_type,
+        delegates: []
+      });
+      serviceStub.byProjectCache.set([
+        funded('F-BLR', 'BLR'),
+        funded('F-BLU', 'blu'),
+        funded('F-W3R', 'W3R'),
+        funded('F-W3U', ' W3U '),
+        funded('F-POL', 'POL'),
+        funded('F-NULL', null)
+      ]);
+      fixture.detectChanges();
+      click(quick(ONGOING));
+
+      // ★ discriminating: pooled and missing funding types are excluded.
+      expect(codes()).toEqual(['F-BLR', 'F-BLU', 'F-W3R', 'F-W3U']);
+      // Nothing is removed from the data — switching it off shows them all.
+      click(quick(ONGOING));
+      expect(codes()).toHaveLength(6);
     });
 
     it('toggling a chip off restores the list', () => {
@@ -1344,11 +1380,35 @@ describe('ByProjectComponent', () => {
       component.clearFilters();
       fixture.detectChanges();
 
-      expect(component.ongoingOnly()).toBe(false);
+      expect(component.ongoingW3BilateralOnly()).toBe(false);
       expect(component.withoutDelegatesOnly()).toBe(false);
       expect(quick(ONGOING).getAttribute('aria-checked')).toBe('false');
       expect(quick(WITHOUT).getAttribute('aria-checked')).toBe('false');
       expect(codes()).toHaveLength(8);
+    });
+  });
+
+  // ── Default quick view ─────────────────────────────────────────────────
+
+  describe('default quick view', () => {
+    it('opens with "Ongoing W3 & Bilateral only" selected and applied', async () => {
+      await createComponent(
+        [
+          PROJECT_WITH_DELEGATES,
+          PROJECT_NO_DELEGATES,
+          { ...PROJECT_WITH_DELEGATES, project_code: 'PRJ-POOL', funding_type: 'POL' }
+        ],
+        99,
+        { keepDefaultFilter: true }
+      );
+      const chip = fixture.nativeElement.querySelector(
+        '[data-testid="by-project-quick-filter-ongoing-w3-bilateral"]'
+      ) as HTMLElement;
+      expect(component.ongoingW3BilateralOnly()).toBe(true);
+      expect(chip.getAttribute('aria-checked')).toBe('true');
+      // Completed (PRJ-002) and pooled (PRJ-POOL) are hidden, not removed.
+      expect(component.filteredRows().map(r => r.project_code)).toEqual(['PRJ-001']);
+      expect(serviceStub.byProjectCache()).toHaveLength(3);
     });
   });
 
@@ -1373,13 +1433,13 @@ describe('ByProjectComponent', () => {
     it('sends the filtered keys and the current filters', async () => {
       component.searchTerm.set(' beta ');
       component.roleTerm.set('delegate');
-      component.ongoingOnly.set(true);
+      component.ongoingW3BilateralOnly.set(true);
       component.withoutDelegatesOnly.set(true);
       fixture.detectChanges();
       await component.exportTable();
       expect(serviceStub.exportByProject).toHaveBeenCalledWith(
         component.filteredRows().map(r => r.project_code),
-        { search: 'beta', role: 'delegate', ongoing_only: true, without_delegates_only: true }
+        { search: 'beta', role: 'delegate', ongoing_w3_bilateral_only: true, without_delegates_only: true }
       );
     });
 
@@ -1389,7 +1449,7 @@ describe('ByProjectComponent', () => {
       await component.exportTable();
       expect(serviceStub.exportByProject).toHaveBeenCalledWith(['PRJ-002'], {
         role: 'all',
-        ongoing_only: false,
+        ongoing_w3_bilateral_only: false,
         without_delegates_only: true
       });
     });

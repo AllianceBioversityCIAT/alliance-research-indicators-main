@@ -177,6 +177,7 @@ function buildProject(
     pi_user_id: piUserId,
     pi_name: null,
     status: 'Ongoing',
+    funding_type: null,
     start_date: '2024-01-15' as unknown as Date,
     end_date: '2026-12-31' as unknown as Date,
     delegates: delegates.map(d => ({ ...d, is_active: d.is_active ?? true }))

@@ -38,7 +38,7 @@ export class ExportByProjectFiltersDto {
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
   @IsBoolean()
-  ongoing_only?: boolean;
+  ongoing_w3_bilateral_only?: boolean;
 
   @ApiPropertyOptional({ type: Boolean })
   @IsOptional()
