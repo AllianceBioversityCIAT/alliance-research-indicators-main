@@ -190,7 +190,7 @@ describe('ByProjectComponent', () => {
       const tag = tags[0].query(By.directive(CustomTagComponent))
         .componentInstance as CustomTagComponent;
       expect(tag.statusId).toBe('pool-funding');
-      expect(tag.statusName).toBe('Contributing to Pool Funding');
+      expect(tag.statusName).toBe('Contributing to CGIAR Portfolio');
       expect(tag.tiny).toBe(true);
 
       // ★ discriminating: the column used to spell it out as plain Yes / No.
