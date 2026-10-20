@@ -1,5 +1,5 @@
 import { Injectable, WritableSignal, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
 import {
@@ -83,6 +83,7 @@ import { GetVersions } from '@shared/interfaces/get-versions.interface';
 import { AskForHelp } from '../components/all-modals/modals-content/ask-for-help-modal/interfaces/ask-for-help.interface';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { HttpParams } from '@angular/common/http';
+import { AgrovocTerm } from '@shared/interfaces/agrovoc-term.interface';
 import { GetInnovationDetails } from '@shared/interfaces/get-innovation-details.interface';
 import { GetInnovationUseDetails } from '@shared/interfaces/get-innovation-use-details.interface';
 import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels.interface';
@@ -1040,6 +1041,9 @@ export class ApiService {
     const url = () => `tools/clarisa/manager/opensearch/countries/search?query=${search}`;
     return this.TP.get(url(), {});
   };
+
+  GET_AgrovocSearch$ = (query: string): Observable<MainResponse<AgrovocTerm[]>> =>
+    this.TP.getObservable<AgrovocTerm[]>('tools/agrovoc/search', { params: new HttpParams().set('query', query) });
 
   GET_ImpactAreas = (): Promise<MainResponse<ImpactArea[]>> => {
     const url = () => `tools/clarisa/impact-areas`;

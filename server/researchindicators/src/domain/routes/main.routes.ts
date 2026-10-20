@@ -32,6 +32,7 @@ import { IntellectualPropertyOwnersModule } from '../entities/intellectual-prope
 import { ResultCapSharingIpModule } from '../entities/result-cap-sharing-ip/result-cap-sharing-ip.module';
 import { ReportingFeedbackModule } from '../entities/reporting-feedback/reporting-feedback.module';
 import { TipIntegrationModule } from '../tools/tip-integration/tip-integration.module';
+import { AgrovocModule } from '../tools/agrovoc/agrovoc.module';
 import { ResultInnovationDevModule } from '../entities/result-innovation-dev/result-innovation-dev.module';
 import { ResultInnovationUseModule } from '../entities/result-innovation-use/result-innovation-use.module';
 import { InnovationDevAnticipatedUsersModule } from '../entities/innovation-dev-anticipated-users/innovation-dev-anticipated-users.module';
@@ -257,6 +258,10 @@ const toolsChildren: Routes = [
   {
     path: 'tip-integration',
     module: TipIntegrationModule,
+  },
+  {
+    path: 'agrovoc',
+    module: AgrovocModule,
   },
 ];
 

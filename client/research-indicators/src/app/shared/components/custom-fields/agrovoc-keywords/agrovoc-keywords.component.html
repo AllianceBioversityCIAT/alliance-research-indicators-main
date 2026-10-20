@@ -1,0 +1,87 @@
+<div class="agrovoc-keywords">
+  <div class="agrovoc-keywords__field">
+    <p-select
+      [options]="terms()"
+      optionLabel="label"
+      optionDisabled="alreadySelected"
+      dataKey="uri"
+      [filter]="false"
+      appendTo="body"
+      panelStyleClass="agrovoc-keywords-panel"
+      placeholder="Search AGROVOC keywords"
+      ariaLabel="AGROVOC keywords"
+      [disabled]="disabled()"
+      [showClear]="false"
+      [style]="{ width: '100%' }"
+      (onChange)="onTermPicked($event)"
+      (onHide)="onPanelHide()">
+      <ng-template pTemplate="header">
+        <div class="p-select-header" (click)="$event.stopPropagation()">
+          <p-iconfield>
+            <input
+              #filter
+              pInputText
+              type="text"
+              class="p-select-filter"
+              role="searchbox"
+              autocomplete="off"
+              aria-label="Search AGROVOC keywords"
+              [value]="searchText()"
+              [disabled]="disabled()"
+              (input)="onSearchInput(filter.value)"
+              (keydown)="onSearchKeydown($event)"
+              (click)="$event.stopPropagation()" />
+            <p-inputicon>
+              <SearchIcon aria-hidden="true" />
+            </p-inputicon>
+          </p-iconfield>
+        </div>
+      </ng-template>
+
+      <ng-template let-item pTemplate="item">
+        <span class="agrovoc-keywords__option">
+          <span class="agrovoc-keywords__label">{{ item.label }}</span>
+          @if (item.matched_label) {
+            <span class="agrovoc-keywords__matched">matched: {{ item.matched_label }}</span>
+          }
+          @if (item.alreadySelected) {
+            <span class="agrovoc-keywords__added">added</span>
+          }
+        </span>
+      </ng-template>
+
+      <ng-template pTemplate="empty">
+        <div class="agrovoc-keywords__state" data-testid="agrovoc-state" aria-live="polite">
+          @switch (state().kind) {
+            @case ('loading') {
+              <span class="agrovoc-keywords__loading">
+                <i class="pi pi-spinner pi-spin" aria-hidden="true"></i>
+                <span>Searching AGROVOC…</span>
+              </span>
+            }
+            @case ('empty') {
+              <span>No AGROVOC terms match “{{ state().query }}”</span>
+            }
+            @case ('error') {
+              <span>AGROVOC search is unavailable, try again</span>
+            }
+            @default {
+              <span>Type at least 3 characters</span>
+            }
+          }
+        </div>
+      </ng-template>
+    </p-select>
+  </div>
+
+  <div class="agrovoc-keywords__chips" aria-label="Selected keywords">
+    @for (keyword of keywords(); track $index) {
+      <p-chip
+        styleClass="agrovoc-keywords__chip"
+        [label]="keyword"
+        [removable]="!disabled()"
+        [attr.data-remove-label]="'Remove ' + keyword"
+        (onRemove)="removeKeyword(keyword)" />
+    }
+  </div>
+</div>

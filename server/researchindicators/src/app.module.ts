@@ -25,6 +25,7 @@ import { GlobalUtilsModule } from './domain/shared/utils/global-utils.module';
 import { RoarManagementModule } from './domain/tools/roar-management/roar-management.module';
 import { ResultOpenSearchModule } from './domain/tools/open-search/results/result.opensearch.module';
 import { TipIntegrationModule } from './domain/tools/tip-integration/tip-integration.module';
+import { AgrovocModule } from './domain/tools/agrovoc/agrovoc.module';
 import { DynamoFeedbackModule } from './domain/tools/dynamo-feedback/dynamo-feedback.module';
 import { AllianceStaffOpenSearchModule } from './domain/tools/open-search/alliance-staff/alliance-staff.opensearch.module';
 import { AdminModule } from './admin/admin.module';
@@ -48,6 +49,7 @@ import { RESULT_CODE } from './domain/shared/utils/results.util';
     PrmsOpenSearchModule,
     AllianceStaffOpenSearchModule,
     TipIntegrationModule,
+    AgrovocModule,
     DynamoFeedbackModule,
     AdminModule,
     CronModule,

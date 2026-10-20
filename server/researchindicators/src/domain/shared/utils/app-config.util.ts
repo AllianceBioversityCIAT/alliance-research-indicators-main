@@ -55,6 +55,11 @@ export class AppConfig {
     return process.env.ARI_CLARISA_HOST;
   }
 
+  // AGROVOC host root. The service appends browse/rest/v1/search/.
+  get ARI_AGROVOC_URL(): string {
+    return process.env.ARI_AGROVOC_URL;
+  }
+
   // PRMS Normalizer host
   get ARI_PRMS_NORMALIZER_HOST(): string {
     return process.env.ARI_PRMS_NORMALIZER_HOST;
