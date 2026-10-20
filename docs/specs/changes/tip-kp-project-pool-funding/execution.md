@@ -95,3 +95,13 @@
 - **Final status:** PASS on attempt 3 · **Requirements covered:** R-TIP-003, R-TIP-004, R-TIP-006, NFR-TIP-001, NFR-TIP-002 (catalog-miss warn).
 - **Decisions made:** parallel lens review on attempt 1 (data-loss surface, effort high); attempts 2–3 single conformance+integrity reviewer (rework override e). Rework kept in the same retained worker (owner rule).
 - **Final verification:** VERIFIED (attempt 3 re-run above).
+
+## Budget tripwire — after T-02 (2026-10-20)
+
+| Measure | Budget (design §1) | Actual after T-01 + T-02 | Remaining work |
+| --- | --- | --- | --- |
+| Tasks | 4 | 2 done | T-03, T-04 |
+| LOC | ~560 (≈200 prod / 360 tests) | **1455** (430 prod / 1025 tests) — `git diff --numstat eb87561b4 HEAD -- server/` | T-03 adds more |
+| Review rounds | 7 | 5 (T-01 ×1; T-02 ×4: 2 parallel lens + 2 rework) | T-03 ≥1 |
+
+**Cause:** T-02 is ~3× its estimate — the per-level catalog lookup with failed≠miss, the kept-row rule (two rework rounds tightened it: earlier failed level; unresolved stored row), the normalised equality skip, and a test suite that asserts full `persistAlignment` args per the Disqualifier. LOC exceeded → stop and escalate per `/akili-execute` §2.4. Execution paused before T-03, awaiting the owner.
