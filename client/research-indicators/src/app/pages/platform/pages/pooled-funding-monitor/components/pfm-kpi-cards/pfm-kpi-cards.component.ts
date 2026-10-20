@@ -28,7 +28,7 @@ export class PfmKpiCardsComponent {
     return [
       {
         key: 'projects',
-        label: 'Projects contributing to Pool funding',
+        label: 'Contributing Project with Results',
         value: k.projects,
         sub: this.scope() === 'mine' ? 'where you are PI' : `of ${k.projects_total.toLocaleString('en-US')} in portfolio`,
         accent: 'border-l-[color:var(--ac-pfm-info-fg)]',
@@ -39,7 +39,7 @@ export class PfmKpiCardsComponent {
       },
       {
         key: 'monitored',
-        label: 'Results eligible for Pool funding mapping',
+        label: 'Results eligible for CGIAR Portfolio mapping',
         value: k.monitored,
         sub: 'can be mapped and synced',
         accent: 'border-l-[color:var(--ac-pfm-accent-navy)]',
@@ -52,7 +52,7 @@ export class PfmKpiCardsComponent {
         key: 'need_attention',
         label: 'Need attention',
         value: k.need_attention,
-        sub: 'draft, pending mapping or pending sync',
+        sub: 'nothing in PRMS yet',
         accent: 'border-l-[color:var(--ac-pfm-seg-pending)]',
         ink: 'text-[var(--ac-pfm-warning-fg)]',
         frame: 'border-[color:var(--ac-pfm-warning-border)]',
