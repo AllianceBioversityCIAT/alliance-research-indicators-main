@@ -24,7 +24,7 @@ const summary = (scope: PfmScope, isPi = true): PfmSummary => ({
 
 const queue: PfmQueue = {
   filter_options: { projects: [], science_programs: [], types: [] },
-  chip_counts: { all: 0, attention: 0, mapping: 0, ready: 0, pending: 0, prms_rejected: 0, synced: 0 },
+  chip_counts: { all: 0, attention: 0, mapping: 0, ready: 0, prms_rejected: 0, synced: 0 },
   groups: [],
   totals: { results: 0, projects: 0, monitored_total: 0 }
 };
@@ -52,13 +52,17 @@ describe('PooledFundingMonitorComponent', () => {
     fixture.detectChanges();
   };
 
-  async function create(opts: { admin?: boolean; params?: Record<string, string> } = {}): Promise<void> {
+  /** `contributorPi`: a Contributor-only user who reaches the page as PI / delegate of a project. */
+  async function create(opts: { admin?: boolean; contributorPi?: boolean; params?: Record<string, string> } = {}): Promise<void> {
     await TestBed.configureTestingModule({
       imports: [PooledFundingMonitorComponent],
       providers: [
         { provide: ApiService, useValue: api },
         { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
-        { provide: RolesService, useValue: { isAdmin: signal(!!opts.admin) } },
+        {
+          provide: RolesService,
+          useValue: { isAdmin: signal(!!opts.admin), canAccessPooledFundingMonitor: signal(!opts.contributorPi) }
+        },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.params ?? {}) } } }
       ]
     }).compileComponents();
@@ -150,7 +154,7 @@ describe('PooledFundingMonitorComponent', () => {
     fixture.detectChanges();
     await flush();
 
-    expect(q('pfm-pi-empty')?.textContent).toContain('You are not PI of any project contributing to Pool funding');
+    expect(q('pfm-pi-empty')?.textContent).toContain('You are not PI of any project contributing to CGIAR Portfolio');
     expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
     // HITL 20: the notice sits in the content area below the white band, not in the header card
     expect(q('pfm-band')?.contains(q('pfm-pi-empty'))).toBe(false);
@@ -165,6 +169,37 @@ describe('PooledFundingMonitorComponent', () => {
     expect(q('pfm-pi-empty')).toBeNull();
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
     expect(kpiValue('need_attention')).toBe('123');
+  });
+
+  describe('Contributor who is PI / delegate of a project (no other role)', () => {
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
+
+    it('offers only their own scope: no Whole portfolio toggle', async () => {
+      await create({ contributorPi: true });
+      fixture.detectChanges();
+      await flush();
+      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
+      expect(q('pfm-scope-all')).toBeNull();
+      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
+    });
+
+    it('ignores ?scope=all in the URL and opens on mine', async () => {
+      await create({ contributorPi: true, params: { scope: 'all' } });
+      fixture.detectChanges();
+      await flush();
+      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
+      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
+    });
+
+    it('empty state has no "View whole portfolio" switch', async () => {
+      api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope, false))));
+      await create({ contributorPi: true });
+      fixture.detectChanges();
+      await flush();
+      expect(q('pfm-pi-empty')).not.toBeNull();
+      expect(q('pfm-pi-empty-switch')).toBeNull();
+    });
   });
 
   it('a chip change refetches without removing the filters; only the groups area shows a skeleton (T-12)', async () => {
@@ -193,7 +228,7 @@ describe('PooledFundingMonitorComponent', () => {
   describe('stale queue numbers (NFR-PFM-006)', () => {
     const loaded: PfmQueue = {
       ...queue,
-      chip_counts: { all: 41, attention: 7, mapping: 5, ready: 3, pending: 11, prms_rejected: 2, synced: 13 },
+      chip_counts: { all: 41, attention: 7, mapping: 5, ready: 3, prms_rejected: 2, synced: 13 },
       groups: [
         {
           code: 'P100',

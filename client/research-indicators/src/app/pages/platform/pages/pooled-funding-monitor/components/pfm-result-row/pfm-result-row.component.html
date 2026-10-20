@@ -40,13 +40,10 @@
       [iconName]="row().star_status_config?.icon?.name ?? undefined"
       [iconColor]="row().star_status_config?.icon?.color ?? undefined"
       [tiny]="true"
-      [tooltip]="row().star_status_description ?? undefined"
+      [tooltip]="starTooltip()"
       [multiline]="true" />
-    @if (row().star_status_description) {
-      <span class="sr-only" data-testid="pfm-row-star-description">{{ row().star_status_description }}</span>
-    }
-    @if (row().star_approved_label) {
-      <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-star-approved">{{ row().star_approved_label }}</p>
+    @if (starTooltip(); as tip) {
+      <span class="sr-only" data-testid="pfm-row-star-description">{{ tip }}</span>
     }
   </div>
   <div class="flex min-w-0 flex-col items-start gap-1" data-testid="pfm-row-mapping">

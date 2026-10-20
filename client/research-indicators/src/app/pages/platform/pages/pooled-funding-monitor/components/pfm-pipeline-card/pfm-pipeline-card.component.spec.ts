@@ -49,7 +49,7 @@ describe('PfmPipelineCardComponent', () => {
     const { el, q } = render();
     expect(el.querySelectorAll('[data-testid="pfm-pipeline-stages"] > li')).toHaveLength(7);
     const tile = (k: string, part: string) => q(`[data-testid="pfm-stage-${k}"] [data-testid="pfm-stage-${part}"]`);
-    expect(tile('mapping_not_started', 'label')).toBe('Mapping not started');
+    expect(tile('mapping_not_started', 'label')).toBe('Mapping pending');
     expect(tile('mapping_not_started', 'value')).toBe('20');
     expect(tile('ready_to_sync', 'value')).toBe('25');
     expect(tile('pending_review', 'label')).toBe('Pending review in PRMS');

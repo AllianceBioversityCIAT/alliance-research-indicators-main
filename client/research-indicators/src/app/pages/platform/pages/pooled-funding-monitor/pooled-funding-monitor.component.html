@@ -5,10 +5,10 @@
   <div class="flex flex-col bg-[var(--ac-pfm-surface)] pt-[8px] sm:pt-[12px] md:pt-[20px]" data-testid="pfm-band">
   <header class="flex w-full max-w-[60rem] flex-col gap-[4px] px-[24px] pb-[10px] pt-[9px] md:px-[28px]">
     <h1 class="atc-primary-blue-600 m-0 font-['Barlow'] text-[18px] font-semibold leading-[20px]">
-      Pooled Funding Contribution Monitor
+      CGIAR Portfolio Contribution Monitor
     </h1>
     <p class="atc-grey-600 m-0 font-['Barlow'] text-[15px] font-normal leading-[20px] py-2">
-      Monitor eligibility, sync approved results contributing to Pool funding to PRMS, and track returning QA statuses and Theory of Change mapping.
+      Monitor eligibility, sync approved results contributing to CGIAR Portfolio to PRMS, and track returning QA statuses and Theory of Change mapping.
     </p>
   </header>
 
@@ -103,8 +103,9 @@
         <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
         <div class="flex flex-col items-start">
           <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
-            You are not PI of any project contributing to Pool funding
+            You are not PI of any project contributing to CGIAR Portfolio
           </p>
+          @if (canSeePortfolio) {
           <button
             type="button"
             class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
@@ -112,6 +113,7 @@
             (click)="selectScope('all')">
             View whole portfolio
           </button>
+          }
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@
       data-testid="pfm-filters-card">
     <div class="flex flex-wrap items-end gap-4" role="group" aria-label="Filters">
       <div class="flex min-w-[13rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
-        <label for="pfm-filter-project-input">Project contributing to Pool funding</label>
+        <label for="pfm-filter-project-input">Project contributing to CGIAR Portfolio</label>
         <p-select
           inputId="pfm-filter-project-input"
           [options]="projectOptions()"
@@ -38,19 +38,6 @@
           filterBy="label"
           styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-sp" />
-      </div>
-      <div class="flex min-w-[11rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
-        <label for="pfm-filter-status-input">Status</label>
-        <p-select
-          inputId="pfm-filter-status-input"
-          [options]="statusOptions"
-          optionLabel="label"
-          optionValue="value"
-          [ngModel]="store.filters().status ?? ALL"
-          (onChange)="onFilter('status', $event.value)"
-          appendTo="body"
-          styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
-          data-testid="pfm-filter-status" />
       </div>
       <div class="flex min-w-[11rem] flex-1 flex-col gap-1.5 text-[12px] font-medium text-[var(--ac-pfm-neutral-fg)]">
         <label for="pfm-filter-type-input">Result type</label>

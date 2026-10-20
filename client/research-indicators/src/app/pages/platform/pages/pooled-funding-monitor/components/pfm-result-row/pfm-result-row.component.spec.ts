@@ -5,6 +5,8 @@ import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.com
 import { provideRouter } from '@angular/router';
 import { PfmResultRow } from '../../pfm.interfaces';
 import { PfmResultRowComponent } from './pfm-result-row.component';
+import { MAPPING_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
+import { SYNC_TAG_COLOR } from '@shared/utils/prms-sync-status.util';
 
 const BASE: PfmResultRow = {
   result_code: 'STAR-1234',
@@ -82,9 +84,18 @@ describe('PfmResultRowComponent', () => {
     expect(sr(q('pfm-row-star'))).toEqual([]);
   });
 
-  it('STAR cell shows the approved label under the tag only when present (HITL 22)', () => {
-    const { q } = render({ star_label: 'Approved', star_status_id: 6, star_approved_label: 'Approved 14 Jul 2026' });
-    expect(q('pfm-row-star-approved').textContent?.trim()).toBe('Approved 14 Jul 2026');
+  it('STAR approved date goes into the tag tooltip (and sr-only), never as a line under the tag', () => {
+    const { q, tipOf, sr } = render({ star_label: 'Approved', star_status_id: 6, star_approved_label: 'Approved 14 Jul 2026' });
+    const cell = q('pfm-row-star');
+    expect(tipOf(cell)).toBe('Waiting for the PI to sign off · Approved 14 Jul 2026');
+    expect(sr(cell)).toEqual(['Waiting for the PI to sign off · Approved 14 Jul 2026']);
+    expect(cell.querySelector('[data-testid="pfm-row-star-approved"]')).toBeNull();
+    expect(cell.querySelector('p')).toBeNull();
+  });
+
+  it('STAR tooltip is just the approved date when the status has no description', () => {
+    const { q, tipOf } = render({ star_status_description: null, star_approved_label: 'Approved 14 Jul 2026' });
+    expect(tipOf(q('pfm-row-star'))).toBe('Approved 14 Jul 2026');
   });
 
   it('STAR tag takes colour, border and icon from star_status_config exactly like the Results Center', () => {
@@ -208,8 +219,8 @@ describe('PfmResultRowComponent', () => {
     expect(cell.querySelectorAll('p').length).toBe(0);
     // jsdom drops var() colours from the CSSOM, so assert the inputs the tag receives.
     const [t] = tagsIn(cell);
-    expect(t.statusColor).toBe('var(--ac-pfm-warning-fg)');
-    expect(t.statusBorder).toBe('var(--ac-pfm-warning-border)');
+    expect(t.statusColor).toBe('var(--ac-status-mapping-incomplete)');
+    expect(t.statusBorder).toBe('var(--ac-status-mapping-incomplete)');
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
@@ -255,7 +266,35 @@ describe('PfmResultRowComponent', () => {
     expect((cell.querySelector('app-custom-tag') as HTMLElement).textContent).toContain('Rejected');
     expect(tipOf(cell)).toBe('Fix the Theory of Change in PRMS');
     expect(sr(cell)).toEqual(['Fix the Theory of Change in PRMS']);
-    expect(tagsIn(cell)[0].statusColor).toBe('var(--ac-pfm-danger-fg)');
+    expect(tagsIn(cell)[0].statusColor).toBe('var(--ac-status-prms-rejected)');
+  });
+
+  // One colour per status across screens: the monitor PRMS cell must match the result
+  // sidebar PRMS sync pill (SYNC_TAG_COLOR) for the same status.
+  it.each([
+    ['Pending Review', 'warning'],
+    ['Approved', 'success'],
+    ['Rejected', 'danger']
+  ] as const)('PRMS %s uses the same colour as the result sidebar PRMS sync pill', (status, tone) => {
+    const { q, tagsIn } = render({ prms_status: status });
+    const [t] = tagsIn(q('pfm-row-prms'));
+    expect(t.statusColor).toBe(SYNC_TAG_COLOR[tone]);
+    expect(t.statusBorder).toBe(SYNC_TAG_COLOR[tone]);
+  });
+
+  it.each([
+    ['Pending', MAPPING_STATUS_COLOR.Pending],
+    ['Incomplete', MAPPING_STATUS_COLOR.Incomplete],
+    ['Complete', MAPPING_STATUS_COLOR.Complete],
+    ['No SP contribution', MAPPING_STATUS_COLOR['No SP contribution']]
+  ] as const)('mapping %s uses its shared status colour', (state, color) => {
+    const { q, tagsIn } = render({ mapping_state: state });
+    expect(tagsIn(q('pfm-row-mapping'))[0].statusColor).toBe(color);
+  });
+
+  it('Complete is a different colour from Pending and from No SP contribution', () => {
+    const colors = new Set([MAPPING_STATUS_COLOR.Complete, MAPPING_STATUS_COLOR.Pending, MAPPING_STATUS_COLOR['No SP contribution']]);
+    expect(colors.size).toBe(3);
   });
 
   it('click on View opens no dialog or drawer', () => {

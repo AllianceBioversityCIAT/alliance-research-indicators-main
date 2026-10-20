@@ -2372,7 +2372,7 @@ describe('ApiService', () => {
     });
 
     it('queue omits empty params', () => {
-      service.GET_PfmQueue({ scope: 'mine', project: null, sp: 'SP01', status: undefined, type: 3, chip: null });
+      service.GET_PfmQueue({ scope: 'mine', project: null, sp: 'SP01', type: 3, chip: null });
       expect(urlOf()).toBe('pooled-funding-monitor/queue?scope=mine&sp=SP01&type=3');
     });
 
