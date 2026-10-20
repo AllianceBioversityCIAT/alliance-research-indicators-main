@@ -157,6 +157,40 @@
   - [x] Full client suite green (Leader); build exit 0; lint clean
 - **Skills:** `angular-developer`, `tdd`
 
+### T-05 — Client: variable-height option rows jump while scrolling
+
+- **Status:** [x] done
+- **Size:** XS
+- **Origin:** owner report at the post-archive visual check (2026-10-20): *"hay un error en el scroll cuando hago un poco de scroll da un salto en el listado"*
+- **Root cause (Leader, verified at source):** `select.component.html:25-27` always enables PrimeNG `[virtualScroll]` with a fixed `[virtualScrollItemSize]` of 41 or 60. The T-03 rows (bold code, a 1–3 line title, a status tag) are taller than that and vary in height, so the virtual scroller positions them wrongly.
+- **Files touched (intended):**
+  - `client/research-indicators/src/app/shared/components/custom-fields/select/select.component.{ts,html}` (+ spec)
+  - `client/research-indicators/src/app/pages/platform/pages/result/pages/policy-change/policy-change.component.{html,spec.ts}`
+- **Scope:**
+  - Add `@Input() virtualScroll = true` to `SelectComponent` and bind `[virtualScroll]="virtualScroll"`. Bind `virtualScrollItemSize` only while it is true; if PrimeNG needs no change for that, leave it.
+  - Pass `[virtualScroll]="false"` on the two Policy Change pickers only.
+  - Narrow blast radius: the default stays `true`, and no other `app-select` changes.
+- **Tests:**
+  1. `SelectComponent`, default → the rendered `p-select` has virtual scroll on.
+  2. `SelectComponent` with `virtualScroll=false` → off.
+  3. Policy Change → both pickers render with virtual scroll off.
+  - Each test reads the `p-select` instance or DOM, never the component input alone.
+- **Amended 2026-10-20 (attempt 2, after the human check failed):** with virtual scroll off, the `appendTo: body` overlay grew to the longest option on one line and spanned the screen. Added to the scope:
+  - `@Input() panelStyleClass = ''` on `SelectComponent`, bound to `p-select`.
+  - `panelStyleClass="policy-change-link-panel"` on both Policy Change pickers.
+  - The class joins the existing `sp-toc-select-panel` / `bil-mapping-picker-panel` width-and-wrap rule in `custom-prime-force-styles.scss`, plus one scoped rule that lets the option row shrink.
+  - Test: both pickers render `panelStyleClass === 'policy-change-link-panel'`.
+  - The panel width is human-verified only, because jsdom does no layout.
+- **Falsifier:** (a) default the input to `false` → test 1 red. (b) drop `[virtualScroll]="false"` from the policy-change template → test 3 red. (c) drop `panelStyleClass` from the policy-change template → the panel-class test red.
+- **Consumers:** every `app-select` user keeps the default; run `select.component.spec.ts` and `policy-change.component.spec.ts`.
+- **Review:** `checklist`
+- **Verification:** from `client/research-indicators/`: `npx jest select.component policy-change --silent --coverage=false`, the K-002 tsc delta gate, `npm run lint -- --quiet`, `npm run build`. Human check: the scroll no longer jumps; the panel stays about field width (also try a laptop-width window); long titles wrap.
+- **Done:**
+  - [x] Tests green; falsifiers observed red and quoted
+  - [x] Full client suite (Leader); build; lint
+  - [x] Human check passed
+- **Skills:** `angular-developer`
+
 ## 4. Coverage closure (clause level)
 
 | Requirement clause | Task |

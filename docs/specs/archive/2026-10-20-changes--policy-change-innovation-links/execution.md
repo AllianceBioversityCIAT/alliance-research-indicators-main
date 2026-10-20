@@ -288,18 +288,19 @@ The owner checked it in the running app after follow-up 1 and confirmed: *"ya qu
 | --- | --- | --- | --- | --- |
 | T-01 Server wrong-type guard (`400`) | PASS | 1 | Grok | `87f64af58` |
 | T-02 Client linkable-results service | PASS | 2 (attempt 1 FAIL: K-002 spec type-check evidence missing) | Grok | `12ac4d7b6` |
-| T-03 Enable and wire the pickers + HITL design follow-up | PASS + human check | 1 (+1 owner-requested follow-up) | Grok | this commit |
+| T-03 Enable and wire the pickers + HITL design follow-up | PASS + human check | 1 (+1 owner-requested follow-up) | Grok | `5c4e6fa13` |
+| T-04 One in-flight request per indicator; error cleared on success (owner-approved, from T-03 advisory 1) | PASS | 2 (attempt 1 FAIL: a test comment asserted an unreachable path, KZ-014) | Grok | `344e6eef2` |
 
 **Budget, design §11:**
-- Tasks: 3 of 3.
-- Review rounds: 5 against the expected 4. The overrun is the owner-requested HITL design follow-up and was raised to the owner at dispatch.
+- Tasks: 4 against the planned 3. T-04 is owner-approved new scope.
+- Review rounds: 7 against the expected 4. The extra rounds are the owner-requested HITL design follow-up (1) and T-04 (2). Each was raised to the owner at dispatch.
 
 **Full suites, Leader-measured.** The commands are the citation; the figures are not restated elsewhere.
 - Server, `npm test -- --silent`: green after T-01.
 - Client, `npm test -- --silent`: green after T-03 follow-up 1. Every client measurement needed a re-run because of the jest worker SIGSEGV flake, which hit a different unrelated suite each time with 0 failed tests. The `workerIdleMemoryLimit` mitigation is still absent from `jest.config.ts`.
 
 **Open items (recorded, not actioned — advisories never become tasks):**
-- Duplicate `main()` and the stale error flag (T-03 Reviewer advisory 1). app-select fires `main(id)` twice per mount. The T-02 service clears `error` only at call start, so one failed duplicate plus one successful duplicate leaves the picker disabled with "could not be loaded". It was raised to the owner and needs an owner decision.
+- ~~Duplicate `main()` and the stale error flag (T-03 Reviewer advisory 1)~~ — **fixed by T-04** (`344e6eef2`), owner-approved.
 - T-01 advisories:
   - the `String()` id normalisation;
   - the `0`-vs-truthiness edge;
@@ -382,3 +383,68 @@ Only the test-2 title and comment changed. The product code and the test logic a
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer(grok) ×2 not reported by host, ended complete; reviewer(claude) 12 calls, 53166 tokens, ended fail; reviewer(claude) not reported by host, ended complete`
 - **Budget:** review rounds now total 7 against the expected 4. The overrun is the owner-requested design follow-up plus this owner-approved T-04.
+
+### T-05 — Client: variable-height option rows jump while scrolling → **Reviewer PASS · HITL pending (not committed)**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-20 |
+| Origin | Owner report after archive: *"hay un error en el scroll cuando hago un poco de scroll da un salto en el listado"*. Added to the archived spec while the archive was still uncommitted |
+| Status | Reviewer PASS (attempt 2 of 3); the human check is pending |
+| Orca task / dispatch | attempt 1 `task_6374678a25b3` / `ctx_6d2a1e091fb5`; attempt 2 `task_a10e2c08afb6` / `ctx_bcd59ea0a527` (same worker, retained) |
+| Implementer | Cursor · `grok-4.7-high`, effort medium → high on rework, skills `angular-developer` (+ `ui-ux-pro-max` on rework) |
+| Reviewer | Claude `akili-reviewer`. Attempt 1: PASS, but the human check FAILED. Attempt 2: PASS |
+
+**Root cause (Leader, verified at source):** `select.component.html:25-27` always used `[virtualScroll]="true"` with a fixed `virtualScrollItemSize` of 41 or 60. The T-03 rows are much taller and vary in height, so the scroller positioned them wrongly.
+
+#### Attempt 1
+
+- **Change:** `@Input() virtualScroll = true` (the default path is unchanged), and `[virtualScroll]="false"` on the two Policy Change pickers.
+- **Implementer verification:** jest 5 suites / 207 tests; tsc delta identical; lint and build green.
+- **Falsifiers:**
+  - default `false` → `Expected true / Received false` at `select.component.spec.ts:466`;
+  - binding removed → `Expected false / Received true` at `policy-change.component.spec.ts:724`.
+- **Leader re-run: VERIFIED.**
+  - jest 5 / 207; lint 0; build 0.
+  - tsc 945, with the touched-file set identical to the pre-T-05 baseline.
+  - Full suite 345/345, 8041/8041, first run.
+- **Reviewer: PASS.** Advisories:
+  - with virtualization off every row is in the DOM; fine at current list sizes;
+  - the `undefined` item-size branch is optional.
+- **Human check: FAILED.** Owner: *"el scroll es mucho más grande que el campo… el tamaño es de la pantalla y está mal"*. With virtual scroll off, the `appendTo: body` overlay grew to the longest option on one line, at full screen width. The human check outranks the Reviewer PASS, so this counts as the attempt's FAIL.
+
+#### Attempt 2
+
+- **Change:**
+  - `@Input() panelStyleClass = ''` bound to `p-select`;
+  - `panelStyleClass="policy-change-link-panel"` on both pickers;
+  - the class added to the existing `sp-toc-select-panel` / `bil-mapping-picker-panel` rule in `custom-prime-force-styles.scss`: max-width `min(40rem, calc(100vw - 2rem))`, with option text wrapping;
+  - plus one scoped rule (`.p-select-option > span { flex: 1 1 auto; min-width: 0 }`).
+- **Task text amended** (`tasks.md` §T-05) to cover this scope, falsifier (c), and the width line of the human check.
+- **Implementer verification:** jest 5 / 210; tsc identical; lint and build green.
+  - s-lint exits 2 on 410 pre-existing problems, none added by the touched SCSS.
+  - Falsifier: class removed → `Expected 'policy-change-link-panel' / Received ''` at `policy-change.component.spec.ts:731`.
+- **Leader re-run: VERIFIED.**
+  - jest 5 / 210; lint 0; build 0.
+  - tsc 945, with the touched-spec set identical.
+  - `npx stylelint` on the SCSS: 1 error at `34:5 rule-empty-line-before`, which is **identical at HEAD**, so pre-existing.
+  - Full suite `Test Suites: 345 passed, 345 total` · `Tests: 8044 passed, 8044 total`, first run.
+- **Reviewer: PASS.**
+  - A `''` class binding adds nothing, so the default changes nothing.
+  - No other `app-select` passes `panelStyleClass`.
+  - The two existing selectors' declarations are byte-identical.
+  - The scoped rule reaches the right node.
+  - The tests read `By.directive(Select)`.
+- **ADVISORY:**
+  1. **Width range.** PrimeNG sets the overlay `min-width` to the trigger width, and `min-width` beats `max-width`. So the panel ranges from the field width up to `min(40rem, 100vw − 2rem)`. On viewports where `col-span-6` is narrower than 40rem, a long title can widen the panel past the field, up to 40rem. That is bounded, no longer screen-wide. The human check should include a laptop-width window.
+  2. A comment on the `virtualScrollItemSize` ternary would help.
+
+**Human check:** pending.
+
+**Run accounting:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer(grok) ×2 not reported by host, ended complete; reviewer(claude) ×2 not reported by host, ended complete`
+
+#### T-05 — Human check → **PASSED**
+
+The owner checked it in the running app and confirmed: *"ya quedó, haz commit"* (2026-10-20). T-05 closes as **PASS**. The code is committed; the archive docs stay uncommitted for the owner's review.
