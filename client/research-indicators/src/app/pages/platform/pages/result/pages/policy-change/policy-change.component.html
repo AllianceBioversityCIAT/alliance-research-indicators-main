@@ -92,6 +92,8 @@
           <app-select
             [pTooltip]="innovationDevelopmentTooltip()"
             tooltipPosition="top"
+            [virtualScroll]="false"
+            panelStyleClass="policy-change-link-panel"
             label="Link to a reported Innovation Development output"
             [disabled]="innovationDevelopmentDisabled()"
             [signal]="body"
@@ -129,6 +131,8 @@
           <app-select
             [pTooltip]="innovationUseTooltip()"
             tooltipPosition="top"
+            [virtualScroll]="false"
+            panelStyleClass="policy-change-link-panel"
             label="Link to a reported Innovation Use"
             [signal]="body"
             [disabled]="innovationUseDisabled()"

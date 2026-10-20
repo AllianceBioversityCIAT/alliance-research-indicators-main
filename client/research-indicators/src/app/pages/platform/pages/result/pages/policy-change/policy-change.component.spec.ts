@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { of } from 'rxjs';
 import { Component, EventEmitter, Input, NO_ERRORS_SCHEMA, Output, signal } from '@angular/core';
 import { By } from '@angular/platform-browser';
+import { Select } from 'primeng/select';
 import { Tooltip } from 'primeng/tooltip';
 
 import PolicyChangeComponent from './policy-change.component';
@@ -456,6 +457,14 @@ describe('PolicyChangeComponent innovation link pickers (R-PCIL-001…004, §5.1
     return debug.componentInstance as SelectComponent;
   }
 
+  function primeSelect(label: string): Select {
+    const debug = fixture.debugElement.queryAll(By.css('app-select')).find(de => (de.nativeElement.textContent ?? '').includes(label));
+    if (!debug) throw new Error(`app-select debug element not found for "${label}"`);
+    const prime = debug.query(By.directive(Select));
+    if (!prime) throw new Error(`p-select not rendered for "${label}"`);
+    return prime.componentInstance as Select;
+  }
+
   async function arrange(options: {
     editable: boolean;
     development: ListOutcome;
@@ -707,6 +716,20 @@ describe('PolicyChangeComponent innovation link pickers (R-PCIL-001…004, §5.1
       expect(renderedSelect(label).querySelector('app-custom-tag')).toBeNull();
       view.destroy();
     }
+  });
+
+  it('renders both innovation pickers with virtual scroll off', async () => {
+    await arrange({ editable: true, development: 'options', use: 'options' });
+
+    expect(primeSelect(INNOVATION_DEVELOPMENT_LABEL).virtualScroll).toBe(false);
+    expect(primeSelect(INNOVATION_USE_LABEL).virtualScroll).toBe(false);
+  });
+
+  it('renders both innovation pickers with the link panel class', async () => {
+    await arrange({ editable: true, development: 'options', use: 'options' });
+
+    expect(primeSelect(INNOVATION_DEVELOPMENT_LABEL).panelStyleClass).toBe('policy-change-link-panel');
+    expect(primeSelect(INNOVATION_USE_LABEL).panelStyleClass).toBe('policy-change-link-panel');
   });
 
   it('drops the Innovation Use label padding hack (NFR-PCIL-002)', async () => {
