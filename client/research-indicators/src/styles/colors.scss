@@ -75,14 +75,26 @@
   --ac-pfm-warning-fg: #8a5a08;
   --ac-pfm-warning-border: #e9cf9e;
   --ac-pfm-outscope-fg: #2f7cc4;
+  // Status colours of CGIAR Portfolio mapping and PRMS status: ONE definition for every
+  // place that shows them (monitor table, pipeline/legend bars, result sidebar PRMS sync
+  // card and history modal). Read them through shared/constants/pfm-status-colors.ts;
+  // never re-pick a colour for these statuses locally (client CLAUDE.md rule).
+  // PRMS keeps the house palette the sidebar already used (pending #E69F00, approved #7CB580, rejected #CF0808).
+  --ac-status-prms-pending: #e69f00;
+  --ac-status-prms-approved: #7cb580;
+  --ac-status-prms-rejected: #cf0808;
+  --ac-status-mapping-pending: #5a6878;
+  --ac-status-mapping-incomplete: #e69f00;
+  --ac-status-mapping-complete: #1f9d55;
+  --ac-status-mapping-no-sp: #2f7cc4;
   --ac-pfm-seg-not-started: #c9d3de;
-  --ac-pfm-seg-incomplete: #e0b35c;
+  --ac-pfm-seg-incomplete: var(--ac-status-mapping-incomplete);
   --ac-pfm-seg-ready: #7db0dd;
-  --ac-pfm-seg-pending: #d78a1a;
-  --ac-pfm-seg-pending-group: #e0a92c;
-  --ac-pfm-seg-approved: #3f9e5c;
-  --ac-pfm-seg-rejected: #b4443a;
-  --ac-pfm-seg-no-sp: #2f7cc4;
+  --ac-pfm-seg-pending: var(--ac-status-prms-pending);
+  --ac-pfm-seg-pending-group: var(--ac-status-prms-pending);
+  --ac-pfm-seg-approved: var(--ac-status-prms-approved);
+  --ac-pfm-seg-rejected: var(--ac-status-prms-rejected);
+  --ac-pfm-seg-no-sp: var(--ac-status-mapping-no-sp);
   --ac-pfm-surface: #ffffff;
   --ac-pfm-surface-border: #e4e9f0;
   --ac-pfm-month-1: #c9d8ee;
@@ -225,14 +237,21 @@ $colors: (
   --ac-pfm-warning-fg: #f0cf85;
   --ac-pfm-warning-border: #6b5521;
   --ac-pfm-outscope-fg: #7fb5e8;
+  --ac-status-prms-pending: #e69f00;
+  --ac-status-prms-approved: #57b576;
+  --ac-status-prms-rejected: #ff4d4d;
+  --ac-status-mapping-pending: #aab5c0;
+  --ac-status-mapping-incomplete: #e69f00;
+  --ac-status-mapping-complete: #4cc27a;
+  --ac-status-mapping-no-sp: #7fb5e8;
   --ac-pfm-seg-not-started: #5b6672;
-  --ac-pfm-seg-incomplete: #c9a04f;
+  --ac-pfm-seg-incomplete: var(--ac-status-mapping-incomplete);
   --ac-pfm-seg-ready: #6aa0d0;
-  --ac-pfm-seg-pending: #e09a2e;
-  --ac-pfm-seg-pending-group: #e0b445;
-  --ac-pfm-seg-approved: #57b576;
-  --ac-pfm-seg-rejected: #e0766b;
-  --ac-pfm-seg-no-sp: #5a9fdc;
+  --ac-pfm-seg-pending: var(--ac-status-prms-pending);
+  --ac-pfm-seg-pending-group: var(--ac-status-prms-pending);
+  --ac-pfm-seg-approved: var(--ac-status-prms-approved);
+  --ac-pfm-seg-rejected: var(--ac-status-prms-rejected);
+  --ac-pfm-seg-no-sp: var(--ac-status-mapping-no-sp);
   --ac-pfm-surface: #23272d;
   --ac-pfm-surface-border: #363c45;
   --ac-pfm-month-1: #3a516e;

@@ -32,7 +32,7 @@ import { RoarManagementService } from '../src/domain/tools/roar-management/roar-
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor - T-05
 //
 // HTTP e2e of the Pooled Funding Monitor on REAL sockets, with the REAL
-// JwtMiddleware, NotContributorOnlyGuard, ValidationPipe, controller, service,
+// JwtMiddleware, PfmAccessGuard, ValidationPipe, controller, service,
 // repository, ResponseInterceptor and GlobalExceptions, against a REAL MySQL.
 //
 // WHAT IS NOT REAL (stated, not hidden):
@@ -83,6 +83,7 @@ const NO_PROJECTS = 105; // center admin who leads nothing
 const CONTRIBUTOR_ONLY = 106;
 const CONTRIBUTOR_AND_ADMIN = 107;
 const MACHINE_RESPONSIBLE = 108; // machine token's responsible human (admin roles)
+const CONTRIBUTOR_DELEGATE = 109; // contributor-only, active delegate of P-C
 
 // token -> identity (ROAR is the only stubbed piece)
 const USERS: Record<string, { sec_user_id: number; roles: number[] }> = {
@@ -90,6 +91,9 @@ const USERS: Record<string, { sec_user_id: number; roles: number[] }> = {
   'tok-pi-b': { sec_user_id: PI_B, roles: [9] },
   'tok-none': { sec_user_id: NO_PROJECTS, roles: [9] },
   'tok-contrib': { sec_user_id: CONTRIBUTOR_ONLY, roles: [3] },
+  // contributor-only users who are PI (P-B) / an active delegate (P-C)
+  'tok-contrib-pi': { sec_user_id: PI_B, roles: [3] },
+  'tok-contrib-delegate': { sec_user_id: CONTRIBUTOR_DELEGATE, roles: [3] },
   'tok-contrib-admin': { sec_user_id: CONTRIBUTOR_AND_ADMIN, roles: [3, 9] },
   'tok-sysadmin': { sec_user_id: PI_A, roles: [1] },
 };
@@ -222,9 +226,15 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       [PI_A, 'a@x.org'],
       [PI_B, 'b@x.org'],
       [NO_PROJECTS, 'n@x.org'],
+      [CONTRIBUTOR_DELEGATE, 'd@x.org'],
     ] as const) {
       await insert('sec_users', { sec_user_id: id, email });
     }
+    await insert('pi_delegates', {
+      project_id: 'P-C',
+      delegate_user_id: CONTRIBUTOR_DELEGATE,
+      is_active: 1,
+    });
     for (const [carnet, email] of [
       ['C-A', 'a@x.org'],
       ['C-B', 'b@x.org'],
@@ -398,7 +408,7 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       expect((await get(`${BASE}/summary`, 'tok-garbage')).status).toBe(401);
     });
 
-    it('403 for a contributor-only user, from the SERVER, on all three endpoints', async () => {
+    it('403 for a contributor-only user who is PI / delegate of nothing, from the SERVER, on all three endpoints', async () => {
       for (const path of [
         `${BASE}/summary`,
         `${BASE}/queue`,
@@ -418,6 +428,24 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       expect(res.status).toBe(403);
       expect(res.body.status).toBe(403);
       expect(res.body.path).toBe(`${BASE}/summary`);
+    });
+
+    it('contributor-only PI or delegate of a project: 200 on their own scope, 403 on the whole portfolio', async () => {
+      for (const token of ['tok-contrib-pi', 'tok-contrib-delegate']) {
+        for (const path of [`${BASE}/summary`, `${BASE}/queue`]) {
+          expect((await get(path, token)).status).toBe(200);
+          expect((await get(`${path}?scope=mine`, token)).status).toBe(200);
+          expect((await get(`${path}?scope=all`, token)).status).toBe(403);
+        }
+      }
+      const pi = await get(`${BASE}/queue`, 'tok-contrib-pi');
+      expect(pi.body.data.groups.map((g: { code: string }) => g.code)).toEqual([
+        'P-B',
+      ]);
+      const delegate = await get(`${BASE}/queue`, 'tok-contrib-delegate');
+      expect(
+        delegate.body.data.groups.map((g: { code: string }) => g.code),
+      ).toEqual(['P-C']);
     });
 
     it('200 for an allowed role, a contributor who also holds another role, and SYSTEM_ADMIN', async () => {
@@ -558,12 +586,7 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
     });
 
     it('400 for invalid enum / number query values', async () => {
-      for (const qs of [
-        'scope=everyone',
-        'chip=nope',
-        'status=nope',
-        'type=abc',
-      ]) {
+      for (const qs of ['scope=everyone', 'chip=nope', 'type=abc']) {
         expect((await get(`${BASE}/queue?${qs}`, 'tok-pi-a')).status).toBe(400);
       }
       expect(
@@ -586,12 +609,18 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
           'snapshot_years',
           'title',
           'type',
+          'creator',
           'star_label',
           'star_status_id',
+          'star_status_name',
+          'star_status_description',
+          'star_status_config',
           'pi_line',
+          'star_approved_label',
           'mapping_state',
           'mapping_note',
           'sp_line',
+          'science_programs',
           'primary_sp',
           'contributing',
           'prms_status',
@@ -694,7 +723,7 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       for (const [, item] of ours) {
         expect(Object.keys(item)).toEqual(['get']);
         expect((item.get as { tags: string[] }).tags).toEqual([
-          'Pooled Funding Monitor',
+          'CGIAR Portfolio Contribution Monitor',
         ]);
         expect((item.get as { security: unknown[] }).security).toBeDefined();
       }

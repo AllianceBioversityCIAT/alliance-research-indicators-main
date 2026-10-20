@@ -7,6 +7,7 @@ import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PfmMappingState, PfmPrmsStatus, PfmResultRow } from '../../pfm.interfaces';
 import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
+import { MAPPING_STATUS_COLOR, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
 
 /**
  * Column template shared by the group's header row and every result row (R-PFM-012 order).
@@ -22,19 +23,22 @@ export interface PfmTagTone {
   border: string;
 }
 const tone = (name: string): PfmTagTone => ({ fg: `var(--ac-pfm-${name}-fg)`, border: `var(--ac-pfm-${name}-fg)` });
-const WARNING_TONE: PfmTagTone = { fg: 'var(--ac-pfm-warning-fg)', border: 'var(--ac-pfm-warning-border)' };
 
+/** Text, outline and icon share the status colour (as the sidebar PRMS sync pill does). */
+const solid = (color: string): PfmTagTone => ({ fg: color, border: color });
+
+// Shared with the result sidebar PRMS sync card: never pick these colours here.
 const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
-  Complete: tone('success'),
-  Incomplete: WARNING_TONE,
-  'Not started': tone('neutral'),
-  'No SP contribution': tone('success')
+  Complete: solid(MAPPING_STATUS_COLOR.Complete),
+  Incomplete: solid(MAPPING_STATUS_COLOR.Incomplete),
+  Pending: solid(MAPPING_STATUS_COLOR.Pending),
+  'No SP contribution': solid(MAPPING_STATUS_COLOR['No SP contribution'])
 };
 
 const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
-  'Pending Review': WARNING_TONE,
-  Approved: tone('success'),
-  Rejected: tone('danger')
+  'Pending Review': solid(PRMS_STATUS_COLOR.pending),
+  Approved: solid(PRMS_STATUS_COLOR.approved),
+  Rejected: solid(PRMS_STATUS_COLOR.rejected)
 };
 
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
@@ -53,6 +57,15 @@ export class PfmResultRowComponent {
   codeNumber = computed(() => String(this.row().official_code ?? '').padStart(3, '0'));
   fullTitle = computed(() => this.row().title || this.row().result_code);
 
+  /**
+   * STAR tag tooltip: the status description, then the approval date when there is one.
+   * The date lives here, not as a line under the tag: a second line pushed the STAR tag
+   * above the other single-line tags of the row (cells are vertically centred).
+   */
+  starTooltip = computed(() => {
+    const r = this.row();
+    return [r.star_status_description, r.star_approved_label].filter(Boolean).join(' · ') || undefined;
+  });
   mappingTone = computed(() => MAPPING_TONES[this.row().mapping_state] ?? tone('neutral'));
   isPrmsNotSent = computed(() => this.row().prms_status === 'Not sent');
   prmsTone = computed(() => (PRMS_TONES as Record<string, PfmTagTone>)[this.row().prms_status] ?? tone('neutral'));

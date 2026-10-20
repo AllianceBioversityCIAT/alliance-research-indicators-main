@@ -213,8 +213,8 @@ describe('AllianceSidebarComponent', () => {
   });
 
   // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor T-10 (R-PFM-001, DD-PFM-11/12)
-  describe('Pooled Funding Contribution Monitor entry', () => {
-    const MONITOR_HREF = 'a[href="/pooled-funding-contribution-monitor"]';
+  describe('CGIAR Portfolio Contribution Monitor entry', () => {
+    const MONITOR_HREF = 'a[href="/cgiar-portfolio-contribution-monitor"]';
 
     async function render(opts: { piAccess: boolean; monitorAccess: boolean; flagOn?: boolean; collapsed?: boolean }) {
       (TestBed.inject(ApiService) as unknown as MockApiService).hasAccess = opts.piAccess;
@@ -235,15 +235,15 @@ describe('AllianceSidebarComponent', () => {
       expect(el.textContent).toContain('PRINCIPAL INVESTIGATOR');
       const hrefs = Array.from(el.querySelectorAll('a.option')).map(a => a.getAttribute('href'));
       expect(hrefs.indexOf('/my-pi-delegates')).toBeGreaterThanOrEqual(0);
-      expect(hrefs.indexOf('/pooled-funding-contribution-monitor')).toBe(hrefs.indexOf('/my-pi-delegates') + 1);
-      expect(el.textContent).toContain('Pooled Funding Contribution Monitor');
+      expect(hrefs.indexOf('/cgiar-portfolio-contribution-monitor')).toBe(hrefs.indexOf('/my-pi-delegates') + 1);
+      expect(el.textContent).toContain('CGIAR Portfolio Contribution Monitor');
     });
 
     it('(b) no PI-delegate access + admin role shows the section with the monitor only', async () => {
       const el = await render({ piAccess: false, monitorAccess: true });
       expect(el.textContent).toContain('PRINCIPAL INVESTIGATOR');
       expect(el.querySelector(MONITOR_HREF)).not.toBeNull();
-      expect(el.textContent).toContain('Pooled Funding Contribution Monitor');
+      expect(el.textContent).toContain('CGIAR Portfolio Contribution Monitor');
       expect(el.querySelector('a[href="/my-pi-delegates"]')).toBeNull();
     });
 
@@ -256,6 +256,12 @@ describe('AllianceSidebarComponent', () => {
       const el = await render({ piAccess: false, monitorAccess: false });
       expect(el.textContent).not.toContain('PRINCIPAL INVESTIGATOR');
       expect(el.querySelector(MONITOR_HREF)).toBeNull();
+    });
+
+    it('(e) contributor-only who is PI / delegate of a project sees both items (same audience as My PI Delegates)', async () => {
+      const el = await render({ piAccess: true, monitorAccess: false });
+      expect(el.querySelector('a[href="/my-pi-delegates"]')).not.toBeNull();
+      expect(el.querySelector(MONITOR_HREF)).not.toBeNull();
     });
 
     it('(d) flag off removes the monitor, keeps My PI Delegates', async () => {
@@ -300,7 +306,8 @@ describe('AllianceSidebarComponent', () => {
   // ─── T-UI-03: My PI Delegates as a direct (non-collapsible) option (R-UI-001) ──
   it('should expose My PI Delegates as a flat option (no collapsible parent group)', () => {
     const options = component.piOptions();
-    expect(options).toHaveLength(1);
+    // A PI / delegate also gets the monitor (flat too), right after My PI Delegates.
+    expect(options.map(o => o.link)).toEqual(['/my-pi-delegates', '/cgiar-portfolio-contribution-monitor']);
     expect(options[0].label).toBe('My PI Delegates');
     expect(options[0].link).toBe('/my-pi-delegates');
     expect((component as unknown as { piGroups?: unknown }).piGroups).toBeUndefined();

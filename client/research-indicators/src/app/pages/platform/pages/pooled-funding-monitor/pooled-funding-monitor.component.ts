@@ -1,6 +1,6 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09
 //
-// Page shell of the Pooled Funding Contribution Monitor: header, scope toggle, KPI cards, the two
+// Page shell of the CGIAR Portfolio Contribution Monitor: header, scope toggle, KPI cards, the two
 // tabs and the PI-empty / loading / error states. The tab bodies (coverage, queue) are filled by
 // T-11..T-13. Read-only: no Sync button, no "PRMS sync" label (R-PFM-014). Tailwind only, no stylesheet.
 
@@ -28,10 +28,17 @@ export default class PooledFundingMonitorComponent implements OnInit {
 
   private static readonly MINE = { value: 'mine' as PfmScope, label: 'Only my results as PI' };
   private static readonly ALL = { value: 'all' as PfmScope, label: 'Whole portfolio' };
+  /**
+   * The whole portfolio is for every non-Contributor role. A Contributor reaches this page only as
+   * PI or delegate of a project, so they get their own scope only (the server refuses scope=all).
+   */
+  readonly canSeePortfolio = this.roles.canAccessPooledFundingMonitor();
   /** Admins see the whole portfolio first (and open on it); everyone else keeps the PI scope first. */
-  readonly scopes: { value: PfmScope; label: string }[] = this.roles.isAdmin()
-    ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
-    : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
+  readonly scopes: { value: PfmScope; label: string }[] = !this.canSeePortfolio
+    ? [PooledFundingMonitorComponent.MINE]
+    : this.roles.isAdmin()
+      ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
+      : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
   readonly tabs: { value: PfmTab; label: string }[] = [
     { value: 'coverage', label: 'Portfolio coverage' },
     { value: 'queue', label: 'Results queue' }
@@ -44,7 +51,10 @@ export default class PooledFundingMonitorComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine' });
+    this.store.init({
+      defaultScope: this.roles.isAdmin() ? 'all' : 'mine',
+      allowedScopes: this.scopes.map(s => s.value)
+    });
   }
 
   selectScope(scope: PfmScope): void {

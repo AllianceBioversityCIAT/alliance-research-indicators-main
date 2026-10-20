@@ -22,7 +22,7 @@ const group = (code: string): PfmGroup => ({
 
 const queue = (...codes: string[]): PfmQueue => ({
   filter_options: { projects: [], science_programs: [], types: [] },
-  chip_counts: { all: 1, attention: 0, mapping: 0, ready: 0, pending: 0, prms_rejected: 0, synced: 0 },
+  chip_counts: { all: 1, attention: 0, mapping: 0, ready: 0, prms_rejected: 0, synced: 0 },
   groups: codes.map(group),
   totals: { results: codes.length, projects: codes.length, monitored_total: codes.length }
 });
@@ -264,7 +264,7 @@ describe('PfmStoreService', () => {
 
   describe('pfmQueryString', () => {
     it('omits empty params', () => {
-      expect(pfmQueryString({ scope: 'mine', project: '', sp: null, status: undefined, type: 3, chip: 'synced' })).toBe(
+      expect(pfmQueryString({ scope: 'mine', project: '', sp: null, type: 3, chip: 'synced' })).toBe(
         '?scope=mine&type=3&chip=synced'
       );
     });

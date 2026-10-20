@@ -9,16 +9,13 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'awaiting_pi', 'rejected', 'synced'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
-
-export const PFM_STATUS_FILTERS = ['all', 'ready_to_sync', 'mapping_pending', 'synced', 'awaiting_pi', 'under_review', 'draft'] as const;
-export type PfmStatusFilter = (typeof PFM_STATUS_FILTERS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
 export type PfmStarLabel = (typeof PFM_STAR_LABELS)[number];
 
-export const PFM_MAPPING_STATES = ['Not started', 'Incomplete', 'Complete', 'No SP contribution'] as const;
+export const PFM_MAPPING_STATES = ['Pending', 'Incomplete', 'Complete', 'No SP contribution'] as const;
 export type PfmMappingState = (typeof PFM_MAPPING_STATES)[number];
 
 export const PFM_PRMS_STATUSES = ['Not sent', 'Pending Review', 'Approved', 'Rejected'] as const;
@@ -101,7 +98,6 @@ export interface PfmChipCounts {
   attention: number;
   mapping: number;
   ready: number;
-  pending: number;
   prms_rejected: number;
   synced: number;
 }
@@ -193,7 +189,6 @@ export interface PfmResultRow {
 export interface PfmFilters {
   project: string | null;
   sp: string | null;
-  status: PfmStatusFilter | null;
   type: number | null;
 }
 
@@ -202,7 +197,6 @@ export interface PfmQueueQuery {
   scope: PfmScope;
   project?: string | null;
   sp?: string | null;
-  status?: PfmStatusFilter | null;
   type?: number | null;
   chip?: PfmChip | null;
 }

@@ -800,8 +800,8 @@ describe('SectionHeaderComponent', () => {
       component['resultTitle'].set('Queue result title');
 
       const breadcrumb = component.breadcrumb();
-      expect(breadcrumb.map(b => b.label)).toEqual(['Pooled Funding Contribution Monitor', 'Result STAR-1706']);
-      expect(breadcrumb[0].route).toBe('/pooled-funding-contribution-monitor');
+      expect(breadcrumb.map(b => b.label)).toEqual(['CGIAR Portfolio Contribution Monitor', 'Result STAR-1706']);
+      expect(breadcrumb[0].route).toBe('/cgiar-portfolio-contribution-monitor');
       expect(breadcrumb[0].queryParams).toEqual({ tab: 'queue' });
       expect(breadcrumb[1].tooltip).toBe('Queue result title');
     });

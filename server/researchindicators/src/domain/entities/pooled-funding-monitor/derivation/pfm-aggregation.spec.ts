@@ -1,6 +1,5 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
-import { PfmStatusFilterEnum } from '../enum/pfm-status-filter.enum';
 import {
   PfmMonitoredRow,
   PfmSpRef,
@@ -78,7 +77,7 @@ const SYNCED = { is_synced_to_prms: true };
 const ROWS: PfmMonitoredRow[] = [
   // r1 Ready (Approved+Complete+not sent); also contributes to SP03
   mk(1, 'P-A', { contributing_sps: [sp('SP03')] }),
-  // r2 Complete + Submitted -> Mapping not started (DD-PFM-6)
+  // r2 Complete + Submitted -> Ready to sync (Ready reads the mapping only)
   mk(2, 'P-A', {
     result_status_id: 2,
     result_status_name: 'Submitted',
@@ -90,7 +89,7 @@ const ROWS: PfmMonitoredRow[] = [
   mk(4, 'P-A', { ...SYNCED, prms_history_status: 'APPROVED' }),
   // r13 (belongs to P-D, listed early) Approved + Incomplete
   mk(13, 'P-D', { mapping_complete: false }),
-  // r5 Draft, no alignment -> Mapping not started
+  // r5 Draft, no alignment -> Mapping pending
   mk(5, 'P-B', {
     ...NO_ALIGN,
     result_status_id: 1,
@@ -116,7 +115,7 @@ const ROWS: PfmMonitoredRow[] = [
     primary_sp: sp('SP03'),
     indicator_id: 2,
   }),
-  // r10 Returned (7), no alignment -> Mapping not started
+  // r10 Returned (7), no alignment -> Mapping pending
   mk(10, 'P-C', { ...NO_ALIGN, result_status_id: 7, result_status_name: 'X' }),
   // r11 PRMS Approved, SP03
   mk(11, 'P-C', {
@@ -137,8 +136,8 @@ describe('pfm-aggregation', () => {
     it('assigns each stage by precedence with hand-written expectations', () => {
       const stageOf = (id: number): PfmStageKeyEnum =>
         assignPfmStage(derived.find((r) => r.row.result_id === id)!.d);
-      // Red input: Complete + Submitted must land in Mapping not started.
-      expect(stageOf(2)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
+      // Red input: Complete + Submitted is Ready to sync (no STAR-status condition).
+      expect(stageOf(2)).toBe(PfmStageKeyEnum.READY_TO_SYNC);
       expect(stageOf(5)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
       expect(stageOf(10)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
       expect(stageOf(3)).toBe(PfmStageKeyEnum.MAPPING_INCOMPLETE);
@@ -165,9 +164,9 @@ describe('pfm-aggregation', () => {
     it('counts every stage, header figures, and the stages sum to the total', () => {
       const p = buildPfmPipeline(derived);
       expect(p.stages).toEqual([
-        { key: 'mapping_not_started', group: 'in_star', value: 3 },
+        { key: 'mapping_not_started', group: 'in_star', value: 2 },
         { key: 'mapping_incomplete', group: 'in_star', value: 3 },
-        { key: 'ready_to_sync', group: 'in_star', value: 1 },
+        { key: 'ready_to_sync', group: 'in_star', value: 2 },
         { key: 'pending_review', group: 'in_prms', value: 1 },
         { key: 'approved', group: 'in_prms', value: 2 },
         { key: 'rejected', group: 'in_prms', value: 1 },
@@ -206,7 +205,7 @@ describe('pfm-aggregation', () => {
         projects: 4,
         projects_total: 20,
         monitored: 13,
-        need_attention: 7,
+        need_attention: 9,
         synced: 4,
         in_prms_scope: 11,
       });
@@ -280,7 +279,6 @@ describe('pfm-aggregation', () => {
         need_attention: 'attention',
         mapping_incomplete: 'mapping',
         ready_to_sync: 'ready',
-        awaiting_pi: 'pending',
         rejected: 'prms_rejected',
         synced: 'synced',
       });
@@ -290,14 +288,13 @@ describe('pfm-aggregation', () => {
       const q = buildPfmQueue(derived, {});
       expect(q.chip_counts).toEqual({
         all: 13,
-        attention: 7,
+        attention: 9,
         mapping: 2,
-        ready: 1,
-        pending: 4,
+        ready: 2,
         prms_rejected: 1,
         synced: 3,
       });
-      // P-B and P-D tie on attention (1): P-B first by code.
+      // P-A and P-C tie on attention (3): P-A first by code.
       expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-C', 'P-B', 'P-D']);
       expect(q.groups[0]).toEqual({
         code: 'P-A',
@@ -336,14 +333,13 @@ describe('pfm-aggregation', () => {
       });
     });
 
-    it('chip counts follow filters: Status = Draft', () => {
-      const q = buildPfmQueue(derived, { status: PfmStatusFilterEnum.DRAFT });
+    it('chip counts follow filters: Result type = 3', () => {
+      const q = buildPfmQueue(derived, { type: 3 });
       expect(q.chip_counts).toEqual({
         all: 1,
         attention: 1,
         mapping: 0,
         ready: 0,
-        pending: 1,
         prms_rejected: 0,
         synced: 0,
       });
@@ -364,8 +360,7 @@ describe('pfm-aggregation', () => {
         all: 4,
         attention: 3,
         mapping: 1,
-        ready: 1,
-        pending: 1,
+        ready: 2,
         prms_rejected: 0,
         synced: 1,
       });
@@ -398,11 +393,8 @@ describe('pfm-aggregation', () => {
       // r1 (contributing), r6, r9, r11 (primary)
       expect(bySp.totals.results).toBe(4);
       expect(bySp.chip_counts.all).toBe(4);
-      const spAndStatus = buildPfmQueue(derived, {
-        sp: 'SP03',
-        status: PfmStatusFilterEnum.SYNCED,
-      });
-      expect(spAndStatus.totals.results).toBe(1);
+      const spAndType = buildPfmQueue(derived, { sp: 'SP03', type: 2 });
+      expect(spAndType.totals.results).toBe(1); // r9
       const typeAndProject = buildPfmQueue(derived, {
         type: 2,
         project: 'P-C',
@@ -412,7 +404,7 @@ describe('pfm-aggregation', () => {
     });
 
     it('monitored_total is ALL monitored results of the scope, not the attention count', () => {
-      // 13 monitored, 7 need attention: the two meanings differ.
+      // 13 monitored, 9 need attention: the two meanings differ.
       const q = buildPfmQueue(derived, { project: 'P-D' });
       expect(q.totals.monitored_total).toBe(13);
       expect(q.chip_counts.attention).toBe(1);

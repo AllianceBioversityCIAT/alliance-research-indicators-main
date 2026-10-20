@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { NotContributorOnlyGuard } from './guards/not-contributor-only.guard';
+import { PfmAccessGuard } from './guards/pfm-access.guard';
 import { PooledFundingMonitorController } from './pooled-funding-monitor.controller';
 import { PooledFundingMonitorService } from './pooled-funding-monitor.service';
 import { PooledFundingMonitorRepository } from './repositories/pooled-funding-monitor.repository';
@@ -12,7 +12,7 @@ import { PooledFundingMonitorRepository } from './repositories/pooled-funding-mo
   providers: [
     PooledFundingMonitorRepository,
     PooledFundingMonitorService,
-    NotContributorOnlyGuard,
+    PfmAccessGuard,
   ],
 })
 export class PooledFundingMonitorModule {}

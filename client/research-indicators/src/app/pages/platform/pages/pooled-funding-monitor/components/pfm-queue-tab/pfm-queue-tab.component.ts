@@ -2,7 +2,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
-import { PfmChip, PfmChipCounts, PfmFilters, PfmStatusFilter } from '../../pfm.interfaces';
+import { PfmChip, PfmChipCounts, PfmFilters } from '../../pfm.interfaces';
 import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
 import { PfmStoreService } from '../../services/pfm-store.service';
 
@@ -14,19 +14,8 @@ const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts }[] = [
   { key: 'need_attention', label: 'Need attention', count: 'attention' },
   { key: 'mapping_incomplete', label: 'Mapping incomplete', count: 'mapping' },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready' },
-  { key: 'awaiting_pi', label: 'Awaiting PI', count: 'pending' },
   { key: 'rejected', label: 'Rejected by PRMS', count: 'prms_rejected' },
   { key: 'synced', label: 'Synced with PRMS', count: 'synced' }
-];
-
-const STATUS_OPTIONS: { label: string; value: PfmStatusFilter | typeof ALL }[] = [
-  { label: 'All statuses', value: ALL },
-  { label: 'Ready to sync', value: 'ready_to_sync' },
-  { label: 'Pool funding mapping pending', value: 'mapping_pending' },
-  { label: 'Synced to PRMS', value: 'synced' },
-  { label: 'Awaiting PI approval', value: 'awaiting_pi' },
-  { label: 'Under review in STAR', value: 'under_review' },
-  { label: 'Draft', value: 'draft' }
 ];
 
 /** Legend of the PRMS bar colors (R-PFM-015). */
@@ -49,7 +38,6 @@ export class PfmQueueTabComponent {
   readonly ALL = ALL;
   readonly chips = CHIPS;
   readonly legend = LEGEND;
-  readonly statusOptions = STATUS_OPTIONS;
 
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */
   readonly queue = computed(() => this.store.queue());

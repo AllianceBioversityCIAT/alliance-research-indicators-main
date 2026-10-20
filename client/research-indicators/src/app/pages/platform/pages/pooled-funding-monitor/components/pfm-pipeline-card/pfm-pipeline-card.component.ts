@@ -15,20 +15,20 @@ interface StageView extends PfmPipelineStage {
 // Literal class strings so Tailwind can see them. Colors are tokens only (NFR-PFM-003).
 const STAGE_META: Record<string, { label: string; note: string; seg: string; ink: string }> = {
   mapping_not_started: {
-    label: 'Mapping not started',
+    label: 'Mapping pending',
     note: 'Waiting on PI approval or on the team to begin',
     seg: 'bg-[var(--ac-pfm-seg-not-started)]',
-    ink: 'text-[var(--ac-pfm-neutral-fg)]'
+    ink: 'text-[var(--ac-status-mapping-pending)]'
   },
   mapping_incomplete: {
     label: 'Mapping incomplete',
     note: 'Projects or budget shares still missing',
     seg: 'bg-[var(--ac-pfm-seg-incomplete)]',
-    ink: 'text-[var(--ac-pfm-warning-fg)]'
+    ink: 'text-[var(--ac-status-mapping-incomplete)]'
   },
   ready_to_sync: {
     label: 'Ready to sync',
-    note: 'Mapping complete, waiting on a push to PRMS',
+    note: 'Mapping complete, not in PRMS yet',
     seg: 'bg-[var(--ac-pfm-seg-ready)]',
     ink: 'text-[var(--ac-pfm-info-fg)]'
   },
@@ -36,25 +36,25 @@ const STAGE_META: Record<string, { label: string; note: string; seg: string; ink
     label: 'Pending review in PRMS',
     note: 'With the PRMS QA team',
     seg: 'bg-[var(--ac-pfm-seg-pending)]',
-    ink: 'text-[var(--ac-pfm-warning-fg)]'
+    ink: 'text-[var(--ac-status-prms-pending)]'
   },
   approved: {
     label: 'Approved in PRMS',
     note: 'Counted in the reporting cycle',
     seg: 'bg-[var(--ac-pfm-seg-approved)]',
-    ink: 'text-[var(--ac-pfm-success-fg)]'
+    ink: 'text-[var(--ac-status-prms-approved)]'
   },
   rejected: {
     label: 'Rejected in PRMS',
     note: 'Returned by QA, needs a fix and resync',
     seg: 'bg-[var(--ac-pfm-seg-rejected)]',
-    ink: 'text-[var(--ac-pfm-danger-fg)]'
+    ink: 'text-[var(--ac-status-prms-rejected)]'
   },
   no_sp_contribution: {
     label: 'No SP contribution',
     note: 'Declared out of PRMS scope by the PI — no action needed',
     seg: 'bg-[var(--ac-pfm-seg-no-sp)]',
-    ink: 'text-[var(--ac-pfm-outscope-fg)]'
+    ink: 'text-[var(--ac-status-mapping-no-sp)]'
   }
 };
 
@@ -71,7 +71,7 @@ export class PfmPipelineCardComponent {
   pipeline = input.required<PfmPipeline>();
   scope = input<PfmScope>('mine');
 
-  scopeNote = computed(() => (this.scope() === 'all' ? 'across all projects contributing to Pool funding' : 'across your projects contributing to Pool funding'));
+  scopeNote = computed(() => (this.scope() === 'all' ? 'across all projects contributing to CGIAR Portfolio' : 'across your projects contributing to CGIAR Portfolio'));
 
   /** Display-only decoration of the server stages; values and order are exactly as sent. */
   stages = computed<StageView[]>(() => {

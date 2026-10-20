@@ -1,6 +1,6 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-07
 //
-// Page-scoped store of the Pooled Funding Monitor (provide it in the page component, NOT
+// Page-scoped store of the CGIAR Portfolio Contribution Monitor (provide it in the page component, NOT
 // `providedIn: 'root'`: it rewrites ?scope=&tab= and must not touch other routes).
 // GET only (R-PFM-014). Every section loads and fails on its own (R-PFM-016).
 
@@ -22,7 +22,7 @@ import {
   PfmTab
 } from '../pfm.interfaces';
 
-const EMPTY_FILTERS: PfmFilters = { project: null, sp: null, status: null, type: null };
+const EMPTY_FILTERS: PfmFilters = { project: null, sp: null, type: null };
 
 @Injectable()
 export class PfmStoreService {
@@ -58,12 +58,14 @@ export class PfmStoreService {
   /**
    * Reads ?scope=&tab= once (unknown values fall back to defaults) and loads both sections.
    * `defaultScope` is the scope used when the URL carries no valid ?scope= (admins pass 'all', HITL 20).
+   * `allowedScopes` narrows what ?scope= may select (a Contributor PI only gets 'mine').
    */
-  init(opts: { defaultScope?: PfmScope } = {}): void {
+  init(opts: { defaultScope?: PfmScope; allowedScopes?: readonly PfmScope[] } = {}): void {
     const params = this.route.snapshot.queryParamMap;
     const scope = params.get('scope');
     const tab = params.get('tab');
-    if ((PFM_SCOPES as readonly string[]).includes(scope ?? '')) this.scope.set(scope as PfmScope);
+    const allowed: readonly string[] = opts.allowedScopes ?? PFM_SCOPES;
+    if (allowed.includes(scope ?? '')) this.scope.set(scope as PfmScope);
     else if (opts.defaultScope) this.scope.set(opts.defaultScope);
     if ((PFM_TABS as readonly string[]).includes(tab ?? '')) this.tab.set(tab as PfmTab);
     rememberPfmScope(this.scope());

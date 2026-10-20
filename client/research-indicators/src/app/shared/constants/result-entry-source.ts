@@ -2,7 +2,7 @@ export const RESULT_ENTRY_SOURCE_QUERY = 'from';
 export const RESULT_ENTRY_SOURCE_VALUE_RESULTS_CENTER = 'results-center';
 /** User opened the result from the Home dashboard (e.g. My latest results). */
 export const RESULT_ENTRY_SOURCE_VALUE_HOME = 'home';
-/** User opened the result from the Pooled Funding Contribution Monitor queue (View / title). */
+/** User opened the result from the CGIAR Portfolio Contribution Monitor queue (View / title). */
 export const RESULT_ENTRY_SOURCE_VALUE_PFM_MONITOR = 'pfm-monitor';
 
 /** Navigating from published OICR modal "Edit" into the full result form (skip modal resolver). */

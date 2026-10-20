@@ -10,7 +10,6 @@ import {
 } from 'class-validator';
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
-import { PfmStatusFilterEnum } from '../enum/pfm-status-filter.enum';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-05
 
@@ -43,11 +42,6 @@ export class PfmQueueQueryDto extends PfmSummaryQueryDto {
   @IsString()
   @MaxLength(64)
   sp?: string;
-
-  @ApiPropertyOptional({ enum: PfmStatusFilterEnum })
-  @IsOptional()
-  @IsEnum(PfmStatusFilterEnum)
-  status?: PfmStatusFilterEnum;
 
   @ApiPropertyOptional({
     type: Number,

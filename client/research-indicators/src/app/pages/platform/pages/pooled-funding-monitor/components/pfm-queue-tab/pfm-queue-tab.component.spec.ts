@@ -11,7 +11,7 @@ const QUEUE: PfmQueue = {
     science_programs: [{ category: 'Accelerators', items: [{ code: 'ACC1', name: 'Climate Acc' }] }],
     types: [{ id: 3, name: 'Innovation development' }]
   },
-  chip_counts: { all: 41, attention: 7, mapping: 5, ready: 3, pending: 11, prms_rejected: 2, synced: 13 },
+  chip_counts: { all: 41, attention: 7, mapping: 5, ready: 3, prms_rejected: 2, synced: 13 },
   groups: [
     {
       code: 'P100',
@@ -25,7 +25,7 @@ const QUEUE: PfmQueue = {
   ],
   totals: { results: 41, projects: 6, monitored_total: 99 }
 };
-const EMPTY: PfmFilters = { project: null, sp: null, status: null, type: null };
+const EMPTY: PfmFilters = { project: null, sp: null, type: null };
 
 function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip | null; filters?: PfmFilters; loading?: boolean } = {}) {
   const store = {
@@ -60,7 +60,6 @@ describe('PfmQueueTabComponent', () => {
       'Need attention 7',
       'Mapping incomplete 5',
       'Ready to sync 3',
-      'Awaiting PI 11',
       'Rejected by PRMS 2',
       'Synced with PRMS 13'
     ]);
@@ -90,8 +89,8 @@ describe('PfmQueueTabComponent', () => {
     expect(store.setChip).toHaveBeenCalledWith(null);
   });
 
-  it('Reset delegates to the store (which restores all four filters and the chip)', () => {
-    const { q, store } = setup({ filters: { project: 'P100', sp: 'ACC1', status: 'draft', type: 3 }, chip: 'synced' });
+  it('Reset delegates to the store (which restores all three filters and the chip)', () => {
+    const { q, store } = setup({ filters: { project: 'P100', sp: 'ACC1', type: 3 }, chip: 'synced' });
     q('pfm-reset')?.click();
     expect(store.resetFilters).toHaveBeenCalledTimes(1);
   });
@@ -102,19 +101,19 @@ describe('PfmQueueTabComponent', () => {
     expect(store.setFilter).toHaveBeenLastCalledWith('project', null);
     fixture.componentInstance.onFilter('type', 3);
     expect(store.setFilter).toHaveBeenLastCalledWith('type', 3);
-    fixture.componentInstance.onFilter('status', 'draft');
-    expect(store.setFilter).toHaveBeenLastCalledWith('status', 'draft');
   });
 
-  it('offers four data-driven filters (SP grouped by category) and no year filter', () => {
-    const { fixture, el } = setup();
+  it('offers three data-driven filters (SP grouped by category), no Status filter and no year filter', () => {
+    const { fixture, el, q } = setup();
     const c = fixture.componentInstance;
-    expect(el.querySelectorAll('p-select').length).toBe(4);
+    expect(el.querySelectorAll('p-select').length).toBe(3);
+    expect(q('pfm-filter-status')).toBeNull();
+    expect(q('pfm-chip-awaiting_pi')).toBeNull();
+    expect(q('pfm-filters-card')?.textContent).toContain('Project contributing to CGIAR Portfolio');
     expect(c.projectOptions().map(o => o.label)).toEqual(['All projects', 'P100 — Alpha project']);
     expect(c.spOptions().map(g => g.label)).toEqual(['All Science Programs', 'Accelerators']);
     expect(c.spOptions()[1].items[0]).toEqual({ label: 'ACC1 — Climate Acc', value: 'ACC1' });
     expect(c.typeOptions().map(o => o.label)).toEqual(['All types', 'Innovation development']);
-    expect(c.statusOptions.length).toBe(7);
     expect(el.textContent?.toLowerCase()).not.toContain('year');
   });
 

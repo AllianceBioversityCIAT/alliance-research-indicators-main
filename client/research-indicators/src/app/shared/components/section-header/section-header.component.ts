@@ -318,7 +318,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
       const resultId = segs[0] === 'result' && segs.length >= 2 ? segs[1] : '';
       if (resultId) {
         return [
-          { label: 'Pooled Funding Contribution Monitor', route: '/pooled-funding-contribution-monitor', queryParams: this.pfmMonitorQueryParams() },
+          { label: 'CGIAR Portfolio Contribution Monitor', route: '/cgiar-portfolio-contribution-monitor', queryParams: this.pfmMonitorQueryParams() },
           { label: `Result ${resultId}`, tooltip: this.resultTitle() }
         ];
       }

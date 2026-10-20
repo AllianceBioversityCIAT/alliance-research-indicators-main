@@ -2,7 +2,6 @@ import { PfmChipEnum } from '../enum/pfm-chip.enum';
 import { PfmMappingStateEnum } from '../enum/pfm-mapping-state.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
-import { PfmStatusFilterEnum } from '../enum/pfm-status-filter.enum';
 import type {
   PfmMonitoredRow,
   PfmMonthlySync,
@@ -10,7 +9,6 @@ import type {
 import {
   derivePfmRow,
   matchesChip,
-  matchesStatusFilter,
   PfmDerivedRow,
   rowRank,
 } from './pfm-derivation';
@@ -59,8 +57,8 @@ export const PFM_STAGES: { key: PfmStageKeyEnum; group: PfmStageGroup }[] = [
 
 /**
  * R-PFM-006 precedence: (1) PRMS != Not sent -> its In-PRMS stage; (2) out of
- * scope; (3) In-STAR rules. DD-PFM-6: Complete mapping but STAR != Approved
- * (so not Ready) lands in Mapping not started - keeps the partition exact.
+ * scope; (3) In-STAR rules: Complete mapping is Ready to sync, Incomplete is
+ * Mapping incomplete, anything else is Mapping pending.
  */
 export const assignPfmStage = (d: PfmDerivedRow): PfmStageKeyEnum => {
   switch (d.prmsStatus) {
@@ -212,7 +210,6 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
 export interface PfmQueueFilters {
   project?: string;
   sp?: string;
-  status?: PfmStatusFilterEnum;
   type?: number;
   chip?: PfmChipEnum;
 }
@@ -223,7 +220,6 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.NEED_ATTENTION]: 'attention',
   [PfmChipEnum.MAPPING_INCOMPLETE]: 'mapping',
   [PfmChipEnum.READY_TO_SYNC]: 'ready',
-  [PfmChipEnum.AWAITING_PI]: 'pending',
   [PfmChipEnum.REJECTED]: 'prms_rejected',
   [PfmChipEnum.SYNCED]: 'synced',
 } as const;
@@ -233,18 +229,17 @@ export type PfmChipCounts = Record<
   number
 >;
 
-/** R-PFM-009: project / SP (primary OR contributing) / status / type, AND-combined. Chip not applied. */
+/** R-PFM-009: project / SP (primary OR contributing) / type, AND-combined. Chip not applied. */
 export const applyPfmFilters = (
   rows: PfmDerivedMonitoredRow[],
   f: PfmQueueFilters,
 ): PfmDerivedMonitoredRow[] =>
   rows.filter(
-    ({ row, d }) =>
+    ({ row }) =>
       (!f.project || row.project_code === f.project) &&
       (!f.sp ||
         row.primary_sp?.code === f.sp ||
         row.contributing_sps.some((s) => s.code === f.sp)) &&
-      (!f.status || matchesStatusFilter(d, f.status)) &&
       (f.type == null || row.indicator_id === f.type),
   );
 

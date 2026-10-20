@@ -68,10 +68,11 @@ export class AllianceSidebarComponent implements OnInit, AfterViewInit, OnDestro
     if (this.canSeePiDelegates()) {
       options.push({ label: 'My PI Delegates', link: '/my-pi-delegates', icon: 'pi-users', iconSize: '13px' });
     }
-    if (this.rolesService.canAccessPooledFundingMonitor() && this.poolFundingFlags.sectionEnabled()) {
+    // Same audience as My PI Delegates, plus every non-Contributor role (see pooledFundingMonitorGuard).
+    if ((this.rolesService.canAccessPooledFundingMonitor() || this.canSeePiDelegates()) && this.poolFundingFlags.sectionEnabled()) {
       options.push({
-        label: 'Pooled Funding Contribution Monitor',
-        link: '/pooled-funding-contribution-monitor',
+        label: 'CGIAR Portfolio Contribution Monitor',
+        link: '/cgiar-portfolio-contribution-monitor',
         icon: 'pi-chart-bar',
         iconSize: '13px'
       });

@@ -25,8 +25,8 @@ describe('PfmKpiCardsComponent', () => {
     expect(text('monitored', 'value')).toBe('31');
     expect(text('need_attention', 'value')).toBe('7');
     expect(text('synced', 'value')).toBe('11');
-    expect(text('projects', 'label')).toBe('Projects contributing to Pool funding');
-    expect(text('monitored', 'label')).toBe('Results eligible for Pool funding mapping');
+    expect(text('projects', 'label')).toBe('Contributing Project with Results');
+    expect(text('monitored', 'label')).toBe('Results eligible for CGIAR Portfolio mapping');
     expect(text('need_attention', 'label')).toBe('Need attention');
     expect(text('synced', 'label')).toBe('Synced with PRMS');
   });
@@ -36,7 +36,7 @@ describe('PfmKpiCardsComponent', () => {
     expect(text('projects', 'sub')).toBe('where you are PI');
     expect(text('synced', 'sub')).toBe('of 26 in PRMS scope');
     expect(text('monitored', 'sub')).toBe('can be mapped and synced');
-    expect(text('need_attention', 'sub')).toBe('draft, pending mapping or pending sync');
+    expect(text('need_attention', 'sub')).toBe('nothing in PRMS yet');
   });
 
   it('portfolio scope sub-line uses the portfolio total', () => {

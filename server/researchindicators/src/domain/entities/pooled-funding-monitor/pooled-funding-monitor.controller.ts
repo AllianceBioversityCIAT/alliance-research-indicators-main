@@ -19,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { RequestWithUser } from '../../shared/global-dto/request-with-user.dto';
 import { ResponseUtils } from '../../shared/utils/response.utils';
-import { NotContributorOnlyGuard } from './guards/not-contributor-only.guard';
+import { PfmAccessGuard } from './guards/pfm-access.guard';
 import { PooledFundingMonitorService } from './pooled-funding-monitor.service';
 import {
   PfmProjectParamDto,
@@ -33,7 +33,6 @@ import {
 } from './dto/pfm-response.dto';
 import { PfmChipEnum } from './enum/pfm-chip.enum';
 import { PfmScopeEnum } from './enum/pfm-scope.enum';
-import { PfmStatusFilterEnum } from './enum/pfm-status-filter.enum';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-05
 
@@ -55,9 +54,9 @@ const SCOPE_QUERY = {
  * Unversioned: no `@Version`, mounted at `/api/pooled-funding-monitor` by
  * `main.routes.ts`. The PI scope comes from `request.user`, never from input.
  */
-@ApiTags('Pooled Funding Monitor')
+@ApiTags('CGIAR Portfolio Contribution Monitor')
 @ApiBearerAuth()
-@UseGuards(NotContributorOnlyGuard)
+@UseGuards(PfmAccessGuard)
 @UsePipes(queryPipe)
 @Controller()
 export class PooledFundingMonitorController {
@@ -66,7 +65,7 @@ export class PooledFundingMonitorController {
   @Get('summary')
   @ApiOperation({
     summary:
-      'Pooled funding monitor: KPIs, pipeline, SP coverage, monthly syncs',
+      'CGIAR Portfolio monitor: KPIs, pipeline, SP coverage, monthly syncs',
   })
   @ApiQuery(SCOPE_QUERY)
   @ApiOkResponse({ type: PfmSummaryResponseDto })
@@ -75,7 +74,7 @@ export class PooledFundingMonitorController {
     @Query() query: PfmSummaryQueryDto,
   ) {
     return ResponseUtils.format({
-      description: 'Pooled funding monitor summary',
+      description: 'CGIAR Portfolio monitor summary',
       status: HttpStatus.OK,
       data: await this.service.getSummary(req.user.sec_user_id, query.scope),
     });
@@ -84,12 +83,11 @@ export class PooledFundingMonitorController {
   @Get('queue')
   @ApiOperation({
     summary:
-      'Pooled funding monitor: filter options, chip counts, project groups',
+      'CGIAR Portfolio monitor: filter options, chip counts, project groups',
   })
   @ApiQuery(SCOPE_QUERY)
   @ApiQuery({ name: 'project', required: false, type: String })
   @ApiQuery({ name: 'sp', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: PfmStatusFilterEnum })
   @ApiQuery({ name: 'type', required: false, type: Number })
   @ApiQuery({ name: 'chip', required: false, enum: PfmChipEnum })
   @ApiOkResponse({ type: PfmQueueResponseDto })
@@ -98,7 +96,7 @@ export class PooledFundingMonitorController {
     @Query() query: PfmQueueQueryDto,
   ) {
     return ResponseUtils.format({
-      description: 'Pooled funding monitor queue',
+      description: 'CGIAR Portfolio monitor queue',
       status: HttpStatus.OK,
       data: await this.service.getQueue(req.user.sec_user_id, query),
     });
@@ -107,13 +105,12 @@ export class PooledFundingMonitorController {
   @Get('queue/projects/:projectCode/results')
   @ApiOperation({
     summary:
-      'Pooled funding monitor: ranked results of one project (404 when the project is outside the viewer scope)',
+      'CGIAR Portfolio monitor: ranked results of one project (404 when the project is outside the viewer scope)',
   })
   @ApiParam({ name: 'projectCode', type: String })
   @ApiQuery(SCOPE_QUERY)
   @ApiQuery({ name: 'project', required: false, type: String })
   @ApiQuery({ name: 'sp', required: false, type: String })
-  @ApiQuery({ name: 'status', required: false, enum: PfmStatusFilterEnum })
   @ApiQuery({ name: 'type', required: false, type: Number })
   @ApiQuery({ name: 'chip', required: false, enum: PfmChipEnum })
   @ApiOkResponse({ type: [PfmResultRowDto] })
@@ -123,7 +120,7 @@ export class PooledFundingMonitorController {
     @Query() query: PfmQueueQueryDto,
   ) {
     return ResponseUtils.format({
-      description: 'Pooled funding monitor project results',
+      description: 'CGIAR Portfolio monitor project results',
       status: HttpStatus.OK,
       data: await this.service.getProjectResults(
         req.user.sec_user_id,
