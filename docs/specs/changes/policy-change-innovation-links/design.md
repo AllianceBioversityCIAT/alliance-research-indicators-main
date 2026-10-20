@@ -77,6 +77,12 @@ Excluded: `result_status_id ∈ {7, 8}`. Applied in the new service after the re
 
 STAR client only; no admin SSR change. Layout keeps the two `col-span-6` columns. Messages copy the sibling picker's wording and tokens (`var(--ac-red-1)`, `var(--ac-grey-800)`, `fs-[14]`).
 
+**Amended 2026-10-20, user ruling at the T-03 HITL.** The owner asked for these changes after seeing the dropdown:
+- **Option rows:** each row in both pickers shows the result code (`platform_code result_official_code`) in **bold**, then the title, then the result's status as the app's status tag (`app-custom-tag`, `[statusId]` / `[statusName]` taken from `result_status`, the same way `project-results-table` does it).
+- **Status data:** no request change. `ApiService.GET_Results` calls `v2/results`. That query always selects `rs.name AS status_name` (`result.repository.ts:908`), and `mapV2ResultListItemToResult` (`map-v2-result-list-item.ts:70`) maps it to `result_status.name`. The request stays exactly `{'indicator-codes': [id]}` (NFR-PCIL-001).
+  *Correction, same day (KZ-007):* the first version of this amendment said to send `'result-status': true`. That premise came from reading the v1 repository, where the flag gates the status join. `GET_Results` serializes only array values, so the boolean never reached the wire, and the flag was inert. The Implementer found this. The Leader verified it at `api.service.ts` `GET_Results` and `result.repository.ts:908` before correcting this text.
+- **Unchanged:** the selected-value display and search (`customFilterBy`) stay as they are.
+
 ## 7. Integration impact
 
 None. Nothing outside `result-policy-change.service.ts` reads `link_results` role `POLICY_CHANGE` in TypeScript (P-5).

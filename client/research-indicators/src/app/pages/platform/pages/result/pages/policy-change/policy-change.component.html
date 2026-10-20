@@ -83,28 +83,78 @@
         </div>
 
         <div class="col-span-6">
+          @if (linkableResults.getError(2)()) {
+            <div class="flex items-center rs-gap-[8] rs-p-[12] rs-mb-[16] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+              <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
+              <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Development outputs could not be loaded. Please try again.</span>
+            </div>
+          }
           <app-select
-            pTooltip="The field is disabled because there are no results of the type Innovation Development Output."
+            [pTooltip]="innovationDevelopmentTooltip()"
             tooltipPosition="top"
             label="Link to a reported Innovation Development output"
-            [disabled]="true"
+            [disabled]="innovationDevelopmentDisabled()"
             [signal]="body"
             [optionLabel]="'title'"
             [optionValue]="{ body: 'innovation_development', option: 'result_id' }"
-            [serviceName]="'innoDevOutput'"
-            placeholder="Select the Innovation Development"></app-select>
+            serviceName="policyChangeLinkableResults"
+            [serviceParams]="2"
+            [customFilterBy]="'result_official_code,title,platform_code'"
+            placeholder="Select the Innovation Development">
+            <ng-template #selectedItemTemplate let-result>
+              <span class="text-[var(--ac-grey-800)]">
+                {{ formatInnovationDevLabel(result) }}
+              </span>
+            </ng-template>
+            <ng-template #item let-result>
+              <span class="flex flex-wrap items-center gap-2 text-[var(--ac-grey-800)] min-w-0">
+                <span class="font-bold shrink-0">{{ formatInnovationDevCode(result) }}</span>
+                <span class="min-w-0 whitespace-normal break-words">{{ result?.title }}</span>
+                <app-custom-tag
+                  class="shrink-0"
+                  [tiny]="true"
+                  [statusId]="result.result_status?.result_status_id"
+                  [statusName]="result.result_status?.name"></app-custom-tag>
+              </span>
+            </ng-template>
+          </app-select>
         </div>
         <div class="col-span-6">
+          @if (linkableResults.getError(6)()) {
+            <div class="flex items-center rs-gap-[8] rs-p-[12] rs-mb-[16] border border-[var(--ac-red-1)] bg-[var(--ac-grey-100)]">
+              <i class="material-symbols-rounded text-[var(--ac-red-1)]">error</i>
+              <span class="fs-[14] text-[var(--ac-grey-800)]">The Innovation Use results could not be loaded. Please try again.</span>
+            </div>
+          }
           <app-select
-            pTooltip="The field is disabled because there are no results of the type Innovation Use."
+            [pTooltip]="innovationUseTooltip()"
             tooltipPosition="top"
-            label="Link to a reported Innovation Use &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            label="Link to a reported Innovation Use"
             [signal]="body"
-            [disabled]="true"
+            [disabled]="innovationUseDisabled()"
             [optionLabel]="'title'"
             [optionValue]="{ body: 'innovation_use', option: 'result_id' }"
-            [serviceName]="'innoUseOutput'"
-            placeholder="Select the Innovation Use"></app-select>
+            serviceName="policyChangeLinkableResults"
+            [serviceParams]="6"
+            [customFilterBy]="'result_official_code,title,platform_code'"
+            placeholder="Select the Innovation Use">
+            <ng-template #selectedItemTemplate let-result>
+              <span class="text-[var(--ac-grey-800)]">
+                {{ formatInnovationDevLabel(result) }}
+              </span>
+            </ng-template>
+            <ng-template #item let-result>
+              <span class="flex flex-wrap items-center gap-2 text-[var(--ac-grey-800)] min-w-0">
+                <span class="font-bold shrink-0">{{ formatInnovationDevCode(result) }}</span>
+                <span class="min-w-0 whitespace-normal break-words">{{ result?.title }}</span>
+                <app-custom-tag
+                  class="shrink-0"
+                  [tiny]="true"
+                  [statusId]="result.result_status?.result_status_id"
+                  [statusName]="result.result_status?.name"></app-custom-tag>
+              </span>
+            </ng-template>
+          </app-select>
         </div>
       </div>
     </div>

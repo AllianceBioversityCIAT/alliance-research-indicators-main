@@ -31,13 +31,13 @@ describe('GetPolicyChangeLinkableResultsService', () => {
   it('main(2) calls GET_Results with indicator-codes [2] exactly', async () => {
     apiMock.GET_Results.mockResolvedValue({ successfulRequest: true, data: { results: [] } });
     await service.main(2);
-    expect(apiMock.GET_Results).toHaveBeenCalledWith({ 'indicator-codes': [2] });
+    expect(apiMock.GET_Results.mock.calls[0][0]).toEqual({ 'indicator-codes': [2] });
   });
 
   it('main(6) calls GET_Results with indicator-codes [6] exactly', async () => {
     apiMock.GET_Results.mockResolvedValue({ successfulRequest: true, data: { results: [] } });
     await service.main(6);
-    expect(apiMock.GET_Results).toHaveBeenCalledWith({ 'indicator-codes': [6] });
+    expect(apiMock.GET_Results.mock.calls[0][0]).toEqual({ 'indicator-codes': [6] });
   });
 
   it('keeps statuses 4, 6 and 14 and drops Not approved (7) and Deleted (8)', async () => {

@@ -151,3 +151,160 @@ Code conformance re-checked against Scope, Tests, Disqualifier, §5.2, DD-1, DD-
 - `runtime events: none`. `checkpoints: 0`.
 - `spawns: implementer(grok) attempt 1 not reported by host, ended complete; reviewer(claude) 9 calls, 54355 tokens, ended fail; implementer(grok) attempt 2 not reported by host, ended complete; reviewer(claude) not reported by host, ended complete`
 - **Budget:** 3 of 4 review rounds used after T-02, with T-03 still to go. A T-03 rework would exceed the design §11 tripwire.
+
+### T-03 — Client: enable and wire the two pickers → **Reviewer PASS · HITL pending (not committed)**
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-10-20 |
+| Final status | Reviewer PASS (attempt 1 of 3). The task stays `[~]` until the human check passes, and it is **not committed** before then (user rule) |
+| Orca task / dispatch | `task_04256fc07d0c` / `ctx_c3fdc677b057`. The worker is retained until the human check closes the task |
+| Implementer | Cursor · `grok-4.7-high`, effort medium, skills `angular-developer`, `ui-ux-pro-max` |
+| Reviewer | Claude `akili-reviewer` (fresh context, lens checklist, full conformance) — **PASS** |
+| Requirements covered | R-PCIL-001 and R-PCIL-002 (code + title label and search); R-PCIL-003, every §5.1 row for both pickers, plus "Read-only result" and "BUT not affected by the other list"; R-PCIL-004 "Round trip" (client binding); NFR-PCIL-002 (tokens; `&nbsp;` removed) |
+
+**Files changed (3):** `client/research-indicators/src/app/pages/platform/pages/result/pages/policy-change/policy-change.component.{html,ts,spec.ts}`
+
+**What changed:**
+- Both pickers use `serviceName="policyChangeLinkableResults"` with `[serviceParams]="2"` and `[serviceParams]="6"`, as number literals.
+- `customFilterBy="result_official_code,title,platform_code"`.
+- Both templates use `formatInnovationDevLabel`, imported from `innovation-use-details.component.ts` (DD-4, not moved).
+- Each picker has a `disabled` computed in §5.1 order: loading, then error, then empty, then `!isEditableStatus()`. Each also has a computed empty-state tooltip.
+- Inline error blocks copy the sibling's markup and tokens.
+- The `&nbsp;` run and the static tooltips are removed.
+
+**Implementer verification (as reported; full report at `/tmp/t03-policy-change-report.md`):**
+- `npx jest policy-change --silent --coverage=false` → 2 suites, 43 tests. The component spec has 36: the 22 existing plus 14 new.
+- K-002: `npx tsc -p tsconfig.spec.json --noEmit` — the policy-change set is identical to a throwaway worktree at HEAD `12ac4d7b6`: 2× the pre-existing `TS2559 … 'GetPolicyChange'`. 945 total on both sides.
+- K-004 red proof (reverted): `policy-change.component.spec.ts(401,9): error TS2322: Type 'string' is not assignable to type 'number'.`
+- lint → "All files pass linting."; build → exit 0.
+
+**Red run and falsifiers (each reverted):**
+- **Red run**, pre-change template: both enabled tests `Expected: false / Received: true` on `expect(isRenderedDisabled(...)).toBe(false)`.
+- **Falsifier (a)**, `[disabled]="true"`: enabled rows at `:621` and `:630`, `Expected: false / Received: true`.
+- **Falsifier (b)**, both pickers `[serviceParams]="2"`: `expect(requested).toContain(6)` → `Expected value: 6 / Received array: [2, 2, 2, 2]`.
+- **Falsifier (c)**, `isEditableStatus()` returning false: read-only rows at `:644` and `:659`, `Expected: true / Received: false`.
+
+**Evidence re-run (Leader inline, non-author): VERIFIED.**
+- jest policy-change → 2 suites, 43 tests passed.
+- `tsc` → 945 total. The policy-change set equals the pre-T-03 baseline log, position-stripped (2× TS2559).
+- lint → exit 0. build → exit 0.
+- Full `npm test -- --silent`: three runs.
+  - Run 1: `1 failed, 344 passed`, 0 failed tests. SIGSEGV in `bulk-upload-config.interface.spec.ts`; alone it passes 7/7.
+  - Run 2: `2 failed, 343 passed`, 0 failed tests. SIGSEGV in `get-os-subnational.service.spec.ts` and `project-utils.service.spec.ts`; together alone they pass 48/48.
+  - Run 3: `Test Suites: 345 passed, 345 total` · `Tests: 8033 passed, 8033 total`.
+  - The crashing suite changes every run. This is the runner flake documented while the `workerIdleMemoryLimit` mitigation is absent from `jest.config.ts`.
+
+**Reviewer summary (PASS):**
+- 10 row tests (§5.1 × 2 pickers) read the rendered combobox `aria-disabled`. PrimeNG binds it to `disabled` only, never to `loading`, and the settled rows also check `p-disabled`. They use the real `SelectComponent`, not a stub (KZ-001).
+- The fixture gates `GET_Results` per indicator and resolves after render (KZ-015).
+- The "Innovation Use error leaves Innovation Development enabled" test exists and reads the rendered element.
+- The spec diff is add-only. None of the 22 existing tests is weakened.
+- Tooltip and error wording matches R-PCIL-003 and the sibling picker.
+
+**ADVISORY (4R, non-gating):**
+1. RELIABILITY — reachable, outside T-03's scope:
+   - `SelectComponent` calls `initializeService()` from both `ngOnChanges` and `ngOnInit`, so `main()` runs twice per picker (falsifier (b) shows `[2,2,2,2]`).
+   - The T-02 service clears `error` only when a call starts, never on success.
+   - If one of the two duplicate requests fails and the other succeeds, the picker stays disabled with "could not be loaded" although the list loaded. Derived by reading the code; not run.
+   - Fix candidates: `error.set(false)` on success, or share the in-flight promise per indicator. **Recorded only; raised to the user at the T-03 gate.**
+2. READABILITY — the error block sits above the select in one `col-span-6`, so a single-picker error vertically offsets the two columns. Added to the HITL alignment check.
+3. TEST (KZ-015, partial) — the read-only tests set `body` before the first render. The real-page order (the list resolves, then `GET_PolicyChange` fills `body`) is not covered, and is left to the HITL round trip and reload. The "enabled" tests look for the error text inside `p-select`; this is cosmetic.
+4. READABILITY — `formatInnovationDevLabel` comes from another page module. DD-4 allows it; move it to `shared/utils/` if anyone objects.
+5. The Implementer's `selectedOption` finding is confirmed harmless: `hideSelected` defaults to `true`, so the block that reads the global list never renders, and the saved value shows through PrimeNG's lookup in the per-indicator list.
+
+**Not Done / Assumptions (verbatim from the Implementer):** "Column alignment after removing the `&nbsp;` hack was not checked in the browser; that HITL pass is the Leader's. `formatInnovationDevLabel` was imported from the sibling page module, not moved to `shared/utils/`." The first sentence is the human check this task already owns. The second is DD-4-permitted, so nothing is owed by the Implementer.
+
+**Human check (HITL):** pending.
+
+**Run accounting:**
+- `runtime events: none`. `checkpoints: 0`.
+- `spawns: implementer(grok) not reported by host, ended complete; reviewer(claude) not reported by host, ended complete`
+- **Budget:** 4 of 4 review rounds used, which is exactly the tripwire. Tasks 3 of 3. No overrun.
+
+#### T-03 — HITL follow-up 1 (user design ruling) → **Reviewer PASS · HITL pending**
+
+**User ruling (2026-10-20, at the visual check):** *"el code del resultado debería estar en negrilla y debería estar el estatus del resultado con el tag que hay en la app"*. The owner asked for this scope directly. Recorded as an execute-time spec edit to `design.md` §6 ("Amended 2026-10-20 — user ruling at T-03 HITL").
+
+**Decisions made:**
+- `design.md` §6 amended. The first version told the list service to send `'result-status': true`.
+- **KZ-007 correction, same day.** That premise came from the v1 repository, where the flag gates the status join. `ApiService.GET_Results` calls `v2/results` and serializes only array values, so the boolean never reached the wire. v2 always selects `rs.name AS status_name` (`result.repository.ts:908`), and `mapV2ResultListItemToResult` maps it to `result_status.name`. The Implementer found this. The Leader verified it at the source and corrected §6 to "no request change".
+- **Budget:** this follow-up adds review round 5, one over the design §11 tripwire of 4. It proceeded because it is owner-requested scope, raised to the owner in chat at dispatch.
+
+**Dispatches:**
+- `task_3d8cdde11ec8` / `ctx_bde0e98da686` — bold code + tag + the inert flag.
+- `task_574b168ac607` / `ctx_de12b7e62e84` — flag removed.
+- Both ran on the same retained T-03 worker.
+
+**Files (vs HEAD `12ac4d7b6`, final):**
+- `policy-change.component.{html,ts,spec.ts}`
+- `get-policy-change-linkable-results.service.spec.ts` — assertion form only
+- `get-policy-change-linkable-results.service.ts` and `result.interface.ts` have no diff: the flag was added and then removed.
+
+**What changed:** each option row in both pickers shows:
+- the code via `formatInnovationDevCode` inside `font-bold`;
+- then the title;
+- then `<app-custom-tag [tiny]="true">`, bound to `result_status`, the same pattern as `project-results-table.component.html:38`.
+
+The closed value has no tag. `customFilterBy` is unchanged.
+
+**Implementer verification (as reported; `/tmp/t03-bold-status-report.md`, `/tmp/t03-status-flag-correction.md`):**
+- jest → 2 suites, 44 tests.
+- tsc → 945 = HEAD, and the touched-file set is unchanged. Probe red: `policy-change.component.spec.ts(684,11): error TS2322`.
+- lint and build → green.
+- **Falsifier** (tag removed from both `#item` templates): `expect(tag).not.toBeNull()` / `Received: null` at `:705`, reverted.
+- The test fixture shapes rows with `mapV2ResultListItemToResult`.
+
+**Evidence re-run (Leader inline, non-author): VERIFIED.**
+- jest policy-change + service → 2 suites, 44 tests.
+- tsc → 945 total; the policy-change set is the 2× pre-existing TS2559.
+- lint → exit 0. build → exit 0.
+- Full `npm test -- --silent`:
+  - run 1 → `2 failed, 343 passed`, 0 failed tests. The runner flake hit `result-information-modal.component.spec.ts` and `get-institutions.service.spec.ts`.
+  - run 2 → `Test Suites: 345 passed, 345 total` · `Tests: 8034 passed, 8034 total`.
+
+**Reviewer: PASS.**
+- Conformance to `design.md` §6 as amended, including the KZ-007 correction.
+- The row test uses the real page shape (the mapper, then the real service, then the real `itemTemplate` and `CustomTagComponent`) and asserts on rendered DOM text.
+- `font-bold` is a utility class; there are no hex values.
+- The §5.1 tests are intact.
+
+**ADVISORY (non-gating):**
+1. The "no tag on the closed value" check runs with nothing selected, so it cannot catch a tag added to `#selectedItemTemplate`. The read-only tests could assert `app-custom-tag` is null.
+2. The service-spec rewrite `mock.calls[0][0] toEqual` is slightly weaker than `toHaveBeenCalledWith`. It does not check extra arguments or the call count. Restoring the original, or using `expect(mock.calls).toEqual([[…]])`, would be stronger.
+3. The two `#item` templates are duplicated; acceptable at two uses.
+
+**Run accounting:**
+- `spawns: implementer(grok) ×2 not reported by host, ended complete; reviewer(claude) not reported by host, ended complete`
+- `runtime events: none`
+
+#### T-03 — Human check (HITL) → **PASSED**
+
+The owner checked it in the running app after follow-up 1 and confirmed: *"ya quedó, haz commit"* (2026-10-20). T-03 closes as **PASS** (Reviewer PASS ×2, human check passed). The retained worker is released after the commit.
+
+## 3. Summary
+
+| Task | Result | Attempts | Implementer | Commit |
+| --- | --- | --- | --- | --- |
+| T-01 Server wrong-type guard (`400`) | PASS | 1 | Grok | `87f64af58` |
+| T-02 Client linkable-results service | PASS | 2 (attempt 1 FAIL: K-002 spec type-check evidence missing) | Grok | `12ac4d7b6` |
+| T-03 Enable and wire the pickers + HITL design follow-up | PASS + human check | 1 (+1 owner-requested follow-up) | Grok | this commit |
+
+**Budget, design §11:**
+- Tasks: 3 of 3.
+- Review rounds: 5 against the expected 4. The overrun is the owner-requested HITL design follow-up and was raised to the owner at dispatch.
+
+**Full suites, Leader-measured.** The commands are the citation; the figures are not restated elsewhere.
+- Server, `npm test -- --silent`: green after T-01.
+- Client, `npm test -- --silent`: green after T-03 follow-up 1. Every client measurement needed a re-run because of the jest worker SIGSEGV flake, which hit a different unrelated suite each time with 0 failed tests. The `workerIdleMemoryLimit` mitigation is still absent from `jest.config.ts`.
+
+**Open items (recorded, not actioned — advisories never become tasks):**
+- Duplicate `main()` and the stale error flag (T-03 Reviewer advisory 1). app-select fires `main(id)` twice per mount. The T-02 service clears `error` only at call start, so one failed duplicate plus one successful duplicate leaves the picker disabled with "could not be loaded". It was raised to the owner and needs an owner decision.
+- T-01 advisories:
+  - the `String()` id normalisation;
+  - the `0`-vs-truthiness edge;
+  - the test mock leak.
+- T-03 follow-up advisories:
+  - a "no tag on the closed value" assertion in the read-only tests;
+  - the strength of the service-spec assertion.
+- Design §13 known limitation: a saved link whose target later became status 7 or 8 shows the placeholder.

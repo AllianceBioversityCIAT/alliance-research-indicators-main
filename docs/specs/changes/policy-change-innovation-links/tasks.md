@@ -4,7 +4,7 @@
 
 - **Module:** results (policy change)
 - **Spec id:** `changes/policy-change-innovation-links`
-- **Status:** not-started
+- **Status:** done
 - **Owner:** d.casanas@cgiar.org
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md
@@ -88,7 +88,7 @@
 
 ### T-03 — Client: enable and wire the two pickers
 
-- **Status:** [ ] todo
+- **Status:** [x] done
 - **Size:** S
 - **Depends on:** T-02
 - **Requirements covered:** R-PCIL-001 code+title label and search; R-PCIL-002 same; R-PCIL-003 every row of design §5.1 (loading, error, empty, enabled, read-only); R-PCIL-003 "Read-only result" scenario; R-PCIL-004 "Round trip" (client binding of `innovation_development` / `innovation_use`); NFR-PCIL-002
@@ -119,9 +119,9 @@
   - A submitted result → both pickers read-only.
   - **No commit before this check passes** (user rule).
 - **Done:**
-  - [ ] All §5.1 rows covered for both pickers; three falsifiers observed red and quoted
-  - [ ] Full client suite green; build exit 0; lint clean
-  - [ ] Human check passed and recorded in `execution.md`
+  - [x] All §5.1 rows covered for both pickers; three falsifiers observed red and quoted
+  - [x] Full client suite green; build exit 0; lint clean
+  - [x] Human check passed and recorded in `execution.md`
 - **Skills:** `angular-developer`, `ui-ux-pro-max`
 
 ## 4. Coverage closure (clause level)
