@@ -158,3 +158,16 @@
 - **Final status:** PASS on attempt 2 (post-pivot; the attempt-1 FAIL was a spec defect) · **Requirements covered:** R-TIP-001 (end to end + re-sync payload half), R-TIP-002, R-TIP-003 (run gate, actor, ERROR, two years, duplicate), R-TIP-005, R-TIP-007, NFR-TIP-001, NFR-TIP-002 (`error` line).
 - **Decisions made:** P-18 refuted → owner chose `is_snapshot` on both sides (first amendment, literal `false`, superseded by Pivot T-03 → PRMS precedent); §12 gains the TIP id (owner). T-04 gains a full no-year double-sync check.
 - **Final verification:** VERIFIED (attempt 2 re-run above).
+
+### T-04 — Full gates and HITL Dev run — automated half PASS; human half pending
+
+- **Date:** 2026-10-20 · **Run by:** Leader, inline, after every worker was released (no concurrent agent — root `CLAUDE.md` §4.3).
+- **Full server suite:** `npm test -- --silent` (from `server/researchindicators/`) → `Test Suites: 430 passed, 430 total` · `Tests: 4213 passed, 4213 total` · `Snapshots: 1 passed, 1 total`. Scope note (KZ-017): `npm test` uses `rootDir: "src"` and does not run `test:e2e`, `test:integration`, or `test:fixtures`.
+- **Build:** `npm run build` → exit 0 (excludes `**/*spec.ts`; the spec type gate was `tsc -p tsconfig.json`, green at each task).
+- **Lint:** `npx eslint src/domain/tools/tip-integration src/domain/entities/bilateral` → exit 0.
+- **Diff of this task:** empty (no file changed) — the `skip-eligible` claim for T-04 rests on the human observation, which is still owed.
+- **Pending — human, on Dev after deploy (`tasks.md` T-04 Verification):**
+  1. Trigger TIP sync for 2026; open a result from agreement `A132` (e.g. TIP id 19191): Alignment tab lists `A132` (primary), `A171`, `A1824`; Pool Funding tab shows `SP01`, `HLO1.AOW1.IO1 Steer to impact`, non-null level and indicator, contribution `1`, read-only. Settles P-16 (High), P-17.
+  2. (Pivot T-03) Full **no-year** TIP sync twice; for a link TIP returns in two years, `SELECT result_id, report_year_id, is_snapshot FROM results WHERE platform_code='TIP' AND public_link=<link>` shows no new rows after run 2, and the earlier year's row carries its own pool funding.
+  - Catalog TTL: allow one 5-min window (K-016) before calling level/indicator missing.
+- **Status:** `[~]` until the human observation is quoted here.

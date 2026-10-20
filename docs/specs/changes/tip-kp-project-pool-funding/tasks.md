@@ -131,7 +131,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 
 ### T-04 — Full gates and HITL Dev run
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-03
+- [~] **Status:** automated gates green 2026-10-20; human Dev run pending · **Size:** S · **Dependencies:** T-03
 - **Requirements covered:**
   - The defect class *Real TIP payload / catalog shape differs from the sample* (requirements §7) — the only class with no automated gate.
   - Settles P-16 (High) and P-17; P-18 if T-03 could not run it.
@@ -148,7 +148,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 - **Consumers:** none.
 - **Review:** `skip-eligible` — claim to prove: the diff of this task is empty (no file changed); its evidence is the Leader's suite run plus the quoted human observation.
 - **Done criteria:**
-  - [ ] Full server suite, build, eslint green (output summary quoted).
+  - [x] Full server suite, build, eslint green (output summary quoted).
   - [ ] Human observation quoted, covering each check above; P-16/P-17 rows updated in `design.md` to verified or refuted.
 - **Skills:** `systematic-debugging` (only if the Dev run disagrees).
 
