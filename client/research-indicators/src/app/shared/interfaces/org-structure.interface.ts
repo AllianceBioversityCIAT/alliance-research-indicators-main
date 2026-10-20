@@ -180,3 +180,17 @@ export interface OrgHistory {
   versions: OrgUnitVersionView[];
   log: OrgChangeLogRow[];
 }
+
+// @akili-spec institutional-performance/organizational-structure T-04 (client half) — design §4 B8, §6.6.
+
+/** One registered consumer and how many of its records use the entry. */
+export interface OrgLinkedConsumer {
+  consumer: string;
+  count: number;
+}
+
+/** B8 `data`: the child count plus one row per registered consumer. */
+export interface OrgLinkedData {
+  childCount: number;
+  consumers: OrgLinkedConsumer[];
+}

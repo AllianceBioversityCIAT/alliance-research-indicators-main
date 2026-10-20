@@ -35,3 +35,6 @@ export const ORG_CODE_PREFIX = 'ORG-';
 /** Accepted years: 2000 to current + 10 (design 5.1). */
 export const ORG_MIN_YEAR = 2000;
 export const ORG_MAX_YEARS_AHEAD = 10;
+
+/** C1 (design 4): the most entries one `resolve` call accepts. */
+export const ORG_MAX_RESOLVE_IDS = 200;

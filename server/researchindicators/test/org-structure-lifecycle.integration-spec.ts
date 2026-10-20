@@ -22,6 +22,7 @@ import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
 import { RolesGuard } from '../src/domain/shared/guards/roles.guard';
 import { SetUpInterceptor } from '../src/domain/shared/Interceptors/setup.interceptor';
 import { SecRolesEnum } from '../src/domain/shared/enum/sec_role.enum';
+import { OrgTestConsumer } from './support/org-test-consumer';
 import {
   createOrgTestDataSource,
   OrgFixtures,
@@ -54,7 +55,7 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
   let seq = 0;
 
   const registry = new OrgUnitUsageRegistry();
-  const linked = new Map<number, number>();
+  const consumer = new OrgTestConsumer();
 
   let dir: string;
   let del1: string;
@@ -175,11 +176,7 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
     del2 = await fixtures.staff('LC', 'Marta', 'Ruiz', true);
 
     // The test consumer of design 5.5 / R-ORG-008 "Linked records block".
-    registry.register({
-      consumerName: 'Test consumer',
-      countByUnitIds: async (ids) =>
-        Object.fromEntries(ids.map((id) => [id, linked.get(id) ?? 0])),
-    });
+    consumer.register(registry);
 
     const moduleRef = await Test.createTestingModule({
       controllers: [OrganizationalStructureController],
@@ -585,7 +582,7 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
   describe('linked records block the delete, not the inactivate (R-ORG-008)', () => {
     it('a test consumer reporting 5 makes the delete a 409 stating 5 and proposing Inactivate; at 0 the delete goes through', async () => {
       const id = await created({ name: 'Linked' });
-      linked.set(id, 5);
+      consumer.setCount(id, 5);
       const before = await snapshot([id]);
 
       const blocked = await del(id);
@@ -598,7 +595,7 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
       expect(inactive.status).toBe(200);
 
       const other = await created({ name: 'Free' });
-      linked.set(other, 0);
+      consumer.setCount(other, 0);
       expect((await del(other)).status).toBe(200);
     });
 

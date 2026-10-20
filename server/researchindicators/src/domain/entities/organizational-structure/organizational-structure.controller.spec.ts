@@ -7,13 +7,17 @@ import { OrgStructureService } from './organizational-structure.service';
 import { ROLES_KEY } from '../../shared/guards/roles.guard';
 import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 
-describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10; T-03: B6, B7, B11, B12, B13)', () => {
+describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9, B10; T-03: B6, B7, B11, B12, B13; T-04: B8, C1, C2, C3)', () => {
   const readService = {
     getYearView: jest.fn(),
     getYearRange: jest.fn(),
     getUnitDetail: jest.fn(),
     getUnitHistory: jest.fn(),
     getChangeLog: jest.fn(),
+    getLinkedData: jest.fn(),
+    resolve: jest.fn(),
+    ancestors: jest.fn(),
+    successors: jest.fn(),
   };
   const service = {
     proposeCode: jest.fn(),
@@ -40,18 +44,28 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
     (name) => name !== 'constructor' && typeof proto[name] === 'function',
   );
 
+  // T-04 (R-ORG-012): the consumer reads are the ONLY handlers without roles.
+  const consumerHandlerNames = ['resolve', 'getAncestors', 'getSuccessors'];
+  const adminHandlerNames = handlerNames.filter(
+    (name) => !consumerHandlerNames.includes(name),
+  );
+
   beforeEach(() => jest.clearAllMocks());
 
   describe('roles metadata (R-ORG-012, NFR-ORG-004)', () => {
-    it('discovers exactly the handlers of T-01, T-02 and T-03', () => {
+    it('discovers exactly the handlers of T-01 to T-04', () => {
       expect(handlerNames).toEqual([
         'getYearView',
         'getCodeProposal',
         'searchStaff',
         'getYears',
         'getChangeLog',
+        'resolve',
         'getUnit',
         'getUnitHistory',
+        'getLinkedData',
+        'getAncestors',
+        'getSuccessors',
         'createUnit',
         'updateUnit',
         'inactivateUnit',
@@ -60,13 +74,28 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       ]);
     });
 
-    it.each(handlerNames)(
+    it.each(adminHandlerNames)(
       '%s declares exactly [CENTER_ADMIN, SYSTEM_ADMIN]',
       (handlerName) => {
         expect(Reflect.getMetadata(ROLES_KEY, proto[handlerName])).toEqual([
           SecRolesEnum.CENTER_ADMIN,
           SecRolesEnum.SYSTEM_ADMIN,
         ]);
+      },
+    );
+
+    // R-ORG-012 AC.1 / design 4: C1-C3 are open to any authenticated user. A
+    // `@Roles` here, on the handler or inherited from the class, would turn a
+    // Contributor's read into a 403 (falsifier 5).
+    it.each(consumerHandlerNames)(
+      '%s (consumer read) declares NO roles, on the handler or the class',
+      (handlerName) => {
+        expect(
+          Reflect.getMetadata(ROLES_KEY, proto[handlerName]),
+        ).toBeUndefined();
+        expect(
+          Reflect.getMetadata(ROLES_KEY, OrganizationalStructureController),
+        ).toBeUndefined();
       },
     );
 
@@ -88,6 +117,8 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       'getYearView',
       'searchStaff',
       'getChangeLog',
+      'resolve',
+      'getAncestors',
       'createUnit',
       'updateUnit',
       'inactivateUnit',
@@ -120,15 +151,19 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       path: Reflect.getMetadata(PATH_METADATA, proto[name]) as string,
     }));
 
-    it('exposes exactly B1-B7, B9-B13 on the design paths (no PUT; DELETE only on `units/:id`)', () => {
+    it('exposes exactly B1-B13 and C1-C3 on the design paths (no PUT; DELETE only on `units/:id`)', () => {
       expect(routes.map((r) => [r.method, r.path])).toEqual([
         [RequestMethod.GET, 'units'],
         [RequestMethod.GET, 'units/code-proposal'],
         [RequestMethod.GET, 'staff'],
         [RequestMethod.GET, 'years'],
         [RequestMethod.GET, 'change-log'],
+        [RequestMethod.GET, 'resolve'],
         [RequestMethod.GET, 'units/:id'],
         [RequestMethod.GET, 'units/:id/history'],
+        [RequestMethod.GET, 'units/:id/linked-data'],
+        [RequestMethod.GET, 'units/:id/ancestors'],
+        [RequestMethod.GET, 'units/:id/successors'],
         [RequestMethod.POST, 'units'],
         [RequestMethod.PATCH, 'units/:id'],
         [RequestMethod.POST, 'units/:id/inactivate'],
@@ -295,6 +330,52 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
     });
   });
 
+  describe('Swagger for the T-04 handlers (NFR-ORG-006)', () => {
+    const paramsOf = (handler: string) =>
+      (Reflect.getMetadata(DECORATORS.API_PARAMETERS, proto[handler]) ??
+        []) as Array<{ name: string; in: string; required?: boolean }>;
+
+    it('C1 documents a REQUIRED ids query and an optional year; C2 an id param and an optional year; C3 an id param; B8 an id param', () => {
+      expect(
+        [...paramsOf('resolve')].sort((a, b) => a.name.localeCompare(b.name)),
+      ).toEqual([
+        expect.objectContaining({ in: 'query', name: 'ids', required: true }),
+        expect.objectContaining({ in: 'query', name: 'year', required: false }),
+      ]);
+      expect(
+        paramsOf('getAncestors')
+          .map((p) => `${p.in}:${p.name}`)
+          .sort(),
+      ).toEqual(['path:id', 'query:year']);
+      expect(paramsOf('getSuccessors').map((p) => `${p.in}:${p.name}`)).toEqual(
+        ['path:id'],
+      );
+      expect(paramsOf('getLinkedData').map((p) => `${p.in}:${p.name}`)).toEqual(
+        ['path:id'],
+      );
+    });
+
+    it('C1 documents the row shapes in its 200 response: null-version cases and `missing` rows', () => {
+      const responses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        proto.resolve,
+      );
+      const text: string = responses['200'].description;
+      expect(text).toContain('{ id, missing: true }');
+      expect(text).toContain('before its first version');
+      expect(text).toContain('reactivation gap');
+    });
+
+    it('B8 documents the shape of `data` in its 200 response', () => {
+      const responses = Reflect.getMetadata(
+        DECORATORS.API_RESPONSE,
+        proto.getLinkedData,
+      );
+      expect(responses['200'].description).toContain('childCount');
+      expect(responses['200'].description).toContain('consumers');
+    });
+  });
+
   describe('envelope per handler', () => {
     it('B1 wraps the year view with status 200', async () => {
       readService.getYearView.mockResolvedValue([{ id: 1 }]);
@@ -424,6 +505,48 @@ describe('OrganizationalStructureController (T-01: B1, B2, B5; T-02: B3, B4, B9,
       expect(result).toMatchObject({
         status: HttpStatus.OK,
         data: { id: 90, mode: 'logical', fromYear: 2027 },
+      });
+    });
+  });
+  describe('envelope of the T-04 handlers', () => {
+    it('C1 passes ids and year and wraps the rows with status 200', async () => {
+      readService.resolve.mockResolvedValue([{ id: 57, version: null }]);
+      const result = await controller.resolve({ ids: [57], year: 2030 });
+      expect(readService.resolve).toHaveBeenCalledWith([57], 2030);
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: [{ id: 57, version: null }],
+      });
+    });
+
+    it('C2 and C3 pass the numeric id (and year) and wrap the chain with status 200', async () => {
+      readService.ancestors.mockResolvedValue([{ id: 57 }]);
+      readService.successors.mockResolvedValue([{ id: 58 }]);
+      expect(await controller.getAncestors(57, { year: 2028 })).toMatchObject({
+        status: HttpStatus.OK,
+        data: [{ id: 57 }],
+      });
+      expect(readService.ancestors).toHaveBeenCalledWith(57, 2028);
+      expect(await controller.getSuccessors(57)).toMatchObject({
+        status: HttpStatus.OK,
+        data: [{ id: 58 }],
+      });
+      expect(readService.successors).toHaveBeenCalledWith(57);
+    });
+
+    it('B8 passes the numeric id and wraps the linked data with status 200', async () => {
+      readService.getLinkedData.mockResolvedValue({
+        childCount: 2,
+        consumers: [{ consumer: 'Test consumer', count: 3 }],
+      });
+      const result = await controller.getLinkedData(57);
+      expect(readService.getLinkedData).toHaveBeenCalledWith(57);
+      expect(result).toMatchObject({
+        status: HttpStatus.OK,
+        data: {
+          childCount: 2,
+          consumers: [{ consumer: 'Test consumer', count: 3 }],
+        },
       });
     });
   });

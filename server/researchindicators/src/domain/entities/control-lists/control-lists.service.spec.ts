@@ -1980,6 +1980,36 @@ describe('ControlListsService', () => {
     });
   });
 
+  // @akili-spec institutional-performance/organizational-structure (T-04, R-ORG-011 AC.2):
+  // the registry check is a pre-check; a consumer that never registered, or a
+  // race, reaches the database FK (errno 1451) and must read as 409, not 500.
+  describe('removeValue FK backstop (errno 1451, org-structure T-04)', () => {
+    it('maps a simulated errno 1451 to a 409 proposing deactivation when the registry reports 0', async () => {
+      mockValueFindOne.mockResolvedValue(
+        buildValue({ id: 23, list_id: 2, value: 'L4 Unit' }),
+      );
+      mockGetInUseCount.mockResolvedValue(0);
+      mockValueDelete.mockRejectedValue({ errno: 1451 });
+
+      await expect(service.removeValue(23)).rejects.toMatchObject({
+        status: 409,
+        response: {
+          message: { description: expect.stringMatching(/deactivate/i) },
+        },
+      });
+      expect(logSpy).not.toHaveBeenCalled();
+    });
+
+    it('rethrows any other delete error unchanged', async () => {
+      const failure = { errno: 1205, message: 'lock wait timeout' };
+      mockValueFindOne.mockResolvedValue(buildValue({ id: 9, list_id: 2 }));
+      mockGetInUseCount.mockResolvedValue(0);
+      mockValueDelete.mockRejectedValue(failure);
+
+      await expect(service.removeValue(9)).rejects.toBe(failure);
+    });
+  });
+
   describe('getValuesByKey (A13, T-04, R-CLG-009)', () => {
     // R-CLG-004: the key alone selects the list - no scope key in the lookup.
     it('throws NotFoundException for an unknown key (R-CLG-004 AC.1) without building a query', async () => {

@@ -38,6 +38,8 @@ import { InactivateOrgUnitDto } from './dto/inactivate-org-unit.dto';
 import { ReactivateOrgUnitDto } from './dto/reactivate-org-unit.dto';
 import { DeleteOrgUnitQueryDto } from './dto/delete-org-unit-query.dto';
 import { ChangeLogQueryDto } from './dto/change-log-query.dto';
+import { ResolveQueryDto } from './dto/resolve-query.dto';
+import { AncestorsQueryDto } from './dto/ancestors-query.dto';
 import { RolesGuard } from '../../shared/guards/roles.guard';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -53,7 +55,10 @@ import { SecRolesEnum } from '../../shared/enum/sec_role.enum';
 // T-01 holds the read half (B1, B2, B5); T-02 adds the save engine (B9, B10),
 // the code proposal (B3) and the staff search (B4); T-03 adds the history and
 // change-log reads (B6, B7) and the lifecycle (B11 inactivate, B12 reactivate,
-// B13 delete). There is NO write route under `change-log` (R-ORG-009 AC.2). No portfolio parameter
+// B13 delete); T-04 adds the linked-data read (B8, admin) and the CONSUMER reads
+// C1 `resolve`, C2 `ancestors`, C3 `successors`, which carry NO `@Roles` (any
+// authenticated user, R-ORG-012; `JwtMiddleware` still rejects anonymous calls).
+// There is NO write route under `change-log` (R-ORG-009 AC.2). No portfolio parameter
 // anywhere (R-ORG-001 AC.1); a write body that sends `portfolioId` is a 400.
 @Controller()
 @ApiTags('Organizational Structure')
@@ -199,6 +204,47 @@ export class OrganizationalStructureController {
     );
   }
 
+  // C1 - literal route, declared before the `units/:id` routes. Consumer read: NO @Roles.
+  @Get('resolve')
+  @ApiOperation({
+    summary:
+      'Resolve entries for a year: the covering version, the status that year and the current delegates (any authenticated user)',
+  })
+  @ApiQuery({
+    name: 'ids',
+    type: String,
+    required: true,
+    description:
+      'Permanent entry ids, comma-separated, 1 to 200. Missing or more than 200 returns 400; an id that does not exist returns { id, missing: true } in its place (200)',
+  })
+  @ApiQuery({
+    name: 'year',
+    type: Number,
+    required: false,
+    description:
+      'Structure year (default: current year). Accepted: 2000 to current year + 10; otherwise 400. A year with no covering version returns the row with `version: null` and the status of that year',
+  })
+  @ApiOkResponse({
+    description:
+      "data = one row per distinct id, in request order. A resolved row: { id, code, year, status ('active' | 'inactive' | 'deleted' as of that year), statusFromYear, successorId, version, delegates }. `version` is the covering version, or null when none covers the year: at or after the entry's end, inside a reactivation gap (status of that year), or before its first version (status 'inactive', not distinguishable from a gap year). An id that does not exist is { id, missing: true } in its place and the call still returns 200",
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async resolve(@Query() query: ResolveQueryDto) {
+    return this.readService.resolve(query.ids, query.year).then((data) =>
+      ResponseUtils.format({
+        description: 'Organizational units resolved',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
   // B5 — declared after every literal route so `:id` cannot swallow them.
   @Get('units/:id')
   @ApiOperation({
@@ -239,6 +285,94 @@ export class OrganizationalStructureController {
     return this.readService.getUnitHistory(id).then((data) =>
       ResponseUtils.format({
         description: 'Organizational unit history found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // B8
+  @Get('units/:id/linked-data')
+  @ApiOperation({
+    summary:
+      'Linked data of an entry: child count and the records each registered consumer holds',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Permanent entry id',
+  })
+  @ApiOkResponse({
+    description:
+      'data = { childCount, consumers: [{ consumer, count }] }; consumers reporting 0 are left out, so an entry with no linked data returns childCount 0 and an empty list',
+  })
+  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
+  async getLinkedData(@Param('id', ParseIntPipe) id: number) {
+    return this.readService.getLinkedData(id).then((data) =>
+      ResponseUtils.format({
+        description: 'Linked data found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // C2. Consumer read: NO @Roles.
+  @Get('units/:id/ancestors')
+  @ApiOperation({
+    summary:
+      'Chain from an entry up to its L1 root as of a year, entry first (any authenticated user)',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Permanent entry id. Unknown returns 404',
+  })
+  @ApiQuery({
+    name: 'year',
+    type: Number,
+    required: false,
+    description:
+      'Structure year (default: current year). 400 when out of range or when the entry has no version covering it',
+  })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async getAncestors(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: AncestorsQueryDto,
+  ) {
+    return this.readService.ancestors(id, query.year).then((data) =>
+      ResponseUtils.format({
+        description: 'Ancestors found',
+        data,
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
+  // C3. Consumer read: NO @Roles.
+  @Get('units/:id/successors')
+  @ApiOperation({
+    summary:
+      'Successor chain of an entry in order, first successor first (any authenticated user)',
+  })
+  @ApiParam({
+    name: 'id',
+    type: Number,
+    required: true,
+    description: 'Permanent entry id. Unknown returns 404',
+  })
+  async getSuccessors(@Param('id', ParseIntPipe) id: number) {
+    return this.readService.successors(id).then((data) =>
+      ResponseUtils.format({
+        description: 'Successors found',
         data,
         status: HttpStatus.OK,
       }),

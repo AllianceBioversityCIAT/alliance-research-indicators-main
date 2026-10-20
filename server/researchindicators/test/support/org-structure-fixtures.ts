@@ -17,6 +17,12 @@ import { DataSource } from 'typeorm';
 export const ORG_FIXTURE_PREFIX = '__T01_';
 /** T-02 suites create entries through the HTTP write path with this code prefix. */
 export const ORG_T02_PREFIX = '__T02_';
+/**
+ * T-04 consumer suite: its OWN prefix. `org-structure-year-view` treats every
+ * `__T01_` entry as its own and asserts exact sets, so a parallel suite that
+ * reused that prefix would leak rows into its year views (KZ-005).
+ */
+export const ORG_T04_PREFIX = '__T04_';
 
 /** Refuse to run against anything that is not the local database. */
 export const assertLocalTestDatabase = (label: string): void => {
@@ -71,7 +77,10 @@ export class OrgFixtures {
   readonly unitIds: number[] = [];
   readonly staffCarnets: string[] = [];
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly prefix: string = ORG_FIXTURE_PREFIX,
+  ) {}
 
   async staff(
     suffix: string,
@@ -79,7 +88,7 @@ export class OrgFixtures {
     last: string,
     isActive: boolean,
   ): Promise<string> {
-    const carnet = `${ORG_FIXTURE_PREFIX}${suffix}`;
+    const carnet = `${this.prefix}${suffix}`;
     await this.dataSource.query(
       `INSERT INTO alliance_user_staff (carnet, first_name, last_name, email, is_active, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
@@ -107,7 +116,7 @@ export class OrgFixtures {
       `INSERT INTO org_units (code, status, status_from_year, created_at)
        VALUES (?, ?, ?, NOW())`,
       [
-        `${ORG_FIXTURE_PREFIX}${suffix}`,
+        `${this.prefix}${suffix}`,
         opts.status ?? 'active',
         opts.statusFromYear ?? null,
       ],
@@ -165,14 +174,14 @@ export class OrgFixtures {
       );
       await this.dataSource.query(
         `DELETE FROM org_units WHERE id IN (${ids}) AND (code LIKE ? OR code LIKE ?)`,
-        [...this.unitIds, `${ORG_FIXTURE_PREFIX}%`, `${ORG_T02_PREFIX}%`],
+        [...this.unitIds, `${this.prefix}%`, `${ORG_T02_PREFIX}%`],
       );
     }
     if (this.staffCarnets.length > 0) {
       const carnets = this.staffCarnets.map(() => '?').join(',');
       await this.dataSource.query(
         `DELETE FROM alliance_user_staff WHERE carnet IN (${carnets}) AND carnet LIKE ?`,
-        [...this.staffCarnets, `${ORG_FIXTURE_PREFIX}%`],
+        [...this.staffCarnets, `${this.prefix}%`],
       );
     }
   }

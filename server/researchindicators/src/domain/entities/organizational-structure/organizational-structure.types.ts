@@ -144,3 +144,65 @@ export interface OrgDeleteResult {
   /** The end year actually applied: null for a physical delete; for an already-inactive entry, its existing end year. */
   fromYear: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// T-04: consumer contract (design 4, C1-C3, B8; D-ORG-18).
+// ---------------------------------------------------------------------------
+
+/** The version of an entry that covers a requested year (C1). */
+export type OrgResolvedVersion = Omit<OrgUnitVersionResponse, 'id'>;
+
+/**
+ * One C1 row (R-ORG-010). `version` is `null` when no version covers `year`:
+ * at or after the entry's end, inside a D-ORG-17 gap, or before its first
+ * version (D-ORG-18). `status` is the status AS OF `year`, never the current one.
+ */
+export interface OrgResolvedUnit {
+  id: number;
+  code: string;
+  year: number;
+  status: OrgUnitStatus;
+  /** The year the entry ended (inactive or deleted), as stored; `null` while active. */
+  statusFromYear: number | null;
+  successorId: number | null;
+  version: OrgResolvedVersion | null;
+  /** CURRENT list, not per year (R-ORG-017). */
+  delegates: OrgStaffRef[];
+}
+
+/** C1 row for an id that does not exist (never did, or physically deleted), D-ORG-19. */
+export interface OrgMissingUnit {
+  id: number;
+  missing: true;
+}
+
+/** One C1 row: a resolved entry or a `missing` marker, in request order. */
+export type OrgResolveRow = OrgResolvedUnit | OrgMissingUnit;
+
+/** One link of the C2 chain, as of the requested year. */
+export interface OrgAncestorNode {
+  id: number;
+  code: string;
+  name: string;
+  acronym: string | null;
+  levelId: number;
+  levelCode: OrgLevelCode | null;
+  levelName: string | null;
+  parentId: number | null;
+}
+
+/** One link of the C3 chain. */
+export interface OrgSuccessorNode {
+  id: number;
+  code: string;
+  status: OrgUnitStatus;
+  statusFromYear: number | null;
+  successorId: number | null;
+}
+
+/** B8: child count plus one row per registered consumer that reports a record. */
+export interface OrgLinkedData {
+  /** Distinct entries with a version under this entry that covers the current year or later. */
+  childCount: number;
+  consumers: Array<{ consumer: string; count: number }>;
+}

@@ -40,6 +40,8 @@ import { controlListNaturalCompare } from './control-list-natural-compare.util';
 // (typeorm/error/QueryFailedError.js), so `error.errno` is readable directly
 // — no `.driverError` indirection needed.
 const MYSQL_DUPLICATE_ENTRY_ERRNO = 1062;
+// @akili-spec institutional-performance/organizational-structure (T-04, R-ORG-011 AC.2)
+const MYSQL_ROW_IS_REFERENCED_ERRNO = 1451;
 
 // R-CLG-009 "Applies to" of one value, as the reads expose it (see
 // `ControlListValueResponse`). A value with no entry in the batch map has no
@@ -582,7 +584,25 @@ export class ControlListsService {
 
     // Physical delete (D-CTL-5). The list-has-values rule lives on A8, not
     // here.
-    await this.valueRepository.delete(id);
+    // @akili-spec institutional-performance/organizational-structure (T-04,
+    // R-ORG-011 AC.2): a consumer FK (ON DELETE RESTRICT) is the race / missing
+    // registration backstop behind the registry check above; errno 1451 reads
+    // as the same 409, never a 500. Same technique as the 1062 mapping.
+    try {
+      await this.valueRepository.delete(id);
+    } catch (error) {
+      if (
+        (error as { errno?: number })?.errno === MYSQL_ROW_IS_REFERENCED_ERRNO
+      ) {
+        this.logger._warn(
+          `control_lists.blocked_delete entity=control_list_value id=${id} reason=fk_restrict`,
+        );
+        this.throwNonFieldConflict(
+          `Value "${value.value}" is referenced by a record of another module and cannot be deleted; deactivate it instead`,
+        );
+      }
+      throw error;
+    }
 
     this.logWrite('deleted', 'control_list_value', id);
 

@@ -45,6 +45,7 @@ import {
   OrgCodeProposal,
   OrgDeleteResult,
   OrgHistory,
+  OrgLinkedData,
   OrgLifecyclePayload,
   OrgStaffOption,
   OrgUnitCreatePayload,
@@ -290,6 +291,11 @@ export class ApiService {
   // @akili-spec institutional-performance/organizational-structure T-03 (B6, B11, B12, B13) — lifecycle and history.
   GET_OrgStructureHistory = (id: number): Promise<MainResponse<OrgHistory>> => {
     return this.TP.get(`organizational-structure/units/${id}/history`, {});
+  };
+
+  // @akili-spec institutional-performance/organizational-structure T-04 (B8) — Linked data tab.
+  GET_OrgStructureLinkedData = (id: number): Promise<MainResponse<OrgLinkedData>> => {
+    return this.TP.get(`organizational-structure/units/${id}/linked-data`, {});
   };
 
   POST_OrgStructureInactivate = (id: number, body: OrgLifecyclePayload): Promise<MainResponse<unknown>> => {

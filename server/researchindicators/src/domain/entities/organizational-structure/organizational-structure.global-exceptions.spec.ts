@@ -25,6 +25,7 @@ describe('Organizational Structure — real GlobalExceptions contract (T-01)', (
     { findStaffByUnitIds: jest.fn().mockResolvedValue([]) } as never,
     { currentYear: () => 2026 },
     { findRowsByUnit: jest.fn().mockResolvedValue([]) } as never,
+    { getBreakdown: jest.fn().mockResolvedValue([]) } as never,
   );
 
   const run = async (action: () => Promise<unknown>) => {

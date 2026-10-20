@@ -11,6 +11,8 @@ import {
   OrgUnitVersionRepository,
   VersionDetailRawRow,
 } from './repositories/org-unit-version.repository';
+import { In } from 'typeorm';
+import { OrgUnit } from './entities/org-unit.entity';
 import {
   DelegateStaffRawRow,
   OrgUnitDelegateRepository,
@@ -20,18 +22,26 @@ import {
   OrgUnitChangeLogRepository,
 } from './repositories/org-unit-change-log.repository';
 import { OrgStructureClock } from './org-structure.clock';
+import { OrgUnitUsageRegistry } from './org-unit-usage.registry';
 import {
   ORG_LEVEL_BY_ID,
+  ORG_MAX_RESOLVE_IDS,
   ORG_MAX_YEARS_AHEAD,
   ORG_MIN_YEAR,
 } from './org-structure.constants';
 import {
+  OrgAncestorNode,
   OrgChangeAction,
   OrgChangeLogRow,
   OrgLevelCode,
+  OrgLinkedData,
+  OrgResolveRow,
+  OrgResolvedVersion,
   OrgStaffRef,
+  OrgSuccessorNode,
   OrgUnitDetailResponse,
   OrgUnitHistoryResponse,
+  OrgUnitStatus,
   OrgUnitVersionResponse,
   YearRange,
   YearViewRow,
@@ -42,7 +52,10 @@ import {
  * and one entry with its versions. A SINGLETON by design (D-ORG-1 / P-5): it
  * injects repositories and the clock only, never `CurrentUserUtil`, so a
  * consumer module can inject it without being pulled into request scope. It
- * is also the surface other modules will call in-process (T-04).
+ * is also the surface other modules call in-process (T-04): `resolve`,
+ * `ancestors`, `successors` and `assertExists` (design 4, "Exported in-process
+ * API"). The usage registry it also reads (B8) has no constructor
+ * dependencies, so the singleton property holds.
  */
 @Injectable()
 export class OrgStructureReadService {
@@ -52,6 +65,7 @@ export class OrgStructureReadService {
     private readonly delegateRepository: OrgUnitDelegateRepository,
     private readonly clock: OrgStructureClock,
     private readonly changeLogRepository: OrgUnitChangeLogRepository,
+    private readonly usageRegistry: OrgUnitUsageRegistry,
   ) {}
 
   /** Accepted years: 2000 to current + 10 (design 5.1); anything else is a 400 naming `year`. */
@@ -153,6 +167,196 @@ export class OrgStructureReadService {
   async getChangeLog(unitId: number): Promise<OrgChangeLogRow[]> {
     const rows = await this.changeLogRepository.findRowsByUnit(unitId);
     return rows.map((row) => this.toLogRow(row));
+  }
+
+  /**
+   * C1 (R-ORG-010, D-ORG-18). One row per requested id, in request order
+   * (duplicates collapsed). `year` defaults to the current year.
+   * - A version covers the year: `version` set, status `active`.
+   * - No version covers it (at or after the end, inside a D-ORG-17 gap, or
+   *   before the first version): `version: null`; status is the entry's end
+   *   status when the year is at or after `status_from_year`, otherwise
+   *   `inactive` (the entry had no covered version that year).
+   * An id that does not exist (never did, or physically deleted) returns
+   * `{ id, missing: true }` in its place and the call still succeeds, so a
+   * roll-up never loses the other ids (D-ORG-19). `assertExists`, C2 and C3
+   * keep their 404.
+   * Delegates are the CURRENT list (R-ORG-017).
+   *
+   * @akili-spec institutional-performance/organizational-structure
+   */
+  async resolve(ids: number[], year?: number): Promise<OrgResolveRow[]> {
+    const unique = this.normalizeIds(ids);
+    const resolveYear = year ?? this.clock.currentYear();
+    this.assertYearInRange(resolveYear);
+
+    const units = await this.loadUnits(unique);
+    const [rows, delegates] = await Promise.all([
+      this.versionRepository.findCoveringByUnits(unique, resolveYear),
+      this.delegatesByUnit(unique),
+    ]);
+    const coveringByUnit = new Map(
+      rows.map((row) => [Number(row.org_unit_id), row]),
+    );
+
+    return unique.map((id) => {
+      const unit = units.get(id);
+      if (!unit) return { id, missing: true as const };
+      const covering = coveringByUnit.get(id);
+      return {
+        id,
+        code: unit.code,
+        year: resolveYear,
+        status: covering
+          ? 'active'
+          : this.statusWithoutVersion(unit, resolveYear),
+        statusFromYear: unit.status_from_year ?? null,
+        successorId: this.toNullableNumber(unit.successor_id),
+        version: covering ? this.toResolvedVersion(covering) : null,
+        delegates: delegates.get(id) ?? [],
+      };
+    });
+  }
+
+  /**
+   * C2: the chain from the entry (first) up to its L1 root (last), as the
+   * structure stood in `year`. 404 for an unknown entry; 400 naming `year` when
+   * the entry itself has no version covering it.
+   */
+  async ancestors(id: number, year?: number): Promise<OrgAncestorNode[]> {
+    const ancestorYear = year ?? this.clock.currentYear();
+    this.assertYearInRange(ancestorYear);
+    await this.loadUnitsOrFail([id]);
+
+    const chain: OrgAncestorNode[] = [];
+    const seen = new Set<number>();
+    let current: number | null = id;
+    while (current !== null && !seen.has(current)) {
+      seen.add(current);
+      const [row] = await this.versionRepository.findCoveringByUnits(
+        [current],
+        ancestorYear,
+      );
+      if (!row) {
+        if (chain.length === 0) {
+          throw new BadRequestException({
+            message: {
+              description: `Organizational unit ${id} has no version covering year ${ancestorYear}`,
+              field: 'year',
+            },
+          });
+        }
+        break;
+      }
+      chain.push({
+        id: Number(row.org_unit_id),
+        code: row.unit_code,
+        name: row.name,
+        acronym: row.acronym ?? null,
+        levelId: Number(row.level_value_id),
+        levelCode: this.toLevelCode(row.level_value_id),
+        levelName: row.level_name ?? null,
+        parentId: this.toNullableNumber(row.parent_id),
+      });
+      current = this.toNullableNumber(row.parent_id);
+    }
+    return chain;
+  }
+
+  /** C3: the successors of an entry in order (first successor first), not including the entry itself. 404 for an unknown entry. */
+  async successors(id: number): Promise<OrgSuccessorNode[]> {
+    const start = (await this.loadUnitsOrFail([id])).get(id);
+    const chain: OrgSuccessorNode[] = [];
+    const seen = new Set<number>([id]);
+    let nextId = this.toNullableNumber(start.successor_id);
+    while (nextId !== null && !seen.has(nextId)) {
+      seen.add(nextId);
+      const next = await this.unitRepository.findOne({ where: { id: nextId } });
+      if (!next) break;
+      chain.push({
+        id: Number(next.id),
+        code: next.code,
+        status: next.status,
+        statusFromYear: next.status_from_year ?? null,
+        successorId: this.toNullableNumber(next.successor_id),
+      });
+      nextId = this.toNullableNumber(next.successor_id);
+    }
+    return chain;
+  }
+
+  /**
+   * Existence check for consumers to run before storing an entry id
+   * (design 5.8). Throws 404 naming every missing id; an empty list passes.
+   */
+  async assertExists(ids: number[]): Promise<void> {
+    if (ids.length === 0) return;
+    await this.loadUnitsOrFail([...new Set(ids)]);
+  }
+
+  /**
+   * B8: child count plus the registered consumers' record counts (consumers
+   * reporting 0 are left out). 404 for an unknown entry.
+   */
+  async getLinkedData(id: number): Promise<OrgLinkedData> {
+    await this.loadUnitsOrFail([id]);
+    const [childCount, consumers] = await Promise.all([
+      this.versionRepository.countChildEntries(id, this.clock.currentYear()),
+      this.usageRegistry.getBreakdown(id),
+    ]);
+    return { childCount, consumers };
+  }
+
+  /** Ids must be 1 to 200 distinct positive integers (C1: more than 200 is a 400 naming `ids`). */
+  private normalizeIds(ids: number[]): number[] {
+    const unique = [...new Set(ids ?? [])];
+    const invalid = (description: string) =>
+      new BadRequestException({ message: { description, field: 'ids' } });
+    if (unique.length === 0) throw invalid('ids must name at least one entry');
+    if (unique.length > ORG_MAX_RESOLVE_IDS) {
+      throw invalid(`ids accepts at most ${ORG_MAX_RESOLVE_IDS} entries`);
+    }
+    if (unique.some((id) => !Number.isInteger(id) || id < 1)) {
+      throw invalid('ids must be positive integers');
+    }
+    return unique;
+  }
+
+  private async loadUnits(ids: number[]): Promise<Map<number, OrgUnit>> {
+    const found = await this.unitRepository.find({ where: { id: In(ids) } });
+    return new Map(found.map((unit) => [Number(unit.id), unit]));
+  }
+
+  private async loadUnitsOrFail(ids: number[]): Promise<Map<number, OrgUnit>> {
+    const byId = await this.loadUnits(ids);
+    const missing = ids.filter((id) => !byId.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        missing.length === 1
+          ? `Organizational unit ${missing[0]} not found`
+          : `Organizational units ${missing.join(', ')} not found`,
+      );
+    }
+    return byId;
+  }
+
+  private statusWithoutVersion(unit: OrgUnit, year: number): OrgUnitStatus {
+    const endedBy = unit.status_from_year;
+    if (unit.status !== 'active' && endedBy != null && endedBy <= year) {
+      return unit.status;
+    }
+    return 'inactive';
+  }
+
+  private toNullableNumber(
+    value: number | string | null | undefined,
+  ): number | null {
+    return value === null || value === undefined ? null : Number(value);
+  }
+
+  private toResolvedVersion(row: VersionDetailRawRow): OrgResolvedVersion {
+    const { id: _versionId, ...fields } = this.toVersionResponse(row);
+    return fields;
   }
 
   private async delegatesByUnit(

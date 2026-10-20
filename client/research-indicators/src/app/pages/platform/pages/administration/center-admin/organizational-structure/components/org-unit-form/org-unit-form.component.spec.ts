@@ -79,9 +79,12 @@ describe('OrgUnitFormComponent', () => {
 
   const root = () => fixture.nativeElement as HTMLElement;
   const q = (testId: string) => root().querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+  // Not `whenStable()`: it also waits out `app-input`'s 2000 ms autosave debounce (a no-op here), so every
+  // keystroke cost 2 s of wall time and a two-keystroke test sat ~0.8 s under Jest's 5 s timeout. A macrotask
+  // turn drains every microtask (mocked API promises, ngModel writes) without waiting on that timer.
   const settle = async () => {
     for (let i = 0; i < 3; i++) {
-      await fixture.whenStable();
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
       fixture.detectChanges();
     }
   };

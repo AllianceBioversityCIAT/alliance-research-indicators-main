@@ -727,4 +727,48 @@ describe('Control Lists — real GlobalExceptions contract (T-01/T-02)', () => {
       path: '/api/control-lists/values/9',
     });
   });
+
+  // @akili-spec institutional-performance/organizational-structure (T-04,
+  // R-ORG-011 AC.2, KZ-017): the FK backstop must reach the wire as the same
+  // non-field 409 envelope, through the REAL GlobalExceptions, not as a 500.
+  it('409 FK backstop: a raw errno 1451 with the registry at 0 reaches the wire as the non-field {description} 409 (org-structure T-04)', async () => {
+    mockValueFindOne.mockResolvedValue({
+      id: 23,
+      list_id: 2,
+      value: 'L4 Unit',
+    });
+    mockListFindOne.mockResolvedValue({ id: 2, is_active: true });
+    mockGetInUseCount.mockResolvedValue(0);
+    mockValueDelete.mockRejectedValue(
+      Object.assign(new Error('Cannot delete or update a parent row'), {
+        errno: 1451,
+        code: 'ER_ROW_IS_REFERENCED_2',
+      }),
+    );
+
+    let thrown: unknown;
+    try {
+      await service.removeValue(23);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeDefined();
+
+    const request = { url: '/api/control-lists/values/23', method: 'DELETE' };
+    const { host, status, json } = makeHost(request);
+
+    filter.catch(thrown, host as any);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+    expect(json).toHaveBeenCalledWith({
+      description: 'ConflictException',
+      status: HttpStatus.CONFLICT,
+      errors: {
+        description:
+          'Value "L4 Unit" is referenced by a record of another module and cannot be deleted; deactivate it instead',
+      },
+      timestamp: expect.any(String),
+      path: '/api/control-lists/values/23',
+    });
+  });
 });

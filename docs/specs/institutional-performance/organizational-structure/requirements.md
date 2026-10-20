@@ -347,7 +347,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
   - **ancestors(id, year)** → the chain up to L1 as of that year (for roll-ups by department or division);
   - **successor chain(id)** → successors in order (for an optional *include predecessors* view, Q-4);
   - **existence check(id)** → for consumers to validate before storing an ID.
-- Consumers register with this module (as Control Lists does) to report how many of their records use each entry; the count drives *Linked data* and the delete/inactivate block (R-ORG-007, R-ORG-008).
+- Consumers register with this module (as Control Lists does) to report how many of their records use each entry; the count drives *Linked data* and the **delete** block (R-ORG-008); it does not block an inactivation, which is blocked only by active children (R-ORG-007) — the records follow the successor (requester, 2026-10-20 — D-ORG-18).
 - **A consumer resolves an entry with the structure of its record's year** (Q-2: the record's reporting year; each consumer spec names the exact field).
 
 #### Scenario: KPI history continues through a move

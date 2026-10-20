@@ -262,7 +262,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-04 — Slice 4: consumer contract, Control Lists wiring and linked data
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-03
+- **Status:** done (2026-10-20, Reviewer PASS ×2 on attempt 2 — execution.md) · **Size:** M · **Dependencies:** T-03
 - **Requirements covered:**
   - R-ORG-010 — `resolve` returns the **current** delegates (R-ORG-017) for any requested year.
   - R-ORG-010 — *KPI history continues through a move*, with a registered test consumer holding values for 2026–2030 under ID 57 and a move from 2029: one series under ID 57; roll-up puts 2026–2028 under A and 2029–2030 under C; **BUT** must NOT require rewriting any stored value. AC.1 (`resolve` and `ancestors` for the requested year, including ended entries before their end); AC.2 (the test consumer drives *Linked data*; its delete-block half was proven in T-03 and is re-run here); successor chain; `assertExists`.
@@ -309,8 +309,8 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `full` — cross-module contract and a change inside Control Lists.
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns (server); angular-developer (client); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] Same command set as T-01, plus `npm run test:integration -- control-lists`, all green; falsifiers 1–5 observed red, then reverted.
-  - [ ] B8, C1–C3 in `/swagger`, observation quoted.
+  - [x] Same command set as T-01, plus `npm run test:integration -- control-lists`, all green; falsifiers 1–5 observed red, then reverted. *(server full suite: the 2 pre-existing suites; client full ×3 green after the flaky-test fix — execution.md)*
+  - [x] B8, C1–C3 in `/swagger`, observation quoted. *(execution.md → T-04 verbatim evidence; attempt-2 C1 texts pinned by a metadata test, not re-observed on a boot)*
 
 ### T-05 — Seed and performance measurement
 

@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { OrgUnitPanelComponent } from './org-unit-panel.component';
 import { OrgLifecycleDone } from '../org-lifecycle-dialog/org-lifecycle-dialog.component';
-import { OrgChangeLogRow, OrgHistory, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
+import { OrgChangeLogRow, OrgHistory, OrgLinkedData, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
@@ -83,6 +83,14 @@ const HISTORY: OrgHistory = {
   ]
 };
 
+const LINKED: OrgLinkedData = {
+  childCount: 3,
+  consumers: [
+    { consumer: 'Organizational Structure › Level', count: 2 },
+    { consumer: 'KPI Results', count: 0 }
+  ]
+};
+
 describe('OrgUnitPanelComponent', () => {
   let fixture: ComponentFixture<OrgUnitPanelComponent>;
   let api: Record<string, jest.Mock>;
@@ -97,6 +105,10 @@ describe('OrgUnitPanelComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
     }
+  };
+  const openLinked = async () => {
+    (q('tab-linked') as HTMLButtonElement).click();
+    await settle();
   };
   const openHistory = async () => {
     (q('tab-history') as HTMLButtonElement).click();
@@ -119,6 +131,7 @@ describe('OrgUnitPanelComponent', () => {
     lifecycle = [];
     api = {
       GET_OrgStructureHistory: jest.fn().mockResolvedValue(ok(HISTORY)),
+      GET_OrgStructureLinkedData: jest.fn().mockResolvedValue(ok(LINKED)),
       GET_OrgStructureUnits: jest.fn().mockResolvedValue(ok(ROWS)),
       GET_OrgStructureCodeProposal: jest.fn().mockResolvedValue(ok({ code: 'ORG-118' })),
       GET_OrgStaff: jest.fn().mockResolvedValue(ok([])),
@@ -279,6 +292,25 @@ describe('OrgUnitPanelComponent', () => {
       expect(fixture.componentInstance.history()).toBeNull();
     });
 
+    it('a History response that arrives after another entry was selected is dropped, not shown for the new entry', async () => {
+      let resolveA!: (r: MainResponse<OrgHistory>) => void;
+      api['GET_OrgStructureHistory'].mockReturnValueOnce(new Promise(resolve => (resolveA = resolve)));
+      await mount(UNIT);
+      await openHistory();
+
+      fixture.componentRef.setInput('row', INACTIVE);
+      fixture.componentRef.setInput('formKey', '6-2');
+      fixture.detectChanges();
+      await settle();
+      resolveA(ok(HISTORY));
+      await settle();
+      api['GET_OrgStructureHistory'].mockReturnValueOnce(new Promise(() => undefined));
+      await openHistory();
+
+      expect(all('version-row')).toHaveLength(0);
+      expect(q('history-loading')).toBeTruthy();
+    });
+
     it('after a save (new form key) an open History reloads, so the new log row appears', async () => {
       await mount(UNIT);
       await openHistory();
@@ -289,6 +321,114 @@ describe('OrgUnitPanelComponent', () => {
       await settle();
 
       expect(api['GET_OrgStructureHistory']).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Linked data tab (R-ORG-013, R-ORG-010 AC.2)', () => {
+    it('loads B8 on first open only and renders the child count and one row per consumer', async () => {
+      await mount(UNIT);
+      expect(api['GET_OrgStructureLinkedData']).not.toHaveBeenCalled();
+
+      await openLinked();
+
+      expect(api['GET_OrgStructureLinkedData']).toHaveBeenCalledTimes(1);
+      expect(api['GET_OrgStructureLinkedData']).toHaveBeenCalledWith(5);
+      expect(q('linked-child-count')?.textContent?.trim()).toBe('3');
+      expect(all('linked-consumer-name').map(n => n.textContent?.trim())).toEqual(['Organizational Structure › Level', 'KPI Results']);
+      expect(all('linked-consumer-count').map(n => n.textContent?.trim())).toEqual(['2', '0']);
+      expect(q('linked-empty')).toBeNull();
+    });
+
+    it('shows No linked data yet when the child count and every consumer count are zero', async () => {
+      api['GET_OrgStructureLinkedData'].mockResolvedValue(ok({ childCount: 0, consumers: [{ consumer: 'KPI Results', count: 0 }] }));
+      await mount(UNIT);
+
+      await openLinked();
+
+      expect(q('linked-empty')?.textContent).toContain('No linked data yet');
+      expect(q('linked-table')).toBeNull();
+    });
+
+    it('a consumer count alone hides the empty state', async () => {
+      api['GET_OrgStructureLinkedData'].mockResolvedValue(ok({ childCount: 0, consumers: [{ consumer: 'KPI Results', count: 4 }] }));
+      await mount(UNIT);
+
+      await openLinked();
+
+      expect(q('linked-empty')).toBeNull();
+      expect(q('linked-child-count')?.textContent?.trim()).toBe('0');
+    });
+
+    it('a child count alone hides the empty state', async () => {
+      api['GET_OrgStructureLinkedData'].mockResolvedValue(ok({ childCount: 1, consumers: [] }));
+      await mount(DEPARTMENT);
+
+      await openLinked();
+
+      expect(q('linked-empty')).toBeNull();
+      expect(q('linked-child-count')?.textContent?.trim()).toBe('1');
+    });
+
+    it('a failed B8 shows an inline error and Retry recovers', async () => {
+      api['GET_OrgStructureLinkedData'].mockResolvedValueOnce(failed());
+      await mount(UNIT);
+
+      await openLinked();
+      expect(q('linked-error')).toBeTruthy();
+
+      inner('linked-retry').click();
+      await settle();
+
+      expect(q('linked-error')).toBeNull();
+      expect(q('linked-child-count')?.textContent?.trim()).toBe('3');
+    });
+
+    it('a deleted entry still opens its Linked data', async () => {
+      await mount(DELETED);
+
+      await openLinked();
+
+      expect(api['GET_OrgStructureLinkedData']).toHaveBeenCalledWith(7);
+      expect(q('linked-child-count')).toBeTruthy();
+    });
+
+    it('a Linked data response that arrives after another entry was selected is dropped, not shown for the new entry', async () => {
+      let resolveA!: (r: MainResponse<OrgLinkedData>) => void;
+      api['GET_OrgStructureLinkedData'].mockReturnValueOnce(new Promise(resolve => (resolveA = resolve)));
+      await mount(UNIT);
+      await openLinked();
+
+      fixture.componentRef.setInput('row', INACTIVE);
+      fixture.componentRef.setInput('formKey', '6-2');
+      fixture.detectChanges();
+      await settle();
+      resolveA(ok(LINKED));
+      await settle();
+      api['GET_OrgStructureLinkedData'].mockReturnValueOnce(new Promise(() => undefined));
+      await openLinked();
+
+      expect(q('linked-child-count')).toBeNull();
+      expect(q('linked-loading')).toBeTruthy();
+    });
+
+    it('after a save an open Linked data reloads; selecting another entry returns to Details and forgets it (transition)', async () => {
+      await mount(UNIT);
+      await openLinked();
+      expect(api['GET_OrgStructureLinkedData']).toHaveBeenCalledTimes(1);
+
+      fixture.componentRef.setInput('formKey', '5-2');
+      fixture.detectChanges();
+      await settle();
+      expect(api['GET_OrgStructureLinkedData']).toHaveBeenCalledTimes(2);
+
+      fixture.componentRef.setInput('row', INACTIVE);
+      fixture.componentRef.setInput('formKey', '6-3');
+      fixture.detectChanges();
+      await settle();
+
+      expect(q('panel-details')).toBeTruthy();
+      expect(q('panel-linked')).toBeNull();
+      expect(fixture.componentInstance.linked()).toBeNull();
     });
   });
 

@@ -51,7 +51,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 | A unit was inactivated or deleted from 2027 | the admin views the **2026** structure | the unit appears, with the name, parent and director it had in 2026 |
 | A unit was inactivated or deleted from 2027 | the admin views the **2027** structure | the unit is hidden (visible with *Show inactive / deleted*) |
 | Any entry that was ever in effect | Delete is pressed | it is never physically removed: it is ended from the chosen year and marked deleted; it disappears from that year's view onward and stays in every earlier year's view |
-| Any entry with active children or associated information | Delete or Inactivate is pressed | it is blocked (F-5); the dialog names the blocker and offers to move or inactivate the children first |
+| Any entry with active children or associated information | Delete or Inactivate is pressed | it is blocked (F-5); the dialog names the blocker and offers to move or inactivate the children first | *Superseded 2026-10-20 (D-ORG-18): associated information blocks **Delete** only; Inactivate is blocked by active children only.*
 | The admin picks a *Structure year* | any year | the tree and table show the structure valid for that year; changes already scheduled for later years are badged |
 
 ## 5. Scope
@@ -131,7 +131,7 @@ The structure is **not tied to a portfolio**. Portfolios, strategy frameworks an
 - Nothing that existed in a past year is physically deleted; in-place edits appear in the change log.
 - An entry has at most one version per year.
 - The history of anything linked to a unit (KPIs first) is continuous across moves and renames, because the link is the permanent ID; only department-level views change from the move's year.
-- No entry with active children or associated information can be deleted or inactivated.
+- No entry with active children or associated information can be deleted or inactivated. *(Superseded 2026-10-20 — D-ORG-18: associated information blocks deletion only; inactivation is blocked by active children only.)*
 - No table or endpoint of this module takes a portfolio parameter.
 - The table view meets F-7.
 

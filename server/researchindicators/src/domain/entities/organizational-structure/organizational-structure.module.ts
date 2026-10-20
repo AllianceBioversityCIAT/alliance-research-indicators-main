@@ -13,6 +13,7 @@ import { OrgUnitVersionRepository } from './repositories/org-unit-version.reposi
 import { OrgUnitDelegateRepository } from './repositories/org-unit-delegate.repository';
 import { OrgUnitChangeLogRepository } from './repositories/org-unit-change-log.repository';
 import { OrgUnitUsageRegistry } from './org-unit-usage.registry';
+import { OrgLevelUsageProvider } from './org-level-usage.provider';
 
 // `OrgStructureReadService` is exported and stays a singleton (repositories +
 // clock only, no request-scoped dependency), so a consumer module can inject
@@ -20,8 +21,9 @@ import { OrgUnitUsageRegistry } from './org-unit-usage.registry';
 // T-02 adds the request-scoped write service (save engine, code proposal, staff
 // search); it imports ControlListsModule for `ControlListValueLookupService`
 // (a singleton). T-03 adds the singleton usage registry (exported, deduplicated by consumer name, no
-// constructor dependencies) that feeds the delete blocker. The level provider and the
-// control-lists wiring join in T-04.
+// constructor dependencies) that feeds the delete blocker. T-04 adds the singleton
+// `OrgLevelUsageProvider`, which registers itself in the Control Lists registry
+// from `onModuleInit` (the registry comes from the imported `ControlListsModule`).
 @Module({
   imports: [ControlListsModule],
   controllers: [OrganizationalStructureController],
@@ -35,6 +37,7 @@ import { OrgUnitUsageRegistry } from './org-unit-usage.registry';
     OrgUnitDelegateRepository,
     OrgUnitChangeLogRepository,
     OrgUnitUsageRegistry,
+    OrgLevelUsageProvider,
   ],
   exports: [OrgStructureReadService, OrgUnitUsageRegistry],
 })

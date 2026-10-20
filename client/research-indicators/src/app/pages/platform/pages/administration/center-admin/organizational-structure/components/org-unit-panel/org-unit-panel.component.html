@@ -75,6 +75,18 @@
         data-testid="tab-history">
         History
       </button>
+      <button
+        type="button"
+        role="tab"
+        id="orgTabLinked"
+        class="org-tab cursor-pointer px-3 py-1.5 text-[13px]"
+        [class.org-tab--active]="tab() === 'linked'"
+        [attr.aria-selected]="tab() === 'linked'"
+        aria-controls="orgPanelLinked"
+        (click)="selectTab('linked')"
+        data-testid="tab-linked">
+        Linked data
+      </button>
     </div>
 
     @if (tab() === 'details') {
@@ -93,6 +105,52 @@
               (saved)="saved.emit($event)"
               (cancelled)="cancelled.emit()">
             </app-org-unit-form>
+          }
+        }
+      </div>
+    } @else if (tab() === 'linked') {
+      <div role="tabpanel" id="orgPanelLinked" aria-labelledby="orgTabLinked" class="flex flex-col gap-3" data-testid="panel-linked">
+        @if (linkedLoading() && !linked()) {
+          <p class="m-0 text-sm atc-grey-700" data-testid="linked-loading">Loading linked data...</p>
+        } @else if (linkedError()) {
+          <div class="flex flex-col items-start gap-2" role="alert" data-testid="linked-error">
+            <p class="m-0 text-sm atc-red-1">We could not load the linked data. Please try again.</p>
+            <p-button
+              label="Retry"
+              icon="pi pi-refresh !text-[12px]"
+              severity="secondary"
+              size="small"
+              styleClass="!rounded-[9px] !text-[13px]"
+              (onClick)="loadLinked(selected.id)"
+              data-testid="linked-retry">
+            </p-button>
+          </div>
+        } @else {
+          @if (linked(); as data) {
+            @if (linkedEmpty()) {
+              <p class="m-0 text-sm atc-grey-700" data-testid="linked-empty">No linked data yet</p>
+            } @else {
+              <table class="org-history-table w-full border-collapse text-[12.5px] atc-grey-900" data-testid="linked-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Linked to</th>
+                    <th scope="col">Records</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-testid="linked-children">
+                    <td>Child entries</td>
+                    <td data-testid="linked-child-count">{{ data.childCount }}</td>
+                  </tr>
+                  @for (c of data.consumers; track c.consumer) {
+                    <tr data-testid="linked-consumer">
+                      <td data-testid="linked-consumer-name">{{ c.consumer }}</td>
+                      <td data-testid="linked-consumer-count">{{ c.count }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
           }
         }
       </div>
