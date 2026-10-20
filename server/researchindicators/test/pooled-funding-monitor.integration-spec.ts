@@ -4,6 +4,8 @@ import {
   buildSciencePrograms,
   derivePfmRow,
 } from '../src/domain/entities/pooled-funding-monitor/derivation/pfm-derivation';
+import { PfmMappingStateEnum } from '../src/domain/entities/pooled-funding-monitor/enum/pfm-mapping-state.enum';
+import { PfmPrmsStatusEnum } from '../src/domain/entities/pooled-funding-monitor/enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../src/domain/entities/pooled-funding-monitor/enum/pfm-scope.enum';
 import {
   PfmMonitoredRow,
@@ -878,6 +880,139 @@ describe('PooledFundingMonitorRepository (real MySQL, seeded rows)', () => {
   });
 
   // ---------------------------------------------------- remaining reads -----
+  // Approving a result runs the versioning SP: it creates a snapshot of the
+  // same year and MOVES the pool-funding alignment (SPs, ToC) onto it, leaving
+  // the live row's alignment inactive; the PRMS push flags the snapshot. The
+  // monitor lists the live row, so mapping and sync must be read across both.
+  // Rows live inside a SAVEPOINT so no other expectation in this file moves.
+  describe('approved result whose alignment and sync flag moved to its version (STAR-627 shape)', () => {
+    beforeAll(async () => {
+      await q(`SAVEPOINT pfm_versioned`);
+      const approved = async (
+        id: number,
+        code: number,
+        snapshot: number,
+        synced: number,
+      ) => {
+        await insert('results', {
+          result_id: id,
+          result_official_code: code,
+          title: `Result ${code}`,
+          indicator_id: 6,
+          result_status_id: 6,
+          report_year_id: YEAR,
+          is_snapshot: snapshot,
+          platform_code: 'STAR',
+          is_active: 1,
+          is_synced_to_prms: synced,
+          updated_at: '2026-10-01 10:20:30',
+        });
+        await insert('result_contracts', {
+          result_id: id,
+          contract_role_id: 1,
+          contract_id: 'P-A',
+          is_primary: 1,
+          is_active: 1,
+        });
+      };
+      const align = async (
+        id: number,
+        resultId: number,
+        hasContribution: number,
+        active: number,
+        withSp: boolean,
+      ) => {
+        await insert('result_pool_funding_alignment', {
+          id,
+          result_id: resultId,
+          has_contribution: hasContribution,
+          is_active: active,
+        });
+        if (withSp) {
+          await insert('result_pool_funding_alignment_sp', {
+            alignment_id: id,
+            sp_code: 'SP01',
+            sp_role: 'PRIMARY',
+            is_active: active,
+          });
+          await insert('result_pool_funding_toc_alignment', {
+            result_id: resultId,
+            sp_code: 'SP01',
+            aligns_with_toc: 1,
+            is_active: active,
+          });
+        }
+      };
+      // 1030: Yes + complete mapping, moved to the version, pushed to PRMS (Pending Review).
+      await approved(60, 1030, 0, 0);
+      await approved(61, 1030, 1, 1);
+      await align(20, 60, 1, 0, true); // deactivated by the versioning SP
+      await align(21, 61, 1, 1, true);
+      await insert('result_prms_sync_history', {
+        environment: 'TEST',
+        correlation_outcome: 'CORRELATED',
+        processing_state: 'PROCESSED',
+        event_source: 'STAR',
+        result_year: YEAR,
+        is_active: 1,
+        result_official_code: '1030',
+        status: 'PENDING_REVIEW',
+        occurred_at: '2026-10-16 17:16:21',
+      });
+      // 1031: answered No, moved to the version, never pushed.
+      await approved(62, 1031, 0, 0);
+      await approved(63, 1031, 1, 0);
+      await align(22, 62, 0, 0, false);
+      await align(23, 63, 0, 1, false);
+    });
+
+    afterAll(async () => {
+      await q(`ROLLBACK TO SAVEPOINT pfm_versioned`);
+    });
+
+    it('is listed once, as the live row', async () => {
+      const row = byCode(await repo.findMonitoredResults(ALL), 1030);
+      expect(row.result_id).toBe(60);
+    });
+
+    it("reads the version's alignment: Complete through the same SQL check as the green check, with its SPs", async () => {
+      const row = byCode(await repo.findMonitoredResults(ALL), 1030);
+      expect([
+        row.has_alignment,
+        row.has_contribution,
+        row.mapping_complete,
+      ]).toEqual([true, true, true]);
+      expect(row.primary_sp?.code).toBe('SP01');
+      expect(derivePfmRow(row).mappingState).toBe(PfmMappingStateEnum.COMPLETE);
+    });
+
+    it('is synced when the version was pushed, so the PRMS history status shows (Pending Review, not Not sent)', async () => {
+      const row = byCode(await repo.findMonitoredResults(ALL), 1030);
+      expect(row.is_synced_to_prms).toBe(true);
+      expect(row.prms_history_status).toBe('PENDING_REVIEW');
+      expect(derivePfmRow(row).prmsStatus).toBe(
+        PfmPrmsStatusEnum.PENDING_REVIEW,
+      );
+    });
+
+    it('a version answered No reads as No SP contribution, not Pending', async () => {
+      const row = byCode(await repo.findMonitoredResults(ALL), 1031);
+      expect([row.has_alignment, row.has_contribution]).toEqual([true, false]);
+      expect(derivePfmRow(row).mappingState).toBe(
+        PfmMappingStateEnum.NO_SP_CONTRIBUTION,
+      );
+      expect(derivePfmRow(row).prmsStatus).toBe(PfmPrmsStatusEnum.NOT_SENT);
+    });
+
+    it("the version's SPs feed the Science Program filter options", async () => {
+      const options = await repo.findFilterOptions(MINE(PI_A));
+      const codesInOptions = options.science_programs.flatMap((g) =>
+        g.items.map((i) => i.code),
+      );
+      expect(codesInOptions).toContain('SP01');
+    });
+  });
+
   describe('countContributingProjects', () => {
     it('counts active contributing projects only (flag OR active mapping)', async () => {
       // P-A (flag), P-B (mapping). Not P-X (inactive mapping), not P-Z (inactive contract).

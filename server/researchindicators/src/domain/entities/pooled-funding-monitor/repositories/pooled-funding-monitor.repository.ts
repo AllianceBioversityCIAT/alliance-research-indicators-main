@@ -125,6 +125,30 @@ const CODE_AS_TEXT_SQL = `(CAST(r.result_official_code AS CHAR CHARACTER SET utf
 const SP_CATALOG_JOIN_SQL = `LEFT JOIN clarisa_science_programs csp
             ON csp.official_code = (sp.sp_code COLLATE utf8mb4_unicode_520_ci)`;
 
+/**
+ * Every active row of the same result and year as `r`: the live row AND its
+ * approved version (`is_snapshot = 1`). Approving a result runs the versioning
+ * SP, which MOVES the pool-funding alignment (and its SPs, ToC and indicator
+ * mapping) onto the new snapshot and deactivates it on the live row, and the
+ * PRMS push flags the row it sent. So after approval the mapping and the sync
+ * flag live on the version, not on the row the monitor lists.
+ */
+const SAME_RESULT_YEAR_SQL = (
+  alias: string,
+): string => `${alias}.platform_code = r.platform_code
+            AND ${alias}.result_official_code = r.result_official_code
+            AND ${alias}.report_year_id = r.report_year_id
+            AND ${alias}.is_active = 1`;
+
+/** Newest active alignment of the result-year, whichever row (live or version) holds it. */
+const ALIGNMENT_ID_SQL = `(
+          SELECT MAX(a.id)
+          FROM result_pool_funding_alignment a
+          INNER JOIN results ra ON ra.result_id = a.result_id
+          WHERE ${SAME_RESULT_YEAR_SQL('ra')}
+            AND a.is_active = 1
+        )`;
+
 const toDate = (value: unknown): Date | null => {
   if (value == null || value === '') return null;
   if (value instanceof Date) return value;
@@ -289,7 +313,11 @@ export class PooledFundingMonitorRepository {
         rs.description AS star_status_description,
         rs.config AS star_status_config,
         ${utcIso('r.updated_at')} AS updated_at_utc,
-        r.is_synced_to_prms,
+        EXISTS (
+          SELECT 1 FROM results rp
+          WHERE ${SAME_RESULT_YEAR_SQL('rp')}
+            AND rp.is_synced_to_prms = 1
+        ) AS is_synced_to_prms,
         ac.agreement_id AS project_code,
         COALESCE(NULLIF(TRIM(ac.short_title), ''), ac.description) AS project_name,
         ac.donor AS donor,
@@ -297,7 +325,8 @@ export class PooledFundingMonitorRepository {
         NULLIF(TRIM(CONCAT_WS(' ', cu.first_name, cu.last_name)), '') AS creator_name,
         (pfa.id IS NOT NULL) AS has_alignment,
         pfa.has_contribution AS has_contribution,
-        pool_funding_alignment_validation(r.result_id) AS mapping_complete,
+        -- Same check as the section's green check, on the row that owns the alignment.
+        pool_funding_alignment_validation(COALESCE(pfa.result_id, r.result_id)) AS mapping_complete,
         (
           SELECT JSON_ARRAYAGG(JSON_OBJECT(
             'code', sp.sp_code,
@@ -346,12 +375,7 @@ export class PooledFundingMonitorRepository {
       LEFT JOIN result_status rs ON rs.result_status_id = r.result_status_id
       LEFT JOIN sec_users cu ON cu.sec_user_id = r.created_by
       LEFT JOIN result_pool_funding_alignment pfa
-        ON pfa.id = (
-          SELECT MAX(a.id)
-          FROM result_pool_funding_alignment a
-          WHERE a.result_id = r.result_id
-            AND a.is_active = 1
-        )
+        ON pfa.id = ${ALIGNMENT_ID_SQL}
       ${where.sql}
       ORDER BY ac.agreement_id ASC, r.result_official_code ASC, r.result_id ASC
     `;
@@ -470,6 +494,24 @@ export class PooledFundingMonitorRepository {
     return rows.length > 0;
   }
 
+  /**
+   * Access gate for a Contributor-only user: are they PI (project lead) or an
+   * active delegate of at least ONE project? Same rule as My PI Delegates, so a
+   * user who sees that module also sees this one. Not limited to contributing
+   * projects: whether there is anything to show is the page's empty state.
+   */
+  async managesAnyProject(userId: number): Promise<boolean> {
+    const pi = this.piPredicate(userId);
+    const rows: unknown[] = await this.dataSource.query(
+      `SELECT 1 AS ok
+       FROM agresso_contracts ac
+       WHERE ${pi.sql}
+       LIMIT 1`,
+      pi.params,
+    );
+    return rows.length > 0;
+  }
+
   /** R-PFM-009: options come from the scope's data, never from a hard-coded list. */
   async findFilterOptions(
     scope: PfmRepositoryScope,
@@ -496,8 +538,7 @@ export class PooledFundingMonitorRepository {
           `SELECT DISTINCT sp.sp_code AS code, csp.name AS name, csp.category AS category
            ${this.monitoredFrom()}
            INNER JOIN result_pool_funding_alignment pfa
-             ON pfa.result_id = r.result_id
-            AND pfa.is_active = 1
+             ON pfa.id = ${ALIGNMENT_ID_SQL}
             AND pfa.has_contribution = 1
            INNER JOIN result_pool_funding_alignment_sp sp
              ON sp.alignment_id = pfa.id
