@@ -61,7 +61,7 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 
 ### T-02 — `BilateralService.importAlignmentFromTip` and TIP display-only
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-01 (`TipTocMappingDto`)
+- [x] **Status:** done (2026-10-20, PASS attempt 3 — see `execution.md`) · **Size:** M · **Dependencies:** T-01 (`TipTocMappingDto`)
 - **Requirements covered:**
   - R-TIP-003 — scenarios *Primary with full mapping*, *Catalog unavailable*, *Catalog down on a later sync* incl. BUT (never overwrite with null), *Re-sync is idempotent* incl. AND (no row deactivated/inserted); the field table (every row, incl. `target_contribution` numeric-string / NaN / 2-decimal); clauses "first match … `warn`", "failure on one level SHALL NOT discard a match on another", "catalog **fails** … SHALL be kept".
   - R-TIP-004 — scenario *Knowledge product imported at a level STAR forbids* incl. BUT (no `level_not_allowed`); clause "no review-history entry and no socket event"; scenario *STAR rules unchanged* (both THEN and AND: STAR KP `level_not_allowed`; TIP `PATCH` still rejected by the external-source gate).
@@ -85,10 +85,10 @@ T-02 and T-03 touch the same package: run sequentially (root `CLAUDE.md` §4.3 c
 - **Consumers:** `display_only` readers (design P-14): `bilateral.service.spec.ts`, `bilateral.controller.spec.ts` (server); `result-sidebar.component.spec.ts`, `pool-funding-alignment.component.spec.ts` (client — wire type unchanged, no edit expected). `BilateralService` new method is additive.
 - **Review:** `full` — gate-free write to a shared data table; correctness-critical.
 - **Done criteria:**
-  - [ ] New + updated specs green; every falsifier observed red and reverted.
-  - [ ] Existing `bilateral` suites green with zero edits to them (except the added display-only and STAR-KP cases).
-  - [ ] `npm run build` and `npx eslint` clean.
-  - [ ] `git diff` shows no change inside `updateAlignment`, `validateTocAlignments`, `importAlignmentFromPrms`, `persistAlignment`, `toc-level-rules.util.ts`.
+  - [x] New + updated specs green; every falsifier observed red and reverted.
+  - [x] Existing `bilateral` suites green with zero edits to them (except the added display-only and STAR-KP cases).
+  - [x] `npm run build` and `npx eslint` clean.
+  - [x] `git diff` shows no change inside `updateAlignment`, `validateTocAlignments`, `importAlignmentFromPrms`, `persistAlignment`, `toc-level-rules.util.ts`.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`.
 
 ---

@@ -42,6 +42,7 @@ import {
   TocLevel,
   TocResult,
 } from '../../tools/toc-integration/dto/toc-integration.types';
+import { TipTocMappingDto } from '../../tools/tip-integration/dto/response-year-tip.dto';
 import {
   allowedLevelsFor,
   resolveResultTypeKey,
@@ -92,6 +93,17 @@ import { PolicyChangeBilateralIndicatorTypeHandler } from './handlers/policy-cha
 
 const POOL_FUNDING_ALIGNMENT_CHANGED = 'POOL_FUNDING_ALIGNMENT_CHANGED';
 const INDICATOR_MAPPING_CHANGED = 'INDICATOR_MAPPING_CHANGED';
+const TIP_TOC_LEVELS: readonly TocLevel[] = ['OUTPUT', 'OUTCOME', 'EOI'];
+
+interface TipCatalogLookup {
+  /** A level that would decide failed. Keep the stored catalog columns. */
+  undecided: boolean;
+  level: TocLevel | null;
+  indicatorId: number | null;
+  unitMessurament: string | null;
+  targetValue: string | null;
+  indicatorMatched: boolean;
+}
 
 // @sdd-spec docs/specs/bilateral-module/toc-mapping-v2 — T-06 / R-BIL-094
 // Per-alignment validation error item surfaced as `errors.toc_alignments`
@@ -652,11 +664,17 @@ export class BilateralService {
     // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-10 / R-PRY-007
     // A non-eligible result that still carries a record (snapshot, synced, or
     // PRMS code) is shown read-only. `eligible` stays the raw contract fact.
+    // @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02 / R-TIP-006, D-7
+    // A non-eligible TIP result that already has an active alignment is shown
+    // read-only. `eligible` stays the raw contract fact. STAR keeps only the
+    // snapshot / synced / PRMS-code term.
     const displayOnly =
       !eligible &&
       (this.toBoolean(context.is_snapshot) ||
         isSyncedToPrms ||
-        context.prms_result_code != null);
+        context.prms_result_code != null ||
+        (context.platform_code === ReportingPlatformEnum.TIP &&
+          alignment != null));
     const visibleAlignment = eligible || displayOnly ? alignment : null;
     const selectedLevers = visibleAlignment?.selected_levers ?? [];
     // @sdd-spec docs/specs/bilateral/primary-contributing-sp — T-08 / R-BIL-123, design.md §4
@@ -1019,6 +1037,301 @@ export class BilateralService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02
+   * / R-TIP-003, R-TIP-004, NFR-TIP-001, NFR-TIP-002, design §7.4
+   *
+   * Writes the primary project's ToC mapping as pool-funding alignment.
+   * Sibling of `importAlignmentFromPrms`, written out again (D-3): no STAR
+   * gate, no review history, no socket. A catalog failure is not a miss.
+   */
+  async importAlignmentFromTip(
+    resultId: number,
+    mapping: TipTocMappingDto,
+    year: number,
+    actorUserId: number | null,
+    memo?: Map<string, TocResult[] | null>,
+  ): Promise<void> {
+    const sp = mapping.science_program_id ?? '';
+    const lookup = await this.lookupTipCatalog(
+      resultId,
+      mapping,
+      sp,
+      year,
+      memo,
+    );
+    const [previousAlignment, activeToc] = await Promise.all([
+      this.alignmentRepository.findActiveAlignmentByResultId(resultId),
+      this.tocAlignmentRepository.findActiveByResultId(resultId),
+    ]);
+    const candidate = lookup.undecided
+      ? this.tipKeptCatalogRow(activeToc, mapping.toc_result_id)
+      : null;
+    // Null catalog columns are not a resolution. Keeping them would drop a
+    // match found on a level that did answer (R-TIP-003).
+    const kept =
+      lookup.undecided && candidate?.level != null ? candidate : null;
+    const tocUpsert = this.buildTipTocUpsert(
+      resultId,
+      sp,
+      mapping,
+      year,
+      lookup,
+      kept,
+    );
+
+    if (
+      this.tipAlignmentUnchanged(
+        previousAlignment,
+        activeToc,
+        sp,
+        mapping,
+        tocUpsert,
+      )
+    ) {
+      return;
+    }
+
+    const keptSps = new Set([sp]);
+    const tocSpCodesToDeactivate = activeToc
+      .map((row) => row.sp_code)
+      .filter((spCode) => !keptSps.has(spCode));
+
+    await this.dataSource.transaction((manager) =>
+      this.persistAlignment(manager, {
+        resultId,
+        previousAlignmentId: previousAlignment?.id ?? null,
+        hasContribution: true,
+        spCodes: [sp],
+        primarySpCode: sp,
+        tocUpserts: [tocUpsert],
+        tocSpCodesToDeactivate,
+        actorUserId,
+        now: new Date(),
+      }),
+    );
+  }
+
+  private async lookupTipCatalog(
+    resultId: number,
+    mapping: TipTocMappingDto,
+    sp: string,
+    year: number,
+    memo?: Map<string, TocResult[] | null>,
+  ): Promise<TipCatalogLookup> {
+    const hits: { level: TocLevel; result: TocResult }[] = [];
+    const failedLevels = new Set<TocLevel>();
+
+    for (const level of TIP_TOC_LEVELS) {
+      const catalog = await this.fetchTipTocLevel(sp, level, year, memo);
+      if (catalog === null) {
+        failedLevels.add(level);
+        continue;
+      }
+      for (const result of catalog) {
+        if (result.toc_result_id === mapping.toc_result_id) {
+          hits.push({ level, result });
+        }
+      }
+    }
+
+    // A failed level earlier in OUTPUT → OUTCOME → EOI would have decided
+    // before the first hit. No hit at all, plus any failure, is the same.
+    const undecided = this.tipCatalogUndecided(failedLevels, hits[0]?.level);
+
+    if (!hits.length) {
+      if (!undecided) {
+        this.warnTipCatalogMiss(resultId, mapping, sp, year);
+      }
+      return {
+        undecided,
+        level: null,
+        indicatorId: null,
+        unitMessurament: null,
+        targetValue: null,
+        indicatorMatched: false,
+      };
+    }
+
+    const first = hits[0];
+    const uuid = mapping.toc_result_indicator_id;
+    const indicators = (first.result.indicators ?? []).filter(
+      (indicator) => uuid != null && indicator.toc_result_indicator_id === uuid,
+    );
+    if (hits.length > 1 || indicators.length !== 1) {
+      this.warnTipCatalogMiss(resultId, mapping, sp, year);
+    }
+    const indicator = indicators[0] ?? null;
+    return {
+      undecided,
+      level: first.level,
+      indicatorId: indicator?.indicator_id ?? null,
+      unitMessurament: indicator?.unit_messurament ?? null,
+      targetValue: indicator
+        ? this.resolveLiveTargetValue(indicator, year)
+        : null,
+      indicatorMatched: indicator != null,
+    };
+  }
+
+  /**
+   * True when the level that would decide could not be read: a failure
+   * before the first hit in `TIP_TOC_LEVELS`, or no hit and any failure.
+   */
+  private tipCatalogUndecided(
+    failedLevels: ReadonlySet<TocLevel>,
+    firstHitLevel: TocLevel | undefined,
+  ): boolean {
+    if (!firstHitLevel) return failedLevels.size > 0;
+    const firstIndex = TIP_TOC_LEVELS.indexOf(firstHitLevel);
+    return TIP_TOC_LEVELS.slice(0, firstIndex).some((level) =>
+      failedLevels.has(level),
+    );
+  }
+
+  /** `null` is a failed fetch. An array (including empty) is an answer. */
+  private async fetchTipTocLevel(
+    sp: string,
+    level: TocLevel,
+    year: number,
+    memo?: Map<string, TocResult[] | null>,
+  ): Promise<TocResult[] | null> {
+    const key = `${year}:${sp}:${level}`;
+    if (memo?.has(key)) {
+      return memo.get(key) ?? null;
+    }
+    try {
+      const catalog = await this.tocIntegrationService.getTocResults(
+        sp,
+        level,
+        year,
+      );
+      memo?.set(key, catalog);
+      return catalog;
+    } catch {
+      memo?.set(key, null);
+      return null;
+    }
+  }
+
+  private tipKeptCatalogRow(
+    rows: ResultPoolFundingTocAlignment[],
+    tocResultId: number | null | undefined,
+  ): ResultPoolFundingTocAlignment | null {
+    if (tocResultId == null) return null;
+    return rows.find((row) => row.toc_result_id === tocResultId) ?? null;
+  }
+
+  private buildTipTocUpsert(
+    resultId: number,
+    sp: string,
+    mapping: TipTocMappingDto,
+    year: number,
+    lookup: TipCatalogLookup,
+    kept: ResultPoolFundingTocAlignment | null,
+  ): TocAlignmentUpsertInput {
+    const useKept = kept != null;
+    return {
+      result_id: resultId,
+      sp_code: sp,
+      aligns_with_toc: true,
+      level: useKept ? (kept.level ?? null) : lookup.level,
+      toc_result_id: mapping.toc_result_id ?? null,
+      indicator_id: useKept ? (kept.indicator_id ?? null) : lookup.indicatorId,
+      quantitative_contribution: this.toTipDecimal(mapping.target_contribution),
+      toc_result_title: mapping.result_title ?? null,
+      indicator_description: mapping.result_indicator_description ?? null,
+      unit_messurament: useKept
+        ? (kept.unit_messurament ?? null)
+        : lookup.unitMessurament,
+      target_value: useKept ? (kept.target_value ?? null) : lookup.targetValue,
+      target_year: useKept
+        ? (kept.target_year ?? null)
+        : lookup.indicatorMatched
+          ? year
+          : null,
+    };
+  }
+
+  private tipAlignmentUnchanged(
+    alignment: {
+      has_contribution?: boolean | null;
+      sp_roles?: { sp_code: string | null; sp_role: string | null }[];
+    } | null,
+    tocRows: ResultPoolFundingTocAlignment[],
+    sp: string,
+    mapping: TipTocMappingDto,
+    upsert: TocAlignmentUpsertInput,
+  ): boolean {
+    if (!alignment || alignment.has_contribution !== true) return false;
+    const roles = alignment.sp_roles ?? [];
+    if (
+      roles.length !== 1 ||
+      roles[0].sp_code !== sp ||
+      roles[0].sp_role !== 'PRIMARY'
+    ) {
+      return false;
+    }
+    if (tocRows.length !== 1 || tocRows[0].sp_code !== sp) return false;
+    const row = tocRows[0];
+    return (
+      row.aligns_with_toc === true &&
+      this.sameTipText(row.level, upsert.level) &&
+      this.sameTipScalar(row.toc_result_id, upsert.toc_result_id) &&
+      this.sameTipScalar(row.indicator_id, upsert.indicator_id) &&
+      this.tipDecimalsEqual(
+        row.quantitative_contribution,
+        mapping.target_contribution,
+      ) &&
+      this.sameTipText(row.toc_result_title, upsert.toc_result_title) &&
+      this.sameTipText(
+        row.indicator_description,
+        upsert.indicator_description,
+      ) &&
+      this.sameTipText(row.unit_messurament, upsert.unit_messurament) &&
+      this.sameTipText(row.target_value, upsert.target_value) &&
+      this.sameTipScalar(row.target_year, upsert.target_year)
+    );
+  }
+
+  /**
+   * Equality for `decimal(18,2)`. The driver returns the column as a string.
+   * Both sides go through `Number()` and a 2-place round, so stored `'1.23'`
+   * matches incoming `1.234`. Null and undefined are the same.
+   */
+  private tipDecimalsEqual(stored: unknown, incoming: unknown): boolean {
+    return this.toTipDecimal(stored) === this.toTipDecimal(incoming);
+  }
+
+  private toTipDecimal(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n * 100) / 100;
+  }
+
+  private sameTipText(stored: unknown, incoming: unknown): boolean {
+    const norm = (value: unknown) =>
+      value === null || value === undefined ? null : String(value).trim();
+    return norm(stored) === norm(incoming);
+  }
+
+  private sameTipScalar(stored: unknown, incoming: unknown): boolean {
+    const norm = (value: unknown) => (value === undefined ? null : value);
+    return norm(stored) === norm(incoming);
+  }
+
+  private warnTipCatalogMiss(
+    resultId: number,
+    mapping: TipTocMappingDto,
+    sp: string,
+    year: number,
+  ): void {
+    this.logger._warn(
+      `TIP result ${resultId}: ToC result ${mapping.toc_result_id} / indicator ${mapping.toc_result_indicator_id} not found (or multiple matches) in catalog ${sp} ${year}`,
+    );
   }
 
   /**

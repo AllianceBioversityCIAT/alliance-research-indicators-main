@@ -29,6 +29,7 @@ import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignme
 import { ResultPoolFundingAlignmentSp } from './entities/result-pool-funding-alignment-sp.entity';
 import { ResultPoolFundingAlignment } from './entities/result-pool-funding-alignment.entity';
 import { ResultReviewHistory } from '../result-review-history/entities/result-review-history.entity';
+import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.6 / NFR-BIL-070
 //
@@ -468,6 +469,87 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         expect(out.selected_science_programs).toEqual([]);
         expect(out.toc_alignments).toEqual([]);
         expect(out.is_read_only).toBe(false);
+      });
+
+      // @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02 / R-TIP-006
+      it('TIP + alignment + not eligible → display_only, read-only, alignment and ToC returned', async () => {
+        findAllCatalog.mockResolvedValue([
+          {
+            official_code: 'SP01',
+            name: 'Breeding for Tomorrow',
+            category: 'Science programs',
+            color: '#ef4444',
+            icon_key: 'SP01',
+          },
+        ]);
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'TIP',
+            is_snapshot: false,
+            is_synced_to_prms: false,
+            prms_result_code: null,
+            is_pool_funding_contributor: 0,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce({
+          ...alignmentRow,
+          sp_roles: [{ sp_code: 'SP01', sp_role: 'PRIMARY' }],
+        });
+        findActiveTocRows.mockResolvedValueOnce([
+          { ...tocRow, sp_code: 'SP01' },
+        ]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(true);
+        expect(out.is_read_only).toBe(true);
+        expect(out.has_contribution).toBe(true);
+        expect(out.selected_science_programs).toEqual([
+          expect.objectContaining({ code: 'SP01', role: 'PRIMARY' }),
+        ]);
+        expect(out.toc_alignments).toEqual([
+          expect.objectContaining({ sp_code: 'SP01', level: 'OUTPUT' }),
+        ]);
+      });
+
+      it('TIP with no active alignment stays display_only false', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'TIP',
+            is_snapshot: false,
+            is_synced_to_prms: false,
+            prms_result_code: null,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+        findActiveTocRows.mockResolvedValueOnce([]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.is_read_only).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.toc_alignments).toEqual([]);
+      });
+
+      it('STAR boundary: alignment, not eligible, no snapshot/sync/PRMS code stays display_only false', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            platform_code: 'STAR',
+            is_snapshot: false,
+            is_synced_to_prms: false,
+            prms_result_code: null,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.toc_alignments).toEqual([]);
       });
     });
 
@@ -2186,6 +2268,72 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
     // `bilateral.service.sourceReadOnlyGate.spec.ts` ("R-BIL-071 scenario
     // 4"), which this task leaves untouched. Not duplicated here to avoid
     // re-wiring that suite's dedicated getScienceProgramsForResult stub.
+  });
+
+  // @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02 / R-TIP-004
+  describe('updateAlignment — STAR knowledge product level gate (R-TIP-004)', () => {
+    beforeEach(() => {
+      jest.spyOn(service, 'getScienceProgramsForResult').mockResolvedValue({
+        result_code: '19792',
+        mapping_status: 'mapped',
+        clarisa_project: { id: 1, short_name: 'p' },
+        science_programs: [
+          {
+            code: 'SP01',
+            name: 'name-of-SP01',
+            mapping_status: 'Confirmed',
+            category: null,
+            color: null,
+            icon_key: null,
+            allocation: 50,
+          },
+        ],
+      });
+    });
+
+    it('rejects a STAR knowledge product ToC entry at OUTPUT with level_not_allowed', async () => {
+      findContext.mockResolvedValueOnce({
+        result_id: 19792,
+        result_official_code: 19792,
+        is_pool_funding_contributor: true,
+        is_synced_to_prms: false,
+        platform_code: 'STAR',
+        report_year_id: 2026,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+      findActiveAlignment.mockResolvedValueOnce(null);
+      findActiveTocRows.mockResolvedValueOnce([]);
+
+      const dto: UpdatePoolFundingAlignmentDto = {
+        has_contribution: true,
+        sp_codes: ['SP01'],
+        primary_sp_code: 'SP01',
+        toc_alignments: [
+          {
+            sp_code: 'SP01',
+            aligns_with_toc: true,
+            level: 'OUTPUT',
+            toc_result_id: 7033,
+          },
+        ],
+      };
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.updateAlignment(19792, '19792', dto, user);
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(BadRequestException);
+      const response = thrown!.getResponse() as {
+        message: { toc_alignments: { error: string }[] };
+      };
+      expect(response.message.toc_alignments).toEqual([
+        { sp_code: 'SP01', field: 'level', error: 'level_not_allowed' },
+      ]);
+      expect(transaction).not.toHaveBeenCalled();
+    });
   });
 });
 
