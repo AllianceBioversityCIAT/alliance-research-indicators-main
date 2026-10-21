@@ -55,3 +55,7 @@ Counts: confirmed severe 2 (+1 with split severity) · suspect 1 · contradictio
 | R2-2 | suspect | suggestion | §5 does not say what happens if a rewritten `TIP-<code>` key collides with an existing row (Dev has none, P-19) | — | M-2 |
 
 **Terminal state: `ESCALATED`** — the two-round fix ceiling is spent and one confirmed (warning) item remains. Decision handed to the owner.
+
+## Owner decision after escalation (2026-10-21)
+
+"Corregir la frase y seguir": R-PPI-001 *Existing rows* and requirements §8 now state the join-derived log platform and the reference rewrite; design §5 adds an explicit abort on a rewritten-key collision (R2-2). Applied as an owner-approved edit outside the judgment lineage (no further re-judgment). Design accepted; proceed to `tasks.md`.
