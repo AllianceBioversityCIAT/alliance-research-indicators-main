@@ -44,6 +44,31 @@ export class PfmMonthlyDto {
   @ApiProperty() synced: number;
 }
 
+export class PfmProjectProgressDto {
+  @ApiProperty() code: string;
+  @ApiProperty({ nullable: true }) name: string | null;
+  @ApiProperty({ nullable: true }) lead_pi: string | null;
+  @ApiProperty() total: number;
+  @ApiProperty({ description: 'In PRMS (any review status) or out of scope.' })
+  done: number;
+  @ApiProperty() remaining: number;
+  @ApiProperty({ description: 'Mapping pending or incomplete.' })
+  to_map: number;
+  @ApiProperty({ description: 'Mapping complete, not in PRMS yet.' })
+  ready: number;
+  @ApiProperty() in_prms: number;
+  @ApiProperty() out_of_scope: number;
+  @ApiProperty() pending_review: number;
+  @ApiProperty() approved: number;
+  @ApiProperty() rejected: number;
+}
+
+export class PfmRejectionReasonDto {
+  @ApiProperty({ description: "PRMS justification, or 'No reason given'." })
+  reason: string;
+  @ApiProperty() count: number;
+}
+
 export class PfmSummaryResponseDto {
   @ApiProperty({ enum: PfmScopeEnum }) scope: PfmScopeEnum;
   @ApiProperty({
@@ -60,6 +85,13 @@ export class PfmSummaryResponseDto {
       'Distinct monitored results with an ACCEPTED sync in the current UTC calendar year.',
   })
   synced_this_year: number;
+  @ApiProperty({
+    type: [PfmProjectProgressDto],
+    description: 'Per project, furthest behind (most remaining) first.',
+  })
+  project_progress: PfmProjectProgressDto[];
+  @ApiProperty({ type: [PfmRejectionReasonDto] })
+  prms_rejection_reasons: PfmRejectionReasonDto[];
 }
 
 export class PfmCodeNameDto {

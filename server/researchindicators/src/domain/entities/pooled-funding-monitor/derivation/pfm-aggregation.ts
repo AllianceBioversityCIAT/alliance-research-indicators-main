@@ -155,6 +155,111 @@ export const buildMonthlySeries = (
   return out;
 };
 
+/**
+ * One contributing project's progress (coverage tab, "who is behind / whom to
+ * contact"). `done` = in PRMS (any review status) or out of scope: a decision
+ * has been taken on those results. `remaining` = total - done.
+ */
+export interface PfmProjectProgress {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  total: number;
+  done: number;
+  remaining: number;
+  /** Mapping pending or incomplete. */
+  to_map: number;
+  /** Mapping complete, not in PRMS yet. */
+  ready: number;
+  in_prms: number;
+  out_of_scope: number;
+  pending_review: number;
+  approved: number;
+  rejected: number;
+}
+
+/** Remaining desc (furthest behind first), then project code asc. */
+export const buildProjectProgress = (
+  rows: PfmDerivedMonitoredRow[],
+): PfmProjectProgress[] => {
+  const byCode = new Map<string, PfmProjectProgress>();
+  for (const { row, d } of rows) {
+    const p = byCode.get(row.project_code) ?? {
+      code: row.project_code,
+      name: row.project_name,
+      lead_pi: row.lead_pi,
+      total: 0,
+      done: 0,
+      remaining: 0,
+      to_map: 0,
+      ready: 0,
+      in_prms: 0,
+      out_of_scope: 0,
+      pending_review: 0,
+      approved: 0,
+      rejected: 0,
+    };
+    p.total += 1;
+    switch (assignPfmStage(d)) {
+      case PfmStageKeyEnum.PENDING_REVIEW:
+        p.in_prms += 1;
+        p.pending_review += 1;
+        break;
+      case PfmStageKeyEnum.APPROVED:
+        p.in_prms += 1;
+        p.approved += 1;
+        break;
+      case PfmStageKeyEnum.REJECTED:
+        p.in_prms += 1;
+        p.rejected += 1;
+        break;
+      case PfmStageKeyEnum.NO_SP_CONTRIBUTION:
+        p.out_of_scope += 1;
+        break;
+      case PfmStageKeyEnum.READY_TO_SYNC:
+        p.ready += 1;
+        break;
+      default:
+        p.to_map += 1;
+    }
+    p.done = p.in_prms + p.out_of_scope;
+    p.remaining = p.total - p.done;
+    byCode.set(row.project_code, p);
+  }
+  return [...byCode.values()].sort(
+    (a, b) =>
+      b.remaining - a.remaining ||
+      (a.code < b.code ? -1 : a.code > b.code ? 1 : 0),
+  );
+};
+
+export interface PfmRejectionReason {
+  reason: string;
+  count: number;
+}
+
+/** Text PRMS gave when it returned a result; one entry per distinct reason. */
+export const PFM_NO_REASON = 'No reason given';
+
+/** PRMS-rejected results grouped by justification: count desc, then reason asc. */
+export const buildRejectionReasons = (
+  rows: PfmDerivedMonitoredRow[],
+): PfmRejectionReason[] => {
+  const counts = new Map<string, number>();
+  for (const { row, d } of rows) {
+    if (d.prmsStatus !== PfmPrmsStatusEnum.REJECTED) continue;
+    const reason = row.prms_justification?.trim() || PFM_NO_REASON;
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([reason, count]) => ({ reason, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        (a.reason < b.reason ? -1 : a.reason > b.reason ? 1 : 0),
+    );
+};
+
 export interface PfmSummaryInput {
   scope: PfmScopeEnum;
   /** Derived rows of the scope set (no filters). */
@@ -184,6 +289,8 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthlySync[];
   synced_this_year: number;
+  project_progress: PfmProjectProgress[];
+  prms_rejection_reasons: PfmRejectionReason[];
 }
 
 export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
@@ -203,6 +310,8 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
   sp_coverage: buildSpCoverage(i.rows),
   monthly: buildMonthlySeries(i.monthlySyncs, i.now),
   synced_this_year: i.syncedThisYear,
+  project_progress: buildProjectProgress(i.rows),
+  prms_rejection_reasons: buildRejectionReasons(i.rows),
 });
 
 // ------------------------------------------------------------------ queue

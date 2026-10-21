@@ -11,9 +11,12 @@ import {
   buildPfmPipeline,
   buildPfmQueue,
   buildPfmSummary,
+  buildProjectProgress,
+  buildRejectionReasons,
   buildSpCoverage,
   deriveMonitoredRows,
   PFM_CHIP_COUNT_KEYS,
+  PFM_NO_REASON,
   PfmStageKeyEnum,
   pfmAttentionFlag,
   rankPfmRows,
@@ -423,6 +426,119 @@ describe('pfm-aggregation', () => {
           c.approved + c.pending + c.rejected + c.out_of_scope + c.not_sent,
         ).toBe(g.result_count);
       }
+    });
+  });
+
+  describe('project progress (coverage tab: who is behind)', () => {
+    // Hand-classified from the 13 rows above. done = in PRMS + out of scope.
+    it('per project: done / remaining and the stage split, furthest behind first, ties by code', () => {
+      const p = buildProjectProgress(derived);
+      expect(p.map((x) => [x.code, x.total, x.done, x.remaining])).toEqual([
+        ['P-A', 4, 1, 3],
+        ['P-C', 4, 2, 2],
+        ['P-B', 4, 3, 1],
+        ['P-D', 1, 0, 1],
+      ]);
+      expect(p[0]).toEqual({
+        code: 'P-A',
+        name: 'Project P-A',
+        lead_pi: 'PI P-A',
+        total: 4,
+        done: 1,
+        remaining: 3,
+        to_map: 1,
+        ready: 2,
+        in_prms: 1,
+        out_of_scope: 0,
+        pending_review: 0,
+        approved: 1,
+        rejected: 0,
+      });
+      const pb = p.find((x) => x.code === 'P-B')!;
+      expect([
+        pb.to_map,
+        pb.out_of_scope,
+        pb.pending_review,
+        pb.rejected,
+      ]).toEqual([1, 1, 1, 1]);
+    });
+
+    it('stage split always adds up to the total, and done matches the pipeline', () => {
+      const p = buildProjectProgress(derived);
+      for (const x of p) {
+        expect(x.to_map + x.ready + x.in_prms + x.out_of_scope).toBe(x.total);
+        expect(x.pending_review + x.approved + x.rejected).toBe(x.in_prms);
+      }
+      const pipe = buildPfmPipeline(derived);
+      expect(p.reduce((a, x) => a + x.done, 0)).toBe(
+        pipe.in_prms + pipe.out_of_scope,
+      );
+    });
+
+    it('is part of the summary', () => {
+      const s = buildPfmSummary({
+        scope: PfmScopeEnum.ALL,
+        rows: derived,
+        projectsTotal: 4,
+        monthlySyncs: [],
+        syncedThisYear: 0,
+        isPiOfAny: true,
+        now: new Date('2026-10-08T12:00:00Z'),
+      });
+      expect(s.project_progress.map((x) => x.code)).toEqual([
+        'P-A',
+        'P-C',
+        'P-B',
+        'P-D',
+      ]);
+      expect(s.prms_rejection_reasons).toEqual([
+        { reason: PFM_NO_REASON, count: 1 },
+      ]);
+    });
+  });
+
+  describe('PRMS rejection reasons', () => {
+    it('groups rejected results by justification; blank or missing reads as no reason; count desc then reason', () => {
+      const rows = deriveMonitoredRows([
+        mk(90, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'REJECTED',
+          prms_justification: 'Wrong ToC',
+        }),
+        mk(91, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'REJECTED',
+          prms_justification: ' Wrong ToC ',
+        }),
+        mk(92, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'REJECTED',
+          prms_justification: 'Missing evidence',
+        }),
+        mk(93, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'REJECTED',
+          prms_justification: '   ',
+        }),
+        mk(94, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'REJECTED',
+          prms_justification: null,
+        }),
+        // not rejected: never counted, even with a justification
+        mk(95, 'P-Z', {
+          ...SYNCED,
+          prms_history_status: 'APPROVED',
+          prms_justification: 'Wrong ToC',
+        }),
+        mk(96, 'P-Z', { prms_justification: 'Wrong ToC' }),
+      ]);
+      expect(buildRejectionReasons(rows)).toEqual([
+        { reason: 'No reason given', count: 2 },
+        { reason: 'Wrong ToC', count: 2 },
+        { reason: 'Missing evidence', count: 1 },
+      ]);
+      expect(buildRejectionReasons([])).toEqual([]);
     });
   });
 

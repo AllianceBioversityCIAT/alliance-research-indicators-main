@@ -475,9 +475,13 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
           'sp_coverage',
           'monthly',
           'synced_this_year',
+          'project_progress',
+          'prms_rejection_reasons',
         ].sort(),
       );
       expect(res.body.data.monthly).toHaveLength(6);
+      expect(Array.isArray(res.body.data.project_progress)).toBe(true);
+      expect(Array.isArray(res.body.data.prms_rejection_reasons)).toBe(true);
     });
 
     it('defaults to the PI scope and matches the independent count', async () => {
