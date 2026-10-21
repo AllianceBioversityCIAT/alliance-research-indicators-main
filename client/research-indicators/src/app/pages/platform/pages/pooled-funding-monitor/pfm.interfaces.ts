@@ -98,6 +98,8 @@ export interface PfmSummary {
   /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
   project_progress?: PfmProjectProgress[];
   prms_rejection_reasons?: PfmRejectionReason[];
+  /** Quick-view counts of the whole scope (no filters). Optional: older servers omit it. */
+  chip_counts?: PfmChipCounts;
 }
 
 // ─── Queue ──────────────────────────────────────────────────────────────────

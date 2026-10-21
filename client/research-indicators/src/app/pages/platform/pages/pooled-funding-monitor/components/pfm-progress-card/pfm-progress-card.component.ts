@@ -1,11 +1,12 @@
-// The first thing on the coverage tab (owner change request, CAMBIO 1): ONE progress bar.
-// 100% = every monitored result has a decision: sent to PRMS or marked out of scope.
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+// Coverage tab, first card: how much of what we must report is already in PRMS, with the two
+// numbers that matter as buttons into the Results queue. Every number here is a quick view, so a
+// click shows exactly that many results.
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PFM_HELP } from '../../pfm-help';
-import { PfmPipeline, PfmScope } from '../../pfm.interfaces';
+import { PfmChip, PfmChipCounts, PfmScope } from '../../pfm.interfaces';
 
 @Component({
   selector: 'app-pfm-progress-card',
@@ -15,23 +16,27 @@ import { PfmPipeline, PfmScope } from '../../pfm.interfaces';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmProgressCardComponent {
-  pipeline = input.required<PfmPipeline>();
+  /** Quick-view counts of the scope: `synced` = in PRMS, `attention` = still on us. */
+  counts = input.required<PfmChipCounts>();
+  /** Results declared out of scope: they never go to PRMS and need nothing. */
+  outOfScope = input(0);
   scope = input.required<PfmScope>();
+  /** Opens the Results queue on that quick view. */
+  open = output<PfmChip>();
 
   readonly help = PFM_HELP;
-  readonly doneFill = PFM_STATE.done.fill;
-  readonly doneFg = PFM_STATE.done.fg;
+  readonly done = PFM_STATE.done;
+  readonly alert = PFM_STATE.alert;
   readonly emptyFill = PFM_STATE_EMPTY;
 
   progress = computed(() => {
-    const p = this.pipeline();
-    const total = p.total;
-    const done = Math.min(total, p.in_prms + p.out_of_scope);
-    const remaining = total - done;
-    // Floor, so 99.6% never reads as a finished 100% while something is still pending.
-    const percent = total === 0 ? 0 : remaining === 0 ? 100 : Math.floor((done / total) * 100);
-    return { total, done, remaining, percent, complete: total > 0 && remaining === 0, width: total ? `${(done / total) * 100}%` : '0%' };
+    const synced = this.counts().synced;
+    const left = this.counts().attention;
+    const total = synced + left;
+    // Floor, so 99.6% never reads as finished while something is still left.
+    const percent = total === 0 ? 0 : left === 0 ? 100 : Math.floor((synced / total) * 100);
+    return { synced, left, total, percent, complete: total > 0 && left === 0, width: total ? `${(synced / total) * 100}%` : '0%' };
   });
 
-  whose = computed(() => (this.scope() === 'all' ? 'Across all contributing projects' : 'Across your projects'));
+  whose = computed(() => (this.scope() === 'all' ? 'all contributing projects' : 'your projects'));
 }

@@ -28,7 +28,8 @@ const SUMMARY: PfmSummary = {
   project_progress: [
     { code: 'P-1', name: 'One', lead_pi: 'Lead One', total: 20, done: 4, remaining: 16, to_map: 14, ready: 2, in_prms: 4, out_of_scope: 0, pending_review: 2, approved: 1, rejected: 1 }
   ],
-  prms_rejection_reasons: [{ reason: 'Wrong ToC', count: 2 }]
+  prms_rejection_reasons: [{ reason: 'Wrong ToC', count: 2 }],
+  chip_counts: { all: 31, attention: 18, mapping: 12, ready: 3, prms_rejected: 3, synced: 9 }
 };
 
 function render(summary: PfmSummary) {
@@ -42,33 +43,47 @@ function render(summary: PfmSummary) {
 }
 
 describe('PfmCoverageTabComponent', () => {
-  it('opens with the progress bar, then our side vs. PRMS side, then the SP and sync activity detail', () => {
+  it('leads with what is in PRMS, then what to do next, then the SP and sync activity detail', () => {
     const { el, q } = render(SUMMARY);
-    const order = ['pfm-progress-card', 'pfm-alliance-card', 'pfm-prms-card', 'pfm-sp-card', 'pfm-sync-card'].map(id =>
+    const order = ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-sync-card'].map(id =>
       Array.from(el.querySelectorAll('[data-testid]')).indexOf(q(id) as Element)
     );
     expect(order.every(i => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // done = in PRMS (11) + out of scope (2) = 13 of 31
-    expect(q('pfm-progress-percent')?.textContent?.trim()).toBe('41%');
-    expect(el.querySelector('[data-testid="pfm-sp-row-SP06"] [data-testid="pfm-sp-count"]')?.textContent?.trim()).toBe('3 / 8');
-    expect(el.querySelector('[data-testid="pfm-month-2026-07"] [data-testid="pfm-month-label"]')?.textContent?.trim()).toBe('Jul');
-    expect(q('pfm-behind-P-1')).not.toBeNull();
-    expect(q('pfm-prms-reasons')?.textContent).toContain('Wrong ToC');
+    // synced 9 of 9 + 18 need attention
+    expect(q('pfm-progress-percent')?.textContent?.trim()).toBe('33%');
+    expect(q('pfm-progress-open-attention')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('18 need action');
+    expect(el.querySelector('[data-testid="pfm-next-mapping_incomplete"] [data-testid="pfm-next-value"]')?.textContent?.trim()).toBe('12');
   });
 
-  it('the old multi-number pipeline card is gone', () => {
+  it('the old multi-colour charts are gone', () => {
     const { q } = render(SUMMARY);
+    expect(q('pfm-alliance-card')).toBeNull();
+    expect(q('pfm-prms-card')).toBeNull();
     expect(q('pfm-pipeline-card')).toBeNull();
-    expect(q('pfm-pipeline-total')).toBeNull();
   });
 
-  it('still renders when the server does not send project_progress / rejection reasons yet', () => {
-    const { project_progress, prms_rejection_reasons, ...older } = SUMMARY;
-    expect(project_progress && prms_rejection_reasons).toBeTruthy();
+  it('every click asks the page to open the queue: quick view from the cards, SP filter from a program', () => {
+    TestBed.configureTestingModule({ imports: [PfmCoverageTabComponent] });
+    const fixture = TestBed.createComponent(PfmCoverageTabComponent);
+    fixture.componentRef.setInput('summary', SUMMARY);
+    fixture.componentRef.setInput('scope', 'all');
+    fixture.detectChanges();
+    const targets: unknown[] = [];
+    fixture.componentInstance.openQueue.subscribe(t => targets.push(t));
+    const el = fixture.nativeElement as HTMLElement;
+    (el.querySelector('[data-testid="pfm-progress-open-attention"]') as HTMLElement).click();
+    (el.querySelector('[data-testid="pfm-next-ready_to_sync"]') as HTMLElement).click();
+    (el.querySelector('[data-testid="pfm-sp-open-SP06"]') as HTMLElement).click();
+    expect(targets).toEqual([{ chip: 'need_attention' }, { chip: 'ready_to_sync' }, { sp: 'SP06' }]);
+  });
+
+  it('falls back to the KPI figures when the server does not send chip_counts yet', () => {
+    const { chip_counts, ...older } = SUMMARY;
+    expect(chip_counts).toBeTruthy();
     const { q } = render(older);
-    expect(q('pfm-progress-card')).not.toBeNull();
-    expect(q('pfm-alliance-behind-empty')).not.toBeNull();
-    expect(q('pfm-prms-reasons-empty')).not.toBeNull();
+    // kpis: synced 11, need_attention 7
+    expect(q('pfm-progress-open-synced')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('11 in PRMS');
+    expect(q('pfm-progress-open-attention')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('7 need action');
   });
 });

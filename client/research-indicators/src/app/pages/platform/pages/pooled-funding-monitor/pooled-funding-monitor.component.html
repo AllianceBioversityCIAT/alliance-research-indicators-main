@@ -134,7 +134,7 @@
           </div>
         } @else {
           @if (store.summary(); as summary) {
-            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" />
+            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
           }
         }
       </div>

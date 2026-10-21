@@ -31,7 +31,7 @@ describe('PfmSpCoverageCardComponent', () => {
   it('Portfolio copy, with a line on how to read the chart', () => {
     const { q } = render('all');
     expect(q('[data-testid="pfm-sp-sub"]')).toBe('Results mapped to each program, and how many are already in PRMS');
-    expect(q('[data-testid="pfm-sp-how"]')).toContain('Green = already in PRMS, grey = not in PRMS yet');
+    expect(q('[data-testid="pfm-sp-how"]')).toContain('Green = already in PRMS, grey = not yet');
     expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('In PRMS');
     expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not in PRMS yet');
   });
@@ -64,5 +64,16 @@ describe('PfmSpCoverageCardComponent', () => {
     expect(w('SP02', 'pfm-sp-total-bar')).toBe('50%');
     expect(w('SP01', 'pfm-sp-synced-bar')).toBe('12.5%');
     expect(w('SP02', 'pfm-sp-synced-bar')).toBe('50%');
+  });
+
+  it('clicking a program asks to open the queue filtered by it', () => {
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    fixture.componentRef.setInput('rows', ROWS);
+    fixture.componentRef.setInput('scope', 'all');
+    fixture.detectChanges();
+    const codes: string[] = [];
+    fixture.componentInstance.openSp.subscribe(c => codes.push(c));
+    (fixture.nativeElement.querySelector('[data-testid="pfm-sp-open-SP02"]') as HTMLElement).click();
+    expect(codes).toEqual(['SP02']);
   });
 });

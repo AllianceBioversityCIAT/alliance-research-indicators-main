@@ -3,36 +3,31 @@
 // wherever it appears. Business language, 1–2 lines, no implementation terms.
 
 export const PFM_HELP = {
-  // Quick views
+  // Quick views (Need attention = Mapping incomplete + Ready to sync + Rejected)
   allResults: 'Every result of a contributing project in this view, whatever its status.',
-  needAttention: 'Results with nothing in PRMS yet: they still need their mapping finished or a sync.',
-  mappingIncomplete: 'Approved results whose CGIAR Portfolio mapping is started but not finished. Applies once the result is approved in STAR.',
+  needAttention: 'Results that still need something from us: finish the mapping, send them to PRMS, or fix what PRMS rejected.',
+  mappingIncomplete: 'The CGIAR Portfolio mapping is not finished yet (not started or partly filled in).',
   readyToSync: 'Mapping complete and not in PRMS yet: these can be sent now.',
   rejected: 'Sent to PRMS and returned by its reviewers. Check the reason, fix the result and sync it again.',
-  synced: 'Already in PRMS: waiting for review or approved.',
+  synced: 'Already in PRMS: waiting for review or approved. Nothing to do on our side.',
 
   // Terms
   outOfScope:
     'Results of a contributing project that were explicitly marked as not contributing to any Science Program, so they are never sent to PRMS.',
   prmsScope: 'Results that should end up in PRMS: every result except those marked out of scope.',
 
-  // Progress bar
-  completed: 'Completed = sent to PRMS or marked out of scope: a decision has already been taken on them.',
+  // Progress
+  inPrms: 'Results already in PRMS, waiting for review or approved.',
+  needAction: 'Results that still need something from us. Click to see them.',
 
-  // Our side (Alliance)
-  mappingPending: 'No CGIAR Portfolio mapping started yet.',
-  mappingIncompleteState: 'Mapping started, but the Science Program or Theory of Change details are still missing.',
-  readyState: 'Mapping complete, waiting to be sent to PRMS.',
-  sentToPrms: 'Already sent to PRMS. Nothing left to do on our side.',
-
-  // PRMS side
+  // PRMS review states (queue legend)
   pendingReview: 'Received by PRMS, waiting for its reviewers.',
   approved: 'Accepted by PRMS. Done.',
   rejectedState: 'Returned by PRMS. Check the reason, fix the result and sync it again.',
 
   // Coverage by Science Program
   spHowToRead:
-    'One bar per Science Program, as long as its number of results. Green = already in PRMS, grey = not in PRMS yet. The goal is all green.',
+    'One bar per Science Program, as long as its number of results. Green = already in PRMS, grey = not yet. Click a program to see its results.',
   spSynced: 'Results of this Science Program already in PRMS.',
   spNotSynced: 'Results of this Science Program not in PRMS yet.'
 } as const;

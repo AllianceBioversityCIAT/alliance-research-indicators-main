@@ -1,5 +1,5 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-11 (R-PFM-007)
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PFM_HELP } from '../../pfm-help';
@@ -15,6 +15,8 @@ import { PfmScope, PfmSpCoverage } from '../../pfm.interfaces';
 export class PfmSpCoverageCardComponent {
   rows = input.required<PfmSpCoverage[]>();
   scope = input.required<PfmScope>();
+  /** Opens the Results queue filtered by that Science Program. */
+  openSp = output<string>();
 
   readonly help = PFM_HELP;
   readonly syncedFill = PFM_STATE.done.fill;

@@ -14,7 +14,13 @@
   </p>
   <ul class="m-0 mt-4 flex list-none flex-col gap-3 p-0">
     @for (r of view(); track r.code) {
-      <li class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_4.5rem]" [attr.data-testid]="'pfm-sp-row-' + r.code">
+      <li [attr.data-testid]="'pfm-sp-row-' + r.code">
+        <button
+          type="button"
+          class="grid w-full cursor-pointer grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-x-4 rounded-md border-0 bg-transparent px-1 py-1 text-left transition-colors duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 sm:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_4.5rem]"
+          [attr.aria-label]="r.code + ' ' + r.name + ': ' + r.synced + ' of ' + r.total + ' in PRMS. See its results.'"
+          [attr.data-testid]="'pfm-sp-open-' + r.code"
+          (click)="openSp.emit(r.code)">
         <span class="min-w-0 truncate text-[13px] text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-sp-label">{{ r.code }} — {{ r.name }}</span>
         <!-- No background on this cell: the bar below is the only thing drawn, and only as long as its total -->
         <div class="h-[18px]">
@@ -29,6 +35,7 @@
           </div>
         </div>
         <span class="text-right font-mono text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-count">{{ r.synced }} / {{ r.total }}</span>
+        </button>
       </li>
     }
   </ul>

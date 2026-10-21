@@ -212,6 +212,25 @@ describe('PooledFundingMonitorComponent', () => {
     });
   });
 
+  it('a click on a coverage card opens the Results queue on that quick view', async () => {
+    api.GET_PfmSummary.mockImplementation((scope: PfmScope) =>
+      Promise.resolve(ok({ ...summary(scope), chip_counts: { all: 5, attention: 3, mapping: 1, ready: 1, prms_rejected: 1, synced: 1 } }))
+    );
+    await create();
+    fixture.detectChanges();
+    await flush();
+    expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
+    api.GET_PfmQueue.mockClear();
+
+    q('pfm-next-ready_to_sync')?.click();
+    await flush();
+    await flush();
+
+    expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
+    expect(api.GET_PfmQueue).toHaveBeenCalledWith(expect.objectContaining({ chip: 'ready_to_sync' }));
+    expect(q('pfm-chip-ready_to_sync')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('a chip change refetches without removing the filters; only the groups area shows a skeleton (T-12)', async () => {
     api.GET_PfmSummary.mockResolvedValue(ok(summary('mine')));
     await create();
