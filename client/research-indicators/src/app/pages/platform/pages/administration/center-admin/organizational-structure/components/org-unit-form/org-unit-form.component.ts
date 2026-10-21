@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
 import { OrgStaffOption, OrgUnitSaved, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
@@ -38,7 +39,7 @@ interface LevelOption {
 @Component({
   selector: 'app-org-unit-form',
   standalone: true,
-  imports: [FormsModule, AutoCompleteModule, ButtonModule, SelectModule, InputComponent],
+  imports: [FormsModule, AutoCompleteModule, ButtonModule, SelectModule, TooltipModule, InputComponent],
   templateUrl: './org-unit-form.component.html',
   styleUrl: './org-unit-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

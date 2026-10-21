@@ -60,7 +60,7 @@
 
       @if (showYear()) {
         <div class="flex flex-col gap-1">
-          <label for="orgLifecycleYear" class="text-sm font-medium atc-grey-800">From year</label>
+          <label for="orgLifecycleYear" class="label inline-block flex items-center">From year</label>
           <p-select
             inputId="orgLifecycleYear"
             [options]="yearOptions()"
@@ -90,7 +90,7 @@
 
       @if (action === 'inactivate') {
         <div class="flex flex-col gap-1">
-          <label for="orgLifecycleSuccessor" class="text-sm font-medium atc-grey-800">Successor (optional)</label>
+          <label for="orgLifecycleSuccessor" class="label inline-block flex items-center">Successor (optional)</label>
           <p-select
             inputId="orgLifecycleSuccessor"
             [options]="successorChoices()"

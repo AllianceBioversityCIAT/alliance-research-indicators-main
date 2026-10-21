@@ -514,7 +514,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 #### Scenario: Add delegates
 - GIVEN active staff *Luis Gómez* (`B2001`) and *Marta Ruiz* (`B2002`), and `ORG-057` with director `A1234`
 - WHEN an Admin adds both as delegates of `ORG-057` and saves
-- THEN the entry stores `[B2001, B2002]` and the panel shows their names and emails
+- THEN the entry stores `[B2001, B2002]` and the panel shows their names (each email on hover of its chip — D-ORG-21, requester 2026-10-21)
 - AND IT MUST write one log row with the old and the new list
 - BUT it must NOT create a version or ask for *Applies from year*
 

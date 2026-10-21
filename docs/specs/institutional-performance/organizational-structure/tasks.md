@@ -403,6 +403,27 @@ Every task depends on the one before it. They share the module's service, contro
 
 ---
 
+### T-08 — HITL rework 2: delegate chips and form visual consistency
+
+- **Status:** done (2026-10-21, Reviewer PASS on attempt 1 — execution.md; the requester's browser re-check and the A1 accessibility decision stay open in T-06) · **Size:** S · **Dependencies:** T-07 · **Added:** 2026-10-21, requester-approved (T-06 round 2)
+- **Origin:** requester, T-06: "ajusta la forma en que se muestran los delegados seleccionados, podria ser como en la imagen [Keywords]. Trata de mantener en este modulo toda la linea visual que ya tiene la aplicacion". Decision **D-ORG-21** (email on hover; form-wide consistency pass).
+- **Requirements covered:** R-ORG-017 *Add delegates* (amended: names shown, email on hover), R-ORG-013 (form usability / app consistency).
+- **Design refs:** §6.5 (amended), §6.8 tokens, D-ORG-21.
+- **Scope — screen only (client):**
+  1. **Delegate chips** in the *Keywords* style: the global `keywords-autocomplete` class (`src/styles/styles.scss:62`) on the delegates `p-autoComplete multiple` — grey rounded chips inside the field, name + remove icon; the **email in a tooltip** on the chip (PrimeNG `pTooltip`, which the app already styles globally); the *Inactive staff* mark stays visible in the chip. Behaviour unchanged (max 20, director excluded, set comparison, no year asked).
+  2. **Visual-consistency pass of the org form** (`org-unit-form` and, where the same fields appear, the lifecycle dialog): labels, hint/help texts, selects and autocompletes aligned with what the app's other forms already use — prefer the shared custom fields (`app-select`, `app-input`, … under `shared/components/custom-fields/`) when one covers the field **without behaviour change**; otherwise keep PrimeNG but apply the same label / hint / spacing classes the app uses (e.g. the `.label` heading and hint styles of `general-information.component.html`). No hex literals — if an exemplar uses a hex, use the matching token. **List every change** (field → before → after → exemplar it follows) and every place you chose **not** to swap, with the reason.
+- **Tests (client unit):** the delegate chip renders the name, carries the email as its tooltip text, keeps the *Inactive staff* mark, and sits inside a container with `keywords-autocomplete`; existing form tests stay green (adapt selectors only where a swapped component changes the DOM — never weaken what a test asserts; list each adapted test). If a field is swapped to a shared component, its validation / disabled / required behaviour is still asserted.
+- **Falsifier:** (1) drop the tooltip binding → the email-on-hover test red; (2) drop `keywords-autocomplete` → the style-container test red; (3) remove the *Inactive staff* mark → its test red.
+- **Disqualifier:** a test that asserts only that a class exists while the chip still renders the email inline; any behaviour change hidden in the consistency pass.
+- **Cannot prove:** that it "looks like the rest of the app" → requester re-check in T-06.
+- **Review:** `standard`.
+- **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
+- **Done criteria:**
+  - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–3 observed red, then reverted; change list recorded in execution.md. *(Leader re-measure 352/352, 8140/8140 — execution.md § T-08)*
+  - [ ] Requester re-checks the chips and the form's look in the browser during T-06 (quoted there).
+
+---
+
 ## 3. Coverage closure (scenario and clause level)
 
 Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning task. "Read half" / "write half" splits are named in the task.

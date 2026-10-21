@@ -2,7 +2,7 @@
   <app-input label="Code" [signal]="fields" optionValue="code" [isRequired]="true" [maxLength]="30" data-testid="field-code"></app-input>
 
   <div class="flex flex-col gap-1">
-    <label for="orgUnitLevel" class="text-sm font-medium atc-grey-800">Level<span class="text-red-500">*</span></label>
+    <label for="orgUnitLevel" class="label inline-block flex items-center">Level<span class="text-red-500">*</span></label>
     <p-select
       inputId="orgUnitLevel"
       [options]="levels()"
@@ -23,7 +23,7 @@
 
   @if (showParent()) {
     <div class="flex flex-col gap-1" data-testid="field-parent">
-      <label for="orgUnitParent" class="text-sm font-medium atc-grey-800">Parent<span class="text-red-500">*</span></label>
+      <label for="orgUnitParent" class="label inline-block flex items-center">Parent<span class="text-red-500">*</span></label>
       <p-select
         inputId="orgUnitParent"
         [options]="parentChoices()"
@@ -41,7 +41,7 @@
   }
 
   <div class="flex flex-col gap-1" data-testid="field-director">
-    <label for="orgUnitDirector" class="text-sm font-medium atc-grey-800">Responsible director</label>
+    <label for="orgUnitDirector" class="label inline-block flex items-center">Responsible director</label>
     <p-autoComplete
       inputId="orgUnitDirector"
       [ngModel]="director()"
@@ -77,38 +77,39 @@
   </div>
 
   <div class="flex flex-col gap-1" data-testid="field-delegates">
-    <label for="orgUnitDelegates" class="text-sm font-medium atc-grey-800">Delegates (current)</label>
-    <p-autoComplete
-      inputId="orgUnitDelegates"
-      [ngModel]="delegates()"
-      [ngModelOptions]="{ standalone: true }"
-      (ngModelChange)="onDelegatesChange($event)"
-      [suggestions]="delegateSuggestions()"
-      (completeMethod)="searchDelegates($event.query)"
-      optionLabel="name"
-      [multiple]="true"
-      [delay]="300"
-      [minLength]="2"
-      placeholder="Search staff to add"
-      appendTo="body"
-      fluid>
-      <ng-template let-person pTemplate="item">
-        <span class="flex flex-col text-[13px]">
-          <span class="atc-grey-900">{{ person.name }}</span>
-          <span class="atc-grey-700">{{ person.email }}</span>
-        </span>
-      </ng-template>
-      <ng-template let-person pTemplate="selecteditem">
-        <span class="text-[13px]" data-testid="delegate-chip">
-          {{ person.name }}
-          <span class="atc-grey-700" data-testid="delegate-chip-email">{{ person.email }}</span>
-          @if (person.isActiveStaff === false) {
-            <span class="org-badge org-badge--ended" data-testid="delegate-inactive">Inactive staff</span>
-          }
-        </span>
-      </ng-template>
-    </p-autoComplete>
-    <small class="text-[12px] atc-grey-700" data-testid="delegates-hint">
+    <label for="orgUnitDelegates" class="label inline-block flex items-center">Delegates (current)</label>
+    <div class="card p-fluid keywords-autocomplete" data-testid="delegates-container">
+      <p-autoComplete
+        inputId="orgUnitDelegates"
+        [ngModel]="delegates()"
+        [ngModelOptions]="{ standalone: true }"
+        (ngModelChange)="onDelegatesChange($event)"
+        [suggestions]="delegateSuggestions()"
+        (completeMethod)="searchDelegates($event.query)"
+        optionLabel="name"
+        [multiple]="true"
+        [delay]="300"
+        [minLength]="2"
+        placeholder="Search staff to add"
+        appendTo="body"
+        fluid>
+        <ng-template let-person pTemplate="item">
+          <span class="flex flex-col text-[13px]">
+            <span class="atc-grey-900">{{ person.name }}</span>
+            <span class="atc-grey-700">{{ person.email }}</span>
+          </span>
+        </ng-template>
+        <ng-template let-person pTemplate="selecteditem">
+          <span [pTooltip]="person.email ?? ''" tooltipPosition="top" data-testid="delegate-chip">
+            {{ person.name }}
+            @if (person.isActiveStaff === false) {
+              <span class="org-badge org-badge--ended" data-testid="delegate-inactive">Inactive staff</span>
+            }
+          </span>
+        </ng-template>
+      </p-autoComplete>
+    </div>
+    <small class="text-[var(--ac-grey-600)] text-[14px]" data-testid="delegates-hint">
       Up to {{ maxDelegates }}. Delegates are the current list and are not tied to a year.
     </small>
     @if (delegateLimitHit()) {
@@ -118,7 +119,7 @@
 
   @if (showAppliesFrom()) {
     <fieldset class="m-0 flex flex-col gap-2 rounded-lg border border-[var(--ac-grey-200)] p-3" data-testid="applies-from-group">
-      <legend class="px-1 text-sm font-medium atc-grey-800">Applies from year</legend>
+      <legend class="label px-1">Applies from year</legend>
       <p-select
         inputId="orgUnitAppliesFrom"
         [options]="yearOptions()"

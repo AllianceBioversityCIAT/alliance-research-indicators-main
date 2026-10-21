@@ -3,6 +3,7 @@ import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { AutoComplete } from 'primeng/autocomplete';
 import { Select } from 'primeng/select';
+import { Tooltip } from 'primeng/tooltip';
 import { OrgUnitFormComponent } from './org-unit-form.component';
 import { OrgStaffOption, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
@@ -522,9 +523,48 @@ describe('OrgUnitFormComponent', () => {
       expect(q('delegates-hint')?.textContent).toContain('not tied to a year');
       expect(root().querySelectorAll('[data-testid="delegate-inactive"]')).toHaveLength(1);
       expect(q('delegate-inactive')?.closest('[data-testid="delegate-chip"]')?.textContent).toContain('Cira Gone');
-      const chips = Array.from(root().querySelectorAll('[data-testid="delegate-chip"]')).map(c => c.textContent ?? '');
-      expect(chips.find(c => c.includes('Cira Gone'))).toContain('B2@example.org');
-      expect(chips.find(c => c.includes('Beto Delegate'))).toContain('B1@example.org');
+    });
+
+    // T-08 / D-ORG-21 — Keywords-style chips: name inline, email only as the hover tooltip.
+    const chipEls = () => fixture.debugElement.queryAll(By.css('[data-testid="delegate-chip"]'));
+    const chipOf = (name: string) => chipEls().find(c => (c.nativeElement.textContent ?? '').includes(name));
+
+    it('a delegate chip shows the name, not the email, and carries the email as its tooltip text', async () => {
+      await mount({ row: EDITED });
+
+      const beto = chipOf('Beto Delegate');
+      const cira = chipOf('Cira Gone');
+      expect(beto?.nativeElement.textContent).not.toContain('B1@example.org');
+      expect(cira?.nativeElement.textContent).not.toContain('B2@example.org');
+      expect(beto?.injector.get(Tooltip).content).toBe('B1@example.org');
+      expect(cira?.injector.get(Tooltip).content).toBe('B2@example.org');
+    });
+
+    it('hovering a chip renders the email in the tooltip', async () => {
+      await mount({ row: EDITED });
+
+      chipOf('Beto Delegate')?.nativeElement.dispatchEvent(new MouseEvent('mouseenter'));
+      await settle();
+      await new Promise<void>(resolve => setTimeout(resolve, 10));
+
+      expect(document.body.querySelector('.p-tooltip')?.textContent).toContain('B1@example.org');
+    });
+
+    it('the delegates field sits inside the keywords-autocomplete container', async () => {
+      await mount({ row: EDITED });
+
+      const container = q('delegates-container') as HTMLElement;
+      expect(container.classList.contains('keywords-autocomplete')).toBe(true);
+      expect(container.querySelector('p-autocomplete, p-autoComplete')).toBeTruthy();
+    });
+
+    it('a delegate picked after mount renders as a chip with its tooltip (transition)', async () => {
+      await mount({ row: EDITED });
+      expect(chipOf('Dina New')).toBeUndefined();
+
+      await pick('field-delegates', [...fixture.componentInstance.delegates(), person('D9', 'Dina New')]);
+
+      expect(chipOf('Dina New')?.injector.get(Tooltip).content).toBe('D9@example.org');
     });
 
     it('refuses the 21st delegate: the list stays at 20 and the limit message shows', async () => {
