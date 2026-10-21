@@ -48,6 +48,8 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
   - `src/domain/tools/prms-normalizer/reference/prms-external-reference.ts` (new) — `prmsRef`, `parsePrmsRef`, and the SQL `CASE` fragment that yields `prmsRef(platform_code, result_official_code)`.
   - `src/domain/tools/prms-normalizer/reference/prms-external-reference.spec.ts` (new).
   - `src/domain/tools/prms-normalizer/builders/common-fields.builder.ts` (+ its spec) — `external_reference` via `prmsRef`.
+  - `src/domain/tools/prms-normalizer/dto/prms-sync-aggregate.ts` — `platform_code` on the aggregate type.
+  - `src/domain/entities/result-prms-sync/repositories/result-prms-sync-aggregate.repository.ts` (+ spec) — header SELECT adds `r.platform_code` (amended 2026-10-21, design P-21).
 - **Tests:** round-trip for every `ReportingPlatformEnum` value; STAR → `'123'`; TIP → `'TIP-123'`; `parsePrmsRef` null for `STAR-123`, `tip-123`, `TIP-007`, `TIP-0`, `TIP-`, `TIP-12a`, `XYZ-1`, `'9007199254740993'`, `''`, null; the SQL fragment rendered for each enum value equals `prmsRef` for that value (assert on the fragment string with the platform substituted, or evaluate it in T-07); builder: STAR aggregate → bare code, TIP aggregate → prefixed.
 - **Verification:** `npx jest src/domain/tools/prms-normalizer --silent` · `npx eslint src/domain/tools/prms-normalizer` · `npx tsc --noEmit -p tsconfig.json` · `npm run build`.
 - **Falsifier:** (a) make `prmsRef` prefix every platform (`STAR-123`) → builder STAR case and round-trip red; (b) make `parsePrmsRef` accept leading zeros → `TIP-007` case red; (c) drop the STAR branch from the SQL fragment → fragment-vs-`prmsRef` assertion red for STAR.

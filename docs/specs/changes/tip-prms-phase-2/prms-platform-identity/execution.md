@@ -34,3 +34,10 @@
 - **Requirements covered:** R-PPI-006 (unit half; rendered state → T-07 HITL).
 - **Decisions made:** none beyond the task.
 - **Final verification:** VERIFIED (above).
+
+### T-01 — `prmsRef` / `parsePrmsRef`, its SQL form, and the builder — in progress
+
+- **Attempt 1, spawn 1** (Orca `task_87748033efa6` / `ctx_2ae0a9f5a310`): completion report with an owed item in `Not Done / Assumptions` (verbatim): "`ResultPrmsSyncAggregateRepository.loadByResultId` does not select `results.platform_code` (not a T-01 file). An aggregate from that loader has `platform_code` undefined, and the builder then emits the STAR bare code. TIP prefixing is proven when the aggregate carries `platform_code`. Production TIP payloads stay bare until that SELECT is added." · "Absent or null `platform_code` is treated as STAR so the existing STAR fixtures stay byte-identical to HEAD."
+- **Evidence re-run of spawn 1 (Leader-inline):** `npx jest src/domain/tools/prms-normalizer src/domain/entities/result-prms-sync --silent` → 23/23 suites, 344/344; eslint 0; `tsc -p tsconfig.json` 0; build 0 — matches the report.
+- **Decision — execute-time spec edit (2026-10-21):** the gap is a site the design omitted, not a meaning change — R-PPI-003 already requires the TIP payload to carry `TIP-123`. Amended `design.md` §7.1 (aggregate loader selects `r.platform_code`) + §11 new row P-21 + count line; `tasks.md` T-01 scope (+ `dto/prms-sync-aggregate.ts`, + `result-prms-sync-aggregate.repository.ts` and its spec). Carried to the T-01 Reviewer as a named conformance check, and once more to T-03's.
+- **continuations: 1** (aggregate loader SELECT + its spec) — same retained worker.
