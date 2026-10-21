@@ -41,7 +41,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-01 — `prmsRef` / `parsePrmsRef`, its SQL form, and the builder
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none
+- [x] **Status:** done (2026-10-21, PASS attempt 1 + 1 continuation — see `execution.md`) · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-PPI-003 (*Reference by platform* — THEN `TIP-123`; BUT STAR bare); R-PPI-004 parsing half (*Bare reference* AND IT MUST NOT match TIP; *Unknown prefix* → null).
 - **Design refs:** §7.1, §7.5 ("One SQL expression for the reference"), D-1, D-4, P-5, P-6.
 - **Scope (files):**
@@ -58,9 +58,9 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `common-fields.builder.ts` → its spec and `payload.builder` specs that snapshot `external_reference` (`grep -rln "external_reference" src/domain/tools/prms-normalizer --include='*.spec.ts'` — run and list in the report). Run `npx jest src/domain/tools/prms-normalizer src/domain/entities/result-prms-sync --silent`.
 - **Review:** `full` — defines the shared identity contract every other task consumes.
 - **Done criteria:**
-  - [ ] All tests green; falsifiers (a)–(c) observed red and reverted.
-  - [ ] STAR payload `external_reference` byte-identical to HEAD for an existing fixture (old-vs-new, K-019).
-  - [ ] eslint, tsc, build green.
+  - [x] All tests green; falsifiers (a)–(c) observed red and reverted.
+  - [x] STAR payload `external_reference` byte-identical to HEAD for an existing fixture (old-vs-new, K-019).
+  - [x] eslint, tsc, build green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---

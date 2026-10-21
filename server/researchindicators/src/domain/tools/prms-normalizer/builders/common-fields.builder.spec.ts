@@ -1,4 +1,5 @@
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { PrmsSyncAggregate } from '../dto/prms-sync-aggregate';
 import {
   CommonFieldsBuilder,
@@ -1144,6 +1145,45 @@ describe('CommonFieldsBuilder', () => {
       const data = builder.build(baseAggregate({ prms_result_code: null }));
 
       expect('result_code' in data).toBe(false);
+    });
+  });
+
+  describe('external_reference by platform (R-PPI-003)', () => {
+    it('sends the bare official code for a STAR result', () => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.STAR,
+        }),
+      );
+
+      expect(data.external_reference).toBe('123');
+    });
+
+    it('prefixes a TIP result with TIP-', () => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.TIP,
+        }),
+      );
+
+      expect(data.external_reference).toBe('TIP-123');
+    });
+
+    it.each([
+      [ReportingPlatformEnum.PRMS, 'PRMS-123'],
+      [ReportingPlatformEnum.AICCRA, 'AICCRA-123'],
+      [ReportingPlatformEnum.BILATERAL, 'BILATERAL-123'],
+    ] as const)('prefixes %s as %s', (platform, reference) => {
+      const data = builder.build(
+        baseAggregate({
+          result_official_code: 123,
+          platform_code: platform,
+        }),
+      );
+
+      expect(data.external_reference).toBe(reference);
     });
   });
 });

@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AppConfig } from '../../../shared/utils/app-config.util';
+import { CommonFieldsBuilder } from '../../../tools/prms-normalizer/builders/common-fields.builder';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
+import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { ResultPrmsSyncAggregateRepository } from './result-prms-sync-aggregate.repository';
 
@@ -473,5 +475,92 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     });
     const blank = await repository.loadByResultId(11);
     expect(blank?.prms_result_code).toBeNull();
+  });
+
+  const syncableHeader = (
+    platform: ReportingPlatformEnum,
+    officialCode: string,
+  ) => ({
+    ...headerRow,
+    result_official_code: officialCode,
+    platform_code: platform,
+    prms_result_code: null,
+  });
+
+  const mockSyncableResult = (
+    platform: ReportingPlatformEnum,
+    officialCode: string,
+  ) => {
+    mockQueries({
+      header: [syncableHeader(platform, officialCode)],
+      contact: [
+        {
+          email: 'ada.lovelace@cgiar.org',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+        },
+      ],
+      submission: [
+        {
+          created_at: '2025-06-15T14:30:00.000Z',
+          submission_comment: null,
+          email: 'ada.lovelace@cgiar.org',
+          first_name: 'Ada',
+          last_name: 'Lovelace',
+        },
+      ],
+      contracts: [
+        {
+          agreement_id: 'D-123',
+          description: 'Grant',
+          ubwClientDescription: 'ExCIAT',
+          is_primary: 1,
+        },
+      ],
+      programs: [
+        {
+          sp_code: 'SP01',
+          sp_role: 'PRIMARY',
+          toc_result_id: null,
+          toc_result_title: null,
+          indicator_description: null,
+          quantitative_contribution: null,
+          aligns_with_toc: 1,
+        },
+      ],
+    });
+  };
+
+  it('selects r.platform_code on the header query', async () => {
+    mockSyncableResult(ReportingPlatformEnum.TIP, '123');
+
+    await repository.loadByResultId(11);
+    const headerSql = String(query.mock.calls[0][0]);
+
+    expect(headerSql).toMatch(/r\.platform_code/);
+  });
+
+  it('maps a TIP header to platform TIP and a STAR header to STAR', async () => {
+    mockSyncableResult(ReportingPlatformEnum.TIP, '123');
+    const tip = await repository.loadByResultId(11);
+    expect(tip?.platform_code).toBe(ReportingPlatformEnum.TIP);
+
+    query.mockClear();
+    mockSyncableResult(ReportingPlatformEnum.STAR, '123');
+    const star = await repository.loadByResultId(11);
+    expect(star?.platform_code).toBe(ReportingPlatformEnum.STAR);
+  });
+
+  it('builds external_reference from the loaded platform (R-PPI-003)', async () => {
+    const builder = new CommonFieldsBuilder();
+
+    mockSyncableResult(ReportingPlatformEnum.TIP, '123');
+    const tip = await repository.loadByResultId(11);
+    expect(builder.build(tip!).external_reference).toBe('TIP-123');
+
+    query.mockClear();
+    mockSyncableResult(ReportingPlatformEnum.STAR, '123');
+    const star = await repository.loadByResultId(11);
+    expect(builder.build(star!).external_reference).toBe('123');
   });
 });
