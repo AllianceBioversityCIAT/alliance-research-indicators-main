@@ -2,7 +2,6 @@
 // contribution), as one bar of two parts: done (one total) and still to do. Each part explains itself
 // in a tooltip; the actions live in "What to do next".
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
@@ -12,7 +11,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 @Component({
   selector: 'app-pfm-progress-card',
-  imports: [DecimalPipe, TooltipModule, PfmEmptyStateComponent],
+  imports: [TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-progress-card.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -41,6 +40,8 @@ export class PfmProgressCardComponent {
       total,
       percent,
       complete: total > 0 && left === 0,
+      // Inside the green part when it is wide enough for "100%", else right after it.
+      labelInside: percent >= 12,
       doneWidth: total ? `${(done / total) * 100}%` : '0%',
       doneTip: `${plural(done, 'result', 'results')} done: ${synced} in PRMS and ${noSp} with no SP contribution.`,
       leftTip: `${plural(left, 'result still needs', 'results still need')} action.`

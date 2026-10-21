@@ -17,11 +17,14 @@ function render(c: PfmChipCounts, scope: 'all' | 'mine' = 'mine') {
 }
 
 describe('PfmProgressCardComponent', () => {
-  it('done = in PRMS + no SP contribution, over every result: the figure, the count and a dot legend', () => {
+  it('done = in PRMS + no SP contribution, over every result: the legend above, the percentage inside the bar, no count line', () => {
     const { q, text } = render(counts(21, 113, 33));
     // (21 + 33) / 167
     expect(text('pfm-progress-percent')).toBe('32%');
-    expect(text('pfm-progress-count')).toBe('54 of 167 results done');
+    expect(q('pfm-progress-done')?.contains(q('pfm-progress-percent'))).toBe(true);
+    expect(q('pfm-progress-count')).toBeNull();
+    const all = Array.from(q('pfm-progress-card')?.querySelectorAll('[data-testid]') ?? []);
+    expect(all.indexOf(q('pfm-progress-legend')!)).toBeLessThan(all.indexOf(q('pfm-progress-bar')!));
     expect(text('pfm-progress-message')).toBe('Results of your projects already done: in PRMS or with no SP contribution.');
     const legend = Array.from(q('pfm-progress-legend')!.children).map(c => c.textContent?.trim());
     expect(legend).toEqual(['Done: in PRMS or no SP contribution', 'Still to do']);
@@ -53,6 +56,12 @@ describe('PfmProgressCardComponent', () => {
     expect(text('pfm-progress-percent')).toBe('100%');
     expect(text('pfm-progress-message')).toBe('Everything for all contributing projects is done: in PRMS or with no SP contribution.');
     expect(q('pfm-progress-left')).toBeNull();
+  });
+
+  it('a green part too thin for the label puts it just after, on the grey', () => {
+    const { q, text } = render(counts(5, 95));
+    expect(text('pfm-progress-percent')).toBe('5%');
+    expect(q('pfm-progress-left')?.contains(q('pfm-progress-percent'))).toBe(true);
   });
 
   it('at 0% there is no done part, only the "still to do" part', () => {
