@@ -1014,8 +1014,11 @@ export class PrmsOpenSearchService
           org.institution_type_name,
         );
       if (isEmpty(institutionType?.code)) continue;
+      const selectable =
+        await this.toSelectableInstitutionType(institutionType);
       const dto = new CreateResultInstitutionTypeDto();
-      dto.institution_type_id = institutionType.code;
+      dto.institution_type_id = selectable.institution_type_id;
+      dto.sub_institution_type_id = selectable.sub_institution_type_id;
       dto.is_organization_known = false;
       institutionTypes.push(dto);
       if (!isEmpty(org.addressing_demands)) {
@@ -1159,8 +1162,10 @@ export class PrmsOpenSearchService
         );
         continue;
       }
+      const selectable =
+        await this.toSelectableInstitutionType(institutionType);
       const customName = org.other_institution?.trim() || undefined;
-      const key = `${institutionType.code}:${customName?.toLowerCase() ?? ''}`;
+      const key = `${selectable.institution_type_id}:${selectable.sub_institution_type_id ?? ''}:${customName?.toLowerCase() ?? ''}`;
       const count = org.how_many ?? null;
 
       const existing = byKey.get(key);
@@ -1175,13 +1180,46 @@ export class PrmsOpenSearchService
       }
 
       const dto = new InnovationUseOrganizationDto();
-      dto.institution_type_id = Number(institutionType.code);
+      dto.institution_type_id = selectable.institution_type_id;
+      dto.sub_institution_type_id = selectable.sub_institution_type_id;
       dto.institution_type_custom_name = customName;
       dto.is_organization_known = false;
       dto.organization_count = count ?? undefined;
       byKey.set(key, { dto, counts: new Set([count]) });
     }
     return [...byKey.values()].map(({ dto }) => dto);
+  }
+
+  /**
+   * STAR reports an organization as a root type plus, optionally, one direct
+   * child as its sub-type: the type dropdown lists only `parent_code IS NULL`
+   * rows, the sub-type dropdown only that root's children, and the Innovation
+   * Use validation rejects anything else. PRMS sends the deepest type name,
+   * so a child becomes root + child, and a grandchild becomes root + its
+   * parent — the third level has no place in STAR and is dropped.
+   */
+  private async toSelectableInstitutionType(
+    institutionType: ClarisaInstitutionType,
+  ): Promise<{
+    institution_type_id: number;
+    sub_institution_type_id?: number;
+  }> {
+    const chain: ClarisaInstitutionType[] = [institutionType];
+    const repo = this.dataSource.getRepository(ClarisaInstitutionType);
+    // Bounded walk: the catalog is three levels deep; the limit only guards
+    // against a malformed parent cycle.
+    while (!isEmpty(chain[0].parent_code) && chain.length < 10) {
+      const parent = await repo.findOne({
+        where: { code: chain[0].parent_code },
+      });
+      if (isEmpty(parent?.code)) break;
+      chain.unshift(parent);
+    }
+    return {
+      institution_type_id: Number(chain[0].code),
+      sub_institution_type_id:
+        chain.length > 1 ? Number(chain[1].code) : undefined,
+    };
   }
 
   /**
