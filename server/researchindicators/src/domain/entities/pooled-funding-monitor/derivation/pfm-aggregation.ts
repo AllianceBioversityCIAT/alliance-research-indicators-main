@@ -271,12 +271,19 @@ export interface PfmSummaryInput {
   /** DISTINCT results accepted this calendar year (cannot be summed from months). */
   syncedThisYear: number;
   isPiOfAny: boolean;
+  /**
+   * PI or active delegate of at least one project, contributing or not (the
+   * access rule). Lets the page tell "your projects do not contribute" apart
+   * from "you lead nothing". Defaults to `isPiOfAny`.
+   */
+  managesAnyProject?: boolean;
   now: Date;
 }
 
 export interface PfmSummary {
   scope: PfmScopeEnum;
   is_pi_of_any: boolean;
+  manages_any_project: boolean;
   kpis: {
     projects: number;
     projects_total: number;
@@ -296,6 +303,7 @@ export interface PfmSummary {
 export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
   scope: i.scope,
   is_pi_of_any: i.isPiOfAny,
+  manages_any_project: i.managesAnyProject ?? i.isPiOfAny,
   kpis: {
     projects: new Set(i.rows.map(({ row }) => row.project_code)).size,
     projects_total: i.projectsTotal,

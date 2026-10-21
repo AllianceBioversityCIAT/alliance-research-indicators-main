@@ -89,14 +89,21 @@ export class PooledFundingMonitorService {
   ): Promise<PfmSummary> {
     const startedAt = performance.now();
     const repoScope = this.resolveScope(userId, scope);
-    const [monitored, projectsTotal, monthlySyncs, syncedThisYear, isPiOfAny] =
-      await Promise.all([
-        this.repository.findMonitoredResults(repoScope),
-        this.repository.countContributingProjects(),
-        this.repository.findMonthlySyncs(repoScope, now),
-        this.repository.countSyncedThisYear(repoScope, now),
-        this.repository.isPiOfAnyContributingProject(userId),
-      ]);
+    const [
+      monitored,
+      projectsTotal,
+      monthlySyncs,
+      syncedThisYear,
+      isPiOfAny,
+      managesAnyProject,
+    ] = await Promise.all([
+      this.repository.findMonitoredResults(repoScope),
+      this.repository.countContributingProjects(),
+      this.repository.findMonthlySyncs(repoScope, now),
+      this.repository.countSyncedThisYear(repoScope, now),
+      this.repository.isPiOfAnyContributingProject(userId),
+      this.repository.managesAnyProject(userId),
+    ]);
     const rows = deriveMonitoredRows(monitored);
     const summary = buildPfmSummary({
       scope,
@@ -105,6 +112,7 @@ export class PooledFundingMonitorService {
       monthlySyncs,
       syncedThisYear,
       isPiOfAny,
+      managesAnyProject,
       now,
     });
     this.logRequest('summary', userId, scope, [], rows.length, startedAt);

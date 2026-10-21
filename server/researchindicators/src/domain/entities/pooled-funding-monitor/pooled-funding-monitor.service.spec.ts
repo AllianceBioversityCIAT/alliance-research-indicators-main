@@ -64,6 +64,7 @@ describe('PooledFundingMonitorService', () => {
       findMonthlySyncs: jest.fn().mockResolvedValue([]),
       countSyncedThisYear: jest.fn().mockResolvedValue(4),
       isPiOfAnyContributingProject: jest.fn().mockResolvedValue(true),
+      managesAnyProject: jest.fn().mockResolvedValue(true),
       findFilterOptions: jest.fn().mockResolvedValue({
         projects: [],
         science_programs: [],
@@ -99,6 +100,26 @@ describe('PooledFundingMonitorService', () => {
       expect(summary.is_pi_of_any).toBe(false);
       expect(summary.synced_this_year).toBe(4);
       expect(summary.kpis.projects_total).toBe(9);
+    });
+
+    // The m.lundy case: PI of many projects, none contributing. The page must
+    // say "your projects do not contribute", not "you lead nothing".
+    it('tells "leads projects, none contributing" apart from "leads nothing"', async () => {
+      repo.isPiOfAnyContributingProject.mockResolvedValue(false);
+      repo.managesAnyProject.mockResolvedValue(true);
+      const leadsOthers = await service.getSummary(77, PfmScopeEnum.MINE);
+      expect([
+        leadsOthers.is_pi_of_any,
+        leadsOthers.manages_any_project,
+      ]).toEqual([false, true]);
+      expect(repo.managesAnyProject).toHaveBeenCalledWith(77);
+
+      repo.managesAnyProject.mockResolvedValue(false);
+      const leadsNothing = await service.getSummary(77, PfmScopeEnum.MINE);
+      expect([
+        leadsNothing.is_pi_of_any,
+        leadsNothing.manages_any_project,
+      ]).toEqual([false, false]);
     });
 
     it.each([undefined, null, NaN, '7' as unknown as number])(

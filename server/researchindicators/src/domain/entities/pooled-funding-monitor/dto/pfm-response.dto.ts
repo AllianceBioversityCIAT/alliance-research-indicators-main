@@ -76,6 +76,11 @@ export class PfmSummaryResponseDto {
       'True when the authenticated user leads or is an active delegate of at least one contributing project, whatever scope is selected.',
   })
   is_pi_of_any: boolean;
+  @ApiProperty({
+    description:
+      'True when the authenticated user leads or is an active delegate of at least one project, contributing or not.',
+  })
+  manages_any_project: boolean;
   @ApiProperty({ type: PfmKpisDto }) kpis: PfmKpisDto;
   @ApiProperty({ type: PfmPipelineDto }) pipeline: PfmPipelineDto;
   @ApiProperty({ type: [PfmSpCoverageDto] }) sp_coverage: PfmSpCoverageDto[];
