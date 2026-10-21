@@ -321,6 +321,8 @@ describe('pfm-derivation', () => {
       [PfmChipEnum.AWAITING_PI, ['draft']],
       // Out of scope and never sent.
       [PfmChipEnum.NO_SP_CONTRIBUTION, ['noSp']],
+      [PfmChipEnum.PRMS_PENDING, ['pending']],
+      [PfmChipEnum.PRMS_APPROVED, ['approvedPrms']],
     ])('%s', (chip, expected) => {
       expect(matching(chip)).toEqual(expected);
     });

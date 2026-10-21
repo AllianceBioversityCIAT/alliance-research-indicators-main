@@ -338,6 +338,8 @@ export const PFM_CHIP_COUNT_KEYS = {
   [PfmChipEnum.SYNCED]: 'synced',
   [PfmChipEnum.AWAITING_PI]: 'awaiting_pi',
   [PfmChipEnum.NO_SP_CONTRIBUTION]: 'no_sp',
+  [PfmChipEnum.PRMS_PENDING]: 'prms_pending',
+  [PfmChipEnum.PRMS_APPROVED]: 'prms_approved',
 } as const;
 
 export type PfmChipCounts = Record<

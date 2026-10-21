@@ -60,6 +60,10 @@ export class PfmChipCountsDto {
     description: 'No SP contribution (out of scope), not in PRMS.',
   })
   no_sp: number;
+  @ApiProperty({ description: 'In PRMS, pending review.' })
+  prms_pending: number;
+  @ApiProperty({ description: 'In PRMS, approved.' })
+  prms_approved: number;
 }
 
 export class PfmProjectProgressDto {

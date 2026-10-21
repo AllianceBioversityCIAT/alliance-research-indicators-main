@@ -8,4 +8,6 @@ export enum PfmChipEnum {
   /** Coverage-tab views (not shown as quick views). */
   AWAITING_PI = 'awaiting_pi',
   NO_SP_CONTRIBUTION = 'no_sp_contribution',
+  PRMS_PENDING = 'prms_pending',
+  PRMS_APPROVED = 'prms_approved',
 }

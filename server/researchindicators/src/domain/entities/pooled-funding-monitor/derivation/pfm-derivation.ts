@@ -294,6 +294,11 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
     // With Need attention and Synced it partitions every monitored result.
     case PfmChipEnum.NO_SP_CONTRIBUTION:
       return d.isOutOfScope && d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
+    // One PRMS review status each (the PRMS status chart); Synced = both.
+    case PfmChipEnum.PRMS_PENDING:
+      return d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW;
+    case PfmChipEnum.PRMS_APPROVED:
+      return d.prmsStatus === PfmPrmsStatusEnum.APPROVED;
     default:
       return true;
   }

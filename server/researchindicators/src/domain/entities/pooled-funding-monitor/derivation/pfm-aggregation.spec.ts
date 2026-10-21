@@ -294,6 +294,8 @@ describe('pfm-aggregation', () => {
         synced: 'synced',
         awaiting_pi: 'awaiting_pi',
         no_sp_contribution: 'no_sp',
+        prms_pending: 'prms_pending',
+        prms_approved: 'prms_approved',
       });
     });
 
@@ -308,7 +310,13 @@ describe('pfm-aggregation', () => {
         synced: 3,
         awaiting_pi: 4, // r2 Submitted, r5 Draft, r9 Under review, r10 Returned
         no_sp: 2, // r6, r12
+        prms_pending: 1, // r7
+        prms_approved: 2, // r4, r11
       });
+      // Synced = Pending review + Approved.
+      expect(q.chip_counts.prms_pending + q.chip_counts.prms_approved).toBe(
+        q.chip_counts.synced,
+      );
       // Need attention + Synced + No SP contribution partition every result.
       expect(
         q.chip_counts.attention + q.chip_counts.synced + q.chip_counts.no_sp,
@@ -363,6 +371,8 @@ describe('pfm-aggregation', () => {
         synced: 0,
         awaiting_pi: 1,
         no_sp: 0,
+        prms_pending: 0,
+        prms_approved: 0,
       });
       expect(q.totals).toEqual({
         results: 1,
@@ -386,6 +396,8 @@ describe('pfm-aggregation', () => {
         synced: 1,
         awaiting_pi: 1,
         no_sp: 0,
+        prms_pending: 0,
+        prms_approved: 1, // r4
       });
       expect(q.groups).toHaveLength(1);
       expect(q.groups[0].result_count).toBe(3);
