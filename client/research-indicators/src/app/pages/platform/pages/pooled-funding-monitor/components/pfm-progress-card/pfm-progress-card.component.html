@@ -1,0 +1,42 @@
+<section
+  class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+  data-testid="pfm-progress-card"
+  aria-labelledby="pfm-progress-title">
+  @let p = progress();
+  <h2 id="pfm-progress-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Reported to PRMS</h2>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-progress-message">
+    @if (p.total === 0) {
+      Nothing to report yet for {{ whose() }}.
+    } @else if (p.complete) {
+      Everything for {{ whose() }} is done: in PRMS or with no SP contribution.
+    } @else {
+      Results of {{ whose() }} already done: in PRMS or with no SP contribution. Click the bar to see them.
+    }
+  </p>
+
+  <!-- Badge + one thick bar. The parts of the bar are the click targets (no extra buttons). -->
+  <!-- isolate: the badge's z-10 only layers it over its own bar, never over the page's sticky header on scroll -->
+  <div class="relative isolate mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
+    <div
+      class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)]"
+      [style.background-color]="doneFill"
+      data-testid="pfm-progress-percent">
+      {{ p.percent }}%
+    </div>
+    <div class="relative -ml-6 flex h-[30px] flex-1 rounded-r-full py-[3px] pl-[18px] pr-[3px]" [style.background-color]="emptyFill">
+      @for (part of p.parts; track part.chip; let last = $last) {
+        <button
+          type="button"
+          class="h-full cursor-pointer border-0 p-0 transition-opacity duration-200 hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 {{ last || p.parts[$index + 1]?.color === null ? 'rounded-r-full' : '' }} {{ part.color ? '' : 'bg-transparent hover:bg-[color-mix(in_srgb,var(--ac-pfm-accent-navy)_8%,transparent)]' }}"
+          [style.width]="part.color ? part.width : null"
+          [class.flex-1]="!part.color"
+          [style.background-color]="part.color"
+          [pTooltip]="part.tip"
+          tooltipPosition="top"
+          [attr.aria-label]="part.tip"
+          [attr.data-testid]="part.testId"
+          (click)="open.emit(part.chip)"></button>
+      }
+    </div>
+  </div>
+</section>

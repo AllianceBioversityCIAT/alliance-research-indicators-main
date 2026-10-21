@@ -1,0 +1,37 @@
+<section
+  class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+  data-testid="pfm-next-steps-card"
+  aria-labelledby="pfm-next-steps-title">
+  <h2 id="pfm-next-steps-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">What to do next</h2>
+  @if (allDone()) {
+    <p class="m-0 mt-2 text-[14px] text-[var(--ac-grey-900)]" data-testid="pfm-next-steps-done">Nothing left to do on our side.</p>
+  } @else {
+    <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Click a card to see those results.</p>
+    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-3">
+      @for (s of steps(); track s.chip) {
+        <li>
+          <button
+            type="button"
+            class="flex h-full w-full cursor-pointer flex-col items-start gap-2 rounded-lg border border-solid border-l-[4px] border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-4 text-left transition-colors duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-[var(--ac-pfm-surface)]"
+            [style.border-left-color]="s.fill"
+            [disabled]="s.value === 0"
+            [attr.aria-label]="s.title + ': ' + s.value + ' results. ' + s.hint"
+            [attr.data-testid]="'pfm-next-' + s.chip"
+            (click)="open.emit(s.chip)">
+            <span class="flex items-center gap-2 text-[14px] font-semibold text-[var(--ac-pfm-accent-navy)]">
+              <i class="pi {{ s.icon }} !text-[13px]" [style.color]="s.fg" aria-hidden="true"></i>
+              {{ s.title }}
+            </span>
+            <span class="text-[32px] font-bold leading-none tabular-nums" [style.color]="s.value ? s.fg : null" data-testid="pfm-next-value">{{ s.value | number }}</span>
+            <span class="text-[12px] text-[var(--ac-pfm-neutral-fg)]">{{ s.value ? s.hint : 'Nothing to do here.' }}</span>
+            @if (s.value) {
+              <span class="mt-auto inline-flex items-center gap-1 text-[12px] font-semibold" [style.color]="s.fg">
+                View results <i class="pi pi-arrow-right !text-[10px]" aria-hidden="true"></i>
+              </span>
+            }
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -9,7 +9,8 @@
           <div
             class="absolute inset-x-0 bottom-0 rounded-t-md {{ b.fill }} {{ b.synced > 0 ? 'min-h-[6px]' : '' }}"
             [style.height]="b.height"
-            [attr.title]="(b.synced | number) + ' results synced in ' + b.label"
+            [pTooltip]="(b.synced | number) + (b.synced === 1 ? ' result' : ' results') + ' synced in ' + b.label"
+            tooltipPosition="top"
             data-testid="pfm-month-bar"></div>
         </div>
         <span class="sr-only" data-testid="pfm-month-value">{{ b.synced | number }}</span>

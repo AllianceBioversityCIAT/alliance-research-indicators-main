@@ -64,6 +64,7 @@ describe('PooledFundingMonitorService', () => {
       findMonthlySyncs: jest.fn().mockResolvedValue([]),
       countSyncedThisYear: jest.fn().mockResolvedValue(4),
       isPiOfAnyContributingProject: jest.fn().mockResolvedValue(true),
+      managesAnyProject: jest.fn().mockResolvedValue(true),
       findFilterOptions: jest.fn().mockResolvedValue({
         projects: [],
         science_programs: [],
@@ -99,6 +100,26 @@ describe('PooledFundingMonitorService', () => {
       expect(summary.is_pi_of_any).toBe(false);
       expect(summary.synced_this_year).toBe(4);
       expect(summary.kpis.projects_total).toBe(9);
+    });
+
+    // The m.lundy case: PI of many projects, none contributing. The page must
+    // say "your projects do not contribute", not "you lead nothing".
+    it('tells "leads projects, none contributing" apart from "leads nothing"', async () => {
+      repo.isPiOfAnyContributingProject.mockResolvedValue(false);
+      repo.managesAnyProject.mockResolvedValue(true);
+      const leadsOthers = await service.getSummary(77, PfmScopeEnum.MINE);
+      expect([
+        leadsOthers.is_pi_of_any,
+        leadsOthers.manages_any_project,
+      ]).toEqual([false, true]);
+      expect(repo.managesAnyProject).toHaveBeenCalledWith(77);
+
+      repo.managesAnyProject.mockResolvedValue(false);
+      const leadsNothing = await service.getSummary(77, PfmScopeEnum.MINE);
+      expect([
+        leadsNothing.is_pi_of_any,
+        leadsNothing.manages_any_project,
+      ]).toEqual([false, false]);
     });
 
     it.each([undefined, null, NaN, '7' as unknown as number])(
@@ -184,6 +205,7 @@ describe('PooledFundingMonitorService', () => {
         prms_status: 'Not sent',
         prms_hint: expect.any(String),
         updated_at: '—',
+        updated_at_iso: null,
         star_status_name: null,
         star_status_description: null,
         star_approved_label: null,
@@ -207,6 +229,8 @@ describe('PooledFundingMonitorService', () => {
         scope: PfmScopeEnum.ALL,
       });
       expect(r.star_status_description).toBe('PI approved it');
+      expect(r.updated_at).toBe('01 Oct, 10:20');
+      expect(r.updated_at_iso).toBe('2026-10-01T10:20:00.000Z');
       expect(r.star_approved_label).toBe('Approved 05 Mar 2026');
       expect(r.science_programs.map((s) => [s.code, s.primary])).toEqual([
         ['SP01', true],

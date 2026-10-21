@@ -36,34 +36,6 @@
     </div>
   </div>
 
-  @if (!piEmpty()) {
-    <!-- KPI cards: share the summary request, so they share its loading / error state -->
-    @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
-      <div class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
-        @for (i of [1, 2, 3, 4]; track i) {
-          <div class="h-[92px] animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]"></div>
-        }
-      </div>
-    } @else if (store.summaryState().error) {
-      <div
-        class="flex items-center gap-3 rounded-lg bg-[var(--ac-pfm-danger-bg)] px-4 py-3 text-[13px] text-[var(--ac-pfm-danger-fg)]"
-        role="alert"
-        data-testid="pfm-summary-error">
-        <span>The summary could not be loaded.</span>
-        <button
-          type="button"
-          class="cursor-pointer rounded-md border border-solid border-[color:var(--ac-pfm-danger-fg)] bg-transparent px-2.5 py-1 text-[12.5px] font-semibold text-[var(--ac-pfm-danger-fg)]"
-          data-testid="pfm-summary-retry"
-          (click)="store.retrySummary()">
-          Retry
-        </button>
-      </div>
-    } @else {
-      @if (store.summary(); as summary) {
-        <app-pfm-kpi-cards [kpis]="summary.kpis" [scope]="store.scope()" />
-      }
-    }
-  }
   </div>
 
   @if (!piEmpty()) {
@@ -103,9 +75,8 @@
         <i class="pi pi-exclamation-triangle shrink-0 !text-[14px] text-[color:var(--ac-warning-fg)]/80" aria-hidden="true"></i>
         <div class="flex flex-col items-start">
           <p class="m-0 font-['Barlow'] text-[12.5px] font-semibold leading-[1.35] text-[color:var(--ac-warning-fg)]/80">
-            You are not PI of any project contributing to CGIAR Portfolio
+            {{ piEmptyMessage() }}
           </p>
-          @if (canSeePortfolio) {
           <button
             type="button"
             class="mt-2 cursor-pointer rounded-md border border-solid border-[color:var(--ac-warning-fg)] bg-transparent px-3 py-1 font-['Barlow'] text-[12.5px] font-semibold text-[color:var(--ac-warning-fg)] no-underline transition-colors duration-200 hover:bg-[color:var(--ac-warning-fg)]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-warning-fg)]"
@@ -113,7 +84,6 @@
             (click)="selectScope('all')">
             View whole portfolio
           </button>
-          }
         </div>
       </div>
     </div>
@@ -136,7 +106,7 @@
           </div>
         } @else {
           @if (store.summary(); as summary) {
-            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" />
+            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
           }
         }
       </div>

@@ -5,7 +5,6 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
-import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import { PooledFundingMonitorRepository } from '../repositories/pooled-funding-monitor.repository';
 
 /**
@@ -21,9 +20,8 @@ import { PooledFundingMonitorRepository } from '../repositories/pooled-funding-m
  *   user with no active roles can arrive as `[null]` (LEFT JOIN +
  *   JSON_ARRAYAGG);
  * - a user whose EVERY role is CONTRIBUTOR (3), UNLESS they are PI or an active
- *   delegate of at least one project (same rule as My PI Delegates). Such a
- *   user only gets their own scope: `scope=all` is still refused, so the
- *   portfolio-wide view stays with the non-contributor roles.
+ *   delegate of at least one project (same rule as My PI Delegates). Once in,
+ *   they see both scopes, the whole portfolio included (owner, 2026-10-21).
  * Any other role mix passes, SYSTEM_ADMIN included, so a future role is not
  * silently locked out the way an `@Roles` allow-list would.
  */
@@ -51,10 +49,7 @@ export class PfmAccessGuard implements CanActivate {
       return true;
     }
 
-    if (
-      request?.query?.scope === PfmScopeEnum.ALL ||
-      !(await this.repository.managesAnyProject(user.sec_user_id))
-    ) {
+    if (!(await this.repository.managesAnyProject(user.sec_user_id))) {
       throw this.denied();
     }
 

@@ -62,6 +62,8 @@ export interface PfmResultRow {
   prms_hint: string;
   /** Server-formatted "dd Mon, HH:mm" (UTC); "—" when `results.updated_at` is NULL. */
   updated_at: string;
+  /** Same instant as ISO-8601 UTC, for sorting; null when `results.updated_at` is NULL. */
+  updated_at_iso: string | null;
 }
 
 const spRef = (sp: PfmSpRef) => ({
@@ -87,14 +89,21 @@ export class PooledFundingMonitorService {
   ): Promise<PfmSummary> {
     const startedAt = performance.now();
     const repoScope = this.resolveScope(userId, scope);
-    const [monitored, projectsTotal, monthlySyncs, syncedThisYear, isPiOfAny] =
-      await Promise.all([
-        this.repository.findMonitoredResults(repoScope),
-        this.repository.countContributingProjects(),
-        this.repository.findMonthlySyncs(repoScope, now),
-        this.repository.countSyncedThisYear(repoScope, now),
-        this.repository.isPiOfAnyContributingProject(userId),
-      ]);
+    const [
+      monitored,
+      projectsTotal,
+      monthlySyncs,
+      syncedThisYear,
+      isPiOfAny,
+      managesAnyProject,
+    ] = await Promise.all([
+      this.repository.findMonitoredResults(repoScope),
+      this.repository.countContributingProjects(),
+      this.repository.findMonthlySyncs(repoScope, now),
+      this.repository.countSyncedThisYear(repoScope, now),
+      this.repository.isPiOfAnyContributingProject(userId),
+      this.repository.managesAnyProject(userId),
+    ]);
     const rows = deriveMonitoredRows(monitored);
     const summary = buildPfmSummary({
       scope,
@@ -103,6 +112,7 @@ export class PooledFundingMonitorService {
       monthlySyncs,
       syncedThisYear,
       isPiOfAny,
+      managesAnyProject,
       now,
     });
     this.logRequest('summary', userId, scope, [], rows.length, startedAt);
@@ -198,6 +208,7 @@ export class PooledFundingMonitorService {
     prms_status: d.prmsStatus,
     prms_hint: d.prmsHint,
     updated_at: d.updatedLabel,
+    updated_at_iso: row.updated_at ? row.updated_at.toISOString() : null,
   });
 
   /**

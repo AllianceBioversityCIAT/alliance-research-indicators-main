@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { PfmSyncActivityCardComponent } from './pfm-sync-activity-card.component';
+import { Tooltip } from 'primeng/tooltip';
+import { By } from '@angular/platform-browser';
+import { monthShade, PfmSyncActivityCardComponent } from './pfm-sync-activity-card.component';
 import { PfmMonthly, PfmScope } from '../../pfm.interfaces';
 
 const MONTHLY: PfmMonthly[] = [
@@ -19,7 +21,7 @@ function render(scope: PfmScope) {
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const q = (sel: string) => el.querySelector(sel)?.textContent?.replace(/\s+/g, ' ').trim();
-  return { el, q };
+  return { fixture, el, q };
 }
 
 describe('PfmSyncActivityCardComponent', () => {
@@ -63,5 +65,34 @@ describe('PfmSyncActivityCardComponent', () => {
   it('footer switches with scope', () => {
     expect(render('all').q('[data-testid="pfm-sync-foot"]')).toBe('1,641 results synced in 2026');
     expect(render('mine').q('[data-testid="pfm-sync-foot"]')).toBe('1,641 of your results synced in 2026');
+  });
+
+  // Owner: navy, darker the more results were synced that month, lighter the fewer.
+  it('the busiest month is the darkest navy, quieter months are lighter', () => {
+    const { el } = render('all');
+    const cls = (m: string) => el.querySelector(`[data-testid="pfm-month-${m}"] [data-testid="pfm-month-bar"]`)?.className ?? '';
+    expect(cls('2026-05')).toContain('--ac-pfm-month-6'); // 52, the max
+    expect(cls('2026-06')).toContain('--ac-pfm-month-5'); // 39
+    expect(cls('2026-02')).toContain('--ac-pfm-month-4'); // 26
+    expect(cls('2026-04')).toContain('--ac-pfm-month-3'); // 13
+    expect(cls('2026-07')).toContain('--ac-pfm-month-2'); // 7
+    expect(el.innerHTML).not.toContain('--ac-state-done-fill');
+  });
+
+  it('shade scale: more is never lighter', () => {
+    const order = ['month-2', 'month-3', 'month-4', 'month-5', 'month-6'];
+    const rank = (v: number) => order.findIndex(o => monthShade(v, 100).includes(o));
+    for (let v = 1; v < 100; v++) expect(rank(v + 1)).toBeGreaterThanOrEqual(rank(v));
+    expect(rank(100)).toBe(4);
+  });
+
+  it('uses the STAR tooltip (pTooltip), not the browser title', () => {
+    const { fixture, el } = render('all');
+    const bar = el.querySelector('[data-testid="pfm-month-2026-05"] [data-testid="pfm-month-bar"]')!;
+    expect(bar.getAttribute('title')).toBeNull();
+    const tip = fixture.debugElement.queryAll(By.directive(Tooltip)).map(d => d.injector.get(Tooltip));
+    expect(tip.length).toBe(6);
+    expect(tip.map(t => t.content)).toContain('52 results synced in May');
+    expect(tip.map(t => t.content)).toContain('7 results synced in Jul');
   });
 });

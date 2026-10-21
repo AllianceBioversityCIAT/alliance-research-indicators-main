@@ -2,6 +2,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
+import { PFM_STATE } from '@shared/constants/pfm-status-colors';
+import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmChipCounts, PfmFilters } from '../../pfm.interfaces';
 import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
 import { PfmStoreService } from '../../services/pfm-store.service';
@@ -9,27 +12,28 @@ import { PfmStoreService } from '../../services/pfm-store.service';
 /** Sentinel of the "All …" option (a null model would render the placeholder instead of the option). */
 const ALL = '__all__';
 
-const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts }[] = [
-  { key: 'all', label: 'All results', count: 'all' },
-  { key: 'need_attention', label: 'Need attention', count: 'attention' },
-  { key: 'mapping_incomplete', label: 'Mapping incomplete', count: 'mapping' },
-  { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready' },
-  { key: 'rejected', label: 'Rejected by PRMS', count: 'prms_rejected' },
-  { key: 'synced', label: 'Synced with PRMS', count: 'synced' }
+/** `dot` = the state colour of that view (same palette as the badges and charts); none for All. */
+const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
+  { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
+  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
+  { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
+  { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
+  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];
 
-/** Legend of the PRMS bar colors (R-PFM-015). */
-const LEGEND = [
-  { label: 'Approved in PRMS', dot: 'bg-[var(--ac-pfm-seg-approved)]' },
-  { label: 'Pending review', dot: 'bg-[var(--ac-pfm-seg-pending)]' },
-  { label: 'Rejected', dot: 'bg-[var(--ac-pfm-seg-rejected)]' },
-  { label: 'Not synced', dot: 'bg-[var(--ac-pfm-seg-not-started)]' }
-];
+/** Views reachable from the coverage tab that are not shown as quick views. */
+const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
+  rejected: 'Rejected by PRMS',
+  awaiting_pi: 'Pending approval by the PI',
+  no_sp_contribution: 'No SP contribution',
+  prms_pending: 'Pending review in PRMS',
+  prms_approved: 'Approved by PRMS'
+};
 
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
-  imports: [FormsModule, SelectModule, PfmProjectGroupComponent],
+  imports: [FormsModule, SelectModule, TooltipModule, PfmProjectGroupComponent],
   templateUrl: './pfm-queue-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -37,7 +41,15 @@ export class PfmQueueTabComponent {
   readonly store = inject(PfmStoreService);
   readonly ALL = ALL;
   readonly chips = CHIPS;
-  readonly legend = LEGEND;
+  /**
+   * A view that is no longer a quick view (Rejected by PRMS) but that the coverage tab still opens
+   * ("Fix and send again"): shown as a removable tag so the queue never filters invisibly.
+   */
+  readonly hiddenChip = computed(() => {
+    const key = this.store.chip();
+    if (!key || CHIPS.some(c => c.key === key)) return null;
+    return HIDDEN_CHIP_LABELS[key] ? { key, label: HIDDEN_CHIP_LABELS[key] } : null;
+  });
 
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */
   readonly queue = computed(() => this.store.queue());

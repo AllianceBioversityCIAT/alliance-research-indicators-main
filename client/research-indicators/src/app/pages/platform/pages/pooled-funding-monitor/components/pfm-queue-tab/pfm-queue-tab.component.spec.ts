@@ -55,12 +55,17 @@ describe('PfmQueueTabComponent', () => {
   it('renders each chip count from the server chip_counts, in mockup order', () => {
     const { el } = setup();
     const chips = Array.from(el.querySelectorAll('[data-testid="pfm-chips"] button'));
-    expect(chips.map(c => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+    // visible text only: the sr-only explanation is checked in its own test
+    const visible = (c: Element) => {
+      const clone = c.cloneNode(true) as Element;
+      clone.querySelectorAll('.sr-only').forEach(n => n.remove());
+      return clone.textContent?.replace(/\s+/g, ' ').trim();
+    };
+    expect(chips.map(visible)).toEqual([
       'All results 41',
       'Need attention 7',
-      'Mapping incomplete 5',
+      'Mapping pending 5',
       'Ready to sync 3',
-      'Rejected by PRMS 2',
       'Synced with PRMS 13'
     ]);
   });
@@ -83,8 +88,8 @@ describe('PfmQueueTabComponent', () => {
     const { q, store } = setup({ chip: 'synced' });
     q('pfm-chip-synced')?.click();
     expect(store.setChip).not.toHaveBeenCalled();
-    q('pfm-chip-rejected')?.click();
-    expect(store.setChip).toHaveBeenCalledWith('rejected');
+    q('pfm-chip-ready_to_sync')?.click();
+    expect(store.setChip).toHaveBeenCalledWith('ready_to_sync');
     q('pfm-chip-all')?.click();
     expect(store.setChip).toHaveBeenCalledWith(null);
   });
@@ -117,17 +122,32 @@ describe('PfmQueueTabComponent', () => {
     expect(el.textContent?.toLowerCase()).not.toContain('year');
   });
 
-  it('count line copy for portfolio and PI scope (singular project), plus the legend', () => {
+  it('count line copy for portfolio and PI scope (singular project); no colour legend any more', () => {
     const all = setup({ scope: 'all' });
     expect(all.q('pfm-count-line')?.textContent?.trim()).toBe('Showing 41 results across 6 projects · 99 flagged portfolio-wide');
-    expect(Array.from(all.el.querySelectorAll('[data-testid="pfm-legend"] li')).map(l => l.textContent?.trim())).toEqual([
-      'Approved in PRMS',
-      'Pending review',
-      'Rejected',
-      'Not synced'
-    ]);
+    expect(all.q('pfm-legend')).toBeNull();
     const mine = setup({ scope: 'mine', queue: { ...QUEUE, totals: { results: 1, projects: 1, monitored_total: 99 } } });
     expect(mine.q('pfm-count-line')?.textContent?.trim()).toBe('Showing 1 results across 1 project where you are PI');
+  });
+
+  it('every quick view explains itself (tooltip + sr-only) and carries its state colour, red for attention', () => {
+    const { el, q } = setup();
+    for (const key of ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'synced']) {
+      const chip = q('pfm-chip-' + key)!;
+      const help = el.querySelector('#pfm-chip-help-' + key)?.textContent?.trim();
+      expect(help?.length).toBeGreaterThan(10);
+      expect(chip.getAttribute('aria-describedby')).toBe('pfm-chip-help-' + key);
+    }
+    // jsdom drops var() colours from the CSSOM: assert the dot is rendered and the colour it is bound to.
+    expect(q('pfm-chip-all')?.querySelector('[data-testid="pfm-chip-dot"]')).toBeNull();
+    expect(q('pfm-chip-need_attention')?.querySelector('[data-testid="pfm-chip-dot"]')).not.toBeNull();
+    const chips = TestBed.createComponent(PfmQueueTabComponent).componentInstance.chips;
+    const dot = (key: string) => chips.find(c => c.key === key)?.dot;
+    expect(dot('all')).toBeNull();
+    expect(dot('need_attention')).toBe('var(--ac-state-alert-fill)');
+    expect(dot('synced')).toBe('var(--ac-state-done-fill)');
+    expect(dot('ready_to_sync')).toBe('var(--ac-state-ready-fill)');
+    expect(dot('mapping_incomplete')).toBe('var(--ac-state-progress-fill)');
   });
 
   it('shows the empty state with Reset when groups is empty', () => {
@@ -147,5 +167,21 @@ describe('PfmQueueTabComponent', () => {
 
   it('renders nothing before the first queue arrives', () => {
     expect(setup({ queue: null }).q('pfm-queue-tab')).toBeNull();
+  });
+
+  // Owner 2026-10-21: Rejected by PRMS is not a quick view any more.
+  it('has no Rejected by PRMS quick view', () => {
+    const { q, el } = setup();
+    expect(q('pfm-chip-rejected')).toBeNull();
+    expect(el.querySelector('[data-testid="pfm-chips"]')?.textContent).not.toContain('Rejected by PRMS');
+    expect(q('pfm-hidden-chip')).toBeNull();
+  });
+
+  // "Fix and send again" on the coverage tab still opens the rejected results: never filter invisibly.
+  it('when the rejected view is active (from the coverage tab) it shows as a removable tag', () => {
+    const { q, store } = setup({ chip: 'rejected' });
+    expect(q('pfm-hidden-chip')?.textContent).toContain('Showing: Rejected by PRMS');
+    q('pfm-hidden-chip-clear')?.click();
+    expect(store.setChip).toHaveBeenCalledWith(null);
   });
 });

@@ -28,7 +28,7 @@ const BASE: PfmResultRow = {
     { code: 'SP09', name: 'Climate Action', primary: false, color: null }
   ],
   pi_line: 'Awaiting PI approval',
-  mapping_state: 'Incomplete',
+  mapping_state: 'Pending',
   mapping_note: 'Budget shares missing',
   sp_line: 'SP01 (primary)',
   primary_sp: { code: 'SP01', name: 'Breeding', color: '#112233' },
@@ -133,10 +133,11 @@ describe('PfmResultRowComponent', () => {
     expect(pill.style.borderColor).not.toBe('');
   });
 
-  it('View href is /result/STAR-<code> for a non-approved row, and the title links to the same place', () => {
-    const { q } = render();
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+  it('the title links to /result/STAR-<code> for a non-approved row; there is no View button (no Action column)', () => {
+    const { q, el } = render();
     expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+    expect(el.querySelector('[data-testid="pfm-row-view"]')).toBeNull();
+    expect(el.querySelectorAll('td')).toHaveLength(9);
   });
 
   it('Code cell shows platform and number; Indicator cell shows type', () => {
@@ -171,34 +172,38 @@ describe('PfmResultRowComponent', () => {
     expect(render({ creator: null }).q('pfm-row-creator').textContent?.trim()).toBe('-');
   });
 
-  it('Science Programs cell renders one custom-tag per program, code as text, primary first with the name + primary tooltip (HITL 22)', () => {
-    const { q, tipOf, sr } = render();
-    const tags = Array.from(q('pfm-row-sp').querySelectorAll('[data-testid="pfm-row-sp-tag"]')) as HTMLElement[];
-    expect(tags.length).toBe(2);
-    expect(tags.map(t => t.querySelector('app-custom-tag span.font-semibold')?.textContent?.trim())).toEqual(['SP01', 'SP09']);
-    const tips = tags.map(t => tipOf(t));
-    expect(tips).toEqual(['Breeding — primary', 'Climate Action']);
-    expect(tags[0].getAttribute('data-primary')).toBe('true');
-    expect(tags[1].getAttribute('data-primary')).toBe('false');
-    // Primary is marked with a star (as in Alliance alignment), not a double border.
-    // The star sits inside the tag, after the code.
-    expect(tags[0].querySelector('app-custom-tag [data-testid="custom-tag-trailing-icon"].pi-star-fill')).not.toBeNull();
-    expect(tags[1].querySelector('[data-testid="custom-tag-trailing-icon"]')).toBeNull();
-    expect(tags[0].classList).not.toContain('ring-2');
-    // every SP pill hugs its code (no fixed 45px label width)
-    tags.forEach(t => expect(t.querySelector('app-custom-tag span')!.className).not.toContain('min-w-[45px]'));
-    expect(sr(q('pfm-row-sp'))).toEqual(['SP01 Breeding, primary', 'SP09 Climate Action']);
-    expect(q('pfm-row-sp').querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
+  // Owner 2026-10-21: plain text like Indicator / Creator, not status tags.
+  it('Science Programs cell is plain comma-separated text, primary first with an outline star', () => {
+    const { q, tagsIn } = render();
+    const cell = q('pfm-row-sp');
+    expect(tagsIn(cell)).toHaveLength(0); // no app-custom-tag
+    const visible = (el: Element) => {
+      const c = el.cloneNode(true) as Element;
+      c.querySelectorAll('.sr-only').forEach(n => n.remove());
+      return c.textContent?.replace(/\s+/g, ' ').trim();
+    };
+    expect(visible(cell)).toBe('SP01, SP09');
+    const tags = Array.from(cell.querySelectorAll<HTMLElement>('[data-testid="pfm-row-sp-tag"]'));
+    expect(tags.map(t => t.getAttribute('data-primary'))).toEqual(['true', 'false']);
+    // outline star (not filled) only on the primary, before the code
+    const star = tags[0].querySelector('[data-testid="pfm-row-sp-star"]')!;
+    expect(star.classList).toContain('pi-star');
+    expect(star.classList).not.toContain('pi-star-fill');
+    expect(tags[0].firstElementChild).toBe(star);
+    expect(tags[1].querySelector('[data-testid="pfm-row-sp-star"]')).toBeNull();
+    // no colour of its own: no inline colour and no border
+    tags.forEach(t => {
+      expect(t.getAttribute('style')).toBeNull();
+      expect(t.className).not.toMatch(/border|text-\[var/);
+    });
   });
 
-  it('SP tag text uses the neutral token (contrast); the DB colour only drives border and icon', () => {
-    const { q, tagsIn } = render();
-    const [primary, other] = tagsIn(q('pfm-row-sp'));
-    expect(primary.statusColor).toBe('var(--ac-pfm-neutral-fg)');
-    expect(primary.statusBorder).toBe('#112233');
-    expect(primary.iconColor).toBe('#112233');
-    expect(other.statusColor).toBe('var(--ac-pfm-neutral-fg)');
-    expect(other.statusBorder).toBe('var(--ac-pfm-neutral-fg)');
+  it('each Science Program has the STAR tooltip (name + role), keyboard-reachable, and sr-only text', () => {
+    const { q, tipOf, sr } = render();
+    const tags = Array.from(q('pfm-row-sp').querySelectorAll<HTMLElement>('[data-testid="pfm-row-sp-tag"]'));
+    expect(tags.map(t => tipOf(t))).toEqual(['SP01: Breeding (primary)', 'SP09: Climate Action (contributing)']);
+    expect(tags.every(t => t.getAttribute('tabindex') === '0')).toBe(true);
+    expect(sr(q('pfm-row-sp'))).toEqual(['Breeding, primary', 'Climate Action, contributing']);
   });
 
   it('Science Programs cell shows a muted dash when there are no programs', () => {
@@ -212,32 +217,31 @@ describe('PfmResultRowComponent', () => {
     const { q, tipOf, tagsIn, sr } = render();
     const cell = q('pfm-row-mapping');
     const tag = cell.querySelector('app-custom-tag') as HTMLElement;
-    expect(tag.textContent?.trim()).toBe('Incomplete');
+    expect(tag.textContent?.trim()).toBe('Pending');
     expect(tipOf(cell)).toBe('Budget shares missing');
     expect(sr(cell)).toEqual(['Budget shares missing']);
     expect(cell.querySelector('[data-testid="pfm-row-mapping-note"]')).toBeNull();
     expect(cell.querySelectorAll('p').length).toBe(0);
     // jsdom drops var() colours from the CSSOM, so assert the inputs the tag receives.
     const [t] = tagsIn(cell);
-    expect(t.statusColor).toBe('var(--ac-status-mapping-incomplete)');
-    expect(t.statusBorder).toBe('var(--ac-status-mapping-incomplete)');
+    expect(t.statusColor).toBe('var(--ac-status-mapping-pending)');
+    expect(t.statusBorder).toBe('var(--ac-status-mapping-pending)');
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [2023, 2025, 2024] });
     const expected = '/result/STAR-1234/general-information?version=2025&from=pfm-monitor';
-    expect(q('pfm-row-view').getAttribute('href')).toBe(expected);
     expect(q('pfm-row-title').getAttribute('href')).toBe(expected);
   });
 
   it('approved without snapshot years has no version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [] });
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+    expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
-  it('View is present on out-of-scope and mapping-incomplete rows', () => {
-    expect(render({ mapping_state: 'No SP contribution', sp_line: 'Not reported to PRMS' }).q('pfm-row-view')).not.toBeNull();
-    expect(render({ mapping_state: 'Incomplete' }).q('pfm-row-view')).not.toBeNull();
+  it('the title link is present on out-of-scope and mapping-pending rows', () => {
+    expect(render({ mapping_state: 'No SP contribution', sp_line: 'Not reported to PRMS' }).q('pfm-row-title')).not.toBeNull();
+    expect(render({ mapping_state: 'Pending' }).q('pfm-row-title')).not.toBeNull();
   });
 
   it('renders server values as received and no other action', () => {
@@ -246,7 +250,7 @@ describe('PfmResultRowComponent', () => {
     expect(q('pfm-row-pi-line')).toBeNull();
     expect(q('pfm-row-mapping-note')).toBeNull();
     expect(q('pfm-row-meta')).toBeNull();
-    expect(el.querySelectorAll('a').length).toBe(2);
+    expect(el.querySelectorAll('a').length).toBe(1); // the title is the only link
     expect(el.querySelector('button')).toBeNull();
     expect(el.textContent).not.toMatch(/Sync|Request approval|Complete mapping/);
   });
@@ -284,7 +288,6 @@ describe('PfmResultRowComponent', () => {
 
   it.each([
     ['Pending', MAPPING_STATUS_COLOR.Pending],
-    ['Incomplete', MAPPING_STATUS_COLOR.Incomplete],
     ['Complete', MAPPING_STATUS_COLOR.Complete],
     ['No SP contribution', MAPPING_STATUS_COLOR['No SP contribution']]
   ] as const)('mapping %s uses its shared status colour', (state, color) => {
@@ -297,10 +300,10 @@ describe('PfmResultRowComponent', () => {
     expect(colors.size).toBe(3);
   });
 
-  it('click on View opens no dialog or drawer', () => {
+  it('clicking the title opens no dialog or drawer', () => {
     const { el, q } = render();
-    q('pfm-row-view').addEventListener('click', e => e.preventDefault());
-    q('pfm-row-view').click();
+    q('pfm-row-title').addEventListener('click', e => e.preventDefault());
+    q('pfm-row-title').click();
     expect(el.querySelector('[role="dialog"], p-dialog, p-drawer, p-sidebar, dialog')).toBeNull();
   });
 });

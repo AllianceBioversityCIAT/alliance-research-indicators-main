@@ -162,6 +162,30 @@ describe('PfmStoreService', () => {
     expect(api.GET_PfmQueue.mock.calls[0][0]).toEqual(expect.objectContaining({ project: 'P1', chip: null }));
   });
 
+  // Coverage-tab click: the queue must show exactly what was clicked, so earlier filters go.
+  it('openQueue clears the filters, applies the quick view / SP, switches to the queue tab and loads once', async () => {
+    const store = build();
+    store.init();
+    await new Promise(r => setTimeout(r));
+    store.setFilter('project', 'P1');
+    store.setFilter('type', 3);
+    await new Promise(r => setTimeout(r));
+    api.GET_PfmQueue.mockClear();
+    router.navigate.mockClear();
+
+    store.openQueue({ chip: 'ready_to_sync' });
+    expect(store.tab()).toBe('queue');
+    expect(store.chip()).toBe('ready_to_sync');
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
+    expect(api.GET_PfmQueue).toHaveBeenLastCalledWith(expect.objectContaining({ chip: 'ready_to_sync', project: null, type: null }));
+    expect(router.navigate).toHaveBeenCalled();
+
+    store.openQueue({ sp: 'SP06' });
+    expect(store.chip()).toBeNull();
+    expect(store.filters().sp).toBe('SP06');
+  });
+
   it('second expand of the same group makes no new call (R-PFM-011)', async () => {
     const store = build();
     store.init();

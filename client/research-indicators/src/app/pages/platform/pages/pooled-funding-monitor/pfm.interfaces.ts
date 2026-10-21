@@ -9,13 +9,13 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
 export type PfmStarLabel = (typeof PFM_STAR_LABELS)[number];
 
-export const PFM_MAPPING_STATES = ['Pending', 'Incomplete', 'Complete', 'No SP contribution'] as const;
+export const PFM_MAPPING_STATES = ['Pending', 'Complete', 'No SP contribution'] as const;
 export type PfmMappingState = (typeof PFM_MAPPING_STATES)[number];
 
 export const PFM_PRMS_STATUSES = ['Not sent', 'Pending Review', 'Approved', 'Rejected'] as const;
@@ -61,14 +61,45 @@ export interface PfmMonthly {
   synced: number;
 }
 
+/** One contributing project's progress. `done` = in PRMS (any review status) or out of scope. */
+export interface PfmProjectProgress {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  total: number;
+  done: number;
+  remaining: number;
+  /** Mapping pending or incomplete. */
+  to_map: number;
+  /** Mapping complete, not in PRMS yet. */
+  ready: number;
+  in_prms: number;
+  out_of_scope: number;
+  pending_review: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface PfmRejectionReason {
+  reason: string;
+  count: number;
+}
+
 export interface PfmSummary {
   scope: PfmScope;
   is_pi_of_any: boolean;
+  /** PI or delegate of at least one project, contributing or not. Optional: older servers omit it. */
+  manages_any_project?: boolean;
   kpis: PfmKpis;
   pipeline: PfmPipeline;
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthly[];
   synced_this_year: number;
+  /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
+  project_progress?: PfmProjectProgress[];
+  prms_rejection_reasons?: PfmRejectionReason[];
+  /** Quick-view counts of the whole scope (no filters). Optional: older servers omit it. */
+  chip_counts?: PfmChipCounts;
 }
 
 // ─── Queue ──────────────────────────────────────────────────────────────────
@@ -100,6 +131,13 @@ export interface PfmChipCounts {
   ready: number;
   prms_rejected: number;
   synced: number;
+  /** Not approved by the PI in STAR yet (in scope, not in PRMS). Optional: older servers omit it. */
+  awaiting_pi?: number;
+  /** No SP contribution, not in PRMS. Optional: older servers omit it. */
+  no_sp?: number;
+  /** In PRMS, pending review / approved (Synced = both). Optional: older servers omit them. */
+  prms_pending?: number;
+  prms_approved?: number;
 }
 
 export interface PfmGroupCounts {
@@ -183,6 +221,8 @@ export interface PfmResultRow {
    * ISO date. Render as-is; never parse or re-format it.
    */
   updated_at: string;
+  /** Same instant as ISO-8601 UTC, for sorting only; null when unknown. Optional: older servers omit it. */
+  updated_at_iso?: string | null;
 }
 
 // ─── Client-side state shapes ───────────────────────────────────────────────

@@ -28,27 +28,45 @@ describe('PfmSpCoverageCardComponent', () => {
     expect(q('[data-testid="pfm-sp-row-SP02"] [data-testid="pfm-sp-count"]')).toBe('10 / 20');
   });
 
-  it('Portfolio copy', () => {
+  it('Portfolio copy, with a line on how to read the chart', () => {
     const { q } = render('all');
-    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Projects mapped to each program, and how many of them are already syncing');
-    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('Syncing to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not syncing');
+    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Results mapped to each program, and how many are already in PRMS');
+    expect(q('[data-testid="pfm-sp-how"]')).toContain('the dark blue part is what is already in PRMS');
+    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('In PRMS');
+    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not in PRMS yet');
   });
 
   it('PI copy', () => {
     const { q } = render('mine');
-    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Your results mapped to each program, and how many are already synced to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('Synced to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not synced');
+    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Your results mapped to each program, and how many are already in PRMS');
   });
 
-  // Data binding only: real rendered proportion is a HITL visual check.
-  it('binds widths: outer = total / max total, inner = synced / own total (data binding)', () => {
+  it('fills in the section navy (not green) over the grey "not in PRMS yet" track', () => {
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    // jsdom drops var() colours from the CSSOM, so assert the values the template binds.
+    expect(fixture.componentInstance.syncedFill).toBe('var(--ac-pfm-accent-navy)');
+    expect(fixture.componentInstance.unsyncedFill).toBe('var(--ac-state-empty)');
+  });
+
+  // Owner 2026-10-21: every bar is the same length (its own 100%) and fills with the share in PRMS.
+  it('every bar has the same full length; the fill is synced / own total', () => {
     const { el } = render('all');
-    const w = (code: string, bar: string) => el.querySelector<HTMLElement>(`[data-testid="pfm-sp-row-${code}"] [data-testid="${bar}"]`)?.style.width;
-    expect(w('SP01', 'pfm-sp-total-bar')).toBe('100%');
-    expect(w('SP02', 'pfm-sp-total-bar')).toBe('50%');
-    expect(w('SP01', 'pfm-sp-synced-bar')).toBe('12.5%');
-    expect(w('SP02', 'pfm-sp-synced-bar')).toBe('50%');
+    const bar = (code: string, part: string) => el.querySelector<HTMLElement>(`[data-testid="pfm-sp-row-${code}"] [data-testid="${part}"]`)!;
+    expect(bar('SP01', 'pfm-sp-total-bar').className).toContain('w-full');
+    expect(bar('SP02', 'pfm-sp-total-bar').className).toContain('w-full');
+    expect(bar('SP01', 'pfm-sp-total-bar').style.width).toBe('');
+    expect(bar('SP01', 'pfm-sp-synced-bar').style.width).toBe('12.5%');
+    expect(bar('SP02', 'pfm-sp-synced-bar').style.width).toBe('50%');
+  });
+
+  it('clicking a program asks to open the queue filtered by it', () => {
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    fixture.componentRef.setInput('rows', ROWS);
+    fixture.componentRef.setInput('scope', 'all');
+    fixture.detectChanges();
+    const codes: string[] = [];
+    fixture.componentInstance.openSp.subscribe(c => codes.push(c));
+    (fixture.nativeElement.querySelector('[data-testid="pfm-sp-open-SP02"]') as HTMLElement).click();
+    expect(codes).toEqual(['SP02']);
   });
 });

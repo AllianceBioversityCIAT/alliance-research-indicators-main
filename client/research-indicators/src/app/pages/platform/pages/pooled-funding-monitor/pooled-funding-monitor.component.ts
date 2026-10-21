@@ -6,7 +6,6 @@
 
 import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject } from '@angular/core';
 import { RolesService } from '@shared/services/cache/roles.service';
-import { PfmKpiCardsComponent } from './components/pfm-kpi-cards/pfm-kpi-cards.component';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
 import { PFM_TABS, PfmScope, PfmTab } from './pfm.interfaces';
@@ -15,7 +14,7 @@ import { PfmStoreService } from './services/pfm-store.service';
 @Component({
   selector: 'app-pooled-funding-monitor',
   standalone: true,
-  imports: [PfmKpiCardsComponent, PfmCoverageTabComponent, PfmQueueTabComponent],
+  imports: [PfmCoverageTabComponent, PfmQueueTabComponent],
   providers: [PfmStoreService],
   templateUrl: './pooled-funding-monitor.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -29,16 +28,22 @@ export default class PooledFundingMonitorComponent implements OnInit {
   private static readonly MINE = { value: 'mine' as PfmScope, label: 'Only my results as PI' };
   private static readonly ALL = { value: 'all' as PfmScope, label: 'Whole portfolio' };
   /**
-   * The whole portfolio is for every non-Contributor role. A Contributor reaches this page only as
-   * PI or delegate of a project, so they get their own scope only (the server refuses scope=all).
+   * Everyone who reaches the page sees both scopes. Admins see the whole portfolio first (and open
+   * on it); everyone else, PIs and delegates included, gets their own results first.
    */
-  readonly canSeePortfolio = this.roles.canAccessPooledFundingMonitor();
-  /** Admins see the whole portfolio first (and open on it); everyone else keeps the PI scope first. */
-  readonly scopes: { value: PfmScope; label: string }[] = !this.canSeePortfolio
-    ? [PooledFundingMonitorComponent.MINE]
-    : this.roles.isAdmin()
-      ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
-      : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
+  readonly scopes: { value: PfmScope; label: string }[] = this.roles.isAdmin()
+    ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
+    : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
+
+  /**
+   * Why the PI scope is empty. A user can lead or delegate projects none of which contributes to the
+   * CGIAR Portfolio: telling them "you are not PI of any project" contradicts what they know.
+   */
+  readonly piEmptyMessage = computed(() =>
+    this.store.summary()?.manages_any_project
+      ? 'None of your projects contributes to the CGIAR Portfolio, so you have no results to report here.'
+      : 'You are not PI or delegate of any project contributing to the CGIAR Portfolio.'
+  );
   readonly tabs: { value: PfmTab; label: string }[] = [
     { value: 'coverage', label: 'Portfolio coverage' },
     { value: 'queue', label: 'Results queue' }
@@ -51,10 +56,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.store.init({
-      defaultScope: this.roles.isAdmin() ? 'all' : 'mine',
-      allowedScopes: this.scopes.map(s => s.value)
-    });
+    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine' });
   }
 
   selectScope(scope: PfmScope): void {

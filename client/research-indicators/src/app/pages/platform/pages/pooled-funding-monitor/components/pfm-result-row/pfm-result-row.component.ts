@@ -9,14 +9,6 @@ import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 import { MAPPING_STATUS_COLOR, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
 
-/**
- * Column template shared by the group's header row and every result row (R-PFM-012 order).
- * Min-width arithmetic (rem): columns 7.2+8.1+5.5+6+7.5+7.5+6.5+6+6+4.2 = 64.5, gaps 9 x 0.5 = 4.5, row padding px-6 = 3 -> 72.
- * STAR status and mapping are 7.5rem (120px) minimum; cells are vertically centred (items-center).
- */
-export const PFM_ROW_GRID =
-  'grid min-w-[72rem] grid-cols-[7.2rem_minmax(8.1rem,2.6fr)_minmax(5.5rem,1fr)_minmax(6rem,0.9fr)_7.5rem_minmax(7.5rem,1.4fr)_minmax(6.5rem,1.3fr)_6rem_6rem_4.2rem] items-center gap-x-2';
-
 /** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
 export interface PfmTagTone {
   fg: string;
@@ -30,7 +22,6 @@ const solid = (color: string): PfmTagTone => ({ fg: color, border: color });
 // Shared with the result sidebar PRMS sync card: never pick these colours here.
 const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
   Complete: solid(MAPPING_STATUS_COLOR.Complete),
-  Incomplete: solid(MAPPING_STATUS_COLOR.Incomplete),
   Pending: solid(MAPPING_STATUS_COLOR.Pending),
   'No SP contribution': solid(MAPPING_STATUS_COLOR['No SP contribution'])
 };
@@ -42,15 +33,17 @@ const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
 };
 
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
+// A table row (`<tr app-pfm-result-row>`) inside the project group's p-table, one <td> per column,
+// so the group gets the Results Center table behaviour (sort, paginator) without moving a column.
 @Component({
-  selector: 'app-pfm-result-row',
+  selector: 'tr[app-pfm-result-row]',
+  host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row' },
   imports: [RouterLink, CustomTagComponent, TooltipModule],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmResultRowComponent {
   row = input.required<PfmResultRow>();
-  readonly grid = PFM_ROW_GRID;
 
   platformColors = computed(() => PLATFORM_COLOR_MAP[this.row().platform_code]);
   /** Same padding as the Results Center code chip (formatResultCode). */
@@ -69,7 +62,6 @@ export class PfmResultRowComponent {
   mappingTone = computed(() => MAPPING_TONES[this.row().mapping_state] ?? tone('neutral'));
   isPrmsNotSent = computed(() => this.row().prms_status === 'Not sent');
   prmsTone = computed(() => (PRMS_TONES as Record<string, PfmTagTone>)[this.row().prms_status] ?? tone('neutral'));
-  neutralTone = tone('neutral');
 
   link = computed(() => {
     const r = this.row();

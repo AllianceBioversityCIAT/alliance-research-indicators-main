@@ -164,26 +164,37 @@ export const deriveMappingState = (
   if (!row.has_alignment) return PfmMappingStateEnum.PENDING;
   if (!row.has_contribution) return PfmMappingStateEnum.NO_SP_CONTRIBUTION;
   if (row.mapping_complete) return PfmMappingStateEnum.COMPLETE;
-  return PfmMappingStateEnum.INCOMPLETE;
+  // Started but not finished is still Pending (owner 2026-10-21: no separate "Incomplete").
+  return PfmMappingStateEnum.PENDING;
 };
 
 const MAPPING_NOTES: Record<PfmMappingStateEnum, string> = {
   [PfmMappingStateEnum.COMPLETE]: 'CGIAR Portfolio split recorded',
-  [PfmMappingStateEnum.INCOMPLETE]: 'Projects or budget shares still missing',
   [PfmMappingStateEnum.PENDING]: 'Starts after PI approval',
   [PfmMappingStateEnum.NO_SP_CONTRIBUTION]:
     'PI declared no Science Program contribution · out of PRMS scope',
 };
 
-export const deriveMappingNote = (state: PfmMappingStateEnum): string =>
-  MAPPING_NOTES[state];
+/** A started Pending mapping says what is missing; a not-started one keeps the default note. */
+export const PFM_STARTED_PENDING_NOTE =
+  'Started: projects or budget shares still missing';
+
+export const deriveMappingNote = (
+  state: PfmMappingStateEnum,
+  started = false,
+): string =>
+  state === PfmMappingStateEnum.PENDING && started
+    ? PFM_STARTED_PENDING_NOTE
+    : MAPPING_NOTES[state];
 
 export const deriveSpLine = (
   state: PfmMappingStateEnum,
   primary: PfmRawRow['primary_sp'],
   contributing: string[],
+  started = true,
 ): string => {
-  if (state === PfmMappingStateEnum.PENDING) return '';
+  // Not started: no SP line, whatever is attached to the row.
+  if (state === PfmMappingStateEnum.PENDING && !started) return '';
   if (state === PfmMappingStateEnum.NO_SP_CONTRIBUTION)
     return 'Not reported to PRMS';
   const parts: string[] = [];
@@ -231,20 +242,24 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     piLine: derivePiLine(starLabel, row.approved_at),
     approvedLabel: deriveApprovedLabel(starLabel, row.approved_at),
     mappingState,
-    mappingNote: deriveMappingNote(mappingState),
+    mappingNote: deriveMappingNote(mappingState, !!row.has_alignment),
     spLine: deriveSpLine(
       mappingState,
       row.primary_sp,
       row.contributing_sp_names,
+      !!row.has_alignment,
     ),
     creator: row.creator ?? null,
     prmsStatus,
     prmsHint: derivePrmsHint(prmsStatus, row.prms_justification),
     updatedLabel: row.updated_at ? formatPfmDateTime(row.updated_at) : '—',
     isOutOfScope,
-    // Ready to sync = mapping complete AND nothing in PRMS yet; Need attention = nothing in PRMS yet.
+    // Ready to sync = mapping complete AND nothing in PRMS yet.
     isReady: mappingState === PfmMappingStateEnum.COMPLETE && notSent,
-    needsAttention: notSent,
+    // Need attention = what is still on us: in PRMS scope with nothing in PRMS, or returned by PRMS.
+    // Exactly Mapping incomplete + Ready to sync + Rejected (out of scope needs nothing).
+    needsAttention:
+      (!isOutOfScope && notSent) || prmsStatus === PfmPrmsStatusEnum.REJECTED,
   };
 };
 
@@ -252,10 +267,11 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
   switch (chip) {
     case PfmChipEnum.NEED_ATTENTION:
       return d.needsAttention;
+    // Mapping not finished (Pending or Incomplete), in PRMS scope, nothing in PRMS yet.
     case PfmChipEnum.MAPPING_INCOMPLETE:
       return (
-        d.starLabel === PfmStarLabelEnum.APPROVED &&
         !d.isOutOfScope &&
+        d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
         d.mappingState !== PfmMappingStateEnum.COMPLETE
       );
     case PfmChipEnum.READY_TO_SYNC:
@@ -267,6 +283,22 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
         d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW ||
         d.prmsStatus === PfmPrmsStatusEnum.APPROVED
       );
+    // Still to be approved by the PI in STAR, in PRMS scope, nothing in PRMS yet.
+    case PfmChipEnum.AWAITING_PI:
+      return (
+        !d.isOutOfScope &&
+        d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
+        d.starLabel !== PfmStarLabelEnum.APPROVED
+      );
+    // Declared no Science Program contribution and never sent: settled, nothing to do.
+    // With Need attention and Synced it partitions every monitored result.
+    case PfmChipEnum.NO_SP_CONTRIBUTION:
+      return d.isOutOfScope && d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
+    // One PRMS review status each (the PRMS status chart); Synced = both.
+    case PfmChipEnum.PRMS_PENDING:
+      return d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW;
+    case PfmChipEnum.PRMS_APPROVED:
+      return d.prmsStatus === PfmPrmsStatusEnum.APPROVED;
     default:
       return true;
   }

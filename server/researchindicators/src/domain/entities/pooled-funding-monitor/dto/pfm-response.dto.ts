@@ -44,6 +44,53 @@ export class PfmMonthlyDto {
   @ApiProperty() synced: number;
 }
 
+export class PfmChipCountsDto {
+  @ApiProperty() all: number;
+  @ApiProperty() attention: number;
+  @ApiProperty() mapping: number;
+  @ApiProperty() ready: number;
+  @ApiProperty() prms_rejected: number;
+  @ApiProperty() synced: number;
+  @ApiProperty({
+    description:
+      'Not approved by the PI in STAR yet, in PRMS scope, not in PRMS.',
+  })
+  awaiting_pi: number;
+  @ApiProperty({
+    description: 'No SP contribution (out of scope), not in PRMS.',
+  })
+  no_sp: number;
+  @ApiProperty({ description: 'In PRMS, pending review.' })
+  prms_pending: number;
+  @ApiProperty({ description: 'In PRMS, approved.' })
+  prms_approved: number;
+}
+
+export class PfmProjectProgressDto {
+  @ApiProperty() code: string;
+  @ApiProperty({ nullable: true }) name: string | null;
+  @ApiProperty({ nullable: true }) lead_pi: string | null;
+  @ApiProperty() total: number;
+  @ApiProperty({ description: 'In PRMS (any review status) or out of scope.' })
+  done: number;
+  @ApiProperty() remaining: number;
+  @ApiProperty({ description: 'Mapping pending or incomplete.' })
+  to_map: number;
+  @ApiProperty({ description: 'Mapping complete, not in PRMS yet.' })
+  ready: number;
+  @ApiProperty() in_prms: number;
+  @ApiProperty() out_of_scope: number;
+  @ApiProperty() pending_review: number;
+  @ApiProperty() approved: number;
+  @ApiProperty() rejected: number;
+}
+
+export class PfmRejectionReasonDto {
+  @ApiProperty({ description: "PRMS justification, or 'No reason given'." })
+  reason: string;
+  @ApiProperty() count: number;
+}
+
 export class PfmSummaryResponseDto {
   @ApiProperty({ enum: PfmScopeEnum }) scope: PfmScopeEnum;
   @ApiProperty({
@@ -51,6 +98,11 @@ export class PfmSummaryResponseDto {
       'True when the authenticated user leads or is an active delegate of at least one contributing project, whatever scope is selected.',
   })
   is_pi_of_any: boolean;
+  @ApiProperty({
+    description:
+      'True when the authenticated user leads or is an active delegate of at least one project, contributing or not.',
+  })
+  manages_any_project: boolean;
   @ApiProperty({ type: PfmKpisDto }) kpis: PfmKpisDto;
   @ApiProperty({ type: PfmPipelineDto }) pipeline: PfmPipelineDto;
   @ApiProperty({ type: [PfmSpCoverageDto] }) sp_coverage: PfmSpCoverageDto[];
@@ -60,6 +112,18 @@ export class PfmSummaryResponseDto {
       'Distinct monitored results with an ACCEPTED sync in the current UTC calendar year.',
   })
   synced_this_year: number;
+  @ApiProperty({
+    type: [PfmProjectProgressDto],
+    description: 'Per project, furthest behind (most remaining) first.',
+  })
+  project_progress: PfmProjectProgressDto[];
+  @ApiProperty({ type: [PfmRejectionReasonDto] })
+  prms_rejection_reasons: PfmRejectionReasonDto[];
+  @ApiProperty({
+    type: PfmChipCountsDto,
+    description: 'Quick-view counts of the whole scope (no filters).',
+  })
+  chip_counts: PfmChipCountsDto;
 }
 
 export class PfmCodeNameDto {
@@ -82,15 +146,6 @@ export class PfmFilterOptionsDto {
   @ApiProperty({ type: [PfmSpGroupOptionDto] })
   science_programs: PfmSpGroupOptionDto[];
   @ApiProperty({ type: [PfmTypeOptionDto] }) types: PfmTypeOptionDto[];
-}
-
-export class PfmChipCountsDto {
-  @ApiProperty() all: number;
-  @ApiProperty() attention: number;
-  @ApiProperty() mapping: number;
-  @ApiProperty() ready: number;
-  @ApiProperty() prms_rejected: number;
-  @ApiProperty() synced: number;
 }
 
 export class PfmGroupCountsDto {
@@ -214,4 +269,9 @@ export class PfmResultRowDto {
       'Server-formatted "dd Mon, HH:mm" (UTC); "—" when results.updated_at is null.',
   })
   updated_at: string;
+  @ApiProperty({
+    nullable: true,
+    description: 'updated_at as ISO-8601 UTC, for sorting; null when unknown.',
+  })
+  updated_at_iso: string | null;
 }

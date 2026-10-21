@@ -58,15 +58,6 @@ describe('PfmAccessGuard', () => {
       );
     });
 
-    it('contributor-only PI asking for the whole portfolio (scope=all)', async () => {
-      managesAnyProject.mockResolvedValue(true);
-      await expect(
-        guard.canActivate(
-          ctx({ sec_user_id: 7, roles: [3] }, 'jwt', { scope: 'all' }),
-        ),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
     it('machine token is refused before the PI lookup runs', async () => {
       managesAnyProject.mockResolvedValue(true);
       await expect(
@@ -101,6 +92,7 @@ describe('PfmAccessGuard', () => {
     it.each([
       ['no scope (defaults to mine)', {}],
       ['scope=mine', { scope: 'mine' }],
+      ['scope=all (whole portfolio)', { scope: 'all' }],
     ])(
       'contributor-only who is PI or delegate of a project, %s',
       async (_label, query) => {

@@ -89,6 +89,19 @@ export class PfmStoreService {
     this.syncUrl();
   }
 
+  /**
+   * Jump from a coverage chart to the Results queue showing exactly what was clicked: filters are
+   * cleared (so the queue count equals the chart number), then the quick view and / or SP is applied.
+   */
+  openQueue(opts: { chip?: PfmChip | null; sp?: string | null }): void {
+    this.filters.set({ ...EMPTY_FILTERS, sp: opts.sp ?? null });
+    this.chip.set(opts.chip ?? null);
+    this.resetGroups();
+    this.tab.set('queue');
+    this.syncUrl();
+    void this.loadQueue();
+  }
+
   /** Changing a filter clears the chip (R-PFM-009) and the cached group rows. */
   setFilter<K extends keyof PfmFilters>(key: K, value: PfmFilters[K]): void {
     this.filters.update(f => ({ ...f, [key]: value }));
