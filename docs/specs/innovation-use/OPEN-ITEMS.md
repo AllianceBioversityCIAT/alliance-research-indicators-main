@@ -120,6 +120,34 @@ Branch: **`AC-1679-Create-the-innovation-use-section`**, pushed. **Brought up to
 | **RB-8** | **Three findings from T-10's Pivot, none in T-10's scope:** (a) the `as keyof GreenChecks` cast is still open (~10 lines, inside files T-10 already owns); (b) and (c) **two live production bugs found in unrelated code** | **open** |
 | **RB-3 / RB-4** | **Accepted risks, not work.** `AR-1` — no client-tier test reaches a live API. `AR-2` — visual and a11y correctness rest on human observation | **accepted, stated** |
 
+
+### 3.3 `innovation-use/excel-export` (AC-1681) — **T-05 open**
+
+T-01…T-04 are Reviewer PASS and committed (unpushed). Full trail: [`excel-export/execution.md`](excel-export/execution.md).
+
+| # | Item | State |
+| --- | --- | --- |
+| **G1** | **P-4 · Prod MySQL version.** `SELECT VERSION();` on Prod must read ≥ 8.0.14, because the view uses `LEFT JOIN LATERAL`. If it reads lower, DD-1 pivots **before** any merge to `main` | **owed (human), blocks `main`** |
+| **G2** | **P-12 · Prod deploy order.** Confirm the Prod pipeline applies migrations before the new code serves. If it does not, the view migration `1791300000000` must be applied by hand ahead of the deploy, or **every** export 500s (D6). Dev runs `migration:execute` on deploy (root `CLAUDE.md` §4.3) | **owed (human), blocks `main`** |
+| **G3** | **Visual check (D7)**, per item: band colour `FF6A1B9A` and label, merged cells, bullet lines readable at width 56, `Not applicable` on a non-Innovation-Use row, dictionary section, notice text. A mocked-data preview was opened 2026-10-05; the user did not itemize it, so it is not discharged. Prefer Dev with real data | **owed (human)** |
+| **G4** | **OQ-1** — product confirms the 9 headers, the line formats and the new notice text. A change loops back to T-01/T-03/T-04 (column specs, read-back test and dictionary migration change together) | **owed (product)** |
+| **G5** | **P-11 / P-16 · Dev layout readings.** Last raw-data group ends at column 74, and dictionary `MAX(sort_order)` on Dev. The read-only `SELECT`s timed out (`ETIMEDOUT`) from the dev machine | **unverified → human** |
+| **G6** | **Real-volume timing** on Dev. NFR-IUX-001 (amended 2026-10-05) keeps only a structural gate; scratch read 81 → 140 ms on 210 results | **owed (human), reading only** |
+| **FU-1** | `report_alliance_alignment` and the other `report_*` views use the derived-table + `GROUP BY` shape, which aggregates the whole child table on every export (design P-5). Converting them to `LATERAL` would speed up every export | **needs its own spec** |
+| **FU-2** | **Scratch harness defect (P-13).** `migration:test:bootstrap` stops at `CreatePiDelegates1787600000000` (errno 3780, collation mismatch). T-01 worked around it on scratch only. Refresh the baseline or pin the collation | **needs its own spec** |
+| **FU-3** | **Pre-existing fixture failures.** 5 fixture suites (`innovation-use-section-round-trip`, `-role-isolation`, `-edit-plus-add-id-collision`, `-result-creation`, `-level-boundary`) die in Nest bootstrap: `ResultPolicyChangeModule` imports index [0] undefined (circular import). Reproduced alone; not caused by AC-1681 | **open, owner TBD** |
+| **FU-4** | `npm run migration:scan` points to a missing script (`scripts/scan-migration-placeholders.js`) | **open** |
+
+### 3.4 `reports/excel-layout-server-side` — **done; G-WBL-1 waived**
+
+T-01 (`7c379141`) and T-02 (`2b906f7c`) are Reviewer PASS and committed (unpushed). Full trail: [`../reports/excel-layout-server-side/execution.md`](../reports/excel-layout-server-side/execution.md).
+
+| # | Item | State |
+| --- | --- | --- |
+| **G-WBL-1** | **P-4 · Prod layout.** Before the `main` merge, a human runs, read-only on Prod, `SELECT * FROM report_workbook_sheet ORDER BY workbook_key, sort_order;` and `SELECT * FROM report_workbook_column_group ORDER BY workbook_key, sheet_key, sort_order;` and compares with requirements §1 "intended layout" (2 sheets, 11 sections; fills compared case-insensitively, a missing `FF` prefix ignored). A difference goes to the user before merge: either the code adopts it, or the Prod rows were drift (design §11) | **waived by the user 2026-10-06** — the export no longer reads the tables; the user tested the export. Optional: whoever has Prod access may still run it to know whether the first deploy changes Prod's file visibly |
+| **FU-1** | **Drop the layout tables.** `report_workbook_sheet` / `report_workbook_column_group` and their entities: the export no longer reads them (ruling (c) kept them); a later, separate human decision | **needs its own decision** |
+| **FU-3** | **Dictionary colours vs band colours.** The Data dictionary's section titles/fills stay in `report_data_dictionary` and already differ from the band colours (e.g. Evidences dictionary fill `FF5C7EC4`, migration `1777026100000:31`, vs band `FF64B1DD`); two sources of section identity remain; unifying them is a later decision | **open** |
+
 ---
 
 ## 4. Family level — needs its own spec
