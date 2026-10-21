@@ -201,7 +201,7 @@ describe('PfmResultRowComponent', () => {
   it('each Science Program has the STAR tooltip (name + role), keyboard-reachable, and sr-only text', () => {
     const { q, tipOf, sr } = render();
     const tags = Array.from(q('pfm-row-sp').querySelectorAll<HTMLElement>('[data-testid="pfm-row-sp-tag"]'));
-    expect(tags.map(t => tipOf(t))).toEqual(['Breeding — primary', 'Climate Action — contributing']);
+    expect(tags.map(t => tipOf(t))).toEqual(['SP01: Breeding (primary)', 'SP09: Climate Action (contributing)']);
     expect(tags.every(t => t.getAttribute('tabindex') === '0')).toBe(true);
     expect(sr(q('pfm-row-sp'))).toEqual(['Breeding, primary', 'Climate Action, contributing']);
   });

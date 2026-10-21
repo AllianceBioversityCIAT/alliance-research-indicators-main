@@ -71,7 +71,7 @@
         class="cursor-help whitespace-nowrap"
         tabindex="0"
         [attr.data-primary]="sp.primary"
-        [pTooltip]="sp.name + (sp.primary ? ' — primary' : ' — contributing')"
+        [pTooltip]="sp.code + ': ' + sp.name + (sp.primary ? ' (primary)' : ' (contributing)')"
         tooltipEvent="both"
         tooltipPosition="top"
         data-testid="pfm-row-sp-tag"
