@@ -12,3 +12,41 @@
   background: var(--ac-grey-100);
   color: var(--ac-grey-700);
 }
+
+// T-09 / D-ORG-22 — chips below the search field, in the look of the AGROVOC Keywords picker.
+.org-delegate-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.org-delegate-item {
+  display: inline-flex;
+}
+
+.org-delegate-chip {
+  align-items: center;
+  gap: 0.25rem;
+  background-color: var(--ac-grey-200);
+  color: var(--ac-grey-800);
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+}
+
+.org-delegate-chip__remove {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ac-grey-800);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.org-delegate-chip__remove:focus-visible {
+  outline: 2px solid var(--ac-grey-800);
+  outline-offset: 2px;
+  border-radius: 50%;
+}

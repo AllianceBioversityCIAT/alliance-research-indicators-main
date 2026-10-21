@@ -424,6 +424,29 @@ Every task depends on the one before it. They share the module's service, contro
 
 ---
 
+### T-09 — HITL rework 3: delegate chips below the search field
+
+- **Status:** done (2026-10-21, Reviewer PASS on attempt 1 — execution.md; the requester's browser re-check stays open in T-06) · **Size:** S · **Dependencies:** T-08 · **Added:** 2026-10-21, requester-approved (T-06 round 3)
+- **Origin:** requester, T-06 round 3 (screenshot of the AGROVOC *Keywords* picker): "no se ven bien los chips de delegados. ajustalo mas bien para que se vean asi, con los chips debajo con la opcion de eliminar". Decision **D-ORG-22** (supersedes D-ORG-21's in-field chips).
+- **Requirements covered:** R-ORG-017 *Add delegates* (names shown, email on hover), R-ORG-013.
+- **Design refs:** §6.5 (amended delegates line), §6.8 tokens, D-ORG-22.
+- **Scope — screen only (client):**
+  1. **Search field:** a staff search on B4 (same debounce, same suggestions — active staff, current director and already-picked delegates excluded) that **adds** the picked person to the delegates and **clears itself**. Single-value search, not `multiple`.
+  2. **Chips below:** the selected delegates render under the field as removable `p-chip`s (remove icon), in the AGROVOC picker's look — exemplar `app-agrovoc-keywords` on `dev` (commit `e3ba7f8e`, `src/app/shared/components/custom-fields/agrovoc-keywords/agrovoc-keywords.component.{html,scss}`): wrapping flex row, `gap: 0.5rem`, `margin-top: 0.5rem`, chip `--ac-grey-200` background, `--ac-grey-800` text and icon, `border-radius: 1rem`, `0.875rem`. Styles **local** to the org form (tokens only, no hex); the global `keywords-autocomplete` class is removed from this field (it is deleted on `dev`).
+  3. Each chip: the **name**, the *Inactive staff* mark when it applies, the **email in a tooltip**, and the accessible name "name, email[, inactive staff]"; the remove button is labelled "Remove <name>".
+  4. Behaviour unchanged: max 20 (limit message), director excluded, set comparison for "changed", no *Applies from year* for a delegates-only change, disabled state respected.
+- **Tests (client unit):** pick a person → a chip appears below the field and the search input is empty (KZ-015 transition); clicking a chip's remove icon removes that delegate; the chip's tooltip = email and its accessible name contains name and email (and "inactive staff" when inactive); the field container no longer carries `keywords-autocomplete`; the 21st pick is refused with the limit message; the director never appears in suggestions. Adapt T-08's chip tests to the new DOM — never weaken what they assert; list each adapted test.
+- **Falsifier:** (1) keep the picked value in the input (don't clear) → the empty-input test red; (2) drop the remove handler → the remove test red; (3) drop the accessible-name binding → its test red; (4) render chips inside the field again (`multiple`) → the "below the field" test red.
+- **Disqualifier:** a "below the field" test that only checks a class; a remove test that calls the handler directly instead of clicking the chip's remove icon.
+- **Cannot prove:** the look matches the AGROVOC picker → requester re-check in T-06.
+- **Review:** `standard`.
+- **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
+- **Done criteria:**
+  - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–4 observed red, then reverted. *(Leader re-measure 352/352, 8142/8142 — execution.md § T-09)*
+  - [ ] Requester re-checks the delegates field in the browser during T-06 (quoted there).
+
+---
+
 ## 3. Coverage closure (scenario and clause level)
 
 Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning task. "Read half" / "write half" splits are named in the task.

@@ -118,6 +118,12 @@ describe('OrgUnitFormComponent', () => {
     auto(testId).triggerEventHandler('ngModelChange', value);
     await settle();
   };
+  // T-09: the delegates search is single-value. A pick goes through the control's real option-select path
+  // (model update, input text, onSelect), the same one a click on a suggestion runs.
+  const pickDelegate = async (person: OrgStaffOption) => {
+    (auto('field-delegates').componentInstance as AutoComplete).onOptionSelect(new Event('click'), person);
+    await settle();
+  };
   const clickSave = async () => {
     (q('save-button')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
@@ -459,7 +465,7 @@ describe('OrgUnitFormComponent', () => {
       const directors = await search('field-director', 'no');
       await pick('field-director', directors[0]);
       const delegates = await search('field-delegates', 'ni');
-      await pick('field-delegates', [delegates.find(d => d.carnet === 'N2')]);
+      await pickDelegate(delegates.find(d => d.carnet === 'N2') as OrgStaffOption);
 
       await clickSave();
 
@@ -493,25 +499,37 @@ describe('OrgUnitFormComponent', () => {
       await mount({ row: EDITED });
       const offered = await search('field-delegates', 'ni');
 
-      await pick('field-delegates', [...fixture.componentInstance.delegates(), offered[0]]);
+      await pickDelegate(offered[0]);
 
       expect(q('applies-from-group')).toBeNull();
       await clickSave();
       expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: ['B1', 'B2', 'N2'] });
     });
 
-    it('reordering the delegate chips is not a change: Save stays disabled', async () => {
+    // Adapted (T-09): reordering is no longer possible with chips; the set comparison is now proven by
+    // removing a delegate and picking the same person again (the order changes, the set does not).
+    it('removing a delegate and picking the same person again is not a change: Save stays disabled', async () => {
+      api['GET_OrgStaff'].mockResolvedValue(ok([person('B1', 'Beto Delegate')]));
       await mount({ row: EDITED });
+      const saveDisabled = () => q('save-button')?.querySelector('button')?.hasAttribute('disabled');
 
-      await pick('field-delegates', [...fixture.componentInstance.delegates()].reverse());
+      removeBtn('Beto Delegate').click();
+      await settle();
+      expect(saveDisabled()).toBe(false);
+      const offered = await search('field-delegates', 'be');
+      await pickDelegate(offered[0]);
 
-      expect(q('save-button')?.querySelector('button')?.hasAttribute('disabled')).toBe(true);
+      expect(fixture.componentInstance.delegates().map(d => d.carnet)).toEqual(['B2', 'B1']);
+      expect(saveDisabled()).toBe(true);
     });
 
     it('clearing every delegate sends an empty list (replace semantics)', async () => {
       await mount({ row: EDITED });
 
-      await pick('field-delegates', []);
+      removeBtn('Beto Delegate').click();
+      await settle();
+      removeBtn('Cira Gone').click();
+      await settle();
       await clickSave();
 
       expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: [] });
@@ -528,6 +546,8 @@ describe('OrgUnitFormComponent', () => {
     // T-08 / D-ORG-21 — Keywords-style chips: name inline, email only as the hover tooltip.
     const chipEls = () => fixture.debugElement.queryAll(By.css('[data-testid="delegate-chip"]'));
     const chipOf = (name: string) => chipEls().find(c => (c.nativeElement.textContent ?? '').includes(name));
+    const removeBtn = (name: string) => q('delegate-chips')?.querySelector(`[aria-label="Remove ${name}"]`) as HTMLButtonElement;
+    const searchInput = () => q('field-delegates')?.querySelector('input') as HTMLInputElement;
 
     it('a delegate chip shows the name, not the email, and carries the email as its tooltip text', async () => {
       await mount({ row: EDITED });
@@ -550,21 +570,53 @@ describe('OrgUnitFormComponent', () => {
       expect(document.body.querySelector('.p-tooltip')?.textContent).toContain('B1@example.org');
     });
 
-    it('the delegates field sits inside the keywords-autocomplete container', async () => {
+    // Adapted (T-09 / D-ORG-22): the global keywords-autocomplete container is gone; the chips are
+    // p-chip elements in a row that follows the search field in the DOM, outside the control.
+    it('the delegates field no longer carries keywords-autocomplete and the chips render below the search field', async () => {
       await mount({ row: EDITED });
 
       const container = q('delegates-container') as HTMLElement;
-      expect(container.classList.contains('keywords-autocomplete')).toBe(true);
-      expect(container.querySelector('p-autocomplete, p-autoComplete')).toBeTruthy();
+      expect(root().querySelector('.keywords-autocomplete')).toBeNull();
+      const search = container.querySelector('p-autocomplete, p-autoComplete') as HTMLElement;
+      const chips = q('delegate-chips') as HTMLElement;
+      expect(search).toBeTruthy();
+      expect(search.contains(chips)).toBe(false);
+      expect(search.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(chips.querySelectorAll('p-chip')).toHaveLength(2);
+      expect(search.querySelector('p-chip, .p-autocomplete-chip')).toBeNull();
     });
 
-    it('a delegate picked after mount renders as a chip with its tooltip (transition)', async () => {
+    it('a delegate picked after mount renders as a chip below the field and the search input is empty (transition)', async () => {
+      api['GET_OrgStaff'].mockResolvedValue(ok([person('D9', 'Dina New')]));
       await mount({ row: EDITED });
       expect(chipOf('Dina New')).toBeUndefined();
 
-      await pick('field-delegates', [...fixture.componentInstance.delegates(), person('D9', 'Dina New')]);
+      await type('field-delegates', 'di');
+      const offered = await search('field-delegates', 'di');
+      await pickDelegate(offered[0]);
 
       expect(chipOf('Dina New')?.injector.get(Tooltip).content).toBe('D9@example.org');
+      expect(searchInput().value).toBe('');
+    });
+
+    it('clicking the chip remove icon removes that delegate', async () => {
+      await mount({ row: EDITED });
+      expect(chipOf('Beto Delegate')).toBeTruthy();
+
+      removeBtn('Beto Delegate').click();
+      await settle();
+
+      expect(chipOf('Beto Delegate')).toBeUndefined();
+      expect(chipOf('Cira Gone')).toBeTruthy();
+      expect(fixture.componentInstance.delegates().map(d => d.carnet)).toEqual(['B2']);
+    });
+
+    it('a chip exposes "name, email" as its accessible name, plus "inactive staff" when it applies', async () => {
+      await mount({ row: EDITED });
+
+      expect(chipOf('Beto Delegate')?.nativeElement.getAttribute('aria-label')).toBe('Beto Delegate, B1@example.org');
+      expect(chipOf('Cira Gone')?.nativeElement.getAttribute('aria-label')).toBe('Cira Gone, B2@example.org, inactive staff');
+      expect(removeBtn('Beto Delegate').getAttribute('aria-label')).toBe('Remove Beto Delegate');
     });
 
     it('refuses the 21st delegate: the list stays at 20 and the limit message shows', async () => {
@@ -573,9 +625,10 @@ describe('OrgUnitFormComponent', () => {
       await mount({ row: many });
       expect(q('delegates-limit')).toBeNull();
 
-      await pick('field-delegates', [...fixture.componentInstance.delegates(), person('D20', 'Delegate 20')]);
+      await pickDelegate(person('D20', 'Delegate 20'));
 
       expect(fixture.componentInstance.delegates()).toHaveLength(20);
+      expect(searchInput().value).toBe('');
       expect(fixture.componentInstance.delegates().some(d => d.carnet === 'D20')).toBe(false);
       expect(q('delegates-limit')).toBeTruthy();
     });

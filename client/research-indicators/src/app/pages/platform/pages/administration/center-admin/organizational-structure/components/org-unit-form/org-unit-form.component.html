@@ -78,16 +78,14 @@
 
   <div class="flex flex-col gap-1" data-testid="field-delegates">
     <label for="orgUnitDelegates" class="label inline-block flex items-center">Delegates (current)</label>
-    <div class="card p-fluid keywords-autocomplete" data-testid="delegates-container">
+    <div data-testid="delegates-container">
       <p-autoComplete
+        #delegateSearch
         inputId="orgUnitDelegates"
-        [ngModel]="delegates()"
-        [ngModelOptions]="{ standalone: true }"
-        (ngModelChange)="onDelegatesChange($event)"
         [suggestions]="delegateSuggestions()"
         (completeMethod)="searchDelegates($event.query)"
+        (onSelect)="addDelegate($event.value, delegateSearch)"
         optionLabel="name"
-        [multiple]="true"
         [delay]="300"
         [minLength]="2"
         placeholder="Search staff to add"
@@ -99,15 +97,32 @@
             <span class="atc-grey-700">{{ person.email }}</span>
           </span>
         </ng-template>
-        <ng-template let-person pTemplate="selecteditem">
-          <span [pTooltip]="person.email ?? ''" tooltipPosition="top" data-testid="delegate-chip">
-            {{ person.name }}
-            @if (person.isActiveStaff === false) {
-              <span class="org-badge org-badge--ended" data-testid="delegate-inactive">Inactive staff</span>
-            }
-          </span>
-        </ng-template>
       </p-autoComplete>
+      <div class="org-delegate-chips" role="list" aria-label="Selected delegates" data-testid="delegate-chips">
+        @for (person of delegates(); track person.carnet) {
+          <!-- p-chip's host binds aria-label to its own label input, so the accessible name sits on the list item. -->
+          <span
+            class="org-delegate-item"
+            role="listitem"
+            [attr.aria-label]="chipName(person)"
+            [pTooltip]="person.email ?? ''"
+            tooltipPosition="top"
+            data-testid="delegate-chip">
+            <p-chip class="org-delegate-chip">
+              <span class="org-delegate-chip__name">{{ person.name }}</span>
+              @if (person.isActiveStaff === false) {
+                <span class="org-badge org-badge--ended" data-testid="delegate-inactive">Inactive staff</span>
+              }
+              <button
+                type="button"
+                class="org-delegate-chip__remove pi pi-times-circle"
+                [attr.aria-label]="'Remove ' + person.name"
+                (click)="removeDelegate(person.carnet)"
+                data-testid="delegate-remove"></button>
+            </p-chip>
+          </span>
+        }
+      </div>
     </div>
     <small class="text-[var(--ac-grey-600)] text-[14px]" data-testid="delegates-hint">
       Up to {{ maxDelegates }}. Delegates are the current list and are not tied to a year.

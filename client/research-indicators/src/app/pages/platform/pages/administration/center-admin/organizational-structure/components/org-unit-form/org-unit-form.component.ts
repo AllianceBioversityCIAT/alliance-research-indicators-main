@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AutoCompleteModule } from 'primeng/autocomplete';
+import { AutoComplete, AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
+import { ChipModule } from 'primeng/chip';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
@@ -39,7 +40,7 @@ interface LevelOption {
 @Component({
   selector: 'app-org-unit-form',
   standalone: true,
-  imports: [FormsModule, AutoCompleteModule, ButtonModule, SelectModule, TooltipModule, InputComponent],
+  imports: [FormsModule, AutoCompleteModule, ButtonModule, ChipModule, SelectModule, TooltipModule, InputComponent],
   templateUrl: './org-unit-form.component.html',
   styleUrl: './org-unit-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -201,11 +202,28 @@ export class OrgUnitFormComponent implements OnInit {
     this.director.set(value && typeof value === 'object' ? value : null);
   }
 
-  onDelegatesChange(value: OrgStaffOption[]): void {
-    const next = value ?? [];
-    this.delegateLimitHit.set(next.length > MAX_DELEGATES);
-    // The 21st pick is refused: a new array reference makes the control re-render the accepted list.
-    this.delegates.set(next.length > MAX_DELEGATES ? next.slice(0, MAX_DELEGATES) : next);
+  // D-ORG-22: the search is single-value; a pick is added to the chips below and the field clears itself.
+  addDelegate(person: OrgStaffOption, search: AutoComplete): void {
+    search.clear();
+    this.delegateSuggestions.set([]);
+    if (this.delegates().some(d => d.carnet === person.carnet)) return;
+    // The 21st pick is refused with the limit message (R-ORG-017).
+    if (this.delegates().length >= MAX_DELEGATES) {
+      this.delegateLimitHit.set(true);
+      return;
+    }
+    this.delegateLimitHit.set(false);
+    this.delegates.update(list => [...list, person]);
+  }
+
+  removeDelegate(carnet: string): void {
+    this.delegateLimitHit.set(false);
+    this.delegates.update(list => list.filter(d => d.carnet !== carnet));
+  }
+
+  /** Accessible name of a chip: "name, email[, inactive staff]". */
+  chipName(person: OrgStaffOption): string {
+    return [person.name, person.email, person.isActiveStaff === false ? 'inactive staff' : null].filter(Boolean).join(', ');
   }
 
   cancel(): void {
