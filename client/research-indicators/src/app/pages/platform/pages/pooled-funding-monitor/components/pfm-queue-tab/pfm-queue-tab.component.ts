@@ -2,6 +2,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
+import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmChipCounts, PfmFilters } from '../../pfm.interfaces';
 import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
 import { PfmStoreService } from '../../services/pfm-store.service';
@@ -9,27 +12,29 @@ import { PfmStoreService } from '../../services/pfm-store.service';
 /** Sentinel of the "All …" option (a null model would render the placeholder instead of the option). */
 const ALL = '__all__';
 
-const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts }[] = [
-  { key: 'all', label: 'All results', count: 'all' },
-  { key: 'need_attention', label: 'Need attention', count: 'attention' },
-  { key: 'mapping_incomplete', label: 'Mapping incomplete', count: 'mapping' },
-  { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready' },
-  { key: 'rejected', label: 'Rejected by PRMS', count: 'prms_rejected' },
-  { key: 'synced', label: 'Synced with PRMS', count: 'synced' }
+/** `dot` = the state colour of that view (same palette as the badges and charts); none for All. */
+const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
+  { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
+  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
+  { key: 'mapping_incomplete', label: 'Mapping incomplete', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
+  { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
+  { key: 'rejected', label: 'Rejected by PRMS', count: 'prms_rejected', help: PFM_HELP.rejected, dot: PFM_STATE.alert.fill },
+  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];
 
 /** Legend of the PRMS bar colors (R-PFM-015). */
 const LEGEND = [
-  { label: 'Approved in PRMS', dot: 'bg-[var(--ac-pfm-seg-approved)]' },
-  { label: 'Pending review', dot: 'bg-[var(--ac-pfm-seg-pending)]' },
-  { label: 'Rejected', dot: 'bg-[var(--ac-pfm-seg-rejected)]' },
-  { label: 'Not synced', dot: 'bg-[var(--ac-pfm-seg-not-started)]' }
+  { label: 'Approved in PRMS', fill: PFM_STATE.done.fill, help: PFM_HELP.approved },
+  { label: 'Pending review', fill: PFM_STATE.waiting.fill, help: PFM_HELP.pendingReview },
+  { label: 'Rejected', fill: PFM_STATE.alert.fill, help: PFM_HELP.rejectedState },
+  { label: 'Out of scope', fill: PFM_STATE.out.fill, help: PFM_HELP.outOfScope },
+  { label: 'Not synced', fill: PFM_STATE_EMPTY, help: 'Not in PRMS yet: still to map or ready to sync.' }
 ];
 
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
-  imports: [FormsModule, SelectModule, PfmProjectGroupComponent],
+  imports: [FormsModule, SelectModule, TooltipModule, PfmProjectGroupComponent],
   templateUrl: './pfm-queue-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

@@ -74,11 +74,19 @@
               : 'border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] font-medium text-[var(--ac-pfm-neutral-fg)]'
           }}"
           [attr.aria-pressed]="activeChip() === c.key"
+          [attr.aria-describedby]="'pfm-chip-help-' + c.key"
           [attr.data-testid]="'pfm-chip-' + c.key"
+          [pTooltip]="c.help"
+          tooltipEvent="both"
+          tooltipPosition="top"
           (click)="selectChip(c.key)">
           @if (activeChip() === c.key) {
             <i class="pi pi-check !text-[9px] leading-none" aria-hidden="true" data-testid="pfm-chip-check"></i>
           }
+          @if (c.dot) {
+            <span class="h-2.5 w-2.5 flex-none rounded-full" [style.background-color]="c.dot" aria-hidden="true" data-testid="pfm-chip-dot"></span>
+          }
+          <span class="sr-only" [id]="'pfm-chip-help-' + c.key">{{ c.help }}</span>
           {{ c.label }}
           @if (!stale()) {
             <span
@@ -100,7 +108,9 @@
       }
       <ul class="m-0 ml-auto flex list-none flex-wrap gap-4 p-0" data-testid="pfm-legend" aria-label="PRMS bar colors">
         @for (l of legend; track l.label) {
-          <li class="inline-flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-sm {{ l.dot }}" aria-hidden="true"></span>{{ l.label }}</li>
+          <li class="inline-flex cursor-help items-center gap-1.5" tabindex="0" [pTooltip]="l.help" tooltipEvent="both" tooltipPosition="top">
+            <span class="h-2.5 w-2.5 rounded-sm" [style.background-color]="l.fill" aria-hidden="true"></span>{{ l.label }}
+          </li>
         }
       </ul>
     </div>

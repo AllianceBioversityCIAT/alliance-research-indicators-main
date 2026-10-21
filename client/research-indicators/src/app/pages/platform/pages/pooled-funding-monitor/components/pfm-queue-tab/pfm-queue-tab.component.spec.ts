@@ -55,7 +55,13 @@ describe('PfmQueueTabComponent', () => {
   it('renders each chip count from the server chip_counts, in mockup order', () => {
     const { el } = setup();
     const chips = Array.from(el.querySelectorAll('[data-testid="pfm-chips"] button'));
-    expect(chips.map(c => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+    // visible text only: the sr-only explanation is checked in its own test
+    const visible = (c: Element) => {
+      const clone = c.cloneNode(true) as Element;
+      clone.querySelectorAll('.sr-only').forEach(n => n.remove());
+      return clone.textContent?.replace(/\s+/g, ' ').trim();
+    };
+    expect(chips.map(visible)).toEqual([
       'All results 41',
       'Need attention 7',
       'Mapping incomplete 5',
@@ -124,10 +130,32 @@ describe('PfmQueueTabComponent', () => {
       'Approved in PRMS',
       'Pending review',
       'Rejected',
+      'Out of scope',
       'Not synced'
     ]);
     const mine = setup({ scope: 'mine', queue: { ...QUEUE, totals: { results: 1, projects: 1, monitored_total: 99 } } });
     expect(mine.q('pfm-count-line')?.textContent?.trim()).toBe('Showing 1 results across 1 project where you are PI');
+  });
+
+  it('every quick view explains itself (tooltip + sr-only) and carries its state colour, red for attention and rejected', () => {
+    const { el, q } = setup();
+    for (const key of ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced']) {
+      const chip = q('pfm-chip-' + key)!;
+      const help = el.querySelector('#pfm-chip-help-' + key)?.textContent?.trim();
+      expect(help?.length).toBeGreaterThan(10);
+      expect(chip.getAttribute('aria-describedby')).toBe('pfm-chip-help-' + key);
+    }
+    // jsdom drops var() colours from the CSSOM: assert the dot is rendered and the colour it is bound to.
+    expect(q('pfm-chip-all')?.querySelector('[data-testid="pfm-chip-dot"]')).toBeNull();
+    expect(q('pfm-chip-need_attention')?.querySelector('[data-testid="pfm-chip-dot"]')).not.toBeNull();
+    const chips = TestBed.createComponent(PfmQueueTabComponent).componentInstance.chips;
+    const dot = (key: string) => chips.find(c => c.key === key)?.dot;
+    expect(dot('all')).toBeNull();
+    expect(dot('need_attention')).toBe('var(--ac-state-alert-fill)');
+    expect(dot('rejected')).toBe('var(--ac-state-alert-fill)');
+    expect(dot('synced')).toBe('var(--ac-state-done-fill)');
+    expect(dot('ready_to_sync')).toBe('var(--ac-state-ready-fill)');
+    expect(dot('mapping_incomplete')).toBe('var(--ac-state-progress-fill)');
   });
 
   it('shows the empty state with Reset when groups is empty', () => {
