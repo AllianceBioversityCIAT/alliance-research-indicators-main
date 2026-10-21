@@ -15,7 +15,8 @@
   </p>
 
   <!-- Badge + one thick bar. The parts of the bar are the click targets (no extra buttons). -->
-  <div class="relative mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
+  <!-- isolate: the badge's z-10 only layers it over its own bar, never over the page's sticky header on scroll -->
+  <div class="relative isolate mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
     <div
       class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)]"
       [style.background-color]="doneFill"
