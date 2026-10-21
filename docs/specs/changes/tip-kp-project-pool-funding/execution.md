@@ -171,3 +171,9 @@
   2. (Pivot T-03) Full **no-year** TIP sync twice; for a link TIP returns in two years, `SELECT result_id, report_year_id, is_snapshot FROM results WHERE platform_code='TIP' AND public_link=<link>` shows no new rows after run 2, and the earlier year's row carries its own pool funding.
   - Catalog TTL: allow one 5-min window (K-016) before calling level/indicator missing.
 - **Status:** `[~]` until the human observation is quoted here.
+
+#### T-04 — human observation, 2026-10-21 (owner)
+- **Observed (owner, verbatim, Spanish):** "revisando el resultado que tiene informaicon si se guardo los contratos pero no veo la seccion de alignment asi este en 2026". Contracts saved; the Pool Funding section is not shown.
+- **Cause (scout, cited):** the STAR client never requests the alignment for a non-STAR code — `client/research-indicators/src/app/shared/utils/platform-code.util.ts:38-42` `POOL_FUNDING_PLATFORMS = [STAR]`; `shared/services/bilateral.service.ts:164-167` returns null for a `TIP-` code without fetching; `result-sidebar.component.ts:125` hides the tab when `!alignment`. This spec's premise "No client change … the sidebar shows the tab when `eligible || display_only`" (design §8, requirements §… non-goal) was **false** — it checked the visibility rule but not the fetch that precedes it. R-TIP-006 is therefore not delivered end to end.
+- **Owner decision:** fix inside phase 2 — `docs/specs/changes/tip-prms-phase-2/prms-platform-identity` R-PPI-006. P-16 (TIP ids == lambda-toc) remains unsettled until the tab can be seen.
+- **Status:** T-04 stays `[~]`.
