@@ -6,7 +6,6 @@
 
 import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject } from '@angular/core';
 import { RolesService } from '@shared/services/cache/roles.service';
-import { PfmKpiCardsComponent } from './components/pfm-kpi-cards/pfm-kpi-cards.component';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
 import { PFM_TABS, PfmScope, PfmTab } from './pfm.interfaces';
@@ -15,7 +14,7 @@ import { PfmStoreService } from './services/pfm-store.service';
 @Component({
   selector: 'app-pooled-funding-monitor',
   standalone: true,
-  imports: [PfmKpiCardsComponent, PfmCoverageTabComponent, PfmQueueTabComponent],
+  imports: [PfmCoverageTabComponent, PfmQueueTabComponent],
   providers: [PfmStoreService],
   templateUrl: './pooled-funding-monitor.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush

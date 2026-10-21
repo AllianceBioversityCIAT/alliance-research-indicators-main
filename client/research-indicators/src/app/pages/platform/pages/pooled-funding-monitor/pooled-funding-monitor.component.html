@@ -36,34 +36,6 @@
     </div>
   </div>
 
-  @if (!piEmpty()) {
-    <!-- KPI cards: share the summary request, so they share its loading / error state -->
-    @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
-        @for (i of [1, 2, 3]; track i) {
-          <div class="h-[112px] animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]"></div>
-        }
-      </div>
-    } @else if (store.summaryState().error) {
-      <div
-        class="flex items-center gap-3 rounded-lg bg-[var(--ac-pfm-danger-bg)] px-4 py-3 text-[13px] text-[var(--ac-pfm-danger-fg)]"
-        role="alert"
-        data-testid="pfm-summary-error">
-        <span>The summary could not be loaded.</span>
-        <button
-          type="button"
-          class="cursor-pointer rounded-md border border-solid border-[color:var(--ac-pfm-danger-fg)] bg-transparent px-2.5 py-1 text-[12.5px] font-semibold text-[var(--ac-pfm-danger-fg)]"
-          data-testid="pfm-summary-retry"
-          (click)="store.retrySummary()">
-          Retry
-        </button>
-      </div>
-    } @else {
-      @if (store.summary(); as summary) {
-        <app-pfm-kpi-cards [kpis]="summary.kpis" />
-      }
-    }
-  }
   </div>
 
   @if (!piEmpty()) {

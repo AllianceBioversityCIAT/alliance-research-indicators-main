@@ -46,7 +46,8 @@ describe('PooledFundingMonitorComponent', () => {
   let el: HTMLElement;
   let api: { GET_PfmSummary: jest.Mock; GET_PfmQueue: jest.Mock };
   const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
-  const kpiValue = (key: string) => q(`pfm-kpi-${key}`)?.querySelector('[data-testid="pfm-kpi-value"]')?.textContent?.trim();
+  /** The coverage tab's "need action" figure (same summary data the KPI cards used to show). */
+  const needAction = () => q('pfm-progress-open-attention')?.getAttribute('aria-label');
   const flush = async () => {
     await fixture.whenStable();
     fixture.detectChanges();
@@ -74,14 +75,15 @@ describe('PooledFundingMonitorComponent', () => {
     api = { GET_PfmSummary: jest.fn(), GET_PfmQueue: jest.fn().mockResolvedValue(ok(queue)) };
   });
 
-  it('shows skeletons while loading, then the 4 KPI values (load -> data, KZ-015)', async () => {
+  it('no KPI cards; the coverage panel shows a skeleton while loading, then the coverage (load -> data, KZ-015)', async () => {
     const pending = deferred<ReturnType<typeof ok<PfmSummary>>>();
     api.GET_PfmSummary.mockReturnValue(pending.promise);
     await create();
     fixture.detectChanges();
 
-    expect(q('pfm-kpi-skeleton')).not.toBeNull();
+    expect(q('pfm-kpi-skeleton')).toBeNull();
     expect(q('pfm-kpi-cards')).toBeNull();
+    expect(q('pfm-coverage-skeleton')).not.toBeNull();
     // toggle and tabs stay usable while loading (R-PFM-016)
     expect(q('pfm-scope-all')?.hasAttribute('disabled')).toBe(false);
     expect(q('pfm-tab-queue')?.hasAttribute('disabled')).toBe(false);
@@ -89,11 +91,9 @@ describe('PooledFundingMonitorComponent', () => {
     pending.resolve(ok(summary('mine')));
     await flush();
 
-    expect(q('pfm-kpi-skeleton')).toBeNull();
-    expect(q('pfm-kpi-projects')).toBeNull();
-    expect(kpiValue('monitored')).toBe('5');
-    expect(kpiValue('need_attention')).toBe('3');
-    expect(kpiValue('synced')).toBe('1');
+    expect(q('pfm-coverage-skeleton')).toBeNull();
+    expect(q('pfm-kpi-cards')).toBeNull();
+    expect(needAction()).toBe('3 results need action. Click to see them.');
   });
 
   it('defaults to the PI scope and swaps to portfolio numbers when toggled', async () => {
@@ -113,8 +113,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('false');
-    expect(kpiValue('need_attention')).toBe('123');
-    expect(kpiValue('monitored')).toBe('500');
+    expect(needAction()).toBe('123 results need action. Click to see them.');
   });
 
   describe('admin default scope (HITL 20)', () => {
@@ -158,8 +157,6 @@ describe('PooledFundingMonitorComponent', () => {
     expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
     // HITL 20: the notice sits in the content area below the white band, not in the header card
     expect(q('pfm-band')?.contains(q('pfm-pi-empty'))).toBe(false);
-    expect(q('pfm-kpi-cards')).toBeNull();
-    expect(el.querySelector('[data-testid="pfm-kpi-value"]')).toBeNull();
     expect(q('pfm-panel-coverage')).toBeNull();
 
     q('pfm-pi-empty-switch')?.click();
@@ -168,7 +165,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-pi-empty')).toBeNull();
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
-    expect(kpiValue('need_attention')).toBe('123');
+    expect(needAction()).toBe('123 results need action. Click to see them.');
   });
 
   describe('Contributor who is PI / delegate of a project (no other role)', () => {
@@ -194,7 +191,7 @@ describe('PooledFundingMonitorComponent', () => {
       await flush();
       expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
       expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
-      expect(kpiValue('need_attention')).toBe('123');
+      expect(needAction()).toBe('123 results need action. Click to see them.');
     });
 
     // The m.lundy case: PI of many projects, none of them contributing.
@@ -319,20 +316,21 @@ describe('PooledFundingMonitorComponent', () => {
     fixture.detectChanges();
     await flush();
 
-    expect(q('pfm-summary-error')).not.toBeNull();
+    expect(q('pfm-summary-error')).toBeNull(); // the KPI band is gone; the coverage panel owns the error
     expect(q('pfm-coverage-error')).not.toBeNull();
-    expect(q('pfm-kpi-cards')).toBeNull();
 
     q('pfm-tab-queue')?.click();
     await flush();
     expect(q('pfm-queue-error')).toBeNull();
     expect(q('pfm-panel-queue')).not.toBeNull();
 
-    q('pfm-summary-retry')?.click();
+    q('pfm-tab-coverage')?.click();
+    await flush();
+    (q('pfm-coverage-error')?.querySelector('button') as HTMLButtonElement).click();
     await flush();
     await flush();
-    expect(q('pfm-summary-error')).toBeNull();
-    expect(kpiValue('monitored')).toBe('5');
+    expect(q('pfm-coverage-error')).toBeNull();
+    expect(needAction()).toBe('3 results need action. Click to see them.');
   });
 
   describe('tabs', () => {

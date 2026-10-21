@@ -14,7 +14,6 @@ export const PFM_HELP = {
   // Terms
   outOfScope:
     'Results of a contributing project that were explicitly marked as not contributing to any Science Program, so they are never sent to PRMS.',
-  prmsScope: 'Results that should end up in PRMS: every result except those marked out of scope.',
 
   // PRMS review states (queue legend)
   pendingReview: 'Received by PRMS, waiting for its reviewers.',
