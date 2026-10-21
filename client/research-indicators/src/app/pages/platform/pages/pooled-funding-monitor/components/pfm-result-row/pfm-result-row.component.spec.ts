@@ -172,34 +172,38 @@ describe('PfmResultRowComponent', () => {
     expect(render({ creator: null }).q('pfm-row-creator').textContent?.trim()).toBe('-');
   });
 
-  it('Science Programs cell renders one custom-tag per program, code as text, primary first with the name + primary tooltip (HITL 22)', () => {
-    const { q, tipOf, sr } = render();
-    const tags = Array.from(q('pfm-row-sp').querySelectorAll('[data-testid="pfm-row-sp-tag"]')) as HTMLElement[];
-    expect(tags.length).toBe(2);
-    expect(tags.map(t => t.querySelector('app-custom-tag span.font-semibold')?.textContent?.trim())).toEqual(['SP01', 'SP09']);
-    const tips = tags.map(t => tipOf(t));
-    expect(tips).toEqual(['Breeding — primary', 'Climate Action']);
-    expect(tags[0].getAttribute('data-primary')).toBe('true');
-    expect(tags[1].getAttribute('data-primary')).toBe('false');
-    // Primary is marked with a star (as in Alliance alignment), not a double border.
-    // The star sits inside the tag, after the code.
-    expect(tags[0].querySelector('app-custom-tag [data-testid="custom-tag-trailing-icon"].pi-star-fill')).not.toBeNull();
-    expect(tags[1].querySelector('[data-testid="custom-tag-trailing-icon"]')).toBeNull();
-    expect(tags[0].classList).not.toContain('ring-2');
-    // every SP pill hugs its code (no fixed 45px label width)
-    tags.forEach(t => expect(t.querySelector('app-custom-tag span')!.className).not.toContain('min-w-[45px]'));
-    expect(sr(q('pfm-row-sp'))).toEqual(['SP01 Breeding, primary', 'SP09 Climate Action']);
-    expect(q('pfm-row-sp').querySelector('[data-testid="pfm-row-sp-line"]')).toBeNull();
+  // Owner 2026-10-21: plain text like Indicator / Creator, not status tags.
+  it('Science Programs cell is plain comma-separated text, primary first with an outline star', () => {
+    const { q, tagsIn } = render();
+    const cell = q('pfm-row-sp');
+    expect(tagsIn(cell)).toHaveLength(0); // no app-custom-tag
+    const visible = (el: Element) => {
+      const c = el.cloneNode(true) as Element;
+      c.querySelectorAll('.sr-only').forEach(n => n.remove());
+      return c.textContent?.replace(/\s+/g, ' ').trim();
+    };
+    expect(visible(cell)).toBe('SP01, SP09');
+    const tags = Array.from(cell.querySelectorAll<HTMLElement>('[data-testid="pfm-row-sp-tag"]'));
+    expect(tags.map(t => t.getAttribute('data-primary'))).toEqual(['true', 'false']);
+    // outline star (not filled) only on the primary, before the code
+    const star = tags[0].querySelector('[data-testid="pfm-row-sp-star"]')!;
+    expect(star.classList).toContain('pi-star');
+    expect(star.classList).not.toContain('pi-star-fill');
+    expect(tags[0].firstElementChild).toBe(star);
+    expect(tags[1].querySelector('[data-testid="pfm-row-sp-star"]')).toBeNull();
+    // no colour of its own: no inline colour and no border
+    tags.forEach(t => {
+      expect(t.getAttribute('style')).toBeNull();
+      expect(t.className).not.toMatch(/border|text-\[var/);
+    });
   });
 
-  it('SP tag text uses the neutral token (contrast); the DB colour only drives border and icon', () => {
-    const { q, tagsIn } = render();
-    const [primary, other] = tagsIn(q('pfm-row-sp'));
-    expect(primary.statusColor).toBe('var(--ac-pfm-neutral-fg)');
-    expect(primary.statusBorder).toBe('#112233');
-    expect(primary.iconColor).toBe('#112233');
-    expect(other.statusColor).toBe('var(--ac-pfm-neutral-fg)');
-    expect(other.statusBorder).toBe('var(--ac-pfm-neutral-fg)');
+  it('each Science Program has the STAR tooltip (name + role), keyboard-reachable, and sr-only text', () => {
+    const { q, tipOf, sr } = render();
+    const tags = Array.from(q('pfm-row-sp').querySelectorAll<HTMLElement>('[data-testid="pfm-row-sp-tag"]'));
+    expect(tags.map(t => tipOf(t))).toEqual(['Breeding — primary', 'Climate Action — contributing']);
+    expect(tags.every(t => t.getAttribute('tabindex') === '0')).toBe(true);
+    expect(sr(q('pfm-row-sp'))).toEqual(['Breeding, primary', 'Climate Action, contributing']);
   });
 
   it('Science Programs cell shows a muted dash when there are no programs', () => {

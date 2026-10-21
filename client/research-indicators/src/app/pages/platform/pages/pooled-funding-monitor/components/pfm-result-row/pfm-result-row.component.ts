@@ -62,7 +62,6 @@ export class PfmResultRowComponent {
   mappingTone = computed(() => MAPPING_TONES[this.row().mapping_state] ?? tone('neutral'));
   isPrmsNotSent = computed(() => this.row().prms_status === 'Not sent');
   prmsTone = computed(() => (PRMS_TONES as Record<string, PfmTagTone>)[this.row().prms_status] ?? tone('neutral'));
-  neutralTone = tone('neutral');
 
   link = computed(() => {
     const r = this.row();

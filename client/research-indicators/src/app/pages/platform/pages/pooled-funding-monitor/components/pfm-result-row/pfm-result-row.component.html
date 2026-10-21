@@ -64,22 +64,21 @@
   </div>
   </td>
   <td class="min-w-[7rem]">
-  <div class="flex min-w-0 flex-wrap items-start gap-1" data-testid="pfm-row-sp">
-    @for (sp of row().science_programs; track sp.code) {
-      <span class="inline-flex items-center gap-1" [attr.data-primary]="sp.primary" data-testid="pfm-row-sp-tag">
-        <app-custom-tag
-          [statusName]="sp.code"
-          [statusColor]="neutralTone.fg"
-          [statusBorder]="sp.color || neutralTone.border"
-          [icon]="true"
-          [iconColor]="sp.color || neutralTone.fg"
-          [tooltip]="sp.primary ? sp.name + ' — primary' : sp.name"
-          [fitContent]="true"
-          [trailingIconName]="sp.primary ? 'pi-star-fill' : undefined"
-          [trailingIconColor]="sp.color || 'var(--ac-pfm-accent-navy)'"
-          [tiny]="true" />
-        <span class="sr-only">{{ sp.code }} {{ sp.name }}{{ sp.primary ? ', primary' : '' }}</span>
-      </span>
+  <!-- Plain text like Indicator / Creator: "☆ SP01, SP02". Outline star = primary; the name is in the STAR tooltip. -->
+  <div class="min-w-0 break-words" data-testid="pfm-row-sp">
+    @for (sp of row().science_programs; track sp.code; let last = $last) {
+      <span
+        class="cursor-help whitespace-nowrap"
+        tabindex="0"
+        [attr.data-primary]="sp.primary"
+        [pTooltip]="sp.name + (sp.primary ? ' — primary' : ' — contributing')"
+        tooltipEvent="both"
+        tooltipPosition="top"
+        data-testid="pfm-row-sp-tag"
+        >@if (sp.primary) {<i class="pi pi-star !text-[11px] mr-1" aria-hidden="true" data-testid="pfm-row-sp-star"></i>}{{ sp.code }}<span class="sr-only">
+          {{ sp.name }}{{ sp.primary ? ', primary' : ', contributing' }}</span
+        ></span
+      >@if (!last) {<span aria-hidden="true">, </span>}
     } @empty {
       <span class="text-[var(--ac-pfm-neutral-fg)]">—</span>
     }
