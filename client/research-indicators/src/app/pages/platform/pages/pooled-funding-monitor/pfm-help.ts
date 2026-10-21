@@ -27,7 +27,7 @@ export const PFM_HELP = {
 
   // Coverage by Science Program
   spHowToRead:
-    'One bar per Science Program, as long as its number of results. Green = already in PRMS, grey = not yet. Click a program to see its results.',
+    'One bar per Science Program: the full bar is all its results, the dark blue part is what is already in PRMS. The goal is a full bar. Click a program to see its results.',
   spSynced: 'Results of this Science Program already in PRMS.',
   spNotSynced: 'Results of this Science Program not in PRMS yet.'
 } as const;

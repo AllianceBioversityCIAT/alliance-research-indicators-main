@@ -22,11 +22,10 @@
           [attr.data-testid]="'pfm-sp-open-' + r.code"
           (click)="openSp.emit(r.code)">
         <span class="min-w-0 truncate text-[13px] text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-sp-label">{{ r.code }} — {{ r.name }}</span>
-        <!-- No background on this cell: the bar below is the only thing drawn, and only as long as its total -->
+        <!-- Same full length for every program (its 100%); the navy part is what is already in PRMS -->
         <div class="h-[18px]">
           <div
-            class="flex h-full overflow-hidden rounded-md"
-            [style.width]="r.wTotal"
+            class="flex h-full w-full overflow-hidden rounded-md"
             [style.background-color]="unsyncedFill"
             [pTooltip]="r.code + ': ' + r.synced + ' in PRMS, ' + r.unsynced + ' not yet (' + r.total + ' results)'"
             tooltipPosition="top"

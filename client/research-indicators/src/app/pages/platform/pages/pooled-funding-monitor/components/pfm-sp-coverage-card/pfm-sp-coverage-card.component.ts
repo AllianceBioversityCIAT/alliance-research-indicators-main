@@ -1,7 +1,7 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-11 (R-PFM-007)
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
-import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PFM_HELP } from '../../pfm-help';
 import { PfmScope, PfmSpCoverage } from '../../pfm.interfaces';
 
@@ -19,7 +19,8 @@ export class PfmSpCoverageCardComponent {
   openSp = output<string>();
 
   readonly help = PFM_HELP;
-  readonly syncedFill = PFM_STATE.done.fill;
+  /** The section's dark navy (owner: not green here); the grey track is the program's total. */
+  readonly syncedFill = 'var(--ac-pfm-accent-navy)';
   readonly unsyncedFill = PFM_STATE_EMPTY;
 
   copy = computed(() =>
@@ -29,21 +30,13 @@ export class PfmSpCoverageCardComponent {
   );
 
   /**
-   * Bar geometry. Each bar is as long as ITS total (total / widest total) and is drawn only by its own
-   * two segments, synced + not synced = 100% of that bar: there is no track behind it, so no grey
-   * filler that reads as a third state.
+   * Bar geometry. Every bar has the same length = 100% of THAT program's results; it fills with the
+   * share already in PRMS, so programs compare by how far along they are, not by size.
    */
-  view = computed(() => {
-    const rows = this.rows();
-    const max = Math.max(1, ...rows.map(r => r.total));
-    return rows.map(r => {
+  view = computed(() =>
+    this.rows().map(r => {
       const synced = Math.min(r.synced, r.total);
-      return {
-        ...r,
-        unsynced: r.total - synced,
-        wTotal: `${(r.total / max) * 100}%`,
-        wSynced: `${r.total ? (synced / r.total) * 100 : 0}%`
-      };
-    });
-  });
+      return { ...r, unsynced: r.total - synced, wSynced: `${r.total ? (synced / r.total) * 100 : 0}%` };
+    })
+  );
 }

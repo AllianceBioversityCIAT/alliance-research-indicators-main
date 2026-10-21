@@ -31,7 +31,7 @@ describe('PfmSpCoverageCardComponent', () => {
   it('Portfolio copy, with a line on how to read the chart', () => {
     const { q } = render('all');
     expect(q('[data-testid="pfm-sp-sub"]')).toBe('Results mapped to each program, and how many are already in PRMS');
-    expect(q('[data-testid="pfm-sp-how"]')).toContain('Green = already in PRMS, grey = not yet');
+    expect(q('[data-testid="pfm-sp-how"]')).toContain('the dark blue part is what is already in PRMS');
     expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('In PRMS');
     expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not in PRMS yet');
   });
@@ -41,29 +41,22 @@ describe('PfmSpCoverageCardComponent', () => {
     expect(q('[data-testid="pfm-sp-sub"]')).toBe('Your results mapped to each program, and how many are already in PRMS');
   });
 
-  // The bug: a fixed-width grey track behind every bar left a filler that read as a third state.
-  it('draws no track behind a bar: the bar cell has no background, only the bar as long as its total', () => {
-    const { el } = render('all');
-    const total = el.querySelector<HTMLElement>('[data-testid="pfm-sp-row-SP02"] [data-testid="pfm-sp-total-bar"]')!;
-    const cell = total.parentElement!;
-    expect(cell.className).not.toMatch(/\bbg-/);
-    expect(cell.style.backgroundColor).toBe('');
-    // synced (green) + not synced (grey) are the two segments of THIS bar. jsdom drops var() colours
-    // from the CSSOM, so assert the values the template binds.
+  it('fills in the section navy (not green) over the grey "not in PRMS yet" track', () => {
     const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
-    expect(fixture.componentInstance.syncedFill).toBe('var(--ac-state-done-fill)');
+    // jsdom drops var() colours from the CSSOM, so assert the values the template binds.
+    expect(fixture.componentInstance.syncedFill).toBe('var(--ac-pfm-accent-navy)');
     expect(fixture.componentInstance.unsyncedFill).toBe('var(--ac-state-empty)');
-    expect(total.querySelector('[data-testid="pfm-sp-synced-bar"]')).not.toBeNull();
   });
 
-  // Data binding only: real rendered proportion is a HITL visual check.
-  it('binds widths: outer = total / max total, inner = synced / own total (data binding)', () => {
+  // Owner 2026-10-21: every bar is the same length (its own 100%) and fills with the share in PRMS.
+  it('every bar has the same full length; the fill is synced / own total', () => {
     const { el } = render('all');
-    const w = (code: string, bar: string) => el.querySelector<HTMLElement>(`[data-testid="pfm-sp-row-${code}"] [data-testid="${bar}"]`)?.style.width;
-    expect(w('SP01', 'pfm-sp-total-bar')).toBe('100%');
-    expect(w('SP02', 'pfm-sp-total-bar')).toBe('50%');
-    expect(w('SP01', 'pfm-sp-synced-bar')).toBe('12.5%');
-    expect(w('SP02', 'pfm-sp-synced-bar')).toBe('50%');
+    const bar = (code: string, part: string) => el.querySelector<HTMLElement>(`[data-testid="pfm-sp-row-${code}"] [data-testid="${part}"]`)!;
+    expect(bar('SP01', 'pfm-sp-total-bar').className).toContain('w-full');
+    expect(bar('SP02', 'pfm-sp-total-bar').className).toContain('w-full');
+    expect(bar('SP01', 'pfm-sp-total-bar').style.width).toBe('');
+    expect(bar('SP01', 'pfm-sp-synced-bar').style.width).toBe('12.5%');
+    expect(bar('SP02', 'pfm-sp-synced-bar').style.width).toBe('50%');
   });
 
   it('clicking a program asks to open the queue filtered by it', () => {
