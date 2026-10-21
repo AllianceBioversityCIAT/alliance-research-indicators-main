@@ -237,3 +237,4 @@ Premise hand-off: `consumer` rows P-9 → T-03/T-04/T-05 `Consumers`; P-15 → T
 | --- | --- | --- | --- | --- | --- |
 | RB-1 | 2026-10-21 | T-02/T-07 need Docker for the TEST schema | Leader environment pre-check before spawn | David Casañas | open |
 | RB-2 | 2026-10-21 | PRMS acceptance of `TIP-<code>` unproven (P-18) | No TIP push in this spec; child 3 settles | David Casañas | open |
+| RB-3 | 2026-10-21 | `migration:test:bootstrap` cannot complete on a fresh container: `CreatePiDelegates1787600000000` fails errno 3780 (utf8mb4 vs utf8mb3) since `027bc60f` — pre-existing, outside this spec | T-02/T-07 use a targeted run (baseline + the sync-table migrations + this spec's); fixing it needs a new append-only migration in its own spec | David Casañas | open |
