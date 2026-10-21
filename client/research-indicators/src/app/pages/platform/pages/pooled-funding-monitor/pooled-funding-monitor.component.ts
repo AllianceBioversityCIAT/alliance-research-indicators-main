@@ -28,12 +28,16 @@ export default class PooledFundingMonitorComponent implements OnInit {
   private static readonly MINE = { value: 'mine' as PfmScope, label: 'Only my results as PI' };
   private static readonly ALL = { value: 'all' as PfmScope, label: 'Whole portfolio' };
   /**
-   * Everyone who reaches the page sees both scopes. Admins see the whole portfolio first (and open
-   * on it); everyone else, PIs and delegates included, gets their own results first.
+   * The whole portfolio is for every role other than Contributor. A Contributor reaches this page only
+   * as PI or delegate of a project, so they get their own results only (owner 2026-10-21; the server
+   * refuses scope=all for them). Admins see the whole portfolio first and open on it.
    */
-  readonly scopes: { value: PfmScope; label: string }[] = this.roles.isAdmin()
-    ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
-    : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
+  readonly canSeePortfolio = this.roles.canAccessPooledFundingMonitor();
+  readonly scopes: { value: PfmScope; label: string }[] = !this.canSeePortfolio
+    ? [PooledFundingMonitorComponent.MINE]
+    : this.roles.isAdmin()
+      ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
+      : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
 
   /**
    * Why the PI scope is empty. A user can lead or delegate projects none of which contributes to the
@@ -56,7 +60,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine' });
+    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine', allowedScopes: this.scopes.map(s => s.value) });
   }
 
   selectScope(scope: PfmScope): void {
