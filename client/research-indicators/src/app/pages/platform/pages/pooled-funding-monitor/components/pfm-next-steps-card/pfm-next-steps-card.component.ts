@@ -55,8 +55,22 @@ export class PfmNextStepsCardComponent {
   /** Opens the Results queue on that quick view. */
   open = output<PfmChip>();
 
-  steps = computed(() =>
-    PFM_NEXT_STEPS.map(s => ({ ...s, value: this.counts()[s.count] ?? 0, fg: PFM_STATE[s.state].fg, fill: PFM_STATE[s.state].fill }))
-  );
+  steps = computed(() => {
+    const all = this.counts().all || 0;
+    return PFM_NEXT_STEPS.map(s => {
+      const value = this.counts()[s.count] ?? 0;
+      const { fg, fill } = PFM_STATE[s.state];
+      return {
+        ...s,
+        value,
+        fg,
+        fill,
+        // Soft card ground and outline mixed from the state token, so light and dark follow it.
+        tint: `color-mix(in srgb, ${fill} 9%, var(--ac-pfm-surface))`,
+        edge: `color-mix(in srgb, ${fill} 30%, var(--ac-pfm-surface))`,
+        share: all ? Math.min(100, Math.round((value / all) * 100)) : 0
+      };
+    });
+  });
   allDone = computed(() => this.steps().every(s => s.value === 0));
 }
