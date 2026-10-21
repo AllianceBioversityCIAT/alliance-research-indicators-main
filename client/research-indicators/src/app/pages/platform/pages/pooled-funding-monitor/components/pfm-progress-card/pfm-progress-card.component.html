@@ -17,8 +17,8 @@
   <!-- Badge + one thick bar. The parts of the bar are the click targets (no extra buttons). -->
   <div class="relative mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
     <div
-      class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full border-[4px] border-solid border-[color:var(--ac-pfm-surface)] text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)] shadow-[0_0_0_3px_var(--ac-pfm-accent-navy)]"
-      [style.background-color]="navy"
+      class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full border-[4px] border-solid border-[color:var(--ac-pfm-surface)] text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)] shadow-[0_0_0_3px_var(--ac-state-done-fill)]"
+      [style.background-color]="doneFill"
       data-testid="pfm-progress-percent">
       {{ p.percent }}%
     </div>

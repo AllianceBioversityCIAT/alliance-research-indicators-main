@@ -45,7 +45,7 @@ function render(summary: PfmSummary) {
 describe('PfmCoverageTabComponent', () => {
   it('leads with what is in PRMS, then what to do next, then the SP and sync activity detail', () => {
     const { el, q } = render(SUMMARY);
-    const order = ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-sync-card'].map(id =>
+    const order = ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card'].map(id =>
       Array.from(el.querySelectorAll('[data-testid]')).indexOf(q(id) as Element)
     );
     expect(order.every(i => i >= 0)).toBe(true);

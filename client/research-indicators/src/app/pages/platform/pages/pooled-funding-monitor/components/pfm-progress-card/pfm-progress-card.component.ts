@@ -3,7 +3,7 @@
 // view (Synced / No SP contribution / Need attention), which together partition every result.
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
-import { PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmChip, PfmChipCounts, PfmScope } from '../../pfm.interfaces';
 
 interface BarPart {
@@ -31,9 +31,11 @@ export class PfmProgressCardComponent {
   /** Opens the Results queue on that view. */
   open = output<PfmChip>();
 
-  /** The section's navy, and a lighter navy for "no SP contribution" (owner: not green). */
-  readonly navy = 'var(--ac-pfm-accent-navy)';
-  readonly lightNavy = 'var(--ac-pfm-month-4)';
+  /**
+   * Done is ONE colour, the palette's green (owner): in PRMS and no SP contribution look the same;
+   * they stay two click targets with their own tooltip.
+   */
+  readonly doneFill = PFM_STATE.done.fill;
   readonly emptyFill = PFM_STATE_EMPTY;
 
   progress = computed(() => {
@@ -46,8 +48,8 @@ export class PfmProgressCardComponent {
     const percent = total === 0 ? 0 : left === 0 ? 100 : Math.floor((done / total) * 100);
     const pct = (n: number) => (total ? `${(n / total) * 100}%` : '0%');
     const parts: BarPart[] = [
-      { chip: 'synced', value: synced, width: pct(synced), color: this.navy, tip: `${plural(synced, 'result', 'results')} in PRMS. Click to see them.`, testId: 'pfm-progress-open-synced' },
-      { chip: 'no_sp_contribution', value: noSp, width: pct(noSp), color: this.lightNavy, tip: `${plural(noSp, 'result', 'results')} with no SP contribution: nothing to do. Click to see them.`, testId: 'pfm-progress-open-no-sp' },
+      { chip: 'synced', value: synced, width: pct(synced), color: this.doneFill, tip: `${plural(synced, 'result', 'results')} in PRMS. Click to see them.`, testId: 'pfm-progress-open-synced' },
+      { chip: 'no_sp_contribution', value: noSp, width: pct(noSp), color: this.doneFill, tip: `${plural(noSp, 'result', 'results')} with no SP contribution: nothing to do. Click to see them.`, testId: 'pfm-progress-open-no-sp' },
       { chip: 'need_attention', value: left, width: pct(left), color: null, tip: `${plural(left, 'result needs', 'results need')} action. Click to see them.`, testId: 'pfm-progress-open-attention' }
     ];
     return { done, left, total, percent, complete: total > 0 && left === 0, parts: parts.filter(p => p.value > 0) };

@@ -48,6 +48,13 @@ describe('PfmProgressCardComponent', () => {
     expect(q('pfm-progress-open-no-sp')?.style.width).toBe(`${(33 / 167) * 100}%`);
   });
 
+  // Owner: one colour for done — in PRMS and no SP contribution look the same (green).
+  it('both done parts share the palette green; the rest is the empty track', () => {
+    const { fixture } = render(counts(21, 113, 33));
+    const parts = fixture.componentInstance.progress().parts;
+    expect(parts.map(p => p.color)).toEqual(['var(--ac-state-done-fill)', 'var(--ac-state-done-fill)', null]);
+  });
+
   it('never shows 100% while something is still left (floors)', () => {
     const { text } = render(counts(999, 1));
     expect(text('pfm-progress-percent')).toBe('99%');

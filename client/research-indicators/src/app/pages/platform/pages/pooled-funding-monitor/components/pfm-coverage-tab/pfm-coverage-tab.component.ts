@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { PfmChip, PfmChipCounts, PfmScope, PfmSummary } from '../../pfm.interfaces';
 import { PfmNextStepsCardComponent } from '../pfm-next-steps-card/pfm-next-steps-card.component';
 import { PfmProgressCardComponent } from '../pfm-progress-card/pfm-progress-card.component';
+import { PfmPrmsStatusCardComponent } from '../pfm-prms-status-card/pfm-prms-status-card.component';
 import { PfmSpCoverageCardComponent } from '../pfm-sp-coverage-card/pfm-sp-coverage-card.component';
 import { PfmSyncActivityCardComponent } from '../pfm-sync-activity-card/pfm-sync-activity-card.component';
 
@@ -19,7 +20,7 @@ export interface PfmQueueTarget {
  */
 @Component({
   selector: 'app-pfm-coverage-tab',
-  imports: [PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmSyncActivityCardComponent],
+  imports: [PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmPrmsStatusCardComponent, PfmSyncActivityCardComponent],
   templateUrl: './pfm-coverage-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

@@ -9,7 +9,7 @@ export type PfmScope = (typeof PFM_SCOPES)[number];
 export const PFM_TABS = ['coverage', 'queue'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
-export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution'] as const;
+export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
 export type PfmChip = (typeof PFM_CHIPS)[number];
 
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
@@ -135,6 +135,9 @@ export interface PfmChipCounts {
   awaiting_pi?: number;
   /** No SP contribution, not in PRMS. Optional: older servers omit it. */
   no_sp?: number;
+  /** In PRMS, pending review / approved (Synced = both). Optional: older servers omit them. */
+  prms_pending?: number;
+  prms_approved?: number;
 }
 
 export interface PfmGroupCounts {
