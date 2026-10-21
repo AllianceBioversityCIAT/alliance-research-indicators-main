@@ -447,6 +447,22 @@ Every task depends on the one before it. They share the module's service, contro
 
 ---
 
+### T-10 — HITL rework 4: Applies-from default follows the Structure year
+
+- **Status:** done (2026-10-21, Reviewer PASS on attempt 1 — execution.md; the requester's browser re-check stays open in T-06) · **Size:** XS · **Dependencies:** T-09 · **Added:** 2026-10-21, requester-approved (T-06 round 4)
+- **Origin:** requester, T-06 round 4: "si tengo en el selector de año superior seleccionado el año, ese debe ser el año preseleccionado en este campo"; for a past structure year: current year, no back-date. Decision **D-ORG-23**.
+- **Requirements covered:** R-ORG-004 (*Applies from year*), R-ORG-005 (back-date stays deliberate), R-ORG-013.
+- **Design refs:** §6.5 (amended *Applies from year* line), D-ORG-23.
+- **Scope — screen only (client):** the form's *Applies from year* default = the page's selected *Structure year* when it is ≥ the current year, else the current year; *Back-date* never pre-checked. Applies on create (incl. "+" add-child from a tree row) and edit, whenever the form is initialised for an entry (select, new entry, after a save reload, and when the top year changes while the form is open — say which of these the current code re-initialises on and make the default follow the top year in each). The option list is unchanged (D-ORG-20).
+- **Tests (client unit):** structure year 2027 (current 2026) → create and edit default 2027, *Back-date* unchecked; structure year 2026 → 2026; structure year 2025 (B2 range starting 2025) → 2026, *Back-date* unchecked; changing the top year with the form open re-defaults per the same rule (KZ-015: drive it through the page's year selector).
+- **Falsifier:** (1) default back to `current` → the 2027 test red; (2) default to the top year without the floor → the 2025 test red; (3) pre-check *Back-date* for a past year → its unchecked assertion red.
+- **Review:** `standard`. **Skills:** angular-developer; systematic-debugging on any failure.
+- **Done criteria:**
+  - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–3 observed red, then reverted. *(Leader re-measure ×3 352/352, 8148/8148 — execution.md § T-10)*
+  - [ ] Requester re-checks the default in the browser during T-06 (quoted there).
+
+---
+
 ## 3. Coverage closure (scenario and clause level)
 
 Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning task. "Read half" / "write half" splits are named in the task.

@@ -3,6 +3,7 @@ import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Select } from 'primeng/select';
 import OrganizationalStructureComponent from './organizational-structure.component';
+import { OrgUnitFormComponent } from './components/org-unit-form/org-unit-form.component';
 import { OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
@@ -624,6 +625,76 @@ describe('OrganizationalStructureComponent', () => {
       await create({ min: 2024, max: 2029, current: 2026 }, DEEP);
 
       expect(component.yearOptions()).toEqual([2024, 2025, 2026, 2027, 2028, 2029]);
+    });
+  });
+
+  // T-10 / D-ORG-23 (KZ-015): the default follows the top Structure year, driven through the page's selector.
+  describe('Applies from year default follows the Structure year (T-10, D-ORG-23)', () => {
+    const form = () => fixture.debugElement.query(By.directive(OrgUnitFormComponent))?.componentInstance as OrgUnitFormComponent;
+    const clickRow = async (name: string) => {
+      treeRowFor(name)?.click();
+      await settle();
+    };
+
+    it('create under 2027 defaults to 2027, Back-date unchecked', async () => {
+      await create();
+      await chooseYear(2027);
+      innerButton('new-entry-button').click();
+      await settle();
+
+      expect(form().appliesFromYear()).toBe(2027);
+      expect(form().backdate()).toBe(false);
+    });
+
+    it('the tree row + under 2027 defaults to 2027', async () => {
+      await create();
+      await chooseYear(2027);
+      (treeRowFor('Division Ten')?.querySelector('[data-testid="org-tree-add"]') as HTMLElement).click();
+      await settle();
+
+      expect(form().appliesFromYear()).toBe(2027);
+    });
+
+    it('edit under 2027 defaults to 2027, Back-date unchecked', async () => {
+      await create();
+      await chooseYear(2027);
+      await clickRow('Division Ten');
+
+      expect(form().row?.code).toBe('ORG-10');
+      expect(form().appliesFromYear()).toBe(2027);
+      expect(form().backdate()).toBe(false);
+    });
+
+    it('create under the current year 2026 defaults to 2026', async () => {
+      await create();
+      innerButton('new-entry-button').click();
+      await settle();
+
+      expect(form().appliesFromYear()).toBe(2026);
+    });
+
+    it('create under the past year 2025 defaults to the current year 2026, Back-date unchecked', async () => {
+      await create();
+      await chooseYear(2025);
+      innerButton('new-entry-button').click();
+      await settle();
+
+      expect(form().appliesFromYear()).toBe(2026);
+      expect(form().backdate()).toBe(false);
+    });
+
+    it('changing the top year with the form open re-defaults by the same rule', async () => {
+      await create();
+      innerButton('new-entry-button').click();
+      await settle();
+      expect(form().appliesFromYear()).toBe(2026);
+
+      await chooseYear(2027);
+      expect(form().appliesFromYear()).toBe(2027);
+
+      await chooseYear(2025);
+      expect(form().appliesFromYear()).toBe(2026);
+      expect(form().backdate()).toBe(false);
     });
   });
 });

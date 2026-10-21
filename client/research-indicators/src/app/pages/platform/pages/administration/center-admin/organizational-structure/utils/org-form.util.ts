@@ -67,6 +67,14 @@ export function appliesFromYears(minYear: number, maxYear: number, currentYear: 
   return years;
 }
 
+/**
+ * Default *Applies from year* (D-ORG-23): the viewed *Structure year* when it is the current year or later,
+ * otherwise the current year. A past year is never the default, so *Back-date* stays a deliberate step.
+ */
+export function defaultAppliesFromYear(structureYear: number, currentYear: number): number {
+  return Math.max(structureYear, currentYear);
+}
+
 export interface OrgFormState {
   code: string;
   levelId: number | null;

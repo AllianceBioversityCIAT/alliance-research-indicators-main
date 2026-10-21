@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnInit, Output, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AutoComplete, AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
@@ -17,6 +17,7 @@ import {
   OrgFormState,
   appliesFromYears,
   buildCreatePayload,
+  defaultAppliesFromYear,
   buildUpdatePayload,
   detectChanges,
   parentOptions,
@@ -45,7 +46,7 @@ interface LevelOption {
   styleUrl: './org-unit-form.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class OrgUnitFormComponent implements OnInit {
+export class OrgUnitFormComponent implements OnInit, OnChanges {
   private readonly api = inject(ApiService);
   private readonly actions = inject(ActionsService);
 
@@ -55,6 +56,8 @@ export class OrgUnitFormComponent implements OnInit {
   @Input({ required: true }) rows: OrgYearViewRow[] = [];
   @Input({ required: true }) range: OrgYearRange = { min: 0, max: 0, current: 0 };
   @Input() prefill: OrgUnitFormPrefill | null = null;
+  /** The page's selected *Structure year*: the *Applies from year* default follows it (D-ORG-23). */
+  @Input() structureYear = 0;
   @Output() saved = new EventEmitter<number | null>();
   @Output() cancelled = new EventEmitter<void>();
 
@@ -108,7 +111,7 @@ export class OrgUnitFormComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     const row = this.row;
-    this.appliesFromYear.set(this.range.current);
+    this.applyDefaultYear();
     if (row) {
       const v = row.version;
       this.fields.set({ code: row.code, name: v.name, acronym: v.acronym ?? '' });
@@ -123,6 +126,19 @@ export class OrgUnitFormComponent implements OnInit {
       void this.loadCodeProposal();
     }
     await this.loadLevels();
+  }
+
+  // The top *Structure year* changed while this form is open: the default follows it (D-ORG-23).
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['structureYear'] && !changes['structureYear'].firstChange) {
+      this.applyDefaultYear();
+      this.dropInvalidParent();
+    }
+  }
+
+  private applyDefaultYear(): void {
+    this.backdate.set(false);
+    this.appliesFromYear.set(defaultAppliesFromYear(this.structureYear, this.range.current));
   }
 
   private async loadCodeProposal(): Promise<void> {

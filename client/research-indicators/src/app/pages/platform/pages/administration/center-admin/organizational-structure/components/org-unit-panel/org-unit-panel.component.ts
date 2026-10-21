@@ -29,6 +29,8 @@ export class OrgUnitPanelComponent implements OnChanges {
   @Input() row: OrgYearViewRow | null = null;
   @Input({ required: true }) rows: OrgYearViewRow[] = [];
   @Input({ required: true }) range: OrgYearRange = { min: 0, max: 0, current: 0 };
+  /** The page's selected *Structure year*, passed to the form for its *Applies from year* default. */
+  @Input() structureYear = 0;
   @Input() creating = false;
   @Input() prefill: OrgUnitFormPrefill | null = null;
   /** Changes on every open and every save: the form is rebuilt and an open History tab reloads. */

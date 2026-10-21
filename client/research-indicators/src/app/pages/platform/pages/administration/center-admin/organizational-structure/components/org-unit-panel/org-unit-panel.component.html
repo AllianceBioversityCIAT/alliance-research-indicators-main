@@ -1,7 +1,7 @@
 @if (creating) {
   <h2 class="m-0 mb-3 text-[15px] font-semibold atc-primary-blue-600" data-testid="new-entry-title">New entry</h2>
   @for (key of [formKey]; track key) {
-    <app-org-unit-form [row]="null" [rows]="rows" [range]="range" [prefill]="prefill" (saved)="saved.emit($event)" (cancelled)="cancelled.emit()">
+    <app-org-unit-form [row]="null" [rows]="rows" [range]="range" [structureYear]="structureYear" [prefill]="prefill" (saved)="saved.emit($event)" (cancelled)="cancelled.emit()">
     </app-org-unit-form>
   }
 } @else {
@@ -101,6 +101,7 @@
               [row]="selected"
               [rows]="rows"
               [range]="range"
+              [structureYear]="structureYear"
               [prefill]="null"
               (saved)="saved.emit($event)"
               (cancelled)="cancelled.emit()">
