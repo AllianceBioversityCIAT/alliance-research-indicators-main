@@ -77,7 +77,7 @@ graph TD
 | ID | Item |
 |---|---|
 | FD-1 | **Owner decisions 2026-10-21:** every TIP result gets a version whether or not it is pushed; push only when all four conditions hold (year = `ARI_PRMS_SYNC` reporting year, primary contract contributes to pool funding, pool-funding green check green on the created version, no `prms_result_code`); one result at a time, waiting for PRMS before the next; author = the TIP submitter's STAR user; applies to legacy TIP results. |
-| FD-2 | **TIP identity in PRMS:** `external_reference` = `TIP-<official_code>`; STAR keeps the bare code (no change for results already synced). `UNVERIFIED — confirm at source before relying on it` — PRMS acceptance of the prefixed value; settled by child 1. |
+| FD-2 | **TIP identity in PRMS:** `external_reference` = `TIP-<official_code>`; STAR keeps the bare code (no change for results already synced). `UNVERIFIED — confirm at source before relying on it` — PRMS acceptance of the prefixed value; evidence in child 1 design P-18; settled by child 3's first TEST-env push. |
 | FD-3 | **TIP gate equivalences:** `COMPLETED_IN_TIP` counts as Approved; `submitted_by` = TIP submitter's STAR user; Knowledge Product is sendable for TIP results only (handle from the `'Handled'` evidence row — prms-sync D-4b). The STAR gate is unchanged. A TIP result whose submitter has no STAR user is not pushed, with a recorded reason (P-1). |
 | FD-4 | PRMS itself dedupes KPs by handle and enforces the reporting cycle year (spike `changes/prms-sync-knowledge-products/spike/README.md`); STAR surfaces PRMS's 207 row message verbatim (R-F4). |
 | OQ-1 | Child 2: how SP versions coexist with TIP's own per-year snapshot rows (`is_version` → `is_snapshot`) — design question, owner child 2. |

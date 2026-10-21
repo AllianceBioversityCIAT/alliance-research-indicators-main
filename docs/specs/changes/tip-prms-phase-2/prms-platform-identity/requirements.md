@@ -120,7 +120,7 @@ An inbound decision SHALL be correlated to the result whose platform and code th
 
 ### R-PPI-005 — The PRMS code reaches the live row of the result's own platform
 
-When a push returns a PRMS result code, it SHALL be copied onto the live row of the same platform, code and year.
+When a push returns a PRMS result code, it SHALL be copied onto the live row of the same platform and official code (the live row may belong to another reporting year than the pushed version, as for STAR today).
 
 #### Scenario: TIP push settles
 - GIVEN TIP `123` and STAR `123` (2026) both have live rows
@@ -170,7 +170,7 @@ The STAR client SHALL request and show the Pool Funding alignment for TIP result
 | External reference regresses for STAR | Builder unit test asserting the bare code for STAR and `TIP-123` for TIP |
 | Correlator matches a TIP decision to STAR | Correlator test with both results present |
 | Client still skips TIP | Client unit test on `getAlignment` for a `TIP-` code + sidebar tab visibility |
-| PRMS rejects `TIP-` references | **No automated gate** — premise `UNVERIFIED`; settled by a TEST-env ingest call or the PRMS team (owner: this spec's design) |
+| PRMS rejects `TIP-` references | **No automated gate** — premise `UNVERIFIED` (design P-18); settled by child 3's first TEST-env push |
 | Rendered read-only state of the TIP tab | Human check at the HITL pause (Dev), after deploy |
 
 ## 8. Data requirements
@@ -197,7 +197,7 @@ The STAR client SHALL request and show the Pool Funding alignment for TIP result
 
 | # | Question | Owner | Target |
 | --- | --- | --- | --- |
-| OQ-1 | Does PRMS accept `TIP-<code>` as `external_reference` (length/charset)? | David Casañas (design / TEST-env call) | design gate |
+| OQ-1 | Does PRMS accept `TIP-<code>` as `external_reference` (length/charset)? | David Casañas — evidence recorded in design P-18; settled by child 3's first TEST-env push | child 3 |
 
 ## 12. Requirement ID index
 
