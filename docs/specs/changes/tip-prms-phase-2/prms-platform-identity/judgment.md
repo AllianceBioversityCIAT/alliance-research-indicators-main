@@ -44,3 +44,14 @@ Counts: confirmed severe 2 (+1 with split severity) · suspect 1 · contradictio
 - N-3: history STAR-sent rows need a canonical numeric code; otherwise NULL.
 - N-4: P-20 cites `tip-integration.service.ts:207`.
 - N-5: tree label, escape note, P-3 cell fixed; off-by-one ranges corrected (P-1, P-12, §7.3).
+
+## Round 2 — final scoped re-judgment
+
+- **Verdicts:** A **FAIL** · B **FAIL** — same single residual, both `warning`; N-2…N-5 resolved, all re-checked citations correct, §5 table intact.
+
+| ID | Kind | Severity | Finding | Judge A | Judge B |
+| --- | --- | --- | --- | --- | --- |
+| R2-1 | confirmed | warning | R-PPI-001 *Existing rows* still says "every existing sync-log row reads platform `STAR`", while design §5 tags a TIP-only-match row `TIP` and rewrites its `external_reference`; requirements §8 omits the rewrite and still says "No data correction beyond the backfill" | R2-1 | M-1 |
+| R2-2 | suspect | suggestion | §5 does not say what happens if a rewritten `TIP-<code>` key collides with an existing row (Dev has none, P-19) | — | M-2 |
+
+**Terminal state: `ESCALATED`** — the two-round fix ceiling is spent and one confirmed (warning) item remains. Decision handed to the owner.
