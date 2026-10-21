@@ -292,6 +292,8 @@ describe('pfm-aggregation', () => {
         ready_to_sync: 'ready',
         rejected: 'prms_rejected',
         synced: 'synced',
+        awaiting_pi: 'awaiting_pi',
+        no_sp_contribution: 'no_sp',
       });
     });
 
@@ -304,7 +306,13 @@ describe('pfm-aggregation', () => {
         ready: 2,
         prms_rejected: 1,
         synced: 3,
+        awaiting_pi: 4, // r2 Submitted, r5 Draft, r9 Under review, r10 Returned
+        no_sp: 2, // r6, r12
       });
+      // Need attention + Synced + No SP contribution partition every result.
+      expect(
+        q.chip_counts.attention + q.chip_counts.synced + q.chip_counts.no_sp,
+      ).toBe(q.chip_counts.all);
       // P-B and P-C tie on attention (2): P-B first by code.
       expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-B', 'P-C', 'P-D']);
       expect(q.groups[0]).toEqual({
@@ -353,6 +361,8 @@ describe('pfm-aggregation', () => {
         ready: 0,
         prms_rejected: 0,
         synced: 0,
+        awaiting_pi: 1,
+        no_sp: 0,
       });
       expect(q.totals).toEqual({
         results: 1,
@@ -374,6 +384,8 @@ describe('pfm-aggregation', () => {
         ready: 2,
         prms_rejected: 0,
         synced: 1,
+        awaiting_pi: 1,
+        no_sp: 0,
       });
       expect(q.groups).toHaveLength(1);
       expect(q.groups[0].result_count).toBe(3);

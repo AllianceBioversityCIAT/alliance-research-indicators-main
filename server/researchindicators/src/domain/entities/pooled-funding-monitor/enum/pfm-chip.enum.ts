@@ -5,4 +5,7 @@ export enum PfmChipEnum {
   READY_TO_SYNC = 'ready_to_sync',
   REJECTED = 'rejected',
   SYNCED = 'synced',
+  /** Coverage-tab views (not shown as quick views). */
+  AWAITING_PI = 'awaiting_pi',
+  NO_SP_CONTRIBUTION = 'no_sp_contribution',
 }

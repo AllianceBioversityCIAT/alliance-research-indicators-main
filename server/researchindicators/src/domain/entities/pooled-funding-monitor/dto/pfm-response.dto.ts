@@ -51,6 +51,15 @@ export class PfmChipCountsDto {
   @ApiProperty() ready: number;
   @ApiProperty() prms_rejected: number;
   @ApiProperty() synced: number;
+  @ApiProperty({
+    description:
+      'Not approved by the PI in STAR yet, in PRMS scope, not in PRMS.',
+  })
+  awaiting_pi: number;
+  @ApiProperty({
+    description: 'No SP contribution (out of scope), not in PRMS.',
+  })
+  no_sp: number;
 }
 
 export class PfmProjectProgressDto {

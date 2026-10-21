@@ -283,6 +283,17 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
         d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW ||
         d.prmsStatus === PfmPrmsStatusEnum.APPROVED
       );
+    // Still to be approved by the PI in STAR, in PRMS scope, nothing in PRMS yet.
+    case PfmChipEnum.AWAITING_PI:
+      return (
+        !d.isOutOfScope &&
+        d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
+        d.starLabel !== PfmStarLabelEnum.APPROVED
+      );
+    // Declared no Science Program contribution and never sent: settled, nothing to do.
+    // With Need attention and Synced it partitions every monitored result.
+    case PfmChipEnum.NO_SP_CONTRIBUTION:
+      return d.isOutOfScope && d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
     default:
       return true;
   }
