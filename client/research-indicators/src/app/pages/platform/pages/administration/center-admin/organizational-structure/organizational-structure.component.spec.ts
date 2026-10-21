@@ -7,6 +7,7 @@ import { OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.i
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import * as xlsxExportUtil from '@shared/utils/xlsx-export.util';
 import { row, staff } from '../../../../../../testing/org-structure.fixture';
 
@@ -78,6 +79,12 @@ describe('OrganizationalStructureComponent', () => {
   };
   const openView = async (view: 'tree' | 'table') => {
     (q(`view-${view}`) as HTMLButtonElement).click();
+    await settle();
+  };
+  const treeRowFor = (name: string) =>
+    (Array.from(root().querySelectorAll('[data-testid="org-tree-row"]')) as HTMLElement[]).find(r => r.textContent?.includes(name));
+  const expandRow = async (name: string) => {
+    (treeRowFor(name)?.querySelector('[data-testid="org-tree-toggle"]') as HTMLButtonElement).click();
     await settle();
   };
   const codeCells = () => Array.from(root().querySelectorAll('[data-testid="cell-code"]')).map(c => c.textContent?.trim());
@@ -299,6 +306,7 @@ describe('OrganizationalStructureComponent', () => {
   describe('tree view', () => {
     it('renders expanders with an aria-label and nests children under the expanded division', async () => {
       await create();
+      await expandRow('Division Ten');
 
       const togglers = Array.from(root().querySelectorAll('button[data-testid="org-tree-toggle"]')) as HTMLButtonElement[];
       // The expanded division reads Collapse; the childless department's toggle is hidden from assistive tech.
@@ -317,11 +325,11 @@ describe('OrganizationalStructureComponent', () => {
         row({ id: 5, code: 'ORG-5', levelCode: 'L4', name: 'Child Unit', parentId: 2, parentCode: 'ORG-2', parentName: 'Data Department' })
       ];
       await create(RANGE, withChild);
-      const rowFor = (name: string) =>
-        (Array.from(root().querySelectorAll('[data-testid="org-tree-row"]')) as HTMLElement[]).find(r => r.textContent?.includes(name));
+      const rowFor = treeRowFor;
       const expander = () => rowFor('Data Department')?.querySelector('td button') as HTMLButtonElement;
+      await expandRow('Division Ten');
 
-      // Arranged transition: the L2 starts collapsed (only L1 is expanded), so its child is not rendered.
+      // Arranged transition: the L2 starts collapsed (the L1 was just expanded), so its child is not rendered.
       expect(rowFor('Child Unit')).toBeUndefined();
       expect(expander().getAttribute('aria-label')).toBe('Expand Data Department');
       expect(expander().getAttribute('aria-expanded')).toBe('false');
@@ -341,6 +349,7 @@ describe('OrganizationalStructureComponent', () => {
 
     it('marks an inactive director on the tree row', async () => {
       await create();
+      await expandRow('Division Ten');
 
       expect(root().querySelectorAll('[data-testid="inactive-staff-badge"]')).toHaveLength(1);
     });
@@ -349,6 +358,7 @@ describe('OrganizationalStructureComponent', () => {
       await create();
       expect(q('detail-empty')).toBeTruthy();
 
+      await expandRow('Division Ten');
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
       await settle();
       expect(q('selected-summary')?.textContent).toContain('ORG-2');
@@ -410,6 +420,7 @@ describe('OrganizationalStructureComponent', () => {
     it('a selected entry shows its header, the History tab and the lifecycle actions in the right panel (T-03)', async () => {
       await create(RANGE, ROWS_2026);
 
+      await expandRow('Division Ten');
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
       await settle();
 
@@ -421,6 +432,7 @@ describe('OrganizationalStructureComponent', () => {
 
     it('after a lifecycle action B2 and B1 reload and the entry stays selected while it is still listed', async () => {
       await create(RANGE, ROWS_2026);
+      await expandRow('Division Ten');
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
       await settle();
       api.GET_OrgStructureYears.mockClear();
@@ -436,6 +448,7 @@ describe('OrganizationalStructureComponent', () => {
 
     it('a PHYSICAL delete clears the selection even though the id was listed before (R-ORG-008)', async () => {
       await create(RANGE, ROWS_2026);
+      await expandRow('Division Ten');
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
       await settle();
 
@@ -448,6 +461,7 @@ describe('OrganizationalStructureComponent', () => {
 
     it('after a save B2 and B1 are reloaded so the new year becomes selectable (T-01 advisory)', async () => {
       await create(RANGE, ROWS_2026);
+      await expandRow('Division Ten');
       (root().querySelectorAll('[data-testid="org-tree-row"]')[1] as HTMLElement).click();
       await settle();
       api.GET_OrgStructureYears.mockResolvedValue(ok({ min: 2025, max: 2028, current: 2026 }));
@@ -462,6 +476,154 @@ describe('OrganizationalStructureComponent', () => {
       expect(component.yearOptions()).toEqual([2025, 2026, 2027, 2028]);
       expect(component.year()).toBe(2026);
       expect(component.selectedId()).toBe(2);
+    });
+  });
+
+  // T-07 / D-ORG-20. KZ-015: every state is reached by the click the admin performs. KZ-017: jsdom has
+  // no layout, so these tests prove the styles and classes the component APPLIES, not that the panel is
+  // actually pinned or the shade noticeable in a real browser (re-checked by the requester at T-06).
+  describe('D-ORG-20 usability rework (T-07)', () => {
+    const DEEP: OrgYearViewRow[] = [
+      row({ id: 10, code: 'ORG-10', levelCode: 'L1', name: 'Division Ten' }),
+      row({ id: 11, code: 'ORG-11', levelCode: 'L1', name: 'Division Eleven' }),
+      row({ id: 2, code: 'ORG-2', levelCode: 'L2', name: 'Data Department', parentId: 10, parentCode: 'ORG-10', parentName: 'Division Ten' }),
+      row({ id: 5, code: 'ORG-5', levelCode: 'L4', name: 'Child Unit', parentId: 2, parentCode: 'ORG-2', parentName: 'Data Department' })
+    ];
+    const treeNames = () => Array.from(root().querySelectorAll('[data-testid="org-tree-name"]')).map(n => n.textContent?.replace(/\s+/g, ' ').trim());
+    const tableRowFor = (name: string) =>
+      (Array.from(root().querySelectorAll('[data-testid="data-table-row"]')) as HTMLElement[]).find(
+        r => r.querySelector('[data-testid="cell-name"]')?.textContent?.trim() === name
+      );
+    const selectedTreeRows = () =>
+      Array.from(root().querySelectorAll('.org-tree-row--selected')).map(r => r.textContent?.replace(/\s+/g, ' ').trim());
+    const selectedTableRows = () => Array.from(root().querySelectorAll('.data-table-row--selected')) as HTMLElement[];
+
+    it('the tree opens with only the L1 rows visible', async () => {
+      await create(RANGE, DEEP);
+
+      expect(treeNames()).toEqual(['Division Ten', 'Division Eleven']);
+      expect(root().querySelectorAll('[data-testid="org-tree-row"]')).toHaveLength(2);
+    });
+
+    it('an expanded node stays expanded after B1 reloads (Show inactive / deleted)', async () => {
+      await create(RANGE, DEEP);
+      await expandRow('Division Ten');
+      expect(treeNames()).toContain('Data Department');
+      api.GET_OrgStructureUnits.mockClear();
+
+      (q('include-ended') as HTMLInputElement).click();
+      await settle();
+
+      expect(api.GET_OrgStructureUnits).toHaveBeenCalledTimes(1);
+      expect(treeNames()).toEqual(['Division Ten', 'Data Department', 'Division Eleven']);
+    });
+
+    it('an expanded node stays expanded after a save reload, and a collapse is kept too', async () => {
+      await create(RANGE, DEEP);
+      await expandRow('Division Ten');
+      await expandRow('Division Eleven');
+      await expandRow('Division Eleven');
+      // A fresh array per call, as a real response is: the same reference would not notify the rows signal.
+      api.GET_OrgStructureUnits.mockImplementation(() => Promise.resolve(ok([...DEEP])));
+
+      await component.onSaved(null);
+      await settle();
+
+      expect(treeNames()).toEqual(['Division Ten', 'Data Department', 'Division Eleven']);
+    });
+
+    it('selecting a deep entry in the table and switching to the tree shows its row with the ancestors expanded', async () => {
+      await create(RANGE, DEEP);
+      await openView('table');
+
+      (tableRowFor('Child Unit') as HTMLElement).click();
+      await settle();
+      await openView('tree');
+
+      expect(treeNames()).toEqual(['Division Ten', 'Data Department', 'Child Unit', 'Division Eleven']);
+      expect(selectedTreeRows()).toHaveLength(1);
+      expect(selectedTreeRows()[0]).toContain('Child Unit');
+    });
+
+    it('re-selecting after a save expands the ancestors of the saved entry', async () => {
+      await create(RANGE, DEEP);
+
+      await component.onSaved(5);
+      await settle();
+
+      expect(treeNames()).toContain('Child Unit');
+      expect(selectedTreeRows()[0]).toContain('Child Unit');
+    });
+
+    it('the selected row is highlighted in the tree and the highlight follows the selection', async () => {
+      await create(RANGE, DEEP);
+      expect(selectedTreeRows()).toEqual([]);
+      await expandRow('Division Ten');
+
+      (treeRowFor('Division Ten') as HTMLElement).click();
+      await settle();
+      expect(selectedTreeRows()).toHaveLength(1);
+      expect(selectedTreeRows()[0]).toContain('Division Ten');
+      expect(treeRowFor('Division Ten')?.getAttribute('aria-selected')).toBe('true');
+
+      (treeRowFor('Data Department') as HTMLElement).click();
+      await settle();
+      expect(selectedTreeRows()).toHaveLength(1);
+      expect(selectedTreeRows()[0]).toContain('Data Department');
+    });
+
+    it('the selected row is highlighted in the table and follows the selection; a click selects it (R-ORG-013)', async () => {
+      await create(RANGE, DEEP);
+      await openView('table');
+      expect(selectedTableRows()).toEqual([]);
+
+      (tableRowFor('Division Ten') as HTMLElement).click();
+      await settle();
+      expect(selectedTableRows()).toHaveLength(1);
+      expect(selectedTableRows()[0].textContent).toContain('Division Ten');
+      expect(q('selected-summary')?.textContent).toContain('ORG-10');
+
+      (tableRowFor('Child Unit') as HTMLElement).click();
+      await settle();
+      expect(selectedTableRows()).toHaveLength(1);
+      expect(selectedTableRows()[0].textContent).toContain('Child Unit');
+    });
+
+    it('the right panel is sticky below the page header with its own scroll, and selecting an entry does not reset it', async () => {
+      const cache = TestBed.inject(CacheService);
+      cache.navbarHeight.set(60);
+      cache.headerHeight.set(80);
+      await create(RANGE, DEEP);
+      const panel = q('detail-panel') as HTMLElement;
+
+      const before = getComputedStyle(panel);
+      expect(before.position).toBe('sticky');
+      expect(before.overflowY).toBe('auto');
+      expect(panel.style.top).toBe('156px');
+      expect(panel.style.maxHeight).toContain('172px');
+
+      await expandRow('Division Ten');
+      (treeRowFor('Data Department') as HTMLElement).click();
+      await settle();
+
+      const after = getComputedStyle(q('detail-panel') as HTMLElement);
+      expect(after.position).toBe('sticky');
+      expect(after.overflowY).toBe('auto');
+      expect((q('detail-panel') as HTMLElement).style.top).toBe('156px');
+    });
+
+    it('the Structure year selector offers next year even when every version starts this year, and defaults to the current one', async () => {
+      await create({ min: 2026, max: 2026, current: 2026 }, DEEP);
+
+      const select = fixture.debugElement.query(By.directive(Select)).componentInstance as Select;
+      expect(select.options).toEqual([2026, 2027]);
+      expect(component.year()).toBe(2026);
+    });
+
+    it('the Structure year selector reaches the latest version year when it is beyond next year', async () => {
+      await create({ min: 2024, max: 2029, current: 2026 }, DEEP);
+
+      expect(component.yearOptions()).toEqual([2024, 2025, 2026, 2027, 2028, 2029]);
     });
   });
 });

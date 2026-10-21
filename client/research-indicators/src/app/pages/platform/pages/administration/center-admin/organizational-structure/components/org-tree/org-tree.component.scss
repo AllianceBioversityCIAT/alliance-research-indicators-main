@@ -3,8 +3,15 @@
   display: block;
 }
 
-.org-tree-row--selected {
-  background: var(--ac-grey-100);
+// D-ORG-20: PrimeNG paints its own row and cell backgrounds, so the highlight must out-rank them; the
+// inset bar is a second, non-colour cue.
+:host ::ng-deep tr.org-tree-row--selected,
+:host ::ng-deep tr.org-tree-row--selected > td {
+  background: var(--ac-light-blue-50);
+}
+
+:host ::ng-deep tr.org-tree-row--selected > td:first-child {
+  box-shadow: inset 3px 0 0 var(--ac-light-blue-400);
 }
 
 .org-tree-row--ended {

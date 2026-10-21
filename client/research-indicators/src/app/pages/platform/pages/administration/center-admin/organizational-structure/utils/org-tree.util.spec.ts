@@ -1,6 +1,7 @@
 import { OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { row, staff } from '../../../../../../../testing/org-structure.fixture';
-import { buildOrgTree, countByLevel, endedBadge, scheduledBadge, toTableRows, visibleRows } from './org-tree.util';
+import { appliesFromYears } from './org-form.util';
+import { ancestorIds, buildOrgTree, countByLevel, endedBadge, scheduledBadge, toTableRows, visibleRows } from './org-tree.util';
 
 // @akili-spec institutional-performance/organizational-structure T-01 (client half) — R-ORG-006, R-ORG-013, R-ORG-014.
 describe('org-tree.util', () => {
@@ -115,5 +116,44 @@ describe('org-tree.util', () => {
         since: '2026'
       }
     ]);
+  });
+
+  // D-ORG-20 (T-07)
+  it('builds every node collapsed unless its id is in the expanded set', () => {
+    const collapsed = buildOrgTree(rows, 2027, false);
+    expect(collapsed[0].expanded).toBe(false);
+    expect(collapsed[0].children?.every(n => n.expanded === false)).toBe(true);
+
+    const open = buildOrgTree(rows, 2027, false, new Set([10, 2]));
+    expect(open[0].expanded).toBe(true);
+    expect(open[0].children?.map(n => n.expanded)).toEqual([true, false]);
+  });
+
+  it('lists the ancestors of an entry nearest first, and none for a root or an unknown id', () => {
+    expect(ancestorIds(rows, 4)).toEqual([3, 2, 10]);
+    expect(ancestorIds(rows, 5)).toEqual([2, 10]);
+    expect(ancestorIds(rows, 10)).toEqual([]);
+    expect(ancestorIds(rows, 999)).toEqual([]);
+  });
+
+  it('stops at a parent that is not among the shown rows, and survives a parent cycle', () => {
+    expect(ancestorIds([rows[1], rows[2]], 3)).toEqual([2]);
+    const cyclic = [
+      row({ id: 1, code: 'ORG-1', levelCode: 'L2', name: 'A', parentId: 2 }),
+      row({ id: 2, code: 'ORG-2', levelCode: 'L2', name: 'B', parentId: 1 })
+    ];
+    expect(ancestorIds(cyclic, 1)).toEqual([2, 1]);
+  });
+});
+
+describe('appliesFromYears (D-ORG-20)', () => {
+  it('reaches next year even when the module has one year, with and without Back-date', () => {
+    expect(appliesFromYears(2026, 2026, 2026, false)).toEqual([2026, 2027]);
+    expect(appliesFromYears(2026, 2026, 2026, true)).toEqual([2026, 2027]);
+  });
+
+  it('offers current..max without Back-date and min..max with it when versions reach further', () => {
+    expect(appliesFromYears(2024, 2029, 2026, false)).toEqual([2026, 2027, 2028, 2029]);
+    expect(appliesFromYears(2024, 2029, 2026, true)).toEqual([2024, 2025, 2026, 2027, 2028, 2029]);
   });
 });

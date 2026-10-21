@@ -7,12 +7,13 @@ import { CustomProgressBarComponent } from '@shared/components/custom-progress-b
 import { DataTableColumn, DataTableComponent } from '@shared/components/data-table/data-table.component';
 import { OrgTableRow, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { ApiService } from '@shared/services/api.service';
+import { CacheService } from '@shared/services/cache/cache.service';
 import { OrgTreeComponent } from './components/org-tree/org-tree.component';
 import { OrgLifecycleDone } from './components/org-lifecycle-dialog/org-lifecycle-dialog.component';
 import { OrgUnitFormPrefill } from './components/org-unit-form/org-unit-form.component';
 import { OrgUnitPanelComponent } from './components/org-unit-panel/org-unit-panel.component';
 import { nextLevelId } from './utils/org-form.util';
-import { OrgLevelCounts, buildOrgTree, countByLevel, toTableRows, visibleRows } from './utils/org-tree.util';
+import { OrgLevelCounts, ancestorIds, buildOrgTree, countByLevel, toTableRows, visibleRows } from './utils/org-tree.util';
 
 type OrgView = 'tree' | 'table';
 
@@ -39,6 +40,7 @@ type OrgView = 'tree' | 'table';
 })
 export default class OrganizationalStructureComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly cache = inject(CacheService);
 
   readonly years = signal<OrgYearRange | null>(null);
   readonly year = signal<number | null>(null);
@@ -63,9 +65,18 @@ export default class OrganizationalStructureComponent implements OnInit {
     const range = this.years();
     if (!range) return [];
     const options: number[] = [];
-    for (let y = range.min; y <= range.max; y++) options.push(y);
+    // D-ORG-20: B2's range extended to next year so a scheduled change can be reached.
+    for (let y = range.min; y <= Math.max(range.max, range.current + 1); y++) options.push(y);
     return options;
   });
+
+  /** Entries the admin expanded (or a selection opened); survives every B1 reload (D-ORG-20). */
+  readonly expandedIds = signal<ReadonlySet<number>>(new Set<number>());
+  /** Sticky right panel (D-ORG-20): sits below the fixed page header and never outgrows the viewport. */
+  // The navbar and section header are `position: fixed`, so the `.content` scrollport starts at y = 0:
+  // the panel must clear BOTH (same sum platform.component.html uses for its padding-top).
+  readonly panelTop = computed(() => this.cache.navbarHeight() + this.cache.headerHeight() + 16);
+  readonly panelMaxHeight = computed(() => `calc(100vh - ${this.cache.navbarHeight() + this.cache.headerHeight() + 32}px)`);
 
   readonly shownRows = computed(() => {
     const year = this.year();
@@ -73,7 +84,7 @@ export default class OrganizationalStructureComponent implements OnInit {
   });
   readonly treeNodes = computed(() => {
     const year = this.year();
-    return year === null ? [] : buildOrgTree(this.rows(), year, this.includeEnded());
+    return year === null ? [] : buildOrgTree(this.rows(), year, this.includeEnded(), this.expandedIds());
   });
   readonly tableRows = computed<OrgTableRow[]>(() => {
     const year = this.year();
@@ -148,7 +159,25 @@ export default class OrganizationalStructureComponent implements OnInit {
   selectUnit(id: number): void {
     this.creating.set(false);
     this.selectedId.set(id);
+    this.revealInTree(id);
     this.formVersion.update(v => v + 1);
+  }
+
+  selectTableRow(row: OrgTableRow): void {
+    this.selectUnit(Number(row.id));
+  }
+
+  onExpansionChanged(change: { id: number; expanded: boolean }): void {
+    const next = new Set(this.expandedIds());
+    if (change.expanded) next.add(change.id);
+    else next.delete(change.id);
+    this.expandedIds.set(next);
+  }
+
+  /** Expands the ancestors of `id` so its row is visible when the tree is shown (D-ORG-20). */
+  private revealInTree(id: number): void {
+    const hidden = ancestorIds(this.rows(), id).filter(ancestor => !this.expandedIds().has(ancestor));
+    if (hidden.length > 0) this.expandedIds.set(new Set([...this.expandedIds(), ...hidden]));
   }
 
   startCreate(prefill: OrgUnitFormPrefill | null = null): void {
@@ -181,6 +210,7 @@ export default class OrganizationalStructureComponent implements OnInit {
     await this.loadUnits();
     this.creating.set(false);
     this.selectedId.set(id !== null && this.rows().some(row => row.id === id) ? id : null);
+    if (this.selectedId() !== null) this.revealInTree(this.selectedId() as number);
     this.formVersion.update(v => v + 1);
   }
 

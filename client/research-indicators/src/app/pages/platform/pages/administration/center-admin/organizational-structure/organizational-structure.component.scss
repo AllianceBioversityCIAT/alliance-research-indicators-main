@@ -4,6 +4,13 @@
   width: 100%;
 }
 
+// D-ORG-20: the right panel sticks below the fixed page header and scrolls on its own. The global
+// `.app-page-wrapper` has `overflow-x: hidden`, which makes it a (non-scrolling) scroll container and
+// would swallow `position: sticky`; `clip` keeps the horizontal clipping without creating one.
+.app-page-wrapper {
+  overflow-x: clip;
+}
+
 .view-toggle__button {
   border: 1px solid var(--ac-grey-200);
   background: var(--ac-white-1);

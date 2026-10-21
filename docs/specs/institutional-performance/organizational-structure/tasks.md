@@ -374,6 +374,35 @@ Every task depends on the one before it. They share the module's service, contro
 
 ---
 
+### T-07 — HITL rework: tree, panel, selection and year range
+
+- **Status:** done (2026-10-21, Reviewer PASS on attempt 2 — execution.md; the requester's browser re-check stays open in T-06) · **Size:** S · **Dependencies:** T-05 (found during T-06; T-06 continues after it) · **Added:** 2026-10-21, requester-approved ("aplica los ajustes")
+- **Origin:** T-06 round 1 observations 1, 2, 3 and 5 (execution.md § T-06). Decision **D-ORG-20**.
+- **Requirements covered:** R-ORG-013 (page usability — tree, panel, selection), R-ORG-006 (year selector), R-ORG-004 (a change can apply from a later year — the UI could not offer one).
+- **Design refs:** §6.2 (Header, Right panel rows), §6.3, §6.5, D-ORG-20.
+- **Scope — screen only (client):**
+  1. **Tree starts collapsed:** on first load every level is collapsed (only L1 rows visible). User expand/collapse state is kept across reloads after a save or lifecycle action and across a year change. When an entry is selected from the table view (or re-selected after a save) and the user switches to the tree, its ancestors are expanded so the selected row is visible.
+  2. **Right panel stays visible:** the panel is sticky inside the page's scroll container (top offset below the page header), with its own vertical scroll when taller than the viewport, so selecting an entry far down the tree always shows its details.
+  3. **Selected row highlighted:** the selected entry's row is shaded in the tree and in the table (token background, no hex), and the highlight follows the selection.
+  4. **Year range:** the *Structure year* selector offers `min … max(max, current + 1)` (B2's range, extended to include **next year**), default the current year. *Applies from year* offers `current … max(max, current + 1)` without *Back-date*, and `min … max(max, current + 1)` with it; default the current year. Server unchanged (it accepts up to current + 10, design §5.1).
+- **Tests (client unit):**
+  - Tree: first render shows only L1 rows; expanding a node then reloading B1 keeps it expanded; selecting a deep entry from the table and switching to the tree expands its ancestors.
+  - Panel: the panel container carries the sticky style/class and its own overflow (assert in the DOM / computed style available in jsdom); selecting an entry does not reset it.
+  - Selection: the selected row carries the highlight class in the tree and in the table; selecting another row moves it.
+  - Years: with B2 `{min: 2026, max: 2026, current: 2026}` the structure selector offers `[2026, 2027]` and defaults to 2026; *Applies from year* offers `[2026, 2027]`, and with *Back-date* still `[2026, 2027]`; with `{min: 2024, max: 2029, current: 2026}` it offers `2024…2029` (back-date) / `2026…2029`.
+- **Falsifier:** (1) start the tree expanded → the "only L1 rows" test red; (2) drop the `current + 1` extension → the `[2026, 2027]` tests red; (3) drop the highlight binding → the selection tests red; (4) reset expansion on reload → the keep-expanded test red.
+- **Red run:** each falsifier observed failing on its own assertion, then reverted.
+- **Disqualifier:** a sticky-panel test that asserts only a class name without the panel's overflow/position being applied by the component's styles; KZ-015 — a test that sets the selection before the first `detectChanges()` instead of performing the click.
+- **Cannot prove:** that the panel stays visible and the highlight is noticeable in a real browser at the requester's resolution → re-checked by the requester in T-06.
+- **Consumers:** `organizational-structure.component.*`, `org-tree.component.*`, `org-unit-form` (year options), `org-form.util.ts` (`appliesFromYears`), `org-tree.util.ts`, their specs.
+- **Review:** `standard`.
+- **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
+- **Done criteria:**
+  - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–4 observed red, then reverted. *(Leader re-measure 352/352, 8136/8136 — execution.md § T-07)*
+  - [ ] Requester re-checks items 1, 2, 3 and 5 in the browser during T-06 (quoted there).
+
+---
+
 ## 3. Coverage closure (scenario and clause level)
 
 Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning task. "Read half" / "write half" splits are named in the task.

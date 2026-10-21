@@ -123,12 +123,17 @@ describe('OrgUnitFormComponent', () => {
   };
 
   async function mount(
-    opts: { row?: OrgYearViewRow | null; rows?: OrgYearViewRow[]; prefill?: { parentId: number | null; levelId: number | null } | null } = {}
+    opts: {
+      row?: OrgYearViewRow | null;
+      rows?: OrgYearViewRow[];
+      prefill?: { parentId: number | null; levelId: number | null } | null;
+      range?: OrgYearRange;
+    } = {}
   ) {
     fixture = TestBed.createComponent(OrgUnitFormComponent);
     fixture.componentRef.setInput('row', opts.row ?? null);
     fixture.componentRef.setInput('rows', opts.rows ?? ALL);
-    fixture.componentRef.setInput('range', RANGE);
+    fixture.componentRef.setInput('range', opts.range ?? RANGE);
     fixture.componentRef.setInput('prefill', opts.prefill ?? null);
     fixture.detectChanges();
     await settle();
@@ -250,6 +255,28 @@ describe('OrgUnitFormComponent', () => {
 
       await choose('field-applies-from', 2025);
       expect(q('backdate-warning')).toBeTruthy();
+    });
+
+    it('a one-year module (min = max = current) still offers next year, with and without Back-date (D-ORG-20)', async () => {
+      await mount({ row: EDITED, range: { min: 2026, max: 2026, current: 2026 } });
+      await type('field-name', 'Renamed Department');
+
+      expect(optionsOf('field-applies-from')).toEqual([2026, 2027]);
+      expect(fixture.componentInstance.appliesFromYear()).toBe(2026);
+
+      (q('field-backdate') as HTMLInputElement).click();
+      await settle();
+      expect(optionsOf('field-applies-from')).toEqual([2026, 2027]);
+    });
+
+    it('a wide module offers min..max with Back-date and current..max without it (D-ORG-20)', async () => {
+      await mount({ row: EDITED, range: { min: 2024, max: 2029, current: 2026 } });
+      await type('field-name', 'Renamed Department');
+
+      expect(optionsOf('field-applies-from')).toEqual([2026, 2027, 2028, 2029]);
+      (q('field-backdate') as HTMLInputElement).click();
+      await settle();
+      expect(optionsOf('field-applies-from')).toEqual([2024, 2025, 2026, 2027, 2028, 2029]);
     });
 
     it('un-ticking Back-date locks the earlier years again and resets the year', async () => {

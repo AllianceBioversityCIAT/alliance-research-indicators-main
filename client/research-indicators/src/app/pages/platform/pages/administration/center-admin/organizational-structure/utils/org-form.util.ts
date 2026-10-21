@@ -55,10 +55,13 @@ export function parentOptions(rows: OrgYearViewRow[], levelId: number | null, ap
     .map(r => ({ id: r.id, label: `${r.code} ${pathOf(r, byId)} (${ORG_LEVEL_LABELS[r.version.levelCode]})` }));
 }
 
-/** Years the *Applies from year* select offers: from the current year on; earlier ones only with *Back-date* (R-ORG-005). */
+/**
+ * Years the *Applies from year* select offers: from the current year on, up to next year at least (D-ORG-20);
+ * earlier ones only with *Back-date* (R-ORG-005).
+ */
 export function appliesFromYears(minYear: number, maxYear: number, currentYear: number, backdate: boolean): number[] {
   const first = backdate ? minYear : currentYear;
-  const last = Math.max(maxYear, currentYear);
+  const last = Math.max(maxYear, currentYear + 1);
   const years: number[] = [];
   for (let y = first; y <= last; y++) years.push(y);
   return years;

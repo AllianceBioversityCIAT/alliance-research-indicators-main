@@ -23,6 +23,8 @@ export class OrgTreeComponent {
   @Output() unitSelected = new EventEmitter<number>();
   /** Row **+** (T-02): add a child under this entry; the page pre-fills parent and next level. */
   @Output() childRequested = new EventEmitter<OrgYearViewRow>();
+  /** An expander was toggled: the page keeps the set so a reload (save, year change) does not collapse it (D-ORG-20). */
+  @Output() expansionChanged = new EventEmitter<{ id: number; expanded: boolean }>();
   @ViewChild(TreeTable) private readonly treeTable?: TreeTable;
 
   levelLabel(row: OrgYearViewRow): string {
@@ -59,6 +61,7 @@ export class OrgTreeComponent {
     rowNode.node.expanded = !rowNode.node.expanded;
     this.treeTable?.updateSerializedValue();
     this.treeTable?.tableService.onUIUpdate(this.treeTable.value);
+    this.expansionChanged.emit({ id: (rowNode.node.data as OrgTreeNodeData).row.id, expanded: !!rowNode.node.expanded });
   }
 
   expanderLabel(node: TreeNode<OrgTreeNodeData>): string {

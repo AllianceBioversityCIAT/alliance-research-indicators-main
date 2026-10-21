@@ -56,7 +56,12 @@ export function countByLevel(rows: OrgYearViewRow[]): OrgLevelCounts {
  * root, or an orphan whose parent is hidden) becomes a root. Siblings are in natural code order.
  * An L4 under an L2 nests directly (the Office level is optional).
  */
-export function buildOrgTree(rows: OrgYearViewRow[], year: number, includeEnded: boolean): TreeNode<OrgTreeNodeData>[] {
+export function buildOrgTree(
+  rows: OrgYearViewRow[],
+  year: number,
+  includeEnded: boolean,
+  expandedIds: ReadonlySet<number> = new Set<number>()
+): TreeNode<OrgTreeNodeData>[] {
   const shown = visibleRows(rows, year, includeEnded);
   const nodes = new Map<number, TreeNode<OrgTreeNodeData>>();
   for (const row of shown) {
@@ -64,7 +69,8 @@ export function buildOrgTree(rows: OrgYearViewRow[], year: number, includeEnded:
       key: String(row.id),
       data: { row, unitCount: 0, ended: isEndedInYear(row, year) },
       children: [],
-      expanded: row.version.levelCode === 'L1',
+      // D-ORG-20: the tree opens collapsed; only entries the admin (or a selection) expanded are open.
+      expanded: expandedIds.has(row.id),
       leaf: true
     });
   }
@@ -100,6 +106,18 @@ export function buildOrgTree(rows: OrgYearViewRow[], year: number, includeEnded:
   };
   settle(roots);
   return roots;
+}
+
+/** Ids of every ancestor of `id` in the shown rows (nearest first); empty for a root or an unknown id (D-ORG-20). */
+export function ancestorIds(rows: OrgYearViewRow[], id: number): number[] {
+  const byId = new Map(rows.map(r => [r.id, r]));
+  const ancestors: number[] = [];
+  let parentId = byId.get(id)?.version.parentId ?? null;
+  while (parentId !== null && byId.has(parentId) && !ancestors.includes(parentId)) {
+    ancestors.push(parentId);
+    parentId = (byId.get(parentId) as OrgYearViewRow).version.parentId;
+  }
+  return ancestors;
 }
 
 function staffLabel(staff: OrgStaffRef): string {

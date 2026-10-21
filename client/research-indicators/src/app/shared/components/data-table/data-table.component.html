@@ -55,7 +55,8 @@
     </ng-template>
 
     <ng-template pTemplate="body" let-row>
-      <tr data-testid="data-table-row">
+      <tr data-testid="data-table-row" [class.data-table-row--selectable]="selectable" [class.data-table-row--selected]="isSelected(row)"
+        [attr.aria-selected]="selectable ? isSelected(row) : null" (click)="onRowClick(row)">
         @for (column of columns; track column.field) {
         <td [attr.data-testid]="'cell-' + column.field">
           @switch (column.type) {

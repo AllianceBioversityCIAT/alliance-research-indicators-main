@@ -3,3 +3,18 @@
   display: block;
   width: 100%;
 }
+
+// Opt-in row selection (organizational-structure D-ORG-20). PrimeNG paints its own row and cell
+// backgrounds, so the highlight out-ranks them; the inset bar is a second, non-colour cue.
+.data-table-row--selectable {
+  cursor: pointer;
+}
+
+:host ::ng-deep tr.data-table-row--selected,
+:host ::ng-deep tr.data-table-row--selected > td {
+  background: var(--ac-light-blue-50);
+}
+
+:host ::ng-deep tr.data-table-row--selected > td:first-child {
+  box-shadow: inset 3px 0 0 var(--ac-light-blue-400);
+}

@@ -339,3 +339,61 @@ describe('DataTableComponent', () => {
     expect((loadingFixture.nativeElement as HTMLElement).querySelector('[data-testid="progress-bar"], p-progressbar')).toBeTruthy();
   });
 });
+
+// Opt-in row selection (organizational-structure D-ORG-20): off unless `selectable`.
+@Component({
+  standalone: true,
+  imports: [DataTableComponent],
+  template: `<app-data-table
+    [columns]="columns"
+    [rows]="rows"
+    [selectable]="selectable"
+    [selectedKey]="selectedKey()"
+    (rowSelected)="picked.push($event.code); selectedKey.set('' + $event.id)"
+  ></app-data-table>`
+})
+class SelectableHost {
+  columns = columns;
+  rows = buildRows().slice(0, 3);
+  selectable = true;
+  selectedKey = signal<string | null>('2');
+  picked: string[] = [];
+}
+
+describe('DataTableComponent row selection (opt-in)', () => {
+  async function mount(selectable: boolean): Promise<ComponentFixture<SelectableHost>> {
+    await TestBed.configureTestingModule({ imports: [SelectableHost], providers: [provideNoopAnimations()] }).compileComponents();
+    const fixture = TestBed.createComponent(SelectableHost);
+    fixture.componentInstance.selectable = selectable;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture;
+  }
+  const rowEls = (f: ComponentFixture<SelectableHost>) => Array.from((f.nativeElement as HTMLElement).querySelectorAll('[data-testid="data-table-row"]')) as HTMLElement[];
+
+  it('highlights the row whose id equals selectedKey, and a click moves the highlight and emits the row', async () => {
+    const fixture = await mount(true);
+    const selected = () => rowEls(fixture).filter(r => r.classList.contains('data-table-row--selected')).map(r => r.querySelector('[data-testid="cell-code"]')?.textContent?.trim());
+    expect(selected()).toEqual(['UOM-2']);
+
+    rowEls(fixture)[2].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.picked).toEqual(['UOM-3']);
+    expect(selected()).toEqual(['UOM-3']);
+  });
+
+  it('a table that is not selectable neither emits on click nor marks rows as selectable', async () => {
+    const fixture = await mount(false);
+
+    rowEls(fixture)[0].click();
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.picked).toEqual([]);
+    expect(rowEls(fixture)[0].classList.contains('data-table-row--selectable')).toBe(false);
+    expect(rowEls(fixture)[0].getAttribute('aria-selected')).toBeNull();
+  });
+});

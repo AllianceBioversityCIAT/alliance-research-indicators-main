@@ -81,7 +81,7 @@
           </ul>
         }
 
-        <div class="flex min-h-[320px] w-full gap-4">
+        <div class="flex min-h-[320px] w-full items-start gap-4">
           <div class="flex min-w-0 basis-[60%] flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white" data-testid="structure-panel">
             @if (loading()) {
               <app-custom-progress-bar></app-custom-progress-bar>
@@ -127,6 +127,7 @@
                   [selectedId]="selectedId()"
                   (unitSelected)="selectUnit($event)"
                   (childRequested)="startCreateChild($event)"
+                  (expansionChanged)="onExpansionChanged($event)"
                   data-testid="tree-view"></app-org-tree>
               } @else {
                 <app-data-table
@@ -135,6 +136,9 @@
                   [loading]="false"
                   [searchFields]="tableSearchFields"
                   [exportFileName]="tableExportFileName()"
+                  [selectable]="true"
+                  [selectedKey]="selectedId() === null ? null : '' + selectedId()"
+                  (rowSelected)="selectTableRow($event)"
                   searchPlaceholder="Search code, name, acronym, director or delegates"
                   emptyMessage="No entries found."
                   data-testid="table-view">
@@ -145,6 +149,11 @@
 
           <aside
             class="flex min-w-0 basis-[40%] flex-col rounded-lg border border-[var(--ac-grey-200)] bg-white p-4"
+            [style.position]="'sticky'"
+            [style.overflow-y]="'auto'"
+            [style.align-self]="'flex-start'"
+            [style.top.px]="panelTop()"
+            [style.max-height]="panelMaxHeight()"
             aria-label="Entry details"
             data-testid="detail-panel">
             @if (years(); as range) {

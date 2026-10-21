@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, ContentChild, Input, signal, TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, ContentChild, EventEmitter, Input, Output, signal, TemplateRef } from '@angular/core';
 import { TableModule, TablePageEvent } from 'primeng/table';
 import { CustomProgressBarComponent } from '../custom-progress-bar/custom-progress-bar.component';
 import { naturalCompare } from '@shared/utils/natural-compare.util';
@@ -61,6 +61,13 @@ export class DataTableComponent<T extends object> {
   @Input() emptyMessage = 'No records found.';
   /** Fields the local search box filters over (design §6.3 "search fields"). */
   @Input() searchFields: (keyof T & string)[] = [];
+  /**
+   * Opt-in row selection (organizational-structure D-ORG-20): when `selectable`, a row click emits
+   * `rowSelected`, and the row whose `id` equals `selectedKey` is highlighted. Off by default.
+   */
+  @Input() selectable = false;
+  @Input() selectedKey: string | null = null;
+  @Output() rowSelected = new EventEmitter<T>();
 
   // Row-actions slot (design §6.3 "an actions template"). The parent projects
   // `<ng-template #rowActions let-row>…</ng-template>` as content of <app-data-table>.
@@ -152,6 +159,15 @@ export class DataTableComponent<T extends object> {
 
   badgeLabel(value: unknown): string {
     return value ? 'Active' : 'Inactive';
+  }
+
+  isSelected(row: T): boolean {
+    const key = (row as Record<string, unknown>)['id'];
+    return this.selectedKey !== null && key !== undefined && String(key) === this.selectedKey;
+  }
+
+  onRowClick(row: T): void {
+    if (this.selectable) this.rowSelected.emit(row);
   }
 
   cellValue(row: T, column: DataTableColumn<T>): unknown {

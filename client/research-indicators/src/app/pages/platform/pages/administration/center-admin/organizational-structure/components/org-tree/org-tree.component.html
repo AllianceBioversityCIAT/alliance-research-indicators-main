@@ -14,6 +14,7 @@
       [ttRow]="rowNode"
       class="org-tree-row cursor-pointer"
       [class.org-tree-row--selected]="rowData.row.id === selectedId"
+      [attr.aria-selected]="rowData.row.id === selectedId"
       [class.org-tree-row--ended]="rowData.ended"
       (click)="select(rowData.row)"
       (keydown.enter)="select(rowData.row)"
