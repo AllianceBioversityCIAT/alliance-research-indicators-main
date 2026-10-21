@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-4" data-testid="pfm-coverage-tab">
-  <app-pfm-progress-card [counts]="counts()" [scope]="scope()" />
+  <app-pfm-progress-card [counts]="counts()" />
   <app-pfm-next-steps-card [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
     <app-pfm-sp-coverage-card [rows]="summary().sp_coverage" [scope]="scope()" (openSp)="openQueue.emit({ sp: $event })" />

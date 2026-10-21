@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
-import { PfmChipCounts, PfmScope } from '../../pfm.interfaces';
+import { PfmChipCounts } from '../../pfm.interfaces';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -19,7 +19,6 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 export class PfmProgressCardComponent {
   /** Quick-view counts of the scope: `synced` + `no_sp` = done, `attention` = still on us. */
   counts = input.required<PfmChipCounts>();
-  scope = input.required<PfmScope>();
 
   /** Done is ONE part in the palette's green (owner): in PRMS and no SP contribution are one total. */
   readonly doneFill = PFM_STATE.done.fill;
@@ -41,12 +40,11 @@ export class PfmProgressCardComponent {
       percent,
       complete: total > 0 && left === 0,
       // Inside the green part when it is wide enough for "100%", else right after it.
-      labelInside: percent >= 12,
+      labelInside: percent >= 15,
       doneWidth: total ? `${(done / total) * 100}%` : '0%',
       doneTip: `${plural(done, 'result', 'results')} done: ${synced} in PRMS and ${noSp} with no SP contribution.`,
       leftTip: `${plural(left, 'result still needs', 'results still need')} action.`
     };
   });
 
-  whose = computed(() => (this.scope() === 'all' ? 'all contributing projects' : 'your projects'));
 }

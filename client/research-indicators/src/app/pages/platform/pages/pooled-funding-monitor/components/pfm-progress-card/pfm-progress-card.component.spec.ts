@@ -4,11 +4,10 @@ import { PfmChipCounts } from '../../pfm.interfaces';
 
 const counts = (synced: number, attention: number, noSp = 0): PfmChipCounts => ({ all: synced + attention + noSp, attention, mapping: 0, ready: 0, prms_rejected: 0, synced, no_sp: noSp });
 
-function render(c: PfmChipCounts, scope: 'all' | 'mine' = 'mine') {
+function render(c: PfmChipCounts) {
   TestBed.configureTestingModule({ imports: [PfmProgressCardComponent] });
   const fixture = TestBed.createComponent(PfmProgressCardComponent);
   fixture.componentRef.setInput('counts', c);
-  fixture.componentRef.setInput('scope', scope);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
@@ -25,7 +24,8 @@ describe('PfmProgressCardComponent', () => {
     expect(q('pfm-progress-count')).toBeNull();
     const all = Array.from(q('pfm-progress-card')?.querySelectorAll('[data-testid]') ?? []);
     expect(all.indexOf(q('pfm-progress-legend')!)).toBeLessThan(all.indexOf(q('pfm-progress-bar')!));
-    expect(text('pfm-progress-message')).toBe('Results of your projects already done: in PRMS or with no SP contribution.');
+    // Owner: no subtitle; the legend and the tooltips say what done means.
+    expect(q('pfm-progress-message')).toBeNull();
     const legend = Array.from(q('pfm-progress-legend')!.children).map(c => c.textContent?.trim());
     expect(legend).toEqual(['Done: in PRMS or no SP contribution', 'Still to do']);
   });
@@ -52,9 +52,8 @@ describe('PfmProgressCardComponent', () => {
   });
 
   it('at 100% the bar is all done: no "still to do" part', () => {
-    const { q, text } = render(counts(40, 0, 10), 'all');
+    const { q, text } = render(counts(40, 0, 10));
     expect(text('pfm-progress-percent')).toBe('100%');
-    expect(text('pfm-progress-message')).toBe('Everything for all contributing projects is done: in PRMS or with no SP contribution.');
     expect(q('pfm-progress-left')).toBeNull();
   });
 
