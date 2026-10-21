@@ -20,7 +20,7 @@ Before any TIP result is pushed to PRMS (child 3), STAR must be able to tell a T
 
 This spec makes the sync log, the decision history, the webhook matching and the reference sent to PRMS carry the platform — and fixes the phase-1 defect that hides the Pool Funding section on TIP results in the STAR client.
 
-STAR behavior does not change: STAR rows are backfilled as `STAR`, and STAR keeps sending the bare code.
+STAR behavior does not change: existing STAR rows are backfilled as `STAR` (design §5 gives the exact rules), and STAR keeps sending the bare code.
 
 ## 2. Glossary
 
@@ -68,8 +68,8 @@ The sync log and the decision history SHALL store the platform of the result eac
 - GIVEN the tables hold rows written before this change
 - WHEN the migration runs
 - THEN every existing sync-log row reads platform `STAR`
-- AND every existing history row whose code is a plain number reads `STAR`
-- BUT a history row whose reference never matched a result (no plain-number code) keeps no platform
+- AND every existing history row that was correlated to a result, or was sent by STAR with a numeric code, reads `STAR`
+- BUT a history row whose reference never matched a result keeps no platform
 - AND IT MUST be reversible (the down migration removes the column and its index without losing other data)
 
 #### Scenario: New push row
@@ -175,8 +175,8 @@ The STAR client SHALL request and show the Pool Funding alignment for TIP result
 
 ## 8. Data requirements
 
-- `result_prms_sync_log`: add `platform_code` (`varchar(50)`, as `results.platform_code`), not null, backfilled `STAR`.
-- `result_prms_sync_history`: add `platform_code`, nullable (an uncorrelated inbound reference has no platform); backfilled `STAR` where the stored code is a plain number.
+- `result_prms_sync_log`: add `platform_code` (`varchar(50)`, as `results.platform_code`), not null; backfilled from the result each row names (STAR when STAR is among the matches or nothing matches) — exact rule in design §5.
+- `result_prms_sync_history`: add `platform_code`, nullable (an uncorrelated inbound reference has no platform); backfilled `STAR` for correlated rows and for STAR-sent rows with a canonical numeric code, NULL otherwise — exact rule in design §5.
 - Indexes: the current `(code, year)` indexes become `(platform_code, code, year)`.
 - Migration: `<timestamp>-addPlatformCodeToPrmsSyncTables.ts`. No data correction beyond the backfill.
 

@@ -3,7 +3,7 @@
 - **Target:** `design.md` (+ `requirements.md`, `../family.md`) at commit `b7aa52e97` (immutable)
 - **Judges:** A and B, blind, read-only, Explore on Sonnet (author: Opus — author ≠ auditor)
 - **Round 1 verdicts:** A FAIL · B FAIL
-- **Status:** round 1 — awaiting owner approval for the round-one fix
+- **Status:** round 2 fix applied (final round per the two-round ceiling); final scoped re-judgment pending
 
 ## Frozen ledger (round 1)
 
@@ -23,3 +23,24 @@
 | J-12 | info | suggestion | `prms-webhook.e2e-spec.ts` builds its own history table and needs the column; budget has no task breakdown yet; §6 interceptor wording (platform comes from the page URL) | F-13 | F-9, F-10 |
 
 Counts: confirmed severe 2 (+1 with split severity) · suspect 1 · contradiction 0 · info 9.
+
+## Round 1 — fix (owner-approved "Corregir y re-juzgar") and scoped re-judgment
+
+- **Fix delta:** `b7aa52e97..c680b609` — J-1/J-2/J-3 fixed; J-4 settled by a read-only Dev query (P-19); J-5…J-11 incorporated; J-12 partly.
+- **Re-judgment:** A **FAIL** · B **PASS**. Both: J-1, J-2, J-3, J-5, J-6, J-7, J-10, J-11 resolved; J-4 partly.
+
+| ID | Kind | Severity | Fix-caused finding | Judge A | Judge B |
+| --- | --- | --- | --- | --- | --- |
+| N-1 | confirmed (severity split) | severe (A) / warning (B) | `requirements.md` :23, :178-179 still state the old backfill rules — contradicts design §5 | N-1 | N-2 |
+| N-2 | confirmed | warning / suggestion | Log backfill can tag a row TIP while its `external_reference` stays bare → readers miss it | N-4 | N-1 |
+| N-3 | confirmed | warning / suggestion | History backfill `event_source='STAR'` tags a non-numeric code STAR — conflicts with "never matched → no platform" | N-3 | N-4 |
+| N-4 | resolved by Leader check | warning (A) | P-20 did not show TIP sets `manageOfficialCode` — it does: `tip-integration.service.ts:207` | N-2 | (J-8 yes, same citation) |
+| N-5 | info | suggestion | §4 tree label, P-9 `\|` rendering, P-3 stale "D-3 backfill regex" | N-5 | N-3 |
+
+## Round 2 — final fix
+
+- N-1: requirements §1, §8 and the R-PPI-001 scenario aligned with design §5.
+- N-2: a backfilled non-STAR log row also gets `external_reference = prmsRef(platform, code)`.
+- N-3: history STAR-sent rows need a canonical numeric code; otherwise NULL.
+- N-4: P-20 cites `tip-integration.service.ts:207`.
+- N-5: tree label, escape note, P-3 cell fixed; off-by-one ranges corrected (P-1, P-12, §7.3).
