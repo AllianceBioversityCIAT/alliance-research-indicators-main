@@ -22,7 +22,11 @@ const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: st
 ];
 
 /** Views reachable from the coverage tab that are not shown as quick views. */
-const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = { rejected: 'Rejected by PRMS' };
+const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
+  rejected: 'Rejected by PRMS',
+  awaiting_pi: 'Pending approval by the PI',
+  no_sp_contribution: 'No SP contribution'
+};
 
 /** Legend of the PRMS bar colors (R-PFM-015). */
 const LEGEND = [

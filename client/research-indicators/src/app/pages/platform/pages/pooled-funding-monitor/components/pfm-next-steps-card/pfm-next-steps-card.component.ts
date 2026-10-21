@@ -1,6 +1,6 @@
-// Coverage tab, "What to do next": the three things left on our side, each one a quick view.
-// Together they are exactly Need attention (Mapping pending + Ready to sync + Rejected), and a
-// click opens the Results queue on that quick view.
+// Coverage tab, "What to do next": the things left on our side, in the order they happen (PI
+// approval, mapping, sync). A click opens the Results queue on that view. A result can be in more
+// than one card (e.g. not approved yet AND mapping pending), so the cards do not add up.
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { PFM_STATE, PfmStateKey } from '@shared/constants/pfm-status-colors';
@@ -17,6 +17,14 @@ interface NextStep {
 
 export const PFM_NEXT_STEPS: NextStep[] = [
   {
+    chip: 'awaiting_pi',
+    count: 'awaiting_pi',
+    title: 'Pending approval by the PI',
+    hint: 'Not approved in STAR yet: the PI needs to approve them.',
+    state: 'waiting',
+    icon: 'pi-user'
+  },
+  {
     chip: 'mapping_incomplete',
     count: 'mapping',
     title: 'Finish the mapping',
@@ -31,14 +39,6 @@ export const PFM_NEXT_STEPS: NextStep[] = [
     hint: 'Their mapping is complete: they can be synced now.',
     state: 'ready',
     icon: 'pi-send'
-  },
-  {
-    chip: 'rejected',
-    count: 'prms_rejected',
-    title: 'Fix and send again',
-    hint: 'PRMS returned them. Check the reason and sync again.',
-    state: 'alert',
-    icon: 'pi-replay'
   }
 ];
 
@@ -55,7 +55,7 @@ export class PfmNextStepsCardComponent {
   open = output<PfmChip>();
 
   steps = computed(() =>
-    PFM_NEXT_STEPS.map(s => ({ ...s, value: this.counts()[s.count], fg: PFM_STATE[s.state].fg, fill: PFM_STATE[s.state].fill }))
+    PFM_NEXT_STEPS.map(s => ({ ...s, value: this.counts()[s.count] ?? 0, fg: PFM_STATE[s.state].fg, fill: PFM_STATE[s.state].fill }))
   );
   allDone = computed(() => this.steps().every(s => s.value === 0));
 }

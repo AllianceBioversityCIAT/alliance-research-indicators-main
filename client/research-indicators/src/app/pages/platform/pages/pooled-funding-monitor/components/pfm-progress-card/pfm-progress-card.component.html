@@ -8,63 +8,34 @@
     @if (p.total === 0) {
       Nothing to report yet for {{ whose() }}.
     } @else if (p.complete) {
-      Everything for {{ whose() }} is in PRMS.
+      Everything for {{ whose() }} is done: in PRMS or with no SP contribution.
     } @else {
-      Share of the results of {{ whose() }} already in PRMS. Click the bar to see them.
+      Results of {{ whose() }} already done: in PRMS or with no SP contribution. Click the bar to see them.
     }
   </p>
 
-  <!-- Badge + thick bar + marker. The two parts of the bar are the click targets (no extra buttons). -->
-  <div class="relative mt-8 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% in PRMS'">
+  <!-- Badge + one thick bar. The parts of the bar are the click targets (no extra buttons). -->
+  <div class="relative mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
     <div
       class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full border-[4px] border-solid border-[color:var(--ac-pfm-surface)] text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)] shadow-[0_0_0_3px_var(--ac-pfm-accent-navy)]"
       [style.background-color]="navy"
       data-testid="pfm-progress-percent">
       {{ p.percent }}%
     </div>
-
-    <div class="relative -ml-6 flex h-[30px] flex-1 overflow-visible rounded-r-full py-[3px] pl-[27px] pr-[3px]" [style.background-color]="emptyFill">
-      @if (p.synced > 0) {
+    <div class="relative -ml-6 flex h-[30px] flex-1 rounded-r-full py-[3px] pl-[27px] pr-[3px]" [style.background-color]="emptyFill">
+      @for (part of p.parts; track part.chip; let last = $last) {
         <button
           type="button"
-          class="h-full cursor-pointer rounded-r-full border-0 p-0 transition-opacity duration-200 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          [style.width]="p.width"
-          [style.background-color]="navy"
-          [pTooltip]="syncedTip()"
+          class="h-full cursor-pointer border-0 p-0 transition-opacity duration-200 hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 {{ last || p.parts[$index + 1]?.color === null ? 'rounded-r-full' : '' }} {{ part.color ? '' : 'bg-transparent hover:bg-[color-mix(in_srgb,var(--ac-pfm-accent-navy)_8%,transparent)]' }}"
+          [style.width]="part.color ? part.width : null"
+          [class.flex-1]="!part.color"
+          [style.background-color]="part.color"
+          [pTooltip]="part.tip"
           tooltipPosition="top"
-          [attr.aria-label]="syncedTip()"
-          data-testid="pfm-progress-open-synced"
-          (click)="open.emit('synced')"></button>
-      }
-      @if (p.left > 0) {
-        <button
-          type="button"
-          class="h-full flex-1 cursor-pointer rounded-r-full border-0 bg-transparent p-0 transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--ac-pfm-accent-navy)_8%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          [pTooltip]="leftTip()"
-          tooltipPosition="top"
-          [attr.aria-label]="leftTip()"
-          data-testid="pfm-progress-open-attention"
-          (click)="open.emit('need_attention')"></button>
-      }
-      @if (p.synced > 0 && p.left > 0) {
-        <!-- Marker at the end of what is done -->
-        <span
-          class="pointer-events-none absolute -top-[30px] flex -translate-x-1/2 flex-col items-center"
-          [style.left]="markerLeft()"
-          aria-hidden="true"
-          data-testid="pfm-progress-marker">
-          <span class="h-[22px] w-[22px] rounded-full border-[4px] border-solid" [style.border-color]="pinFill" [style.background-color]="pinFg"></span>
-          <span class="-mt-[2px] h-0 w-0 border-x-[6px] border-t-[9px] border-solid border-x-transparent" [style.border-top-color]="pinFill"></span>
-        </span>
+          [attr.aria-label]="part.tip"
+          [attr.data-testid]="part.testId"
+          (click)="open.emit(part.chip)"></button>
       }
     </div>
   </div>
-
-  @if (outOfScope() > 0) {
-    <p class="m-0 mt-4 text-[13px] text-[var(--ac-pfm-neutral-fg)]">
-      <span class="cursor-help" tabindex="0" [pTooltip]="help.outOfScope" tooltipEvent="both" tooltipPosition="top" data-testid="pfm-progress-out"
-        >{{ outOfScope() | number }} out of scope · no action needed</span
-      >
-    </p>
-  }
 </section>

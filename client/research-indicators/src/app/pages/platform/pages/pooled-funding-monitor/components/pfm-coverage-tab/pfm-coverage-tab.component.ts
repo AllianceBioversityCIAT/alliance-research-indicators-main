@@ -38,7 +38,8 @@ export class PfmCoverageTabComponent {
         mapping: 0,
         ready: 0,
         prms_rejected: 0,
-        synced: s.kpis.synced
+        synced: s.kpis.synced,
+        no_sp: s.pipeline.out_of_scope
       }
     );
   });
