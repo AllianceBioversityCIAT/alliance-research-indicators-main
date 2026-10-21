@@ -1,26 +1,18 @@
 // Coverage tab, first card: how many results already have a decision (in PRMS, or declared no SP
-// contribution), as one bar. The bar is the click target: each part opens the Results queue on that
-// view (Synced / No SP contribution / Need attention), which together partition every result.
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+// contribution), as one bar of two parts: done (one total) and still to do. Each part explains itself
+// in a tooltip; the actions live in "What to do next".
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
-import { PfmChip, PfmChipCounts, PfmScope } from '../../pfm.interfaces';
-
-interface BarPart {
-  chip: PfmChip;
-  value: number;
-  width: string;
-  color: string | null;
-  tip: string;
-  testId: string;
-}
+import { PfmChipCounts, PfmScope } from '../../pfm.interfaces';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 @Component({
   selector: 'app-pfm-progress-card',
-  imports: [TooltipModule, PfmEmptyStateComponent],
+  imports: [DecimalPipe, TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-progress-card.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -29,14 +21,10 @@ export class PfmProgressCardComponent {
   /** Quick-view counts of the scope: `synced` + `no_sp` = done, `attention` = still on us. */
   counts = input.required<PfmChipCounts>();
   scope = input.required<PfmScope>();
-  /** Opens the Results queue on that view. */
-  open = output<PfmChip>();
 
-  /**
-   * Done is ONE colour, the palette's green (owner): in PRMS and no SP contribution look the same;
-   * they stay two click targets with their own tooltip.
-   */
+  /** Done is ONE part in the palette's green (owner): in PRMS and no SP contribution are one total. */
   readonly doneFill = PFM_STATE.done.fill;
+  readonly doneFg = PFM_STATE.done.fg;
   readonly emptyFill = PFM_STATE_EMPTY;
 
   progress = computed(() => {
@@ -47,13 +35,16 @@ export class PfmProgressCardComponent {
     const total = done + left;
     // Floor, so 99.6% never reads as finished while something is still left.
     const percent = total === 0 ? 0 : left === 0 ? 100 : Math.floor((done / total) * 100);
-    const pct = (n: number) => (total ? `${(n / total) * 100}%` : '0%');
-    const parts: BarPart[] = [
-      { chip: 'synced', value: synced, width: pct(synced), color: this.doneFill, tip: `${plural(synced, 'result', 'results')} in PRMS. Click to see them.`, testId: 'pfm-progress-open-synced' },
-      { chip: 'no_sp_contribution', value: noSp, width: pct(noSp), color: this.doneFill, tip: `${plural(noSp, 'result', 'results')} with no SP contribution: nothing to do. Click to see them.`, testId: 'pfm-progress-open-no-sp' },
-      { chip: 'need_attention', value: left, width: pct(left), color: null, tip: `${plural(left, 'result needs', 'results need')} action. Click to see them.`, testId: 'pfm-progress-open-attention' }
-    ];
-    return { done, left, total, percent, complete: total > 0 && left === 0, parts: parts.filter(p => p.value > 0) };
+    return {
+      done,
+      left,
+      total,
+      percent,
+      complete: total > 0 && left === 0,
+      doneWidth: total ? `${(done / total) * 100}%` : '0%',
+      doneTip: `${plural(done, 'result', 'results')} done: ${synced} in PRMS and ${noSp} with no SP contribution.`,
+      leftTip: `${plural(left, 'result still needs', 'results still need')} action.`
+    };
   });
 
   whose = computed(() => (this.scope() === 'all' ? 'all contributing projects' : 'your projects'));

@@ -11,34 +11,44 @@
     @if (p.complete) {
       Everything for {{ whose() }} is done: in PRMS or with no SP contribution.
     } @else {
-      Results of {{ whose() }} already done: in PRMS or with no SP contribution. Click the bar to see them.
+      Results of {{ whose() }} already done: in PRMS or with no SP contribution.
     }
   </p>
 
-  <!-- Badge + one thick bar. The parts of the bar are the click targets (no extra buttons). -->
-  <!-- isolate: the badge's z-10 only layers it over its own bar, never over the page's sticky header on scroll -->
-  <div class="relative isolate mt-5 flex items-center" data-testid="pfm-progress-bar" role="group" [attr.aria-label]="p.percent + '% done'">
-    <div
-      class="relative z-10 flex h-[72px] w-[72px] flex-none items-center justify-center rounded-full text-[22px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)]"
-      [style.background-color]="doneFill"
-      data-testid="pfm-progress-percent">
-      {{ p.percent }}%
-    </div>
-    <div class="relative -ml-6 flex h-[30px] flex-1 rounded-r-full py-[3px] pl-[18px] pr-[3px]" [style.background-color]="emptyFill">
-      @for (part of p.parts; track part.chip; let last = $last) {
-        <button
-          type="button"
-          class="h-full cursor-pointer border-0 p-0 transition-opacity duration-200 hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 {{ last || p.parts[$index + 1]?.color === null ? 'rounded-r-full' : '' }} {{ part.color ? '' : 'bg-transparent hover:bg-[color-mix(in_srgb,var(--ac-pfm-accent-navy)_8%,transparent)]' }}"
-          [style.width]="part.color ? part.width : null"
-          [class.flex-1]="!part.color"
-          [style.background-color]="part.color"
-          [pTooltip]="part.tip"
-          tooltipPosition="top"
-          [attr.aria-label]="part.tip"
-          [attr.data-testid]="part.testId"
-          (click)="open.emit(part.chip)"></button>
-      }
-    </div>
+  <!-- Same language as the cards below: the figure, one rounded bar, a dot legend. Done is ONE part (in PRMS + no SP contribution). -->
+  <p class="m-0 mt-4 flex items-baseline gap-2">
+    <span class="text-[32px] font-bold leading-none tabular-nums" [style.color]="doneFg" data-testid="pfm-progress-percent">{{ p.percent }}%</span>
+    <span class="text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-progress-count">{{ p.done | number }} of {{ p.total | number }} results done</span>
+  </p>
+  <div class="mt-3 flex h-[18px] w-full overflow-hidden rounded-md" [style.background-color]="emptyFill" data-testid="pfm-progress-bar">
+    @if (p.done) {
+      <span
+        class="block h-full"
+        tabindex="0"
+        role="img"
+        [style.width]="p.doneWidth"
+        [style.background-color]="doneFill"
+        [pTooltip]="p.doneTip"
+        tooltipEvent="both"
+        tooltipPosition="top"
+        [attr.aria-label]="p.doneTip"
+        data-testid="pfm-progress-done"></span>
+    }
+    @if (p.left) {
+      <span
+        class="block h-full flex-1"
+        tabindex="0"
+        role="img"
+        [pTooltip]="p.leftTip"
+        tooltipEvent="both"
+        tooltipPosition="top"
+        [attr.aria-label]="p.leftTip"
+        data-testid="pfm-progress-left"></span>
+    }
   </div>
+  <p class="m-0 mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-progress-legend">
+    <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-[4px]" [style.background-color]="doneFill" aria-hidden="true"></span>Done: in PRMS or no SP contribution</span>
+    <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-[4px]" [style.background-color]="emptyFill" aria-hidden="true"></span>Still to do</span>
+  </p>
   }
 </section>
