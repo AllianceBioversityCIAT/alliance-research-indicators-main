@@ -7,9 +7,7 @@
   <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS plus those with no SP contribution. Click a slice to see them.</p>
 
   @if (s.total === 0) {
-    <p class="m-0 mt-4 rounded-lg bg-[var(--ac-pfm-neutral-bg)] p-3 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-prms-status-empty">
-      Nothing in PRMS yet.
-    </p>
+    <app-pfm-empty-state data-testid="pfm-prms-status-empty" />
   } @else {
     <div class="mt-4 flex justify-center">
       <svg viewBox="0 0 120 120" class="h-[170px] w-[170px] -rotate-90" role="img" [attr.aria-label]="s.total + ' results in PRMS or with no SP contribution'" data-testid="pfm-prms-donut">

@@ -51,7 +51,13 @@ describe('PfmNextStepsCardComponent', () => {
 
   it('all done: one line, no cards', () => {
     const { q, el } = render({ ...COUNTS, mapping: 0, ready: 0, awaiting_pi: 0 });
-    expect(q('pfm-next-steps-done')?.textContent?.trim()).toBe('Nothing left to do on our side.');
+    expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing left to do on our side');
+    expect(el.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('no results at all: the shared "Nothing yet" state, no cards', () => {
+    const { el } = render({ all: 0, attention: 0, mapping: 0, ready: 0, prms_rejected: 0, synced: 0, awaiting_pi: 0, no_sp: 0 });
+    expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing yet');
     expect(el.querySelectorAll('button')).toHaveLength(0);
   });
 });

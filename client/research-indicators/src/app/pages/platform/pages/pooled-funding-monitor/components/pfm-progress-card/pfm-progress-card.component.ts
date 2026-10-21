@@ -4,6 +4,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmChip, PfmChipCounts, PfmScope } from '../../pfm.interfaces';
 
 interface BarPart {
@@ -19,7 +20,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 @Component({
   selector: 'app-pfm-progress-card',
-  imports: [TooltipModule],
+  imports: [TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-progress-card.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush

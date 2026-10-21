@@ -75,10 +75,11 @@ describe('PfmProgressCardComponent', () => {
     expect(q('pfm-progress-open-attention')).not.toBeNull();
   });
 
-  it('nothing to report: 0%, no division by zero, nothing to click', () => {
-    const { el, text } = render(counts(0, 0));
-    expect(text('pfm-progress-percent')).toBe('0%');
-    expect(text('pfm-progress-message')).toBe('Nothing to report yet for your projects.');
+  it('nothing to report: the shared "Nothing yet" state, no badge, no bar, nothing to click', () => {
+    const { el, q } = render(counts(0, 0));
+    expect(q('pfm-empty-state')?.textContent?.trim()).toBe('Nothing yet');
+    expect(q('pfm-progress-percent')).toBeNull();
+    expect(q('pfm-progress-bar')).toBeNull();
     expect(el.querySelectorAll('button')).toHaveLength(0);
   });
 

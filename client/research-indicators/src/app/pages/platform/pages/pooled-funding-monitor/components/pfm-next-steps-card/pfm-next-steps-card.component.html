@@ -3,8 +3,10 @@
   data-testid="pfm-next-steps-card"
   aria-labelledby="pfm-next-steps-title">
   <h2 id="pfm-next-steps-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">What to do next</h2>
-  @if (allDone()) {
-    <p class="m-0 mt-2 text-[14px] text-[var(--ac-grey-900)]" data-testid="pfm-next-steps-done">Nothing left to do on our side.</p>
+  @if (counts().all === 0) {
+    <app-pfm-empty-state />
+  } @else if (allDone()) {
+    <app-pfm-empty-state message="Nothing left to do on our side" data-testid="pfm-next-steps-done" />
   } @else {
     <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Click a card to see those results.</p>
     <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-3">

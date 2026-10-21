@@ -86,4 +86,25 @@ describe('PfmCoverageTabComponent', () => {
     expect(q('pfm-progress-open-synced')?.getAttribute('aria-label')).toBe('11 results in PRMS. Click to see them.');
     expect(q('pfm-progress-open-attention')?.getAttribute('aria-label')).toBe('7 results need action. Click to see them.');
   });
+
+  // Owner: an empty monitor must look the same everywhere.
+  it('with no results every card shows the same "Nothing yet" state', () => {
+    const empty: PfmSummary = {
+      ...SUMMARY,
+      kpis: { projects: 0, projects_total: 0, monitored: 0, need_attention: 0, synced: 0, in_prms_scope: 0 },
+      pipeline: { total: 0, in_scope: 0, not_synced: 0, in_prms: 0, out_of_scope: 0, stages: [] },
+      sp_coverage: [],
+      monthly: [{ month: '2026-09', synced: 0 }, { month: '2026-10', synced: 0 }],
+      synced_this_year: 0,
+      chip_counts: { all: 0, attention: 0, mapping: 0, ready: 0, prms_rejected: 0, synced: 0, awaiting_pi: 0, no_sp: 0 }
+    };
+    const { el } = render(empty);
+    const states = Array.from(el.querySelectorAll('[data-testid="pfm-empty-state"]')).map(e => e.textContent?.trim());
+    expect(states).toEqual(['Nothing yet', 'Nothing yet', 'Nothing yet', 'Nothing yet', 'Nothing yet']);
+    for (const card of ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card']) {
+      expect(el.querySelector(`[data-testid="${card}"] [data-testid="pfm-empty-state"]`)).not.toBeNull();
+    }
+    expect(el.querySelector('[data-testid="pfm-sync-bars"]')).toBeNull();
+    expect(el.querySelector('[data-testid="pfm-sp-legend"]')).toBeNull();
+  });
 });

@@ -2,6 +2,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmMonthly, PfmScope } from '../../pfm.interfaces';
 
 // Navy scale of the section (owner): the busier the month, the darker its bar. Months are an
@@ -22,7 +23,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 @Component({
   selector: 'app-pfm-sync-activity-card',
-  imports: [DecimalPipe, TooltipModule],
+  imports: [DecimalPipe, TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-sync-activity-card.component.html',
   host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -40,4 +41,6 @@ export class PfmSyncActivityCardComponent {
   });
 
   year = computed(() => this.monthly().at(-1)?.month.slice(0, 4) ?? '');
+  /** Nothing synced in the window or this year: show the shared empty state, not an empty axis. */
+  empty = computed(() => this.syncedThisYear() === 0 && this.monthly().every(m => m.synced === 0));
 }

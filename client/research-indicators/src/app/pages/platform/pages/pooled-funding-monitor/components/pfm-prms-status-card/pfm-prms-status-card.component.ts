@@ -5,6 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, PfmStateKey } from '@shared/constants/pfm-status-colors';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmChip, PfmPipeline } from '../../pfm.interfaces';
 
 interface Slice {
@@ -29,7 +30,7 @@ const C = 2 * Math.PI * R;
 
 @Component({
   selector: 'app-pfm-prms-status-card',
-  imports: [DecimalPipe, TooltipModule],
+  imports: [DecimalPipe, TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-prms-status-card.component.html',
   host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush

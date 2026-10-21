@@ -4,6 +4,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { PFM_STATE, PfmStateKey } from '@shared/constants/pfm-status-colors';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmChip, PfmChipCounts } from '../../pfm.interfaces';
 
 interface NextStep {
@@ -44,7 +45,7 @@ export const PFM_NEXT_STEPS: NextStep[] = [
 
 @Component({
   selector: 'app-pfm-next-steps-card',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, PfmEmptyStateComponent],
   templateUrl: './pfm-next-steps-card.component.html',
   host: { class: 'block' },
   changeDetection: ChangeDetectionStrategy.OnPush

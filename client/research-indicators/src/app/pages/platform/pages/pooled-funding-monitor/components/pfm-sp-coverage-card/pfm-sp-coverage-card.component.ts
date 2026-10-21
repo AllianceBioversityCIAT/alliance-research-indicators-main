@@ -2,12 +2,13 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PFM_HELP } from '../../pfm-help';
 import { PfmScope, PfmSpCoverage } from '../../pfm.interfaces';
 
 @Component({
   selector: 'app-pfm-sp-coverage-card',
-  imports: [TooltipModule],
+  imports: [TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-sp-coverage-card.component.html',
   host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush

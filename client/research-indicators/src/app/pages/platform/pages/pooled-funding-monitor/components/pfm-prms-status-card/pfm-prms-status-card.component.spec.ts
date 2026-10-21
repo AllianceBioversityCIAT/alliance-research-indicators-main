@@ -81,9 +81,9 @@ describe('PfmPrmsStatusCardComponent', () => {
     expect((q('pfm-prms-legend-rejected') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('nothing in PRMS yet: one line, no donut', () => {
+  it('nothing in PRMS yet: the shared "Nothing yet" state, no donut', () => {
     const { q } = render(pipe(0, 0, 0, 0));
-    expect(q('pfm-prms-status-empty')?.textContent?.trim()).toBe('Nothing in PRMS yet.');
+    expect(q('pfm-empty-state')?.textContent?.trim()).toBe('Nothing yet');
     expect(q('pfm-prms-donut')).toBeNull();
   });
 });

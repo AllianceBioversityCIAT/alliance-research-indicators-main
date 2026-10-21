@@ -4,10 +4,11 @@
   aria-labelledby="pfm-progress-title">
   @let p = progress();
   <h2 id="pfm-progress-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Reported to PRMS</h2>
+  @if (p.total === 0) {
+    <app-pfm-empty-state />
+  } @else {
   <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-progress-message">
-    @if (p.total === 0) {
-      Nothing to report yet for {{ whose() }}.
-    } @else if (p.complete) {
+    @if (p.complete) {
       Everything for {{ whose() }} is done: in PRMS or with no SP contribution.
     } @else {
       Results of {{ whose() }} already done: in PRMS or with no SP contribution. Click the bar to see them.
@@ -39,4 +40,5 @@
       }
     </div>
   </div>
+  }
 </section>
