@@ -47,6 +47,7 @@ describe('AppConfig', () => {
     process.env.ARI_SEE_ALL_LOGS = 'true';
     process.env.ARI_JWT_ACCESS_EXPIRES_IN = '2h';
     process.env.ARI_CLARISA_HOST = 'clarisa';
+    process.env.ARI_AGROVOC_URL = 'https://agrovoc.fao.org/';
     process.env.ARI_CLARISA_USER = 'cu';
     process.env.ARI_CLARISA_PASS = 'cp';
     process.env.ARI_MYSQL_HOST = 'mh';
@@ -100,6 +101,7 @@ describe('AppConfig', () => {
     expect(cfg.ARI_SEE_ALL_LOGS).toBe(true);
     expect(cfg.ARI_JWT_ACCESS_EXPIRES_IN).toBe('2h');
     expect(cfg.ARI_CLARISA_HOST).toBe('clarisa');
+    expect(cfg.ARI_AGROVOC_URL).toBe('https://agrovoc.fao.org/');
     expect(cfg.ARI_CLARISA_USER).toBe('cu');
     expect(cfg.ARI_CLARISA_PASS).toBe('cp');
     expect(cfg.ARI_MYSQL_HOST).toBe('mh');

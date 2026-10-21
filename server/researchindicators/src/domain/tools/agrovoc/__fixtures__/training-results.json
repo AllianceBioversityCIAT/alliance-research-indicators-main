@@ -1,0 +1,131 @@
+[
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_37835",
+    "type": ["skos:Concept"],
+    "prefLabel": "agricultural training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_442",
+    "type": ["skos:Concept"],
+    "prefLabel": "animal training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9000068",
+    "type": ["skos:Concept"],
+    "prefLabel": "gender training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9cce007c",
+    "type": ["skos:Concept"],
+    "prefLabel": "oblique training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_abc5defb",
+    "type": ["skos:Concept"],
+    "prefLabel": "e-learning",
+    "lang": "en",
+    "altLabel": "online training",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_5983",
+    "type": ["skos:Concept"],
+    "prefLabel": "plant training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9000150",
+    "type": ["skos:Concept"],
+    "prefLabel": "skill training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9000150",
+    "type": ["skos:Concept"],
+    "prefLabel": "skill training",
+    "lang": "en",
+    "altLabel": "skills training",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_37910",
+    "type": ["skos:Concept"],
+    "prefLabel": "teacher training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_7861",
+    "type": ["skos:Concept"],
+    "prefLabel": "training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_28781",
+    "type": ["skos:Concept"],
+    "prefLabel": "training centres",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_7862",
+    "type": ["skos:Concept"],
+    "prefLabel": "training courses",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9000168",
+    "type": ["skos:Concept"],
+    "prefLabel": "training materials",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_24094",
+    "type": ["skos:Concept"],
+    "prefLabel": "training programmes",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_9000169",
+    "type": ["skos:Concept"],
+    "prefLabel": "training strategies",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_58b8f66e",
+    "type": ["skos:Concept"],
+    "prefLabel": "vertical training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_8285",
+    "type": ["skos:Concept"],
+    "prefLabel": "vocational training",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_abc5defb",
+    "type": ["skos:Concept"],
+    "prefLabel": "e-learning",
+    "lang": "en",
+    "altLabel": "Web-based training",
+    "vocab": "agrovoc"
+  }
+]

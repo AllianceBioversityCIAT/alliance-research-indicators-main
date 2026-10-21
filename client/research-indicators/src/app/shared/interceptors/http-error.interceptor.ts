@@ -113,6 +113,11 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // toast back. 401 and 409 are already excluded globally below.
         const isPrmsSyncError = req.url.includes('/prms-sync');
 
+        // The keywords field owns the AGROVOC error message (R-AGV-005).
+        // URL only, like isPrmsSyncError: any status here would otherwise
+        // stack a generic toast on the inline "unavailable" state.
+        const isAgrovocSearchError = req.url.includes('tools/agrovoc');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -121,7 +126,8 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isAiFormalizeError &&
           !isPoolFundingTagValidationError &&
           !isPoolFundingAlignmentValidationError &&
-          !isPrmsSyncError
+          !isPrmsSyncError &&
+          !isAgrovocSearchError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`
