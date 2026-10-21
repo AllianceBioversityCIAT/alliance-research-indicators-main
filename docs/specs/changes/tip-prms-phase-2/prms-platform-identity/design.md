@@ -2,7 +2,7 @@
 
 - **Module:** prms-sync + prms-webhook (server) · bilateral read path (client)
 - **Spec id:** 2026-10-prms-platform-identity
-- **Status:** draft
+- **Status:** approved (2026-10-21)
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked TRD section:** ../../../../trd/trd.md (integrations — PRMS Normalizer; result lifecycle)

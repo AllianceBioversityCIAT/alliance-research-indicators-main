@@ -2,7 +2,7 @@
 
 - **Module:** prms-sync (server) + bilateral (client read)
 - **Spec id:** 2026-10-prms-platform-identity
-- **Status:** draft
+- **Status:** approved (2026-10-21)
 - **Owner:** David Casañas
 - **Linked PRD section:** `docs/prd.md` — PRMS as downstream consumer; external result ingestion (TIP)
 - **Linked tickets:** AC-1761 (phase 2)
