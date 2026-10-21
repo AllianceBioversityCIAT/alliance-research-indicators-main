@@ -10,13 +10,13 @@
     <app-pfm-empty-state message="Nothing left to do on our side" data-testid="pfm-next-steps-done" />
   } @else {
     <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Click a card to see those results.</p>
-    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-3">
+    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-3">
       @for (s of steps(); track s.chip) {
         <li>
           <!-- The whole card is the action: tinted in its state colour, with a bar for its share of all results -->
           <button
             type="button"
-            class="group flex h-full w-full cursor-pointer flex-col gap-3 rounded-xl border border-solid border-transparent p-4 text-left transition-[box-shadow,border-color,transform] duration-200 hover:-translate-y-px hover:shadow-md focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            class="flex h-full w-full cursor-pointer flex-col gap-3 rounded-xl border border-solid border-transparent p-4 text-left focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
             [style.background-color]="s.tint"
             [style.border-color]="s.value ? s.edge : null"
             [disabled]="s.value === 0"
