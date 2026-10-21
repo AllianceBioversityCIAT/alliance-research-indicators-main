@@ -143,8 +143,9 @@ describe('pfm-aggregation', () => {
       expect(stageOf(2)).toBe(PfmStageKeyEnum.READY_TO_SYNC);
       expect(stageOf(5)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
       expect(stageOf(10)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
-      expect(stageOf(3)).toBe(PfmStageKeyEnum.MAPPING_INCOMPLETE);
-      expect(stageOf(9)).toBe(PfmStageKeyEnum.MAPPING_INCOMPLETE);
+      // Started-but-unfinished mappings are Mapping pending too (no separate Incomplete).
+      expect(stageOf(3)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
+      expect(stageOf(9)).toBe(PfmStageKeyEnum.MAPPING_NOT_STARTED);
       expect(stageOf(1)).toBe(PfmStageKeyEnum.READY_TO_SYNC);
       expect(stageOf(7)).toBe(PfmStageKeyEnum.PENDING_REVIEW);
       expect(stageOf(4)).toBe(PfmStageKeyEnum.APPROVED);
@@ -167,8 +168,7 @@ describe('pfm-aggregation', () => {
     it('counts every stage, header figures, and the stages sum to the total', () => {
       const p = buildPfmPipeline(derived);
       expect(p.stages).toEqual([
-        { key: 'mapping_not_started', group: 'in_star', value: 2 },
-        { key: 'mapping_incomplete', group: 'in_star', value: 3 },
+        { key: 'mapping_not_started', group: 'in_star', value: 5 },
         { key: 'ready_to_sync', group: 'in_star', value: 2 },
         { key: 'pending_review', group: 'in_prms', value: 1 },
         { key: 'approved', group: 'in_prms', value: 2 },

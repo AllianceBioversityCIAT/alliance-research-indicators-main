@@ -1,5 +1,4 @@
 import { PfmChipEnum } from '../enum/pfm-chip.enum';
-import { PfmMappingStateEnum } from '../enum/pfm-mapping-state.enum';
 import { PfmPrmsStatusEnum } from '../enum/pfm-prms-status.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import type {
@@ -34,7 +33,6 @@ export const deriveMonitoredRows = (
 
 export enum PfmStageKeyEnum {
   MAPPING_NOT_STARTED = 'mapping_not_started',
-  MAPPING_INCOMPLETE = 'mapping_incomplete',
   READY_TO_SYNC = 'ready_to_sync',
   PENDING_REVIEW = 'pending_review',
   APPROVED = 'approved',
@@ -44,10 +42,9 @@ export enum PfmStageKeyEnum {
 
 export type PfmStageGroup = 'in_star' | 'in_prms' | 'out_of_scope';
 
-/** Display order of the seven stages. */
+/** Display order of the six stages. */
 export const PFM_STAGES: { key: PfmStageKeyEnum; group: PfmStageGroup }[] = [
   { key: PfmStageKeyEnum.MAPPING_NOT_STARTED, group: 'in_star' },
-  { key: PfmStageKeyEnum.MAPPING_INCOMPLETE, group: 'in_star' },
   { key: PfmStageKeyEnum.READY_TO_SYNC, group: 'in_star' },
   { key: PfmStageKeyEnum.PENDING_REVIEW, group: 'in_prms' },
   { key: PfmStageKeyEnum.APPROVED, group: 'in_prms' },
@@ -57,8 +54,8 @@ export const PFM_STAGES: { key: PfmStageKeyEnum; group: PfmStageGroup }[] = [
 
 /**
  * R-PFM-006 precedence: (1) PRMS != Not sent -> its In-PRMS stage; (2) out of
- * scope; (3) In-STAR rules: Complete mapping is Ready to sync, Incomplete is
- * Mapping incomplete, anything else is Mapping pending.
+ * scope; (3) In-STAR rules: Complete mapping is Ready to sync, anything else
+ * is Mapping pending (started or not).
  */
 export const assignPfmStage = (d: PfmDerivedRow): PfmStageKeyEnum => {
   switch (d.prmsStatus) {
@@ -73,8 +70,6 @@ export const assignPfmStage = (d: PfmDerivedRow): PfmStageKeyEnum => {
   }
   if (d.isOutOfScope) return PfmStageKeyEnum.NO_SP_CONTRIBUTION;
   if (d.isReady) return PfmStageKeyEnum.READY_TO_SYNC;
-  if (d.mappingState === PfmMappingStateEnum.INCOMPLETE)
-    return PfmStageKeyEnum.MAPPING_INCOMPLETE;
   return PfmStageKeyEnum.MAPPING_NOT_STARTED;
 };
 

@@ -164,26 +164,37 @@ export const deriveMappingState = (
   if (!row.has_alignment) return PfmMappingStateEnum.PENDING;
   if (!row.has_contribution) return PfmMappingStateEnum.NO_SP_CONTRIBUTION;
   if (row.mapping_complete) return PfmMappingStateEnum.COMPLETE;
-  return PfmMappingStateEnum.INCOMPLETE;
+  // Started but not finished is still Pending (owner 2026-10-21: no separate "Incomplete").
+  return PfmMappingStateEnum.PENDING;
 };
 
 const MAPPING_NOTES: Record<PfmMappingStateEnum, string> = {
   [PfmMappingStateEnum.COMPLETE]: 'CGIAR Portfolio split recorded',
-  [PfmMappingStateEnum.INCOMPLETE]: 'Projects or budget shares still missing',
   [PfmMappingStateEnum.PENDING]: 'Starts after PI approval',
   [PfmMappingStateEnum.NO_SP_CONTRIBUTION]:
     'PI declared no Science Program contribution · out of PRMS scope',
 };
 
-export const deriveMappingNote = (state: PfmMappingStateEnum): string =>
-  MAPPING_NOTES[state];
+/** A started Pending mapping says what is missing; a not-started one keeps the default note. */
+export const PFM_STARTED_PENDING_NOTE =
+  'Started: projects or budget shares still missing';
+
+export const deriveMappingNote = (
+  state: PfmMappingStateEnum,
+  started = false,
+): string =>
+  state === PfmMappingStateEnum.PENDING && started
+    ? PFM_STARTED_PENDING_NOTE
+    : MAPPING_NOTES[state];
 
 export const deriveSpLine = (
   state: PfmMappingStateEnum,
   primary: PfmRawRow['primary_sp'],
   contributing: string[],
+  started = true,
 ): string => {
-  if (state === PfmMappingStateEnum.PENDING) return '';
+  // Not started: no SP line, whatever is attached to the row.
+  if (state === PfmMappingStateEnum.PENDING && !started) return '';
   if (state === PfmMappingStateEnum.NO_SP_CONTRIBUTION)
     return 'Not reported to PRMS';
   const parts: string[] = [];
@@ -231,11 +242,12 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     piLine: derivePiLine(starLabel, row.approved_at),
     approvedLabel: deriveApprovedLabel(starLabel, row.approved_at),
     mappingState,
-    mappingNote: deriveMappingNote(mappingState),
+    mappingNote: deriveMappingNote(mappingState, !!row.has_alignment),
     spLine: deriveSpLine(
       mappingState,
       row.primary_sp,
       row.contributing_sp_names,
+      !!row.has_alignment,
     ),
     creator: row.creator ?? null,
     prmsStatus,

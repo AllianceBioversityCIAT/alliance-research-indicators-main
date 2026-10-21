@@ -135,10 +135,10 @@ describe('pfm-derivation', () => {
         'Not reported to PRMS',
       ],
       [
-        'check fails',
+        'check fails (started, not finished) -> Pending, not a separate Incomplete',
         { has_alignment: 1, has_contribution: 1, mapping_complete: 0 },
-        M.INCOMPLETE,
-        'Projects or budget shares still missing',
+        M.PENDING,
+        'Started: projects or budget shares still missing',
         'SP05 Climate (primary)',
       ],
       [
@@ -155,7 +155,8 @@ describe('pfm-derivation', () => {
         raw({
           ...flags,
           primary_sp: sp,
-          contributing_sp_names: mapping === M.INCOMPLETE ? [] : contributing,
+          contributing_sp_names:
+            flags.mapping_complete === 0 ? [] : contributing,
         }),
       );
       expect(d.mappingState).toBe(mapping);
