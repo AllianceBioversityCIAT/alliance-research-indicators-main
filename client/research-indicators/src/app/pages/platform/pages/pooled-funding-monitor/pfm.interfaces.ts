@@ -210,6 +210,8 @@ export interface PfmResultRow {
    * ISO date. Render as-is; never parse or re-format it.
    */
   updated_at: string;
+  /** Same instant as ISO-8601 UTC, for sorting only; null when unknown. Optional: older servers omit it. */
+  updated_at_iso?: string | null;
 }
 
 // ─── Client-side state shapes ───────────────────────────────────────────────

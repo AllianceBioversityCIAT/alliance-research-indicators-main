@@ -133,10 +133,11 @@ describe('PfmResultRowComponent', () => {
     expect(pill.style.borderColor).not.toBe('');
   });
 
-  it('View href is /result/STAR-<code> for a non-approved row, and the title links to the same place', () => {
-    const { q } = render();
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+  it('the title links to /result/STAR-<code> for a non-approved row; there is no View button (no Action column)', () => {
+    const { q, el } = render();
     expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+    expect(el.querySelector('[data-testid="pfm-row-view"]')).toBeNull();
+    expect(el.querySelectorAll('td')).toHaveLength(9);
   });
 
   it('Code cell shows platform and number; Indicator cell shows type', () => {
@@ -226,18 +227,17 @@ describe('PfmResultRowComponent', () => {
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [2023, 2025, 2024] });
     const expected = '/result/STAR-1234/general-information?version=2025&from=pfm-monitor';
-    expect(q('pfm-row-view').getAttribute('href')).toBe(expected);
     expect(q('pfm-row-title').getAttribute('href')).toBe(expected);
   });
 
   it('approved without snapshot years has no version', () => {
     const { q } = render({ star_status_id: 6, star_label: 'Approved', snapshot_years: [] });
-    expect(q('pfm-row-view').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
+    expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
-  it('View is present on out-of-scope and mapping-incomplete rows', () => {
-    expect(render({ mapping_state: 'No SP contribution', sp_line: 'Not reported to PRMS' }).q('pfm-row-view')).not.toBeNull();
-    expect(render({ mapping_state: 'Incomplete' }).q('pfm-row-view')).not.toBeNull();
+  it('the title link is present on out-of-scope and mapping-incomplete rows', () => {
+    expect(render({ mapping_state: 'No SP contribution', sp_line: 'Not reported to PRMS' }).q('pfm-row-title')).not.toBeNull();
+    expect(render({ mapping_state: 'Incomplete' }).q('pfm-row-title')).not.toBeNull();
   });
 
   it('renders server values as received and no other action', () => {
@@ -246,7 +246,7 @@ describe('PfmResultRowComponent', () => {
     expect(q('pfm-row-pi-line')).toBeNull();
     expect(q('pfm-row-mapping-note')).toBeNull();
     expect(q('pfm-row-meta')).toBeNull();
-    expect(el.querySelectorAll('a').length).toBe(2);
+    expect(el.querySelectorAll('a').length).toBe(1); // the title is the only link
     expect(el.querySelector('button')).toBeNull();
     expect(el.textContent).not.toMatch(/Sync|Request approval|Complete mapping/);
   });
@@ -297,10 +297,10 @@ describe('PfmResultRowComponent', () => {
     expect(colors.size).toBe(3);
   });
 
-  it('click on View opens no dialog or drawer', () => {
+  it('clicking the title opens no dialog or drawer', () => {
     const { el, q } = render();
-    q('pfm-row-view').addEventListener('click', e => e.preventDefault());
-    q('pfm-row-view').click();
+    q('pfm-row-title').addEventListener('click', e => e.preventDefault());
+    q('pfm-row-title').click();
     expect(el.querySelector('[role="dialog"], p-dialog, p-drawer, p-sidebar, dialog')).toBeNull();
   });
 });

@@ -38,8 +38,8 @@
     <span
       class="inline-flex items-center whitespace-nowrap rounded-full border border-solid px-3.5 py-1 text-[12px] font-semibold {{
         group().attention
-          ? 'border-[color:var(--ac-pfm-warning-border)] bg-[var(--ac-pfm-warning-bg)] text-[var(--ac-pfm-warning-fg)]'
-          : 'border-[color:var(--ac-pfm-success-fg)] bg-[var(--ac-pfm-success-bg)] text-[var(--ac-pfm-success-fg)]'
+          ? 'border-[color:var(--ac-state-alert-fg)] bg-[color-mix(in_srgb,var(--ac-state-alert-fill)_10%,transparent)] text-[var(--ac-state-alert-fg)]'
+          : 'border-[color:var(--ac-state-done-fg)] bg-[color-mix(in_srgb,var(--ac-state-done-fill)_10%,transparent)] text-[var(--ac-state-done-fg)]'
       }}"
       data-testid="pfm-group-flag"
       >{{ flagLabel() }}</span
@@ -48,14 +48,7 @@
   </button>
 
   @if (open()) {
-    <div [id]="'pfm-group-body-' + group().code" class="overflow-x-auto" data-testid="pfm-group-body">
-      <div
-        class="{{ grid }} items-center border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)] px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]"
-        role="presentation">
-        @for (c of columns; track c) {
-          <span class="{{ $last ? 'text-right' : '' }}">{{ c }}</span>
-        }
-      </div>
+    <div [id]="'pfm-group-body-' + group().code" class="flex flex-col border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)]" data-testid="pfm-group-body">
       @if (error()) {
         <div class="flex items-center gap-3 px-6 py-4 text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-group-error">
           <span>Could not load the results of this project.</span>
@@ -74,11 +67,62 @@
           }
         </div>
       } @else {
-        @for (r of rows(); track r.result_code) {
-          <app-pfm-result-row [row]="r" />
-        } @empty {
-          <p class="m-0 px-6 py-4 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-empty">No results in this project.</p>
-        }
+        <!-- Same table recipe as the Results Center: search + Clear (no Apply Filters), sort per column, paginator -->
+        <div class="bg-[var(--ac-white-1)] px-5 py-4" data-testid="pfm-group-search">
+          <app-search-export-controls
+            [showApply]="false"
+            [showClear]="true"
+            [searchValue]="search()"
+            [searchPlaceholder]="'Find a result by code, title, creator, status or Science Program'"
+            (searchChange)="setSearch($event)"
+            (clear)="clear()" />
+        </div>
+        <div class="w-full overflow-x-auto border-0 border-t border-solid border-[color:var(--ac-grey-200)]">
+          <p-table
+            #dt
+            [value]="tableRows()"
+            [paginator]="tableRows().length > 0"
+            [rows]="pageSize()"
+            [first]="first()"
+            (onPage)="first.set($event.first); pageSize.set($event.rows)"
+            [rowsPerPageOptions]="[5, 10, 25, 50]"
+            paginatorDropdownAppendTo="body"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="Showing {first} to {last} of {totalRecords} results"
+            paginatorStyleClass="justify-end! border-t border-[color:var(--ac-grey-200)] bg-[color:var(--ac-white-1)] px-3 py-2"
+            [scrollable]="true"
+            [tableStyle]="{ 'min-width': '100%' }"
+            styleClass="p-datatable-gridlines table-custom-styles p-datatable-hoverable-rows"
+            [attr.aria-label]="'Results of project ' + group().code"
+            data-testid="pfm-group-table">
+            <ng-template pTemplate="header">
+              <tr>
+                @for (c of columns; track c.header) {
+                  <th scope="col" class="atc-primary-blue-600 whitespace-nowrap" [pSortableColumn]="c.sort" [attr.data-testid]="'pfm-col-' + c.sort">
+                    <div class="flex items-center gap-2 text-[14px] font-[500] leading-4.5">
+                      {{ c.header }}
+                      <p-sortIcon [field]="c.sort"></p-sortIcon>
+                    </div>
+                  </th>
+                }
+              </tr>
+            </ng-template>
+            <ng-template pTemplate="body" let-r>
+              <tr app-pfm-result-row [row]="r"></tr>
+            </ng-template>
+            <ng-template pTemplate="emptymessage">
+              <tr>
+                <td [attr.colspan]="columns.length" class="!py-6 text-center text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-empty">
+                  @if (search()) {
+                    No results match “{{ search() }}”.
+                  } @else {
+                    No results in this project.
+                  }
+                </td>
+              </tr>
+            </ng-template>
+          </p-table>
+        </div>
       }
     </div>
   }
