@@ -90,7 +90,7 @@ describe('PooledFundingMonitorComponent', () => {
     await flush();
 
     expect(q('pfm-kpi-skeleton')).toBeNull();
-    expect(kpiValue('projects')).toBe('2');
+    expect(q('pfm-kpi-projects')).toBeNull();
     expect(kpiValue('monitored')).toBe('5');
     expect(kpiValue('need_attention')).toBe('3');
     expect(kpiValue('synced')).toBe('1');
@@ -114,7 +114,7 @@ describe('PooledFundingMonitorComponent', () => {
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('false');
     expect(kpiValue('need_attention')).toBe('123');
-    expect(q('pfm-kpi-projects')?.querySelector('[data-testid="pfm-kpi-sub"]')?.textContent?.trim()).toBe('of 40 in portfolio');
+    expect(kpiValue('monitored')).toBe('500');
   });
 
   describe('admin default scope (HITL 20)', () => {
@@ -303,7 +303,7 @@ describe('PooledFundingMonitorComponent', () => {
     await flush();
     await flush();
     expect(q('pfm-summary-error')).toBeNull();
-    expect(kpiValue('projects')).toBe('2');
+    expect(kpiValue('monitored')).toBe('5');
   });
 
   describe('tabs', () => {

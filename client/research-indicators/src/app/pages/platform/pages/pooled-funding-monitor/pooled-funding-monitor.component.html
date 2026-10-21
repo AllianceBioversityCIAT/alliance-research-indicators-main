@@ -39,9 +39,9 @@
   @if (!piEmpty()) {
     <!-- KPI cards: share the summary request, so they share its loading / error state -->
     @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
-      <div class="grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
-        @for (i of [1, 2, 3, 4]; track i) {
-          <div class="h-[92px] animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]"></div>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3" data-testid="pfm-kpi-skeleton" aria-busy="true" aria-label="Loading summary">
+        @for (i of [1, 2, 3]; track i) {
+          <div class="h-[112px] animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]"></div>
         }
       </div>
     } @else if (store.summaryState().error) {
@@ -60,7 +60,7 @@
       </div>
     } @else {
       @if (store.summary(); as summary) {
-        <app-pfm-kpi-cards [kpis]="summary.kpis" [scope]="store.scope()" />
+        <app-pfm-kpi-cards [kpis]="summary.kpis" />
       }
     }
   }

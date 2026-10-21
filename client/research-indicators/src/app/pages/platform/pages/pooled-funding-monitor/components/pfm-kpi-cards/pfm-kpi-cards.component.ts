@@ -1,6 +1,8 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09 (R-PFM-005)
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { PfmKpis, PfmScope } from '../../pfm.interfaces';
+import { TooltipModule } from 'primeng/tooltip';
+import { PFM_HELP } from '../../pfm-help';
+import { PfmKpis } from '../../pfm.interfaces';
 
 interface KpiCard {
   key: string;
@@ -12,31 +14,24 @@ interface KpiCard {
   frame: string;
   icon: string;
   iconInk: string;
+  /** Plain-language tooltip of the card. */
+  help: string;
+  /** Optional tooltip on the sub-line term (e.g. "PRMS scope"). */
+  subHelp?: string;
 }
 
 @Component({
   selector: 'app-pfm-kpi-cards',
+  imports: [TooltipModule],
   templateUrl: './pfm-kpi-cards.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmKpiCardsComponent {
   kpis = input.required<PfmKpis>();
-  scope = input.required<PfmScope>();
 
   cards = computed<KpiCard[]>(() => {
     const k = this.kpis();
     return [
-      {
-        key: 'projects',
-        label: 'Contributing Project with Results',
-        value: k.projects,
-        sub: this.scope() === 'mine' ? 'where you are PI' : `of ${k.projects_total.toLocaleString('en-US')} in portfolio`,
-        accent: 'border-l-[color:var(--ac-pfm-info-fg)]',
-        ink: 'text-[var(--ac-pfm-info-fg)]',
-        frame: 'border-[color:var(--ac-pfm-surface-border)]',
-        icon: 'pi-briefcase',
-        iconInk: 'atc-primary-blue-300'
-      },
       {
         key: 'monitored',
         label: 'Results eligible for CGIAR Portfolio mapping',
@@ -46,29 +41,33 @@ export class PfmKpiCardsComponent {
         ink: 'text-[var(--ac-pfm-accent-navy)]',
         frame: 'border-[color:var(--ac-pfm-surface-border)]',
         icon: 'pi-list',
-        iconInk: 'atc-primary-blue-300'
+        iconInk: 'atc-primary-blue-300',
+        help: 'Results of contributing projects that can be mapped to the CGIAR Portfolio and sent to PRMS.'
       },
       {
         key: 'need_attention',
         label: 'Need attention',
         value: k.need_attention,
         sub: 'nothing in PRMS yet',
-        accent: 'border-l-[color:var(--ac-pfm-seg-pending)]',
-        ink: 'text-[var(--ac-pfm-warning-fg)]',
-        frame: 'border-[color:var(--ac-pfm-warning-border)]',
+        accent: 'border-l-[color:var(--ac-state-alert-fill)]',
+        ink: 'text-[var(--ac-state-alert-fg)]',
+        frame: 'border-[color:var(--ac-pfm-surface-border)]',
         icon: 'pi-exclamation-triangle',
-        iconInk: 'atc-orange-1'
+        iconInk: 'text-[var(--ac-state-alert-fg)]',
+        help: PFM_HELP.needAttention
       },
       {
         key: 'synced',
         label: 'Synced with PRMS',
         value: k.synced,
         sub: `of ${k.in_prms_scope.toLocaleString('en-US')} in PRMS scope`,
-        accent: 'border-l-[color:var(--ac-pfm-seg-approved)]',
-        ink: 'text-[var(--ac-pfm-success-fg)]',
+        accent: 'border-l-[color:var(--ac-state-done-fill)]',
+        ink: 'text-[var(--ac-state-done-fg)]',
         frame: 'border-[color:var(--ac-pfm-surface-border)]',
         icon: 'pi-check-circle',
-        iconInk: 'atc-primary-blue-300'
+        iconInk: 'text-[var(--ac-state-done-fg)]',
+        help: PFM_HELP.synced,
+        subHelp: PFM_HELP.prmsScope
       }
     ];
   });
