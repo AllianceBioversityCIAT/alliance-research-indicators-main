@@ -61,6 +61,30 @@ export interface PfmMonthly {
   synced: number;
 }
 
+/** One contributing project's progress. `done` = in PRMS (any review status) or out of scope. */
+export interface PfmProjectProgress {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  total: number;
+  done: number;
+  remaining: number;
+  /** Mapping pending or incomplete. */
+  to_map: number;
+  /** Mapping complete, not in PRMS yet. */
+  ready: number;
+  in_prms: number;
+  out_of_scope: number;
+  pending_review: number;
+  approved: number;
+  rejected: number;
+}
+
+export interface PfmRejectionReason {
+  reason: string;
+  count: number;
+}
+
 export interface PfmSummary {
   scope: PfmScope;
   is_pi_of_any: boolean;
@@ -69,6 +93,9 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthly[];
   synced_this_year: number;
+  /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
+  project_progress?: PfmProjectProgress[];
+  prms_rejection_reasons?: PfmRejectionReason[];
 }
 
 // ─── Queue ──────────────────────────────────────────────────────────────────

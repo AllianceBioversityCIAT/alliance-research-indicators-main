@@ -3,15 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { DecimalPipe } from '@angular/common';
 import { PfmMonthly, PfmScope } from '../../pfm.interfaces';
 
-// Literal class strings so Tailwind sees them; oldest month lightest, current darkest.
-const MONTH_FILLS = [
-  'bg-[var(--ac-pfm-month-1)]',
-  'bg-[var(--ac-pfm-month-2)]',
-  'bg-[var(--ac-pfm-month-3)]',
-  'bg-[var(--ac-pfm-month-4)]',
-  'bg-[var(--ac-pfm-month-5)]',
-  'bg-[var(--ac-pfm-month-6)]'
-];
+// Synced = done, so every month uses the palette's done fill (one colour; months are not states,
+// so no light-to-dark tones of one hue).
+const MONTH_FILL = 'bg-[var(--ac-state-done-fill)]';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -31,7 +25,7 @@ export class PfmSyncActivityCardComponent {
   bars = computed(() => {
     const m = this.monthly();
     const max = Math.max(1, ...m.map(x => x.synced));
-    return m.map((x, i) => ({ ...x, fill: MONTH_FILLS[Math.max(0, Math.min(MONTH_FILLS.length - 1, i + MONTH_FILLS.length - m.length))] ?? MONTH_FILLS[5], label: MONTHS[Number(x.month.slice(5, 7)) - 1] ?? x.month, height: `${(x.synced / max) * 100}%` }));
+    return m.map(x => ({ ...x, fill: MONTH_FILL, label: MONTHS[Number(x.month.slice(5, 7)) - 1] ?? x.month, height: `${(x.synced / max) * 100}%` }));
   });
 
   year = computed(() => this.monthly().at(-1)?.month.slice(0, 4) ?? '');

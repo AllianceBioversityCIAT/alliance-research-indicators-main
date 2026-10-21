@@ -28,18 +28,32 @@ describe('PfmSpCoverageCardComponent', () => {
     expect(q('[data-testid="pfm-sp-row-SP02"] [data-testid="pfm-sp-count"]')).toBe('10 / 20');
   });
 
-  it('Portfolio copy', () => {
+  it('Portfolio copy, with a line on how to read the chart', () => {
     const { q } = render('all');
-    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Projects mapped to each program, and how many of them are already syncing');
-    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('Syncing to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not syncing');
+    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Results mapped to each program, and how many are already in PRMS');
+    expect(q('[data-testid="pfm-sp-how"]')).toContain('Green = already in PRMS, grey = not in PRMS yet');
+    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('In PRMS');
+    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not in PRMS yet');
   });
 
   it('PI copy', () => {
     const { q } = render('mine');
-    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Your results mapped to each program, and how many are already synced to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-synced"]')).toBe('Synced to PRMS');
-    expect(q('[data-testid="pfm-sp-legend-unsynced"]')).toBe('Not synced');
+    expect(q('[data-testid="pfm-sp-sub"]')).toBe('Your results mapped to each program, and how many are already in PRMS');
+  });
+
+  // The bug: a fixed-width grey track behind every bar left a filler that read as a third state.
+  it('draws no track behind a bar: the bar cell has no background, only the bar as long as its total', () => {
+    const { el } = render('all');
+    const total = el.querySelector<HTMLElement>('[data-testid="pfm-sp-row-SP02"] [data-testid="pfm-sp-total-bar"]')!;
+    const cell = total.parentElement!;
+    expect(cell.className).not.toMatch(/\bbg-/);
+    expect(cell.style.backgroundColor).toBe('');
+    // synced (green) + not synced (grey) are the two segments of THIS bar. jsdom drops var() colours
+    // from the CSSOM, so assert the values the template binds.
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    expect(fixture.componentInstance.syncedFill).toBe('var(--ac-state-done-fill)');
+    expect(fixture.componentInstance.unsyncedFill).toBe('var(--ac-state-empty)');
+    expect(total.querySelector('[data-testid="pfm-sp-synced-bar"]')).not.toBeNull();
   });
 
   // Data binding only: real rendered proportion is a HITL visual check.

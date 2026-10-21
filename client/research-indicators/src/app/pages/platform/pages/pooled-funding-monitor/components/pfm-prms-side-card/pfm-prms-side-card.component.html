@@ -1,0 +1,55 @@
+<section
+  class="h-full rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+  data-testid="pfm-prms-card"
+  aria-labelledby="pfm-prms-title">
+  <h2 id="pfm-prms-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">PRMS side</h2>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">What happened to the
+    <span class="font-semibold tabular-nums text-[var(--ac-grey-900)]">{{ sent() | number }}</span>
+    {{ sent() === 1 ? 'result' : 'results' }} we already sent.</p>
+
+  @if (sent() === 0) {
+    <p class="m-0 mt-4 rounded-lg bg-[var(--ac-pfm-neutral-bg)] p-3 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-prms-empty">
+      Nothing sent to PRMS yet.
+    </p>
+  } @else {
+    <div class="mt-4">
+      <app-pfm-state-bar [segments]="segments()" [label]="barLabel()" />
+    </div>
+
+    <h3 class="m-0 mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Why PRMS rejected</h3>
+    @if (topReasons().length === 0) {
+      <p class="m-0 mt-2 text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-prms-reasons-empty">No rejections.</p>
+    } @else {
+      <ul class="m-0 mt-2 flex list-none flex-col gap-1.5 p-0" data-testid="pfm-prms-reasons">
+        @for (r of topReasons(); track r.reason) {
+          <li class="flex items-start justify-between gap-3 text-[13px]" data-testid="pfm-prms-reason">
+            <span class="min-w-0 text-[var(--ac-grey-900)]">{{ r.reason }}</span>
+            <span class="flex-none font-semibold tabular-nums" [style.color]="alertFg">{{ r.count | number }}</span>
+          </li>
+        }
+      </ul>
+      @if (moreReasons() > 0) {
+        <p class="m-0 mt-1 text-[12px] text-[var(--ac-pfm-neutral-fg)]">and {{ moreReasons() }} more {{ moreReasons() === 1 ? 'reason' : 'reasons' }}</p>
+      }
+    }
+
+    @if (withRejections().length > 0) {
+      <h3 class="m-0 mt-5 text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--ac-pfm-neutral-fg)]">Projects with rejections</h3>
+      <ul class="m-0 mt-2 flex list-none flex-col gap-2 p-0" data-testid="pfm-prms-projects">
+        @for (p of withRejections(); track p.code) {
+          <li class="flex flex-col text-[13px]" [attr.data-testid]="'pfm-prms-project-' + p.code">
+            <div class="flex items-baseline justify-between gap-3">
+              <span class="min-w-0 truncate text-[var(--ac-pfm-accent-navy)]" [attr.title]="p.code + ' — ' + (p.name ?? '')"
+                ><span class="font-semibold">{{ p.code }}</span> — {{ p.name }}</span
+              >
+              <span class="flex-none font-semibold tabular-nums" [style.color]="alertFg">{{ p.rejected | number }} rejected</span>
+            </div>
+            <p class="m-0 text-[12px] text-[var(--ac-pfm-neutral-fg)]">
+              Contact: <span class="text-[var(--ac-grey-900)]">{{ p.lead_pi || 'No Lead PI on record' }}</span>
+            </p>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>
