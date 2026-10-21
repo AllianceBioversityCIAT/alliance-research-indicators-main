@@ -38,16 +38,21 @@ describe('PfmPrmsStatusCardComponent', () => {
     expect(q('pfm-prms-total')?.textContent?.trim()).toBe('61');
   });
 
-  it('legend: approved / pending review / rejected / no SP contribution with count and share', () => {
-    const { el } = render(pipe(13, 8, 7, 33));
-    const rows = Array.from(el.querySelectorAll('[data-testid^="pfm-prms-legend-"]'))
-      .filter(r => r.getAttribute('data-testid') !== 'pfm-prms-legend-value')
-      .map(r => Array.from(r.querySelectorAll('span')).map(x => x.textContent?.trim()).filter(Boolean).join(' | '));
-    expect(rows).toEqual([
-      'Approved by PRMS | 13 | (21%)',
-      'Pending review in PRMS | 8 | (13%)',
-      'Rejected by PRMS | 7 | (11%)',
-      'No SP contribution | 33 | (54%)'
+  // Owner: compact legend — category only; count and share in the tooltip.
+  it('legend shows only the categories; count and share are in its tooltip', () => {
+    const { el, fixture } = render(pipe(13, 8, 7, 33));
+    const rows = Array.from(el.querySelectorAll('[data-testid="pfm-prms-legend"] button'));
+    expect(rows.map(r => r.textContent?.trim())).toEqual(['Approved by PRMS', 'Pending review in PRMS', 'Rejected by PRMS', 'No SP contribution']);
+    expect(el.querySelector('[data-testid="pfm-prms-legend-value"]')).toBeNull();
+    const tips = fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .filter(d => el.querySelector('[data-testid="pfm-prms-legend"]')!.contains(d.nativeElement))
+      .map(d => d.injector.get(Tooltip).content);
+    expect(tips).toEqual([
+      'Approved by PRMS: 13 results (21%)',
+      'Pending review in PRMS: 8 results (13%)',
+      'Rejected by PRMS: 7 results (11%)',
+      'No SP contribution: 33 results (54%)'
     ]);
   });
 

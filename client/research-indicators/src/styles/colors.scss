@@ -81,12 +81,14 @@
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
   --ac-state-todo-fg: #475569;
   --ac-state-todo-fill: #64748b;
-  --ac-state-progress-fg: #b45309;
-  --ac-state-progress-fill: #d97706;
+  --ac-state-progress-fg: #c2410c;
+  --ac-state-progress-fill: #ea580c;
   --ac-state-ready-fg: #1d4ed8;
   --ac-state-ready-fill: #2563eb;
-  --ac-state-waiting-fg: #6d28d9;
-  --ac-state-waiting-fill: #7c3aed;
+  // Pending (review / PI approval) is the bilateral module's yellow #E69F00 (owner). Its fill is
+  // 2.25:1 on white, below 3:1: accepted as the house colour, the value is always in the tooltip.
+  --ac-state-waiting-fg: #8a5d00;
+  --ac-state-waiting-fill: #e69f00;
   --ac-state-done-fg: #15803d;
   --ac-state-done-fill: #16a34a;
   --ac-state-alert-fg: #b91c1c;
@@ -256,12 +258,12 @@ $colors: (
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
   --ac-state-todo-fg: #a8b5c4;
   --ac-state-todo-fill: #8492a6;
-  --ac-state-progress-fg: #f5b041;
-  --ac-state-progress-fill: #e09b2d;
+  --ac-state-progress-fg: #fb923c;
+  --ac-state-progress-fill: #f97316;
   --ac-state-ready-fg: #8ab4ff;
   --ac-state-ready-fill: #5b8def;
-  --ac-state-waiting-fg: #c0a8ff;
-  --ac-state-waiting-fill: #9a7af0;
+  --ac-state-waiting-fg: #f2c14e;
+  --ac-state-waiting-fill: #e6a700;
   --ac-state-done-fg: #5fd38d;
   --ac-state-done-fill: #3fb86f;
   --ac-state-alert-fg: #ff8a8a;

@@ -59,7 +59,8 @@ export class PfmPrmsStatusCardComponent {
           fg: PFM_STATE[s.state].fg,
           dash: `${share * C} ${C - share * C}`,
           dashOffset: -offset * C,
-          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see them.`
+          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see them.`,
+          legendTip: `${s.label}: ${s.value} ${s.value === 1 ? 'result' : 'results'} (${Math.round(share * 100)}%)`
         };
         offset += share;
         return item;
