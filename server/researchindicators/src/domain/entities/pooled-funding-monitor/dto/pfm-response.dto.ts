@@ -44,6 +44,15 @@ export class PfmMonthlyDto {
   @ApiProperty() synced: number;
 }
 
+export class PfmChipCountsDto {
+  @ApiProperty() all: number;
+  @ApiProperty() attention: number;
+  @ApiProperty() mapping: number;
+  @ApiProperty() ready: number;
+  @ApiProperty() prms_rejected: number;
+  @ApiProperty() synced: number;
+}
+
 export class PfmProjectProgressDto {
   @ApiProperty() code: string;
   @ApiProperty({ nullable: true }) name: string | null;
@@ -97,6 +106,11 @@ export class PfmSummaryResponseDto {
   project_progress: PfmProjectProgressDto[];
   @ApiProperty({ type: [PfmRejectionReasonDto] })
   prms_rejection_reasons: PfmRejectionReasonDto[];
+  @ApiProperty({
+    type: PfmChipCountsDto,
+    description: 'Quick-view counts of the whole scope (no filters).',
+  })
+  chip_counts: PfmChipCountsDto;
 }
 
 export class PfmCodeNameDto {
@@ -119,15 +133,6 @@ export class PfmFilterOptionsDto {
   @ApiProperty({ type: [PfmSpGroupOptionDto] })
   science_programs: PfmSpGroupOptionDto[];
   @ApiProperty({ type: [PfmTypeOptionDto] }) types: PfmTypeOptionDto[];
-}
-
-export class PfmChipCountsDto {
-  @ApiProperty() all: number;
-  @ApiProperty() attention: number;
-  @ApiProperty() mapping: number;
-  @ApiProperty() ready: number;
-  @ApiProperty() prms_rejected: number;
-  @ApiProperty() synced: number;
 }
 
 export class PfmGroupCountsDto {

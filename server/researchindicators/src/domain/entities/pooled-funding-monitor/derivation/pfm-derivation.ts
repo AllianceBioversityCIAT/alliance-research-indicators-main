@@ -242,9 +242,12 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     prmsHint: derivePrmsHint(prmsStatus, row.prms_justification),
     updatedLabel: row.updated_at ? formatPfmDateTime(row.updated_at) : '—',
     isOutOfScope,
-    // Ready to sync = mapping complete AND nothing in PRMS yet; Need attention = nothing in PRMS yet.
+    // Ready to sync = mapping complete AND nothing in PRMS yet.
     isReady: mappingState === PfmMappingStateEnum.COMPLETE && notSent,
-    needsAttention: notSent,
+    // Need attention = what is still on us: in PRMS scope with nothing in PRMS, or returned by PRMS.
+    // Exactly Mapping incomplete + Ready to sync + Rejected (out of scope needs nothing).
+    needsAttention:
+      (!isOutOfScope && notSent) || prmsStatus === PfmPrmsStatusEnum.REJECTED,
   };
 };
 
@@ -252,10 +255,11 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
   switch (chip) {
     case PfmChipEnum.NEED_ATTENTION:
       return d.needsAttention;
+    // Mapping not finished (Pending or Incomplete), in PRMS scope, nothing in PRMS yet.
     case PfmChipEnum.MAPPING_INCOMPLETE:
       return (
-        d.starLabel === PfmStarLabelEnum.APPROVED &&
         !d.isOutOfScope &&
+        d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT &&
         d.mappingState !== PfmMappingStateEnum.COMPLETE
       );
     case PfmChipEnum.READY_TO_SYNC:

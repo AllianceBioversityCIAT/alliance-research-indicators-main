@@ -208,11 +208,11 @@ describe('pfm-derivation', () => {
 
     // Red input: no contribution with complete mapping flag. Nothing in PRMS
     // -> needs attention; the mapping is not Complete -> not ready.
-    it('has_contribution=0 + mapping_complete=1 -> No SP contribution, needsAttention, not ready', () => {
+    it('has_contribution=0 + mapping_complete=1 -> No SP contribution: out of scope needs nothing, not ready', () => {
       const d = derivePfmRow(raw({ has_contribution: 0, mapping_complete: 1 }));
       expect(d.mappingState).toBe(M.NO_SP_CONTRIBUTION);
       expect(d.isOutOfScope).toBe(true);
-      expect(d.needsAttention).toBe(true);
+      expect(d.needsAttention).toBe(false);
       expect(d.isReady).toBe(false);
     });
 
@@ -241,15 +241,31 @@ describe('pfm-derivation', () => {
       expect(d.needsAttention).toBe(false);
     });
 
-    it('no PRMS status at all -> needs attention, whatever the mapping', () => {
+    it('in PRMS scope with nothing in PRMS -> needs attention, whatever the mapping or STAR status', () => {
       for (const flags of [
         { has_alignment: 0, has_contribution: null, mapping_complete: null },
         { mapping_complete: 0 },
-        { has_contribution: 0 },
         { result_status_id: 4, result_status_name: 'Draft' },
       ]) {
         expect(derivePfmRow(raw(flags)).needsAttention).toBe(true);
       }
+    });
+
+    // Red input: a PRMS-rejected result is back on us.
+    it('rejected by PRMS -> needs attention; pending review / approved -> not', () => {
+      expect(
+        derivePfmRow(
+          raw({ is_synced_to_prms: 1, prms_history_status: 'REJECTED' }),
+        ).needsAttention,
+      ).toBe(true);
+      expect(derivePfmRow(raw({ is_synced_to_prms: 1 })).needsAttention).toBe(
+        false,
+      );
+      expect(
+        derivePfmRow(
+          raw({ is_synced_to_prms: 1, prms_history_status: 'APPROVED' }),
+        ).needsAttention,
+      ).toBe(false);
     });
   });
 
@@ -292,7 +308,10 @@ describe('pfm-derivation', () => {
 
     it.each([
       [PfmChipEnum.ALL, Object.keys(rows)],
-      [PfmChipEnum.NEED_ATTENTION, ['ready', 'incomplete', 'noSp', 'draft']],
+      [
+        PfmChipEnum.NEED_ATTENTION,
+        ['ready', 'incomplete', 'rejected', 'draft'],
+      ],
       [PfmChipEnum.MAPPING_INCOMPLETE, ['incomplete']],
       [PfmChipEnum.READY_TO_SYNC, ['ready', 'draft']],
       [PfmChipEnum.REJECTED, ['rejected']],
@@ -302,12 +321,35 @@ describe('pfm-derivation', () => {
     });
   });
 
+  // Red input: a Draft with no mapping at all is still "mapping incomplete" (no STAR-status gate),
+  // so Need attention = Mapping incomplete + Ready to sync + Rejected, exactly.
+  it('Mapping incomplete: any not-finished mapping in PRMS scope with nothing in PRMS, whatever the STAR status', () => {
+    const chip = (flags: Parameters<typeof raw>[0]) =>
+      matchesChip(derivePfmRow(raw(flags)), PfmChipEnum.MAPPING_INCOMPLETE);
+    expect(
+      chip({
+        has_alignment: 0,
+        has_contribution: null,
+        mapping_complete: null,
+        result_status_id: 4,
+        result_status_name: 'Draft',
+      }),
+    ).toBe(true);
+    expect(
+      chip({
+        mapping_complete: 0,
+        result_status_id: 2,
+        result_status_name: 'Submitted',
+      }),
+    ).toBe(true);
+    expect(chip({})).toBe(false); // complete -> ready, not incomplete
+    expect(chip({ has_contribution: 0 })).toBe(false); // out of scope
+    expect(chip({ mapping_complete: 0, is_synced_to_prms: 1 })).toBe(false); // already in PRMS
+  });
+
   describe('rowRank (R-PFM-012)', () => {
-    it('orders needs attention < out of scope < Pending Review < Approved < others', () => {
+    it('orders needs attention (rejected included) < out of scope < Pending Review < Approved', () => {
       const ranked = [
-        derivePfmRow(
-          raw({ is_synced_to_prms: 1, prms_history_status: 'REJECTED' }),
-        ),
         derivePfmRow(
           raw({ is_synced_to_prms: 1, prms_history_status: 'APPROVED' }),
         ),
@@ -317,7 +359,7 @@ describe('pfm-derivation', () => {
       ]
         .map((d) => rowRank(d))
         .sort((a, b) => a - b);
-      expect(ranked).toEqual([0, 1, 2, 3, 4]);
+      expect(ranked).toEqual([0, 1, 2, 3]);
       expect(rowRank(derivePfmRow(raw()))).toBe(0);
       expect(rowRank(derivePfmRow(raw({ has_contribution: 0 })))).toBe(1);
       expect(rowRank(derivePfmRow(raw({ is_synced_to_prms: 1 })))).toBe(2);
@@ -334,7 +376,7 @@ describe('pfm-derivation', () => {
             raw({ is_synced_to_prms: 1, prms_history_status: 'REJECTED' }),
           ),
         ),
-      ).toBe(4);
+      ).toBe(0);
     });
   });
 });

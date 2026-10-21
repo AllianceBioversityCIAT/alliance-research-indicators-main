@@ -478,6 +478,7 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
           'synced_this_year',
           'project_progress',
           'prms_rejection_reasons',
+          'chip_counts',
         ].sort(),
       );
       expect(res.body.data.monthly).toHaveLength(6);

@@ -208,8 +208,8 @@ describe('pfm-aggregation', () => {
         projects: 4,
         projects_total: 20,
         monitored: 13,
-        need_attention: 9,
-        synced: 4,
+        need_attention: 8,
+        synced: 3,
         in_prms_scope: 11,
       });
       expect(s.synced_this_year).toBe(5);
@@ -220,7 +220,15 @@ describe('pfm-aggregation', () => {
       expect(s.kpis.need_attention).toBe(q.chip_counts.attention);
       const prms = s.pipeline.stages.filter((x) => x.group === 'in_prms');
       expect(prms.map((x) => x.value)).toEqual([1, 2, 1]);
-      expect(s.kpis.synced).toBe(4);
+      expect(s.kpis.synced).toBe(q.chip_counts.synced);
+      // Need attention = Mapping incomplete + Ready to sync + Rejected; + Synced = the PRMS scope.
+      expect(
+        q.chip_counts.mapping +
+          q.chip_counts.ready +
+          q.chip_counts.prms_rejected,
+      ).toBe(s.kpis.need_attention);
+      expect(s.kpis.need_attention + s.kpis.synced).toBe(s.kpis.in_prms_scope);
+      expect(s.chip_counts).toEqual(q.chip_counts);
     });
 
     it('SP coverage: primary only, out of scope and no-primary excluded, by code', () => {
@@ -291,14 +299,14 @@ describe('pfm-aggregation', () => {
       const q = buildPfmQueue(derived, {});
       expect(q.chip_counts).toEqual({
         all: 13,
-        attention: 9,
-        mapping: 2,
+        attention: 8,
+        mapping: 5,
         ready: 2,
         prms_rejected: 1,
         synced: 3,
       });
-      // P-A and P-C tie on attention (3): P-A first by code.
-      expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-C', 'P-B', 'P-D']);
+      // P-B and P-C tie on attention (2): P-B first by code.
+      expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-B', 'P-C', 'P-D']);
       expect(q.groups[0]).toEqual({
         code: 'P-A',
         name: 'Project P-A',
@@ -314,14 +322,14 @@ describe('pfm-aggregation', () => {
           not_sent: 3,
         },
       });
-      expect(q.groups[2].counts).toEqual({
+      expect(q.groups[1].counts).toEqual({
         approved: 0,
         pending: 1,
         rejected: 1,
         out_of_scope: 1,
         not_sent: 1,
       });
-      expect(q.groups[1].counts).toEqual({
+      expect(q.groups[2].counts).toEqual({
         approved: 1,
         pending: 0,
         rejected: 0,
@@ -341,7 +349,7 @@ describe('pfm-aggregation', () => {
       expect(q.chip_counts).toEqual({
         all: 1,
         attention: 1,
-        mapping: 0,
+        mapping: 1,
         ready: 0,
         prms_rejected: 0,
         synced: 0,
@@ -407,7 +415,7 @@ describe('pfm-aggregation', () => {
     });
 
     it('monitored_total is ALL monitored results of the scope, not the attention count', () => {
-      // 13 monitored, 9 need attention: the two meanings differ.
+      // 13 monitored, 8 need attention: the two meanings differ.
       const q = buildPfmQueue(derived, { project: 'P-D' });
       expect(q.totals.monitored_total).toBe(13);
       expect(q.chip_counts.attention).toBe(1);
@@ -545,7 +553,7 @@ describe('pfm-aggregation', () => {
   describe('row ranking (R-PFM-012)', () => {
     it('ranks attention, out of scope, pending, approved, rest; stable on ties', () => {
       expect(ids(rankPfmRows(derived))).toEqual([
-        1, 2, 3, 13, 5, 9, 10, 6, 12, 7, 4, 11, 8,
+        1, 2, 3, 13, 5, 8, 9, 10, 6, 12, 7, 4, 11,
       ]);
     });
   });

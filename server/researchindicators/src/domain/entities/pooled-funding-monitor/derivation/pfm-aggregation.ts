@@ -298,6 +298,8 @@ export interface PfmSummary {
   synced_this_year: number;
   project_progress: PfmProjectProgress[];
   prms_rejection_reasons: PfmRejectionReason[];
+  /** Quick-view counts of the whole scope (no filters), so the coverage tab and the queue agree. */
+  chip_counts: PfmChipCounts;
 }
 
 export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
@@ -309,9 +311,8 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
     projects_total: i.projectsTotal,
     monitored: i.rows.length,
     need_attention: i.rows.filter(({ d }) => d.needsAttention).length,
-    synced: i.rows.filter(
-      ({ d }) => d.prmsStatus !== PfmPrmsStatusEnum.NOT_SENT,
-    ).length,
+    // Same rule as the Synced quick view: in PRMS and not rejected.
+    synced: i.rows.filter(({ d }) => matchesChip(d, PfmChipEnum.SYNCED)).length,
     in_prms_scope: i.rows.filter(({ d }) => !d.isOutOfScope).length,
   },
   pipeline: buildPfmPipeline(i.rows),
@@ -320,6 +321,7 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
   synced_this_year: i.syncedThisYear,
   project_progress: buildProjectProgress(i.rows),
   prms_rejection_reasons: buildRejectionReasons(i.rows),
+  chip_counts: countPfmChips(i.rows),
 });
 
 // ------------------------------------------------------------------ queue
