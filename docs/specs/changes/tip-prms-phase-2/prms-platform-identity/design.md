@@ -123,7 +123,7 @@ No endpoint change. Wire changes:
 - Status reader `LAST_ATTEMPT_SQL`: match the log on `platform_code` and `external_reference = prmsRef(...)` of the result (the same function, expressed in SQL as a `CASE` on `platform_code`); `LAST_DECISION_SQL`: history on `(platform_code, code, year)`.
 - History reader: `RESULT_METADATA_SQL` selects `platform_code`; `EVENTS_SQL` / `SYNC_COUNT_SQL` key on it.
 - Mapping diff and apply: `HISTORY_ROW_SQL` (`pool-funding-mapping-diff.service.ts:48`) and `HISTORY_SQL` (`pool-funding-mapping-apply.service.ts:36`) also select `platform_code`; `resolveActiveSnapshot` (`diff.service.ts:419`) gains a platform parameter, passed by both callers (`diff.service.ts:838`, `apply.service.ts:515`); `ACTIVE_SNAPSHOT_SQL` filters on it (P-14). A history row with a NULL platform is never correlated, so it never reaches these paths.
-- **One SQL expression for the reference.** The `CASE` used in readers is defined once next to `prmsRef` and asserted against it in a test over every `ReportingPlatformEnum` value (KZ-001: the property is asserted in the SQL output, not the call).
+- **One SQL expression for the reference.** The `CASE` used in readers is defined once next to `prmsRef` and asserted against it in a test over every `ReportingPlatformEnum` value (KZ-001: the property is asserted in the SQL output, not the call). **A NULL `platform_code` is read as STAR** (`COALESCE(<platform>, 'STAR')`), exactly as the builder does (T-01) — `results.platform_code` is nullable (`result.entity.ts:176-182`). *Amended 2026-10-21 (owner, after the T-01 Reviewer advisory); implemented in T-03.*
 
 ### 7.6 Logging
 Unchanged lines; the correlator's existing "multiple live rows" warn now names the platform.

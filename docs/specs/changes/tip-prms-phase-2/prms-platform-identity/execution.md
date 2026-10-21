@@ -58,3 +58,5 @@
 - **Requirements covered:** R-PPI-003; R-PPI-004 parsing half; NFR-PPI-001 (payload half).
 - **Decisions made:** execute-time spec edit P-21 (above); `dto/prms-sync-aggregate.ts` added to scope by the same edit.
 - **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED.
+
+**Owner decisions after T-01 (2026-10-21):** (1) "Lo prendo yo" — T-02 waits for Docker (Leader pre-check: `docker info` → daemon not running; read-only Dev query also `ETIMEDOUT`). (2) "COALESCE a STAR" — **execute-time spec edit:** `design.md` §7.5 (SQL fragment reads NULL platform as STAR, like the builder) and `tasks.md` T-03 Scope (+ the fragment file, its test and falsifier). Meaning of R-PPI-002/003 unchanged. Carried to the T-03 Reviewer as a named check (with P-21).
