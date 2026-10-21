@@ -184,6 +184,7 @@ describe('PooledFundingMonitorService', () => {
         prms_status: 'Not sent',
         prms_hint: expect.any(String),
         updated_at: '—',
+        updated_at_iso: null,
         star_status_name: null,
         star_status_description: null,
         star_approved_label: null,
@@ -207,6 +208,8 @@ describe('PooledFundingMonitorService', () => {
         scope: PfmScopeEnum.ALL,
       });
       expect(r.star_status_description).toBe('PI approved it');
+      expect(r.updated_at).toBe('01 Oct, 10:20');
+      expect(r.updated_at_iso).toBe('2026-10-01T10:20:00.000Z');
       expect(r.star_approved_label).toBe('Approved 05 Mar 2026');
       expect(r.science_programs.map((s) => [s.code, s.primary])).toEqual([
         ['SP01', true],

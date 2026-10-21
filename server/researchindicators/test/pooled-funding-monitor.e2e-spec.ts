@@ -630,6 +630,7 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
           'prms_status',
           'prms_hint',
           'updated_at',
+          'updated_at_iso',
         ].sort(),
       );
       const codes = res.body.data.map(

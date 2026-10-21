@@ -246,4 +246,9 @@ export class PfmResultRowDto {
       'Server-formatted "dd Mon, HH:mm" (UTC); "—" when results.updated_at is null.',
   })
   updated_at: string;
+  @ApiProperty({
+    nullable: true,
+    description: 'updated_at as ISO-8601 UTC, for sorting; null when unknown.',
+  })
+  updated_at_iso: string | null;
 }

@@ -62,6 +62,8 @@ export interface PfmResultRow {
   prms_hint: string;
   /** Server-formatted "dd Mon, HH:mm" (UTC); "—" when `results.updated_at` is NULL. */
   updated_at: string;
+  /** Same instant as ISO-8601 UTC, for sorting; null when `results.updated_at` is NULL. */
+  updated_at_iso: string | null;
 }
 
 const spRef = (sp: PfmSpRef) => ({
@@ -198,6 +200,7 @@ export class PooledFundingMonitorService {
     prms_status: d.prmsStatus,
     prms_hint: d.prmsHint,
     updated_at: d.updatedLabel,
+    updated_at_iso: row.updated_at ? row.updated_at.toISOString() : null,
   });
 
   /**
