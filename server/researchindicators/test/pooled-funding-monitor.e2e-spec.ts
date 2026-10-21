@@ -430,12 +430,12 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       expect(res.body.path).toBe(`${BASE}/summary`);
     });
 
-    it('contributor-only PI or delegate of a project: 200 on their own scope and on the whole portfolio', async () => {
+    it('contributor-only PI or delegate of a project: 200 on their own scope, 403 on the whole portfolio', async () => {
       for (const token of ['tok-contrib-pi', 'tok-contrib-delegate']) {
         for (const path of [`${BASE}/summary`, `${BASE}/queue`]) {
           expect((await get(path, token)).status).toBe(200);
           expect((await get(`${path}?scope=mine`, token)).status).toBe(200);
-          expect((await get(`${path}?scope=all`, token)).status).toBe(200);
+          expect((await get(`${path}?scope=all`, token)).status).toBe(403);
         }
       }
       const pi = await get(`${BASE}/queue`, 'tok-contrib-pi');
