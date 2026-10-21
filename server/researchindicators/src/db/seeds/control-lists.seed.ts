@@ -15,8 +15,12 @@ import { QueryRunner } from 'typeorm';
  * own explicit id, so a second run inserts 0 rows. Each function returns the
  * total of inserted rows (`affectedRows`) so the seed integration suite can
  * assert that a re-run changes nothing. The `AUTO_INCREMENT` reset after each
- * seed is also a no-op on a re-run: MySQL never lowers the counter below
- * MAX(id) + 1.
+ * seed runs ONLY when that call inserted rows. (An earlier note here called it
+ * a no-op on a re-run; it is not: it can rewind a counter that deletes had
+ * pushed above MAX(id) + 1, and it is DDL, which takes an exclusive metadata
+ * lock and deadlocked parallel Organizational Structure suites, T-05.) The
+ * counter is still above the seeded ids after a first run, because InnoDB also
+ * raises it past every explicit id inserted.
  *
  * Seeded ids are fixed across environments (D-CTL-14): categories 1-2,
  * lists 1-6, values 1-23. None of these statements carries a `?` or a
@@ -59,10 +63,13 @@ export const seedControlListCategories = async (
   }
 
   // AUTO_INCREMENT must start above the seeded ids for every admin-created
-  // category.
-  await runner.query(
-    `ALTER TABLE \`control_list_categories\` AUTO_INCREMENT = 3`,
-  );
+  // category. Skipped when nothing was inserted: a re-run must not issue DDL
+  // (see the header note).
+  if (inserted > 0) {
+    await runner.query(
+      `ALTER TABLE \`control_list_categories\` AUTO_INCREMENT = 3`,
+    );
+  }
 
   return inserted;
 };
@@ -141,8 +148,10 @@ export const seedControlLists = async (
   }
 
   // AUTO_INCREMENT must start above the seeded ids for every admin-created
-  // list.
-  await runner.query(`ALTER TABLE \`control_lists\` AUTO_INCREMENT = 7`);
+  // list. Skipped when nothing was inserted (see the header note).
+  if (inserted > 0) {
+    await runner.query(`ALTER TABLE \`control_lists\` AUTO_INCREMENT = 7`);
+  }
 
   return inserted;
 };
@@ -374,8 +383,14 @@ export const seedControlListValues = async (
   }
 
   // AUTO_INCREMENT must start above the seeded ids for every admin-created
-  // value.
-  await runner.query(`ALTER TABLE \`control_list_values\` AUTO_INCREMENT = 24`);
+  // value. Skipped when nothing was inserted (see the header note): this table
+  // is the parent of `org_unit_versions.level_value_id`, and DDL on it from a
+  // parallel integration worker deadlocks with Organizational Structure writes.
+  if (inserted > 0) {
+    await runner.query(
+      `ALTER TABLE \`control_list_values\` AUTO_INCREMENT = 24`,
+    );
+  }
 
   return inserted;
 };

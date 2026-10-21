@@ -243,9 +243,12 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
       if (app) await app.close();
       if (fixtures?.unitIds.length) {
         // `successor_id` is RESTRICT: break the links before the rows go.
+        // FORCE INDEX keeps this a PRIMARY-key range: as a table scan it
+        // X-locks every row (the seeded 1..117 included) until commit and
+        // deadlocked with parallel suites' FK checks (T-05).
         const ids = fixtures.unitIds.map(() => '?').join(',');
         await dataSource.query(
-          `UPDATE org_units SET successor_id = NULL WHERE id IN (${ids})`,
+          `UPDATE org_units FORCE INDEX (PRIMARY) SET successor_id = NULL WHERE id IN (${ids})`,
           fixtures.unitIds,
         );
       }

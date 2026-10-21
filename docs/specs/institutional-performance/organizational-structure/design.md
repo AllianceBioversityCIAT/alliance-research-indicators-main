@@ -149,9 +149,9 @@ All four tables: `utf8mb4`, collation `utf8mb4_unicode_ci` declared explicitly (
 ### 3.4 Seed (R-ORG-015)
 
 - **Location:** `src/db/seeds/org-structure.seed.ts`, imported by `…004-seedOrgStructure.ts` (D-ORG-14). Same shape as `control-lists.seed.ts`: each function returns `affectedRows` so the seed suite can assert a re-run inserts 0.
-- **Source:** the `TREE` constant in `../mockup/OrgStructure.dc.html` (:345 onward), the transcription of MMF sheet *04. ORG structure* used for the approved mockup. The seed migration embeds it as data. **Count as run (2026-10-08):** L1 = 3, L2 = 19, L3 = 1, L4 = 91 in `U([...])` groups + 4 explicit = **95**, against **94** in the proposal. Settled by the seed task with a named, per-group count and the requester's check (P-11).
+- **Source:** the `TREE` constant in `../mockup/OrgStructure.dc.html` (:417 onward), the transcription of MMF sheet *04. ORG structure* used for the approved mockup. The seed migration embeds it as data. **Count (re-run 2026-10-21 by evaluating `TREE`, not by regex):** L1 = 3, L2 = 19, L3 = 1, L4 = **94** — 117 entries, matching the proposal and the requester's sheet image (per-department counts identical, three parentless rows placed as stated). The 2026-10-08 figure of 95 was a miscount of the regex method. **Requester (2026-10-21):** load all 94 (yellow-highlighted rows in the sheet included — the highlight is ignored; same-named units under Global Support and Regional are distinct entries) and the mockup's directors (P-11, RB-1 closed).
 - Fixed ids 1…N in tree order; codes `ORG-001`…; every version `[2026, NULL)`; level ids 20–23; `AUTO_INCREMENT` set above N (D-CTL-14 technique).
-- **Directors:** the mockup holds 12 director names/emails. Match `alliance_user_staff` by email, else exact `first_name + last_name`; no single match → `NULL`. The migration logs the unmatched names (`LoggerUtil`) and the seed task records them for the requester.
+- **Directors:** the mockup `TREE` assigns **11** directors (carnets A0101–A0111; A0112–A0114 exist only in `STAFF` as delegate/demo staff — the earlier "12" was a miscount, corrected 2026-10-21 at T-05). Only **active** staff (`is_active = 1`, not deleted) are candidates, as for the picker (P-14); an inactive-only hit stores `NULL` and is reported. Match `alliance_user_staff` by email, else exact `first_name + last_name`; no single match → `NULL`. The migration logs the unmatched names (`LoggerUtil`) and the seed task records them for the requester.
 - Idempotent: every insert is `INSERT … SELECT … WHERE NOT EXISTS` on the fixed id. One `seed` log row per entry, also guarded.
 
 ---
@@ -352,7 +352,7 @@ Same mapping as Control Lists (control-lists design §6.4): `--ac-primary-blue-6
 
 ## 13. Premise Ledger
 
-**Count:** 14 premises — 13 verified, 1 open (P-11; Impact: 0 High open). Verified at `9e69c79a`; P-1…P-4, P-6, P-12, P-13 re-verified at `fa99546b` (2026-10-16).
+**Count:** 14 premises — 14 verified, 0 open (P-11 settled 2026-10-21). Verified at `9e69c79a`; P-1…P-4, P-6, P-12, P-13 re-verified at `fa99546b` (2026-10-16).
 
 | # | Claim | Citation (as run) | If false |
 | --- | --- | --- | --- |
@@ -366,7 +366,7 @@ Same mapping as Control Lists (control-lists design §6.4): `--ac-primary-blue-6
 | P-8 | No tree component used in the client; PrimeNG is 19.x | `grep -rn "p-treeTable\|<p-tree\|TreeTableModule\|primeng/tree" app` → 0; `package.json:49` | — |
 | P-9 | Staff sync upserts and never deletes; staff PK is `carnet` varchar(10) | `base-control-list-save.ts:39-41`; `alliance-user-staff.entity.ts` | FK RESTRICT would block the sync — Medium |
 | P-10 | Existing staff search mixes `AND`/`OR` without parentheses | `alliance-user-staff.service.ts:35-43` | D-ORG-8 rationale weaker — Low |
-| P-11 | Mockup `TREE` holds 3 / 19 / 1 / 95 entries by level | `python` regex over `OrgStructure.dc.html` (`U([...])` groups = 19, 91 names; + 4 explicit L4) | **Open:** proposal says 94 units. Settled in the seed task with a per-group listing and requester check |
+| P-11 | Mockup `TREE` holds 3 / 19 / 1 / 94 entries by level | `node` evaluation of `TREE` (`OrgStructure.dc.html:417-447`, 2026-10-21): `{"L1":3,"L2":19,"L3":1,"L4":94} total 117`; the 2026-10-08 regex count (95) was wrong | **Settled 2026-10-21:** 94 = proposal = requester's sheet image; requester: load all rows (highlight ignored) and the mockup directors |
 | P-12 | *Portfolio Management* is a leaf *Center admin* item (no `children`); Control Lists is under *System admin*; center-admin route pattern at `app.routes.ts:321-323` | `alliance-sidebar.component.ts:88-93,120` | Nav task changes shape — Low |
 | P-13 | The client has no method for the by-key read (`GET /api/control-lists/by-key/:listKey/values`); the server route exists without `@Roles` | `grep -n by-key api.service.ts` → 0; `control-lists.controller.ts:344-349` | Reuse it instead of adding one — Low |
 | P-14 | "Active staff" (R-ORG-016) has two candidate columns: `alliance_user_staff.status` (text, copied raw from Agresso — `alliance-staff.mapper.ts:14`; values undocumented) and `is_active` (from `AuditableEntity`, which the existing search filters on — `alliance-user-staff.service.ts:37`) | **Settled 2026-10-16 (requester): `is_active = 1`.** Measured on local `stardb` 2026-10-16: `status='N', is_active=1` → 3046; `status=NULL, is_active=1` → 39 — neither column separates leavers, and the Agresso sync (`cloneAllAgressoStaff`) never writes `is_active`. **Accepted risk:** until something marks leavers, the picker offers everyone in the table. The same column already drives the existing staff search. **Invalidating condition (K-013):** a sync or job that starts writing `is_active = 0`, or a documented meaning for `status` | The picker offers people who have left (accepted) — Medium |

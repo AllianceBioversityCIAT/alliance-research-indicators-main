@@ -23,6 +23,8 @@ export const ORG_T02_PREFIX = '__T02_';
  * reused that prefix would leak rows into its year views (KZ-005).
  */
 export const ORG_T04_PREFIX = '__T04_';
+/** T-05 seed suite (staff probes) and performance suite (synthetic entries). */
+export const ORG_T05_PREFIX = '__T05_';
 
 /** Refuse to run against anything that is not the local database. */
 export const assertLocalTestDatabase = (label: string): void => {

@@ -314,12 +314,12 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-05 — Seed and performance measurement
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-04 (the seed half needs only T-01; see §1)
+- **Status:** done (2026-10-21, Reviewer PASS on attempt 2 — execution.md) · **Size:** M · **Dependencies:** T-04 (the seed half needs only T-01; see §1)
 - **Requirements covered:**
   - R-ORG-015 — *Seed runs twice* (no entry, version or log row added); AC.1 counts; fixed ids; one version `[2026, open)` per entry; DT = Technology Integration; the three parentless units placed under the parent they appear with; director matching (email, else exact first + last name; no single match → empty) and the seed report; one `seed` log row per entry.
   - NFR-ORG-001 — year view of ≤ 500 entries p95 ≤ 300 ms; `resolve` of 100 ids ≤ 100 ms.
 - **Design refs:** §3.4, D-ORG-12, D-ORG-14, P-11
-- **First step (P-11):** list the mockup `TREE` (`../mockup/OrgStructure.dc.html:387` onward) per group, with the count per level. Send the requester the list and the 94 / 95 discrepancy, and record their answer in `execution.md` before writing the seed. The AC.1 counts are then the confirmed ones; "117" in requirements AC.1 is corrected if they differ (with a Correction Closure sweep).
+- **First step (P-11):** list the mockup `TREE` (`../mockup/OrgStructure.dc.html:417` onward) per group, with the count per level. Send the requester the list and the 94 / 95 discrepancy, and record their answer in `execution.md` before writing the seed. The AC.1 counts are then the confirmed ones; "117" in requirements AC.1 is corrected if they differ (with a Correction Closure sweep).
 - **Scope — database:** `src/db/seeds/org-structure.seed.ts` (data + insert functions returning `affectedRows`; no delegate rows; `INSERT … SELECT … WHERE NOT EXISTS` on fixed ids; `AUTO_INCREMENT` above N; director lookup by email, then by exact name; unmatched names logged with `LoggerUtil`). `src/db/migrations/1791000000004-seedOrgStructure.ts` imports it and exports only its class (D-ORG-14). Then `npm run migration:test:execute`.
 - **Scope — tests:** `test/org-structure-seed.integration-spec.ts`.
 - **Tests:**
@@ -329,7 +329,7 @@ Every task depends on the one before it. They share the module's service, contro
     - Spot checks by fixed id: the DT entry name, and the three formerly parentless units' parents.
     - The unmatched-director list is printed and copied into `execution.md` as the seed report.
   - **Performance (local DB):**
-    - Add synthetic entries up to 500 inside a test transaction rolled back after the run.
+    - Add synthetic entries up to 500 inside a test transaction rolled back after the run. *(As built, 2026-10-21: the synthetic rows are committed and deleted in the suite's last step, with 0 left proven — the read service uses its own pooled connections and cannot see uncommitted rows. A full untimed pass of 20 calls per operation runs before the timed runs. The suite is opt-in: `ORG_PERF_STRICT=1 npm run test:integration -- org-structure-performance`.)*
     - Time B1 for one year and `resolve` of 100 ids, 20 calls each, 3 runs; report p95 per run.
 - **Falsifier:**
   1. Remove `WHERE NOT EXISTS` from the versions insert → the re-run adds rows (or fails on the unique index; record which).
@@ -347,10 +347,10 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `standard` — data only, but irreversible on a shared DB once merged to `dev`, where the pipeline runs migrations.
 - **Skills:** nestjs-expert (server); systematic-debugging on any failure.
 - **Done criteria:**
-  - [ ] Requester's answer on P-11 recorded; counts in requirements AC.1 match it.
-  - [ ] `migration:test:execute` output, seed suite green, re-run 0 rows, seed report quoted.
-  - [ ] NFR-ORG-001: three runs with p95 per run quoted, verdict *pass* / *fail* / *inconclusive*.
-  - [ ] Falsifiers 1–3 observed red, then reverted.
+  - [x] Requester's answer on P-11 recorded; counts in requirements AC.1 match it. *(94 units / 117 entries — execution.md § T-05)*
+  - [x] `migration:test:execute` output, seed suite green, re-run 0 rows, seed report quoted.
+  - [x] NFR-ORG-001: three runs with p95 per run quoted, verdict *pass* / *fail* / *inconclusive*. *(Verdict recorded: **inconclusive** by the spread rule in 1 of 6 post-warm-up batches; budget met in every run with ≥ 7× margin — execution.md § NFR-ORG-001 verdict)*
+  - [x] Falsifiers 1–3 observed red, then reverted.
 
 ### T-06 — HITL: browser, mockup and seed review
 
@@ -466,7 +466,7 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 | --- | --- | --- | --- | --- | --- |
-| RB-1 | 2026-10-16 | P-11: the mockup `TREE` has 95 units, the proposal says 94 | T-05 first step: per-group list, requester decides before the seed is written | Leader / requester | open |
+| RB-1 | 2026-10-16 | P-11: the mockup `TREE` has 95 units, the proposal says 94 | T-05 first step: per-group list, requester decides before the seed is written | Leader / requester | **closed 2026-10-21** — `TREE` re-counted by evaluation: 94 units (the 95 was a regex miscount); matches the requester's sheet image per department; requester: load all rows incl. yellow-highlighted ones, and the mockup directors |
 | RB-2 | 2026-10-16 | P-14: which staff column means "active" is not documented | T-02 first step: measured query, rule written into design before code; stop if it does not separate current staff from people who left | Leader | **closed 2026-10-16** — measured (no separation); requester chose `is_active = 1`, accepted risk (design P-14, §4 B4) |
 | RB-3 | 2026-10-16 | Merging the seed to `dev` applies it to the shared Dev DB automatically (root `CLAUDE.md` §4.3, 2026-08-27 correction); Prod pipeline parity unconfirmed | Requester approves T-05 before merge to `dev`; confirm Prod behaviour before `main` (design §11) | Requester | open |
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |

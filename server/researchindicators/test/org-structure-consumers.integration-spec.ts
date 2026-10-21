@@ -360,9 +360,11 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
       if (app) await app.close();
       if (backstopApp) await backstopApp.close();
       if (fixtures?.unitIds.length) {
+        // FORCE INDEX keeps this a PRIMARY-key range (a scan X-locks every row
+        // until commit and deadlocked with parallel suites, T-05).
         const ids = fixtures.unitIds.map(() => '?').join(',');
         await dataSource.query(
-          `UPDATE org_units SET successor_id = NULL WHERE id IN (${ids})`,
+          `UPDATE org_units FORCE INDEX (PRIMARY) SET successor_id = NULL WHERE id IN (${ids})`,
           fixtures.unitIds,
         );
       }

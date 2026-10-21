@@ -610,7 +610,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 
 ## 12. Open questions
 
-None blocking. Q-1…Q-4 were accepted as recommended (proposal §12, 2026-10-08). Q-1 is now moot: `org.level` is global (2026-10-13). Q-2 leaves the exact year field to each consumer spec. P-11 (94 vs 95 seeded units) is settled in the seed task.
+None blocking. Q-1…Q-4 were accepted as recommended (proposal §12, 2026-10-08). Q-1 is now moot: `org.level` is global (2026-10-13). Q-2 leaves the exact year field to each consumer spec. P-11 (94 vs 95 seeded units) was settled in the seed task on 2026-10-21: **94** units (117 entries) — the 95 was a miscount; AC.1 stands.
 
 ## 13. Requirement ID index
 
