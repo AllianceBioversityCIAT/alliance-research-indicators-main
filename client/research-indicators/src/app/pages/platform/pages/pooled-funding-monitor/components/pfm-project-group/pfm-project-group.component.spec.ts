@@ -82,7 +82,8 @@ describe('PfmProjectGroupComponent', () => {
     expect(q('pfm-group-code')?.textContent?.trim()).toBe('P100');
     expect(q('pfm-group-name')?.textContent?.trim()).toBe('Alpha project');
     expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Lead PI: A. PI · Donor X');
-    expect(q('pfm-group-count')?.textContent?.trim()).toBe('7 results');
+    // done (3 approved + 2 pending + 1 no SP) of all results
+    expect(q('pfm-group-count')?.textContent?.trim()).toBe('6 of 7 results');
     expect(q('pfm-group-flag')?.textContent?.trim()).toBe('2 need attention');
   });
 
@@ -95,10 +96,10 @@ describe('PfmProjectGroupComponent', () => {
     const clear = setup({ ...GROUP, attention: 0 });
     expect(clear.q('pfm-group-flag')?.textContent?.trim()).toBe('All clear');
     expect(
-      setup({ ...GROUP, result_count: 1 })
+      setup({ ...GROUP, result_count: 1, counts: { approved: 0, pending: 0, rejected: 0, out_of_scope: 0, not_sent: 1 } })
         .q('pfm-group-count')
         ?.textContent?.trim()
-    ).toBe('1 result');
+    ).toBe('0 of 1 result');
   });
 
   // Same rule and colour as the coverage tab's Reported to PRMS bar.

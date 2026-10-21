@@ -133,7 +133,11 @@ export class PfmProjectGroupComponent {
   });
   /** Text alternative of the bar for assistive tech. */
   barSummary = computed(() => `${this.progress().done} of ${this.group().result_count} done: in PRMS or with no SP contribution`);
-  countLabel = computed(() => `${this.group().result_count} ${this.group().result_count === 1 ? 'result' : 'results'}`);
+  /** "{done} of {total} results": the green part of the bar, out of the project's results. */
+  countLabel = computed(() => {
+    const total = this.group().result_count;
+    return `${this.progress().done} of ${total} ${total === 1 ? 'result' : 'results'}`;
+  });
   /** Flag copy is client-owned (mockup `flagLabel`). */
   flagLabel = computed(() => {
     const n = this.group().attention;
