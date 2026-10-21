@@ -154,7 +154,7 @@ describe('PooledFundingMonitorComponent', () => {
     fixture.detectChanges();
     await flush();
 
-    expect(q('pfm-pi-empty')?.textContent).toContain('You are not PI of any project contributing to CGIAR Portfolio');
+    expect(q('pfm-pi-empty')?.textContent).toContain('You are not PI or delegate of any project contributing to the CGIAR Portfolio.');
     expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
     // HITL 20: the notice sits in the content area below the white band, not in the header card
     expect(q('pfm-band')?.contains(q('pfm-pi-empty'))).toBe(false);
@@ -174,31 +174,41 @@ describe('PooledFundingMonitorComponent', () => {
   describe('Contributor who is PI / delegate of a project (no other role)', () => {
     beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
 
-    it('offers only their own scope: no Whole portfolio toggle', async () => {
+    // Owner 2026-10-21: a PI / delegate also sees the whole portfolio, their own results first.
+    it('offers both scopes, Only my results as PI first, and opens on mine', async () => {
       await create({ contributorPi: true });
       fixture.detectChanges();
       await flush();
-      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
-      expect(q('pfm-scope-all')).toBeNull();
-      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
-    });
-
-    it('ignores ?scope=all in the URL and opens on mine', async () => {
-      await create({ contributorPi: true, params: { scope: 'all' } });
-      fixture.detectChanges();
-      await flush();
+      const order = Array.from(el.querySelectorAll('[data-testid^="pfm-scope-"]')).map(b => b.getAttribute('data-testid'));
+      expect(order).toEqual(['pfm-scope-mine', 'pfm-scope-all']);
       expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
       expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
-      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
     });
 
-    it('empty state has no "View whole portfolio" switch', async () => {
-      api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope, false))));
+    it('can switch to the whole portfolio', async () => {
       await create({ contributorPi: true });
       fixture.detectChanges();
       await flush();
-      expect(q('pfm-pi-empty')).not.toBeNull();
-      expect(q('pfm-pi-empty-switch')).toBeNull();
+      q('pfm-scope-all')?.click();
+      await flush();
+      await flush();
+      expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
+      expect(kpiValue('need_attention')).toBe('123');
+    });
+
+    // The m.lundy case: PI of many projects, none of them contributing.
+    it('empty PI scope while leading non-contributing projects says so, not "you are not PI", and offers the portfolio', async () => {
+      api.GET_PfmSummary.mockImplementation((scope: PfmScope) =>
+        Promise.resolve(ok({ ...summary(scope, false), manages_any_project: true }))
+      );
+      await create({ contributorPi: true });
+      fixture.detectChanges();
+      await flush();
+      const notice = q('pfm-pi-empty')?.textContent ?? '';
+      expect(notice).toContain('None of your projects contributes to the CGIAR Portfolio');
+      expect(notice).not.toContain('You are not PI');
+      expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
     });
   });
 

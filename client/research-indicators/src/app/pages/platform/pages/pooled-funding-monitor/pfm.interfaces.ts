@@ -88,6 +88,8 @@ export interface PfmRejectionReason {
 export interface PfmSummary {
   scope: PfmScope;
   is_pi_of_any: boolean;
+  /** PI or delegate of at least one project, contributing or not. Optional: older servers omit it. */
+  manages_any_project?: boolean;
   kpis: PfmKpis;
   pipeline: PfmPipeline;
   sp_coverage: PfmSpCoverage[];
