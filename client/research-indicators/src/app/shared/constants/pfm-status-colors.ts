@@ -42,7 +42,6 @@ export const PRMS_STATUS_COLOR = {
 /** CGIAR Portfolio mapping status, keyed by the wire value of `mapping_state`. */
 export const MAPPING_STATUS_COLOR = {
   Pending: 'var(--ac-status-mapping-pending)',
-  Incomplete: 'var(--ac-status-mapping-incomplete)',
   Complete: 'var(--ac-status-mapping-complete)',
   'No SP contribution': 'var(--ac-status-mapping-no-sp)'
 } as const;

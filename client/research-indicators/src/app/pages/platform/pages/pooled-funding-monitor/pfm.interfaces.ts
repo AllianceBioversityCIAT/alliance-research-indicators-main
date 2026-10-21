@@ -15,7 +15,7 @@ export type PfmChip = (typeof PFM_CHIPS)[number];
 export const PFM_STAR_LABELS = ['Draft', 'Submitted', 'Under review', 'Approved', 'Returned'] as const;
 export type PfmStarLabel = (typeof PFM_STAR_LABELS)[number];
 
-export const PFM_MAPPING_STATES = ['Pending', 'Incomplete', 'Complete', 'No SP contribution'] as const;
+export const PFM_MAPPING_STATES = ['Pending', 'Complete', 'No SP contribution'] as const;
 export type PfmMappingState = (typeof PFM_MAPPING_STATES)[number];
 
 export const PFM_PRMS_STATUSES = ['Not sent', 'Pending Review', 'Approved', 'Rejected'] as const;

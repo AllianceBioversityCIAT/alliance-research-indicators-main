@@ -1,5 +1,5 @@
 // Coverage tab, "What to do next": the three things left on our side, each one a quick view.
-// Together they are exactly Need attention (Mapping incomplete + Ready to sync + Rejected), and a
+// Together they are exactly Need attention (Mapping pending + Ready to sync + Rejected), and a
 // click opens the Results queue on that quick view.
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';

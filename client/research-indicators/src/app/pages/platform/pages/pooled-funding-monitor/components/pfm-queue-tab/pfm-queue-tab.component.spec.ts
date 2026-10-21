@@ -64,7 +64,7 @@ describe('PfmQueueTabComponent', () => {
     expect(chips.map(visible)).toEqual([
       'All results 41',
       'Need attention 7',
-      'Mapping incomplete 5',
+      'Mapping pending 5',
       'Ready to sync 3',
       'Synced with PRMS 13'
     ]);

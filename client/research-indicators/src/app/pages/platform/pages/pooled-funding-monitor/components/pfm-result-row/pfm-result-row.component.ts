@@ -22,7 +22,6 @@ const solid = (color: string): PfmTagTone => ({ fg: color, border: color });
 // Shared with the result sidebar PRMS sync card: never pick these colours here.
 const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
   Complete: solid(MAPPING_STATUS_COLOR.Complete),
-  Incomplete: solid(MAPPING_STATUS_COLOR.Incomplete),
   Pending: solid(MAPPING_STATUS_COLOR.Pending),
   'No SP contribution': solid(MAPPING_STATUS_COLOR['No SP contribution'])
 };

@@ -178,7 +178,7 @@ describe('PfmProjectGroupComponent', () => {
     ]);
   });
 
-  it('every row (incl. out-of-scope and mapping-incomplete) opens the result from its title; no other action; no dialog on click', () => {
+  it('every row (incl. out-of-scope and mapping-pending) opens the result from its title; no other action; no dialog on click', () => {
     const { store, fixture, q, el } = setup();
     (q('pfm-group-toggle') as HTMLButtonElement).click();
     store.groupRows.set({
@@ -187,7 +187,7 @@ describe('PfmProjectGroupComponent', () => {
         row({
           result_code: 'STAR-2',
           official_code: 2,
-          mapping_state: 'Incomplete',
+          mapping_state: 'Pending',
           star_status_id: 6,
           star_label: 'Approved',
           snapshot_years: [2024, 2025]

@@ -98,7 +98,6 @@
   --ac-status-prms-approved: var(--ac-state-done-fg);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
   --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-incomplete: var(--ac-state-progress-fg);
   --ac-status-mapping-complete: var(--ac-state-ready-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
@@ -274,7 +273,6 @@ $colors: (
   --ac-status-prms-approved: var(--ac-state-done-fg);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
   --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-incomplete: var(--ac-state-progress-fg);
   --ac-status-mapping-complete: var(--ac-state-ready-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);

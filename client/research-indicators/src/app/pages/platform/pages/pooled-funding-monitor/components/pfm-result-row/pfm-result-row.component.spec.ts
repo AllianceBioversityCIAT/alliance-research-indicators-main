@@ -28,7 +28,7 @@ const BASE: PfmResultRow = {
     { code: 'SP09', name: 'Climate Action', primary: false, color: null }
   ],
   pi_line: 'Awaiting PI approval',
-  mapping_state: 'Incomplete',
+  mapping_state: 'Pending',
   mapping_note: 'Budget shares missing',
   sp_line: 'SP01 (primary)',
   primary_sp: { code: 'SP01', name: 'Breeding', color: '#112233' },
@@ -213,15 +213,15 @@ describe('PfmResultRowComponent', () => {
     const { q, tipOf, tagsIn, sr } = render();
     const cell = q('pfm-row-mapping');
     const tag = cell.querySelector('app-custom-tag') as HTMLElement;
-    expect(tag.textContent?.trim()).toBe('Incomplete');
+    expect(tag.textContent?.trim()).toBe('Pending');
     expect(tipOf(cell)).toBe('Budget shares missing');
     expect(sr(cell)).toEqual(['Budget shares missing']);
     expect(cell.querySelector('[data-testid="pfm-row-mapping-note"]')).toBeNull();
     expect(cell.querySelectorAll('p').length).toBe(0);
     // jsdom drops var() colours from the CSSOM, so assert the inputs the tag receives.
     const [t] = tagsIn(cell);
-    expect(t.statusColor).toBe('var(--ac-status-mapping-incomplete)');
-    expect(t.statusBorder).toBe('var(--ac-status-mapping-incomplete)');
+    expect(t.statusColor).toBe('var(--ac-status-mapping-pending)');
+    expect(t.statusBorder).toBe('var(--ac-status-mapping-pending)');
   });
 
   it('approved (6) with snapshot years opens the latest snapshot version', () => {
@@ -235,9 +235,9 @@ describe('PfmResultRowComponent', () => {
     expect(q('pfm-row-title').getAttribute('href')).toBe('/result/STAR-1234?from=pfm-monitor');
   });
 
-  it('the title link is present on out-of-scope and mapping-incomplete rows', () => {
+  it('the title link is present on out-of-scope and mapping-pending rows', () => {
     expect(render({ mapping_state: 'No SP contribution', sp_line: 'Not reported to PRMS' }).q('pfm-row-title')).not.toBeNull();
-    expect(render({ mapping_state: 'Incomplete' }).q('pfm-row-title')).not.toBeNull();
+    expect(render({ mapping_state: 'Pending' }).q('pfm-row-title')).not.toBeNull();
   });
 
   it('renders server values as received and no other action', () => {
@@ -284,7 +284,6 @@ describe('PfmResultRowComponent', () => {
 
   it.each([
     ['Pending', MAPPING_STATUS_COLOR.Pending],
-    ['Incomplete', MAPPING_STATUS_COLOR.Incomplete],
     ['Complete', MAPPING_STATUS_COLOR.Complete],
     ['No SP contribution', MAPPING_STATUS_COLOR['No SP contribution']]
   ] as const)('mapping %s uses its shared status colour', (state, color) => {
