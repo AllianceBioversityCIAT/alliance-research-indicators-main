@@ -57,6 +57,7 @@ import {
   ImpersonationUserRow
 } from '@shared/interfaces/impersonation.interface';
 import { environment } from '../../../environments/environment';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { PostError } from '../interfaces/post-error.interface';
 import { GetContractsByUser } from '@shared/interfaces/get-contracts-by-user.interface';
 import { GeneralReportItem } from '@shared/interfaces/get-general-report.interface';
@@ -839,10 +840,19 @@ export class ApiService {
   };
 
   // Bilateral routes are URI-versioned and the backend regex on :resultCode accepts
-  // only digits, so we strip any STAR- prefix the FE may pass in (route params can
-  // arrive in either form). See bilateral-module/ari-backend-context handoff §4.
+  // only digits, so we strip any known platform prefix the FE may pass in (route
+  // params arrive as STAR-123 or TIP-123). Platform travels in the interceptor's
+  // reportingPlatforms query, not in this path (D-7).
   private bilateralPath(resultCode: string, suffix = ''): string {
-    const numeric = resultCode.replace(/^STAR-/i, '');
+    let numeric = resultCode;
+    const upper = resultCode.toUpperCase();
+    for (const platform of Object.values(PLATFORM_CODES)) {
+      const prefix = `${platform}-`;
+      if (upper.startsWith(prefix)) {
+        numeric = resultCode.slice(prefix.length);
+        break;
+      }
+    }
     return `v1/results/${encodeURIComponent(numeric)}/pool-funding-alignment${suffix}`;
   }
 

@@ -2,7 +2,7 @@
 
 - **Module:** prms-sync + prms-webhook (server) · bilateral read path (client)
 - **Spec id:** 2026-10-prms-platform-identity
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — ESCALATED, owner-resolved 2026-10-21)
@@ -160,7 +160,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-06 — Client: Pool Funding section for TIP results
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none (parallel-safe with server tasks)
+- [x] **Status:** done (2026-10-21, PASS attempt 1 — see `execution.md`) · **Size:** S · **Dependencies:** none (parallel-safe with server tasks)
 - **Requirements covered:** R-PPI-006 (*TIP result with imported alignment* THEN tab shown, AND read-only, BUT not editable / no save; *TIP result without alignment* stays hidden; *Other platforms* unchanged).
 - **Design refs:** §6, §8, D-7, reversion challenge (§10), P-15, P-16.
 - **Scope (files):** `client/research-indicators/src/app/shared/utils/platform-code.util.ts` (+ spec), `shared/services/api.service.ts` (`bilateralPath`, + spec), `shared/services/bilateral.service.spec.ts` (flip the zero-request assertion), `shared/components/result-sidebar/result-sidebar.component.spec.ts` (tab for `display_only`).
@@ -172,9 +172,9 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `platform-code.util.spec.ts:57-78` (asserts `[STAR]`), `bilateral.service.spec.ts:296-297,339` (zero requests for `TIP-…`), every `bilateralPath` caller (`grep -rn "bilateralPath" src` — run and list), `result-sidebar.component.spec.ts`, `pool-funding-alignment.component.spec.ts`.
 - **Review:** `checklist` + exported constant (override b) → conformance Reviewer.
 - **Done criteria:**
-  - [ ] Specs green; falsifiers observed red and reverted.
-  - [ ] lint, build green (client budgets unchanged).
-  - [ ] Visual read-only state deferred to T-07 HITL (jsdom cannot render it).
+  - [x] Specs green; falsifiers observed red and reverted.
+  - [x] lint, build green (client budgets unchanged).
+  - [x] Visual read-only state deferred to T-07 HITL (jsdom cannot render it).
 - **Skills:** `angular-developer`.
 
 ---

@@ -952,6 +952,38 @@ describe('ResultSidebarComponent', () => {
         expect(poolFundingItem()).toBeNull();
       });
     });
+
+    // R-PPI-006 — same visibility rule (eligible || display_only) for a TIP result.
+    // KZ-015: render hidden first, then the imported alignment arrives.
+    describe('R-PPI-006 TIP pool funding tab', () => {
+      const tipAlignment = (over: Partial<AlignmentResponse> = {}): AlignmentResponse => ({
+        result_code: 'TIP-123',
+        eligible: false,
+        has_pool_funding_alignment_eligible: false,
+        has_contribution: true,
+        selected_levers: [],
+        is_synced_to_prms: false,
+        is_read_only: true,
+        display_only: false,
+        has_pool_funding_data: true,
+        version_locked: false,
+        ...over
+      });
+
+      it('shows the tab for display_only and hides it when eligible and display_only are false', () => {
+        setAlignment(tipAlignment({ eligible: false, display_only: false }));
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).toBeNull();
+        expect(component.hasPoolFundingOption()).toBe(false);
+
+        setAlignment(tipAlignment({ eligible: false, display_only: true }));
+        fixture.detectChanges();
+
+        expect(poolFundingItem()).not.toBeNull();
+        expect(component.hasPoolFundingOption()).toBe(true);
+      });
+    });
   });
 
   describe('PRMS SYNC button', () => {
