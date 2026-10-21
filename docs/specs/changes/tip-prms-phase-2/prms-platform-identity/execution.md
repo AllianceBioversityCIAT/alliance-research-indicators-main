@@ -71,3 +71,17 @@
 - **Not Done / Assumptions (verbatim excerpt):** "Down does not undo a rewritten reference. A second up then reads `TIP-123` as no match and stores STAR. Observed." · "Out of file scope, these entity specs still assert the old column list / index shape and will fail when run: `result-prms-sync-log.entity.spec.ts` … and `prms-webhook-delivery.entity.spec.ts` … They were not edited." · NULL `results.platform_code` counts as STAR; several non-STAR platforms with no STAR → STAR, not rewritten.
 - **Leader check:** `npx jest src/domain/entities/result-prms-sync/entities src/domain/entities/prms-webhook/entities --silent --coverage=false` → `Test Suites: 2 failed` · `Tests: 4 failed, 41 passed` — confirms the consumer gap.
 - **continuations: 1** (down restores the rewritten reference; the two entity specs; collision abort exercised on MySQL) — same retained worker (`task_eef3b8bd2eb2` / `ctx_6d80b4a7efd9`). Falsifier (b) recorded as unable to go red on MySQL 8.0; the jest order assertion gates down order.
+- **Continuation 1 result (summary):** down restores rewritten references (up→down→up identical: row 2 `TIP-123/TIP`); both entity specs updated; collision exercised on MySQL → `ER_SIGNAL_EXCEPTION` 1644, references unchanged, but the two nullable columns and the check procedure had already been created (DDL implicit commit) — a collision abort would leave the migration half-applied. Leader re-run: migration-specs + entity specs 19/19 suites, 241/241; tsc 0; eslint 0; build 0.
+
+## T-02 discarded by the owner (2026-10-21)
+
+- **Owner (verbatim):** "siento que esta actividad 2 esta abibalente no siento seguridad con esta fallo mucho la conexion con claude y creo que sera mejor descartar todos los cambios de la actividad 2 y retomar magnana esa tarea".
+- **Action (Leader, pathspec restore — only T-02's files were uncommitted):** `git restore` of `prms-webhook-delivery.entity.ts` + spec and `result-prms-sync-log.entity.ts` + spec; `git clean -f` of `db/migrations/1792617297685-addPlatformCodeToPrmsSyncTables.ts` and `db/migration-specs/1792617297685-addPlatformCodeToPrmsSyncTables.spec.ts`. `git status --porcelain` after: clean. No Reviewer ran; nothing of T-02 was committed. Workers released; no TEST container running. T-01 and T-06 (committed) are untouched.
+- **Carry into the restart (lessons from this attempt, for the fresh brief):**
+  1. Full `migration:test:bootstrap` is blocked by a pre-existing defect (RB-3, `CreatePiDelegates1787600000000` errno 3780) — use the targeted run (baseline + `1789479131116`, `1790023167000`, `1790086170692` + this migration).
+  2. Falsifier (b) cannot go red on MySQL 8.0 (dropping a column inside a composite index is accepted) — the jest order assertion is the down-order gate.
+  3. `down()` must restore rewritten `<platform>-<code>` references, or `up → down → up` mis-tags them.
+  4. The entity specs `result-prms-sync-log.entity.spec.ts` and `prms-webhook-delivery.entity.spec.ts` pin the column/index shape — they belong to T-02's Consumers.
+  5. The collision check must run **before any DDL** (read-only SELECT), or an abort leaves the schema half-applied — **open owner decision**, design §5 order.
+  6. `CAST('TIP-123' AS UNSIGNED)` errors under `STRICT_TRANS_TABLES` — guard the cast.
+- **Status:** T-02 `[ ]` — to restart tomorrow with a fresh worker.

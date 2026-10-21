@@ -67,7 +67,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-02 — Migration and entity columns
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** none
+- [ ] **Status:** todo — attempt discarded by the owner 2026-10-21, restart pending (lessons in `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-PPI-001 (*Existing rows* — THEN log platform from the named result; AND non-STAR reference rewritten; AND history STAR rules; BUT never-matched history → no platform; AND IT MUST be reversible); NFR-PPI-002.
 - **Design refs:** §5 (table, migration order, down, collision abort), D-2, D-3, P-2, P-3, P-4, P-19.
 - **Scope (files):**
