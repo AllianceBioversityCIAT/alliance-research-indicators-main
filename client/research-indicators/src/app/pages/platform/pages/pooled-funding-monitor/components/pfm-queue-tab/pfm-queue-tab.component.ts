@@ -18,9 +18,11 @@ const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: st
   { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
   { key: 'mapping_incomplete', label: 'Mapping incomplete', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
-  { key: 'rejected', label: 'Rejected by PRMS', count: 'prms_rejected', help: PFM_HELP.rejected, dot: PFM_STATE.alert.fill },
   { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];
+
+/** Views reachable from the coverage tab that are not shown as quick views. */
+const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = { rejected: 'Rejected by PRMS' };
 
 /** Legend of the PRMS bar colors (R-PFM-015). */
 const LEGEND = [
@@ -42,6 +44,15 @@ export class PfmQueueTabComponent {
   readonly store = inject(PfmStoreService);
   readonly ALL = ALL;
   readonly chips = CHIPS;
+  /**
+   * A view that is no longer a quick view (Rejected by PRMS) but that the coverage tab still opens
+   * ("Fix and send again"): shown as a removable tag so the queue never filters invisibly.
+   */
+  readonly hiddenChip = computed(() => {
+    const key = this.store.chip();
+    if (!key || CHIPS.some(c => c.key === key)) return null;
+    return HIDDEN_CHIP_LABELS[key] ? { key, label: HIDDEN_CHIP_LABELS[key] } : null;
+  });
   readonly legend = LEGEND;
 
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */

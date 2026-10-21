@@ -99,6 +99,21 @@
           }
         </button>
       }
+      @if (hiddenChip(); as h) {
+        <span
+          class="inline-flex items-center gap-2 rounded-full border border-solid border-[color:var(--ac-pfm-accent-navy)] bg-[var(--ac-pfm-info-bg)] py-1 pl-4 pr-2 text-[13px] font-semibold text-[var(--ac-pfm-accent-navy)]"
+          data-testid="pfm-hidden-chip">
+          Showing: {{ h.label }}
+          <button
+            type="button"
+            class="inline-flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[var(--ac-pfm-accent-navy)] hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2"
+            [attr.aria-label]="'Remove ' + h.label"
+            data-testid="pfm-hidden-chip-clear"
+            (click)="selectChip('all')">
+            <i class="pi pi-times !text-[10px]" aria-hidden="true"></i>
+          </button>
+        </span>
+      }
     </div>
     </div>
 
