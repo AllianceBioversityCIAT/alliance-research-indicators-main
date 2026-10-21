@@ -307,6 +307,22 @@ describe('AgrovocKeywordsComponent', () => {
     expect(chips()).toEqual(['Capacity Sharing']);
   }));
 
+  it('removing an older keyword keeps the newer chips visible', fakeAsync(() => {
+    // p-chip hides itself on remove; a chip instance reused for the next keyword
+    // would carry that display:none and hide a keyword that is still selected.
+    setup({ keywords: ['In-Person', 'asd', 'fgh'] });
+
+    const remove = fixture.nativeElement.querySelector('.p-chip-remove-icon') as HTMLElement;
+    remove.click();
+    fixture.detectChanges();
+
+    const visibleChips = Array.from(fixture.nativeElement.querySelectorAll('p-chip') as NodeListOf<HTMLElement>)
+      .filter(chip => chip.style.display !== 'none')
+      .map(chip => chip.querySelector('.p-chip-label')?.textContent?.trim());
+    expect(component.keywords()).toEqual(['asd', 'fgh']);
+    expect(visibleChips).toEqual(['asd', 'fgh']);
+  }));
+
   it('case 9 — a disabled field cannot search or remove chips', fakeAsync(() => {
     setup({ keywords: ['In-Person', 'Capacity Sharing'], disabled: true });
 

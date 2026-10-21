@@ -75,7 +75,8 @@
   </div>
 
   <div class="agrovoc-keywords__chips" aria-label="Selected keywords">
-    @for (keyword of keywords(); track $index) {
+    <!-- Track by value: p-chip hides itself on remove, so a reused instance would hide the next keyword. -->
+    @for (keyword of keywords(); track keyword) {
       <p-chip
         styleClass="agrovoc-keywords__chip"
         [label]="keyword"
