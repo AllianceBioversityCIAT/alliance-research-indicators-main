@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
+import { DataSource, Not } from 'typeorm';
 import { SaveResultService } from './save-all-sections.service';
 import { ResultsService } from '../../entities/results/results.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
@@ -22,6 +22,8 @@ import { ResultPolicyChangeService } from '../../entities/result-policy-change/r
 import { ResultCapacitySharingService } from '../../entities/result-capacity-sharing/result-capacity-sharing.service';
 import { ResultInnovationDevService } from '../../entities/result-innovation-dev/result-innovation-dev.service';
 import { ResultIpRightsService } from '../../entities/result-ip-rights/result-ip-rights.service';
+import { ResultInnovationUseService } from '../../entities/result-innovation-use/result-innovation-use.service';
+import { ResultInnovationUse } from '../../entities/result-innovation-use/entities/result-innovation-use.entity';
 
 describe('SaveResultService', () => {
   let service: SaveResultService;
@@ -50,6 +52,10 @@ describe('SaveResultService', () => {
     Pick<ResultInnovationDevService, 'update'>
   >;
   let resultIpRightsService: jest.Mocked<Pick<ResultIpRightsService, 'update'>>;
+  let resultInnovationUseService: jest.Mocked<
+    Pick<ResultInnovationUseService, 'create' | 'update'>
+  >;
+  let innovationUseRepoHandle: { exists: jest.Mock };
   let queryService: jest.Mocked<QueryService>;
   let currentUser: jest.Mocked<CurrentUserUtil>;
   let resultsUtil: jest.Mocked<
@@ -112,8 +118,12 @@ describe('SaveResultService', () => {
     linkResultRepoHandle = {
       find: jest.fn().mockResolvedValue([]),
     };
+    innovationUseRepoHandle = {
+      exists: jest.fn().mockResolvedValue(true),
+    };
     getRepository = jest.fn((entity) => {
       if (entity === LinkResult) return linkResultRepoHandle;
+      if (entity === ResultInnovationUse) return innovationUseRepoHandle;
       return resultRepoHandle;
     });
 
@@ -202,6 +212,13 @@ describe('SaveResultService', () => {
             update: jest.fn().mockResolvedValue(undefined),
           },
         },
+        {
+          provide: ResultInnovationUseService,
+          useValue: {
+            create: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+          },
+        },
       ],
     }).compile();
 
@@ -214,6 +231,7 @@ describe('SaveResultService', () => {
     resultCapacitySharingService = module.get(ResultCapacitySharingService);
     resultInnovationDevService = module.get(ResultInnovationDevService);
     resultIpRightsService = module.get(ResultIpRightsService);
+    resultInnovationUseService = module.get(ResultInnovationUseService);
     queryService = module.get(QueryService);
     currentUser = module.get(CurrentUserUtil);
     resultsUtil = module.get(ResultsUtil);
@@ -698,6 +716,60 @@ describe('SaveResultService', () => {
       );
     });
 
+    it('should save innovationUse when indicator is INNOVATION_USE', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 95,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+      dto.innovationUse = { innovation_use_level_id: 3, actors: [] } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationUseService.create).not.toHaveBeenCalled();
+      expect(resultInnovationUseService.update).toHaveBeenCalledWith(
+        95,
+        dto.innovationUse,
+      );
+    });
+
+    it('should create the missing innovation use detail row before updating it', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 96,
+        result_official_code: 7001,
+      } as any);
+      innovationUseRepoHandle.exists.mockResolvedValue(false);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+      dto.innovationUse = { actors: [] } as any;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(innovationUseRepoHandle.exists).toHaveBeenCalledWith({
+        where: { result_id: 96, is_active: true },
+      });
+      expect(resultInnovationUseService.create).toHaveBeenCalledWith(96);
+      expect(
+        resultInnovationUseService.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        resultInnovationUseService.update.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('should not touch innovation use when the DTO carries none', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 97,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.createResult.indicator_id = IndicatorsEnum.INNOVATION_USE;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultInnovationUseService.update).not.toHaveBeenCalled();
+    });
+
     it('should merge STAR primary levers before updating alignment', async () => {
       resultRepoHandle.findOne.mockResolvedValue({
         result_id: 3,
@@ -870,6 +942,110 @@ describe('SaveResultService', () => {
       expect(resultsService.createResult).toHaveBeenCalled();
       expect(queryService.deleteLogicalResultById).toHaveBeenCalledWith(88);
       expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveAllSections title duplicate handling', () => {
+    const starExtraData = (counters = new CounterResults()) => ({
+      platformCode: ReportingPlatformEnum.STAR,
+      counters,
+      resultSaved: [] as number[],
+      currentCode: { current: 0 },
+      duplicateByTitle: true,
+    });
+
+    it('should skip the save when another live result has the same title', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ result_id: 77 });
+      const counters = new CounterResults();
+      const dto = minimalResultDto();
+      dto.createResult.title = '  Same title  ';
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, starExtraData(counters));
+
+      expect(resultRepoHandle.findOne).toHaveBeenLastCalledWith({
+        where: { title: 'Same title', is_active: true, is_snapshot: false },
+        select: { result_id: true },
+      });
+      expect(resultsService.createResult).not.toHaveBeenCalled();
+      expect(resultRepoHandle.find).not.toHaveBeenCalled();
+      expect(counters[CounterResultsEnum.CREATED]).toBe(0);
+    });
+
+    it('should exclude the row being updated from the title check', async () => {
+      resultRepoHandle.findOne
+        .mockResolvedValueOnce({ result_id: 5, result_official_code: 7001 })
+        .mockResolvedValueOnce(null);
+      const counters = new CounterResults();
+
+      await service.saveAllSections(
+        minimalResultDto(),
+        starExtraData(counters),
+      );
+
+      expect(resultRepoHandle.findOne.mock.calls[1][0].where).toEqual({
+        title: 't',
+        is_active: true,
+        is_snapshot: false,
+        result_id: Not(5),
+      });
+      expect(counters[CounterResultsEnum.UPDATED]).toBe(1);
+    });
+
+    it('should ignore public_link duplicates when deduplicating by title', async () => {
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      resultRepoHandle.find.mockResolvedValue([
+        {
+          result_id: 55,
+          platform_code: ReportingPlatformEnum.TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        },
+      ]);
+      resultsService.createResult.mockResolvedValue({
+        result_id: 1,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.public_link = 'https://example.org/doc';
+
+      await service.saveAllSections(dto, starExtraData());
+
+      expect(resultsService.createResult).toHaveBeenCalled();
+      expect(queryService.deleteLogicalResultById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveAllSections PRMS identifiers', () => {
+    it('should write prms_result_code and prms_phase_id when present', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 5,
+        result_official_code: 7001,
+      } as any);
+      const dto = minimalResultDto();
+      dto.prms_result_code = 28731;
+      dto.prms_phase_id = 6;
+
+      await service.saveAllSections(dto, prmsExtraData());
+
+      expect(resultRepoHandle.update).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ prms_result_code: 28731, prms_phase_id: 6 }),
+      );
+    });
+
+    it('should leave both columns untouched when the DTO does not carry them', async () => {
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 5,
+        result_official_code: 7001,
+      } as any);
+
+      await service.saveAllSections(minimalResultDto(), prmsExtraData());
+
+      const written = resultRepoHandle.update.mock.calls[0][1];
+      expect(written).not.toHaveProperty('prms_result_code');
+      expect(written).not.toHaveProperty('prms_phase_id');
     });
   });
 

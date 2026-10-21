@@ -51,7 +51,7 @@ export class ResultPoolFundingTocAlignmentRepository extends Repository<ResultPo
    */
   async upsertForSp(
     input: TocAlignmentUpsertInput,
-    actorUserId: number,
+    actorUserId: number | null,
     manager?: EntityManager,
   ): Promise<ResultPoolFundingTocAlignment> {
     const repo = manager
@@ -109,7 +109,7 @@ export class ResultPoolFundingTocAlignmentRepository extends Repository<ResultPo
   async deactivateForSps(
     resultId: number,
     spCodes: string[],
-    actorUserId: number,
+    actorUserId: number | null,
     manager?: EntityManager,
   ): Promise<number> {
     if (!spCodes.length) {

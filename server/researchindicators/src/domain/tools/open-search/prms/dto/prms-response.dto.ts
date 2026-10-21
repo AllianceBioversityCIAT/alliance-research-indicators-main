@@ -186,6 +186,9 @@ export class ResultResponseMapper {
   public result_code: string;
   public status_id: string;
   public year: string;
+  // PRMS reporting phase id (not a year). The STAR import stores it on the
+  // result version, never on the live row.
+  public phase_id?: number;
   public pdf_link: string;
   public prms_link: string;
   public last_update_at: string;
@@ -206,6 +209,7 @@ export class ResultResponseMapper {
   public policy_change_summary: PolicyChangeSummaryMapper;
   public capacity_development_summary: CapacityDevelopmentSummaryMapper;
   public innovation_development_summary: InnovationDevelopmentSummaryMapper;
+  public innovation_use_summary?: InnovationUseSummaryMapper | null;
 }
 
 export class PolicyChangeSummaryMapper {
@@ -248,6 +252,82 @@ export class InnovationDevelopmentSummaryMapper {
   public evidence_of_user_need_user_demand: unknown[];
   public scaling_study_urls: unknown[];
   public innovation_development_questionnaire: InnovationDevelopmentQuestionnaireMapper;
+}
+
+/**
+ * PRMS `innovation_use_summary`. Only the current-use numbers, the use level
+ * and the linked results have a home in STAR; the 2030 section, the budgets
+ * and the scaling studies are typed for completeness but not imported.
+ */
+export class InnovationUseSummaryMapper {
+  public has_innovation_link: boolean;
+  public linked_results: InnovationUseLinkedResultMapper[];
+  public innov_use_to_be_determined: boolean;
+  public current_core_innovation_use_supported_by_evidence: {
+    female_using: number | null;
+    male_using: number | null;
+  } | null;
+  public current_section: InnovationUseSectionMapper | null;
+  public innovation_use_level: InnovationUseLevelMapper | null;
+  public readiness_level_explanation: string | null;
+  public has_scaling_studies: boolean;
+  public scaling_study_urls: string[];
+  public innov_use_2030_to_be_determined: boolean;
+  public innovation_use_2030_section: InnovationUseSectionMapper | null;
+  public initiative_budget: unknown[];
+  public bilateral_project_budget: unknown[];
+  public partner_budget: unknown[];
+}
+
+export class InnovationUseLinkedResultMapper {
+  public result_id: string | null;
+  public result_type_id: number | null;
+  public result_type_name: string | null;
+  public title: string | null;
+}
+
+export class InnovationUseSectionMapper {
+  public actors: InnovationUseActorMapper[];
+  public organizations: InnovationUseOrganizationMapper[];
+  public other_quantitative: InnovationUseQuantitativeMapper[];
+}
+
+/**
+ * `sex_and_age_disaggregation: true` means PRMS holds only the total
+ * (`how_many`); `false` means it holds the women / men / youth breakdown.
+ * `women` and `men` are totals that include their youth share.
+ */
+export class InnovationUseActorMapper {
+  public actor_type_name: string;
+  public other_actor_type?: string | null;
+  public sex_and_age_disaggregation: boolean;
+  public addressing_demands: unknown;
+  public how_many?: number | null;
+  public women?: number | null;
+  public women_youth?: number | null;
+  public men?: number | null;
+  public men_youth?: number | null;
+}
+
+export class InnovationUseOrganizationMapper {
+  public institution_type_name: string;
+  public other_institution?: string | null;
+  public addressing_demands: unknown;
+  public how_many: number | null;
+  public graduate_students?: number | null;
+}
+
+export class InnovationUseQuantitativeMapper {
+  public quantity: number;
+  public unit_of_measure: string;
+  public addressing_demands: unknown;
+}
+
+export class InnovationUseLevelMapper {
+  public id: string;
+  public level: number;
+  public name: string;
+  public definition: string;
 }
 
 export class InnovationCharacterizationMapper {
@@ -348,6 +428,19 @@ export class PolicyStageMapper {
   public name: string;
   public definition: string;
 }
+
+export type PrmsSearchParams = Partial<
+  Record<
+    | 'year'
+    | 'centerAcronym'
+    | 'resultType'
+    | 'resultCode'
+    | 'source'
+    | 'fundingType'
+    | 'statusId',
+    string | number
+  >
+>;
 
 export class PrmsTemporalResponseMapper {
   public code: number;

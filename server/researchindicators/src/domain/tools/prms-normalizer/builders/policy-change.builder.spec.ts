@@ -72,6 +72,7 @@ const policyAggregate = (
 ): PrmsSyncAggregate => ({
   result_id: 9003,
   result_official_code: 1441063,
+  prms_result_code: null,
   indicator_id: 4,
   created_at: new Date('2024-03-01T10:00:00.000Z'),
   title: 'Policy change type-block fixture',

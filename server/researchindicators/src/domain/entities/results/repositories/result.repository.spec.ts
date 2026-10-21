@@ -616,6 +616,15 @@ describe('ResultRepository', () => {
       );
     });
 
+    // R-PRY-007 — the display-only rule needs the snapshot flag in the SELECT.
+    it('selects r.is_snapshot (R-PRY-007)', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(
+        /SELECT[\s\S]*\br\.is_snapshot\b[\s\S]*FROM results r/,
+      );
+    });
+
     it('binds the result id as the sole positional parameter', async () => {
       await repository.findPoolFundingAlignmentContext(123);
       expect(querySpy.mock.calls[0][1]).toEqual([123]);

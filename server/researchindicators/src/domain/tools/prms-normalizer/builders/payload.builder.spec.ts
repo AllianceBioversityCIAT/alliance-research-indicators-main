@@ -108,6 +108,7 @@ const completeAggregate = (
 ): PrmsSyncAggregate => ({
   result_id: 9009,
   result_official_code: 1441080,
+  prms_result_code: null,
   indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
   created_at: CREATED_AT,
   title: 'Payload builder assembly fixture',
