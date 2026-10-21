@@ -12,6 +12,7 @@ import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-proce
 import { PrmsOpenSearchModule } from '../open-search/prms/prms.opensearch.module';
 import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.module';
 import { SaveAllSectionsModule } from '../../shared/services/save-all-sections.module';
+import { BilateralModule } from '../../entities/bilateral/bilateral.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SaveAllSectionsModule } from '../../shared/services/save-all-sections.m
     PrmsOpenSearchModule,
     ClarisaSdgsModule,
     SaveAllSectionsModule,
+    BilateralModule,
   ],
   controllers: [TipIntegrationController],
   providers: [TipIntegrationService, TipIntegrationRepository],
