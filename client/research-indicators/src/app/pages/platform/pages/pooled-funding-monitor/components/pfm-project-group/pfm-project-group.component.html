@@ -21,17 +21,15 @@
       >
     </span>
     <span class="text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-count">{{ countLabel() }}</span>
+    <!-- Same rule and colour as the coverage tab's Reported to PRMS bar (done = in PRMS or no SP contribution) -->
     <span
-      class="flex h-3 w-[190px] overflow-hidden rounded-full bg-[var(--ac-pfm-seg-not-started)]"
+      class="flex h-3 w-[190px] overflow-hidden rounded-full"
+      [style.background-color]="emptyFill"
+      [attr.title]="barSummary()"
       aria-hidden="true"
       data-testid="pfm-group-bar">
-      @for (s of segments(); track s.key) {
-        <span
-          class="h-full {{ s.seg }}"
-          [style.flex-grow]="s.n"
-          [style.flex-basis]="0"
-          [attr.title]="s.title(s.n)"
-          [attr.data-testid]="'pfm-group-seg-' + s.key"></span>
+      @if (progress().done > 0) {
+        <span class="h-full rounded-full" [style.width]="progress().width" [style.background-color]="doneFill" data-testid="pfm-group-done"></span>
       }
     </span>
     <span class="sr-only" data-testid="pfm-group-bar-summary">{{ barSummary() }}</span>

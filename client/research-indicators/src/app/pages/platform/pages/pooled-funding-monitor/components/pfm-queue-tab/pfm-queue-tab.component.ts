@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
-import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
+import { PFM_STATE } from '@shared/constants/pfm-status-colors';
 import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmChipCounts, PfmFilters } from '../../pfm.interfaces';
 import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
@@ -30,15 +30,6 @@ const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
   prms_approved: 'Approved by PRMS'
 };
 
-/** Legend of the PRMS bar colors (R-PFM-015). */
-const LEGEND = [
-  { label: 'Approved in PRMS', fill: PFM_STATE.done.fill, help: PFM_HELP.approved },
-  { label: 'Pending review', fill: PFM_STATE.waiting.fill, help: PFM_HELP.pendingReview },
-  { label: 'Rejected', fill: PFM_STATE.alert.fill, help: PFM_HELP.rejectedState },
-  { label: 'Out of scope', fill: PFM_STATE.out.fill, help: PFM_HELP.outOfScope },
-  { label: 'Not synced', fill: PFM_STATE_EMPTY, help: 'Not in PRMS yet: still to map or ready to sync.' }
-];
-
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
@@ -59,7 +50,6 @@ export class PfmQueueTabComponent {
     if (!key || CHIPS.some(c => c.key === key)) return null;
     return HIDDEN_CHIP_LABELS[key] ? { key, label: HIDDEN_CHIP_LABELS[key] } : null;
   });
-  readonly legend = LEGEND;
 
   /** Last loaded queue: stays rendered (filters included) while a refetch is in flight. */
   readonly queue = computed(() => this.store.queue());

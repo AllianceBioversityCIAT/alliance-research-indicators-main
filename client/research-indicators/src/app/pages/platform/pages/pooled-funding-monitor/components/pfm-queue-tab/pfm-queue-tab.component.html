@@ -121,13 +121,6 @@
       @if (!stale()) {
         <p class="m-0" data-testid="pfm-count-line">{{ countLine() }}</p>
       }
-      <ul class="m-0 ml-auto flex list-none flex-wrap gap-4 p-0" data-testid="pfm-legend" aria-label="PRMS bar colors">
-        @for (l of legend; track l.label) {
-          <li class="inline-flex cursor-help items-center gap-1.5" tabindex="0" [pTooltip]="l.help" tooltipEvent="both" tooltipPosition="top">
-            <span class="h-2.5 w-2.5 rounded-sm" [style.background-color]="l.fill" aria-hidden="true"></span>{{ l.label }}
-          </li>
-        }
-      </ul>
     </div>
 
     <!-- Groups are never rendered while the queue is stale (NFR-PFM-006) -->

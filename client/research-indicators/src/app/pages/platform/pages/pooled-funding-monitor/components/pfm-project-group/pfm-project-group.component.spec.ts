@@ -101,22 +101,27 @@ describe('PfmProjectGroupComponent', () => {
     ).toBe('1 result');
   });
 
-  it('bar renders only non-zero segments, each with a title from server counts', () => {
-    const { el } = setup();
-    const segs = Array.from(el.querySelectorAll('[data-testid="pfm-group-bar"] > span'));
-    expect(segs.map(s => s.getAttribute('title'))).toEqual([
-      '3 approved in PRMS',
-      '2 pending review',
-      '1 no SP contribution · out of PRMS scope',
-      '1 not synced yet'
-    ]);
-    expect(el.querySelector('[data-testid="pfm-group-seg-rejected"]')).toBeNull();
-    // The bar is decorative; its text alternative lives in the button (no list inside a button).
-    expect(el.querySelector('[data-testid="pfm-group-bar"]')?.getAttribute('aria-hidden')).toBe('true');
-    expect(el.querySelector('[data-testid="pfm-group-toggle"] ul')).toBeNull();
+  // Same rule and colour as the coverage tab's Reported to PRMS bar.
+  it('bar is ONE green part = in PRMS (approved + pending review) + no SP contribution, over the grey rest', () => {
+    const { el, fixture } = setup();
+    const bar = el.querySelector('[data-testid="pfm-group-bar"]') as HTMLElement;
+    const parts = Array.from(bar.children);
+    expect(parts).toHaveLength(1);
+    // GROUP: 3 approved + 2 pending + 1 out of scope = 6 of 7 (rejected / not sent are left)
+    expect((parts[0] as HTMLElement).style.width).toBe(`${(6 / 7) * 100}%`);
+    expect(fixture.componentInstance.doneFill).toBe('var(--ac-state-done-fill)');
+    expect(fixture.componentInstance.emptyFill).toBe('var(--ac-state-empty)');
+    expect(bar.textContent?.trim()).toBe(''); // no percentage
+    // The bar is decorative; its text alternative lives in the button.
+    expect(bar.getAttribute('aria-hidden')).toBe('true');
     const summary = el.querySelector('[data-testid="pfm-group-bar-summary"]') as HTMLElement;
     expect(summary.className).toContain('sr-only');
-    expect(summary.textContent).toBe('3 approved in PRMS, 2 pending review, 1 no SP contribution · out of PRMS scope, 1 not synced yet');
+    expect(summary.textContent).toBe('6 of 7 done: in PRMS or with no SP contribution');
+  });
+
+  it('nothing done: no green part, only the grey track', () => {
+    const { el } = setup({ ...GROUP, counts: { approved: 0, pending: 0, rejected: 2, out_of_scope: 0, not_sent: 5 } });
+    expect(el.querySelector('[data-testid="pfm-group-done"]')).toBeNull();
   });
 
   it('a native button toggles on click: aria-expanded flips and the call goes to the store', () => {

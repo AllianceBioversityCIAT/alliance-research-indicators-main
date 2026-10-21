@@ -3,18 +3,10 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal, vi
 import { Table, TableModule } from 'primeng/table';
 import { SearchExportControlsComponent } from '@shared/components/search-export-controls/search-export-controls.component';
 import { PfmGroup, PfmResultRow } from '../../pfm.interfaces';
+import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmStoreService } from '../../services/pfm-store.service';
 import { PfmResultRowComponent } from '../pfm-result-row/pfm-result-row.component';
 
-// Literal class strings so Tailwind can see them. Colors are tokens only (NFR-PFM-003).
-const SEGMENTS: { key: 'approved' | 'pending' | 'rejected' | 'out_of_scope' | 'not_sent'; seg: string; title: (n: number) => string }[] = [
-  { key: 'approved', seg: 'bg-[var(--ac-pfm-seg-approved)]', title: n => `${n} approved in PRMS` },
-  { key: 'pending', seg: 'bg-[var(--ac-pfm-seg-pending-group)]', title: n => `${n} pending review` },
-  { key: 'rejected', seg: 'bg-[var(--ac-pfm-seg-rejected)]', title: n => `${n} rejected` },
-  { key: 'out_of_scope', seg: 'bg-[var(--ac-pfm-seg-no-sp)]', title: n => `${n} no SP contribution · out of PRMS scope` },
-  // Not synced = the 'nothing yet' grey of every progress bar, not a state colour.
-  { key: 'not_sent', seg: 'bg-[var(--ac-state-empty)]', title: n => `${n} not synced yet` }
-];
 
 /** Columns in their fixed order; `sort` is the row field p-table sorts on. No Action column: the title opens the result. */
 const COLUMNS: { header: string; sort: keyof PfmTableRow }[] = [
@@ -92,6 +84,8 @@ export class PfmProjectGroupComponent {
   readonly store = inject(PfmStoreService);
   group = input.required<PfmGroup>();
   readonly columns = COLUMNS;
+  readonly doneFill = PFM_STATE.done.fill;
+  readonly emptyFill = PFM_STATE_EMPTY;
   /** Rows per page: starts at 5, then follows the paginator dropdown. */
   readonly pageSize = signal(PFM_GROUP_PAGE_SIZE);
   private readonly table = viewChild<Table>('dt');
@@ -127,14 +121,18 @@ export class PfmProjectGroupComponent {
     this.table()?.reset();
   }
 
-  /** Zero segments are not rendered (a zero-width element would still be focusable / hoverable). */
-  segments = computed(() => SEGMENTS.map(s => ({ ...s, n: this.group().counts[s.key] })).filter(s => s.n > 0));
-  /** Text alternative of the bar for assistive tech: non-zero segments only. */
-  barSummary = computed(() =>
-    this.segments()
-      .map(s => s.title(s.n))
-      .join(', ')
-  );
+  /**
+   * Same rule as the coverage tab's Reported to PRMS bar: done = in PRMS (pending review or approved)
+   * or no SP contribution, in ONE green; the rest (Need attention, rejected included) is the grey track.
+   */
+  progress = computed(() => {
+    const g = this.group();
+    const done = g.counts.approved + g.counts.pending + g.counts.out_of_scope;
+    const total = g.result_count;
+    return { done, width: total ? `${(done / total) * 100}%` : '0%' };
+  });
+  /** Text alternative of the bar for assistive tech. */
+  barSummary = computed(() => `${this.progress().done} of ${this.group().result_count} done: in PRMS or with no SP contribution`);
   countLabel = computed(() => `${this.group().result_count} ${this.group().result_count === 1 ? 'result' : 'results'}`);
   /** Flag copy is client-owned (mockup `flagLabel`). */
   flagLabel = computed(() => {

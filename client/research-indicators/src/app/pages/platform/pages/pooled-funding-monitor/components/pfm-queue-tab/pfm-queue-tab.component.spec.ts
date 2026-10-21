@@ -122,16 +122,10 @@ describe('PfmQueueTabComponent', () => {
     expect(el.textContent?.toLowerCase()).not.toContain('year');
   });
 
-  it('count line copy for portfolio and PI scope (singular project), plus the legend', () => {
+  it('count line copy for portfolio and PI scope (singular project); no colour legend any more', () => {
     const all = setup({ scope: 'all' });
     expect(all.q('pfm-count-line')?.textContent?.trim()).toBe('Showing 41 results across 6 projects · 99 flagged portfolio-wide');
-    expect(Array.from(all.el.querySelectorAll('[data-testid="pfm-legend"] li')).map(l => l.textContent?.trim())).toEqual([
-      'Approved in PRMS',
-      'Pending review',
-      'Rejected',
-      'Out of scope',
-      'Not synced'
-    ]);
+    expect(all.q('pfm-legend')).toBeNull();
     const mine = setup({ scope: 'mine', queue: { ...QUEUE, totals: { results: 1, projects: 1, monitored_total: 99 } } });
     expect(mine.q('pfm-count-line')?.textContent?.trim()).toBe('Showing 1 results across 1 project where you are PI');
   });
