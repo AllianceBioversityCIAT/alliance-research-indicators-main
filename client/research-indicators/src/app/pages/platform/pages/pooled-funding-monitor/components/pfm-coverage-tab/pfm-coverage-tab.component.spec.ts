@@ -52,7 +52,7 @@ describe('PfmCoverageTabComponent', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // synced 9 of 9 + 18 need attention
     expect(q('pfm-progress-percent')?.textContent?.trim()).toBe('33%');
-    expect(q('pfm-progress-open-attention')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('18 need action');
+    expect(q('pfm-progress-open-attention')?.getAttribute('aria-label')).toBe('18 results need action. Click to see them.');
     expect(el.querySelector('[data-testid="pfm-next-mapping_incomplete"] [data-testid="pfm-next-value"]')?.textContent?.trim()).toBe('12');
   });
 
@@ -83,7 +83,7 @@ describe('PfmCoverageTabComponent', () => {
     expect(chip_counts).toBeTruthy();
     const { q } = render(older);
     // kpis: synced 11, need_attention 7
-    expect(q('pfm-progress-open-synced')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('11 in PRMS');
-    expect(q('pfm-progress-open-attention')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('7 need action');
+    expect(q('pfm-progress-open-synced')?.getAttribute('aria-label')).toBe('11 results in PRMS. Click to see them.');
+    expect(q('pfm-progress-open-attention')?.getAttribute('aria-label')).toBe('7 results need action. Click to see them.');
   });
 });

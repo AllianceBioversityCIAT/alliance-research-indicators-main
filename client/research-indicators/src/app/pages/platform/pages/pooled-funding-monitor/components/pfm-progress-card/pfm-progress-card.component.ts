@@ -25,9 +25,12 @@ export class PfmProgressCardComponent {
   open = output<PfmChip>();
 
   readonly help = PFM_HELP;
-  readonly done = PFM_STATE.done;
-  readonly alert = PFM_STATE.alert;
+  /** The section's navy (owner: not green). */
+  readonly navy = 'var(--ac-pfm-accent-navy)';
   readonly emptyFill = PFM_STATE_EMPTY;
+  /** Marker colours: the palette's amber. */
+  readonly pinFill = PFM_STATE.progress.fill;
+  readonly pinFg = PFM_STATE.progress.fg;
 
   progress = computed(() => {
     const synced = this.counts().synced;
@@ -39,4 +42,9 @@ export class PfmProgressCardComponent {
   });
 
   whose = computed(() => (this.scope() === 'all' ? 'all contributing projects' : 'your projects'));
+
+  syncedTip = computed(() => `${this.progress().synced} ${this.progress().synced === 1 ? 'result' : 'results'} in PRMS. Click to see them.`);
+  leftTip = computed(() => `${this.progress().left} ${this.progress().left === 1 ? 'result needs' : 'results need'} action. Click to see them.`);
+  /** Marker position: the bar's content box starts 27px in (under the badge) and ends 3px before the edge. */
+  markerLeft = computed(() => `calc(27px + (100% - 30px) * ${this.progress().total ? this.progress().synced / this.progress().total : 0})`);
 }
