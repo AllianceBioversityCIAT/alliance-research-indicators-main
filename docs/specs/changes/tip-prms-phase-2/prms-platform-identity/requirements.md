@@ -26,7 +26,7 @@ STAR behavior does not change: STAR rows are backfilled as `STAR`, and STAR keep
 
 | Term | Meaning |
 | --- | --- |
-| Platform | `results.platform_code` — `STAR`, `TIP`, `AICCRA`, `PRMS` |
+| Platform | `results.platform_code` — `STAR`, `PRMS`, `TIP`, `AICCRA`, `BILATERAL` (`ReportingPlatformEnum`) |
 | Sync log | `result_prms_sync_log` — one row per outbound push attempt |
 | Decision history | `result_prms_sync_history` — append-only record of outbound pushes and inbound PRMS decisions |
 | External reference | The identifier STAR sends PRMS for a result, returned on every ingest row and on the decision webhook |
@@ -67,7 +67,9 @@ The sync log and the decision history SHALL store the platform of the result eac
 #### Scenario: Existing rows
 - GIVEN the tables hold rows written before this change
 - WHEN the migration runs
-- THEN every existing row reads platform `STAR`
+- THEN every existing sync-log row reads platform `STAR`
+- AND every existing history row whose code is a plain number reads `STAR`
+- BUT a history row whose reference never matched a result (no plain-number code) keeps no platform
 - AND IT MUST be reversible (the down migration removes the column and its index without losing other data)
 
 #### Scenario: New push row
@@ -173,7 +175,9 @@ The STAR client SHALL request and show the Pool Funding alignment for TIP result
 
 ## 8. Data requirements
 
-- `result_prms_sync_log` and `result_prms_sync_history`: add `platform_code` (same type as `results.platform_code`), not null, backfilled `STAR`; index `(platform_code, <code>, <year>)` replacing or extending the current `(code, year)` index.
+- `result_prms_sync_log`: add `platform_code` (`varchar(50)`, as `results.platform_code`), not null, backfilled `STAR`.
+- `result_prms_sync_history`: add `platform_code`, nullable (an uncorrelated inbound reference has no platform); backfilled `STAR` where the stored code is a plain number.
+- Indexes: the current `(code, year)` indexes become `(platform_code, code, year)`.
 - Migration: `<timestamp>-addPlatformCodeToPrmsSyncTables.ts`. No data correction beyond the backfill.
 
 ## 9. Cross-system impact
