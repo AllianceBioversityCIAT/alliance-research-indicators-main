@@ -1,4 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { Select } from 'primeng/select';
 import { SelectComponent } from './select.component';
 import { signal, SimpleChange } from '@angular/core';
 import { ServiceLocatorService } from '../../../services/service-locator.service';
@@ -450,5 +452,34 @@ describe('SelectComponent', () => {
     await Promise.resolve();
 
     expect(failingService.main).toHaveBeenCalled();
+  });
+
+  function renderedPrimeSelect(fixture: ComponentFixture<SelectComponent>): Select {
+    fixture.detectChanges();
+    const select = fixture.debugElement.query(By.directive(Select));
+    if (!select) throw new Error('p-select not rendered');
+    return select.componentInstance as Select;
+  }
+
+  it('renders p-select with virtual scroll on by default', () => {
+    const fixture = TestBed.createComponent(SelectComponent);
+    expect(renderedPrimeSelect(fixture).virtualScroll).toBe(true);
+  });
+
+  it('renders p-select with virtual scroll off when virtualScroll is false', () => {
+    const fixture = TestBed.createComponent(SelectComponent);
+    fixture.componentRef.setInput('virtualScroll', false);
+    expect(renderedPrimeSelect(fixture).virtualScroll).toBe(false);
+  });
+
+  it('renders p-select with an empty panelStyleClass by default', () => {
+    const fixture = TestBed.createComponent(SelectComponent);
+    expect(renderedPrimeSelect(fixture).panelStyleClass).toBe('');
+  });
+
+  it('passes panelStyleClass through to the rendered p-select', () => {
+    const fixture = TestBed.createComponent(SelectComponent);
+    fixture.componentRef.setInput('panelStyleClass', 'policy-change-link-panel');
+    expect(renderedPrimeSelect(fixture).panelStyleClass).toBe('policy-change-link-panel');
   });
 });
