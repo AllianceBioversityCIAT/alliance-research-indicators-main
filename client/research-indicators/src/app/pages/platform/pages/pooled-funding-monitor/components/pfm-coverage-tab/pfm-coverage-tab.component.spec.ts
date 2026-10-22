@@ -52,7 +52,7 @@ describe('PfmCoverageTabComponent', () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // synced 9 of 9 + 18 need attention
     expect(q('pfm-progress-percent')?.textContent?.trim()).toBe('33%');
-    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('18 results still need action.');
+    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('18 results still need action. Click to see them.');
     expect(el.querySelector('[data-testid="pfm-next-mapping_incomplete"] [data-testid="pfm-next-value"]')?.textContent?.trim()).toBe('12');
   });
 
@@ -74,7 +74,10 @@ describe('PfmCoverageTabComponent', () => {
     const el = fixture.nativeElement as HTMLElement;
     (el.querySelector('[data-testid="pfm-next-ready_to_sync"]') as HTMLElement).click();
     (el.querySelector('[data-testid="pfm-sp-open-SP06"]') as HTMLElement).click();
-    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { sp: 'SP06' }]);
+    (el.querySelector('[data-testid="pfm-progress-done"]') as HTMLElement).click();
+    (el.querySelector('[data-testid="pfm-progress-left"]') as HTMLElement).click();
+    (el.querySelector('[data-testid="pfm-prms-legend-rejected"]') as HTMLElement).click();
+    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { sp: 'SP06' }, { chip: 'synced' }, { chip: 'need_attention' }, { chip: 'synced' }]);
   });
 
   it('falls back to the KPI figures when the server does not send chip_counts yet', () => {
@@ -82,8 +85,8 @@ describe('PfmCoverageTabComponent', () => {
     expect(chip_counts).toBeTruthy();
     const { q } = render(older);
     // kpis: synced 11, need_attention 7, out of scope 2
-    expect(q('pfm-progress-done')?.getAttribute('aria-label')).toBe('13 results done: 11 in PRMS and 2 with no SP contribution.');
-    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('7 results still need action.');
+    expect(q('pfm-progress-done')?.getAttribute('aria-label')).toBe('13 results done: 11 in PRMS and 2 with no SP contribution. Click to see the results synced with PRMS.');
+    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('7 results still need action. Click to see them.');
   });
 
   // Owner: an empty monitor must look the same everywhere.

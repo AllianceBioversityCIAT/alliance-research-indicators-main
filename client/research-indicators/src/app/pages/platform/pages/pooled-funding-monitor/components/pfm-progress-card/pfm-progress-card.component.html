@@ -7,44 +7,44 @@
   @if (p.total === 0) {
     <app-pfm-empty-state />
   } @else {
-  <!-- Same language as the cards below: a dot legend, then one thick rounded bar with the percentage inside, big enough to stand out. Done is ONE part (in PRMS + no SP contribution). -->
+  <!-- A dot legend, then one thick bar: done (in PRMS + no SP contribution) opens Synced with PRMS, still to do opens Need attention. -->
   <p class="m-0 mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-progress-legend">
     <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-[4px]" [style.background-color]="doneFill" aria-hidden="true"></span>Done: in PRMS or no SP contribution</span>
     <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-[4px]" [style.background-color]="emptyFill" aria-hidden="true"></span>Still to do</span>
   </p>
   <div class="mt-3 flex h-[48px] w-full overflow-hidden rounded-lg" [style.background-color]="emptyFill" data-testid="pfm-progress-bar">
     @if (p.done) {
-      <span
-        class="flex h-full items-center"
-        tabindex="0"
-        role="img"
+      <button
+        type="button"
+        class="flex h-full cursor-pointer items-center border-0 p-0 transition-opacity duration-200 hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
         [style.width]="p.doneWidth"
         [style.background-color]="doneFill"
         [pTooltip]="p.doneTip"
         tooltipEvent="both"
         tooltipPosition="top"
         [attr.aria-label]="p.doneTip"
-        data-testid="pfm-progress-done">
+        data-testid="pfm-progress-done"
+        (click)="open.emit('synced')">
         @if (p.labelInside) {
           <span class="px-4 text-[24px] font-bold leading-none tabular-nums text-[var(--ac-pfm-surface)]" aria-hidden="true" data-testid="pfm-progress-percent">{{ p.percent }}%</span>
         }
-      </span>
+      </button>
     }
     @if (p.left) {
-      <span
-        class="flex h-full flex-1 items-center"
-        tabindex="0"
-        role="img"
+      <button
+        type="button"
+        class="flex h-full flex-1 cursor-pointer items-center border-0 bg-transparent p-0 transition-colors duration-200 hover:bg-[color-mix(in_srgb,var(--ac-pfm-accent-navy)_6%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2"
         [pTooltip]="p.leftTip"
         tooltipEvent="both"
         tooltipPosition="top"
         [attr.aria-label]="p.leftTip"
-        data-testid="pfm-progress-left">
+        data-testid="pfm-progress-left"
+        (click)="open.emit('need_attention')">
         <!-- A thin green part cannot hold the label: it sits just after it, on the grey -->
         @if (!p.labelInside) {
           <span class="px-4 text-[24px] font-bold leading-none tabular-nums" [style.color]="doneFg" aria-hidden="true" data-testid="pfm-progress-percent">{{ p.percent }}%</span>
         }
-      </span>
+      </button>
     }
   </div>
   <span class="sr-only">{{ p.percent }}% done</span>

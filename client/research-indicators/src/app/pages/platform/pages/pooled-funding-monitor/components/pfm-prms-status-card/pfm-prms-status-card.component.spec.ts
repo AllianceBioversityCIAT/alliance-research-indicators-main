@@ -66,18 +66,19 @@ describe('PfmPrmsStatusCardComponent', () => {
     expect(len(3)).toBeCloseTo((33 / 61) * C, 6);
   });
 
-  it('every slice and legend row opens the queue on exactly those results', () => {
+  it('every slice and legend row opens the Synced with PRMS quick view', () => {
     const { q, opened } = render(pipe(13, 8, 7, 33));
     for (const k of ['approved', 'pending_review', 'rejected', 'no_sp']) q('pfm-prms-slice-' + k)!.dispatchEvent(new MouseEvent('click'));
-    expect(opened).toEqual(['prms_approved', 'prms_pending', 'rejected', 'no_sp_contribution']);
+    // Owner: any click on this chart opens Synced with PRMS.
+    expect(opened).toEqual(['synced', 'synced', 'synced', 'synced']);
     q('pfm-prms-legend-rejected')!.click();
-    expect(opened.at(-1)).toBe('rejected');
+    expect(opened.at(-1)).toBe('synced');
   });
 
   it('slices use the STAR tooltip', () => {
     const { fixture } = render(pipe(13, 8, 7, 33));
     const tips = fixture.debugElement.queryAll(By.directive(Tooltip)).map(d => d.injector.get(Tooltip).content);
-    expect(tips).toContain('No SP contribution: 33 (54%). Click to see them.');
+    expect(tips).toContain('No SP contribution: 33 (54%). Click to see the results synced with PRMS.');
   });
 
   it('a zero slice is not drawn and its legend row is disabled', () => {

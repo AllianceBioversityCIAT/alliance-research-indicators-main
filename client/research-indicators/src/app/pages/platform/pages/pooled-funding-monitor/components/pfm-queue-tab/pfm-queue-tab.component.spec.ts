@@ -54,7 +54,7 @@ function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip
 }
 
 describe('PfmQueueTabComponent', () => {
-  it('renders each chip count from the server chip_counts, in owner order, with no Need attention quick view', () => {
+  it('renders each chip count from the server chip_counts, in owner order: All, Need attention, Pending approval, Mapping pending, Ready to sync, Synced', () => {
     const { el } = setup();
     const chips = Array.from(el.querySelectorAll('[data-testid="pfm-chips"] button'));
     // visible text only: the sr-only explanation is checked in its own test
@@ -65,6 +65,8 @@ describe('PfmQueueTabComponent', () => {
     };
     expect(chips.map(visible)).toEqual([
       'All results 41',
+      'Need attention 7',
+      'Pending approval 0', // QUEUE has no awaiting_pi count (older server): reads 0
       'Mapping pending 5',
       'Ready to sync 3',
       'Synced with PRMS 13'
@@ -114,7 +116,6 @@ describe('PfmQueueTabComponent', () => {
     const c = fixture.componentInstance;
     expect(el.querySelectorAll('p-select').length).toBe(3);
     expect(q('pfm-filter-status')).toBeNull();
-    expect(q('pfm-chip-awaiting_pi')).toBeNull();
     expect(q('pfm-filters-card')?.textContent).toContain('Project contributing to CGIAR Portfolio');
     expect(c.projectOptions().map(o => o.label)).toEqual(['All projects', 'P100 — Alpha project']);
     expect(c.spOptions().map(g => g.label)).toEqual(['All Science Programs', 'Accelerators']);
@@ -186,10 +187,20 @@ describe('PfmQueueTabComponent', () => {
   });
 
   // Owner 2026-10-22: Need attention is not a quick view; an old ?chip=need_attention link still filters, visibly.
-  it('has no Need attention quick view; an old link to it shows as a removable tag', () => {
-    expect(setup().q('pfm-chip-need_attention')).toBeNull();
-    const { q, store } = setup({ chip: 'need_attention' });
-    expect(q('pfm-hidden-chip')?.textContent).toContain('Showing: Need attention');
+  // Owner: Need attention and Pending approval are quick views again (the coverage tab opens them).
+  it('Need attention and Pending approval are quick views, not removable tags', () => {
+    for (const chip of ['need_attention', 'awaiting_pi'] as PfmChip[]) {
+      const { q } = setup({ chip, queue: { ...QUEUE, chip_counts: { ...QUEUE.chip_counts, awaiting_pi: 4 } } });
+      expect(q('pfm-chip-' + chip)?.getAttribute('aria-pressed')).toBe('true');
+      expect(q('pfm-hidden-chip')).toBeNull();
+    }
+    expect(setup({ queue: { ...QUEUE, chip_counts: { ...QUEUE.chip_counts, awaiting_pi: 4 } } }).q('pfm-chip-awaiting_pi')?.textContent).toContain('4');
+  });
+
+  it('Rejected by PRMS stays a removable tag (not a quick view)', () => {
+    const { q, store } = setup({ chip: 'rejected' });
+    expect(q('pfm-chip-rejected')).toBeNull();
+    expect(q('pfm-hidden-chip')?.textContent).toContain('Showing: Rejected by PRMS');
     q('pfm-hidden-chip-clear')?.click();
     expect(store.setChip).toHaveBeenCalledWith(null);
   });

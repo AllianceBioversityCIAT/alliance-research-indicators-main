@@ -4,7 +4,7 @@
   aria-labelledby="pfm-prms-status-title">
   @let s = slices();
   <h2 id="pfm-prms-status-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">PRMS status</h2>
-  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS plus those with no SP contribution. Click a slice to see them.</p>
+  <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Results in PRMS plus those with no SP contribution. Click the chart to see the results synced with PRMS.</p>
 
   @if (s.total === 0) {
     <app-pfm-empty-state data-testid="pfm-prms-status-empty" />
@@ -26,7 +26,7 @@
               [pTooltip]="it.tip"
               tooltipPosition="top"
               [attr.data-testid]="'pfm-prms-slice-' + it.key"
-              (click)="open.emit(it.chip)"></circle>
+              (click)="open.emit(target)"></circle>
           }
         }
         <g class="rotate-90 [transform-origin:60px_60px]">
@@ -48,7 +48,7 @@
             tooltipPosition="top"
             [attr.aria-label]="it.tip"
             [attr.data-testid]="'pfm-prms-legend-' + it.key"
-            (click)="open.emit(it.chip)">
+            (click)="open.emit(target)">
             <span class="h-2.5 w-2.5 flex-none rounded-full" [style.background-color]="it.fill" aria-hidden="true"></span>
             {{ it.label }}
           </button>

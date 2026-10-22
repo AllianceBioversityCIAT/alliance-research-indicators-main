@@ -40,6 +40,8 @@ export class PfmPrmsStatusCardComponent {
   pipeline = input.required<PfmPipeline>();
   /** Opens the Results queue on that view. */
   open = output<PfmChip>();
+  /** Owner: any click on this chart opens the Synced with PRMS quick view. */
+  readonly target: PfmChip = 'synced';
 
   readonly r = R;
   readonly circumference = C;
@@ -60,7 +62,7 @@ export class PfmPrmsStatusCardComponent {
           fg: statusColor(s.status),
           dash: `${share * C} ${C - share * C}`,
           dashOffset: -offset * C,
-          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see them.`,
+          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see the results synced with PRMS.`,
           legendTip: `${s.label}: ${s.value} ${s.value === 1 ? 'result' : 'results'} (${Math.round(share * 100)}%)`
         };
         offset += share;

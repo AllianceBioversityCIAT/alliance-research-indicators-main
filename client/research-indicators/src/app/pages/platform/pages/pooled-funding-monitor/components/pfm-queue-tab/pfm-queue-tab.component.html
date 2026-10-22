@@ -94,7 +94,7 @@
                 activeChip() === c.key ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]' : 'bg-[var(--ac-pfm-neutral-bg)]'
               }}"
               data-testid="pfm-chip-count"
-              >{{ q.chip_counts[c.count] }}</span
+              >{{ q.chip_counts[c.count] ?? 0 }}</span
             >
           }
         </button>
