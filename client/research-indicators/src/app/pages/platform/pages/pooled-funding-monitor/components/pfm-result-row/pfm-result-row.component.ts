@@ -7,7 +7,7 @@ import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PfmMappingState, PfmPrmsStatus, PfmResultRow } from '../../pfm.interfaces';
 import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
-import { MAPPING_STATUS_COLOR, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
+import { MAPPING_STATUS_COLOR, PRMS_STATUS_BORDER, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
 
 /** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
 export interface PfmTagTone {
@@ -28,7 +28,7 @@ const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
 
 const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
   'Pending Review': solid(PRMS_STATUS_COLOR.pending),
-  Approved: solid(PRMS_STATUS_COLOR.approved),
+  Approved: { fg: PRMS_STATUS_COLOR.approved, border: PRMS_STATUS_BORDER.approved },
   Rejected: solid(PRMS_STATUS_COLOR.rejected)
 };
 

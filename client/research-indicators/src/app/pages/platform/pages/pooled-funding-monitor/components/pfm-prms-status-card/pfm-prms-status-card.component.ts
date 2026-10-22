@@ -18,7 +18,7 @@ interface Slice {
 
 /** Order around the donut and in the legend; values come from the pipeline stages. */
 export const PFM_PRMS_SLICES: Slice[] = [
-  { key: 'approved', label: 'Approved by PRMS', stage: 'approved', chip: 'prms_approved', state: 'done' },
+  { key: 'approved', label: 'Approved by PRMS', stage: 'approved', chip: 'prms_approved', state: 'approved' },
   { key: 'pending_review', label: 'Pending review in PRMS', stage: 'pending_review', chip: 'prms_pending', state: 'waiting' },
   { key: 'rejected', label: 'Rejected by PRMS', stage: 'rejected', chip: 'rejected', state: 'alert' },
   { key: 'no_sp', label: 'No SP contribution', stage: 'no_sp_contribution', chip: 'no_sp_contribution', state: 'out' }

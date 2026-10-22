@@ -6,7 +6,7 @@ import { provideRouter } from '@angular/router';
 import { PfmResultRow } from '../../pfm.interfaces';
 import { PfmResultRowComponent } from './pfm-result-row.component';
 import { MAPPING_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
-import { SYNC_TAG_COLOR } from '@shared/utils/prms-sync-status.util';
+import { SYNC_TAG_BORDER, SYNC_TAG_COLOR } from '@shared/utils/prms-sync-status.util';
 
 const BASE: PfmResultRow = {
   result_code: 'STAR-1234',
@@ -283,7 +283,7 @@ describe('PfmResultRowComponent', () => {
     const { q, tagsIn } = render({ prms_status: status });
     const [t] = tagsIn(q('pfm-row-prms'));
     expect(t.statusColor).toBe(SYNC_TAG_COLOR[tone]);
-    expect(t.statusBorder).toBe(SYNC_TAG_COLOR[tone]);
+    expect(t.statusBorder).toBe(SYNC_TAG_BORDER[tone]);
   });
 
   it.each([
