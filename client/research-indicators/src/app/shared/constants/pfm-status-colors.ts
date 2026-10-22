@@ -58,3 +58,21 @@ export const MAPPING_STATUS_COLOR = {
   Complete: 'var(--ac-status-mapping-complete)',
   'No SP contribution': 'var(--ac-status-mapping-no-sp)'
 } as const;
+
+/** PRMS status, keyed by the wire value of the monitor's `prms_status` (Not sent has no colour). */
+export const PRMS_STATUS_COLOR_BY_LABEL = {
+  'Pending Review': PRMS_STATUS_COLOR.pending,
+  Approved: PRMS_STATUS_COLOR.approved,
+  Rejected: PRMS_STATUS_COLOR.rejected
+} as const;
+
+/**
+ * THE parameter: the colour of a status, by the status itself. A table tag, a chart slice, a legend
+ * dot, a quick-view dot or a card that stands for a status reads its colour HERE, by naming the
+ * status, never by picking a palette tone. Change the status colour in colors.scss and every
+ * surface follows.
+ */
+export type PfmStatusRef = { mapping: keyof typeof MAPPING_STATUS_COLOR } | { prms: keyof typeof PRMS_STATUS_COLOR_BY_LABEL };
+export function statusColor(ref: PfmStatusRef): string {
+  return 'mapping' in ref ? MAPPING_STATUS_COLOR[ref.mapping] : PRMS_STATUS_COLOR_BY_LABEL[ref.prms];
+}
