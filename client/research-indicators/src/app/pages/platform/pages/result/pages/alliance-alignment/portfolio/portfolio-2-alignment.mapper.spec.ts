@@ -935,6 +935,40 @@ describe('portfolio-2-alignment.mapper', () => {
     expect(enrichAlignmentSdgTargets([{ id: '' }, { id: 'not-a-number' }])).toEqual([]);
   });
 
+  describe('buildPortfolio2AlignmentPatch result_sdg_targets', () => {
+    const base = {
+      contracts: [],
+      result_sdgs: [],
+      primary_levers: [],
+      contributor_levers: [],
+      research_areas: [],
+      strategic_objectives: [],
+      impact_outcomes: []
+    } as unknown as GetAllianceAlignment;
+
+    it('includes only valid positive sdg targets when requested', () => {
+      const payload = buildPortfolio2AlignmentPatch(
+        {
+          ...base,
+          result_sdg_targets: [{ sdg_target_id: '27' }, { sdg_target_id: 'abc' }, { sdg_target_id: 0 }, { sdg_target_id: -3 }]
+        } as unknown as GetAllianceAlignment,
+        false,
+        true,
+        true
+      );
+      expect(payload.result_sdg_targets).toEqual([{ sdg_target_id: 27 }]);
+    });
+
+    it('defaults to an empty list when result_sdg_targets is missing', () => {
+      const payload = buildPortfolio2AlignmentPatch(base, false, true, true);
+      expect(payload.result_sdg_targets).toEqual([]);
+    });
+
+    it('omits result_sdg_targets when not requested', () => {
+      expect(buildPortfolio2AlignmentPatch(base, false).result_sdg_targets).toBeUndefined();
+    });
+  });
+
   describe('defensive coalescing branches', () => {
     const originalMap = Array.prototype.map;
     let mapSpy: jest.SpyInstance;

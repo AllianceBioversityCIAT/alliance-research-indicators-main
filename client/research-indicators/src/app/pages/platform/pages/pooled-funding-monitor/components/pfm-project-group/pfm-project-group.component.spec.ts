@@ -422,4 +422,44 @@ describe('project table search helpers', () => {
       expect(ctx.store.groupViews()['P100']).toEqual({ first: 10, rows: 10, search: '', sortField: 'updated_sort', sortOrder: -1 });
     });
   });
+
+  describe('fallbacks', () => {
+    it('sorts a result without a title by its lower-cased code', () => {
+      expect(toTableRow(row({ title: '', result_code: 'STAR-77' })).title_sort).toBe('star-77');
+    });
+
+    it('a saved view with missing fields falls back to the defaults', () => {
+      const partial = { first: undefined, rows: 0, search: undefined, sortField: undefined, sortOrder: 1 } as unknown as PfmGroupView;
+      const { fixture } = setup(GROUP, { P100: partial });
+      const cmp = fixture.componentInstance;
+
+      expect(cmp.search()).toBe('');
+      expect(cmp.pageSize()).toBe(5);
+      expect(cmp.sortField()).toBeNull();
+      expect(cmp.sortOrder()).toBe(1);
+      expect(cmp.first()).toBe(0);
+    });
+
+    it('is loading while open with neither rows nor state; not loading when it has errored', () => {
+      const { fixture, store } = setup();
+      const cmp = fixture.componentInstance;
+      expect(cmp.loading()).toBe(true);
+
+      store.groupState.set({ P100: { loading: false, error: true } });
+      expect(cmp.loading()).toBe(false);
+      expect(cmp.error()).toBe(true);
+    });
+
+    it('has no table rows before they are loaded', () => {
+      const { fixture } = setup();
+
+      expect(fixture.componentInstance.tableRows()).toEqual([]);
+    });
+
+    it('a project with no results has an empty bar', () => {
+      const { fixture } = setup({ ...GROUP, result_count: 0, counts: { approved: 0, pending: 0, rejected: 0, out_of_scope: 0, not_sent: 0 } });
+
+      expect(fixture.componentInstance.progress()).toEqual({ done: 0, width: '0%' });
+    });
+  });
 });

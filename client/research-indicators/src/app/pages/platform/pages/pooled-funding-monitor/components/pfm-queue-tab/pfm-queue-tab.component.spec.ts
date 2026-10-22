@@ -193,4 +193,22 @@ describe('PfmQueueTabComponent', () => {
     q('pfm-hidden-chip-clear')?.click();
     expect(store.setChip).toHaveBeenCalledWith(null);
   });
+
+  describe('fallbacks', () => {
+    it('shows no tag for a chip that is neither a quick view nor a known hidden view', () => {
+      const { fixture } = setup({ chip: 'bogus' as PfmChip });
+
+      expect(fixture.componentInstance.hiddenChip()).toBeNull();
+    });
+
+    it('before the first queue: only the "All" options, an empty count line', () => {
+      const { fixture } = setup({ queue: null });
+      const cmp = fixture.componentInstance;
+
+      expect(cmp.projectOptions()).toEqual([{ label: 'All projects', value: '__all__' }]);
+      expect(cmp.spOptions()).toEqual([{ label: 'All Science Programs', items: [{ label: 'All Science Programs', value: '__all__' }] }]);
+      expect(cmp.typeOptions()).toEqual([{ label: 'All types', value: '__all__' }]);
+      expect(cmp.countLine()).toBe('');
+    });
+  });
 });

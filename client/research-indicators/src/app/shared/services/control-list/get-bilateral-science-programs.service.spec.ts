@@ -84,4 +84,8 @@ describe('GetBilateralScienceProgramsService', () => {
     await service.main();
     expect(getSciencePrograms).toHaveBeenCalledWith('19792');
   });
+
+  it('update() is an inert no-op', () => {
+    expect(service.update()).toBeUndefined();
+  });
 });

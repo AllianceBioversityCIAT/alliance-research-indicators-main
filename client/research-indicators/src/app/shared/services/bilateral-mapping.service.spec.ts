@@ -416,5 +416,130 @@ describe('BilateralMappingService', () => {
       });
     });
   });
-});
 
+  // ── Coverage completion: pending search/pagination and fallbacks ──────────
+
+  describe('edge branches (coverage completion)', () => {
+    const cand = (id: number, short: string | null, full: string | null, contract: string | null) => ({
+      clarisaProjectId: id,
+      clarisaProjectShortName: short,
+      clarisaProjectFullName: full,
+      externalCode: null,
+      derivedContractId: contract,
+      action: 'toCreate'
+    });
+
+    const preview = (extra: Record<string, unknown>) =>
+      ok({
+        feedFetchedAt: null,
+        counts: { toCreate: 0, alreadyMapped: 0, ambiguous: 0, unresolved: 0, divergent: 0, supersede: 0 },
+        ...extra
+      });
+
+    it('pending list returns null when the preview fails', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(err(500, { errors: 'x' }));
+      expect(await service.list({ status: 'pending' })).toBeNull();
+      expect(mockApi.POST_AutomapperPreview).toHaveBeenCalledWith(undefined);
+    });
+
+    it('pending list tolerates missing buckets and returns an empty single page', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(preview({}));
+      const result = await service.list({ status: 'pending' }, 2026);
+      expect(result?.items).toEqual([]);
+      expect(result?.meta).toEqual({ total: 0, page: 1, limit: 20, totalPages: 1 });
+    });
+
+    it('pending list merges toCreate/ambiguous/unresolved, filters by search across the three fields and paginates', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
+        preview({
+          toCreate: [cand(1, 'Alpha', 'Zeta', 'C1'), cand(2, null, null, null)],
+          ambiguous: [cand(3, 'Beta', 'Rice Farming', 'C2')],
+          unresolved: [cand(4, 'Gamma', 'Other', 'XRICE')]
+        })
+      );
+      const result = await service.list({ status: 'pending', search: '  rice ', page: 1, limit: 1 }, 2026);
+      expect(result?.meta).toEqual({ total: 2, page: 1, limit: 1, totalPages: 2 });
+      expect(result?.items.map(i => i.clarisa_project_id)).toEqual([3]);
+
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
+        preview({
+          toCreate: [cand(1, 'Alpha', 'Zeta', 'C1')],
+          ambiguous: [cand(3, 'Beta', 'Rice Farming', 'C2')],
+          unresolved: [cand(4, 'Gamma', 'Other', 'XRICE')]
+        })
+      );
+      const page2 = await service.list({ status: 'pending', search: 'rice', page: 2, limit: 1 }, 2026);
+      expect(page2?.items.map(i => i.clarisa_project_id)).toEqual([4]);
+
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
+        preview({ toCreate: [cand(1, 'Alpha', 'Zeta', 'C1'), cand(2, null, null, null)] })
+      );
+      const byShort = await service.list({ status: 'pending', search: 'alp' });
+      expect(byShort?.items.map(i => i.clarisa_project_id)).toEqual([1]);
+    });
+
+    it('pending list shows an em dash and negative id for candidates without a derived contract', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(preview({ toCreate: [cand(7, 'S', 'F', '')] }));
+      const result = await service.list({ status: 'pending' });
+      expect(result?.items[0]).toEqual(expect.objectContaining({ id: -7, agresso_agreement_id: '—' }));
+    });
+
+    it('list marks an inactive row without mapping_status as Inactive and keeps an explicit status even if inactive', async () => {
+      const page: BilateralMappingListPage = {
+        items: [mapping({ id: 1, is_active: false }), mapping({ id: 2, is_active: false, mapping_status: 'Mapped' })],
+        meta: { total: 2, page: 1, limit: 20, totalPages: 1 }
+      };
+      mockApi.GET_BilateralProjectMappings.mockResolvedValue(ok(page));
+      const result = await service.list();
+      expect(result?.items.map(i => i.mapping_status)).toEqual(['Inactive', 'Mapped']);
+    });
+
+    it('loadAgressoOptions handles a missing data payload and description fallbacks', async () => {
+      mockApi.GET_FindContracts.mockResolvedValueOnce(ok(undefined));
+      expect(await service.loadAgressoOptions()).toEqual([]);
+
+      mockApi.GET_FindContracts.mockResolvedValueOnce(
+        ok({
+          data: [
+            { agreement_id: 'A1', description: 'Desc' },
+            { agreement_id: 'A2', projectDescription: 'Project desc' },
+            { agreement_id: 'A3' }
+          ]
+        })
+      );
+      expect(await service.loadAgressoOptions('q')).toEqual([
+        { agreement_id: 'A1', description: 'Desc' },
+        { agreement_id: 'A2', description: 'Project desc' },
+        { agreement_id: 'A3', description: '' }
+      ]);
+    });
+
+    it('loadClarisaProjectOptions returns [] when a successful response has no data', async () => {
+      mockApi.GET_ClarisaBilateralProjects.mockResolvedValue(ok(null));
+      expect(await service.loadClarisaProjectOptions()).toEqual([]);
+    });
+
+    it('mutations on a nullish response resolve to status 0 and an empty message', async () => {
+      mockApi.POST_BilateralProjectMapping.mockResolvedValue(undefined);
+      expect(await service.create({ agresso_agreement_id: 'A', clarisa_project_id: 1 })).toEqual({
+        ok: false,
+        status: 0,
+        message: ''
+      });
+    });
+
+    it('mutation failure with neither errors nor description yields an empty message', async () => {
+      mockApi.POST_BilateralProjectMapping.mockResolvedValue({
+        successfulRequest: false,
+        status: 500,
+        description: '',
+        errorDetail: { errors: '' }
+      });
+      expect(await service.create({ agresso_agreement_id: 'A', clarisa_project_id: 1 })).toEqual({
+        ok: false,
+        status: 500,
+        message: ''
+      });
+    });
+  });
+});

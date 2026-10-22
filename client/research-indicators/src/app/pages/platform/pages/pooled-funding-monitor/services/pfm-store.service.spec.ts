@@ -7,6 +7,7 @@ import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { ApiService } from '@services/api.service';
 import { PfmStoreService } from './pfm-store.service';
 import { PfmGroup, PfmQueue, PfmResultRow, PfmSummary, pfmQueryString } from '../pfm.interfaces';
+import { PfmGroupView, PfmReturnState, savePfmReturnState } from '../pfm-return-state';
 
 const ok = <T>(data: T) => ({ successfulRequest: true, data });
 
@@ -287,10 +288,231 @@ describe('PfmStoreService', () => {
   });
 
   describe('pfmQueryString', () => {
+    it('drops empty values and is an empty string when nothing remains', () => {
+      expect(pfmQueryString({ scope: 'mine', project: '', sp: null, type: null, chip: null })).toBe('?scope=mine');
+      expect(pfmQueryString({ project: null, sp: undefined } as never)).toBe('');
+    });
+
     it('omits empty params', () => {
       expect(pfmQueryString({ scope: 'mine', project: '', sp: null, type: 3, chip: 'synced' })).toBe(
         '?scope=mine&type=3&chip=synced'
       );
+    });
+  });
+
+  describe('restoring the state saved when leaving for a result', () => {
+    const view: PfmGroupView = { first: 10, rows: 5, search: 'x', sortField: 'title', sortOrder: -1 };
+    const saved = (over: Partial<Omit<PfmReturnState, 'v' | 'savedAt'>> = {}) =>
+      savePfmReturnState({
+        scope: 'all',
+        tab: 'queue',
+        filters: { project: 'P1', sp: 'SP01', type: 3 },
+        chip: 'synced',
+        openGroups: ['P1', 'P2'],
+        groupViews: { P1: view },
+        resultCode: 'STAR-9',
+        ...over
+      });
+
+    beforeEach(() => sessionStorage.clear());
+
+    it('restores scope, tab, filters, chip, views and open groups, reopens the rows and syncs the URL', async () => {
+      saved();
+      const store = build();
+      store.init();
+      await new Promise(r => setTimeout(r));
+
+      expect(store.scope()).toBe('all');
+      expect(store.tab()).toBe('queue');
+      expect(store.filters()).toEqual({ project: 'P1', sp: 'SP01', type: 3 });
+      expect(store.chip()).toBe('synced');
+      expect(store.groupViews()).toEqual({ P1: view });
+      expect([...store.openGroups()]).toEqual(['P1', 'P2']);
+      expect(store.focusResult()).toBe('STAR-9');
+      expect(router.navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { scope: 'all', tab: 'queue' } }));
+      expect(api.GET_PfmProjectResults).toHaveBeenCalledWith('P1', expect.objectContaining({ scope: 'all', chip: 'synced' }));
+      expect(api.GET_PfmProjectResults).toHaveBeenCalledWith('P2', expect.anything());
+      expect(Object.keys(store.groupRows()).sort()).toEqual(['P1', 'P2']);
+    });
+
+    it('ignores a saved scope that is not allowed and a saved tab that is unknown; missing views and groups default to empty', async () => {
+      saved({ scope: 'all', tab: 'bogus' as never, openGroups: undefined as never, groupViews: undefined as never });
+      const store = build();
+      store.init({ allowedScopes: ['mine'] });
+      await new Promise(r => setTimeout(r));
+
+      expect(store.scope()).toBe('mine');
+      expect(store.tab()).toBe('coverage');
+      expect(store.groupViews()).toEqual({});
+      expect(store.openGroups().size).toBe(0);
+      expect(api.GET_PfmProjectResults).not.toHaveBeenCalled();
+    });
+  });
+
+  it('saveReturnState stores the current view so a later init restores it', () => {
+    sessionStorage.clear();
+    const first = build();
+    first.setTab('queue');
+    first.setFilter('sp', 'SP02');
+    first.toggleGroup('P7');
+    first.setGroupView('P7', { first: 20, rows: 10, search: '', sortField: null, sortOrder: 1 });
+    first.saveReturnState('STAR-1');
+    TestBed.resetTestingModule();
+
+    const second = build();
+    second.init();
+
+    expect(second.tab()).toBe('queue');
+    expect(second.filters().sp).toBe('SP02');
+    expect([...second.openGroups()]).toEqual(['P7']);
+    expect(second.groupViews()['P7'].first).toBe(20);
+    expect(second.focusResult()).toBe('STAR-1');
+  });
+
+  it('setScope to the current scope and setTab to the current tab do nothing', async () => {
+    const store = build();
+    store.init();
+    await new Promise(r => setTimeout(r));
+    api.GET_PfmSummary.mockClear();
+    api.GET_PfmQueue.mockClear();
+    router.navigate.mockClear();
+
+    store.setScope('mine');
+    store.setTab('coverage');
+
+    expect(api.GET_PfmSummary).not.toHaveBeenCalled();
+    expect(api.GET_PfmQueue).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('resetFilters clears filters and chip, empties the groups and reloads the queue', async () => {
+    const store = build();
+    store.init();
+    await new Promise(r => setTimeout(r));
+    store.setFilter('project', 'P1');
+    store.setChip('synced');
+    store.toggleGroup('P1');
+    await new Promise(r => setTimeout(r));
+    api.GET_PfmQueue.mockClear();
+
+    store.resetFilters();
+    await new Promise(r => setTimeout(r));
+
+    expect(store.filters()).toEqual({ project: null, sp: null, type: null });
+    expect(store.chip()).toBeNull();
+    expect(store.groupRows()).toEqual({});
+    expect(api.GET_PfmQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('retrySummary reloads the summary after a failure', async () => {
+    api.GET_PfmSummary.mockRejectedValueOnce(new Error('boom'));
+    const store = build();
+    store.init();
+    await new Promise(r => setTimeout(r));
+    expect(store.summaryState().error).toBe(true);
+
+    await store.retrySummary();
+
+    expect(store.summaryState()).toEqual({ loading: false, error: false });
+    expect(store.summary()?.scope).toBe('mine');
+  });
+
+  describe('unsuccessful or empty responses are errors', () => {
+    it.each([
+      ['unsuccessful', { successfulRequest: false, data: summary('mine') }],
+      ['empty data', { successfulRequest: true, data: null }],
+      ['no response', undefined]
+    ])('summary: %s', async (_name, res) => {
+      api.GET_PfmSummary.mockResolvedValue(res);
+      const store = build();
+      await store.loadSummary();
+      expect(store.summaryState()).toEqual({ loading: false, error: true });
+      expect(store.summary()).toBeNull();
+    });
+
+    it.each([
+      ['unsuccessful', { successfulRequest: false, data: queue('A') }],
+      ['empty data', { successfulRequest: true, data: null }]
+    ])('queue: %s', async (_name, res) => {
+      api.GET_PfmQueue.mockResolvedValue(res);
+      const store = build();
+      await store.loadQueue();
+      expect(store.queueState()).toEqual({ loading: false, error: true });
+      expect(store.queue()).toBeNull();
+    });
+
+    it.each([
+      ['unsuccessful', { successfulRequest: false, data: [row('r')] }],
+      ['empty data', { successfulRequest: true, data: null }]
+    ])('group rows: %s', async (_name, res) => {
+      api.GET_PfmProjectResults.mockResolvedValue(res);
+      const store = build();
+      store.toggleGroup('P1');
+      await new Promise(r => setTimeout(r));
+      expect(store.groupState()['P1']).toEqual({ loading: false, error: true });
+      expect(store.groupRows()['P1']).toBeUndefined();
+    });
+  });
+
+  describe('stale responses are dropped (success and failure)', () => {
+    const deferred = () => {
+      let resolve!: (v: unknown) => void;
+      let reject!: (e: unknown) => void;
+      const promise = new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+
+    it('summary: an older success and an older failure do not overwrite the newer result', async () => {
+      const store = build();
+      const slowOk = deferred();
+      api.GET_PfmSummary.mockImplementationOnce(() => slowOk.promise);
+      const first = store.loadSummary();
+      await store.loadSummary(); // newer, resolves with 'mine'
+      slowOk.resolve(ok(summary('all')));
+      await first;
+      expect(store.summary()?.scope).toBe('mine');
+
+      const slowFail = deferred();
+      api.GET_PfmSummary.mockImplementationOnce(() => slowFail.promise);
+      const second = store.loadSummary();
+      await store.loadSummary();
+      slowFail.reject(new Error('late'));
+      await second;
+      expect(store.summaryState()).toEqual({ loading: false, error: false });
+    });
+
+    it('queue: an older failure does not overwrite the newer result', async () => {
+      const store = build();
+      const slowFail = deferred();
+      api.GET_PfmQueue.mockImplementationOnce(() => slowFail.promise);
+      const first = store.loadQueue();
+      await store.loadQueue();
+      slowFail.reject(new Error('late'));
+      await first;
+      expect(store.queueState()).toEqual({ loading: false, error: false });
+      expect(store.queue()?.groups.map(g => g.code)).toEqual(['P1', 'P2']);
+    });
+
+    it('group rows: a response arriving after the key changed is dropped, whether it succeeds or fails', async () => {
+      const store = build();
+      const slowOk = deferred();
+      api.GET_PfmProjectResults.mockImplementationOnce(() => slowOk.promise);
+      store.toggleGroup('P1');
+      store.setChip('synced'); // new key: rows reset
+      slowOk.resolve(ok([row('late')]));
+      await new Promise(r => setTimeout(r));
+      expect(store.groupRows()['P1']).toBeUndefined();
+
+      const slowFail = deferred();
+      api.GET_PfmProjectResults.mockImplementationOnce(() => slowFail.promise);
+      store.toggleGroup('P2');
+      store.setChip(null);
+      slowFail.reject(new Error('late'));
+      await new Promise(r => setTimeout(r));
+      expect(store.groupState()['P2']).toBeUndefined();
     });
   });
 });

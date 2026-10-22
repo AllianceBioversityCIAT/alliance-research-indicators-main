@@ -480,6 +480,53 @@ describe('PiDelegateHistoryComponent', () => {
     });
   });
 
+  // Coverage completion: defensive fallbacks ------------------------------------
+
+  describe('defensive fallbacks', () => {
+    it('opening without a context does not fetch and leaves clean state', async () => {
+      await openModalAndWait(modalService, fixture);
+
+      expect(apiService.callCount).toBe(0);
+      expect(component.loading()).toBe(false);
+      expect(component.error()).toBeNull();
+      expect(component.entries()).toEqual([]);
+    });
+
+    it('treats a successful response without data as an empty list', async () => {
+      apiService.nextResponse = { ...makeResponse([]), data: undefined as unknown as PiDelegateHistoryEntry[] };
+      modalService.piDelegateHistoryContext.set({ source: 'byProject', projectCode: 'PRJ-001', projectName: null });
+
+      await openModalAndWait(modalService, fixture);
+
+      expect(component.entries()).toEqual([]);
+      expect(component.error()).toBeNull();
+    });
+
+    it('names a nameless person "Unknown" in the heading', () => {
+      modalService.piDelegateHistoryContext.set({ source: 'byPerson', delegateUserId: 7, name: null });
+
+      expect(component.contentName).toBe('Unknown');
+    });
+
+    it('treats a missing modal entry as closed (no fetch)', async () => {
+      jest.spyOn(modalService, 'isModalOpen').mockReturnValue(undefined as unknown as { isOpen: boolean; title: string });
+      const second = TestBed.createComponent(PiDelegateHistoryComponent);
+      second.detectChanges();
+      await second.whenStable();
+
+      expect(apiService.callCount).toBe(0);
+      expect(second.componentInstance.loading()).toBe(false);
+    });
+
+    it('formatDate degrades to empty parts when Intl returns none', () => {
+      const spy = jest.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockReturnValue([]);
+
+      expect(component.formatDate('2026-03-14T10:12:00.000Z')).toBe('14/03/2026 at :  ()');
+
+      spy.mockRestore();
+    });
+  });
+
   // getInitials helper ----------------------------------------------------------
 
   describe('getInitials helper', () => {

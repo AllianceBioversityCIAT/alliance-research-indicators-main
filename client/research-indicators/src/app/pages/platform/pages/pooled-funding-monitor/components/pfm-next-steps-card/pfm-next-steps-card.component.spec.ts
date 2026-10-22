@@ -70,4 +70,22 @@ describe('PfmNextStepsCardComponent', () => {
     expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing yet');
     expect(el.querySelectorAll('button')).toHaveLength(0);
   });
+
+  it('with no results the shares are 0 (no division by zero) even if a count is set', () => {
+    const { fixture } = render({ ...COUNTS, all: 0 });
+    expect(fixture.componentInstance.steps().map(s => s.share)).toEqual([0, 0, 0]);
+    expect(fixture.componentInstance.allDone()).toBe(false);
+  });
+
+  it('a share never exceeds 100', () => {
+    const { fixture } = render({ ...COUNTS, all: 10, mapping: 50 });
+    expect(fixture.componentInstance.steps().find(s => s.chip === 'mapping_incomplete')?.share).toBe(100);
+  });
+
+  it('a missing "all" count reads as 0', () => {
+    const { all, ...older } = COUNTS;
+    expect(all).toBe(167);
+    const { fixture } = render(older as PfmChipCounts);
+    expect(fixture.componentInstance.steps().map(s => s.share)).toEqual([0, 0, 0]);
+  });
 });

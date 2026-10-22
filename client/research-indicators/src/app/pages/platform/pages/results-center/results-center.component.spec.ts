@@ -304,6 +304,22 @@ describe('ResultsCenterComponent', () => {
       expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('status id 999'));
     });
 
+    it('warns only once per status id across repeated resolutions', () => {
+      const resultStatusService = TestBed.inject(GetAllResultStatusService);
+      resultStatusService.list.set([{ result_status_id: 999 } as any]);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+      resultStatusService.loading.set(false);
+      resultStatusService.list.set([{ result_status_id: 999 } as any, { result_status_id: 998 } as any]);
+      fixture.detectChanges();
+      TestBed.flushEffects();
+
+      // 998 proves the effect re-ran on the second resolution; 999 must not repeat.
+      expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('status id 998'));
+      const warningsForId999 = consoleWarnSpy.mock.calls.filter(call => String(call[0]).includes('status id 999'));
+      expect(warningsForId999).toHaveLength(1);
+    });
+
     it('does not warn while the status control list is still loading', () => {
       const resultStatusService = TestBed.inject(GetAllResultStatusService);
       resultStatusService.loading.set(true);
@@ -313,6 +329,36 @@ describe('ResultsCenterComponent', () => {
       TestBed.flushEffects();
 
       expect(ourVocabularyWarnings()).toHaveLength(0);
+    });
+  });
+
+  describe('buildUrlStateFromCurrentFilters fallbacks', () => {
+    it('yields empty filters and scope "all" when the results filter carries none of the URL-backed keys', () => {
+      resultsCenterService.resultsFilter.set({ 'indicator-codes': [], 'lever-codes': [], 'create-user-codes': [] } as any);
+
+      const state = (component as any).buildUrlStateFromCurrentFilters();
+
+      expect(state).toEqual({ filters: {}, scope: 'all' });
+    });
+
+    it('keeps only non-empty string contract codes', () => {
+      resultsCenterService.resultsFilter.set({
+        'contract-codes': ['A100', '', undefined, 5],
+        'status-codes': [2],
+        years: [2025],
+        'platform-code': ['STAR'],
+        'indicator-codes-filter': [1]
+      } as any);
+
+      const state = (component as any).buildUrlStateFromCurrentFilters();
+
+      expect(state.filters).toEqual({
+        contract: ['A100'],
+        status: [2],
+        year: [2025],
+        source: ['STAR'],
+        indicators: [1]
+      });
     });
   });
 

@@ -817,6 +817,12 @@ describe('SectionHeaderComponent', () => {
       }
     });
 
+    it('PFM monitor breadcrumb helper returns undefined when the path does not start with /result/<id>', () => {
+      const url = '/nested/result/STAR-1706?from=pfm-monitor';
+      component['currentUrl'].set(url);
+      expect(component['breadcrumbForPfmMonitorEntry'](url)).toBeUndefined();
+    });
+
     it('PFM monitor breadcrumb omits scope when none is remembered', () => {
       sessionStorage.clear();
       component['contractId'].set('A132');

@@ -95,4 +95,32 @@ describe('PfmSyncActivityCardComponent', () => {
     expect(tip.map(t => t.content)).toContain('52 results synced in May');
     expect(tip.map(t => t.content)).toContain('7 results synced in Jul');
   });
+
+  describe('derived values', () => {
+    function inputs(monthly: PfmMonthly[], syncedThisYear: number) {
+      const fixture = TestBed.createComponent(PfmSyncActivityCardComponent);
+      fixture.componentRef.setInput('monthly', monthly);
+      fixture.componentRef.setInput('syncedThisYear', syncedThisYear);
+      fixture.componentRef.setInput('scope', 'all');
+      return fixture.componentInstance;
+    }
+
+    it('year is the year of the latest month, or empty with no months', () => {
+      expect(inputs(MONTHLY, 1).year()).toBe('2026');
+      expect(inputs([], 0).year()).toBe('');
+    });
+
+    it('is empty only when nothing was synced this year AND every month is zero', () => {
+      const zero: PfmMonthly[] = [{ month: '2026-01', synced: 0 }];
+      expect(inputs(zero, 0).empty()).toBe(true);
+      expect(inputs(zero, 5).empty()).toBe(false);
+      expect(inputs([{ month: '2026-01', synced: 2 }], 0).empty()).toBe(false);
+    });
+
+    it('a month outside 01-12 keeps its raw text as label, and an all-zero window gives zero-height bars', () => {
+      const bars = inputs([{ month: '2026-13', synced: 0 }], 0).bars();
+      expect(bars[0].label).toBe('2026-13');
+      expect(bars[0].height).toBe('0%');
+    });
+  });
 });

@@ -27,7 +27,9 @@
  * that lacks the key** — which is exactly what CI does, and what caught it.
  * Do not read a green run here as "the environment-shape hazard is covered".
  */
-import { isLocalAuthBypassActive } from './local-auth-bypass';
+import { signal } from '@angular/core';
+import { isLocalAuthBypassActive, applyLocalAuthBypass } from './local-auth-bypass';
+import { DataCache } from '@interfaces/cache.interface';
 
 // Mutable double for the gitignored environment module, so each test can present
 // a different environment SHAPE — not merely a different value.
@@ -69,5 +71,62 @@ describe('isLocalAuthBypassActive', () => {
       setEnvironment({ production: false, localAuthBypass: truthy });
       expect(isLocalAuthBypassActive()).toBe(false);
     }
+  });
+});
+
+describe('applyLocalAuthBypass', () => {
+  const makeCache = (dataCache: Partial<DataCache> = {}) =>
+    ({
+      dataCache: signal(Object.assign(new DataCache(), dataCache)),
+      isLoggedIn: signal(false),
+      isValidatingToken: signal(true)
+    }) as never as {
+      dataCache: ReturnType<typeof signal<DataCache>>;
+      isLoggedIn: ReturnType<typeof signal<boolean>>;
+      isValidatingToken: ReturnType<typeof signal<boolean>>;
+    };
+
+  const setEnvironment = (shape: Record<string, unknown>) => {
+    for (const key of Object.keys(environmentMock)) delete environmentMock[key];
+    Object.assign(environmentMock, shape);
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('does nothing when the bypass is inactive', () => {
+    setEnvironment({ production: true, localAuthBypass: true });
+    const cache = makeCache();
+    applyLocalAuthBypass(cache as never);
+    expect(cache.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem('data')).toBeNull();
+  });
+
+  it('keeps an existing session and only marks it logged in', () => {
+    setEnvironment({ production: false, localAuthBypass: true });
+    const cache = makeCache({ access_token: 'real-token' });
+    applyLocalAuthBypass(cache as never);
+    expect(cache.isLoggedIn()).toBe(true);
+    expect(cache.dataCache().access_token).toBe('real-token');
+    expect(localStorage.getItem('data')).toBeNull();
+  });
+
+  it('seeds a SYSTEM_ADMIN local session when none exists', () => {
+    setEnvironment({ production: false, localAuthBypass: true });
+    const cache = makeCache();
+    applyLocalAuthBypass(cache as never);
+    const stored = JSON.parse(localStorage.getItem('data') as string);
+    expect(stored.access_token).toBe('local-auth-bypass');
+    expect(stored.user.email).toBe('local-dev@example.com');
+    expect(stored.user.user_role_list[0].role_id).toBe(1);
+    expect(stored.exp).toBeGreaterThan(Math.floor(Date.now() / 1000));
+    expect(cache.dataCache().refresh_token).toBe('local-auth-bypass');
+    expect(cache.isLoggedIn()).toBe(true);
+    expect(cache.isValidatingToken()).toBe(false);
+    expect(console.warn).toHaveBeenCalled();
   });
 });

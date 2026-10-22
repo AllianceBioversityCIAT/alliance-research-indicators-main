@@ -542,4 +542,43 @@ describe('ToPromiseService', () => {
       request.flush(envelope);
     }));
   });
+
+  describe('extra raw headers and postBlob', () => {
+    it('post applies raw headers', async () => {
+      httpClientMock.post = jest.fn().mockReturnValue(of({ data: {} }));
+      await service.post('/u', {}, { headers: { 'X-Custom': 'v1' } });
+      const headers = (httpClientMock.post as jest.Mock).mock.calls[0][2].headers;
+      expect(headers.get('X-Custom')).toBe('v1');
+    });
+
+    it('get applies raw headers', async () => {
+      httpClientMock.get = jest.fn().mockReturnValue(of({ data: {} }));
+      await service.get('/u', { headers: { 'X-Impersonation-Session': 'abc' } });
+      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
+      expect(headers.get('X-Impersonation-Session')).toBe('abc');
+    });
+
+    it('postBlob posts with blob responseType and no extra headers by default', async () => {
+      const blob = new Blob(['x']);
+      httpClientMock.post = jest.fn().mockReturnValue(of(blob));
+      const res = await service.postBlob('/u', { a: 1 });
+      expect(res).toBe(blob);
+      const [url, body, options] = (httpClientMock.post as jest.Mock).mock.calls[0];
+      expect(url).toBe(`${environment.mainApiUrl}/u`);
+      expect(body).toEqual({ a: 1 });
+      expect(options.responseType).toBe('blob');
+      expect(options.headers.keys()).toEqual([]);
+    });
+
+    it('postBlob sets all configured headers and the auth marker', async () => {
+      httpClientMock.post = jest.fn().mockReturnValue(of(new Blob(['x'])));
+      await service.postBlob('/u', {}, { useResultInterceptor: true, platform: 'STAR', noAuthInterceptor: true, isAuth: true });
+      const { headers } = (httpClientMock.post as jest.Mock).mock.calls[0][2];
+      expect(headers.get('X-Use-Year')).toBe('true');
+      expect(headers.get('X-Platform')).toBe('STAR');
+      expect(headers.get('no-auth-interceptor')).toBe('true');
+      expect(headers.get('X-Ari-Auth-Call')).toBe('1');
+      expect((httpClientMock.post as jest.Mock).mock.calls[0][0]).toBe(`${environment.managementApiUrl}/u`);
+    });
+  });
 });

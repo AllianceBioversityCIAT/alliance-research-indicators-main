@@ -269,4 +269,25 @@ describe('PrmsSyncCardComponent', () => {
     (host.querySelector('[data-testid="prms-sync-history-link"]') as HTMLAnchorElement).click();
     expect(emitted).toHaveLength(1);
   });
+
+  it('falls back to a neutral Pending Review state with no actor when there are no events', () => {
+    render(history({ events: [] }));
+    const cmp = fixture.componentInstance;
+
+    expect(cmp.latest()).toBeNull();
+    expect(cmp.status()).toEqual({ label: 'Pending Review', tone: 'warning' });
+    expect(cmp.actor()).toBeNull();
+    expect(cmp.boxModifier()).toBe('neutral');
+  });
+
+  it('focuses the history link on focusHistoryLink()', () => {
+    const host = render(history());
+    const link = host.querySelector('[data-testid="prms-sync-history-link"]') as HTMLAnchorElement;
+    fixture.componentInstance.focusHistoryLink();
+    expect(document.activeElement).toBe(link);
+  });
+
+  it('focusHistoryLink() does not throw when the link is not rendered', () => {
+    expect(() => fixture.componentInstance.focusHistoryLink()).not.toThrow();
+  });
 });

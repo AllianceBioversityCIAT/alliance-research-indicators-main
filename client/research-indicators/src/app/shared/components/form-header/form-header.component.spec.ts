@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { FormHeaderComponent } from './form-header.component';
 import { CacheService } from '@shared/services/cache/cache.service';
+import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
 
 describe('FormHeaderComponent', () => {
@@ -208,6 +209,30 @@ describe('FormHeaderComponent', () => {
 
       const openSpy = jest.spyOn(globalThis, 'open').mockImplementation(() => null);
       component.openPublicLink();
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+
+    it.each(['AICCRA', 'PRMS'] as const)('openExternalLink() opens the external link for the %s platform', code => {
+      isExternalResultSignal.set(true);
+      currentMetadataSignal.set({ ...externalMetadata, platform_code: PLATFORM_CODES[code] });
+      fixture.detectChanges();
+
+      const openSpy = jest.spyOn(globalThis, 'open').mockImplementation(() => null);
+      component.openExternalLink();
+
+      expect(openSpy).toHaveBeenCalledWith(externalMetadata.external_link, '_blank', 'noopener');
+      openSpy.mockRestore();
+    });
+
+    it('openExternalLink() does nothing for an unsupported platform', () => {
+      isExternalResultSignal.set(true);
+      currentMetadataSignal.set({ ...externalMetadata, platform_code: 'UNKNOWN' });
+      fixture.detectChanges();
+
+      const openSpy = jest.spyOn(globalThis, 'open').mockImplementation(() => null);
+      component.openExternalLink();
 
       expect(openSpy).not.toHaveBeenCalled();
       openSpy.mockRestore();

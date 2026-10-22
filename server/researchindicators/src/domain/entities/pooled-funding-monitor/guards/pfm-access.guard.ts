@@ -7,11 +7,15 @@ import {
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import { PooledFundingMonitorRepository } from '../repositories/pooled-funding-monitor.repository';
+import { EnvAppConfigUtil } from '../../../shared/utils/env-app-config.util';
 
 /**
  * Access guard for the CGIAR Portfolio Contribution Monitor (DD-PFM-2).
  *
  * Refuses (403):
+ * - everyone, admins included, while `POOL_FUNDING.SECTION.ENABLED` is `false`: the bilateral
+ *   reporting period is closed (owner 2026-10-22). Same flag that hides the menu entry and the route
+ *   on the client, which only hides the way in; this closes the API itself;
  * - a machine credential (`request.credential === 'machine'`). A machine token
  *   takes on its responsible human's `sec_user_id` and roles, so it cannot be
  *   told apart by the user shape; `JwtMiddleware.applyImpersonation` sets
@@ -29,9 +33,18 @@ import { PooledFundingMonitorRepository } from '../repositories/pooled-funding-m
  */
 @Injectable()
 export class PfmAccessGuard implements CanActivate {
-  constructor(private readonly repository: PooledFundingMonitorRepository) {}
+  constructor(
+    private readonly repository: PooledFundingMonitorRepository,
+    private readonly appConfig: EnvAppConfigUtil,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (!(await this.appConfig.POOL_FUNDING_SECTION_ENABLED())) {
+      throw new ForbiddenException(
+        'CGIAR Portfolio Contribution Monitor is closed: the bilateral reporting period is not active',
+      );
+    }
+
     const request = context.switchToHttp().getRequest();
     const user = request?.user;
     const roles: number[] = Array.isArray(user?.roles)
