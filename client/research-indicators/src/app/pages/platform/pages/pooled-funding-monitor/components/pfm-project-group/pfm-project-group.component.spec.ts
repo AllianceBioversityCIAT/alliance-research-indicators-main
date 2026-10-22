@@ -1,3 +1,4 @@
+import { provideDateFormatConfigMock } from '../../../../../../testing/date-format-config.mock';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -61,7 +62,7 @@ function setup(group: PfmGroup = GROUP) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [PfmProjectGroupComponent],
-    providers: [{ provide: PfmStoreService, useValue: store }, provideRouter([])]
+    providers: [{ provide: PfmStoreService, useValue: store }, provideRouter([]), provideDateFormatConfigMock()]
   });
   const fixture = TestBed.createComponent(PfmProjectGroupComponent);
   fixture.componentRef.setInput('group', group);
@@ -318,7 +319,7 @@ describe('PfmProjectGroupComponent', () => {
     (el.querySelector('[data-testid="pfm-col-updated_sort"]') as HTMLElement).click();
     fixture.detectChanges();
     // label order would put "01 Feb" first; the instant puts 2 Jan first
-    expect(bodyRows().map(r => r.querySelector('[data-testid="pfm-row-updated"]')?.textContent?.trim())).toEqual(['02 Jan, 10:00', '01 Feb, 10:00']);
+    expect(bodyRows().map(r => r.querySelector('[data-testid="pfm-row-updated"]')?.textContent?.trim())).toEqual(['02/01/2026', '01/02/2026']);
   });
 });
 

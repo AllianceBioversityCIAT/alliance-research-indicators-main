@@ -110,4 +110,4 @@
     }
   </div>
   </td>
-  <td class="min-w-[6rem]"><p class="m-0 text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-updated">{{ row().updated_at }}</p></td>
+  <td class="min-w-[6rem]"><p class="m-0 text-[12px] tabular-nums text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-row-updated">{{ (row().updated_at_iso | formatDate: null : 'date') || '—' }}</p></td>

@@ -1,3 +1,4 @@
+import { provideDateFormatConfigMock } from '../../../../testing/date-format-config.mock';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { PfmResultRowComponent } from './components/pfm-result-row/pfm-result-row.component';
@@ -13,7 +14,7 @@ import { PfmMappingState, PfmPipeline, PfmPrmsStatus, PfmResultRow } from './pfm
 
 function tableTag(over: Partial<PfmResultRow>): PfmResultRowComponent {
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ imports: [PfmResultRowComponent], providers: [provideRouter([])] });
+  TestBed.configureTestingModule({ imports: [PfmResultRowComponent], providers: [provideRouter([]), provideDateFormatConfigMock()] });
   const f = TestBed.createComponent(PfmResultRowComponent);
   f.componentRef.setInput('row', {
     platform_code: 'STAR',
