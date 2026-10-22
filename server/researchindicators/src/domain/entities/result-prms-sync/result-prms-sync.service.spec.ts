@@ -638,13 +638,16 @@ describe('ResultPrmsSyncService', () => {
       // slot here to populate them with. That every one of them lands as a
       // NULL literal in the emitted INSERT is proven by the repository's
       // own spec (KZ-001: a property in generated SQL is asserted there).
+      // NULL results.platform_code is STAR. The history code is the bare
+      // official code (1001), not the payload reference (ARI-1001).
       const arg =
         outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
       expect(arg).toEqual({
         userId: 7,
         occurredAt: expect.any(Date),
         environment: 'TEST',
-        resultOfficialCode: 'ARI-1001',
+        platformCode: 'STAR',
+        resultOfficialCode: '1001',
         resultYear: 2026,
         prmsResultCode: 9199,
       });
@@ -653,11 +656,82 @@ describe('ResultPrmsSyncService', () => {
           'userId',
           'occurredAt',
           'environment',
+          'platformCode',
           'resultOfficialCode',
           'resultYear',
           'prmsResultCode',
         ].sort(),
       );
+    });
+
+    it('a STAR push whose payload reference is the bare code binds that same code', async () => {
+      aggregateRepository.loadByResultId.mockResolvedValue({
+        result_id: 42,
+        platform_code: 'STAR',
+      });
+      payloadBuilder.build.mockReturnValue(
+        envelope({ external_reference: '1001' }),
+      );
+      normalizer.ingest.mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-star',
+          results: [
+            {
+              success: true,
+              external_reference: '1001',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+
+      await service.sync(42);
+
+      const arg =
+        outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
+      // HEAD wrote the payload reference. For STAR that reference is the
+      // bare code, so the bound code is byte-identical and the platform
+      // column is the addition.
+      expect(arg.platformCode).toBe('STAR');
+      expect(arg.resultOfficialCode).toBe('1001');
+    });
+
+    it('a TIP push passes platform TIP and the bare code, not TIP-123', async () => {
+      logRepository.claimAttempt.mockResolvedValue({
+        kind: 'claimed',
+        attemptId: 9,
+        attemptNumber: 1,
+        resultOfficialCode: 123,
+        resultYear: 2026,
+      });
+      aggregateRepository.loadByResultId.mockResolvedValue({
+        result_id: 42,
+        platform_code: 'TIP',
+      });
+      payloadBuilder.build.mockReturnValue(
+        envelope({ external_reference: 'TIP-123' }),
+      );
+      normalizer.ingest.mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-tip',
+          results: [
+            {
+              success: true,
+              external_reference: 'TIP-123',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+
+      await service.sync(42);
+
+      const arg =
+        outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
+      expect(arg.platformCode).toBe('TIP');
+      expect(arg.resultOfficialCode).toBe('123');
     });
 
     it('Falsifier 1 — a throwing history write does NOT fail an otherwise-successful push, and is logged at error', async () => {

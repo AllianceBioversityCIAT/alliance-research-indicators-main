@@ -292,6 +292,7 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(stored.correlation_outcome).toBe(
         DeliveryCorrelationOutcome.NO_REFERENCE,
       );
+      expect(stored.platform_code).toBeNull();
       expect(stored.result_official_code).toBeNull();
       expect(stored.decision).toBe('APPROVE');
       expect(correlate).toHaveBeenCalledWith({
@@ -310,6 +311,7 @@ describe('PrmsWebhookDeliveryService', () => {
       expect(storedInput().correlation_outcome).toBe(
         DeliveryCorrelationOutcome.NO_REFERENCE,
       );
+      expect(storedInput().platform_code).toBeNull();
       expect(storedInput().result_official_code).toBeNull();
     });
   });
@@ -619,6 +621,41 @@ describe('PrmsWebhookDeliveryService', () => {
       );
       expect(stored.decision).toBeNull();
       expect(stored.status).toBeNull();
+    });
+  });
+
+  describe('inbound reference is stored parsed (R-PPI-001, design §7.3)', () => {
+    it('TIP-123 is stored as platform TIP and bare code 123', async () => {
+      await service.accept(
+        request(wellFormedBody({ external_reference: 'TIP-123' })),
+      );
+
+      const stored = storedInput();
+      expect(stored.platform_code).toBe('TIP');
+      expect(stored.result_official_code).toBe('123');
+      expect(correlate).toHaveBeenCalledWith(
+        expect.objectContaining({ result_official_code: 'TIP-123' }),
+      );
+    });
+
+    it('a bare 123 is stored as STAR and the same code', async () => {
+      await service.accept(
+        request(wellFormedBody({ external_reference: '123' })),
+      );
+
+      const stored = storedInput();
+      expect(stored.platform_code).toBe('STAR');
+      expect(stored.result_official_code).toBe('123');
+    });
+
+    it('XYZ-123 is stored raw with no platform', async () => {
+      await service.accept(
+        request(wellFormedBody({ external_reference: 'XYZ-123' })),
+      );
+
+      const stored = storedInput();
+      expect(stored.platform_code).toBeNull();
+      expect(stored.result_official_code).toBe('XYZ-123');
     });
   });
 });

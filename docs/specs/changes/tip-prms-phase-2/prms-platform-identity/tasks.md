@@ -116,7 +116,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-04 — Decision-history writes and history reader
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02
+- [x] **Status:** done (2026-10-22, PASS attempt 1 — see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-PPI-001 (*New push row* — history half); R-PPI-002 (history THEN/BUT); NFR-PPI-001 (history half).
 - **Design refs:** §7.3, §7.5 (history reader), D-3, D-6, P-11, P-12.
 - **Scope (files):**
@@ -132,8 +132,8 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `prms-webhook-delivery.repository.spec.ts` (34 SQL-text assertions), `prms-webhook-delivery.service.spec.ts`, `prms-sync-history.reader.spec.ts` (25), `result-prms-sync.service.spec.ts`, `prms.opensearch.service.spec.ts` (imported history caller); realign from the failing run (K-018).
 - **Review:** `full` — stored field + shared contract (override b).
 - **Done criteria:**
-  - [ ] Suites green; falsifiers observed red and reverted.
-  - [ ] eslint, tsc, build green.
+  - [x] Suites green; falsifiers observed red and reverted.
+  - [x] eslint, tsc, build green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { formatPersonName } from '../../shared/utils/name-format.util';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { PRMS_SYNC_HTTP_DESCRIPTIONS } from './dto/prms-sync.dto';
 import {
   PrmsSyncHistoryDto,
@@ -11,9 +12,10 @@ import {
 /**
  * Q1 — result metadata. The reporting year is resolved here, never from
  * the client. Flat predicates only: no OR (design §5, KZ-017).
+ * `platform_code` is selected so the history key can bind it (design §7.5).
  */
 const RESULT_METADATA_SQL = `
-      SELECT result_official_code, report_year_id, prms_result_code, prms_phase_id
+      SELECT result_official_code, report_year_id, prms_result_code, prms_phase_id, platform_code
       FROM results
       WHERE result_id = ?
     `;
@@ -21,6 +23,7 @@ const RESULT_METADATA_SQL = `
 /**
  * Q2 — timeline. Newest first by COALESCE(decided_at, occurred_at), then id.
  * Duplicate deliveries and inactive rows are not timeline entries.
+ * Keyed on the result's platform as well as code and year (R-PPI-002).
  */
 const EVENTS_SQL = `
       SELECT h.*, su.first_name, su.last_name
@@ -28,24 +31,36 @@ const EVENTS_SQL = `
       LEFT JOIN sec_users su ON su.sec_user_id = h.actor_user_id
       WHERE h.result_official_code = ?
         AND h.result_year = ?
+        AND h.platform_code = ?
         AND h.duplicate_of_id IS NULL
         AND h.is_active = TRUE
       ORDER BY COALESCE(h.decided_at, h.occurred_at) DESC, h.id DESC
     `;
 
 /**
- * Q3 — sync_count counts STAR pushes awaiting review, not inbound decisions.
+ * Q3 — sync_count counts pushes awaiting review on this platform, not
+ * inbound decisions and not another platform's rows.
  */
 const SYNC_COUNT_SQL = `
       SELECT COUNT(*)
       FROM result_prms_sync_history
       WHERE result_official_code = ?
         AND result_year = ?
+        AND platform_code = ?
         AND event_source = 'STAR'
         AND status = 'PENDING_REVIEW'
         AND duplicate_of_id IS NULL
         AND is_active = TRUE
     `;
+
+/** NULL `results.platform_code` is STAR, matching the payload builder. */
+const platformCodeOf = (row: { platform_code?: unknown }): string => {
+  const raw = row.platform_code;
+  if (typeof raw !== 'string') {
+    return ReportingPlatformEnum.STAR;
+  }
+  return raw;
+};
 
 const asNullableNumber = (value: unknown): number | null =>
   value == null || value === '' ? null : Number(value);
@@ -172,6 +187,7 @@ export class PrmsSyncHistoryReader {
           report_year_id?: unknown;
           prms_result_code?: unknown;
           prms_phase_id?: unknown;
+          platform_code?: unknown;
         }
       | undefined;
     if (!resultRow) {
@@ -180,15 +196,18 @@ export class PrmsSyncHistoryReader {
 
     const officialCode = resultRow.result_official_code;
     const year = resultRow.report_year_id;
+    const platform = platformCodeOf(resultRow);
 
     try {
       const eventRows: unknown[] = await this.dataSource.query(EVENTS_SQL, [
         officialCode,
         year,
+        platform,
       ]);
       const countRows: unknown[] = await this.dataSource.query(SYNC_COUNT_SQL, [
         officialCode,
         year,
+        platform,
       ]);
       const countRow = countRows[0] as Record<string, unknown> | undefined;
       const syncCount = Number(countRow?.['COUNT(*)'] ?? 0);

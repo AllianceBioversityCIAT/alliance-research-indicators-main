@@ -137,3 +137,18 @@
 - **Requirements covered:** R-PPI-001 *New push row* (log); R-PPI-002 status + attempt number (unit); R-PPI-005; NFR-PPI-001 (log half).
 - **Decisions made:** execute-time spec edit `design.md` §7.2 + `tasks.md` T-03 scope (live copy COALESCE), above.
 - **Final status:** PASS on attempt 2 · **Final verification:** VERIFIED.
+
+### T-04 — Decision-history writes and history reader — in progress
+
+- **Implementer:** Grok `grok-4.7-high` via Cursor — Orca `task_6b5247708694` / `ctx_a8f7007598d0` (fresh worker, effort medium, skills `nestjs-expert`, `tdd`). Forward pointers carried: NULL→STAR (§7.5, §7.2 amended), T-02 history column shape, reuse `parsePrmsRef`. Brief: scratchpad `t04-brief.md`.
+- **Attempt 1 — files changed:** `prms-webhook-delivery.repository.ts` (+ spec), `prms-webhook-delivery.service.ts` (+ spec), `result-prms-sync.service.ts` (+ spec), `prms-sync-history.reader.ts` (+ spec).
+- **Falsifiers (verbatim excerpts, reverted):** (a) imported `NOT EXISTS` without `platform_code = 'STAR'` → `Expected pattern: /platform_code = 'STAR'/`; (b) raw reference stored as code → `Expected: "123" / Received: "TIP-123"`; (c) `EVENTS_SQL` without platform → `Expected pattern: /h\.platform_code = \?/`.
+- **STAR outbound old-vs-new:** repository INSERT `HEAD: OCCURRED_AT, 'TEST', CORRELATED, '1441061', 2026, …` → `NEW: OCCURRED_AT, 'TEST', CORRELATED, 'STAR', '1441061', 2026, …` (code string unchanged). Service fixture `'ARI-1001'` (artificial) realigned to bare `'1001'` (K-018); STAR bare-reference and TIP cases added.
+- **Not Done / Assumptions (verbatim excerpt; no owed item):** "Parsing runs once, in the delivery service." · "The correlator and the delivery log still see the raw wire reference." · "`''` as `results.platform_code` is passed through, matching T-03 `platformCodeOf`." · "`findHistory` now has a platform predicate … There is no production caller."
+- **Evidence re-run (Leader-inline):** VERIFIED — `npx jest src/domain/entities/prms-webhook src/domain/entities/result-prms-sync --silent` 23/23 suites, 382/382; `npx jest src/domain/tools/open-search` (imported-history caller) 16/16, 130/130; eslint 0; tsc 0; build 0.
+- **Reviewer (`akili-reviewer`, Claude Opus):** PASS — NULL→STAR on outbound and reader; unparseable → raw + NULL platform; bare code on every parsed write (INSERT columns/placeholders counted); outbound bare code consistent with P-11/§7.3; `findHistory*` platform param per §7.3/D-6, no production caller; correlator still gets the raw reference (T-05).
+- **ADVISORY:** **spec tension (raised to the owner):** a parsed but never-matched inbound reference (e.g. `TIP-999`) gets `platform_code='TIP'` while R-PPI-001 *Existing rows* backfill gives never-matched rows no platform — new and backfilled rows disagree; code follows §7.3 · `platformCodeOf` now duplicated (T-03 + T-04 ×2) — one home next to `prmsRef` · outbound platform read from the aggregate while the log row's comes from the claim read (could differ only if `results.platform_code` changes mid-push) · predicates proven on SQL text / JS fake only (T-07).
+- **spawns:** implementer (Grok/Cursor) not reported by host, ended complete; reviewer 12 calls, 103579 tokens, ended complete.
+- **Requirements covered:** R-PPI-001 *New push row* (history); R-PPI-002 history (unit); R-PPI-004 *Unknown prefix* (stored raw); NFR-PPI-001 (history half).
+- **Decisions made:** none beyond the task.
+- **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED.

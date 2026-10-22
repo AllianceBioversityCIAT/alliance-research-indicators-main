@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { parsePrmsRef } from '../../tools/prms-normalizer/reference/prms-external-reference';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
@@ -217,6 +218,28 @@ const classifyBody = (body: unknown): ClassifiedBody => {
 const statusFor = (decision: string | null): string | null =>
   decision === null ? null : (DECISION_STATUS[decision] ?? null);
 
+/**
+ * What the history row stores for one inbound reference (design §7.3, D-3).
+ * `parsePrmsRef` yields the platform and the bare code. A reference it
+ * rejects keeps the raw string and no platform. A missing reference stays
+ * null on both. The correlator still receives the raw wire value.
+ */
+const historyIdentity = (
+  reference: string | null,
+): { platform_code: string | null; result_official_code: string | null } => {
+  if (reference === null) {
+    return { platform_code: null, result_official_code: null };
+  }
+  const parsed = parsePrmsRef(reference);
+  if (parsed === null) {
+    return { platform_code: null, result_official_code: reference };
+  }
+  return {
+    platform_code: parsed.platform,
+    result_official_code: String(parsed.code),
+  };
+};
+
 const readExternalReference = (
   body: Record<string, unknown>,
 ): { ok: boolean; value: string | null } => {
@@ -363,13 +386,15 @@ export class PrmsWebhookDeliveryService {
   ): Promise<ServiceResponseDto<{ received: true }>> {
     const classified = classifyBody(input.body);
     const environment = this.environmentLabel();
+    const identity = historyIdentity(classified.resultOfficialCode);
 
     const stored = await this.repository.recordDelivery({
       delivery_id: input.deliveryId,
       occurred_at: new Date(),
       environment,
       correlation_outcome: classified.correlationOutcome,
-      result_official_code: classified.resultOfficialCode,
+      platform_code: identity.platform_code,
+      result_official_code: identity.result_official_code,
       prms_result_id: classified.prmsResultId,
       prms_result_code: classified.prmsResultCode,
       decision: classified.decision,
