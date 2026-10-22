@@ -76,15 +76,23 @@
   --ac-pfm-warning-border: #e9cf9e;
   --ac-pfm-outscope-fg: var(--ac-state-out-fg);
   // ONE status palette for the CGIAR Portfolio monitor and the result sidebar (client CLAUDE.md rule).
-  // One distinct hue per state, never two tones of one hue; green is reserved for done.
+  // One distinct hue per state, never two tones of one hue; no purple for a status (owner).
+  // Greens (owner): mapping Complete = the green of done; PRMS Approved = the STAR Approved sage
+  // #7CB580 / border #A8CEAB (result_status config, same in both themes, never changed here);
+  // No SP contribution = aquamarine, a blue-green, so it never reads as either green.
   // -fg = text / outline (>= 4.5:1 on the surface), -fill = bars and dots (>= 3:1).
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
-  --ac-state-todo-fg: #475569;
-  --ac-state-todo-fill: #64748b;
+  // Mapping Pending: a light grey, so it does not read as the STAR Submitted navy (owner: lighter
+  // than the 4.5:1 text floor, accepted; the state is also named in the tag).
+  --ac-state-todo-fg: #7b8798;
+  --ac-state-todo-fill: #a9b3c1;
   --ac-state-progress-fg: #c2410c;
   --ac-state-progress-fill: #ea580c;
-  --ac-state-ready-fg: #1d4ed8;
-  --ac-state-ready-fill: #2563eb;
+
+  // Ready to sync: the app's steel blue (the Sync activity scale), never a bright royal blue or
+  // indigo, which read as purple (owner: no purple, ever).
+  --ac-state-ready-fg: #234a94;
+  --ac-state-ready-fill: #3f74b8;
   // Pending (review / PI approval) is the bilateral module's yellow #E69F00 (owner). Its fill is
   // 2.25:1 on white, below 3:1: accepted as the house colour, the value is always in the tooltip.
   --ac-state-waiting-fg: #8a5d00;
@@ -93,21 +101,27 @@
   --ac-state-done-fill: #16a34a;
   --ac-state-alert-fg: #b91c1c;
   --ac-state-alert-fill: #dc2626;
-  --ac-state-out-fg: #0f766e;
-  --ac-state-out-fill: #0d9488;
+  --ac-state-complete-fg: var(--ac-state-done-fg);
+  --ac-state-complete-fill: var(--ac-state-done-fill);
+  --ac-state-approved-fg: #7cb580;
+  --ac-state-approved-fill: #7cb580;
+  --ac-state-approved-border: #a8ceab;
+  --ac-state-out-fg: #0e7490;
+  --ac-state-out-fill: #0891b2;
   --ac-state-empty: #d5dce5;
   --ac-status-prms-pending: var(--ac-state-waiting-fg);
-  --ac-status-prms-approved: var(--ac-state-done-fg);
+  --ac-status-prms-approved: var(--ac-state-approved-fg);
+  --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
   --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-complete: var(--ac-state-ready-fg);
+  --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
   --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
   --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
   --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-approved: var(--ac-state-done-fill);
+  --ac-pfm-seg-approved: var(--ac-state-approved-fill);
   --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
   --ac-pfm-seg-no-sp: var(--ac-state-out-fill);
   --ac-pfm-surface: #ffffff;
@@ -253,36 +267,45 @@ $colors: (
   --ac-pfm-warning-border: #6b5521;
   --ac-pfm-outscope-fg: var(--ac-state-out-fg);
   // ONE status palette for the CGIAR Portfolio monitor and the result sidebar (client CLAUDE.md rule).
-  // One distinct hue per state, never two tones of one hue; green is reserved for done.
+  // One distinct hue per state, never two tones of one hue; no purple for a status (owner).
+  // Greens (owner): mapping Complete = the green of done; PRMS Approved = the STAR Approved sage
+  // #7CB580 / border #A8CEAB (result_status config, same in both themes, never changed here);
+  // No SP contribution = aquamarine, a blue-green, so it never reads as either green.
   // -fg = text / outline (>= 4.5:1 on the surface), -fill = bars and dots (>= 3:1).
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
-  --ac-state-todo-fg: #a8b5c4;
-  --ac-state-todo-fill: #8492a6;
+  --ac-state-todo-fg: #8c99aa;
+  --ac-state-todo-fill: #6b7789;
   --ac-state-progress-fg: #fb923c;
   --ac-state-progress-fill: #f97316;
-  --ac-state-ready-fg: #8ab4ff;
-  --ac-state-ready-fill: #5b8def;
+  --ac-state-ready-fg: #8bbcf0;
+  --ac-state-ready-fill: #5b8dc7;
   --ac-state-waiting-fg: #f2c14e;
   --ac-state-waiting-fill: #e6a700;
   --ac-state-done-fg: #5fd38d;
   --ac-state-done-fill: #3fb86f;
   --ac-state-alert-fg: #ff8a8a;
   --ac-state-alert-fill: #f06262;
-  --ac-state-out-fg: #3fd6c6;
-  --ac-state-out-fill: #22b3a4;
+  --ac-state-complete-fg: var(--ac-state-done-fg);
+  --ac-state-complete-fill: var(--ac-state-done-fill);
+  --ac-state-approved-fg: #7cb580;
+  --ac-state-approved-fill: #7cb580;
+  --ac-state-approved-border: #a8ceab;
+  --ac-state-out-fg: #67e8f9;
+  --ac-state-out-fill: #22d3ee;
   --ac-state-empty: #3d444e;
   --ac-status-prms-pending: var(--ac-state-waiting-fg);
-  --ac-status-prms-approved: var(--ac-state-done-fg);
+  --ac-status-prms-approved: var(--ac-state-approved-fg);
+  --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
   --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-complete: var(--ac-state-ready-fg);
+  --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
   --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
   --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
   --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-approved: var(--ac-state-done-fill);
+  --ac-pfm-seg-approved: var(--ac-state-approved-fill);
   --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
   --ac-pfm-seg-no-sp: var(--ac-state-out-fill);
   --ac-pfm-surface: #23272d;

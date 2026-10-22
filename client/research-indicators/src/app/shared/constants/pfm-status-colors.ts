@@ -7,7 +7,9 @@
  * (client CLAUDE.md rule).
  *
  * One distinct hue per state, never two tones of one hue; green is reserved for done,
- * red for "needs attention" / rejected. `fg` is for text and outlines (>= 4.5:1 on the
+ * red for "needs attention" / rejected; no purple. Greens (owner): mapping Complete is the green of
+ * done; PRMS Approved is the STAR Approved sage (#7CB580 / border #A8CEAB, from result_status config,
+ * never changed here); No SP contribution is aquamarine, a blue-green that reads as neither. `fg` is for text and outlines (>= 4.5:1 on the
  * surface), `fill` for bars and dots (>= 3:1).
  */
 export const PFM_STATE = {
@@ -15,8 +17,12 @@ export const PFM_STATE = {
   todo: { fg: 'var(--ac-state-todo-fg)', fill: 'var(--ac-state-todo-fill)' },
   /** Started, not finished (mapping incomplete). */
   progress: { fg: 'var(--ac-state-progress-fg)', fill: 'var(--ac-state-progress-fill)' },
-  /** Our part is finished, not sent yet (mapping complete / ready to sync). */
+  /** Ready to sync: mapping complete, not sent yet (the "Send to PRMS" action). */
   ready: { fg: 'var(--ac-state-ready-fg)', fill: 'var(--ac-state-ready-fill)' },
+  /** CGIAR Portfolio mapping Complete: the green of done. */
+  complete: { fg: 'var(--ac-state-complete-fg)', fill: 'var(--ac-state-complete-fill)' },
+  /** Approved by PRMS: the STAR Approved sage, so "Approved" looks the same in both. */
+  approved: { fg: 'var(--ac-state-approved-fg)', fill: 'var(--ac-state-approved-fill)' },
   /** Waiting on PRMS (pending review). */
   waiting: { fg: 'var(--ac-state-waiting-fg)', fill: 'var(--ac-state-waiting-fill)' },
   /** Done: synced to PRMS / approved / completed. */
@@ -37,6 +43,13 @@ export const PRMS_STATUS_COLOR = {
   pending: 'var(--ac-status-prms-pending)',
   approved: 'var(--ac-status-prms-approved)',
   rejected: 'var(--ac-status-prms-rejected)'
+} as const;
+
+/** Tag outline per PRMS status: Approved keeps the STAR Approved border, the others outline in their colour. */
+export const PRMS_STATUS_BORDER = {
+  pending: PRMS_STATUS_COLOR.pending,
+  approved: 'var(--ac-status-prms-approved-border)',
+  rejected: PRMS_STATUS_COLOR.rejected
 } as const;
 
 /** CGIAR Portfolio mapping status, keyed by the wire value of `mapping_state`. */
