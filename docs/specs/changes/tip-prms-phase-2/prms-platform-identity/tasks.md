@@ -2,7 +2,7 @@
 
 - **Module:** prms-sync + prms-webhook (server) · bilateral read path (client)
 - **Spec id:** 2026-10-prms-platform-identity
-- **Status:** in-progress
+- **Status:** done
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — ESCALATED, owner-resolved 2026-10-21)
@@ -221,7 +221,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-10 — Knowledge Product ToC level `OUTPUT` (HITL T-07, owner decision)
 
-- [~] **Status:** automated part PASS 2026-10-22 (see `execution.md`); **owner HITL on Dev owed** (with T-07) · **Size:** S · **Dependencies:** T-06
+- [x] **Status:** done (2026-10-22, PASS + owner HITL — see `execution.md`) · **Size:** S · **Dependencies:** T-06
 - **Requirements covered:** R-PPI-006 (*TIP result with imported alignment* — THEN shown: the imported ToC alignment of a TIP Knowledge Product renders, read-only).
 - **Design refs:** §8 *Knowledge Product ToC level* (added 2026-10-22); `execution.md` "T-07 HITL — partial observation".
 - **Scope (files, server):** `src/domain/entities/bilateral/utils/toc-level-rules.util.ts` — `knowledge_product: ['OUTPUT']`, drop the OQ-V2-5 "maps to []" note; its spec `toc-level-rules.util.spec.ts`; `bilateral.service.getHlosIndicatorsForResult.spec.ts` and `bilateral.service.spec.ts` where they pin `[]` for KP (realign from the failing run, K-018). Client: no production change expected — run its pool-funding tests to prove it.
@@ -232,14 +232,14 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Review:** `full` — changes a shared rule and what STAR KPs can save (override b).
 - **Done criteria:**
   - [x] Falsifier observed red and reverted; server and client tests green.
-  - [ ] Owner HITL on Dev (with T-07): the TIP result shows its SP01 ToC details read-only; a STAR Knowledge Product shows the ToC block with level `OUTPUT`.
+  - [x] Owner HITL on Dev (with T-07): the TIP result shows its SP01 ToC details read-only; a STAR Knowledge Product shows the ToC block with level `OUTPUT`.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
 
 ### T-07 — Integration spec, full gates, and HITL check
 
-- [~] **Status:** automated part PASS 2026-10-22 (see `execution.md`); **HITL on Dev owed to the owner** after push/deploy · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08, T-09
+- [x] **Status:** done (2026-10-22, PASS + owner HITL — see `execution.md`) · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08, T-09
 - **Requirements covered:** R-PPI-002 and R-PPI-004 at the SQL level (end to end on a real schema); NFR-PPI-001 (full suites); R-PPI-006 rendered state (HITL); parent spec `tip-kp-project-pool-funding` T-04 item 1 (unblocked by R-PPI-006).
 - **Design refs:** §13 (integration row), §14, P-17.
 - **Scope (files):** `test/prms-platform-identity.integration-spec.ts` (new, `test:integration`; own `result_official_code` band — read sibling headers first, FP-45). No production code.
@@ -257,7 +257,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Done criteria:**
   - [x] Integration spec green on a fresh container; falsifier observed red and reverted.
   - [x] Full server and client suites, builds, lint green (summary lines quoted).
-  - [ ] Human observation quoted, covering each check; parent T-04 item 1 recorded there.
+  - [x] Human observation quoted, covering each check; parent T-04 item 1 recorded there.
 - **Skills:** `nestjs-expert`, `systematic-debugging` (only if the integration run disagrees).
 
 ---

@@ -179,3 +179,5 @@
 - **Status:** T-04 stays `[~]`.
 
 - **Cross-spec note (2026-10-22):** `changes/tip-prms-phase-2/prms-platform-identity` T-10 makes Knowledge Products allow the ToC level `OUTPUT` (owner decision). R-TIP-004 *STAR rules unchanged* ("rejected with `level_not_allowed`") is superseded; recorded inline in `requirements.md`.
+
+- **T-04 item 1 (2026-10-22):** unblocked by `changes/tip-prms-phase-2/prms-platform-identity` R-PPI-006 (T-06) + T-10; owner HITL on the test environment, verbatim: "ya esta en test todo ya lo probe y ya veo toda la data de tip esta perfecta". TIP agreement `A132` / TIP 19191 Pool Funding data shown.
