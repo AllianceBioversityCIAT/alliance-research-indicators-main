@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — ESCALATED, owner-resolved 2026-10-21)
 - **Family:** ../family.md (child 1 of 3)
-- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1) — 9 tasks after the owner-approved pivot T-07 (2026-10-22, T-08 and T-09 added)
+- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1) — 10 tasks after owner-approved additions (2026-10-22: T-08, T-09 pivot; T-10 from the T-07 HITL); 12 review rounds (1 over, owner-approved)
 - **Last updated:** 2026-10-21
 
 Server commands run from `server/researchindicators/`; client commands from `client/research-indicators/`.
@@ -216,6 +216,24 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
   - [x] Falsifier observed red and reverted; integration spec green on a fresh Dev-dump container.
   - [x] Full server suite, tsc, build green.
 - **Skills:** `nestjs-expert`.
+
+---
+
+### T-10 — Knowledge Product ToC level `OUTPUT` (HITL T-07, owner decision)
+
+- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-06
+- **Requirements covered:** R-PPI-006 (*TIP result with imported alignment* — THEN shown: the imported ToC alignment of a TIP Knowledge Product renders, read-only).
+- **Design refs:** §10 *Knowledge Product ToC level* (added 2026-10-22); `execution.md` "T-07 HITL — partial observation".
+- **Scope (files, server):** `src/domain/entities/bilateral/utils/toc-level-rules.util.ts` — `knowledge_product: ['OUTPUT']`, drop the OQ-V2-5 "maps to []" note; its spec `toc-level-rules.util.spec.ts`; `bilateral.service.getHlosIndicatorsForResult.spec.ts` and `bilateral.service.spec.ts` where they pin `[]` for KP (realign from the failing run, K-018). Client: no production change expected — run its pool-funding tests to prove it.
+- **Tests:** util — every result type's levels, KP = `['OUTPUT']`; catalog — a mapped KP result fetches the `OUTPUT` catalog (no longer zero upstream calls); write gate — a KP `OUTPUT` alignment is accepted, a KP `OUTCOME` alignment is rejected.
+- **Verification:** `npx jest src/domain/entities/bilateral --silent` · `npx eslint src/domain/entities/bilateral` · `npx tsc --noEmit -p tsconfig.json` · `npm run build`; client `npx jest src/app/pages/platform/pages/result/pages/pool-funding-alignment src/app/shared/services/bilateral.service.spec.ts --silent --coverage=false`.
+- **Falsifier:** revert KP to `[]` → the util KP assertion and the catalog "fetches OUTPUT" assertion red.
+- **Consumers:** `getHlosIndicatorsForResult` (catalog), the ToC write-gate validation (`bilateral.service.ts` `allowedLevelsFor(resolveResultTypeKey(...))`), the TIP import (`buildTipTocUpsert`, which already stores `OUTPUT`), client `pool-funding-alignment.component.ts` (`allowedLevels`, `hloSectionVisible`).
+- **Review:** `full` — changes a shared rule and what STAR KPs can save (override b).
+- **Done criteria:**
+  - [ ] Falsifier observed red and reverted; server and client tests green.
+  - [ ] Owner HITL on Dev (with T-07): the TIP result shows its SP01 ToC details read-only; a STAR Knowledge Product shows the ToC block with level `OUTPUT`.
+- **Skills:** `nestjs-expert`, `tdd`.
 
 ---
 

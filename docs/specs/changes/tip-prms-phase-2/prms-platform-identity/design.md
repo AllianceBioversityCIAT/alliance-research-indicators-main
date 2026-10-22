@@ -131,6 +131,7 @@ Unchanged lines; the correlator's existing "multiple live rows" warn now names t
 ## 8. Frontend / UX
 
 - `POOL_FUNDING_PLATFORMS` = `[STAR, TIP]` (R-PPI-006). AICCRA, PRMS, BILATERAL stay excluded.
+- **Knowledge Product ToC level (T-10, owner decision 2026-10-22):** `allowedLevelsFor('knowledge_product')` returns `['OUTPUT']` (was `[]`, pending OQ-V2-5 from `bilateral-module/toc-mapping-v2`). Without it the catalog answers `allowed_levels: []` for every KP and the client hides the whole ToC section, so a TIP result's imported `OUTPUT` alignment never renders (HITL 2026-10-22). Server-only: the catalog and the write gate share the function; the client reads `allowed_levels`. Side effect, accepted by the owner: STAR Knowledge Products can now pick and save an `OUTPUT` alignment.
 - `bilateralPath` (`api.service.ts`) strips **any** known platform prefix, not only `STAR-`, so the route receives digits (P-15); platform travels in the interceptor's `reportingPlatforms` query.
 - No template or component change: the Pool Funding component is already read-only for any external result (P-16); the sidebar rule `eligible || display_only` is unchanged.
 - Specs to flip: `platform-code.util.spec.ts` (`toEqual([STAR])`), `bilateral.service.spec.ts:296-297,339` (asserts zero requests for `TIP-…`).
