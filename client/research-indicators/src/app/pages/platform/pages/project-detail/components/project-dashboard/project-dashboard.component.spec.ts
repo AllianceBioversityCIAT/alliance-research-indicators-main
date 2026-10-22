@@ -20,7 +20,7 @@ import { ProjectDashboardCardComponent } from '../project-dashboard-card/project
 import { ResultsCenterTableComponent } from '../../../results-center/components/results-center-table/results-center-table.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 
-jest.mock('mapbox-gl', () => ({}), { virtual: true });
+jest.mock('mapbox-gl', () => ({}));
 
 @Component({
   selector: 'app-project-dashboard-card',
