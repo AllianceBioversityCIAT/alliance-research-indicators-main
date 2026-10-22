@@ -5,8 +5,8 @@
       class="flex h-full flex-col items-center justify-center text-center rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
       data-testid="pfm-total-card"
       aria-labelledby="pfm-total-title">
-      <h2 id="pfm-total-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Results that should contribute to the CGIAR Portfolio</h2>
-      <p class="m-0 mt-3 text-[40px] font-bold leading-none tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-total-value">{{ counts().all | number }}</p>
+      <h2 id="pfm-total-title" class="m-0 text-[15px] font-semibold leading-4.5 text-[var(--ac-pfm-accent-navy)]">Results that should contribute to the CGIAR Portfolio</h2>
+      <p class="m-0 mt-4 text-[40px] font-bold leading-none tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-total-value">{{ counts().all | number }}</p>
     </section>
     <app-pfm-progress-card class="h-full" [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
   </div>
