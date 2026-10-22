@@ -71,8 +71,12 @@ describe('PFM status colours (one palette, owner rules)', () => {
     for (const v of values('--ac-status-mapping-no-sp')) expect(hue(v)).toBeLessThanOrEqual(200);
   });
 
-  it('mapping Pending is a light grey, never the STAR Submitted navy', () => {
-    expect(light('--ac-status-mapping-pending')).toBe('#7b8798');
+  // Owner: mapping Pending, PRMS Pending Review, the Mapping pending quick view and the
+  // Finish the mapping card are the same orange.
+  it('every pending is the orange of Mapping pending / Finish the mapping, never the STAR Submitted navy', () => {
+    expect(values('--ac-status-mapping-pending')).toEqual(values('--ac-state-progress-fg'));
+    expect(values('--ac-status-prms-pending')).toEqual(values('--ac-state-progress-fg'));
+    expect(values('--ac-pfm-seg-pending')).toEqual(values('--ac-state-progress-fill'));
     expect(light('--ac-status-mapping-pending')).not.toBe(STAR_SUBMITTED);
   });
 

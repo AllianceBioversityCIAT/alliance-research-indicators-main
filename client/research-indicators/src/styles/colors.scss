@@ -109,17 +109,20 @@
   --ac-state-out-fg: #0e7490;
   --ac-state-out-fill: #0891b2;
   --ac-state-empty: #d5dce5;
-  --ac-status-prms-pending: var(--ac-state-waiting-fg);
+
+  // Owner: every "pending" of the result flow is ONE colour, the orange of Mapping pending /
+  // Finish the mapping: CGIAR Portfolio mapping Pending and PRMS Pending Review alike.
+  --ac-status-prms-pending: var(--ac-state-progress-fg);
   --ac-status-prms-approved: var(--ac-state-approved-fg);
   --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
-  --ac-status-mapping-pending: var(--ac-state-todo-fg);
+  --ac-status-mapping-pending: var(--ac-state-progress-fg);
   --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
   --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
-  --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
+  --ac-pfm-seg-pending: var(--ac-state-progress-fill);
   --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
   --ac-pfm-seg-approved: var(--ac-state-approved-fill);
   --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
@@ -293,17 +296,20 @@ $colors: (
   --ac-state-out-fg: #67e8f9;
   --ac-state-out-fill: #22d3ee;
   --ac-state-empty: #3d444e;
-  --ac-status-prms-pending: var(--ac-state-waiting-fg);
+
+  // Owner: every "pending" of the result flow is ONE colour, the orange of Mapping pending /
+  // Finish the mapping: CGIAR Portfolio mapping Pending and PRMS Pending Review alike.
+  --ac-status-prms-pending: var(--ac-state-progress-fg);
   --ac-status-prms-approved: var(--ac-state-approved-fg);
   --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
-  --ac-status-mapping-pending: var(--ac-state-todo-fg);
+  --ac-status-mapping-pending: var(--ac-state-progress-fg);
   --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
   --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
   --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
-  --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
+  --ac-pfm-seg-pending: var(--ac-state-progress-fill);
   --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
   --ac-pfm-seg-approved: var(--ac-state-approved-fill);
   --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
