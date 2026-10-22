@@ -47,8 +47,8 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 //      one catalogs[] entry per SP, one levels[] entry per allowed level,
 //      EOI forces aow_code: null, single batched fan-out with exact args
 //      (R-BIL-090 AC.1, R-BIL-091 AC.1, NFR-BIL-091)
-//   7. allowed_levels: [] (Knowledge Product) → catalogs: [], ZERO
-//      TocIntegrationService calls (R-BIL-091 AC.2)
+//   7. Knowledge Product → allowed_levels: ['OUTPUT']; a mapped result
+//      fetches the OUTPUT catalog (prms-platform-identity T-10)
 //   8. version_locked flag off report_year_id vs the configured reporting
 //      year, both branches (R-BIL-097 read flag)
 //
@@ -522,7 +522,8 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(out.catalogs[1].levels[1].toc_results[0].toc_result_id).toBe(31);
   });
 
-  it('returns catalogs: [] with ZERO upstream calls when allowed_levels is empty (e.g. Knowledge Product)', async () => {
+  // @sdd-spec docs/specs/changes/tip-prms-phase-2/prms-platform-identity — T-10
+  it('fetches the OUTPUT catalog for a mapped Knowledge Product', async () => {
     findContext.mockResolvedValueOnce(
       context({ indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT }),
     );
@@ -535,16 +536,49 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
       short_name: 'DESIRA',
       project_mappings_array: [sp(2, 'SP02')],
     });
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([['SP02:OUTPUT', [tocResult('SP02', 1)]]]),
+    );
 
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
     expect(out.mapping_status).toBe('mapped');
     expect(out.result_type).toBe('knowledge_product');
-    expect(out.allowed_levels).toEqual([]);
-    expect(out.catalogs).toEqual([]);
-    // R-BIL-091 AC.2: zero TocIntegrationService calls — getTocResultsForSps
-    // is the service's only entry point in this flow.
-    expect(getTocResultsForSps).toHaveBeenCalledTimes(0);
+    expect(getTocResultsForSps).toHaveBeenCalledTimes(1);
+    expect(getTocResultsForSps).toHaveBeenCalledWith(
+      ['SP02'],
+      ['OUTPUT'],
+      2026,
+    );
+    expect(out.allowed_levels).toEqual(['OUTPUT']);
+    expect(out.catalogs).toEqual([
+      {
+        sp_code: 'SP02',
+        levels: [
+          {
+            level: 'OUTPUT',
+            toc_results: [
+              {
+                toc_result_id: 1,
+                title: 'ToC result 1',
+                description: 'Description 1',
+                aow_code: 'AOW01',
+                indicators: [
+                  {
+                    indicator_id: 10,
+                    indicator_description: 'Indicator for 1',
+                    unit_of_measurement: 'Number',
+                    type_value: 'Custom',
+                    target_value: '12',
+                    target_year: 2026,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
   });
 
   it('sets version_locked: true when the result year differs from the configured reporting year', async () => {

@@ -221,7 +221,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-10 — Knowledge Product ToC level `OUTPUT` (HITL T-07, owner decision)
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-06
+- [~] **Status:** automated part PASS 2026-10-22 (see `execution.md`); **owner HITL on Dev owed** (with T-07) · **Size:** S · **Dependencies:** T-06
 - **Requirements covered:** R-PPI-006 (*TIP result with imported alignment* — THEN shown: the imported ToC alignment of a TIP Knowledge Product renders, read-only).
 - **Design refs:** §10 *Knowledge Product ToC level* (added 2026-10-22); `execution.md` "T-07 HITL — partial observation".
 - **Scope (files, server):** `src/domain/entities/bilateral/utils/toc-level-rules.util.ts` — `knowledge_product: ['OUTPUT']`, drop the OQ-V2-5 "maps to []" note; its spec `toc-level-rules.util.spec.ts`; `bilateral.service.getHlosIndicatorsForResult.spec.ts` and `bilateral.service.spec.ts` where they pin `[]` for KP (realign from the failing run, K-018). Client: no production change expected — run its pool-funding tests to prove it.
@@ -231,7 +231,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `getHlosIndicatorsForResult` (catalog), the ToC write-gate validation (`bilateral.service.ts` `allowedLevelsFor(resolveResultTypeKey(...))`), the TIP import (`buildTipTocUpsert`, which already stores `OUTPUT`), client `pool-funding-alignment.component.ts` (`allowedLevels`, `hloSectionVisible`).
 - **Review:** `full` — changes a shared rule and what STAR KPs can save (override b).
 - **Done criteria:**
-  - [ ] Falsifier observed red and reverted; server and client tests green.
+  - [x] Falsifier observed red and reverted; server and client tests green.
   - [ ] Owner HITL on Dev (with T-07): the TIP result shows its SP01 ToC details read-only; a STAR Knowledge Product shows the ToC block with level `OUTPUT`.
 - **Skills:** `nestjs-expert`, `tdd`.
 
