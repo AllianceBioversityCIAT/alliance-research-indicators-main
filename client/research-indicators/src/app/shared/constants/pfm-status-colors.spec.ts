@@ -88,7 +88,16 @@ describe('PFM status colours (one palette, owner rules)', () => {
   });
 
   it('Ready to sync uses the Sync activity steel blue', () => {
-    expect(values('--ac-state-ready-fill')).toEqual([light('--ac-pfm-month-5'), values('--ac-pfm-month-4')[1]]);
+    expect(values('--ac-state-ready')).toEqual([light('--ac-pfm-month-5'), values('--ac-pfm-month-6')[1]]);
+  });
+
+  // Owner: the same state is the same colour in a table tag, a card, a quick-view dot and a chart.
+  it('one colour per state: -fg and -fill are the same value, in both themes', () => {
+    for (const st of ['todo', 'progress', 'ready', 'waiting', 'done', 'complete', 'alert', 'approved', 'out']) {
+      expect({ st, fg: values(`--ac-state-${st}-fg`) }).toEqual({ st, fg: values(`--ac-state-${st}-fill`) });
+    }
+    // the Finish the mapping card and the Mapping pending dot read the same orange as the table tag
+    expect(values('--ac-state-progress-fill')).toEqual(values('--ac-status-mapping-pending'));
   });
 
   it('PRMS statuses: one colour each, the same token the sidebar sync card reads', () => {
