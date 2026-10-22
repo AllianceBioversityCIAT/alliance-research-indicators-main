@@ -25,8 +25,8 @@ import {
 /**
  * Applies an approved pool-funding diff onto the version's own rows.
  *
- * The version is the active snapshot for (result_official_code, result_year)
- * on the history row — the same row the diff compared. A changed value is
+ * The version is the active snapshot for (platform, result_official_code,
+ * result_year) on the history row — the same row the diff compared. A changed value is
  * never updated in place: the active row is deactivated and a new row is
  * inserted. Runs after the diff, post-acknowledgement, and must not throw —
  * the 2xx is already gone, and correlation_outcome plus processing_state
@@ -35,7 +35,7 @@ import {
 
 const HISTORY_SQL = `
 SELECT decision, changes, correlation_outcome, raw_body,
-       result_official_code, result_year
+       platform_code, result_official_code, result_year
 FROM result_prms_sync_history
 WHERE id = ?
 `;
@@ -516,6 +516,7 @@ export class PoolFundingMappingApplyService {
       (sql, params) => this.dataSource.query(sql, params),
       officialCode,
       reportYearId,
+      scalar(row.platform_code),
     );
     if (snapshot.ok === false) {
       this.logger._warn(

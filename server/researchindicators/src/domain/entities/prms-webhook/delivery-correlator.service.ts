@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { parsePrmsRef } from '../../tools/prms-normalizer/reference/prms-external-reference';
 import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { DeliveryProcessingState } from './enum/delivery-processing-state.enum';
@@ -14,8 +15,8 @@ import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.servi
 /**
  * Live-row lookup. All four predicates of the `ResultsUtil` convention,
  * in the design §6.4 order: platform, official code, active, not a
- * snapshot. `platform_code` is a literal from `ReportingPlatformEnum.STAR`
- * so dropping that predicate does not shift the bound official code.
+ * snapshot. `platform_code` is bound from `parsePrmsRef` (design §7.4):
+ * `TIP-123` and bare `123` are different live rows.
  * `ORDER BY result_id ASC` is what "the first" means when more than one
  * live row matches (R-PWH-007 AC.4) — without it the engine picks. The id
  * is resolved here only to SELECT the row and to keep that ordering
@@ -26,7 +27,7 @@ import { PoolFundingMappingDiffService } from './pool-funding-mapping-diff.servi
 const LIVE_ROW_SQL = `
 SELECT result_id, report_year_id
 FROM results
-WHERE platform_code = '${ReportingPlatformEnum.STAR}'
+WHERE platform_code = ?
   AND result_official_code = ?
   AND is_active = TRUE
   AND is_snapshot = FALSE
@@ -64,7 +65,7 @@ export interface DeliveryCorrelationApplied {
    * a version is overwritten, the year is not.
    */
   resultYear: number | null;
-  /** STAR official code when correlated; null on the stop branches. */
+  /** Bare official code when correlated; null on the stop branches. */
   officialCode: number | null;
   processingState: DeliveryProcessingState.PROCESSED;
 }
@@ -81,27 +82,10 @@ export type DeliveryCorrelationResult =
 type ReferenceResolution =
   | { kind: 'absent' }
   | { kind: 'invalid' }
-  | { kind: 'code'; code: number };
+  | { kind: 'code'; platform: ReportingPlatformEnum; code: number };
 
 const errorText = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
-
-/**
- * A canonical base-10 integer, and nothing else.
- * `Number('')` is `0` and `Number('abc')` is `NaN` — neither may reach
- * the query (R-PWH-007 AC.2). Leading zeros are rejected because
- * `Number('01441061')` is `1441061`, a different code than the text.
- */
-const parseOfficialCode = (resultOfficialCode: string): number | null => {
-  if (!/^[0-9]+$/.test(resultOfficialCode)) {
-    return null;
-  }
-  const code = Number(resultOfficialCode);
-  if (!Number.isSafeInteger(code) || String(code) !== resultOfficialCode) {
-    return null;
-  }
-  return code;
-};
 
 @Injectable()
 export class DeliveryCorrelatorService {
@@ -163,7 +147,10 @@ export class DeliveryCorrelatorService {
     }
 
     const rows: Array<{ result_id: unknown; report_year_id: unknown }> =
-      await this.dataSource.query(LIVE_ROW_SQL, [reference.code]);
+      await this.dataSource.query(LIVE_ROW_SQL, [
+        reference.platform,
+        reference.code,
+      ]);
     if (rows.length === 0) {
       return this.finish(
         delivery.id,
@@ -174,7 +161,7 @@ export class DeliveryCorrelatorService {
     }
     if (rows.length > 1) {
       this.logger._warn(
-        `Ambiguous correlation for result_official_code=${delivery.result_official_code}: ${rows.length} live rows matched; applying the first`,
+        `Ambiguous correlation for platform=${reference.platform} result_official_code=${delivery.result_official_code}: ${rows.length} live rows matched; applying the first`,
       );
     }
     const resultId = Number(rows[0].result_id);
@@ -240,11 +227,11 @@ export class DeliveryCorrelatorService {
     if (typeof resultOfficialCode !== 'string') {
       return { kind: 'invalid' };
     }
-    const code = parseOfficialCode(resultOfficialCode);
-    if (code === null) {
+    const parsed = parsePrmsRef(resultOfficialCode);
+    if (parsed === null) {
       return { kind: 'invalid' };
     }
-    return { kind: 'code', code };
+    return { kind: 'code', platform: parsed.platform, code: parsed.code };
   }
 
   private async finish(

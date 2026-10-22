@@ -152,3 +152,19 @@
 - **Requirements covered:** R-PPI-001 *New push row* (history); R-PPI-002 history (unit); R-PPI-004 *Unknown prefix* (stored raw); NFR-PPI-001 (history half).
 - **Decisions made:** none beyond the task.
 - **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED.
+
+### T-05 — Correlator and mapping diff/apply — in progress
+
+- **Implementer:** Grok `grok-4.7-high` via Cursor — Orca `task_776b2cc67bd9` / `ctx_0e4f683f3f29` (fresh worker, effort medium, skills `nestjs-expert`, `tdd`). Forward pointers carried: correlator gets the raw reference (T-04), NULL-platform history rows, NULL→STAR. Brief: scratchpad `t05-brief.md`.
+- **Attempt 1 — files changed:** `delivery-correlator.service.ts` (+ spec), `pool-funding-mapping-diff.service.ts` (+ spec), `pool-funding-mapping-apply.service.ts` (+ spec), `prms-webhook-delivery.service.ts` (comment only: removed `parseOfficialCode` → `parsePrmsRef`).
+- **Falsifiers (verbatim excerpts, reverted):** (a) `LIVE_ROW_SQL` fixed to `'STAR'` → `TIP-123 correlates to the TIP live row`: `- "resultYear": 2026, + "resultYear": 2024,` (fixture has TIP 2026 and STAR 2024 live rows for code 123); (b) `resolveActiveSnapshot` ignoring platform → diff and apply `Expected ["TIP", "19949", 2026]` / `Received ["19949", 2026]`.
+- **`resolveActiveSnapshot` callers:** `grep -rn` → definition `pool-funding-mapping-diff.service.ts:422`, callers diff `:846`, apply `:515` (+ import `:15`); `test/` 0 hits. Both pass `scalar(row.platform_code)`.
+- **Not Done / Assumptions (verbatim excerpt; no owed item):** "Una fila de historial con `platform_code` NULL no llega a diff/apply (design §7.5). No se añadió una rama." · "`LIVE_ROW_SQL` compara `platform_code` de forma estricta … `ACTIVE_SNAPSHOT_SQL` usa `COALESCE(platform_code, 'STAR')`" · "El test previo que trataba la referencia `\"0\"` como código real ahora espera `UNKNOWN_REFERENCE`" · merged migration `1790086170692` comment still names `parseOfficialCode` (append-only, not edited).
+- **Evidence re-run (Leader-inline):** VERIFIED — `npx jest src/domain/entities/prms-webhook --silent` 14/14 suites, 226/226; eslint 0; tsc 0; build 0; caller grep 4 non-spec hits.
+- **Reviewer (`akili-reviewer`, Claude Opus):** PASS — strict live side = HEAD's strict `'STAR'` literal for bare refs; snapshot COALESCE is the pushed-side rule (§7.2/§7.5); STAR snapshot lookup only changes where another platform shares code+year (HEAD failed `rows.length !== 1`) — the mix-up R-PPI-002 removes; NULL-platform history cannot reach diff/apply (only caller is the correlator after CORRELATED; same `parsePrmsRef` on the same string); comment edit accepted (FP-50).
+- **Adjudication "0":** not a T-05 defect, but `design.md` §7.1 claimed `parseOfficialCode` enforced the same rule — false (HEAD accepted `"0"`). **Leader data point:** read-only Dev query 2026-10-22 `SELECT COUNT(*) FROM results WHERE result_official_code <= 0` → `0`. **Execute-time spec edit:** `design.md` §7.1 parenthetical corrected — rejecting code 0 is a deliberate change, unreachable on Dev. Carried to the T-07 Reviewer as a named check.
+- **ADVISORY:** **forward pointer to T-07:** a snapshot row with NULL `platform_code` resolved by a STAR history row on MySQL (the specs' fake reproduces COALESCE) · the `"0"` test's last assertion is redundant · apply class doc comment not re-wrapped.
+- **spawns:** implementer (Grok/Cursor) not reported by host, ended complete; reviewer 18 calls, 98803 tokens, ended complete.
+- **Requirements covered:** R-PPI-004 (all three scenarios, unit); R-PPI-002 mapping diff/apply.
+- **Decisions made:** execute-time spec edit `design.md` §7.1 (above).
+- **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED.

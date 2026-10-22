@@ -246,7 +246,7 @@ const readExternalReference = (
   // `external_reference` is PRMS's OWN wire field ([WH] contract). It is
   // deliberately NOT renamed alongside our column: we store the value in
   // `result_official_code`, but PRMS keeps sending it under its own key.
-  // The value is not validated here — `parseOfficialCode` in the correlator
+  // The value is not validated here — `parsePrmsRef` in the correlator
   // decides whether it is a real official code, and may classify it invalid.
   if (!('external_reference' in body) || body.external_reference == null) {
     return { ok: true, value: null };

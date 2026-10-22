@@ -140,7 +140,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-05 — Correlator and mapping diff/apply
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02, T-04
+- [x] **Status:** done (2026-10-22, PASS attempt 1 — see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-02, T-04
 - **Requirements covered:** R-PPI-004 (*TIP decision* THEN/AND; *Bare reference* THEN/AND IT MUST NOT; *Unknown prefix*); R-PPI-002 (mapping diff/apply never mixes platforms).
 - **Design refs:** §7.4, §7.5 (mapping), D-4, P-13, P-14.
 - **Scope (files):**
@@ -155,8 +155,8 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `delivery-correlator.service.spec.ts` (21 SQL-text assertions), `pool-funding-mapping-diff.service.spec.ts`, `pool-funding-mapping-apply.service.spec.ts`, every other caller of `resolveActiveSnapshot` (`grep -rn "resolveActiveSnapshot" src test` — run and list).
 - **Review:** `full` — inbound decision routing (live path) + exported symbol signature (override b).
 - **Done criteria:**
-  - [ ] Suites green; falsifiers observed red and reverted.
-  - [ ] eslint, tsc, build green.
+  - [x] Suites green; falsifiers observed red and reverted.
+  - [x] eslint, tsc, build green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
