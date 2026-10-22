@@ -60,8 +60,11 @@ describe('PfmCoverageTabComponent', () => {
     const { q } = render(SUMMARY);
     expect(q('pfm-total-card')?.textContent).toContain('Results that should contribute to the CGIAR Portfolio');
     expect(q('pfm-total-value')?.textContent?.trim()).toBe('31'); // chip_counts.all
-    // same row as the progress card
-    expect(q('pfm-total-card')?.parentElement).toBe(q('pfm-progress-card')?.closest('app-pfm-progress-card')?.parentElement);
+    // same row, total first, then the progress card
+    const row = q('pfm-total-card')!.parentElement!;
+    expect(row).toBe(q('pfm-progress-card')?.closest('app-pfm-progress-card')?.parentElement);
+    expect(row.firstElementChild).toBe(q('pfm-total-card'));
+    expect(q('pfm-total-card')!.className).toContain('text-center');
   });
 
   it('the old multi-colour charts are gone', () => {
