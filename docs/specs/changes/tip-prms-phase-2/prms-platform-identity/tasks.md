@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — ESCALATED, owner-resolved 2026-10-21)
 - **Family:** ../family.md (child 1 of 3)
-- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1)
+- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1) — 8 tasks after the owner-approved pivot T-07 (2026-10-22, T-08 added)
 - **Last updated:** 2026-10-21
 
 Server commands run from `server/researchindicators/`; client commands from `client/research-indicators/`.
