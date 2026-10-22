@@ -5,6 +5,7 @@ import { SearchExportControlsComponent } from '@shared/components/search-export-
 import { PfmGroup, PfmResultRow } from '../../pfm.interfaces';
 import { PFM_STATE, PFM_STATE_EMPTY } from '@shared/constants/pfm-status-colors';
 import { PfmStoreService } from '../../services/pfm-store.service';
+import { formatPersonName } from '@shared/utils/person-name.util';
 import { PfmResultRowComponent } from '../pfm-result-row/pfm-result-row.component';
 
 
@@ -132,6 +133,15 @@ export class PfmProjectGroupComponent {
     return { done, width: total ? `${(done / total) * 100}%` : '0%' };
   });
   /** Text alternative of the bar for assistive tech. */
+  /**
+   * "Principal Investigator: Daniela Zuniga Pino" (owner: labelled, first name first, not Agresso's
+   * "ZUNIGA PINO, DANIELA"; the donor is not shown anywhere else, so not here either). Empty when there is no PI.
+   */
+  leadLine = computed(() => {
+    const pi = formatPersonName(this.group().lead_pi);
+    return pi ? `Principal Investigator: ${pi}` : '';
+  });
+
   barSummary = computed(() => `${this.progress().done} of ${this.group().result_count} done: in PRMS or with no SP contribution`);
   /** "{done} of {total} results": the green part of the bar, out of the project's results. */
   countLabel = computed(() => {

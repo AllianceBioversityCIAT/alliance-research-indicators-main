@@ -77,11 +77,21 @@ describe('PfmProjectGroupComponent', () => {
     expect(q('pfm-group-body')).toBeNull();
   });
 
-  it('header shows code, name, lead PI · donor, count and the attention flag', () => {
+  // Owner: say what each value is, and write the PI as people read a name.
+  it('only the Principal Investigator, first name first and title-cased; no donor', () => {
+    const { q } = setup({ ...GROUP, lead_pi: 'ZUNIGA PINO, DANIELA', donor: 'CROP TRUST' });
+    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Principal Investigator: Daniela Zuniga Pino');
+  });
+
+  it('no PI: no line at all, never an empty label', () => {
+    expect(setup({ ...GROUP, lead_pi: null }).q('pfm-group-lead')).toBeNull();
+  });
+
+  it('header shows code, name, Principal Investigator, count and the attention flag', () => {
     const { q } = setup();
     expect(q('pfm-group-code')?.textContent?.trim()).toBe('P100');
     expect(q('pfm-group-name')?.textContent?.trim()).toBe('Alpha project');
-    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Lead PI: A. PI · Donor X');
+    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Principal Investigator: A. Pi');
     // done (3 approved + 2 pending + 1 no SP) of all results
     expect(q('pfm-group-count')?.textContent?.trim()).toBe('6 of 7 results');
     expect(q('pfm-group-flag')?.textContent?.trim()).toBe('2 need attention');
