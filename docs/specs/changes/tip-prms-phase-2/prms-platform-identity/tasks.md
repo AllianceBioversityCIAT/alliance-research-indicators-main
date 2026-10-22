@@ -182,9 +182,28 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ---
 
+### T-08 — Align the sync tables' collation with `results` (pivot T-07)
+
+- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-02
+- **Requirements covered:** R-PPI-002 (status + attempt reads must run on the real schema); NFR-PPI-002.
+- **Design refs:** §5 *Collation* (added 2026-10-22), Pivot Record T-07 in `execution.md`.
+- **Scope (files):** `src/db/migrations/<ts>-convertPrmsSyncTablesCollation.ts` (new, timestamp after `1792673320363`) + `src/db/migration-specs/<ts>-convertPrmsSyncTablesCollation.spec.ts` (new). Up: both tables `CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`; down: back to `utf8mb4_unicode_520_ci`.
+- **Tests:** spec asserts both statements in up and in down, and the exact collation names.
+- **Verification:** `npx jest src/db/migration-specs --silent` · `npx tsc --noEmit -p tsconfig.json` · `npm run build` · on a fresh Dev-dump container: `migration:test:execute` then `migration:test:revert` (this migration only) with both tables' `CHECKSUM TABLE` equal before up and after down, and `information_schema` collations quoted after up and after down.
+- **Falsifier:** omit one table from up → the spec assertion red; on the Dev-dump container the T-07 integration spec stays red with 1267.
+- **Consumers:** every SQL that compares a string column of these two tables with a column of another table — list each with both collations (a `unicode_520` peer would now clash). T-07's integration spec is the end-to-end gate.
+- **Review:** `full` — schema change on shared tables (override b, f).
+- **Done criteria:**
+  - [ ] Spec green; falsifier observed red and reverted.
+  - [ ] Up + down observed on a fresh Dev-dump container; checksums equal; collations quoted.
+  - [ ] Cross-table string comparison audit listed.
+- **Skills:** `nestjs-expert`.
+
+---
+
 ### T-07 — Integration spec, full gates, and HITL check
 
-- [~] **Status:** blocked — Pivot Record T-07 (MySQL 1267 collation mix in the status reader), awaiting owner · **Size:** M · **Dependencies:** T-03, T-05, T-06
+- [~] **Status:** blocked — waits for T-08 (Pivot Record T-07, owner-approved 2026-10-22) · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08
 - **Requirements covered:** R-PPI-002 and R-PPI-004 at the SQL level (end to end on a real schema); NFR-PPI-001 (full suites); R-PPI-006 rendered state (HITL); parent spec `tip-kp-project-pool-funding` T-04 item 1 (unblocked by R-PPI-006).
 - **Design refs:** §13 (integration row), §14, P-17.
 - **Scope (files):** `test/prms-platform-identity.integration-spec.ts` (new, `test:integration`; own `result_official_code` band — read sibling headers first, FP-45). No production code.
