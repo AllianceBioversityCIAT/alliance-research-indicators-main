@@ -1,3 +1,4 @@
+import { AppConfig } from '../src/domain/entities/app-config/entities/app-config.entity';
 import 'dotenv/config';
 import {
   Global,
@@ -331,7 +332,8 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
     ds = new DataSource({
       type: 'mysql',
       ...c,
-      entities: [],
+      // app_config only: PfmAccessGuard reads POOL_FUNDING.SECTION.ENABLED through the repository.
+      entities: [AppConfig],
       synchronize: false,
       migrationsRun: false,
       logging: false,
@@ -452,6 +454,43 @@ describe('Pooled Funding Monitor (HTTP e2e, scratch MySQL)', () => {
       for (const token of ['tok-pi-a', 'tok-contrib-admin', 'tok-sysadmin']) {
         const res = await get(`${BASE}/summary`, token);
         expect(res.status).toBe(200);
+      }
+    });
+
+    // Owner 2026-10-22: the monitor is open only while the bilateral reporting period runs.
+    // The row is absent in the scratch schema (= open, as the client reads it); every other test
+    // here runs that way. Inside the suite transaction, so the rollback removes the row.
+    it('POOL_FUNDING.SECTION.ENABLED = false: 403 for everyone, SYSTEM_ADMIN included, on all three endpoints; true: open again', async () => {
+      const setFlag = (value: string | null) =>
+        value === null
+          ? q(
+              `DELETE FROM app_config WHERE \`key\` = 'POOL_FUNDING.SECTION.ENABLED'`,
+            )
+          : q(
+              `INSERT INTO app_config (\`key\`, simple_value, is_active) VALUES ('POOL_FUNDING.SECTION.ENABLED', ?, 1)
+               ON DUPLICATE KEY UPDATE simple_value = VALUES(simple_value), is_active = 1`,
+              [value],
+            );
+      try {
+        await setFlag('false');
+        for (const path of [
+          `${BASE}/summary`,
+          `${BASE}/queue`,
+          `${BASE}/queue/projects/P-A/results`,
+        ]) {
+          for (const token of ['tok-sysadmin', 'tok-pi-a']) {
+            const res = await get(path, token);
+            expect({ path, token, status: res.status }).toEqual({
+              path,
+              token,
+              status: 403,
+            });
+          }
+        }
+        await setFlag('true');
+        expect((await get(`${BASE}/summary`, 'tok-sysadmin')).status).toBe(200);
+      } finally {
+        await setFlag(null);
       }
     });
   });

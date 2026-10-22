@@ -1,16 +1,43 @@
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { PooledFundingMonitorRepository } from '../repositories/pooled-funding-monitor.repository';
 import { PfmAccessGuard } from './pfm-access.guard';
+import { EnvAppConfigUtil } from '../../../shared/utils/env-app-config.util';
 
 describe('PfmAccessGuard', () => {
   const managesAnyProject = jest.fn<Promise<boolean>, [number]>();
-  const guard = new PfmAccessGuard({
-    managesAnyProject,
-  } as unknown as PooledFundingMonitorRepository);
+  const sectionEnabled = jest.fn<Promise<boolean>, []>();
+  const guard = new PfmAccessGuard(
+    { managesAnyProject } as unknown as PooledFundingMonitorRepository,
+    {
+      POOL_FUNDING_SECTION_ENABLED: sectionEnabled,
+    } as unknown as EnvAppConfigUtil,
+  );
 
   beforeEach(() => {
     managesAnyProject.mockReset();
     managesAnyProject.mockResolvedValue(false);
+    sectionEnabled.mockReset();
+    sectionEnabled.mockResolvedValue(true);
+  });
+
+  // Owner 2026-10-22: the monitor is open only while the bilateral reporting period runs.
+  describe('POOL_FUNDING.SECTION.ENABLED', () => {
+    it('off: everyone is refused, admins included, before any role check', async () => {
+      sectionEnabled.mockResolvedValue(false);
+      for (const roles of [[1], [9], [3]]) {
+        await expect(
+          guard.canActivate(ctx({ sec_user_id: 7, roles })),
+        ).rejects.toThrow('bilateral reporting period is not active');
+      }
+      expect(managesAnyProject).not.toHaveBeenCalled();
+    });
+
+    it('on: the role rules decide as before', async () => {
+      await expect(
+        guard.canActivate(ctx({ sec_user_id: 7, roles: [9] })),
+      ).resolves.toBe(true);
+      expect(sectionEnabled).toHaveBeenCalled();
+    });
   });
 
   const ctx = (
