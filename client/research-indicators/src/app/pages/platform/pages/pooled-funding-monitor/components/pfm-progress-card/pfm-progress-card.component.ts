@@ -13,7 +13,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
   selector: 'app-pfm-progress-card',
   imports: [TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-progress-card.component.html',
-  host: { class: 'block' },
+  host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PfmProgressCardComponent {

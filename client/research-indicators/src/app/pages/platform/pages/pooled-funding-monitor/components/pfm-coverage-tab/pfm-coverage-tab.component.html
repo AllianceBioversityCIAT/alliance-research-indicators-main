@@ -1,5 +1,15 @@
 <div class="flex flex-col gap-4" data-testid="pfm-coverage-tab">
-  <app-pfm-progress-card [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
+  <!-- Progress (3/4) next to the total that should contribute (1/4), same height -->
+  <div class="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_1fr]">
+    <app-pfm-progress-card class="h-full" [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
+    <section
+      class="flex h-full flex-col justify-center rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
+      data-testid="pfm-total-card"
+      aria-labelledby="pfm-total-title">
+      <h2 id="pfm-total-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">Results that should contribute to the CGIAR Portfolio</h2>
+      <p class="m-0 mt-3 text-[40px] font-bold leading-none tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-total-value">{{ counts().all | number }}</p>
+    </section>
+  </div>
   <app-pfm-next-steps-card [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
   <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
     <app-pfm-sp-coverage-card [rows]="summary().sp_coverage" [scope]="scope()" (openSp)="openQueue.emit({ sp: $event })" />
