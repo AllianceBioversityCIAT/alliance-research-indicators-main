@@ -184,7 +184,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-07 — Integration spec, full gates, and HITL check
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-03, T-05, T-06
+- [~] **Status:** blocked — Pivot Record T-07 (MySQL 1267 collation mix in the status reader), awaiting owner · **Size:** M · **Dependencies:** T-03, T-05, T-06
 - **Requirements covered:** R-PPI-002 and R-PPI-004 at the SQL level (end to end on a real schema); NFR-PPI-001 (full suites); R-PPI-006 rendered state (HITL); parent spec `tip-kp-project-pool-funding` T-04 item 1 (unblocked by R-PPI-006).
 - **Design refs:** §13 (integration row), §14, P-17.
 - **Scope (files):** `test/prms-platform-identity.integration-spec.ts` (new, `test:integration`; own `result_official_code` band — read sibling headers first, FP-45). No production code.
