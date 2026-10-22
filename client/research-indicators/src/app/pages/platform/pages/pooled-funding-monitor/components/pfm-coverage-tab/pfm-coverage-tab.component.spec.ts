@@ -77,7 +77,7 @@ describe('PfmCoverageTabComponent', () => {
     (el.querySelector('[data-testid="pfm-progress-done"]') as HTMLElement).click();
     (el.querySelector('[data-testid="pfm-progress-left"]') as HTMLElement).click();
     (el.querySelector('[data-testid="pfm-prms-legend-rejected"]') as HTMLElement).click();
-    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { sp: 'SP06' }, { chip: 'synced' }, { chip: 'need_attention' }, { chip: 'synced' }]);
+    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { sp: 'SP06' }, { chip: 'synced' }, { chip: 'need_attention' }, { chip: 'rejected' }]);
   });
 
   it('falls back to the KPI figures when the server does not send chip_counts yet', () => {
