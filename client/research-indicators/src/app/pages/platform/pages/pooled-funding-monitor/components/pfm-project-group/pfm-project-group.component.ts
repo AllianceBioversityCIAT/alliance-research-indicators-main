@@ -1,5 +1,5 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-13 (R-PFM-011)
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { Table, TableModule } from 'primeng/table';
 import { SearchExportControlsComponent } from '@shared/components/search-export-controls/search-export-controls.component';
 import { PfmGroup, PfmResultRow } from '../../pfm.interfaces';
@@ -81,7 +81,7 @@ export const PFM_GROUP_PAGE_SIZE = 5;
   templateUrl: './pfm-project-group.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PfmProjectGroupComponent {
+export class PfmProjectGroupComponent implements OnInit {
   readonly store = inject(PfmStoreService);
   group = input.required<PfmGroup>();
   readonly columns = COLUMNS;
@@ -95,6 +95,31 @@ export class PfmProjectGroupComponent {
   readonly search = signal('');
   /** Index of the first row of the current page; back to 0 on every search / clear. */
   readonly first = signal(0);
+  /** Column the user sorted by (p-table row field) and its direction; null = server order. */
+  readonly sortField = signal<string | null>(null);
+  readonly sortOrder = signal<1 | -1>(1);
+
+  /** Every change of page, page size, search or sort is kept in the store, so a return from a result restores it. */
+  private readonly rememberView = effect(() => {
+    const view = { first: this.first(), rows: this.pageSize(), search: this.search(), sortField: this.sortField(), sortOrder: this.sortOrder() };
+    this.store.setGroupView(this.group().code, view);
+  });
+
+  /** Back from a result: start where the user left this project's table. */
+  ngOnInit(): void {
+    const view = this.store.groupViews()[this.group().code];
+    if (!view) return;
+    this.search.set(view.search ?? '');
+    this.pageSize.set(view.rows || PFM_GROUP_PAGE_SIZE);
+    this.sortField.set(view.sortField ?? null);
+    this.sortOrder.set(view.sortOrder === -1 ? -1 : 1);
+    this.first.set(view.first ?? 0);
+  }
+
+  onSort(event: { field: string; order: number }): void {
+    this.sortField.set(event.field);
+    this.sortOrder.set(event.order === -1 ? -1 : 1);
+  }
   readonly skeletons = [0, 1, 2];
 
   open = computed(() => this.store.openGroups().has(this.group().code));
@@ -119,6 +144,8 @@ export class PfmProjectGroupComponent {
   clear(): void {
     this.search.set('');
     this.first.set(0);
+    this.sortField.set(null);
+    this.sortOrder.set(1);
     this.table()?.reset();
   }
 

@@ -39,6 +39,8 @@ function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip
     groupState: signal({}),
     toggleGroup: jest.fn(),
     retryGroup: jest.fn(),
+    groupViews: signal({}),
+    setGroupView: jest.fn(),
     setFilter: jest.fn(),
     setChip: jest.fn(),
     resetFilters: jest.fn()

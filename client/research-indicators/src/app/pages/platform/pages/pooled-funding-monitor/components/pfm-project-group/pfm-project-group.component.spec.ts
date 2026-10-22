@@ -1,3 +1,4 @@
+import { PfmGroupView } from '../../pfm-return-state';
 import { provideDateFormatConfigMock } from '../../../../../../testing/date-format-config.mock';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -43,7 +44,8 @@ const row = (over: Partial<PfmResultRow>): PfmResultRow => ({
   ...over
 });
 
-function setup(group: PfmGroup = GROUP) {
+function setup(group: PfmGroup = GROUP, views: Record<string, PfmGroupView> = {}) {
+  const groupViews = signal<Record<string, PfmGroupView>>(views);
   const store = {
     openGroups: signal<ReadonlySet<string>>(new Set()),
     groupRows: signal<Record<string, PfmResultRow[]>>({}),
@@ -57,7 +59,9 @@ function setup(group: PfmGroup = GROUP) {
       }
       store.openGroups.set(s);
     }),
-    retryGroup: jest.fn()
+    retryGroup: jest.fn(),
+    groupViews,
+    setGroupView: jest.fn((code: string, view: PfmGroupView) => groupViews.update(m => ({ ...m, [code]: view })))
   };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -367,5 +371,47 @@ describe('project table search helpers', () => {
 
   it('sort values: lower-case title, SP codes, ISO updated ("" when unknown)', () => {
     expect([r.title_sort, r.sp_sort, r.updated_sort, r.star_sort]).toEqual(['climate seed vault', 'SP13', '', 'Approved']);
+  });
+
+  // Owner 2026-10-22: back from a result, each project table is where the user left it.
+  describe('table view kept for a return from a result', () => {
+    const many = () => Array.from({ length: 12 }, (_, i) => row({ result_code: `STAR-${i + 1}`, official_code: i + 1, title: `Result ${i + 1}` }));
+    const report = (el: HTMLElement) => el.querySelector('.p-paginator-current')?.textContent?.trim();
+
+    it('opens on the saved page, page size and search', () => {
+      const ctx = setup(GROUP, { P100: { first: 5, rows: 5, search: 'result', sortField: null, sortOrder: 1 } });
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      expect(ctx.fixture.componentInstance.search()).toBe('result');
+      expect(report(ctx.el)).toBe('Showing 6 to 10 of 12 results');
+    });
+
+    it('a saved sort is applied and does not send the table back to page 1', () => {
+      const ctx = setup(GROUP, { P100: { first: 5, rows: 5, search: '', sortField: 'official_code', sortOrder: -1 } });
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      expect(report(ctx.el)).toBe('Showing 6 to 10 of 12 results');
+      const codes = Array.from(ctx.el.querySelectorAll('[data-testid="pfm-row-code-number"]')).map(e => e.textContent?.trim());
+      // descending by code, second page: 7 down to 3
+      expect(codes).toEqual(['007', '006', '005', '004', '003']);
+    });
+
+    it('every page, size, search or sort change is kept in the store', () => {
+      const ctx = setup();
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      const cmp = ctx.fixture.componentInstance;
+      cmp.pageSize.set(10);
+      cmp.first.set(10);
+      cmp.onSort({ field: 'updated_sort', order: -1 });
+      ctx.fixture.detectChanges();
+      expect(ctx.store.groupViews()['P100']).toEqual({ first: 10, rows: 10, search: '', sortField: 'updated_sort', sortOrder: -1 });
+    });
   });
 });
