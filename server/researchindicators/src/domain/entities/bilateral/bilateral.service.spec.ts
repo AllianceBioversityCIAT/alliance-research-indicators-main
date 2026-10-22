@@ -2270,8 +2270,36 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
     // re-wiring that suite's dedicated getScienceProgramsForResult stub.
   });
 
-  // @sdd-spec docs/specs/changes/tip-kp-project-pool-funding — T-02 / R-TIP-004
-  describe('updateAlignment — STAR knowledge product level gate (R-TIP-004)', () => {
+  // @sdd-spec docs/specs/changes/tip-prms-phase-2/prms-platform-identity — T-10
+  // R-TIP-004's STAR clause (OUTPUT → level_not_allowed) is superseded: the
+  // owner allows OUTPUT on a Knowledge Product. OUTCOME stays rejected.
+  describe('updateAlignment — STAR knowledge product ToC level (T-10)', () => {
+    const kpContext = {
+      result_id: 19792,
+      result_official_code: 19792,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+      report_year_id: 2026,
+      indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+    };
+
+    const kpDto = (
+      level: 'OUTPUT' | 'OUTCOME',
+    ): UpdatePoolFundingAlignmentDto => ({
+      has_contribution: true,
+      sp_codes: ['SP01'],
+      primary_sp_code: 'SP01',
+      toc_alignments: [
+        {
+          sp_code: 'SP01',
+          aligns_with_toc: true,
+          level,
+          toc_result_id: 7033,
+        },
+      ],
+    });
+
     beforeEach(() => {
       jest.spyOn(service, 'getScienceProgramsForResult').mockResolvedValue({
         result_code: '19792',
@@ -2291,36 +2319,32 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       });
     });
 
-    it('rejects a STAR knowledge product ToC entry at OUTPUT with level_not_allowed', async () => {
-      findContext.mockResolvedValueOnce({
-        result_id: 19792,
-        result_official_code: 19792,
-        is_pool_funding_contributor: true,
-        is_synced_to_prms: false,
-        platform_code: 'STAR',
-        report_year_id: 2026,
-        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-      });
-      findActiveAlignment.mockResolvedValueOnce(null);
-      findActiveTocRows.mockResolvedValueOnce([]);
+    it('accepts a STAR knowledge product ToC entry at OUTPUT', async () => {
+      findContext.mockResolvedValue(kpContext);
+      findActiveAlignment.mockResolvedValue(null);
+      getTocResults.mockResolvedValue([
+        {
+          toc_result_id: 7033,
+          title: 'Imported KP output',
+          indicators: [],
+        },
+      ]);
 
-      const dto: UpdatePoolFundingAlignmentDto = {
-        has_contribution: true,
-        sp_codes: ['SP01'],
-        primary_sp_code: 'SP01',
-        toc_alignments: [
-          {
-            sp_code: 'SP01',
-            aligns_with_toc: true,
-            level: 'OUTPUT',
-            toc_result_id: 7033,
-          },
-        ],
-      };
+      await expect(
+        service.updateAlignment(19792, '19792', kpDto('OUTPUT'), user),
+      ).resolves.toEqual(expect.objectContaining({ result_code: '19792' }));
+
+      expect(getTocResults).toHaveBeenCalledWith('SP01', 'OUTPUT', 2026);
+      expect(transaction).toHaveBeenCalled();
+    });
+
+    it('rejects a STAR knowledge product ToC entry at OUTCOME with level_not_allowed', async () => {
+      findContext.mockResolvedValueOnce(kpContext);
+      findActiveAlignment.mockResolvedValueOnce(null);
 
       let thrown: HttpException | undefined;
       try {
-        await service.updateAlignment(19792, '19792', dto, user);
+        await service.updateAlignment(19792, '19792', kpDto('OUTCOME'), user);
       } catch (err) {
         thrown = err as HttpException;
       }
@@ -2332,6 +2356,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       expect(response.message.toc_alignments).toEqual([
         { sp_code: 'SP01', field: 'level', error: 'level_not_allowed' },
       ]);
+      expect(getTocResults).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
   });

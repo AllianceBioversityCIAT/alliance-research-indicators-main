@@ -177,3 +177,5 @@
 - **Cause (scout, cited):** the STAR client never requests the alignment for a non-STAR code — `client/research-indicators/src/app/shared/utils/platform-code.util.ts:38-42` `POOL_FUNDING_PLATFORMS = [STAR]`; `shared/services/bilateral.service.ts:164-167` returns null for a `TIP-` code without fetching; `result-sidebar.component.ts:125` hides the tab when `!alignment`. This spec's premise "No client change … the sidebar shows the tab when `eligible || display_only`" (design §8, requirements §… non-goal) was **false** — it checked the visibility rule but not the fetch that precedes it. R-TIP-006 is therefore not delivered end to end.
 - **Owner decision:** fix inside phase 2 — `docs/specs/changes/tip-prms-phase-2/prms-platform-identity` R-PPI-006. P-16 (TIP ids == lambda-toc) remains unsettled until the tab can be seen.
 - **Status:** T-04 stays `[~]`.
+
+- **Cross-spec note (2026-10-22):** `changes/tip-prms-phase-2/prms-platform-identity` T-10 makes Knowledge Products allow the ToC level `OUTPUT` (owner decision). R-TIP-004 *STAR rules unchanged* ("rejected with `level_not_allowed`") is superseded; recorded inline in `requirements.md`.

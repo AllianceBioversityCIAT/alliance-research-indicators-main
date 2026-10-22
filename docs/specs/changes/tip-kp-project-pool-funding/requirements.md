@@ -210,7 +210,7 @@ When the primary project (as resolved by R-TIP-001, and known per R-TIP-002) has
 
 ### R-TIP-004 — External import bypasses STAR save rules; STAR rules stay
 
-The TIP pool-funding write SHALL NOT apply any `updateAlignment` gate: external-source (TIP) read-only gate, reporting-year lock, pool-funding contributor check, already-synced check, SP-catalog check, primary-SP rules, ToC level-by-result-type rule (`level_not_allowed` — Knowledge Products have no allowed level), indicator/contribution validation. It SHALL write no review-history entry and emit no socket event.
+The TIP pool-funding write SHALL NOT apply any `updateAlignment` gate: external-source (TIP) read-only gate, reporting-year lock, pool-funding contributor check, already-synced check, SP-catalog check, primary-SP rules, ToC level-by-result-type rule (`level_not_allowed` — at the time Knowledge Products had no allowed level; since 2026-10-22 a STAR knowledge product allows only `OUTPUT`, see *STAR rules unchanged* below), indicator/contribution validation. It SHALL write no review-history entry and emit no socket event.
 
 #### Scenario: Knowledge product imported at a level STAR forbids
 
@@ -224,6 +224,7 @@ The TIP pool-funding write SHALL NOT apply any `updateAlignment` gate: external-
 - GIVEN a STAR-platform knowledge product
 - WHEN a contributor saves pool funding with a ToC entry at level `OUTPUT`
 - THEN the save is rejected with `level_not_allowed`, as before
+- **Superseded 2026-10-22 (owner decision, confirmed with product):** Knowledge Products allow the ToC level `OUTPUT`, so this STAR rejection no longer holds — a STAR knowledge product's `OUTPUT` entry is accepted and `OUTCOME` is still rejected. Delivered by `changes/tip-prms-phase-2/prms-platform-identity` T-10 (see its `design.md` §10 and `execution.md`). The external-source gate line below is unchanged.
 - AND a user `PATCH` on a TIP result's pool funding is still rejected by the external-source gate
 
 ### R-TIP-005 — No mapping, no change
