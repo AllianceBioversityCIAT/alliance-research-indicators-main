@@ -2,7 +2,7 @@
 
 - **Module:** institutional-performance — server + client
 - **Spec id:** 2026-10-organizational-structure
-- **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate)
+- **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate) · **Pivot amendment 2026-10-22 (delegates versioned — R-ORG-017, R-ORG-010) awaiting requester approval**
 - **Depth:** **Full** — new module with temporal (per-year) data, an append-only log, cross-module contracts (control lists in, future consumers out), migrations + seed. A wrong year resolution corrupts every later report silently
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Parent spec:** [`../family.md`](../family.md) — child 2 of 5. Shared rules **F-1, F-3 … F-9** apply and are cited, not restated. **F-2 does not apply** (family exception, 2026-10-08)
@@ -11,7 +11,7 @@
 - **Linked tickets:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258)
 - **Proposal:** [`proposal.md`](proposal.md) — approved 2026-10-08 with Q-1…Q-4 as recommended; this spec stays aligned with it
 - **Approval Mode:** `gated`
-- **Last updated:** 2026-10-16 — requester: delegates per entry from Agresso staff, one current list, not versioned (R-ORG-017). Also 2026-10-16 — RB-3 of `changes/control-lists-global-scope`: `org.level` is global and read by key (C-3, C-4, R-ORG-011, §11). Previous: 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
+- **Last updated:** 2026-10-22 — **Pivot** (execution.md → *Pivot Record: delegates versioned per year*, requester 2026-10-22): delegates become a versioned field of each version, like the director (R-ORG-017 rewritten, D-ORG-24 supersedes D-ORG-15); `resolve` returns the delegates of the requested year (R-ORG-010); R-ORG-004 versioned-field list, R-ORG-009, R-ORG-013 form, R-ORG-014 column, glossary, §7 data, §10 and §11 rows amended; new task T-12. Previous: 2026-10-16 — requester: delegates per entry from Agresso staff, one current list, not versioned (R-ORG-017; superseded 2026-10-22). Also 2026-10-16 — RB-3 of `changes/control-lists-global-scope`: `org.level` is global and read by key (C-3, C-4, R-ORG-011, §11). Previous: 2026-10-08 (requester: director linked to the Agresso staff table — R-ORG-016)
 
 ---
 
@@ -32,7 +32,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 | Term | Meaning |
 | --- | --- |
 | **Entry** | One node of the structure (a division, department, office or unit), identified by its permanent ID |
-| **Version** | The values of an entry (name, acronym, level, parent, director) for a range of years `[from, to)`. `to` empty = still current |
+| **Version** | The values of an entry (name, acronym, level, parent, director, delegates) for a range of years `[from, to)`. `to` empty = still current |
 | **Year view** | The structure as it was in a given year: for every entry, the version whose range contains that year |
 | **Applies from year** | The year a save takes effect from. It decides whether the save edits a version in place, creates a new one, or back-dates |
 | **Back-date** | A save whose *Applies from year* is earlier than the current year. It changes reports for past years |
@@ -41,7 +41,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 | **Successor** | The entry that takes over an inactivated entry (used for merges) |
 | **Change log** | Append-only record of every write: who, when (timestamp), what, the year it applies from, old → new values |
 | **Director** | The responsible person, chosen from the Alliance staff table synced from Agresso (`alliance_user_staff`) and stored by staff ID (`carnet`). Name and email are read from that table, never typed |
-| **Delegate** | A staff member who acts for the director of an entry. Chosen from the same staff table and stored by `carnet`. One current list per entry, not versioned (R-ORG-017) |
+| **Delegate** | A staff member who acts for the director of an entry. Chosen from the same staff table and stored by `carnet`. A list per **version**, versioned per year like the director (R-ORG-017; requester 2026-10-22 — D-ORG-24) |
 | **Associated information** | Records in other modules that store an entry's ID and are registered with this module (none at ship time) |
 | **Admin** | A user who passes F-1: Center Admin or System Admin |
 
@@ -57,7 +57,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 **Affected surface (what renders on the route):** the shared sidebar (one new *Center admin* item), the new page, the shared `DataTable`, the shared modal host (one new modal name), the control-lists usage registry (one new consumer).
 
-**In scope:** entries, per-year versions, back-dating, year views, inactivate/reactivate with successor, logical delete, delegates per entry, change log, read contract for consumers, the `org.level` consumer wiring carried over from Control Lists (F-4 of its archive), the page, seed data.
+**In scope:** entries, per-year versions, back-dating, year views, inactivate/reactivate with successor, logical delete, delegates per entry and year (versioned), change log, read contract for consumers, the `org.level` consumer wiring carried over from Control Lists (F-4 of its archive), the page, seed data.
 
 **Not changing:** existing Center admin items and pages; Control Lists behavior (only a consumer is registered); existing tables; any portfolio data.
 
@@ -172,7 +172,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
   - **later versions:** each changed field is also changed in every later version **only where that later version still holds the value being replaced**. A value changed on purpose in a later version is kept.
 - *Y* must be within the entry's life: not before its first year, and not on or after the year it ends (if inactivated or deleted).
 - *Y* earlier than the current year is a back-date (R-ORG-005).
-- Fields that are versioned: name, acronym, level, parent, director (R-ORG-016). Code is not versioned (R-ORG-002).
+- Fields that are versioned: name, acronym, level, parent, director (R-ORG-016), delegates (R-ORG-017 — the list is one value, compared as a set: a later version keeps its own list unless it equals the list being replaced). Code is not versioned (R-ORG-002).
 
 #### Scenario: Three years without change
 - GIVEN entry `ORG-057` was created in 2026 and never edited
@@ -323,7 +323,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - **As an** Admin or auditor **I want** every change recorded **so that** I can see who changed what and when, even inside a year.
 
 **Details**
-- Every write — create, in-place edit, new version, back-date, delegates change, inactivate, reactivate, delete (logical or physical) — appends one log entry with: entry ID, action, user, timestamp, *Applies from year*, back-date flag, and old → new values of each changed field.
+- Every write — create, in-place edit, new version, back-date, inactivate, reactivate, delete (logical or physical) — appends one log entry (a delegates change is an in-place edit or a new version like any versioned field, its diff under `delegates` — R-ORG-017 AC.4; rows written as `delegates_change` before 2026-10-22 stay readable) with: entry ID, action, user, timestamp, *Applies from year*, back-date flag, and old → new values of each changed field.
 - The log is **append-only**: there is no endpoint to edit or delete it, and it survives a physical delete of its entry.
 - The form's **History** tab shows the entry's versions (one row per year range) and its log, newest first.
 
@@ -343,7 +343,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 **Details**
 - A consumer stores the entry's permanent ID and nothing else from it.
 - The module exposes (to other server modules, and as an authenticated read endpoint):
-  - **resolve(ids, year)** → for each ID, the version covering that year (name, acronym, level, parent ID, director staff ID with name and email), its status that year, and its **current** delegates (staff ID, name, email — R-ORG-017);
+  - **resolve(ids, year)** → for each ID, the version covering that year (name, acronym, level, parent ID, director staff ID with name and email), its status that year, and the **delegates of that version** — the delegates of the requested year (staff ID, name, email — R-ORG-017); a year with no covering version (`version: null`) returns an empty delegate list (requester, 2026-10-22 — D-ORG-24; was "current delegates" for any year);
   - **ancestors(id, year)** → the chain up to L1 as of that year (for roll-ups by department or division);
   - **successor chain(id)** → successors in order (for an optional *include predecessors* view, Q-4);
   - **existence check(id)** → for consumers to validate before storing an ID.
@@ -360,6 +360,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 **Acceptance criteria**
 - [ ] AC.1 — `resolve` and `ancestors` return the version for the requested year, including ended entries for years before their end.
 - [ ] AC.2 — A test consumer registered in the test suite drives *Linked data* and the delete block.
+- [ ] AC.3 — `resolve` for year *N* returns the delegates of the version covering *N*; for an entry whose delegates differ between two years, the two calls return different lists; a year with no covering version returns `[]` (D-ORG-24).
 
 ### R-ORG-011 — Control-list consumer wiring (carried over from Control Lists)
 
@@ -409,7 +410,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 - Header: title, description, **Structure year** selector, **+ New entry**, view toggle **Tree / Table**, filter *Show inactive / deleted*.
 - **Tree:** divisions › departments › offices › units, expand/collapse on container rows, the entry's code, name, acronym, director, status and *scheduled* badge.
 - **Table:** R-ORG-014.
-- **Form** (modal or side panel): Code*, Level*, Name*, Acronym, Parent*, Responsible director (staff search, R-ORG-016; its email shown read-only), **Delegates (current)** (multi-select staff search, R-ORG-017; not tied to *Applies from year*), **Applies from year***, **Back-date** checkbox with its warning. Actions: only **Cancel**, **Save** and, in edit mode, **Delete** (F-4); *Inactivate* / *Reactivate* sit next to Delete. Tabs: **Details**, **History** (R-ORG-009), **Linked data** (counts per registered consumer, or *No linked data yet*).
+- **Form** (modal or side panel): Code*, Level*, Name*, Acronym, Parent*, Responsible director (staff search, R-ORG-016; its email shown read-only), **Delegates** (staff search with removable chips, R-ORG-017; versioned like the director, so a delegates change carries *Applies from year* — D-ORG-24), **Applies from year***, **Back-date** checkbox with its warning. Actions: only **Cancel**, **Save** and, in edit mode, **Delete** (F-4); *Inactivate* / *Reactivate* sit next to Delete. Tabs: **Details**, **History** (R-ORG-009), **Linked data** (counts per registered consumer, or *No linked data yet*).
 - Parent picker offers only entries of an allowed level that are active in *Applies from year*.
 - UI states: **loading** (progress bar), **empty** (no entries: call to action *+ New entry*; no entries in the chosen year: message naming the year), **error** (inline message, retry), **success** (toast after each save, inactivate, reactivate or delete).
 
@@ -435,7 +436,7 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 **Details**
 - Reuse the shared `DataTable` from Control Lists: rows per page 10/25/50/100, resizable columns, sort with indicator, **default sort by code ascending, natural order** (`ORG-2` before `ORG-10`), search over code, name, acronym and director, **Export .xlsx** of the filtered and sorted rows for the chosen year. The file name includes the year.
-- Columns: ID · Code · Level · Name · Acronym · Parent (code + name, as of the year) · Director · Delegates (current, names) · Status · Since (year of the version shown).
+- Columns: ID · Code · Level · Name · Acronym · Parent (code + name, as of the year) · Director · Delegates (names, as of the year) · Status · Since (year of the version shown).
 
 #### Scenario: Export of a past year
 - GIVEN the year selector is on 2026 and the search is `data`
@@ -499,47 +500,67 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 ### R-ORG-017 — Delegates from Agresso staff
 
-- **As an** Admin **I want** to record a list of delegates for each entry, besides its director **so that** the people who act for the director are known and can later be given edit rights (requester, 2026-10-16).
+- **As an** Admin **I want** to record a list of delegates for each entry, besides its director, **for each year** **so that** the people who act for the director are known for the year a report covers and can later be given edit rights (requester, 2026-10-16; versioned per year by the requester's Pivot of 2026-10-22).
+
+> **Pivot 2026-10-22 (D-ORG-24, supersedes D-ORG-15).** Until this date the rule was "one current list per entry, not versioned per year; a change applies immediately and needs no *Applies from year*; every year view shows the current list, labelled *current*; earlier lists only in the change log". Requester: "si todo esta anualizado o versionado por año, tambien los delegados deberian estarlo". The rule below replaces it; tasks closed before the Pivot (T-01…T-04, T-08, T-09) proved the old rule and are re-proved by T-12.
 
 **Details**
-- Delegates are chosen from `alliance_user_staff`, like the director (R-ORG-016). The entry stores staff IDs (`carnet`) only. Name and email are read from the staff table whenever the entry is shown or exported.
-- **One current list per entry, not versioned per year** (requester, 2026-10-16). A change applies immediately and needs no *Applies from year*. Every year view shows the entry's current delegates, and the UI labels them *current*. Earlier lists are kept only in the change log (R-ORG-009).
-- The list is optional, holds at most 20 people, and has no duplicates.
-- **The director cannot be a delegate of the same entry.** A save fails with `400` when a delegate is the director of the version covering the current year or of any later version. The rule holds in both directions: adding the director as a delegate fails (naming `delegates`), and so does making a delegate the director (naming `director`).
-- The picker offers only active staff. A delegate who later becomes inactive stays in the list with the *Inactive staff* mark. An unknown staff ID or an inactive one being newly added fails with `400` naming `delegates`. Write bodies accept only staff IDs; names or emails for delegates are rejected (`400`).
-- A write sends the **whole list** (replace). Omitted = unchanged; empty = cleared.
-- Delegates grant **no permission** in this spec. Consumers read them through `resolve` (R-ORG-010); `institutional-indicators` decides what they may do.
-- A deleted entry rejects delegate changes (`409`), like any other write. An inactive entry accepts them.
+- Delegates are chosen from `alliance_user_staff`, like the director (R-ORG-016). Each **version** stores staff IDs (`carnet`) only. Name and email are read from the staff table whenever the entry is shown or exported.
+- **Versioned like the director** (requester, 2026-10-22). The delegate list is a field of each version (R-ORG-004): a change carries *Applies from year* *Y*, edits the version starting at *Y* in place or splits the version covering *Y*, passes the back-date gate (R-ORG-005), and must fall inside the entry's life (R-ORG-004 bounds). **Propagation:** the new list is also written into every later version **only where that version's list equals the list being replaced** (compared as a set, order ignored); a later version whose list was changed on purpose keeps it (R-ORG-004 *A later deliberate change is kept*). Every year view, the History tab and `resolve` show the delegates **of the version covering the year** — never "current" ones.
+- The list is optional, holds at most 20 people per version, and has no duplicates.
+- **The director cannot be a delegate of the same entry — per version.** After the save (its own director change and the propagation included), no version of the entry may hold its own director among its delegates. A save that breaks this fails with `400`, naming `delegates` when the delegates change causes the overlap and `director` when the director change causes it. A person may be the director in one version and a delegate in another.
+- The picker offers only active staff. A delegate who later becomes inactive stays in the list with the *Inactive staff* mark. An unknown staff ID, or an inactive one **newly added** (not in the list of the version being replaced at *Y*), fails with `400` naming `delegates`. Write bodies accept only staff IDs; names or emails for delegates are rejected (`400`).
+- A write sends the **whole list** for *Y* (replace). Omitted = unchanged; empty = cleared from *Y* (with the same propagation).
+- Delegates grant **no permission** in this spec. Consumers read them through `resolve` for a year (R-ORG-010); `institutional-indicators` decides what they may do.
+- A deleted entry rejects delegate changes (`409`), like any other write. An inactive entry accepts them only for years before its end (R-ORG-004 bounds), like any versioned field. A reactivation copies the last version's delegates with its other values (R-ORG-007).
 
-#### Scenario: Add delegates
-- GIVEN active staff *Luis Gómez* (`B2001`) and *Marta Ruiz* (`B2002`), and `ORG-057` with director `A1234`
-- WHEN an Admin adds both as delegates of `ORG-057` and saves
-- THEN the entry stores `[B2001, B2002]` and the panel shows their names (each email on hover of its chip — D-ORG-21, requester 2026-10-21)
-- AND IT MUST write one log row with the old and the new list
-- BUT it must NOT create a version or ask for *Applies from year*
+#### Scenario: Add delegates from a year
+- GIVEN active staff *Luis Gómez* (`B2001`) and *Marta Ruiz* (`B2002`), today is in 2026, and `ORG-057` has one version `[2026, open)` with director `A1234` and no delegates
+- WHEN an Admin adds both as delegates of `ORG-057`, applying from 2027, and saves
+- THEN `ORG-057` has `[2026, 2027)` with no delegates and `[2027, open)` with `[B2001, B2002]`, and the panel shows their names (each email on hover of its chip — D-ORG-22)
+- AND IT MUST write one `new_version` log row whose diff carries the old and the new list under `delegates`
+- BUT it must NOT change the 2026 version or any other entry
+- WHEN an Admin instead applies the same change from 2026
+- THEN the version `[2026, open)` is updated in place and one `edit_in_place` log row is written
 
-#### Scenario: Director as delegate
-- GIVEN `ORG-057`'s current version has director `A1234`
-- WHEN an Admin adds `A1234` as a delegate
-- THEN the request fails with `400` naming `delegates`
-- AND IT MUST NOT change the list
+#### Scenario: A later deliberate delegates change is kept
+- GIVEN `ORG-057` has delegates `[B2001]` in `[2026, 2028)` and `[B2003]` in `[2028, open)`
+- WHEN an Admin replaces `B2001` with `B2002`, applying from 2026
+- THEN `[2026, 2028)` holds `[B2002]`
+- BUT `[2028, open)` must still hold `[B2003]`
+- WHEN the later version instead held `[B2001]` as well
+- THEN both versions hold `[B2002]`
+
+#### Scenario: Director as delegate (per version)
+- GIVEN `ORG-057` has director `A1234` in `[2026, 2028)` and `C3001` in `[2028, open)`, and no delegates, today is in 2026
+- WHEN an Admin adds `A1234` as a delegate applying from 2028
+- THEN it is saved and only `[2028, open)` holds `[A1234]`
+- WHEN an Admin instead adds `A1234` applying from 2026
+- THEN the request fails with `400` naming `delegates`, because `A1234` directs `[2026, 2028)`
+- AND IT MUST NOT change any version
 
 #### Scenario: Delegate made director
-- GIVEN `B2001` is a delegate of `ORG-057`
-- WHEN an Admin sets `B2001` as director from the current year
+- GIVEN `B2001` is a delegate of `ORG-057` in `[2027, open)`, and `ORG-057` has director `A1234` in `[2026, 2027)` and `[2027, open)`
+- WHEN an Admin sets `B2001` as director applying from 2027
 - THEN the request fails with `400` naming `director`
+- WHEN an Admin instead sets `B2001` as director applying from 2026
+- THEN the request also fails with `400` naming `director`, because the change propagates into `[2027, open)` (it still holds `A1234`), where `B2001` is a delegate
 
 #### Scenario: Delegates shown in a past year
-- GIVEN `ORG-057`'s delegates were changed from `[B2001]` to `[B2002]` this year
-- WHEN an Admin views last year's structure
-- THEN `ORG-057` shows `[B2002]`, labelled *current*
-- AND the History tab shows the change from `[B2001]` to `[B2002]` with its date and user
+- GIVEN `ORG-057` has delegates `[B2001]` in `[2026, 2027)` and `[B2002]` in `[2027, open)`
+- WHEN an Admin views the 2026 structure
+- THEN `ORG-057` shows `[B2001]`
+- WHEN the Admin views 2027
+- THEN `ORG-057` shows `[B2002]`
+- AND the History tab lists both versions with their delegates and the log row of the change with its date and user
+- BUT no view labels the list *current*
 
 **Acceptance criteria**
-- [ ] AC.1 — Only staff IDs are stored; name and email come from the staff table.
+- [ ] AC.1 — Only staff IDs are stored, per version; name and email come from the staff table.
 - [ ] AC.2 — Duplicate, unknown, newly-added inactive, or more than 20 → `400` naming `delegates`; name or email in the body → `400`.
-- [ ] AC.3 — Director/delegate overlap rejected in both directions.
-- [ ] AC.4 — A delegates-only save writes one `delegates_change` log row and no version.
+- [ ] AC.3 — Director/delegate overlap rejected in both directions, checked on **every** version the save writes (including propagated ones).
+- [ ] AC.4 — A delegates change is a versioned change: a delegates-only save writes one `edit_in_place` or `new_version` log row whose diff carries `delegates: {old, new}`, and no `delegates_change` row (D-ORG-24 — that action stays in the log's vocabulary only so rows written before 2026-10-22 remain readable). A delegates change without *Applies from year* → `400`.
+- [ ] AC.5 — Year views, `resolve` (R-ORG-010 AC.3) and History return the delegates of the version covering the year.
 
 ---
 
@@ -557,9 +578,9 @@ Admins get a new page, *Center admin › Organizational Structure* (its own item
 
 ## 7. Data requirements
 
-- New tables (no `portfolio_id`): entries (permanent ID, code, status, status-from year, successor), versions (entry, from year, to year, name, acronym, level value ID, parent entry ID, director staff ID), delegates (entry, staff ID; not versioned), change log (append-only).
-- Unique indexes: entry code; version `(entry, from year)`; delegate `(entry, staff ID)`.
-- FKs: version → entry; version parent → entry; version level → control-list value (`ON DELETE RESTRICT`, R-ORG-011); version director → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-016); delegate → entry; delegate staff ID → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-017); entry successor → entry.
+- New tables (no `portfolio_id`): entries (permanent ID, code, status, status-from year, successor), versions (entry, from year, to year, name, acronym, level value ID, parent entry ID, director staff ID), delegates (version, staff ID — versioned with their version since the 2026-10-22 Pivot, D-ORG-24; was per entry), change log (append-only).
+- Unique indexes: entry code; version `(entry, from year)`; delegate `(version, staff ID)`.
+- FKs: version → entry; version parent → entry; version level → control-list value (`ON DELETE RESTRICT`, R-ORG-011); version director → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-016); delegate → version (`ON DELETE CASCADE`); delegate staff ID → `alliance_user_staff.carnet` (`ON DELETE RESTRICT`, R-ORG-017); entry successor → entry.
 - Migrations are append-only; the seed ships in a migration with fixed IDs.
 - No OpenSearch fields.
 
@@ -585,7 +606,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 | **Authorization leak** | Unit tests per handler: allowed and denied roles |
 | **Level from the wrong list / level value deleted while used** | Unit test with `assertValueInList` failing; integration test: value delete → `409` via FK mapping |
 | **Director not a staff member / name typed by hand** | Unit test: unknown `carnet` → `400`; DTO rejects name/email fields |
-| **Delegate overlap with the director, duplicate or unknown delegate; delegates versioned by mistake** | Unit tests for each rule in both directions; integration: a delegates-only save adds no version row and one `delegates_change` log row |
+| **Delegate overlap with the director (in any version), duplicate or unknown delegate; delegates not versioned** (a delegates change that writes no version, a past year showing another year's list, a propagation that overwrites a later deliberate list) | Unit tests for each rule in both directions, per version, including a propagated version; integration: a delegates-only save from *Y* splits or edits in place exactly like a director change, writes one `new_version` / `edit_in_place` row with a `delegates` diff, and the year views and `resolve` for *Y − 1* and *Y* return different lists (T-12; until 2026-10-22 this row asserted "no version row and one `delegates_change` row" — superseded by D-ORG-24) |
 | **Director of a past version lost when staff data changes** | Integration test: change the staff row's status; past versions still resolve the same staff ID with current name/email |
 | **Consumer contract wrong** (resolve/ancestors) | Unit + integration tests with a registered test consumer |
 | **Seed counts wrong or not idempotent** | Migration run twice on the local development database; counts 117 / 117 / 3-19-1-94 |
@@ -607,6 +628,7 @@ Agresso, indirectly: the director reads the staff table that the existing Agress
 | Risk | Mid-year reorganisations appear only from the year chosen (accepted by the requester, proposal §12) |
 | Risk | A consumer forgets to register → an entry with linked records becomes deletable. Mitigation: consumers also add an FK to the entry ID; each consumer spec cites R-ORG-010 |
 | Risk | Back-dates change published totals. Mitigation: explicit flag, warning, log |
+| Risk | `resolve` changed meaning on 2026-10-22: delegates are now those of the requested year, not the current ones (D-ORG-24). No consumer exists yet, so nothing breaks today; a future consumer (e.g. `institutional-indicators` edit rights) that wants "who may act **now**" must call `resolve` with the current year. Mitigation: each consumer spec cites R-ORG-010 AC.3 |
 
 ## 12. Open questions
 

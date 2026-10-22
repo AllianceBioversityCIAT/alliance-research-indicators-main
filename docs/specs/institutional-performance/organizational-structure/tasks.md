@@ -9,7 +9,7 @@
 - **Parent spec:** [`../family.md`](../family.md) — child 2 of 5
 - **Branch:** `institutional-kpis`
 - **Jira:** [PARI-258](https://cgiarmel.atlassian.net/browse/PARI-258) — sub-tasks `<TO CONFIRM>`
-- **Last updated:** 2026-10-16 (delegates added — R-ORG-017, D-ORG-15)
+- **Last updated:** 2026-10-22 — **Pivot** (delegates versioned per year — D-ORG-24 supersedes D-ORG-15): new task **T-12** (todo, awaiting requester approval); T-06 paused until T-12; closed tasks' delegate clauses annotated as history; §1, §3, §4 (RB-7), §5 amended. Previous: 2026-10-16 (delegates added — R-ORG-017, D-ORG-15)
 
 > **Legend.** *Falsifier* = the concrete input or mutation that must turn the gate red. *Red run* = what must be observed failing, and on which assertion. *Disqualifier* = what makes a green reading worthless. *Cannot prove* = what a presence-type check leaves open, and the check that closes it. *Consumers* = existing files that pin a symbol the task changes. An absent value reads `n/a`, never blank.
 
@@ -22,7 +22,7 @@
 > - Tests clean up every row they create, and never touch seeded rows (control lists ids ≤ 23; org units ids ≤ the seed's N, after T-05).
 > - The shared Dev DB is never evidence (root `CLAUDE.md` §4.3).
 
-> **Budget tripwire (design §14, re-based 2026-10-16 at T-01).** About **20,000** LOC including tests (was 9,700); ≤ 2 review rounds per task. A slice that passes **4,500 LOC** (was 2,500), or a third review round, stops execution and goes to the requester.
+> **Budget tripwire (design §14, re-based 2026-10-16 at T-01; Pivot 2026-10-22).** About **23,000** LOC including tests (was 20,000 before T-12's ~3,000; 9,700 before T-01); ≤ 2 review rounds per task. A slice that passes **4,500 LOC** (was 2,500), or a third review round, stops execution and goes to the requester.
 
 ---
 
@@ -34,7 +34,9 @@ graph TD
   T02 --> T03[T-03 Slice 3: lifecycle, delete, change log, history]
   T03 --> T04[T-04 Slice 4: consumer contract, Control Lists wiring, linked data]
   T04 --> T05[T-05 Seed + performance measurement]
-  T05 --> T06[T-06 HITL: browser, mockup, seed review]
+  T05 --> RW[T-07…T-11 HITL reworks, found during T-06]
+  RW --> T12[T-12 Pivot: delegates versioned per year]
+  T12 --> T06[T-06 HITL: browser, mockup, seed review — resumes after T-12]
 ```
 
 | PR | Task | What a user can do after it |
@@ -44,6 +46,8 @@ graph TD
 | **PR 3** | T-03 | Inactivate with successor, reactivate, delete (physical or logical), read History |
 | **PR 4** | T-04 | Other modules resolve entries by ID and year; *Linked data* tab; an `org.level` value in use cannot be deleted |
 | **PR 5** | T-05 | The page opens with the Alliance structure (seeded) |
+| (T-07…T-11 commits) | T-07…T-11 | HITL reworks of the page (tree, panel, chips, defaults, alignment) |
+| **PR 6** (or commits on the same branch) | T-12 | Delegates change from a year like the director; each year shows its own delegates; `resolve` returns the year's delegates |
 | — | T-06 | Human check; no code |
 
 Every task depends on the one before it. They share the module's service, controller and page, and the server half of each one is the same package. T-05 needs only the T-01 schema, but it runs after T-04 so that NFR-ORG-001 can measure `resolve` (T-04). The Leader may move only its seed half earlier, and only while no other server worker is active.
@@ -63,10 +67,10 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-013 — *Menu placement* (right after *Portfolio Management*, same indent; **BUT** must NOT change order, label or link of any existing item); *Empty module* (empty state with *+ New entry*; the "AND IT MUST allow creating the first L1" clause is T-02); header (year selector, toggle, filter); AC.1 (expanded and collapsed sidebar); AC.2 for loading, empty (both variants) and error with Retry, in both views; AC.3.
   - R-ORG-014 — *Export of a past year* (exact rows of the 2026 view in screen order; name contains `2026`); AC.1, AC.2; columns.
   - R-ORG-016 — read half of AC.1 (B1 returns director name and email joined from staff; `isActiveStaff` drives the *Inactive staff* mark).
-  - R-ORG-017 — read half: AC.1 (B1/B5 return current delegates joined from staff); *Delegates shown in a past year* first clause (a past year view shows the **current** list, labelled *current*) on fixture rows; table *Delegates* column and its export.
+  - R-ORG-017 — read half: AC.1 (B1/B5 return current delegates joined from staff); *Delegates shown in a past year* first clause (a past year view shows the **current** list, labelled *current*) on fixture rows; table *Delegates* column and its export. *(History — the "current list in every year" rule is superseded by D-ORG-24 (2026-10-22); re-proved per year by T-12.)*
   - NFR-ORG-002 (index half), NFR-ORG-004 (B1, B2, B5), NFR-ORG-005 (tree keyboard, `aria-label`, `aria-sort`), NFR-ORG-006 (B1, B2, B5).
 - **Design refs:** §2.1 (module, controller, read service, constants, entities, repositories; client page, `org-tree`, `org-tree.util`, interface, sidebar, route), §3.1, §3.3 (`…000–…002`), §4 B1, B2, B5, §5.1, §5.7, §6.1–6.4, §6.8, §8, D-ORG-1, 5, 6, 7, P-6, P-8, P-12
-- **Scope — database:** `src/db/migrations/1791000000000-createOrgUnits.ts`, `…001-createOrgUnitVersions.ts`, `…002-createOrgUnitChangeLog.ts`, `…003-createOrgUnitDelegates.ts`, with tables, FKs, indexes and collation exactly as design §3.1. This includes `level_value_id` → `control_list_values.id` RESTRICT, `director_carnet` → `alliance_user_staff.carnet` RESTRICT and `org_unit_delegates.staff_carnet` → `alliance_user_staff.carnet` RESTRICT, with `uq_org_unit_delegates_unit_staff`. No FK on the log. Each file exports only its class. Then `npm run migration:test:execute` on the local DB.
+- **Scope — database:** `src/db/migrations/1791000000000-createOrgUnits.ts`, `…001-createOrgUnitVersions.ts`, `…002-createOrgUnitChangeLog.ts`, `…003-createOrgUnitDelegates.ts`, with tables, FKs, indexes and collation exactly as design §3.1. This includes `level_value_id` → `control_list_values.id` RESTRICT, `director_carnet` → `alliance_user_staff.carnet` RESTRICT and `org_unit_delegates.staff_carnet` → `alliance_user_staff.carnet` RESTRICT, with `uq_org_unit_delegates_unit_staff` *(re-keyed to the version by `…005` in T-12, D-ORG-24; `…003` itself stays as written)*. No FK on the log. Each file exports only its class. Then `npm run migration:test:execute` on the local DB.
 - **Scope — server:** entities, repositories, `org-structure.constants.ts`, clock provider, `OrgStructureReadService` (singleton: `getYearView`, year range), controller with B1, B2, B5 (class-level `RolesGuard`, `SetUpInterceptor`, Swagger; literal routes before `:id`), module registered in `entities.module.ts` and `main.routes.ts` at `organizational-structure`. The read service imports nothing request-scoped.
 - **Scope — screen:** page shell (header, *Structure year* `p-select` from B2, *Tree / Table* toggle, *Show inactive / deleted*, count chips, split layout with an empty right panel, *+ New entry* button wired to an empty form placeholder), `org-tree` on `p-treeTable`, `org-tree.util`, `DataTable` view with the R-ORG-014 columns and file name `organizational-structure_<year>.xlsx`, interface file, `ApiService` methods for B1, B2, B5, sidebar item, lazy route with `canMatch: [centerAdminGuard]`.
 - **Tests:**
@@ -78,7 +82,7 @@ Every task depends on the one before it. They share the module's service, contro
     - Migrations up; `SHOW COLUMNS … LIKE 'portfolio_id'` empty on all three tables.
     - `SHOW INDEX` → `Non_unique = 0` on `uq_org_units_code` and `uq_org_unit_versions_unit_from`; a raw duplicate `(org_unit_id, valid_from_year)` insert → errno 1062.
     - `SHOW CREATE TABLE org_unit_versions` names RESTRICT on the level and director FKs; `SHOW CREATE TABLE org_unit_delegates` names RESTRICT on the staff FK and the unique pair; `org_unit_change_log` has no FK.
-    - Delegates on fixtures: an entry with two delegate rows is returned with both in the 2026 **and** 2027 views (current list, not per year).
+    - Delegates on fixtures: an entry with two delegate rows is returned with both in the 2026 **and** 2027 views (current list, not per year). *(Superseded by D-ORG-24 — T-12 rewrites this test: delegates per version, different lists per year.)*
     - Year view on inserted fixtures: one entry with `[2026, 2027)` + `[2027, NULL)` under different parents; one ended in 2027 (`status = deleted`, `status_from_year = 2027`); one created in 2028. Views for 2026, 2027 and 2028 return exactly the expected rows and parents, with and without `includeEnded`.
     - A Contributor token gets 403 on B1.
   - **Client unit:**
@@ -126,7 +130,7 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-009 — AC.1 for `create`, `edit_in_place`, `new_version`, `code_change` (exactly one log row each, with the listed fields).
   - R-ORG-012 — AC.1 for B3, B4, B9, B10; *Denied role*: Contributor 403; **BUT** must NOT change data or append to the log.
   - R-ORG-013 — *Empty module*: **AND IT MUST** allow creating the first L1 entry; form fields; parent picker limited to allowed levels active in *Applies from year*; *Applies from year* appears only after a change and is hidden for a code-only edit; AC.2 success state (toast naming *updated in place* / *new version from Y* / *back-dated from Y*).
-  - R-ORG-017 — *Add delegates* (stores `[B2001, B2002]`; **AND IT MUST** write one log row with old and new lists; **BUT** must NOT create a version or ask for *Applies from year*); *Director as delegate* (400 `delegates`; **AND IT MUST NOT** change the list); *Delegate made director* (400 `director`); replace semantics (omitted unchanged, `[]` clears); a deleted entry → 409; AC.1–AC.4. The History half of *Delegates shown in a past year* is T-03.
+  - R-ORG-017 — *Add delegates* (stores `[B2001, B2002]`; **AND IT MUST** write one log row with old and new lists; **BUT** must NOT create a version or ask for *Applies from year*); *Director as delegate* (400 `delegates`; **AND IT MUST NOT** change the list); *Delegate made director* (400 `director`); replace semantics (omitted unchanged, `[]` clears); a deleted entry → 409; AC.1–AC.4. The History half of *Delegates shown in a past year* is T-03. *(History — R-ORG-017 was rewritten by the 2026-10-22 Pivot (D-ORG-24): "no version / no *Applies from year*", the `delegates_change` row and the current-year-based overlap are superseded; T-12 owns the rewritten scenarios and AC.1–AC.5.)*
   - R-ORG-016 — *Pick a director* (stores `A1234`; **AND** the form shows her email read-only); *Director leaves later* (2026 still shows her with *Inactive staff*; **BUT** the picker must NOT offer her); *Unknown staff ID* (400 naming `director`); director name or email in a body → 400; AC.1, AC.2, AC.3.
   - NFR-ORG-002 (invariant half), NFR-ORG-004 (B3, B4, B9, B10), NFR-ORG-006 (same handlers).
 - **Design refs:** §2.1 (service, `org-version-timeline.util`, DTOs, `org-unit-panel` Details tab, by-key `ApiService` method), §3.2 I-1…I-5, §4 B3, B4, B9, B10, §5.2, §5.3, §5.6, §6.5, D-ORG-2, 4, 8, 9, P-2, P-10, P-13, **P-14**
@@ -134,12 +138,12 @@ Every task depends on the one before it. They share the module's service, contro
 - **Scope — server:**
   - Timeline util (pure: locate, split, edit in place, propagate only where the later value equals the replaced value, `assertTimeline`).
   - Service: one transaction per write with `SELECT … FOR UPDATE` on the entry; `assertValueInList(levelId, 'org.level')` + level id ∈ {20…23}; staff existence; back-date gate; hierarchy and cycle validation over boundary years; one log row per write in the same transaction; errno 1062 → 409 naming `code`.
-  - Delegates: validation of §5.2 step 1 (≤ 20, duplicates, existence, newly added active, I-6 in both directions, computed after the save's own director change); replace inside the same transaction; `delegates_change` log row.
+  - Delegates: validation of §5.2 step 1 (≤ 20, duplicates, existence, newly added active, I-6 in both directions, computed after the save's own director change); replace inside the same transaction; `delegates_change` log row. *(Superseded by D-ORG-24 / T-12: delegates are a versioned field; I-6 per version in step 7; no `delegates_change` row.)*
   - Code proposal (B3); parenthesized staff search (B4, active only per P-14, at most 20 rows).
   - DTOs with `whitelist` + `forbidNonWhitelisted`, so `id`, `portfolioId`, `directorName` and `directorEmail` are rejected.
   - B9, B10 with Swagger.
 - **Scope — screen:**
-  - Details tab of `org-unit-panel`: Code (pre-filled from B3), Level from `GET_ControlListValuesByKey('org.level', true)`, Name, Acronym, Parent (hidden for L1; options limited by level and *Applies from year*, shown with path), director `p-autoComplete` on B4 (debounce 300 ms, name + email, email echoed read-only), **Delegates (current)** multi-select on B4 (chips, max 20, the director excluded, *Inactive staff* mark, hint that it is not tied to a year), *Applies from year*, *Back-date* checkbox with warning.
+  - Details tab of `org-unit-panel`: Code (pre-filled from B3), Level from `GET_ControlListValuesByKey('org.level', true)`, Name, Acronym, Parent (hidden for L1; options limited by level and *Applies from year*, shown with path), director `p-autoComplete` on B4 (debounce 300 ms, name + email, email echoed read-only), **Delegates (current)** multi-select on B4 (chips, max 20, the director excluded, *Inactive staff* mark, hint that it is not tied to a year), *Applies from year*, *Back-date* checkbox with warning. *(The "current" label and "not tied to a year" hint are superseded by D-ORG-24 — T-12.)*
   - Save / Cancel; the toast states the result.
   - Row **+** in the tree pre-fills parent and next level.
 - **Tests:**
@@ -153,13 +157,13 @@ Every task depends on the one before it. They share the module's service, contro
     - `id`, `portfolioId`, `directorName`, `directorEmail` → 400 with no repository write.
     - Simulated errno 1062 with the pre-check stubbed → 409 naming `code`.
     - Exactly one log row per action, with `backdated` set correctly.
-    - Delegates: 21 ids, a duplicate, an unknown `carnet`, a newly added inactive one → 400 naming `delegates`; an inactive one already in the list is kept on an unrelated save; director as delegate → 400 `delegates`; a delegate set as director from the current year → 400 `director`; the director of a **scheduled later** version added as delegate → 400; one request that changes the director away from X and adds X as delegate → accepted (overlap computed after the save).
+    - Delegates: 21 ids, a duplicate, an unknown `carnet`, a newly added inactive one → 400 naming `delegates`; an inactive one already in the list is kept on an unrelated save; director as delegate → 400 `delegates`; a delegate set as director from the current year → 400 `director`; the director of a **scheduled later** version added as delegate → 400; one request that changes the director away from X and adds X as delegate → accepted (overlap computed after the save). *(History: the current-year-based overlap is superseded by I-6 per version, D-ORG-24 — T-12 re-bases these tests.)*
   - **Server integration (local DB):**
     - Create, then move from 2027 → two rows with the right ranges.
     - Checksum of every other entry's version rows before and after a save is identical (R-ORG-004 AC.3).
     - Back-date with the flag → the 2026 and 2027 views move; the log row has `applies_from_year = 2026`, `backdated = 1` and `created_at` = now.
     - Contributor 403 on B9 → row and log counts unchanged.
-    - Delegates-only `PATCH` → `org_unit_versions` row count unchanged, `org_unit_delegates` rows replaced, exactly one `delegates_change` log row with old and new lists.
+    - Delegates-only `PATCH` → `org_unit_versions` row count unchanged, `org_unit_delegates` rows replaced, exactly one `delegates_change` log row with old and new lists. *(Superseded by D-ORG-24 — T-12 inverts this test: a delegates-only save from a new year adds a version row and writes `new_version`.)*
     - Staff: set a fixture staff row inactive (per P-14), then restore it → the past version still resolves the same `carnet` with the current name and email, and B4 no longer returns it.
     - B4 with a search term that matches an inactive staff member **only by last name or email** → not returned. This is the P-10 precedence defect, asserted on real SQL.
   - **Client unit:**
@@ -168,7 +172,7 @@ Every task depends on the one before it. They share the module's service, contro
     - *Applies from year* hidden until a change and hidden for a code-only edit.
     - Back-date unlocks earlier years and shows the warning before save.
     - The payload carries `directorCarnet` and `delegateCarnets` only (no names or emails).
-    - Delegates: the director is not offered; a delegates-only edit does not show *Applies from year*; the 21st pick is refused.
+    - Delegates: the director is not offered; a delegates-only edit does not show *Applies from year*; the 21st pick is refused. *(The *Applies from year* clause is superseded by D-ORG-24 — T-12 inverts it.)*
     - The email echo is read-only.
     - The toast text for each of the three outcomes.
     - The picker list excludes an inactive staff fixture.
@@ -182,7 +186,7 @@ Every task depends on the one before it. They share the module's service, contro
   6. Write the log row after the commit → a forced failure after the version write leaves a version without its log row (or a log row without its version).
   7. Read the year from `new Date()` instead of the clock provider → the "today is 2027" tests fail.
   8. Check the director/delegate overlap only against the stored director (before the save's change) → the "change director away from X and add X" request is rejected, and the "delegate made director" request passes.
-  9. Store delegates on the version → the delegates-only save adds a version row.
+  9. Store delegates on the version → the delegates-only save adds a version row. *(History: under D-ORG-24 storing delegates on the version is the required design; T-12 carries the inverse falsifier.)*
 - **Red run:** each falsifier is observed failing on its own assertion (version ranges, status, row set, log count), then reverted.
 - **Disqualifier:**
   - A propagation test whose later versions hold the same value as the earlier one: it cannot tell "kept" from "overwritten".
@@ -209,7 +213,7 @@ Every task depends on the one before it. They share the module's service, contro
   - R-ORG-008 — *Logical delete* (*Deleted (from 2027)*; **AND IT MUST** still appear in the 2026 view); *Physical delete of an entry created this year* (rows gone, code free; **AND** the log keeps a delete row with the last values); *Linked records block* (409 stating the count and proposing *Inactivate*, through a test consumer in `OrgUnitUsageRegistry`); AC.1, AC.2, AC.3; the dialog states the entry stays visible in earlier years.
   - R-ORG-002 — the "code reused only after a physical delete" clause (after the physical delete, a create with the same code → 201).
   - R-ORG-006 AC.2 — end to end: inactivated and deleted entries, produced by B11 and B13, in earlier views and absent later.
-  - R-ORG-017 — *Delegates shown in a past year*: **AND** the History tab shows the change with its date and user.
+  - R-ORG-017 — *Delegates shown in a past year*: **AND** the History tab shows the change with its date and user. *(Scenario rewritten by D-ORG-24 — History now lists delegates per version; T-12.)*
   - R-ORG-009 — *Log survives everything* (create + physical delete both returned by B7); AC.1 for `inactivate`, `reactivate`, `delete_logical`, `delete_physical`; AC.2 (no route updates or deletes the log); History tab.
   - R-ORG-012 — AC.1 for B6, B7, B11, B12, B13 (Contributor 403, nothing written, no log row).
   - R-ORG-013 — *Inactivate* / *Reactivate* next to *Delete*; the lifecycle dialog; a 409 shows the server's description and a single *Close*.
@@ -229,8 +233,8 @@ Every task depends on the one before it. They share the module's service, contro
     - Physically delete a fixture entry → its `org_units` and `org_unit_versions` rows are gone, `org_unit_change_log` keeps the `create` and `delete_physical` rows, and B7 returns both.
     - Logical delete → the row is still in `org_units` with `status = deleted`, the 2026 view has it, the 2027 view does not.
     - Merge → B5 on `ORG-061` returns `successorId`.
-    - Delegates history: change `[B2001]` → `[B2002]`; B6 returns the `delegates_change` row with both lists, user and timestamp (R-ORG-017 *Delegates shown in a past year*, History half).
-    - Physical delete of an entry with delegates → its delegate rows are gone; logical delete → they stay.
+    - Delegates history: change `[B2001]` → `[B2002]`; B6 returns the `delegates_change` row with both lists, user and timestamp (R-ORG-017 *Delegates shown in a past year*, History half). *(Superseded by D-ORG-24 — T-12: an `edit_in_place` / `new_version` row with a `delegates` diff, and versions carrying their lists.)*
+    - Physical delete of an entry with delegates → its delegate rows are gone; logical delete → they stay. *(Still true per version after D-ORG-24; T-12 re-runs it on the re-keyed table.)*
     - Blocked inactivate → checksum of the version rows unchanged.
   - **Client unit:**
     - Dialog fields per action.
@@ -264,7 +268,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 - **Status:** done (2026-10-20, Reviewer PASS ×2 on attempt 2 — execution.md) · **Size:** M · **Dependencies:** T-03
 - **Requirements covered:**
-  - R-ORG-010 — `resolve` returns the **current** delegates (R-ORG-017) for any requested year.
+  - R-ORG-010 — `resolve` returns the **current** delegates (R-ORG-017) for any requested year. *(Superseded by D-ORG-24 (requester, 2026-10-22): `resolve` returns the delegates of the requested year — R-ORG-010 AC.3, T-12.)*
   - R-ORG-010 — *KPI history continues through a move*, with a registered test consumer holding values for 2026–2030 under ID 57 and a move from 2029: one series under ID 57; roll-up puts 2026–2028 under A and 2029–2030 under C; **BUT** must NOT require rewriting any stored value. AC.1 (`resolve` and `ancestors` for the requested year, including ended entries before their end); AC.2 (the test consumer drives *Linked data*; its delete-block half was proven in T-03 and is re-run here); successor chain; `assertExists`.
   - R-ORG-011 — *Level in use* (deleting `L4 Unit` → 409 stating the count and proposing deactivation; **AND** the `org.level` list shows *Used by: Organizational Structure › Level*); AC.1 (count per value = number of **versions** using it); AC.2 (a raw FK violation on value delete → 409); registered exactly once from a singleton `onModuleInit`.
   - R-ORG-012 — consumer reads C1–C3 open to any authenticated user (Contributor 200); AC.1 re-run over **every** handler of the controller (B1–B13 admin, C1–C3 open).
@@ -354,14 +358,14 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-06 — HITL: browser, mockup and seed review
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-05 · **Owner:** requester
+- **Status:** todo — **paused 2026-10-22 until T-12 is done** (Pivot: delegates versioned per year; execution.md → *Pivot Record*) · **Size:** S · **Dependencies:** T-05; resumes after T-12 · **Owner:** requester
 - **Requirements covered:** the requirements §10 substitutes: tree rendering, expand/collapse, column resize; visual fidelity to the mockup; seed content against the source sheet. NFR-ORG-005 manual keyboard pass. R-ORG-013 AC.1 seen with a real Center-Admin-only user.
 - **Design refs:** §6, §10 *Manual (HITL)*, mockup artboard 2
 - **Scope:** no code. With the app running locally (`docker compose up --build -d` or the native commands):
   1. Log in as a **Center Admin only** user: the item sits right after *Portfolio Management*; the page opens. Log in as a Contributor: the item is absent and the URL redirects.
   2. Tree: expand and collapse with the mouse and with the arrow keys; indent per level; badges (*scheduled*, *inactive*, *deleted*, *Inactive staff*).
   3. Table: resize a column, sort, page through 10 / 25 / 50 / 100 rows, export 2026 and open the file.
-  4. Create, move from next year, back-date (warning seen before *Save*), add and remove delegates (director not offered; no year asked), inactivate with successor, delete; check History after each.
+  4. Create, move from next year, back-date (warning seen before *Save*), add and remove delegates from a year (director not offered; *Applies from year* asked; the previous year still shows its own delegates — D-ORG-24, T-12), inactivate with successor, delete; check History after each.
   5. Compare side by side with `../mockup/OrgStructure.dc.html`; list differences as accepted or as rework. The *Delegates* field and table column were added to the mockup on 2026-10-16 (artifact version 25); compare them too.
   6. Review the seeded tree against sheet *04. ORG structure*, and fill in the directors from the seed report.
 - **Falsifier:** n/a (human check). The requester's quoted words are what discharge each criterion (KZ-002).
@@ -407,10 +411,10 @@ Every task depends on the one before it. They share the module's service, contro
 
 - **Status:** done (2026-10-21, Reviewer PASS on attempt 1 — execution.md; the requester's browser re-check and the A1 accessibility decision stay open in T-06) · **Size:** S · **Dependencies:** T-07 · **Added:** 2026-10-21, requester-approved (T-06 round 2)
 - **Origin:** requester, T-06: "ajusta la forma en que se muestran los delegados seleccionados, podria ser como en la imagen [Keywords]. Trata de mantener en este modulo toda la linea visual que ya tiene la aplicacion". Decision **D-ORG-21** (email on hover; form-wide consistency pass).
-- **Requirements covered:** R-ORG-017 *Add delegates* (amended: names shown, email on hover), R-ORG-013 (form usability / app consistency).
+- **Requirements covered:** R-ORG-017 *Add delegates* (amended: names shown, email on hover; scenario renamed *Add delegates from a year* by D-ORG-24, 2026-10-22), R-ORG-013 (form usability / app consistency).
 - **Design refs:** §6.5 (amended), §6.8 tokens, D-ORG-21.
 - **Scope — screen only (client):**
-  1. **Delegate chips** in the *Keywords* style: the global `keywords-autocomplete` class (`src/styles/styles.scss:62`) on the delegates `p-autoComplete multiple` — grey rounded chips inside the field, name + remove icon; the **email in a tooltip** on the chip (PrimeNG `pTooltip`, which the app already styles globally); the *Inactive staff* mark stays visible in the chip. Behaviour unchanged (max 20, director excluded, set comparison, no year asked).
+  1. **Delegate chips** in the *Keywords* style: the global `keywords-autocomplete` class (`src/styles/styles.scss:62`) on the delegates `p-autoComplete multiple` — grey rounded chips inside the field, name + remove icon; the **email in a tooltip** on the chip (PrimeNG `pTooltip`, which the app already styles globally); the *Inactive staff* mark stays visible in the chip. Behaviour unchanged (max 20, director excluded, set comparison, no year asked). *(History: "no year asked" is superseded by D-ORG-24 — T-12.)*
   2. **Visual-consistency pass of the org form** (`org-unit-form` and, where the same fields appear, the lifecycle dialog): labels, hint/help texts, selects and autocompletes aligned with what the app's other forms already use — prefer the shared custom fields (`app-select`, `app-input`, … under `shared/components/custom-fields/`) when one covers the field **without behaviour change**; otherwise keep PrimeNG but apply the same label / hint / spacing classes the app uses (e.g. the `.label` heading and hint styles of `general-information.component.html`). No hex literals — if an exemplar uses a hex, use the matching token. **List every change** (field → before → after → exemplar it follows) and every place you chose **not** to swap, with the reason.
 - **Tests (client unit):** the delegate chip renders the name, carries the email as its tooltip text, keeps the *Inactive staff* mark, and sits inside a container with `keywords-autocomplete`; existing form tests stay green (adapt selectors only where a swapped component changes the DOM — never weaken what a test asserts; list each adapted test). If a field is swapped to a shared component, its validation / disabled / required behaviour is still asserted.
 - **Falsifier:** (1) drop the tooltip binding → the email-on-hover test red; (2) drop `keywords-autocomplete` → the style-container test red; (3) remove the *Inactive staff* mark → its test red.
@@ -428,13 +432,13 @@ Every task depends on the one before it. They share the module's service, contro
 
 - **Status:** done (2026-10-21, Reviewer PASS on attempt 1 — execution.md; the requester's browser re-check stays open in T-06) · **Size:** S · **Dependencies:** T-08 · **Added:** 2026-10-21, requester-approved (T-06 round 3)
 - **Origin:** requester, T-06 round 3 (screenshot of the AGROVOC *Keywords* picker): "no se ven bien los chips de delegados. ajustalo mas bien para que se vean asi, con los chips debajo con la opcion de eliminar". Decision **D-ORG-22** (supersedes D-ORG-21's in-field chips).
-- **Requirements covered:** R-ORG-017 *Add delegates* (names shown, email on hover), R-ORG-013.
+- **Requirements covered:** R-ORG-017 *Add delegates* (names shown, email on hover; scenario renamed *Add delegates from a year* by D-ORG-24, 2026-10-22), R-ORG-013.
 - **Design refs:** §6.5 (amended delegates line), §6.8 tokens, D-ORG-22.
 - **Scope — screen only (client):**
   1. **Search field:** a staff search on B4 (same debounce, same suggestions — active staff, current director and already-picked delegates excluded) that **adds** the picked person to the delegates and **clears itself**. Single-value search, not `multiple`.
   2. **Chips below:** the selected delegates render under the field as removable `p-chip`s (remove icon), in the AGROVOC picker's look — exemplar `app-agrovoc-keywords` on `dev` (commit `e3ba7f8e`, `src/app/shared/components/custom-fields/agrovoc-keywords/agrovoc-keywords.component.{html,scss}`): wrapping flex row, `gap: 0.5rem`, `margin-top: 0.5rem`, chip `--ac-grey-200` background, `--ac-grey-800` text and icon, `border-radius: 1rem`, `0.875rem`. Styles **local** to the org form (tokens only, no hex); the global `keywords-autocomplete` class is removed from this field (it is deleted on `dev`).
   3. Each chip: the **name**, the *Inactive staff* mark when it applies, the **email in a tooltip**, and the accessible name "name, email[, inactive staff]"; the remove button is labelled "Remove <name>".
-  4. Behaviour unchanged: max 20 (limit message), director excluded, set comparison for "changed", no *Applies from year* for a delegates-only change, disabled state respected.
+  4. Behaviour unchanged: max 20 (limit message), director excluded, set comparison for "changed", no *Applies from year* for a delegates-only change, disabled state respected. *(History: the "no *Applies from year*" clause is superseded by D-ORG-24 — T-12 inverts it; the chip look delivered here stays.)*
 - **Tests (client unit):** pick a person → a chip appears below the field and the search input is empty (KZ-015 transition); clicking a chip's remove icon removes that delegate; the chip's tooltip = email and its accessible name contains name and email (and "inactive staff" when inactive); the field container no longer carries `keywords-autocomplete`; the 21st pick is refused with the limit message; the director never appears in suggestions. Adapt T-08's chip tests to the new DOM — never weaken what they assert; list each adapted test.
 - **Falsifier:** (1) keep the picked value in the input (don't clear) → the empty-input test red; (2) drop the remove handler → the remove test red; (3) drop the accessible-name binding → its test red; (4) render chips inside the field again (`multiple`) → the "below the field" test red.
 - **Disqualifier:** a "below the field" test that only checks a class; a remove test that calls the handler directly instead of clicking the chip's remove icon.
@@ -460,6 +464,106 @@ Every task depends on the one before it. They share the module's service, contro
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–3 observed red, then reverted. *(Leader re-measure ×3 352/352, 8148/8148 — execution.md § T-10)*
   - [ ] Requester re-checks the default in the browser during T-06 (quoted there).
+
+---
+
+### T-11 — HITL rework 5: tree name alignment and indentation
+
+- **Status:** done (2026-10-22, Reviewer PASS on attempt 2 — execution.md; the requester's browser re-check stays open in T-06) · **Size:** XS · **Dependencies:** T-10 · **Added:** 2026-10-22, requester-approved (T-06 round 5)
+- **Origin:** requester, T-06 round 5 (screenshot of BOF expanded — unit names under the same parent start at different x positions): "ajusta la sangria, no todas los nombres de las unidades estan alineadas". Leader reading of the screenshot: the name text appears centred in its cell, so its start position varies with the text length; the name column is narrow, so names wrap to 2–3 lines.
+- **Requirements covered:** R-ORG-013 (page usability), design §6.3 (indent per level).
+- **Design refs:** §6.3, D-ORG-6, D-ORG-20.
+- **Scope — screen only (client), `org-tree` only:**
+  1. The name cell is **left-aligned**: every row's name starts at `indent(level) + toggler slot`, so siblings line up exactly, whatever the text length. Leaf rows (no children) reserve the same toggler-width slot as expandable rows, so a unit's name aligns with an expandable sibling's name.
+  2. Indentation is a fixed step per depth (PrimeNG `p-treeTableToggler` / row level), identical for every row at the same depth; wrapped lines align with the first line, not with the cell edge.
+  3. Give the name column more width (or let it take the free space) so common names fit on one or two lines; the other columns keep their content readable. Tokens only, no hex; component style budget respected.
+- **Tests (client unit):** for a fixture with an expanded L2 that has children of different name lengths plus an expandable sibling, the name elements of all rows at the same depth carry the same left offset/indent style (assert the inline `padding-left` / indent value or the class PrimeNG applies per level — whichever the component actually renders — and that the name cell's computed `text-align` is not `center`); a leaf row renders the toggler-slot placeholder.
+- **Falsifier:** (1) centre the name cell again → the text-align test red; (2) remove the leaf placeholder → the placeholder test red.
+- **Disqualifier:** a test that asserts only the presence of a class while the rendered style still centres the text.
+- **Cannot prove:** pixel alignment in a real browser → requester re-check in T-06.
+- **Review:** `standard`. **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
+- **Done criteria:**
+  - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–2 observed red, then reverted. *(Leader re-measure 352/352, 8150/8150 — execution.md § T-11)*
+  - [ ] Requester re-checks the alignment in the browser during T-06 (quoted there).
+
+---
+
+### T-12 — Pivot: delegates versioned per year
+
+- **Status:** todo — **awaiting requester approval of the amended requirements / design before any code** (Pivot, 2026-10-22) · **Size:** L · **Dependencies:** T-11 (client half touches the same page; no server dependency) · **Added:** 2026-10-22 (Pivot Record in execution.md)
+- **Origin:** requester, T-06: "Ajusta el tema de los delegados. Me parece que si todo esta anualizado o versionado por año, tambien los delegados deberian estarlo." Decisions: versioned like the director; `resolve` per year; pivot inside this spec. Decision **D-ORG-24** (supersedes D-ORG-15).
+- **Requirements covered:**
+  - R-ORG-017 (rewritten) — *Add delegates from a year* (split `[2026, 2027)` / `[2027, open)`; **AND IT MUST** write one `new_version` row with a `delegates` diff; **BUT** must NOT change the 2026 version or any other entry; in-place variant from 2026 → `edit_in_place`); *A later deliberate delegates change is kept* (**BUT** `[2028, open)` keeps `[B2003]`; equal later list is propagated); *Director as delegate (per version)* (allowed from 2028, 400 `delegates` from 2026; **AND IT MUST NOT** change any version); *Delegate made director* (400 `director` from 2027 and, through propagation, from 2026); *Delegates shown in a past year* (2026 shows `[B2001]`, 2027 `[B2002]`; **AND** History lists both versions with their delegates and the log row; **BUT** no *current* label); AC.1–AC.5; delegates change on an inactive entry only before its end; reactivation copies the last version's delegates.
+  - R-ORG-010 — `resolve` returns the delegates of the requested year; `version: null` → `[]`; AC.3.
+  - R-ORG-004 — delegates in the versioned-field list (split, in place, propagation with set equality, bounds); R-ORG-005 — back-date gate on a delegates change.
+  - R-ORG-009 — AC.1 for a delegates change (one `edit_in_place` / `new_version` row; no `delegates_change` row); legacy `delegates_change` rows still readable in B6 / B7 and the History tab.
+  - R-ORG-013 — form: delegates inside the *Applies from year* group, the version's delegates shown, a delegates-only change shows *Applies from year*; R-ORG-014 — the *Delegates* column shows the viewed year's names (and the export).
+  - R-ORG-007 / R-ORG-008 — delegates kept, dropped or copied with their versions on inactivate (version starting at *E* dropped), reactivate, logical and physical delete.
+- **Design refs:** §2.1 (migration row), §3.1 (`org_unit_delegates` after `…005`, Delegates bullet, log enum note), §3.2 I-6, §3.3 (`…005` up/down), §4 B1, B5, B6, B9, B10, C1 and the `outcome` note, §5.2 steps 1, 5–8, §5.4, §5.5, §6.4, §6.5, §6.6, §11, §13 P-15, D-ORG-16, D-ORG-24.
+- **First step (P-15):** on the local DB (`ARI_MYSQL_*`, re-checked local), run `SELECT COUNT(*) FROM org_unit_delegates` and `git branch -r --contains 8028311b` after a `git fetch`; quote both with the date in `execution.md` **before** writing `…005`. Non-zero rows → stop and ask the requester (the migration would refuse anyway).
+- **Scope — database:** `src/db/migrations/1791000000005-versionOrgUnitDelegates.ts` exactly as design §3.3: row-count guard in `up` and `down` (throw with the count), rebuild to `org_unit_version_id` + `FK_org_unit_delegates_org_unit_version_id` (CASCADE) + `FK_org_unit_delegates_staff_carnet` (RESTRICT, `readStaffCarnetColumnClause`) + `uq_org_unit_delegates_version_staff` + `idx_org_unit_delegates_staff`; `down` restores the `…003` shape. Exports only its class. `…003` is **not edited**. Then `npm run migration:test:execute` on the local DB, and one revert of `…005` (typeorm revert passthrough, local DB only — re-check the host first) + re-execute to prove `down` / `up` on the empty table.
+- **Scope — server:**
+  - Entity `org-unit-delegate.entity.ts` (`org_unit_version_id`, relation to `OrgUnitVersion`); repository: read delegates by version ids, replace by version id.
+  - Timeline util: `delegates` in `VERSIONED_FIELDS` with **set equality** (sorted carnets); split copies the covering list into both halves; propagation per §5.2 step 6.
+  - Service: delegates validation (≤ 20, duplicates, existence, newly-added-active against the version at *Y*); `appliesFromYear` required for `delegateCarnets` (B10 DTO / service rule); I-6 over the resulting timeline after propagation, naming per §5.2 step 7; write delegate rows for every version written; log diff `delegates: {old, new}` on `create` / `edit_in_place` / `new_version`; `delegates_change` no longer written (enum kept); `outcome.action` never `delegates_change`.
+  - Lifecycle: inactivate drops the version starting at *E* with its delegates (logged), keeps the rest; reactivate copies the last version's delegates as stored; logical delete as inactivate; physical delete logs the last version's delegates.
+  - Read service: B1 (delegates of the version shown, incl. `includeEnded` rows), B5 / B6 (delegates per version; entry-level list removed), C1 (delegates of the covering version; `[]` for `version: null`; `missing` rows unchanged). Swagger texts for B1, B5, B6, B10, C1 updated.
+- **Scope — screen:**
+  - `org-structure.interface.ts`: version-level `delegates`; entry-level delegates removed; `outcome.action` union keeps `delegates_change` only for history rows.
+  - `org-unit-form`: the delegates field initialised from the version the form shows (as the director); moved inside the *Applies from year* group; the "not tied to a year" hint and the *current* label removed; a delegates-only change shows *Applies from year* / *Back-date* and sends `appliesFromYear`; the director exclusion uses the director shown in the form; D-ORG-22 chip look, limit, tooltip and accessible names unchanged.
+  - Toast from `outcome` (no `delegates_change` branch needed for new saves); History tab: versions table gains a *Delegates* column; a `delegates` diff renders old → new names; legacy `delegates_change` rows keep *Delegates changed*.
+  - Table / export: no client logic change expected (B1 already returns the year's list) — assert it.
+- **Tests:**
+  - **Server unit:**
+    - Timeline util (table-driven, `assertTimeline` after each step): delegates split / in place / propagate-kept (`[B2003]` stays) / propagate-overwritten (equal list replaced); set equality — `[B1, B2]` vs `[B2, B1]` counts as equal (propagates), `[B1]` vs `[B1, B2]` does not.
+    - Service: every rewritten R-ORG-017 scenario with the clock at 2026; back-date gate on a delegates-only change (clock 2027, from 2026 without flag → 400); `delegateCarnets` without `appliesFromYear` → 400; I-6 overlap that exists **only** in a propagated later version → 400; overlap naming (`delegates` vs `director`, both-fields case); move director away from X and add X as delegate in one request → accepted; a newly added inactive carnet → 400, an inactive one already in the version's list kept; exactly one log row per save with the `delegates` diff and the right action; no `delegates_change` row on any path.
+    - Lifecycle: reactivate copies the last version's delegates (including an inactive-staff one); inactivate from *E* drops the version starting at *E* and its delegates appear in that log row.
+    - Read service: B1 and C1 for 2026 vs 2027 on an entry whose lists differ; C1 `version: null` → `delegates: []`; `missing` rows unchanged.
+  - **Server integration (local DB):**
+    - Schema after `…005`: `SHOW CREATE TABLE org_unit_delegates` → `org_unit_version_id` FK `ON DELETE CASCADE` to `org_unit_versions`, staff FK RESTRICT, `uq_org_unit_delegates_version_staff`, no `org_unit_id` column; duplicate `(version, carnet)` → errno 1062; `up` with a row present throws (on a probe schema or inside a guarded test), `down` then `up` on the empty table succeed.
+    - Delegates-only `PATCH` from 2027 on a `[2026, open)` entry → **one more** version row, the `[2026, 2027)` version still holds its old list, one `new_version` log row with the `delegates` diff, zero `delegates_change` rows; B1 2026 vs 2027 and C1 2026 vs 2027 return the two different lists.
+    - Other-entry checksum (delegate rows included) unchanged after the save (R-ORG-004 AC.3).
+    - Lifecycle on real rows: physical delete removes the delegate rows through the cascade; logical delete keeps them; inactivate dropping the version at *E* removes its rows; reactivate creates rows for the new version.
+    - A legacy `delegates_change` log row inserted as a fixture is still returned by B6 / B7.
+  - **Client unit:**
+    - Form shows the delegates of the version covering the *Structure year* (fixture with different lists per version; switching the top year re-initialises them — KZ-015: through the page's year selector).
+    - A delegates-only change shows *Applies from year* and sends `appliesFromYear` (+ `backdate` when ticked); no "not tied to a year" hint; no *current* label.
+    - Director exclusion uses the director of the version shown.
+    - History: versions table shows per-version delegate names; a `delegates` diff renders; a legacy `delegates_change` row keeps its label.
+    - Toast for a delegates-only `outcome` of `new_version` reads *new version from Y*.
+- **Falsifier:**
+  1. Keep the delegates-only special path (replace rows, no version) → the "one more version row" integration test and the split unit test fail.
+  2. `resolve` / B1 read the latest (or current-year) version's delegates for every year → the 2026-vs-2027 assertions fail.
+  3. Check I-6 only on the version at *Y* (before propagation) or against the current version only → the propagated-overlap test returns 200.
+  4. Propagate the new list into every later version unconditionally → the `[B2003]` kept assertion fails.
+  5. Compare lists with reference / order-sensitive equality → the `[B1, B2]` vs `[B2, B1]` propagation test fails.
+  6. Keep writing `delegates_change` for a delegates-only save → the "zero `delegates_change` rows" assertions fail.
+  7. Remove the row-count guard from `…005` `up` → the "throws with a row present" test passes the migration.
+  8. Reactivate without copying delegates → the reactivation test finds an empty list.
+  9. Client: leave the delegates field outside the year group / keep the "no *Applies from year*" rule → the form test that expects *Applies from year* fails.
+- **Red run:** each falsifier is observed failing on its own assertion (row counts, returned lists, status code, log action, migration error), not on setup, then reverted.
+- **Disqualifier:**
+  - A propagation fixture whose later version holds the same list as the earlier one — it cannot tell kept from overwritten (as T-02).
+  - A per-year read test whose fixture has the same delegates in every version.
+  - An I-6 test where the overlap is visible at *Y* itself — it cannot catch a check that skips propagated versions.
+  - A migration test run against a non-local host, or a `migration:show` count with ANSI codes / from a failed command (K-014).
+  - An existing T-02 / T-03 / T-04 / T-08 / T-09 test deleted instead of rewritten to the new rule, or weakened (e.g. assertion removed) without being listed.
+  - Client `npm test` green without `ng build`.
+- **Cannot prove:** that the *Applies from year* group reads naturally with the delegates inside it, and that a past year's chips look right in a real browser → requester at T-06. That no deployed environment holds delegate rows beyond the local DB is covered by P-15 (git) and the migration guard, not measured on Dev.
+- **Consumers (existing tests that pin the old rule and will change):**
+  - Server unit `organizational-structure.service.spec.ts`: *"requires appliesFromYear … but not for code or delegates only"* (:661 — delegates now need the year); *"Add delegates: … ONE delegates_change log row … NO version and no year needed"* (:801 — inverted); *"Director as delegate"*, *"Delegate made director from the current year"*, *"the director of a SCHEDULED LATER version added as a delegate"*, *"moves the director away from A1 and adds A1"*, *"B9 rejects the director among the delegates"* (:853–:890 — re-based on per-version I-6; the scheduled-later case now depends on whether the later list is propagated).
+  - Server unit `org-structure-read.service.spec.ts` (*"… carries the current delegates"*, :530), `organizational-structure.lifecycle.spec.ts`, `repositories/organizational-structure.repositories.spec.ts`, `org-version-timeline.util` spec — delegates per version.
+  - Server integration: `org-structure-schema.integration-spec.ts` (`uq_org_unit_delegates_unit_staff`, :113; duplicate pair, :162; *"entry FK is CASCADE"*, :235 — now the version FK); `org-structure-save.integration-spec.ts` (*"a delegates-only PATCH adds NO version row … delegates_change"*, :411 — inverted); `org-structure-year-view.integration-spec.ts` (*"… in the 2026 AND 2027 views (current list, not per year)"*, :375 — inverted); `org-structure-lifecycle.integration-spec.ts` (*"Delegates shown in a past year … delegates_change row"*, :652); `org-structure-consumers.integration-spec.ts`, `org-structure-performance.integration-spec.ts`, `test/support/org-structure-fixtures.ts` (fixtures insert delegates by entry).
+  - Client: `org-unit-form.component.spec.ts` (*"a delegates-only edit does not show Applies from year"*, :497 — inverted; the `delegates_change` toast row, :382; T-08 / T-09 chip tests keep their assertions); `org-unit-panel.component.spec.ts` (`delegates_change` outcome, :69); `org-history.util.spec.ts` (legacy label, :56 — kept); `org-tree.util.spec.ts` (*"current delegates joined"*, :88 — wording); `organizational-structure.component.spec.ts`; `testing/org-structure.fixture.ts`.
+- **Review:** `full` — data model change, migration, temporal engine and a cross-module contract (`resolve`).
+- **Skills:** nestjs-expert, api-design-principles, error-handling-patterns, tdd (timeline util) (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
+- **Budget:** ~3,000 LOC incl. tests (server ~1,900, client ~1,100), under the 4,500-LOC slice tripwire; ≤ 2 review rounds (design §14).
+- **Done criteria:**
+  - [ ] P-15 first-step output quoted with date in `execution.md`.
+  - [ ] `migration:test:execute` output, `SHOW CREATE TABLE org_unit_delegates`, and the `down` / `up` round trip quoted.
+  - [ ] Same command set as T-01 (server unit, `test:integration -- org-structure`, `npx eslint` on the module and `src/db/migrations/1791*`, `npm run build`; client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline), all green; falsifiers 1–9 observed red, then reverted.
+  - [ ] Every consumer test listed above rewritten (not deleted) and listed in `execution.md` with old → new assertion.
+  - [ ] B1, B5, B6, B10, C1 Swagger texts updated and seen in `/swagger`, observation quoted.
 
 ---
 
@@ -519,10 +623,13 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | R-ORG-015 | *Seed runs twice*; AC.1; directors; seed report | T-05 |
 | R-ORG-016 | read half of AC.1 (joined name / email, `isActiveStaff`) | T-01 |
 | R-ORG-016 | *Pick a director* · *Director leaves later* incl. **BUT** not offered · *Unknown staff ID* · AC.1–AC.3 | T-02 |
-| R-ORG-017 | read half of AC.1; past year shows the current list | T-01 |
-| R-ORG-017 | *Add delegates* incl. **AND IT MUST** one log row, **BUT** no version / no year · *Director as delegate* incl. **AND IT MUST NOT** change · *Delegate made director* · AC.1–AC.4 | T-02 |
-| R-ORG-017 | *Delegates shown in a past year* — **AND** History shows the change | T-03 |
-| R-ORG-017 | delegates in `resolve` | T-04 |
+| R-ORG-017 | ~~read half of AC.1; past year shows the current list~~ (T-01, superseded 2026-10-22) → read half of AC.1 and AC.5 per version | T-12 |
+| R-ORG-017 | *Add delegates from a year* incl. **AND IT MUST** one `new_version` row with the `delegates` diff, **BUT** 2026 version and other entries unchanged; in-place variant | T-12 |
+| R-ORG-017 | *A later deliberate delegates change is kept* incl. **BUT** `[2028, open)` keeps `[B2003]` | T-12 |
+| R-ORG-017 | *Director as delegate (per version)* incl. **AND IT MUST NOT** change any version · *Delegate made director* (incl. through propagation) · AC.1–AC.4 | T-12 (the pre-Pivot rule was proved by T-02 — history) |
+| R-ORG-017 | *Delegates shown in a past year* — per-year views, **AND** History lists versions with delegates, **BUT** no *current* label | T-12 (pre-Pivot halves: T-01 / T-03 — history) |
+| R-ORG-010 | AC.3 — `resolve` returns the year's delegates; `version: null` → `[]` | T-12 (was "current delegates", T-04 — history) |
+| R-ORG-004 / R-ORG-009 | delegates as a versioned field (split, in place, propagation, back-date); no `delegates_change` row | T-12 |
 | NFR-ORG-001 | performance | T-05 |
 | NFR-ORG-002 | index · invariant | T-01 · T-02 |
 | NFR-ORG-003 | append-only log | T-03 |
@@ -541,8 +648,8 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | Level from the wrong list | T-02 |
 | Level value deleted while used | T-04 |
 | Director not staff / typed by hand · past director lost | T-02 |
-| Delegate overlap, duplicate, unknown; delegates versioned by mistake | T-02 |
-| Consumer contract wrong | T-04 |
+| Delegate overlap (per version), duplicate, unknown; delegates not versioned (no version written, past year showing another year's list, deliberate later list overwritten) | T-12 (pre-Pivot form "versioned by mistake": T-02 — history) |
+| Consumer contract wrong | T-04 · T-12 (`resolve` delegates per year) |
 | Seed counts / idempotency | T-05 |
 | Natural sort / export | T-01 |
 | Hidden compile errors (`npm run build`, `ng build`) | every task |
@@ -561,15 +668,16 @@ Every scenario and every `BUT` / `AND IT MUST` clause has exactly one owning tas
 | RB-4 | 2026-10-16 | Existing `AllianceUserStaffService.findBySearch` `AND`/`OR` precedence defect (P-10) | Not fixed here; candidate `/akili-propose bugfix/...` | Requester | open |
 | RB-5 | 2026-10-16 | `alliance_user_staff` charset differs by environment (Dev `utf8mb3` per the 2026-08-14 baseline dump; local `utf8mb4`); Prod not measured. The carnet FK migrations (`…001`, `…003`) depend on it (D-ORG-16) | T-01 rework proves up/down against a local probe schema with the Dev DDL; a human confirms `SHOW CREATE TABLE alliance_user_staff` on Dev and Prod before the merge to `dev`/`main`. **Measured 2026-10-16 by the requester on *testing*:** `alliance_user_staff.carnet` = `utf8mb4` / `utf8mb4_0900_ai_ci`, `VERSION()` = `8.0.46-0ubuntu0.22.04.4` — the baseline dump's `utf8mb3` is stale for that server. Still owed: Prod (`main`) | Requester | open — testing measured, Prod pending |
 | RB-6 | 2026-10-16 | Cross-entry race (T-02 Reviewer A advisory, reasoned): `FOR UPDATE` locks only the saved entry and the hierarchy graph is read unlocked, so two concurrent saves on different entries (e.g. P L2→L3 while an L3 is created under P) can each pass validation and leave an I-3 violation | Either lock the parent/child rows the check reads, or accept (≈ 500 entries, few admins). **Requester decision pending** | Requester | open — **widened 2026-10-19 (T-03 Reviewer A, constructed, not executed):** inactivate / logical delete can now shorten a parent's coverage while a concurrent child move or reactivate under it reads the parent unlocked → I-3 break; a physical delete is backstopped by the RESTRICT FK (surfaces as a 500) |
+| RB-7 | 2026-10-22 | Pivot (D-ORG-24): (a) **contract change** — `resolve` now returns the requested year's delegates, and B5 drops its entry-level delegates field; a future consumer that wants "who acts now" must ask for the current year; (b) **schema change after an applied migration** — `…003` is applied locally, so `…005` rebuilds the table; it refuses on non-empty tables (P-15) | (a) No consumer exists yet (R-ORG-010 risk row; each consumer spec cites AC.3). (b) T-12 first step measures the local row count; `…003` + `…005` reach Dev together because neither is on a remote branch | Leader / requester | open — closes when T-12 passes |
 
 ---
 
 ## 5. Done definition
 
-- [ ] T-01…T-06 are `done`, each with its Reviewer PASS in `execution.md`.
+- [ ] T-01…T-12 are `done`, each with its Reviewer PASS in `execution.md` (T-06: the requester's quoted words); T-12 before T-06 resumes.
 - [ ] T-06 ran **before** `/akili-validate` (KZ-007).
 - [ ] Every row of §3 is closed by the owning task's evidence.
 - [ ] Server coverage ≥ 60 % and client floors still green.
 - [ ] Swagger documents B1–B13 and C1–C3.
-- [ ] RB-1…RB-3 closed; RB-4 filed or explicitly deferred.
-- [ ] Rollout note: merge order, migrations applied on `dev` deploy, backout = revert code, then `down` `…004` → `…000` while no consumer stores unit ids.
+- [ ] RB-1…RB-3 and RB-7 closed; RB-4 filed or explicitly deferred.
+- [ ] Rollout note: merge order, migrations applied on `dev` deploy, backout = revert code, then `down` `…005` → `…000` while no consumer stores unit ids (`…005`'s `down` refuses while delegate rows exist — design §3.3).
