@@ -184,7 +184,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-08 — Align the sync tables' collation with `results` (pivot T-07)
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-02
+- [x] **Status:** done (2026-10-22, PASS attempt 1 — see `execution.md`) · **Size:** S · **Dependencies:** T-02
 - **Requirements covered:** R-PPI-002 (status + attempt reads must run on the real schema); NFR-PPI-002.
 - **Design refs:** §5 *Collation* (added 2026-10-22), Pivot Record T-07 in `execution.md`.
 - **Scope (files):** `src/db/migrations/<ts>-convertPrmsSyncTablesCollation.ts` (new, timestamp after `1792673320363`) + `src/db/migration-specs/<ts>-convertPrmsSyncTablesCollation.spec.ts` (new). Up: both tables `CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`; down: back to `utf8mb4_unicode_520_ci`.
@@ -194,9 +194,9 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** every SQL that compares a string column of these two tables with a column of another table — list each with both collations (a `unicode_520` peer would now clash). T-07's integration spec is the end-to-end gate.
 - **Review:** `full` — schema change on shared tables (override b, f).
 - **Done criteria:**
-  - [ ] Spec green; falsifier observed red and reverted.
-  - [ ] Up + down observed on a fresh Dev-dump container; checksums equal; collations quoted.
-  - [ ] Cross-table string comparison audit listed.
+  - [x] Spec green; falsifier observed red and reverted.
+  - [x] Up + down observed on a fresh Dev-dump container; checksums equal; collations quoted.
+  - [x] Cross-table string comparison audit listed.
 - **Skills:** `nestjs-expert`.
 
 ---
