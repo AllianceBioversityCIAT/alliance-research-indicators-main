@@ -38,7 +38,7 @@ MoSCoW: all three **Must**; order is forced by dependency.
 
 | # | Spec Path | Title / Scope | Depends on | Parallel-safe | Status | Owner |
 |---|---|---|---|---|---|---|
-| 1 | `tip-prms-phase-2/prms-platform-identity` | `platform_code` on `result_prms_sync_log` and `result_prms_sync_history` (STAR backfill for existing rows); every reader/writer and the webhook correlator platform-aware; `external_reference` = `TIP-<code>` for TIP (STAR unchanged); PRMS code copied to the live row of the result's own platform; **client: show the Pool Funding section for TIP results** (phase-1 T-04 defect) | `none` | `yes` | `pending` | David Casañas |
+| 1 | `tip-prms-phase-2/prms-platform-identity` | `platform_code` on `result_prms_sync_log` and `result_prms_sync_history` (STAR backfill for existing rows); every reader/writer and the webhook correlator platform-aware; `external_reference` = `TIP-<code>` for TIP (STAR unchanged); PRMS code copied to the live row of the result's own platform; **client: show the Pool Funding section for TIP results** (phase-1 T-04 defect) | `none` | `yes` | `done` | David Casañas |
 | 2 | `tip-prms-phase-2/tip-versioning` | Versioning procedures platform-aware; the TIP sync versions every result it creates or updates (delete old version, recreate), reconciled with TIP's own per-year snapshot rows; legacy TIP results | `prms-platform-identity` | `no` | `pending` | David Casañas |
 | 3 | `tip-prms-phase-2/tip-prms-push` | TIP gate equivalences (`COMPLETED_IN_TIP` ≙ Approved, `submitted_by` = TIP submitter, KP allowed for TIP only); push from the sync with no HTTP request user; sequential per result; skip when `prms_result_code` is present; legacy TIP results | `tip-versioning` | `no` | `pending` | David Casañas |
 
