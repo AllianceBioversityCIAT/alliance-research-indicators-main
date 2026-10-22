@@ -13,17 +13,18 @@ import { PfmStoreService } from '../../services/pfm-store.service';
 const ALL = '__all__';
 
 /** `dot` = the state colour of that view (same palette as the badges and charts); none for All.
- * Order (owner): the work in the order it happens, then Need attention last, beside Synced. */
+ * Order (owner): the work in the order it happens. Need attention is not a quick view (owner: not needed). */
 const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
   { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
   { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
-  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill },
-  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill }
+  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];
 
 /** Views reachable from the coverage tab that are not shown as quick views. */
 const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
+  // An old link with ?chip=need_attention still opens it, shown as a removable tag.
+  need_attention: 'Need attention',
   rejected: 'Rejected by PRMS',
   awaiting_pi: 'Pending approval by the PI',
   no_sp_contribution: 'No SP contribution',
