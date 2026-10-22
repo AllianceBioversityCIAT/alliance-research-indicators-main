@@ -221,7 +221,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-07 — Integration spec, full gates, and HITL check
 
-- [~] **Status:** blocked — waits for T-08 and T-09 (Pivot Record T-07, owner-approved 2026-10-22) · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08, T-09
+- [~] **Status:** automated part PASS 2026-10-22 (see `execution.md`); **HITL on Dev owed to the owner** after push/deploy · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08, T-09
 - **Requirements covered:** R-PPI-002 and R-PPI-004 at the SQL level (end to end on a real schema); NFR-PPI-001 (full suites); R-PPI-006 rendered state (HITL); parent spec `tip-kp-project-pool-funding` T-04 item 1 (unblocked by R-PPI-006).
 - **Design refs:** §13 (integration row), §14, P-17.
 - **Scope (files):** `test/prms-platform-identity.integration-spec.ts` (new, `test:integration`; own `result_official_code` band — read sibling headers first, FP-45). No production code.
@@ -237,8 +237,8 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** none beyond the suites listed.
 - **Review:** `checklist` — test-only code; produces derived evidence a later gate consumes (override c) → conformance Reviewer.
 - **Done criteria:**
-  - [ ] Integration spec green on a fresh container; falsifier observed red and reverted.
-  - [ ] Full server and client suites, builds, lint green (summary lines quoted).
+  - [x] Integration spec green on a fresh container; falsifier observed red and reverted.
+  - [x] Full server and client suites, builds, lint green (summary lines quoted).
   - [ ] Human observation quoted, covering each check; parent T-04 item 1 recorded there.
 - **Skills:** `nestjs-expert`, `systematic-debugging` (only if the integration run disagrees).
 
