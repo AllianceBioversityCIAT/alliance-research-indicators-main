@@ -203,7 +203,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-09 — ORM connection collation `utf8mb4_0900_ai_ci` (pivot T-07, second step)
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-08
+- [x] **Status:** done (2026-10-22, PASS attempt 1 — see `execution.md`) · **Size:** S · **Dependencies:** T-08
 - **Requirements covered:** R-PPI-002 (status + attempt reads run on the real schema); NFR-PPI-001 (no regression across the server).
 - **Design refs:** §5 *Collation* (amended 2026-10-22), §7.5, Pivot Record T-07 in `execution.md`.
 - **Scope (files):** `src/db/config/mysql/orm.config.ts` — `extra.charset` → `utf8mb4_0900_ai_ci`; any spec that pins that value.
@@ -213,8 +213,8 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** every query of the server (global setting) — the full unit suite plus the owner's manual end-to-end run (2026-10-22, recorded in `execution.md`).
 - **Review:** `full` — shared contract (override b).
 - **Done criteria:**
-  - [ ] Falsifier observed red and reverted; integration spec green on a fresh Dev-dump container.
-  - [ ] Full server suite, tsc, build green.
+  - [x] Falsifier observed red and reverted; integration spec green on a fresh Dev-dump container.
+  - [x] Full server suite, tsc, build green.
 - **Skills:** `nestjs-expert`.
 
 ---
