@@ -38,7 +38,7 @@ const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
 // so the group gets the Results Center table behaviour (sort, paginator) without moving a column.
 @Component({
   selector: 'tr[app-pfm-result-row]',
-  host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row' },
+  host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row', '[attr.data-result-code]': 'row().result_code' },
   imports: [RouterLink, CustomTagComponent, TooltipModule, FormatDatePipe],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush

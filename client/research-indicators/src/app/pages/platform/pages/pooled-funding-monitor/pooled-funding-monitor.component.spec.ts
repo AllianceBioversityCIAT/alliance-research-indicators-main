@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, NavigationStart, Router, convertToParamMap } from '@angular/router';
+import { Subject } from 'rxjs';
+import { savePfmReturnState } from './pfm-return-state';
 import { signal } from '@angular/core';
 import { ApiService } from '@services/api.service';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -45,6 +47,7 @@ describe('PooledFundingMonitorComponent', () => {
   let fixture: ComponentFixture<PooledFundingMonitorComponent>;
   let el: HTMLElement;
   let api: { GET_PfmSummary: jest.Mock; GET_PfmQueue: jest.Mock };
+  let routerEvents: Subject<unknown>;
   const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
   /** The coverage tab's "need action" figure (same summary data the KPI cards used to show). */
   const needAction = () => q('pfm-progress-left')?.getAttribute('aria-label');
@@ -59,7 +62,7 @@ describe('PooledFundingMonitorComponent', () => {
       imports: [PooledFundingMonitorComponent],
       providers: [
         { provide: ApiService, useValue: api },
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true), events: routerEvents } },
         {
           provide: RolesService,
           useValue: { isAdmin: signal(!!opts.admin), canAccessPooledFundingMonitor: signal(!opts.contributorPi) }
@@ -72,6 +75,8 @@ describe('PooledFundingMonitorComponent', () => {
   }
 
   beforeEach(() => {
+    routerEvents = new Subject<unknown>();
+    sessionStorage.clear();
     api = { GET_PfmSummary: jest.fn(), GET_PfmQueue: jest.fn().mockResolvedValue(ok(queue)) };
   });
 
@@ -308,7 +313,11 @@ describe('PooledFundingMonitorComponent', () => {
   });
 
   it('a failed summary shows an inline error with Retry; the queue tab still works (R-PFM-016)', async () => {
-    api.GET_PfmSummary.mockRejectedValueOnce(new Error('boom')).mockResolvedValue(ok(summary('mine')));
+    // Reject on a later tick, as a real HTTP failure does: an already-rejected mock promise is flagged
+    // "uncaught" by zone.js before the store's await handles it, and the error then lands in a later test.
+    api.GET_PfmSummary.mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new Error('boom'))))).mockResolvedValue(
+      ok(summary('mine'))
+    );
     await create();
     fixture.detectChanges();
     await flush();
@@ -386,5 +395,65 @@ describe('PooledFundingMonitorComponent', () => {
     expect(el.textContent).not.toMatch(/Sync now/i);
     expect(el.textContent).not.toMatch(/PRMS sync:/i);
     expect(el.querySelectorAll('[role="tab"]')).toHaveLength(2);
+  });
+
+  // Owner 2026-10-22: back from a result (breadcrumb or browser Back) = the same place in the queue.
+  describe('return from a result', () => {
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
+
+    it('leaving for a result opened from the monitor saves the view', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      const store = fixture.componentInstance.store;
+      store.openQueue({ chip: 'ready_to_sync' });
+      store.setGroupView('P100', { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 });
+      routerEvents.next(new NavigationStart(1, '/result/STAR-629/general-information?from=pfm-monitor'));
+      const saved = JSON.parse(sessionStorage.getItem('pfm-monitor-return-state') ?? 'null');
+      expect(saved).toEqual(
+        expect.objectContaining({
+          tab: 'queue',
+          chip: 'ready_to_sync',
+          resultCode: 'STAR-629',
+          groupViews: { P100: { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 } }
+        })
+      );
+    });
+
+    it('coming back restores the queue view, the open projects and their table views, once', async () => {
+      savePfmReturnState({
+        scope: 'mine',
+        tab: 'queue',
+        filters: { project: null, sp: 'SP06', type: null },
+        chip: 'ready_to_sync',
+        openGroups: ['P100'],
+        groupViews: { P100: { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 } },
+        resultCode: 'STAR-629'
+      });
+      (api as unknown as { GET_PfmProjectResults: jest.Mock }).GET_PfmProjectResults = jest.fn().mockResolvedValue(ok([]));
+      await create();
+      fixture.detectChanges();
+      await flush();
+      const back = fixture.componentInstance.store;
+      expect(back.tab()).toBe('queue');
+      expect(back.chip()).toBe('ready_to_sync');
+      expect(back.filters().sp).toBe('SP06');
+      expect([...back.openGroups()]).toEqual(['P100']);
+      expect(back.groupViews()['P100']).toEqual({ first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 });
+      expect(back.focusResult()).toBe('STAR-629');
+      expect(api.GET_PfmQueue).toHaveBeenCalledWith(expect.objectContaining({ chip: 'ready_to_sync', sp: 'SP06' }));
+      // read once: nothing is left for the next visit
+      expect(sessionStorage.getItem('pfm-monitor-return-state')).toBeNull();
+    });
+
+    it('a navigation that is not to a result from the monitor saves nothing', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      fixture.componentInstance.store.openQueue({ chip: 'synced' });
+      routerEvents.next(new NavigationStart(1, '/results-center'));
+      routerEvents.next(new NavigationStart(2, '/result/STAR-1/general-information?from=results-center'));
+      expect(sessionStorage.getItem('pfm-monitor-return-state')).toBeNull();
+    });
   });
 });
