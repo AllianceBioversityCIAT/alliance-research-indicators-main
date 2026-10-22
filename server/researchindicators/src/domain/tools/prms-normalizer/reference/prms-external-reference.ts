@@ -80,13 +80,13 @@ export const parsePrmsRef = (
  * The same reference as `prmsRef`, as one SQL CASE.
  *
  * Column expressions MUST be trusted literals — they are interpolated.
- * STAR is the bare code; every other `platform_code` is
- * `CONCAT(platform, '-', code)`.
+ * A NULL platform is STAR (`COALESCE`), matching the builder. STAR is the
+ * bare code; every other `platform_code` is `CONCAT(platform, '-', code)`.
  */
 export const prmsExternalReferenceSql = (
   platformColumn = 'platform_code',
   codeColumn = 'result_official_code',
 ): string => `CASE
-  WHEN ${platformColumn} = 'STAR' THEN CAST(${codeColumn} AS CHAR)
-  ELSE CONCAT(${platformColumn}, '-', ${codeColumn})
+  WHEN COALESCE(${platformColumn}, 'STAR') = 'STAR' THEN CAST(${codeColumn} AS CHAR)
+  ELSE CONCAT(COALESCE(${platformColumn}, 'STAR'), '-', ${codeColumn})
 END`;

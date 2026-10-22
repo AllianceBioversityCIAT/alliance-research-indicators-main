@@ -37,11 +37,12 @@ const REJECTED_REFERENCES: Array<string | null> = [
  */
 const evaluateReferenceSql = (
   sql: string,
-  platform: string,
+  platform: string | null,
   code: number,
 ): string => {
+  const platformLiteral = platform == null ? 'NULL' : `'${platform}'`;
   const rendered = sql
-    .replace(/\bplatform_code\b/g, `'${platform}'`)
+    .replace(/\bplatform_code\b/g, platformLiteral)
     .replace(/\bresult_official_code\b/g, String(code))
     .trim();
   const match = rendered.match(
@@ -56,8 +57,36 @@ const evaluateReferenceSql = (
   return evalScalar(taken);
 };
 
+/**
+ * Folds `COALESCE(a, b)` the way MySQL does: the first argument that is
+ * not the NULL token. The NULL-platform case is red without this fold
+ * only when the fragment itself contains COALESCE — dropping it leaves
+ * `CONCAT(NULL, '-', code)`, which is not `prmsRef(STAR, code)`.
+ */
+const foldCoalesce = (expr: string): string => {
+  let current = expr;
+  for (let guard = 0; guard < 8; guard += 1) {
+    const next = current.replace(
+      /COALESCE\(([^()]*)\)/gi,
+      (_match, args: string) => {
+        const parts = splitSqlArgs(args);
+        const chosen = parts.find(
+          (part) => unquote(part).toUpperCase() !== 'NULL',
+        );
+        return chosen ?? 'NULL';
+      },
+    );
+    if (next === current) {
+      return current;
+    }
+    current = next;
+  }
+  return current;
+};
+
 const evalEquality = (expr: string): boolean => {
-  const parts = expr.split('=').map((part) => part.trim());
+  const folded = foldCoalesce(expr);
+  const parts = folded.split('=').map((part) => part.trim());
   if (parts.length !== 2) {
     throw new Error(`WHEN is not an equality: ${expr}`);
   }
@@ -65,17 +94,18 @@ const evalEquality = (expr: string): boolean => {
 };
 
 const evalScalar = (expr: string): string => {
-  const cast = expr.match(/^CAST\((.+) AS CHAR\)$/i);
+  const folded = foldCoalesce(expr);
+  const cast = folded.match(/^CAST\((.+) AS CHAR\)$/i);
   if (cast) {
     return unquote(cast[1].trim());
   }
-  const concat = expr.match(/^CONCAT\((.+)\)$/i);
+  const concat = folded.match(/^CONCAT\((.+)\)$/i);
   if (concat) {
     return splitSqlArgs(concat[1])
       .map((arg) => unquote(arg))
       .join('');
   }
-  return unquote(expr);
+  return unquote(folded);
 };
 
 const splitSqlArgs = (args: string): string[] => {
@@ -163,6 +193,12 @@ describe('prms external reference', () => {
         }
       },
     );
+
+    it('reads a NULL platform as STAR, equal to prmsRef(STAR, code)', () => {
+      expect(evaluateReferenceSql(sql, null, 123)).toBe(
+        prmsRef(ReportingPlatformEnum.STAR, 123),
+      );
+    });
 
     it('accepts caller column aliases', () => {
       const aliased = prmsExternalReferenceSql(

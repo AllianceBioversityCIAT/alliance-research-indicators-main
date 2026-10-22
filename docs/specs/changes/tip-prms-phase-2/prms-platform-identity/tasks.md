@@ -92,7 +92,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-03 — Sync log repository and status reader
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02
+- [x] **Status:** done (2026-10-22, PASS attempt 2 — see `execution.md`) · **Size:** M · **Dependencies:** T-01, T-02
 - **Requirements covered:** R-PPI-001 (*New push row* — log half); R-PPI-002 (*Same code and year on two platforms* — sync status + attempt number THEN/AND, BUT STAR unchanged); R-PPI-005 (*TIP push settles* — THEN TIP live row, AND STAR untouched); NFR-PPI-001 (log half).
 - **Design refs:** §7.2, §7.5 (status reader), D-1, D-5, P-6, P-7, P-8, P-10, P-20.
 - **Scope (files):**
@@ -107,9 +107,9 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** `result-prms-sync-log.repository.spec.ts` (43 SQL-text assertions today), `result-prms-sync-status.reader.spec.ts` (12), `result-prms-sync.service.spec.ts`; realign from the failing run, not a grep (K-018).
 - **Review:** `full` — changes the push's key and a write to `results` (override b).
 - **Done criteria:**
-  - [ ] Suites green; falsifiers observed red and reverted.
-  - [ ] STAR claim/settle values byte-identical to HEAD for an existing fixture.
-  - [ ] eslint, tsc, build green.
+  - [x] Suites green; falsifiers observed red and reverted.
+  - [x] STAR claim/settle values byte-identical to HEAD for an existing fixture.
+  - [x] eslint, tsc, build green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
