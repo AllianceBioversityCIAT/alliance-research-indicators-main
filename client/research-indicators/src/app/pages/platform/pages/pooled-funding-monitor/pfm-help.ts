@@ -8,7 +8,7 @@ export const PFM_HELP = {
   mappingIncomplete: 'The CGIAR Portfolio mapping is still Pending: not started yet or partly filled in.',
   readyToSync: 'Mapping complete and not in PRMS yet: these can be sent now.',
   rejected: 'Sent to PRMS and returned by its reviewers. Check the reason, fix the result and sync it again.',
-  synced: 'Already in PRMS: waiting for review or approved. Nothing to do on our side.',
+  synced: 'Already in PRMS, whatever its review status: pending review, approved or rejected. Done on our side.',
 
   // Terms
   outOfScope:

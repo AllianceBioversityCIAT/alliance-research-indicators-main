@@ -150,12 +150,13 @@ export class PfmProjectGroupComponent implements OnInit {
   }
 
   /**
-   * Same rule as the coverage tab's Reported to PRMS bar: done = in PRMS (pending review or approved)
-   * or no SP contribution, in ONE green; the rest (Need attention, rejected included) is the grey track.
+   * Same rule as the coverage tab's Reported to PRMS bar: done = in PRMS, whatever its review status
+   * (pending review, approved or rejected: owner 2026-10-22), or no SP contribution, in ONE green;
+   * the rest (Need attention: nothing in PRMS yet) is the grey track.
    */
   progress = computed(() => {
     const g = this.group();
-    const done = g.counts.approved + g.counts.pending + g.counts.out_of_scope;
+    const done = g.counts.approved + g.counts.pending + g.counts.rejected + g.counts.out_of_scope;
     const total = g.result_count;
     return { done, width: total ? `${(done / total) * 100}%` : '0%' };
   });

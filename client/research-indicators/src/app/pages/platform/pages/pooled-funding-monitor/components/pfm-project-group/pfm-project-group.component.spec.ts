@@ -118,6 +118,14 @@ describe('PfmProjectGroupComponent', () => {
   });
 
   // Same rule and colour as the coverage tab's Reported to PRMS bar.
+  // Owner 2026-10-22: anything in PRMS is done, rejected included.
+  it('rejected results count as done (in PRMS); only nothing-in-PRMS-yet is left', () => {
+    const { el, fixture } = setup({ ...GROUP, result_count: 7, counts: { approved: 1, pending: 1, rejected: 2, out_of_scope: 1, not_sent: 2 } });
+    const bar = el.querySelector('[data-testid="pfm-group-bar"]') as HTMLElement;
+    expect((bar.children[0] as HTMLElement).style.width).toBe(`${(5 / 7) * 100}%`);
+    expect(fixture.componentInstance.countLabel()).toBe('5 of 7 results');
+  });
+
   it('bar is ONE green part = in PRMS (approved + pending review) + no SP contribution, over the grey rest', () => {
     const { el, fixture } = setup();
     const bar = el.querySelector('[data-testid="pfm-group-bar"]') as HTMLElement;
@@ -135,8 +143,8 @@ describe('PfmProjectGroupComponent', () => {
     expect(summary.textContent).toBe('6 of 7 done: in PRMS or with no SP contribution');
   });
 
-  it('nothing done: no green part, only the grey track', () => {
-    const { el } = setup({ ...GROUP, counts: { approved: 0, pending: 0, rejected: 2, out_of_scope: 0, not_sent: 5 } });
+  it('nothing done (nothing in PRMS, nothing out of scope): no green part, only the grey track', () => {
+    const { el } = setup({ ...GROUP, counts: { approved: 0, pending: 0, rejected: 0, out_of_scope: 0, not_sent: 7 } });
     expect(el.querySelector('[data-testid="pfm-group-done"]')).toBeNull();
   });
 
