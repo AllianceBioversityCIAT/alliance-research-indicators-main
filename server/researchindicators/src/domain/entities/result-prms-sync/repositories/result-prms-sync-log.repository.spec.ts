@@ -195,7 +195,7 @@ describe('ResultPrmsSyncLogRepository', () => {
 
   // --- identity columns + external_reference from claim time (2026-09-21) ----
 
-  it('claims on (external_reference, result_year), never on result_id', async () => {
+  it('claims on (platform_code, external_reference, result_year), never on result_id', async () => {
     transactionQuery
       .mockResolvedValueOnce([
         {
@@ -212,15 +212,17 @@ describe('ResultPrmsSyncLogRepository', () => {
     await claim();
 
     const inFlightSql = String(transactionQuery.mock.calls[1][0]);
+    expect(inFlightSql).toMatch(/platform_code = \?/);
     expect(inFlightSql).toMatch(/external_reference = \?/);
     expect(inFlightSql).toMatch(/result_year = \?/);
     // The surrogate key is gone from the log entirely; keying on it would leave a
     // live row and its snapshots as separate identities, and PRMS resolves both
     // to ONE result via external_reference.
     expect(inFlightSql).not.toMatch(/WHERE result_id/);
-    // A STRING: external_reference is varchar, and it already carries the result
-    // official code, so no separate numeric code column is stored.
+    // HEAD bound ['19999', 2026, IN_FLIGHT]. This fixture has no platform, so it
+    // is STAR: the reference string stays '19999' and the platform is prepended.
     expect(transactionQuery.mock.calls[1][1]).toEqual([
+      'STAR',
       '19999',
       2026,
       PrmsSyncOutcome.IN_FLIGHT,
@@ -256,7 +258,10 @@ describe('ResultPrmsSyncLogRepository', () => {
     // rejects the type ("Incorrect integer value: 'IN_FLIGHT' for column
     // 'created_by'"), which points nowhere near the real mistake. This exact
     // bug shipped on 2026-09-22 under a `toContain` assertion.
+    // HEAD bound ['19999', 2026, 1, 'TEST', IN_FLIGHT, 7]. The reference is
+    // still the bare code; platform_code is the new leading column.
     expect(insertParams).toEqual([
+      'STAR',
       '19999',
       2026,
       1,
@@ -338,9 +343,12 @@ describe('ResultPrmsSyncLogRepository', () => {
     expect(liveSql).toMatch(/SET live\.prms_result_code = \?/);
     expect(liveSql).toMatch(/live\.is_snapshot = FALSE/);
     expect(liveSql).toMatch(/live\.is_active = TRUE/);
-    // Official codes are shared across platforms (TIP, PRMS, AICCRA rows exist
-    // with the same code in Dev), so without this filter a TIP row is written.
-    expect(liveSql).toMatch(/live\.platform_code = 'STAR'/);
+    // NULL on the pushed side is STAR, so a STAR push still copies. The live
+    // side stays strict: HEAD never wrote a NULL live row.
+    expect(liveSql).toMatch(
+      /live\.platform_code\s*=\s*COALESCE\(pushed\.platform_code,\s*'STAR'\)/,
+    );
+    expect(liveSql).not.toMatch(/report_year_id/);
     expect(liveSql).toMatch(/live\.prms_result_code IS NULL/);
     expect(liveSql).toMatch(
       /pushed\.result_official_code = live\.result_official_code/,
@@ -703,6 +711,164 @@ describe('ResultPrmsSyncLogRepository', () => {
       const lockSql = transactionQuery.mock.calls[0][0] as string;
       expect(lockSql).toContain('FOR UPDATE');
       expect(lockSql).not.toMatch(/is_snapshot/i);
+    });
+  });
+
+  const claimRow = (platform: string | null, code: number) => ({
+    result_id: 42,
+    result_official_code: code,
+    report_year_id: 2026,
+    is_synced_to_prms: 0,
+    platform_code: platform,
+  });
+
+  const primeClaim = (platform: string | null, code: number) => {
+    transactionQuery
+      .mockResolvedValueOnce([claimRow(platform, code)])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ max_attempt: 0 }])
+      .mockResolvedValueOnce({ insertId: 7 });
+  };
+
+  describe('platform identity on the sync log (R-PPI-001 / R-PPI-002)', () => {
+    it('a TIP claim writes platform_code TIP and external_reference TIP-123', async () => {
+      primeClaim('TIP', 123);
+
+      await claim();
+
+      const selectSql = String(transactionQuery.mock.calls[0][0]);
+      expect(selectSql).toMatch(/platform_code/);
+
+      const inFlightSql = String(transactionQuery.mock.calls[1][0]);
+      expect(inFlightSql).toMatch(/platform_code = \?/);
+      expect(inFlightSql).toMatch(/external_reference = \?/);
+      expect(inFlightSql).toMatch(/result_year = \?/);
+      expect(transactionQuery.mock.calls[1][1]).toEqual([
+        'TIP',
+        'TIP-123',
+        2026,
+        PrmsSyncOutcome.IN_FLIGHT,
+      ]);
+
+      const maxSql = String(transactionQuery.mock.calls[2][0]);
+      expect(maxSql).toMatch(/platform_code = \?/);
+      expect(maxSql).toMatch(/external_reference = \?/);
+      expect(maxSql).toMatch(/result_year = \?/);
+      expect(transactionQuery.mock.calls[2][1]).toEqual([
+        'TIP',
+        'TIP-123',
+        2026,
+      ]);
+
+      const insertSql = String(transactionQuery.mock.calls[3][0]);
+      const insertParams = transactionQuery.mock.calls[3][1] as unknown[];
+      expect(insertSql).toMatch(/platform_code/);
+      expect(insertParams).toEqual([
+        'TIP',
+        'TIP-123',
+        2026,
+        1,
+        'TEST',
+        PrmsSyncOutcome.IN_FLIGHT,
+        7,
+      ]);
+      expect((insertSql.match(/\?/g) ?? []).length).toBe(insertParams.length);
+    });
+
+    it('a STAR claim writes platform_code STAR and the bare code 123', async () => {
+      primeClaim('STAR', 123);
+
+      await claim();
+
+      expect(transactionQuery.mock.calls[3][1]).toEqual([
+        'STAR',
+        '123',
+        2026,
+        1,
+        'TEST',
+        PrmsSyncOutcome.IN_FLIGHT,
+        7,
+      ]);
+    });
+
+    it('a NULL platform_code is claimed as STAR with the bare code', async () => {
+      primeClaim(null, 123);
+
+      await claim();
+
+      expect(transactionQuery.mock.calls[1][1]).toEqual([
+        'STAR',
+        '123',
+        2026,
+        PrmsSyncOutcome.IN_FLIGHT,
+      ]);
+      expect(transactionQuery.mock.calls[3][1]).toEqual([
+        'STAR',
+        '123',
+        2026,
+        1,
+        'TEST',
+        PrmsSyncOutcome.IN_FLIGHT,
+        7,
+      ]);
+    });
+
+    it('insertRefusedByStar keys MAX+1 on platform and writes prmsRef', async () => {
+      transactionQuery
+        .mockResolvedValueOnce([
+          {
+            result_id: 42,
+            result_official_code: 123,
+            report_year_id: 2026,
+            platform_code: 'TIP',
+          },
+        ])
+        .mockResolvedValueOnce([{ max_attempt: 4 }])
+        .mockResolvedValueOnce({ insertId: 11 });
+
+      const inserted = await repository.insertRefusedByStar({
+        resultId: 42,
+        environment: 'TEST',
+        userId: 7,
+        failureReason: 'Pool Funding Alignment is not green-checked',
+      });
+
+      expect(inserted).toEqual({ attemptId: 11, attemptNumber: 5 });
+      const selectSql = String(transactionQuery.mock.calls[0][0]);
+      expect(selectSql).toMatch(/platform_code/);
+      const maxSql = String(transactionQuery.mock.calls[1][0]);
+      expect(maxSql).toMatch(/platform_code = \?/);
+      expect(transactionQuery.mock.calls[1][1]).toEqual([
+        'TIP',
+        'TIP-123',
+        2026,
+      ]);
+      const insertParams = transactionQuery.mock.calls[2][1] as unknown[];
+      expect(insertParams[0]).toBe('TIP');
+      expect(insertParams[1]).toBe('TIP-123');
+      expect(
+        (String(transactionQuery.mock.calls[2][0]).match(/\?/g) ?? []).length,
+      ).toBe(insertParams.length);
+    });
+  });
+
+  describe('live-row PRMS code copy (R-PPI-005)', () => {
+    it('joins the live row on the pushed platform and has no year predicate', async () => {
+      transactionQuery
+        .mockResolvedValueOnce({ affectedRows: 1 })
+        .mockResolvedValueOnce({ affectedRows: 1 });
+      query.mockResolvedValue({ affectedRows: 1 });
+
+      await acceptedSettle();
+
+      const liveSql = String(query.mock.calls[1][0]);
+      expect(liveSql).toMatch(
+        /live\.platform_code\s*=\s*COALESCE\(pushed\.platform_code,\s*'STAR'\)/,
+      );
+      expect(liveSql).not.toMatch(
+        /live\.platform_code\s*=\s*pushed\.platform_code/,
+      );
+      expect(liveSql).not.toMatch(/report_year_id/);
     });
   });
 });

@@ -55,15 +55,16 @@ describe('platform-code.util', () => {
   });
 
   describe('POOL_FUNDING_PLATFORMS', () => {
-    it('contains only STAR today', () => {
-      expect(POOL_FUNDING_PLATFORMS).toEqual([PLATFORM_CODES.STAR]);
+    it('contains STAR and TIP', () => {
+      expect(POOL_FUNDING_PLATFORMS).toEqual([PLATFORM_CODES.STAR, PLATFORM_CODES.TIP]);
     });
   });
 
   describe('isPoolFundingCapable', () => {
-    // D-2 — enumerated over PLATFORM_CODES, never a literal list of codes, so a new
-    // platform added to the constant is refused by default rather than silently passing.
-    it.each(Object.values(PLATFORM_CODES).filter(code => code !== PLATFORM_CODES.STAR))(
+    // D-2 — enumerated over PLATFORM_CODES minus the capable set, never a literal
+    // list of codes, so a new platform added to the constant is refused by default
+    // rather than silently passing.
+    it.each(Object.values(PLATFORM_CODES).filter(code => !POOL_FUNDING_PLATFORMS.includes(code)))(
       '%s is not pool-funding capable',
       platformCode => {
         expect(isPoolFundingCapable(`${platformCode}-31288`)).toBe(false);
@@ -76,6 +77,14 @@ describe('platform-code.util', () => {
 
     it('a STAR-prefixed code is pool-funding capable', () => {
       expect(isPoolFundingCapable('STAR-31288')).toBe(true);
+    });
+
+    it('TIP-123 is pool-funding capable', () => {
+      expect(isPoolFundingCapable('TIP-123')).toBe(true);
+    });
+
+    it('AICCRA-1 is not pool-funding capable', () => {
+      expect(isPoolFundingCapable('AICCRA-1')).toBe(false);
     });
   });
 });

@@ -17,6 +17,7 @@ import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normaliz
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { PrmsWebhookDeliveryRepository } from '../prms-webhook/repositories/prms-webhook-delivery.repository';
 import { evaluateSyncGate } from './eligibility/sync-gate';
 import { ResultPrmsSyncAggregateRepository } from './repositories/result-prms-sync-aggregate.repository';
@@ -26,6 +27,17 @@ import {
   PRMS_SYNC_CLAIM_COLLISION,
   prmsSyncExpiryMessage,
 } from './result-prms-sync.constants';
+
+/** NULL `results.platform_code` is STAR, matching the payload builder. */
+const platformCodeOf = (row: {
+  platform_code?: unknown;
+}): ReportingPlatformEnum => {
+  const raw = row.platform_code;
+  if (typeof raw !== 'string') {
+    return ReportingPlatformEnum.STAR;
+  }
+  return raw as ReportingPlatformEnum;
+};
 
 export interface PrmsSyncResponseData {
   outcome: PrmsSyncOutcome;
@@ -188,6 +200,7 @@ export class ResultPrmsSyncService {
 
     let payload: PrmsNormalizerRequestDto;
     let storedPrmsResultCode: number | null = null;
+    let platformCode = ReportingPlatformEnum.STAR;
     try {
       const aggregate = await this.aggregateRepository.loadByResultId(resultId);
       if (!aggregate) {
@@ -204,6 +217,7 @@ export class ResultPrmsSyncService {
         throw new NotFoundException('Result not found');
       }
       storedPrmsResultCode = aggregate.prms_result_code ?? null;
+      platformCode = platformCodeOf(aggregate);
       payload = this.payloadBuilder.build(aggregate);
     } catch (error) {
       if (error instanceof PrmsPayloadBuildError) {
@@ -260,7 +274,7 @@ export class ResultPrmsSyncService {
         resultId,
         userId,
         environment,
-        externalReference,
+        platformCode,
         prmsResultCode: interpreted.prmsResultCode,
         resultOfficialCode: claim.resultOfficialCode,
         resultYear: claim.resultYear,
@@ -293,7 +307,7 @@ export class ResultPrmsSyncService {
     resultId: number;
     userId: number | null;
     environment: string;
-    externalReference: string | null;
+    platformCode: string;
     prmsResultCode: number | null;
     resultOfficialCode: number | null;
     resultYear: number;
@@ -303,7 +317,11 @@ export class ResultPrmsSyncService {
         userId: input.userId,
         occurredAt: new Date(),
         environment: input.environment,
-        resultOfficialCode: input.externalReference,
+        platformCode: input.platformCode,
+        resultOfficialCode:
+          input.resultOfficialCode === null
+            ? null
+            : String(input.resultOfficialCode),
         resultYear: input.resultYear,
         prmsResultCode: input.prmsResultCode,
       });

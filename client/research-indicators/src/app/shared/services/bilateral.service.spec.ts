@@ -16,6 +16,13 @@ import {
 } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import { SAVED_TOC_ALIGNMENTS_FIXTURE, TOC_CATALOG_CAPSHARING_FIXTURE, TOC_CATALOG_TWO_SP_FIXTURE } from '../../testing/toc-catalog.fixture';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
+import { POOL_FUNDING_PLATFORMS } from '@shared/utils/platform-code.util';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ToPromiseService } from './to-promise.service';
+import { ControlListCacheService } from './control-list-cache.service';
+import { SignalEndpointService } from './signal-endpoint.service';
+import { environment } from '../../../environments/environment';
 
 describe('BilateralService', () => {
   let service: BilateralService;
@@ -290,19 +297,21 @@ describe('BilateralService', () => {
       expect(service.loadingAlignment()).toBe(false);
     });
 
-    // R-PFG-001 AC.1 — Bug Mode repro. Opening a non-alignment-capable result must
-    // issue ZERO calls to the alignment endpoint. Red on HEAD (today the request is
-    // always issued and the server 404s).
-    it('a TIP-prefixed result issues zero alignment requests', async () => {
+    // R-PPI-006 — TIP is capable. The numeric URL is proved by the
+    // HttpTestingController describe below (a call-count here cannot see the path).
+    it('a TIP-prefixed result issues one alignment request', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(baseAlignment));
+
       const result = await service.getAlignment('TIP-31288');
 
-      expect(mockApi.GET_PoolFundingAlignment).not.toHaveBeenCalled();
-      expect(result).toBeNull();
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledTimes(1);
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledWith('TIP-31288');
+      expect(result).toEqual(baseAlignment);
     });
 
-    // R-PFG-001 AC.3 / R-PFG-002 AC.2 — enumerated over PLATFORM_CODES, never a
-    // literal list (D-2: the AICCRA precedent at result.interceptor.ts:50-53).
-    it.each(Object.values(PLATFORM_CODES).filter(code => code !== PLATFORM_CODES.STAR))(
+    // R-PFG-001 AC.3 / R-PFG-002 AC.2 — enumerated over PLATFORM_CODES minus the
+    // capable set, never a literal list (D-2). AICCRA and PRMS stay at zero requests.
+    it.each(Object.values(PLATFORM_CODES).filter(code => !POOL_FUNDING_PLATFORMS.includes(code)))(
       '%s is not capable — zero alignment requests',
       async platformCode => {
         const result = await service.getAlignment(`${platformCode}-31288`);
@@ -323,21 +332,16 @@ describe('BilateralService', () => {
       expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledWith('31288');
     });
 
-    // AC.0 — the D-6 stale-state-leak guard. Green BOTH before and after on HEAD:
-    // pre-fix, the ineligible call still reaches the network and the (simulated)
-    // 404 is what nulls the state today; post-fix, the guard clears it without a
-    // request. NOT red-before evidence — it is the proof that DD-3's clearing
-    // survives either mechanism (falsified separately, see execution.md).
+    // AC.0 — the D-6 stale-state-leak guard. An incapable code (AICCRA; TIP is
+    // capable under R-PPI-006) clears state without a second request.
     it('AC.0 — after an eligible fetch populates state, an ineligible code clears it', async () => {
       mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok<AlignmentResponse>(baseAlignment));
       await service.getAlignment('STAR-31288');
       expect(service.currentAlignment()).toEqual(baseAlignment);
 
-      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(
-        err<AlignmentResponse>(404, 'not found', undefined as unknown as AlignmentResponse)
-      );
-      const result = await service.getAlignment('TIP-99999');
+      const result = await service.getAlignment('AICCRA-99999');
 
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledTimes(1);
       expect(service.currentAlignment()).toBeNull();
       expect(result).toBeNull();
     });
@@ -1337,5 +1341,84 @@ describe('BilateralService', () => {
       expect(await second).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
       expect(service.loadingTocCatalog()).toBe(false);
     });
+  });
+});
+
+// R-PPI-006 / D-7 — real ApiService + HttpTestingController. A mocked
+// GET_PoolFundingAlignment cannot see the path bilateralPath builds, and setting
+// currentAlignment directly cannot prove the fetch (KZ-001, KZ-015).
+describe('BilateralService getAlignment for TIP (HttpTestingController)', () => {
+  let service: BilateralService;
+  let httpMock: HttpTestingController;
+  let cache: CacheService;
+
+  const writableAlignment: AlignmentResponse = {
+    result_code: '123',
+    eligible: true,
+    has_pool_funding_alignment_eligible: true,
+    has_contribution: false,
+    selected_levers: [],
+    is_synced_to_prms: false,
+    is_read_only: false,
+    display_only: true,
+    version_locked: false
+  };
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        BilateralService,
+        ApiService,
+        ToPromiseService,
+        CacheService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: RolesService, useValue: { canAccessCenterAdmin: signal(true) } },
+        { provide: CurrentResultService, useValue: { isCurrentUserOwner: signal(true) } },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+          }
+        }
+      ]
+    });
+    service = TestBed.inject(BilateralService);
+    httpMock = TestBed.inject(HttpTestingController);
+    cache = TestBed.inject(CacheService);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('getAlignment(TIP-123) issues one request to the numeric path and stays not editable after the response', async () => {
+    expect(service.currentAlignment()).toBeNull();
+    expect(service.editable()).toBe(false);
+
+    cache.setCurrentResultId('TIP-123');
+    expect(service.editable()).toBe(false);
+
+    const pending = service.getAlignment('TIP-123');
+    expect(service.currentAlignment()).toBeNull();
+
+    const req = httpMock.expectOne(incoming => incoming.method === 'GET' && incoming.url.includes('pool-funding-alignment'));
+    expect(req.request.url).toBe(`${environment.mainApiUrl}v1/results/123/pool-funding-alignment`);
+
+    req.flush({ data: writableAlignment, status: 200, description: 'OK' });
+    const result = await pending;
+
+    expect(result).toEqual(writableAlignment);
+    expect(service.currentAlignment()).toEqual(writableAlignment);
+    expect(service.editable()).toBe(false);
+  });
+
+  it('getAlignment(AICCRA-1) issues no alignment request', async () => {
+    const result = await service.getAlignment('AICCRA-1');
+
+    expect(result).toBeNull();
+    httpMock.expectNone(incoming => incoming.url.includes('pool-funding-alignment'));
   });
 });

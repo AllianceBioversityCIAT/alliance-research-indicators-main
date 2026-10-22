@@ -5,7 +5,7 @@ import { LoggerUtil } from '../../shared/utils/logger.util';
 /**
  * Pool-funding diff persisted on a correlated PRMS decision.
  *
- * BEFORE is the active snapshot for (result_official_code, result_year):
+ * BEFORE is the active snapshot for (platform, result_official_code, result_year):
  * its result_pool_funding_toc_alignment rows and the alignment_sp rows
  * joined through result_pool_funding_alignment. AFTER is
  * result_prms_sync_history.raw_body.
@@ -46,19 +46,21 @@ export const QUANTITATIVE_CONTRIBUTION = 'Quantitative contribution';
 export const NOT_PROVIDED_BY_PRMS = 'Not provided by PRMS';
 
 const HISTORY_ROW_SQL = `
-SELECT result_official_code, result_year, raw_body
+SELECT platform_code, result_official_code, result_year, raw_body
 FROM result_prms_sync_history
 WHERE id = ?
 `;
 
 /**
- * One active snapshot for the decision's (official code, reporting year).
- * The live row (is_snapshot false) is never the baseline.
+ * One active snapshot for the decision's (platform, official code,
+ * reporting year). A NULL `results.platform_code` is STAR. The live row
+ * (is_snapshot false) is never the baseline.
  */
 export const ACTIVE_SNAPSHOT_SQL = `
 SELECT result_id
 FROM results
-WHERE result_official_code = ?
+WHERE COALESCE(platform_code, 'STAR') = ?
+  AND result_official_code = ?
   AND report_year_id = ?
   AND is_snapshot = TRUE
   AND is_active = TRUE
@@ -112,6 +114,7 @@ export type SnapshotLookup =
   | { ok: false; reason: string };
 
 interface HistorySnapshot {
+  platform_code: unknown;
   result_official_code: unknown;
   result_year: unknown;
   raw_body: unknown;
@@ -423,8 +426,13 @@ export const resolveActiveSnapshot = async (
   ) => Promise<Array<{ result_id: unknown }>>,
   officialCode: string,
   reportYearId: number,
+  platformCode: string | null,
 ): Promise<SnapshotLookup> => {
-  const rows = await run(ACTIVE_SNAPSHOT_SQL, [officialCode, reportYearId]);
+  const rows = await run(ACTIVE_SNAPSHOT_SQL, [
+    platformCode,
+    officialCode,
+    reportYearId,
+  ]);
   if (rows.length !== 1) {
     return {
       ok: false,
@@ -839,6 +847,7 @@ export class PoolFundingMappingDiffService {
       (sql, params) => this.dataSource.query(sql, params),
       officialCode,
       reportYearId,
+      scalar(row.platform_code),
     );
     if (snapshot.ok === false) {
       this.logger._warn(

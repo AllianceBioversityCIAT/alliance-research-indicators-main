@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import {
   PrmsSyncAggregate,
   PrmsStaffSnapshot,
 } from '../dto/prms-sync-aggregate';
 import { homologateCenter } from '../homologation/center.homologation';
+import { prmsRef } from '../reference/prms-external-reference';
 
 /**
  * Build failure for a missing or invalid common-field mapping.
@@ -426,14 +428,17 @@ export class CommonFieldsBuilder {
       'submitted_by',
     );
 
+    const officialCode = requirePresent(
+      aggregate.result_official_code == null
+        ? null
+        : String(aggregate.result_official_code),
+      'external_reference',
+    );
+
     const data: Record<string, unknown> = {
-      external_reference: String(
-        requirePresent(
-          aggregate.result_official_code == null
-            ? null
-            : String(aggregate.result_official_code),
-          'external_reference',
-        ),
+      external_reference: prmsRef(
+        aggregate.platform_code ?? ReportingPlatformEnum.STAR,
+        officialCode,
       ),
       // Re-push only. A first push has no stored code, and the key must be
       // absent — null or "" would tell PRMS the code is blank.

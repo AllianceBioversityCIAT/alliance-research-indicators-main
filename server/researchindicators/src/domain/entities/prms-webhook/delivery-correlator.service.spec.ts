@@ -385,15 +385,19 @@ describe('DeliveryCorrelatorService', () => {
 
       expect(table.selects).toHaveLength(1);
       const sql = table.selects[0].sql.replace(/\s+/g, ' ').trim();
-      expect(sql).toContain("platform_code = 'STAR'");
+      expect(sql).toContain('platform_code = ?');
+      expect(sql).not.toContain("platform_code = 'STAR'");
       expect(sql).toContain('result_official_code = ?');
       expect(sql).toContain('is_active = TRUE');
       expect(sql).toContain('is_snapshot = FALSE');
       expect(sql).toMatch(
-        /WHERE platform_code = 'STAR' AND result_official_code = \? AND is_active = TRUE AND is_snapshot = FALSE/,
+        /WHERE platform_code = \? AND result_official_code = \? AND is_active = TRUE AND is_snapshot = FALSE/,
       );
       expect(sql).not.toMatch(/\bOR\b/);
-      expect(table.selects[0].params).toEqual([OFFICIAL]);
+      expect(table.selects[0].params).toEqual([
+        ReportingPlatformEnum.STAR,
+        OFFICIAL,
+      ]);
     });
   });
 
@@ -451,18 +455,19 @@ describe('DeliveryCorrelatorService', () => {
       },
     );
 
-    it('the literal "0" is a real code and correlates to that row — it is not the empty-string coercion', async () => {
+    it('the literal "0" is not a canonical code and is UNKNOWN_REFERENCE — parsePrmsRef rejects non-positive codes, so it never queries the code-0 row', async () => {
       const result = await service.correlate(
         delivery({ result_official_code: '0' }),
       );
 
       expect(result).toMatchObject({
         applied: true,
-        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
-        resultYear: 2020,
-        officialCode: 0,
+        correlationOutcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+        resultYear: null,
+        officialCode: null,
       });
-      expect(table.selects[0]?.params).toEqual([0]);
+      expect(table.selects).toEqual([]);
+      expect(result.applied ? result.resultYear : null).not.toBe(CODE_ZERO_ID);
     });
   });
 
@@ -518,7 +523,10 @@ describe('DeliveryCorrelatorService', () => {
         processingState: DeliveryProcessingState.PROCESSED,
       });
       expect(table.selects).toHaveLength(1);
-      expect(table.selects[0].params).toEqual([9999999]);
+      expect(table.selects[0].params).toEqual([
+        ReportingPlatformEnum.STAR,
+        9999999,
+      ]);
       expect(table.updates[0]?.set.result_year).toBeNull();
       expectNoResultsWrite();
     });
@@ -547,6 +555,7 @@ describe('DeliveryCorrelatorService', () => {
       expect(warn).toHaveBeenCalledTimes(1);
       const message = String(warn.mock.calls[0][0]);
       expect(message).toMatch(/Ambiguous/);
+      expect(message).toContain(`platform=${ReportingPlatformEnum.STAR}`);
       expect(message).toContain(`result_official_code=${OFFICIAL}`);
       expect(message).toContain('2 live rows');
       expect(table.updates[0]?.set.result_year).toBe(LIVE_YEAR);
@@ -721,6 +730,131 @@ describe('DeliveryCorrelatorService', () => {
         .join('\n');
       expect(messages).toContain('delivery_id=none');
       expect(messages).toContain(`id=${DELIVERY_ROW_ID}`);
+    });
+  });
+
+  describe('R-PPI-004 — the decision matches the platform the reference names', () => {
+    // Both platforms have a live row for code 123. A fixture with only one
+    // of them cannot prove routing (the other platform was never a candidate).
+    // Distinct years: the stored year is the only proof of which row won.
+    // STAR has the lower result_id, so ORDER BY result_id ASC picks STAR
+    // whenever the platform predicate is dropped or stuck on STAR.
+    const STAR_LIVE_ID = 60;
+    const TIP_LIVE_ID = 70;
+    const STAR_YEAR = 2024;
+    const TIP_YEAR = 2026;
+
+    beforeEach(() => {
+      table.rows = [
+        resultRow({
+          result_id: STAR_LIVE_ID,
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.STAR,
+          report_year_id: STAR_YEAR,
+        }),
+        resultRow({
+          result_id: TIP_LIVE_ID,
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: TIP_YEAR,
+        }),
+      ];
+    });
+
+    it('TIP-123 correlates to the TIP live row', async () => {
+      const result = await service.correlate(
+        delivery({ result_official_code: 'TIP-123' }),
+      );
+
+      expect(result).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
+        resultYear: TIP_YEAR,
+        officialCode: 123,
+        processingState: DeliveryProcessingState.PROCESSED,
+      });
+      expect(winner(TIP_YEAR)).toMatchObject({
+        result_id: TIP_LIVE_ID,
+        platform_code: ReportingPlatformEnum.TIP,
+        result_official_code: 123,
+      });
+      expect(table.selects).toHaveLength(1);
+      expect(table.selects[0].params).toEqual([ReportingPlatformEnum.TIP, 123]);
+      expect(table.updates[0]?.set.result_year).toBe(TIP_YEAR);
+      expect(table.updates[0]?.sql).not.toMatch(/result_official_code\s*=/);
+      expectNoResultsWrite();
+    });
+
+    it('bare 123 correlates to the STAR live row and not the TIP row', async () => {
+      const result = await service.correlate(
+        delivery({ result_official_code: '123' }),
+      );
+
+      expect(result).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.CORRELATED,
+        resultYear: STAR_YEAR,
+        officialCode: 123,
+      });
+      expect(winner(STAR_YEAR)).toMatchObject({
+        result_id: STAR_LIVE_ID,
+        platform_code: ReportingPlatformEnum.STAR,
+      });
+      expect(table.selects[0].params).toEqual([
+        ReportingPlatformEnum.STAR,
+        123,
+      ]);
+      expect(table.updates[0]?.set.result_year).not.toBe(TIP_YEAR);
+    });
+
+    it('XYZ-123 is UNKNOWN_REFERENCE and issues no results query', async () => {
+      const result = await service.correlate(
+        delivery({ result_official_code: 'XYZ-123' }),
+      );
+
+      expect(result).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.UNKNOWN_REFERENCE,
+        resultYear: null,
+        officialCode: null,
+        processingState: DeliveryProcessingState.PROCESSED,
+      });
+      expect(table.selects).toEqual([]);
+      expectNoResultsWrite();
+    });
+
+    it('null is NO_REFERENCE and issues no results query', async () => {
+      const result = await service.correlate(
+        delivery({ result_official_code: null }),
+      );
+
+      expect(result).toMatchObject({
+        applied: true,
+        correlationOutcome: DeliveryCorrelationOutcome.NO_REFERENCE,
+        resultYear: null,
+        officialCode: null,
+      });
+      expect(table.selects).toEqual([]);
+      expectNoResultsWrite();
+    });
+
+    it('names the matched platform when more than one TIP live row matches', async () => {
+      table.rows.push(
+        resultRow({
+          result_id: 90,
+          result_official_code: 123,
+          platform_code: ReportingPlatformEnum.TIP,
+          report_year_id: 2023,
+        }),
+      );
+
+      await service.correlate(delivery({ result_official_code: 'TIP-123' }));
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain(
+        `platform=${ReportingPlatformEnum.TIP}`,
+      );
+      expect(String(warn.mock.calls[0][0])).toContain('2 live rows');
     });
   });
 });

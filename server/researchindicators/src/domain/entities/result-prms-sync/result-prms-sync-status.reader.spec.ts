@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { prmsExternalReferenceSql } from '../../tools/prms-normalizer/reference/prms-external-reference';
 import {
   deriveSyncState,
   mapLastAttempt,
@@ -337,10 +338,9 @@ describe('ResultPrmsSyncStatusReader', () => {
     const decisionCall = query.mock.calls.find((call) =>
       /result_prms_sync_history/.test(call[0] as string),
     );
-    // Two params, both the same id: the query resolves the official code AND
-    // the year through `results`, because the history is keyed on the PAIR.
-    // Neither half identifies a version on its own.
-    expect(decisionCall?.[1]).toEqual([42, 42]);
+    // Three params, all the same id: platform, official code and year are each
+    // resolved through `results`. None of the three identifies a version alone.
+    expect(decisionCall?.[1]).toEqual([42, 42, 42]);
   });
 
   it("Falsifier 4 (T-11 amendment) — a result pushed ACCEPTED with NO inbound verdict returns last_decision = null, not T-11's own STAR row read back as a decision (R-PWH-008 AC.3 regression)", async () => {
@@ -396,6 +396,48 @@ describe('ResultPrmsSyncStatusReader', () => {
     expect(status.last_decision).toBeNull();
     expect(status.sync_state).toBe('synced');
     expect(status.last_attempt).toEqual(outbound);
+  });
+
+  it('binds the result platform on the last attempt and the last decision (R-PPI-002)', async () => {
+    query.mockImplementation((sql: string) => {
+      if (/result_prms_sync_log/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/result_prms_sync_history/.test(sql)) {
+        return Promise.resolve([]);
+      }
+      if (/FROM results/i.test(sql)) {
+        return Promise.resolve([
+          { is_synced_to_prms: 0, prms_result_code: null },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await reader.getStatus(42);
+
+    const attemptCall = query.mock.calls.find((call) =>
+      /result_prms_sync_log/.test(call[0] as string),
+    );
+    const attemptSql = String(attemptCall?.[0]);
+    expect(attemptSql).toContain(
+      prmsExternalReferenceSql('platform_code', 'result_official_code'),
+    );
+    expect(attemptSql).toMatch(
+      /platform_code\s*=\s*\(\s*SELECT COALESCE\(platform_code, 'STAR'\)/,
+    );
+    expect(attemptCall?.[1]).toEqual([42, 42, 42]);
+
+    const decisionCall = query.mock.calls.find((call) =>
+      /result_prms_sync_history/.test(call[0] as string),
+    );
+    const decisionSql = String(decisionCall?.[0]);
+    expect(decisionSql).toMatch(
+      /platform_code\s*=\s*\(\s*SELECT COALESCE\(platform_code, 'STAR'\)/,
+    );
+    expect(decisionSql).toMatch(/result_official_code = \(/);
+    expect(decisionSql).toMatch(/result_year = \(/);
+    expect(decisionCall?.[1]).toEqual([42, 42, 42]);
   });
 });
 

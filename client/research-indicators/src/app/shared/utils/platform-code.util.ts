@@ -32,10 +32,10 @@ export function platformFromResultCode(code: string): PlatformCode {
   return platformFromResultCodeOrNull(code) ?? PLATFORM_CODES.STAR;
 }
 
-// R-PFG-002 — the eligible-source set is data, not a hardcoded identity check.
-// Named via PLATFORM_CODES (DD-2: no bare 'STAR' string literal at the call
-// sites). Today: STAR alone. Enabling TIP later is a one-element edit here.
-export const POOL_FUNDING_PLATFORMS: readonly PlatformCode[] = [PLATFORM_CODES.STAR];
+// R-PFG-002 / R-PPI-006 — the eligible-source set is data, not a hardcoded
+// identity check. Named via PLATFORM_CODES (DD-2: no bare 'STAR' string literal
+// at the call sites). STAR and TIP. AICCRA and PRMS stay excluded.
+export const POOL_FUNDING_PLATFORMS: readonly PlatformCode[] = [PLATFORM_CODES.STAR, PLATFORM_CODES.TIP];
 
 export function isPoolFundingCapable(code: string): boolean {
   return POOL_FUNDING_PLATFORMS.includes(platformFromResultCode(code));
