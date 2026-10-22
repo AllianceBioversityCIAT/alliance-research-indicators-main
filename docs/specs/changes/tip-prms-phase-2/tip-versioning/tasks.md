@@ -63,11 +63,11 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-02 — A TIP run is refused while another is in progress
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none
+- [x] **Status:** done — §4/§5 tension settled by the owner 2026-10-22 (409) · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-TVR-001 (*New handle* — BUT must NOT create a second official code for `H`: two overlapping runs could mint one code twice).
 - **Design refs:** §5 step 1, §4, DD-10, §2.1 (`sync-process-log.service.ts` row).
 - **Scope (files):** `src/domain/entities/sync-process-log/sync-process-log.service.ts` (+ spec) — new read "is `<process>` `IN_PROGRESS` and younger than N hours"; `tip-integration.service.ts` (+ spec) — guard **before** the existing `try`; the `catch` marks the log row `FAILED`.
-- **Tests:** guard refuses when an `IN_PROGRESS` row is 1 h old; allows when it is 7 h old; allows when the last row is `FAILED`/`COMPLETED`; a failing run (TIP fetch throws) marks its row `FAILED`; the refusal logs `warn` and does not throw `'Error saving temporal data'`.
+- **Tests:** guard refuses when an `IN_PROGRESS` row is 1 h old; allows when it is 7 h old; allows when the last row is `FAILED`/`COMPLETED`; a failing run (TIP fetch throws) marks its row `FAILED`; the refusal logs `warn` and rejects with `ConflictException` (409), not `'Error saving temporal data'`, and creates no log row (design §4/§5 step 1 as amended 2026-10-22).
 - **Verification:** `npx jest src/domain/entities/sync-process-log src/domain/tools/tip-integration --silent` · eslint on both folders · `npx tsc --noEmit -p tsconfig.json`.
 - **Falsifier:** (a) drop the age bound → the 7 h case goes red; (b) remove the `FAILED` update from the `catch` → the failing-run case goes red.
 - **Red run:** both observed on their assertion, quoted, reverted.

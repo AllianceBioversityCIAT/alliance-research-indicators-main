@@ -83,13 +83,13 @@ A version row is an ordinary `results` row: `platform_code = 'TIP'`, `is_snapsho
 
 ## 4. API surface
 
-No endpoint change. `PATCH ipr-data/sync` and the RMQ pattern `tip-clone-knowledge-products` keep their contracts. A run started while another is `IN_PROGRESS` is refused and logged (`warn`). With `async=false` the `PATCH` caller sees the refusal through the existing error path; with `async=true` the controller does not await (`tip-integration.controller.ts:90-96`), so the refusal is visible in the log only.
+No endpoint change. `PATCH ipr-data/sync` and the RMQ pattern `tip-clone-knowledge-products` keep their contracts. A run started while another is `IN_PROGRESS` is refused: logged (`warn`) and rejected with `ConflictException` (HTTP 409, "TIP sync already in progress"). With `async=false` the `PATCH` caller receives the 409 through the existing error path (`GlobalExceptions`); with `async=true` the controller does not await (`tip-integration.controller.ts:90-96`) and the RMQ handler has no caller, so the refusal is visible in the log only — the same as any failed run today. *(Amended 2026-10-22, owner decision at T-02: §4 and §5 step 1 disagreed — a `return` reaches the controller as HTTP 200 "synced successfully".)*
 
 ## 5. Workflows & business rules
 
 **Per run** (`getKnowledgeProductsByYear`):
 
-1. **Before** the existing `try`, refuse the run if a TIP `sync_process_log` row is `IN_PROGRESS` and younger than 6 h; log `warn` and return. A run that fails marks its row `FAILED`, so a failed run does not block the next one. The check and `initiateSync` are not atomic — two runs started in the same instant can both pass; accepted (cron weekly, `PATCH` manual).
+1. **Before** the existing `try`, refuse the run if a TIP `sync_process_log` row is `IN_PROGRESS` and younger than 6 h; log `warn` and reject with `ConflictException` (409, §4) — never the `'Error saving temporal data'` `BadRequestException`, and no `sync_process_log` row is created. A run that fails marks its row `FAILED`, so a failed run does not block the next one. The check and `initiateSync` are not atomic — two runs started in the same instant can both pass; accepted (cron weekly, `PATCH` manual).
 2. Stage every page, awaiting each save; count failed staging saves and write the count to the run's log line (JD-14). A failed save means that publication is absent from this run; the next run picks it up.
 3. `processing` maps rows as today; the TIP routine never reads `is_version_applied` (it sets `target.isSnapshot`).
 4. Group mapped rows by `public_link`. A row with an empty link is skipped with a `warn` (0 in Dev). Within a handle, one payload per year: the first by staging order wins, the rest are logged `warn`.

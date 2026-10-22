@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { TipIprDataDto } from './dto/tip-ipr-data.dto';
 import { ResultsService } from '../../entities/results/results.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
@@ -190,13 +194,25 @@ export class TipIntegrationService extends BaseApi {
   }
 
   async getKnowledgeProductsByYear(year?: number) {
+    const runAlreadyInProgress =
+      await this.syncProcessLogService.isInProgressYoungerThan(
+        SyncProcessEnum.TIP_INTEGRATION,
+        6,
+      );
+    if (runAlreadyInProgress) {
+      this.logger.warn('TIP sync refused: a run is already in progress');
+      throw new ConflictException('TIP sync already in progress');
+    }
+
     const executionCode = uuidv4();
+    let syncProcessLogId: number | undefined;
     try {
       const counters: CounterResults = new CounterResults();
       const resultSaved: number[] = [];
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.TIP_INTEGRATION,
       );
+      syncProcessLogId = syncProcessLog?.id;
       const endYeard = year ?? new Date().getFullYear();
       let currentYear = year ?? 2021;
       let stagingFailures = 0;
@@ -268,6 +284,17 @@ export class TipIntegrationService extends BaseApi {
       this.logger.error(
         `Error saving temporal data: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
+      if (syncProcessLogId != null) {
+        await this.syncProcessLogService
+          .markFailed(syncProcessLogId)
+          .catch((markError) => {
+            const message =
+              markError instanceof Error ? markError.message : 'Unknown error';
+            this.logger.error(
+              `Error marking sync process log ${syncProcessLogId} as FAILED: ${message}`,
+            );
+          });
+      }
       throw new BadRequestException('Error saving temporal data');
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);

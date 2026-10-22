@@ -16,7 +16,8 @@ import { TipIntegrationRepository } from './repository/tip-integration.repositor
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 import {
   TipKnowledgeProductDto,
   TipMappedResult,
@@ -193,6 +194,8 @@ describe('TipIntegrationService', () => {
             initiateSync: jest.fn().mockResolvedValue({ id: 1 }),
             update: jest.fn().mockResolvedValue(undefined),
             endSync: jest.fn().mockResolvedValue(undefined),
+            isInProgressYoungerThan: jest.fn().mockResolvedValue(false),
+            markFailed: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -344,6 +347,7 @@ describe('TipIntegrationService', () => {
       jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
       mockStagingRepo.save.mockReset();
       mockStagingRepo.save.mockResolvedValue(undefined);
+      syncProcessLogService.isInProgressYoungerThan.mockResolvedValue(false);
     });
 
     it('should fetch TIP data, load temporal results, process and end sync', async () => {
@@ -573,9 +577,51 @@ describe('TipIntegrationService', () => {
       await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
         BadRequestException,
       );
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        'Error saving temporal data',
+      );
+      expect(syncProcessLogService.markFailed).toHaveBeenCalledWith(1);
       expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
         expect.any(String),
       );
+    });
+
+    it('refuses a run already in progress with ConflictException and creates no log row', async () => {
+      syncProcessLogService.isInProgressYoungerThan.mockResolvedValue(true);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      let caught: unknown;
+      try {
+        await service.getKnowledgeProductsByYear(2025);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(ConflictException);
+      const conflict = caught as ConflictException;
+      expect(conflict.getStatus()).toBe(409);
+      expect(conflict.message).toBe('TIP sync already in progress');
+      expect(conflict.message).not.toBe('Error saving temporal data');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP sync refused: a run is already in progress',
+      );
+      expect(
+        syncProcessLogService.isInProgressYoungerThan,
+      ).toHaveBeenCalledWith(SyncProcessEnum.TIP_INTEGRATION, 6);
+      expect(syncProcessLogService.initiateSync).not.toHaveBeenCalled();
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+      expect(prmsRepository.deleteTemporalResults).not.toHaveBeenCalled();
+    });
+
+    it('does not mark a log row FAILED when initiateSync throws before a row exists', async () => {
+      syncProcessLogService.initiateSync.mockRejectedValueOnce(
+        new Error('insert failed'),
+      );
+
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        'Error saving temporal data',
+      );
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
     });
   });
 
