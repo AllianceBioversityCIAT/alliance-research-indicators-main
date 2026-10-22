@@ -2,7 +2,7 @@ import { Component, HostListener, computed, input, output, signal } from '@angul
 import { DialogModule } from 'primeng/dialog';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { PrmsSyncHistoryEvent, PrmsSyncHistoryResponse } from '@shared/interfaces/prms-sync-history.interface';
-import { SYNC_TAG_COLOR, deriveSyncVerb, formatSyncStatus, formatSyncTimestamp, resolveActorName } from '@shared/utils/prms-sync-status.util';
+import { SYNC_TAG_BORDER, SYNC_TAG_COLOR, deriveSyncVerb, formatSyncStatus, formatSyncTimestamp, resolveActorName } from '@shared/utils/prms-sync-status.util';
 
 interface BeforeAfter {
   before?: unknown;
@@ -92,6 +92,10 @@ export class PrmsSyncHistoryModalComponent {
 
   tagColor(event: PrmsSyncHistoryEvent): string {
     return SYNC_TAG_COLOR[formatSyncStatus(event).tone];
+  }
+
+  tagBorder(event: PrmsSyncHistoryEvent): string {
+    return SYNC_TAG_BORDER[formatSyncStatus(event).tone];
   }
 
   statusLabel(event: PrmsSyncHistoryEvent): string {

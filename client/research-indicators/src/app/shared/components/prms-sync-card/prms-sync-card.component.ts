@@ -2,7 +2,7 @@ import { Component, ElementRef, computed, input, output, viewChild } from '@angu
 import { environment } from '@envs/environment';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 import { PrmsSyncHistoryResponse } from '@shared/interfaces/prms-sync-history.interface';
-import { SYNC_TAG_COLOR, formatSyncDayMonth, formatSyncStatus, presentActorName } from '@shared/utils/prms-sync-status.util';
+import { SYNC_TAG_BORDER, SYNC_TAG_COLOR, formatSyncDayMonth, formatSyncStatus, presentActorName } from '@shared/utils/prms-sync-status.util';
 
 @Component({
   selector: 'app-prms-sync-card',
@@ -21,6 +21,7 @@ export class PrmsSyncCardComponent {
     return event ? formatSyncStatus(event) : { label: 'Pending Review', tone: 'warning' as const };
   });
   readonly tagColor = computed(() => SYNC_TAG_COLOR[this.status().tone]);
+  readonly tagBorder = computed(() => SYNC_TAG_BORDER[this.status().tone]);
   /**
    * Pending is the resting state of every push. Only an approve or reject
    * from PRMS tints the box; a malformed decision stays neutral.

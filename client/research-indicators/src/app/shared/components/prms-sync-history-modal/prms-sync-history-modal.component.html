@@ -96,7 +96,7 @@
                 data-testid="prms-history-status"
                 [statusName]="statusLabel(entry)"
                 [statusColor]="tagColor(entry)"
-                [statusBorder]="tagColor(entry)"></app-custom-tag>
+                [statusBorder]="tagBorder(entry)"></app-custom-tag>
               @if (reviewerRole(entry); as role) {
                 <span class="prms-history__role atc-grey-600" data-testid="prms-history-role">{{ role }}</span>
               }

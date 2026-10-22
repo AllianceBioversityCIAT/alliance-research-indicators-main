@@ -72,7 +72,7 @@ function expectBox(host: HTMLElement, modifier: 'neutral' | 'approved' | 'reject
   }
 }
 
-function expectTag(host: HTMLElement, label: string, color: string, card: ComponentFixture<PrmsSyncCardComponent>): void {
+function expectTag(host: HTMLElement, label: string, color: string, card: ComponentFixture<PrmsSyncCardComponent>, border = color): void {
   const tag = host.querySelector('[data-testid="prms-sync-status"]');
   expect(tag?.tagName).toBe('APP-CUSTOM-TAG');
   const chip = tag?.querySelector('div') as HTMLElement;
@@ -81,7 +81,7 @@ function expectTag(host: HTMLElement, label: string, color: string, card: Compon
   const debug = card.debugElement.query(By.directive(CustomTagComponent));
   expect(debug.componentInstance.statusName).toBe(label);
   expect(debug.componentInstance.statusColor).toBe(color);
-  expect(debug.componentInstance.statusBorder).toBe(color);
+  expect(debug.componentInstance.statusBorder).toBe(border);
 }
 
 describe('PrmsSyncCardComponent', () => {
@@ -151,7 +151,8 @@ describe('PrmsSyncCardComponent', () => {
     expectDeletedChrome(host);
     expectBox(host, 'approved');
     expect(text(host.querySelector('[data-testid="prms-sync-eyebrow"]') as HTMLElement)).toBe('PRMS sync #2');
-    expectTag(host, 'Approved', 'var(--ac-status-prms-approved)', fixture);
+    // Owner: PRMS Approved looks like the STAR Approved tag (sage text, lighter sage outline).
+    expectTag(host, 'Approved', 'var(--ac-status-prms-approved)', fixture, 'var(--ac-status-prms-approved-border)');
     const actor = host.querySelector('[data-testid="prms-sync-actor"]') as HTMLElement;
     expect(text(actor)).toContain('by Daniel Okoth ·');
     expect(actor.getAttribute('title')).toBe('Daniel Okoth');
