@@ -2,7 +2,7 @@
 
 - **Module:** institutional-performance — server + client
 - **Spec id:** 2026-10-organizational-structure
-- **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate) · **Pivot amendment 2026-10-22 (delegates versioned — R-ORG-017, R-ORG-010) awaiting requester approval**
+- **Status:** approved 2026-10-16 (requester; Phase 1 accepted at the resumed design gate) · **Pivot amendment 2026-10-22 (delegates versioned — R-ORG-017, R-ORG-010) approved by the requester 2026-10-22**
 - **Depth:** **Full** — new module with temporal (per-year) data, an append-only log, cross-module contracts (control lists in, future consumers out), migrations + seed. A wrong year resolution corrupts every later report silently
 - **Owner:** Hector F. Tobón (requester) · PISA4 / Strategy Refresh
 - **Parent spec:** [`../family.md`](../family.md) — child 2 of 5. Shared rules **F-1, F-3 … F-9** apply and are cited, not restated. **F-2 does not apply** (family exception, 2026-10-08)
