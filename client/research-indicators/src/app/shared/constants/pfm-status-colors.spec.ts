@@ -71,13 +71,15 @@ describe('PFM status colours (one palette, owner rules)', () => {
     for (const v of values('--ac-status-mapping-no-sp')) expect(hue(v)).toBeLessThanOrEqual(200);
   });
 
-  // Owner: mapping Pending, PRMS Pending Review, the Mapping pending quick view and the
-  // Finish the mapping card are the same orange.
-  it('every pending is the orange of Mapping pending / Finish the mapping, never the STAR Submitted navy', () => {
-    expect(values('--ac-status-mapping-pending')).toEqual(values('--ac-state-progress-fg'));
-    expect(values('--ac-status-prms-pending')).toEqual(values('--ac-state-progress-fg'));
-    expect(values('--ac-pfm-seg-pending')).toEqual(values('--ac-state-progress-fill'));
+  // Owner: mapping Pending, the Mapping pending quick view and the Finish the mapping card are the
+  // same orange; PRMS Pending Review is a light grey (waiting on PRMS), in the table and the chart.
+  it('mapping Pending is the Finish the mapping orange; PRMS Pending Review is light grey', () => {
+    expect(values('--ac-status-mapping-pending')).toEqual(values('--ac-state-progress'));
+    expect(values('--ac-status-prms-pending')).toEqual(values('--ac-state-todo'));
+    expect(light('--ac-status-prms-pending')).toBe('#7b8798');
+    expect(values('--ac-pfm-seg-pending')).toEqual(values('--ac-status-prms-pending'));
     expect(light('--ac-status-mapping-pending')).not.toBe(STAR_SUBMITTED);
+    expect(light('--ac-status-prms-pending')).not.toBe(STAR_SUBMITTED);
   });
 
   it('no state token, light or dark, is purple or a bright royal blue / indigo', () => {
