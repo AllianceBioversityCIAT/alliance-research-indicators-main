@@ -236,3 +236,4 @@
 - **Budget:** 7 → 10 tasks, 11 → 12 review rounds — all additions owner-approved.
 - **Open for later (advisories, not tasks):** `platformCodeOf` duplicated (T-03/T-04); stale P-17 integration specs; RB-3 full bootstrap blocker (`CreatePiDelegates1787600000000`); automapper comments citing the old connection collation; 12 legacy-collation tables are a latent 1267 trap for future `CAST` comparisons; P-18 (PRMS accepting `TIP-` refs) settles in child 3.
 - **Next:** `/akili-validate`, `/akili-archive` for this spec; `/akili-specify` for child 2 (`tip-versioning`).
+- **Correction (2026-10-22, validation):** entries above that point to "design.md §10 *Knowledge Product ToC level*" refer to **§8**.

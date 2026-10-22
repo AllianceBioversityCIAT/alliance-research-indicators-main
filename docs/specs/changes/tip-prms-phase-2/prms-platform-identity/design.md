@@ -23,7 +23,7 @@ One rule, applied everywhere a PRMS sync is written or matched: **a result is id
 
 No change to the STAR gate, payload, or values: for STAR every key and reference is what it is today.
 
-**Budget (tripwire for `/akili-execute`):** 7 tasks · ~850 LOC (≈ 260 production, 590 tests incl. the integration spec) · 11 review rounds (one per task + one rework margin on T-02, T-03, T-04, T-05). Re-sized at Phase 3 from 6/800/10 when T-04/T-05 were split per the one-review-reads-it rule.
+**Budget (tripwire for `/akili-execute`):** 7 tasks · ~850 LOC (≈ 260 production, 590 tests incl. the integration spec) · 11 review rounds (one per task + one rework margin on T-02, T-03, T-04, T-05). Re-sized at Phase 3 from 6/800/10 when T-04/T-05 were split per the one-review-reads-it rule. **Actual (2026-10-22):** 10 tasks (T-08, T-09 pivot T-07; T-10 from the T-07 HITL — all owner-approved) · ≈2,900 inserted lines incl. tests and the 671-line integration spec · 12 review rounds (1 over, owner-approved).
 
 ## 2. Goals & non-goals
 
