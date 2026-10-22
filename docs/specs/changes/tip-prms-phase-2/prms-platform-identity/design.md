@@ -108,7 +108,7 @@ No endpoint change. Wire changes:
 - `claimInsideLock` and `insertRefusedByStarInsideLock` read the result's `platform_code` in the SELECT they already run and write `platform_code` + `external_reference = prmsRef(platform, code)` — so the claim and the settle carry the **same** value (today they differ only when the payload would differ, P-6).
 - In-flight lookup and both `MAX(attempt_number)+1` queries key on `(platform_code, external_reference, result_year)`.
 - `settleTransaction` unchanged (its COALESCE now writes the same value).
-- `recordPrmsResultCodeOnLiveVersion`: `live.platform_code = pushed.platform_code` instead of the `'STAR'` literal. **No year predicate is added** — the live row can belong to another reporting year than the pushed snapshot (P-10).
+- `recordPrmsResultCodeOnLiveVersion`: `live.platform_code = COALESCE(pushed.platform_code, 'STAR')` instead of the `'STAR'` literal — the pushed side reads NULL as STAR (§7.5), the live side stays strict, so every STAR push copies exactly as HEAD did (NFR-PPI-001; amended 2026-10-22). **No year predicate is added** — the live row can belong to another reporting year than the pushed snapshot (P-10).
 
 ### 7.3 Decision history (R-PPI-001/002/004)
 - **Outbound** (`recordOutboundPendingReview`): writes `platform_code` of the pushed result and `result_official_code` = bare code (today it writes the payload reference, which for STAR is already the bare code — P-11).
