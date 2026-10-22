@@ -1,3 +1,5 @@
+import { formatUtcDateWithConfig } from './date-format.util';
+import { DATE_FORMAT_CONFIG_FIXTURE } from '../../testing/date-format-config.mock';
 import type { DateFormatJsonValue } from '@shared/interfaces/date-format-config.interface';
 import {
   formatUtcToCet,
@@ -285,5 +287,20 @@ describe('date-format.util', () => {
       expect(result.dateFormat).toBe('dd/mm/yy');
       expect(result.hourFormat).toBe('12');
     });
+  });
+});
+
+describe('formatUtcDateWithConfig', () => {
+  it('follows the configuration: order, separator, digits and timezone, no time', () => {
+    expect(formatUtcDateWithConfig('2026-10-03T14:05:00.000Z', DATE_FORMAT_CONFIG_FIXTURE)).toBe('03/10/2026');
+    expect(formatUtcDateWithConfig('2025-12-31T23:30:00.000Z', DATE_FORMAT_CONFIG_FIXTURE)).toBe('01/01/2026');
+    const mdy = { ...DATE_FORMAT_CONFIG_FIXTURE, date: { ...DATE_FORMAT_CONFIG_FIXTURE.date, order: 'MDY' as const, separator: '-' } };
+    expect(formatUtcDateWithConfig('2026-10-03T14:05:00.000Z', mdy)).toBe('10-03-2026');
+  });
+
+  it('without a configuration: dd/mm/yyyy in UTC; nothing for an empty or invalid value', () => {
+    expect(formatUtcDateWithConfig('2025-12-31T23:30:00.000Z', null)).toBe('31/12/2025');
+    expect(formatUtcDateWithConfig(null, DATE_FORMAT_CONFIG_FIXTURE)).toBeNull();
+    expect(formatUtcDateWithConfig('not-a-date', DATE_FORMAT_CONFIG_FIXTURE)).toBeNull();
   });
 });
