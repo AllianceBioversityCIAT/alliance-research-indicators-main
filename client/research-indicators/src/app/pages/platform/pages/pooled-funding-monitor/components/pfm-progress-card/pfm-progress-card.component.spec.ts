@@ -16,12 +16,12 @@ function render(c: PfmChipCounts) {
 }
 
 describe('PfmProgressCardComponent', () => {
-  it('done = in PRMS + no SP contribution, over every result: the legend above, the percentage inside the bar, no count line', () => {
+  it('done = in PRMS + no SP contribution, over every result: the legend above, the percentage inside the bar, and done / total after it', () => {
     const { q, text } = render(counts(21, 113, 33));
     // (21 + 33) / 167
     expect(text('pfm-progress-percent')).toBe('32%');
     expect(q('pfm-progress-done')?.contains(q('pfm-progress-percent'))).toBe(true);
-    expect(q('pfm-progress-count')).toBeNull();
+    expect(q('pfm-progress-count')?.textContent?.trim()).toBe('54 / 167');
     const all = Array.from(q('pfm-progress-card')?.querySelectorAll('[data-testid]') ?? []);
     expect(all.indexOf(q('pfm-progress-legend')!)).toBeLessThan(all.indexOf(q('pfm-progress-bar')!));
     // Owner: no subtitle; the legend and the tooltips say what done means.
@@ -49,6 +49,11 @@ describe('PfmProgressCardComponent', () => {
     q('pfm-progress-done')!.click();
     q('pfm-progress-left')!.click();
     expect(opened).toEqual(['synced', 'need_attention']);
+  });
+
+  it('shows "done / total" just after the bar', () => {
+    const { text } = render(counts(21, 113, 33));
+    expect(text('pfm-progress-count')).toBe('54 / 167');
   });
 
   it('done is the palette green', () => {
