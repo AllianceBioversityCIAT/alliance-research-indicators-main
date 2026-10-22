@@ -67,7 +67,7 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ### T-02 — Migration and entity columns
 
-- [ ] **Status:** todo — attempt discarded by the owner 2026-10-21, restart pending (lessons in `execution.md`) · **Size:** M · **Dependencies:** none
+- [x] **Status:** done (2026-10-22, PASS attempt 2 after the restart — see `execution.md`) · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-PPI-001 (*Existing rows* — THEN log platform from the named result; AND non-STAR reference rewritten; AND history STAR rules; BUT never-matched history → no platform; AND IT MUST be reversible); NFR-PPI-002.
 - **Design refs:** §5 (table, migration order, down, collision abort), D-2, D-3, P-2, P-3, P-4, P-19.
 - **Scope (files):**
@@ -83,9 +83,9 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 - **Consumers:** the two entities are read by every §7 site (design P-9); entity edits are additive (new property). The DB-backed specs P-17 lists are already broken and are not this task's gate.
 - **Review:** `full` — schema change on shared tables (override b, f).
 - **Done criteria:**
-  - [ ] Migration spec green; falsifiers observed red and reverted.
-  - [ ] Bootstrap + revert both observed green on a fresh container, outputs quoted.
-  - [ ] tsc, build green.
+  - [x] Migration spec green; falsifiers observed red and reverted ((b) cannot go red on MySQL 8.0 — recorded).
+  - [x] Up + down observed green on a fresh container (targeted route, RB-3) and on a restored Dev dump, outputs quoted.
+  - [x] tsc, build green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
