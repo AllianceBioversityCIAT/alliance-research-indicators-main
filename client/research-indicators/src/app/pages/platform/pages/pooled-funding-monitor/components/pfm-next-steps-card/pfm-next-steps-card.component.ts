@@ -3,7 +3,7 @@
 // than one card (e.g. not approved yet AND mapping pending), so the cards do not add up.
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { PFM_STATE, PfmStateKey } from '@shared/constants/pfm-status-colors';
+import { PFM_STATE, statusColor } from '@shared/constants/pfm-status-colors';
 import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmChip, PfmChipCounts } from '../../pfm.interfaces';
 
@@ -12,7 +12,8 @@ interface NextStep {
   count: keyof PfmChipCounts;
   title: string;
   hint: string;
-  state: PfmStateKey;
+  /** Card colour: a status's own colour when the card stands for a status (Finish the mapping = mapping Pending). */
+  color: string;
   icon: string;
 }
 
@@ -22,7 +23,7 @@ export const PFM_NEXT_STEPS: NextStep[] = [
     count: 'awaiting_pi',
     title: 'Pending approval by the PI',
     hint: 'Not approved in STAR yet: the PI needs to approve them.',
-    state: 'waiting',
+    color: PFM_STATE.waiting.fill,
     icon: 'pi-user'
   },
   {
@@ -30,7 +31,7 @@ export const PFM_NEXT_STEPS: NextStep[] = [
     count: 'mapping',
     title: 'Finish the mapping',
     hint: 'Complete the CGIAR Portfolio mapping of these results.',
-    state: 'progress',
+    color: statusColor({ mapping: 'Pending' }),
     icon: 'pi-pencil'
   },
   {
@@ -38,7 +39,7 @@ export const PFM_NEXT_STEPS: NextStep[] = [
     count: 'ready',
     title: 'Send to PRMS',
     hint: 'Their mapping is complete: they can be synced now.',
-    state: 'ready',
+    color: PFM_STATE.ready.fill,
     icon: 'pi-send'
   }
 ];
@@ -59,7 +60,8 @@ export class PfmNextStepsCardComponent {
     const all = this.counts().all || 0;
     return PFM_NEXT_STEPS.map(s => {
       const value = this.counts()[s.count] ?? 0;
-      const { fg, fill } = PFM_STATE[s.state];
+      const fg = s.color;
+      const fill = s.color;
       return {
         ...s,
         value,

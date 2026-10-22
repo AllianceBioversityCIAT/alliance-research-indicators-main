@@ -145,7 +145,7 @@ describe('PfmQueueTabComponent', () => {
     expect(dot('all')).toBeNull();
     expect(dot('synced')).toBe('var(--ac-state-done-fill)');
     expect(dot('ready_to_sync')).toBe('var(--ac-state-ready-fill)');
-    expect(dot('mapping_incomplete')).toBe('var(--ac-state-progress-fill)');
+    expect(dot('mapping_incomplete')).toBe('var(--ac-status-mapping-pending)');
   });
 
   it('shows the empty state with Reset when groups is empty', () => {

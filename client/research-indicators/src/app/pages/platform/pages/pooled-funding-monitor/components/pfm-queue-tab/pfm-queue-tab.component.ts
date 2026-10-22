@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
-import { PFM_STATE } from '@shared/constants/pfm-status-colors';
+import { PFM_STATE, statusColor } from '@shared/constants/pfm-status-colors';
 import { PFM_HELP } from '../../pfm-help';
 import { PfmChip, PfmChipCounts, PfmFilters } from '../../pfm.interfaces';
 import { PfmProjectGroupComponent } from '../pfm-project-group/pfm-project-group.component';
@@ -16,7 +16,7 @@ const ALL = '__all__';
  * Order (owner): the work in the order it happens. Need attention is not a quick view (owner: not needed). */
 const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
   { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
-  { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
+  { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: statusColor({ mapping: 'Pending' }) },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
   { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
 ];

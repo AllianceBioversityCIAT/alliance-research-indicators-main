@@ -59,7 +59,7 @@ describe('PfmPrmsStatusCardComponent', () => {
   it('slices are sized by share and use the shared palette', () => {
     const { fixture } = render(pipe(13, 8, 7, 33));
     const items = fixture.componentInstance.slices().items;
-    expect(items.map(i => i.fill)).toEqual(['var(--ac-state-approved-fill)', 'var(--ac-state-progress-fill)', 'var(--ac-state-alert-fill)', 'var(--ac-state-out-fill)']);
+    expect(items.map(i => i.fill)).toEqual(['var(--ac-status-prms-approved)', 'var(--ac-status-prms-pending)', 'var(--ac-status-prms-rejected)', 'var(--ac-status-mapping-no-sp)']);
     const C = fixture.componentInstance.circumference;
     const len = (i: number) => Number(items[i].dash.split(' ')[0]);
     expect(len(0) + len(1) + len(2) + len(3)).toBeCloseTo(C, 6);
