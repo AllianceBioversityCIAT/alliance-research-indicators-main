@@ -124,10 +124,14 @@ export class TipIntegrationService extends BaseApi {
     );
   }
 
-  private async saveTemporalData(year: number, executionCode: string) {
+  private async saveTemporalData(
+    year: number,
+    executionCode: string,
+  ): Promise<number> {
     let pendingData = true;
     let offset = 0;
     const limit = 50;
+    let failedSaves = 0;
     // TIP throttles repeated calls ("Too Many Attempts."), so pace the pagination
     const delayBetweenRequestsMs = 1000;
     while (pendingData) {
@@ -154,21 +158,26 @@ export class TipIntegrationService extends BaseApi {
       const itemsToStage =
         response?.data?.filter((item) => !this.isCaseStudy(item)) ?? [];
 
-      itemsToStage.forEach(async (item) => {
-        await this.dataSource
-          .getRepository(SyncStagingRecordsEntity)
-          .save({
-            execution_code: executionCode,
-            code: item.id,
-            year,
-            data: item,
-          })
-          .catch((error) => {
+      const pageFailures = await Promise.all(
+        itemsToStage.map(async (item) => {
+          try {
+            await this.dataSource.getRepository(SyncStagingRecordsEntity).save({
+              execution_code: executionCode,
+              code: item.id,
+              year,
+              data: item,
+            });
+            return 0;
+          } catch (error) {
+            const failure = error as { message?: string; stack?: string };
             this.logger.error(
-              `Error saving temporal result ${item.name}: ${error.message} \n ${error.stack}`,
+              `Error saving temporal result ${item.name}: ${failure.message} \n ${failure.stack}`,
             );
-          });
-      });
+            return 1;
+          }
+        }),
+      );
+      failedSaves += pageFailures.reduce((sum, failed) => sum + failed, 0);
 
       if (response?.data_count < limit || isEmpty(response?.data_count)) {
         pendingData = false;
@@ -177,6 +186,7 @@ export class TipIntegrationService extends BaseApi {
         await this.sleep(delayBetweenRequestsMs);
       }
     }
+    return failedSaves;
   }
 
   async getKnowledgeProductsByYear(year?: number) {
@@ -189,9 +199,13 @@ export class TipIntegrationService extends BaseApi {
       );
       const endYeard = year ?? new Date().getFullYear();
       let currentYear = year ?? 2021;
+      let stagingFailures = 0;
       for (currentYear; currentYear <= endYeard; currentYear++) {
         this.logger.log(`Saving temporal data for year ${currentYear}`);
-        await this.saveTemporalData(currentYear, executionCode);
+        stagingFailures += await this.saveTemporalData(
+          currentYear,
+          executionCode,
+        );
       }
 
       const tipResults =
@@ -245,6 +259,9 @@ export class TipIntegrationService extends BaseApi {
           );
         }
       }
+      this.logger.log(
+        `TIP run summary: staging failures ${stagingFailures}, created ${counters.createdRecords}, updated ${counters.updatedRecords}, error ${counters.errorRecords}`,
+      );
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {

@@ -342,6 +342,8 @@ describe('TipIntegrationService', () => {
   describe('getKnowledgeProductsByYear', () => {
     beforeEach(() => {
       jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      mockStagingRepo.save.mockReset();
+      mockStagingRepo.save.mockResolvedValue(undefined);
     });
 
     it('should fetch TIP data, load temporal results, process and end sync', async () => {
@@ -472,6 +474,95 @@ describe('TipIntegrationService', () => {
         ([record]) => record.code,
       );
       expect(stagedCodes).toEqual([1, 4]);
+    });
+
+    it('should read staging only after every deferred staging save resolves', async () => {
+      const page = {
+        data: [
+          { id: 1, name: 'KP 1' },
+          { id: 2, name: 'KP 2' },
+        ],
+        data_count: 2,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+
+      const resolvers: Array<() => void> = [];
+      let unresolved = 0;
+      let readWhileUnresolved = false;
+      mockStagingRepo.save.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            unresolved += 1;
+            resolvers.push(() => {
+              unresolved -= 1;
+              resolve(undefined);
+            });
+          }),
+      );
+      prmsRepository.findTemporalResults.mockImplementation(async () => {
+        if (unresolved > 0) readWhileUnresolved = true;
+        return [];
+      });
+
+      const run = service.getKnowledgeProductsByYear(2025);
+      const readyDeadline = Date.now() + 1000;
+      while (
+        mockStagingRepo.save.mock.calls.length === 0 &&
+        Date.now() < readyDeadline
+      ) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockStagingRepo.save).toHaveBeenCalled();
+      expect(prmsRepository.findTemporalResults).not.toHaveBeenCalled();
+      expect(readWhileUnresolved).toBe(false);
+
+      const releaseDeadline = Date.now() + 1000;
+      while (resolvers.length > 0 && Date.now() < releaseDeadline) {
+        resolvers.splice(0).forEach((release) => release());
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await run;
+
+      expect(readWhileUnresolved).toBe(false);
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalledTimes(1);
+    });
+
+    it('should count one rejected staging save and continue the run', async () => {
+      const page = {
+        data: [
+          { id: 1, name: 'KP ok' },
+          { id: 2, name: 'KP bad' },
+        ],
+        data_count: 2,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+      const logSpy = jest.spyOn((service as any).logger, 'log');
+      mockStagingRepo.save.mockImplementation((record: { code: number }) => {
+        if (record.code === 2) {
+          return Promise.reject(new Error('write failed'));
+        }
+        return Promise.resolve(undefined);
+      });
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalledTimes(1);
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('staging failures 1'),
+      );
     });
 
     it('should throw BadRequestException and clean temporal data when TIP API request fails', async () => {

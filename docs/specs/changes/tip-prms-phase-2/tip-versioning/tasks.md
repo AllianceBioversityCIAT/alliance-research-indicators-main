@@ -41,7 +41,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-01 — Staging is written completely before it is read
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none
+- [x] **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-TVR-005 (*Slow staging writes* — THEN every publication is read; BUT must NOT be skipped because its write had not finished).
 - **Design refs:** §5 step 2, DD-6, P-8.
 - **Scope (files):** `src/domain/tools/tip-integration/tip-integration.service.ts` (`saveTemporalData`, `:127-180`) + `tip-integration.service.spec.ts`.
