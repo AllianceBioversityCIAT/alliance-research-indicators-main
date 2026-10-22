@@ -21,6 +21,7 @@ import {
   PfmSummary,
   PfmTab
 } from '../pfm.interfaces';
+import { PfmGroupView, savePfmReturnState, takePfmReturnState } from '../pfm-return-state';
 
 const EMPTY_FILTERS: PfmFilters = { project: null, sp: null, type: null };
 
@@ -46,6 +47,10 @@ export class PfmStoreService {
   readonly queueState = signal<PfmSectionState>({ loading: false, error: false });
   /** Per-group row loading / error, keyed by project code. */
   readonly groupState = signal<Record<string, PfmSectionState>>({});
+  /** Per-group table view (page, rows per page, search, sort), kept so a return from a result restores it. */
+  readonly groupViews = signal<Record<string, PfmGroupView>>({});
+  /** After a return from a result: the result to scroll back to, once its row is on screen. */
+  readonly focusResult = signal<string | null>(null);
 
   readonly query = computed<PfmQueueQuery>(() => ({ scope: this.scope(), ...this.filters(), chip: this.chip() }));
 
@@ -68,9 +73,39 @@ export class PfmStoreService {
     if (allowed.includes(scope ?? '')) this.scope.set(scope as PfmScope);
     else if (opts.defaultScope) this.scope.set(opts.defaultScope);
     if ((PFM_TABS as readonly string[]).includes(tab ?? '')) this.tab.set(tab as PfmTab);
+    const back = takePfmReturnState();
+    if (back) {
+      // Coming back from a result opened in the queue: the same view, projects, pages and sort.
+      if (allowed.includes(back.scope)) this.scope.set(back.scope);
+      if ((PFM_TABS as readonly string[]).includes(back.tab)) this.tab.set(back.tab);
+      this.filters.set({ ...EMPTY_FILTERS, ...back.filters });
+      this.chip.set(back.chip);
+      this.groupViews.set(back.groupViews ?? {});
+      this.openGroups.set(new Set(back.openGroups ?? []));
+      this.focusResult.set(back.resultCode);
+      this.syncUrl();
+    }
     rememberPfmScope(this.scope());
     void this.loadSummary();
     void this.loadQueue();
+    for (const code of this.openGroups()) void this.loadGroupRows(code);
+  }
+
+  /** Called when the user leaves for a result from the queue (see the page component). */
+  saveReturnState(resultCode: string | null): void {
+    savePfmReturnState({
+      scope: this.scope(),
+      tab: this.tab(),
+      filters: this.filters(),
+      chip: this.chip(),
+      openGroups: [...this.openGroups()],
+      groupViews: this.groupViews(),
+      resultCode
+    });
+  }
+
+  setGroupView(code: string, view: PfmGroupView): void {
+    this.groupViews.update(m => ({ ...m, [code]: view }));
   }
 
   setScope(scope: PfmScope): void {
@@ -207,6 +242,7 @@ export class PfmStoreService {
     this.rowsInFlight.clear();
     this.groupRows.set({});
     this.groupState.set({});
+    this.groupViews.set({});
     this.openGroups.set(new Set());
   }
 

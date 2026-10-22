@@ -4,7 +4,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { TooltipModule } from 'primeng/tooltip';
-import { PFM_STATE, PfmStateKey } from '@shared/constants/pfm-status-colors';
+import { PfmStatusRef, statusColor } from '@shared/constants/pfm-status-colors';
+import { PfmEmptyStateComponent } from '../pfm-empty-state/pfm-empty-state.component';
 import { PfmChip, PfmPipeline } from '../../pfm.interfaces';
 
 interface Slice {
@@ -12,15 +13,16 @@ interface Slice {
   label: string;
   stage: string;
   chip: PfmChip;
-  state: PfmStateKey;
+  /** The status the slice stands for: its colour is that status's colour, the same as the table tag. */
+  status: PfmStatusRef;
 }
 
 /** Order around the donut and in the legend; values come from the pipeline stages. */
 export const PFM_PRMS_SLICES: Slice[] = [
-  { key: 'approved', label: 'Approved by PRMS', stage: 'approved', chip: 'prms_approved', state: 'done' },
-  { key: 'pending_review', label: 'Pending review in PRMS', stage: 'pending_review', chip: 'prms_pending', state: 'waiting' },
-  { key: 'rejected', label: 'Rejected by PRMS', stage: 'rejected', chip: 'rejected', state: 'alert' },
-  { key: 'no_sp', label: 'No SP contribution', stage: 'no_sp_contribution', chip: 'no_sp_contribution', state: 'out' }
+  { key: 'approved', label: 'Approved by PRMS', stage: 'approved', chip: 'prms_approved', status: { prms: 'Approved' } },
+  { key: 'pending_review', label: 'Pending review in PRMS', stage: 'pending_review', chip: 'prms_pending', status: { prms: 'Pending Review' } },
+  { key: 'rejected', label: 'Rejected by PRMS', stage: 'rejected', chip: 'rejected', status: { prms: 'Rejected' } },
+  { key: 'no_sp', label: 'No SP contribution', stage: 'no_sp_contribution', chip: 'no_sp_contribution', status: { mapping: 'No SP contribution' } }
 ];
 
 /** Donut geometry (SVG user units). */
@@ -29,7 +31,7 @@ const C = 2 * Math.PI * R;
 
 @Component({
   selector: 'app-pfm-prms-status-card',
-  imports: [DecimalPipe, TooltipModule],
+  imports: [DecimalPipe, TooltipModule, PfmEmptyStateComponent],
   templateUrl: './pfm-prms-status-card.component.html',
   host: { class: 'block h-full' },
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -54,11 +56,12 @@ export class PfmPrmsStatusCardComponent {
         const item = {
           ...s,
           share: Math.round(share * 100),
-          fill: PFM_STATE[s.state].fill,
-          fg: PFM_STATE[s.state].fg,
+          fill: statusColor(s.status),
+          fg: statusColor(s.status),
           dash: `${share * C} ${C - share * C}`,
           dashOffset: -offset * C,
-          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see them.`
+          tip: `${s.label}: ${s.value} (${Math.round(share * 100)}%). Click to see them.`,
+          legendTip: `${s.label}: ${s.value} ${s.value === 1 ? 'result' : 'results'} (${Math.round(share * 100)}%)`
         };
         offset += share;
         return item;

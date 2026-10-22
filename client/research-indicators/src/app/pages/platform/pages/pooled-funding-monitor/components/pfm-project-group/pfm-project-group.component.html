@@ -16,9 +16,9 @@
     >
     <span class="min-w-0 flex-1 basis-60">
       <span class="block text-[15px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-group-name">{{ group().name }}</span>
-      <span class="mt-1 block text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-lead"
-        >Lead PI: {{ group().lead_pi }} · {{ group().donor }}</span
-      >
+      @if (leadLine(); as lead) {
+        <span class="mt-1 block text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-lead">{{ lead }}</span>
+      }
     </span>
     <span class="text-[13px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-group-count">{{ countLabel() }}</span>
     <!-- Same rule and colour as the coverage tab's Reported to PRMS bar (done = in PRMS or no SP contribution) -->
@@ -83,6 +83,9 @@
             [rows]="pageSize()"
             [first]="first()"
             (onPage)="first.set($event.first); pageSize.set($event.rows)"
+            [sortField]="sortField() ?? undefined"
+            [sortOrder]="sortOrder()"
+            (onSort)="onSort($event)"
             [rowsPerPageOptions]="[5, 10, 25, 50]"
             paginatorDropdownAppendTo="body"
             [showCurrentPageReport]="true"

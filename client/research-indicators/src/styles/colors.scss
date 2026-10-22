@@ -76,38 +76,62 @@
   --ac-pfm-warning-border: #e9cf9e;
   --ac-pfm-outscope-fg: var(--ac-state-out-fg);
   // ONE status palette for the CGIAR Portfolio monitor and the result sidebar (client CLAUDE.md rule).
-  // One distinct hue per state, never two tones of one hue; green is reserved for done.
-  // -fg = text / outline (>= 4.5:1 on the surface), -fill = bars and dots (>= 3:1).
+  // One distinct hue per state, never two tones of one hue; no purple for a status (owner).
+  // Greens (owner): mapping Complete = the green of done; PRMS Approved = the STAR Approved sage
+  // #7CB580 / border #A8CEAB (result_status config, same in both themes, never changed here);
+  // No SP contribution = aquamarine, a blue-green, so it never reads as either green.
+  // ONE colour per state (owner): --ac-state-<state> is the value; -fg (text, outline) and -fill
+  // (bars, dots, chart slices, card accents) are aliases of it, so a state is the exact same colour
+  // in a table tag, a quick-view dot, a coverage card and a chart. Change a state here, only here.
+  // Mapping Pending, Mapping pending and Finish the mapping are `progress` (orange); PRMS Pending
+  // Review is `todo` (light grey); `waiting` (bilateral yellow) is only Pending approval by the PI.
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
-  --ac-state-todo-fg: #475569;
-  --ac-state-todo-fill: #64748b;
-  --ac-state-progress-fg: #b45309;
-  --ac-state-progress-fill: #d97706;
-  --ac-state-ready-fg: #1d4ed8;
-  --ac-state-ready-fill: #2563eb;
-  --ac-state-waiting-fg: #6d28d9;
-  --ac-state-waiting-fill: #7c3aed;
-  --ac-state-done-fg: #15803d;
-  --ac-state-done-fill: #16a34a;
-  --ac-state-alert-fg: #b91c1c;
-  --ac-state-alert-fill: #dc2626;
-  --ac-state-out-fg: #0f766e;
-  --ac-state-out-fill: #0d9488;
+  --ac-state-todo: #7b8798;
+  --ac-state-todo-fg: var(--ac-state-todo);
+  --ac-state-todo-fill: var(--ac-state-todo);
+  --ac-state-progress: #c2410c;
+  --ac-state-progress-fg: var(--ac-state-progress);
+  --ac-state-progress-fill: var(--ac-state-progress);
+  --ac-state-ready: #3f74b8;
+  --ac-state-ready-fg: var(--ac-state-ready);
+  --ac-state-ready-fill: var(--ac-state-ready);
+  --ac-state-waiting: #e69f00;
+  --ac-state-waiting-fg: var(--ac-state-waiting);
+  --ac-state-waiting-fill: var(--ac-state-waiting);
+  --ac-state-done: #15803d;
+  --ac-state-done-fg: var(--ac-state-done);
+  --ac-state-done-fill: var(--ac-state-done);
+  --ac-state-complete-fg: var(--ac-state-done);
+  --ac-state-complete-fill: var(--ac-state-done);
+  --ac-state-alert: #b91c1c;
+  --ac-state-alert-fg: var(--ac-state-alert);
+  --ac-state-alert-fill: var(--ac-state-alert);
+  --ac-state-approved: #7cb580;
+  --ac-state-approved-fg: var(--ac-state-approved);
+  --ac-state-approved-fill: var(--ac-state-approved);
+  --ac-state-approved-border: #a8ceab;
+  --ac-state-out: #0e7490;
+  --ac-state-out-fg: var(--ac-state-out);
+  --ac-state-out-fill: var(--ac-state-out);
   --ac-state-empty: #d5dce5;
-  --ac-status-prms-pending: var(--ac-state-waiting-fg);
-  --ac-status-prms-approved: var(--ac-state-done-fg);
+
+  // Owner: PRMS Pending Review is a light grey (waiting on PRMS, nothing for us to do); the
+  // orange stays for CGIAR Portfolio mapping Pending / Mapping pending / Finish the mapping.
+  --ac-status-prms-pending: var(--ac-state-todo-fg);
+  --ac-status-prms-approved: var(--ac-state-approved-fg);
+  --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
-  --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-complete: var(--ac-state-ready-fg);
+  --ac-status-mapping-pending: var(--ac-state-progress-fg);
+  --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
-  --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
-  --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
+  --ac-pfm-seg-not-started: var(--ac-status-mapping-pending);
+  --ac-pfm-seg-incomplete: var(--ac-status-mapping-pending);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
-  --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-approved: var(--ac-state-done-fill);
-  --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
-  --ac-pfm-seg-no-sp: var(--ac-state-out-fill);
+  --ac-pfm-seg-pending: var(--ac-status-prms-pending);
+  --ac-pfm-seg-pending-group: var(--ac-status-prms-pending);
+  --ac-pfm-seg-approved: var(--ac-status-prms-approved);
+  --ac-pfm-seg-rejected: var(--ac-status-prms-rejected);
+  --ac-pfm-seg-no-sp: var(--ac-status-mapping-no-sp);
   --ac-pfm-surface: #ffffff;
   --ac-pfm-surface-border: #e4e9f0;
   --ac-pfm-month-1: #c9d8ee;
@@ -251,38 +275,62 @@ $colors: (
   --ac-pfm-warning-border: #6b5521;
   --ac-pfm-outscope-fg: var(--ac-state-out-fg);
   // ONE status palette for the CGIAR Portfolio monitor and the result sidebar (client CLAUDE.md rule).
-  // One distinct hue per state, never two tones of one hue; green is reserved for done.
-  // -fg = text / outline (>= 4.5:1 on the surface), -fill = bars and dots (>= 3:1).
+  // One distinct hue per state, never two tones of one hue; no purple for a status (owner).
+  // Greens (owner): mapping Complete = the green of done; PRMS Approved = the STAR Approved sage
+  // #7CB580 / border #A8CEAB (result_status config, same in both themes, never changed here);
+  // No SP contribution = aquamarine, a blue-green, so it never reads as either green.
+  // ONE colour per state (owner): --ac-state-<state> is the value; -fg (text, outline) and -fill
+  // (bars, dots, chart slices, card accents) are aliases of it, so a state is the exact same colour
+  // in a table tag, a quick-view dot, a coverage card and a chart. Change a state here, only here.
+  // Mapping Pending, Mapping pending and Finish the mapping are `progress` (orange); PRMS Pending
+  // Review is `todo` (light grey); `waiting` (bilateral yellow) is only Pending approval by the PI.
   // --ac-state-empty is the 'nothing yet' track of a progress bar, deliberately not a state colour.
-  --ac-state-todo-fg: #a8b5c4;
-  --ac-state-todo-fill: #8492a6;
-  --ac-state-progress-fg: #f5b041;
-  --ac-state-progress-fill: #e09b2d;
-  --ac-state-ready-fg: #8ab4ff;
-  --ac-state-ready-fill: #5b8def;
-  --ac-state-waiting-fg: #c0a8ff;
-  --ac-state-waiting-fill: #9a7af0;
-  --ac-state-done-fg: #5fd38d;
-  --ac-state-done-fill: #3fb86f;
-  --ac-state-alert-fg: #ff8a8a;
-  --ac-state-alert-fill: #f06262;
-  --ac-state-out-fg: #3fd6c6;
-  --ac-state-out-fill: #22b3a4;
+  --ac-state-todo: #8c99aa;
+  --ac-state-todo-fg: var(--ac-state-todo);
+  --ac-state-todo-fill: var(--ac-state-todo);
+  --ac-state-progress: #fb923c;
+  --ac-state-progress-fg: var(--ac-state-progress);
+  --ac-state-progress-fill: var(--ac-state-progress);
+  --ac-state-ready: #8bbcf0;
+  --ac-state-ready-fg: var(--ac-state-ready);
+  --ac-state-ready-fill: var(--ac-state-ready);
+  --ac-state-waiting: #f2c14e;
+  --ac-state-waiting-fg: var(--ac-state-waiting);
+  --ac-state-waiting-fill: var(--ac-state-waiting);
+  --ac-state-done: #5fd38d;
+  --ac-state-done-fg: var(--ac-state-done);
+  --ac-state-done-fill: var(--ac-state-done);
+  --ac-state-complete-fg: var(--ac-state-done);
+  --ac-state-complete-fill: var(--ac-state-done);
+  --ac-state-alert: #ff8a8a;
+  --ac-state-alert-fg: var(--ac-state-alert);
+  --ac-state-alert-fill: var(--ac-state-alert);
+  --ac-state-approved: #7cb580;
+  --ac-state-approved-fg: var(--ac-state-approved);
+  --ac-state-approved-fill: var(--ac-state-approved);
+  --ac-state-approved-border: #a8ceab;
+  --ac-state-out: #67e8f9;
+  --ac-state-out-fg: var(--ac-state-out);
+  --ac-state-out-fill: var(--ac-state-out);
   --ac-state-empty: #3d444e;
-  --ac-status-prms-pending: var(--ac-state-waiting-fg);
-  --ac-status-prms-approved: var(--ac-state-done-fg);
+
+  // Owner: PRMS Pending Review is a light grey (waiting on PRMS, nothing for us to do); the
+  // orange stays for CGIAR Portfolio mapping Pending / Mapping pending / Finish the mapping.
+  --ac-status-prms-pending: var(--ac-state-todo-fg);
+  --ac-status-prms-approved: var(--ac-state-approved-fg);
+  --ac-status-prms-approved-border: var(--ac-state-approved-border);
   --ac-status-prms-rejected: var(--ac-state-alert-fg);
-  --ac-status-mapping-pending: var(--ac-state-todo-fg);
-  --ac-status-mapping-complete: var(--ac-state-ready-fg);
+  --ac-status-mapping-pending: var(--ac-state-progress-fg);
+  --ac-status-mapping-complete: var(--ac-state-complete-fg);
   --ac-status-mapping-no-sp: var(--ac-state-out-fg);
-  --ac-pfm-seg-not-started: var(--ac-state-todo-fill);
-  --ac-pfm-seg-incomplete: var(--ac-state-progress-fill);
+  --ac-pfm-seg-not-started: var(--ac-status-mapping-pending);
+  --ac-pfm-seg-incomplete: var(--ac-status-mapping-pending);
   --ac-pfm-seg-ready: var(--ac-state-ready-fill);
-  --ac-pfm-seg-pending: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-pending-group: var(--ac-state-waiting-fill);
-  --ac-pfm-seg-approved: var(--ac-state-done-fill);
-  --ac-pfm-seg-rejected: var(--ac-state-alert-fill);
-  --ac-pfm-seg-no-sp: var(--ac-state-out-fill);
+  --ac-pfm-seg-pending: var(--ac-status-prms-pending);
+  --ac-pfm-seg-pending-group: var(--ac-status-prms-pending);
+  --ac-pfm-seg-approved: var(--ac-status-prms-approved);
+  --ac-pfm-seg-rejected: var(--ac-status-prms-rejected);
+  --ac-pfm-seg-no-sp: var(--ac-status-mapping-no-sp);
   --ac-pfm-surface: #23272d;
   --ac-pfm-surface-border: #363c45;
   --ac-pfm-month-1: #3a516e;

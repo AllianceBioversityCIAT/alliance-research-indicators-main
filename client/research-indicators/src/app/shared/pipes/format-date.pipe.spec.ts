@@ -1,3 +1,4 @@
+import { DATE_FORMAT_CONFIG_FIXTURE } from '../../testing/date-format-config.mock';
 import { TestBed } from '@angular/core/testing';
 import { FormatDatePipe } from './format-date.pipe';
 import { DateFormatConfigService } from '@shared/services/date-format-config.service';
@@ -37,5 +38,12 @@ describe('FormatDatePipe', () => {
   it('should return empty string when value is invalid date string', () => {
     const result = pipe.transform('not-a-date');
     expect(result).toBe('');
+  });
+
+  it("mode 'date' gives only the configured date, no time", () => {
+    const value = pipe.transform('2026-10-03T14:05:00.000Z', DATE_FORMAT_CONFIG_FIXTURE, 'date');
+    expect(value).toBe('03/10/2026');
+    expect(pipe.transform('2026-10-03T14:05:00.000Z', DATE_FORMAT_CONFIG_FIXTURE)).toContain(' at ');
+    expect(pipe.transform(null, DATE_FORMAT_CONFIG_FIXTURE, 'date')).toBe('');
   });
 });

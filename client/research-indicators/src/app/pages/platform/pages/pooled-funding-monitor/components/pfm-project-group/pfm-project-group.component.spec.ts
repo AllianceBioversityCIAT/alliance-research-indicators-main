@@ -1,3 +1,5 @@
+import { PfmGroupView } from '../../pfm-return-state';
+import { provideDateFormatConfigMock } from '../../../../../../testing/date-format-config.mock';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -42,7 +44,8 @@ const row = (over: Partial<PfmResultRow>): PfmResultRow => ({
   ...over
 });
 
-function setup(group: PfmGroup = GROUP) {
+function setup(group: PfmGroup = GROUP, views: Record<string, PfmGroupView> = {}) {
+  const groupViews = signal<Record<string, PfmGroupView>>(views);
   const store = {
     openGroups: signal<ReadonlySet<string>>(new Set()),
     groupRows: signal<Record<string, PfmResultRow[]>>({}),
@@ -56,12 +59,14 @@ function setup(group: PfmGroup = GROUP) {
       }
       store.openGroups.set(s);
     }),
-    retryGroup: jest.fn()
+    retryGroup: jest.fn(),
+    groupViews,
+    setGroupView: jest.fn((code: string, view: PfmGroupView) => groupViews.update(m => ({ ...m, [code]: view })))
   };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [PfmProjectGroupComponent],
-    providers: [{ provide: PfmStoreService, useValue: store }, provideRouter([])]
+    providers: [{ provide: PfmStoreService, useValue: store }, provideRouter([]), provideDateFormatConfigMock()]
   });
   const fixture = TestBed.createComponent(PfmProjectGroupComponent);
   fixture.componentRef.setInput('group', group);
@@ -77,11 +82,21 @@ describe('PfmProjectGroupComponent', () => {
     expect(q('pfm-group-body')).toBeNull();
   });
 
-  it('header shows code, name, lead PI · donor, count and the attention flag', () => {
+  // Owner: say what each value is, and write the PI as people read a name.
+  it('only the Principal Investigator, first name first and title-cased; no donor', () => {
+    const { q } = setup({ ...GROUP, lead_pi: 'ZUNIGA PINO, DANIELA', donor: 'CROP TRUST' });
+    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Principal Investigator: Daniela Zuniga Pino');
+  });
+
+  it('no PI: no line at all, never an empty label', () => {
+    expect(setup({ ...GROUP, lead_pi: null }).q('pfm-group-lead')).toBeNull();
+  });
+
+  it('header shows code, name, Principal Investigator, count and the attention flag', () => {
     const { q } = setup();
     expect(q('pfm-group-code')?.textContent?.trim()).toBe('P100');
     expect(q('pfm-group-name')?.textContent?.trim()).toBe('Alpha project');
-    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Lead PI: A. PI · Donor X');
+    expect(q('pfm-group-lead')?.textContent?.trim()).toBe('Principal Investigator: A. Pi');
     // done (3 approved + 2 pending + 1 no SP) of all results
     expect(q('pfm-group-count')?.textContent?.trim()).toBe('6 of 7 results');
     expect(q('pfm-group-flag')?.textContent?.trim()).toBe('2 need attention');
@@ -103,6 +118,14 @@ describe('PfmProjectGroupComponent', () => {
   });
 
   // Same rule and colour as the coverage tab's Reported to PRMS bar.
+  // Owner 2026-10-22: anything in PRMS is done, rejected included.
+  it('rejected results count as done (in PRMS); only nothing-in-PRMS-yet is left', () => {
+    const { el, fixture } = setup({ ...GROUP, result_count: 7, counts: { approved: 1, pending: 1, rejected: 2, out_of_scope: 1, not_sent: 2 } });
+    const bar = el.querySelector('[data-testid="pfm-group-bar"]') as HTMLElement;
+    expect((bar.children[0] as HTMLElement).style.width).toBe(`${(5 / 7) * 100}%`);
+    expect(fixture.componentInstance.countLabel()).toBe('5 of 7 results');
+  });
+
   it('bar is ONE green part = in PRMS (approved + pending review) + no SP contribution, over the grey rest', () => {
     const { el, fixture } = setup();
     const bar = el.querySelector('[data-testid="pfm-group-bar"]') as HTMLElement;
@@ -120,8 +143,8 @@ describe('PfmProjectGroupComponent', () => {
     expect(summary.textContent).toBe('6 of 7 done: in PRMS or with no SP contribution');
   });
 
-  it('nothing done: no green part, only the grey track', () => {
-    const { el } = setup({ ...GROUP, counts: { approved: 0, pending: 0, rejected: 2, out_of_scope: 0, not_sent: 5 } });
+  it('nothing done (nothing in PRMS, nothing out of scope): no green part, only the grey track', () => {
+    const { el } = setup({ ...GROUP, counts: { approved: 0, pending: 0, rejected: 0, out_of_scope: 0, not_sent: 7 } });
     expect(el.querySelector('[data-testid="pfm-group-done"]')).toBeNull();
   });
 
@@ -308,7 +331,7 @@ describe('PfmProjectGroupComponent', () => {
     (el.querySelector('[data-testid="pfm-col-updated_sort"]') as HTMLElement).click();
     fixture.detectChanges();
     // label order would put "01 Feb" first; the instant puts 2 Jan first
-    expect(bodyRows().map(r => r.querySelector('[data-testid="pfm-row-updated"]')?.textContent?.trim())).toEqual(['02 Jan, 10:00', '01 Feb, 10:00']);
+    expect(bodyRows().map(r => r.querySelector('[data-testid="pfm-row-updated"]')?.textContent?.trim())).toEqual(['02/01/2026', '01/02/2026']);
   });
 });
 
@@ -356,5 +379,47 @@ describe('project table search helpers', () => {
 
   it('sort values: lower-case title, SP codes, ISO updated ("" when unknown)', () => {
     expect([r.title_sort, r.sp_sort, r.updated_sort, r.star_sort]).toEqual(['climate seed vault', 'SP13', '', 'Approved']);
+  });
+
+  // Owner 2026-10-22: back from a result, each project table is where the user left it.
+  describe('table view kept for a return from a result', () => {
+    const many = () => Array.from({ length: 12 }, (_, i) => row({ result_code: `STAR-${i + 1}`, official_code: i + 1, title: `Result ${i + 1}` }));
+    const report = (el: HTMLElement) => el.querySelector('.p-paginator-current')?.textContent?.trim();
+
+    it('opens on the saved page, page size and search', () => {
+      const ctx = setup(GROUP, { P100: { first: 5, rows: 5, search: 'result', sortField: null, sortOrder: 1 } });
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      expect(ctx.fixture.componentInstance.search()).toBe('result');
+      expect(report(ctx.el)).toBe('Showing 6 to 10 of 12 results');
+    });
+
+    it('a saved sort is applied and does not send the table back to page 1', () => {
+      const ctx = setup(GROUP, { P100: { first: 5, rows: 5, search: '', sortField: 'official_code', sortOrder: -1 } });
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      expect(report(ctx.el)).toBe('Showing 6 to 10 of 12 results');
+      const codes = Array.from(ctx.el.querySelectorAll('[data-testid="pfm-row-code-number"]')).map(e => e.textContent?.trim());
+      // descending by code, second page: 7 down to 3
+      expect(codes).toEqual(['007', '006', '005', '004', '003']);
+    });
+
+    it('every page, size, search or sort change is kept in the store', () => {
+      const ctx = setup();
+      ctx.store.openGroups.set(new Set(['P100']));
+      ctx.store.groupRows.set({ P100: many() });
+      ctx.store.groupState.set({ P100: { loading: false, error: false } });
+      ctx.fixture.detectChanges();
+      const cmp = ctx.fixture.componentInstance;
+      cmp.pageSize.set(10);
+      cmp.first.set(10);
+      cmp.onSort({ field: 'updated_sort', order: -1 });
+      ctx.fixture.detectChanges();
+      expect(ctx.store.groupViews()['P100']).toEqual({ first: 10, rows: 10, search: '', sortField: 'updated_sort', sortOrder: -1 });
+    });
   });
 });

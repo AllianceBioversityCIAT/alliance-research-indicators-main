@@ -6,8 +6,9 @@ import { buildResultLink } from '@shared/utils/result-link.util';
 import { PLATFORM_COLOR_MAP } from '@shared/constants/platform-colors';
 import { PfmMappingState, PfmPrmsStatus, PfmResultRow } from '../../pfm.interfaces';
 import { TooltipModule } from 'primeng/tooltip';
+import { FormatDatePipe } from '@shared/pipes/format-date.pipe';
 import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
-import { MAPPING_STATUS_COLOR, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
+import { PRMS_STATUS_BORDER, statusColor } from '@shared/constants/pfm-status-colors';
 
 /** Semantic token pair (foreground doubles as the outline) for a tag; bound as var() strings, never hex. */
 export interface PfmTagTone {
@@ -21,15 +22,15 @@ const solid = (color: string): PfmTagTone => ({ fg: color, border: color });
 
 // Shared with the result sidebar PRMS sync card: never pick these colours here.
 const MAPPING_TONES: Record<PfmMappingState, PfmTagTone> = {
-  Complete: solid(MAPPING_STATUS_COLOR.Complete),
-  Pending: solid(MAPPING_STATUS_COLOR.Pending),
-  'No SP contribution': solid(MAPPING_STATUS_COLOR['No SP contribution'])
+  Complete: solid(statusColor({ mapping: 'Complete' })),
+  Pending: solid(statusColor({ mapping: 'Pending' })),
+  'No SP contribution': solid(statusColor({ mapping: 'No SP contribution' }))
 };
 
 const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
-  'Pending Review': solid(PRMS_STATUS_COLOR.pending),
-  Approved: solid(PRMS_STATUS_COLOR.approved),
-  Rejected: solid(PRMS_STATUS_COLOR.rejected)
+  'Pending Review': solid(statusColor({ prms: 'Pending Review' })),
+  Approved: { fg: statusColor({ prms: 'Approved' }), border: PRMS_STATUS_BORDER.approved },
+  Rejected: solid(statusColor({ prms: 'Rejected' }))
 };
 
 /** One result of a project group. Values are rendered as received; View is the only action (R-PFM-014). */
@@ -37,8 +38,8 @@ const PRMS_TONES: Record<Exclude<PfmPrmsStatus, 'Not sent'>, PfmTagTone> = {
 // so the group gets the Results Center table behaviour (sort, paginator) without moving a column.
 @Component({
   selector: 'tr[app-pfm-result-row]',
-  host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row' },
-  imports: [RouterLink, CustomTagComponent, TooltipModule],
+  host: { class: 'text-[14px]', 'data-testid': 'pfm-result-row', '[attr.data-result-code]': 'row().result_code' },
+  imports: [RouterLink, CustomTagComponent, TooltipModule, FormatDatePipe],
   templateUrl: './pfm-result-row.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

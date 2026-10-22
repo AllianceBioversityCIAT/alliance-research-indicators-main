@@ -3,13 +3,12 @@
 // wherever it appears. Business language, 1–2 lines, no implementation terms.
 
 export const PFM_HELP = {
-  // Quick views (Need attention = Mapping pending + Ready to sync + Rejected)
+  // Quick views
   allResults: 'Every result of a contributing project in this view, whatever its status.',
-  needAttention: 'Results that still need something from us: finish the mapping, send them to PRMS, or fix what PRMS rejected.',
   mappingIncomplete: 'The CGIAR Portfolio mapping is still Pending: not started yet or partly filled in.',
   readyToSync: 'Mapping complete and not in PRMS yet: these can be sent now.',
   rejected: 'Sent to PRMS and returned by its reviewers. Check the reason, fix the result and sync it again.',
-  synced: 'Already in PRMS: waiting for review or approved. Nothing to do on our side.',
+  synced: 'Already in PRMS, whatever its review status: pending review, approved or rejected. Done on our side.',
 
   // Terms
   outOfScope:

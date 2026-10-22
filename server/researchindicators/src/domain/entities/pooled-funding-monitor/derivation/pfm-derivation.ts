@@ -256,10 +256,10 @@ export const derivePfmRow = (row: PfmRawRow): PfmDerivedRow => {
     isOutOfScope,
     // Ready to sync = mapping complete AND nothing in PRMS yet.
     isReady: mappingState === PfmMappingStateEnum.COMPLETE && notSent,
-    // Need attention = what is still on us: in PRMS scope with nothing in PRMS, or returned by PRMS.
-    // Exactly Mapping incomplete + Ready to sync + Rejected (out of scope needs nothing).
-    needsAttention:
-      (!isOutOfScope && notSent) || prmsStatus === PfmPrmsStatusEnum.REJECTED,
+    // Need attention = what is still on us: in PRMS scope with nothing in PRMS yet. Exactly Mapping
+    // incomplete + Ready to sync. Anything in PRMS, whatever its review status (rejected included),
+    // is done on our side (owner 2026-10-22); out of scope needs nothing.
+    needsAttention: !isOutOfScope && notSent,
   };
 };
 
@@ -278,11 +278,9 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
       return d.isReady;
     case PfmChipEnum.REJECTED:
       return d.prmsStatus === PfmPrmsStatusEnum.REJECTED;
+    // In PRMS, whatever its review status: pending review, approved or rejected (owner 2026-10-22).
     case PfmChipEnum.SYNCED:
-      return (
-        d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW ||
-        d.prmsStatus === PfmPrmsStatusEnum.APPROVED
-      );
+      return d.prmsStatus !== PfmPrmsStatusEnum.NOT_SENT;
     // Still to be approved by the PI in STAR, in PRMS scope, nothing in PRMS yet.
     case PfmChipEnum.AWAITING_PI:
       return (
@@ -294,7 +292,7 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
     // With Need attention and Synced it partitions every monitored result.
     case PfmChipEnum.NO_SP_CONTRIBUTION:
       return d.isOutOfScope && d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT;
-    // One PRMS review status each (the PRMS status chart); Synced = both.
+    // One PRMS review status each (the PRMS status chart); Synced = all three.
     case PfmChipEnum.PRMS_PENDING:
       return d.prmsStatus === PfmPrmsStatusEnum.PENDING_REVIEW;
     case PfmChipEnum.PRMS_APPROVED:
@@ -305,7 +303,7 @@ export const matchesChip = (d: PfmDerivedState, chip: PfmChipEnum): boolean => {
 };
 
 /**
- * Needs attention (in PRMS scope) -> out of scope -> PRMS Pending Review ->
+ * Needs attention (in PRMS scope, nothing in PRMS) -> out of scope -> PRMS Pending Review ->
  * PRMS Approved -> others. Out-of-scope rows also have nothing in PRMS, but
  * there is nothing to act on, so they rank after the actionable ones.
  */

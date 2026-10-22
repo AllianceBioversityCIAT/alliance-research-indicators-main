@@ -1,5 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, NavigationStart, Router, convertToParamMap } from '@angular/router';
+import { Subject } from 'rxjs';
+import { savePfmReturnState } from './pfm-return-state';
 import { signal } from '@angular/core';
 import { ApiService } from '@services/api.service';
 import { RolesService } from '@shared/services/cache/roles.service';
@@ -45,9 +47,10 @@ describe('PooledFundingMonitorComponent', () => {
   let fixture: ComponentFixture<PooledFundingMonitorComponent>;
   let el: HTMLElement;
   let api: { GET_PfmSummary: jest.Mock; GET_PfmQueue: jest.Mock };
+  let routerEvents: Subject<unknown>;
   const q = (id: string) => el.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
   /** The coverage tab's "need action" figure (same summary data the KPI cards used to show). */
-  const needAction = () => q('pfm-progress-open-attention')?.getAttribute('aria-label');
+  const needAction = () => q('pfm-progress-left')?.getAttribute('aria-label');
   const flush = async () => {
     await fixture.whenStable();
     fixture.detectChanges();
@@ -59,7 +62,7 @@ describe('PooledFundingMonitorComponent', () => {
       imports: [PooledFundingMonitorComponent],
       providers: [
         { provide: ApiService, useValue: api },
-        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true) } },
+        { provide: Router, useValue: { navigate: jest.fn().mockResolvedValue(true), events: routerEvents } },
         {
           provide: RolesService,
           useValue: { isAdmin: signal(!!opts.admin), canAccessPooledFundingMonitor: signal(!opts.contributorPi) }
@@ -72,6 +75,8 @@ describe('PooledFundingMonitorComponent', () => {
   }
 
   beforeEach(() => {
+    routerEvents = new Subject<unknown>();
+    sessionStorage.clear();
     api = { GET_PfmSummary: jest.fn(), GET_PfmQueue: jest.fn().mockResolvedValue(ok(queue)) };
   });
 
@@ -93,7 +98,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-coverage-skeleton')).toBeNull();
     expect(q('pfm-kpi-cards')).toBeNull();
-    expect(needAction()).toBe('3 results need action. Click to see them.');
+    expect(needAction()).toBe('3 results still need action.');
   });
 
   it('defaults to the PI scope and swaps to portfolio numbers when toggled', async () => {
@@ -113,7 +118,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('false');
-    expect(needAction()).toBe('123 results need action. Click to see them.');
+    expect(needAction()).toBe('123 results still need action.');
   });
 
   describe('admin default scope (HITL 20)', () => {
@@ -165,37 +170,34 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-pi-empty')).toBeNull();
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
-    expect(needAction()).toBe('123 results need action. Click to see them.');
+    expect(needAction()).toBe('123 results still need action.');
   });
 
   describe('Contributor who is PI / delegate of a project (no other role)', () => {
     beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
 
-    // Owner 2026-10-21: a PI / delegate also sees the whole portfolio, their own results first.
-    it('offers both scopes, Only my results as PI first, and opens on mine', async () => {
+    // Owner 2026-10-21 (DD-PFM-29): a PI / delegate only gets their own results, never the whole portfolio.
+    it('offers only Only my results as PI, and opens on mine', async () => {
       await create({ contributorPi: true });
       fixture.detectChanges();
       await flush();
       const order = Array.from(el.querySelectorAll('[data-testid^="pfm-scope-"]')).map(b => b.getAttribute('data-testid'));
-      expect(order).toEqual(['pfm-scope-mine', 'pfm-scope-all']);
-      expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('true');
+      expect(order).toEqual(['pfm-scope-mine']);
+      expect(q('pfm-scope-all')).toBeNull();
       expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
+      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
     });
 
-    it('can switch to the whole portfolio', async () => {
-      await create({ contributorPi: true });
+    it('ignores ?scope=all in the URL and opens on mine', async () => {
+      await create({ contributorPi: true, params: { scope: 'all' } });
       fixture.detectChanges();
       await flush();
-      q('pfm-scope-all')?.click();
-      await flush();
-      await flush();
-      expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
-      expect(api.GET_PfmSummary).toHaveBeenCalledWith('all');
-      expect(needAction()).toBe('123 results need action. Click to see them.');
+      expect(api.GET_PfmSummary).toHaveBeenCalledWith('mine');
+      expect(api.GET_PfmSummary).not.toHaveBeenCalledWith('all');
     });
 
     // The m.lundy case: PI of many projects, none of them contributing.
-    it('empty PI scope while leading non-contributing projects says so, not "you are not PI", and offers the portfolio', async () => {
+    it('empty PI scope while leading non-contributing projects says so, not "you are not PI", and offers no portfolio', async () => {
       api.GET_PfmSummary.mockImplementation((scope: PfmScope) =>
         Promise.resolve(ok({ ...summary(scope, false), manages_any_project: true }))
       );
@@ -205,7 +207,7 @@ describe('PooledFundingMonitorComponent', () => {
       const notice = q('pfm-pi-empty')?.textContent ?? '';
       expect(notice).toContain('None of your projects contributes to the CGIAR Portfolio');
       expect(notice).not.toContain('You are not PI');
-      expect(q('pfm-pi-empty-switch')?.textContent?.trim()).toBe('View whole portfolio');
+      expect(q('pfm-pi-empty-switch')).toBeNull();
     });
   });
 
@@ -311,7 +313,11 @@ describe('PooledFundingMonitorComponent', () => {
   });
 
   it('a failed summary shows an inline error with Retry; the queue tab still works (R-PFM-016)', async () => {
-    api.GET_PfmSummary.mockRejectedValueOnce(new Error('boom')).mockResolvedValue(ok(summary('mine')));
+    // Reject on a later tick, as a real HTTP failure does: an already-rejected mock promise is flagged
+    // "uncaught" by zone.js before the store's await handles it, and the error then lands in a later test.
+    api.GET_PfmSummary.mockImplementationOnce(() => new Promise((_, reject) => setTimeout(() => reject(new Error('boom'))))).mockResolvedValue(
+      ok(summary('mine'))
+    );
     await create();
     fixture.detectChanges();
     await flush();
@@ -330,7 +336,7 @@ describe('PooledFundingMonitorComponent', () => {
     await flush();
     await flush();
     expect(q('pfm-coverage-error')).toBeNull();
-    expect(needAction()).toBe('3 results need action. Click to see them.');
+    expect(needAction()).toBe('3 results still need action.');
   });
 
   describe('tabs', () => {
@@ -389,5 +395,65 @@ describe('PooledFundingMonitorComponent', () => {
     expect(el.textContent).not.toMatch(/Sync now/i);
     expect(el.textContent).not.toMatch(/PRMS sync:/i);
     expect(el.querySelectorAll('[role="tab"]')).toHaveLength(2);
+  });
+
+  // Owner 2026-10-22: back from a result (breadcrumb or browser Back) = the same place in the queue.
+  describe('return from a result', () => {
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok(summary(scope)))));
+
+    it('leaving for a result opened from the monitor saves the view', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      const store = fixture.componentInstance.store;
+      store.openQueue({ chip: 'ready_to_sync' });
+      store.setGroupView('P100', { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 });
+      routerEvents.next(new NavigationStart(1, '/result/STAR-629/general-information?from=pfm-monitor'));
+      const saved = JSON.parse(sessionStorage.getItem('pfm-monitor-return-state') ?? 'null');
+      expect(saved).toEqual(
+        expect.objectContaining({
+          tab: 'queue',
+          chip: 'ready_to_sync',
+          resultCode: 'STAR-629',
+          groupViews: { P100: { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 } }
+        })
+      );
+    });
+
+    it('coming back restores the queue view, the open projects and their table views, once', async () => {
+      savePfmReturnState({
+        scope: 'mine',
+        tab: 'queue',
+        filters: { project: null, sp: 'SP06', type: null },
+        chip: 'ready_to_sync',
+        openGroups: ['P100'],
+        groupViews: { P100: { first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 } },
+        resultCode: 'STAR-629'
+      });
+      (api as unknown as { GET_PfmProjectResults: jest.Mock }).GET_PfmProjectResults = jest.fn().mockResolvedValue(ok([]));
+      await create();
+      fixture.detectChanges();
+      await flush();
+      const back = fixture.componentInstance.store;
+      expect(back.tab()).toBe('queue');
+      expect(back.chip()).toBe('ready_to_sync');
+      expect(back.filters().sp).toBe('SP06');
+      expect([...back.openGroups()]).toEqual(['P100']);
+      expect(back.groupViews()['P100']).toEqual({ first: 10, rows: 10, search: 'seed', sortField: 'updated_sort', sortOrder: -1 });
+      expect(back.focusResult()).toBe('STAR-629');
+      expect(api.GET_PfmQueue).toHaveBeenCalledWith(expect.objectContaining({ chip: 'ready_to_sync', sp: 'SP06' }));
+      // read once: nothing is left for the next visit
+      expect(sessionStorage.getItem('pfm-monitor-return-state')).toBeNull();
+    });
+
+    it('a navigation that is not to a result from the monitor saves nothing', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      fixture.componentInstance.store.openQueue({ chip: 'synced' });
+      routerEvents.next(new NavigationStart(1, '/results-center'));
+      routerEvents.next(new NavigationStart(2, '/result/STAR-1/general-information?from=results-center'));
+      expect(sessionStorage.getItem('pfm-monitor-return-state')).toBeNull();
+    });
   });
 });

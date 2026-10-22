@@ -4,7 +4,12 @@
 // tabs and the PI-empty / loading / error states. The tab bodies (coverage, queue) are filled by
 // T-11..T-13. Read-only: no Sync button, no "PRMS sync" label (R-PFM-014). Tailwind only, no stylesheet.
 
-import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, OnInit, computed, effect, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationStart, Router } from '@angular/router';
+import { filter } from 'rxjs';
+import { isPfmMonitorEntryFromUrl } from '@shared/constants/result-entry-source';
+import { resultCodeFromUrl } from './pfm-return-state';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
@@ -24,16 +29,45 @@ export default class PooledFundingMonitorComponent implements OnInit {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   private readonly roles = inject(RolesService);
+  private readonly router = inject(Router);
+
+  /**
+   * Leaving for a result opened from the queue (its link carries ?from=pfm-monitor): remember where the
+   * user was, so the breadcrumb or browser Back brings them back to the same projects, pages and sort.
+   */
+  private readonly rememberOnLeave = this.router.events
+    .pipe(
+      filter((e): e is NavigationStart => e instanceof NavigationStart && isPfmMonitorEntryFromUrl(e.url)),
+      takeUntilDestroyed()
+    )
+    .subscribe(e => this.store.saveReturnState(resultCodeFromUrl(e.url)));
+
+  /** Back from a result: once its row is rendered (rows load lazily), bring it into view. */
+  private readonly scrollBack = effect(() => {
+    const code = this.store.focusResult();
+    this.store.groupRows();
+    if (!code) return;
+    setTimeout(() => {
+      const row = this.host.nativeElement.querySelector(`[data-result-code="${CSS.escape(code)}"]`);
+      if (!row) return;
+      row.scrollIntoView({ block: 'center' });
+      this.store.focusResult.set(null);
+    });
+  });
 
   private static readonly MINE = { value: 'mine' as PfmScope, label: 'Only my results as PI' };
   private static readonly ALL = { value: 'all' as PfmScope, label: 'Whole portfolio' };
   /**
-   * Everyone who reaches the page sees both scopes. Admins see the whole portfolio first (and open
-   * on it); everyone else, PIs and delegates included, gets their own results first.
+   * The whole portfolio is for every role other than Contributor. A Contributor reaches this page only
+   * as PI or delegate of a project, so they get their own results only (owner 2026-10-21; the server
+   * refuses scope=all for them). Admins see the whole portfolio first and open on it.
    */
-  readonly scopes: { value: PfmScope; label: string }[] = this.roles.isAdmin()
-    ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
-    : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
+  readonly canSeePortfolio = this.roles.canAccessPooledFundingMonitor();
+  readonly scopes: { value: PfmScope; label: string }[] = !this.canSeePortfolio
+    ? [PooledFundingMonitorComponent.MINE]
+    : this.roles.isAdmin()
+      ? [PooledFundingMonitorComponent.ALL, PooledFundingMonitorComponent.MINE]
+      : [PooledFundingMonitorComponent.MINE, PooledFundingMonitorComponent.ALL];
 
   /**
    * Why the PI scope is empty. A user can lead or delegate projects none of which contributes to the
@@ -56,7 +90,7 @@ export default class PooledFundingMonitorComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine' });
+    this.store.init({ defaultScope: this.roles.isAdmin() ? 'all' : 'mine', allowedScopes: this.scopes.map(s => s.value) });
   }
 
   selectScope(scope: PfmScope): void {

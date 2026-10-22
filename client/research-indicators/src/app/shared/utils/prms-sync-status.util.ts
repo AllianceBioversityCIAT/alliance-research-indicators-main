@@ -1,5 +1,5 @@
 import { PrmsSyncHistoryEvent } from '@shared/interfaces/prms-sync-history.interface';
-import { PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
+import { PRMS_STATUS_BORDER, PRMS_STATUS_COLOR } from '@shared/constants/pfm-status-colors';
 
 export type SyncStatusTone = 'success' | 'warning' | 'danger';
 
@@ -20,6 +20,13 @@ export const SYNC_TAG_COLOR: Record<SyncStatusTone, string> = {
   warning: PRMS_STATUS_COLOR.pending,
   success: PRMS_STATUS_COLOR.approved,
   danger: PRMS_STATUS_COLOR.rejected
+};
+
+/** Tag outline, same source as the monitor table (Approved = the STAR Approved border). */
+export const SYNC_TAG_BORDER: Record<SyncStatusTone, string> = {
+  warning: PRMS_STATUS_BORDER.pending,
+  success: PRMS_STATUS_BORDER.approved,
+  danger: PRMS_STATUS_BORDER.rejected
 };
 
 function isApprove(value: string | null): boolean {

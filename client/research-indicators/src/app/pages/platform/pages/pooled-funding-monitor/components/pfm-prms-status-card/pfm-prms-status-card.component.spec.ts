@@ -38,23 +38,28 @@ describe('PfmPrmsStatusCardComponent', () => {
     expect(q('pfm-prms-total')?.textContent?.trim()).toBe('61');
   });
 
-  it('legend: approved / pending review / rejected / no SP contribution with count and share', () => {
-    const { el } = render(pipe(13, 8, 7, 33));
-    const rows = Array.from(el.querySelectorAll('[data-testid^="pfm-prms-legend-"]'))
-      .filter(r => r.getAttribute('data-testid') !== 'pfm-prms-legend-value')
-      .map(r => Array.from(r.querySelectorAll('span')).map(x => x.textContent?.trim()).filter(Boolean).join(' | '));
-    expect(rows).toEqual([
-      'Approved by PRMS | 13 | (21%)',
-      'Pending review in PRMS | 8 | (13%)',
-      'Rejected by PRMS | 7 | (11%)',
-      'No SP contribution | 33 | (54%)'
+  // Owner: compact legend — category only; count and share in the tooltip.
+  it('legend shows only the categories; count and share are in its tooltip', () => {
+    const { el, fixture } = render(pipe(13, 8, 7, 33));
+    const rows = Array.from(el.querySelectorAll('[data-testid="pfm-prms-legend"] button'));
+    expect(rows.map(r => r.textContent?.trim())).toEqual(['Approved by PRMS', 'Pending review in PRMS', 'Rejected by PRMS', 'No SP contribution']);
+    expect(el.querySelector('[data-testid="pfm-prms-legend-value"]')).toBeNull();
+    const tips = fixture.debugElement
+      .queryAll(By.directive(Tooltip))
+      .filter(d => el.querySelector('[data-testid="pfm-prms-legend"]')!.contains(d.nativeElement))
+      .map(d => d.injector.get(Tooltip).content);
+    expect(tips).toEqual([
+      'Approved by PRMS: 13 results (21%)',
+      'Pending review in PRMS: 8 results (13%)',
+      'Rejected by PRMS: 7 results (11%)',
+      'No SP contribution: 33 results (54%)'
     ]);
   });
 
   it('slices are sized by share and use the shared palette', () => {
     const { fixture } = render(pipe(13, 8, 7, 33));
     const items = fixture.componentInstance.slices().items;
-    expect(items.map(i => i.fill)).toEqual(['var(--ac-state-done-fill)', 'var(--ac-state-waiting-fill)', 'var(--ac-state-alert-fill)', 'var(--ac-state-out-fill)']);
+    expect(items.map(i => i.fill)).toEqual(['var(--ac-status-prms-approved)', 'var(--ac-status-prms-pending)', 'var(--ac-status-prms-rejected)', 'var(--ac-status-mapping-no-sp)']);
     const C = fixture.componentInstance.circumference;
     const len = (i: number) => Number(items[i].dash.split(' ')[0]);
     expect(len(0) + len(1) + len(2) + len(3)).toBeCloseTo(C, 6);
@@ -81,9 +86,9 @@ describe('PfmPrmsStatusCardComponent', () => {
     expect((q('pfm-prms-legend-rejected') as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('nothing in PRMS yet: one line, no donut', () => {
+  it('nothing in PRMS yet: the shared "Nothing yet" state, no donut', () => {
     const { q } = render(pipe(0, 0, 0, 0));
-    expect(q('pfm-prms-status-empty')?.textContent?.trim()).toBe('Nothing in PRMS yet.');
+    expect(q('pfm-empty-state')?.textContent?.trim()).toBe('Nothing yet');
     expect(q('pfm-prms-donut')).toBeNull();
   });
 });

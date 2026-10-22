@@ -208,8 +208,8 @@ describe('pfm-aggregation', () => {
         projects: 4,
         projects_total: 20,
         monitored: 13,
-        need_attention: 8,
-        synced: 3,
+        need_attention: 7,
+        synced: 4,
         in_prms_scope: 11,
       });
       expect(s.synced_this_year).toBe(5);
@@ -221,12 +221,11 @@ describe('pfm-aggregation', () => {
       const prms = s.pipeline.stages.filter((x) => x.group === 'in_prms');
       expect(prms.map((x) => x.value)).toEqual([1, 2, 1]);
       expect(s.kpis.synced).toBe(q.chip_counts.synced);
-      // Need attention = Mapping incomplete + Ready to sync + Rejected; + Synced = the PRMS scope.
-      expect(
-        q.chip_counts.mapping +
-          q.chip_counts.ready +
-          q.chip_counts.prms_rejected,
-      ).toBe(s.kpis.need_attention);
+      // Need attention = Mapping incomplete + Ready to sync (anything in PRMS is done, rejected
+      // included: owner 2026-10-22); + Synced = the PRMS scope.
+      expect(q.chip_counts.mapping + q.chip_counts.ready).toBe(
+        s.kpis.need_attention,
+      );
       expect(s.kpis.need_attention + s.kpis.synced).toBe(s.kpis.in_prms_scope);
       expect(s.chip_counts).toEqual(q.chip_counts);
     });
@@ -303,26 +302,28 @@ describe('pfm-aggregation', () => {
       const q = buildPfmQueue(derived, {});
       expect(q.chip_counts).toEqual({
         all: 13,
-        attention: 8,
+        attention: 7,
         mapping: 5,
         ready: 2,
         prms_rejected: 1,
-        synced: 3,
+        synced: 4,
         awaiting_pi: 4, // r2 Submitted, r5 Draft, r9 Under review, r10 Returned
         no_sp: 2, // r6, r12
         prms_pending: 1, // r7
         prms_approved: 2, // r4, r11
       });
-      // Synced = Pending review + Approved.
-      expect(q.chip_counts.prms_pending + q.chip_counts.prms_approved).toBe(
-        q.chip_counts.synced,
-      );
+      // Synced = Pending review + Approved + Rejected: in PRMS, whatever its review status.
+      expect(
+        q.chip_counts.prms_pending +
+          q.chip_counts.prms_approved +
+          q.chip_counts.prms_rejected,
+      ).toBe(q.chip_counts.synced);
       // Need attention + Synced + No SP contribution partition every result.
       expect(
         q.chip_counts.attention + q.chip_counts.synced + q.chip_counts.no_sp,
       ).toBe(q.chip_counts.all);
-      // P-B and P-C tie on attention (2): P-B first by code.
-      expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-B', 'P-C', 'P-D']);
+      // P-C (2 need attention) before P-B (1: its rejected result is done, owner 2026-10-22).
+      expect(q.groups.map((g) => g.code)).toEqual(['P-A', 'P-C', 'P-B', 'P-D']);
       expect(q.groups[0]).toEqual({
         code: 'P-A',
         name: 'Project P-A',
@@ -338,20 +339,23 @@ describe('pfm-aggregation', () => {
           not_sent: 3,
         },
       });
-      expect(q.groups[1].counts).toEqual({
+      const group = (code: string) => q.groups.find((g) => g.code === code)!;
+      expect(group('P-B').counts).toEqual({
         approved: 0,
         pending: 1,
         rejected: 1,
         out_of_scope: 1,
         not_sent: 1,
       });
-      expect(q.groups[2].counts).toEqual({
+      expect(group('P-B').attention).toBe(1);
+      expect(group('P-C').counts).toEqual({
         approved: 1,
         pending: 0,
         rejected: 0,
         out_of_scope: 1,
         not_sent: 2,
       });
+      expect(group('P-C').attention).toBe(2);
       expect(q.groups.map((g) => g.result_count)).toEqual([4, 4, 4, 1]);
       expect(q.totals).toEqual({
         results: 13,
@@ -575,9 +579,9 @@ describe('pfm-aggregation', () => {
   });
 
   describe('row ranking (R-PFM-012)', () => {
-    it('ranks attention, out of scope, pending, approved, rest; stable on ties', () => {
+    it('ranks attention, out of scope, pending, approved, rest (rejected); stable on ties', () => {
       expect(ids(rankPfmRows(derived))).toEqual([
-        1, 2, 3, 13, 5, 8, 9, 10, 6, 12, 7, 4, 11,
+        1, 2, 3, 13, 5, 9, 10, 6, 12, 7, 4, 11, 8,
       ]);
     });
   });

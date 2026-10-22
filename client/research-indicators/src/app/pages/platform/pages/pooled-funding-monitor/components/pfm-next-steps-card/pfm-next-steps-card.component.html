@@ -1,34 +1,42 @@
+
 <section
   class="rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-5 md:p-6"
   data-testid="pfm-next-steps-card"
   aria-labelledby="pfm-next-steps-title">
-  <h2 id="pfm-next-steps-title" class="m-0 text-[16px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">What to do next</h2>
-  @if (allDone()) {
-    <p class="m-0 mt-2 text-[14px] text-[var(--ac-grey-900)]" data-testid="pfm-next-steps-done">Nothing left to do on our side.</p>
+  <h2 id="pfm-next-steps-title" class="m-0 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]">What to do next</h2>
+  @if (counts().all === 0) {
+    <app-pfm-empty-state />
+  } @else if (allDone()) {
+    <app-pfm-empty-state message="Nothing left to do on our side" data-testid="pfm-next-steps-done" />
   } @else {
     <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Click a card to see those results.</p>
-    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-3 p-0 md:grid-cols-3">
+    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-3">
       @for (s of steps(); track s.chip) {
         <li>
+          <!-- The whole card is the action: tinted in its state colour, with a bar for its share of all results -->
           <button
             type="button"
-            class="flex h-full w-full cursor-pointer flex-col items-start gap-2 rounded-lg border border-solid border-l-[4px] border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] p-4 text-left transition-colors duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-[var(--ac-pfm-surface)]"
-            [style.border-left-color]="s.fill"
+            class="flex h-full w-full cursor-pointer flex-col gap-3 rounded-xl border border-solid border-transparent p-4 text-left focus-visible:outline focus-visible:outline-2 disabled:cursor-default disabled:opacity-60"
+            [style.background-color]="s.tint"
+            [style.border-color]="s.value ? s.edge : null"
             [disabled]="s.value === 0"
             [attr.aria-label]="s.title + ': ' + s.value + ' results. ' + s.hint"
             [attr.data-testid]="'pfm-next-' + s.chip"
             (click)="open.emit(s.chip)">
-            <span class="flex items-center gap-2 text-[14px] font-semibold text-[var(--ac-pfm-accent-navy)]">
-              <i class="pi {{ s.icon }} !text-[13px]" [style.color]="s.fg" aria-hidden="true"></i>
-              {{ s.title }}
-            </span>
-            <span class="text-[32px] font-bold leading-none tabular-nums" [style.color]="s.value ? s.fg : null" data-testid="pfm-next-value">{{ s.value | number }}</span>
-            <span class="text-[12px] text-[var(--ac-pfm-neutral-fg)]">{{ s.value ? s.hint : 'Nothing to do here.' }}</span>
-            @if (s.value) {
-              <span class="mt-auto inline-flex items-center gap-1 text-[12px] font-semibold" [style.color]="s.fg">
-                View results <i class="pi pi-arrow-right !text-[10px]" aria-hidden="true"></i>
+            <span class="flex items-center gap-3">
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" [style.background-color]="s.fill" aria-hidden="true">
+                <i class="pi {{ s.icon }} !text-[14px] text-[var(--ac-pfm-surface)]"></i>
               </span>
-            }
+              <span class="text-[14px] font-semibold leading-5 text-[var(--ac-pfm-accent-navy)]">{{ s.title }}</span>
+            </span>
+            <span class="flex items-baseline gap-2">
+              <span class="text-[32px] font-bold leading-none tabular-nums" [style.color]="s.value ? s.fg : null" data-testid="pfm-next-value">{{ s.value | number }}</span>
+              <span class="text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-next-share">of {{ counts().all | number }} results</span>
+            </span>
+            <span class="block h-[6px] w-full overflow-hidden rounded-full bg-[var(--ac-pfm-surface)]" aria-hidden="true">
+              <span class="block h-full rounded-full" [style.width.%]="s.share" [style.background-color]="s.fill"></span>
+            </span>
+            <span class="text-[12px] leading-[18px] text-[var(--ac-pfm-neutral-fg)]">{{ s.value ? s.hint : 'Nothing to do here.' }}</span>
           </button>
         </li>
       }

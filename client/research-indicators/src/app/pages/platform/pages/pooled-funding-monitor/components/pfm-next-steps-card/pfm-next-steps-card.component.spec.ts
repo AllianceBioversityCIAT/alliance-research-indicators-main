@@ -16,18 +16,28 @@ function render(c: PfmChipCounts = COUNTS) {
   return { fixture, el, q, opened };
 }
 
+const fixtureShares = (el: HTMLElement) =>
+  Array.from(el.querySelectorAll('button')).map(b => Number.parseFloat((b.querySelector('[data-testid="pfm-next-share"]')!.parentElement!.nextElementSibling!.firstElementChild as HTMLElement).style.width));
+
 describe('PfmNextStepsCardComponent', () => {
   it('PI approval first, then the mapping, then the sync; no "Fix and send again"', () => {
     const { el, q } = render();
     const order = Array.from(el.querySelectorAll('[data-testid^="pfm-next-"]'))
       .map(b => b.getAttribute('data-testid'))
-      .filter(id => !['pfm-next-value', 'pfm-next-steps-done', 'pfm-next-steps-card'].includes(id ?? ''));
+      .filter(id => !['pfm-next-value', 'pfm-next-share', 'pfm-next-steps-done', 'pfm-next-steps-card'].includes(id ?? ''));
     expect(order).toEqual(['pfm-next-awaiting_pi', 'pfm-next-mapping_incomplete', 'pfm-next-ready_to_sync']);
     expect(q('pfm-next-rejected')).toBeNull();
     expect(el.textContent).not.toContain('Fix and send again');
     const value = (chip: string) => q('pfm-next-' + chip)?.querySelector('[data-testid="pfm-next-value"]')?.textContent?.trim();
     expect(q('pfm-next-awaiting_pi')?.textContent).toContain('Pending approval by the PI');
     expect([value('awaiting_pi'), value('mapping_incomplete'), value('ready_to_sync')]).toEqual(['45', '70', '36']);
+  });
+
+  it('the card itself is the link: no "View results" line; it shows its share of all results', () => {
+    const { el, q } = render();
+    expect(el.textContent).not.toContain('View results');
+    expect(q('pfm-next-awaiting_pi')?.querySelector('[data-testid="pfm-next-share"]')?.textContent?.trim()).toBe('of 167 results');
+    expect(fixtureShares(el)).toEqual([27, 42, 22]);
   });
 
   it('a click opens the Results queue on that view', () => {
@@ -51,7 +61,13 @@ describe('PfmNextStepsCardComponent', () => {
 
   it('all done: one line, no cards', () => {
     const { q, el } = render({ ...COUNTS, mapping: 0, ready: 0, awaiting_pi: 0 });
-    expect(q('pfm-next-steps-done')?.textContent?.trim()).toBe('Nothing left to do on our side.');
+    expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing left to do on our side');
+    expect(el.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('no results at all: the shared "Nothing yet" state, no cards', () => {
+    const { el } = render({ all: 0, attention: 0, mapping: 0, ready: 0, prms_rejected: 0, synced: 0, awaiting_pi: 0, no_sp: 0 });
+    expect(el.querySelector('[data-testid="pfm-empty-state"]')?.textContent?.trim()).toBe('Nothing yet');
     expect(el.querySelectorAll('button')).toHaveLength(0);
   });
 });
