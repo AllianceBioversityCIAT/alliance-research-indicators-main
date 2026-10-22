@@ -52,13 +52,15 @@
           styleClass="w-full !h-[40px] !items-center !rounded-lg !border-[color:var(--ac-pfm-surface-border)] !bg-[var(--ac-pfm-surface)] !text-[14px] !text-[var(--ac-pfm-accent-navy)]"
           data-testid="pfm-filter-type" />
       </div>
-      <button
-        type="button"
-        class="h-[40px] cursor-pointer rounded-lg border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-4 text-[13px] font-medium text-[var(--ac-pfm-neutral-fg)] transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+      <!-- Same "Clear" text button as the tables (search-export-controls) -->
+      <p-button
+        styleClass="!h-[40px] !text-[12px] !text-[var(--ac-grey-700)]"
+        label="Clear"
+        [text]="true"
+        size="small"
+        severity="secondary"
         data-testid="pfm-reset"
-        (click)="store.resetFilters()">
-        Reset
-      </button>
+        (onClick)="store.resetFilters()" />
     </div>
 
     <hr class="m-0 border-0 border-t border-solid border-[color:var(--ac-pfm-surface-border)]" aria-hidden="true" />
@@ -94,7 +96,7 @@
                 activeChip() === c.key ? 'bg-[var(--ac-pfm-accent-navy)] text-[var(--ac-pfm-surface)]' : 'bg-[var(--ac-pfm-neutral-bg)]'
               }}"
               data-testid="pfm-chip-count"
-              >{{ q.chip_counts[c.count] }}</span
+              >{{ q.chip_counts[c.count] ?? 0 }}</span
             >
           }
         </button>

@@ -1,5 +1,6 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-11 (R-PFM-006..008)
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { PfmChip, PfmChipCounts, PfmScope, PfmSummary } from '../../pfm.interfaces';
 import { PfmNextStepsCardComponent } from '../pfm-next-steps-card/pfm-next-steps-card.component';
 import { PfmProgressCardComponent } from '../pfm-progress-card/pfm-progress-card.component';
@@ -20,7 +21,7 @@ export interface PfmQueueTarget {
  */
 @Component({
   selector: 'app-pfm-coverage-tab',
-  imports: [PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmPrmsStatusCardComponent, PfmSyncActivityCardComponent],
+  imports: [DecimalPipe, PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmPrmsStatusCardComponent, PfmSyncActivityCardComponent],
   templateUrl: './pfm-coverage-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

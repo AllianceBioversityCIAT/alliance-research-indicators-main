@@ -29,7 +29,7 @@ describe('PfmNextStepsCardComponent', () => {
     expect(q('pfm-next-rejected')).toBeNull();
     expect(el.textContent).not.toContain('Fix and send again');
     const value = (chip: string) => q('pfm-next-' + chip)?.querySelector('[data-testid="pfm-next-value"]')?.textContent?.trim();
-    expect(q('pfm-next-awaiting_pi')?.textContent).toContain('Pending approval by the PI');
+    expect(q('pfm-next-awaiting_pi')?.textContent).toContain('Approve the results');
     expect([value('awaiting_pi'), value('mapping_incomplete'), value('ready_to_sync')]).toEqual(['45', '70', '36']);
   });
 

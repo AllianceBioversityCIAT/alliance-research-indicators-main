@@ -98,7 +98,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-coverage-skeleton')).toBeNull();
     expect(q('pfm-kpi-cards')).toBeNull();
-    expect(needAction()).toBe('3 results still need action.');
+    expect(needAction()).toBe('3 results still need action. Click to see them.');
   });
 
   it('defaults to the PI scope and swaps to portfolio numbers when toggled', async () => {
@@ -118,7 +118,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
     expect(q('pfm-scope-mine')?.getAttribute('aria-pressed')).toBe('false');
-    expect(needAction()).toBe('123 results still need action.');
+    expect(needAction()).toBe('123 results still need action. Click to see them.');
   });
 
   describe('admin default scope (HITL 20)', () => {
@@ -170,7 +170,7 @@ describe('PooledFundingMonitorComponent', () => {
 
     expect(q('pfm-pi-empty')).toBeNull();
     expect(q('pfm-scope-all')?.getAttribute('aria-pressed')).toBe('true');
-    expect(needAction()).toBe('123 results still need action.');
+    expect(needAction()).toBe('123 results still need action. Click to see them.');
   });
 
   describe('Contributor who is PI / delegate of a project (no other role)', () => {
@@ -336,7 +336,7 @@ describe('PooledFundingMonitorComponent', () => {
     await flush();
     await flush();
     expect(q('pfm-coverage-error')).toBeNull();
-    expect(needAction()).toBe('3 results still need action.');
+    expect(needAction()).toBe('3 results still need action. Click to see them.');
   });
 
   describe('tabs', () => {

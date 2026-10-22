@@ -16,12 +16,12 @@ function render(c: PfmChipCounts) {
 }
 
 describe('PfmProgressCardComponent', () => {
-  it('done = in PRMS + no SP contribution, over every result: the legend above, the percentage inside the bar, no count line', () => {
+  it('done = in PRMS + no SP contribution, over every result: the legend above, the percentage inside the bar, and done / total after it', () => {
     const { q, text } = render(counts(21, 113, 33));
     // (21 + 33) / 167
     expect(text('pfm-progress-percent')).toBe('32%');
     expect(q('pfm-progress-done')?.contains(q('pfm-progress-percent'))).toBe(true);
-    expect(q('pfm-progress-count')).toBeNull();
+    expect(q('pfm-progress-count')?.textContent?.trim()).toBe('54 / 167');
     const all = Array.from(q('pfm-progress-card')?.querySelectorAll('[data-testid]') ?? []);
     expect(all.indexOf(q('pfm-progress-legend')!)).toBeLessThan(all.indexOf(q('pfm-progress-bar')!));
     // Owner: no subtitle; the legend and the tooltips say what done means.
@@ -31,14 +31,29 @@ describe('PfmProgressCardComponent', () => {
   });
 
   // Owner: in PRMS and no SP contribution are ONE total, not two pieces of the bar.
-  it('the bar has two parts, done (one total) and still to do, each explained in its tooltip only', () => {
+  it('the bar has two parts, done (one total) and still to do, each explained in its tooltip', () => {
     const { q, el } = render(counts(21, 113, 33));
     const parts = Array.from(q('pfm-progress-bar')!.children).map(c => c.getAttribute('data-testid'));
     expect(parts).toEqual(['pfm-progress-done', 'pfm-progress-left']);
-    expect(q('pfm-progress-done')?.getAttribute('aria-label')).toBe('54 results done: 21 in PRMS and 33 with no SP contribution.');
-    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('113 results still need action.');
+    expect(q('pfm-progress-done')?.getAttribute('aria-label')).toBe('54 results done: 21 in PRMS and 33 with no SP contribution. Click to see the results synced with PRMS.');
+    expect(q('pfm-progress-left')?.getAttribute('aria-label')).toBe('113 results still need action. Click to see them.');
     expect(q('pfm-progress-done')?.style.width).toBe(`${(54 / 167) * 100}%`);
-    expect(el.querySelectorAll('button')).toHaveLength(0);
+    expect(el.querySelectorAll('button')).toHaveLength(2);
+  });
+
+  // Owner: the bar is clickable and opens the quick views.
+  it('done opens Synced with PRMS and still to do opens Need attention', () => {
+    const { fixture, q } = render(counts(21, 113, 33));
+    const opened: string[] = [];
+    fixture.componentInstance.open.subscribe(c => opened.push(c));
+    q('pfm-progress-done')!.click();
+    q('pfm-progress-left')!.click();
+    expect(opened).toEqual(['synced', 'need_attention']);
+  });
+
+  it('shows "done / total" just after the bar', () => {
+    const { text } = render(counts(21, 113, 33));
+    expect(text('pfm-progress-count')).toBe('54 / 167');
   });
 
   it('done is the palette green', () => {

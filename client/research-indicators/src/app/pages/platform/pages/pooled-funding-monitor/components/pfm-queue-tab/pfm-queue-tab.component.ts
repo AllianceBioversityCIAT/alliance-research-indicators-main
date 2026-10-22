@@ -1,6 +1,7 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-12 (R-PFM-009, 010, 014..016)
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, statusColor } from '@shared/constants/pfm-status-colors';
@@ -13,9 +14,12 @@ import { PfmStoreService } from '../../services/pfm-store.service';
 const ALL = '__all__';
 
 /** `dot` = the state colour of that view (same palette as the badges and charts); none for All.
- * Order (owner): the work in the order it happens. Need attention is not a quick view (owner: not needed). */
+ * Order (owner): All, Need attention, then the work in the order it happens. The coverage tab's
+ * progress bar and "What to do next" cards open these same quick views. */
 const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
   { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
+  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
+  { key: 'awaiting_pi', label: 'Pending approval', count: 'awaiting_pi', help: PFM_HELP.pendingApproval, dot: PFM_STATE.waiting.fill },
   { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: statusColor({ mapping: 'Pending' }) },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
   { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
@@ -23,10 +27,7 @@ const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: st
 
 /** Views reachable from the coverage tab that are not shown as quick views. */
 const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
-  // An old link with ?chip=need_attention still opens it, shown as a removable tag.
-  need_attention: 'Need attention',
   rejected: 'Rejected by PRMS',
-  awaiting_pi: 'Pending approval by the PI',
   no_sp_contribution: 'No SP contribution',
   prms_pending: 'Pending review in PRMS',
   prms_approved: 'Approved by PRMS'
@@ -35,7 +36,7 @@ const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
-  imports: [FormsModule, SelectModule, TooltipModule, PfmProjectGroupComponent],
+  imports: [FormsModule, SelectModule, ButtonModule, TooltipModule, PfmProjectGroupComponent],
   templateUrl: './pfm-queue-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

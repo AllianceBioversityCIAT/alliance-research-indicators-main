@@ -21,7 +21,7 @@ export const PFM_NEXT_STEPS: NextStep[] = [
   {
     chip: 'awaiting_pi',
     count: 'awaiting_pi',
-    title: 'Pending approval by the PI',
+    title: 'Approve the results',
     hint: 'Not approved in STAR yet: the PI needs to approve them.',
     color: PFM_STATE.waiting.fill,
     icon: 'pi-user'

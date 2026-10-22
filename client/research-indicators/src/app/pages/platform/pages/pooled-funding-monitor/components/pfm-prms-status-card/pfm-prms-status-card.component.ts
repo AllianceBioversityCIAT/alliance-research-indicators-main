@@ -39,6 +39,7 @@ const C = 2 * Math.PI * R;
 export class PfmPrmsStatusCardComponent {
   pipeline = input.required<PfmPipeline>();
   /** Opens the Results queue on that view. */
+  /** Each slice opens its own view in the queue (shown there as a removable tag). */
   open = output<PfmChip>();
 
   readonly r = R;

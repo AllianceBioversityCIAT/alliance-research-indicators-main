@@ -10,7 +10,7 @@
     <app-pfm-empty-state message="Nothing left to do on our side" data-testid="pfm-next-steps-done" />
   } @else {
     <p class="m-0 mt-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">Click a card to see those results.</p>
-    <ul class="m-0 mt-4 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-3">
+    <ul class="m-0 mt-5 grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-3 md:gap-5">
       @for (s of steps(); track s.chip) {
         <li>
           <!-- The whole card is the action: tinted in its state colour, with a bar for its share of all results -->
