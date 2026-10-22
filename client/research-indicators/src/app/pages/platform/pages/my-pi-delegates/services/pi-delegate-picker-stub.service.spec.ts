@@ -98,6 +98,14 @@ describe('PiDelegatePeoplePickerStubService', () => {
     expect(svc.list()).toHaveLength(0);
   });
 
+  it('main() treats a successful response with null data as an empty list', async () => {
+    mockApi.GET_ActiveUsers.mockResolvedValue({ data: null, successfulRequest: true });
+
+    await svc.main();
+
+    expect(svc.list()).toEqual([]);
+  });
+
   it('main() populates list with correctly mapped DelegateSummary items', async () => {
     const users: ActiveUser[] = [
       { sec_user_id: 10, first_name: 'Alice', last_name: 'Smith', email: 'alice@example.com', carnet: null },

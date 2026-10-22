@@ -1498,4 +1498,67 @@ describe('ByProjectComponent', () => {
       expect(clickSpy).not.toHaveBeenCalled();
     });
   });
+
+  // ── Coverage completion: edge branches ──────────────────────────────────
+
+  describe('edge branches', () => {
+    beforeEach(async () => {
+      await createComponent([PROJECT_WITH_DELEGATES, PROJECT_NO_DELEGATES]);
+    });
+
+    it('formatDate accepts a Date instance', () => {
+      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15 Jan 2024');
+    });
+
+    it('formatDate returns the raw text for an unparseable date', () => {
+      expect(component.formatDate('not-a-date')).toBe('not-a-date');
+    });
+
+    it('role keydown ignores keys that are not arrows (no selection change, no preventDefault)', () => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+      const before = component.roleTerm();
+
+      component.onRoleKeydown(event, 0);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(component.roleTerm()).toBe(before);
+    });
+
+    it('revoke confirmation shows only the code when the project has no name', () => {
+      component.onRevokeDelegate({ ...PROJECT_WITH_DELEGATES, project_name: null as unknown as string }, DELEGATE_A);
+
+      const alert = actionsStub.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.detail).toContain('<strong>PRJ-001</strong></div>');
+      expect(alert.detail).not.toContain(' — ');
+    });
+
+    describe('export', () => {
+      let clickSpy: jest.SpyInstance;
+
+      beforeEach(() => {
+        (globalThis.URL as unknown as { createObjectURL: jest.Mock }).createObjectURL = jest.fn().mockReturnValue('blob:x');
+        (globalThis.URL as unknown as { revokeObjectURL: jest.Mock }).revokeObjectURL = jest.fn();
+        clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+      });
+
+      afterEach(() => clickSpy.mockRestore());
+
+      it('falls back to the filtered rows when the table has no processed data', async () => {
+        Object.defineProperty(component.table(), 'processedData', { configurable: true, get: () => undefined });
+
+        await component.exportTable();
+
+        expect(serviceStub.exportByProject.mock.calls[0][0]).toEqual(component.filteredRows().map(r => r.project_code));
+      });
+
+      it('an empty export file is a failure: error toast and no download', async () => {
+        serviceStub.exportByProject.mockResolvedValue(new Blob([]));
+
+        await component.exportTable();
+
+        expect(actionsStub.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+        expect(clickSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
 });

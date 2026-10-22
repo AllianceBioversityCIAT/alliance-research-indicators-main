@@ -10,6 +10,7 @@ import { Router } from '@angular/router';
 import { resultInterceptor } from '@shared/interceptors/result.interceptor';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 
 describe('ApiService', () => {
@@ -2650,4 +2651,228 @@ describe('ApiService — pool funding outgoing URLs (HttpTestingController, R-PF
   });
 
 
+});
+
+describe('ApiService - remaining endpoint coverage', () => {
+  let service: ApiService;
+  let tp: {
+    get: jest.Mock;
+    post: jest.Mock;
+    patch: jest.Mock;
+    delete: jest.Mock;
+    getWithParams: jest.Mock;
+    postBlob: jest.Mock;
+    getEnv: jest.Mock;
+    http: { delete: jest.Mock };
+  };
+
+  beforeEach(() => {
+    tp = {
+      get: jest.fn().mockResolvedValue({ data: 'get' }),
+      post: jest.fn().mockResolvedValue({ data: 'post' }),
+      patch: jest.fn().mockResolvedValue({ data: 'patch' }),
+      delete: jest.fn().mockResolvedValue({ data: 'delete' }),
+      getWithParams: jest.fn().mockResolvedValue({ data: 'withParams' }),
+      postBlob: jest.fn().mockResolvedValue(new Blob(['x'])),
+      getEnv: jest.fn().mockReturnValue('https://api.test/'),
+      http: { delete: jest.fn() }
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        { provide: ToPromiseService, useValue: tp },
+        { provide: CacheService, useValue: { getCurrentNumericResultId: jest.fn().mockReturnValue(1) } },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: { createEndpoint: jest.fn().mockReturnValue({}) }
+        }
+      ]
+    });
+    service = TestBed.inject(ApiService);
+  });
+
+  it('GET_Portfolio2026SdgTargets gets portfolio-2026-sdg-targets', async () => {
+    await expect(service.GET_Portfolio2026SdgTargets()).resolves.toEqual({ data: 'get' });
+    expect(tp.get).toHaveBeenCalledWith('portfolio-2026-sdg-targets', {});
+  });
+
+  it('PATCH_Portfolio2026SdgTargets patches the body', async () => {
+    const body = { sdg_target_ids: [1, 2] };
+    await expect(service.PATCH_Portfolio2026SdgTargets(body)).resolves.toEqual({ data: 'patch' });
+    expect(tp.patch).toHaveBeenCalledWith('portfolio-2026-sdg-targets', body, {});
+  });
+
+  describe('bilateral project mappings', () => {
+    it('GET_BilateralProjectMappings sends every provided filter as string params', async () => {
+      await service.GET_BilateralProjectMappings({
+        page: 2,
+        limit: 10,
+        search: 'abc',
+        is_active: false,
+        status: 'Complete',
+        source: 'manual'
+      } as any);
+      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings', {
+        page: '2',
+        limit: '10',
+        search: 'abc',
+        is_active: 'false',
+        status: 'Complete',
+        source: 'manual'
+      });
+    });
+
+    it('GET_BilateralProjectMappings sends empty params when no query given', async () => {
+      await service.GET_BilateralProjectMappings();
+      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings', {});
+    });
+
+    it('GET_BilateralProjectMappings omits falsy search/status/source', async () => {
+      await service.GET_BilateralProjectMappings({ search: '', status: '', source: '' } as any);
+      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings', {});
+    });
+
+    it('GET_BilateralProjectMapping gets by id', async () => {
+      await service.GET_BilateralProjectMapping(7);
+      expect(tp.get).toHaveBeenCalledWith('bilateral-project-mappings/7', {});
+    });
+
+    it('POST_BilateralProjectMapping posts the body with result interceptor', async () => {
+      const body = { a: 1 } as any;
+      await service.POST_BilateralProjectMapping(body);
+      expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings', body, { useResultInterceptor: true });
+    });
+
+    it('PATCH_BilateralProjectMapping patches by id', async () => {
+      const body = { b: 2 } as any;
+      await service.PATCH_BilateralProjectMapping(7, body);
+      expect(tp.patch).toHaveBeenCalledWith('bilateral-project-mappings/7', body, { useResultInterceptor: true });
+    });
+
+    it('PATCH_BilateralProjectMappingDeactivate patches the deactivate route with empty body', async () => {
+      await service.PATCH_BilateralProjectMappingDeactivate(7);
+      expect(tp.patch).toHaveBeenCalledWith('bilateral-project-mappings/7/deactivate', {}, { useResultInterceptor: true });
+    });
+
+    it('GET_BilateralMappingCoverage passes the phase when defined', async () => {
+      await service.GET_BilateralMappingCoverage(3);
+      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings/coverage', { phase: '3' });
+    });
+
+    it('GET_BilateralMappingCoverage sends no phase when undefined', async () => {
+      await service.GET_BilateralMappingCoverage();
+      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings/coverage', {});
+    });
+
+    it('POST_AutomapperPreview posts the body', async () => {
+      const body = { phase: 1 } as any;
+      await service.POST_AutomapperPreview(body);
+      expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/preview', body, { useResultInterceptor: true });
+    });
+
+    it('POST_AutomapperPreview defaults the body to {}', async () => {
+      await service.POST_AutomapperPreview();
+      expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/preview', {}, { useResultInterceptor: true });
+    });
+
+    it('POST_AutomapperApply posts the body', async () => {
+      const body = { phase: 1 } as any;
+      await service.POST_AutomapperApply(body);
+      expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/apply', body, { useResultInterceptor: true });
+    });
+
+    it('POST_AutomapperApply defaults the body to {}', async () => {
+      await service.POST_AutomapperApply();
+      expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/apply', {}, { useResultInterceptor: true });
+    });
+
+    it('GET_ClarisaBilateralProjects uses getWithParams when searching', async () => {
+      await expect(service.GET_ClarisaBilateralProjects('zz')).resolves.toEqual({ data: 'withParams' });
+      expect(tp.getWithParams).toHaveBeenCalledWith('tools/clarisa/projects/bilateral', { search: 'zz' });
+      expect(tp.get).not.toHaveBeenCalled();
+    });
+
+    it('GET_ClarisaBilateralProjects uses plain get without search', async () => {
+      await expect(service.GET_ClarisaBilateralProjects()).resolves.toEqual({ data: 'get' });
+      expect(tp.get).toHaveBeenCalledWith('tools/clarisa/projects/bilateral', {});
+    });
+
+    it('GET_ClarisaProjectPhases gets the phases route', async () => {
+      await service.GET_ClarisaProjectPhases();
+      expect(tp.get).toHaveBeenCalledWith('tools/clarisa/projects/phases', {});
+    });
+  });
+
+  describe('PI delegates', () => {
+    it('GET_PIDelegatesByProject encodes the project id', async () => {
+      await service.GET_PIDelegatesByProject('A B/1');
+      expect(tp.get).toHaveBeenCalledWith('pi-delegates?projectId=A%20B%2F1', {});
+    });
+
+    it('GET_PIDelegatesByDelegate puts the delegate id in the query', async () => {
+      await service.GET_PIDelegatesByDelegate(42);
+      expect(tp.get).toHaveBeenCalledWith('pi-delegates/by-delegate?delegate_user_id=42', {});
+    });
+
+    it('POST_PIDelegates posts the assignments', async () => {
+      const body = { assignments: [{ project_id: 'P1', delegates: [{ delegate_user_id: 5 }] }] };
+      await service.POST_PIDelegates(body);
+      expect(tp.post).toHaveBeenCalledWith('pi-delegates', body, {});
+    });
+
+    it('DELETE_PIDelegates sends a body-carrying DELETE through HttpClient', async () => {
+      const response = { data: 'deleted' };
+      tp.http.delete.mockReturnValue(of(response));
+      const body = { pi_delegate_ids: [1, 2] };
+      await expect(service.DELETE_PIDelegates(body)).resolves.toEqual(response);
+      expect(tp.getEnv).toHaveBeenCalledWith(undefined);
+      expect(tp.http.delete).toHaveBeenCalledWith('https://api.test/pi-delegates', { body });
+    });
+
+    it('POST_PiDelegatesExportByProjectXlsx posts a blob request', async () => {
+      const body = { project_codes: ['P1'] } as any;
+      const blob = await service.POST_PiDelegatesExportByProjectXlsx(body);
+      expect(blob).toBeInstanceOf(Blob);
+      expect(tp.postBlob).toHaveBeenCalledWith('pi-delegates/export/by-project/xlsx', body, {});
+    });
+
+    it('POST_PiDelegatesExportByPersonXlsx posts a blob request', async () => {
+      const body = { delegate_user_ids: [1] } as any;
+      const blob = await service.POST_PiDelegatesExportByPersonXlsx(body);
+      expect(blob).toBeInstanceOf(Blob);
+      expect(tp.postBlob).toHaveBeenCalledWith('pi-delegates/export/by-person/xlsx', body, {});
+    });
+  });
+
+  describe('impersonation', () => {
+    it('searchImpersonationUsers sends the search as a query param', async () => {
+      await service.searchImpersonationUsers('ann');
+      expect(tp.get).toHaveBeenCalledTimes(1);
+      const [url, options] = tp.get.mock.calls[0];
+      expect(url).toBe('impersonation/users');
+      expect(options.params.get('search')).toBe('ann');
+    });
+
+    it('startImpersonation posts the body', async () => {
+      const body = { target_user_id: 9, reason: 'support' };
+      await service.startImpersonation(body);
+      expect(tp.post).toHaveBeenCalledWith('impersonation/start', body, {});
+    });
+
+    it('endImpersonation sends the reason and session header', async () => {
+      await service.endImpersonation('sess-1', 'logout');
+      expect(tp.post).toHaveBeenCalledWith('impersonation/end', { reason: 'logout' }, { headers: { 'X-Impersonation-Session': 'sess-1' } });
+    });
+
+    it('endImpersonation sends an empty body without a reason', async () => {
+      await service.endImpersonation('sess-1');
+      expect(tp.post).toHaveBeenCalledWith('impersonation/end', {}, { headers: { 'X-Impersonation-Session': 'sess-1' } });
+    });
+
+    it('currentImpersonation gets with the session header', async () => {
+      await service.currentImpersonation('sess-2');
+      expect(tp.get).toHaveBeenCalledWith('impersonation/current', { headers: { 'X-Impersonation-Session': 'sess-2' } });
+    });
+  });
 });

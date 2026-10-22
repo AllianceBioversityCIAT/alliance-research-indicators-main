@@ -69,4 +69,20 @@ describe('PfmSpCoverageCardComponent', () => {
     (fixture.nativeElement.querySelector('[data-testid="pfm-sp-open-SP02"]') as HTMLElement).click();
     expect(codes).toEqual(['SP02']);
   });
+
+  it('a program with no results has an empty fill and nothing unsynced', () => {
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    fixture.componentRef.setInput('rows', [{ code: 'SP03', name: 'Empty', synced: 0, total: 0 }]);
+    fixture.componentRef.setInput('scope', 'all');
+
+    expect(fixture.componentInstance.view()[0]).toEqual(expect.objectContaining({ unsynced: 0, wSynced: '0%' }));
+  });
+
+  it('synced is capped at the total', () => {
+    const fixture = TestBed.createComponent(PfmSpCoverageCardComponent);
+    fixture.componentRef.setInput('rows', [{ code: 'SP04', name: 'Over', synced: 9, total: 4 }]);
+    fixture.componentRef.setInput('scope', 'all');
+
+    expect(fixture.componentInstance.view()[0]).toEqual(expect.objectContaining({ unsynced: 0, wSynced: '100%' }));
+  });
 });

@@ -426,6 +426,73 @@ describe('AutomapperDialogComponent', () => {
       expect(errorEl!.textContent).toContain('No external codes in cohort');
     });
   });
+
+  // ── Coverage completion: preview errors, tab selection, fallbacks ───────
+
+  describe('loadPreview edge cases', () => {
+    const zeroCounts = { toCreate: 0, alreadyMapped: 0, ambiguous: 0, unresolved: 0, divergent: 0, supersede: 0 };
+
+    it('sets a preview error and clears preview when the service returns null', async () => {
+      mockService.previewAutoMap.mockResolvedValue(null);
+      await component.loadPreview();
+      expect(component.previewError()).toBe('Could not generate automapper preview. Please try again.');
+      expect(component.preview()).toBeNull();
+      expect(component.loadingPreview()).toBe(false);
+    });
+
+    it.each([
+      [{ divergent: 1 }, 'divergent'],
+      [{ ambiguous: 1 }, 'ambiguous'],
+      [{ unresolved: 1 }, 'unresolved'],
+      [{ supersede: 1 }, 'supersede'],
+      [{}, 'alreadyMapped'],
+      [{ toCreate: 3, divergent: 1 }, 'toCreate']
+    ])('picks the initial tab for counts %j -> %s', async (counts, tab) => {
+      mockService.previewAutoMap.mockResolvedValue({ ...samplePreview, counts: { ...zeroCounts, ...counts } });
+      component.activeTab.set('alreadyMapped');
+      await component.loadPreview();
+      expect(component.activeTab()).toBe(tab);
+    });
+
+    it('selectTab switches the active tab', () => {
+      component.selectTab('ambiguous');
+      expect(component.activeTab()).toBe('ambiguous');
+    });
+  });
+
+  describe('feed timestamp fallbacks', () => {
+    it('returns "unknown" when there is no preview or feedFetchedAt', () => {
+      expect(component.formattedFeedFetchedAt()).toBe('unknown');
+    });
+
+    it('falls back to the raw feedFetchedAt string when date formatting throws', () => {
+      const spy = jest.spyOn(Date.prototype, 'toLocaleString').mockImplementation(() => {
+        throw new Error('boom');
+      });
+      try {
+        component.preview.set(samplePreview);
+        expect(component.formattedFeedFetchedAt()).toBe(samplePreview.feedFetchedAt);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  });
+
+  describe('apply confirmation controls', () => {
+    it('onStartApply enters confirmation and clears apply error; onCancelApplyConfirm leaves it', () => {
+      component.applyError.set('old');
+      component.onStartApply();
+      expect(component.confirmingApply()).toBe(true);
+      expect(component.applyError()).toBeNull();
+      component.onCancelApplyConfirm();
+      expect(component.confirmingApply()).toBe(false);
+    });
+
+    it('uses the generic apply error when the failure carries no message', async () => {
+      mockService.applyAutoMap.mockResolvedValue({ ok: false, status: 500, message: '' });
+      await component.onConfirmApply();
+      expect(component.applyError()).toBe('Failed to apply auto-mapping.');
+      expect(component.applying()).toBe(false);
+    });
+  });
 });
-
-

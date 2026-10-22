@@ -302,4 +302,58 @@ describe('AgressoPoolFundingTagComponent', () => {
       expect(success!.textContent).toContain('Your changes have been saved');
     });
   });
+
+  describe('edge branches (coverage completion)', () => {
+    it('canSave is false when no contract is loaded', () => {
+      component.newValue.set(true);
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('canSave is false when no new value has been chosen', () => {
+      currentContract.set(bilateralRow);
+      component.newValue.set(null);
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('onSave does nothing without a contract, a chosen value or an agreement id', async () => {
+      component.newValue.set(true);
+      await component.onSave();
+
+      currentContract.set(bilateralRow);
+      component.newValue.set(null);
+      await component.onSave();
+
+      currentContract.set({ ...bilateralRow, agreement_id: undefined });
+      component.newValue.set(true);
+      await component.onSave();
+
+      expect(mockBilateral.patchTag).not.toHaveBeenCalled();
+    });
+
+    it('save 400 with a non-bilateral description surfaces that description inline', async () => {
+      currentContract.set(bilateralRow);
+      component.newValue.set(true);
+      mockBilateral.patchTag.mockResolvedValue({ ok: false, status: 400, description: 'Validation failed' });
+
+      await component.onSave();
+
+      expect(component.inlineError()).toBe('Validation failed');
+      expect(mockClarity.trackEvent).not.toHaveBeenCalled();
+    });
+
+    it('save 400 with an empty description sets no inline error', async () => {
+      currentContract.set(bilateralRow);
+      component.newValue.set(true);
+      mockBilateral.patchTag.mockResolvedValue({ ok: false, status: 400, description: '' });
+
+      await component.onSave();
+
+      expect(component.inlineError()).toBeNull();
+    });
+
+    it('onJustificationInput keeps values below the limit untouched', () => {
+      component.onJustificationInput('short note');
+      expect(component.justification()).toBe('short note');
+    });
+  });
 });

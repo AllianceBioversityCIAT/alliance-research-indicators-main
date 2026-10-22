@@ -259,6 +259,15 @@ describe('PolicyChangeComponent', () => {
     expect(component.body().amount_status).toBeNull();
   });
 
+  it('initializes the amount to zero when switching to Program/Budget/Investment', () => {
+    component.body.set({ policy_type_id: 1, usd_amount: null, amount_status: null } as any);
+
+    component.body.update(current => ({ ...current, policy_type_id: 3 }));
+    component.onPolicyTypeChange(3);
+
+    expect(component.body().usd_amount).toBe(0);
+  });
+
   it('initializes a missing USD amount to zero for Program/Budget/Investment', async () => {
     mockApiService.GET_PolicyChange.mockResolvedValue({
       data: { policy_type_id: 3, usd_amount: null, amount_status: null }

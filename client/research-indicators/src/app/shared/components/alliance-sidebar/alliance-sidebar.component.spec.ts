@@ -291,6 +291,19 @@ describe('AllianceSidebarComponent', () => {
     expect(api.GET_PiDelegateAccess).toHaveBeenCalledWith(99, 'all');
   });
 
+  it('skips the PI access check when the cached user has no id', async () => {
+    const api = TestBed.inject(ApiService) as unknown as MockApiService;
+    (TestBed.inject(CacheService) as unknown as { dataCache: jest.Mock }).dataCache.mockReturnValue({ user: {} });
+    api.GET_PiDelegateAccess.mockClear();
+
+    const f = TestBed.createComponent(AllianceSidebarComponent);
+    f.detectChanges();
+    await f.whenStable();
+
+    expect(api.GET_PiDelegateAccess).not.toHaveBeenCalled();
+    expect(f.componentInstance.canSeePiDelegates()).toBe(false);
+  });
+
   it('keeps the section hidden when the check fails', async () => {
     const api = TestBed.inject(ApiService) as unknown as MockApiService;
     api.GET_PiDelegateAccess.mockRejectedValueOnce(new Error('network'));

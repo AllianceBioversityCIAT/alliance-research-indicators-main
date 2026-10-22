@@ -1647,4 +1647,180 @@ describe('AssignPiDelegateComponent', () => {
     });
   });
 
+  // ── Coverage completion: fallbacks, edge cases and error feedback ────────
+
+  describe('fallbacks and edge cases', () => {
+    const ALICE = { delegate_user_id: 5, name: 'Alice', email: 'a@test.com' };
+
+    function openWith(ctx: Parameters<MockAllModalsService['assignPiDelegateContext']['set']>[0]) {
+      modalService.assignPiDelegateContext.set(ctx);
+      modalService.openModal('assignPiDelegate');
+      fixture.detectChanges();
+    }
+
+    it('currentUserId reads the signed-in sec_user_id, or null when there is none', () => {
+      expect(component.currentUserId()).toBe(99);
+
+      cacheService.dataCache.set({ user: {} as { sec_user_id: number } });
+
+      expect(component.currentUserId()).toBeNull();
+    });
+
+    it('treats missing selection arrays as empty lists', () => {
+      component.peopleSignal.set({} as never);
+      component.projectsSignal.set({} as never);
+
+      expect(component.selectedPeople()).toEqual([]);
+      expect(component.getSelectedProjectsList()).toEqual([]);
+    });
+
+    it('describes the projects field for an administrator in the new-delegate mode', () => {
+      piService.isAdminView.set(true);
+      openWith({ source: 'newDelegate' });
+
+      expect(component.projectsDescription()).toContain('Any project on the platform is available');
+    });
+
+    it('formatDate accepts a Date and echoes an unparseable value', () => {
+      expect(component.formatDate(new Date(2024, 0, 15))).toBe('15 Jan 2024');
+      expect(component.formatDate('not-a-date')).toBe('not-a-date');
+    });
+
+    it('treats a missing modal entry as closed (nothing is seeded)', () => {
+      jest.spyOn(modalService, 'isModalOpen').mockReturnValue(undefined as unknown as { isOpen: boolean; title: string });
+      const second = TestBed.createComponent(AssignPiDelegateComponent);
+      second.detectChanges();
+
+      expect(second.componentInstance.selectedPeople()).toEqual([]);
+    });
+
+    it('opening from a project that is not in the cache selects just that project, with no people', () => {
+      piService.byProjectCache.set([]);
+
+      openWith({ source: 'byProject', projectCode: 'PX' });
+
+      expect(component.getSelectedProjectsList()).toEqual([{ project_code: 'PX', project_name: null }]);
+      expect(component.getSelectedPeopleList()).toEqual([]);
+    });
+
+    it('opening from a person who is on no cached project seeds no people', () => {
+      piService.byProjectCache.set([buildProject('P1', [])]);
+
+      openWith({ source: 'byPerson', delegateUserId: 77 });
+
+      expect(component.getSelectedPeopleList()).toEqual([]);
+      expect(component.getSelectedProjectsList()).toEqual([]);
+    });
+
+    it('confirm for a project outside the cache lists the new person with the code only', () => {
+      piService.byProjectCache.set([]);
+      openWith({ source: 'byProject', projectCode: 'PX' });
+      component.peopleSignal.set({ selected_people: [ALICE] });
+
+      component.onConfirm();
+
+      const detail = actionsService.showGlobalAlertCalls[0].detail;
+      expect(detail).toContain('<strong>PX</strong></div>');
+      expect(detail).not.toContain(' — ');
+      expect(detail).toContain('<strong>Added:</strong> Alice');
+    });
+
+    it('confirm for a project outside the cache falls back to the selected project name', () => {
+      piService.byProjectCache.set([]);
+      openWith({ source: 'byProject', projectCode: 'PX' });
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'PX', project_name: 'Named PX' }] });
+      component.peopleSignal.set({ selected_people: [ALICE] });
+
+      component.onConfirm();
+
+      expect(actionsService.showGlobalAlertCalls[0].detail).toContain('<strong>PX</strong> — Named PX');
+    });
+
+    it('adding a person to a project outside the cache starts from an empty delegate list', () => {
+      piService.byProjectCache.set([]);
+      openWith({ source: 'newDelegate' });
+      component.peopleSignal.set({ selected_people: [ALICE] });
+      component.projectsSignal.set({ selected_projects: [{ project_code: 'PX', project_name: null }] });
+
+      component.onConfirm();
+      actionsService.showGlobalAlertCalls[0].confirmCallback?.event?.();
+
+      expect(piService.assignCalls[0]).toEqual([{ project_id: 'PX', delegates: [{ delegate_user_id: 5 }] }]);
+    });
+
+    it('pluralises the unchanged-projects summary', () => {
+      piService.byProjectCache.set([
+        buildProject('P1', [ALICE]),
+        buildProject('P2', [ALICE]),
+        buildProject('P3', [])
+      ]);
+      openWith({ source: 'newDelegate' });
+      component.peopleSignal.set({ selected_people: [ALICE] });
+      component.projectsSignal.set({
+        selected_projects: [
+          { project_code: 'P1', project_name: 'P1' },
+          { project_code: 'P2', project_name: 'P2' },
+          { project_code: 'P3', project_name: 'P3' }
+        ]
+      });
+
+      component.onConfirm();
+
+      const detail = actionsService.showGlobalAlertCalls[0].detail;
+      expect(detail).toContain('No changes for the other 2 selected projects.');
+    });
+
+    it('Cancel closes the modal', () => {
+      openWith({ source: 'newDelegate' });
+      expect(modalService.isModalOpen('assignPiDelegate').isOpen).toBe(true);
+
+      component.onCancel();
+
+      expect(modalService.isModalOpen('assignPiDelegate').isOpen).toBe(false);
+    });
+
+    describe('feedback after Save', () => {
+      async function saveWith(setupError: () => void) {
+        piService.byProjectCache.set([buildProject('P1', [])]);
+        openWith({ source: 'newDelegate' });
+        component.peopleSignal.set({ selected_people: [ALICE] });
+        component.projectsSignal.set({ selected_projects: [{ project_code: 'P1', project_name: 'P1' }] });
+        component.onConfirm();
+        piService.assign = jest.fn(async () => setupError());
+        await (component as unknown as {
+          executeAssign: (a: { project_id: string; delegates: { delegate_user_id: number }[] }[]) => Promise<void>;
+        }).executeAssign([{ project_id: 'P1', delegates: [{ delegate_user_id: 5 }] }]);
+      }
+
+      it('shows a success toast when the service reports no error', async () => {
+        await saveWith(() => undefined);
+
+        expect(actionsService.showToastCalls.at(-1)).toEqual(
+          expect.objectContaining({ severity: 'success', summary: 'PI Delegates updated' })
+        );
+      });
+
+      it('shows the service error in an error toast', async () => {
+        await saveWith(() => piService.error.set('Server said no'));
+
+        expect(actionsService.showToastCalls.at(-1)).toEqual({
+          severity: 'error',
+          summary: 'Assignment failed',
+          detail: 'Server said no'
+        });
+      });
+
+      it('falls back to a generic message if the error clears between the two reads', async () => {
+        piService.error = jest.fn().mockReturnValueOnce('boom').mockReturnValue(null) as never;
+
+        await (component as unknown as { executeAssign: (a: never[]) => Promise<void> }).executeAssign([]);
+
+        expect(actionsService.showToastCalls.at(-1)).toEqual({
+          severity: 'error',
+          summary: 'Assignment failed',
+          detail: 'An error occurred. The screen has been refreshed.'
+        });
+      });
+    });
+  });
 });

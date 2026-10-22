@@ -964,6 +964,52 @@ describe('ProjectDashboardComponent', () => {
       expect(component.groundingTextDraft().length).toBe(20_000);
     });
 
+    it('should not open the modal or fetch the overview when the route carries no project id', async () => {
+      await setup(null, { isAdmin: true });
+      documentOverviewServiceMock.fetchDocumentOverviewSummary.mockClear();
+
+      await component.openGroundingSetupModal();
+
+      expect(component.contractId()).toBe('');
+      expect(documentOverviewServiceMock.fetchDocumentOverviewSummary).not.toHaveBeenCalled();
+      expect(allModalsServiceMock.openModal).not.toHaveBeenCalled();
+    });
+
+    it('should treat a missing textarea value as an empty draft', async () => {
+      await setup();
+      component.groundingTextDraft.set('previous');
+
+      component.onGroundingTextInput({ target: {} } as unknown as Event);
+
+      expect(component.groundingTextDraft()).toBe('');
+    });
+
+    it('should not remove the grounding text for non-admin users', async () => {
+      await setup('C-1', { isAdmin: false });
+      component.groundingText.set('Keep me');
+      component.showGroundingTextEditor.set(true);
+      component.groundingTextDraft.set('draft');
+
+      component.removeGroundingText();
+
+      expect(component.groundingText()).toBe('Keep me');
+      expect(component.showGroundingTextEditor()).toBe(true);
+      expect(component.groundingTextDraft()).toBe('draft');
+    });
+
+    it('should remove the grounding text and close the editor for admins', async () => {
+      await setup();
+      component.groundingText.set('Remove me');
+      component.showGroundingTextEditor.set(true);
+      component.groundingTextDraft.set('draft');
+
+      component.removeGroundingText();
+
+      expect(component.groundingText()).toBe('');
+      expect(component.showGroundingTextEditor()).toBe(false);
+      expect(component.groundingTextDraft()).toBe('');
+    });
+
     it('should not save an empty or whitespace-only text resource', async () => {
       await setup();
       component.groundingTextDraft.set('   ');

@@ -175,4 +175,18 @@ describe('BilateralMappingCoverageComponent', () => {
     component.onTriggerAutoMap();
     expect(emitted).toBe(true);
   });
+
+  // ── Coverage completion: computed guards ─────────────────────────────────
+
+  it('reports 0% and an empty denominator before any coverage is loaded', () => {
+    expect(component.coverage()).toBeNull();
+    expect(component.coveragePercentage()).toBe(0);
+    expect(component.denominatorText()).toBe('');
+  });
+
+  it('reports 0% when the reachable cohort is empty', () => {
+    component.coverage.set({ mapped: 0, pending: 0, reachable: 0 });
+    expect(component.coveragePercentage()).toBe(0);
+    expect(component.denominatorText()).toBe('Coverage 0 / 0 · 0% (eligible CLARISA projects, phase 2026)');
+  });
 });

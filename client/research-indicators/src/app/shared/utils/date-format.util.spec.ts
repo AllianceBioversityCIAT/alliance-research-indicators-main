@@ -303,4 +303,10 @@ describe('formatUtcDateWithConfig', () => {
     expect(formatUtcDateWithConfig(null, DATE_FORMAT_CONFIG_FIXTURE)).toBeNull();
     expect(formatUtcDateWithConfig('not-a-date', DATE_FORMAT_CONFIG_FIXTURE)).toBeNull();
   });
+
+
+  it('defaults the locale to en-GB when the configuration has none', () => {
+    const noLocale = { ...DATE_FORMAT_CONFIG_FIXTURE, locale: undefined } as unknown as DateFormatJsonValue;
+    expect(formatUtcDateWithConfig('2026-10-03T14:05:00.000Z', noLocale)).toBe('03/10/2026');
+  });
 });

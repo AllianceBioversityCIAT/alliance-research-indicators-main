@@ -377,6 +377,16 @@ describe('PooledFundingMonitorComponent', () => {
       expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
     });
 
+    it('ArrowLeft from the second tab goes to the first', async () => {
+      fixture.componentInstance.selectTab('queue');
+      await flush();
+
+      q('pfm-tab-queue')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }));
+      await flush();
+
+      expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
+    });
+
     it('ignores other keys', async () => {
       q('pfm-tab-coverage')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
       await flush();
@@ -444,6 +454,54 @@ describe('PooledFundingMonitorComponent', () => {
       expect(api.GET_PfmQueue).toHaveBeenCalledWith(expect.objectContaining({ chip: 'ready_to_sync', sp: 'SP06' }));
       // read once: nothing is left for the next visit
       expect(sessionStorage.getItem('pfm-monitor-return-state')).toBeNull();
+    });
+
+    describe('scrolling back to the result', () => {
+      const originalScroll = Element.prototype.scrollIntoView;
+      const originalEscape = (globalThis as { CSS?: { escape?: (v: string) => string } }).CSS?.escape;
+      let scrollIntoView: jest.Mock;
+
+      beforeEach(() => {
+        scrollIntoView = jest.fn();
+        Element.prototype.scrollIntoView = scrollIntoView;
+        const css = ((globalThis as { CSS?: object }).CSS ??= {}) as { escape?: (v: string) => string };
+        css.escape = (v: string) => v;
+      });
+
+      afterEach(() => {
+        Element.prototype.scrollIntoView = originalScroll;
+        (globalThis as { CSS: { escape?: (v: string) => string } }).CSS.escape = originalEscape;
+      });
+
+      it('brings the row into view and clears the pending focus once the row is on screen', async () => {
+        await create();
+        fixture.detectChanges();
+        await flush();
+        const row = document.createElement('div');
+        row.setAttribute('data-result-code', 'STAR-629');
+        el.appendChild(row);
+
+        fixture.componentInstance.store.focusResult.set('STAR-629');
+        fixture.detectChanges();
+        await new Promise(r => setTimeout(r));
+
+        expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+        expect(scrollIntoView.mock.contexts[0]).toBe(row);
+        expect(fixture.componentInstance.store.focusResult()).toBeNull();
+      });
+
+      it('waits (keeps the pending focus) while the row is not rendered yet', async () => {
+        await create();
+        fixture.detectChanges();
+        await flush();
+
+        fixture.componentInstance.store.focusResult.set('STAR-404');
+        fixture.detectChanges();
+        await new Promise(r => setTimeout(r));
+
+        expect(scrollIntoView).not.toHaveBeenCalled();
+        expect(fixture.componentInstance.store.focusResult()).toBe('STAR-404');
+      });
     });
 
     it('a navigation that is not to a result from the monitor saves nothing', async () => {

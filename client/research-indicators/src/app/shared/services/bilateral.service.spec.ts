@@ -1129,4 +1129,136 @@ describe('BilateralService', () => {
       });
     });
   });
+
+  // ── Coverage completion: nullish responses, in-flight dedup, stale requests ──
+
+  describe('edge branches (coverage completion)', () => {
+    const deferred = <T>() => {
+      let resolve!: (v: T) => void;
+      const promise = new Promise<T>(r => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const alignmentFail = (errors: unknown): MainResponse<AlignmentResponse> =>
+      ({
+        data: undefined,
+        status: 400,
+        description: 'error',
+        timestamp: '',
+        path: '',
+        successfulRequest: false,
+        errorDetail: { errors: errors as string, detail: '', description: 'Validation failed' }
+      }) as unknown as MainResponse<AlignmentResponse>;
+
+    it('patchTag success leaves a null currentContract untouched', async () => {
+      service.currentContract.set(null);
+      mockApi.PATCH_PoolFundingTag.mockResolvedValue(ok({ agreement_id: 'X', is_pool_funding_contributor: true } as PoolFundingTagPatchResponse));
+      const result = await service.patchTag('X', true);
+      expect(result.ok).toBe(true);
+      expect(service.currentContract()).toBeNull();
+    });
+
+    it('patchTag failure with a nullish response falls back to status 0 and empty description', async () => {
+      mockApi.PATCH_PoolFundingTag.mockResolvedValue(undefined);
+      expect(await service.patchTag('X', true)).toEqual({ ok: false, status: 0, description: '' });
+    });
+
+    it('patchTag failure without errorDetail falls back to an empty description', async () => {
+      mockApi.PATCH_PoolFundingTag.mockResolvedValue({ successfulRequest: false, status: 500 });
+      expect(await service.patchTag('X', true)).toEqual({ ok: false, status: 500, description: '' });
+    });
+
+    it('getSciencePrograms shares one in-flight request for the same result code', async () => {
+      const d = deferred<MainResponse<PoolFundingSciencePrograms>>();
+      mockApi.GET_PoolFundingSciencePrograms.mockReturnValue(d.promise);
+      const first = service.getSciencePrograms('STAR-1');
+      const second = service.getSciencePrograms('1');
+      d.resolve(ok<PoolFundingSciencePrograms>({ result_code: '1', mapping_status: 'mapped', science_programs: [] } as unknown as PoolFundingSciencePrograms));
+      expect(await first).toEqual(await second);
+      expect(mockApi.GET_PoolFundingSciencePrograms).toHaveBeenCalledTimes(1);
+    });
+
+    it('getSciencePrograms ignores a stale response when a newer request has started', async () => {
+      const d1 = deferred<MainResponse<PoolFundingSciencePrograms>>();
+      const d2 = deferred<MainResponse<PoolFundingSciencePrograms>>();
+      mockApi.GET_PoolFundingSciencePrograms.mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
+      const first = service.getSciencePrograms('1');
+      const second = service.getSciencePrograms('2');
+      d1.resolve(ok({ result_code: '1', mapping_status: 'mapped', science_programs: [{ code: 'OLD' }] } as unknown as PoolFundingSciencePrograms));
+      expect(await first).toEqual([]);
+      expect(service.sciencePrograms()).toEqual([]);
+      expect(service.loadingSciencePrograms()).toBe(true);
+      d2.resolve(ok({ result_code: '2', mapping_status: 'mapped', science_programs: [{ code: 'NEW' }] } as unknown as PoolFundingSciencePrograms));
+      expect(await second).toEqual([{ code: 'NEW' }]);
+      expect(service.loadingSciencePrograms()).toBe(false);
+    });
+
+    it('getSciencePrograms tolerates a payload without science_programs / mapping_status', async () => {
+      mockApi.GET_PoolFundingSciencePrograms.mockResolvedValue(ok(undefined as unknown as PoolFundingSciencePrograms));
+      expect(await service.getSciencePrograms('9')).toEqual([]);
+      expect(service.mappingStatus()).toBeNull();
+    });
+
+    it('patchAlignment failure with a nullish response yields status 0 and empty description', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(undefined);
+      expect(await service.patchAlignment('R', { has_contribution: true })).toEqual({
+        ok: false,
+        status: 0,
+        description: ''
+      });
+    });
+
+    it.each([
+      ['an array object', []],
+      ['null', null],
+      ['an unparsable string', '{not json'],
+      ['a non-object string', 'plain text']
+    ])('patchAlignment failure with errors as %s surfaces no structured errors', async (_label, errors) => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(alignmentFail(errors));
+      expect(await service.patchAlignment('R', { has_contribution: true })).toEqual({
+        ok: false,
+        status: 400,
+        description: 'Validation failed'
+      });
+    });
+
+    it.each([
+      ['null', null],
+      ['an array', []]
+    ])('extractFieldErrors ignores a parsed value that is %s', async (_label, parsedValue) => {
+      const spy = jest.spyOn(JSON, 'parse').mockReturnValueOnce(parsedValue);
+      try {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(alignmentFail('{"a":"b"}'));
+        const result = await service.patchAlignment('R', { has_contribution: true });
+        expect(result).toEqual({ ok: false, status: 400, description: 'Validation failed' });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('getTocCatalog shares one in-flight request for the same result code', async () => {
+      const d = deferred<MainResponse<BilateralTocCatalogResponse>>();
+      mockApi.GET_PoolFundingHlosIndicators.mockReturnValue(d.promise);
+      const first = service.getTocCatalog('STAR-7');
+      const second = service.getTocCatalog('7');
+      d.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_CAPSHARING_FIXTURE));
+      expect(await first).toEqual(await second);
+      expect(mockApi.GET_PoolFundingHlosIndicators).toHaveBeenCalledTimes(1);
+    });
+
+    it('getTocCatalog ignores a stale response when a newer request has started', async () => {
+      const d1 = deferred<MainResponse<BilateralTocCatalogResponse>>();
+      const d2 = deferred<MainResponse<BilateralTocCatalogResponse>>();
+      mockApi.GET_PoolFundingHlosIndicators.mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
+      const first = service.getTocCatalog('1');
+      const second = service.getTocCatalog('2');
+      d1.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_CAPSHARING_FIXTURE));
+      expect(await first).toBeNull();
+      expect(service.tocCatalog()).toBeNull();
+      expect(service.loadingTocCatalog()).toBe(true);
+      d2.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_TWO_SP_FIXTURE));
+      expect(await second).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
+      expect(service.loadingTocCatalog()).toBe(false);
+    });
+  });
 });

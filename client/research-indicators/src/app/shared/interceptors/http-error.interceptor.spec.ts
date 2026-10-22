@@ -946,4 +946,23 @@ describe('httpErrorInterceptor', () => {
       });
     });
   });
+
+  it('should fall back to the generic message when the error carries no usable detail', fakeAsync(() => {
+    const bare = { status: 500, message: '', error: null } as unknown as HttpErrorResponse;
+    mockHandler = jest.fn().mockReturnValue(throwError(() => bare));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({});
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    let errorCaught: unknown;
+    interceptor(mockRequest, mockHandler).subscribe({ error: e => (errorCaught = e) });
+    tick();
+
+    expect(errorCaught).toBe(bare);
+    expect(mockActionsService.showToast).toHaveBeenCalledWith({
+      detail: 'Something went wrong, please try again.',
+      severity: 'error',
+      summary: 'Error'
+    });
+  }));
 });

@@ -316,4 +316,36 @@ describe('PfmResultRowComponent', () => {
     q('pfm-row-title').click();
     expect(el.querySelector('[role="dialog"], p-dialog, p-drawer, p-sidebar, dialog')).toBeNull();
   });
+
+  describe('fallbacks', () => {
+    function instance(over: Partial<PfmResultRow>) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ imports: [PfmResultRowComponent], providers: [provideRouter([]), provideDateFormatConfigMock()] });
+      const fixture = TestBed.createComponent(PfmResultRowComponent);
+      fixture.componentRef.setInput('row', { ...BASE, ...over });
+      return fixture.componentInstance;
+    }
+
+    it('pads a missing official code to 000', () => {
+      expect(instance({ official_code: null as unknown as number }).codeNumber()).toBe('000');
+    });
+
+    it('uses the result code as the title when the result has none', () => {
+      expect(instance({ title: '' }).fullTitle()).toBe('STAR-1234');
+    });
+
+    it('an unknown mapping state gets the neutral tone', () => {
+      expect(instance({ mapping_state: 'Mystery' as never }).mappingTone()).toEqual({
+        fg: 'var(--ac-pfm-neutral-fg)',
+        border: 'var(--ac-pfm-neutral-fg)'
+      });
+    });
+
+    it('an unknown PRMS status gets the neutral tone', () => {
+      expect(instance({ prms_status: 'Mystery' as never }).prmsTone()).toEqual({
+        fg: 'var(--ac-pfm-neutral-fg)',
+        border: 'var(--ac-pfm-neutral-fg)'
+      });
+    });
+  });
 });

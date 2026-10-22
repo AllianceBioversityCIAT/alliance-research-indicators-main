@@ -3106,6 +3106,35 @@ describe('CreateOicrFormComponent', () => {
       expect(component.isCompleteStepTwo).toBe(true);
     });
 
+    it('matches options by id when they carry no lever_id, keeping the selections that match', () => {
+      const noLeverId = (id: number) => ({ id, portfolio_id: 2 }) as unknown as GetLevers;
+      arrange(2026, [noLeverId(12), noLeverId(13)], [12, 3], [13]);
+
+      const stepTwo = mockCreateResultManagementService.createOicrBody().step_two;
+      expect(stepTwo.primary_lever.map((l: any) => l.lever_id)).toEqual([12]);
+      expect(stepTwo.contributor_lever.map((l: any) => l.lever_id)).toEqual([13]);
+    });
+
+    it('tolerates a step_two with no primary or contributor lever lists and leaves it untouched', () => {
+      mockCreateResultManagementService.createOicrBody.update((body: any) => ({
+        ...body,
+        base_information: { ...body.base_information, year: 2026 },
+        step_two: { contributor_lever: [{ lever_id: 12 }] }
+      }));
+      TestBed.inject(GetLeversService).getList({ reportYear: 2026 }).set([option(12, 2)]);
+      fixture.detectChanges();
+      expect(mockCreateResultManagementService.createOicrBody().step_two.primary_lever).toBeUndefined();
+      expect(mockCreateResultManagementService.createOicrBody().step_two.contributor_lever).toEqual([{ lever_id: 12 }]);
+
+      mockCreateResultManagementService.createOicrBody.update((body: any) => ({
+        ...body,
+        step_two: { primary_lever: [{ lever_id: 12 }] }
+      }));
+      fixture.detectChanges();
+      expect(mockCreateResultManagementService.createOicrBody().step_two.contributor_lever).toBeUndefined();
+      expect(mockCreateResultManagementService.createOicrBody().step_two.primary_lever).toEqual([{ lever_id: 12 }]);
+    });
+
     it('locks the step for review statuses only', () => {
       mockCreateResultManagementService.statusId.set(9);
       expect(component.isStatusLocked()).toBe(false);
