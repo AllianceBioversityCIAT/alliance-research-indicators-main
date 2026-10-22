@@ -85,3 +85,8 @@
   5. The collision check must run **before any DDL** (read-only SELECT), or an abort leaves the schema half-applied — **open owner decision**, design §5 order.
   6. `CAST('TIP-123' AS UNSIGNED)` errors under `STRICT_TRANS_TABLES` — guard the cast.
 - **Status:** T-02 `[ ]` — to restart tomorrow with a fresh worker.
+
+## T-02 restart (2026-10-22)
+
+- **Owner decision (open item 5 above):** "Antes de todo" — the collision pre-check runs first, read-only, before any DDL. **Execute-time spec edit:** `design.md` §5 *Migration order* gains step 0 (read-only `SELECT` deriving each log row's platform from the `results` join; a thrown `Error`, no stored procedure). Meaning of R-PPI-001 / NFR-PPI-002 unchanged — it narrows *when* the abort happens so "merges nothing" also means "changes nothing". Carried to the T-02 Reviewer as a named conformance check.
+- **Environment pre-check (Leader):** `docker info` → 29.8.2; `orca` at `/usr/local/bin/orca`.
