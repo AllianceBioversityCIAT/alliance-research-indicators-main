@@ -52,7 +52,7 @@ function setup(over: { queue?: PfmQueue | null; scope?: PfmScope; chip?: PfmChip
 }
 
 describe('PfmQueueTabComponent', () => {
-  it('renders each chip count from the server chip_counts, in mockup order', () => {
+  it('renders each chip count from the server chip_counts, in owner order (Need attention last, beside Synced)', () => {
     const { el } = setup();
     const chips = Array.from(el.querySelectorAll('[data-testid="pfm-chips"] button'));
     // visible text only: the sr-only explanation is checked in its own test
@@ -63,10 +63,10 @@ describe('PfmQueueTabComponent', () => {
     };
     expect(chips.map(visible)).toEqual([
       'All results 41',
-      'Need attention 7',
       'Mapping pending 5',
       'Ready to sync 3',
-      'Synced with PRMS 13'
+      'Synced with PRMS 13',
+      'Need attention 7'
     ]);
   });
 

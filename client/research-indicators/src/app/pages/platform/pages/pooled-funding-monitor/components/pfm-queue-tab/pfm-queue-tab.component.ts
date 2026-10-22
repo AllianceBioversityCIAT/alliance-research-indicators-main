@@ -12,13 +12,14 @@ import { PfmStoreService } from '../../services/pfm-store.service';
 /** Sentinel of the "All …" option (a null model would render the placeholder instead of the option). */
 const ALL = '__all__';
 
-/** `dot` = the state colour of that view (same palette as the badges and charts); none for All. */
+/** `dot` = the state colour of that view (same palette as the badges and charts); none for All.
+ * Order (owner): the work in the order it happens, then Need attention last, beside Synced. */
 const CHIPS: { key: PfmChip; label: string; count: keyof PfmChipCounts; help: string; dot: string | null }[] = [
   { key: 'all', label: 'All results', count: 'all', help: PFM_HELP.allResults, dot: null },
-  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill },
   { key: 'mapping_incomplete', label: 'Mapping pending', count: 'mapping', help: PFM_HELP.mappingIncomplete, dot: PFM_STATE.progress.fill },
   { key: 'ready_to_sync', label: 'Ready to sync', count: 'ready', help: PFM_HELP.readyToSync, dot: PFM_STATE.ready.fill },
-  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill }
+  { key: 'synced', label: 'Synced with PRMS', count: 'synced', help: PFM_HELP.synced, dot: PFM_STATE.done.fill },
+  { key: 'need_attention', label: 'Need attention', count: 'attention', help: PFM_HELP.needAttention, dot: PFM_STATE.alert.fill }
 ];
 
 /** Views reachable from the coverage tab that are not shown as quick views. */
