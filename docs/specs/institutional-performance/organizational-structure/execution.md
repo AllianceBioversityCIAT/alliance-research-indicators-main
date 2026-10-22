@@ -541,3 +541,8 @@ matched 11 of 11
 - **Delivered (D-ORG-23):** *Applies from year* defaults to `max(Structure year, current year)` on create, tree "+", edit, after-save and a top-year change; *Back-date* never pre-checked.
 - **Final verification:** client full ×3 352/352, 8148/8148; lint; `ng build`; tsc 945 = baseline. Falsifiers 1–3 observed red and reverted.
 - **Carried to T-06:** browser re-check; requester to confirm that a top-year change resets a hand-picked *Applies from year*; parent check against the previous year's rows (T-07 legacy, advisory).
+
+### T-06 — requester decisions on open accessibility items (2026-10-22)
+
+- **Focus after removing a delegate with the keyboard** (T-09 Reviewer advisory 1): "no importa que quede sin foco" → **accepted as is**; no change.
+- **Seeing a delegate's email without a mouse** (T-08 advisory A1, keyboard half; T-09 advisory 5): "dejalo como esta, con teclado no se podria ver" → **accepted as is**. Recorded in D-ORG-22 as a deliberate deviation from the WCAG 2.1 AA floor (`docs/ux-ui/design.md` §10) for this field. The screen-reader half stays covered by the chip's accessible name "name, email[, inactive staff]" (T-09).
