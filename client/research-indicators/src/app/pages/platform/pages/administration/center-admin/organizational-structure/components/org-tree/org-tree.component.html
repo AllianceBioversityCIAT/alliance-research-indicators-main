@@ -1,7 +1,7 @@
 <p-treeTable [value]="nodes" styleClass="p-treetable-gridlines table-custom-styles" data-testid="org-tree" aria-label="Organizational structure tree">
   <ng-template pTemplate="header">
     <tr>
-      <th class="text-[13px] font-medium atc-grey-800">Name</th>
+      <th class="text-[13px] font-medium atc-grey-800" style="width: 40%; text-align: left" data-testid="org-tree-name-header">Name</th>
       <th class="text-[13px] font-medium atc-grey-800">Code</th>
       <th class="text-[13px] font-medium atc-grey-800">Level</th>
       <th class="text-[13px] font-medium atc-grey-800">Responsible director</th>
@@ -19,13 +19,12 @@
       (click)="select(rowData.row)"
       (keydown.enter)="select(rowData.row)"
       data-testid="org-tree-row">
-      <td>
-        <div class="flex items-center gap-2">
+      <td style="text-align: left" data-testid="org-tree-name-cell">
+        <div class="flex items-center gap-2" [style.padding-left.px]="rowNode.level * 16" data-testid="org-tree-indent">
           <button
             type="button"
             class="p-treetable-toggler org-tree-toggle"
             tabindex="-1"
-            [style.margin-left.px]="rowNode.level * 16"
             [style.visibility]="hasChildren(rowNode.node) ? 'visible' : 'hidden'"
             [attr.aria-hidden]="hasChildren(rowNode.node) ? null : 'true'"
             [attr.aria-label]="expanderLabel(rowNode.node)"
@@ -34,7 +33,7 @@
             data-testid="org-tree-toggle">
             <i class="pi atc-grey-700" [ngClass]="rowNode.node.expanded ? 'pi-chevron-down' : 'pi-chevron-right'" aria-hidden="true"></i>
           </button>
-          <span class="text-[13.5px] atc-grey-900" data-testid="org-tree-name"
+          <span class="org-tree-name text-[13.5px] atc-grey-900" data-testid="org-tree-name"
             >{{ rowData.row.version.name }}
             @if (rowData.row.version.acronym) {
               <span class="atc-grey-700">({{ rowData.row.version.acronym }})</span>

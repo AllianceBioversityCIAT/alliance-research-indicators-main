@@ -43,11 +43,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 1.75rem; // never shrinks, so the leaf placeholder holds the same slot as an expander
   width: 1.75rem;
   height: 1.75rem;
   border: 0;
   background: transparent;
   cursor: pointer;
+}
+
+.org-tree-name {
+  flex: 0 1 auto; // takes only its content width, so the "N units" count stays next to the name
+  min-width: 0; // wrapped lines stay in the name column, aligned with the first line
+  overflow-wrap: anywhere; // a single long word or acronym wraps instead of overflowing into the count
+  text-align: left;
 }
 
 .org-tree-add {

@@ -320,6 +320,48 @@ describe('OrganizationalStructureComponent', () => {
       expect(root().querySelector('[data-testid="org-tree-count"]')?.textContent).toContain('1 units');
     });
 
+    // T-11 (HITL round 5): names must start at the same x per depth. jsdom does not load component
+    // stylesheets, so this asserts what the template renders inline (indent value, text-align, slot).
+    describe('name alignment (T-11)', () => {
+      const L2 = { levelCode: 'L2' as const, parentId: 10, parentCode: 'ORG-10', parentName: 'Division Ten' };
+      const rows = [
+        ROWS_2026[0],
+        row({ id: 2, code: 'ORG-2', name: 'Data Department', ...L2 }),
+        row({ id: 3, code: 'ORG-3', name: 'QA', ...L2 }),
+        row({ id: 4, code: 'ORG-4', name: 'A Much Longer Department Name Here', ...L2 }),
+        row({ id: 5, code: 'ORG-5', levelCode: 'L4', name: 'Child Unit', parentId: 2, parentCode: 'ORG-2', parentName: 'Data Department' })
+      ];
+      const rowEl = (name: string) => treeRowFor(name) as HTMLElement;
+      const indent = (name: string) => (rowEl(name).querySelector('[data-testid="org-tree-indent"]') as HTMLElement).style.paddingLeft;
+
+      it('gives every row of a depth the same indent, left-aligns the name cell, and deepens per level', async () => {
+        await create(RANGE, rows);
+        await expandRow('Division Ten');
+
+        expect(indent('Data Department')).toBe('16px');
+        expect(indent('QA')).toBe(indent('Data Department'));
+        expect(indent('A Much Longer Department Name Here')).toBe(indent('Data Department'));
+        expect(indent('Division Ten')).toBe('0px');
+        await expandRow('Data Department');
+        expect(indent('Child Unit')).toBe('32px');
+
+        for (const name of ['Division Ten', 'Data Department', 'QA', 'A Much Longer Department Name Here', 'Child Unit']) {
+          const cell = rowEl(name).querySelector('[data-testid="org-tree-name-cell"]') as HTMLElement;
+          expect(getComputedStyle(cell).textAlign).toBe('left');
+        }
+      });
+
+      it('a leaf row renders the toggler slot (hidden, same element) so its name lines up with an expandable sibling', async () => {
+        await create(RANGE, rows);
+        await expandRow('Division Ten');
+
+        const slot = (name: string) => rowEl(name).querySelector('[data-testid="org-tree-toggle"]') as HTMLElement;
+        expect(slot('QA')).toBeTruthy();
+        expect(slot('QA').style.visibility).toBe('hidden');
+        expect(slot('Data Department').style.visibility).toBe('visible');
+      });
+    });
+
     it('names the expander by its state: a collapsed L2 with children reads Expand, then Collapse after a click (KZ-015)', async () => {
       const withChild = [
         ...ROWS_2026,
