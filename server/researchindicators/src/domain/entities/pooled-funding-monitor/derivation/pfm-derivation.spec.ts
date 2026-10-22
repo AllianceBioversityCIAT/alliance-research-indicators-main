@@ -253,12 +253,13 @@ describe('pfm-derivation', () => {
     });
 
     // Red input: a PRMS-rejected result is back on us.
-    it('rejected by PRMS -> needs attention; pending review / approved -> not', () => {
+    // Owner 2026-10-22: anything in PRMS is done on our side, rejected included.
+    it('in PRMS, whatever its review status (rejected included) -> not needs attention', () => {
       expect(
         derivePfmRow(
           raw({ is_synced_to_prms: 1, prms_history_status: 'REJECTED' }),
         ).needsAttention,
-      ).toBe(true);
+      ).toBe(false);
       expect(derivePfmRow(raw({ is_synced_to_prms: 1 })).needsAttention).toBe(
         false,
       );
@@ -309,14 +310,12 @@ describe('pfm-derivation', () => {
 
     it.each([
       [PfmChipEnum.ALL, Object.keys(rows)],
-      [
-        PfmChipEnum.NEED_ATTENTION,
-        ['ready', 'incomplete', 'rejected', 'draft'],
-      ],
+      [PfmChipEnum.NEED_ATTENTION, ['ready', 'incomplete', 'draft']],
       [PfmChipEnum.MAPPING_INCOMPLETE, ['incomplete']],
       [PfmChipEnum.READY_TO_SYNC, ['ready', 'draft']],
       [PfmChipEnum.REJECTED, ['rejected']],
-      [PfmChipEnum.SYNCED, ['pending', 'approvedPrms']],
+      // In PRMS whatever its review status (owner 2026-10-22).
+      [PfmChipEnum.SYNCED, ['pending', 'approvedPrms', 'rejected']],
       // Not approved by the PI yet, in scope, nothing in PRMS (Draft here; Approved rows are not).
       [PfmChipEnum.AWAITING_PI, ['draft']],
       // Out of scope and never sent.
@@ -329,7 +328,7 @@ describe('pfm-derivation', () => {
   });
 
   // Red input: a Draft with no mapping at all is still "mapping incomplete" (no STAR-status gate),
-  // so Need attention = Mapping incomplete + Ready to sync + Rejected, exactly.
+  // so Need attention = Mapping incomplete + Ready to sync, exactly.
   it('Mapping incomplete: any not-finished mapping in PRMS scope with nothing in PRMS, whatever the STAR status', () => {
     const chip = (flags: Parameters<typeof raw>[0]) =>
       matchesChip(derivePfmRow(raw(flags)), PfmChipEnum.MAPPING_INCOMPLETE);
@@ -355,7 +354,7 @@ describe('pfm-derivation', () => {
   });
 
   describe('rowRank (R-PFM-012)', () => {
-    it('orders needs attention (rejected included) < out of scope < Pending Review < Approved', () => {
+    it('orders needs attention < out of scope < Pending Review < Approved < Rejected', () => {
       const ranked = [
         derivePfmRow(
           raw({ is_synced_to_prms: 1, prms_history_status: 'APPROVED' }),
@@ -383,7 +382,7 @@ describe('pfm-derivation', () => {
             raw({ is_synced_to_prms: 1, prms_history_status: 'REJECTED' }),
           ),
         ),
-      ).toBe(0);
+      ).toBe(4);
     });
   });
 });
