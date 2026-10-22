@@ -1,6 +1,7 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-12 (R-PFM-009, 010, 014..016)
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ButtonModule } from 'primeng/button';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { PFM_STATE, statusColor } from '@shared/constants/pfm-status-colors';
@@ -35,7 +36,7 @@ const HIDDEN_CHIP_LABELS: Partial<Record<PfmChip, string>> = {
 /** Filters, quick-view chips and footer of the Results queue. Groups render through `pfm-project-group` (T-13). */
 @Component({
   selector: 'app-pfm-queue-tab',
-  imports: [FormsModule, SelectModule, TooltipModule, PfmProjectGroupComponent],
+  imports: [FormsModule, SelectModule, ButtonModule, TooltipModule, PfmProjectGroupComponent],
   templateUrl: './pfm-queue-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

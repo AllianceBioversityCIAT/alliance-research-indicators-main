@@ -97,9 +97,12 @@ describe('PfmQueueTabComponent', () => {
     expect(store.setChip).toHaveBeenCalledWith(null);
   });
 
-  it('Reset delegates to the store (which restores all three filters and the chip)', () => {
+  it('Clear (the tables\' text button) delegates to the store, which restores all three filters and the chip', () => {
     const { q, store } = setup({ filters: { project: 'P100', sp: 'ACC1', type: 3 }, chip: 'synced' });
-    q('pfm-reset')?.click();
+    const btn = q('pfm-reset')!.querySelector('button') as HTMLButtonElement;
+    expect(btn.textContent?.trim()).toBe('Clear');
+    expect(q('pfm-filters-card')?.textContent).not.toContain('Reset');
+    btn.click();
     expect(store.resetFilters).toHaveBeenCalledTimes(1);
   });
 
