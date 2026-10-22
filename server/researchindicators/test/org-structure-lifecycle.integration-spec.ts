@@ -132,13 +132,43 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
         typeof r.changes === 'string' ? JSON.parse(r.changes) : r.changes,
     }));
   };
-  const delegatesOf = async (id: number) =>
+  /** `[from, delegates]` per version of the entry (delegates hang off the version, D-ORG-24). */
+  const delegatesOf = async (id: number) => {
+    const rows = await query(
+      `SELECT v.valid_from_year AS f, dl.staff_carnet AS c
+         FROM org_unit_versions v
+         LEFT JOIN org_unit_delegates dl ON dl.org_unit_version_id = v.id
+        WHERE v.org_unit_id = ? ORDER BY v.valid_from_year, dl.id`,
+      [id],
+    );
+    const byFrom = new Map<number, string[]>();
+    for (const row of rows as Array<{ f: number; c: string | null }>) {
+      const list = byFrom.get(row.f) ?? [];
+      if (row.c !== null) list.push(row.c);
+      byFrom.set(row.f, list);
+    }
+    return [...byFrom.entries()];
+  };
+  const versionIdsOf = async (id: number) =>
     (
       await query(
-        `SELECT staff_carnet AS c FROM org_unit_delegates WHERE org_unit_id = ? ORDER BY id`,
+        `SELECT id FROM org_unit_versions WHERE org_unit_id = ? ORDER BY valid_from_year`,
         [id],
       )
-    ).map((r: any) => r.c);
+    ).map((r: any) => Number(r.id));
+  /** Delegate rows still hanging off the given version ids. */
+  const delegateRowsOfVersions = async (versionIds: number[]) =>
+    versionIds.length === 0
+      ? 0
+      : Number(
+          (
+            await query(
+              `SELECT COUNT(*) AS n FROM org_unit_delegates
+                WHERE org_unit_version_id IN (${versionIds.map(() => '?').join(',')})`,
+              versionIds,
+            )
+          )[0].n,
+        );
   /** Every row that could change for these entries: units, versions, delegates, log. */
   const snapshot = async (ids: number[]) => {
     const ph = ids.map(() => '?').join(',');
@@ -150,7 +180,10 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
           ids,
         ),
         query(
-          `SELECT * FROM org_unit_delegates WHERE org_unit_id IN (${ph}) ORDER BY id`,
+          `SELECT * FROM org_unit_delegates
+            WHERE org_unit_version_id IN
+                  (SELECT id FROM org_unit_versions WHERE org_unit_id IN (${ph}))
+            ORDER BY id`,
           ids,
         ),
         query(
@@ -270,7 +303,9 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
         delegateCarnets: [del1],
       });
       const freedCode = await codeOf(id);
-      expect(await delegatesOf(id)).toEqual([del1]);
+      expect(await delegatesOf(id)).toEqual([[2026, [del1]]]);
+      const versionIds = await versionIdsOf(id);
+      expect(await delegateRowsOfVersions(versionIds)).toBe(1);
 
       const res = await del(id);
 
@@ -282,7 +317,8 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
       });
       expect(await rowOf(id)).toBeUndefined();
       expect(await versionsOf(id)).toEqual([]);
-      expect(await delegatesOf(id)).toEqual([]);
+      // The delegate rows went with their version through the CASCADE.
+      expect(await delegateRowsOfVersions(versionIds)).toBe(0);
 
       const logs = await logsOf(id);
       expect(logs.map((l: any) => l.action)).toEqual([
@@ -341,7 +377,7 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
         status_from_year: 2027,
       });
       expect(await versionsOf(id)).toEqual([[2026, 2027, deptA]]);
-      expect(await delegatesOf(id)).toEqual([del1]);
+      expect(await delegatesOf(id)).toEqual([[2026, [del1]]]);
       expect((await yearView(2026)).map((r) => r.id)).toContain(id);
       expect((await yearView(2027)).map((r) => r.id)).not.toContain(id);
       const withEnded = (await yearView(2027, true)).find((r) => r.id === id);
@@ -619,6 +655,46 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
     });
   });
 
+  describe('delegates through inactivate and reactivate on real rows (D-ORG-24, R-ORG-007)', () => {
+    it('inactivate from the year a version starts drops THAT version and its delegate rows, logs its list, and keeps the earlier version delegates; reactivate copies the last version list into a new version', async () => {
+      const id = await created({ name: 'Cycle', delegateCarnets: [del1] });
+      expect(
+        (await patch(id, { delegateCarnets: [del2], appliesFromYear: 2027 }))
+          .status,
+      ).toBe(200);
+      const [keepId, dropId] = await versionIdsOf(id);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, [del1]],
+        [2027, [del2]],
+      ]);
+
+      const ended = await inactivate(id, { fromYear: 2027 });
+      expect(ended.status).toBe(200);
+
+      expect(await versionsOf(id)).toEqual([[2026, 2027, deptA]]);
+      expect(await delegatesOf(id)).toEqual([[2026, [del1]]]);
+      expect(await delegateRowsOfVersions([dropId])).toBe(0);
+      expect(await delegateRowsOfVersions([keepId])).toBe(1);
+      const inactivateLog = (await logsOf(id)).find(
+        (l: any) => l.action === 'inactivate',
+      );
+      expect(inactivateLog.changes.droppedVersions.old[0]).toMatchObject({
+        from: 2027,
+        delegates: [del2],
+      });
+
+      const back = await reactivate(id, { fromYear: 2027 });
+      expect(back.status).toBe(200);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, [del1]],
+        [2027, [del1]],
+      ]);
+      const [, newId] = await versionIdsOf(id);
+      expect(newId).not.toBe(dropId);
+      expect(await delegateRowsOfVersions([newId])).toBe(1);
+    });
+  });
+
   describe('back-date gate (R-ORG-005)', () => {
     it('with today in 2027, inactivating from 2026 needs backdate=true; with it the log says so', async () => {
       // An L1 (no parent), because a child's parent must cover every year of it.
@@ -649,36 +725,66 @@ describe('Organizational Structure — lifecycle against real MySQL (T-03)', () 
   });
 
   describe('history (B6) and change log (B7), R-ORG-009, R-ORG-017', () => {
-    it('Delegates shown in a past year: changing [B] to [C] puts one delegates_change row with both lists, the user and the time in B6', async () => {
+    it('Delegates shown in a past year: [B] to [C] from 2027 gives B6 two versions with their lists, one new_version row with both lists, the user and the time; 2026 keeps [B] (D-ORG-24)', async () => {
       const id = await created({
         name: 'With delegates',
         delegateCarnets: [del1],
       });
-      const edit = await patch(id, { delegateCarnets: [del2] });
+      const edit = await patch(id, {
+        delegateCarnets: [del2],
+        appliesFromYear: 2027,
+      });
       expect(edit.status).toBe(200);
-      expect(edit.body.data.outcome.action).toBe('delegates_change');
+      expect(edit.body.data.outcome.action).toBe('new_version');
 
       const res = await history(id);
 
       expect(res.status).toBe(200);
-      expect(res.body.data.versions).toHaveLength(1);
+      expect(
+        res.body.data.versions.map((v: any) => [
+          v.from,
+          v.delegates.map((d: any) => d.carnet),
+        ]),
+      ).toEqual([
+        [2026, [del1]],
+        [2027, [del2]],
+      ]);
       const [latest, first] = res.body.data.log;
       expect(first.action).toBe('create');
       expect(latest).toMatchObject({
         unitId: id,
-        action: 'delegates_change',
-        appliesFromYear: null,
+        action: 'new_version',
+        appliesFromYear: 2027,
         backdated: false,
         changes: { delegates: { old: [del1], new: [del2] } },
         createdBy: { id: 4242 },
       });
       expect(new Date(latest.createdAt).toString()).not.toBe('Invalid Date');
-      // the past-year view still shows the CURRENT list
-      expect(
-        (await yearView(2026))
+      const listIn = async (year: number) =>
+        (await yearView(year))
           .find((r) => r.id === id)
-          .delegates.map((d: any) => d.carnet),
-      ).toEqual([del2]);
+          .delegates.map((d: any) => d.carnet);
+      expect(await listIn(2026)).toEqual([del1]);
+      expect(await listIn(2027)).toEqual([del2]);
+      expect((await logsOf(id)).map((l: any) => l.action)).not.toContain(
+        'delegates_change',
+      );
+    });
+
+    it('a legacy delegates_change row written before the pivot is still returned by B6 and B7', async () => {
+      const id = await created({ name: 'Legacy log' });
+      await query(
+        `INSERT INTO org_unit_change_log (org_unit_id, action, backdated, changes, created_at)
+         VALUES (?, 'delegates_change', 0, ?, NOW())`,
+        [id, JSON.stringify({ delegates: { old: [], new: [del1] } })],
+      );
+
+      const viaB6 = await history(id);
+      const viaB7 = await changeLog(`?unitId=${id}`);
+
+      for (const log of [viaB6.body.data.log, viaB7.body.data]) {
+        expect(log.map((r: any) => r.action)).toContain('delegates_change');
+      }
     });
 
     it('B7 answers 400 without a numeric unitId and an empty list for an id that never existed', async () => {

@@ -27,7 +27,6 @@ interface UnitRow {
 class LifecycleStore {
   units = new Map<number, UnitRow>();
   versions: Array<TimelineVersion & { unitId: number }> = [];
-  delegates: Array<{ unitId: number; carnet: string }> = [];
   logs: Array<Record<string, any>> = [];
   writes = 0;
   nextVersionId = 1000;
@@ -36,7 +35,6 @@ class LifecycleStore {
     const snapshot = structuredClone({
       units: [...this.units],
       versions: this.versions,
-      delegates: this.delegates,
       logs: this.logs,
     });
     try {
@@ -44,7 +42,6 @@ class LifecycleStore {
     } catch (error) {
       this.units = new Map(snapshot.units);
       this.versions = snapshot.versions;
-      this.delegates = snapshot.delegates;
       this.logs = snapshot.logs;
       throw error;
     }
@@ -59,7 +56,7 @@ class LifecycleStore {
   async loadVersions(_m: unknown, unitId: number) {
     return this.versions
       .filter((v) => v.unitId === unitId)
-      .map(({ unitId: _u, ...v }) => ({ ...v }))
+      .map(({ unitId: _u, ...v }) => ({ ...v, delegates: [...v.delegates] }))
       .sort((a, b) => a.from - b.from);
   }
   async loadGraphVersions(): Promise<GraphVersion[]> {
@@ -71,20 +68,24 @@ class LifecycleStore {
       levelId: v.levelId,
     }));
   }
-  async loadDelegateCarnets(_m: unknown, unitId: number) {
-    return this.delegates
-      .filter((d) => d.unitId === unitId)
-      .map((d) => d.carnet);
-  }
+  // A version row carries its delegate rows (D-ORG-24): insertVersion writes
+  // the row with none, addDelegates writes them, deleteVersions drops them.
   async insertVersion(_m: unknown, unitId: number, v: TimelineVersion) {
     this.writes++;
-    this.versions.push({ ...v, id: this.nextVersionId++, unitId });
+    const id = this.nextVersionId++;
+    this.versions.push({ ...v, delegates: [], id, unitId });
+    return id;
+  }
+  async addDelegates(_m: unknown, versionId: number, carnets: string[]) {
+    this.writes += carnets.length;
+    this.versions.find((x) => x.id === versionId).delegates.push(...carnets);
   }
   async updateVersion(_m: unknown, v: TimelineVersion) {
     this.writes++;
+    const { delegates: _delegates, ...fields } = v;
     Object.assign(
       this.versions.find((x) => x.id === v.id),
-      v,
+      fields,
     );
   }
   async deleteVersions(_m: unknown, unitId: number, ids: number[]) {
@@ -112,7 +113,6 @@ class LifecycleStore {
     this.writes++;
     this.units.delete(id);
     this.versions = this.versions.filter((v) => v.unitId !== id);
-    this.delegates = this.delegates.filter((d) => d.unitId !== id);
   }
   async findSuccessorReferrers(_m: unknown, id: number) {
     return [...this.units.values()]
@@ -150,6 +150,7 @@ class LifecycleStore {
         levelId: L4,
         parentId: null,
         directorCarnet: null,
+        delegates: [],
         ...v,
       });
     }
@@ -222,12 +223,7 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
   const fieldOf = (error: { getResponse(): any }) =>
     error.getResponse().message.field;
   const checksum = () =>
-    JSON.stringify([
-      [...store.units],
-      store.versions,
-      store.delegates,
-      store.logs,
-    ]);
+    JSON.stringify([[...store.units], store.versions, store.logs]);
   /** Asserts the whole store is exactly as before AND nothing was written. */
   const expectUntouched = (before: string) => {
     expect(checksum()).toBe(before);
@@ -462,6 +458,24 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
         ]);
       });
 
+      it('the dropped version takes its delegates with it and the log keeps that list; the kept version keeps its own (D-ORG-24)', async () => {
+        store.unit(6, 'ORG-006', [
+          { from: 2026, to: 2027, parentId: 2, delegates: ['B2001'] },
+          { from: 2027, parentId: 2, delegates: ['B2002', 'B2003'] },
+        ]);
+        await service.inactivate(6, { fromYear: 2027 });
+
+        expect(store.versionsOf(6).map((v) => [v.from, v.delegates])).toEqual([
+          [2026, ['B2001']],
+        ]);
+        expect(store.logs[0].changes.droppedVersions.old).toEqual([
+          expect.objectContaining({
+            from: 2027,
+            delegates: ['B2002', 'B2003'],
+          }),
+        ]);
+      });
+
       it.each([20277, 1999])(
         'a year outside 2000..current+10 (%i) is 400 naming fromYear',
         async (year) => {
@@ -653,12 +667,25 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
       expectUntouched(before);
     });
 
-    it('is 400 naming `director` when the copied director became a delegate (I-6)', async () => {
-      store.versions.find((v) => v.unitId === 6).directorCarnet = 'A1';
-      store.delegates.push({ unitId: 6, carnet: 'A1' });
-      const error = await rejection(service.reactivate(6, { fromYear: 2027 }));
-      expect(error.getStatus()).toBe(400);
-      expect(fieldOf(error)).toBe('director');
+    it('copies the last version delegates (an inactive-staff one included) into the new version; the log carries them (D-ORG-24)', async () => {
+      const last = store.versions.find((v) => v.unitId === 6);
+      last.directorCarnet = 'A1';
+      last.delegates = ['B2001', 'GONE'];
+      await service.reactivate(6, { fromYear: 2027 });
+
+      expect(
+        store.versionsOf(6).map((v) => [v.from, v.directorCarnet, v.delegates]),
+      ).toEqual([
+        [2026, 'A1', ['B2001', 'GONE']],
+        [2027, 'A1', ['B2001', 'GONE']],
+      ]);
+      expect(store.logs[0].changes.newVersion.new.delegates).toEqual([
+        'B2001',
+        'GONE',
+      ]);
+      // Independent rows: changing one version's list leaves the other alone.
+      store.versionsOf(6)[1].delegates.push('X');
+      expect(store.versionsOf(6)[0].delegates).toEqual(['B2001', 'GONE']);
     });
 
     it('back-date gate: with today in 2028, from 2027 needs the flag', async () => {
@@ -693,16 +720,16 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
   describe('B13 delete (R-ORG-008, design 5.5, D-ORG-13)', () => {
     describe('physical versus logical is decided by the FIRST version and the clock', () => {
       it('clock 2026, entry first seen in 2026: PHYSICAL — rows gone, log kept with the last values', async () => {
-        store.delegates.push({ unitId: 4, carnet: 'B2001' });
         store.logs.push({ unitId: 4, action: 'create' });
-        store.versions.find((v) => v.unitId === 4).directorCarnet = 'A1';
+        const only = store.versions.find((v) => v.unitId === 4);
+        only.directorCarnet = 'A1';
+        only.delegates = ['B2001'];
 
         const result = await service.remove(4, {});
 
         expect(result).toEqual({ id: 4, mode: 'physical', fromYear: null });
         expect(store.units.has(4)).toBe(false);
         expect(store.versionsOf(4)).toEqual([]);
-        expect(store.delegates.filter((d) => d.unitId === 4)).toEqual([]);
         expect(store.logs.map((l) => l.action)).toEqual([
           'create',
           'delete_physical',
@@ -723,7 +750,7 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
       it('clock 2027, SAME entry first seen in 2026: LOGICAL from 2027 — the row and its delegates stay', async () => {
         today = 2027;
         build();
-        store.delegates.push({ unitId: 4, carnet: 'B2001' });
+        store.versions.find((v) => v.unitId === 4).delegates = ['B2001'];
 
         const result = await service.remove(4, {});
 
@@ -736,7 +763,7 @@ describe('OrgStructureService lifecycle (T-03: B11 inactivate, B12 reactivate, B
         expect(store.versionsOf(4).map((v) => [v.from, v.to])).toEqual([
           [2026, 2027],
         ]);
-        expect(store.delegates.filter((d) => d.unitId === 4)).toHaveLength(1);
+        expect(store.versionsOf(4)[0].delegates).toEqual(['B2001']);
         expect(store.logs).toHaveLength(1);
         expect(store.logs[0]).toMatchObject({
           action: 'delete_logical',

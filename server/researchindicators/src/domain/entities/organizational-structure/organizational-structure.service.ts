@@ -31,8 +31,10 @@ import {
   changedVersions,
   endTimeline,
   findCovering,
+  findDirectorDelegateOverlap,
   gapsOf,
   reopenTimeline,
+  sameCarnets,
   TimelineVersion,
   VersionChanges,
 } from './org-version-timeline.util';
@@ -44,7 +46,6 @@ import { InactivateOrgUnitDto } from './dto/inactivate-org-unit.dto';
 import { ReactivateOrgUnitDto } from './dto/reactivate-org-unit.dto';
 import { DeleteOrgUnitQueryDto } from './dto/delete-org-unit-query.dto';
 import {
-  OrgChangeAction,
   OrgDeleteResult,
   OrgSaveOutcome,
   OrgUnitDetailResponse,
@@ -135,6 +136,7 @@ export class OrgStructureService {
           [],
         );
 
+        // The list goes into the first version (D-ORG-24).
         const version: TimelineVersion = {
           from: year,
           to: null,
@@ -143,8 +145,9 @@ export class OrgStructureService {
           levelId: dto.levelId,
           parentId,
           directorCarnet: director,
+          delegates,
         };
-        this.assertNoDirectorOverlap([version], delegates, [], current);
+        this.assertNoDirectorOverlap([], [version], year);
         await this.assertHierarchy(manager, 0, [version], year);
 
         const code = dto.code ?? (await this.nextCode(manager));
@@ -152,8 +155,7 @@ export class OrgStructureService {
 
         const userId = this.currentUser.user_id;
         const unitId = await this.store.insertUnit(manager, code, userId);
-        await this.store.insertVersion(manager, unitId, version, userId);
-        await this.store.addDelegates(manager, unitId, delegates, userId);
+        await this.insertVersionWithDelegates(manager, unitId, version, userId);
 
         const changes: ChangeSet = { code: { old: null, new: code } };
         for (const [field, value] of Object.entries({
@@ -196,12 +198,15 @@ export class OrgStructureService {
     dto: UpdateOrgUnitDto,
   ): Promise<OrgUnitSaveResponse> {
     const current = this.clock.currentYear();
+    // Delegates are a versioned field like the director (D-ORG-24): sending
+    // them needs `appliesFromYear` too.
     const touchesVersion = [
       dto.name,
       dto.acronym,
       dto.levelId,
       dto.parentId,
       dto.directorCarnet,
+      dto.delegateCarnets,
     ].some((value) => value !== undefined);
     const year = dto.appliesFromYear;
 
@@ -210,7 +215,7 @@ export class OrgStructureService {
         if (year === undefined || year === null) {
           throw badRequest(
             'appliesFromYear',
-            'appliesFromYear is required when name, acronym, level, parent or director change',
+            'appliesFromYear is required when name, acronym, level, parent, director or delegates change',
           );
         }
         this.assertAppliesFromYear(year);
@@ -224,7 +229,7 @@ export class OrgStructureService {
       this.logWrite(outcome.action, id, outcome.year, outcome.backdated);
     }
     const saveOutcome: OrgSaveOutcome = {
-      action: outcome.action as OrgSaveOutcome['action'],
+      action: outcome.action,
       appliesFromYear: outcome.year,
       backdated: outcome.backdated,
     };
@@ -241,7 +246,7 @@ export class OrgStructureService {
     touchesVersion: boolean,
     current: number,
   ): Promise<{
-    action: OrgChangeAction | null;
+    action: OrgSaveOutcome['action'];
     year: number | null;
     backdated: boolean;
   }> {
@@ -301,12 +306,22 @@ export class OrgStructureService {
           dto.directorCarnet,
         );
       }
+      if (dto.delegateCarnets !== undefined) {
+        // "Newly added" is judged against the list of the version at Y (step 1).
+        wanted.delegates = await this.resolveDelegates(
+          manager,
+          dto.delegateCarnets,
+          findCovering(versions, year).delegates,
+        );
+      }
 
       result = applyChange(versions, year, wanted);
       if (result.kind !== 'none') {
         // A save never creates, fills or moves a gap (D-ORG-17): the result
         // has exactly the gaps the stored timeline had.
         assertTimeline(result.versions, { ended, gaps: gapsOf(versions) });
+        // I-6 per version, over the timeline AFTER propagation (step 7).
+        this.assertNoDirectorOverlap(versions, result.versions, year);
         if (result.diff.parentId || result.diff.levelId) {
           await this.assertHierarchy(
             manager,
@@ -318,38 +333,6 @@ export class OrgStructureService {
         }
         for (const [field, change] of Object.entries(result.diff)) {
           changes[field] = change;
-        }
-      }
-    }
-
-    const storedDelegates = await this.store.loadDelegateCarnets(manager, id);
-    let delegateChange: { added: string[]; removed: string[] } | null = null;
-    if (dto.delegateCarnets !== undefined || result.diff.directorCarnet) {
-      const wanted =
-        dto.delegateCarnets === undefined
-          ? storedDelegates
-          : await this.resolveDelegates(
-              manager,
-              dto.delegateCarnets,
-              storedDelegates,
-            );
-      this.assertNoDirectorOverlap(
-        result.versions,
-        wanted,
-        storedDelegates,
-        current,
-      );
-      if (dto.delegateCarnets !== undefined) {
-        const lower = (list: string[]) => list.map((c) => c.toLowerCase());
-        const added = wanted.filter(
-          (c) => !lower(storedDelegates).includes(c.toLowerCase()),
-        );
-        const removed = storedDelegates.filter(
-          (c) => !lower(wanted).includes(c.toLowerCase()),
-        );
-        if (added.length > 0 || removed.length > 0) {
-          delegateChange = { added, removed };
-          changes.delegates = { old: storedDelegates, new: wanted };
         }
       }
     }
@@ -368,21 +351,28 @@ export class OrgStructureService {
       );
     }
     const { inserts, updates } = changedVersions(versions, result.versions);
+    const before = new Map(versions.map((v) => [v.id, v]));
     for (const version of updates) {
       await this.store.updateVersion(manager, version, userId);
+      // Rewrite a version's delegate rows only when its list changed (as a set).
+      if (!sameCarnets(version.delegates, before.get(version.id).delegates)) {
+        await this.store.replaceDelegates(
+          manager,
+          version.id,
+          version.delegates,
+          userId,
+        );
+      }
     }
     for (const version of inserts) {
-      await this.store.insertVersion(manager, id, version, userId);
-    }
-    if (delegateChange) {
-      await this.store.removeDelegates(manager, id, delegateChange.removed);
-      await this.store.addDelegates(manager, id, delegateChange.added, userId);
+      await this.insertVersionWithDelegates(manager, id, version, userId);
     }
 
+    // A delegates change is a versioned change like the director's (D-ORG-24):
+    // no `delegates_change` row is written any more.
     const versioned = result.kind !== 'none';
-    let action: OrgChangeAction = 'delegates_change';
+    let action: NonNullable<OrgSaveOutcome['action']> = 'code_change';
     if (result.kind !== 'none') action = result.kind;
-    else if (changes.code) action = 'code_change';
     const backdated = versioned && year < current;
     await this.store.insertLog(manager, {
       unitId: id,
@@ -537,17 +527,16 @@ export class OrgStructureService {
           });
           // I-3 / I-4: the copied parent must still be active from `year` on.
           await this.assertHierarchy(manager, id, reopened.versions, year);
-          // I-6: the copied director must not have become one of the delegates.
-          const delegates = await this.store.loadDelegateCarnets(manager, id);
-          this.assertNoDirectorOverlap(
-            reopened.versions,
-            delegates,
-            delegates,
-            current,
-          );
+          // I-6 cannot break here: the copy takes the last version's director
+          // AND its delegates together (D-ORG-24), and that version satisfied it.
 
           const userId = this.currentUser.user_id;
-          await this.store.insertVersion(manager, id, reopened.added, userId);
+          await this.insertVersionWithDelegates(
+            manager,
+            id,
+            reopened.added,
+            userId,
+          );
           await this.store.updateUnitStatus(
             manager,
             id,
@@ -651,8 +640,10 @@ export class OrgStructureService {
     })) {
       if (value !== null) changes[field] = { old: value, new: null };
     }
-    const delegates = await this.store.loadDelegateCarnets(manager, id);
-    if (delegates.length > 0) changes.delegates = { old: delegates, new: [] };
+    // The last version's delegates are logged before the cascade removes them (D-ORG-24).
+    if (last.delegates.length > 0) {
+      changes.delegates = { old: last.delegates, new: [] };
+    }
     // The log row is written first and has no foreign key (D-ORG-5): it survives the delete.
     await this.store.insertLog(manager, {
       unitId: id,
@@ -833,7 +824,29 @@ export class OrgStructureService {
       levelId: v.levelId,
       parentId: v.parentId,
       directorCarnet: v.directorCarnet,
+      delegates: v.delegates,
     };
+  }
+
+  /** Inserts a version and its delegate rows (D-ORG-24: the rows hang off the version id). */
+  private async insertVersionWithDelegates(
+    manager: EntityManager,
+    unitId: number,
+    version: TimelineVersion,
+    userId: number,
+  ): Promise<void> {
+    const versionId = await this.store.insertVersion(
+      manager,
+      unitId,
+      version,
+      userId,
+    );
+    await this.store.addDelegates(
+      manager,
+      versionId,
+      version.delegates,
+      userId,
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -994,36 +1007,26 @@ export class OrgStructureService {
   }
 
   /**
-   * I-6: no delegate is the director of the version covering the current year
-   * or of any later version, computed over the timeline AFTER this save's own
-   * director change. The side that introduces the overlap is named: a delegate
-   * that was not already in the list is `delegates`; one already there means the
-   * director change caused it (`director`).
+   * I-6 per version (D-ORG-24): no version of the resulting timeline holds its
+   * own director among its delegates, checked on every version the save writes,
+   * propagated ones included (`before` is empty on create). The 400 names
+   * `director` when this save changed that version's director, else `delegates`.
    */
   private assertNoDirectorOverlap(
-    versions: Array<Pick<TimelineVersion, 'to' | 'directorCarnet'>>,
-    delegates: string[],
-    storedDelegates: string[],
-    current: number,
+    before: TimelineVersion[],
+    after: TimelineVersion[],
+    year: number,
   ): void {
-    const directors = new Set(
-      versions
-        .filter((v) => v.to === null || v.to > current)
-        .map((v) => v.directorCarnet?.toLowerCase())
-        .filter((c) => !!c),
-    );
-    const overlap = delegates.filter((c) => directors.has(c.toLowerCase()));
-    if (overlap.length === 0) return;
-    const stored = new Set(storedDelegates.map((c) => c.toLowerCase()));
-    const introduced = overlap.find((c) => !stored.has(c.toLowerCase()));
-    throw introduced
+    const overlap = findDirectorDelegateOverlap(before, after, year);
+    if (!overlap) return;
+    throw overlap.field === 'director'
       ? badRequest(
-          'delegates',
-          `${introduced} is the director of this entry and cannot also be a delegate`,
+          'director',
+          `${overlap.carnet} is a delegate of this entry in the version from ${overlap.from} and cannot also be its director there`,
         )
       : badRequest(
-          'director',
-          `${overlap[0]} is a delegate of this entry and cannot also be its director`,
+          'delegates',
+          `${overlap.carnet} is the director of this entry in the version from ${overlap.from} and cannot also be a delegate there`,
         );
   }
 

@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, computed, inject, signal } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
-import { OrgChangeLogRow, OrgHistory, OrgLifecycleAction, OrgLinkedData, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
+import {
+  OrgChangeLogRow,
+  OrgHistory,
+  OrgLifecycleAction,
+  OrgLinkedData,
+  OrgYearRange,
+  OrgYearViewRow
+} from '@shared/interfaces/org-structure.interface';
 import { ApiService } from '@shared/services/api.service';
 import { pathOf } from '../../utils/org-form.util';
 import { ORG_ACTION_LABELS, actorLabel, diffLines, formatLogTime, versionRows } from '../../utils/org-history.util';
@@ -37,6 +44,8 @@ export class OrgUnitPanelComponent implements OnChanges {
   @Input() formKey = '';
   @Output() saved = new EventEmitter<number | null>();
   @Output() cancelled = new EventEmitter<void>();
+  /** Forwards the form's in-flight save state to the page (it holds the *Structure year* still meanwhile). */
+  @Output() savingChange = new EventEmitter<boolean>();
   @Output() lifecycleDone = new EventEmitter<OrgLifecycleDone>();
 
   readonly levelLabels = ORG_LEVEL_LABELS;
@@ -63,6 +72,10 @@ export class OrgUnitPanelComponent implements OnChanges {
     const names = new Map<string, string>();
     for (const r of this.rows) {
       for (const person of [r.version.director, ...r.delegates]) if (person?.name) names.set(person.carnet, person.name);
+    }
+    // Versions of the open History tab: a past list's people may not be in the viewed year's rows (D-ORG-24).
+    for (const v of this.history()?.versions ?? []) {
+      for (const person of [v.director, ...(v.delegates ?? [])]) if (person?.name && !names.has(person.carnet)) names.set(person.carnet, person.name);
     }
     return names;
   }

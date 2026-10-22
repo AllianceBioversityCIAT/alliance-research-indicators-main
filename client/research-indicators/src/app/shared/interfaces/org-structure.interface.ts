@@ -27,9 +27,14 @@ export interface OrgUnitVersionView {
   parentCode: string | null;
   parentName: string | null;
   director: OrgStaffRef | null;
+  /**
+   * Delegates of THIS version (B5 / B6 — D-ORG-24: versioned like the director). Absent on the B1 version,
+   * where the row's own `delegates` carries the list of the version shown.
+   */
+  delegates?: OrgStaffRef[];
 }
 
-/** One entry of the year view (design §4 B1). `delegates` is the CURRENT list, whatever the year (R-ORG-017). */
+/** One entry of the year view (design §4 B1). `delegates` is the list of the version shown (D-ORG-24, R-ORG-017). */
 export interface OrgYearViewRow {
   id: number;
   code: string;
@@ -104,9 +109,12 @@ export interface OrgUnitUpdatePayload {
   backdate?: boolean;
 }
 
-/** What the server actually did (design §4 "B9/B10 response `outcome`"); `action: null` = nothing written. */
+/**
+ * What the server actually did (design §4 "B9/B10 response `outcome`"); `action: null` = nothing written.
+ * A delegates change reports `edit_in_place` / `new_version` like any versioned field (D-ORG-24).
+ */
 export interface OrgSaveOutcome {
-  action: 'create' | 'edit_in_place' | 'new_version' | 'code_change' | 'delegates_change' | null;
+  action: 'create' | 'edit_in_place' | 'new_version' | 'code_change' | null;
   appliesFromYear: number | null;
   backdated: boolean;
 }
@@ -144,7 +152,7 @@ export type OrgChangeLogAction =
   | 'edit_in_place'
   | 'new_version'
   | 'code_change'
-  | 'delegates_change'
+  | 'delegates_change' // legacy: written before 2026-10-22, still returned for old rows (D-ORG-24)
   | 'inactivate'
   | 'reactivate'
   | 'delete_logical'

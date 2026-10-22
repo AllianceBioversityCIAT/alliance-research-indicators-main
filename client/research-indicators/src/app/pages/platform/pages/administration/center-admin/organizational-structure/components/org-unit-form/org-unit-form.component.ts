@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+  computed,
+  inject,
+  signal
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AutoComplete, AutoCompleteModule } from 'primeng/autocomplete';
 import { ButtonModule } from 'primeng/button';
@@ -6,7 +18,7 @@ import { ChipModule } from 'primeng/chip';
 import { SelectModule } from 'primeng/select';
 import { TooltipModule } from 'primeng/tooltip';
 import { InputComponent } from '@shared/components/custom-fields/input/input.component';
-import { OrgStaffOption, OrgUnitSaved, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
+import { OrgStaffOption, OrgUnitSaved, OrgUnitVersionView, OrgYearRange, OrgYearViewRow } from '@shared/interfaces/org-structure.interface';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { ActionsService } from '@shared/services/actions.service';
 import { ApiService } from '@shared/services/api.service';
@@ -19,6 +31,7 @@ import {
   buildCreatePayload,
   defaultAppliesFromYear,
   buildUpdatePayload,
+  delegatesReplaced,
   detectChanges,
   parentOptions,
   saveToast
@@ -35,7 +48,7 @@ interface LevelOption {
 }
 
 // @akili-spec institutional-performance/organizational-structure T-02 (client half) — design §2.1,
-// §4 B3/B4/B9/B10, §6.5, D-ORG-8, D-ORG-15; requirements R-ORG-002..005, 013, 016, 017. Details tab of
+// §4 B3/B4/B9/B10, §6.5, D-ORG-8, D-ORG-24 (delegates versioned per year); requirements R-ORG-002..005, 013, 016, 017. Details tab of
 // the right panel. The page recreates this component per entry (and after each save), so every field
 // is initialised once, in `ngOnInit`, from the inputs.
 @Component({
@@ -60,6 +73,8 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
   @Input() structureYear = 0;
   @Output() saved = new EventEmitter<number | null>();
   @Output() cancelled = new EventEmitter<void>();
+  /** `true` while a save is in flight: the page keeps the *Structure year* still so this form is not rebuilt mid-save. */
+  @Output() savingChange = new EventEmitter<boolean>();
 
   readonly maxDelegates = MAX_DELEGATES;
   readonly fields = signal({ code: '', name: '', acronym: '' });
@@ -74,6 +89,9 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
   readonly directorSuggestions = signal<OrgStaffOption[]>([]);
   readonly delegateSuggestions = signal<OrgStaffOption[]>([]);
   readonly delegateLimitHit = signal(false);
+  /** Every version of the entry (B6), loaded once on the first delegates change; `null` until then (D-ORG-25). */
+  private readonly versions = signal<OrgUnitVersionView[] | null>(null);
+  private versionsRequested = false;
 
   // Guards a slow search response that a newer keystroke has already superseded.
   private readonly staffToken = { director: 0, delegates: 0 };
@@ -95,11 +113,26 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
     backdate: this.backdate()
   }));
   readonly changes = computed(() => (this.row ? detectChanges(this.state(), this.row) : { code: false, versioned: true, delegates: false }));
-  /** *Applies from year* shows once a versioned field changed; a code-only or delegates-only edit hides it (R-ORG-013). */
+  /** *Applies from year* shows once a versioned field (delegates included, D-ORG-24) changed; a code-only edit hides it (R-ORG-013). */
   readonly showAppliesFrom = computed(() => this.isCreate() || this.changes().versioned);
   readonly yearOptions = computed(() => appliesFromYears(this.range.min, this.range.max, this.range.current, this.backdate()));
   readonly parentChoices = computed(() => parentOptions(this.rows, this.levelId(), this.appliesFromYear(), this.row?.id ?? null));
   readonly showBackdateWarning = computed(() => this.backdate() && this.appliesFromYear() < this.range.current);
+  /**
+   * D-ORG-25: the list is sent for the version covering *Applies from year*; when that is another version than
+   * the one on screen, and its list differs, say which one and whose list is replaced. Saving stays allowed.
+   */
+  readonly delegatesReplaceWarning = computed(() => {
+    const row = this.row;
+    const versions = this.versions();
+    if (!row || !versions || !this.changes().delegates) return null;
+    return delegatesReplaced(
+      versions,
+      row.version.from,
+      this.appliesFromYear(),
+      this.delegates().map(d => d.carnet)
+    );
+  });
 
   readonly canSave = computed(() => {
     const s = this.state();
@@ -230,11 +263,26 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
     }
     this.delegateLimitHit.set(false);
     this.delegates.update(list => [...list, person]);
+    void this.loadVersions();
   }
 
   removeDelegate(carnet: string): void {
     this.delegateLimitHit.set(false);
     this.delegates.update(list => list.filter(d => d.carnet !== carnet));
+    void this.loadVersions();
+  }
+
+  // B6 (one extra call, only once an existing entry's delegates are touched): the versions' own lists are the
+  // source of the D-ORG-25 warning. A failed call leaves the warning off; the save is unaffected.
+  private async loadVersions(): Promise<void> {
+    if (!this.row || this.versionsRequested) return;
+    this.versionsRequested = true;
+    try {
+      const response = await this.api.GET_OrgStructureHistory(this.row.id);
+      if (response?.successfulRequest !== false) this.versions.set(response?.data?.versions ?? null);
+    } catch {
+      this.versions.set(null);
+    }
   }
 
   /** Accessible name of a chip: "name, email[, inactive staff]". */
@@ -249,6 +297,7 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
   async save(): Promise<void> {
     if (!this.canSave()) return;
     this.saving.set(true);
+    this.savingChange.emit(true);
     const state = this.state();
     const row = this.row;
     const current = this.range.current;
@@ -267,6 +316,7 @@ export class OrgUnitFormComponent implements OnInit, OnChanges {
       this.actions.showToast({ severity: 'error', summary: 'Error', detail: 'We could not save the entry. Please try again.' });
     } finally {
       this.saving.set(false);
+      this.savingChange.emit(false);
     }
   }
 

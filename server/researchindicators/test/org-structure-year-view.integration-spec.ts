@@ -109,6 +109,9 @@ describe('Organizational Structure — year view, years and one entry against re
         levelId: 22,
         parentId: id.P1,
         directorCarnet: dir,
+        // Delegates are a field of each VERSION (D-ORG-24); the two lists
+        // differ, so a read that ignored the year could not pass.
+        delegates: [delA, delB],
       },
       {
         from: 2027,
@@ -117,12 +120,22 @@ describe('Organizational Structure — year view, years and one entry against re
         acronym: 'ALP',
         levelId: 22,
         parentId: id.P2,
+        delegates: [delB],
       },
     ]);
     // B: ended (deleted) from 2027; its only version is [2026, 2027).
     id.B = await fixtures.unit(
       'B',
-      [{ from: 2026, to: 2027, name: 'Bravo', levelId: 23, parentId: id.P1 }],
+      [
+        {
+          from: 2026,
+          to: 2027,
+          name: 'Bravo',
+          levelId: 23,
+          parentId: id.P1,
+          delegates: [delB],
+        },
+      ],
       { status: 'deleted', statusFromYear: 2027 },
     );
     // C: created in 2028.
@@ -135,10 +148,6 @@ describe('Organizational Structure — year view, years and one entry against re
       [{ from: 2027, to: 2029, name: 'Delta', levelId: 23, parentId: id.P1 }],
       { status: 'inactive', statusFromYear: 2029 },
     );
-    // Delegates are the CURRENT list of an entry, not per year.
-    await fixtures.delegate(id.A, delA);
-    await fixtures.delegate(id.A, delB);
-
     const moduleRef = await Test.createTestingModule({
       controllers: [OrganizationalStructureController],
       providers: [
@@ -372,25 +381,31 @@ describe('Organizational Structure — year view, years and one entry against re
   });
 
   describe('delegates (R-ORG-017 read half)', () => {
-    it('an entry with two delegate rows returns both, identically, in the 2026 AND 2027 views (current list, not per year)', async () => {
-      const expected = [
-        {
-          carnet: delA,
-          name: 'Luis Gomez',
-          email: 's2@example.org',
-          isActiveStaff: false,
-        },
-        {
-          carnet: delB,
-          name: 'Marta Ruiz',
-          email: 's3@example.org',
-          isActiveStaff: true,
-        },
-      ];
-      for (const year of [2026, 2027]) {
-        const a = (await view(year)).find((r) => r.code.endsWith('_A'));
-        expect(a.delegates).toEqual(expected);
-      }
+    // Built per test: the carnets are created in beforeAll.
+    const luis = () => ({
+      carnet: delA,
+      name: 'Luis Gomez',
+      email: 's2@example.org',
+      isActiveStaff: false,
+    });
+    const marta = () => ({
+      carnet: delB,
+      name: 'Marta Ruiz',
+      email: 's3@example.org',
+      isActiveStaff: true,
+    });
+
+    it('an entry whose versions hold DIFFERENT lists shows each year its own: [Luis, Marta] in 2026 and [Marta] in 2027, never a current list (D-ORG-24)', async () => {
+      const in2026 = (await view(2026)).find((r) => r.code.endsWith('_A'));
+      const in2027 = (await view(2027)).find((r) => r.code.endsWith('_A'));
+      expect(in2026.delegates).toEqual([luis(), marta()]);
+      expect(in2027.delegates).toEqual([marta()]);
+    });
+
+    it('an ended entry shown through includeEnded carries the delegates of its LAST version', async () => {
+      const b = (await view(2027, true)).find((r) => r.code.endsWith('_B'));
+      expect(b.version.to).toBe(2027);
+      expect(b.delegates).toEqual([marta()]);
     });
 
     it('an entry without delegates returns an empty list', async () => {
@@ -440,7 +455,7 @@ describe('Organizational Structure — year view, years and one entry against re
   });
 
   describe('one entry (B5)', () => {
-    it('returns the entry with its versions oldest first, parents resolved and the delegates', async () => {
+    it('returns the entry with its versions oldest first, parents resolved and each version with its own delegates', async () => {
       const res = await request(app.getHttpServer())
         .get(`/units/${id.A}`)
         .set(asAdmin);
@@ -463,7 +478,10 @@ describe('Organizational Structure — year view, years and one entry against re
         'Parent Two',
       ]);
       expect(data.versions[0].director.carnet).toBe(dir);
-      expect(data.delegates.map((d) => d.carnet)).toEqual([delA, delB]);
+      expect(
+        data.versions.map((v) => v.delegates.map((d) => d.carnet)),
+      ).toEqual([[delA, delB], [delB]]);
+      expect(data).not.toHaveProperty('delegates');
     });
 
     it('an ended entry reports its status and the year it took effect', async () => {

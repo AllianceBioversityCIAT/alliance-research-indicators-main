@@ -52,6 +52,7 @@ export interface OrgVersionRow {
   level: string;
   parent: string;
   director: string;
+  delegates: string;
 }
 
 const EMPTY = '—';
@@ -104,7 +105,9 @@ export function versionRows(versions: OrgUnitVersionView[]): OrgVersionRow[] {
       name: v.name,
       level: code ? `${code} ${ORG_LEVEL_LABELS[code]}` : String(v.levelId),
       parent: v.parentId === null ? EMPTY : [v.parentCode, v.parentName].filter(Boolean).join(' ') || String(v.parentId),
-      director: v.director ? (v.director.name ?? v.director.carnet) : EMPTY
+      director: v.director ? (v.director.name ?? v.director.carnet) : EMPTY,
+      // Each version carries its own list (D-ORG-24); a payload without one reads as empty.
+      delegates: v.delegates?.length ? v.delegates.map(d => d.name ?? d.carnet).join('; ') : EMPTY
     };
   });
 }

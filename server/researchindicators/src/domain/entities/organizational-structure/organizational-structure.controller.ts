@@ -75,7 +75,8 @@ export class OrganizationalStructureController {
   // B1
   @Get('units')
   @ApiOperation({
-    summary: 'Year view: every entry with the version that covers a year',
+    summary:
+      'Year view: every entry with the version that covers a year and that version’s delegates',
   })
   @ApiQuery({
     name: 'year',
@@ -89,7 +90,7 @@ export class OrganizationalStructureController {
     type: Boolean,
     required: false,
     description:
-      'Also return entries inactivated or deleted from a year at or before the viewed one (default false)',
+      'Also return entries inactivated or deleted from a year at or before the viewed one (default false). Each row carries `delegates`: the delegates of the version shown (the one covering the year, or the last one of an ended entry), never a current list',
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UsePipes(
@@ -208,7 +209,7 @@ export class OrganizationalStructureController {
   @Get('resolve')
   @ApiOperation({
     summary:
-      'Resolve entries for a year: the covering version, the status that year and the current delegates (any authenticated user)',
+      'Resolve entries for a year: the covering version, the status that year and the delegates of that version (any authenticated user)',
   })
   @ApiQuery({
     name: 'ids',
@@ -226,7 +227,7 @@ export class OrganizationalStructureController {
   })
   @ApiOkResponse({
     description:
-      "data = one row per distinct id, in request order. A resolved row: { id, code, year, status ('active' | 'inactive' | 'deleted' as of that year), statusFromYear, successorId, version, delegates }. `version` is the covering version, or null when none covers the year: at or after the entry's end, inside a reactivation gap (status of that year), or before its first version (status 'inactive', not distinguishable from a gap year). An id that does not exist is { id, missing: true } in its place and the call still returns 200",
+      "data = one row per distinct id, in request order. A resolved row: { id, code, year, status ('active' | 'inactive' | 'deleted' as of that year), statusFromYear, successorId, version, delegates }. `delegates` are the delegates of the covering version, i.e. of the requested year (a consumer that wants who acts now must ask for the current year), and `[]` when `version` is null. `version` is the covering version, or null when none covers the year: at or after the entry's end, inside a reactivation gap (status of that year), or before its first version (status 'inactive', not distinguishable from a gap year). An id that does not exist is { id, missing: true } in its place and the call still returns 200",
   })
   @UsePipes(
     new ValidationPipe({
@@ -248,7 +249,8 @@ export class OrganizationalStructureController {
   // B5 — declared after every literal route so `:id` cannot swallow them.
   @Get('units/:id')
   @ApiOperation({
-    summary: 'One entry with all its versions and its current delegates',
+    summary:
+      'One entry with all its versions, each with its director and its own delegates',
   })
   @ApiParam({
     name: 'id',
@@ -271,7 +273,7 @@ export class OrganizationalStructureController {
   @Get('units/:id/history')
   @ApiOperation({
     summary:
-      "An entry's versions (oldest first) and its change log (newest first)",
+      "An entry's versions (oldest first, each with its delegates) and its change log (newest first; rows written as delegates_change before the delegates became versioned stay readable)",
   })
   @ApiParam({
     name: 'id',
@@ -388,7 +390,7 @@ export class OrganizationalStructureController {
   @ApiBody({ type: CreateOrgUnitDto })
   @ApiCreatedResponse({
     description:
-      'data = the B5 shape (entry, versions, delegates) plus `outcome`: what the save actually did',
+      'data = the B5 shape (entry and its versions, each with its delegates) plus `outcome`: what the save actually did',
     schema: {
       type: 'object',
       properties: {
@@ -423,7 +425,7 @@ export class OrganizationalStructureController {
   @Patch('units/:id')
   @ApiOperation({
     summary:
-      'Change an entry: edits a version in place, splits one, back-dates, changes the code and/or replaces the delegates',
+      'Change an entry: edits a version in place, splits one, back-dates and/or changes the code. Delegates are a versioned field like the director, so delegateCarnets needs appliesFromYear',
   })
   @ApiParam({
     name: 'id',
@@ -434,7 +436,7 @@ export class OrganizationalStructureController {
   @ApiBody({ type: UpdateOrgUnitDto })
   @ApiOkResponse({
     description:
-      'data = the B5 shape (entry, versions, delegates) plus `outcome`: what the save actually did',
+      'data = the B5 shape (entry and its versions, each with its delegates) plus `outcome`: what the save actually did',
     schema: {
       type: 'object',
       properties: {
@@ -483,7 +485,8 @@ export class OrganizationalStructureController {
   })
   @ApiBody({ type: InactivateOrgUnitDto })
   @ApiOkResponse({
-    description: 'data = the B5 shape (entry, versions, delegates)',
+    description:
+      'data = the B5 shape (entry and its versions, each with its delegates)',
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UsePipes(
@@ -521,7 +524,8 @@ export class OrganizationalStructureController {
   })
   @ApiBody({ type: ReactivateOrgUnitDto })
   @ApiOkResponse({
-    description: 'data = the B5 shape (entry, versions, delegates)',
+    description:
+      'data = the B5 shape (entry and its versions, each with its delegates)',
   })
   @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
   @UsePipes(

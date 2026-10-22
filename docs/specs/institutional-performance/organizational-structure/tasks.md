@@ -358,7 +358,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-06 — HITL: browser, mockup and seed review
 
-- **Status:** todo — **paused 2026-10-22 until T-12 is done** (Pivot: delegates versioned per year; execution.md → *Pivot Record*) · **Size:** S · **Dependencies:** T-05; resumes after T-12 · **Owner:** requester
+- **Status:** in progress — **resumed 2026-10-22 after T-12** (was paused for the delegates pivot) (Pivot: delegates versioned per year; execution.md → *Pivot Record*) · **Size:** S · **Dependencies:** T-05; resumes after T-12 · **Owner:** requester
 - **Requirements covered:** the requirements §10 substitutes: tree rendering, expand/collapse, column resize; visual fidelity to the mockup; seed content against the source sheet. NFR-ORG-005 manual keyboard pass. R-ORG-013 AC.1 seen with a real Center-Admin-only user.
 - **Design refs:** §6, §10 *Manual (HITL)*, mockup artboard 2
 - **Scope:** no code. With the app running locally (`docker compose up --build -d` or the native commands):
@@ -490,7 +490,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-12 — Pivot: delegates versioned per year
 
-- **Status:** in-progress (2026-10-22 — requester approved the amended spec: "Sí, aprobada: arranca T-12") · **Size:** L · **Dependencies:** T-11 (client half touches the same page; no server dependency) · **Added:** 2026-10-22 (Pivot Record in execution.md)
+- **Status:** done (2026-10-22, Reviewers A and B PASS on attempt 2 — execution.md; requester approved the amended spec: "Sí, aprobada: arranca T-12") · **Size:** L · **Dependencies:** T-11 (client half touches the same page; no server dependency) · **Added:** 2026-10-22 (Pivot Record in execution.md)
 - **Origin:** requester, T-06: "Ajusta el tema de los delegados. Me parece que si todo esta anualizado o versionado por año, tambien los delegados deberian estarlo." Decisions: versioned like the director; `resolve` per year; pivot inside this spec. Decision **D-ORG-24** (supersedes D-ORG-15).
 - **Requirements covered:**
   - R-ORG-017 (rewritten) — *Add delegates from a year* (split `[2026, 2027)` / `[2027, open)`; **AND IT MUST** write one `new_version` row with a `delegates` diff; **BUT** must NOT change the 2026 version or any other entry; in-place variant from 2026 → `edit_in_place`); *A later deliberate delegates change is kept* (**BUT** `[2028, open)` keeps `[B2003]`; equal later list is propagated); *Director as delegate (per version)* (allowed from 2028, 400 `delegates` from 2026; **AND IT MUST NOT** change any version); *Delegate made director* (400 `director` from 2027 and, through propagation, from 2026); *Delegates shown in a past year* (2026 shows `[B2001]`, 2027 `[B2002]`; **AND** History lists both versions with their delegates and the log row; **BUT** no *current* label); AC.1–AC.5; delegates change on an inactive entry only before its end; reactivation copies the last version's delegates.
@@ -559,11 +559,11 @@ Every task depends on the one before it. They share the module's service, contro
 - **Skills:** nestjs-expert, api-design-principles, error-handling-patterns, tdd (timeline util) (server); angular-developer, ui-ux-pro-max (client); systematic-debugging on any failure.
 - **Budget:** ~3,000 LOC incl. tests (server ~1,900, client ~1,100), under the 4,500-LOC slice tripwire; ≤ 2 review rounds (design §14).
 - **Done criteria:**
-  - [ ] P-15 first-step output quoted with date in `execution.md`.
-  - [ ] `migration:test:execute` output, `SHOW CREATE TABLE org_unit_delegates`, and the `down` / `up` round trip quoted.
-  - [ ] Same command set as T-01 (server unit, `test:integration -- org-structure`, `npx eslint` on the module and `src/db/migrations/1791*`, `npm run build`; client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline), all green; falsifiers 1–9 observed red, then reverted.
-  - [ ] Every consumer test listed above rewritten (not deleted) and listed in `execution.md` with old → new assertion.
-  - [ ] B1, B5, B6, B10, C1 Swagger texts updated and seen in `/swagger`, observation quoted.
+  - [x] P-15 first-step output quoted with date in `execution.md`. *(count 0 after the requester's deletion; `git branch -r --contains 8028311b | wc -l` → 0, 2026-10-22)*
+  - [x] `migration:test:execute` output, `SHOW CREATE TABLE org_unit_delegates`, and the `down` / `up` round trip quoted.
+  - [x] Same command set as T-01 (server unit, `test:integration -- org-structure`, `npx eslint` on the module and `src/db/migrations/1791*`, `npm run build`; client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline), all green; falsifiers 1–9 observed red, then reverted. *(server: the 2 pre-existing suites; client falsifier A via a decoy — execution.md § T-12)*
+  - [x] Every consumer test listed above rewritten (not deleted) and listed in `execution.md` with old → new assertion.
+  - [x] B1, B5, B6, B10, C1 Swagger texts updated and seen in `/swagger`, observation quoted. *(the live `/swagger-json` of the requester's running server — the JSON document, not the rendered page)*
 
 ---
 

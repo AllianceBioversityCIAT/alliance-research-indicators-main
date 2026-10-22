@@ -9,6 +9,8 @@ export interface YearViewRawRow {
   code: string;
   status: 'active' | 'inactive' | 'deleted';
   status_from_year: number | null;
+  /** The version shown; its delegates are joined by this id (D-ORG-24). */
+  version_id: number | string;
   valid_from_year: number;
   valid_to_year: number | null;
   name: string;
@@ -53,7 +55,7 @@ export class OrgUnitRepository extends Repository<OrgUnit> {
       : '';
     const sql = `
       SELECT u.id, u.code, u.status, u.status_from_year,
-             v.valid_from_year, v.valid_to_year, v.name, v.acronym,
+             v.id AS version_id, v.valid_from_year, v.valid_to_year, v.name, v.acronym,
              v.level_value_id, lv.code AS level_code, lv.value AS level_name,
              v.parent_id, pu.code AS parent_code, pv.name AS parent_name,
              v.director_carnet,

@@ -56,6 +56,11 @@ export default class OrganizationalStructureComponent implements OnInit {
   readonly prefill = signal<OrgUnitFormPrefill | null>(null);
   /** Bumped on every open and every save so the form is rebuilt from the freshly loaded rows. */
   readonly formVersion = signal(0);
+  /**
+   * A form save is in flight. The *Structure year* is held still meanwhile: changing it rebuilds the form,
+   * and a destroyed form can no longer report `saved`, so the page would never reload or reselect (T-12 review).
+   */
+  readonly formSaving = signal(false);
   readonly formKey = computed(() => `${this.creating() ? 'new' : this.selectedId()}-${this.formVersion()}`);
 
   // Guards a slow response for a year the admin has already left (same technique as control-lists).
@@ -102,7 +107,7 @@ export default class OrganizationalStructureComponent implements OnInit {
 
   readonly tableExportFileName = computed(() => `organizational-structure_${this.year() ?? ''}.xlsx`);
 
-  // Delegates are the CURRENT list whatever the year (R-ORG-017), so the header says so.
+  // Delegates are those of the viewed year's version (R-ORG-017, D-ORG-24).
   readonly tableColumns: DataTableColumn<OrgTableRow>[] = [
     { field: 'id', header: 'ID', width: '70px' },
     { field: 'code', header: 'Code', type: 'code', width: '110px' },
@@ -111,7 +116,7 @@ export default class OrganizationalStructureComponent implements OnInit {
     { field: 'acronym', header: 'Acronym', width: '100px' },
     { field: 'parent', header: 'Parent' },
     { field: 'director', header: 'Director' },
-    { field: 'delegates', header: 'Delegates (current)' },
+    { field: 'delegates', header: 'Delegates' },
     { field: 'status', header: 'Status' },
     { field: 'since', header: 'Since', width: '80px' }
   ];
@@ -142,9 +147,12 @@ export default class OrganizationalStructureComponent implements OnInit {
   }
 
   async onYearChange(year: number): Promise<void> {
-    if (year === this.year()) return;
+    if (year === this.year() || this.formSaving()) return;
     this.year.set(year);
     await this.loadUnits();
+    // An open edit form shows the version of the viewed year, delegates included (D-ORG-24): recreate it.
+    // A form creating a new entry keeps what was typed.
+    if (!this.creating() && this.selectedId() !== null) this.formVersion.update(v => v + 1);
   }
 
   async onIncludeEndedChange(checked: boolean): Promise<void> {
@@ -157,6 +165,7 @@ export default class OrganizationalStructureComponent implements OnInit {
   }
 
   selectUnit(id: number): void {
+    this.formSaving.set(false);
     this.creating.set(false);
     this.selectedId.set(id);
     this.revealInTree(id);
@@ -181,6 +190,7 @@ export default class OrganizationalStructureComponent implements OnInit {
   }
 
   startCreate(prefill: OrgUnitFormPrefill | null = null): void {
+    this.formSaving.set(false);
     this.selectedId.set(null);
     this.prefill.set(prefill);
     this.creating.set(true);
@@ -192,6 +202,7 @@ export default class OrganizationalStructureComponent implements OnInit {
   }
 
   closeForm(): void {
+    this.formSaving.set(false);
     this.creating.set(false);
     this.selectedId.set(null);
   }

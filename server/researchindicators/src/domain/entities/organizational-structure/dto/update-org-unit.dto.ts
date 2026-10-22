@@ -22,8 +22,8 @@ const presentNotNull = (_: unknown, value: unknown) =>
  * as it is. `null` clears `acronym`, `parentId` and `directorCarnet`. Like
  * B9 there is no `id`, `portfolioId`, director name/email or delegate
  * name/email (400 through `forbidNonWhitelisted`). `appliesFromYear` is
- * required by the service unless only `code` and/or `delegateCarnets` are
- * sent (R-ORG-017: delegates are not tied to a year).
+ * required by the service unless only `code` is sent: delegates are a versioned
+ * field like the director (R-ORG-017, D-ORG-24).
  */
 export class UpdateOrgUnitDto {
   @ApiPropertyOptional({ type: String, maxLength: 30 })
@@ -72,7 +72,7 @@ export class UpdateOrgUnitDto {
   @ApiPropertyOptional({
     type: [String],
     description:
-      'Replaces the whole delegate list: omitted = unchanged, [] = cleared',
+      'Replaces the whole delegate list of the version at appliesFromYear (a versioned field, so appliesFromYear is required): omitted = unchanged, [] = cleared. Later versions that hold the same set take it too',
   })
   @ValidateIf(present)
   @IsArray()
@@ -84,7 +84,7 @@ export class UpdateOrgUnitDto {
   @ApiPropertyOptional({
     type: Number,
     description:
-      'Year the versioned change applies from. Required unless only code and/or delegateCarnets are sent',
+      'Year the versioned change applies from. Required unless only code is sent (delegateCarnets needs it like directorCarnet)',
   })
   @IsOptional()
   @IsInt()

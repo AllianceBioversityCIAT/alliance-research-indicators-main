@@ -130,7 +130,7 @@ const timingRun = process.env.ORG_PERF_STRICT === '1';
       );
 
       for (let i = 0; i < toCreate; i++) {
-        const id = await fixtures.unit(`P${i}`, [
+        await fixtures.unit(`P${i}`, [
           {
             from: 2026,
             to: null,
@@ -138,11 +138,11 @@ const timingRun = process.env.ORG_PERF_STRICT === '1';
             levelId: 23,
             parentId: Number(parents[i % parents.length].id),
             directorCarnet: i % 2 === 0 ? staff[i % staff.length].carnet : null,
+            // One in four carries a delegate on its version (D-ORG-24).
+            delegates:
+              i % 4 === 0 ? [staff[(i + 7) % staff.length].carnet] : [],
           },
         ]);
-        if (i % 4 === 0) {
-          await fixtures.delegate(id, staff[(i + 7) % staff.length].carnet);
-        }
       }
 
       const view = await service.getYearView(YEAR, false);

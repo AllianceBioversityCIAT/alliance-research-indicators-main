@@ -72,6 +72,8 @@ export interface VersionSeed {
   parentId?: number | null;
   directorCarnet?: string | null;
   acronym?: string | null;
+  /** Delegate carnets of THIS version, inserted with it (D-ORG-24). */
+  delegates?: string[];
 }
 
 /** Inserts rows and remembers them so `cleanup` removes exactly those. */
@@ -131,8 +133,9 @@ export class OrgFixtures {
     return id;
   }
 
-  async version(unitId: number, v: VersionSeed): Promise<void> {
-    await this.dataSource.query(
+  /** Inserts a version and returns its id (delegates hang off it, D-ORG-24). */
+  async version(unitId: number, v: VersionSeed): Promise<number> {
+    const result = await this.dataSource.query(
       `INSERT INTO org_unit_versions
          (org_unit_id, valid_from_year, valid_to_year, name, acronym,
           level_value_id, parent_id, director_carnet, created_at)
@@ -148,13 +151,19 @@ export class OrgFixtures {
         v.directorCarnet ?? null,
       ],
     );
+    const versionId = Number(result.insertId);
+    for (const carnet of v.delegates ?? []) {
+      await this.delegate(versionId, carnet);
+    }
+    return versionId;
   }
 
-  async delegate(unitId: number, carnet: string): Promise<void> {
+  /** One delegate row of ONE VERSION (D-ORG-24). */
+  async delegate(versionId: number, carnet: string): Promise<void> {
     await this.dataSource.query(
-      `INSERT INTO org_unit_delegates (org_unit_id, staff_carnet, created_at)
+      `INSERT INTO org_unit_delegates (org_unit_version_id, staff_carnet, created_at)
        VALUES (?, ?, NOW())`,
-      [unitId, carnet],
+      [versionId, carnet],
     );
   }
 
@@ -163,7 +172,9 @@ export class OrgFixtures {
     if (this.unitIds.length > 0) {
       const ids = this.unitIds.map(() => '?').join(',');
       await this.dataSource.query(
-        `DELETE FROM org_unit_delegates WHERE org_unit_id IN (${ids})`,
+        `DELETE FROM org_unit_delegates
+          WHERE org_unit_version_id IN
+                (SELECT id FROM org_unit_versions WHERE org_unit_id IN (${ids}))`,
         this.unitIds,
       );
       await this.dataSource.query(

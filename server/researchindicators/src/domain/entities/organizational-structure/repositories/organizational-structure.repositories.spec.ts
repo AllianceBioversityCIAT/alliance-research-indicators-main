@@ -66,17 +66,18 @@ describe('Organizational Structure repositories', () => {
   });
 
   describe('OrgUnitDelegateRepository', () => {
-    it('findStaffByUnitIds sends one placeholder per id and skips the query for none', async () => {
+    it('findStaffByVersionIds filters on the VERSION id (one placeholder per id), skips the query for none', async () => {
       const repo = new OrgUnitDelegateRepository(dataSource);
       const query = jest.fn().mockResolvedValue([]);
       repo.query = query;
 
-      await expect(repo.findStaffByUnitIds([])).resolves.toEqual([]);
+      await expect(repo.findStaffByVersionIds([])).resolves.toEqual([]);
       expect(query).not.toHaveBeenCalled();
 
-      await repo.findStaffByUnitIds([4, 5, 6]);
+      await repo.findStaffByVersionIds([4, 5, 6]);
       const [sql, params] = query.mock.calls[0];
-      expect(sql).toContain('IN (?,?,?)');
+      expect(sql).toContain('dl.org_unit_version_id IN (?,?,?)');
+      expect(sql).not.toContain('org_unit_id IN');
       expect(params).toEqual([4, 5, 6]);
     });
   });

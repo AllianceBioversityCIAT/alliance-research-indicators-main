@@ -1,7 +1,15 @@
 @if (creating) {
   <h2 class="m-0 mb-3 text-[15px] font-semibold atc-primary-blue-600" data-testid="new-entry-title">New entry</h2>
   @for (key of [formKey]; track key) {
-    <app-org-unit-form [row]="null" [rows]="rows" [range]="range" [structureYear]="structureYear" [prefill]="prefill" (saved)="saved.emit($event)" (cancelled)="cancelled.emit()">
+    <app-org-unit-form
+      [row]="null"
+      [rows]="rows"
+      [range]="range"
+      [structureYear]="structureYear"
+      [prefill]="prefill"
+      (saved)="saved.emit($event)"
+      (cancelled)="cancelled.emit()"
+      (savingChange)="savingChange.emit($event)">
     </app-org-unit-form>
   }
 } @else {
@@ -104,7 +112,8 @@
               [structureYear]="structureYear"
               [prefill]="null"
               (saved)="saved.emit($event)"
-              (cancelled)="cancelled.emit()">
+              (cancelled)="cancelled.emit()"
+              (savingChange)="savingChange.emit($event)">
             </app-org-unit-form>
           }
         }
@@ -184,6 +193,7 @@
                     <th scope="col">Level</th>
                     <th scope="col">Parent</th>
                     <th scope="col">Director</th>
+                    <th scope="col">Delegates</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -194,6 +204,7 @@
                       <td>{{ v.level }}</td>
                       <td>{{ v.parent }}</td>
                       <td>{{ v.director }}</td>
+                      <td data-testid="version-delegates">{{ v.delegates }}</td>
                     </tr>
                   }
                 </tbody>

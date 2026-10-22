@@ -22,7 +22,7 @@ describe('Organizational Structure — real GlobalExceptions contract (T-01)', (
   const service = new OrgStructureReadService(
     unitRepo as never,
     {} as never,
-    { findStaffByUnitIds: jest.fn().mockResolvedValue([]) } as never,
+    { findStaffByVersionIds: jest.fn().mockResolvedValue([]) } as never,
     { currentYear: () => 2026 },
     { findRowsByUnit: jest.fn().mockResolvedValue([]) } as never,
     { getBreakdown: jest.fn().mockResolvedValue([]) } as never,

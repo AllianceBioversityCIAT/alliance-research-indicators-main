@@ -261,13 +261,35 @@ describe('OrganizationalStructureComponent', () => {
       expect(codeCells()).toEqual(['ORG-2', 'ORG-10']);
     });
 
-    it('shows the Delegates column labelled current, with the joined names and the Inactive staff mark', async () => {
+    // Adapted (T-12, D-ORG-24): the header no longer says "(current)".
+    it('shows the Delegates column (no "current" label), with the joined names and the Inactive staff mark', async () => {
       await create();
       await openView('table');
 
-      expect(q('column-header-delegates')?.textContent).toContain('Delegates (current)');
+      expect(q('column-header-delegates')?.textContent?.trim()).toBe('Delegates');
       expect(q('cell-delegates')?.textContent).toContain('Cira Delegate; Dario Delegate');
       expect(q('cell-director')?.textContent).toContain('Beto Gone (Inactive staff)');
+    });
+
+    it("the Delegates column follows the viewed year: another year shows that year's list (D-ORG-24)", async () => {
+      await create();
+      const later = row({
+        id: 2,
+        code: 'ORG-2',
+        levelCode: 'L2',
+        name: 'Data Department',
+        parentId: 10,
+        delegates: [staff('C9', 'Eva Later')],
+        from: 2027
+      });
+      api.GET_OrgStructureUnits.mockImplementation((year: number) => Promise.resolve(ok(year === 2027 ? [later] : ROWS_2026)));
+      await openView('table');
+      expect(q('cell-delegates')?.textContent).toContain('Cira Delegate; Dario Delegate');
+
+      await chooseYear(2027);
+
+      expect(q('cell-delegates')?.textContent?.trim()).toBe('Eva Later');
+      expect(root().textContent).not.toContain('Cira Delegate');
     });
 
     it('exports exactly the filtered and sorted rows, and the file name carries the year', async () => {
@@ -670,6 +692,70 @@ describe('OrganizationalStructureComponent', () => {
     });
   });
 
+  // T-12 review (Reviewer B): changing the Structure year while a PATCH is in flight rebuilt the form, so
+  // `saved` reached no listener and the page never reloaded or reselected. The year is now held still during a save.
+  describe('Structure year while a save is in flight (T-12 review)', () => {
+    const form = () => fixture.debugElement.query(By.directive(OrgUnitFormComponent))?.componentInstance as OrgUnitFormComponent;
+    const yearDisabled = () => q('year-select')?.classList.contains('p-disabled');
+    const startSaveInFlight = async () => {
+      let finish!: (value: unknown) => void;
+      api['PATCH_OrgStructureUnit'].mockReturnValue(new Promise(resolve => (finish = resolve)));
+      api.GET_OrgStructureYears.mockResolvedValue(ok(RANGE));
+      await create();
+      await expandRow('Division Ten');
+      treeRowFor('Data Department')?.click();
+      await settle();
+      (root().querySelector('[aria-label="Remove Cira Delegate"]') as HTMLButtonElement).click();
+      await settle();
+      (q('save-button')?.querySelector('button') as HTMLButtonElement).click();
+      await settle();
+      return finish;
+    };
+
+    it('holds the year still while the save is pending, then reloads and reselects the saved entry', async () => {
+      const finish = await startSaveInFlight();
+      const openForm = form();
+      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledTimes(1);
+      expect(yearDisabled()).toBe(true);
+      api.GET_OrgStructureUnits.mockClear();
+
+      await chooseYear(2027);
+
+      expect(component.year()).toBe(2026);
+      expect(api.GET_OrgStructureUnits).not.toHaveBeenCalled();
+      expect(form()).toBe(openForm);
+
+      finish(ok({ id: 2, outcome: { action: 'edit_in_place', appliesFromYear: 2026, backdated: false } }));
+      await settle();
+      await settle();
+
+      expect(api.GET_OrgStructureUnits).toHaveBeenCalledWith(2026, false);
+      expect(component.selectedId()).toBe(2);
+      expect(form()).not.toBe(openForm);
+      expect(yearDisabled()).toBe(false);
+    });
+
+    it('a failed save frees the year again', async () => {
+      const finish = await startSaveInFlight();
+      expect(yearDisabled()).toBe(true);
+
+      finish({
+        data: undefined,
+        status: 400,
+        description: 'Bad',
+        timestamp: '',
+        path: '',
+        successfulRequest: false,
+        errorDetail: { errors: 'nope' }
+      });
+      await settle();
+
+      expect(yearDisabled()).toBe(false);
+      await chooseYear(2027);
+      expect(component.year()).toBe(2027);
+    });
+  });
+
   // T-10 / D-ORG-23 (KZ-015): the default follows the top Structure year, driven through the page's selector.
   describe('Applies from year default follows the Structure year (T-10, D-ORG-23)', () => {
     const form = () => fixture.debugElement.query(By.directive(OrgUnitFormComponent))?.componentInstance as OrgUnitFormComponent;
@@ -723,6 +809,39 @@ describe('OrganizationalStructureComponent', () => {
 
       expect(form().appliesFromYear()).toBe(2026);
       expect(form().backdate()).toBe(false);
+    });
+
+    // T-12 (D-ORG-24, KZ-015): the form shows the delegates of the version covering the viewed year; the
+    // transition is the real one (select the entry, then change the top year through the page's selector).
+    it("changing the top year with an entry open re-initialises the delegates from that year's version", async () => {
+      await create();
+      const later = row({
+        id: 2,
+        code: 'ORG-2',
+        levelCode: 'L2',
+        name: 'Data Department',
+        parentId: 10,
+        delegates: [staff('C9', 'Eva Later')],
+        from: 2027
+      });
+      api.GET_OrgStructureUnits.mockImplementation((year: number) => Promise.resolve(ok(year === 2027 ? [later] : ROWS_2026)));
+      await expandRow('Division Ten');
+      await clickRow('Data Department');
+      expect(
+        form()
+          .delegates()
+          .map(d => d.carnet)
+      ).toEqual(['C3', 'C4']);
+
+      await chooseYear(2027);
+
+      expect(
+        form()
+          .delegates()
+          .map(d => d.carnet)
+      ).toEqual(['C9']);
+      expect(root().querySelector('[data-testid="delegate-chips"]')?.textContent).toContain('Eva Later');
+      expect(root().querySelector('[data-testid="delegate-chips"]')?.textContent).not.toContain('Cira Delegate');
     });
 
     it('changing the top year with the form open re-defaults by the same rule', async () => {

@@ -53,7 +53,7 @@ export interface YearViewRow {
     parentName: string | null;
     director: OrgStaffRef | null;
   };
-  /** CURRENT list, not per year (R-ORG-017, D-ORG-15). */
+  /** Delegates of the version shown: the one covering the year, or the last one of an `includeEnded` row (R-ORG-017, D-ORG-24). */
   delegates: OrgStaffRef[];
   /** Smallest version start after the viewed year, if any (R-ORG-006 AC.3). */
   scheduledFromYear: number | null;
@@ -82,9 +82,11 @@ export interface OrgUnitVersionResponse {
   parentCode: string | null;
   parentName: string | null;
   director: OrgStaffRef | null;
+  /** Delegates of THIS version (R-ORG-017, D-ORG-24). */
+  delegates: OrgStaffRef[];
 }
 
-/** B5: the entry, all its versions (oldest first) and its current delegates. */
+/** B5: the entry and all its versions (oldest first), each with its own delegates. */
 export interface OrgUnitDetailResponse {
   id: number;
   code: string;
@@ -92,23 +94,17 @@ export interface OrgUnitDetailResponse {
   statusFromYear: number | null;
   successorId: number | null;
   versions: OrgUnitVersionResponse[];
-  delegates: OrgStaffRef[];
 }
 
 /**
  * What a B9/B10 save actually did (design 4, "B9/B10 response outcome"): the
  * action the service logged, `null` when nothing was written. When one save
- * logs a version action together with a code or delegates change, the version
- * action is reported.
+ * logs a version action together with a code change, the version action is
+ * reported. `delegates_change` is never reported: a delegates change is a
+ * versioned change like any other (D-ORG-24).
  */
 export interface OrgSaveOutcome {
-  action:
-    | 'create'
-    | 'edit_in_place'
-    | 'new_version'
-    | 'code_change'
-    | 'delegates_change'
-    | null;
+  action: 'create' | 'edit_in_place' | 'new_version' | 'code_change' | null;
   appliesFromYear: number | null;
   backdated: boolean;
 }
@@ -150,7 +146,10 @@ export interface OrgDeleteResult {
 // ---------------------------------------------------------------------------
 
 /** The version of an entry that covers a requested year (C1). */
-export type OrgResolvedVersion = Omit<OrgUnitVersionResponse, 'id'>;
+export type OrgResolvedVersion = Omit<
+  OrgUnitVersionResponse,
+  'id' | 'delegates'
+>;
 
 /**
  * One C1 row (R-ORG-010). `version` is `null` when no version covers `year`:
@@ -166,7 +165,7 @@ export interface OrgResolvedUnit {
   statusFromYear: number | null;
   successorId: number | null;
   version: OrgResolvedVersion | null;
-  /** CURRENT list, not per year (R-ORG-017). */
+  /** Delegates of the covering version, i.e. of the requested year; `[]` when `version` is null (R-ORG-010 AC.3, D-ORG-24). */
   delegates: OrgStaffRef[];
 }
 

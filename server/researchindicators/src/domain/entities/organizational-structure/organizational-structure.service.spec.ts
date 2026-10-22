@@ -38,7 +38,6 @@ class FakeStore {
     }
   >();
   versions: Array<TimelineVersion & { unitId: number }> = [];
-  delegates: Array<{ unitId: number; carnet: string }> = [];
   logs: Array<Record<string, any>> = [];
   staff = new Map<string, boolean>();
   writes = 0;
@@ -52,7 +51,6 @@ class FakeStore {
     const snapshot = structuredClone({
       units: [...this.units],
       versions: this.versions,
-      delegates: this.delegates,
       logs: this.logs,
     });
     try {
@@ -60,7 +58,6 @@ class FakeStore {
     } catch (error) {
       this.units = new Map(snapshot.units);
       this.versions = snapshot.versions;
-      this.delegates = snapshot.delegates;
       this.logs = snapshot.logs;
       throw error;
     }
@@ -94,7 +91,7 @@ class FakeStore {
   async loadVersions(_m: unknown, unitId: number) {
     return this.versions
       .filter((v) => v.unitId === unitId)
-      .map(({ unitId: _u, ...v }) => ({ ...v }))
+      .map(({ unitId: _u, ...v }) => ({ ...v, delegates: [...v.delegates] }))
       .sort((a, b) => a.from - b.from);
   }
   async loadGraphVersions(): Promise<GraphVersion[]> {
@@ -106,29 +103,27 @@ class FakeStore {
       levelId: v.levelId,
     }));
   }
+  // A version row carries its delegate rows here (D-ORG-24): insertVersion
+  // writes the row with no delegates, addDelegates / replaceDelegates write them.
   async insertVersion(_m: unknown, unitId: number, v: TimelineVersion) {
     this.writes++;
-    this.versions.push({ ...v, id: this.nextVersionId++, unitId });
+    const id = this.nextVersionId++;
+    this.versions.push({ ...v, delegates: [], id, unitId });
+    return id;
   }
   async updateVersion(_m: unknown, v: TimelineVersion) {
     this.writes++;
     const row = this.versions.find((x) => x.id === v.id);
-    Object.assign(row, v);
+    const { delegates: _delegates, ...fields } = v;
+    Object.assign(row, fields);
   }
-  async loadDelegateCarnets(_m: unknown, unitId: number) {
-    return this.delegates
-      .filter((d) => d.unitId === unitId)
-      .map((d) => d.carnet);
-  }
-  async addDelegates(_m: unknown, unitId: number, carnets: string[]) {
+  async addDelegates(_m: unknown, versionId: number, carnets: string[]) {
     this.writes += carnets.length;
-    carnets.forEach((carnet) => this.delegates.push({ unitId, carnet }));
+    this.versions.find((x) => x.id === versionId).delegates.push(...carnets);
   }
-  async removeDelegates(_m: unknown, unitId: number, carnets: string[]) {
-    this.writes += carnets.length;
-    this.delegates = this.delegates.filter(
-      (d) => !(d.unitId === unitId && carnets.includes(d.carnet)),
-    );
+  async replaceDelegates(_m: unknown, versionId: number, carnets: string[]) {
+    this.writes += 1 + carnets.length;
+    this.versions.find((x) => x.id === versionId).delegates = [...carnets];
   }
   async findStaff(_m: unknown, carnets: string[]) {
     return carnets
@@ -159,6 +154,7 @@ class FakeStore {
         levelId: L4,
         parentId: null,
         directorCarnet: null,
+        delegates: [],
         ...v,
       });
     }
@@ -658,13 +654,16 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
       });
     });
 
-    it('requires appliesFromYear when a versioned field is sent, but not for code or delegates only', async () => {
+    it('requires appliesFromYear when a versioned field is sent (delegates included, D-ORG-24), but not for code only', async () => {
       const error = await rejection(update(4, { name: 'X' }));
       expect(fieldOf(error)).toBe('appliesFromYear');
-      await expect(update(4, { code: 'ORG-444' })).resolves.toBeDefined();
-      await expect(
+      const delegatesOnly = await rejection(
         update(4, { delegateCarnets: ['B2'] }),
-      ).resolves.toBeDefined();
+      );
+      expect(delegatesOnly.getStatus()).toBe(400);
+      expect(fieldOf(delegatesOnly)).toBe('appliesFromYear');
+      expect(store.writes).toBe(0);
+      await expect(update(4, { code: 'ORG-444' })).resolves.toBeDefined();
     });
 
     it('rejects a year before the entry first year', async () => {
@@ -704,7 +703,9 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
         NotFoundException,
       );
       store.unit(60, 'ORG-060', [{ from: 2026, to: 2027 }], 'deleted', 2027);
-      const error = await rejection(update(60, { delegateCarnets: ['B2'] }));
+      const error = await rejection(
+        update(60, { delegateCarnets: ['B2'], appliesFromYear: 2026 }),
+      );
       expect(error.getStatus()).toBe(409);
       expect(store.writes).toBe(0);
     });
@@ -795,37 +796,107 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
       store.staff.set('D1', true);
       store.staff.set('D2', true);
     });
-    const delegatesOf = (id: number) =>
-      store.delegates.filter((d) => d.unitId === id).map((d) => d.carnet);
+    /** Entry 4 as a list of [from, to, delegates, director] per version. */
+    const shape = (id: number) =>
+      store
+        .versionsOf(id)
+        .map((v) => [v.from, v.to, v.delegates, v.directorCarnet]);
+    /** Replace entry 4 with the given versions (director A1 unless stated). */
+    const reset4 = (versions: Array<Partial<TimelineVersion>>) => {
+      store.versions = store.versions.filter((v) => v.unitId !== 4);
+      store.unit(4, 'ORG-004', versions);
+    };
 
-    it('Add delegates: stores the list, ONE delegates_change log row with old and new, NO version and no year needed', async () => {
-      const versionsBefore = JSON.stringify(store.versions);
-      await update(4, { delegateCarnets: ['B2', 'C3'] });
-      expect(delegatesOf(4)).toEqual(['B2', 'C3']);
-      expect(JSON.stringify(store.versions)).toBe(versionsBefore);
+    it('Add delegates from 2027: [2026, 2027) keeps no delegates, [2027, open) gets both; ONE new_version row with the delegates diff; other entries untouched', async () => {
+      const others = snapshotOthers(4);
+      const res = await update(4, {
+        delegateCarnets: ['B2', 'C3'],
+        appliesFromYear: 2027,
+      });
+      expect(shape(4)).toEqual([
+        [2026, 2027, [], 'A1'],
+        [2027, null, ['B2', 'C3'], 'A1'],
+      ]);
+      expect(snapshotOthers(4)).toBe(others);
       expect(store.logs).toHaveLength(1);
       expect(store.logs[0]).toMatchObject({
-        action: 'delegates_change',
-        appliesFromYear: null,
+        action: 'new_version',
+        appliesFromYear: 2027,
       });
       expect(store.logs[0].changes.delegates).toEqual({
         old: [],
         new: ['B2', 'C3'],
       });
+      expect(res.outcome).toEqual({
+        action: 'new_version',
+        appliesFromYear: 2027,
+        backdated: false,
+      });
     });
 
-    it('replace semantics: omitted = unchanged, [] clears, the same set is a no-op', async () => {
-      await update(4, { delegateCarnets: ['B2'] });
+    it('the same change from 2026 edits [2026, open) in place: one edit_in_place row, no version added', async () => {
+      await update(4, { delegateCarnets: ['B2'], appliesFromYear: 2026 });
+      expect(shape(4)).toEqual([[2026, null, ['B2'], 'A1']]);
+      expect(store.logs).toHaveLength(1);
+      expect(store.logs[0]).toMatchObject({
+        action: 'edit_in_place',
+        appliesFromYear: 2026,
+      });
+    });
+
+    it('A later deliberate list is kept: [B2] -> [D1] from 2026 leaves [2028, open) with [C3]', async () => {
+      reset4([
+        { from: 2026, to: 2028, directorCarnet: 'A1', delegates: ['B2'] },
+        { from: 2028, directorCarnet: 'A1', delegates: ['C3'] },
+      ]);
+      await update(4, { delegateCarnets: ['D1'], appliesFromYear: 2026 });
+      expect(shape(4)).toEqual([
+        [2026, 2028, ['D1'], 'A1'],
+        [2028, null, ['C3'], 'A1'],
+      ]);
+    });
+
+    it('a later version holding the same list takes the new one, even written in another order', async () => {
+      reset4([
+        { from: 2026, to: 2028, directorCarnet: 'A1', delegates: ['B2', 'C3'] },
+        { from: 2028, directorCarnet: 'A1', delegates: ['C3', 'B2'] },
+      ]);
+      await update(4, { delegateCarnets: ['D1'], appliesFromYear: 2026 });
+      expect(shape(4).map((row) => row[2])).toEqual([['D1'], ['D1']]);
+    });
+
+    it('replace semantics: omitted = unchanged, [] clears from the year, the same set is a no-op', async () => {
+      await update(4, { delegateCarnets: ['B2', 'C3'], appliesFromYear: 2026 });
       store.logs = [];
       await update(4, { name: 'N', appliesFromYear: 2026 });
-      expect(delegatesOf(4)).toEqual(['B2']);
-      await update(4, { delegateCarnets: ['B2'] });
-      expect(store.logs).toHaveLength(1); // only the name change
-      await update(4, { delegateCarnets: [] });
-      expect(delegatesOf(4)).toEqual([]);
+      expect(shape(4)[0][2]).toEqual(['B2', 'C3']);
+      store.logs = [];
+      await update(4, { delegateCarnets: ['C3', 'B2'], appliesFromYear: 2026 });
+      expect(store.logs).toHaveLength(0);
+      await update(4, { delegateCarnets: [], appliesFromYear: 2026 });
+      expect(shape(4)[0][2]).toEqual([]);
       expect(store.logs.at(-1).changes.delegates).toEqual({
-        old: ['B2'],
+        old: ['B2', 'C3'],
         new: [],
+      });
+    });
+
+    it('applies the back-date gate to a delegates-only change (clock 2027)', async () => {
+      today = 2027;
+      const error = await rejection(
+        update(4, { delegateCarnets: ['B2'], appliesFromYear: 2026 }),
+      );
+      expect(error.getStatus()).toBe(400);
+      expect(fieldOf(error)).toBe('backdate');
+      expect(store.writes).toBe(0);
+      await update(4, {
+        delegateCarnets: ['B2'],
+        appliesFromYear: 2026,
+        backdate: true,
+      });
+      expect(store.logs[0]).toMatchObject({
+        action: 'edit_in_place',
+        backdated: true,
       });
     });
 
@@ -834,46 +905,92 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
       ['a duplicate', ['B2', 'B2']],
       ['an unknown carnet', ['Z9999']],
       ['a newly added inactive staff member', ['OLD']],
-    ])('%s -> 400 naming `delegates`, list unchanged', async (_l, list) => {
-      const error = await rejection(update(4, { delegateCarnets: list }));
+    ])('%s -> 400 naming `delegates`, nothing written', async (_l, list) => {
+      const before = JSON.stringify(store.versions);
+      const error = await rejection(
+        update(4, { delegateCarnets: list, appliesFromYear: 2026 }),
+      );
       expect(error.getStatus()).toBe(400);
       expect(fieldOf(error)).toBe('delegates');
-      expect(delegatesOf(4)).toEqual([]);
+      expect(JSON.stringify(store.versions)).toBe(before);
       expect(store.logs).toHaveLength(0);
     });
 
-    it('an inactive delegate already in the list is kept on an unrelated save and on a list that still holds it', async () => {
-      store.delegates.push({ unitId: 4, carnet: 'OLD' });
-      await update(4, { name: 'Renamed', appliesFromYear: 2026 });
-      expect(delegatesOf(4)).toEqual(['OLD']);
-      await update(4, { delegateCarnets: ['OLD', 'B2'] });
-      expect(delegatesOf(4)).toEqual(['OLD', 'B2']);
-    });
-
-    it('Director as delegate -> 400 naming `delegates`, list unchanged', async () => {
-      const error = await rejection(update(4, { delegateCarnets: ['A1'] }));
-      expect(error.getStatus()).toBe(400);
-      expect(fieldOf(error)).toBe('delegates');
-      expect(delegatesOf(4)).toEqual([]);
-    });
-
-    it('Delegate made director from the current year -> 400 naming `director`', async () => {
-      store.delegates.push({ unitId: 4, carnet: 'B2' });
-      const error = await rejection(
-        update(4, { directorCarnet: 'B2', appliesFromYear: 2026 }),
-      );
-      expect(error.getStatus()).toBe(400);
-      expect(fieldOf(error)).toBe('director');
-    });
-
-    it('the director of a SCHEDULED LATER version added as a delegate -> 400', async () => {
-      store.versions = store.versions.filter((v) => v.unitId !== 4);
-      store.unit(4, 'ORG-004', [
-        { from: 2026, to: 2028, parentId: 2, directorCarnet: 'A1' },
-        { from: 2028, to: null, parentId: 2, directorCarnet: 'D1' },
+    it('an inactive delegate already in the version list is kept on an unrelated save and on a list that still holds it; "newly added" is judged against the version at Y', async () => {
+      reset4([
+        { from: 2026, to: 2027, directorCarnet: 'A1', delegates: ['OLD'] },
+        { from: 2027, directorCarnet: 'A1', delegates: [] },
       ]);
-      const error = await rejection(update(4, { delegateCarnets: ['D1'] }));
+      await update(4, { name: 'Renamed', appliesFromYear: 2026 });
+      expect(shape(4)[0][2]).toEqual(['OLD']);
+      await update(4, {
+        delegateCarnets: ['OLD', 'B2'],
+        appliesFromYear: 2026,
+      });
+      expect(shape(4)[0][2]).toEqual(['OLD', 'B2']);
+      // The 2027 version does not hold OLD, so adding it THERE is a new addition.
+      const error = await rejection(
+        update(4, { delegateCarnets: ['OLD'], appliesFromYear: 2027 }),
+      );
       expect(fieldOf(error)).toBe('delegates');
+    });
+
+    describe('I-6 per version (D-ORG-24)', () => {
+      beforeEach(() =>
+        reset4([
+          { from: 2026, to: 2028, directorCarnet: 'A1' },
+          { from: 2028, directorCarnet: 'D1' },
+        ]),
+      );
+
+      it('Director as delegate: allowed from 2028 (only [2028, open) holds A1), 400 naming `delegates` from 2026 with no version changed', async () => {
+        await update(4, { delegateCarnets: ['A1'], appliesFromYear: 2028 });
+        expect(shape(4)).toEqual([
+          [2026, 2028, [], 'A1'],
+          [2028, null, ['A1'], 'D1'],
+        ]);
+
+        reset4([
+          { from: 2026, to: 2028, directorCarnet: 'A1' },
+          { from: 2028, directorCarnet: 'D1' },
+        ]);
+        const before = JSON.stringify(store.versions);
+        store.logs = [];
+        const error = await rejection(
+          update(4, { delegateCarnets: ['A1'], appliesFromYear: 2026 }),
+        );
+        expect(error.getStatus()).toBe(400);
+        expect(fieldOf(error)).toBe('delegates');
+        expect(JSON.stringify(store.versions)).toBe(before);
+        expect(store.logs).toHaveLength(0);
+      });
+
+      it('an overlap that exists ONLY in a propagated later version is still a 400 (D1 directs [2028, open), reached by propagation from 2026)', async () => {
+        const before = JSON.stringify(store.versions);
+        const error = await rejection(
+          update(4, { delegateCarnets: ['D1'], appliesFromYear: 2026 }),
+        );
+        expect(error.getStatus()).toBe(400);
+        expect(fieldOf(error)).toBe('delegates');
+        expect(error.getResponse().message.description).toContain('2028');
+        expect(JSON.stringify(store.versions)).toBe(before);
+      });
+    });
+
+    it('Delegate made director: 400 naming `director` from 2027 and, through propagation, from 2026', async () => {
+      reset4([
+        { from: 2026, to: 2027, directorCarnet: 'A1' },
+        { from: 2027, directorCarnet: 'A1', delegates: ['B2'] },
+      ]);
+      const before = JSON.stringify(store.versions);
+      for (const year of [2027, 2026]) {
+        const error = await rejection(
+          update(4, { directorCarnet: 'B2', appliesFromYear: year }),
+        );
+        expect(error.getStatus()).toBe(400);
+        expect(fieldOf(error)).toBe('director');
+      }
+      expect(JSON.stringify(store.versions)).toBe(before);
     });
 
     it('one request that moves the director away from A1 and adds A1 as a delegate is ACCEPTED (overlap computed after the save)', async () => {
@@ -882,16 +999,33 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
         delegateCarnets: ['A1'],
         appliesFromYear: 2026,
       });
-      expect(delegatesOf(4)).toEqual(['A1']);
-      expect(store.versionsOf(4)[0].directorCarnet).toBe('C3');
+      expect(shape(4)).toEqual([[2026, null, ['A1'], 'C3']]);
       expect(store.logs).toHaveLength(1);
     });
 
-    it('B9 rejects the director among the delegates', async () => {
+    it('B9 writes the delegates into the first version with a create diff, and rejects the director among them', async () => {
+      await create({ directorCarnet: 'A1', delegateCarnets: ['B2', 'C3'] });
+      expect(store.versions.at(-1)).toMatchObject({
+        directorCarnet: 'A1',
+        delegates: ['B2', 'C3'],
+      });
+      expect(store.logs[0].changes.delegates).toEqual({
+        old: [],
+        new: ['B2', 'C3'],
+      });
       const error = await rejection(
         create({ directorCarnet: 'A1', delegateCarnets: ['A1'] }),
       );
       expect(fieldOf(error)).toBe('delegates');
+    });
+
+    it('never writes a delegates_change row, on any path', async () => {
+      await update(4, { delegateCarnets: ['B2'], appliesFromYear: 2027 });
+      await update(4, { delegateCarnets: ['C3'], appliesFromYear: 2026 });
+      await update(4, { delegateCarnets: [], appliesFromYear: 2027 });
+      await create({ delegateCarnets: ['B2'] });
+      expect(store.logs.length).toBeGreaterThan(0);
+      expect(store.logs.map((l) => l.action)).not.toContain('delegates_change');
     });
   });
 
@@ -967,10 +1101,16 @@ describe('OrgStructureService (T-02: save engine, B3, B4, B9, B10)', () => {
       ],
       ['a code-only change', { code: 'ORG-444' }, 'code_change', null],
       [
-        'a delegates-only change',
-        { delegateCarnets: ['B2'] },
-        'delegates_change',
-        null,
+        'a delegates-only change from a later year',
+        { delegateCarnets: ['B2'], appliesFromYear: 2027 },
+        'new_version',
+        2027,
+      ],
+      [
+        'a delegates-only change in the start year',
+        { delegateCarnets: ['B2'], appliesFromYear: 2026 },
+        'edit_in_place',
+        2026,
       ],
     ])('%s -> %s', async (_l, dto, action, year) => {
       const res = await update(4, dto as UpdateOrgUnitDto);

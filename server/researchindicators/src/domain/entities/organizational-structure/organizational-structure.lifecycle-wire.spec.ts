@@ -106,7 +106,7 @@ describe('Organizational Structure — real GlobalExceptions contract for the li
       status: 'active',
     });
     store.loadVersions.mockResolvedValue([
-      { id: 1, from: 2026, to: null, levelId: 21, parentId: 1 },
+      { id: 1, from: 2026, to: null, levelId: 21, parentId: 1, delegates: [] },
     ]);
     store.loadGraphVersions.mockResolvedValue([
       { unitId: 4, from: 2026, to: null, parentId: 2, levelId: 23 },
@@ -134,7 +134,7 @@ describe('Organizational Structure — real GlobalExceptions contract for the li
       status: 'active',
     });
     store.loadVersions.mockResolvedValue([
-      { id: 1, from: 2026, to: null, levelId: 23, parentId: 2 },
+      { id: 1, from: 2026, to: null, levelId: 23, parentId: 2, delegates: [] },
     ]);
     store.loadGraphVersions.mockResolvedValue([]);
     const { status, body } = await run(() => service.remove(57, {}), 'DELETE');
@@ -154,7 +154,7 @@ describe('Organizational Structure — real GlobalExceptions contract for the li
       status: 'active',
     });
     store.loadVersions.mockResolvedValue([
-      { id: 1, from: 2026, to: null, levelId: 23, parentId: 2 },
+      { id: 1, from: 2026, to: null, levelId: 23, parentId: 2, delegates: [] },
     ]);
     store.loadGraphVersions.mockResolvedValue([]);
     store.findUnit.mockResolvedValue(null);

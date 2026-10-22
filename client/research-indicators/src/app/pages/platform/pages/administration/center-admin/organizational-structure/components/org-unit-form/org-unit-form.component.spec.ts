@@ -124,6 +124,7 @@ describe('OrgUnitFormComponent', () => {
     (auto('field-delegates').componentInstance as AutoComplete).onOptionSelect(new Event('click'), person);
     await settle();
   };
+  const removeBtn = (name: string) => q('delegate-chips')?.querySelector(`[aria-label="Remove ${name}"]`) as HTMLButtonElement;
   const clickSave = async () => {
     (q('save-button')?.querySelector('button') as HTMLButtonElement).click();
     await settle();
@@ -152,6 +153,7 @@ describe('OrgUnitFormComponent', () => {
       GET_OrgStructureCodeProposal: jest.fn().mockResolvedValue(ok({ code: 'ORG-118' })),
       GET_ControlListValuesByKey: jest.fn().mockResolvedValue(ok(LEVELS)),
       GET_OrgStaff: jest.fn().mockResolvedValue(ok([])),
+      GET_OrgStructureHistory: jest.fn().mockResolvedValue(ok({ versions: [], log: [] })),
       POST_OrgStructureUnit: jest.fn().mockResolvedValue(ok({ id: 99 })),
       PATCH_OrgStructureUnit: jest.fn().mockResolvedValue(ok({ id: 7 }))
     };
@@ -230,20 +232,20 @@ describe('OrgUnitFormComponent', () => {
   describe('Applies from year and Back-date (R-ORG-004, 005, 013)', () => {
     it('is hidden on open, appears once a versioned field changes, and hides again when it is changed back (transition)', async () => {
       await mount({ row: EDITED });
-      expect(q('applies-from-group')).toBeNull();
+      expect(q('field-applies-from')).toBeNull();
 
       await type('field-name', 'Renamed Department');
-      expect(q('applies-from-group')).toBeTruthy();
+      expect(q('field-applies-from')).toBeTruthy();
 
       await type('field-name', 'Editable Department');
-      expect(q('applies-from-group')).toBeNull();
+      expect(q('field-applies-from')).toBeNull();
     });
 
     it('stays hidden for a code-only edit, which sends only the code', async () => {
       await mount({ row: EDITED });
 
       await type('field-code', 'ORG-77');
-      expect(q('applies-from-group')).toBeNull();
+      expect(q('field-applies-from')).toBeNull();
       await clickSave();
 
       expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { code: 'ORG-77' });
@@ -377,17 +379,32 @@ describe('OrgUnitFormComponent', () => {
       expect(toast.mock.calls.some(c => c[0].severity === 'success')).toBe(false);
     });
 
-    it.each([
-      ['code_change', 'Code updated'],
-      ['delegates_change', 'Delegates updated']
-    ])('%s shows %s', async (action, text) => {
-      outcome(action, null);
+    it('code_change shows Code updated', async () => {
+      outcome('code_change', null);
       await mount({ row: EDITED });
       await type('field-code', 'ORG-77');
 
       await clickSave();
 
-      expect(lastToast()).toMatchObject({ severity: 'success', detail: text });
+      expect(lastToast()).toMatchObject({ severity: 'success', detail: 'Code updated' });
+    });
+
+    // Adapted (T-12, D-ORG-24): the `delegates_change` outcome row is gone; a delegates change reports like any versioned field.
+    describe.each([
+      ['edit_in_place', 2026, false, 'Entry updated in place'],
+      ['new_version', 2027, false, 'Entry saved as a new version from 2027'],
+      ['new_version', 2025, true, 'Entry back-dated from 2025']
+    ])('a delegates-only save reported as %s (year %s, backdated %s)', (action, year, backdated, text) => {
+      it(`toasts "${text}"`, async () => {
+        outcome(action, year, backdated);
+        await mount({ row: EDITED });
+        removeBtn('Beto Delegate').click();
+        await settle();
+
+        await clickSave();
+
+        expect(lastToast()).toMatchObject({ severity: 'success', detail: text });
+      });
     });
 
     it('a create shows the created text and the back-dated variant', async () => {
@@ -494,16 +511,183 @@ describe('OrgUnitFormComponent', () => {
       expect((await search('field-delegates', 'xe')).map(o => o.carnet)).toEqual(['N2']);
     });
 
-    it('a delegates-only edit does not show Applies from year and sends only delegateCarnets', async () => {
+    // Adapted (T-12, D-ORG-24): was "a delegates-only edit does not show Applies from year and sends only
+    // delegateCarnets". Delegates are versioned like the director, so the year group appears and the year goes out.
+    it('a delegates-only edit shows Applies from year and sends delegateCarnets with appliesFromYear', async () => {
       api['GET_OrgStaff'].mockResolvedValue(ok([person('N2', 'Nico New')]));
       await mount({ row: EDITED });
+      expect(q('field-applies-from')).toBeNull();
       const offered = await search('field-delegates', 'ni');
 
       await pickDelegate(offered[0]);
 
-      expect(q('applies-from-group')).toBeNull();
+      expect(q('field-applies-from')).toBeTruthy();
       await clickSave();
-      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: ['B1', 'B2', 'N2'] });
+      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: ['B1', 'B2', 'N2'], appliesFromYear: 2026 });
+    });
+
+    it('a delegates-only change applied from a past year sends backdate with the year', async () => {
+      await mount({ row: EDITED });
+      removeBtn('Beto Delegate').click();
+      await settle();
+      (q('field-backdate') as HTMLInputElement).click();
+      await settle();
+      await choose('field-applies-from', 2025);
+
+      await clickSave();
+
+      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: ['B2'], appliesFromYear: 2025, backdate: true });
+    });
+
+    it('removing the last change hides Applies from year again (delegates revert to the version list)', async () => {
+      api['GET_OrgStaff'].mockResolvedValue(ok([person('B1', 'Beto Delegate')]));
+      await mount({ row: EDITED });
+
+      removeBtn('Beto Delegate').click();
+      await settle();
+      expect(q('field-applies-from')).toBeTruthy();
+      await pickDelegate((await search('field-delegates', 'be'))[0]);
+
+      expect(q('field-applies-from')).toBeNull();
+    });
+
+    // T-12 attempt 2 (design §6.5, D-ORG-24 (g)): the delegates field is a DESCENDANT of the Applies from year
+    // group, present from the first render; only the year select, Back-date and the warnings wait for a change.
+    it('the delegates field sits inside the Applies from year group from the first render, on edit and on create', async () => {
+      await mount({ row: EDITED });
+
+      const group = q('applies-from-group') as HTMLElement;
+      expect(group).toBeTruthy();
+      expect(group.contains(q('field-delegates'))).toBe(true);
+      expect(group.contains(q('field-director'))).toBe(false);
+      expect(group.querySelector('legend')?.textContent).toContain('Applies from year');
+      expect(q('field-applies-from')).toBeNull();
+      expect(q('field-backdate')).toBeNull();
+
+      fixture.destroy();
+      await mount({ row: null, rows: [] });
+
+      expect((q('applies-from-group') as HTMLElement).contains(q('field-delegates'))).toBe(true);
+      expect(q('field-applies-from')).toBeTruthy();
+    });
+
+    // D-ORG-25: the entry's versions (B6) are the source; B6 is called once, on the first delegates change.
+    describe('replacing the delegates of another version (D-ORG-25)', () => {
+      const WIDE: OrgYearRange = { min: 2025, max: 2028, current: 2026 };
+      const versionsOf = (later: ReturnType<typeof staff>[]) => [
+        { ...EDITED.version, from: 2026, to: 2028, delegates: EDITED.delegates },
+        { ...EDITED.version, from: 2028, to: null, delegates: later }
+      ];
+      const history = (later: ReturnType<typeof staff>[]) =>
+        api['GET_OrgStructureHistory'].mockResolvedValue(ok({ versions: versionsOf(later), log: [] }));
+      const saveDisabled = () => q('save-button')?.querySelector('button')?.hasAttribute('disabled');
+
+      it('names the version and its delegates when the target year lies in another version with a different list; Save stays enabled', async () => {
+        history([staff('C9', 'Carlos Pérez')]);
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        await choose('field-applies-from', 2028);
+
+        expect(q('delegates-replace-warning')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+          'This replaces the delegates of the version from 2028 (Carlos Pérez)'
+        );
+        expect(saveDisabled()).toBe(false);
+        await clickSave();
+        expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: ['B2'], appliesFromYear: 2028 });
+      });
+
+      it('says "none" when the replaced version holds no delegates', async () => {
+        history([]);
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        await choose('field-applies-from', 2028);
+
+        expect(q('delegates-replace-warning')?.textContent).toContain('version from 2028 (none)');
+      });
+
+      it('is not shown when the target year is inside the version on screen', async () => {
+        history([staff('C9', 'Carlos Pérez')]);
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        await choose('field-applies-from', 2027);
+
+        expect(q('delegates-replace-warning')).toBeNull();
+      });
+
+      it('is not shown when the other version holds the same list as a set', async () => {
+        history([staff('B2', 'Cira Gone', false)]);
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        await choose('field-applies-from', 2028);
+
+        expect(q('delegates-replace-warning')).toBeNull();
+      });
+
+      it('is not shown for a change that is not about delegates, and B6 is not even called', async () => {
+        history([staff('C9', 'Carlos Pérez')]);
+        await mount({ row: EDITED, range: WIDE });
+
+        await type('field-name', 'Renamed Department');
+        await choose('field-applies-from', 2028);
+
+        expect(q('delegates-replace-warning')).toBeNull();
+        expect(api['GET_OrgStructureHistory']).not.toHaveBeenCalled();
+      });
+
+      it('loads B6 once for the entry however many times the list changes', async () => {
+        history([staff('C9', 'Carlos Pérez')]);
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        removeBtn('Cira Gone').click();
+        await settle();
+
+        expect(api['GET_OrgStructureHistory']).toHaveBeenCalledTimes(1);
+        expect(api['GET_OrgStructureHistory']).toHaveBeenCalledWith(7);
+      });
+
+      it('a failed B6 shows no warning and does not block Save', async () => {
+        api['GET_OrgStructureHistory'].mockImplementation(async () => {
+          throw new Error('boom');
+        });
+        await mount({ row: EDITED, range: WIDE });
+
+        removeBtn('Beto Delegate').click();
+        await settle();
+        await choose('field-applies-from', 2028);
+
+        expect(q('delegates-replace-warning')).toBeNull();
+        expect(saveDisabled()).toBe(false);
+      });
+    });
+
+    it('shows the delegates of the version it was given and excludes the director of that version', async () => {
+      api['GET_OrgStaff'].mockResolvedValue(ok([person('A1', 'Ana Director'), person('A9', 'Other Director'), person('N2', 'Nico New')]));
+      const v2027 = row({
+        id: 7,
+        code: 'ORG-7',
+        levelCode: 'L2',
+        name: 'Editable Department',
+        parentId: 10,
+        director: staff('A9', 'Other Director'),
+        delegates: [staff('C3', 'Cleo Later')],
+        from: 2027
+      });
+      await mount({ row: v2027 });
+
+      expect(root().querySelectorAll('[data-testid="delegate-chip"]')).toHaveLength(1);
+      expect(q('delegate-chips')?.textContent).toContain('Cleo Later');
+      expect(q('delegate-chips')?.textContent).not.toContain('Beto Delegate');
+      expect((await search('field-delegates', 'an')).map(o => o.carnet)).toEqual(['A1', 'N2']);
     });
 
     // Adapted (T-09): reordering is no longer possible with chips; the set comparison is now proven by
@@ -523,7 +707,8 @@ describe('OrgUnitFormComponent', () => {
       expect(saveDisabled()).toBe(true);
     });
 
-    it('clearing every delegate sends an empty list (replace semantics)', async () => {
+    // Adapted (T-12, D-ORG-24): the body now also carries appliesFromYear (delegates are versioned).
+    it('clearing every delegate sends an empty list (replace semantics) with appliesFromYear', async () => {
       await mount({ row: EDITED });
 
       removeBtn('Beto Delegate').click();
@@ -532,13 +717,16 @@ describe('OrgUnitFormComponent', () => {
       await settle();
       await clickSave();
 
-      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: [] });
+      expect(api['PATCH_OrgStructureUnit']).toHaveBeenCalledWith(7, { delegateCarnets: [], appliesFromYear: 2026 });
     });
 
-    it('shows the Inactive staff mark on an already-stored delegate and the not-tied-to-a-year hint', async () => {
+    // Adapted (T-12, D-ORG-24): the "not tied to a year" hint and the "(current)" label are gone.
+    it('shows the Inactive staff mark on an already-stored delegate, with no "not tied to a year" hint and no "current" label', async () => {
       await mount({ row: EDITED });
 
-      expect(q('delegates-hint')?.textContent).toContain('not tied to a year');
+      expect(q('delegates-hint')?.textContent).not.toContain('not tied to a year');
+      expect(q('delegates-hint')?.textContent).toContain('Applies from year');
+      expect(q('field-delegates')?.querySelector('label')?.textContent?.trim()).toBe('Delegates');
       expect(root().querySelectorAll('[data-testid="delegate-inactive"]')).toHaveLength(1);
       expect(q('delegate-inactive')?.closest('[data-testid="delegate-chip"]')?.textContent).toContain('Cira Gone');
     });
@@ -546,7 +734,6 @@ describe('OrgUnitFormComponent', () => {
     // T-08 / D-ORG-21 — Keywords-style chips: name inline, email only as the hover tooltip.
     const chipEls = () => fixture.debugElement.queryAll(By.css('[data-testid="delegate-chip"]'));
     const chipOf = (name: string) => chipEls().find(c => (c.nativeElement.textContent ?? '').includes(name));
-    const removeBtn = (name: string) => q('delegate-chips')?.querySelector(`[aria-label="Remove ${name}"]`) as HTMLButtonElement;
     const searchInput = () => q('field-delegates')?.querySelector('input') as HTMLInputElement;
 
     it('a delegate chip shows the name, not the email, and carries the email as its tooltip text', async () => {

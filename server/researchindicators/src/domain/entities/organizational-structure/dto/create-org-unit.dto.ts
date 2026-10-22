@@ -83,7 +83,7 @@ export class CreateOrgUnitDto {
   @ApiPropertyOptional({
     type: [String],
     description:
-      'Whole list of delegate carnets (R-ORG-017): at most 20, no duplicates, never the director',
+      'Whole list of delegate carnets of the first version (R-ORG-017, D-ORG-24): at most 20, no duplicates, never that version’s director',
   })
   @IsOptional()
   @IsArray()

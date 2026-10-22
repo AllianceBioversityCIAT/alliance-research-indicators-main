@@ -105,7 +105,9 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
                     AND v.valid_to_year IS NULL) AS open2026,
                 (SELECT COUNT(*) FROM org_unit_change_log l
                   WHERE l.org_unit_id = u.id AND l.action = 'seed') AS seeds,
-                (SELECT COUNT(*) FROM org_unit_delegates d WHERE d.org_unit_id = u.id) AS delegates
+                (SELECT COUNT(*) FROM org_unit_delegates d
+                   JOIN org_unit_versions dv ON dv.id = d.org_unit_version_id
+                  WHERE dv.org_unit_id = u.id) AS delegates
            FROM org_units u WHERE u.id ${ids}`,
       );
       expect(perUnit).toHaveLength(117);

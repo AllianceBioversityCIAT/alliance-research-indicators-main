@@ -4,6 +4,7 @@ import {
   OrgStaffOption,
   OrgUnitCreatePayload,
   OrgUnitUpdatePayload,
+  OrgUnitVersionView,
   OrgYearViewRow
 } from '@shared/interfaces/org-structure.interface';
 import { ORG_LEVEL_LABELS, isEndedInYear } from './org-tree.util';
@@ -88,7 +89,7 @@ export interface OrgFormState {
 }
 
 // Delegates compare as a SET: reordering chips is not a change (R-ORG-017).
-const sameList = (a: string[], b: string[]) => a.length === b.length && a.every(v => b.includes(v)) && b.every(v => a.includes(v));
+export const sameList = (a: string[], b: string[]) => a.length === b.length && a.every(v => b.includes(v)) && b.every(v => a.includes(v));
 
 export interface OrgChanges {
   code: boolean;
@@ -96,22 +97,60 @@ export interface OrgChanges {
   delegates: boolean;
 }
 
-/** Which parts of an existing entry the form changed. Code and delegates are not versioned (R-ORG-002, 017). */
+/**
+ * Which parts of an existing entry the form changed. Only the code is unversioned (R-ORG-002); delegates are
+ * a versioned field like the director (R-ORG-017, D-ORG-24), so a delegates change also sets `versioned`.
+ * `delegates` stays as its own flag: it says whether `delegateCarnets` goes into the B10 body.
+ */
 export function detectChanges(form: OrgFormState, row: OrgYearViewRow): OrgChanges {
   const v = row.version;
+  const delegates = !sameList(
+    form.delegates.map(d => d.carnet),
+    row.delegates.map(d => d.carnet)
+  );
   return {
     code: form.code.trim() !== row.code,
     versioned:
+      delegates ||
       form.name.trim() !== v.name ||
       form.acronym.trim() !== (v.acronym ?? '') ||
       form.levelId !== v.levelId ||
       form.parentId !== v.parentId ||
       (form.director?.carnet ?? null) !== (v.director?.carnet ?? null),
-    delegates: !sameList(
-      form.delegates.map(d => d.carnet),
-      row.delegates.map(d => d.carnet)
-    )
+    delegates
   };
+}
+
+export interface OrgDelegatesReplaced {
+  /** Start year of the version whose list the save would replace. */
+  from: number;
+  /** Its current delegates, names joined with `, ` (`none` when it has none). */
+  names: string;
+}
+
+/**
+ * D-ORG-25: the delegates sent for *Applies from year* replace the whole list of the version covering that
+ * year. When that is NOT the version on screen and its list differs from the form's (as a set), returns what
+ * would be replaced so the form can warn before *Save*; otherwise `null`. A year no version covers (a gap)
+ * replaces nothing. `versions` come from B6, oldest first; `to` is exclusive.
+ */
+export function delegatesReplaced(
+  versions: OrgUnitVersionView[],
+  viewedFrom: number,
+  appliesFromYear: number,
+  formCarnets: string[]
+): OrgDelegatesReplaced | null {
+  const target = versions.find(v => v.from <= appliesFromYear && (v.to === null || appliesFromYear < v.to));
+  if (!target || target.from === viewedFrom) return null;
+  const current = target.delegates ?? [];
+  if (
+    sameList(
+      current.map(d => d.carnet),
+      formCarnets
+    )
+  )
+    return null;
+  return { from: target.from, names: current.length ? current.map(d => d.name ?? d.carnet).join(', ') : 'none' };
 }
 
 /** B9 body: carnets only, never names or emails (R-ORG-016, 017). */
@@ -131,8 +170,8 @@ export function buildUpdatePayload(form: OrgFormState, row: OrgYearViewRow, chan
   const v = row.version;
   const payload: OrgUnitUpdatePayload = {};
   if (changes.code) payload.code = form.code.trim();
-  if (changes.delegates) payload.delegateCarnets = form.delegates.map(d => d.carnet);
   if (changes.versioned) {
+    if (changes.delegates) payload.delegateCarnets = form.delegates.map(d => d.carnet);
     if (form.name.trim() !== v.name) payload.name = form.name.trim();
     if (form.acronym.trim() !== (v.acronym ?? '')) payload.acronym = form.acronym.trim();
     if (form.levelId !== v.levelId) payload.levelId = form.levelId as number;
@@ -162,8 +201,6 @@ export function saveToast(outcome: OrgSaveOutcome | undefined): OrgSaveToast {
       return { severity: 'info', detail: 'No changes' };
     case 'code_change':
       return { severity: 'success', detail: 'Code updated' };
-    case 'delegates_change':
-      return { severity: 'success', detail: 'Delegates updated' };
     case 'create':
       return { severity: 'success', detail: outcome.backdated ? `Entry created, back-dated from ${year}` : `Entry created from ${year}` };
     case 'new_version':

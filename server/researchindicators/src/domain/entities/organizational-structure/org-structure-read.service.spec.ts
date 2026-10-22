@@ -27,7 +27,27 @@ describe('OrgStructureReadService', () => {
     findCoveringByUnits: jest.fn(),
     countChildEntries: jest.fn(),
   };
-  const delegateRepo = { findStaffByUnitIds: jest.fn() };
+  const delegateRepo = { findStaffByVersionIds: jest.fn() };
+  /** A delegate row of a VERSION (D-ORG-24), joined with its staff row. */
+  const delegateRow = (
+    versionId: number,
+    carnet: string,
+    over: Record<string, unknown> = {},
+  ) => ({
+    org_unit_version_id: String(versionId),
+    staff_carnet: carnet,
+    first_name: carnet,
+    last_name: 'Staff',
+    email: `${carnet.toLowerCase()}@example.org`,
+    is_active: 1,
+    ...over,
+  });
+  /** A delegates repository holding `rows`, answering by the version ids it is asked for. */
+  const delegatesHold = (rows: Array<ReturnType<typeof delegateRow>>) =>
+    delegateRepo.findStaffByVersionIds.mockImplementation(
+      async (ids: number[]) =>
+        rows.filter((row) => ids.includes(Number(row.org_unit_version_id))),
+    );
   const changeLogRepo = { findRowsByUnit: jest.fn() };
   const registry = { getBreakdown: jest.fn() };
   const clock: OrgStructureClock = { currentYear: () => year };
@@ -37,6 +57,7 @@ describe('OrgStructureReadService', () => {
     code: 'ORG-007',
     status: 'active',
     status_from_year: null,
+    version_id: '700',
     valid_from_year: 2026,
     valid_to_year: null,
     name: 'Data & AI',
@@ -60,7 +81,7 @@ describe('OrgStructureReadService', () => {
     jest.clearAllMocks();
     year = 2026;
     unitRepo.findYearViewRows.mockResolvedValue([]);
-    delegateRepo.findStaffByUnitIds.mockResolvedValue([]);
+    delegateRepo.findStaffByVersionIds.mockResolvedValue([]);
     service = new OrgStructureReadService(
       unitRepo as never,
       versionRepo as never,
@@ -224,33 +245,31 @@ describe('OrgStructureReadService', () => {
       expect(row.version.to).toBe(2027);
     });
 
-    it('attaches the CURRENT delegates of each entry, in order, with an inactive mark', async () => {
+    it('attaches the delegates of the version SHOWN for each entry, in order, with an inactive mark', async () => {
       unitRepo.findYearViewRows.mockResolvedValue([
-        rawRow({ id: '7' }),
-        rawRow({ id: '8', code: 'ORG-008' }),
+        rawRow({ id: '7', version_id: '700' }),
+        rawRow({ id: '8', code: 'ORG-008', version_id: '800' }),
       ]);
-      delegateRepo.findStaffByUnitIds.mockResolvedValue([
-        {
-          org_unit_id: '7',
-          staff_carnet: 'B2001',
+      delegateRepo.findStaffByVersionIds.mockResolvedValue([
+        delegateRow(700, 'B2001', {
           first_name: 'Luis',
           last_name: 'Gomez',
           email: 'luis@example.org',
-          is_active: 1,
-        },
-        {
-          org_unit_id: '7',
-          staff_carnet: 'B2002',
+        }),
+        delegateRow(700, 'B2002', {
           first_name: 'Marta',
           last_name: 'Ruiz',
           email: null,
           is_active: 0,
-        },
+        }),
       ]);
 
       const rows = await service.getYearView(2026);
 
-      expect(delegateRepo.findStaffByUnitIds).toHaveBeenCalledWith([7, 8]);
+      // Asked by VERSION id, not by entry id (D-ORG-24).
+      expect(delegateRepo.findStaffByVersionIds).toHaveBeenCalledWith([
+        700, 800,
+      ]);
       expect(rows[0].delegates.map((d) => d.carnet)).toEqual([
         'B2001',
         'B2002',
@@ -261,6 +280,22 @@ describe('OrgStructureReadService', () => {
         isActiveStaff: false,
       });
       expect(rows[1].delegates).toEqual([]);
+    });
+
+    it('the SAME entry shows different delegates in 2026 and 2027 when its versions differ (R-ORG-017 AC.5, no "current" list)', async () => {
+      delegatesHold([delegateRow(700, 'B2001'), delegateRow(701, 'B2002')]);
+      unitRepo.findYearViewRows.mockImplementation(async (y: number) => [
+        rawRow({
+          version_id: y === 2026 ? '700' : '701',
+          valid_from_year: y === 2026 ? 2026 : 2027,
+        }),
+      ]);
+
+      const [in2026] = await service.getYearView(2026);
+      const [in2027] = await service.getYearView(2027);
+
+      expect(in2026.delegates.map((d) => d.carnet)).toEqual(['B2001']);
+      expect(in2027.delegates.map((d) => d.carnet)).toEqual(['B2002']);
     });
   });
 
@@ -320,7 +355,7 @@ describe('OrgStructureReadService', () => {
       expect(versionRepo.findDetailedByUnit).not.toHaveBeenCalled();
     });
 
-    it('returns the entry, its versions oldest first and its delegates', async () => {
+    it('returns the entry and its versions oldest first, each with its OWN delegates and no entry-level list', async () => {
       unitRepo.findOne.mockResolvedValue({
         id: '7',
         code: 'ORG-007',
@@ -329,21 +364,24 @@ describe('OrgStructureReadService', () => {
         successor_id: '9',
       });
       versionRepo.findDetailedByUnit.mockResolvedValue([
-        rawRow({ valid_to_year: 2027 }),
-        rawRow({ valid_from_year: 2027, valid_to_year: 2028, name: 'DAI' }),
+        rawRow({ id: '700', valid_to_year: 2027 }),
+        rawRow({
+          id: '701',
+          valid_from_year: 2027,
+          valid_to_year: 2028,
+          name: 'DAI',
+        }),
       ]);
-      delegateRepo.findStaffByUnitIds.mockResolvedValue([
-        {
-          org_unit_id: '7',
-          staff_carnet: 'B2001',
-          first_name: 'Luis',
-          last_name: 'Gomez',
-          email: 'luis@example.org',
-          is_active: 1,
-        },
-      ]);
+      delegatesHold([delegateRow(701, 'B2001')]);
 
       const detail = await service.getUnitDetail(7);
+
+      expect(delegateRepo.findStaffByVersionIds).toHaveBeenCalledWith([
+        700, 701,
+      ]);
+      expect(detail.versions.map((v) => v.delegates.length)).toEqual([0, 1]);
+      expect(detail.versions[1].delegates[0].carnet).toBe('B2001');
+      expect(detail).not.toHaveProperty('delegates');
 
       expect(detail).toMatchObject({
         id: 7,
@@ -358,7 +396,6 @@ describe('OrgStructureReadService', () => {
       ]);
       expect(detail.versions[0].director.carnet).toBe('A1234');
       expect(detail.versions[0].levelCode).toBe('L4');
-      expect(detail.delegates).toHaveLength(1);
     });
   });
 
@@ -400,6 +437,25 @@ describe('OrgStructureReadService', () => {
           createdBy: { id: 4242, name: 'Hector Tobon', email: 'h@example.org' },
         },
       ]);
+    });
+
+    it('B6 lists every version with its own delegates next to the log (History, R-ORG-017)', async () => {
+      unitRepo.findOne.mockResolvedValue({ id: 57 });
+      versionRepo.findDetailedByUnit.mockResolvedValue([
+        rawRow({ id: '570', valid_to_year: 2027 }),
+        rawRow({ id: '571', valid_from_year: 2027 }),
+      ]);
+      delegatesHold([delegateRow(570, 'B2001'), delegateRow(571, 'B2002')]);
+      changeLogRepo.findRowsByUnit.mockResolvedValue([
+        logRaw({ action: 'new_version', applies_from_year: 2027 }),
+      ]);
+
+      const history = await service.getUnitHistory(57);
+
+      expect(
+        history.versions.map((v) => v.delegates.map((d) => d.carnet)),
+      ).toEqual([['B2001'], ['B2002']]);
+      expect(history.log[0].action).toBe('new_version');
     });
 
     it('B6 for an id that does not exist (also a physically deleted one) is the same 404 string as B5, and reads no log', async () => {
@@ -527,21 +583,48 @@ describe('OrgStructureReadService', () => {
         expect(at2029[0].version).not.toBeNull();
       });
 
-      it('returns one row per id in request order, collapses duplicates, and carries the current delegates', async () => {
+      it('returns the delegates of the version covering the REQUESTED year: [B1] for 2026 and [B2] for 2027 on one entry (R-ORG-010 AC.3, D-ORG-24)', async () => {
+        unitRepo.find.mockResolvedValue([unit({ id: 57 })]);
+        versionRepo.findCoveringByUnits.mockImplementation(
+          async (_ids: number[], y: number) => [
+            covering(57, y === 2026 ? { id: '570' } : { id: '571' }),
+          ],
+        );
+        delegatesHold([delegateRow(570, 'B1'), delegateRow(571, 'B2')]);
+
+        const [in2026] = await resolveAll([57], 2026);
+        const [in2027] = await resolveAll([57], 2027);
+
+        expect(in2026.delegates.map((d) => d.carnet)).toEqual(['B1']);
+        expect(in2027.delegates.map((d) => d.carnet)).toEqual(['B2']);
+        expect(in2027.version).not.toHaveProperty('delegates');
+      });
+
+      it('a year with no covering version (version null) returns an empty delegate list, whatever other versions hold', async () => {
+        unitRepo.find.mockResolvedValue([
+          unit({ id: 57, status: 'inactive', status_from_year: 2027 }),
+        ]);
+        versionRepo.findCoveringByUnits.mockResolvedValue([]);
+        delegatesHold([delegateRow(570, 'B1')]);
+
+        const [row] = await resolveAll([57], 2028);
+
+        expect(row.version).toBeNull();
+        expect(row.delegates).toEqual([]);
+      });
+
+      it("returns one row per id in request order, collapses duplicates, and carries each one's own delegates", async () => {
         unitRepo.find.mockResolvedValue([unit({ id: 2 }), unit({ id: 1 })]);
         versionRepo.findCoveringByUnits.mockResolvedValue([
-          covering(1),
-          covering(2),
+          covering(1, { id: '101' }),
+          covering(2, { id: '102' }),
         ]);
-        delegateRepo.findStaffByUnitIds.mockResolvedValue([
-          {
-            org_unit_id: '2',
-            staff_carnet: 'D1',
+        delegatesHold([
+          delegateRow(102, 'D1', {
             first_name: 'Eva',
             last_name: 'Lopez',
             email: 'eva@example.org',
-            is_active: 1,
-          },
+          }),
         ]);
 
         const rows = await resolveAll([2, 1, 2]);

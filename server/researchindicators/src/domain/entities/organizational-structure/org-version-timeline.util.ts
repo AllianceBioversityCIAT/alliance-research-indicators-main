@@ -2,7 +2,7 @@
  * Pure helpers over an entry's version ranges (design.md section 2.1, D-ORG-2).
  * No I/O. T-01 holds only the year-coverage predicate and its SQL twin;
  * the save-engine functions (locate, split, propagate, assertTimeline) arrive
- * with T-02.
+ * with T-02. T-12 (D-ORG-24) adds the delegate list as a versioned field.
  *
  * A version covers the half-open range `[from, to)`; `to === null` is
  * open-ended. A year N is covered when `from <= N AND (to IS NULL OR to > N)`
@@ -38,6 +38,12 @@ export interface TimelineVersion {
   levelId: number;
   parentId: number | null;
   directorCarnet: string | null;
+  /**
+   * Staff carnets of this version's delegates (R-ORG-017, D-ORG-24). One value
+   * for the save engine: compared as a SET (order and case ignored), never by
+   * reference. Never shared between two versions: every copy takes its own array.
+   */
+  delegates: string[];
 }
 
 export type VersionedField =
@@ -45,7 +51,8 @@ export type VersionedField =
   | 'acronym'
   | 'levelId'
   | 'parentId'
-  | 'directorCarnet';
+  | 'directorCarnet'
+  | 'delegates';
 
 export const VERSIONED_FIELDS: readonly VersionedField[] = [
   'name',
@@ -53,10 +60,36 @@ export const VERSIONED_FIELDS: readonly VersionedField[] = [
   'levelId',
   'parentId',
   'directorCarnet',
+  'delegates',
 ];
 
-/** Fields a save wants to set. A key that is absent means "leave as is"; `null` clears. */
+/** Fields a save wants to set. A key that is absent means "leave as is"; `null` clears (a delegate list clears with `[]`). */
 export type VersionChanges = Partial<Pick<TimelineVersion, VersionedField>>;
+
+/** Set equality of two carnet lists: order and case are ignored (design 5.2 step 6). */
+export const sameCarnets = (a: string[], b: string[]): boolean => {
+  const left = new Set(a.map((carnet) => carnet.toLowerCase()));
+  const right = new Set(b.map((carnet) => carnet.toLowerCase()));
+  return left.size === right.size && [...left].every((c) => right.has(c));
+};
+
+/** Equality of one versioned field: a set for `delegates`, `===` for the scalar fields. */
+export const sameFieldValue = (
+  field: VersionedField,
+  a: unknown,
+  b: unknown,
+): boolean =>
+  field === 'delegates' ? sameCarnets(a as string[], b as string[]) : a === b;
+
+/** A copy that shares nothing mutable with its source (the delegate list is the only array). */
+const cloneVersion = (version: TimelineVersion): TimelineVersion => ({
+  ...version,
+  delegates: [...version.delegates],
+});
+
+/** The value of a field as a copy, so two versions never share one delegate array. */
+const copyValue = (value: unknown): unknown =>
+  Array.isArray(value) ? [...value] : value;
 
 export type VersionDiff = Partial<
   Record<VersionedField, { old: unknown; new: unknown }>
@@ -96,9 +129,7 @@ export const applyChange = (
   year: number,
   changes: VersionChanges,
 ): ApplyChangeResult => {
-  const ordered = versions
-    .map((v) => ({ ...v }))
-    .sort((a, b) => a.from - b.from);
+  const ordered = versions.map(cloneVersion).sort((a, b) => a.from - b.from);
   const target = findCovering(ordered, year);
   if (!target) {
     throw new OrgTimelineInvariantError(`no version covers year ${year}`);
@@ -107,7 +138,7 @@ export const applyChange = (
   const diff: VersionDiff = {};
   for (const field of VERSIONED_FIELDS) {
     if (changes[field] === undefined) continue;
-    if (target[field] !== changes[field]) {
+    if (!sameFieldValue(field, target[field], changes[field])) {
       diff[field] = { old: target[field], new: changes[field] };
     }
   }
@@ -117,7 +148,7 @@ export const applyChange = (
 
   const apply = (version: TimelineVersion) => {
     for (const field of Object.keys(diff) as VersionedField[]) {
-      (version[field] as unknown) = diff[field].new;
+      (version[field] as unknown) = copyValue(diff[field].new);
     }
   };
 
@@ -128,7 +159,9 @@ export const applyChange = (
     result = ordered;
     kind = 'edit_in_place';
   } else {
-    const newHalf: TimelineVersion = { ...target, from: year };
+    // Delegates split with the version (D-ORG-24): the new half starts from the
+    // covering version's list and only then takes the new one.
+    const newHalf: TimelineVersion = { ...cloneVersion(target), from: year };
     delete newHalf.id;
     apply(newHalf);
     target.to = year;
@@ -136,10 +169,12 @@ export const applyChange = (
     kind = 'new_version';
   }
 
+  // The delegate list is one value here, replaced only where a later version
+  // holds the SAME SET as the list being replaced (a deliberate later list stays).
   for (const later of result.filter((v) => v.from > year)) {
     for (const field of Object.keys(diff) as VersionedField[]) {
-      if (later[field] === diff[field].old) {
-        (later[field] as unknown) = diff[field].new;
+      if (sameFieldValue(field, later[field], diff[field].old)) {
+        (later[field] as unknown) = copyValue(diff[field].new);
       }
     }
   }
@@ -161,12 +196,62 @@ export const changedVersions = (
     } else if (
       old.from !== version.from ||
       old.to !== version.to ||
-      VERSIONED_FIELDS.some((field) => old[field] !== version[field])
+      VERSIONED_FIELDS.some(
+        (field) => !sameFieldValue(field, old[field], version[field]),
+      )
     ) {
       updates.push(version);
     }
   }
   return { inserts, updates };
+};
+
+/** A version of the resulting timeline whose director is also one of its delegates (I-6). */
+export interface DirectorDelegateOverlap {
+  /** Start year of the offending version. */
+  from: number;
+  carnet: string;
+  /**
+   * The field the 400 names: `director` when this save changed that version's
+   * director (including by propagation), else `delegates`. When both changed,
+   * `director` wins, so the answer never depends on iteration order.
+   */
+  field: 'director' | 'delegates';
+}
+
+/**
+ * I-6 per version (design 3.2, 5.2 step 7; D-ORG-24). Checked over the
+ * RESULTING timeline, after propagation, on every version the save writes: an
+ * overlap that exists only in a propagated later version is found here and
+ * nowhere else. Versions the save does not touch already satisfy it. `before`
+ * is the stored timeline (empty on create); a new half of a split is compared
+ * with the version it was split from.
+ */
+export const findDirectorDelegateOverlap = (
+  before: TimelineVersion[],
+  after: TimelineVersion[],
+  year: number,
+): DirectorDelegateOverlap | null => {
+  const { inserts, updates } = changedVersions(before, after);
+  const byId = new Map(before.map((v) => [v.id, v]));
+  const covering = findCovering(before, year);
+  const written = [...updates, ...inserts].sort((a, b) => a.from - b.from);
+  for (const version of written) {
+    if (!version.directorCarnet) continue;
+    const director = version.directorCarnet.toLowerCase();
+    const carnet = version.delegates.find((c) => c.toLowerCase() === director);
+    if (carnet === undefined) continue;
+    const prior =
+      version.id === undefined ? covering : (byId.get(version.id) ?? undefined);
+    const directorChanged =
+      prior !== undefined && prior.directorCarnet !== version.directorCarnet;
+    return {
+      from: version.from,
+      carnet,
+      field: directorChanged ? 'director' : 'delegates',
+    };
+  }
+  return null;
 };
 
 /** The years `[from, to)` between two consecutive versions where the entry had no version (D-ORG-17). */
@@ -275,9 +360,7 @@ export const endTimeline = (
   versions: TimelineVersion[],
   endYear: number,
 ): EndTimelineResult => {
-  const ordered = versions
-    .map((v) => ({ ...v }))
-    .sort((a, b) => a.from - b.from);
+  const ordered = versions.map(cloneVersion).sort((a, b) => a.from - b.from);
   const first = ordered[0];
   if (!first) {
     throw new OrgTimelineInvariantError('an entry needs at least one version');
@@ -335,9 +418,7 @@ export const reopenTimeline = (
   year: number,
   endedFrom: number,
 ): ReopenTimelineResult => {
-  const ordered = versions
-    .map((v) => ({ ...v }))
-    .sort((a, b) => a.from - b.from);
+  const ordered = versions.map(cloneVersion).sort((a, b) => a.from - b.from);
   const last = ordered[ordered.length - 1];
   if (!last) {
     throw new OrgTimelineInvariantError('an entry needs at least one version');
@@ -351,7 +432,12 @@ export const reopenTimeline = (
       },
     };
   }
-  const added: TimelineVersion = { ...last, from: year, to: null };
+  // The copy carries the last version's delegates as stored (R-ORG-007, D-ORG-24).
+  const added: TimelineVersion = {
+    ...cloneVersion(last),
+    from: year,
+    to: null,
+  };
   delete added.id;
   return { ok: true, versions: [...ordered, added], added };
 };

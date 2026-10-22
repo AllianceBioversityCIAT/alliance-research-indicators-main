@@ -79,6 +79,7 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
   const SCRATCH_CODE = `${ORG_T04_PREFIX}LVL${Date.now()}`;
 
   let staffCarnet: string;
+  let delegateCarnet: string;
   let root: number;
   let deptA: number;
   let deptC: number;
@@ -211,6 +212,7 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
     }
 
     staffCarnet = await fixtures.staff('C1', 'Elena', 'Soto', true);
+    delegateCarnet = await fixtures.staff('C2', 'Luis', 'Gomez', true);
 
     const [orgLevelList] = await query(
       `SELECT id FROM control_lists WHERE list_key = 'org.level'`,
@@ -240,6 +242,8 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
         levelId: 23,
         parentId: deptA,
         directorCarnet: staffCarnet,
+        // Delegates are per VERSION (D-ORG-24): a list before the move, none after.
+        delegates: [delegateCarnet],
       },
       {
         from: 2029,
@@ -250,7 +254,6 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
         directorCarnet: staffCarnet,
       },
     ]);
-    await fixtures.delegate(u57, staffCarnet);
 
     ended = await fixtures.unit(
       'C_ENDED',
@@ -447,9 +450,18 @@ describe('Organizational Structure — consumer contract and Control Lists wirin
         carnet: staffCarnet,
         name: 'Elena Soto',
       });
-      expect(byYear[2026].delegates).toEqual([
-        expect.objectContaining({ carnet: staffCarnet, name: 'Elena Soto' }),
-      ]);
+      // R-ORG-010 AC.3: the delegates of the version covering THAT year.
+      for (const year of [2026, 2028]) {
+        expect(byYear[year].delegates).toEqual([
+          expect.objectContaining({
+            carnet: delegateCarnet,
+            name: 'Luis Gomez',
+          }),
+        ]);
+      }
+      for (const year of [2029, 2030]) {
+        expect(byYear[year].delegates).toEqual([]);
+      }
       expect(byYear[2026].version).not.toHaveProperty('id');
     });
 

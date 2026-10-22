@@ -61,8 +61,8 @@ const log = (id: number, o: Partial<OrgChangeLogRow>): OrgChangeLogRow => ({
 // Newest first, as B6 returns it.
 const HISTORY: OrgHistory = {
   versions: [
-    { ...UNIT.version, from: 2026, to: 2028, name: 'Unit Five (old)' },
-    { ...UNIT.version, from: 2028, to: null }
+    { ...UNIT.version, from: 2026, to: 2028, name: 'Unit Five (old)', delegates: [staff('B3001', 'Olga Old')] },
+    { ...UNIT.version, from: 2028, to: null, delegates: [staff('B3002', 'Nora New'), staff('B3003', 'Pablo Plus')] }
   ],
   log: [
     log(3, {
@@ -248,6 +248,38 @@ describe('OrgUnitPanelComponent', () => {
       expect(first.querySelector('[data-testid="log-meta"]')?.textContent).toContain('Beatriz Admin');
       expect(first.querySelector('[data-testid="log-meta"]')?.textContent).toContain('2027-05-02 09:15');
       expect(first.querySelector('[data-testid="log-diff"]')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Delegates: B2001 → Marta Ruiz');
+    });
+
+    // T-12 (D-ORG-24): delegates are listed per version, like the director.
+    it("the versions table has a Delegates column holding each version's own list", async () => {
+      await mount(UNIT);
+
+      await openHistory();
+
+      const headers = Array.from((q('history-versions') as HTMLElement).querySelectorAll('th')).map(h => h.textContent?.trim());
+      expect(headers).toEqual(['Years', 'Name', 'Level', 'Parent', 'Director', 'Delegates']);
+      expect(all('version-delegates').map(c => c.textContent?.trim())).toEqual(['Olga Old', 'Nora New; Pablo Plus']);
+    });
+
+    it('a delegates diff inside a new_version row shows old and new names, resolved from the versions on screen', async () => {
+      api['GET_OrgStructureHistory'].mockResolvedValue(
+        ok({
+          versions: HISTORY.versions,
+          log: [
+            log(9, {
+              action: 'new_version',
+              appliesFromYear: 2028,
+              changes: { delegates: { old: ['B3001'], new: ['B3002', 'B3003'] } }
+            })
+          ]
+        })
+      );
+      await mount(UNIT);
+
+      await openHistory();
+
+      expect(all('log-action').map(a => a.textContent?.trim())).toEqual(['New version']);
+      expect(q('log-diff')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Delegates: Olga Old → Nora New, Pablo Plus');
     });
 
     it('a back-dated version shows the Back-dated mark, its applies-from year and the field diff', async () => {

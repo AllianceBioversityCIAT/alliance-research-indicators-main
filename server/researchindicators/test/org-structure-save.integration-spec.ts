@@ -55,6 +55,7 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
   let dir: string;
   let del1: string;
   let del2: string;
+  let del3: string;
   let root: number;
   let deptA: number;
   let deptC: number;
@@ -99,13 +100,32 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
         typeof r.changes === 'string' ? JSON.parse(r.changes) : r.changes,
     }));
   };
-  const delegatesOf = async (id: number) =>
-    (
-      await query(
-        `SELECT staff_carnet AS c FROM org_unit_delegates WHERE org_unit_id = ? ORDER BY id`,
-        [id],
-      )
-    ).map((r: any) => r.c);
+  /** `[from, delegates]` per version of the entry, oldest first (delegates hang off the version, D-ORG-24). */
+  const delegatesOf = async (id: number) => {
+    const rows = await query(
+      `SELECT v.valid_from_year AS f, dl.staff_carnet AS c
+         FROM org_unit_versions v
+         LEFT JOIN org_unit_delegates dl ON dl.org_unit_version_id = v.id
+        WHERE v.org_unit_id = ? ORDER BY v.valid_from_year, dl.id`,
+      [id],
+    );
+    const byFrom = new Map<number, string[]>();
+    for (const row of rows as Array<{ f: number; c: string | null }>) {
+      const list = byFrom.get(row.f) ?? [];
+      if (row.c !== null) list.push(row.c);
+      byFrom.set(row.f, list);
+    }
+    return [...byFrom.entries()];
+  };
+  const versionCount = async (id: number) =>
+    Number(
+      (
+        await query(
+          `SELECT COUNT(*) AS n FROM org_unit_versions WHERE org_unit_id = ?`,
+          [id],
+        )
+      )[0].n,
+    );
   // Scoped to the rows THIS suite owns (codes `__T02_%`, minus the lifecycle
   // suite's `__T02_LIF%`): suites run in parallel on one database, so a global
   // COUNT(*) or a checksum over every row would see another suite's writes.
@@ -121,12 +141,21 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
         .n,
     );
   };
-  const otherRows = (except: number) =>
-    query(
+  // Other entries' version rows AND their delegate rows (R-ORG-004 AC.3).
+  const otherRows = async (except: number) => [
+    await query(
       `SELECT v.* FROM org_unit_versions v JOIN org_units u ON u.id = v.org_unit_id
         WHERE ${OWN} AND v.org_unit_id <> ? ORDER BY v.id`,
       [except],
-    );
+    ),
+    await query(
+      `SELECT dl.* FROM org_unit_delegates dl
+         JOIN org_unit_versions v ON v.id = dl.org_unit_version_id
+         JOIN org_units u ON u.id = v.org_unit_id
+        WHERE ${OWN} AND v.org_unit_id <> ? ORDER BY dl.id`,
+      [except],
+    ),
+  ];
   const yearView = async (year: number) => {
     const res = await request(app.getHttpServer())
       .get(`/units?year=${year}`)
@@ -141,6 +170,7 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
     dir = await fixtures.staff('ZA', 'Ana', 'Pereira', true);
     del1 = await fixtures.staff('ZB', 'Luis', 'Gomez', true);
     del2 = await fixtures.staff('ZC', 'Marta', 'Ruiz', true);
+    del3 = await fixtures.staff('ZE', 'Nora', 'Vega', true);
 
     const moduleRef = await Test.createTestingModule({
       controllers: [OrganizationalStructureController],
@@ -408,7 +438,14 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
   });
 
   describe('delegates (R-ORG-017)', () => {
-    it('a delegates-only PATCH adds NO version row, replaces the delegate rows and writes exactly one delegates_change row with old and new', async () => {
+    const resolveIn = async (id: number, year: number) =>
+      (
+        await request(app.getHttpServer())
+          .get(`/resolve?ids=${id}&year=${year}`)
+          .set(admin)
+      ).body.data[0];
+
+    it('a delegates-only PATCH from 2027 on a [2026, open) entry adds ONE version row: 2026 keeps its list, 2027 gets the new one, one new_version row with the delegates diff and no delegates_change row; B1 and C1 give the two lists (D-ORG-24)', async () => {
       const id = await created({
         levelId: 23,
         name: 'Deleg',
@@ -416,50 +453,186 @@ describe('Organizational Structure — save engine against real MySQL (T-02)', (
         directorCarnet: dir,
         delegateCarnets: [del1],
       });
-      const versionsBefore = JSON.stringify(await versionsOf(id));
-      const rowsBefore = Number(
-        (
-          await query(
-            `SELECT COUNT(*) AS n FROM org_unit_versions WHERE org_unit_id = ?`,
-            [id],
-          )
-        )[0].n,
-      );
+      const others = JSON.stringify(await otherRows(id));
+      const rowsBefore = await versionCount(id);
 
-      const res = await patch(id, { delegateCarnets: [del2] });
+      const res = await patch(id, {
+        delegateCarnets: [del2],
+        appliesFromYear: 2027,
+      });
+
       expect(res.status).toBe(200);
-      expect(
-        Number(
-          (
-            await query(
-              `SELECT COUNT(*) AS n FROM org_unit_versions WHERE org_unit_id = ?`,
-              [id],
-            )
-          )[0].n,
-        ),
-      ).toBe(rowsBefore);
-      expect(JSON.stringify(await versionsOf(id))).toBe(versionsBefore);
-      expect(await delegatesOf(id)).toEqual([del2]);
-      const logs = (await logsOf(id)).filter(
-        (l: any) => l.action === 'delegates_change',
-      );
-      expect(logs).toHaveLength(1);
-      expect(logs[0].changes.delegates).toEqual({ old: [del1], new: [del2] });
-      expect(logs[0].applies_from_year).toBeNull();
+      expect(res.body.data.outcome).toEqual({
+        action: 'new_version',
+        appliesFromYear: 2027,
+        backdated: false,
+      });
+      expect(await versionCount(id)).toBe(rowsBefore + 1);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, [del1]],
+        [2027, [del2]],
+      ]);
+      expect(JSON.stringify(await otherRows(id))).toBe(others);
+
+      const logs = await logsOf(id);
+      expect(logs.map((l: any) => l.action)).toEqual(['create', 'new_version']);
+      expect(logs[1].applies_from_year).toBe(2027);
+      expect(logs[1].changes.delegates).toEqual({ old: [del1], new: [del2] });
+
+      const listIn = async (year: number) =>
+        (await yearView(year))
+          .find((r) => r.id === id)
+          .delegates.map((d: any) => d.carnet);
+      expect(await listIn(2026)).toEqual([del1]);
+      expect(await listIn(2027)).toEqual([del2]);
+      const c1 = async (year: number) =>
+        (await resolveIn(id, year)).delegates.map((d: any) => d.carnet);
+      expect(await c1(2026)).toEqual([del1]);
+      expect(await c1(2027)).toEqual([del2]);
     });
 
-    it('the director cannot be a delegate and the failed save changes nothing', async () => {
+    it('the same change from 2026 edits the version in place: no row added, one edit_in_place row', async () => {
+      const id = await created({
+        levelId: 23,
+        name: 'InPlace',
+        parentId: deptA,
+      });
+      const res = await patch(id, {
+        delegateCarnets: [del1, del2],
+        appliesFromYear: 2026,
+      });
+      expect(res.status).toBe(200);
+      expect(await versionCount(id)).toBe(1);
+      expect(await delegatesOf(id)).toEqual([[2026, [del1, del2]]]);
+      const logs = await logsOf(id);
+      expect(logs.map((l: any) => l.action)).toEqual([
+        'create',
+        'edit_in_place',
+      ]);
+    });
+
+    it('A later deliberate list is kept: [del3] from 2026 leaves [2028, open) with [del2]', async () => {
+      const id = await created({
+        levelId: 23,
+        name: 'Kept',
+        parentId: deptA,
+        delegateCarnets: [del1],
+      });
+      expect(
+        (await patch(id, { delegateCarnets: [del2], appliesFromYear: 2028 }))
+          .status,
+      ).toBe(200);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, [del1]],
+        [2028, [del2]],
+      ]);
+
+      expect(
+        (await patch(id, { delegateCarnets: [del3], appliesFromYear: 2026 }))
+          .status,
+      ).toBe(200);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, [del3]],
+        [2028, [del2]],
+      ]);
+    });
+
+    it('a delegates change without appliesFromYear is 400 naming appliesFromYear and writes nothing', async () => {
+      const id = await created({
+        levelId: 23,
+        name: 'NoYear',
+        parentId: deptA,
+      });
+      const res = await patch(id, { delegateCarnets: [del1] });
+      expect(res.status).toBe(400);
+      expect(res.body.message.field).toBe('appliesFromYear');
+      expect(await delegatesOf(id)).toEqual([[2026, []]]);
+      expect(await logsOf(id)).toHaveLength(1);
+    });
+
+    it('the director cannot be a delegate OF THE SAME VERSION: allowed from 2028 where another person directs; 400 from 2026 (a propagated or covered version) changing nothing', async () => {
       const id = await created({
         levelId: 23,
         name: 'Overlap',
         parentId: deptA,
         directorCarnet: dir,
       });
-      const res = await patch(id, { delegateCarnets: [dir] });
+      expect(
+        (await patch(id, { directorCarnet: del1, appliesFromYear: 2028 }))
+          .status,
+      ).toBe(200);
+
+      const ok = await patch(id, {
+        delegateCarnets: [dir],
+        appliesFromYear: 2028,
+      });
+      expect(ok.status).toBe(200);
+      expect(await delegatesOf(id)).toEqual([
+        [2026, []],
+        [2028, [dir]],
+      ]);
+
+      const before = JSON.stringify([
+        await versionsOf(id),
+        await delegatesOf(id),
+        await logsOf(id).then((l: any[]) => l.length),
+      ]);
+      const bad = await patch(id, {
+        delegateCarnets: [dir],
+        appliesFromYear: 2026,
+      });
+      expect(bad.status).toBe(400);
+      expect(bad.body.message.field).toBe('delegates');
+      expect(
+        JSON.stringify([
+          await versionsOf(id),
+          await delegatesOf(id),
+          await logsOf(id).then((l: any[]) => l.length),
+        ]),
+      ).toBe(before);
+    });
+
+    it('an overlap that exists ONLY in a propagated later version is 400 on the real tables (del1 directs [2028, open))', async () => {
+      const id = await created({
+        levelId: 23,
+        name: 'Propagated',
+        parentId: deptA,
+        directorCarnet: dir,
+      });
+      await patch(id, { directorCarnet: del1, appliesFromYear: 2028 });
+      const before = JSON.stringify([
+        await versionsOf(id),
+        await delegatesOf(id),
+      ]);
+
+      const res = await patch(id, {
+        delegateCarnets: [del1],
+        appliesFromYear: 2026,
+      });
+
       expect(res.status).toBe(400);
       expect(res.body.message.field).toBe('delegates');
-      expect(await delegatesOf(id)).toEqual([]);
-      expect(await logsOf(id)).toHaveLength(1);
+      expect(
+        JSON.stringify([await versionsOf(id), await delegatesOf(id)]),
+      ).toBe(before);
+    });
+
+    it('a delegate made director is 400 naming `director`, from 2027 and through propagation from 2026', async () => {
+      const id = await created({
+        levelId: 23,
+        name: 'MadeDirector',
+        parentId: deptA,
+        directorCarnet: dir,
+      });
+      await patch(id, { delegateCarnets: [del1], appliesFromYear: 2027 });
+      for (const year of [2027, 2026]) {
+        const res = await patch(id, {
+          directorCarnet: del1,
+          appliesFromYear: year,
+        });
+        expect(res.status).toBe(400);
+        expect(res.body.message.field).toBe('director');
+      }
     });
   });
 

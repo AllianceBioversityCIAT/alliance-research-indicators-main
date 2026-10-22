@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { OrgUnit } from '../entities/org-unit.entity';
 import { OrgUnitVersion } from '../entities/org-unit-version.entity';
 import { OrgUnitDelegate } from '../entities/org-unit-delegate.entity';
@@ -94,6 +94,18 @@ export class OrgStructureWriteRepository {
       where: { org_unit_id: unitId },
       order: { valid_from_year: 'ASC' },
     });
+    // Delegates are a field of each version (D-ORG-24): one read for the entry.
+    const delegateRows =
+      rows.length === 0
+        ? []
+        : await manager.find(OrgUnitDelegate, {
+            where: { org_unit_version_id: In(rows.map((row) => row.id)) },
+            order: { id: 'ASC' },
+          });
+    const delegatesOf = (versionId: number) =>
+      delegateRows
+        .filter((d) => Number(d.org_unit_version_id) === Number(versionId))
+        .map((d) => d.staff_carnet);
     return rows.map((row) => ({
       id: Number(row.id),
       from: Number(row.valid_from_year),
@@ -103,6 +115,7 @@ export class OrgStructureWriteRepository {
       levelId: Number(row.level_value_id),
       parentId: row.parent_id === null ? null : Number(row.parent_id),
       directorCarnet: row.director_carnet ?? null,
+      delegates: delegatesOf(row.id),
     }));
   }
 
@@ -132,8 +145,8 @@ export class OrgStructureWriteRepository {
     unitId: number,
     version: TimelineVersion,
     userId: number,
-  ): Promise<void> {
-    await manager.insert(OrgUnitVersion, {
+  ): Promise<number> {
+    const result = await manager.insert(OrgUnitVersion, {
       org_unit_id: unitId,
       valid_from_year: version.from,
       valid_to_year: version.to,
@@ -144,6 +157,8 @@ export class OrgStructureWriteRepository {
       director_carnet: version.directorCarnet,
       created_by: userId,
     });
+    // The caller writes this version's delegate rows with the id returned here.
+    return Number(result.identifiers[0].id);
   }
 
   async updateVersion(
@@ -167,7 +182,7 @@ export class OrgStructureWriteRepository {
     );
   }
 
-  /** Versions removed by a lifecycle change (a version that would cover no year, design 5.4). */
+  /** Versions removed by a lifecycle change (a version that would cover no year, design 5.4); their delegate rows go with them through the FK CASCADE (D-ORG-24). */
   async deleteVersions(
     manager: EntityManager,
     unitId: number,
@@ -226,21 +241,10 @@ export class OrgStructureWriteRepository {
     return rows.map((row) => ({ id: Number(row.id), code: row.code }));
   }
 
-  /** Current delegates of an entry in insertion order (R-ORG-017). */
-  async loadDelegateCarnets(
-    manager: EntityManager,
-    unitId: number,
-  ): Promise<string[]> {
-    const rows = await manager.find(OrgUnitDelegate, {
-      where: { org_unit_id: unitId },
-      order: { id: 'ASC' },
-    });
-    return rows.map((row) => row.staff_carnet);
-  }
-
+  /** Writes the delegate rows of a version that has none yet (an inserted version). */
   async addDelegates(
     manager: EntityManager,
-    unitId: number,
+    versionId: number,
     carnets: string[],
     userId: number,
   ): Promise<void> {
@@ -248,24 +252,25 @@ export class OrgStructureWriteRepository {
     await manager.insert(
       OrgUnitDelegate,
       carnets.map((staff_carnet) => ({
-        org_unit_id: unitId,
+        org_unit_version_id: versionId,
         staff_carnet,
         created_by: userId,
       })),
     );
   }
 
-  async removeDelegates(
+  /** Replaces a version's whole delegate list (delete + insert, inside the save's transaction, D-ORG-24). */
+  async replaceDelegates(
     manager: EntityManager,
-    unitId: number,
+    versionId: number,
     carnets: string[],
+    userId: number,
   ): Promise<void> {
-    if (carnets.length === 0) return;
-    const placeholders = carnets.map(() => '?').join(',');
     await manager.query(
-      `DELETE FROM org_unit_delegates WHERE org_unit_id = ? AND staff_carnet IN (${placeholders})`,
-      [unitId, ...carnets],
+      `DELETE FROM org_unit_delegates WHERE org_unit_version_id = ?`,
+      [versionId],
     );
+    await this.addDelegates(manager, versionId, carnets, userId);
   }
 
   /** Staff rows by carnet; the carnet comes back as stored (the column collation is case-insensitive). */

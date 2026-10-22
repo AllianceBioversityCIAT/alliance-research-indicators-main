@@ -3,7 +3,9 @@ import {
   assertTimeline,
   changedVersions,
   findCovering,
+  findDirectorDelegateOverlap,
   OrgTimelineInvariantError,
+  sameCarnets,
   TimelineVersion,
 } from './org-version-timeline.util';
 
@@ -20,6 +22,7 @@ const ver = (over: Partial<TimelineVersion> = {}): TimelineVersion => ({
   levelId: 23,
   parentId: 10,
   directorCarnet: 'A',
+  delegates: [],
   ...over,
 });
 
@@ -205,6 +208,190 @@ describe('applyChange sequences (R-ORG-004)', () => {
         [2029, null],
       ]);
       expect(versions.map((v) => v.directorCarnet)).toEqual(['A', 'C', 'C']);
+    });
+  });
+});
+
+/**
+ * Delegates as a versioned field (R-ORG-017, D-ORG-24). Every fixture gives
+ * DIFFERENT lists to different versions, so "kept" and "overwritten" give
+ * different answers (disqualifier: a fixture with the same list everywhere
+ * cannot tell them apart).
+ */
+describe('delegates as a versioned field (D-ORG-24)', () => {
+  const delegatesOf = (versions: TimelineVersion[]) =>
+    versions.map((v) => v.delegates);
+
+  it('split: the old half keeps its list, the new half takes the new one, and they share no array', () => {
+    const result = applyChange([ver({ id: 1, delegates: ['B1'] })], 2027, {
+      delegates: ['B1', 'B2'],
+    });
+    expect(result.kind).toBe('new_version');
+    expect(ranges(result.versions)).toEqual([
+      [2026, 2027],
+      [2027, null],
+    ]);
+    expect(delegatesOf(result.versions)).toEqual([['B1'], ['B1', 'B2']]);
+    expect(result.diff).toEqual({
+      delegates: { old: ['B1'], new: ['B1', 'B2'] },
+    });
+    result.versions[0].delegates.push('MUTATED');
+    expect(result.versions[1].delegates).toEqual(['B1', 'B2']);
+    assertTimeline(result.versions, { ended: false });
+  });
+
+  it('in place: a delegates-only change in the start year edits that version', () => {
+    const result = applyChange([ver({ id: 1 })], 2026, { delegates: ['B1'] });
+    expect(result.kind).toBe('edit_in_place');
+    expect(result.versions[0]).toMatchObject({ id: 1, delegates: ['B1'] });
+  });
+
+  it('a later deliberate list is kept: [B3] in [2028, open) survives a change of B1 to B2 from 2026', () => {
+    const t = [
+      ver({ id: 1, from: 2026, to: 2028, delegates: ['B1'] }),
+      ver({ id: 2, from: 2028, delegates: ['B3'] }),
+    ];
+    const { versions } = applyChange(t, 2026, { delegates: ['B2'] });
+    expect(delegatesOf(versions)).toEqual([['B2'], ['B3']]);
+  });
+
+  it('a later version that holds the same list takes the new one too', () => {
+    const t = [
+      ver({ id: 1, from: 2026, to: 2028, delegates: ['B1'] }),
+      ver({ id: 2, from: 2028, delegates: ['B1'] }),
+    ];
+    const { versions } = applyChange(t, 2026, { delegates: ['B2'] });
+    expect(delegatesOf(versions)).toEqual([['B2'], ['B2']]);
+    expect(versions[0].delegates).not.toBe(versions[1].delegates);
+  });
+
+  it('compares lists as SETS: [B1, B2] equals [B2, B1] (propagates), [B1] differs from [B1, B2] (kept)', () => {
+    const reordered = [
+      ver({ id: 1, from: 2026, to: 2028, delegates: ['B1', 'B2'] }),
+      ver({ id: 2, from: 2028, delegates: ['B2', 'B1'] }),
+    ];
+    expect(
+      delegatesOf(applyChange(reordered, 2026, { delegates: ['B9'] }).versions),
+    ).toEqual([['B9'], ['B9']]);
+
+    const subset = [
+      ver({ id: 1, from: 2026, to: 2028, delegates: ['B1', 'B2'] }),
+      ver({ id: 2, from: 2028, delegates: ['B1'] }),
+    ];
+    expect(
+      delegatesOf(applyChange(subset, 2026, { delegates: ['B9'] }).versions),
+    ).toEqual([['B9'], ['B1']]);
+  });
+
+  it('sending the same set in another order is a no-op', () => {
+    const result = applyChange(
+      [ver({ id: 1, delegates: ['B1', 'B2'] })],
+      2027,
+      { delegates: ['b2', 'B1'] },
+    );
+    expect(result.kind).toBe('none');
+  });
+
+  it('sameCarnets ignores order and case but not membership', () => {
+    expect(sameCarnets(['A', 'b'], ['B', 'a'])).toBe(true);
+    expect(sameCarnets(['A'], ['A', 'B'])).toBe(false);
+    expect(sameCarnets([], [])).toBe(true);
+  });
+
+  it('changedVersions flags a version whose list changed as a set, not one that was only reordered', () => {
+    const before = [ver({ id: 1, delegates: ['B1', 'B2'] })];
+    expect(
+      changedVersions(before, [ver({ id: 1, delegates: ['B2', 'B1'] })])
+        .updates,
+    ).toEqual([]);
+    expect(
+      changedVersions(before, [ver({ id: 1, delegates: ['B1'] })]).updates,
+    ).toHaveLength(1);
+  });
+
+  describe('I-6 per version (findDirectorDelegateOverlap)', () => {
+    // Director A in [2026, 2028) and C in [2028, open); no delegates.
+    const stored = () => [
+      ver({ id: 1, from: 2026, to: 2028, directorCarnet: 'A' }),
+      ver({ id: 2, from: 2028, directorCarnet: 'C' }),
+    ];
+    const check = (
+      year: number,
+      changes: Parameters<typeof applyChange>[2],
+    ) => {
+      const before = stored();
+      return findDirectorDelegateOverlap(
+        before,
+        applyChange(before, year, changes).versions,
+        year,
+      );
+    };
+
+    it('allows the director of ANOTHER version as a delegate (A from 2028)', () => {
+      expect(check(2028, { delegates: ['A'] })).toBeNull();
+    });
+
+    it('rejects A from 2026, naming delegates, in the version from 2026', () => {
+      expect(check(2026, { delegates: ['A'] })).toEqual({
+        from: 2026,
+        carnet: 'A',
+        field: 'delegates',
+      });
+    });
+
+    it('finds an overlap that exists ONLY in a propagated later version (not visible at Y)', () => {
+      // 2028 version: director C, delegates [] (equals the replaced list), so
+      // the new list [C] propagates there; at Y = 2026 director A is not in [C].
+      expect(check(2026, { delegates: ['C'] })).toEqual({
+        from: 2028,
+        carnet: 'C',
+        field: 'delegates',
+      });
+    });
+
+    it('a delegate made director names director (in place and through propagation)', () => {
+      const before = [
+        ver({ id: 1, from: 2026, to: 2027, directorCarnet: 'A' }),
+        ver({ id: 2, from: 2027, directorCarnet: 'A', delegates: ['B'] }),
+      ];
+      for (const year of [2027, 2026]) {
+        const after = applyChange(before, year, { directorCarnet: 'B' });
+        expect(
+          findDirectorDelegateOverlap(before, after.versions, year),
+        ).toEqual({ from: 2027, carnet: 'B', field: 'director' });
+      }
+    });
+
+    it('moving the director away from X while adding X as delegate is accepted', () => {
+      const before = [ver({ id: 1, directorCarnet: 'X' })];
+      const after = applyChange(before, 2026, {
+        directorCarnet: 'Y',
+        delegates: ['X'],
+      });
+      expect(
+        findDirectorDelegateOverlap(before, after.versions, 2026),
+      ).toBeNull();
+    });
+
+    it('names director when the same version changes both fields into an overlap', () => {
+      const before = [ver({ id: 1, directorCarnet: 'X' })];
+      const after = applyChange(before, 2026, {
+        directorCarnet: 'Y',
+        delegates: ['Y'],
+      });
+      expect(findDirectorDelegateOverlap(before, after.versions, 2026)).toEqual(
+        { from: 2026, carnet: 'Y', field: 'director' },
+      );
+    });
+
+    it('on create (no stored versions) names delegates', () => {
+      expect(
+        findDirectorDelegateOverlap(
+          [],
+          [ver({ directorCarnet: 'A', delegates: ['a'] })],
+          2026,
+        ),
+      ).toEqual({ from: 2026, carnet: 'a', field: 'delegates' });
     });
   });
 });

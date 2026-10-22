@@ -93,8 +93,9 @@ export class OrgStructureReadService {
       viewYear,
       includeEnded,
     );
-    const delegates = await this.delegatesByUnit(
-      rows.map((row) => Number(row.id)),
+    // Delegates of the version SHOWN for each row (D-ORG-24), not of the entry.
+    const delegates = await this.delegatesByVersion(
+      rows.map((row) => Number(row.version_id)),
     );
 
     return rows.map((row) => this.toYearViewRow(row, delegates));
@@ -117,17 +118,17 @@ export class OrgStructureReadService {
     };
   }
 
-  /** B5: the entry, all its versions (oldest first) and its current delegates. */
+  /** B5: the entry and all its versions (oldest first), each with its own delegates (D-ORG-24). */
   async getUnitDetail(id: number): Promise<OrgUnitDetailResponse> {
     const unit = await this.unitRepository.findOne({ where: { id } });
     if (!unit) {
       throw new NotFoundException(`Organizational unit ${id} not found`);
     }
 
-    const [versions, delegates] = await Promise.all([
-      this.versionRepository.findDetailedByUnit(id),
-      this.delegatesByUnit([id]),
-    ]);
+    const versions = await this.versionRepository.findDetailedByUnit(id);
+    const delegates = await this.delegatesByVersion(
+      versions.map((row) => Number(row.id)),
+    );
 
     return {
       id: Number(unit.id),
@@ -138,15 +139,14 @@ export class OrgStructureReadService {
         unit.successor_id === null || unit.successor_id === undefined
           ? null
           : Number(unit.successor_id),
-      versions: versions.map((row) => this.toVersionResponse(row)),
-      delegates: delegates.get(id) ?? [],
+      versions: versions.map((row) => this.toVersionResponse(row, delegates)),
     };
   }
 
   /**
-   * B6 (R-ORG-009, R-ORG-017 History half): the versions table, then the log
-   * newest first. 404 for an id that does not exist, including a physically
-   * deleted one: its log is reachable through B7.
+   * B6 (R-ORG-009, R-ORG-017 History half): the versions table (each with its
+   * delegates, D-ORG-24), then the log newest first. 404 for an id that does not
+   * exist, including a physically deleted one: its log is reachable through B7.
    */
   async getUnitHistory(id: number): Promise<OrgUnitHistoryResponse> {
     const unit = await this.unitRepository.findOne({ where: { id } });
@@ -157,8 +157,11 @@ export class OrgStructureReadService {
       this.versionRepository.findDetailedByUnit(id),
       this.changeLogRepository.findRowsByUnit(id),
     ]);
+    const delegates = await this.delegatesByVersion(
+      versions.map((row) => Number(row.id)),
+    );
     return {
-      versions: versions.map((row) => this.toVersionResponse(row)),
+      versions: versions.map((row) => this.toVersionResponse(row, delegates)),
       log: log.map((row) => this.toLogRow(row)),
     };
   }
@@ -181,7 +184,8 @@ export class OrgStructureReadService {
    * `{ id, missing: true }` in its place and the call still succeeds, so a
    * roll-up never loses the other ids (D-ORG-19). `assertExists`, C2 and C3
    * keep their 404.
-   * Delegates are the CURRENT list (R-ORG-017).
+   * Delegates are those of the covering version, i.e. of the requested year
+   * (R-ORG-010 AC.3, D-ORG-24); `[]` when `version` is null.
    *
    * @akili-spec institutional-performance/organizational-structure
    */
@@ -191,10 +195,13 @@ export class OrgStructureReadService {
     this.assertYearInRange(resolveYear);
 
     const units = await this.loadUnits(unique);
-    const [rows, delegates] = await Promise.all([
-      this.versionRepository.findCoveringByUnits(unique, resolveYear),
-      this.delegatesByUnit(unique),
-    ]);
+    const rows = await this.versionRepository.findCoveringByUnits(
+      unique,
+      resolveYear,
+    );
+    const delegates = await this.delegatesByVersion(
+      rows.map((row) => Number(row.id)),
+    );
     const coveringByUnit = new Map(
       rows.map((row) => [Number(row.org_unit_id), row]),
     );
@@ -213,7 +220,7 @@ export class OrgStructureReadService {
         statusFromYear: unit.status_from_year ?? null,
         successorId: this.toNullableNumber(unit.successor_id),
         version: covering ? this.toResolvedVersion(covering) : null,
-        delegates: delegates.get(id) ?? [],
+        delegates: covering ? (delegates.get(Number(covering.id)) ?? []) : [],
       };
     });
   }
@@ -355,31 +362,37 @@ export class OrgStructureReadService {
   }
 
   private toResolvedVersion(row: VersionDetailRawRow): OrgResolvedVersion {
-    const { id: _versionId, ...fields } = this.toVersionResponse(row);
+    // C1 carries the delegates on the row, not inside `version`.
+    const {
+      id: _versionId,
+      delegates: _delegates,
+      ...fields
+    } = this.toVersionResponse(row);
     return fields;
   }
 
-  private async delegatesByUnit(
-    unitIds: number[],
+  /** Delegates grouped by VERSION id (D-ORG-24), each list in insertion order. */
+  private async delegatesByVersion(
+    versionIds: number[],
   ): Promise<Map<number, OrgStaffRef[]>> {
-    const rows = await this.delegateRepository.findStaffByUnitIds(unitIds);
-    const byUnit = new Map<number, OrgStaffRef[]>();
+    const rows =
+      await this.delegateRepository.findStaffByVersionIds(versionIds);
+    const byVersion = new Map<number, OrgStaffRef[]>();
     for (const row of rows) {
-      const unitId = Number(row.org_unit_id);
-      const list = byUnit.get(unitId) ?? [];
+      const versionId = Number(row.org_unit_version_id);
+      const list = byVersion.get(versionId) ?? [];
       list.push(this.toStaffRef(row));
-      byUnit.set(unitId, list);
+      byVersion.set(versionId, list);
     }
-    return byUnit;
+    return byVersion;
   }
 
   private toYearViewRow(
     row: YearViewRawRow,
     delegates: Map<number, OrgStaffRef[]>,
   ): YearViewRow {
-    const id = Number(row.id);
     return {
-      id,
+      id: Number(row.id),
       code: row.code,
       status: row.status,
       statusFromYear: row.status_from_year ?? null,
@@ -396,7 +409,7 @@ export class OrgStructureReadService {
         parentName: row.parent_name ?? null,
         director: this.toDirector(row),
       },
-      delegates: delegates.get(id) ?? [],
+      delegates: delegates.get(Number(row.version_id)) ?? [],
       scheduledFromYear:
         row.scheduled_from_year === null ||
         row.scheduled_from_year === undefined
@@ -405,7 +418,10 @@ export class OrgStructureReadService {
     };
   }
 
-  private toVersionResponse(row: VersionDetailRawRow): OrgUnitVersionResponse {
+  private toVersionResponse(
+    row: VersionDetailRawRow,
+    delegates: Map<number, OrgStaffRef[]> = new Map(),
+  ): OrgUnitVersionResponse {
     return {
       id: Number(row.id),
       from: Number(row.valid_from_year),
@@ -419,6 +435,7 @@ export class OrgStructureReadService {
       parentCode: row.parent_code ?? null,
       parentName: row.parent_name ?? null,
       director: this.toDirector(row),
+      delegates: delegates.get(Number(row.id)) ?? [],
     };
   }
 

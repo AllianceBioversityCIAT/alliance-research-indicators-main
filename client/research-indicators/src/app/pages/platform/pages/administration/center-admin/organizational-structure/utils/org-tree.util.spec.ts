@@ -85,7 +85,7 @@ describe('org-tree.util', () => {
     expect(countByLevel(visibleRows(rows, 2027, false))).toEqual({ L1: 1, L2: 2, L3: 1, L4: 2 });
   });
 
-  it('flattens rows to display strings, current delegates joined and inactive staff marked', () => {
+  it('flattens rows to display strings, the delegates of the viewed version joined and inactive staff marked', () => {
     const data = [
       row({
         id: 2,

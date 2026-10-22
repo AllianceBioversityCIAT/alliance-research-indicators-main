@@ -19,7 +19,7 @@
                 [options]="yearOptions()"
                 [ngModel]="year()"
                 (onChange)="onYearChange($event.value)"
-                [disabled]="years() === null"
+                [disabled]="years() === null || formSaving()"
                 styleClass="min-w-[120px]"
                 aria-label="Structure year"
                 data-testid="year-select">
@@ -167,6 +167,7 @@
                 [formKey]="formKey()"
                 (saved)="onSaved($event)"
                 (cancelled)="closeForm()"
+                (savingChange)="formSaving.set($event)"
                 (lifecycleDone)="onLifecycleDone($event)"></app-org-unit-panel>
             } @else {
               <p class="m-0 text-sm atc-grey-700" data-testid="detail-empty">Select an entry to see its details.</p>

@@ -1,5 +1,5 @@
 import { OrgChangeLogRow, OrgUnitVersionView } from '@shared/interfaces/org-structure.interface';
-import { actorLabel, diffLines, formatDiffValue, formatLogTime, versionRows, versionYears } from './org-history.util';
+import { ORG_ACTION_LABELS, actorLabel, diffLines, formatDiffValue, formatLogTime, versionRows, versionYears } from './org-history.util';
 
 // @akili-spec institutional-performance/organizational-structure T-03 (client half) — design §6.6;
 // requirements R-ORG-009, R-ORG-017 (a delegates change shows both lists).
@@ -38,8 +38,45 @@ describe('org-history.util', () => {
       version({ from: 2028, name: 'Renamed' })
     ]);
 
-    expect(rows[0]).toEqual({ years: '2026–2027', name: 'Unit', level: 'L4 Unit', parent: 'ORG-2 Dept', director: 'Ana' });
-    expect(rows[1]).toEqual({ years: '2028 onwards', name: 'Renamed', level: 'L4 Unit', parent: '—', director: '—' });
+    // Adapted (T-12): rows gained a `delegates` text (dash when a version holds none).
+    expect(rows[0]).toEqual({ years: '2026–2027', name: 'Unit', level: 'L4 Unit', parent: 'ORG-2 Dept', director: 'Ana', delegates: '—' });
+    expect(rows[1]).toEqual({ years: '2028 onwards', name: 'Renamed', level: 'L4 Unit', parent: '—', director: '—', delegates: '—' });
+  });
+
+  it("shows each version's own delegates, names joined, carnet when a name is missing (D-ORG-24)", () => {
+    const rows = versionRows([
+      version({ from: 2026, to: 2027, delegates: [{ carnet: 'B1', name: 'Beto', email: null, isActiveStaff: true }] }),
+      version({
+        from: 2027,
+        delegates: [
+          { carnet: 'B2', name: 'Cira', email: null, isActiveStaff: true },
+          { carnet: 'B3', name: null, email: null, isActiveStaff: false }
+        ]
+      })
+    ]);
+
+    expect(rows.map(r => r.delegates)).toEqual(['Beto', 'Cira; B3']);
+  });
+
+  it('a delegates diff on a version action renders old and new names; a legacy delegates_change row keeps its label', () => {
+    const names = new Map([
+      ['B1', 'Beto'],
+      ['B2', 'Cira']
+    ]);
+    const versioned: OrgChangeLogRow = {
+      id: 5,
+      unitId: 7,
+      action: 'new_version',
+      appliesFromYear: 2027,
+      backdated: false,
+      createdAt: '2026-10-22T08:30:00.000Z',
+      createdBy: { id: 3, name: 'Admin', email: null },
+      changes: { delegates: { old: ['B1'], new: ['B1', 'B2'] } }
+    };
+
+    expect(ORG_ACTION_LABELS[versioned.action]).toBe('New version');
+    expect(diffLines(versioned, names)).toEqual([{ field: 'delegates', label: 'Delegates', before: 'Beto', after: 'Beto, Cira' }]);
+    expect(ORG_ACTION_LABELS['delegates_change']).toBe('Delegates changed');
   });
 
   it('formats diff values: lists of staff by name, empty and null as a dash', () => {

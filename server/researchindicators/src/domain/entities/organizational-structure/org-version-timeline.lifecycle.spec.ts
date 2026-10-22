@@ -19,10 +19,38 @@ const ver = (over: Partial<TimelineVersion> = {}): TimelineVersion => ({
   levelId: 23,
   parentId: 10,
   directorCarnet: null,
+  delegates: [],
   ...over,
 });
 const ranges = (versions: TimelineVersion[]) =>
   versions.map((v) => [v.from, v.to]);
+
+describe('delegates through the lifecycle (D-ORG-24)', () => {
+  it('inactivate keeps the delegates of the kept versions and returns the dropped version WITH its list', () => {
+    const result = endTimeline(
+      [
+        ver({ id: 1, from: 2026, to: 2027, delegates: ['B1'] }),
+        ver({ id: 2, from: 2027, delegates: ['B2'] }),
+      ],
+      2027,
+    );
+    if ('violation' in result) throw new Error('expected ok');
+    expect(result.versions.map((v) => v.delegates)).toEqual([['B1']]);
+    expect(result.dropped.map((v) => v.delegates)).toEqual([['B2']]);
+  });
+
+  it('reopen copies the last version delegates into the new version, as an independent array', () => {
+    const result = reopenTimeline(
+      [ver({ id: 1, from: 2026, to: 2028, delegates: ['B1', 'OLD'] })],
+      2029,
+      2028,
+    );
+    if ('violation' in result) throw new Error('expected ok');
+    expect(result.added.delegates).toEqual(['B1', 'OLD']);
+    result.versions[0].delegates.push('MUTATED');
+    expect(result.added.delegates).toEqual(['B1', 'OLD']);
+  });
+});
 
 describe('endTimeline (inactivate / logical delete)', () => {
   it('ends the only version at E: [2026, null) from 2027 -> [2026, 2027)', () => {
