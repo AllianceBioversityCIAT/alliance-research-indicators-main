@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — ESCALATED, owner-resolved 2026-10-21)
 - **Family:** ../family.md (child 1 of 3)
-- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1) — 8 tasks after the owner-approved pivot T-07 (2026-10-22, T-08 added)
+- **Budget:** 7 tasks · ~850 LOC · 11 review rounds (design §1) — 9 tasks after the owner-approved pivot T-07 (2026-10-22, T-08 and T-09 added)
 - **Last updated:** 2026-10-21
 
 Server commands run from `server/researchindicators/`; client commands from `client/research-indicators/`.
@@ -201,9 +201,27 @@ T-01 and T-02 are independent but in the same package — run sequentially. **T-
 
 ---
 
+### T-09 — ORM connection collation `utf8mb4_0900_ai_ci` (pivot T-07, second step)
+
+- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-08
+- **Requirements covered:** R-PPI-002 (status + attempt reads run on the real schema); NFR-PPI-001 (no regression across the server).
+- **Design refs:** §5 *Collation* (amended 2026-10-22), §7.5, Pivot Record T-07 in `execution.md`.
+- **Scope (files):** `src/db/config/mysql/orm.config.ts` — `extra.charset` → `utf8mb4_0900_ai_ci`; any spec that pins that value.
+- **Tests:** a spec asserting the configured charset (existing or new, beside the config's other specs if any).
+- **Verification:** server `npm test -- --silent` (full) · `npm run build` · `npx tsc --noEmit -p tsconfig.json` · on a fresh Dev-dump container with all pending migrations executed: `npm run test:integration -- prms-platform-identity` green; the two other `AS CHAR` SQL sites (`temp_external_oicrs.service.ts`, `app-config.repository.ts`) named with the tables they compare against.
+- **Falsifier:** connection charset back to `utf8mb4_unicode_520_ci` → the T-07 integration case red with 1267 on the Dev-dump container.
+- **Consumers:** every query of the server (global setting) — the full unit suite plus the owner's manual end-to-end run (2026-10-22, recorded in `execution.md`).
+- **Review:** `full` — shared contract (override b).
+- **Done criteria:**
+  - [ ] Falsifier observed red and reverted; integration spec green on a fresh Dev-dump container.
+  - [ ] Full server suite, tsc, build green.
+- **Skills:** `nestjs-expert`.
+
+---
+
 ### T-07 — Integration spec, full gates, and HITL check
 
-- [~] **Status:** blocked — waits for T-08 (Pivot Record T-07, owner-approved 2026-10-22) · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08
+- [~] **Status:** blocked — waits for T-08 and T-09 (Pivot Record T-07, owner-approved 2026-10-22) · **Size:** M · **Dependencies:** T-03, T-05, T-06, T-08, T-09
 - **Requirements covered:** R-PPI-002 and R-PPI-004 at the SQL level (end to end on a real schema); NFR-PPI-001 (full suites); R-PPI-006 rendered state (HITL); parent spec `tip-kp-project-pool-funding` T-04 item 1 (unblocked by R-PPI-006).
 - **Design refs:** §13 (integration row), §14, P-17.
 - **Scope (files):** `test/prms-platform-identity.integration-spec.ts` (new, `test:integration`; own `result_official_code` band — read sibling headers first, FP-45). No production code.
