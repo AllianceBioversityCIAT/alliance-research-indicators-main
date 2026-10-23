@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED round 1)
 - **Family:** ../family.md (child 2 of 3)
-- **Budget:** 8 tasks · ~1,600 LOC · 11 review rounds (design §14) — **+1 task T-02b (owner-approved scope change 2026-10-22, RB-3)**
+- **Budget:** 8 tasks · ~1,600 LOC · 11 review rounds (design §14) — **+1 task T-02b (owner-approved scope change 2026-10-22, RB-3)**; **overrun accepted by the owner 2026-10-23 at the budget tripwire (11/11 rounds used at T-06; ≈15 expected)**
 - **Last updated:** 2026-10-22
 
 All commands run from `server/researchindicators/`.
@@ -180,7 +180,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-06 — Conversion migration `mergeTipHandleDuplicates`
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** none
+- [x] **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-TVR-006 (*Two live rows, no links* — B live, A version with B's code, keeps `result_id`; AND IT MUST record before-values; *Linked older row* — A live, B version; *Reverse*); NFR-TVR-002; NFR-TVR-003.
 - **Design refs:** §3.2 (every row), DD-7, DD-8, P-11, P-12; server `CLAUDE.md` §7 (`?`/`:word`, `updated_at = updated_at`, collation 1267).
 - **Scope (files):** `src/db/migrations/<ts>-mergeTipHandleDuplicates.ts` (new; `npm run migration:empty --name=mergeTipHandleDuplicates`); `src/db/migration-specs/<ts>-mergeTipHandleDuplicates.spec.ts` (new, not beside the migration).
@@ -208,7 +208,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 - [ ] **Status:** todo · **Size:** M · **Dependencies:** T-05, T-06
 - **Requirements covered:** R-TVR-002 *Version exists* on MySQL (BUT not delete/recreate — same `result_id`); R-TVR-003 *Older year* (BUT live unchanged, `updated_at` included); R-TVR-004 on MySQL; R-TVR-006 *Linked older row* (AND the next full run writes the highest year to A); R-TVR-007 *Legacy handle still in TIP*; R-TVR-008 *Second run* (BUT must NOT create any row); NFR-TVR-001; NFR-TVR-002.
 - **Design refs:** §10 (integration and end-to-end rows), §11, P-11, P-15.
-- **Scope (files):** `test/tip-versioning.integration-spec.ts` (new) + `execution.md` evidence.
+- **Scope (files):** `test/tip-versioning.integration-spec.ts` (new) + `execution.md` evidence. **Added 2026-10-23 (owner, at the budget tripwire):** the JD-12 rollback cleanup query (design §3.2 *Down*, §11 step 4 — reverting after a full TIP sync has run) written into `execution.md` and proven on the Dev-dump container; a rollout note that after a failed `up` the recovery is re-running `up`, never `migration:revert` (a failed `up` is not recorded, so `revert` would undo the previous migration).
 - **Integration cases (TEST container with Dev dump, own `result_official_code` band — read sibling headers, server guide FP-45):** resolver never returns a STAR row with the same code (T-04 falsifier); version update keeps `is_snapshot = 1` and its `result_id`; live untouched (row + `updated_at`) for an older year; failed live create deletes that row only; run guard query filters process/status/age (T-02); routine over a fixture twice → identical row set.
 - **End-to-end (local server → TEST container with Dev dump, real TIP API, full run 2021 → current):** before/after counts of live rows, versions, handles with > 1 live row (must be 0), linked rows' ids unchanged; run 2 creates 0 rows.
 - **Full gates:** `npm test -- --silent`, `npm run test:integration`, `npm run build`, `npx tsc --noEmit -p tsconfig.json`, `npx eslint src test` — run by the Leader after the worker reports (§4.3 concurrency).
@@ -221,6 +221,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
   - [ ] Integration spec green; falsifier observed red on MySQL.
   - [ ] End-to-end figures for both runs recorded in `execution.md`.
   - [ ] Full gates green.
+  - [ ] JD-12 cleanup query recorded in `execution.md` and run on the Dev-dump container (post-sync revert restores pre-migration codes); failed-`up` recovery note recorded.
 - **Skills:** `nestjs-expert`, `systematic-debugging`.
 
 ---
@@ -274,6 +275,6 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
-| RB-1 | 2026-10-22 | Dev DB unreachable from this machine at spec time (VPN) — the Dev dump for T-06/T-07 needs it | Connect VPN before T-06 | David Casañas | open |
+| RB-1 | 2026-10-22 | Dev DB unreachable from this machine at spec time (VPN) — the Dev dump for T-06/T-07 needs it | Connect VPN before T-06 — VPN on 2026-10-23, Dev reachable, T-06 dumps taken | David Casañas | closed for T-06 (re-check for T-07) |
 | RB-2 | 2026-10-22 | `migration:test:bootstrap` blocked by a pre-existing migration (child 1 F1) | Use the Dev dump path, as child 1 did | — | open |
 | RB-3 | 2026-10-22 | `PATCH ipr-data/sync?async=true` fires `getKnowledgeProductsByYear` without `await`/`.catch` (`tip-integration.controller.ts:95-98`); a refused (409, T-02) or failed run is an unhandled rejection that can terminate the process (T-02 Reviewer advisory; Node behavior on this deployment not measured) | **Owner approved (2026-10-22) adding the `.catch` (log the error) in this spec** — done as **T-02b** (2026-10-23) | David Casañas | closed |
