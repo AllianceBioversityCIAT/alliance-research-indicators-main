@@ -476,3 +476,8 @@
   - This is the R-OWT-007 missing-config row, live, with the exact §4 message.
   - The local `.env` has no `ARI_OICR_TEMPLATE_URL` (`grep -c` → 0).
 - The Swagger done criterion is now ticked.
+
+#### Owner local download (2026-10-23)
+
+- The owner added the env var, restarted the server, and downloaded from the button. Quote: "si se descargo bien creo que lo pasare a test".
+- **Scope of the quote (KZ-002):** it covers that the download from the button succeeds locally. It does **not** cover any T-08 HITL clause: Word opening without a repair prompt, working "+"/dropdowns, visible revisions, the login round trip, the network check, timing, or the Dev download. Those stay open for T-08.
