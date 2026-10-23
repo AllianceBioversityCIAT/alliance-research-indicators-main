@@ -1,9 +1,4 @@
-import {
-  OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED,
-  PORTFOLIO_2_ID,
-  isOicrTemplateDownloadHidden,
-  resolvePortfolioId
-} from './oicr-template-download.util';
+import { PORTFOLIO_2_ID, isOicrTemplateDownloadHidden, resolvePortfolioId } from './oicr-template-download.util';
 
 describe('oicr-template-download.util', () => {
   describe('resolvePortfolioId', () => {
@@ -23,20 +18,12 @@ describe('oicr-template-download.util', () => {
   });
 
   describe('isOicrTemplateDownloadHidden', () => {
-    it('hides the download for Portfolio 2', () => {
-      expect(isOicrTemplateDownloadHidden({ portfolio: { id: PORTFOLIO_2_ID } })).toBe(true);
+    it('shows the download for Portfolio 2', () => {
+      expect(isOicrTemplateDownloadHidden({ portfolio: { id: PORTFOLIO_2_ID } })).toBe(false);
     });
 
-    it.each([{ portfolio: { id: 1 } }, { portfolio_id: 3 }, {}, undefined, null])(
-      'keeps the download for %p',
-      source => {
-        expect(isOicrTemplateDownloadHidden(source as never)).toBe(false);
-      }
-    );
-
-    it('is driven by the re-enable switch', () => {
-      // Flipping OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED to true is the whole restore.
-      expect(OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED).toBe(false);
+    it.each([{ portfolio: { id: 1 } }, { portfolio_id: 3 }, {}, undefined, null])('hides the download for %p', source => {
+      expect(isOicrTemplateDownloadHidden(source as never)).toBe(true);
     });
   });
 });

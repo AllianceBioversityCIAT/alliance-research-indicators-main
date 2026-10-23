@@ -264,8 +264,8 @@ describe('OicrHeaderComponent', () => {
       fixture.detectChanges();
       expect(component.showHandleLinkButton()).toBe(false);
       expect(component.canDownloadTemplate()).toBe(true);
-      // No portfolio in the cache, so the Portfolio 2 rule does not apply.
-      expect(component.showDownloadTemplate()).toBe(true);
+      // No portfolio in the cache, so the download stays hidden.
+      expect(component.showDownloadTemplate()).toBe(false);
     });
 
     it('showDownloadTemplate should be false when published even without link', () => {
@@ -278,7 +278,7 @@ describe('OicrHeaderComponent', () => {
       expect(component.showDownloadTemplate()).toBe(false);
     });
 
-    it('hides the download for a Portfolio 2 OICR, in every status the rule would allow', () => {
+    it('shows the download for a Portfolio 2 OICR, in every status the rule would allow', () => {
       const cache = TestBed.inject(CacheService);
       cache.currentMetadata.set({ portfolio: { id: 2 } });
 
@@ -287,20 +287,20 @@ describe('OicrHeaderComponent', () => {
         component.data = { status_id: statusId } as OicrHeaderData;
         fixture.detectChanges();
         expect(component.canDownloadTemplate()).toBe(true);
-        expect(component.isTemplateDownloadHidden()).toBe(true);
-        expect(component.showDownloadTemplate()).toBe(false);
+        expect(component.isTemplateDownloadHidden()).toBe(false);
+        expect(component.showDownloadTemplate()).toBe(true);
       }
     });
 
-    it('keeps the download for a Portfolio 1 OICR', () => {
+    it('hides the download for a Portfolio 1 OICR', () => {
       const cache = TestBed.inject(CacheService);
       cache.currentMetadata.set({ portfolio: { id: 1 } });
       component.showDownload = true;
       component.data = { status_id: '11' } as OicrHeaderData;
       fixture.detectChanges();
 
-      expect(component.isTemplateDownloadHidden()).toBe(false);
-      expect(component.showDownloadTemplate()).toBe(true);
+      expect(component.isTemplateDownloadHidden()).toBe(true);
+      expect(component.showDownloadTemplate()).toBe(false);
     });
 
     it('openHandleLink should open cgspace link in a new tab', () => {
@@ -366,23 +366,26 @@ describe('OicrHeaderComponent — Download OICR Template button visibility', () 
 
   const downloadButtons = () => fixture.debugElement.queryAll(By.directive(StubDownloadOicrTemplateComponent));
 
-  it('renders no app-download-oicr-template for a Portfolio 2 OICR', () => {
-    TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 2 } });
+  it('shows the download button after Portfolio 2 metadata arrives', () => {
     component.showDownload = true;
     component.data = { status_id: '11' } as OicrHeaderData;
     fixture.detectChanges();
+    expect(downloadButtons().length).toBe(0);
+
+    TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 2 } });
+    fixture.detectChanges();
 
     expect(component.canDownloadTemplate()).toBe(true);
-    expect(downloadButtons().length).toBe(0);
+    expect(downloadButtons().length).toBeGreaterThan(0);
   });
 
-  it('still renders app-download-oicr-template for a Portfolio 1 OICR', () => {
+  it('renders no app-download-oicr-template for a Portfolio 1 OICR', () => {
     TestBed.inject(CacheService).currentMetadata.set({ portfolio: { id: 1 } });
     component.showDownload = true;
     component.data = { status_id: '11' } as OicrHeaderData;
     fixture.detectChanges();
 
-    expect(downloadButtons().length).toBeGreaterThan(0);
+    expect(downloadButtons().length).toBe(0);
   });
 
   it('still renders the CGSpace link button for a published Portfolio 2 OICR', () => {

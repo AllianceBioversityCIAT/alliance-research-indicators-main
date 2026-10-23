@@ -453,20 +453,20 @@ describe('SectionHeaderComponent', () => {
     expect(items[0].items?.length).toBe(0);
   });
 
-  it('showOicrTemplateDownload is true for an OICR outside Portfolio 2', () => {
+  it('showOicrTemplateDownload is false for an OICR outside Portfolio 2', () => {
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
-    expect(component.showOicrTemplateDownload()).toBe(true);
+    expect(component.showOicrTemplateDownload()).toBe(false);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5 });
-    expect(component.showOicrTemplateDownload()).toBe(true);
+    expect(component.showOicrTemplateDownload()).toBe(false);
   });
 
-  it('showOicrTemplateDownload is false for a Portfolio 2 OICR', () => {
+  it('showOicrTemplateDownload is true for a Portfolio 2 OICR', () => {
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
-    expect(component.showOicrTemplateDownload()).toBe(false);
+    expect(component.showOicrTemplateDownload()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 2 });
-    expect(component.showOicrTemplateDownload()).toBe(false);
+    expect(component.showOicrTemplateDownload()).toBe(true);
   });
 
   it('showOicrTemplateDownload is false for a non-OICR result', () => {
@@ -474,14 +474,17 @@ describe('SectionHeaderComponent', () => {
     expect(component.showOicrTemplateDownload()).toBe(false);
   });
 
-  it('renders the download icon only when showOicrTemplateDownload() is true', () => {
+  it('renders the download icon after Portfolio 2 metadata arrives', () => {
     // Pins the TEMPLATE binding: asserting the computed alone cannot catch the @if
-    // still reading `indicator_id === 5` directly.
-    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    // still reading `indicator_id === 5` directly. The first detectChanges() already
+    // ran in beforeEach, before this metadata, so the icon must appear on the update.
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
 
-    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 2 } });
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
   });

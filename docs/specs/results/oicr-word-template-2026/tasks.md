@@ -275,7 +275,7 @@ graph TD
 
 ### T-05 — Button visibility: Portfolio 2 only
 
-- **Status:** todo · **Size:** S · **Dependencies:** none · **Review:** `checklist` — one predicate flip plus a known spec sweep, with the inversion list in design §13
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** S · **Dependencies:** none · **Review:** `checklist` — one predicate flip plus a known spec sweep, with the inversion list in design §13
 - **Requirements covered:** R-OWT-008 (the visibility table: P2 not published shown, P2 published per existing rule, P1 hidden, unknown hidden; both scenarios)
 - **Design refs:** §2.2 (util row), §6, D-OWT-11, §13 (inversion list), P-14, P-16
 - **First step (P-16 smoke check, not a gate):** on Dev, read the `…/metadata` response for STAR-554 (P2) and one 2025 OICR, from the result page and from the OICR modal. Record `portfolio.id` in `execution.md`.
@@ -295,9 +295,9 @@ graph TD
   - At least one header spec must set metadata **after** the first render and see the button appear.
 - **Consumers:** `oicr-template-download.util.spec.ts`, `oicr-header.component.spec.ts`, `section-header.component.spec.ts` (P-14; no cypress/e2e suite exists in the client).
 - **Done criteria:**
-  - [ ] P-16 smoke check recorded.
-  - [ ] Full client suite green.
-  - [ ] Falsifier observed red.
+  - [x] P-16 smoke check recorded (DB function read; scope limit recorded in `execution.md`).
+  - [x] Full client suite green (8041/8041; one runner SIGSEGV suite re-run green in isolation).
+  - [x] Falsifier observed red.
 - **Skills:** `angular-developer`
 
 ### T-06 — Guarded download route, legacy redirect and page states
