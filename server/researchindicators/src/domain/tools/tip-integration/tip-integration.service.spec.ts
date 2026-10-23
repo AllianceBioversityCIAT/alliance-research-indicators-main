@@ -936,12 +936,21 @@ describe('TipIntegrationService', () => {
           for (const key of Object.keys(extra?.findOptions ?? {})) {
             where[key] = result[extra.findOptions[key]];
           }
-          savedRows.push({ result_id: nextId++, where });
+          const resultId = nextId++;
+          savedRows.push({ result_id: resultId, where });
           const link = result.public_link ?? '';
-          if (link.endsWith('/created')) extra.counters.createdRecords += 1;
-          else if (link.endsWith('/updated'))
+          let outcome: 'created' | 'updated' | 'error' | 'skipped' = 'skipped';
+          if (link.endsWith('/created')) {
+            extra.counters.createdRecords += 1;
+            outcome = 'created';
+          } else if (link.endsWith('/updated')) {
             extra.counters.updatedRecords += 1;
-          else if (link.endsWith('/error')) extra.counters.errorRecords += 1;
+            outcome = 'updated';
+          } else if (link.endsWith('/error')) {
+            extra.counters.errorRecords += 1;
+            outcome = 'error';
+          }
+          return { resultId, outcome };
         },
       );
       mockResultRepo.findOne.mockImplementation(async (options) => {

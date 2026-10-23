@@ -83,7 +83,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-03 — `saveAllSections` per-call `target`, outcome return, row-only compensation
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** none
+- [x] **Status:** done · **Size:** M · **Dependencies:** none
 - **Requirements covered:** R-TVR-002 (*Version exists* — THEN updated, keeps `result_id`; BUT must NOT delete and recreate); NFR-TVR-001 (no-`target` path unchanged).
 - **Design refs:** §2.1 (`ExtraData`, `save-all-sections.service.ts`, `query.service.ts` rows), §5 *Failures*, DD-2, DD-11, P-2, P-15, judgment JD-1.
 - **Scope (files):** `src/domain/shared/services/save-all-sections.service.ts` (+ spec) — `target` handling on lookup, **create and update** (`isAppliedVersion = target.isSnapshot`), return `{ resultId, outcome }`, `compensateRowOnly`; `src/domain/shared/utils/query.service.ts` (+ spec) — row-only delete by `result_id`.
