@@ -387,3 +387,80 @@
 - **Owner decision, revised (2026-10-23):** "comencemos". Build T-03 now. P-22 moves to the T-08 HITL download from the deployed Dev server; a 502 there triggers the Pivot Protocol.
   - The owner asked whether the Leader could run the curl itself. It can only run it from the workstation, where the result is still `200 112531`, not from the Dev runtime.
   - P-22 stays **UNVERIFIED** until T-08. RB-1 stays open, with owner T-08.
+- **P-22, owner attestation (2026-10-23):** the owner wrote, verbatim, "no hay problema en el server de dev funciona bien".
+  - Recorded as the owner's statement that the Dev server reaches S3. It is not a quoted command output (KZ-002: tick only what the quoted words cover).
+  - P-22 is treated as **settled by owner attestation**. The T-08 HITL download from Dev re-confirms it as observed behavior.
+  - T-03 dispatched: Orca `task_8fa1e1cfc1b8` / `ctx_3ad0a8aa0363`, Cursor `grok-4.7-high`.
+
+### T-03 — Endpoint, service, configuration and errors
+
+- **Status:** PASS (attempt 1). One done criterion is still open: the Swagger boot check.
+- **Date:** 2026-10-23
+- **Effort:** high.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+- **Skills deviation:** `nestjs-expert`, `api-design-principles` and `error-handling-patterns` could not load on the Cursor host; the brief carried them in prose.
+- **P-22:** settled by owner attestation. See the T-03 pre-start block above. The T-08 Dev download re-confirms it.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-high`, Orca `run_704dd2d24af9` / `task_8fa1e1cfc1b8` / `ctx_3ad0a8aa0363` (retained until PASS, released after). Brief: `T-03-brief.md`, report: `T-03-report.md` (session scratchpad).
+- **Files changed:**
+  - new: `server/researchindicators/src/domain/entities/result-oicr/word-template/oicr-word-template.service.ts` (+ spec);
+  - `result-oicr.controller.ts` (+ spec), adding `downloadWordTemplate`;
+  - `result-oicr.module.ts`, adding `HttpModule` and the provider;
+  - `shared/utils/app-config.util.ts` (+ spec), adding `ARI_OICR_TEMPLATE_URL`;
+  - `.env.example`;
+  - `result-status-workflow.repository.ts` (+ spec), with `download_url` now in path form.
+- **Implementer verification:**
+  - `npm test -- --silent src/domain/entities/result-oicr src/domain/entities/result-status-workflow src/domain/tools/clarisa`: `Tests: 621 passed, 621 total`;
+  - `app-config.util.spec`: 13/13;
+  - build: exit 0;
+  - eslint: exit 0.
+- **Falsifiers (verbatim, reverted):**
+  - Fetch before the portfolio check: `Expected number of calls: 0` / `Received number of calls: 1` / `1: "https://files.example/a.docx", {"responseType": "arraybuffer", "timeout": 10000}`.
+  - Module-level cache: the call sequence ended `"portfolio"` where `- "data", - "fetch"` were expected on the second call.
+  - `ResponseUtils.format` instead of `StreamableFile`:
+    - as written, this did not compile: `TS2740: Type 'ServiceResponseDto<Buffer<ArrayBufferLike>>' is missing the following properties from type 'StreamableFile'`;
+    - with a cast added so the suite would load: `Expected constructor: StreamableFile` / `Received constructor: Object`.
+- **Static check:** `app.module.ts` JwtMiddleware `exclude` lists `configuration/:key`, `/`, `/admin(.*)`, `/admin/public(.*)`, `/.well-known(.*)`, `/favicon.ico`, `reports/${RESULT_CODE}/pdf` and `${PRMS_CALLBACK_PATH}(.*)`. `word-template` is absent, so the middleware applies. The 401 itself is evidenced only by T-08.
+- **Not Done / Assumptions (verbatim from the report; the two "not done" items are Leader- or T-08-owned, and none is a blocker or a Worker-owed item):**
+  - "P-22 (Dev-host GET of the template) skipped, deferred to T-08 by the brief."
+  - "Swagger boot not run (Leader)."
+  - "A fetch that fails with no HTTP status and is not a timeout becomes 502 `Could not fetch the OICR template (network)`, logged as `result_code=<code> upstream_status=network`."
+  - "The file name uses the server process local clock (`getFullYear` / `getHours`), not UTC."
+  - "Any portfolio other than 2, including a null function result, gets the Portfolio 2-only 400. The log reason is `portfolio_<id>` or `portfolio_missing`."
+  - "A whitespace-only URL is treated as missing after `trim`."
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - Scoped suites plus the app-config spec: `Test Suites: 62 passed, 62 total` · `Tests: 634 passed, 634 total`.
+  - eslint: exit 0. Build: exit 0.
+  - Full server suite: `Test Suites: 444 passed, 444 total` · `Tests: 4354 passed, 4354 total`.
+  - The T-01/T-02 files are unchanged (`git diff --stat HEAD` empty).
+- **Swagger boot check (Leader-owned): NOT YET RUN.**
+  - Booting the server starts RabbitMQ consumers and cron jobs against shared infrastructure, so the Leader did not boot it unattended. No local server was running (`:3000` and `:3001` returned `000`).
+  - It runs when the owner starts the server for the local download test: `GET /swagger-json` must list `/api/results/oicr/word-template/{resultCode}` with no `/v1`.
+  - Static evidence until then: the handler has `@Get('word-template/' + RESULT_CODE)` and no `@Version`, under `results/oicr` (P-3).
+- **Local env gap:** the owner's local `server/researchindicators/.env` has no `ARI_OICR_TEMPLATE_URL` (`grep -c` gives 0). Without it, a local download answers 500 `OICR template URL is not configured`, which is R-OWT-007 behaving as designed.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - The order is proven by a recorded call sequence.
+  - All eight §4 messages match exactly.
+  - The §9 log lines are present, and the happy path asserts that no warn or error fires.
+  - Nothing is cached.
+  - The controller reads `resultUtil` first, the route is unversioned, and the Swagger decorators are present.
+  - `StreamableFile` passes through `ResponseInterceptor` unwrapped (P-2).
+  - The `download_url` path form is asserted.
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY: a URL that answers 200 with a body that is not a zip makes `JSZip.loadAsync` throw a plain `Error`. That gives a generic 500 that the handler does not log. Mapping it to a named, logged 500 would be cheap.
+  - RISK: an indicator-5, Portfolio 2 result with no active `result_oicrs` row still produces a document of placeholders. Carried from T-02.
+  - READABILITY: the `upstream_status=network` token would read better as `reason=network`.
+  - RESILIENCE: the disposition file name uses the server timezone. The client names its own saved file (D-OWT-8).
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-high): not reported by host, ended complete;
+  - reviewer: 15 calls, 92,864 tokens, ended complete.
+- **Requirements covered:**
+  - R-OWT-001: 200 type and disposition, not an envelope, version line;
+  - R-OWT-006: all rows, and the 2025 → no-fetch scenario;
+  - R-OWT-007: missing config, no cache;
+  - R-OWT-010: `download_url`;
+  - NFR-OWT-002.
+- **Final verification:** PASS. The Swagger boot check is pending.

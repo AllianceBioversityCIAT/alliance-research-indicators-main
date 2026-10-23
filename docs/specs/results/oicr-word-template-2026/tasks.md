@@ -156,7 +156,7 @@ graph TD
 
 ### T-03 — Endpoint, service, configuration and errors
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02 · **Review:** `full` — eligibility order, error contract, outbound call
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`; Swagger boot check pending at the owner's local run) · **Size:** M · **Dependencies:** T-01, T-02 · **Review:** `full` — eligibility order, error contract, outbound call
 - **Requirements covered:**
   - R-OWT-001: both scenarios and the version line.
   - R-OWT-006: every row and both scenarios.
@@ -217,11 +217,11 @@ graph TD
   - `domain/tools/clarisa/clarisa.module.spec.ts:80`, which loads the module graph including `ResultOicrModule`; run it after the `HttpModule` import.
   - The client (T-04) consumes the endpoint contract.
 - **Done criteria:**
-  - [ ] P-22 settled and recorded.
-  - [ ] All listed specs green.
-  - [ ] Falsifiers observed red.
-  - [ ] Swagger shows the route unversioned.
-  - [ ] Build green.
+  - [x] P-22 settled and recorded (owner attestation; re-confirmed by the T-08 Dev download).
+  - [x] All listed specs green.
+  - [x] Falsifiers observed red.
+  - [ ] Swagger shows the route unversioned. *(Pending: checked at the owner's local server run; static evidence: no `@Version` on the handler.)*
+  - [x] Build green.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
 ### T-04 — Client download through the endpoint
