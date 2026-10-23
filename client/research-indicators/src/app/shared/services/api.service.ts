@@ -128,7 +128,6 @@ import {
   UpdateAppConfigDto
 } from '@shared/interfaces/app-config.interface';
 import { GetTags } from '@shared/interfaces/get-tags.interface';
-import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interface';
 import { ExistingOicrSource, LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetApi, PatchLeverSdgTargetsRequest } from '@shared/interfaces/lever-sdg-target.interface';
 import { MaturityLevel } from '@shared/interfaces/maturity-level.interface';
@@ -1175,11 +1174,6 @@ export class ApiService {
   // Live OICR only: no useResultInterceptor, so the request never sends a version.
   GET_OicrWordTemplate = (code: number | string): Promise<Blob> => {
     return this.TP.getBlob(`results/oicr/word-template/${code}`);
-  };
-
-  GET_OICRDetails = (resultCode: number | string): Promise<MainResponse<GetOICRDetails>> => {
-    const url = () => `results/oicr/details/${resultCode}`;
-    return this.TP.get(url(), {});
   };
 
   GET_OICRModal = (resultCode: number): Promise<MainResponse<OicrCreation>> => {

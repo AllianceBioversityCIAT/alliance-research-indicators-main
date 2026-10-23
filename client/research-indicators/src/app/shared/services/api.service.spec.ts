@@ -1778,15 +1778,6 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('agresso/contracts/results/current-user&direction=asc', {});
     });
 
-    it('should call GET_OICRDetails', () => {
-      const resultCode = 123;
-      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
-
-      service.GET_OICRDetails(resultCode);
-
-      expect(mockToPromiseService.get).toHaveBeenCalledWith('results/oicr/details/123', {});
-    });
-
     it('should call GET_OicrWordTemplate through getBlob without useResultInterceptor', async () => {
       const blob = new Blob(['PK']);
       (mockToPromiseService.getBlob as jest.Mock).mockResolvedValue(blob);

@@ -332,3 +332,55 @@
   - R-OWT-009 (unit-reachable parts: login required by config, auto-download, navigate on success, loading, error without navigation);
   - R-OWT-010 (redirect; missing parameter → error).
 - **Final verification:** PASS.
+
+### T-07 — Retire the WASM generation path
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-23
+- **Effort:** medium.
+- **Review mode:** lens checklist (single reviewer). Task `Review: checklist`.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium`, Orca `run_704dd2d24af9` / `task_d9855703ad10` / `ctx_58e01d2df7c2` (retained until PASS, released after). Brief: `T-07-brief.md`, report: `T-07-report.md` (session scratchpad).
+- **Files deleted (`git rm`):**
+  - `client/research-indicators/src/app/shared/services/go/wasm.service.ts` (+ spec);
+  - `client/research-indicators/public/go/{main.go,main.wasm,wasm_exec.js,WASM-DOCX-README.md}`;
+  - `client/research-indicators/src/app/shared/interfaces/gets/get-oicr-details.interface.ts`.
+- **Files edited:**
+  - `angular.json`: `build.options.scripts` → `[]`;
+  - `api.service.ts`: `GET_OICRDetails` and its import removed;
+  - `api.service.spec.ts`: its case removed;
+  - `environment.example.ts`: `filesStorageUrl` and `oicrTemplateName` removed.
+- **Greps before deletion** (raw output in the report):
+  - P-15: 31 hits. The WASM ones are all in `wasm.service{,.spec}.ts` plus `angular.json:44`; the `OicrDownloadService` hits are the service that stays.
+  - `window.Go`: 2 hits, both in `wasm.service.ts`.
+  - P-17: 5 lines, all the method and its spec.
+  - P-19: 7 hits. The only runtime reader was `wasm.service.ts:35`.
+- **Verification grep after** (`grep -rnE "WasmService|wasm_exec|main\.wasm|processDocxWasm|GET_OICRDetails|GetOICRDetails|oicrTemplateName" src angular.json`): only `src/environments/environment.dev.ts:35` and `src/environments/environment.ts:33`, both gitignored. The Leader re-ran it with the same result.
+- **Falsifier red:** a stale `import { WasmService } from '@shared/services/go/wasm.service'` failed the build with `✘ [ERROR] TS2307: Cannot find module '@shared/services/go/wasm.service' or its corresponding type declarations.` (exit 1). The import was then removed and the build went green.
+- **Implementer verification:**
+  - build: exit 0, `NO_GO_FOLDER` in `dist/research-indicators/browser`;
+  - spec tsc: 945 errors before and after;
+  - lint: exit 0;
+  - `api.service.spec.ts`: 244/244.
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - `npm run build`: exit 0. `find dist/research-indicators` returns no `go` directory and no `*wasm*` under a go path.
+  - Full client suite: `Test Suites: 2 failed, 343 passed, 345 total` · `Tests: 8042 passed, 8042 total`.
+    - Both failed suites (`get-clarisa-institutions-type.service.spec.ts`, `scroll-top.service.spec.ts`) are `A jest worker process … was terminated by another process: signal=SIGSEGV`: runner crashes with 0 failed tests.
+    - Re-run in isolation: `Tests: 10 passed, 10 total`.
+    - The suite count went from 346 to 345 (the WASM spec was deleted) and the test count from 8070 to 8042 (the WASM spec's tests and the `GET_OICRDetails` case removed).
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - A package-wide search found 0 references to any deleted file or symbol. The search excluded `node_modules`, `dist`, `.angular` and `coverage`, and covered `angular.json`, `public/`, `index.html`, `ngsw-config.json`, `nginx.conf`, `Dockerfile` and `jest.config.ts`.
+  - `angular.json` changed only in `scripts`; the budgets are unchanged.
+  - `GET_OICRDetails` has no reader left.
+  - No server file was touched.
+  - Unreachable by the reviewer's search: the gitignored env files (deploy note, design §7) and the browser's runtime requests (T-08 HITL).
+- **ADVISORY:** none.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-medium): not reported by host, ended complete;
+  - reviewer: 11 calls, 45,384 tokens, ended complete.
+- **Requirements covered:** R-OWT-011 (the code half; the network clause is owned by T-08).
+- **Deploy note (R-B-4):** each host's gitignored `environment.ts` / `environment.dev.ts` still declare `filesStorageUrl` and `oicrTemplateName`. Nothing reads them now; drop them on the next refresh from `environment.example.ts`.
+- **Final verification:** PASS.

@@ -58,7 +58,6 @@ export const environment = {
 
   documentOverviewUrl: '',
   fileManagerUrl: '',
-  filesStorageUrl: '',
   feedbackUrl: '',
   releasesNotesApiUrl: '',
   releaseNotesDatabaseId: '',
@@ -71,7 +70,6 @@ export const environment = {
   frontVersionKey: '',
   frontVersionUrl: '',
   s3Folder: '',
-  oicrTemplateName: '',
   keyProjectOverview: '',
   keyTextMining: '',
 

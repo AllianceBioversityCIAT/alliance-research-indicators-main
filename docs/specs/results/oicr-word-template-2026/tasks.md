@@ -339,7 +339,7 @@ graph TD
 
 ### T-07 — Retire the WASM generation path
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-04, T-06 · **Review:** `checklist` — deletions with a measured consumer list (P-15, P-17, reversion challenge D-OWT-13)
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** S · **Dependencies:** T-04, T-06 · **Review:** `checklist` — deletions with a measured consumer list (P-15, P-17, reversion challenge D-OWT-13)
 - **Requirements covered:** R-OWT-011 (the browser requests neither `main.wasm` nor the S3 template)
 - **Design refs:** §2.2 (deleted rows, `GET_OICRDetails` row, `environment.example.ts` row), §7, D-OWT-13, P-15, P-17, P-19
 - **Scope:**
@@ -365,10 +365,10 @@ graph TD
   - A green build alone cannot prove the browser no longer fetches `main.wasm`. The HITL network check in T-08 does.
 - **Consumers:** every file in P-15 and P-17 (listed in design §15).
 - **Done criteria:**
-  - [ ] Grep totals pasted (before: P-15 list; after: 0).
-  - [ ] Build green.
-  - [ ] No `go/` in `dist/`.
-  - [ ] Full suite green.
+  - [x] Grep totals pasted (before: P-15 list; after: 0 outside the gitignored env files).
+  - [x] Build green.
+  - [x] No `go/` in `dist/`.
+  - [x] Full suite green (8042/8042; two runner SIGSEGV suites re-run green in isolation).
 - **Skills:** `angular-developer`
 
 ### T-08 — Baseline docs and human checks
