@@ -464,3 +464,15 @@
   - R-OWT-010: `download_url`;
   - NFR-OWT-002.
 - **Final verification:** PASS. The Swagger boot check is pending.
+
+#### T-03 — Swagger boot check (Leader, 2026-10-23, the owner's local server)
+
+- **Server:** native, port `:3001`, process cwd `Heavy-DEV/server/researchindicators` (this worktree, HEAD `17750575`).
+- `curl http://localhost:3001/swagger-json` → `200`. The word-template path is `/api/results/oicr/word-template/{resultCode}` (no `/v1`). `get`: summary `Download the filled 2026 OICR Word template`, tags `["Results"]`, 200 content `application/vnd.openxmlformats-officedocument.wordprocessingml.document`.
+- **Anonymous** `GET /api/results/oicr/word-template/554` → `401`. This is local evidence for the R-OWT-001 unauthenticated scenario; T-08 repeats it on Dev.
+  - `GET /api/v1/…` also returns `401`, because the JWT middleware answers before routing.
+  - So the 401 does **not** prove that `/v1` is absent; the Swagger listing does.
+- **Owner's first authenticated request (screenshot):** `{description: "InternalServerErrorException", errors: "OICR template URL is not configured", path: "/api/results/oicr/word-template/554", status: 500}`.
+  - This is the R-OWT-007 missing-config row, live, with the exact §4 message.
+  - The local `.env` has no `ARI_OICR_TEMPLATE_URL` (`grep -c` → 0).
+- The Swagger done criterion is now ticked.

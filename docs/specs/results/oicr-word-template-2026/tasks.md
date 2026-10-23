@@ -220,7 +220,7 @@ graph TD
   - [x] P-22 settled and recorded (owner attestation; re-confirmed by the T-08 Dev download).
   - [x] All listed specs green.
   - [x] Falsifiers observed red.
-  - [ ] Swagger shows the route unversioned. *(Pending: checked at the owner's local server run; static evidence: no `@Version` on the handler.)*
+  - [x] Swagger shows the route unversioned (local server :3001, `/swagger-json` → `/api/results/oicr/word-template/{resultCode}`; see `execution.md`).
   - [x] Build green.
 - **Skills:** `nestjs-expert`, `api-design-principles`, `error-handling-patterns`
 
