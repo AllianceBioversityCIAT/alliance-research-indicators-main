@@ -7,7 +7,7 @@
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED round 1)
 - **Family:** ../family.md (child 2 of 3)
-- **Budget:** 8 tasks · ~1,600 LOC · 11 review rounds (design §14)
+- **Budget:** 8 tasks · ~1,600 LOC · 11 review rounds (design §14) — **+1 task T-02b (owner-approved scope change 2026-10-22, RB-3)**
 - **Last updated:** 2026-10-22
 
 All commands run from `server/researchindicators/`.
@@ -20,6 +20,7 @@ All commands run from `server/researchindicators/`.
 graph TD
   T-01[T-01 Staging awaited] --> T-05
   T-02[T-02 Run guard] --> T-05
+  T-02 --> T-02b[T-02b Async rejection caught]
   T-03[T-03 saveAllSections target + row-only delete] --> T-05
   T-04[T-04 TipHandleRepository.resolve] --> T-05[T-05 Per-handle routine]
   T-05 --> T-07[T-07 Integration spec + end-to-end runs + full gates]
@@ -78,6 +79,28 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
   - [ ] Four guard cases + failing-run case green; falsifiers observed red.
   - [ ] Consumers' specs green; eslint, tsc green.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`.
+
+---
+
+### T-02b — An async TIP sync's rejection is caught and logged
+
+- [x] **Status:** done · **Size:** XS · **Dependencies:** T-02
+- **Origin:** owner-approved scope change 2026-10-22 (RB-3; owner: "la 1 pero solo dejalo docuemntado magnana lo seguimos"), from the T-02 Reviewer advisory.
+- **Requirements covered:** design §4 as amended 2026-10-22 — with `async=true` "the refusal is visible in the log only"; today a rejected fire-and-forget call is an unhandled rejection, which can terminate the process instead of only logging.
+- **Design refs:** §4 (amended), §9 (`warn`/`error` lines).
+- **Scope (files):** `src/domain/tools/tip-integration/tip-integration.controller.ts` (`syncIprData`, `async=true` branch) + `tip-integration.controller.spec.ts`. The `async=false` branch and the RMQ handler are unchanged.
+- **Change:** attach a `.catch` to the fire-and-forget `getKnowledgeProductsByYear` call that logs the error with `LoggerUtil` (`warn` for the 409 `ConflictException`, `error` otherwise) and swallows it; the HTTP 200 "IPR data synced asynchronously" response is unchanged.
+- **Tests:** service mock rejecting with `ConflictException` → handler returns the async 200 and the rejection is handled (logged `warn`); rejecting with another error → logged `error`; `async=false` with a rejecting service still rejects (409 reaches the caller).
+- **Verification:** `npx jest src/domain/tools/tip-integration --silent` · `npx eslint src/domain/tools/tip-integration` · `npx tsc --noEmit -p tsconfig.json`.
+- **Falsifier:** remove the `.catch` → the "rejection is handled" test goes red on its assertion (an unhandled rejection observed by the test, or the log call missing) — not a jest crash or timeout.
+- **Red run:** observed on the assertion, quoted, reverted.
+- **Disqualifier:** a test that only checks the 200 response cannot see an unhandled rejection — it passes with or without the `.catch`.
+- **Consumers:** `tip-integration.controller.spec.ts` (whole file).
+- **Review:** `checklist` — one-line behavior change on an HTTP handler.
+- **Done criteria:**
+  - [ ] Tests green; falsifier observed red and reverted.
+  - [ ] eslint, tsc green.
+- **Skills:** `nestjs-expert`, `error-handling-patterns`.
 
 ---
 
@@ -253,4 +276,4 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 |---|---|---|---|---|---|
 | RB-1 | 2026-10-22 | Dev DB unreachable from this machine at spec time (VPN) — the Dev dump for T-06/T-07 needs it | Connect VPN before T-06 | David Casañas | open |
 | RB-2 | 2026-10-22 | `migration:test:bootstrap` blocked by a pre-existing migration (child 1 F1) | Use the Dev dump path, as child 1 did | — | open |
-| RB-3 | 2026-10-22 | `PATCH ipr-data/sync?async=true` fires `getKnowledgeProductsByYear` without `await`/`.catch` (`tip-integration.controller.ts:95-98`); a refused (409, T-02) or failed run is an unhandled rejection that can terminate the process (T-02 Reviewer advisory; Node behavior on this deployment not measured) | **Owner approved (2026-10-22) adding the `.catch` (log the error) in this spec** — scope change; not yet implemented, to be scheduled as a task in the next session | David Casañas | open |
+| RB-3 | 2026-10-22 | `PATCH ipr-data/sync?async=true` fires `getKnowledgeProductsByYear` without `await`/`.catch` (`tip-integration.controller.ts:95-98`); a refused (409, T-02) or failed run is an unhandled rejection that can terminate the process (T-02 Reviewer advisory; Node behavior on this deployment not measured) | **Owner approved (2026-10-22) adding the `.catch` (log the error) in this spec** — done as **T-02b** (2026-10-23) | David Casañas | closed |

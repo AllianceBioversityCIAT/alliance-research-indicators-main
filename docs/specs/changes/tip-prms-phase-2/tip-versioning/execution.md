@@ -108,3 +108,23 @@ Orca run `run_8e754ab6eadc`.
 - **Context:** T-02 Reviewer advisory — `tip-integration.controller.ts:95-98` fires `getKnowledgeProductsByYear` without `await`/`.catch` when `async=true`; T-02's 409 refusal (and any failed run) becomes an unhandled rejection that can terminate the process. Not measured on this deployment's Node.
 - **Owner answer (verbatim):** "la 1 pero solo dejalo docuemntado magnana lo seguimos" — option 1 = add the fix in this spec.
 - **Scope change:** approved by the owner. Controller change: add a `.catch` on the fire-and-forget call that logs the error. **Not implemented yet** — recorded as `tasks.md` RB-3; schedule it as a task at the start of the next session (before or alongside T-05).
+
+## Session resumed — 2026-10-23
+
+- Owner ran `/akili-resume` then `/akili-execute`. RB-3 scheduled as **T-02b** in `tasks.md` (owner-approved scope change 2026-10-22; budget line annotated +1 task).
+
+### T-02b — An async TIP sync's rejection is caught and logged — PASS
+
+- **Implementer:** Grok `grok-4.7-high` via Cursor — Orca `task_7c776f68ada3` / `ctx_ba237072217b` (fresh worker, effort low, skills `nestjs-expert`, `error-handling-patterns` — task default). Brief: scratchpad `t02b-brief.md`.
+- **runtime events:** provider/connection death ×1 (Cursor: "Agent stopped retrying — The connection was interrupted repeatedly without saving progress") → rung 1 tree probe (controller: logger + import only; spec: new tests, 2 red) → rung 3 resume-by-message to the same worker (context survived). No attempt consumed.
+- **Date:** 2026-10-23 · **Attempts:** 1 · **Effort:** low
+- **Attempt 1 — files changed:** `tip-integration.controller.ts` — `LoggerUtil` logger; `async=true` branch chains `.catch` on `getKnowledgeProductsByYear`: `ConflictException` → `warn(message)`, else `error(message, stack)` / `String(error)`; no rethrow; HTTP 200 unchanged; `async=false` and RMQ untouched. `tip-integration.controller.spec.ts` — `rejectUnlessCaught` sentinel (hooks `.catch` on the promise the controller receives; a sentinel handler pushes to `missed` only if the controller attached none), `warn` and `error` cases, `async=false` 409 reaches the caller.
+- **Falsifier (verbatim excerpt):** `.catch` removed → `-t "logs warn when an async ConflictException"`: `expect(received).toEqual(expected)` · `- Array []` · `+ Array [ [ConflictException: TIP sync already in progress], ]` at spec `:148` (`expect(missed).toEqual([])`). Reverted. Implementer note: a `process.on('unhandledRejection')` listener inside Jest's vm sees 0 events, so it was not used.
+- **Implementer verification:** `npx jest src/domain/tools/tip-integration --silent` → 6/6, 86/86; eslint 0; tsc 0.
+- **Evidence re-run (Leader-inline):** VERIFIED — same three commands, same results.
+- **Reviewer (`akili-reviewer`, Claude Opus):** PASS — sentinel discriminates (controller attaches `.catch` synchronously; `.then` without handler / `.finally` read as missed; only the controller holds the promise); `.catch` cannot throw for reachable input; `async=false`/RMQ unchanged; `LoggerUtil` only.
+- **Not Done / Assumptions (verbatim excerpt; no owed item):** "no se usó `process.on('unhandledRejection')` porque dentro del vm no observa el rechazo. No queda trabajo de T-02b sin entregar."
+- **ADVISORY:** the sentinel proves a `.catch` was attached, not that the chain ends handled (a rethrowing `.catch` would pass — covered today by the spy assertions) · `.then(undefined, onRejected)` would read as missed (safe direction) · `String(error)` throws on `Object.create(null)` — unreachable · two async tests duplicate spy setup.
+- **spawns:** implementer (Grok/Cursor) not reported by host, ended died → resumed → complete; reviewer 6 calls, 53347 tokens, ended complete.
+- **Requirements covered:** design §4 (amended) `async=true` "log only"; RB-3 closed.
+- **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED. Continue gate: auto-approved (owner standing rule).

@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Controller,
   Get,
   Query,
@@ -17,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import {
   QueryIndicators,
@@ -29,6 +31,10 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
+  private readonly logger = new LoggerUtil({
+    name: TipIntegrationController.name,
+  });
+
   constructor(private readonly tipIntegrationService: TipIntegrationService) {}
 
   @MessagePattern('tip.get-ipr-data')
@@ -93,9 +99,19 @@ export class TipIntegrationController {
     asyncProcess?: TrueFalseEnum,
   ) {
     if (asyncProcess == TrueFalseEnum.TRUE) {
-      this.tipIntegrationService.getKnowledgeProductsByYear(
-        year ? +year : undefined,
-      );
+      this.tipIntegrationService
+        .getKnowledgeProductsByYear(year ? +year : undefined)
+        .catch((error: unknown) => {
+          if (error instanceof ConflictException) {
+            this.logger.warn(error.message);
+            return;
+          }
+          if (error instanceof Error) {
+            this.logger.error(error.message, error.stack);
+            return;
+          }
+          this.logger.error(String(error));
+        });
       return ResponseUtils.format({
         data: 'IPR data synced asynchronously',
         description: 'IPR data synced asynchronously',
