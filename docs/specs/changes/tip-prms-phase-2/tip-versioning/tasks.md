@@ -154,7 +154,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-05 — The per-handle routine in the TIP sync
 
-- [ ] **Status:** todo · **Size:** L · **Dependencies:** T-01, T-02, T-03, T-04
+- [x] **Status:** done · **Size:** L · **Dependencies:** T-01, T-02, T-03, T-04
 - **Requirements covered:**
   - R-TVR-001 *New handle* (live + version with new `C`; BUT no second code later), *Same handle, another year* (version with `C`; AND IT MUST NOT create a new live row).
   - R-TVR-002 *First year seen also gets its version*; *Year TIP no longer returns* (version left unchanged).

@@ -20,7 +20,6 @@ import {
 } from './dto/response-year-tip.dto';
 import { mapTipProjects } from './mapper/tip-projects.mapper';
 import { AgressoContract } from '../../entities/agresso-contract/entities/agresso-contract.entity';
-import { Result } from '../../entities/results/entities/result.entity';
 import { BilateralService } from '../../entities/bilateral/bilateral.service';
 import { TocResult } from '../toc-integration/dto/toc-integration.types';
 import { ClarisaRegionsService } from '../clarisa/entities/clarisa-regions/clarisa-regions.service';
@@ -48,7 +47,16 @@ import { CurrentUserUtil } from '../../shared/utils/current-user.util';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
-import { SaveResultService } from '../../shared/services/save-all-sections.service';
+import { ExternalMappersDto } from '../../shared/global-dto/external-mappers.dto';
+import {
+  ExtraData,
+  SaveAllSectionsResult,
+  SaveResultService,
+} from '../../shared/services/save-all-sections.service';
+import {
+  TipHandleRepository,
+  TipHandleResolution,
+} from './repository/tip-handle.repository';
 import { v4 as uuidv4 } from 'uuid';
 import { SyncStagingRecordsEntity } from '../open-search/prms/entities/sync-staging-records.entity';
 import { PrmsRepository } from '../open-search/prms/repositories/prms.repository';
@@ -77,6 +85,7 @@ export class TipIntegrationService extends BaseApi {
     private readonly prmsRepository: PrmsRepository,
     private readonly clarisaSdgsService: ClarisaSdgsService,
     private readonly bilateralService: BilateralService,
+    private readonly tipHandleRepository: TipHandleRepository,
   ) {
     super(
       httpService,
@@ -206,8 +215,10 @@ export class TipIntegrationService extends BaseApi {
 
     const executionCode = uuidv4();
     let syncProcessLogId: number | undefined;
+    const counters: CounterResults = new CounterResults();
+    let stagingFailures = 0;
+    let skippedRecords = 0;
     try {
-      const counters: CounterResults = new CounterResults();
       const resultSaved: number[] = [];
       const syncProcessLog = await this.syncProcessLogService.initiateSync(
         SyncProcessEnum.TIP_INTEGRATION,
@@ -215,7 +226,6 @@ export class TipIntegrationService extends BaseApi {
       syncProcessLogId = syncProcessLog?.id;
       const endYeard = year ?? new Date().getFullYear();
       let currentYear = year ?? 2021;
-      let stagingFailures = 0;
       for (currentYear; currentYear <= endYeard; currentYear++) {
         this.logger.log(`Saving temporal data for year ${currentYear}`);
         stagingFailures += await this.saveTemporalData(
@@ -230,60 +240,25 @@ export class TipIntegrationService extends BaseApi {
         );
       const dataProcessed = await this.processing(tipResults);
       const catalogMemo = new Map<string, TocResult[] | null>();
-      const extraData = {
+      const batchExtra: ExtraData<ExternalMappersDto> = {
         platformCode: ReportingPlatformEnum.TIP,
         resultSaved,
         counters,
         manageOfficialCode: true,
-        findOptions: {
-          public_link: 'public_link' as const,
-          is_snapshot: 'is_version_applied' as const,
-        },
       };
-      for (const result of dataProcessed) {
-        const savedBefore = counters.createdRecords + counters.updatedRecords;
-        await this.saveResultService.saveAllSections(result, extraData);
-        const savedNow = counters.createdRecords + counters.updatedRecords;
-        if (savedNow === savedBefore) continue;
-        if (result.poolFunding == null) continue;
-        try {
-          const saved = await this.dataSource.getRepository(Result).findOne({
-            where: {
-              public_link: result.public_link,
-              platform_code: ReportingPlatformEnum.TIP,
-              report_year_id: result.createResult.year,
-              is_snapshot: result.is_version_applied,
-            },
-            select: { result_id: true },
-          });
-          if (!saved?.result_id) {
-            throw new Error('saved result not found');
-          }
-          await this.bilateralService.importAlignmentFromTip(
-            saved.result_id,
-            result.poolFunding,
-            result.createResult.year,
-            result.userData?.sec_user_id ?? null,
-            catalogMemo,
-          );
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : 'Unknown error';
-          const tipId = result.knowledgeProduct?.tip_id;
-          this.logger.error(
-            `Error importing TIP pool funding for TIP ${tipId} ${result.public_link} (${result.createResult.year}): ${message}`,
-          );
-        }
-      }
-      this.logger.log(
-        `TIP run summary: staging failures ${stagingFailures}, created ${counters.createdRecords}, updated ${counters.updatedRecords}, error ${counters.errorRecords}`,
+      skippedRecords = await this.persistHandles(
+        dataProcessed,
+        batchExtra,
+        catalogMemo,
       );
+      this.logTipRunSummary(stagingFailures, counters, skippedRecords);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
       this.logger.error(
         `Error saving temporal data: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
+      this.logTipRunSummary(stagingFailures, counters, skippedRecords);
       if (syncProcessLogId != null) {
         await this.syncProcessLogService
           .markFailed(syncProcessLogId)
@@ -522,4 +497,265 @@ export class TipIntegrationService extends BaseApi {
     }
     return this.clarisaLeversService.findByNames(clarisaLevers);
   }
+
+  private logTipRunSummary(
+    stagingFailures: number,
+    counters: CounterResults,
+    skippedRecords: number,
+  ): void {
+    this.logger.log(
+      `TIP run summary: staging failures ${stagingFailures}, created ${counters.createdRecords}, updated ${counters.updatedRecords}, skipped ${skippedRecords}, error ${counters.errorRecords}`,
+    );
+  }
+
+  /**
+   * One payload per handle per year. Empty links and repeated years are
+   * warned and dropped; the first staging-order payload wins.
+   */
+  private groupByHandle(
+    rows: TipMappedResult[],
+  ): Map<string, Map<number, TipMappedResult>> {
+    const grouped = new Map<string, Map<number, TipMappedResult>>();
+    for (const row of rows) {
+      const handle = row.public_link;
+      if (isEmpty(handle)) {
+        this.logger.warn('TIP row skipped: empty public link');
+        continue;
+      }
+      let byYear = grouped.get(handle);
+      if (!byYear) {
+        byYear = new Map();
+        grouped.set(handle, byYear);
+      }
+      const year = row.createResult?.year;
+      if (byYear.has(year)) {
+        this.logger.warn(
+          `TIP handle ${handle}: repeated year ${year}; first payload kept`,
+        );
+        continue;
+      }
+      byYear.set(year, row);
+    }
+    return grouped;
+  }
+
+  private async persistHandles(
+    rows: TipMappedResult[],
+    batchExtra: ExtraData<ExternalMappersDto>,
+    catalogMemo: Map<string, TocResult[] | null>,
+  ): Promise<number> {
+    let skipped = 0;
+    for (const [handle, byYear] of this.groupByHandle(rows)) {
+      try {
+        skipped += await this.syncHandle(
+          handle,
+          byYear,
+          batchExtra,
+          catalogMemo,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error saving TIP handle ${handle}: ${message}`);
+        if (batchExtra.counters) {
+          batchExtra.counters.errorRecords += 1;
+        }
+      }
+    }
+    return skipped;
+  }
+
+  private warnRowsNotPicked(
+    handle: string,
+    resolution: TipHandleResolution,
+  ): void {
+    if (resolution.otherLive.length > 0) {
+      const ids = resolution.otherLive.map((row) => row.result_id).join(', ');
+      this.logger.warn(
+        `TIP handle ${handle}: extra live rows not picked: ${ids}`,
+      );
+    }
+    if (resolution.otherVersions.length > 0) {
+      const ids = resolution.otherVersions
+        .map((row) => row.result_id)
+        .join(', ');
+      this.logger.warn(
+        `TIP handle ${handle}: extra version rows not picked: ${ids}`,
+      );
+    }
+  }
+
+  /**
+   * Live code, else the highest existing version's code, else one new TIP code.
+   * Minted once per handle so the version and the live row share it.
+   */
+  private async officialCodeFor(
+    resolution: TipHandleResolution,
+  ): Promise<number> {
+    if (resolution.live?.result_official_code != null) {
+      return resolution.live.result_official_code;
+    }
+    const versionRows = Object.values(resolution.versions);
+    if (versionRows.length > 0) {
+      const highest = versionRows.reduce((best, row) =>
+        row.report_year_id > best.report_year_id ? row : best,
+      );
+      if (highest.result_official_code != null) {
+        return highest.result_official_code;
+      }
+    }
+    return this.resultsService.newOfficialCode(ReportingPlatformEnum.TIP);
+  }
+
+  private async syncHandle(
+    handle: string,
+    byYear: Map<number, TipMappedResult>,
+    batchExtra: ExtraData<ExternalMappersDto>,
+    catalogMemo: Map<string, TocResult[] | null>,
+  ): Promise<number> {
+    const resolution = await this.tipHandleRepository.resolve(handle);
+    this.warnRowsNotPicked(handle, resolution);
+    const officialCode = await this.officialCodeFor(resolution);
+    const years = [...byYear.keys()].sort((left, right) => left - right);
+    const savedYears: number[] = [];
+    const outcomeByYear = new Map<number, SaveAllSectionsResult['outcome']>();
+    const pendingImports: TipPoolImport[] = [];
+    let skipped = 0;
+
+    try {
+      for (const year of years) {
+        const source = byYear.get(year)!;
+        const versionId = resolution.versions[year]?.result_id;
+        const saved = await this.saveResultService.saveAllSections(
+          this.payloadForSave(source),
+          {
+            ...batchExtra,
+            target: {
+              ...(versionId != null ? { resultId: versionId } : {}),
+              officialCode,
+              isSnapshot: true,
+            },
+          },
+        );
+        outcomeByYear.set(year, saved.outcome);
+        skipped += this.collectSaved(
+          saved,
+          year,
+          source,
+          pendingImports,
+          savedYears,
+        );
+      }
+
+      const existingYears = Object.keys(resolution.versions).map((year) =>
+        Number(year),
+      );
+      const candidates = [...savedYears, ...existingYears];
+      if (candidates.length > 0) {
+        const liveYear = Math.max(...candidates);
+        const cameFromThisRun = savedYears.includes(liveYear);
+        const notBelowLive =
+          resolution.live == null || liveYear >= resolution.live.report_year_id;
+        if (cameFromThisRun && notBelowLive) {
+          const source = byYear.get(liveYear)!;
+          const liveId = resolution.live?.result_id;
+          const saved = await this.saveResultService.saveAllSections(
+            this.payloadForSave(source),
+            {
+              ...batchExtra,
+              target: {
+                ...(liveId != null ? { resultId: liveId } : {}),
+                officialCode,
+                isSnapshot: false,
+                compensateRowOnly: true,
+              },
+            },
+          );
+          skipped += this.collectSaved(saved, liveYear, source, pendingImports);
+        }
+      }
+
+      if (years.length > 0) {
+        const highestRunYear = Math.max(...years);
+        if (outcomeByYear.get(highestRunYear) === 'skipped') {
+          this.logger.warn(
+            `TIP handle ${handle}: highest year ${highestRunYear} skipped as a duplicate`,
+          );
+        }
+      }
+    } finally {
+      await this.importPoolFunding(pendingImports, catalogMemo);
+    }
+    return skipped;
+  }
+
+  /**
+   * saveAllSections writes stored lever rows back onto the payload object.
+   * Each call gets its own copy so a version save cannot move those rows
+   * onto the live save. structuredClone keeps Dates. The payload is a
+   * property bag: setSystemUser only reads sec_user_id, email and roles.
+   */
+  private payloadForSave(payload: TipMappedResult): TipMappedResult {
+    return structuredClone(payload);
+  }
+
+  /**
+   * Only created and updated rows are saved. A skipped or error outcome
+   * must not become the live year and must not receive Pool Funding.
+   */
+  private collectSaved(
+    saved: SaveAllSectionsResult,
+    year: number,
+    payload: TipMappedResult,
+    pendingImports: TipPoolImport[],
+    savedYears?: number[],
+  ): number {
+    if (saved.outcome === 'skipped') return 1;
+    if (
+      (saved.outcome === 'created' || saved.outcome === 'updated') &&
+      saved.resultId != null
+    ) {
+      savedYears?.push(year);
+      if (payload.poolFunding != null) {
+        pendingImports.push({
+          resultId: saved.resultId,
+          year,
+          mapping: payload.poolFunding,
+          payload,
+        });
+      }
+    }
+    return 0;
+  }
+
+  private async importPoolFunding(
+    rows: TipPoolImport[],
+    catalogMemo: Map<string, TocResult[] | null>,
+  ): Promise<void> {
+    for (const row of rows) {
+      try {
+        await this.bilateralService.importAlignmentFromTip(
+          row.resultId,
+          row.mapping,
+          row.year,
+          row.payload.userData?.sec_user_id ?? null,
+          catalogMemo,
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+        const tipId = row.payload.knowledgeProduct?.tip_id;
+        this.logger.error(
+          `Error importing TIP pool funding for TIP ${tipId} ${row.payload.public_link} (${row.year}): ${message}`,
+        );
+      }
+    }
+  }
 }
+
+type TipPoolImport = {
+  resultId: number;
+  year: number;
+  mapping: NonNullable<TipMappedResult['poolFunding']>;
+  payload: TipMappedResult;
+};
