@@ -8,6 +8,7 @@ import { ClarisaLeversModule } from '../clarisa/entities/clarisa-levers/clarisa-
 import { ClarisaCountriesModule } from '../clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ResultKnowledgeProductModule } from '../../entities/result-knowledge-product/result-knowledge-product.module';
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
+import { TipHandleRepository } from './repository/tip-handle.repository';
 import { SyncProcessLogModule } from '../../entities/sync-process-log/sync-process-log.module';
 import { PrmsOpenSearchModule } from '../open-search/prms/prms.opensearch.module';
 import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.module';
@@ -29,7 +30,15 @@ import { BilateralModule } from '../../entities/bilateral/bilateral.module';
     BilateralModule,
   ],
   controllers: [TipIntegrationController],
-  providers: [TipIntegrationService, TipIntegrationRepository],
-  exports: [TipIntegrationRepository, TipIntegrationService],
+  providers: [
+    TipIntegrationService,
+    TipIntegrationRepository,
+    TipHandleRepository,
+  ],
+  exports: [
+    TipIntegrationRepository,
+    TipHandleRepository,
+    TipIntegrationService,
+  ],
 })
 export class TipIntegrationModule {}

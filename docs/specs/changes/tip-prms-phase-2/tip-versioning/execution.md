@@ -79,3 +79,32 @@ Orca run `run_8e754ab6eadc`.
 - **Requirements covered:** R-TVR-002 (*Version exists*, unit half; MySQL in T-07); NFR-TVR-001 (no-`target` path).
 - **Decisions made:** parallel lens review (data-loss surface), recorded per Step 2.3.
 - **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED. Continue gate: auto-approved (owner standing rule).
+
+### T-04 — `TipHandleRepository.resolve` — PASS
+
+- **Implementer:** Grok `grok-4.7-high` via Cursor — Orca `task_21c95cad6a96` / `ctx_742cac2d446e` (fresh worker, effort medium, skills `nestjs-expert`, `tdd` — task default). Brief: scratchpad `t04-brief.md`. Exemplar: `repository/tip-integration.repository.ts`. Leader narrowing: return shape usable by T-05 (chosen live, unpicked live rows, versions by year).
+- **Date:** 2026-10-23 · **Attempts:** 1 · **Effort:** medium · **Skills:** `nestjs-expert`, `tdd`
+- **Attempt 1 — files changed:** `src/domain/tools/tip-integration/repository/tip-handle.repository.ts` (new) — `resolve(handle): Promise<TipHandleResolution>` = `{ live: TipHandleRow | null; otherLive; versions: Record<year, TipHandleRow>; otherVersions }`, row = `result_id, result_official_code, report_year_id, is_snapshot, is_active`; one query `WHERE r.platform_code = 'TIP' AND r.public_link = ?` (no `r.is_active` predicate), `EXISTS` on active `link_results.other_result_id` for the survivor rule; live pick = active first, then exactly-one-linked, else highest `report_year_id`, tie highest `result_id`; duplicate-year versions = active first, then highest `result_id`. `tip-handle.repository.spec.ts` (new). `tip-integration.module.ts` — provider + export.
+- **Falsifiers (verbatim excerpts):** (1) `r.platform_code = 'TIP'` removed → `Expected substring: "r.platform_code = 'TIP'"` · `Received string: "WHERE r.public_link = ?"` at spec `:65`. Reverted. (2) `AND r.is_active = 1` added to the outer WHERE → `Expected pattern: not /is_active/` at `:67`. Reverted.
+- **Implementer verification:** `npx jest src/domain/tools/tip-integration --silent` → 6/6, 83/83; eslint 0; tsc 0.
+- **Evidence re-run (Leader-inline):** VERIFIED — same three commands, same results.
+- **Reviewer (`akili-reviewer`, Claude Opus):** PASS — placeholder use safe, no collation hazard, `EXISTS` matches §3.2, platform filter on `results` for both lists, live/versions split by `is_snapshot` (disjoint), survivor rule incl. tie-break, return shape fits T-05 steps 5.2–5.3; T-02 amendments untouched (last carry of that edit).
+- **Not Done / Assumptions (verbatim excerpt; no owed item — MySQL proof is T-07 by design):** "El unitario solo ve el SQL que arma el mock. No demuestra que MySQL excluya una fila STAR con el mismo `public_link` o el mismo código. Esa prueba es T-07." · "«None or both» de §3.2 se generalizó a «el número de filas vinculadas no es exactamente 1»" · "Si ninguna viva está activa, la regla de superviviente corre sobre las inactivas (DD-9)".
+- **Forward pointers → T-05:** use `live?.result_official_code` / `versions[Y].result_id`; `warn` on `otherLive` and `otherVersions`. **→ T-07:** the STAR-same-code red on MySQL; assert `is_linked` on a really linked row (driver value shape); count `platform_code = 'TIP' AND is_snapshot IS NULL` (NULL is read as live).
+- **ADVISORY:** reliability — nullable `is_snapshot`: `NULL` → live (document in TSDoc; count in T-07) · readability — with ≥3 live rows and ≥2 linked, pick is highest year over the whole pool (locked by spec `:183-212`; §3.2 silent) — add a TSDoc line · reliability — `asFlag` accepts `true`/`1`/`'1'` only.
+- **spawns:** implementer (Grok/Cursor) not reported by host, ended complete; reviewer 11 calls, 52820 tokens, ended complete.
+- **Requirements covered:** R-TVR-001 *Equal codes across platforms* (unit half; MySQL in T-07).
+- **Decisions made:** none beyond the task.
+- **Final status:** PASS on attempt 1 · **Final verification:** VERIFIED. Run paused here at the owner's request ("cuando termines esta tarea actual paramos y seguimos mañana").
+
+## Session pause — 2026-10-23
+
+- Done: T-01 `f07c181e`, T-02 `90569290`, T-03 `0736f851`, T-04 (this commit). All unpushed.
+- Review rounds used: 5 of 11 (T-03 ran two parallel lens reviewers).
+- Next: schedule RB-3 (async `.catch`, owner-approved scope change) as a task, then T-05 (depends on T-01..T-04, all done). T-06 needs the VPN for the Dev dump.
+
+## Owner decision — async sync unhandled rejection (2026-10-22)
+
+- **Context:** T-02 Reviewer advisory — `tip-integration.controller.ts:95-98` fires `getKnowledgeProductsByYear` without `await`/`.catch` when `async=true`; T-02's 409 refusal (and any failed run) becomes an unhandled rejection that can terminate the process. Not measured on this deployment's Node.
+- **Owner answer (verbatim):** "la 1 pero solo dejalo docuemntado magnana lo seguimos" — option 1 = add the fix in this spec.
+- **Scope change:** approved by the owner. Controller change: add a `.catch` on the fire-and-forget call that logs the error. **Not implemented yet** — recorded as `tasks.md` RB-3; schedule it as a task at the start of the next session (before or alongside T-05).

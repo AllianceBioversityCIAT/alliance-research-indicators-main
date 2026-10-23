@@ -110,7 +110,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-04 — `TipHandleRepository.resolve`
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** none
+- [x] **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-TVR-001 (*Equal codes across platforms* — THEN every TIP lookup filters `platform_code = 'TIP'`).
 - **Design refs:** §2.1 (resolver row), §5 step 5.1, DD-9, P-15.
 - **Scope (files):** `src/domain/tools/tip-integration/repository/tip-handle.repository.ts` (new) + spec; provider registration in the TIP module.
@@ -253,3 +253,4 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 |---|---|---|---|---|---|
 | RB-1 | 2026-10-22 | Dev DB unreachable from this machine at spec time (VPN) — the Dev dump for T-06/T-07 needs it | Connect VPN before T-06 | David Casañas | open |
 | RB-2 | 2026-10-22 | `migration:test:bootstrap` blocked by a pre-existing migration (child 1 F1) | Use the Dev dump path, as child 1 did | — | open |
+| RB-3 | 2026-10-22 | `PATCH ipr-data/sync?async=true` fires `getKnowledgeProductsByYear` without `await`/`.catch` (`tip-integration.controller.ts:95-98`); a refused (409, T-02) or failed run is an unhandled rejection that can terminate the process (T-02 Reviewer advisory; Node behavior on this deployment not measured) | **Owner approved (2026-10-22) adding the `.catch` (log the error) in this spec** — scope change; not yet implemented, to be scheduled as a task in the next session | David Casañas | open |
