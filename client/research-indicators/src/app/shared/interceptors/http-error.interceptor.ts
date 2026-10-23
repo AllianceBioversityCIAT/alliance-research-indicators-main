@@ -118,6 +118,10 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // stack a generic toast on the inline "unavailable" state.
         const isAgrovocSearchError = req.url.includes('tools/agrovoc');
 
+        // The download button owns this error. The body is a Blob, so a toast
+        // here would be the technical "Http failure…" message.
+        const isOicrWordTemplateError = req.url.includes('oicr/word-template');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -127,7 +131,8 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingTagValidationError &&
           !isPoolFundingAlignmentValidationError &&
           !isPrmsSyncError &&
-          !isAgrovocSearchError
+          !isAgrovocSearchError &&
+          !isOicrWordTemplateError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`

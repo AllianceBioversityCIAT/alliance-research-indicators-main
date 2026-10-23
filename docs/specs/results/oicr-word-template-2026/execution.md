@@ -159,3 +159,62 @@
 
 - **Cause:** the engine and its suite are about 2.4× the per-component estimate. The design §5 step 7 hardening and the §10 suite (24 tests, falsifiers (a)–(g), 6+ drift guards) went past the POC's ~300 lines. The estimate sized the port, not the hardening.
 - **Action:** execution stopped and escalated to the owner before T-02, per `/akili-execute` §2.4 (Budget Tripwire).
+- **Owner decision (2026-10-23, AskUserQuestion):** "Continue, accept overrun". The LOC budget is re-baselined to about 3 000 added lines for the spec. Execution resumes with T-02 (server) and T-04 (client) in parallel. T-04 builds against the design §4 contract; tasks.md T-04 allows this ("editing can start in parallel against the §4 contract").
+
+### T-04 — Client download through the endpoint
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-23
+- **Effort:** medium (Size M, well specified).
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`. Override (b) applies: it touches the shared `httpErrorInterceptor` and exported symbols.
+- **Skills deviation:** `angular-developer` and `error-handling-patterns` could not load on the Cursor host; the brief carried them in prose.
+- **Dependency note:** started before T-03 (endpoint) exists and built against the design §4 contract, as tasks.md T-04 allows. Runs in parallel with T-02 (server).
+- **Leader narrowing in the brief:** `pages/oicr-download/oicr-download.component.ts` was changed only enough to compile against `download(code)`. The path route, legacy redirect and navigation stay with T-06. `wasm.service.ts`, `public/go/*`, `angular.json` and `GET_OICRDetails` stay with T-07.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium`, Orca `run_704dd2d24af9` / `task_1c4cc6bfff95` / `ctx_716bc0aff235` (retained until PASS, released after). Brief: `T-04-brief.md`, report: `T-04-report.md` (session scratchpad).
+- **Files changed** (all under `client/research-indicators/src/app/`):
+  - new: `shared/utils/download-blob.util.ts`;
+  - services: `shared/services/api.service.ts` (+ spec), `shared/services/oicr-download.service.ts` (+ spec, rewritten);
+  - button: `shared/components/download-oicr-template/download-oicr-template.component.{ts,html,spec.ts}`;
+  - interceptor: `shared/interceptors/http-error.interceptor.ts` (+ spec);
+  - page: `pages/oicr-download/oicr-download.component.ts` (+ spec).
+- **Implementer verification:**
+  - 5 specs: `Tests: 301 passed, 301 total`;
+  - `npm run build`: exit 0;
+  - `tsc -p tsconfig.spec.json`: 945 errors before and after, no new errors;
+  - `npm run lint -- --quiet`: `All files pass linting.`
+- **Falsifiers (verbatim, reverted):**
+  - `description` read before `errors`: `Expected substring: "Result is not an OICR"` / `Received message: "BadRequestException"`.
+  - Interceptor exclusion removed: `Expected number of calls: 1` / `Received number of calls: 2`.
+- **Notes from the report:**
+  - Error bodies are read with `FileReader.readAsText`, which works in jsdom (J-27).
+  - The generic text is `Could not download the OICR template. Please try again.`
+- **Evidence re-run (Leader, inline): VERIFIED.**
+  - Same 5 specs: `Tests: 301 passed, 301 total`.
+  - Full client suite, after both workers reported: `Test Suites: 1 failed, 345 passed, 346 total` · `Tests: 8065 passed, 8065 total`.
+    - The failed suite is `landing-texts.service.spec.ts`: `A jest worker process (pid=85543) was terminated by another process: signal=SIGSEGV`. That is a runner crash with 0 failed tests.
+    - Re-run in isolation: `Tests: 1 passed, 1 total`.
+    - This is the same runner flake as the T-05 run, this time on a different suite.
+  - `npm run build`: exit 0, `Application bundle generation complete.`
+  - The button no longer references `WasmService`: grep count 0.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - The `errors` → `description` → generic order is asserted with exact strings, and the JSON branch is proven.
+  - The server `GlobalExceptions` sets `description = exception.name` and `errors = response.message` (`global.exception.ts:31-44`), which is the order the client relies on.
+  - The interceptor exclusion is URL-scoped and tested on a real error path for both URLs.
+  - The button spec walks idle → click → loading → one toast, and `httpMock.verify()` shows exactly one request (R-OWT-011).
+  - No `X-Use-Year` header is sent (D-OWT-15).
+  - Scope stays within the narrowing.
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY (KZ-017): the button spec registers no interceptors, so its "one toast" cannot see an interceptor toast. The no-double-toast claim rests on the button spec and the interceptor spec together.
+  - READABILITY: the page component repeats the generic sentence instead of importing `OICR_WORD_TEMPLATE_GENERIC_ERROR`. T-06 rewrites that component.
+  - RESILIENCE: if `errors` arrives as an array, `description` (the class name) would be shown. Not reachable for this endpoint.
+  - READABILITY: `api.service.spec.ts` asserts the call arguments twice.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-medium): not reported by host, ended complete;
+  - reviewer: 10 calls, 96,360 tokens, ended complete.
+- **Requirements covered:** R-OWT-008 (click downloads, loading, error toast), R-OWT-001 (version line), R-OWT-011 (button clause).
+- **Decisions made:** the Leader narrowed the page-component consumer adjustment (see above).
+- **Final verification:** PASS.

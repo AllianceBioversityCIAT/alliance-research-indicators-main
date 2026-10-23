@@ -1787,6 +1787,17 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('results/oicr/details/123', {});
     });
 
+    it('should call GET_OicrWordTemplate through getBlob without useResultInterceptor', async () => {
+      const blob = new Blob(['PK']);
+      (mockToPromiseService.getBlob as jest.Mock).mockResolvedValue(blob);
+
+      const result = await service.GET_OicrWordTemplate(554);
+
+      expect(result).toBe(blob);
+      expect(mockToPromiseService.getBlob).toHaveBeenCalledWith('results/oicr/word-template/554');
+      expect((mockToPromiseService.getBlob as jest.Mock).mock.calls[0]).toEqual(['results/oicr/word-template/554']);
+    });
+
     it('should call GET_OICRModal', () => {
       const resultCode = 123;
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });

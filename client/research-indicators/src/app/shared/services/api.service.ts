@@ -1172,6 +1172,11 @@ export class ApiService {
     return this.TP.get('', { isAuth: urlWithTimestamp, noCache: true });
   };
 
+  // Live OICR only: no useResultInterceptor, so the request never sends a version.
+  GET_OicrWordTemplate = (code: number | string): Promise<Blob> => {
+    return this.TP.getBlob(`results/oicr/word-template/${code}`);
+  };
+
   GET_OICRDetails = (resultCode: number | string): Promise<MainResponse<GetOICRDetails>> => {
     const url = () => `results/oicr/details/${resultCode}`;
     return this.TP.get(url(), {});

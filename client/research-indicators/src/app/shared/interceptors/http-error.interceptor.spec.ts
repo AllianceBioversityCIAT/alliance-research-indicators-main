@@ -996,4 +996,50 @@ describe('httpErrorInterceptor', () => {
       });
     });
   });
+
+  it('should not toast an oicr/word-template error, and should toast an error on another URL', done => {
+    const oicrRequest = new HttpRequest('GET', 'http://test.com/api/results/oicr/word-template/554');
+    const oicrError = new HttpErrorResponse({
+      error: { errors: 'Result is not an OICR', description: 'BadRequestException' },
+      status: 400,
+      statusText: 'Bad Request'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => oicrError));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(oicrRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: oicrCaught => {
+        expect(oicrCaught).toBe(oicrError);
+
+        const otherRequest = new HttpRequest('GET', 'http://test.com/api/results/554/general-information');
+        const otherError = new HttpErrorResponse({
+          error: { errors: 'Upstream failed' },
+          status: 500,
+          statusText: 'Internal Server Error'
+        });
+        mockHandler = jest.fn().mockReturnValue(throwError(() => otherError));
+
+        interceptor(otherRequest, mockHandler).subscribe({
+          next: () => done.fail('Should have thrown an error'),
+          error: otherCaught => {
+            expect(otherCaught).toBe(otherError);
+            expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+            expect(mockActionsService.showToast).toHaveBeenCalledWith({
+              detail: 'Upstream failed',
+              severity: 'error',
+              summary: 'Error'
+            });
+            expect(mockActionsService.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'Result is not an OICR' }));
+            done();
+          }
+        });
+      }
+    });
+  });
 });

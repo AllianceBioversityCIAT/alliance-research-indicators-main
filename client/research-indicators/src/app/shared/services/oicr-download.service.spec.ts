@@ -1,189 +1,79 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { OicrDownloadService } from './oicr-download.service';
-import { WasmService } from './go/wasm.service';
+import { HttpErrorResponse } from '@angular/common/http';
+import { OicrDownloadService, OICR_WORD_TEMPLATE_GENERIC_ERROR } from './oicr-download.service';
 import { ApiService } from './api.service';
-import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interface';
 
 describe('OicrDownloadService', () => {
   let service: OicrDownloadService;
-  let wasmMock: jest.Mocked<WasmService>;
-  let apiMock: jest.Mocked<ApiService>;
+  let apiMock: { GET_OicrWordTemplate: jest.Mock };
+  let downloadedNames: string[];
 
   beforeEach(() => {
-    wasmMock = {
-      loadWasm: jest.fn().mockResolvedValue(true),
-      processDocx: jest.fn(),
-      downloadFile: jest.fn()
-    } as unknown as jest.Mocked<WasmService>;
+    downloadedNames = [];
+    apiMock = { GET_OicrWordTemplate: jest.fn() };
 
-    apiMock = {
-      GET_OICRDetails: jest.fn()
-    } as unknown as jest.Mocked<ApiService>;
+    const urlApi = globalThis.URL as unknown as { createObjectURL: jest.Mock; revokeObjectURL: jest.Mock };
+    urlApi.createObjectURL = jest.fn().mockReturnValue('blob:oicr');
+    urlApi.revokeObjectURL = jest.fn();
+    jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloadedNames.push(this.download);
+    });
 
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
-      providers: [
-        OicrDownloadService,
-        { provide: WasmService, useValue: wasmMock },
-        { provide: ApiService, useValue: apiMock }
-      ]
+      providers: [OicrDownloadService, { provide: ApiService, useValue: apiMock }]
     });
 
     service = TestBed.inject(OicrDownloadService);
   });
 
-  it('should be created', () => {
-    expect(service).toBeTruthy();
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
-  it('generateAndDownload should load WASM, fetch details, process and download file on success', async () => {
-    const data: any = {
-      tag_id: 2,
-      other_projects: [
-        { project_id: 1, project_title: 'Project A' },
-        { project_id: 2, project_title: 'Project B' }
-      ],
-      regions: [{ region_name: 'Africa' }],
-      countries: [{ country_name: 'Kenya' }],
-      other_levers: [{ lever_full: 'Lever 1' }],
-      main_levers: [{ main_lever_name: 'Main Lever 1' }],
-      title: 'Test Title',
-      main_project: 'Main Project',
-      outcome_impact_statement: 'Statement',
-      geographic_scope: 'Global',
-      geographic_scope_comments: 'Comments',
-      handle_link: 'http://test.com'
-    };
+  function errorBlob(body: string, type = 'application/json'): HttpErrorResponse {
+    return new HttpErrorResponse({
+      error: new Blob([body], { type }),
+      status: 400,
+      statusText: 'Bad Request',
+      url: 'https://example.test/api/results/oicr/word-template/554'
+    });
+  }
 
-    apiMock.GET_OICRDetails.mockResolvedValue({ data } as any);
-    
-    const fileData = new Uint8Array([1, 2, 3]);
-    wasmMock.processDocx.mockResolvedValue({
-      success: true,
-      fileData
-    } as any);
+  it('saves the file as STAR_OICR_<code>_<yyyyMMdd>_<HHmm>.docx in local time', async () => {
+    jest.useFakeTimers({
+      now: new Date(2026, 9, 23, 14, 5, 30),
+      doNotFake: ['nextTick', 'queueMicrotask', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'setImmediate']
+    });
+    apiMock.GET_OicrWordTemplate.mockResolvedValue(new Blob(['PK']));
 
-    const result = await service.generateAndDownload(123);
+    await service.download(554);
 
-    expect(wasmMock.loadWasm).toHaveBeenCalled();
-    expect(apiMock.GET_OICRDetails).toHaveBeenCalledWith(123);
-    
-    // Verify data transformations
-    expect(data.other_projects_text).toBe('1 - Project A\n\n2 - Project B');
-    expect(data.regions_countries_text).toBe('Regions:\nAfrica\n\nCountries:\nKenya');
-    expect(data.tag_name_text).toBe('Updated OICR (Same Level of Maturity)');
-    expect(data.others_levers_text).toBe('Lever 1');
-    expect(data.main_levers_text).toBe('Main Lever 1');
-    
-    expect(wasmMock.processDocx).toHaveBeenCalled();
-    expect(wasmMock.downloadFile).toHaveBeenCalled();
-    expect(result.success).toBe(true);
-    
-    // Verify filename format
-    const [, filename] = (wasmMock.downloadFile.mock.calls[0] as any);
-    expect(filename).toMatch(/^STAR_OICR_123_\d{8}_\d{4}\.docx$/);
+    expect(apiMock.GET_OicrWordTemplate).toHaveBeenCalledTimes(1);
+    expect(apiMock.GET_OicrWordTemplate).toHaveBeenCalledWith(554);
+    expect(downloadedNames).toEqual(['STAR_OICR_554_20261023_1405.docx']);
   });
 
-  it('generateAndDownload should return error if WASM fails to load', async () => {
-    wasmMock.loadWasm.mockResolvedValue(false);
+  it('prefers errors over description', async () => {
+    apiMock.GET_OicrWordTemplate.mockRejectedValue(
+      errorBlob(JSON.stringify({ errors: 'Result is not an OICR', description: 'BadRequestException' }))
+    );
 
-    const result = await service.generateAndDownload(123);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('Failed to load WASM. Please try again.');
-    expect(apiMock.GET_OICRDetails).not.toHaveBeenCalled();
-    expect(wasmMock.processDocx).not.toHaveBeenCalled();
+    await expect(service.download(554)).rejects.toThrow('Result is not an OICR');
+    expect(downloadedNames).toEqual([]);
   });
 
-  it('generateAndDownload should handle processing errors', async () => {
-    const data: any = {
-      tag_id: 1,
-      other_projects: [],
-      regions: [],
-      countries: [],
-      other_levers: [],
-      main_levers: []
-    };
+  it('uses description when errors is absent', async () => {
+    apiMock.GET_OicrWordTemplate.mockRejectedValue(
+      errorBlob(JSON.stringify({ description: 'The OICR Word template applies to 2026 (Portfolio 2) OICRs only' }))
+    );
 
-    apiMock.GET_OICRDetails.mockResolvedValue({ data } as any);
-    wasmMock.processDocx.mockRejectedValue(new Error('Processing failed'));
-
-    const result = await service.generateAndDownload(123);
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Error inesperado');
+    await expect(service.download(554)).rejects.toThrow('The OICR Word template applies to 2026 (Portfolio 2) OICRs only');
   });
 
-  it('generateAndDownload should format regions and countries correctly', async () => {
-    const data: any = {
-      tag_id: 1,
-      other_projects: [],
-      regions: [{ region_name: 'Asia' }],
-      countries: [{ country_name: 'India' }, { country_name: 'China' }],
-      other_levers: [],
-      main_levers: []
-    };
+  it('uses the generic message when the body is HTML', async () => {
+    apiMock.GET_OicrWordTemplate.mockRejectedValue(errorBlob('<html><body>Bad Gateway</body></html>', 'text/html'));
 
-    apiMock.GET_OICRDetails.mockResolvedValue({ data } as any);
-    wasmMock.processDocx.mockResolvedValue({
-      success: true,
-      fileData: new Uint8Array([1, 2, 3])
-    } as any);
-
-    await service.generateAndDownload(123);
-
-    expect(data.regions_countries_text).toBe('Regions:\nAsia\n\nCountries:\nIndia, China');
-  });
-
-  it('generateAndDownload should handle empty regions and countries', async () => {
-    const data: any = {
-      tag_id: 1,
-      other_projects: [],
-      regions: [],
-      countries: [],
-      other_levers: [],
-      main_levers: []
-    };
-
-    apiMock.GET_OICRDetails.mockResolvedValue({ data } as any);
-    wasmMock.processDocx.mockResolvedValue({
-      success: true,
-      fileData: new Uint8Array([1, 2, 3])
-    } as any);
-
-    await service.generateAndDownload(123);
-
-    expect(data.regions_countries_text).toBe('');
-  });
-
-  it('generateAndDownload should map tag IDs to text correctly', async () => {
-    const testCases = [
-      { tag_id: 1, expected: 'New OICR' },
-      { tag_id: 2, expected: 'Updated OICR (Same Level of Maturity)' },
-      { tag_id: 3, expected: 'Updated OICR (New Level of Maturity)' }
-    ];
-
-    for (const testCase of testCases) {
-      const data: any = {
-        tag_id: testCase.tag_id,
-        other_projects: [],
-        regions: [],
-        countries: [],
-        other_levers: [],
-        main_levers: []
-      };
-
-      apiMock.GET_OICRDetails.mockResolvedValue({ data } as any);
-      wasmMock.processDocx.mockResolvedValue({
-        success: true,
-        fileData: new Uint8Array([1, 2, 3])
-      } as any);
-
-      await service.generateAndDownload(123);
-
-      expect(data.tag_name_text).toBe(testCase.expected);
-    }
+    await expect(service.download(554)).rejects.toThrow(OICR_WORD_TEMPLATE_GENERIC_ERROR);
   });
 });
-

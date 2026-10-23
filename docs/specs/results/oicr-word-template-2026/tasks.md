@@ -226,7 +226,7 @@ graph TD
 
 ### T-04 — Client download through the endpoint
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-03 (endpoint contract; editing can start in parallel against the §4 contract) · **Review:** `full` — shared interceptor and the error UX
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** M · **Dependencies:** T-03 (endpoint contract; editing can start in parallel against the §4 contract) · **Review:** `full` — shared interceptor and the error UX
 - **Requirements covered:**
   - R-OWT-008: the click downloads, the loading state, the error toast.
   - R-OWT-001: the version line (no `useResultInterceptor`).
@@ -267,10 +267,10 @@ graph TD
   - `pages/oicr-download/oicr-download.component.spec.ts` (still calls the service; adjusted in T-06).
   - `api.service.spec.ts` (additive method).
 - **Done criteria:**
-  - [ ] Specs green.
-  - [ ] Falsifiers observed red.
-  - [ ] Build and `tsc -p tsconfig.spec.json` green.
-  - [ ] The button no longer imports `WasmService`.
+  - [x] Specs green.
+  - [x] Falsifiers observed red.
+  - [x] Build and `tsc -p tsconfig.spec.json` green (spec tsc: 945 pre-existing errors before/after, none new).
+  - [x] The button no longer imports `WasmService`.
 - **Skills:** `angular-developer`, `error-handling-patterns`
 
 ### T-05 — Button visibility: Portfolio 2 only

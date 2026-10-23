@@ -2,15 +2,13 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import OicrDownloadComponent from './oicr-download.component';
-import { WasmService, ProcessResult } from '@shared/services/go/wasm.service';
 import { OicrDownloadService } from '@shared/services/oicr-download.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('OicrDownloadComponent', () => {
   let component: OicrDownloadComponent;
   let fixture: ComponentFixture<OicrDownloadComponent>;
-  let wasmMock: jest.Mocked<WasmService>;
-  let oicrDownloadServiceMock: jest.Mocked<OicrDownloadService>;
+  let oicrDownloadServiceMock: { download: jest.Mock };
   let routerMock: jest.Mocked<Router>;
   let routeMock: Partial<ActivatedRoute>;
   let queryParamsSubject: Subject<any>;
@@ -18,13 +16,9 @@ describe('OicrDownloadComponent', () => {
   beforeEach(async () => {
     queryParamsSubject = new Subject<any>();
 
-    wasmMock = {
-      loadWasm: jest.fn().mockResolvedValue(true)
-    } as unknown as jest.Mocked<WasmService>;
-
     oicrDownloadServiceMock = {
-      generateAndDownload: jest.fn()
-    } as unknown as jest.Mocked<OicrDownloadService>;
+      download: jest.fn()
+    };
 
     routerMock = {
       navigate: jest.fn().mockResolvedValue(true)
@@ -37,7 +31,6 @@ describe('OicrDownloadComponent', () => {
     await TestBed.configureTestingModule({
       imports: [OicrDownloadComponent],
       providers: [
-        { provide: WasmService, useValue: wasmMock },
         { provide: OicrDownloadService, useValue: oicrDownloadServiceMock },
         { provide: Router, useValue: routerMock },
         { provide: ActivatedRoute, useValue: routeMock }
@@ -59,16 +52,14 @@ describe('OicrDownloadComponent', () => {
 
   describe('ngOnInit', () => {
     it('should trigger download when resultCode is present in query params', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       fixture.detectChanges();
       queryParamsSubject.next({ resultCode: '12345' });
 
       await fixture.whenStable();
 
-      expect(oicrDownloadServiceMock.generateAndDownload).toHaveBeenCalledWith('12345');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('12345');
     });
 
     it('should set error result when resultCode is missing', () => {
@@ -79,7 +70,7 @@ describe('OicrDownloadComponent', () => {
         success: false,
         error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
       });
-      expect(oicrDownloadServiceMock.generateAndDownload).not.toHaveBeenCalled();
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
     });
 
     it('should not trigger download when resultCode is undefined', () => {
@@ -90,89 +81,66 @@ describe('OicrDownloadComponent', () => {
         success: false,
         error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
       });
-      expect(oicrDownloadServiceMock.generateAndDownload).not.toHaveBeenCalled();
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
     });
   });
 
   describe('generateAndDownload', () => {
     it('should set processing to true and call service', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
-      expect(oicrDownloadServiceMock.generateAndDownload).toHaveBeenCalledWith(12345);
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith(12345);
       expect(component.result?.success).toBe(true);
     });
 
-    it('should set wasmLoaded and navigate on success with numeric resultCode', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+    it('should navigate on success with numeric resultCode', async () => {
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(19542);
 
-      expect(component.wasmLoaded()).toBe(true);
-      expect(routerMock.navigate).toHaveBeenCalledWith([
-        '/result',
-        `${PLATFORM_CODES.STAR}-19542`,
-        'general-information'
-      ]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', `${PLATFORM_CODES.STAR}-19542`, 'general-information']);
     });
 
     it('should navigate with full resultCode path when resultCode includes dash', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload('STAR-19542');
 
-      expect(routerMock.navigate).toHaveBeenCalledWith([
-        '/result',
-        'STAR-19542',
-        'general-information'
-      ]);
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', 'STAR-19542', 'general-information']);
     });
 
-    it('should handle service errors and set processing to false', async () => {
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: false,
-        error: 'Failed to load WASM'
-      } as ProcessResult);
+    it('should show the service error message and not navigate', async () => {
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
 
       await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
       expect(component.result?.success).toBe(false);
-      expect(component.result?.error).toBe('Failed to load WASM');
+      expect(component.result?.error).toBe('Result is not an OICR');
       expect(routerMock.navigate).not.toHaveBeenCalled();
     });
 
     it('should reset result before processing', async () => {
-      component.result = { success: false, error: 'Previous error' } as ProcessResult;
+      component.result = { success: false, error: 'Previous error' };
 
-      oicrDownloadServiceMock.generateAndDownload.mockResolvedValue({
-        success: true
-      } as ProcessResult);
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
 
       await component.generateAndDownload(12345);
 
       expect(component.result?.success).toBe(true);
     });
 
-    it('should always set processing to false in finally block even on error', async () => {
+    it('should set processing to false when the download rejects', async () => {
       component.processing.set(true);
-      oicrDownloadServiceMock.generateAndDownload.mockRejectedValue(new Error('Test error'));
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
 
-      try {
-        await component.generateAndDownload(12345);
-      } catch {
-        // Expected to throw
-      }
+      await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
+      expect(component.result?.error).toBe('Result is not an OICR');
     });
   });
 
@@ -206,10 +174,5 @@ describe('OicrDownloadComponent', () => {
     it('should initialize with result as null', () => {
       expect(component.result).toBeNull();
     });
-
-    it('should initialize with wasmLoaded as false', () => {
-      expect(component.wasmLoaded()).toBe(false);
-    });
   });
 });
-
