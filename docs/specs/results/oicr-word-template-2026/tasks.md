@@ -302,7 +302,7 @@ graph TD
 
 ### T-06 — Guarded download route, legacy redirect and page states
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-04 · **Review:** `full` — auth routing and the login round trip
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** M · **Dependencies:** T-04 · **Review:** `full` — auth routing and the login round trip
 - **Requirements covered:**
   - R-OWT-009: login required, return with the same code, auto-download, navigate on success, loading, error without navigation, and the BUT for a 2025 link.
   - R-OWT-010: redirect; missing parameter → error.
@@ -332,9 +332,9 @@ graph TD
 - **Disqualifier:** the Cognito round trip (logged out → login → back on `/oicr/download/554` → file) **cannot** be reached by unit tests. Only the HITL check in T-08 evidences it (requirements D-6).
 - **Consumers:** `app.routes.spec.ts`, `pages/oicr-download/oicr-download.component.spec.ts`.
 - **Done criteria:**
-  - [ ] Specs green.
-  - [ ] Falsifiers observed red.
-  - [ ] Build green.
+  - [x] Specs green.
+  - [x] Falsifiers observed red.
+  - [x] Build green.
 - **Skills:** `angular-developer`
 
 ### T-07 — Retire the WASM generation path

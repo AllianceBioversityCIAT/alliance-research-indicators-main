@@ -276,3 +276,59 @@
 - **Decisions made:** the countries role filter was accepted per design §3, based on the live-data check above.
 - **Forward pointer → T-03 `[advisory-grade]`:** the service could treat a null core data row (no active `result_oicrs`) as an error instead of filling an empty title and year (RESILIENCE advisory above). Advisory only; T-03 must not widen scope for it.
 - **Final verification:** PASS.
+
+### T-03 — pre-start (P-22, RB-1)
+
+- **2026-10-23, Leader probe:** `curl` from the Leader's workstation returns `200 112531`. That is not the runtime the premise is about. The Leader has no route to the Dev host: `~/.ssh/config` has no hosts, and `docs/infrastructure.md:66` gives agents no access to deployment hosts.
+- **Owner decision (AskUserQuestion):** "I'll run the curl on Dev". T-03 is held until the owner pastes the Dev-host result. T-06 (client) proceeds in parallel.
+
+### T-06 — Guarded download route, legacy redirect and page states
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-23
+- **Effort:** medium.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full` (auth routing).
+- **Skills deviation:** `angular-developer` could not load on the Cursor host; the brief carried it in prose.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium`, Orca `run_704dd2d24af9` / `task_b70b3ced1dc8` / `ctx_4095e355828f` (retained until PASS, released after). Brief: `T-06-brief.md`, report: `T-06-report.md` (session scratchpad).
+- **Files changed:**
+  - `client/research-indicators/src/app/app.routes.ts` (+ spec);
+  - `client/research-indicators/src/app/pages/oicr-download/oicr-download.component.ts` (+ spec);
+  - the HTML is unchanged: the loading and error markup already existed.
+- **Implementer verification:**
+  - 2 specs: `Tests: 26 passed, 26 total`;
+  - build: exit 0;
+  - `npm run lint -- --quiet`: `All files pass linting.`;
+  - `tsc -p tsconfig.spec.json`: 945 errors before and after, with identical normalized sets.
+- **Falsifiers (verbatim, reverted):**
+  - `canMatch` removed:
+    - test `requires login on /oicr/download/:resultCode and declares that route before the legacy entry`;
+    - red: `Matcher error: received value must not be null nor undefined` / `Received has value: undefined` at `expect(guarded.canMatch).toContain(rolesGuard)`.
+  - Navigate on error:
+    - test `shows the service error and does not navigate`;
+    - red: `Expected number of calls: 0` / `Received number of calls: 1` / `1: ["/result", "STAR-554", "general-information"]`.
+- **Not claimed:** the Cognito round trip (requirements D-6). It is owned by T-08 HITL.
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - 2 specs: `Tests: 26 passed, 26 total`.
+  - Full client suite: `Test Suites: 346 passed, 346 total` · `Tests: 8070 passed, 8070 total`, exit 0.
+  - `npm run build`: exit 0.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - Neither route has children, so `/oicr/download` and `/oicr/download/554` each match only their own route.
+  - `isDeclaredUnder` returns true for a route with no children, so `returnUrl` is `/oicr/download/554` (`roles.guard.ts:29-31`, `:82`).
+  - The legacy entry stays unguarded and redirects before the guard runs, as D-OWT-10 requires.
+  - `snapshot` is correct for both entries: the redirect moves to a different route config, so a new component instance is created.
+  - No claim of the Cognito leg.
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY: the route test checks that the guard is configured, not what it does. Two cases using the existing `navigate()` harness in `app.routes.spec.ts:18-35` would pin P-12 as a test: logged out → `/login?returnUrl=%2Foicr%2Fdownload%2F554`; logged in → stays on the link.
+  - READABILITY: the loading test asserts `processing() === true` without a prior negative assertion.
+  - RESILIENCE: `snapshot` misses a parameter-only change on a reused component. Not reachable today: there are no in-app links to the route.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-medium): not reported by host, ended complete;
+  - reviewer: 11 calls, 59,341 tokens, ended complete.
+- **Requirements covered:**
+  - R-OWT-009 (unit-reachable parts: login required by config, auto-download, navigate on success, loading, error without navigation);
+  - R-OWT-010 (redirect; missing parameter → error).
+- **Final verification:** PASS.

@@ -47,20 +47,21 @@ export default class OicrDownloadComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Get resultCode from query params
-    this.route.queryParams.subscribe(params => {
-      const resultCode = params['resultCode'];
+    const pathCode = this.route.snapshot.paramMap.get('resultCode');
+    if (pathCode) {
+      this.generateAndDownload(pathCode);
+      return;
+    }
 
-      if (!resultCode) {
-        this.result = {
-          success: false,
-          error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
-        };
-        return;
-      }
+    const queryCode = this.route.snapshot.queryParamMap.get('resultCode');
+    if (queryCode) {
+      this.router.navigate(['/oicr/download', queryCode], { replaceUrl: true });
+      return;
+    }
 
-      // Auto-trigger download when component loads
-      this.generateAndDownload(resultCode);
-    });
+    this.result = {
+      success: false,
+      error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
+    };
   }
 }

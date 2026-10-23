@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
-import { Subject } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import OicrDownloadComponent from './oicr-download.component';
 import { OicrDownloadService } from '@shared/services/oicr-download.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
@@ -10,12 +9,16 @@ describe('OicrDownloadComponent', () => {
   let fixture: ComponentFixture<OicrDownloadComponent>;
   let oicrDownloadServiceMock: { download: jest.Mock };
   let routerMock: jest.Mocked<Router>;
-  let routeMock: Partial<ActivatedRoute>;
-  let queryParamsSubject: Subject<any>;
+  let routeMock: { snapshot: { paramMap: ReturnType<typeof convertToParamMap>; queryParamMap: ReturnType<typeof convertToParamMap> } };
+
+  const setRoute = (pathCode?: string, queryCode?: string) => {
+    routeMock.snapshot = {
+      paramMap: convertToParamMap(pathCode ? { resultCode: pathCode } : {}),
+      queryParamMap: convertToParamMap(queryCode ? { resultCode: queryCode } : {})
+    };
+  };
 
   beforeEach(async () => {
-    queryParamsSubject = new Subject<any>();
-
     oicrDownloadServiceMock = {
       download: jest.fn()
     };
@@ -25,7 +28,10 @@ describe('OicrDownloadComponent', () => {
     } as unknown as jest.Mocked<Router>;
 
     routeMock = {
-      queryParams: queryParamsSubject.asObservable()
+      snapshot: {
+        paramMap: convertToParamMap({}),
+        queryParamMap: convertToParamMap({})
+      }
     };
 
     await TestBed.configureTestingModule({
@@ -42,7 +48,6 @@ describe('OicrDownloadComponent', () => {
   });
 
   afterEach(() => {
-    queryParamsSubject.complete();
     jest.clearAllMocks();
   });
 
@@ -51,37 +56,66 @@ describe('OicrDownloadComponent', () => {
   });
 
   describe('ngOnInit', () => {
-    it('should trigger download when resultCode is present in query params', async () => {
+    it('calls the download service with the path code', async () => {
       oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
 
       fixture.detectChanges();
-      queryParamsSubject.next({ resultCode: '12345' });
-
       await fixture.whenStable();
 
-      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('12345');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554');
     });
 
-    it('should set error result when resultCode is missing', () => {
+    it('redirects a legacy query code to the path form', () => {
+      setRoute(undefined, '554');
+
       fixture.detectChanges();
-      queryParamsSubject.next({});
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/oicr/download', '554'], { replaceUrl: true });
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+    });
+
+    it('shows the missing resultCode error when no code is present', () => {
+      fixture.detectChanges();
 
       expect(component.result).toEqual({
         success: false,
         error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
       });
+      expect(fixture.nativeElement.textContent).toContain('Missing resultCode parameter. Please provide a valid resultCode in the URL.');
       expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
     });
 
-    it('should not trigger download when resultCode is undefined', () => {
-      fixture.detectChanges();
-      queryParamsSubject.next({ resultCode: undefined });
+    it('shows the service error and does not navigate', async () => {
+      oicrDownloadServiceMock.download.mockRejectedValue(new Error('Result is not an OICR'));
+      setRoute('554');
 
-      expect(component.result).toEqual({
-        success: false,
-        error: 'Missing resultCode parameter. Please provide a valid resultCode in the URL.'
-      });
-      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.textContent).toContain('Result is not an OICR');
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('navigates to general information after a successful download', async () => {
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/result', `${PLATFORM_CODES.STAR}-554`, 'general-information']);
+    });
+
+    it('shows Preparing your document while the download is in flight', () => {
+      oicrDownloadServiceMock.download.mockReturnValue(new Promise(() => undefined));
+      setRoute('554');
+
+      fixture.detectChanges();
+
+      expect(component.processing()).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('Preparing your document');
     });
   });
 
