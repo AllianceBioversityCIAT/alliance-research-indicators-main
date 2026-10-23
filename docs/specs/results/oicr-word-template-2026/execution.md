@@ -80,3 +80,82 @@
 - **Requirements covered:** R-OWT-008 (visibility table, both scenarios).
 - **Decisions made:** the P-16 smoke check ran on the DB function instead of the Dev metadata response (no authenticated session). Its scope is recorded above.
 - **Final verification:** PASS.
+
+### T-01 — Document engine (pure) with fidelity, field and drift suites
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-23
+- **Effort:** high. Size L, the binary-format core, well specified by design §5 step 7 and the validated POC.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+- **Skills deviation:** `nestjs-expert`, `tdd` and `error-handling-patterns` could not load on the Cursor host. The brief carried their discipline in prose: red on the assertion first, literal expected values, one named error class per failure kind, no `@nestjs` import.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-high`, Orca `run_704dd2d24af9` / `task_9e60c6874a1b` / `ctx_09afc0c1f620` (retained until PASS, released after). Brief: `T-01-brief.md`, report: `T-01-report.md` (session scratchpad).
+- **Files changed:**
+  - new under `server/researchindicators/src/domain/entities/result-oicr/word-template/`:
+    - `oicr-word-template.ids.ts` (43 lines);
+    - `oicr-word-template.engine.ts` (821);
+    - `oicr-word-template.engine.spec.ts` (798);
+    - `__fixtures__/oicr-template-2026.docx` (binary);
+  - modified: `server/researchindicators/package.json` and `package-lock.json` (+2 lines each: the two direct dependency declarations).
+- **Implementer verification:**
+  - scoped suite: `Tests: 24 passed, 24 total`;
+  - `npx eslint src/domain/entities/result-oicr/word-template`: exit 0;
+  - `npm run build`: exit 0;
+  - `npm ls`: both libraries are direct dependencies.
+- **Falsifiers (a)–(g), each observed red on its behavioral assertion, then reverted** (verbatim from the Implementer report):
+  - (a) Text outside a target (`quantify` → `QUANTIFY` in the generated buffer): the `firstDiff` object received `"output": "QUANTIFY the scale and reach of the reported out"` against `"template": "quantify the scale and reach of the reported out"`, where empty strings were expected.
+  - (b) One `w:del` dropped: `Expected: 5` / `Received: 3`.
+  - (c) Duplicate `w:id`: `Expected: 151` / `Received: 150` (set size against array length).
+  - (d) `Multi-regional` written into the geo scope: `- Array []` / `+ Array [ "Multi-regional" ]` from `selectedOptionMismatches`.
+  - (e) `styles.xml` changed: `- Array []` / `+ Array [ "word/styles.xml" ]`.
+  - (f) `setOption` skips silently: `Expected constructor: OicrWordTemplateMissingOptionError` / `Received value: undefined`.
+  - (g) Positional section-15 addressing with swapped columns: `Expected: "Name Value"` / `Received: "Position Value"`.
+- **Fixture SHA-1:** `e469c79d7f00fe053c975d0d8b6b3a55b6712658`. It matches the POC template and P-6, and the suite also asserts it.
+- **POC vs design:** the ids agree. Where the two differ, the design won:
+  - `textId` is copied (the POC forced `77777777`);
+  - leaves are addressed by pinned id (the POC used position);
+  - errors are named;
+  - validation runs before any write;
+  - XML 1.0 normalization was added.
+- **Evidence re-run (Leader, inline, after the worker reported): VERIFIED.**
+  - Scoped suite: `Tests: 24 passed, 24 total`.
+  - `npm ls jszip @xmldom/xmldom`: `├── @xmldom/xmldom@0.8.10` and `├── jszip@3.10.1` (direct dependencies).
+  - eslint: exit 0. Build: exit 0.
+  - `shasum` of the fixture: `e469c79d…`.
+  - Full server suite (`npm test -- --silent`): `Test Suites: 442 passed, 442 total` · `Tests: 4298 passed, 4298 total`, exit 0.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus). Findings:
+  - design §5 steps 7.1–7.9 are all met;
+  - `validate` runs before `applyFields`;
+  - named errors use the §4 wording;
+  - N counts none-label rows; fresh `w:id`/`paraId` below `0x80000000`; `textId` copied;
+  - the null edit compares against the raw zip string;
+  - the drift guards cover all six §10 mutations and assert that no buffer is returned;
+  - the engine imports only `@xmldom/xmldom`, `jszip` and the ids module;
+  - the lockfile diff holds only the two declarations.
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY: the xmldom parser ignores non-fatal parse errors (`error: () => undefined`), so a hand-corrupted template might parse into the wrong structure. Suggestion: treat errors as fatal.
+  - RISK: `cloneItems` gives fresh ids only to `w:sdt` `w:id`s and to paraIds. A `w:commentRangeStart` or `w:permStart` inside an item would duplicate its id, and validation does not scan for those tags. The current fixture is not affected (P-21).
+  - TEST COVERAGE: the "no placeholder flag/style" check lists 12 controls. It omits position, affiliation, email, the 3.b rows, the "If other" rows and the cloned 3.a rows. §10 says "every filled control"; it is the same `setText` path.
+  - TEST STRENGTH (KZ-001): the special-character check reads re-serialized output. Asserting on the raw `outXml` string would be stronger.
+  - READABILITY: a structure error thrown inside `cloneItems` names the control `'repeatingSection'`. It is unreachable through `build`.
+  - LOCKFILE: a `deprecated` line written by `npm install` was removed by hand and will return on a later install.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-high): not reported by host, ended complete;
+  - reviewer: 14 calls, 117,075 tokens, ended complete.
+- **Requirements covered:** R-OWT-004, R-OWT-005, R-OWT-006 (template rows), NFR-OWT-003; the engine parts of R-OWT-002 and R-OWT-003.
+- **Decisions made:** none beyond the brief.
+- **Final verification:** PASS.
+
+## Budget Tripwire — after T-01 (2026-10-23)
+
+| Measure | Budget (design §14) | Actual so far | Delta |
+|---|---|---|---|
+| Tasks | 8 | 2 closed (T-01, T-05) | on plan |
+| LOC added | ~1 400 for the whole spec (≈ 700 server code + tests over engine, mapper and drift guards) | ~1 700 after 2 of 8 tasks: T-01 1 662 (engine 821, spec 798, ids 43) plus T-05 +40/−51 | **exceeded**: T-01 alone is above the whole-spec estimate, with T-02, T-03, T-04 and T-06 still to come |
+| Review rounds | 12 | 2 (both PASS on the first attempt) | under |
+
+- **Cause:** the engine and its suite are about 2.4× the per-component estimate. The design §5 step 7 hardening and the §10 suite (24 tests, falsifiers (a)–(g), 6+ drift guards) went past the POC's ~300 lines. The estimate sized the port, not the hardening.
+- **Action:** execution stopped and escalated to the owner before T-02, per `/akili-execute` §2.4 (Budget Tripwire).

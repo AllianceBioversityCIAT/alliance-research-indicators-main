@@ -51,7 +51,7 @@ graph TD
 
 ### T-01 — Document engine (pure) with fidelity, field and drift suites
 
-- **Status:** todo · **Size:** L · **Dependencies:** none · **Review:** `full` — this is the binary-format core, and every "never half-fill" guarantee lives here
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** L · **Dependencies:** none · **Review:** `full` — this is the binary-format core, and every "never half-fill" guarantee lives here
 - **Requirements covered:** R-OWT-004, R-OWT-005, R-OWT-006 (template rows), NFR-OWT-003; part of R-OWT-002 (placeholder kept, untouched fields) and R-OWT-003 (exact option)
 - **Design refs:** §2.1 (`word-template/*.ids.ts`, `*.engine.ts`, `__fixtures__/`), §5 step 7, §10 engine rows, D-OWT-2, D-OWT-3, D-OWT-4, D-OWT-16, P-6, P-7, P-8, P-21
 - **Scope:**
@@ -102,11 +102,11 @@ graph TD
   - A red that comes from a missing fixture path is not a red.
 - **Consumers:** none (new symbols only).
 - **Done criteria:**
-  - [ ] All engine tests green.
-  - [ ] Falsifiers (a)–(g) each observed red and quoted in `execution.md`.
-  - [ ] The fixture SHA-1 is recorded.
-  - [ ] `npm ls` shows both libraries as direct dependencies.
-  - [ ] Build green.
+  - [x] All engine tests green.
+  - [x] Falsifiers (a)–(g) each observed red and quoted in `execution.md`.
+  - [x] The fixture SHA-1 is recorded.
+  - [x] `npm ls` shows both libraries as direct dependencies.
+  - [x] Build green.
 - **Skills:** `nestjs-expert`, `tdd`, `error-handling-patterns`
 
 ### T-02 — Modal data query and homologation mapper
