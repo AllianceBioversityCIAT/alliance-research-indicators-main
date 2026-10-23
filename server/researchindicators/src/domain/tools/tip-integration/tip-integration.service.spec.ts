@@ -16,7 +16,8 @@ import { TipIntegrationRepository } from './repository/tip-integration.repositor
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
 import { SaveResultService } from '../../shared/services/save-all-sections.service';
 import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-platform.enum';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
+import { SyncProcessEnum } from '../../entities/sync-process-log/enum/sync-process.enum';
 import {
   TipKnowledgeProductDto,
   TipMappedResult,
@@ -29,6 +30,11 @@ import { PrmsRepository } from '../open-search/prms/repositories/prms.repository
 import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
 import { TemportalDataResponse } from '../open-search/prms/dto/prms-response.dto';
 import { SyncStagingRecordsEntity } from '../open-search/prms/entities/sync-staging-records.entity';
+import {
+  TipHandleRepository,
+  TipHandleResolution,
+  TipHandleRow,
+} from './repository/tip-handle.repository';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -43,6 +49,7 @@ describe('TipIntegrationService', () => {
   let prmsRepository: jest.Mocked<PrmsRepository>;
   let clarisaSdgsService: jest.Mocked<ClarisaSdgsService>;
   let bilateralService: { importAlignmentFromTip: jest.Mock };
+  let tipHandleRepository: { resolve: jest.Mock };
 
   const mockResultRepo = {
     findOne: jest.fn(),
@@ -117,6 +124,7 @@ describe('TipIntegrationService', () => {
             findResultAlignment: jest.fn(),
             updateResultAlignment: jest.fn(),
             saveGeoLocation: jest.fn(),
+            newOfficialCode: jest.fn().mockResolvedValue(9001),
           },
         },
         {
@@ -193,13 +201,29 @@ describe('TipIntegrationService', () => {
             initiateSync: jest.fn().mockResolvedValue({ id: 1 }),
             update: jest.fn().mockResolvedValue(undefined),
             endSync: jest.fn().mockResolvedValue(undefined),
+            isInProgressYoungerThan: jest.fn().mockResolvedValue(false),
+            markFailed: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
           provide: SaveResultService,
           useValue: {
             bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
-            saveAllSections: jest.fn().mockResolvedValue(undefined),
+            saveAllSections: jest.fn().mockResolvedValue({
+              resultId: 1,
+              outcome: 'created',
+            }),
+          },
+        },
+        {
+          provide: TipHandleRepository,
+          useValue: {
+            resolve: jest.fn().mockResolvedValue({
+              live: null,
+              otherLive: [],
+              versions: {},
+              otherVersions: [],
+            }),
           },
         },
         {
@@ -236,6 +260,7 @@ describe('TipIntegrationService', () => {
     prmsRepository = module.get(PrmsRepository);
     clarisaSdgsService = module.get(ClarisaSdgsService);
     bilateralService = module.get(BilateralService);
+    tipHandleRepository = module.get(TipHandleRepository);
 
     mockAgressoRepo.find.mockReset();
     mockAgressoRepo.find.mockImplementation(echoKnownAgreements);
@@ -342,6 +367,9 @@ describe('TipIntegrationService', () => {
   describe('getKnowledgeProductsByYear', () => {
     beforeEach(() => {
       jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      mockStagingRepo.save.mockReset();
+      mockStagingRepo.save.mockResolvedValue(undefined);
+      syncProcessLogService.isInProgressYoungerThan.mockResolvedValue(false);
     });
 
     it('should fetch TIP data, load temporal results, process and end sync', async () => {
@@ -366,16 +394,30 @@ describe('TipIntegrationService', () => {
       );
       expect(service.processing).toHaveBeenCalledWith([]);
       expect(saveResultService.bulkSaveAllSections).not.toHaveBeenCalled();
-      expect(saveResultService.saveAllSections).toHaveBeenCalledWith(mapped, {
-        platformCode: ReportingPlatformEnum.TIP,
-        resultSaved: expect.any(Array),
-        counters: expect.any(Object),
-        manageOfficialCode: true,
-        findOptions: {
-          public_link: 'public_link',
-          is_snapshot: 'is_version_applied',
-        },
+      expect(saveResultService.saveAllSections).toHaveBeenCalledTimes(2);
+      const extras = saveResultService.saveAllSections.mock.calls.map(
+        (call) => call[1],
+      );
+      expect(extras[0].platformCode).toBe(ReportingPlatformEnum.TIP);
+      expect(extras[0].manageOfficialCode).toBe(true);
+      expect(extras[0].findOptions).toBeUndefined();
+      expect(extras[0].target).toEqual({
+        officialCode: 9001,
+        isSnapshot: true,
       });
+      expect(extras[1].target).toEqual({
+        officialCode: 9001,
+        isSnapshot: false,
+        compensateRowOnly: true,
+      });
+      expect(extras[0]).not.toBe(extras[1]);
+      const firstPayload = saveResultService.saveAllSections.mock.calls[0][0];
+      const secondPayload = saveResultService.saveAllSections.mock.calls[1][0];
+      expect(firstPayload).not.toBe(mapped);
+      expect(secondPayload).not.toBe(mapped);
+      expect(firstPayload).not.toBe(secondPayload);
+      expect(firstPayload).toEqual(mapped);
+      expect(secondPayload).toEqual(mapped);
       expect(mapped.is_version_applied).toBe(false);
       expect(syncProcessLogService.update).toHaveBeenCalledWith(
         1,
@@ -411,9 +453,13 @@ describe('TipIntegrationService', () => {
         .spyOn(service as any, 'getRequest')
         .mockReturnValueOnce(of({ data: page1 }))
         .mockReturnValueOnce(of({ data: page2 }));
-      jest
-        .spyOn(service, 'processing')
-        .mockResolvedValue([{ official_code: 1 }] as any);
+      jest.spyOn(service, 'processing').mockResolvedValue([
+        {
+          official_code: 1,
+          public_link: 'http://link.example',
+          createResult: { year: 2026 },
+        },
+      ] as any);
       prmsRepository.findTemporalResults.mockResolvedValue([
         wrapTemporal({ ...baseProduct, name: 'KP 1' }),
       ] as any);
@@ -424,7 +470,7 @@ describe('TipIntegrationService', () => {
       expect(getRequestSpy.mock.calls[1][0]).toContain('offset=50');
       expect((service as any).sleep).toHaveBeenCalledTimes(1);
       expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
-      expect(saveResultService.saveAllSections).toHaveBeenCalledTimes(1);
+      expect(saveResultService.saveAllSections).toHaveBeenCalledTimes(2);
       expect(saveResultService.bulkSaveAllSections).not.toHaveBeenCalled();
     });
 
@@ -474,6 +520,95 @@ describe('TipIntegrationService', () => {
       expect(stagedCodes).toEqual([1, 4]);
     });
 
+    it('should read staging only after every deferred staging save resolves', async () => {
+      const page = {
+        data: [
+          { id: 1, name: 'KP 1' },
+          { id: 2, name: 'KP 2' },
+        ],
+        data_count: 2,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+
+      const resolvers: Array<() => void> = [];
+      let unresolved = 0;
+      let readWhileUnresolved = false;
+      mockStagingRepo.save.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            unresolved += 1;
+            resolvers.push(() => {
+              unresolved -= 1;
+              resolve(undefined);
+            });
+          }),
+      );
+      prmsRepository.findTemporalResults.mockImplementation(async () => {
+        if (unresolved > 0) readWhileUnresolved = true;
+        return [];
+      });
+
+      const run = service.getKnowledgeProductsByYear(2025);
+      const readyDeadline = Date.now() + 1000;
+      while (
+        mockStagingRepo.save.mock.calls.length === 0 &&
+        Date.now() < readyDeadline
+      ) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(mockStagingRepo.save).toHaveBeenCalled();
+      expect(prmsRepository.findTemporalResults).not.toHaveBeenCalled();
+      expect(readWhileUnresolved).toBe(false);
+
+      const releaseDeadline = Date.now() + 1000;
+      while (resolvers.length > 0 && Date.now() < releaseDeadline) {
+        resolvers.splice(0).forEach((release) => release());
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await run;
+
+      expect(readWhileUnresolved).toBe(false);
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalledTimes(1);
+    });
+
+    it('should count one rejected staging save and continue the run', async () => {
+      const page = {
+        data: [
+          { id: 1, name: 'KP ok' },
+          { id: 2, name: 'KP bad' },
+        ],
+        data_count: 2,
+      };
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: page }));
+      jest.spyOn(service, 'processing').mockResolvedValue([]);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+      const logSpy = jest.spyOn((service as any).logger, 'log');
+      mockStagingRepo.save.mockImplementation((record: { code: number }) => {
+        if (record.code === 2) {
+          return Promise.reject(new Error('write failed'));
+        }
+        return Promise.resolve(undefined);
+      });
+
+      await service.getKnowledgeProductsByYear(2025);
+
+      expect(mockStagingRepo.save).toHaveBeenCalledTimes(2);
+      expect(prmsRepository.findTemporalResults).toHaveBeenCalledTimes(1);
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('staging failures 1'),
+      );
+    });
+
     it('should throw BadRequestException and clean temporal data when TIP API request fails', async () => {
       jest
         .spyOn(service as any, 'getRequest')
@@ -482,9 +617,51 @@ describe('TipIntegrationService', () => {
       await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
         BadRequestException,
       );
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        'Error saving temporal data',
+      );
+      expect(syncProcessLogService.markFailed).toHaveBeenCalledWith(1);
       expect(prmsRepository.deleteTemporalResults).toHaveBeenCalledWith(
         expect.any(String),
       );
+    });
+
+    it('refuses a run already in progress with ConflictException and creates no log row', async () => {
+      syncProcessLogService.isInProgressYoungerThan.mockResolvedValue(true);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      let caught: unknown;
+      try {
+        await service.getKnowledgeProductsByYear(2025);
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(ConflictException);
+      const conflict = caught as ConflictException;
+      expect(conflict.getStatus()).toBe(409);
+      expect(conflict.message).toBe('TIP sync already in progress');
+      expect(conflict.message).not.toBe('Error saving temporal data');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP sync refused: a run is already in progress',
+      );
+      expect(
+        syncProcessLogService.isInProgressYoungerThan,
+      ).toHaveBeenCalledWith(SyncProcessEnum.TIP_INTEGRATION, 6);
+      expect(syncProcessLogService.initiateSync).not.toHaveBeenCalled();
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+      expect(prmsRepository.deleteTemporalResults).not.toHaveBeenCalled();
+    });
+
+    it('does not mark a log row FAILED when initiateSync throws before a row exists', async () => {
+      syncProcessLogService.initiateSync.mockRejectedValueOnce(
+        new Error('insert failed'),
+      );
+
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        'Error saving temporal data',
+      );
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
     });
   });
 
@@ -784,6 +961,12 @@ describe('TipIntegrationService', () => {
     const savedRows: {
       result_id: number;
       where: Record<string, unknown>;
+      target?: {
+        isSnapshot?: boolean;
+        officialCode?: number;
+        resultId?: number;
+        compensateRowOnly?: boolean;
+      };
     }[] = [];
 
     beforeEach(() => {
@@ -799,12 +982,25 @@ describe('TipIntegrationService', () => {
           for (const key of Object.keys(extra?.findOptions ?? {})) {
             where[key] = result[extra.findOptions[key]];
           }
-          savedRows.push({ result_id: nextId++, where });
+          const resultId = nextId++;
+          savedRows.push({
+            result_id: resultId,
+            where,
+            target: extra?.target ? { ...extra.target } : undefined,
+          });
           const link = result.public_link ?? '';
-          if (link.endsWith('/created')) extra.counters.createdRecords += 1;
-          else if (link.endsWith('/updated'))
+          let outcome: 'created' | 'updated' | 'error' | 'skipped' = 'skipped';
+          if (link.endsWith('/created')) {
+            extra.counters.createdRecords += 1;
+            outcome = 'created';
+          } else if (link.endsWith('/updated')) {
             extra.counters.updatedRecords += 1;
-          else if (link.endsWith('/error')) extra.counters.errorRecords += 1;
+            outcome = 'updated';
+          } else if (link.endsWith('/error')) {
+            extra.counters.errorRecords += 1;
+            outcome = 'error';
+          }
+          return { resultId, outcome };
         },
       );
       mockResultRepo.findOne.mockImplementation(async (options) => {
@@ -826,15 +1022,15 @@ describe('TipIntegrationService', () => {
         row('http://batch/error', 2025, mapping('SP01', 4)),
       ]);
 
-      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(2);
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(4);
       expect(
         bilateralService.importAlignmentFromTip.mock.calls.map(
           (call) => call[1].toc_result_id,
         ),
-      ).toEqual([1, 2]);
+      ).toEqual([1, 1, 2, 2]);
     });
 
-    it('imports each year of one link on the snapshot flag the save keyed', async () => {
+    it('writes a version per year then the live row, ignoring is_version_applied', async () => {
       await runYear([
         row(
           'http://same.example/created',
@@ -854,23 +1050,39 @@ describe('TipIntegrationService', () => {
         ),
       ]);
 
-      const versioned = savedRows.find(
-        (saved) => saved.where.report_year_id === 2025,
+      const targets = saveResultService.saveAllSections.mock.calls.map(
+        (call) => call[1].target,
       );
-      const live = savedRows.find(
-        (saved) => saved.where.report_year_id === 2026,
-      );
-      expect(versioned?.where.is_snapshot).toBe(true);
-      expect(live?.where.is_snapshot).toBe(false);
+      expect(targets.map((target) => target.isSnapshot)).toEqual([
+        true,
+        true,
+        false,
+      ]);
+      expect(
+        saveResultService.saveAllSections.mock.calls.map(
+          (call) => call[0].createResult.year,
+        ),
+      ).toEqual([2025, 2026, 2026]);
       expect(
         saveResultService.saveAllSections.mock.calls[0][1].findOptions,
-      ).toEqual({
-        public_link: 'public_link',
-        is_snapshot: 'is_version_applied',
-      });
+      ).toBeUndefined();
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(3);
+      const version2025 = savedRows.find(
+        (saved) => saved.where.report_year_id === 2025,
+      );
+      const version2026 = savedRows.find(
+        (saved) =>
+          saved.where.report_year_id === 2026 &&
+          saved.target?.isSnapshot === true,
+      );
+      const live = savedRows.find(
+        (saved) =>
+          saved.where.report_year_id === 2026 &&
+          saved.target?.isSnapshot === false,
+      );
       expect(bilateralService.importAlignmentFromTip).toHaveBeenNthCalledWith(
         1,
-        versioned?.result_id,
+        version2025?.result_id,
         expect.objectContaining({
           science_program_id: 'SP01',
           toc_result_id: 7033,
@@ -881,6 +1093,17 @@ describe('TipIntegrationService', () => {
       );
       expect(bilateralService.importAlignmentFromTip).toHaveBeenNthCalledWith(
         2,
+        version2026?.result_id,
+        expect.objectContaining({
+          science_program_id: 'SP02',
+          toc_result_id: 8001,
+        }),
+        2026,
+        null,
+        expect.any(Map),
+      );
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenNthCalledWith(
+        3,
         live?.result_id,
         expect.objectContaining({
           science_program_id: 'SP02',
@@ -890,25 +1113,30 @@ describe('TipIntegrationService', () => {
         null,
         expect.any(Map),
       );
-      const firstMemo =
-        bilateralService.importAlignmentFromTip.mock.calls[0][4];
-      const secondMemo =
-        bilateralService.importAlignmentFromTip.mock.calls[1][4];
-      expect(firstMemo).toBe(secondMemo);
+      const memos = bilateralService.importAlignmentFromTip.mock.calls.map(
+        (call) => call[4],
+      );
+      expect(memos[0]).toBe(memos[1]);
+      expect(memos[1]).toBe(memos[2]);
     });
 
     it('passes a null actor when userData is null and the submitter id when resolved', async () => {
       await runYear([
-        row('http://actor/created', 2025, mapping('SP01', 1), null),
-        row('http://actor/created', 2025, mapping('SP01', 2), {
+        row('http://actor-null/created', 2025, mapping('SP01', 1), null),
+        row('http://actor-user/created', 2025, mapping('SP01', 2), {
           sec_user_id: 77,
         }),
       ]);
 
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(4);
       expect(bilateralService.importAlignmentFromTip.mock.calls[0][3]).toBe(
         null,
       );
-      expect(bilateralService.importAlignmentFromTip.mock.calls[1][3]).toBe(77);
+      expect(bilateralService.importAlignmentFromTip.mock.calls[1][3]).toBe(
+        null,
+      );
+      expect(bilateralService.importAlignmentFromTip.mock.calls[2][3]).toBe(77);
+      expect(bilateralService.importAlignmentFromTip.mock.calls[3][3]).toBe(77);
     });
 
     it('keeps going when the first import throws and logs that TIP id', async () => {
@@ -929,12 +1157,14 @@ describe('TipIntegrationService', () => {
         ),
       ]);
 
-      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(2);
-      expect(bilateralService.importAlignmentFromTip.mock.calls[1][1]).toEqual(
-        expect.objectContaining({ science_program_id: 'SP02' }),
-      );
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(4);
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map(
+          (call) => call[1].science_program_id,
+        ),
+      ).toEqual(['SP01', 'SP01', 'SP02', 'SP02']);
       const counters = syncProcessLogService.update.mock.calls[0][1];
-      expect(counters.createdRecords).toBe(2);
+      expect(counters.createdRecords).toBe(4);
       expect(counters.updatedRecords).toBe(0);
       expect(counters.errorRecords).toBe(0);
       expect(errorSpy).toHaveBeenCalledWith(
@@ -1035,6 +1265,840 @@ describe('TipIntegrationService', () => {
 
       expect(clarisaLeversService.findByNames).toHaveBeenCalledWith([]);
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('per-handle routine', () => {
+    type SaveOutcome = 'created' | 'updated' | 'skipped' | 'error';
+    type RecordedSave = {
+      payload: TipMappedResult;
+      extra: {
+        target?: {
+          resultId?: number;
+          officialCode: number;
+          isSnapshot: boolean;
+          compensateRowOnly?: boolean;
+        };
+        counters?: {
+          createdRecords: number;
+          updatedRecords: number;
+          errorRecords: number;
+        };
+      };
+      resultId: number;
+      outcome: SaveOutcome;
+    };
+
+    const recorded: RecordedSave[] = [];
+
+    const emptyResolution = (): TipHandleResolution => ({
+      live: null,
+      otherLive: [],
+      versions: {},
+      otherVersions: [],
+    });
+
+    const handleRow = (
+      resultId: number,
+      code: number,
+      year: number,
+      isSnapshot: boolean,
+    ): TipHandleRow => ({
+      result_id: resultId,
+      result_official_code: code,
+      report_year_id: year,
+      is_snapshot: isSnapshot,
+      is_active: true,
+    });
+
+    const payload = (
+      handle: string,
+      year: number,
+      extras: {
+        title?: string;
+        poolFunding?: TipTocMappingDto | null;
+        userData?: { sec_user_id: number } | null;
+        tipId?: number;
+      } = {},
+    ): TipMappedResult =>
+      ({
+        public_link: handle,
+        createResult: { year, title: extras.title ?? `title-${year}` },
+        poolFunding: extras.poolFunding ?? null,
+        userData: extras.userData ?? null,
+        knowledgeProduct: { tip_id: extras.tipId ?? year },
+        is_version_applied: false,
+      }) as TipMappedResult;
+
+    const versionSaves = () =>
+      recorded.filter((row) => row.extra.target?.isSnapshot === true);
+    const liveSaves = () =>
+      recorded.filter((row) => row.extra.target?.isSnapshot === false);
+    const writtenSaves = () =>
+      recorded.filter(
+        (row) => row.outcome === 'created' || row.outcome === 'updated',
+      );
+
+    const run = async (rows: TipMappedResult[]) => {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: { data: [], data_count: 0 } }));
+      jest.spyOn(service, 'processing').mockResolvedValue(rows);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+      await service.getKnowledgeProductsByYear(2026);
+    };
+
+    const installSave = (
+      decide: (
+        row: TipMappedResult,
+        extra: RecordedSave['extra'],
+      ) => SaveOutcome = () => 'created',
+    ) => {
+      recorded.length = 0;
+      let nextId = 1000;
+      saveResultService.saveAllSections.mockImplementation(
+        async (row, extra) => {
+          const mapped = row as TipMappedResult;
+          const outcome = decide(mapped, extra);
+          const resultId = extra?.target?.resultId ?? nextId++;
+          if (outcome === 'created') extra.counters.createdRecords += 1;
+          if (outcome === 'updated') extra.counters.updatedRecords += 1;
+          if (outcome === 'error') extra.counters.errorRecords += 1;
+          recorded.push({ payload: mapped, extra, resultId, outcome });
+          return { resultId, outcome };
+        },
+      );
+    };
+
+    beforeEach(() => {
+      tipHandleRepository.resolve.mockResolvedValue(emptyResolution());
+      resultsService.newOfficialCode.mockResolvedValue(4242);
+      installSave();
+    });
+
+    it('R-TVR-001 new handle mints one code for the live row and the version', async () => {
+      await run([payload('http://h', 2025, { title: 'new-2025' })]);
+
+      expect(resultsService.newOfficialCode).toHaveBeenCalledTimes(1);
+      expect(resultsService.newOfficialCode).toHaveBeenCalledWith(
+        ReportingPlatformEnum.TIP,
+      );
+      expect(recorded.map((row) => row.payload.createResult.title)).toEqual([
+        'new-2025',
+        'new-2025',
+      ]);
+      expect(recorded[0].extra.target).toEqual({
+        officialCode: 4242,
+        isSnapshot: true,
+      });
+      expect(recorded[1].extra.target).toEqual({
+        officialCode: 4242,
+        isSnapshot: false,
+        compensateRowOnly: true,
+      });
+      expect(recorded[0].extra).not.toBe(recorded[1].extra);
+
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(10, 4242, 2025, false),
+        otherLive: [],
+        versions: { 2025: handleRow(11, 4242, 2025, true) },
+        otherVersions: [],
+      });
+      recorded.length = 0;
+      await run([payload('http://h', 2026, { title: 'later-2026' })]);
+
+      expect(resultsService.newOfficialCode).toHaveBeenCalledTimes(1);
+      expect(
+        recorded.every((row) => row.extra.target?.officialCode === 4242),
+      ).toBe(true);
+    });
+
+    it('R-TVR-001 same handle another year versions the new year and does not create a live row', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 50, 2025, false),
+        otherLive: [],
+        versions: { 2025: handleRow(500, 50, 2025, true) },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2026, { title: 'y2026' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(versionSaves()).toHaveLength(1);
+      expect(versionSaves()[0].extra.target).toEqual({
+        officialCode: 50,
+        isSnapshot: true,
+      });
+      expect(versionSaves()[0].outcome).toBe('created');
+      expect(versionSaves()[0].payload.createResult.title).toBe('y2026');
+      expect(liveSaves()).toHaveLength(1);
+      expect(liveSaves()[0].extra.target?.resultId).toBe(400);
+      expect(liveSaves()[0].extra.target?.officialCode).toBe(50);
+      expect(liveSaves()[0].outcome).toBe('updated');
+      expect(liveSaves()[0].payload.createResult.year).toBe(2026);
+      const counters = syncProcessLogService.update.mock.calls[0][1];
+      expect(counters.createdRecords).toBe(1);
+      expect(counters.updatedRecords).toBe(1);
+    });
+
+    it('R-TVR-002 first year seen also gets its version', async () => {
+      await run([payload('http://h', 2023, { title: 'only-2023' })]);
+
+      expect(
+        recorded.map((row) => [
+          row.payload.createResult.year,
+          row.extra.target?.isSnapshot,
+          row.payload.createResult.title,
+        ]),
+      ).toEqual([
+        [2023, true, 'only-2023'],
+        [2023, false, 'only-2023'],
+      ]);
+    });
+
+    it('R-TVR-002 year TIP no longer returns leaves the missing year unchanged', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(300, 8, 2025, false),
+        otherLive: [],
+        versions: {
+          2023: handleRow(301, 8, 2023, true),
+          2025: handleRow(302, 8, 2025, true),
+        },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2025, { title: 'still-2025' })]);
+
+      expect(recorded.some((row) => row.extra.target?.resultId === 301)).toBe(
+        false,
+      );
+      expect(versionSaves()[0].extra.target?.resultId).toBe(302);
+      expect(versionSaves()[0].payload.createResult.title).toBe('still-2025');
+      expect(versionSaves()[0].outcome).toBe('updated');
+    });
+
+    it('R-TVR-003 three years: versions ascending then live holds the highest', async () => {
+      await run([
+        payload('http://h', 2026, { title: 't-2026' }),
+        payload('http://h', 2023, { title: 't-2023' }),
+        payload('http://h', 2025, { title: 't-2025' }),
+      ]);
+
+      expect(
+        recorded.map((row) => [
+          row.payload.createResult.year,
+          row.extra.target?.isSnapshot,
+          row.payload.createResult.title,
+        ]),
+      ).toEqual([
+        [2023, true, 't-2023'],
+        [2025, true, 't-2025'],
+        [2026, true, 't-2026'],
+        [2026, false, 't-2026'],
+      ]);
+      expect(resultsService.newOfficialCode).toHaveBeenCalledTimes(1);
+      expect(
+        recorded.every((row) => row.extra.target?.officialCode === 4242),
+      ).toBe(true);
+      expect(new Set(recorded.map((row) => row.extra)).size).toBe(
+        recorded.length,
+      );
+      expect(recorded[0].extra.target?.isSnapshot).toBe(true);
+      const counters = syncProcessLogService.update.mock.calls[0][1];
+      expect(counters.createdRecords).toBe(4);
+      expect(counters.updatedRecords).toBe(0);
+    });
+
+    it('R-TVR-003 older year after a newer one leaves the live row untouched', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 10, 2026, false),
+        otherLive: [],
+        versions: { 2026: handleRow(401, 10, 2026, true) },
+        otherVersions: [],
+      });
+
+      await run([payload('http://h', 2025, { title: 'only-2025' })]);
+
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0].extra.target?.isSnapshot).toBe(true);
+      expect(recorded[0].payload.createResult).toEqual({
+        year: 2025,
+        title: 'only-2025',
+      });
+      expect(liveSaves()).toHaveLength(0);
+    });
+
+    it('live row at 2026 with no version stays untouched when the run brings 2025', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 10, 2026, false),
+        otherLive: [],
+        versions: {},
+        otherVersions: [],
+      });
+
+      await run([payload('http://h', 2025, { title: 'older-than-live' })]);
+
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0].extra.target).toEqual({
+        officialCode: 10,
+        isSnapshot: true,
+      });
+      expect(recorded[0].payload.createResult.year).toBe(2025);
+      expect(liveSaves()).toHaveLength(0);
+    });
+
+    it('R-TVR-003 new highest year keeps result_id and code', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 77, 2026, false),
+        otherLive: [],
+        versions: { 2026: handleRow(401, 77, 2026, true) },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2027, { title: 'y2027' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(versionSaves()[0].extra.target).toEqual({
+        officialCode: 77,
+        isSnapshot: true,
+      });
+      expect(versionSaves()[0].outcome).toBe('created');
+      expect(liveSaves()[0].extra.target?.resultId).toBe(400);
+      expect(liveSaves()[0].extra.target?.officialCode).toBe(77);
+      expect(liveSaves()[0].extra.target?.isSnapshot).toBe(false);
+      expect(liveSaves()[0].outcome).toBe('updated');
+      expect(liveSaves()[0].payload.createResult).toEqual({
+        year: 2027,
+        title: 'y2027',
+      });
+    });
+
+    it('R-TVR-003 highest year skipped as a duplicate is not written', async () => {
+      installSave((row) =>
+        row.createResult.year === 2026 ? 'skipped' : 'created',
+      );
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await run([
+        payload('http://h', 2025, {
+          title: 'kept-2025',
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 1 },
+        }),
+        payload('http://h', 2026, {
+          title: 'dup-2026',
+          poolFunding: { science_program_id: 'SP02', toc_result_id: 2 },
+        }),
+      ]);
+
+      expect(
+        writtenSaves().map((row) => [
+          row.payload.createResult.year,
+          row.extra.target?.isSnapshot,
+          row.payload.createResult.title,
+        ]),
+      ).toEqual([
+        [2025, true, 'kept-2025'],
+        [2025, false, 'kept-2025'],
+      ]);
+      expect(
+        recorded.some(
+          (row) =>
+            row.payload.createResult.year === 2026 &&
+            (row.outcome === 'created' || row.outcome === 'updated'),
+        ),
+      ).toBe(false);
+      expect(
+        recorded.find((row) => row.payload.createResult.year === 2026)?.outcome,
+      ).toBe('skipped');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP handle http://h: highest year 2026 skipped as a duplicate',
+      );
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map((call) => [
+          call[1].science_program_id,
+          call[2],
+        ]),
+      ).toEqual([
+        ['SP01', 2025],
+        ['SP01', 2025],
+      ]);
+    });
+
+    it('R-TVR-004 two years two mappings stay on their own rows', async () => {
+      await run([
+        payload('http://h', 2025, {
+          title: 'm2025',
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 11 },
+        }),
+        payload('http://h', 2026, {
+          title: 'm2026',
+          poolFunding: { science_program_id: 'SP02', toc_result_id: 22 },
+        }),
+      ]);
+
+      const version2025 = recorded.find(
+        (row) =>
+          row.extra.target?.isSnapshot === true &&
+          row.payload.createResult.year === 2025,
+      );
+      const version2026 = recorded.find(
+        (row) =>
+          row.extra.target?.isSnapshot === true &&
+          row.payload.createResult.year === 2026,
+      );
+      const live = recorded.find(
+        (row) => row.extra.target?.isSnapshot === false,
+      );
+      expect(version2025?.resultId).not.toBe(version2026?.resultId);
+      expect(live?.resultId).not.toBe(version2026?.resultId);
+      expect(live?.payload.createResult.title).toBe('m2026');
+      expect(version2025?.payload.createResult.title).toBe('m2025');
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map((call) => [
+          call[0],
+          call[1].science_program_id,
+          call[2],
+        ]),
+      ).toEqual([
+        [version2025?.resultId, 'SP01', 2025],
+        [version2026?.resultId, 'SP02', 2026],
+        [live?.resultId, 'SP02', 2026],
+      ]);
+    });
+
+    it('R-TVR-007 legacy handle gets a version and keeps the live result_id', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 12, 2024, false),
+        otherLive: [],
+        versions: {},
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2024, { title: 'legacy-2024' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(versionSaves()[0].extra.target).toEqual({
+        officialCode: 12,
+        isSnapshot: true,
+      });
+      expect(versionSaves()[0].outcome).toBe('created');
+      expect(liveSaves()[0].extra.target?.resultId).toBe(400);
+      expect(liveSaves()[0].extra.target?.officialCode).toBe(12);
+      expect(liveSaves()[0].outcome).toBe('updated');
+      expect(liveSaves()[0].payload.createResult.year).toBe(2024);
+    });
+
+    it('skips an empty link with a warn', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await run([
+        payload('', 2025, { title: 'blank' }),
+        {
+          ...payload('http://kept', 2024, { title: 'kept' }),
+          public_link: null,
+        } as TipMappedResult,
+        payload('http://kept', 2024, { title: 'kept' }),
+      ]);
+
+      expect(
+        warnSpy.mock.calls.filter(
+          (call) => call[0] === 'TIP row skipped: empty public link',
+        ),
+      ).toHaveLength(2);
+      expect(recorded).toHaveLength(2);
+      expect(
+        recorded.every((row) => row.payload.public_link === 'http://kept'),
+      ).toBe(true);
+      expect(recorded[0].payload.createResult.title).toBe('kept');
+    });
+
+    it('repeated handle and year keeps the first payload and warns', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await run([
+        payload('http://h', 2025, { title: 'first' }),
+        payload('http://h', 2025, { title: 'second' }),
+      ]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP handle http://h: repeated year 2025; first payload kept',
+      );
+      expect(versionSaves()).toHaveLength(1);
+      expect(versionSaves()[0].payload.createResult.title).toBe('first');
+      expect(liveSaves()[0].payload.createResult.title).toBe('first');
+      expect(
+        recorded.some((row) => row.payload.createResult.title === 'second'),
+      ).toBe(false);
+    });
+
+    it('version-only handle reuses its code', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: null,
+        otherLive: [],
+        versions: { 2024: handleRow(9, 42, 2024, true) },
+        otherVersions: [],
+      });
+
+      await run([payload('http://h', 2025, { title: 'next' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(
+        recorded.every((row) => row.extra.target?.officialCode === 42),
+      ).toBe(true);
+      expect(versionSaves()[0].extra.target?.resultId).toBeUndefined();
+      expect(liveSaves()[0].extra.target?.resultId).toBeUndefined();
+      expect(liveSaves()[0].extra.target?.compensateRowOnly).toBe(true);
+    });
+
+    it('prefers the live row code when a version row has another code', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 10, 2025, false),
+        otherLive: [],
+        versions: { 2025: handleRow(401, 99, 2025, true) },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2026, { title: 'next' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(recorded).toHaveLength(2);
+      expect(
+        recorded.every((row) => row.extra.target?.officialCode === 10),
+      ).toBe(true);
+      expect(
+        recorded.some((row) => row.extra.target?.officialCode === 99),
+      ).toBe(false);
+    });
+
+    it('reuses the higher version year code when versions disagree', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: null,
+        otherLive: [],
+        versions: {
+          2023: handleRow(1, 11, 2023, true),
+          2026: handleRow(2, 22, 2026, true),
+        },
+        otherVersions: [],
+      });
+
+      await run([payload('http://h', 2027, { title: 'newest' })]);
+
+      expect(resultsService.newOfficialCode).not.toHaveBeenCalled();
+      expect(recorded).toHaveLength(2);
+      expect(
+        recorded.every((row) => row.extra.target?.officialCode === 22),
+      ).toBe(true);
+      expect(
+        recorded.some((row) => row.extra.target?.officialCode === 11),
+      ).toBe(false);
+    });
+
+    it('live save receives the TIP levers, not the version save mutation', async () => {
+      const tipLevers = [{ lever_id: 7 }];
+      const row = payload('http://h', 2025, {
+        title: 'levers',
+        poolFunding: { science_program_id: 'SP01', toc_result_id: 3 },
+      });
+      row.alignments = {
+        primary_levers: tipLevers,
+      } as unknown as TipMappedResult['alignments'];
+      const leversAtCall: Array<Array<Record<string, unknown>>> = [];
+      saveResultService.saveAllSections.mockImplementation(
+        async (input, extra) => {
+          const mapped = input as TipMappedResult;
+          leversAtCall.push(
+            (mapped.alignments?.primary_levers ?? []).map((lever) => ({
+              ...lever,
+            })),
+          );
+          if (mapped.alignments) {
+            mapped.alignments.primary_levers = [
+              {
+                lever_id: 7,
+                result_lever_id: 50,
+                result_lever_sdg_targets: [{ result_lever_sdg_target_id: 900 }],
+              },
+            ] as never;
+          }
+          if (mapped.poolFunding) {
+            mapped.poolFunding.science_program_id = 'MUTATED';
+          }
+          extra.counters.createdRecords += 1;
+          const resultId = extra.target?.isSnapshot ? 501 : 502;
+          return { resultId, outcome: 'created' as const };
+        },
+      );
+
+      await run([row]);
+
+      expect(leversAtCall).toHaveLength(2);
+      expect(leversAtCall[0]).toEqual([{ lever_id: 7 }]);
+      expect(leversAtCall[1]).toEqual([{ lever_id: 7 }]);
+      expect(leversAtCall[1][0]).not.toHaveProperty('result_lever_id');
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map(
+          (call) => call[1].science_program_id,
+        ),
+      ).toEqual(['SP01', 'SP01']);
+    });
+
+    it('imports an already saved year when a later save in the handle rejects', async () => {
+      let calls = 0;
+      saveResultService.saveAllSections.mockImplementation(
+        async (_row, extra) => {
+          calls += 1;
+          if (calls === 2) {
+            throw new Error('live save failed');
+          }
+          extra.counters.createdRecords += 1;
+          return { resultId: 70, outcome: 'created' as const };
+        },
+      );
+
+      await run([
+        payload('http://h', 2025, {
+          title: 'partial',
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 3 },
+        }),
+      ]);
+
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(1);
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledWith(
+        70,
+        expect.objectContaining({
+          science_program_id: 'SP01',
+          toc_result_id: 3,
+        }),
+        2025,
+        null,
+        expect.any(Map),
+      );
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+    });
+
+    it('passes compensateRowOnly on the live create', async () => {
+      await run([payload('http://h', 2025, { title: 'fresh' })]);
+
+      expect(liveSaves()[0].extra.target?.compensateRowOnly).toBe(true);
+      expect(versionSaves()[0].extra.target?.compensateRowOnly).toBeUndefined();
+    });
+
+    it('imports pool funding only for created and updated outcomes', async () => {
+      installSave((row) => {
+        if (row.public_link.endsWith('/skip')) return 'skipped';
+        if (row.public_link.endsWith('/bad')) return 'error';
+        if (row.public_link.endsWith('/upd')) return 'updated';
+        return 'created';
+      });
+
+      await run([
+        payload('http://batch/created', 2025, {
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 1 },
+        }),
+        payload('http://batch/upd', 2025, {
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 2 },
+        }),
+        payload('http://batch/skip', 2025, {
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 3 },
+        }),
+        payload('http://batch/bad', 2025, {
+          poolFunding: { science_program_id: 'SP01', toc_result_id: 4 },
+        }),
+      ]);
+
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledTimes(4);
+      expect(
+        bilateralService.importAlignmentFromTip.mock.calls.map(
+          (call) => call[1].toc_result_id,
+        ),
+      ).toEqual([1, 1, 2, 2]);
+    });
+
+    it('live year move with pool funding imports that mapping', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 5, 2025, false),
+        otherLive: [],
+        versions: { 2025: handleRow(401, 5, 2025, true) },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([
+        payload('http://h', 2026, {
+          title: 'moved',
+          poolFunding: { science_program_id: 'SP02', toc_result_id: 9 },
+        }),
+      ]);
+
+      expect(liveSaves()[0].extra.target?.resultId).toBe(400);
+      expect(liveSaves()[0].payload.createResult.year).toBe(2026);
+      expect(bilateralService.importAlignmentFromTip).toHaveBeenCalledWith(
+        400,
+        expect.objectContaining({
+          science_program_id: 'SP02',
+          toc_result_id: 9,
+        }),
+        2026,
+        null,
+        expect.any(Map),
+      );
+    });
+
+    it('live year move without pool funding does not import', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(400, 5, 2025, false),
+        otherLive: [],
+        versions: { 2025: handleRow(401, 5, 2025, true) },
+        otherVersions: [],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+
+      await run([payload('http://h', 2026, { title: 'moved-bare' })]);
+
+      expect(liveSaves()[0].extra.target?.resultId).toBe(400);
+      expect(liveSaves()[0].payload.createResult.year).toBe(2026);
+      expect(liveSaves()[0].payload.poolFunding).toBeNull();
+      expect(bilateralService.importAlignmentFromTip).not.toHaveBeenCalled();
+    });
+
+    it('a rejected handle does not abort the run', async () => {
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+      let nextId = 50;
+      saveResultService.saveAllSections.mockImplementation(
+        async (row, extra) => {
+          const mapped = row as TipMappedResult;
+          if (mapped.public_link === 'http://bad') {
+            throw new Error('compensate failed');
+          }
+          const resultId = nextId++;
+          extra.counters.createdRecords += 1;
+          recorded.push({
+            payload: mapped,
+            extra,
+            resultId,
+            outcome: 'created',
+          });
+          return { resultId, outcome: 'created' as const };
+        },
+      );
+
+      await run([
+        payload('http://bad', 2025, { title: 'bad' }),
+        payload('http://good', 2024, { title: 'good' }),
+      ]);
+
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(
+        recorded.some((row) => row.payload.public_link === 'http://good'),
+      ).toBe(true);
+      expect(
+        recorded.some((row) => row.payload.createResult.title === 'good'),
+      ).toBe(true);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error saving TIP handle http://bad: compensate failed',
+      );
+      const counters = syncProcessLogService.update.mock.calls[0][1];
+      expect(counters.errorRecords).toBe(1);
+      expect(counters.createdRecords).toBe(2);
+    });
+
+    it('warns about otherLive and otherVersions rows and does not write them', async () => {
+      tipHandleRepository.resolve.mockResolvedValue({
+        live: handleRow(10, 3, 2025, false),
+        otherLive: [handleRow(77, 4, 2024, false)],
+        versions: { 2025: handleRow(11, 3, 2025, true) },
+        otherVersions: [handleRow(88, 9, 2025, true)],
+      });
+      installSave((_row, extra) =>
+        extra.target?.resultId != null ? 'updated' : 'created',
+      );
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await run([payload('http://h', 2025, { title: 'keep' })]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP handle http://h: extra live rows not picked: 77',
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        'TIP handle http://h: extra version rows not picked: 88',
+      );
+      expect(liveSaves()[0].extra.target?.resultId).toBe(10);
+      expect(versionSaves()[0].extra.target?.resultId).toBe(11);
+      expect(
+        recorded.some(
+          (row) =>
+            row.extra.target?.resultId === 77 ||
+            row.extra.target?.resultId === 88,
+        ),
+      ).toBe(false);
+    });
+
+    it('includes skipped in the TIP run summary', async () => {
+      installSave((row) =>
+        row.createResult.year === 2024 ? 'skipped' : 'created',
+      );
+      const logSpy = jest.spyOn((service as any).logger, 'log');
+
+      await run([
+        payload('http://h', 2024, { title: 'skip-me' }),
+        payload('http://h', 2023, { title: 'keep-me' }),
+      ]);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'TIP run summary: staging failures 0, created 2, updated 0, skipped 1, error 0',
+      );
+    });
+
+    it('logs the run summary when the run fails', async () => {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'getRequest').mockReturnValue(
+        of({
+          data: {
+            data: [
+              { id: 1, name: 'KP ok', type: ['Journal article'] },
+              { id: 2, name: 'KP bad', type: ['Journal article'] },
+            ],
+            data_count: 2,
+          },
+        }),
+      );
+      mockStagingRepo.save.mockImplementation((record: { code: number }) => {
+        if (record.code === 2) return Promise.reject(new Error('write failed'));
+        return Promise.resolve(undefined);
+      });
+      prmsRepository.findTemporalResults.mockRejectedValue(
+        new Error('read failed'),
+      );
+      const logSpy = jest.spyOn((service as any).logger, 'log');
+
+      await expect(service.getKnowledgeProductsByYear(2025)).rejects.toThrow(
+        'Error saving temporal data',
+      );
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringContaining('staging failures 1'),
+      );
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('skipped 0'));
     });
   });
 });

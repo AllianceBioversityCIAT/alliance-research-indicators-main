@@ -120,7 +120,7 @@ export class SaveResultService {
   public async saveAllSections(
     result: ExternalMappersDto,
     extraData?: ExtraData<ExternalMappersDto>,
-  ) {
+  ): Promise<SaveAllSectionsResult> {
     let typeCounter: CounterResultsEnum = null;
     let findResult: Result = null;
     this.logger.debug(
@@ -143,31 +143,45 @@ export class SaveResultService {
     // never call `applyGroup`, and under a hard delete the audit row is the
     // only surviving trace).
     let multiIdentityRefusedResultIds: number[] = [];
+    const target = extraData?.target;
 
     try {
-      const isAppliedVersion = result?.is_version_applied ?? false;
-      const findOptions: FindOptionsWhere<Result> = {
-        result_official_code: result.official_code,
-        platform_code: extraData?.platformCode,
-        report_year_id: result.createResult.year,
-      };
+      // Target covers create and update. Staging's is_version must not
+      // flip an existing version row to live.
+      const isAppliedVersion = target
+        ? target.isSnapshot
+        : (result?.is_version_applied ?? false);
 
       const statusId =
         extraData?.statusMapper?.[result.status_id] ??
         result?.status_id ??
         ResultStatusEnum.DRAFT;
 
-      if (!isEmpty(extraData?.findOptions)) {
-        delete findOptions.result_official_code;
-
-        for (const key in extraData?.findOptions) {
-          findOptions[key] = result[extraData?.findOptions[key]];
+      if (target) {
+        if (target.resultId != null) {
+          findResult = await this.dataSource.getRepository(Result).findOne({
+            where: { result_id: target.resultId },
+          });
         }
-      }
+      } else {
+        const findOptions: FindOptionsWhere<Result> = {
+          result_official_code: result.official_code,
+          platform_code: extraData?.platformCode,
+          report_year_id: result.createResult.year,
+        };
 
-      findResult = await this.dataSource.getRepository(Result).findOne({
-        where: findOptions,
-      });
+        if (!isEmpty(extraData?.findOptions)) {
+          delete findOptions.result_official_code;
+
+          for (const key in extraData?.findOptions) {
+            findOptions[key] = result[extraData?.findOptions[key]];
+          }
+        }
+
+        findResult = await this.dataSource.getRepository(Result).findOne({
+          where: findOptions,
+        });
+      }
 
       if (extraData?.duplicateByTitle) {
         // Title-only rule (PRMS-as-STAR import): skip the incoming row when
@@ -253,7 +267,9 @@ export class SaveResultService {
 
         if (!findResult) {
           let officialCode: number;
-          if (extraData?.manageOfficialCode) {
+          if (target) {
+            officialCode = target.officialCode;
+          } else if (extraData?.manageOfficialCode) {
             officialCode = await this._resultsService.newOfficialCode(
               extraData?.platformCode,
             );
@@ -370,7 +386,13 @@ export class SaveResultService {
         this.logger.error(
           `Error processing result ${createNewResult.result_id}, rolling back. Error: ${errorMessage}`,
         );
-        await this.rollbackCreatedResult(createNewResult.result_id);
+        if (target?.compensateRowOnly) {
+          await this._queryService.deleteResultRowById(
+            createNewResult.result_id,
+          );
+        } else {
+          await this.rollbackCreatedResult(createNewResult.result_id);
+        }
       }
       this.logger.error(
         `Error processing ${this.platformCode(extraData?.platformCode)} result: ${errorMessage}`,
@@ -432,6 +454,19 @@ export class SaveResultService {
     this.logger.debug(
       `Finished processing result ${result.official_code ?? findResult?.result_official_code} from ${this.platformCode(extraData?.platformCode)}.`,
     );
+    return {
+      resultId: findResult?.result_id ?? null,
+      outcome: this.outcomeFor(typeCounter),
+    };
+  }
+
+  private outcomeFor(
+    typeCounter: CounterResultsEnum | null,
+  ): SaveAllSectionsOutcome {
+    if (typeCounter === CounterResultsEnum.CREATED) return 'created';
+    if (typeCounter === CounterResultsEnum.UPDATED) return 'updated';
+    if (typeCounter === CounterResultsEnum.OMITTED_DUPLICATE) return 'skipped';
+    return 'error';
   }
 
   private platformCode(platformCode?: ReportingPlatformEnum) {
@@ -679,6 +714,28 @@ export class SaveResultService {
   }
 }
 
+/**
+ * Per-call row the caller already resolved. Pass it on a copy of `extraData`:
+ * the service reads it and never writes it back onto a shared batch object.
+ */
+export type SaveSectionTarget = {
+  resultId?: number;
+  officialCode: number;
+  isSnapshot: boolean;
+  compensateRowOnly?: boolean;
+};
+
+export type SaveAllSectionsOutcome =
+  | 'created'
+  | 'updated'
+  | 'skipped'
+  | 'error';
+
+export type SaveAllSectionsResult = {
+  resultId: number | null;
+  outcome: SaveAllSectionsOutcome;
+};
+
 export type ExtraData<T extends object> = {
   resultSaved?: number[];
   currentCode?: { current: number };
@@ -692,6 +749,7 @@ export type ExtraData<T extends object> = {
   runId?: string;
   /** Dedupe by title only (PRMS-as-STAR import); never deletes. */
   duplicateByTitle?: boolean;
+  target?: SaveSectionTarget;
 };
 
 export type FindOptionsKeyMap<

@@ -496,4 +496,17 @@ export class QueryService {
       })
       .map((row) => Number(row.result_id));
   }
+
+  /**
+   * Hard-deletes one `results` row via `full_delete_result_version`.
+   *
+   * Unlike {@link deleteFullResultById}, this does not consult
+   * {@link resolveResultDeleteTargetIds}: a live seed stays a single id, so
+   * sibling versions that share its official code are left in place.
+   */
+  async deleteResultRowById(resultId: number): Promise<void> {
+    await this.dataSource.query('SELECT full_delete_result_version(?)', [
+      resultId,
+    ]);
+  }
 }

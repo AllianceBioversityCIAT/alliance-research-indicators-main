@@ -9,7 +9,7 @@
 - **Family path:** `docs/specs/changes/tip-prms-phase-2/`
 - **Parent spec / Feature:** `TIP Integration / TIP results in PRMS`
 - **Date created:** `2026-10-21`
-- **Last updated:** `2026-10-21`
+- **Last updated:** `2026-10-22`
 - **Spec-family status:** `open`
 - **Owner / Squad:** David Casañas / ARI
 - **Linked PRD section:** [`docs/prd.md`](../../../prd.md) — external result ingestion (TIP); PRMS as downstream consumer
@@ -38,8 +38,8 @@ MoSCoW: all three **Must**; order is forced by dependency.
 
 | # | Spec Path | Title / Scope | Depends on | Parallel-safe | Status | Owner |
 |---|---|---|---|---|---|---|
-| 1 | `tip-prms-phase-2/prms-platform-identity` | `platform_code` on `result_prms_sync_log` and `result_prms_sync_history` (STAR backfill for existing rows); every reader/writer and the webhook correlator platform-aware; `external_reference` = `TIP-<code>` for TIP (STAR unchanged); PRMS code copied to the live row of the result's own platform; **client: show the Pool Funding section for TIP results** (phase-1 T-04 defect) | `none` | `yes` | `pending` | David Casañas |
-| 2 | `tip-prms-phase-2/tip-versioning` | Versioning procedures platform-aware; the TIP sync versions every result it creates or updates (delete old version, recreate), reconciled with TIP's own per-year snapshot rows; legacy TIP results | `prms-platform-identity` | `no` | `pending` | David Casañas |
+| 1 | `tip-prms-phase-2/prms-platform-identity` | `platform_code` on `result_prms_sync_log` and `result_prms_sync_history` (STAR backfill for existing rows); every reader/writer and the webhook correlator platform-aware; `external_reference` = `TIP-<code>` for TIP (STAR unchanged); PRMS code copied to the live row of the result's own platform; **client: show the Pool Funding section for TIP results** (phase-1 T-04 defect) | `none` | `yes` | `done` | David Casañas |
+| 2 | `tip-prms-phase-2/tip-versioning` | One TIP result per handle (`public_link` = the `Handled` evidence): a live row holding the highest year TIP returned, plus one version row (`is_snapshot = 1`, same official code) per year, created or updated in place by the TIP sync — no `SP_versioning`; staging written completely before processing; one-off conversion of existing TIP data (duplicate live rows per handle merged into one code, links kept on the live row); legacy TIP results. **Re-scoped 2026-10-22 (owner HITL):** cron cadence, the STAR/TIP code collision in the shared version routines, and copying `result_knowledge_products` in `SP_versioning` are out of this child | `prms-platform-identity` | `no` | `active` | David Casañas |
 | 3 | `tip-prms-phase-2/tip-prms-push` | TIP gate equivalences (`COMPLETED_IN_TIP` ≙ Approved, `submitted_by` = TIP submitter, KP allowed for TIP only); push from the sync with no HTTP request user; sequential per result; skip when `prms_result_code` is present; legacy TIP results | `tip-versioning` | `no` | `pending` | David Casañas |
 
 ### Status Vocabulary
@@ -80,4 +80,4 @@ graph TD
 | FD-2 | **TIP identity in PRMS:** `external_reference` = `TIP-<official_code>`; STAR keeps the bare code (no change for results already synced). `UNVERIFIED — confirm at source before relying on it` — PRMS acceptance of the prefixed value; evidence in child 1 design P-18; settled by child 3's first TEST-env push. |
 | FD-3 | **TIP gate equivalences:** `COMPLETED_IN_TIP` counts as Approved; `submitted_by` = TIP submitter's STAR user; Knowledge Product is sendable for TIP results only (handle from the `'Handled'` evidence row — prms-sync D-4b). The STAR gate is unchanged. A TIP result whose submitter has no STAR user is not pushed, with a recorded reason (P-1). |
 | FD-4 | PRMS itself dedupes KPs by handle and enforces the reporting cycle year (spike `changes/prms-sync-knowledge-products/spike/README.md`); STAR surfaces PRMS's 207 row message verbatim (R-F4). |
-| OQ-1 | Child 2: how SP versions coexist with TIP's own per-year snapshot rows (`is_version` → `is_snapshot`) — design question, owner child 2. |
+| OQ-1 | **Resolved 2026-10-22 (owner, child 2):** TIP's per-year rows become versions of one result per handle (same official code, `is_snapshot = 1`), written directly by the sync; the live row carries the highest year. Today's Dev data (read-only, 2026-10-22): 8,630 live TIP rows, 3 versions, 63 handles holding two live rows with two codes. FD-1's "every TIP result gets a version (SP_versioning, delete+recreate)" is superseded on the mechanism: versions are updated in place, so no `result_id` changes. |

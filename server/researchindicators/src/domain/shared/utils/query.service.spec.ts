@@ -245,6 +245,39 @@ describe('QueryService — a snapshot is a version, not a reporting-year row', (
     expect(outcomes).toEqual([]);
     expect(routineCalls).toEqual([]);
   });
+
+  describe('deleteResultRowById', () => {
+    it('hard-deletes only the given id when that row is live and has a family', async () => {
+      // A live TIP row with a snapshot of the same code: the family delete
+      // would resolve both; the row-only delete must touch the given id alone.
+      const { service, query } = buildService({
+        rows: [
+          {
+            result_id: 42,
+            result_official_code: 21156,
+            platform_code: 'TIP',
+            report_year_id: 2026,
+            is_snapshot: false,
+          },
+          {
+            result_id: 43,
+            result_official_code: 21156,
+            platform_code: 'TIP',
+            report_year_id: 2025,
+            is_snapshot: true,
+          },
+        ],
+      });
+
+      await service.deleteResultRowById(42);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(query).toHaveBeenCalledWith(
+        'SELECT full_delete_result_version(?)',
+        [42],
+      );
+    });
+  });
 });
 
 describe('QueryService — a NULL is_snapshot row buckets live, never absent from either bucket', () => {
