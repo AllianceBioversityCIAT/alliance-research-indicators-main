@@ -145,9 +145,9 @@ No change.
 ## 11. Rollout
 
 1. Merge to `dev` → the Dev pipeline applies the migration (root `CLAUDE.md` §4.3, 2026-08-27 correction).
-2. Run one full TIP sync (no `year`) — creates version rows for every handle TIP returns.
+2. **Before** the first full sync, take the TIP-scoped backout snapshot (the JD-12 cleanup in `execution.md` needs it: TIP `results` rows and the `link_results` rows that touch them). Then run one full TIP sync (no `year`) — creates version rows for every handle TIP returns. *(Snapshot step added 2026-10-23 at T-07 — the cleanup cannot be TIP-scoped or correct without a pre-sync copy.)*
 3. Run the OpenSearch results reset so demoted rows leave the index.
-4. Backout before step 2: `migration:revert`. After step 2: code rollback plus the cleanup query in `execution.md` (JD-12).
+4. Backout before step 2: `migration:revert`. After step 2: code rollback plus the cleanup query in `execution.md` (JD-12), then `migration:revert`. After a **failed** `up` (deploy aborted mid-migration): re-run `up`, never `migration:revert` — a failed `up` is not recorded, so `revert` would undo the previous migration; a precheck abort repeats until the data is fixed. *(Amended 2026-10-23 at T-07.)*
 
 ## 12. Design decisions
 

@@ -205,12 +205,12 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-07 — Integration spec, end-to-end runs and full gates
 
-- [ ] **Status:** todo · **Size:** M · **Dependencies:** T-05, T-06
+- [x] **Status:** done (full gates: pre-existing deviation recorded in execution.md) · **Size:** M · **Dependencies:** T-05, T-06
 - **Requirements covered:** R-TVR-002 *Version exists* on MySQL (BUT not delete/recreate — same `result_id`); R-TVR-003 *Older year* (BUT live unchanged, `updated_at` included); R-TVR-004 on MySQL; R-TVR-006 *Linked older row* (AND the next full run writes the highest year to A); R-TVR-007 *Legacy handle still in TIP*; R-TVR-008 *Second run* (BUT must NOT create any row); NFR-TVR-001; NFR-TVR-002.
 - **Design refs:** §10 (integration and end-to-end rows), §11, P-11, P-15.
-- **Scope (files):** `test/tip-versioning.integration-spec.ts` (new) + `execution.md` evidence. **Added 2026-10-23 (owner, at the budget tripwire):** the JD-12 rollback cleanup query (design §3.2 *Down*, §11 step 4 — reverting after a full TIP sync has run) written into `execution.md` and proven on the Dev-dump container; a rollout note that after a failed `up` the recovery is re-running `up`, never `migration:revert` (a failed `up` is not recorded, so `revert` would undo the previous migration).
+- **Scope (files):** `test/tip-versioning.integration-spec.ts` (new) + `execution.md` evidence + **`test/jest-integration.json` `maxWorkers: 1`** (owner-approved 2026-10-23 at the T-07 review — serialise integration suites, FP-51 precedent). **Added 2026-10-23 (owner, at the budget tripwire):** the JD-12 rollback cleanup query (design §3.2 *Down*, §11 step 4 — reverting after a full TIP sync has run) written into `execution.md` and proven on the Dev-dump container; a rollout note that after a failed `up` the recovery is re-running `up`, never `migration:revert` (a failed `up` is not recorded, so `revert` would undo the previous migration).
 - **Integration cases (TEST container with Dev dump, own `result_official_code` band — read sibling headers, server guide FP-45):** resolver never returns a STAR row with the same code (T-04 falsifier); version update keeps `is_snapshot = 1` and its `result_id`; live untouched (row + `updated_at`) for an older year; failed live create deletes that row only; run guard query filters process/status/age (T-02); routine over a fixture twice → identical row set.
-- **End-to-end (local server → TEST container with Dev dump, real TIP API, full run 2021 → current):** before/after counts of live rows, versions, handles with > 1 live row (must be 0), linked rows' ids unchanged; run 2 creates 0 rows.
+- **End-to-end (local server → TEST container with Dev dump, real TIP API, full run 2021 → current):** *(2026-10-23, owner: one local run was done in attempt 1; repeating it costs ~40 min a run, which the work plan does not budget — further end-to-end verification moves to the owner's live run on the test environment in T-08.)* before/after counts of live rows, versions, handles with > 1 live row (must be 0), linked rows' ids unchanged; run 2 creates 0 rows.
 - **Full gates:** `npm test -- --silent`, `npm run test:integration`, `npm run build`, `npx tsc --noEmit -p tsconfig.json`, `npx eslint src test` — run by the Leader after the worker reports (§4.3 concurrency).
 - **Falsifier:** re-apply T-03 falsifier (a) → the "version update keeps `is_snapshot = 1`" integration case red on MySQL.
 - **Red run:** observed on MySQL, quoted, reverted.
@@ -218,10 +218,10 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 - **Consumers:** every `*.integration-spec.ts` (shared config; run all).
 - **Review:** `full` — the only real-MySQL evidence.
 - **Done criteria:**
-  - [ ] Integration spec green; falsifier observed red on MySQL.
-  - [ ] End-to-end figures for both runs recorded in `execution.md`.
+  - [x] Integration spec green; falsifier observed red on MySQL.
+  - [x] End-to-end figures for both runs recorded in `execution.md`.
   - [ ] Full gates green.
-  - [ ] JD-12 cleanup query recorded in `execution.md` and run on the Dev-dump container (post-sync revert restores pre-migration codes); failed-`up` recovery note recorded.
+  - [x] JD-12 cleanup query recorded in `execution.md` and run on the Dev-dump container (post-sync revert restores pre-migration codes); failed-`up` recovery note recorded.
 - **Skills:** `nestjs-expert`, `systematic-debugging`.
 
 ---
@@ -231,7 +231,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 - [ ] **Status:** todo · **Size:** S · **Dependencies:** T-07 (and the owner's push)
 - **Requirements covered:** P-13 / P-16 settlement; rollout §11 steps 2–3.
 - **Design refs:** §6, §11, P-13, P-16.
-- **Scope:** after the owner pushes to `dev` (pipeline applies the migration): owner runs one full TIP sync and the OpenSearch results reset; owner checks (1) a multi-year handle (e.g. `hdl.handle.net/10568/181023`) opens as one TIP result with its versions in the selector; (2) results lists / dashboards show TIP counts the owner considers right. Docs: `docs/trd/trd.md` §9.1 TIP row (one result per handle, versions per year); server child guide §8 if the owner wants the rule recorded.
+- **Scope:** after the owner pushes to `dev` (pipeline applies the migration): owner takes the TIP-scoped backout snapshot (design §11 step 2), runs one full TIP sync **and then a second one** (R-TVR-008 live check, moved here from T-07 on 2026-10-23: run 2 must create 0 rows — compare TIP row counts before/after run 2) and the OpenSearch results reset; owner checks (1) a multi-year handle (e.g. `hdl.handle.net/10568/181023`) opens as one TIP result with its versions in the selector; (2) results lists / dashboards show TIP counts the owner considers right. Docs: `docs/trd/trd.md` §9.1 TIP row (one result per handle, versions per year); server child guide §8 if the owner wants the rule recorded.
 - **Verification:** owner's words quoted in `execution.md` (KZ-002 — quote what the observation covered).
 - **Falsifier:** n/a — a human check; it can fail by the owner seeing two results for one handle or no versions.
 - **Red run:** n/a.
