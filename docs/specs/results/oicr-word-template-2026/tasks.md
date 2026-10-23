@@ -111,7 +111,7 @@ graph TD
 
 ### T-02 — Modal data query and homologation mapper
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01 (field-values shape) · **Review:** `full` — the homologation tables are the business rules BI agreed
+- **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** M · **Dependencies:** T-01 (field-values shape) · **Review:** `full` — the homologation tables are the business rules BI agreed
 - **Requirements covered:** R-OWT-002 (table, empty → placeholder, previous handle tag 2/3), R-OWT-003 (all tables, unmapped → none), R-OWT-004 (STAR order)
 - **Design refs:** §3, §5 step 6, D-OWT-6, D-OWT-7, P-5
 - **Scope:**
@@ -148,10 +148,10 @@ graph TD
   - `result-oicr.repository.spec.ts`: additive method.
   - `result-oicr.service.spec.ts` mocks the repository; no change expected.
 - **Done criteria:**
-  - [ ] Every homologation row has a test.
-  - [ ] The e2e XML case is green.
-  - [ ] Falsifiers observed red.
-  - [ ] Build green.
+  - [x] Every homologation row has a test.
+  - [x] The e2e XML case is green.
+  - [x] Falsifiers observed red.
+  - [x] Build green.
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-03 — Endpoint, service, configuration and errors

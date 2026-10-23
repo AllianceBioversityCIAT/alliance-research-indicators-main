@@ -218,3 +218,61 @@
 - **Requirements covered:** R-OWT-008 (click downloads, loading, error toast), R-OWT-001 (version line), R-OWT-011 (button clause).
 - **Decisions made:** the Leader narrowed the page-component consumer adjustment (see above).
 - **Final verification:** PASS.
+
+### T-02 — Modal data query and homologation mapper
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-23
+- **Effort:** high. These tables are the business rules BI agreed.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+- **Skills deviation:** `nestjs-expert` and `tdd` could not load on the Cursor host; the brief carried them in prose.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-high`, Orca `run_704dd2d24af9` / `task_aef90edbee1f` / `ctx_e7a06f540a8b` (retained until PASS, released after). Brief: `T-02-brief.md`, report: `T-02-report.md` (session scratchpad).
+- **Files changed** (all under `server/researchindicators/src/domain/entities/result-oicr/`):
+  - modified: `repositories/result-oicr.repository.ts` (+ spec), which adds `getWordTemplateData` with 8 parameterized queries;
+  - new: `word-template/dto/oicr-word-template-data.dto.ts`;
+  - new: `word-template/oicr-word-template.mapper.ts` (+ spec).
+- **Implementer verification:**
+  - `npm test -- --silent src/domain/entities/result-oicr`: `Tests: 137 passed, 137 total`;
+  - eslint: exit 0;
+  - build: exit 0.
+- **Falsifiers (verbatim, reverted):**
+  - Area 16 mapped to its STAR name:
+    - the mapper test failed with `- "PISA"` / `+ "Policy, Inclusion and Socio-economic Analysis for Impact and Learning"`;
+    - the e2e test failed with `OicrWordTemplateMissingOptionError: OICR template control raContribDropdown has no option "Policy, Inclusion and Socio-economic Analysis for Impact and Learning"`.
+  - 202 removed from the regional set: `Expected: "Regional"` / `Received: "Sub-regional"`. The Eastern Africa case (code 14), which differs only in the code, stayed green.
+  - Previous handle filled for tag 1: `expect(received).toBeNull()` / `Received: "https://hdl.handle.net/10568/554"`.
+- **Not Done / Assumptions (verbatim from the report; no blocker and no owed item, so not a continuation):**
+  - "Countries are not filtered by `country_role_id`. Design §3 and the POC `extract.js` both omit it. The modal's `findGeoLocation` does pass `CountryRolesEnum.GEO_LOCATION` (`2`), and role `1` is trainee nationality. This query follows §3. A result that also stores trainee nationalities would put those names in the Countries block."
+  - "'First' linked handle, main contact, main project, and tag are the lowest primary key (`ORDER BY treo.id`, `u.result_user_id`, `rc.result_contract_id`, `rt.id`, then `LIMIT 1`). `/modal` uses TypeORM `find` with no `order`, so this is a stable reading of 'first', not a byte match of that find."
+  - "A main-project row with an empty `agreement_id` or an empty `description` becomes no value. A present pair is `\"<agreement_id> - <description>\"`."
+  - "'If other, please specify' lists custom names of **primary** area 18 only. A contributing area 18 still maps to the dropdown `Other` and does not add a specify row. An empty custom name is a row whose value is none."
+- **Leader check on the countries assumption:** a read-only query on the shared test DB (2026-10-23), `SELECT country_role_id, COUNT(*) … FROM result_countries JOIN results … WHERE indicator_id = 5 AND both is_active = 1 GROUP BY country_role_id`, returned `[{"role":2,"n":113,"results":69}]`. Every active OICR country row is GEO_LOCATION today, so the §3 query and the modal agree on live data. Recorded as advisory, not rework.
+- **Evidence re-run (Leader, inline, after both workers reported): VERIFIED.**
+  - `src/domain/entities/result-oicr`: `Tests: 137 passed, 137 total`.
+  - eslint: exit 0. Build: exit 0.
+  - Full server suite: `Test Suites: 443 passed, 443 total` · `Tests: 4343 passed, 4343 total`.
+  - The T-01 engine files are unchanged (`git diff --stat HEAD` empty).
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - All 8 queries are parameterized, with `is_active = 1` on every source table.
+  - Every homologation row has a test with a literal expected label, and each fixture varies only its discriminating field.
+  - The geo rule and the regions/countries format match R-OWT-003 and design §5 step 6.
+  - The previous-handle sources match `TempExternalOicrsService.findResultOicrs`.
+  - The e2e test runs the T-01 engine and asserts every R-OWT-002 field.
+  - "If other" counts primary area 18 only (R-OWT-002).
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY: the repository spec asserts `is_active = 1` once per query, not once per joined table. Deleting `ac.is_active = 1` (or the same filter on `cr`, `cc`, `sn`, `s`, `teo` or `ro_linked`) would stay green. Every filter was confirmed by reading the SQL.
+  - RISK: countries and sub-nationals are not filtered on `country_role_id = 2`. Live data is all role 2 today (see the Leader check above).
+  - READABILITY: a main project with an `agreement_id` but an empty `description` gives no value, which also drops the id. This is undocumented as a decision.
+  - RESILIENCE: the core query uses `INNER JOIN result_oicrs`, so an indicator-5 result with no active `result_oicrs` row would give a document with an empty title and year instead of an error. Not constructible through the save flow.
+  - RELIABILITY: "first" means the lowest primary key, while `/modal` uses `find` with no order. The T-08 Dev download covers this (KZ-017).
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-high): not reported by host, ended complete;
+  - reviewer: 16 calls, 107,100 tokens, ended complete.
+- **Requirements covered:** R-OWT-002 (table, empty → no value, previous handle only for tags 2/3), R-OWT-003 (all tables, unmapped → none), R-OWT-004 (STAR order).
+- **Decisions made:** the countries role filter was accepted per design §3, based on the live-data check above.
+- **Forward pointer → T-03 `[advisory-grade]`:** the service could treat a null core data row (no active `result_oicrs`) as an error instead of filling an empty title and year (RESILIENCE advisory above). Advisory only; T-03 must not widen scope for it.
+- **Final verification:** PASS.
