@@ -1,0 +1,53 @@
+:host {
+  display: block;
+}
+
+.agrovoc-keywords__field {
+  width: 100%;
+}
+
+.agrovoc-keywords__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+:host ::ng-deep .agrovoc-keywords__chip.p-chip {
+  background-color: var(--ac-grey-200);
+  color: var(--ac-grey-800);
+  border-radius: 1rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.125rem;
+  text-transform: capitalize;
+}
+
+:host ::ng-deep .agrovoc-keywords__chip .p-chip-remove-icon {
+  color: var(--ac-grey-800);
+}
+
+.agrovoc-keywords__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.125rem;
+  white-space: normal;
+}
+
+.agrovoc-keywords__matched,
+.agrovoc-keywords__added {
+  color: var(--ac-grey-700);
+  font-size: 0.75rem;
+}
+
+.agrovoc-keywords__state {
+  padding: 0.5rem 0.75rem;
+  color: var(--ac-grey-800);
+}
+
+.agrovoc-keywords__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}

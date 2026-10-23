@@ -58,6 +58,7 @@ export interface ProjectSummaryRow {
   description: string | null;
   is_pool_funding_contributor: number;
   contract_status: string | null;
+  funding_type: string | null;
   start_date: Date | null;
   end_date: Date | null;
   pi_user_id: number | null;
@@ -114,7 +115,7 @@ export interface HistoryRow {
 // (@sdd-spec bilateral-module/mapping-drives-pool-funding-tag).
 const PROJECT_SUMMARY_SELECT = `SELECT ac.agreement_id, ac.description,
               ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
-              ac.contract_status, ac.start_date, ac.end_date,
+              ac.contract_status, ac.funding_type, ac.start_date, ac.end_date,
               ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
                  FROM alliance_user_staff aus
@@ -510,6 +511,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
     description: string | null;
     is_pool_funding_contributor: number;
     contract_status: string | null;
+    funding_type: string | null;
     start_date: Date | null;
     end_date: Date | null;
     pi_user_id: number | null;
@@ -520,6 +522,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       description: string | null;
       is_pool_funding_contributor: number;
       contract_status: string | null;
+      funding_type: string | null;
       start_date: Date | null;
       end_date: Date | null;
       pi_user_id: number | null;
@@ -533,7 +536,7 @@ export class PiDelegatesRepository extends Repository<PiDelegate> {
       // PROJECT_SUMMARY_SELECT — the flag OR an active bilateral mapping.
       `SELECT ac.agreement_id, ac.description,
               ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
-              ac.contract_status, ac.start_date, ac.end_date,
+              ac.contract_status, ac.funding_type, ac.start_date, ac.end_date,
               ac.project_lead_description AS pi_name,
               (SELECT su.sec_user_id
                  FROM alliance_user_staff aus

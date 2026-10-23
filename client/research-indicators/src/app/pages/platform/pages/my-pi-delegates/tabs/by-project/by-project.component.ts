@@ -148,11 +148,13 @@ export class ByProjectComponent {
   // Unlike the role chips these are not mutually exclusive: each is on or off and
   // they combine (AND) with any role chip, with each other and with the search.
 
-  readonly ongoingOnly = signal(false);
+  // On by default: the table opens on ongoing W3 / Bilateral projects. Nothing is
+  // removed from the data — switching the chip off shows every project again.
+  readonly ongoingW3BilateralOnly = signal(true);
   readonly withoutDelegatesOnly = signal(false);
 
-  toggleOngoing(): void {
-    this.ongoingOnly.update(on => !on);
+  toggleOngoingW3Bilateral(): void {
+    this.ongoingW3BilateralOnly.update(on => !on);
   }
 
   toggleWithoutDelegates(): void {
@@ -164,7 +166,7 @@ export class ByProjectComponent {
     this.searchTerm.set('');
     this.statusTerm.set('All');
     this.roleTerm.set('all');
-    this.ongoingOnly.set(false);
+    this.ongoingW3BilateralOnly.set(false);
     this.withoutDelegatesOnly.set(false);
   }
 
@@ -173,7 +175,7 @@ export class ByProjectComponent {
     const query = this.searchTerm().trim().toLowerCase();
     const status = this.statusTerm();
     const role = this.roleTerm();
-    const ongoingOnly = this.ongoingOnly();
+    const ongoingW3BilateralOnly = this.ongoingW3BilateralOnly();
     const withoutDelegatesOnly = this.withoutDelegatesOnly();
     return this.service
       .byProjectCache()
@@ -181,7 +183,7 @@ export class ByProjectComponent {
         const matchesRole = this.matchesRole(row, role);
         const matchesStatus = status === 'All' || row.status === status;
         const matchesQuery = !query || this.matchesQuery(row, query);
-        const matchesOngoing = !ongoingOnly || this.isOngoing(row);
+        const matchesOngoing = !ongoingW3BilateralOnly || (this.isOngoing(row) && this.isW3OrBilateral(row));
         const matchesWithoutDelegates = !withoutDelegatesOnly || this.service.hasNoDelegate(row);
         return matchesRole && matchesOngoing && matchesWithoutDelegates && matchesStatus && matchesQuery;
       })
@@ -213,6 +215,14 @@ export class ByProjectComponent {
     return !!project.status && this.statusDisplay(project).statusId === 1;
   }
 
+  /** W3 and Bilateral funding: Agresso FundingTypeID BLR, BLU, W3R or W3U. */
+  private static readonly W3_BILATERAL_FUNDING_TYPES = new Set(['BLR', 'BLU', 'W3R', 'W3U']);
+
+  private isW3OrBilateral(project: ProjectDelegates): boolean {
+    const code = project.funding_type?.trim().toUpperCase();
+    return !!code && ByProjectComponent.W3_BILATERAL_FUNDING_TYPES.has(code);
+  }
+
   // ─── Excel export ─────────────────────────────────────────────────────────────
   //
   // Exports exactly the rows the table shows. The keys are read from the p-table's
@@ -235,7 +245,7 @@ export class ByProjectComponent {
       const blob = await this.service.exportByProject(this.currentProjectCodes(), {
         ...(search && { search }),
         role: this.roleTerm(),
-        ongoing_only: this.ongoingOnly(),
+        ongoing_w3_bilateral_only: this.ongoingW3BilateralOnly(),
         without_delegates_only: this.withoutDelegatesOnly()
       });
       if (!blob?.size) throw new Error('Empty export file');
