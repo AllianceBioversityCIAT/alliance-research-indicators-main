@@ -384,3 +384,6 @@
 - **Requirements covered:** R-OWT-011 (the code half; the network clause is owned by T-08).
 - **Deploy note (R-B-4):** each host's gitignored `environment.ts` / `environment.dev.ts` still declare `filesStorageUrl` and `oicrTemplateName`. Nothing reads them now; drop them on the next refresh from `environment.example.ts`.
 - **Final verification:** PASS.
+- **Owner decision, revised (2026-10-23):** "comencemos". Build T-03 now. P-22 moves to the T-08 HITL download from the deployed Dev server; a 502 there triggers the Pivot Protocol.
+  - The owner asked whether the Leader could run the curl itself. It can only run it from the workstation, where the result is still `200 112531`, not from the Dev runtime.
+  - P-22 stays **UNVERIFIED** until T-08. RB-1 stays open, with owner T-08.
