@@ -395,4 +395,16 @@ describe('OicrHeaderComponent — Download OICR Template button visibility', () 
     expect(downloadButtons().length).toBe(0);
     expect(fixture.nativeElement.textContent).toContain('CGSpace link');
   });
+
+  // Owner 2026-10-26: the OICR header always shows its reporting year (real template in this suite).
+  it('shows the reporting year when there is one, and nothing when there is none', () => {
+    component.data = { title: 'T', report_year: 2026 };
+    fixture.detectChanges();
+    const year = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="oicr-header-report-year"]');
+    const spans = Array.from(year()?.querySelectorAll('span') ?? []).map(e => e.textContent?.trim());
+    expect(spans).toEqual(['Reporting year', '2026']);
+    component.data = { title: 'T' };
+    fixture.detectChanges();
+    expect(year()).toBeNull();
+  });
 });

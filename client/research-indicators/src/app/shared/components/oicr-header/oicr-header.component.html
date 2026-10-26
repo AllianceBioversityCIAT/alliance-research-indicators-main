@@ -59,6 +59,14 @@
           <span class="text-[13px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{ data?.['endDateGlobal'] |
             date: 'dd/MM/yyyy' }}</span>
         </div>
+
+        @if (data?.['report_year']) {
+        <div class="flex items-center" data-testid="oicr-header-report-year">
+          <span class="text-[13px] text-[#777c83] !font-['Space_Grotesk'] leading-4">Reporting year</span>
+          <i class="pi pi-arrow-right !text-[8px] px-2 !text-[#8D9299]"></i>
+          <span class="text-[13px] leading-[18px] text-[#345b8f] !font-['Space_Grotesk']">{{ data?.['report_year'] }}</span>
+        </div>
+        }
       </div>
     </div>
 
