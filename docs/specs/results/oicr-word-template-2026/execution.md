@@ -639,3 +639,13 @@
   - reviewer: 15 calls, 65,637 tokens, ended complete.
 - **Requirements covered:** R-OWT-008 (amended table, both scenarios), R-OWT-009 (amended 2025-link scenario, unresolved-portfolio scenario), R-OWT-013 (link half).
 - **Final verification:** PASS.
+
+#### Owner local test after PV-1 (2026-10-26)
+
+- **Setup the owner was given before testing:** restart `ng serve` so the restored `angular.json` script loads, start the server, and test STAR-120 (2025) and STAR-554/STAR-626 (2026) from the button and from the link, including the Network check.
+- **Owner's words (verbatim):** "lo veo perfecto ambos agnos".
+- **What the quote covers (KZ-002):**
+  - The owner's own judgment, on the local stack, that the 2025 and 2026 downloads both look right.
+  - It does **not** itemize the T-08 clauses: Word repair prompt, "+"/dropdowns, revisions, grey text, login round trip, Network, timing.
+  - It is local, not the deployed Dev server.
+- **Status of T-08:** its HITL items stay open until they are observed on Dev and quoted per item.
