@@ -63,7 +63,7 @@ describe('OicrDownloadComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 2);
     });
 
     it('redirects a legacy query code to the path form', () => {
@@ -126,7 +126,7 @@ describe('OicrDownloadComponent', () => {
       await component.generateAndDownload(12345);
 
       expect(component.processing()).toBe(false);
-      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith(12345);
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith(12345, 2);
       expect(component.result?.success).toBe(true);
     });
 

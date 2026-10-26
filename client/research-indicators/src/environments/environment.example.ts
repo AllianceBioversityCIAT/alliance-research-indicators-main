@@ -58,6 +58,7 @@ export const environment = {
 
   documentOverviewUrl: '',
   fileManagerUrl: '',
+  filesStorageUrl: '',
   feedbackUrl: '',
   releasesNotesApiUrl: '',
   releaseNotesDatabaseId: '',

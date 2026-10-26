@@ -34,7 +34,8 @@ export default class OicrDownloadComponent implements OnInit {
     this.result = null;
 
     try {
-      await this.oicrDownloadService.download(resultCode);
+      // T-10: resolve the portfolio from metadata and pass it here. Until then this page keeps the server path.
+      await this.oicrDownloadService.download(resultCode, 2);
       this.result = { success: true };
       const resultPath = this.getResultCodePath(resultCode);
       this.router.navigate(['/result', resultPath, 'general-information']);

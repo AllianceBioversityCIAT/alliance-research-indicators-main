@@ -40,7 +40,9 @@
               "src/styles/custom-prime-force-styles.scss",
               "src/styles/responsive-size.scss"
             ],
-            "scripts": []
+            "scripts": [
+              "./public/go/wasm_exec.js"
+            ]
           },
           "configurations": {
             "production": {

@@ -3,23 +3,41 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { ApiService } from './api.service';
 import { downloadBlob } from '@shared/utils/download-blob.util';
+import { OicrLegacyDownloadService } from './oicr-legacy-download.service';
 
 /** Shown when the error body is missing, empty, or not the JSON envelope. */
 export const OICR_WORD_TEMPLATE_GENERIC_ERROR = 'Could not download the OICR template. Please try again.';
+
+/** Shown when the portfolio is neither 1 (legacy) nor 2 (server). */
+export const OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR = 'This OICR does not have a Word template download for its portfolio.';
 
 @Injectable({
   providedIn: 'root'
 })
 export class OicrDownloadService {
   private api = inject(ApiService);
+  private legacy = inject(OicrLegacyDownloadService);
 
-  async download(code: string | number): Promise<void> {
-    try {
-      const blob = await this.api.GET_OicrWordTemplate(code);
-      downloadBlob(blob, oicrWordTemplateFileName(code, new Date()));
-    } catch (error) {
-      throw new Error(await oicrWordTemplateErrorMessage(error));
+  async download(code: string | number, portfolioId: number | null | undefined): Promise<void> {
+    if (portfolioId === 1) {
+      const result = await this.legacy.generateAndDownload(code);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      return;
     }
+
+    if (portfolioId === 2) {
+      try {
+        const blob = await this.api.GET_OicrWordTemplate(code);
+        downloadBlob(blob, oicrWordTemplateFileName(code, new Date()));
+      } catch (error) {
+        throw new Error(await oicrWordTemplateErrorMessage(error));
+      }
+      return;
+    }
+
+    throw new Error(OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR);
   }
 }
 

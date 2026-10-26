@@ -4,6 +4,7 @@ import { TooltipModule } from 'primeng/tooltip';
 import { CacheService } from '@shared/services/cache/cache.service';
 import { OicrDownloadService, OICR_WORD_TEMPLATE_GENERIC_ERROR } from '@shared/services/oicr-download.service';
 import { ActionsService } from '@shared/services/actions.service';
+import { resolvePortfolioId } from '@shared/utils/oicr-template-download.util';
 
 @Component({
   selector: 'app-download-oicr-template',
@@ -20,7 +21,7 @@ export class DownloadOicrTemplateComponent {
   async downloadOicrTemplate() {
     this.processing.set(true);
     try {
-      await this.oicrDownloadService.download(this.cache.getCurrentNumericResultId());
+      await this.oicrDownloadService.download(this.cache.getCurrentNumericResultId(), resolvePortfolioId(this.cache.currentMetadata()));
     } catch (error) {
       const detail = error instanceof Error && error.message.trim() !== '' ? error.message : OICR_WORD_TEMPLATE_GENERIC_ERROR;
       this.actions.showToast({ severity: 'error', summary: 'Error', detail });

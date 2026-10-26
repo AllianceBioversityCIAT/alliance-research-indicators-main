@@ -381,7 +381,7 @@ graph TD
 
 ### T-09 — Restore the legacy WASM path for Portfolio 1 and route by portfolio (PV-1)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-07 · **Review:** `full` — restores a whole generation path and introduces the routing point both entries use
+- **Status:** done (PASS attempt 1, 2026-10-26 — see `execution.md`) · **Size:** M · **Dependencies:** T-07 · **Review:** `full` — restores a whole generation path and introduces the routing point both entries use
 - **Requirements covered:** R-OWT-013 (all clauses); R-OWT-008 (the click downloads the portfolio's document, loading, one error toast — both paths); R-OWT-011 (a Portfolio 2 download never touches the WASM)
 - **Design refs:** §16 (PV-1 table and P-24…P-27), §12 D-OWT-17, §2.2 (restored rows)
 - **Scope:**
@@ -407,10 +407,10 @@ graph TD
   - A restore that is not byte-identical outside `TEMPLATE_URL` is not a restore (the `git diff ca43e56c^` check).
 - **Consumers:** `download-oicr-template.component.spec.ts`, `oicr-download.service.spec.ts`, `pages/oicr-download/oicr-download.component.spec.ts`, `api.service.spec.ts`, every P-15/P-17 file (design §15).
 - **Done criteria:**
-  - [ ] Restore diff shows only the `TEMPLATE_URL` change.
-  - [ ] Specs green; falsifiers observed red.
-  - [ ] Build green with `go/` in `dist/`.
-  - [ ] Full client suite green (Leader).
+  - [x] Restore diff shows only the `TEMPLATE_URL` change.
+  - [x] Specs green; falsifiers observed red.
+  - [x] Build green with `go/` in `dist/`.
+  - [x] Full client suite green (Leader; 8080/8080, one runner SIGSEGV suite re-run green in isolation).
 - **Skills:** `angular-developer`, `error-handling-patterns`
 
 ### T-10 — Visibility for Portfolio 1 and 2; the link page resolves the portfolio (PV-1)

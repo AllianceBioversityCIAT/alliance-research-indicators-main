@@ -524,3 +524,64 @@
   - This exceeds the re-baseline by about 350 LOC. It is reported at this gate.
 - **Effect on closed tasks.** T-05 and T-07 stay `done` as executed. Their effects are amended (T-10) and reversed (T-09) by new tasks, so the history is not rewritten.
 - **Approval (2026-10-26):** the owner approved the PV-1 amendment, including the 2025 template pin and the budget overshoot (about 3 350 LOC against the 3 000 re-baseline). Owner's reply, verbatim: "si". The status lines now read "amendment approved by the owner 2026-10-26". Execution resumes with T-09.
+
+### T-09 — Restore the legacy WASM path for Portfolio 1 and route by portfolio (PV-1)
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-26
+- **Effort:** high (post-pivot task).
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+- **Skills deviation:** `angular-developer` and `error-handling-patterns` could not load on the Cursor host; the brief carried them in prose.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-high`, Orca `run_704dd2d24af9` / `task_44844bd95d9c` / `ctx_1a6defd799b1` (retained until PASS, released after). Brief: `T-09-brief.md`, report: `T-09-report.md` (session scratchpad).
+- **Restored from `ca43e56c^`:**
+  - whole files: `wasm.service.ts` (+ spec), `public/go/{main.go,main.wasm,wasm_exec.js,WASM-DOCX-README.md}`, `get-oicr-details.interface.ts`;
+  - T-07's removed hunks only: `angular.json` (the scripts entry), `api.service.ts` (`GET_OICRDetails` + import), `api.service.spec.ts` (its case), `environment.example.ts` (`filesStorageUrl` only).
+- **Authored:**
+  - `WasmService.TEMPLATE_URL` pinned to `templates/2025_OICR_Template.docx`, with a matching spec assertion;
+  - `oicr-legacy-download.service.ts` (+ spec), restored from `83d6c37d`. The service is rename-only; the spec was renamed and also reformatted by the formatter (Reviewer advisory);
+  - `OicrDownloadService.download(code, portfolioId)` routing (+ spec);
+  - the button passes `resolvePortfolioId(cache.currentMetadata())`, and its `ngOnInit`/`loadWasm` are gone (+ spec);
+  - the page passes a fixed `2` with a `// T-10:` comment, keeping current behavior until T-10 (+ spec).
+- **Restore check:** `git diff ca43e56c^ --stat` over the restored paths shows `wasm.service.spec.ts | 6 +++++-` and `wasm.service.ts | 2 +-`: the `TEMPLATE_URL` line plus the spec assertion and its import. `public/go/*` and the interface show no diff. The Leader re-ran the check with the same result.
+- **Implementer verification:**
+  - 6 specs: `Tests: 301 passed, 301 total`;
+  - build: exit 0, and the `dist/…/go/main.wasm` SHA matches the source (`5565bb57…`);
+  - spec tsc: 945 errors before and after, with an identical normalized set;
+  - lint: exit 0.
+- **Falsifiers (verbatim, reverted):**
+  - P1 routed to the server: `Expected number of calls: 1` / `Received number of calls: 0` at `expect(legacyMock.generateAndDownload).toHaveBeenCalledTimes(1)`.
+  - `loadWasm()` in the button's `ngOnInit`: `Expected number of calls: 0` / `Received number of calls: 1` at `expect(loadWasm).not.toHaveBeenCalled()`.
+  - `TEMPLATE_URL` reading `oicrTemplateName`: `- ".../templates/2025_OICR_Template.docx"` / `+ ".../templates/2025_OICR_Template_dev.docx"`.
+- **Not Done / Assumptions (verbatim; no blocker and no owed item, so not a continuation):**
+  - "The download page passes `2` as the portfolio argument, with a `// T-10:` comment. That is the smallest signature change that keeps today's page behavior (always the server path). Portfolio resolution from `GET_Metadata` is T-10."
+  - "The unknown-portfolio message is the constant `OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR`: `This OICR does not have a Word template download for its portfolio.`"
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - 6 specs: `Tests: 301 passed, 301 total`.
+  - Build: exit 0, and `dist/…/go/main.wasm` equals the source (one unique SHA).
+  - Full client suite: `Test Suites: 1 failed, 346 passed, 347 total` · `Tests: 8080 passed, 8080 total`.
+    - The failed suite is `yes-or-not.service.spec.ts`: `A jest worker process (pid=75402) was terminated by another process: signal=SIGSEGV`. That is a runner crash with 0 failed tests.
+    - Re-run in isolation: `Tests: 5 passed, 5 total`.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - The restore changes only `TEMPLATE_URL` and its assertion, and the legacy service is rename-only.
+  - Routing is one exact decision point, matching §16.
+  - The button no longer injects or preloads `WasmService` (R-OWT-011 for Portfolio 2), and one toast covers both paths.
+  - The tests use the real `OicrDownloadService`.
+  - The page's fixed `2` is a narrow interim, deferred to T-10.
+  - Neither `oicrTemplateName` nor any server file is touched.
+- **ADVISORY (4R, recorded, non-gating):**
+  - READABILITY: the legacy spec is restored, renamed **and reformatted** (trailing whitespace, a collapsed array, dropped parentheses). The report said "names and import path only".
+  - RELIABILITY: the existing button toast test's wait moved from `setTimeout(0)` to polling up to 100 ms, because of a `FileReader` race on this host.
+  - RELIABILITY: the unknown-portfolio `it.each` covers `undefined` and `3` but not `null`, which is what `resolvePortfolioId` returns. The code handles `null` correctly.
+  - RISK: until T-10, the link page sends Portfolio 1 to the server path, which answers 400. This is reachable today and was already so at HEAD; T-10 closes it.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-high): not reported by host, ended complete;
+  - reviewer: 9 calls, 66,931 tokens, ended complete.
+- **Requirements covered:**
+  - R-OWT-013: restored unchanged, pinned to the 2025 file, one toast on failure;
+  - R-OWT-008: the click downloads the portfolio's document for both paths;
+  - R-OWT-011: a Portfolio 2 download never loads the WASM.
+- **Final verification:** PASS.
