@@ -81,6 +81,7 @@
       project_lead_description: currentContract()?.project_lead_description,
       start_date: currentContract()?.start_date,
       endDateGlobal: currentContract()?.endDateGlobal || undefined,
+      report_year: oicrReportYear(),
       levers: currentContract()?.levers,
       status_id: getStatusIdAsString(),
       status_config: cache.currentMetadata().result_status

@@ -411,4 +411,26 @@ describe('OicrHeaderComponent — Download OICR Template button visibility', () 
     expect(downloadButtons().length).toBe(0);
     expect(fixture.nativeElement.textContent).toContain('CGSpace link');
   });
+
+  // Owner 2026-10-26: the OICR header always shows its reporting year (real template in this suite).
+  it('shows the reporting year when there is one, and nothing when there is none', () => {
+    // top row, between the OICR code and the status tag (owner)
+    component.showTag = true;
+    component.data = { title: 'T', result_official_code: 629, report_year: 2026, status_id: '11' };
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const year = () => el.querySelector('[data-testid="oicr-header-report-year"]');
+    // a calendar icon + the year, in the OICR code's own font; "Reporting year" for screen readers
+    expect(year()?.querySelector('i.pi-calendar')).not.toBeNull();
+    expect(year()?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Reporting year 2026');
+    expect(year()?.querySelector('.sr-only')?.textContent?.trim()).toBe('Reporting year');
+    expect(year()?.getAttribute('title')).toBe('Reporting year 2026');
+    const row = year()!.parentElement!;
+    const order = Array.from(row.children).map(c => (c.getAttribute('data-testid') === 'oicr-header-report-year' ? 'year' : c.tagName.toLowerCase()));
+    expect(order.indexOf('year')).toBeLessThan(order.indexOf('app-custom-tag'));
+    expect(row.textContent).toContain('629');
+    component.data = { title: 'T' };
+    fixture.detectChanges();
+    expect(year()).toBeNull();
+  });
 });

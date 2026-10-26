@@ -3014,6 +3014,19 @@ describe('CreateOicrFormComponent', () => {
       expect(component.showEditPublishedOicrButton()).toBe(false);
     });
 
+    // Owner 2026-10-26: a Postponed OICR can also be fully edited by an admin.
+    it('showEditPublishedOicrButton is true for admin on a Postponed (11) OICR, false for non-admin', () => {
+      mockCreateResultManagementService.editingOicr.set(true);
+      mockCreateResultManagementService.statusId.set(11);
+      mockRolesService.isAdmin.mockReturnValue(true);
+      expect(component.showEditPublishedOicrButton()).toBe(true);
+      mockRolesService.isAdmin.mockReturnValue(false);
+      // a fresh status write recomputes the signal after the role changed
+      mockCreateResultManagementService.statusId.set(14);
+      mockCreateResultManagementService.statusId.set(11);
+      expect(component.showEditPublishedOicrButton()).toBe(false);
+    });
+
     it('showEditPublishedOicrButton is false when status is not published', () => {
       mockCreateResultManagementService.editingOicr.set(true);
       mockCreateResultManagementService.statusId.set(10);

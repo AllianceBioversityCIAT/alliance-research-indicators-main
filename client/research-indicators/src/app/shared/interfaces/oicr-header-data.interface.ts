@@ -16,6 +16,8 @@ export interface OicrHeaderData {
   project_lead_description?: string;
   start_date?: string | Date;
   endDateGlobal?: string | Date;
+  /** Reporting year of the OICR, shown in the header so the year is always visible. */
+  report_year?: string | number | null;
   lever?: string;
   leverUrl?: string;
   leverFirst?: string;
