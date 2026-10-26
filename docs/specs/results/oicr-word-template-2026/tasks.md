@@ -440,7 +440,7 @@ graph TD
 
 ### T-08 — Baseline docs and human checks
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-01…T-07, T-09, T-10 deployed to Dev · **Review:** `checklist` — doc edits plus quoted human evidence
+- **Status:** in progress [~] — docs half PASS 2026-10-26; HITL on Dev open · **Size:** S · **Dependencies:** T-01…T-07, T-09, T-10 deployed to Dev · **Review:** `checklist` — doc edits plus quoted human evidence
 - **Requirements covered:**
   - R-OWT-012.
   - The HITL halves of the defect gates: D-5 (Word repair prompt, "+" and dropdowns), D-6 (Cognito round trip), D-11 / NFR-OWT-001 (timing).
@@ -463,7 +463,7 @@ graph TD
 - **Disqualifier:** a human answer that covers an adjacent property is not evidence for the clause. Example: "the file downloaded" does not cover "Word opened without repair". Tick only what the quoted words cover.
 - **Consumers:** none.
 - **Done criteria:**
-  - [ ] Docs updated, grep at 0.
+  - [x] Docs updated, grep at 0 (3 → 0, see `execution.md`).
   - [ ] Seven HITL observations quoted (item 3 counts the button and the link).
 - **Skills:** `cognitive-doc-design`
 

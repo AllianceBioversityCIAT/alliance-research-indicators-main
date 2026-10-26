@@ -201,7 +201,7 @@ Organized by **page domain** under `src/app/pages/`, cross-cutting code under `s
 | **What's New** | `pages/platform/pages/whats-new/` | Release notes — list (`whats-new-home`) + detail (`details/:id`) |
 | **Auth / Landing** | `pages/login/`, `pages/auth/`, `pages/landing/` | Cognito entry & callback; public surface |
 | **Report viewer** | `pages/star-report-viewer/` | Standalone result report at `/reports/result/:id`; top-level route (outside the platform shell), guarded by `rolesGuard` |
-| **Real-time / OICR / Dynamic Fields** | `pages/room/`, `pages/oicr-download/`, `pages/dynamic-fields/` | WebSocket collaboration; public template download; form-field config utility |
+| **Real-time / OICR / Dynamic Fields** | `pages/room/`, `pages/oicr-download/`, `pages/dynamic-fields/` | WebSocket collaboration; login-required OICR Word download (2026: `GET /api/results/oicr/word-template/:resultCode`, server-side; 2025: legacy client WASM); form-field config utility |
 | **Dev scaffold** ⚠️ | `pages/cache-test/` | Cache-inspection harness routed at `/cache-test` with **no guard and no `isLoggedIn` data** — publicly reachable and shipped in the production bundle. Flagged in `docs/specs/drift-report.md`; decide whether it should ship at all |
 | **Shared / Theme / Testing** | `src/app/shared/`, `theme/`, `testing/` | Components, services, pipes, interfaces; PrimeNG Aura preset (`roartheme.ts`); test harness/mocks |
 

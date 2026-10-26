@@ -649,3 +649,38 @@
   - It does **not** itemize the T-08 clauses: Word repair prompt, "+"/dropdowns, revisions, grey text, login round trip, Network, timing.
   - It is local, not the deployed Dev server.
 - **Status of T-08:** its HITL items stay open until they are observed on Dev and quoted per item.
+
+### T-08 — Baseline docs and human checks (docs half)
+
+- **Status:** docs half PASS (attempt 1). The **HITL half is open**, so the task stays `[~]`.
+- **Date:** 2026-10-26
+- **Effort:** low.
+- **Review mode:** lens checklist (single reviewer). Task `Review: checklist`.
+
+#### Attempt 1 (docs)
+
+- **Implementer:** Cursor `grok-4.7-low`, Orca `run_704dd2d24af9` / `task_695fa4b1591e` / `ctx_b07adae3394f`. Brief: `T-08-docs-brief.md`, report: `T-08-docs-report.md` (session scratchpad).
+- **Files changed:**
+  - `docs/ux-ui/design.md`: line 100 (IA tree), line 250 (screen inventory row 21: `/oicr/download/:resultCode`, legacy redirect, Auth `Yes`, both paths), and a decisions-log entry dated 2026-10-26 (`[advisory-grade]`, Leader-added);
+  - `docs/trd/trd.md`: line 204, which now describes the login-required download with both paths.
+- **Falsifier, red then green:**
+  - Before the edit, the Leader ran `grep -n "Public download\|public template download" docs/ux-ui/design.md docs/trd/trd.md`. It returned **3** hits: `docs/ux-ui/design.md:100`, `docs/ux-ui/design.md:250` and `docs/trd/trd.md:204`.
+  - After the edit it returns **0** hits (grep exit 1). Re-run by the Leader: VERIFIED.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus). Each statement was checked against the code:
+  - the guarded route at `app.routes.ts:36-42`;
+  - the unguarded legacy redirect at `:44-46` and `oicr-download.component.ts:75-77`;
+  - the unversioned endpoint `result-oicr.controller.ts:119` under `main.routes.ts:114`;
+  - Portfolio 1 → legacy and Portfolio 2 → server in `oicr-download.service.ts:22-40`.
+  
+  Table shapes are preserved.
+- **ADVISORY:** the IA tree heading "Public / Unauthenticated" now contains a login-required entry. Suggested fix: rename the heading to "Outside the shell (public / utility)", which matches the sentence at line 90.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-low): not reported by host, ended complete;
+  - reviewer: 7 calls, 36,254 tokens, ended complete.
+- **Requirements covered:** R-OWT-012.
+- **Still open (HITL on the deployed Dev server, owner):** the seven observations in tasks.md T-08 (Word 2026 ×2, the 2025 download from the button and from the link, the logged-out round trip, Network, timing ≤ 5 s, anonymous `curl` → 401). Local partials so far:
+  - anonymous 401 observed locally on `:3001`;
+  - the owner's local quote "lo veo perfecto ambos agnos".
+  
+  Neither discharges a Dev clause.
