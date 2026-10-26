@@ -1,13 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
-import OicrDownloadComponent from './oicr-download.component';
+import OicrDownloadComponent, { OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR } from './oicr-download.component';
 import { OicrDownloadService } from '@shared/services/oicr-download.service';
+import { ApiService } from '@shared/services/api.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
 
 describe('OicrDownloadComponent', () => {
   let component: OicrDownloadComponent;
   let fixture: ComponentFixture<OicrDownloadComponent>;
   let oicrDownloadServiceMock: { download: jest.Mock };
+  let apiMock: { GET_Metadata: jest.Mock };
   let routerMock: jest.Mocked<Router>;
   let routeMock: { snapshot: { paramMap: ReturnType<typeof convertToParamMap>; queryParamMap: ReturnType<typeof convertToParamMap> } };
 
@@ -18,9 +20,18 @@ describe('OicrDownloadComponent', () => {
     };
   };
 
+  const settle = async () => {
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    fixture.detectChanges();
+  };
+
   beforeEach(async () => {
     oicrDownloadServiceMock = {
       download: jest.fn()
+    };
+    apiMock = {
+      GET_Metadata: jest.fn().mockResolvedValue({ data: { portfolio: { id: 2 } } })
     };
 
     routerMock = {
@@ -38,6 +49,7 @@ describe('OicrDownloadComponent', () => {
       imports: [OicrDownloadComponent],
       providers: [
         { provide: OicrDownloadService, useValue: oicrDownloadServiceMock },
+        { provide: ApiService, useValue: apiMock },
         { provide: Router, useValue: routerMock },
         { provide: ActivatedRoute, useValue: routeMock }
       ]
@@ -61,9 +73,69 @@ describe('OicrDownloadComponent', () => {
       setRoute('554');
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await settle();
 
       expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 2);
+    });
+
+    it('downloads a Portfolio 1 result from the path code', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: { portfolio: { id: 1 } } });
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(apiMock.GET_Metadata).toHaveBeenCalledWith('554');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 1);
+    });
+
+    it('downloads a Portfolio 2 result from the path code', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: { portfolio: { id: 2 } } });
+      oicrDownloadServiceMock.download.mockResolvedValue(undefined);
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(apiMock.GET_Metadata).toHaveBeenCalledWith('554');
+      expect(oicrDownloadServiceMock.download).toHaveBeenCalledWith('554', 2);
+    });
+
+    it('shows an error when metadata is rejected and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockRejectedValue(new Error('metadata failed'));
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when metadata has no portfolio and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({ data: {} });
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when metadata has no data and does not download or navigate', async () => {
+      apiMock.GET_Metadata.mockResolvedValue({});
+      setRoute('554');
+
+      fixture.detectChanges();
+      await settle();
+
+      expect(fixture.nativeElement.textContent).toContain(OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR);
+      expect(oicrDownloadServiceMock.download).not.toHaveBeenCalled();
+      expect(routerMock.navigate).not.toHaveBeenCalled();
     });
 
     it('redirects a legacy query code to the path form', () => {
@@ -91,8 +163,7 @@ describe('OicrDownloadComponent', () => {
       setRoute('554');
 
       fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
+      await settle();
 
       expect(fixture.nativeElement.textContent).toContain('Result is not an OICR');
       expect(routerMock.navigate).not.toHaveBeenCalled();
@@ -103,7 +174,7 @@ describe('OicrDownloadComponent', () => {
       setRoute('554');
 
       fixture.detectChanges();
-      await fixture.whenStable();
+      await settle();
 
       expect(routerMock.navigate).toHaveBeenCalledWith(['/result', `${PLATFORM_CODES.STAR}-554`, 'general-information']);
     });

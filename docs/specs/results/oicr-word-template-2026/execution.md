@@ -585,3 +585,57 @@
   - R-OWT-008: the click downloads the portfolio's document for both paths;
   - R-OWT-011: a Portfolio 2 download never loads the WASM.
 - **Final verification:** PASS.
+
+### T-10 — Visibility for Portfolio 1 and 2; the link page resolves the portfolio (PV-1)
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-26
+- **Effort:** medium.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium`, Orca `run_704dd2d24af9` / `task_3e86c24f68bd` / `ctx_bf2a0b67297d` (retained until PASS, released after). Brief: `T-10-brief.md`, report: `T-10-report.md` (session scratchpad).
+- **Files changed:**
+  - `oicr-template-download.util.ts` (+ spec): hidden unless the portfolio is 1 or 2;
+  - `pages/oicr-download/oicr-download.component.ts` (+ spec): `GET_Metadata` → `resolvePortfolioId` → `download(code, portfolio)`, with a fixed `OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR`;
+  - `oicr-header` and `section-header`: doc comments, plus their specs;
+  - `oicr-download.service.spec.ts`: advisory item, `null` added to the unknown `it.each`.
+- **Consumer grep before editing:** `grep -rnE "isOicrTemplateDownloadHidden|resolvePortfolioId" src` → 15 lines (full list in the report).
+- **Implementer verification:**
+  - 5 specs: 161/161;
+  - lint: exit 0;
+  - build: exit 0;
+  - spec tsc: 945 before and after, with identical normalized sets.
+- **Falsifiers (verbatim):**
+  - `OicrDownloadComponent › ngOnInit › downloads a Portfolio 1 result from the path code` failed with `Expected: "554", 1` / `Received: "554", 2`.
+  - `isOicrTemplateDownloadHidden › shows the download for Portfolio 1` failed with `Expected: false` / `Received: true`.
+  - Both were observed against the T-05 predicate and the fixed-2 page, before the production change.
+- **Transition tests (KZ-015):**
+  - `shows the download button after Portfolio 1 metadata arrives` (oicr-header);
+  - `renders the download icon after Portfolio 1 metadata arrives` (section-header);
+  - published Portfolio 1 stays hidden: `renders no download button for a published Portfolio 1 OICR`.
+- **Not Done / Assumptions (verbatim; no blocker and no owed item):**
+  - "The page's fixed message is `OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR`: 'This OICR's portfolio could not be resolved, so the template was not downloaded.'"
+  - "`GET_Metadata` is typed `(id: number)`. The page passes the route code through (`resultCode as number`)…"
+  - "A resolved portfolio other than 1 or 2 (for example 3) still calls `download`, which rejects with `OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR`."
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - 5 specs: `Tests: 161 passed, 161 total`.
+  - Build: exit 0.
+  - Full client suite: `Test Suites: 347 passed, 347 total` · `Tests: 8093 passed, 8093 total`, exit 0.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - All five amended R-OWT-008 rows and both amended R-OWT-009 scenarios are asserted.
+  - KZ-015 transitions are real.
+  - The page returns early on failure or an unresolved portfolio, so neither `download` nor `navigate` runs.
+  - `useResultInterceptor` on `/oicr/download/:code` adds neither `reportYear` nor `reportingPlatforms`: the URL matches neither pattern, so the request is plain `results/554/metadata`. The server-emitted link carries no version.
+- **ADVISORY (4R, recorded, non-gating):**
+  - RELIABILITY: the "metadata rejected" test mocks a rejection that the real `TP` never produces; `TP` resolves `{successfulRequest:false}` without `data`. That real shape is covered by the `{}`/`{data:{}}` tests.
+  - RISK: a hand-typed `?version=` on the link would resolve the portfolio from that version. No emitted link carries one.
+  - READABILITY: `resultCode as number` hides that the code is a string.
+  - READABILITY: `PORTFOLIO_1_ID` is exported but used only inside the util.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-medium): not reported by host, ended complete;
+  - reviewer: 15 calls, 65,637 tokens, ended complete.
+- **Requirements covered:** R-OWT-008 (amended table, both scenarios), R-OWT-009 (amended 2025-link scenario, unresolved-portfolio scenario), R-OWT-013 (link half).
+- **Final verification:** PASS.

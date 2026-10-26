@@ -101,7 +101,7 @@ describe('OicrDownloadService', () => {
     expect(legacyMock.generateAndDownload).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, 3])('portfolio %s rejects and calls neither path', async portfolioId => {
+  it.each([undefined, null, 3])('portfolio %s rejects and calls neither path', async portfolioId => {
     await expect(service.download(554, portfolioId)).rejects.toThrow(OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR);
     expect(legacyMock.generateAndDownload).not.toHaveBeenCalled();
     expect(apiMock.GET_OicrWordTemplate).not.toHaveBeenCalled();

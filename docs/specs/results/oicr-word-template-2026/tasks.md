@@ -415,7 +415,7 @@ graph TD
 
 ### T-10 — Visibility for Portfolio 1 and 2; the link page resolves the portfolio (PV-1)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-09 · **Review:** `full` — shared visibility util read by two headers, and the email-link entry
+- **Status:** done (PASS attempt 1, 2026-10-26 — see `execution.md`) · **Size:** M · **Dependencies:** T-09 · **Review:** `full` — shared visibility util read by two headers, and the email-link entry
 - **Requirements covered:** R-OWT-008 (amended visibility table, both 2026 and 2025 scenarios); R-OWT-009 (amended 2025-link scenario; unresolved-portfolio scenario); R-OWT-013 (the link half)
 - **Design refs:** §16, §12 D-OWT-11 (amended), D-OWT-17, §6, P-25
 - **Scope:**
@@ -433,9 +433,9 @@ graph TD
 - **Disqualifier:** a header spec that sets metadata before the first `detectChanges()` is an end state (KZ-015); at least one header spec must arrange the Portfolio 1 transition.
 - **Consumers:** `oicr-template-download.util.spec.ts`, `oicr-header.component.spec.ts`, `section-header.component.spec.ts`, `pages/oicr-download/oicr-download.component.spec.ts`.
 - **Done criteria:**
-  - [ ] Specs green; falsifiers observed red.
-  - [ ] Build green.
-  - [ ] Full client suite green (Leader).
+  - [x] Specs green; falsifiers observed red.
+  - [x] Build green.
+  - [x] Full client suite green (Leader; 347/347 suites, 8093 tests).
 - **Skills:** `angular-developer`
 
 ### T-08 — Baseline docs and human checks

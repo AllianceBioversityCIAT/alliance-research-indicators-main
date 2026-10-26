@@ -18,11 +18,15 @@ describe('oicr-template-download.util', () => {
   });
 
   describe('isOicrTemplateDownloadHidden', () => {
+    it('shows the download for Portfolio 1', () => {
+      expect(isOicrTemplateDownloadHidden({ portfolio: { id: 1 } })).toBe(false);
+    });
+
     it('shows the download for Portfolio 2', () => {
       expect(isOicrTemplateDownloadHidden({ portfolio: { id: PORTFOLIO_2_ID } })).toBe(false);
     });
 
-    it.each([{ portfolio: { id: 1 } }, { portfolio_id: 3 }, {}, undefined, null])('hides the download for %p', source => {
+    it.each([{ portfolio_id: 3 }, {}, undefined, null])('hides the download for %p', source => {
       expect(isOicrTemplateDownloadHidden(source as never)).toBe(true);
     });
   });

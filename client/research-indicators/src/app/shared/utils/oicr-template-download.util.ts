@@ -1,4 +1,5 @@
-/** Portfolio 2 — the only portfolio that shows the OICR template download. */
+/** Portfolio 1 uses the legacy download; Portfolio 2 uses the server download. Both show the button. */
+export const PORTFOLIO_1_ID = 1;
 export const PORTFOLIO_2_ID = 2;
 
 /**
@@ -19,9 +20,10 @@ export function resolvePortfolioId(source: OicrTemplatePortfolioSource | null | 
 }
 
 /**
- * Hides "Download OICR Template" unless the portfolio resolves to 2.
- * An unknown portfolio hides the button — the 2025 fallback that showed it is retired.
+ * Hides "Download OICR Template" unless the portfolio resolves to 1 or 2.
+ * An unknown portfolio, or any portfolio other than 1 and 2, hides the button.
  */
 export function isOicrTemplateDownloadHidden(source: OicrTemplatePortfolioSource | null | undefined): boolean {
-  return resolvePortfolioId(source) !== PORTFOLIO_2_ID;
+  const portfolioId = resolvePortfolioId(source);
+  return portfolioId !== PORTFOLIO_1_ID && portfolioId !== PORTFOLIO_2_ID;
 }

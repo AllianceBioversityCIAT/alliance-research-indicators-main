@@ -453,11 +453,14 @@ describe('SectionHeaderComponent', () => {
     expect(items[0].items?.length).toBe(0);
   });
 
-  it('showOicrTemplateDownload is false for an OICR outside Portfolio 2', () => {
+  it('showOicrTemplateDownload is true for a Portfolio 1 OICR and false when the portfolio is missing or other', () => {
     (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
-    expect(component.showOicrTemplateDownload()).toBe(false);
+    expect(component.showOicrTemplateDownload()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 5 });
+    expect(component.showOicrTemplateDownload()).toBe(false);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 3 });
     expect(component.showOicrTemplateDownload()).toBe(false);
   });
 
@@ -484,9 +487,17 @@ describe('SectionHeaderComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
 
-    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio_id: 3 });
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+  });
+
+  it('renders the download icon after Portfolio 1 metadata arrives', () => {
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
+
+    (cacheService.currentMetadata as any).set({ indicator_id: 5, portfolio: { id: 1 } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(1);
   });
 
   it('showStarPdfReport should require STAR result and supported indicators', () => {

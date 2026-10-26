@@ -1,7 +1,13 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { OicrDownloadService } from '@shared/services/oicr-download.service';
+import { ApiService } from '@shared/services/api.service';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
+import { resolvePortfolioId } from '@shared/utils/oicr-template-download.util';
+
+/** Shown when metadata fails or the result has no portfolio. The page does not download. */
+export const OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR =
+  "This OICR's portfolio could not be resolved, so the template was not downloaded.";
 
 interface OicrDownloadPageResult {
   success: boolean;
@@ -16,11 +22,18 @@ interface OicrDownloadPageResult {
 })
 export default class OicrDownloadComponent implements OnInit {
   oicrDownloadService = inject(OicrDownloadService);
+  api = inject(ApiService);
   route = inject(ActivatedRoute);
   router = inject(Router);
 
   processing = signal(false);
   result: OicrDownloadPageResult | null = null;
+
+  private async portfolioFor(resultCode: string | number): Promise<number | null> {
+    const response = await this.api.GET_Metadata(resultCode as number).catch(() => null);
+    if (response?.data == null) return null;
+    return resolvePortfolioId(response.data);
+  }
 
   private getResultCodePath(resultCode: string | number): string {
     if (typeof resultCode === 'string' && resultCode.includes('-')) {
@@ -34,8 +47,13 @@ export default class OicrDownloadComponent implements OnInit {
     this.result = null;
 
     try {
-      // T-10: resolve the portfolio from metadata and pass it here. Until then this page keeps the server path.
-      await this.oicrDownloadService.download(resultCode, 2);
+      const portfolioId = await this.portfolioFor(resultCode);
+      if (portfolioId == null) {
+        this.result = { success: false, error: OICR_DOWNLOAD_PAGE_PORTFOLIO_ERROR };
+        return;
+      }
+
+      await this.oicrDownloadService.download(resultCode, portfolioId);
       this.result = { success: true };
       const resultPath = this.getResultCodePath(resultCode);
       this.router.navigate(['/result', resultPath, 'general-information']);
