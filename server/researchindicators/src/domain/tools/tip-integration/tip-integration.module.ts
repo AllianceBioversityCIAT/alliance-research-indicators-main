@@ -14,6 +14,7 @@ import { PrmsOpenSearchModule } from '../open-search/prms/prms.opensearch.module
 import { ClarisaSdgsModule } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.module';
 import { SaveAllSectionsModule } from '../../shared/services/save-all-sections.module';
 import { BilateralModule } from '../../entities/bilateral/bilateral.module';
+import { ResultPrmsSyncModule } from '../../entities/result-prms-sync/result-prms-sync.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { BilateralModule } from '../../entities/bilateral/bilateral.module';
     ClarisaSdgsModule,
     SaveAllSectionsModule,
     BilateralModule,
+    ResultPrmsSyncModule,
   ],
   controllers: [TipIntegrationController],
   providers: [

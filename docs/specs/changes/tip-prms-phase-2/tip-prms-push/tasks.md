@@ -193,7 +193,7 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 
 ### T-04 — TIP push phase
 
-- [ ] **Status:** pending · **Size:** M · **Dependencies:** T-03
+- [x] **Status:** done 2026-10-26 (PASS, `execution.md`) · **Size:** M · **Dependencies:** T-03
 - **First step (settles P-13, High):** read-only count on Dev (`ARI_MYSQL_*`, `SET SESSION TRANSACTION READ ONLY`, VPN needed — owner). Count TIP `is_snapshot = 1`, `report_year_id = <ARI_PRMS_SYNC>`, `result_status_id = 20` rows, then:
   - how many have `prms_result_code IS NULL`;
   - how many have `pool_funding_alignment_validation(result_id) = 1`;
@@ -263,10 +263,10 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
   The grep was run 2026-10-26 for `getKnowledgeProductsByYear|collectSaved|persistHandles|TipHandleRepository|TipIntegrationModule`.
 - **Review:** `full` — new integration behavior; ordering, actor and failure isolation are all correctness-critical.
 - **Done criteria:**
-  - [ ] P-13 count recorded, and the owner informed if it is 0.
-  - [ ] All new cases are green; the existing TIP specs are green.
-  - [ ] Falsifiers (a)–(d) observed red and reverted.
-  - [ ] tsc and build are green.
+  - [x] P-13 count recorded, and the owner informed if it is 0.
+  - [x] All new cases are green; the existing TIP specs are green.
+  - [x] Falsifiers (a)–(d) observed red and reverted.
+  - [x] tsc and build are green.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`.
 
 ---

@@ -1,5 +1,7 @@
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import { DataSource, In, IsNull, Not } from 'typeorm';
+import { Result } from '../../../entities/results/entities/result.entity';
+import { ResultPrmsSyncModule } from '../../../entities/result-prms-sync/result-prms-sync.module';
 import { TipIntegrationModule } from '../tip-integration.module';
 import {
   TipHandleRepository,
@@ -314,5 +316,55 @@ describe('TipHandleRepository.resolve', () => {
     ) as unknown[];
     expect(providers).toContain(TipHandleRepository);
     expect(exportsMeta).toContain(TipHandleRepository);
+  });
+
+  it('imports ResultPrmsSyncModule for the push phase', () => {
+    const imports = Reflect.getMetadata(
+      'imports',
+      TipIntegrationModule,
+    ) as unknown[];
+    expect(imports).toContain(ResultPrmsSyncModule);
+  });
+});
+
+describe('TipHandleRepository.idsWithPrmsCode', () => {
+  it('returns an empty list and does not query when given no ids', async () => {
+    const query = jest.fn();
+    const getRepository = jest.fn();
+    const repository = new TipHandleRepository({
+      query,
+      getRepository,
+    } as unknown as DataSource);
+
+    await expect(repository.idsWithPrmsCode([])).resolves.toEqual([]);
+
+    expect(query).not.toHaveBeenCalled();
+    expect(getRepository).not.toHaveBeenCalled();
+  });
+
+  it('reads ids that already store a PRMS code with TypeORM In', async () => {
+    const find = jest
+      .fn()
+      .mockResolvedValue([{ result_id: 10 }, { result_id: '20' }]);
+    const getRepository = jest.fn().mockReturnValue({ find });
+    const query = jest.fn();
+    const repository = new TipHandleRepository({
+      query,
+      getRepository,
+    } as unknown as DataSource);
+
+    await expect(repository.idsWithPrmsCode([10, 20, 30])).resolves.toEqual([
+      10, 20,
+    ]);
+
+    expect(query).not.toHaveBeenCalled();
+    expect(getRepository).toHaveBeenCalledWith(Result);
+    expect(find).toHaveBeenCalledWith({
+      select: { result_id: true },
+      where: {
+        result_id: In([10, 20, 30]),
+        prms_result_code: Not(IsNull()),
+      },
+    });
   });
 });

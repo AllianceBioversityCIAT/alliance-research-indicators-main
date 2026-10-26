@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, In, IsNull, Not } from 'typeorm';
+import { Result } from '../../../entities/results/entities/result.entity';
 
 export interface TipHandleRow {
   result_id: number;
@@ -62,6 +63,24 @@ export class TipHandleRepository {
       versions: versionPick.versions,
       otherVersions: versionPick.otherVersions,
     };
+  }
+
+  /**
+   * Result ids in the given list that already store a PRMS code.
+   * An empty list returns immediately and issues no query.
+   */
+  async idsWithPrmsCode(ids: number[]): Promise<number[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const rows = await this.dataSource.getRepository(Result).find({
+      select: { result_id: true },
+      where: {
+        result_id: In(ids),
+        prms_result_code: Not(IsNull()),
+      },
+    });
+    return rows.map((row) => Number(row.result_id));
   }
 }
 
