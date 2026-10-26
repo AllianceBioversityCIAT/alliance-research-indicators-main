@@ -481,3 +481,46 @@
 
 - The owner added the env var, restarted the server, and downloaded from the button. Quote: "si se descargo bien creo que lo pasare a test".
 - **Scope of the quote (KZ-002):** it covers that the download from the button succeeds locally. It does **not** cover any T-08 HITL clause: Word opening without a repair prompt, working "+"/dropdowns, visible revisions, the login round trip, the network check, timing, or the Dev download. Those stay open for T-08.
+
+## Pivot Record: PV-1 — 2025 OICRs keep the legacy download (2026-10-26)
+
+- **Trigger.** On 2026-10-26, after T-01…T-07 had passed and the owner had downloaded the 2026 template locally, the owner wrote that the docx must serve both 2025 and 2026, tied to the result's year. Owner's words (verbatim): "hay un ajuste con respecto a los docx ahora solicitaron que el docx se debe mostrar tanto el 2025 como el 2026 este template debe ir ligado al year del resutlado si es 2025 pues se muestra 2025 si es 2026 el otro hay que tener en cuenta que el desarrollo del 2025 es el legacy y pues no se ajusto nada entonces como hariamos funcionar el legacy y el nuevo teniendo en cuenta que el nuevo se quedara ya para los demas agns pero el legacy esta totalmente diferente".
+- **What this overturns.** The request contradicts approved clauses:
+  - R-OWT-008 ("Portfolio 1 hidden");
+  - R-OWT-009 ("2025 link → error");
+  - R-OWT-011 (WASM retired);
+  - requirements §10 ("2025 OICRs? No template");
+  - D-OWT-11 and D-OWT-13.
+  
+  This is a scope change, not an implementation defect. It is a Pivot, not rework. No ADR in the TRD is affected; the decisions are spec-level (D-OWT-*).
+- **Alternatives presented to the owner** (AskUserQuestion, 2026-10-26):
+  - **A.** Two client paths chosen by portfolio, legacy unchanged. Recommended.
+  - **B.** Port 2025 to the server engine. More work, and the 2025 document would change, so BI would re-validate.
+  - **C.** Run the Go WASM inside the Node server. Fragile.
+- **Decision.** The owner chose **A**. Recorded as D-OWT-17.
+- **Revised direction:**
+  - `OicrDownloadService.download(code, portfolioId)` is the single routing point: Portfolio 1 goes to the restored legacy path, Portfolio 2 to the server endpoint.
+  - The legacy code is restored from `83d6c37d` / `ca43e56c^`. The only change is that `WasmService.TEMPLATE_URL` is pinned to `templates/2025_OICR_Template.docx` (P-24, P-26).
+  - The button stops pre-loading the WASM.
+  - The link page resolves the portfolio through `GET_Metadata` before choosing a path.
+  - The server is unchanged.
+- **Facts gathered before amending** (commands run 2026-10-26):
+  - Nothing on the branch is pushed: `git merge-base --is-ancestor <c> origin/…` returns not-ancestor for `ca43e56c`, `8dd355de`, `c81539b2` and `1a362b54`. The branch is ahead 11.
+  - S3 (`curl`): `2025_OICR_Template_dev.docx 200 103802`, `2025_OICR_Template.docx 200 103802`, `2026_OICR_Template_dev.docx 200 112531`.
+  - Both 2025 files have SHA-1 `ce2127a09a3c3246153d4d93871ef6183c0f3f59`.
+  - `GET_Metadata` is at `api.service.ts:771-777`, and `GetMetadata.portfolio*` at `get-metadata.interface.ts:13-16`.
+- **Spec amended** (amendment pending owner approval):
+  - `requirements.md`: status line, executive summary, scope, R-OWT-008, R-OWT-009 (two scenarios), R-OWT-011 (title and sentence), new R-OWT-013, R-OWT-012, §7, R-1, §10, the index.
+  - `design.md`: status line, executive summary, §1 non-goals, §2.2 restored rows, §6, §7, §11 comms, D-OWT-11 (amended), D-OWT-13 (superseded), new D-OWT-17, new §16 (PV-1 table, P-24…P-27, budget delta). Open questions moved to §17.
+  - `tasks.md`: status line, summary table, DAG, T-05 and T-07 notes, new **T-09** and **T-10**, T-08 (dependencies, docs scope, HITL items 3 and 4, seven observations), coverage rows, done definition.
+- **Correction closure:**
+  - Forward sweep: `grep -nE "only for Portfolio 2|Portfolio 2 only|hidden for 2025|2025 download is gone|no longer get|2026-only error|link to a 2025 OICR → error|Six HITL"` over the three spec files. The only unannotated survivors are the "Before" column of the design §16 table and the historical T-05 heading, which now carries a PV-1 note.
+  - Backward sweep: grep for citations of R-OWT-008, R-OWT-011, D-OWT-11 and D-OWT-13 in `docs/ux-ui/design.md`, `docs/trd/trd.md` and `judgment.md`. The only hit is `judgment.md:79`, a historical record that is left unchanged.
+  - Removed lines: `git diff -U0` was read line by line. Every removal is an intended replacement. The R-OWT-008 loading/toast sentence survived (`requirements.md:319`).
+- **Budget.**
+  - Owner re-baseline (2026-10-23): about 3 000 LOC.
+  - PV-1 adds 2 tasks, about 350 authored LOC (plus about 1 600 restored lines, which are not authored) and 3 review rounds.
+  - New totals: 10 tasks, about 3 350 LOC, 15 review rounds.
+  - This exceeds the re-baseline by about 350 LOC. It is reported at this gate.
+- **Effect on closed tasks.** T-05 and T-07 stay `done` as executed. Their effects are amended (T-10) and reversed (T-09) by new tasks, so the history is not rewritten.
+- **Approval (2026-10-26):** the owner approved the PV-1 amendment, including the 2025 template pin and the budget overshoot (about 3 350 LOC against the 3 000 re-baseline). Owner's reply, verbatim: "si". The status lines now read "amendment approved by the owner 2026-10-26". Execution resumes with T-09.

@@ -2,11 +2,11 @@
 
 - **Module:** results (server `entities/result-oicr` · client OICR download button, `/oicr/download` route)
 - **Spec id:** 2026-10-oicr-word-template-2026
-- **Status:** approved (Phase 2 gate, 2026-10-23) — Judgment Day APPROVED, round 2 (see `judgment.md`)
+- **Status:** approved (Phase 2 gate, 2026-10-23) — Judgment Day APPROVED, round 2 (see `judgment.md`) · **amended 2026-10-26 by Pivot PV-1** (§16) — amendment approved by the owner 2026-10-26
 - **Owner:** STAR / ARI squad
 - **Linked requirements:** ./requirements.md
 - **Linked detailed design:** ../../../trd/trd.md (frontend route map, line 204); ../../../ux-ui/design.md (screen inventory, lines 100 and 250)
-- **Last updated:** 2026-10-23
+- **Last updated:** 2026-10-26
 
 ---
 
@@ -24,8 +24,8 @@ The engine edits only the 13 target content controls, clones repeating rows when
 On the client:
 
 - the button and a new guarded route `/oicr/download/:resultCode` call that endpoint through `getBlob`;
-- the button is shown only for Portfolio 2;
-- the Go WASM, its assets and its global script are deleted.
+- the button is shown for Portfolio 1 and 2 (PV-1); Portfolio 2 uses the new endpoint, Portfolio 1 the legacy WASM;
+- ~~the Go WASM, its assets and its global script are deleted~~ — **PV-1:** the Go WASM stays as the **legacy path for Portfolio 1 (2025)**, unchanged except that it always uses the 2025 template file; the client picks the path by portfolio in one place (§16).
 
 ---
 
@@ -44,7 +44,7 @@ On the client:
 **Non-goals**
 
 - Fields outside the modal.
-- 2025 templates.
+- Generating 2025 templates on the server, or changing the legacy 2025 document (PV-1 keeps it as it is).
 - Template caching.
 - Removing `GET results/oicr/details/:resultCode`.
 - Changing `rolesGuard` (the code goes in the path instead).
@@ -105,9 +105,9 @@ Sibling `*.spec.ts` files are added for the engine, mapper, service and controll
 | `app/shared/interceptors/http-error.interceptor.ts` | **+ URL-scoped exclusion** `oicr/word-template`, beside `isAgrovocSearchError` (D-9) |
 | `app/app.routes.ts` | **+ `oicr/download/:resultCode`** with `canMatch: [rolesGuard]`, `data: { isLoggedIn: true }`. The existing `oicr/download` stays as the legacy entry (D-10) |
 | `app/pages/oicr-download/*` | Reads the code from the path. A legacy query code is navigated (`replaceUrl`) to the path form. Shows loading and error, and navigates to General Information only on success |
-| **Deleted** | `app/shared/services/go/wasm.service.ts` (+ spec) · `public/go/main.go`, `main.wasm`, `wasm_exec.js`, `WASM-DOCX-README.md` · the `scripts` entry `./public/go/wasm_exec.js` in `angular.json:44` |
-| `app/shared/services/api.service.ts`, `app/shared/interfaces/gets/get-oicr-details.interface.ts` | `GET_OICRDetails` (`api.service.ts:1175-1178`), its import (`api.service.ts:131`), its spec case (`api.service.spec.ts:1781-1787`) and its interface are removed **only if** the consumer sweep finds no other reader (P-17) |
-| `src/environments/environment.example.ts:61,74` | Remove `filesStorageUrl` and `oicrTemplateName` (R-B-4) |
+| ~~**Deleted**~~ **Restored by PV-1** | `app/shared/services/go/wasm.service.ts` (+ spec) · `public/go/main.go`, `main.wasm`, `wasm_exec.js`, `WASM-DOCX-README.md` · the `scripts` entry `./public/go/wasm_exec.js` in `angular.json:44` — deleted by T-07, restored byte-for-byte from `ca43e56c^` by T-09, except `TEMPLATE_URL` (§16) |
+| `app/shared/services/api.service.ts`, `app/shared/interfaces/gets/get-oicr-details.interface.ts` | ~~`GET_OICRDetails` … removed~~ **PV-1:** removed by T-07, **restored** by T-09 — the legacy path reads it |
+| `src/environments/environment.example.ts:61,74` | **PV-1:** `filesStorageUrl` is **restored** (the legacy `WasmService` reads it). `oicrTemplateName` stays removed: the legacy file name is pinned in code (§16) |
 | `docs/ux-ui/design.md:100,250`, `docs/trd/trd.md:204` | `/oicr/download/:resultCode` described as login-required, with generation on the server (R-OWT-012) |
 
 ### 2.3 Reuse
@@ -214,7 +214,7 @@ There are no side effects: no audit write, no OpenSearch, no socket, no message.
 | Surface | Before | After |
 |---|---|---|
 | `app-download-oicr-template` (icon and outlined button) | Enabled after the WASM loads. Silent on error | Always enabled while idle. Spinner/`loading` while downloading. Error → one toast with the message read from the error Blob: `errors`, then `description`, then a generic text when the body is not JSON (D-OWT-9) |
-| `oicr-header`, `section-header` | Hidden for Portfolio 2 | Shown only for Portfolio 2 (D-11). `oicr-header` keeps "not published"; `section-header` keeps its own OICR-indicator rule |
+| `oicr-header`, `section-header` | Hidden for Portfolio 2 | Shown for Portfolio 1 and 2 (D-11 as amended by PV-1); hidden when the portfolio is unknown. `oicr-header` keeps "not published"; `section-header` keeps its own OICR-indicator rule |
 | `/oicr/download/:resultCode` page | — | "Preparing your document" → download → navigate to `/result/STAR-<code>/general-information`. Error → the existing error panel with the server message, no navigation |
 | `/oicr/download?resultCode=` | Downloads unguarded | Navigates (`replaceUrl`) to the path form. A missing code shows the existing "Missing resultCode" error |
 
@@ -228,7 +228,7 @@ No new tokens or styles. The existing markup is reused.
 |---|---|
 | New server env var | `ARI_OICR_TEMPLATE_URL`. Dev value: `https://alliance-files-storage.s3.us-east-1.amazonaws.com/templates/2026_OICR_Template_dev.docx` (source of truth: the deploy's `.env`) |
 | Outbound call | GET to that URL, 10 s timeout, no credentials |
-| Client env | `oicrTemplateName` and `filesStorageUrl` become **unused**. Their only reader was `wasm.service.ts:35` (P-19, J-26). They are removed from the committed `environment.example.ts:61,74`. The gitignored `environment.ts`/`environment.dev.ts` on each host get a deploy note (R-B-4) |
+| Client env | **PV-1:** `filesStorageUrl` is read again by the legacy `WasmService`. `oicrTemplateName` stays **unused**: the legacy template is pinned to `templates/2025_OICR_Template.docx` (P-24, P-26). The gitignored env files need no change |
 
 ---
 
@@ -282,7 +282,7 @@ Coverage stays above the global 60 % (server) and the client floors.
 - **Deploy order:** the server, with `ARI_OICR_TEMPLATE_URL` set in its `.env`, before or with the client. A client deployed against an old server would 404 on the new endpoint.
 - **Feature flag:** none. The visibility rule is the gate.
 - **Backout:** revert both PRs. The old client path needs the 2025 template, which is untouched in S3.
-- **Comms:** PISA-MELP and BI. The 2025 download is gone, and the email link now requires login.
+- **Comms:** PISA-MELP and BI. 2026 OICRs now get the 2026 template from the server; 2025 OICRs keep the 2025 download as before (PV-1); the email link now requires login.
 
 ---
 
@@ -300,12 +300,13 @@ Coverage stays above the global 60 % (server) and the client floors.
 | D-OWT-8 | 2026-10-23 | The client names the saved file itself, in local time. The server sends a server-clock `Content-Disposition` for direct callers | `getBlob` returns the body only, and today's name is in local time (`oicr-download.service.ts:113-120`) |
 | D-OWT-9 | 2026-10-23 | The download **owns its error UX**: the interceptor excludes `oicr/word-template` by URL; the service reads the error Blob as JSON and shows `errors`, then `description`, then a generic message (J-6) | With `responseType: 'blob'` the interceptor sees a Blob and would toast a technical "Http failure…" (P-13). This is the same pattern as AGROVOC and PRMS sync |
 | D-OWT-10 | 2026-10-23 | Code **in the path** + `rolesGuard`; the legacy query route navigates to the path form | The guard's `returnUrl` keeps path segments only (C-7, P-12). Changing the guard is out of scope (shared by every route) |
-| D-OWT-11 | 2026-10-23 | Visibility: **shown only when the portfolio resolves to 2**; unknown → hidden. *Reversion* — see §13 | The 2025 path that motivated "unknown → shown" is retired |
+| D-OWT-11 | 2026-10-23 · **amended by PV-1** | Visibility: ~~shown only when the portfolio resolves to 2~~ **shown when the portfolio resolves to 1 or 2**; unknown or other → hidden. *Reversion* — see §13 | The 2025 path that motivated "unknown → shown" is retired |
 | D-OWT-12 | 2026-10-23 | New shared `downloadBlob` util; the PI-delegates copy is untouched | Narrow blast radius: do not edit another feature to save ten lines |
-| D-OWT-13 | 2026-10-23 | **Delete the WASM** files, service and global script. *Reversion* — see §13 | R-OWT-011. `wasm_exec.js` loads on every page today (`angular.json:44`), and `main.wasm` is fetched whenever the button renders |
+| D-OWT-13 | 2026-10-23 · **superseded by PV-1 (D-OWT-17)** | ~~**Delete the WASM** files, service and global script.~~ *Reversion* — see §13 | R-OWT-011. `wasm_exec.js` loads on every page today (`angular.json:44`), and `main.wasm` is fetched whenever the button renders |
 | D-OWT-14 | 2026-10-23 | Missing result = 400 `Result not found` (existing), not 404 | `ResultsUtil` already answers that, the first time the handler reads the result (P-1) |
 | D-OWT-15 | 2026-10-23 | The client always downloads the **live** OICR: it never sends a version (`useResultInterceptor` off). The endpoint keeps `@GetResultVersion()` like every OICR route, so a direct API caller passing `reportYear` gets that snapshot (R-A-2) | The button produces a working document, not a snapshot. On a version view the button follows that view's metadata, and that is accepted (J-10) |
 | D-OWT-16 | 2026-10-23 | The engine normalizes line endings and keeps only XML 1.0 `Char` characters | Real data reaches the DB from imports and pastes, and one invalid character corrupts the whole file (J-9) |
+| D-OWT-17 | 2026-10-26 | **Two generation paths, chosen by portfolio, in one client service (PV-1).** Portfolio 1 → the legacy WASM path, unchanged; Portfolio 2 → the server endpoint. The legacy template is **pinned** to `templates/2025_OICR_Template.docx`; the WASM is loaded **only** inside a Portfolio 1 download, never pre-loaded by the button | Owner direction 2026-10-26 (option A of three: A two paths · B port 2025 to the server · C run the WASM on the server). A keeps the 2025 document byte-for-byte as users receive it today and costs the least; later years stay on the new path. Pinning is required because Dev's `oicrTemplateName` now names the 2026 file (P-26) |
 
 ---
 
@@ -369,6 +370,38 @@ Depth check: Standard holds. Two packages, a new endpoint and a binary format en
 
 ---
 
-## 16. Open questions
+## 16. Pivot PV-1 — 2025 OICRs keep the legacy download (2026-10-26)
+
+**Trigger:** after T-01…T-07, the owner reported that the download must serve **both** years: the template follows the result's year, the 2025 development is the legacy and was not changed, and the new path is the one later years use. The owner chose option A (D-OWT-17).
+
+**What changes**
+
+| Area | Before PV-1 | After PV-1 |
+|---|---|---|
+| Visibility (`oicr-template-download.util.ts`) | Shown only for Portfolio 2 | Shown for Portfolio 1 and 2; hidden for unknown/other. `oicr-header` keeps "not published"; `section-header` keeps its OICR rule |
+| `OicrDownloadService.download(code, portfolioId)` | Server only | **The single routing point:** `1` → `OicrLegacyDownloadService.generateAndDownload(code)`; `2` → the server blob path (unchanged); anything else → rejects with a fixed message. A legacy `{ success: false, error }` result rejects with that `error` text, so the button and the page handle both paths the same way |
+| `OicrLegacyDownloadService` (new file, restored code) | — | The pre-spec `OicrDownloadService` from `83d6c37d` (field mapping, `GET_OICRDetails`, `WasmService.processDocx`, file name), renamed. **No logic change** |
+| `WasmService` | Deleted (T-07) | Restored from `ca43e56c^`; only `TEMPLATE_URL` changes to `${environment.filesStorageUrl}templates/2025_OICR_Template.docx` |
+| Button | Calls `download(code)` | Passes `resolvePortfolioId(cache.currentMetadata())`. **No** `loadWasm()` in `ngOnInit` (the pre-spec button pre-loaded it on every render); the legacy service loads it on demand |
+| `/oicr/download/:resultCode` page | Calls `download(code)` | First `GET_Metadata(code)` → `resolvePortfolioId`, then `download(code, portfolioId)`. A failed metadata request or an unresolved portfolio → error panel, no navigation, no download |
+| `public/go/*`, `angular.json` `scripts`, `GET_OICRDetails` + interface, `filesStorageUrl` in `environment.example.ts` | Deleted (T-07) | Restored from `ca43e56c^` |
+| Server | — | **No change.** The endpoint still answers 400 for Portfolio 1; the client never sends one there |
+
+**Premises (PV-1)**
+
+| # | Claim | Class | Citation (as run) | Verified at | If false |
+|---|---|---|---|---|---|
+| P-24 | `templates/2025_OICR_Template.docx` and `templates/2025_OICR_Template_dev.docx` both exist in S3 and are byte-identical | data-env | `curl` → `200 103802` for both; `shasum` both `ce2127a09a3c3246153d4d93871ef6183c0f3f59` (2026-10-26) | 6627adf7 | The pinned name must differ per environment (Low) |
+| P-25 | The client can resolve a result's portfolio from its code: `ApiService.GET_Metadata(id)` → `results/${id}/metadata`, and `GetMetadata` carries `portfolio_id`/`portfolioId`/`portfolio` (read by `resolvePortfolioId`) | location | `api.service.ts:771-777`; `get-metadata.interface.ts:13-16`; P-16 (server side of the same signal) | 6627adf7 | The page needs another source for the portfolio (Low) |
+| P-26 | Dev's gitignored `environment.dev.ts` sets `oicrTemplateName: "2026_OICR_Template_dev.docx"`, so the restored WASM reading that key would load the 2026 template | data-env | `client/research-indicators/src/environments/environment.dev.ts:35` (this host, 2026-10-23 T-07 report) | 6627adf7 | Pinning is unnecessary but harmless (Low) |
+| P-27 | The pre-spec legacy code is intact in history: `OicrDownloadService` at `83d6c37d`, and every T-07 deletion at `ca43e56c^` | existence | `git show 83d6c37d:…/oicr-download.service.ts` (131 lines); `git show ca43e56c --stat`; nothing on this branch is pushed (`git merge-base --is-ancestor` → not pushed) | 6627adf7 | Restoration needs a rewrite (High) |
+
+**Superseded clauses (kept visible, struck):** D-OWT-11 (amended), D-OWT-13 (superseded), §2.2 *Deleted* / `GET_OICRDetails` / `environment.example.ts` rows, §7 client env row, the R-OWT-008 "Portfolio 1 hidden" row, the R-OWT-009 "link to a 2025 OICR → error" scenario, R-OWT-011's "every download" sentence, requirements R-1 and the §10 "2025 OICRs?" row.
+
+**Budget delta (§14):** +2 tasks (T-09, T-10), ≈ +350 authored LOC (routing, legacy rename, page, specs) plus ≈ 1 600 restored lines that are not authored, +3 review rounds. New totals: 10 tasks · ≈ 3 350 added LOC (owner re-baseline 2026-10-23 was ≈ 3 000) · 15 review rounds.
+
+---
+
+## 17. Open questions
 
 None. OQ-1/OQ-2 were closed at the Phase 1 gate.

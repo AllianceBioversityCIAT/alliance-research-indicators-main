@@ -2,7 +2,7 @@
 
 - **Module:** results (server `entities/result-oicr` · client OICR download button and `/oicr/download` route)
 - **Spec id:** 2026-10-oicr-word-template-2026
-- **Status:** approved (Phase 3 gate, 2026-10-23) · execution not started
+- **Status:** approved (Phase 3 gate, 2026-10-23) · **amended 2026-10-26 by Pivot PV-1** (T-09, T-10 added; T-08 amended) — amendment approved by the owner 2026-10-26
 - **Owner:** STAR / ARI squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (approved; Judgment Day APPROVED, see ./judgment.md)
@@ -18,10 +18,12 @@
 | T-02 | `getWordTemplateData` repository method + homologation mapper + end-to-end XML test | server | M | T-01 | full |
 | T-03 | Service + `downloadWordTemplate` endpoint + config + errors/logs + `download_url` path form | server | M | T-01, T-02 | full |
 | T-04 | Client download path: API blob call, rewritten `OicrDownloadService`, shared `downloadBlob`, button without WASM, interceptor exclusion | client | M | T-03 (contract) | full |
-| T-05 | Button visibility: shown only for Portfolio 2; spec sweep | client | S | — | checklist |
+| T-05 | Button visibility: shown only for Portfolio 2; spec sweep *(done; rule amended by T-10, PV-1)* | client | S | — | checklist |
 | T-06 | Guarded route `/oicr/download/:resultCode`, legacy redirect, page states | client | M | T-04 | full |
-| T-07 | Retire the WASM path: files, global script, dead API, dead env keys | client | S | T-04, T-06 | checklist |
-| T-08 | Baseline docs + HITL checks (Word, email link, timing, Dev download) | docs + both | S | T-01…T-07 | checklist |
+| T-07 | Retire the WASM path: files, global script, dead API, dead env keys *(done; reversed by T-09, PV-1)* | client | S | T-04, T-06 | checklist |
+| T-09 | **PV-1** Restore the legacy WASM path for Portfolio 1 and route downloads by portfolio (service + button) | client | M | T-07 | full |
+| T-10 | **PV-1** Visibility for Portfolio 1 and 2; the link page resolves the portfolio before downloading | client | M | T-09 | full |
+| T-08 | Baseline docs + HITL checks (Word 2026 and 2025, email link, timing, Dev download) | docs + both | S | T-01…T-07, T-09, T-10 | checklist |
 
 ```mermaid
 graph TD
@@ -33,9 +35,11 @@ graph TD
   T04 --> T07[T-07 retire WASM]
   T06 --> T07
   T05[T-05 visibility]
+  T07 --> T09[T-09 legacy restore + routing]
+  T09 --> T10[T-10 visibility P1+P2 + page]
   T03 --> T08[T-08 docs + HITL]
   T05 --> T08
-  T07 --> T08
+  T10 --> T08
 ```
 
 **Parallelism (root `CLAUDE.md` §4.3):**
@@ -275,6 +279,8 @@ graph TD
 
 ### T-05 — Button visibility: Portfolio 2 only
 
+> **PV-1 (2026-10-26):** done as specified; the rule "Portfolio 1 hidden" is amended by T-10 (Portfolio 1 shown, legacy path).
+
 - **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** S · **Dependencies:** none · **Review:** `checklist` — one predicate flip plus a known spec sweep, with the inversion list in design §13
 - **Requirements covered:** R-OWT-008 (the visibility table: P2 not published shown, P2 published per existing rule, P1 hidden, unknown hidden; both scenarios)
 - **Design refs:** §2.2 (util row), §6, D-OWT-11, §13 (inversion list), P-14, P-16
@@ -339,6 +345,8 @@ graph TD
 
 ### T-07 — Retire the WASM generation path
 
+> **PV-1 (2026-10-26):** done as specified; its deletions are reversed by T-09 (the legacy path serves Portfolio 1). `oicrTemplateName` stays removed.
+
 - **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** S · **Dependencies:** T-04, T-06 · **Review:** `checklist` — deletions with a measured consumer list (P-15, P-17, reversion challenge D-OWT-13)
 - **Requirements covered:** R-OWT-011 (the browser requests neither `main.wasm` nor the S3 template)
 - **Design refs:** §2.2 (deleted rows, `GET_OICRDetails` row, `environment.example.ts` row), §7, D-OWT-13, P-15, P-17, P-19
@@ -371,9 +379,68 @@ graph TD
   - [x] Full suite green (8042/8042; two runner SIGSEGV suites re-run green in isolation).
 - **Skills:** `angular-developer`
 
+### T-09 — Restore the legacy WASM path for Portfolio 1 and route by portfolio (PV-1)
+
+- **Status:** todo · **Size:** M · **Dependencies:** T-07 · **Review:** `full` — restores a whole generation path and introduces the routing point both entries use
+- **Requirements covered:** R-OWT-013 (all clauses); R-OWT-008 (the click downloads the portfolio's document, loading, one error toast — both paths); R-OWT-011 (a Portfolio 2 download never touches the WASM)
+- **Design refs:** §16 (PV-1 table and P-24…P-27), §12 D-OWT-17, §2.2 (restored rows)
+- **Scope:**
+  - Restore **byte-for-byte from `ca43e56c^`** (`git checkout ca43e56c^ -- <paths>`): `src/app/shared/services/go/wasm.service.ts` (+ spec), `public/go/{main.go,main.wasm,wasm_exec.js,WASM-DOCX-README.md}`, the `angular.json` `scripts` entry `./public/go/wasm_exec.js`, `GET_OICRDetails` + its import in `api.service.ts` and its spec case, `interfaces/gets/get-oicr-details.interface.ts`, and `filesStorageUrl` in `environment.example.ts` (not `oicrTemplateName`).
+  - In the restored `WasmService`, change only `TEMPLATE_URL` to `` `${environment.filesStorageUrl}templates/2025_OICR_Template.docx` `` (P-24, P-26).
+  - New `src/app/shared/services/oicr-legacy-download.service.ts`: the `83d6c37d` `OicrDownloadService` restored and renamed `OicrLegacyDownloadService` — same field mapping, same `generateAndDownload(code): Promise<ProcessResult>`, same file name. No logic change. Its spec: the `83d6c37d` `oicr-download.service.spec.ts` restored and renamed accordingly.
+  - `OicrDownloadService.download(code, portfolioId)`: `1` → legacy (a `{ success: false, error }` result rejects with `error`; `success: true` resolves); `2` → the existing server path; anything else → rejects with a fixed message.
+  - `app-download-oicr-template`: passes `resolvePortfolioId(this.cache.currentMetadata())`; no `loadWasm()` in `ngOnInit`; one toast on any rejection (existing).
+  - `pages/oicr-download/oicr-download.component.ts`: compile against the new signature only (portfolio resolution is T-10).
+- **Tests:**
+  - `oicr-download.service.spec.ts`: portfolio 1 → the legacy service called, `ApiService.GET_OicrWordTemplate` **not** called; portfolio 2 → the server path, legacy **not** called; unknown → rejects, neither called; legacy `{ success: false, error: 'X' }` → rejects with `X`.
+  - Button spec: a Portfolio 2 render and click never calls `WasmService.loadWasm`; a Portfolio 1 click calls the legacy path; a legacy failure → one toast.
+  - The restored `wasm.service.spec.ts` and legacy spec pass, with the `TEMPLATE_URL` assertion updated to the 2025 file.
+- **Verification:** `git diff ca43e56c^ -- <restored paths>` shows only the `TEMPLATE_URL` line (paste it); changed specs `npx jest --coverage=false --silent <paths>`; `npm run build` (and `public/go`/`go/` present in `dist/`); `npx tsc -p tsconfig.spec.json --noEmit` (945 baseline, no new); `npm run lint -- --quiet`. Full suite: Leader.
+- **Falsifier:**
+  - Route portfolio 1 to the server path → the "portfolio 1 → legacy, server not called" test red.
+  - Keep `loadWasm()` in the button's `ngOnInit` → the "Portfolio 2 render never loads the WASM" test red.
+  - Leave `TEMPLATE_URL` reading `oicrTemplateName` → the `wasm.service.spec` 2025-file assertion red.
+- **Red run:** each observed red on its assertion, quoted in `execution.md`, then reverted.
+- **Disqualifier:**
+  - A routing test that mocks `OicrDownloadService` itself proves nothing about routing.
+  - A green unit suite cannot show the legacy document is identical to before; only the T-08 HITL 2025 download in Word does.
+  - A restore that is not byte-identical outside `TEMPLATE_URL` is not a restore (the `git diff ca43e56c^` check).
+- **Consumers:** `download-oicr-template.component.spec.ts`, `oicr-download.service.spec.ts`, `pages/oicr-download/oicr-download.component.spec.ts`, `api.service.spec.ts`, every P-15/P-17 file (design §15).
+- **Done criteria:**
+  - [ ] Restore diff shows only the `TEMPLATE_URL` change.
+  - [ ] Specs green; falsifiers observed red.
+  - [ ] Build green with `go/` in `dist/`.
+  - [ ] Full client suite green (Leader).
+- **Skills:** `angular-developer`, `error-handling-patterns`
+
+### T-10 — Visibility for Portfolio 1 and 2; the link page resolves the portfolio (PV-1)
+
+- **Status:** todo · **Size:** M · **Dependencies:** T-09 · **Review:** `full` — shared visibility util read by two headers, and the email-link entry
+- **Requirements covered:** R-OWT-008 (amended visibility table, both 2026 and 2025 scenarios); R-OWT-009 (amended 2025-link scenario; unresolved-portfolio scenario); R-OWT-013 (the link half)
+- **Design refs:** §16, §12 D-OWT-11 (amended), D-OWT-17, §6, P-25
+- **Scope:**
+  - `isOicrTemplateDownloadHidden(source)` → hidden unless `resolvePortfolioId(source)` is `1` or `2`. Update the doc comment.
+  - `OicrDownloadComponent`: for the path code, call `ApiService.GET_Metadata(code)`, resolve the portfolio with `resolvePortfolioId`, then `OicrDownloadService.download(code, portfolioId)`. Metadata failure or unresolved portfolio → the existing error panel with a fixed message, no navigation, no download. Success → general-information as today.
+- **Tests:**
+  - Util spec: P1 → shown; P2 → shown; `{}`, `undefined`, `null`, `{ portfolio_id: 3 }` → hidden.
+  - Header specs: invert the T-05 "Portfolio 1 hidden" assertions; a **transition** test where Portfolio 1 metadata arrives after the first render and the button appears (KZ-015); published Portfolio 1 stays hidden in `oicr-header`.
+  - Page spec: path code with Portfolio 1 metadata → `download('554', 1)`; with Portfolio 2 → `download('554', 2)`; metadata rejected → error text, `download` and `navigate` not called; metadata without portfolio → same.
+- **Verification:** changed specs; `npm run build`; `npx tsc -p tsconfig.spec.json --noEmit`; `npm run lint -- --quiet`. Full suite: Leader (KZ-003).
+- **Falsifier:**
+  - Keep the T-05 predicate (`!== 2`) → the "P1 → shown" util test red.
+  - Skip the metadata call and pass a fixed portfolio → the Portfolio 1 page test red.
+- **Red run:** observed red, quoted, reverted.
+- **Disqualifier:** a header spec that sets metadata before the first `detectChanges()` is an end state (KZ-015); at least one header spec must arrange the Portfolio 1 transition.
+- **Consumers:** `oicr-template-download.util.spec.ts`, `oicr-header.component.spec.ts`, `section-header.component.spec.ts`, `pages/oicr-download/oicr-download.component.spec.ts`.
+- **Done criteria:**
+  - [ ] Specs green; falsifiers observed red.
+  - [ ] Build green.
+  - [ ] Full client suite green (Leader).
+- **Skills:** `angular-developer`
+
 ### T-08 — Baseline docs and human checks
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-01…T-07 deployed to Dev · **Review:** `checklist` — doc edits plus quoted human evidence
+- **Status:** todo · **Size:** S · **Dependencies:** T-01…T-07, T-09, T-10 deployed to Dev · **Review:** `checklist` — doc edits plus quoted human evidence
 - **Requirements covered:**
   - R-OWT-012.
   - The HITL halves of the defect gates: D-5 (Word repair prompt, "+" and dropdowns), D-6 (Cognito round trip), D-11 / NFR-OWT-001 (timing).
@@ -382,12 +449,12 @@ graph TD
   - R-OWT-011: the network clause.
 - **Design refs:** §2.2 (docs row), §10 HITL row, §11, P-22
 - **Scope:**
-  - `docs/ux-ui/design.md:100,250` and `docs/trd/trd.md:204`: `/oicr/download/:resultCode`, login required, server-side generation.
+  - `docs/ux-ui/design.md:100,250` and `docs/trd/trd.md:204`: `/oicr/download/:resultCode`, login required, and the two generation paths (server for Portfolio 2, legacy client WASM for Portfolio 1 — PV-1).
   - HITL on Dev, each observation **quoted** in `execution.md` (KZ-002):
     1. Download STAR-554 and STAR-626 from the button. Open both in Word: no repair prompt; the 3.a and 3.b cloned rows have a working "+" and dropdown; the revisions show in the margin; filled text is not grey.
     2. Logged out, open `/oicr/download/554`: login → back on `/oicr/download/554` → file saved.
-    3. A 2025 OICR link → error shown, no file.
-    4. DevTools network on download: only `results/oicr/word-template/…`; no `main.wasm`, no S3 request.
+    3. *(amended by PV-1)* A 2025 OICR (e.g. STAR-120) from the button **and** from its link → the file downloads; it opens in Word like the pre-spec 2025 document, built from the **2025** template.
+    4. DevTools network on a **2026** download: only `results/oicr/word-template/…`; no `main.wasm`, no S3 request. On a 2025 download, `main.wasm` and `templates/2025_OICR_Template.docx` are expected.
     5. Request time ≤ 5 s.
     6. Anonymous `curl` to the endpoint → 401.
 - **Verification:** doc diffs reviewed; HITL quotes present.
@@ -397,7 +464,7 @@ graph TD
 - **Consumers:** none.
 - **Done criteria:**
   - [ ] Docs updated, grep at 0.
-  - [ ] Six HITL observations quoted.
+  - [ ] Seven HITL observations quoted (item 3 counts the button and the link).
 - **Skills:** `cognitive-doc-design`
 
 ---
@@ -436,20 +503,24 @@ graph TD
 | R-OWT-006 · 2025: 400 and no template fetched | T-03 (call-order test) |
 | R-OWT-007 · URL from config, effective next download, no cache | T-03 (two-fetches test) |
 | R-OWT-007 · missing configuration → 500 | T-03 |
-| R-OWT-008 · visibility table (P2, P2 published, P1, unknown) | T-05 |
-| R-OWT-008 · click downloads; loading; error toast | T-04 |
-| R-OWT-008 · scenario 2026 shows; scenario 2025 hides | T-05 |
+| R-OWT-008 · visibility table (P2, P2 published, P1, unknown) | T-05; P1 row amended → T-10 (PV-1) |
+| R-OWT-008 · click downloads; loading; error toast | T-04 (P2), T-09 (routing, P1) |
+| R-OWT-008 · scenario 2026 shows | T-05 |
+| R-OWT-008 · scenario 2025 keeps the legacy download (PV-1) | T-10 (visibility), T-09 (routing), T-08 (live) |
 | R-OWT-009 · login required | T-06 (routes spec), T-08 (live) |
 | R-OWT-009 · return to the same link with the same code | T-06 (path design), T-08 (Cognito round trip) |
 | R-OWT-009 · auto-download; navigate on success | T-06 |
 | R-OWT-009 · loading and error states; no navigation after error | T-06 |
-| R-OWT-009 · 2025 link → error, BUT must NOT download | T-06 (error path), T-03 (400), T-08 (live) |
+| R-OWT-009 · 2025 link → legacy download, BUT not the endpoint (PV-1) | T-10 (page), T-09 (routing), T-08 (live) |
+| R-OWT-009 · unresolved portfolio → error, no download (PV-1) | T-10 |
 | R-OWT-010 · legacy redirect | T-06 |
 | R-OWT-010 · missing parameter → error | T-06 |
 | R-OWT-010 · server `download_url` in path form | T-03 |
-| R-OWT-011 · client does not fetch the template or run the WASM | T-04 (button path), T-07 (deletion) |
+| R-OWT-011 · a 2026 download does not fetch the template or run the WASM | T-04 (button path), T-09 (no pre-load; P2 routing) |
 | R-OWT-011 · BUT `main.wasm` and S3 must NOT be requested | T-08 (network check) |
 | R-OWT-012 · baseline docs | T-08 |
+| R-OWT-013 · legacy restored unchanged, pinned to the 2025 file, one toast on failure | T-09 |
+| R-OWT-013 · document identical to the pre-spec 2025 download | T-08 (Word) |
 | NFR-OWT-001 · ≤ 5 s | T-08 |
 | NFR-OWT-002 · handler errors logged | T-03 |
 | NFR-OWT-003 · direct dependencies | T-01 (`npm ls`) |
@@ -468,8 +539,8 @@ Every row names a task. No gap is discharged by citing another requirement.
 
 ## Done definition
 
-- [ ] All T-01…T-08 are `done`, each with a Reviewer PASS recorded in `execution.md`.
+- [ ] All T-01…T-10 are `done`, each with a Reviewer PASS recorded in `execution.md`.
 - [ ] The feature was exercised in the running product (T-08) **before** `/akili-validate` (KZ-007).
 - [ ] Coverage floors green (server 60 %, client floors).
 - [ ] Swagger documents the endpoint.
-- [ ] Rollout note in place: `ARI_OICR_TEMPLATE_URL` on the server; PISA-MELP and BI told that the 2025 download is gone and the link now requires login.
+- [ ] Rollout note in place: `ARI_OICR_TEMPLATE_URL` on the server; PISA-MELP and BI told that 2026 OICRs get the 2026 template, 2025 OICRs keep the 2025 download (PV-1), and the link now requires login.

@@ -2,14 +2,14 @@
 
 - **Module:** results (server: `entities/result-oicr` · client: OICR download button + `/oicr/download` route)
 - **Spec id:** 2026-10-oicr-word-template-2026
-- **Status:** approved (Phase 1 gate, 2026-10-23)
+- **Status:** approved (Phase 1 gate, 2026-10-23) · **amended 2026-10-26 by Pivot PV-1** (2025 OICRs keep the legacy download; see `execution.md` → *Pivot Record: PV-1*) — amendment approved by the owner 2026-10-26
 - **Depth:** Standard (one new endpoint + document engine + client route/button change; no data-model change)
 - **Approval Mode:** standard (no proposal; every gate stops for the user)
 - **Owner:** STAR / ARI squad
 - **Linked PRD section:** `docs/prd.md` CP-3 — *"Download an OICR template / report when needed"* (line 209)
 - **Linked tickets:** AC-1793 — *US2 Update the word template with OICR data*
 - **Pre-spec dialogue & POC:** `~/Desktop/OICR-2026-word-export/README.md` (outside the repo; owner + BI decisions 2026-10-22/23, POC run on STAR-554 and STAR-626)
-- **Last updated:** 2026-10-23
+- **Last updated:** 2026-10-26
 
 ---
 
@@ -21,7 +21,7 @@ Today the "Download OICR Template" button is **hidden for 2026 OICRs**, and for 
 - **Two entry points, one endpoint:**
   - the **button**, re-enabled for 2026 OICRs;
   - a **link** (`/oicr/download/<code>`) that can be pasted in an email. It requires login, comes back after login, and downloads by itself.
-- **2025 OICRs no longer get a template.** The 2025 file and the WASM path are retired.
+- **2025 OICRs keep today's download, unchanged** (PV-1). The template follows the result's year: a 2025 OICR (Portfolio 1) gets the **2025** template through the existing client-side WASM (the *legacy* path); a 2026 OICR (Portfolio 2) gets the **2026** template from the server (the *new* path). The new path is the one later years use.
 
 ---
 
@@ -62,16 +62,16 @@ Today the "Download OICR Template" button is **hidden for 2026 OICRs**, and for 
 
 - A server endpoint that returns the filled 2026 template for a 2026 OICR.
 - The field mapping and the homologations agreed with the owner and BI.
-- Re-enabling the button for 2026 OICRs, and hiding it for 2025 OICRs.
+- Re-enabling the button for 2026 OICRs, and keeping it for 2025 OICRs on the legacy path (PV-1).
 - A login-protected download link that survives the login round-trip.
-- Retiring the client-side WASM generation.
+- Routing each download to the legacy path (Portfolio 1) or the new path (Portfolio 2), in one place on the client (PV-1).
 - Updating the baseline docs that call `/oicr/download` public.
 
 ### Out of scope
 
 - Fields outside the creation modal, for example strategic objectives, evidence, quantification and partners. They stay as the template ships them.
 - *Other contributing projects*. The modal does not capture them, so they are not filled.
-- A template for 2025 OICRs.
+- Changing the 2025 (legacy) document, its field mapping or its WASM, or generating it on the server (PV-1: the legacy is kept as it is).
 - Any schema or data change.
 - Removing the existing `GET results/oicr/details/:resultCode` endpoint.
 - Editing the template file itself.
@@ -310,23 +310,26 @@ The template URL SHALL be read from server configuration, one value per environm
 
 | OICR | Button (`oicr-header` and `section-header` icon) |
 |---|---|
-| Portfolio 2, not published | **shown** |
+| Portfolio 2, not published | **shown** — downloads the 2026 template (new path, R-OWT-001) |
 | Portfolio 2, published | hidden in `oicr-header`, as today. The `section-header` icon follows its own existing rule |
-| Portfolio 1 | **hidden** in both placements |
-| Unknown portfolio | hidden |
+| Portfolio 1, not published | **shown** — downloads the 2025 template (legacy path, R-OWT-013) |
+| Portfolio 1, published | hidden in `oicr-header`, as today. The `section-header` icon follows its own existing rule |
+| Unknown portfolio, or any portfolio other than 1 and 2 | hidden |
 
-Clicking the button SHALL download the document from R-OWT-001. While the download is in progress the button SHALL show the existing loading state. On error it SHALL show one error toast carrying the server's message (R-OWT-006). Today the button shows no error at all.
+Clicking the button SHALL download the document of the result's portfolio: Portfolio 2 from R-OWT-001, Portfolio 1 from the legacy path (R-OWT-013). While the download is in progress the button SHALL show the existing loading state. On error it SHALL show one error toast carrying the server's message (R-OWT-006). Today the button shows no error at all.
 
 #### Scenario: 2026 OICR shows the button
 - GIVEN the user opens a Portfolio 2 OICR that is not published
 - THEN the download button is visible in the OICR header and in the section header
 - AND clicking it saves `STAR_OICR_<code>_<date>_<time>.docx`
 
-#### Scenario: 2025 OICR hides the button
-- GIVEN a Portfolio 1 OICR
-- THEN neither placement shows the button
+#### Scenario: 2025 OICR keeps the legacy download (PV-1)
+- GIVEN a Portfolio 1 OICR that is not published
+- THEN both placements show the button
+- AND clicking it saves the **2025** template filled by the legacy path
+- BUT it must NOT call the R-OWT-001 endpoint
 
-> **Unknown portfolio → hidden.** This inverts today's fallback, which shows the button. Today's fallback existed to keep the old 2025 path, and that path is retired.
+> **Unknown portfolio → hidden.** This inverts today's fallback, which shows the button. With two paths, the client must know the portfolio to pick one; without it there is no correct path.
 
 ---
 
@@ -348,9 +351,15 @@ The page SHALL show a loading state while generating, and an error message when 
 - AND after login they land on `/oicr/download/554`, not on `/oicr/download` and not on Home
 - AND the file downloads without any click
 
-#### Scenario: link to a 2025 OICR
+#### Scenario: link to a 2025 OICR (amended by PV-1)
 - GIVEN a logged-in user opens the link of a Portfolio 1 OICR
-- THEN the page shows the 2026-only error message
+- THEN the page resolves the result's portfolio first
+- AND it downloads the 2025 template through the legacy path (R-OWT-013)
+- BUT it must NOT call the R-OWT-001 endpoint
+
+#### Scenario: link whose portfolio cannot be resolved
+- GIVEN the result's metadata has no portfolio, or the metadata request fails
+- THEN the page shows an error message and does not navigate
 - BUT it must NOT download a file
 
 ---
@@ -365,20 +374,37 @@ A link in the old form `/oicr/download?resultCode=<code>` SHALL redirect to `/oi
 
 ---
 
-### R-OWT-011 — Client no longer generates the document
+### R-OWT-011 — Client does not generate 2026 documents
 
-The client SHALL NOT fetch the template, and SHALL NOT load or run the WASM. Every download goes through R-OWT-001.
+*(Amended by PV-1.)* For a **Portfolio 2** OICR the client SHALL NOT fetch the template, and SHALL NOT run the WASM: the download goes through R-OWT-001. Only a **Portfolio 1** download uses the legacy path (R-OWT-013).
 
-#### Scenario: no WASM on download
-- GIVEN the user clicks the button
+#### Scenario: no WASM on a 2026 download
+- GIVEN the user clicks the button on a Portfolio 2 OICR
 - THEN the only request the download makes is the R-OWT-001 endpoint
-- BUT `main.wasm` and the S3 template must NOT be requested by the browser
+- BUT `main.wasm` and the S3 template must NOT be requested by the browser for that download
+
+---
+
+### R-OWT-013 — 2025 OICRs keep the legacy download (PV-1)
+
+A Portfolio 1 (2025) OICR SHALL be downloaded exactly as before this spec: the client fetches the result through `GET results/oicr/details/:resultCode`, fetches the **2025** template from S3 and fills it with the Go WASM. The document, its field mapping and the WASM are **unchanged**.
+
+- The legacy path SHALL always use the **2025** template file, whatever the host's `oicrTemplateName` says. Today Dev's `environment.dev.ts` names the 2026 file there, and the WASM finds only 8 of its 11 controls in it (C-2).
+- On failure the button SHALL show one error toast with the legacy error text, like the new path (R-OWT-008). The legacy page keeps its error panel.
+- The server endpoint keeps answering 400 for Portfolio 1 (R-OWT-006). The client never sends a Portfolio 1 result there.
+
+#### Scenario: 2025 OICR document is the legacy one
+- GIVEN STAR-120 is a Portfolio 1 OICR
+- WHEN the user downloads it from the button
+- THEN the browser fetches `main.wasm` and `templates/2025_OICR_Template.docx`, and saves `STAR_OICR_120_<date>_<time>.docx`
+- AND the document matches what the legacy path produced before this spec
+- BUT it must NOT be built from the 2026 template
 
 ---
 
 ### R-OWT-012 — Baseline docs reflect the change
 
-`docs/ux-ui/design.md` and `docs/trd/trd.md` SHALL describe `/oicr/download/:resultCode` as login-required. They SHALL also describe server-side generation.
+`docs/ux-ui/design.md` and `docs/trd/trd.md` SHALL describe `/oicr/download/:resultCode` as login-required. They SHALL also describe the two generation paths: server-side for Portfolio 2, the legacy client-side WASM for Portfolio 1 (PV-1).
 
 ---
 
@@ -426,7 +452,7 @@ No data model changes. No migration.
 | System | Impact |
 |---|---|
 | S3 (`alliance-files-storage`) | The server reads the template with an outbound GET. It is public; no credentials |
-| STAR client | Button visibility, the download route, and removal of the WASM path |
+| STAR client | Button visibility, the download route, and routing between the legacy WASM path (Portfolio 1) and the server endpoint (Portfolio 2) |
 | CLARISA / AGRESSO / OpenSearch / sockets / RabbitMQ | None |
 
 ---
@@ -458,7 +484,7 @@ No data model changes. No migration.
 | A-1 | The template's control ids are stable while PISA-MELP does not edit it | R-OWT-006 fails loudly. The ids live in one place in code |
 | A-2 | The S3 object is public, as the 2025 one is | Verified for the Dev file (C-10) |
 | A-3 | Real data contains odd characters. STAR-554's elaboration starts with 4 zero-width spaces | They are copied as-is (R-OWT-002 "as-is"). Cleaning is out of scope |
-| R-1 | Removing the WASM removes the 2025 download, which some user may still expect | Agreed with the owner 2026-10-23: 2025 OICRs no longer get a template |
+| R-1 | ~~Removing the WASM removes the 2025 download~~ — superseded by PV-1 (2026-10-26): the 2025 download is kept on the legacy path | Two generation paths coexist until 2025 OICRs no longer need a template; the legacy is then removed in its own change |
 
 ---
 
@@ -472,7 +498,7 @@ No data model changes. No migration.
 | Affiliation text? | Staff `center` as stored, upper case included |
 | Sub-Saharan Africa and LAC? | `Regional` |
 | Research area 16? | `PISA` |
-| 2025 OICRs? | No template; the button is hidden; the old file and the WASM are retired |
+| 2025 OICRs? | ~~No template; the button is hidden; the old file and the WASM are retired~~ → **PV-1 (2026-10-26, owner):** 2025 OICRs keep the 2025 template through the legacy WASM path, unchanged; 2026 uses the new server path |
 | Where is the document built? | Server |
 | Download by link? | Login-protected client route, code in the path |
 
@@ -499,8 +525,9 @@ No data model changes. No migration.
 | R-OWT-008 | Button visibility |
 | R-OWT-009 | Email download link |
 | R-OWT-010 | Legacy link keeps working |
-| R-OWT-011 | Client no longer generates the document |
+| R-OWT-011 | Client does not generate 2026 documents |
 | R-OWT-012 | Baseline docs reflect the change |
+| R-OWT-013 | 2025 OICRs keep the legacy download (PV-1) |
 | NFR-OWT-001..003 | Response time · Observability · Explicit dependencies |
 
 ---
