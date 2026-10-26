@@ -35,6 +35,13 @@ import {
   TipHandleResolution,
   TipHandleRow,
 } from './repository/tip-handle.repository';
+import {
+  persistedStarRefusalData,
+  PrmsSyncPersistedRefusalException,
+  ResultPrmsSyncService,
+} from '../../entities/result-prms-sync/result-prms-sync.service';
+import { PrmsSyncOutcome } from '../prms-normalizer/enum/prms-sync-outcome.enum';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 
 describe('TipIntegrationService', () => {
   let service: TipIntegrationService;
@@ -49,7 +56,10 @@ describe('TipIntegrationService', () => {
   let prmsRepository: jest.Mocked<PrmsRepository>;
   let clarisaSdgsService: jest.Mocked<ClarisaSdgsService>;
   let bilateralService: { importAlignmentFromTip: jest.Mock };
-  let tipHandleRepository: { resolve: jest.Mock };
+  let tipHandleRepository: { resolve: jest.Mock; idsWithPrmsCode: jest.Mock };
+  let resultPrmsSyncService: { sync: jest.Mock };
+  let reportingYearResolver: { resolve: jest.Mock };
+  let currentUser: { setSystemUser: jest.Mock; clearSystemUser: jest.Mock };
 
   const mockResultRepo = {
     findOne: jest.fn(),
@@ -181,6 +191,20 @@ describe('TipIntegrationService', () => {
           },
         },
         {
+          provide: ResultPrmsSyncService,
+          useValue: {
+            sync: jest.fn().mockResolvedValue({
+              outcome: PrmsSyncOutcome.ACCEPTED,
+            }),
+          },
+        },
+        {
+          provide: ReportingYearResolver,
+          useValue: {
+            resolve: jest.fn().mockResolvedValue(2026),
+          },
+        },
+        {
           provide: AppConfig,
           useValue: {
             ARI_CLIENT_HOST: 'http://client.example',
@@ -224,6 +248,7 @@ describe('TipIntegrationService', () => {
               versions: {},
               otherVersions: [],
             }),
+            idsWithPrmsCode: jest.fn().mockResolvedValue([]),
           },
         },
         {
@@ -261,6 +286,9 @@ describe('TipIntegrationService', () => {
     clarisaSdgsService = module.get(ClarisaSdgsService);
     bilateralService = module.get(BilateralService);
     tipHandleRepository = module.get(TipHandleRepository);
+    resultPrmsSyncService = module.get(ResultPrmsSyncService);
+    reportingYearResolver = module.get(ReportingYearResolver);
+    currentUser = module.get(CurrentUserUtil);
 
     mockAgressoRepo.find.mockReset();
     mockAgressoRepo.find.mockImplementation(echoKnownAgreements);
@@ -2099,6 +2127,470 @@ describe('TipIntegrationService', () => {
         expect.stringContaining('staging failures 1'),
       );
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('skipped 0'));
+    });
+  });
+
+  describe('PRMS push phase', () => {
+    const mapping: TipTocMappingDto = {
+      science_program_id: 'SP01',
+      aow_compose_code: 'SP01-AOW05',
+    };
+    const userA = {
+      sec_user_id: 11,
+      email: 'ana@alliance.org',
+      first_name: 'Ana',
+      last_name: 'Arias',
+    };
+    const userB = {
+      sec_user_id: 22,
+      email: 'bea@alliance.org',
+      first_name: 'Bea',
+      last_name: 'Baez',
+    };
+    const accepted = () => ({ outcome: PrmsSyncOutcome.ACCEPTED });
+    const SUMMARY =
+      /^PRMS push: candidates=(\d+) skipped=(\d+) not_eligible=(\d+) ACCEPTED=(\d+) REJECTED_BY_PRMS=(\d+) REFUSED_BY_STAR=(\d+) RETRYABLE=(\d+) AUTH_FAILED=(\d+) TRANSPORT_FAILED=(\d+) UNKNOWN=(\d+) NOT_SENT=(\d+) ERROR=(\d+) duration_ms=(\d+)$/;
+
+    function candidateRow(
+      handle: string,
+      year: number,
+      extras: {
+        poolFunding?: TipTocMappingDto | null;
+        userData?: typeof userA | null;
+      } = {},
+    ): TipMappedResult {
+      return {
+        public_link: handle,
+        createResult: { year, title: handle },
+        poolFunding:
+          extras.poolFunding === undefined ? mapping : extras.poolFunding,
+        userData: extras.userData === undefined ? userA : extras.userData,
+      } as TipMappedResult;
+    }
+
+    function installSaves(options: {
+      versionId: (payload: TipMappedResult) => number;
+      liveId: (payload: TipMappedResult) => number;
+      versionOutcome?: (
+        payload: TipMappedResult,
+      ) => 'created' | 'updated' | 'skipped' | 'error';
+    }): void {
+      saveResultService.saveAllSections.mockImplementation(
+        async (payload, extra) => {
+          const mapped = payload as TipMappedResult;
+          const isVersion = extra?.target?.isSnapshot === true;
+          return {
+            resultId: isVersion
+              ? options.versionId(mapped)
+              : options.liveId(mapped),
+            outcome: isVersion
+              ? (options.versionOutcome?.(mapped) ?? 'created')
+              : 'created',
+          };
+        },
+      );
+    }
+
+    async function flushUntil(done: () => boolean, ms = 1000): Promise<void> {
+      const deadline = Date.now() + ms;
+      while (!done() && Date.now() < deadline) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    }
+
+    function arm(rows: TipMappedResult[]): void {
+      jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+      jest
+        .spyOn(service as any, 'getRequest')
+        .mockReturnValue(of({ data: { data: [], data_count: 0 } }));
+      jest.spyOn(service, 'processing').mockResolvedValue(rows);
+      prmsRepository.findTemporalResults.mockResolvedValue([]);
+      reportingYearResolver.resolve.mockResolvedValue(2026);
+    }
+
+    async function runPush(
+      year: number,
+      rows: TipMappedResult[],
+    ): Promise<void> {
+      arm(rows);
+      await service.getKnowledgeProductsByYear(year);
+    }
+
+    function pushLine(spy: jest.SpyInstance): string {
+      const line = spy.mock.calls
+        .map((call) => String(call[0]))
+        .find((entry) => entry.startsWith('PRMS push:'));
+      expect(line).toBeDefined();
+      return line as string;
+    }
+
+    it('a live save of the reporting year adds no candidate', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+
+      await runPush(2026, [candidateRow('http://h/live', 2026)]);
+
+      expect(
+        resultPrmsSyncService.sync.mock.calls.map((call) => call[0]),
+      ).toEqual([101]);
+    });
+
+    it('adds no candidate when the version save is skipped or errors', async () => {
+      installSaves({
+        versionId: (payload) =>
+          payload.public_link.endsWith('/bad') ? 302 : 301,
+        liveId: () => 900,
+        versionOutcome: (payload) =>
+          payload.public_link.endsWith('/bad') ? 'error' : 'skipped',
+      });
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [
+        candidateRow('http://h/skip', 2026),
+        candidateRow('http://h/bad', 2026),
+      ]);
+
+      expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
+      expect(pushLine(log)).toBe('PRMS push: candidates=0');
+    });
+
+    it('keeps the first candidate when the same resultId is saved twice', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: (payload) => (payload.public_link.endsWith('/b') ? 502 : 501),
+      });
+
+      await runPush(2026, [
+        candidateRow('http://h/a', 2026, { userData: userA }),
+        candidateRow('http://h/b', 2026, { userData: userB }),
+      ]);
+
+      expect(
+        resultPrmsSyncService.sync.mock.calls.map((call) => call[0]),
+      ).toEqual([101]);
+      expect(resultPrmsSyncService.sync.mock.calls[0][1]).toEqual({
+        origin: 'TIP_SYNC',
+        tocMapping: mapping,
+        author: {
+          email: userA.email,
+          first_name: userA.first_name,
+          last_name: userA.last_name,
+        },
+      });
+    });
+
+    it('logs candidates=0 and does not query or sync a non-reporting year', async () => {
+      installSaves({
+        versionId: () => 50,
+        liveId: () => 51,
+      });
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2024, [candidateRow('http://h/old', 2024)]);
+
+      expect(tipHandleRepository.idsWithPrmsCode).not.toHaveBeenCalled();
+      expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
+      expect(pushLine(log)).toBe('PRMS push: candidates=0');
+    });
+
+    it('counts null poolFunding as not_eligible and does not call sync', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [
+        candidateRow('http://h/bare', 2026, { poolFunding: null }),
+      ]);
+
+      expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
+      expect(tipHandleRepository.idsWithPrmsCode).not.toHaveBeenCalled();
+      expect(pushLine(log)).toContain('candidates=1');
+      expect(pushLine(log)).toContain('not_eligible=1');
+      expect(pushLine(log)).toContain('skipped=0');
+    });
+
+    it('counts a row that already has a PRMS code as skipped and does not sync', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      tipHandleRepository.idsWithPrmsCode.mockResolvedValue([101]);
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [candidateRow('http://h/coded', 2026)]);
+
+      expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
+      expect(tipHandleRepository.idsWithPrmsCode).toHaveBeenCalledWith([101]);
+      expect(pushLine(log)).toContain('candidates=1');
+      expect(pushLine(log)).toContain('skipped=1');
+      expect(pushLine(log)).toContain('not_eligible=0');
+    });
+
+    it('does not start the second sync before the first deferred sync resolves', async () => {
+      installSaves({
+        versionId: (payload) =>
+          payload.public_link.endsWith('/b') ? 202 : 101,
+        liveId: (payload) => (payload.public_link.endsWith('/b') ? 1202 : 1101),
+      });
+      const gates: Array<(value: unknown) => void> = [];
+      resultPrmsSyncService.sync.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            gates.push(resolve);
+          }),
+      );
+      arm([
+        candidateRow('http://h/a', 2026, { userData: userA }),
+        candidateRow('http://h/b', 2026, { userData: userB }),
+      ]);
+
+      const run = service.getKnowledgeProductsByYear(2026);
+      try {
+        await flushUntil(
+          () => resultPrmsSyncService.sync.mock.calls.length >= 1,
+        );
+        expect(resultPrmsSyncService.sync).toHaveBeenCalledTimes(1);
+        expect(resultPrmsSyncService.sync.mock.calls[0][0]).toBe(101);
+        expect(syncProcessLogService.update).toHaveBeenCalledWith(
+          1,
+          expect.any(Object),
+        );
+        expect(syncProcessLogService.endSync).not.toHaveBeenCalled();
+
+        gates[0](accepted());
+        await flushUntil(
+          () => resultPrmsSyncService.sync.mock.calls.length >= 2,
+        );
+        expect(resultPrmsSyncService.sync).toHaveBeenCalledTimes(2);
+        expect(resultPrmsSyncService.sync.mock.calls[1][0]).toBe(202);
+        gates[1](accepted());
+      } finally {
+        gates.forEach((release) => release(accepted()));
+        await run.catch(() => undefined);
+      }
+
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+    });
+
+    it('counts PrmsSyncPersistedRefusalException as REFUSED_BY_STAR', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      resultPrmsSyncService.sync.mockRejectedValue(
+        new PrmsSyncPersistedRefusalException(
+          persistedStarRefusalData(
+            1,
+            'Pool Funding Alignment is not green-checked',
+          ),
+        ),
+      );
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [candidateRow('http://h/refused', 2026)]);
+
+      const line = pushLine(log);
+      expect(line).toContain('REFUSED_BY_STAR=1');
+      expect(line).toContain('NOT_SENT=0');
+      expect(line).toContain('ERROR=0');
+      expect(currentUser.clearSystemUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('counts a 409 ConflictException as NOT_SENT and warns status and message', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      resultPrmsSyncService.sync.mockRejectedValue(
+        new ConflictException('already synced'),
+      );
+      const warn = jest.spyOn((service as any).logger, 'warn');
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [candidateRow('http://h/conflict', 2026)]);
+
+      expect(warn).toHaveBeenCalledWith(
+        'PRMS push NOT_SENT result 101 status=409 message=already synced',
+      );
+      expect(pushLine(log)).toContain('NOT_SENT=1');
+      expect(pushLine(log)).toContain('REFUSED_BY_STAR=0');
+    });
+
+    it('counts a thrown Error as ERROR, sends the next candidate, and ends the run', async () => {
+      installSaves({
+        versionId: (payload) =>
+          payload.public_link.endsWith('/b') ? 202 : 101,
+        liveId: (payload) => (payload.public_link.endsWith('/b') ? 1202 : 1101),
+      });
+      resultPrmsSyncService.sync.mockImplementation((id: number) => {
+        if (id === 101) {
+          return Promise.reject(new Error('transport down'));
+        }
+        return Promise.resolve({
+          outcome: PrmsSyncOutcome.REJECTED_BY_PRMS,
+        });
+      });
+      const log = jest.spyOn((service as any).logger, 'log');
+      const errorLog = jest.spyOn((service as any).logger, 'error');
+
+      await runPush(2026, [
+        candidateRow('http://h/a', 2026),
+        candidateRow('http://h/b', 2026, { userData: userB }),
+      ]);
+
+      expect(
+        resultPrmsSyncService.sync.mock.calls.map((call) => call[0]),
+      ).toEqual([101, 202]);
+      expect(errorLog).toHaveBeenCalledWith(
+        'PRMS push ERROR result 101: transport down',
+      );
+      const line = pushLine(log);
+      expect(line).toContain('ERROR=1');
+      expect(line).toContain('REJECTED_BY_PRMS=1');
+      expect(line).toContain('candidates=2');
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+      expect(currentUser.clearSystemUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears the system user after a throwing candidate before the next sync', async () => {
+      installSaves({
+        versionId: (payload) =>
+          payload.public_link.endsWith('/b') ? 202 : 101,
+        liveId: (payload) => (payload.public_link.endsWith('/b') ? 1202 : 1101),
+      });
+      const gates: Array<{
+        resolve: (value: unknown) => void;
+        reject: (reason?: unknown) => void;
+      }> = [];
+      resultPrmsSyncService.sync.mockImplementation(
+        () =>
+          new Promise((resolve, reject) => {
+            gates.push({ resolve, reject });
+          }),
+      );
+      arm([
+        candidateRow('http://h/a', 2026, { userData: null }),
+        candidateRow('http://h/b', 2026, { userData: userB }),
+      ]);
+
+      const run = service.getKnowledgeProductsByYear(2026);
+      try {
+        await flushUntil(
+          () => resultPrmsSyncService.sync.mock.calls.length >= 1,
+        );
+        expect(currentUser.setSystemUser).toHaveBeenNthCalledWith(
+          1,
+          null,
+          true,
+        );
+        expect(resultPrmsSyncService.sync.mock.calls[0][1]).toEqual({
+          origin: 'TIP_SYNC',
+          tocMapping: mapping,
+          author: null,
+        });
+        expect(currentUser.clearSystemUser).not.toHaveBeenCalled();
+
+        gates[0].reject(new Error('boom'));
+        await flushUntil(
+          () =>
+            currentUser.clearSystemUser.mock.calls.length >= 1 ||
+            resultPrmsSyncService.sync.mock.calls.length >= 2,
+        );
+        expect(currentUser.clearSystemUser).toHaveBeenCalledTimes(1);
+        expect(resultPrmsSyncService.sync).toHaveBeenCalledTimes(2);
+        expect(currentUser.setSystemUser).toHaveBeenNthCalledWith(
+          2,
+          userB,
+          true,
+        );
+        expect(resultPrmsSyncService.sync.mock.calls[1][1].author).toEqual({
+          email: userB.email,
+          first_name: userB.first_name,
+          last_name: userB.last_name,
+        });
+        gates[1].resolve(accepted());
+      } finally {
+        gates.forEach((gate) => gate.resolve(accepted()));
+        await run.catch(() => undefined);
+      }
+
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+    });
+
+    it('logs every summary key and the counts sum to candidates', async () => {
+      installSaves({
+        versionId: (payload) => {
+          if (payload.public_link.endsWith('/coded')) return 2;
+          if (payload.public_link.endsWith('/ok')) return 3;
+          if (payload.public_link.endsWith('/conflict')) return 4;
+          return 1;
+        },
+        liveId: (payload) => {
+          if (payload.public_link.endsWith('/coded')) return 12;
+          if (payload.public_link.endsWith('/ok')) return 13;
+          if (payload.public_link.endsWith('/conflict')) return 14;
+          return 11;
+        },
+      });
+      tipHandleRepository.idsWithPrmsCode.mockImplementation(
+        async (ids: number[]) => ids.filter((id) => id === 2),
+      );
+      resultPrmsSyncService.sync.mockImplementation((id: number) => {
+        if (id === 4) {
+          throw new ConflictException('already synced');
+        }
+        return Promise.resolve(accepted());
+      });
+      const log = jest.spyOn((service as any).logger, 'log');
+
+      await runPush(2026, [
+        candidateRow('http://h/bare', 2026, { poolFunding: null }),
+        candidateRow('http://h/coded', 2026),
+        candidateRow('http://h/ok', 2026),
+        candidateRow('http://h/conflict', 2026),
+      ]);
+
+      const line = pushLine(log);
+      expect(line).not.toContain('IN_FLIGHT');
+      const match = line.match(SUMMARY);
+      expect(match).not.toBeNull();
+      const candidates = Number(match?.[1]);
+      const counted = (match ?? []).slice(2, 13).map(Number);
+      expect(counted.reduce((sum, value) => sum + value, 0)).toBe(candidates);
+      expect(candidates).toBe(4);
+      expect(Number(match?.[2])).toBe(1);
+      expect(Number(match?.[3])).toBe(1);
+      expect(Number(match?.[4])).toBe(1);
+      expect(Number(match?.[11])).toBe(1);
+      expect(Number(match?.[12])).toBe(0);
+      expect(Number(match?.[13])).toBeGreaterThanOrEqual(0);
+    });
+
+    it('still ends the run when the code query throws', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      tipHandleRepository.idsWithPrmsCode.mockRejectedValue(
+        new Error('code query failed'),
+      );
+      const errorLog = jest.spyOn((service as any).logger, 'error');
+
+      await runPush(2026, [candidateRow('http://h/query', 2026)]);
+
+      expect(errorLog).toHaveBeenCalledWith(
+        'PRMS push phase failed: code query failed',
+      );
+      expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
+      expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
     });
   });
 });

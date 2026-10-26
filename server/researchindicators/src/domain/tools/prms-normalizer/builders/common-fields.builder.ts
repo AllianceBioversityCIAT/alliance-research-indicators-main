@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
 import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+import type { TipTocMappingDto } from '../../tip-integration/dto/response-year-tip.dto';
 import {
   PrmsSyncAggregate,
   PrmsStaffSnapshot,
@@ -237,6 +238,48 @@ const buildTocMapping = (
   return toc;
 };
 
+const isAbsentTipValue = (value: unknown): boolean => {
+  if (value == null) {
+    return true;
+  }
+  return typeof value === 'string' && value.trim() === '';
+};
+
+/**
+ * TIP `toc_mapping` (R-TPP-004). Only the seven keys TIP is allowed to send.
+ * `toc_internal_id` and `toc_result_indicator_id` stay off the payload.
+ * Empty strings and nulls are omitted; `0` is a contribution and is sent.
+ */
+const buildTipTocMapping = (
+  mapping: TipTocMappingDto,
+): Record<string, unknown> => {
+  const toc: Record<string, unknown> = {
+    science_program_id: requirePresent(
+      mapping.science_program_id,
+      'toc_mapping.science_program_id',
+    ),
+  };
+  if (!isAbsentTipValue(mapping.aow_compose_code)) {
+    toc.aow_compose_code = mapping.aow_compose_code;
+  }
+  if (!isAbsentTipValue(mapping.toc_result_id)) {
+    toc.toc_result_id = mapping.toc_result_id;
+  }
+  if (!isAbsentTipValue(mapping.result_title)) {
+    toc.result_title = mapping.result_title;
+  }
+  if (!isAbsentTipValue(mapping.result_indicator_description)) {
+    toc.result_indicator_description = mapping.result_indicator_description;
+  }
+  if (!isAbsentTipValue(mapping.result_indicator_type_name)) {
+    toc.result_indicator_type_name = mapping.result_indicator_type_name;
+  }
+  if (!isAbsentTipValue(mapping.target_contribution)) {
+    toc.target_contribution = mapping.target_contribution;
+  }
+  return toc;
+};
+
 const buildContributingPrograms = (
   aggregate: PrmsSyncAggregate,
 ): Record<string, unknown>[] =>
@@ -414,7 +457,10 @@ export class CommonFieldsBuilder {
    * Maps the already-loaded aggregate to the flat common `data` block
    * (homologation.md §4). Type-specific nesting is T-07/T-08/T-09.
    */
-  build(aggregate: PrmsSyncAggregate): Record<string, unknown> {
+  build(
+    aggregate: PrmsSyncAggregate,
+    overrides?: { tocMapping?: TipTocMappingDto },
+  ): Record<string, unknown> {
     const leadCenter = resolveCenter(aggregate.primary_contract);
     const createdBy = requireStaff(aggregate.created_by, 'created_by');
     if (!aggregate.submitted_by) {
@@ -467,7 +513,10 @@ export class CommonFieldsBuilder {
       lead_center: leadCenter,
       title: requirePresent(aggregate.title, 'title'),
       description: requirePresent(aggregate.description, 'description'),
-      toc_mapping: buildTocMapping(aggregate),
+      toc_mapping:
+        overrides?.tocMapping != null
+          ? buildTipTocMapping(overrides.tocMapping)
+          : buildTocMapping(aggregate),
       geo_focus: buildGeoFocus(aggregate),
       contributing_center: [leadCenter],
     };

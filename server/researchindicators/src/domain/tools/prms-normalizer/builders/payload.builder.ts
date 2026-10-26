@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
 import { PrmsNormalizerRequestDto } from '../dto/prms-normalizer.dto';
+import type { TipTocMappingDto } from '../../tip-integration/dto/response-year-tip.dto';
 import { PrmsSyncAggregate } from '../dto/prms-sync-aggregate';
 import {
   IndicatorTypeHomologation,
@@ -39,10 +40,14 @@ export class PayloadBuilder {
    * Assembles `{ tenant, op, results: [{ type, data }] }` (design.md §5.2 step 4).
    * Common fields stay flat at `data`; the type builder's same-named nested
    * object is merged in (D-B). Gating lives at the endpoint, not here.
+   * `overrides.tocMapping`, when present, replaces the stored alignment.
    */
-  build(aggregate: PrmsSyncAggregate): PrmsNormalizerRequestDto {
+  build(
+    aggregate: PrmsSyncAggregate,
+    overrides?: { tocMapping?: TipTocMappingDto },
+  ): PrmsNormalizerRequestDto {
     const type = this.resolveType(aggregate.indicator_id);
-    const common = this.commonFields.build(aggregate);
+    const common = this.commonFields.build(aggregate, overrides);
     const typeBlock = this.buildTypeBlock(type, aggregate);
     return {
       tenant: PRMS_INGEST_TENANT,

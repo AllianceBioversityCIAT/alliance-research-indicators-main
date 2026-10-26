@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
 } from '@nestjs/common';
 import { TipIprDataDto } from './dto/tip-ipr-data.dto';
@@ -17,6 +18,7 @@ import {
   TipKnowledgeProductsResponseDto,
   TipMappedResult,
   TipRegionDto,
+  TipTocMappingDto,
 } from './dto/response-year-tip.dto';
 import { mapTipProjects } from './mapper/tip-projects.mapper';
 import { AgressoContract } from '../../entities/agresso-contract/entities/agresso-contract.entity';
@@ -43,6 +45,7 @@ import { ReportingPlatformEnum } from '../../entities/results/enum/reporting-pla
 import { QueryService } from '../../shared/utils/query.service';
 import { ResultKnowledgeProductService } from '../../entities/result-knowledge-product/result-knowledge-product.service';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 
 import { TipIntegrationRepository } from './repository/tip-integration.repository';
 import { SyncProcessLogService } from '../../entities/sync-process-log/sync-process-log.service';
@@ -64,6 +67,12 @@ import { TemportalDataResponse } from '../open-search/prms/dto/prms-response.dto
 import { ResultSdg } from '../../entities/result-sdgs/entities/result-sdg.entity';
 import { ClarisaSdgsService } from '../clarisa/entities/clarisa-sdgs/clarisa-sdgs.service';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
+import { SecUser } from '../../complementary-entities/secondary/user/dto/sec-user.dto';
+import {
+  PrmsSyncPersistedRefusalException,
+  ResultPrmsSyncService,
+} from '../../entities/result-prms-sync/result-prms-sync.service';
+import { PrmsSyncOutcome } from '../prms-normalizer/enum/prms-sync-outcome.enum';
 
 @Injectable()
 export class TipIntegrationService extends BaseApi {
@@ -86,6 +95,8 @@ export class TipIntegrationService extends BaseApi {
     private readonly clarisaSdgsService: ClarisaSdgsService,
     private readonly bilateralService: BilateralService,
     private readonly tipHandleRepository: TipHandleRepository,
+    private readonly resultPrmsSyncService: ResultPrmsSyncService,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {
     super(
       httpService,
@@ -246,13 +257,16 @@ export class TipIntegrationService extends BaseApi {
         counters,
         manageOfficialCode: true,
       };
+      const pushCandidates: TipPushCandidate[] = [];
       skippedRecords = await this.persistHandles(
         dataProcessed,
         batchExtra,
         catalogMemo,
+        pushCandidates,
       );
       this.logTipRunSummary(stagingFailures, counters, skippedRecords);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
+      await this.pushToPrms(pushCandidates);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
       this.logger.error(
@@ -543,6 +557,7 @@ export class TipIntegrationService extends BaseApi {
     rows: TipMappedResult[],
     batchExtra: ExtraData<ExternalMappersDto>,
     catalogMemo: Map<string, TocResult[] | null>,
+    pushCandidates: TipPushCandidate[],
   ): Promise<number> {
     let skipped = 0;
     for (const [handle, byYear] of this.groupByHandle(rows)) {
@@ -552,6 +567,7 @@ export class TipIntegrationService extends BaseApi {
           byYear,
           batchExtra,
           catalogMemo,
+          pushCandidates,
         );
       } catch (error) {
         const message =
@@ -612,6 +628,7 @@ export class TipIntegrationService extends BaseApi {
     byYear: Map<number, TipMappedResult>,
     batchExtra: ExtraData<ExternalMappersDto>,
     catalogMemo: Map<string, TocResult[] | null>,
+    pushCandidates?: TipPushCandidate[],
   ): Promise<number> {
     const resolution = await this.tipHandleRepository.resolve(handle);
     this.warnRowsNotPicked(handle, resolution);
@@ -644,6 +661,7 @@ export class TipIntegrationService extends BaseApi {
           source,
           pendingImports,
           savedYears,
+          pushCandidates,
         );
       }
 
@@ -702,6 +720,8 @@ export class TipIntegrationService extends BaseApi {
   /**
    * Only created and updated rows are saved. A skipped or error outcome
    * must not become the live year and must not receive Pool Funding.
+   * A push candidate is recorded only when the caller passes the list,
+   * which the version save does and the live save does not.
    */
   private collectSaved(
     saved: SaveAllSectionsResult,
@@ -709,6 +729,7 @@ export class TipIntegrationService extends BaseApi {
     payload: TipMappedResult,
     pendingImports: TipPoolImport[],
     savedYears?: number[],
+    pushCandidates?: TipPushCandidate[],
   ): number {
     if (saved.outcome === 'skipped') return 1;
     if (
@@ -716,6 +737,12 @@ export class TipIntegrationService extends BaseApi {
       saved.resultId != null
     ) {
       savedYears?.push(year);
+      pushCandidates?.push({
+        resultId: saved.resultId,
+        year,
+        tocMapping: payload.poolFunding ?? null,
+        userData: payload.userData ?? null,
+      });
       if (payload.poolFunding != null) {
         pendingImports.push({
           resultId: saved.resultId,
@@ -751,6 +778,110 @@ export class TipIntegrationService extends BaseApi {
       }
     }
   }
+
+  /**
+   * One PRMS call at a time, after every handle is saved. A failure here
+   * is logged and swallowed so the TIP run still reaches endSync.
+   * PrmsSyncPersistedRefusalException extends UnprocessableEntityException,
+   * so it is classified before any other HttpException.
+   */
+  private async pushToPrms(raw: TipPushCandidate[]): Promise<void> {
+    const started = Date.now();
+    try {
+      const reportingYear = await this.reportingYearResolver.resolve();
+      const seen = new Set<number>();
+      const candidates: TipPushCandidate[] = [];
+      for (const candidate of raw) {
+        if (candidate.year !== reportingYear || seen.has(candidate.resultId)) {
+          continue;
+        }
+        seen.add(candidate.resultId);
+        candidates.push(candidate);
+      }
+      if (candidates.length === 0) {
+        this.logger.log('PRMS push: candidates=0');
+        return;
+      }
+
+      const outcomes = zeroPushOutcomes();
+      let skipped = 0;
+      let notEligible = 0;
+      const pending: TipPushReady[] = [];
+      for (const candidate of candidates) {
+        if (candidate.tocMapping == null) {
+          notEligible += 1;
+        } else {
+          pending.push({ ...candidate, tocMapping: candidate.tocMapping });
+        }
+      }
+
+      const codedIds =
+        pending.length === 0
+          ? []
+          : await this.tipHandleRepository.idsWithPrmsCode(
+              pending.map((candidate) => candidate.resultId),
+            );
+      const coded = new Set(codedIds);
+      const toSend: TipPushReady[] = [];
+      for (const candidate of pending) {
+        if (coded.has(candidate.resultId)) {
+          skipped += 1;
+        } else {
+          toSend.push(candidate);
+        }
+      }
+
+      let notSent = 0;
+      let errors = 0;
+      for (const candidate of toSend) {
+        try {
+          this._currentUser.setSystemUser(candidate.userData as SecUser, true);
+          const synced = await this.resultPrmsSyncService.sync(
+            candidate.resultId,
+            {
+              origin: 'TIP_SYNC',
+              tocMapping: candidate.tocMapping,
+              author: authorForPush(candidate.userData),
+            },
+          );
+          bumpPushOutcome(outcomes, synced.outcome);
+        } catch (error) {
+          if (error instanceof PrmsSyncPersistedRefusalException) {
+            outcomes[PrmsSyncOutcome.REFUSED_BY_STAR] += 1;
+          } else if (error instanceof HttpException) {
+            notSent += 1;
+            this.logger.warn(
+              `PRMS push NOT_SENT result ${candidate.resultId} status=${error.getStatus()} message=${error.message}`,
+            );
+          } else {
+            errors += 1;
+            const message =
+              error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(
+              `PRMS push ERROR result ${candidate.resultId}: ${message}`,
+            );
+          }
+        } finally {
+          this._currentUser.clearSystemUser();
+        }
+      }
+
+      this.logger.log(
+        formatPrmsPushSummary(
+          candidates.length,
+          skipped,
+          notEligible,
+          outcomes,
+          notSent,
+          errors,
+          Date.now() - started,
+        ),
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`PRMS push phase failed: ${message}`);
+    }
+  }
 }
 
 type TipPoolImport = {
@@ -759,3 +890,80 @@ type TipPoolImport = {
   mapping: NonNullable<TipMappedResult['poolFunding']>;
   payload: TipMappedResult;
 };
+
+type TipPushCandidate = {
+  resultId: number;
+  year: number;
+  tocMapping: TipTocMappingDto | null;
+  userData: SecUser | null;
+};
+
+type TipPushReady = TipPushCandidate & { tocMapping: TipTocMappingDto };
+
+const PUSH_OUTCOME_KEYS = [
+  PrmsSyncOutcome.ACCEPTED,
+  PrmsSyncOutcome.REJECTED_BY_PRMS,
+  PrmsSyncOutcome.REFUSED_BY_STAR,
+  PrmsSyncOutcome.RETRYABLE,
+  PrmsSyncOutcome.AUTH_FAILED,
+  PrmsSyncOutcome.TRANSPORT_FAILED,
+  PrmsSyncOutcome.UNKNOWN,
+] as const;
+
+type PushOutcomeKey = (typeof PUSH_OUTCOME_KEYS)[number];
+type PushOutcomeCounts = Record<PushOutcomeKey, number>;
+
+function zeroPushOutcomes(): PushOutcomeCounts {
+  return {
+    [PrmsSyncOutcome.ACCEPTED]: 0,
+    [PrmsSyncOutcome.REJECTED_BY_PRMS]: 0,
+    [PrmsSyncOutcome.REFUSED_BY_STAR]: 0,
+    [PrmsSyncOutcome.RETRYABLE]: 0,
+    [PrmsSyncOutcome.AUTH_FAILED]: 0,
+    [PrmsSyncOutcome.TRANSPORT_FAILED]: 0,
+    [PrmsSyncOutcome.UNKNOWN]: 0,
+  };
+}
+
+function bumpPushOutcome(
+  outcomes: PushOutcomeCounts,
+  outcome: PrmsSyncOutcome,
+): void {
+  if (Object.prototype.hasOwnProperty.call(outcomes, outcome)) {
+    outcomes[outcome as PushOutcomeKey] += 1;
+  }
+}
+
+function authorForPush(user: SecUser | null): {
+  email: string;
+  first_name: string;
+  last_name: string;
+} | null {
+  if (user == null) {
+    return null;
+  }
+  return {
+    email: user.email,
+    first_name: user.first_name ?? '',
+    last_name: user.last_name ?? '',
+  };
+}
+
+function formatPrmsPushSummary(
+  candidates: number,
+  skipped: number,
+  notEligible: number,
+  outcomes: PushOutcomeCounts,
+  notSent: number,
+  errors: number,
+  durationMs: number,
+): string {
+  const outcomeText = PUSH_OUTCOME_KEYS.map(
+    (key) => `${key}=${outcomes[key]}`,
+  ).join(' ');
+  return (
+    `PRMS push: candidates=${candidates} skipped=${skipped} ` +
+    `not_eligible=${notEligible} ${outcomeText} NOT_SENT=${notSent} ` +
+    `ERROR=${errors} duration_ms=${durationMs}`
+  );
+}

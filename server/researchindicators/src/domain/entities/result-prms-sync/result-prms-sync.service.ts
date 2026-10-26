@@ -13,6 +13,8 @@ import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outc
 import { interpretPrmsSyncResponse } from '../../tools/prms-normalizer/response/prms-sync-response.interpreter';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
+import type { TipTocMappingDto } from '../../tools/tip-integration/dto/response-year-tip.dto';
+import type { PrmsStaffSnapshot } from '../../tools/prms-normalizer/dto/prms-sync-aggregate';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
@@ -37,6 +39,23 @@ const platformCodeOf = (row: {
     return ReportingPlatformEnum.STAR;
   }
   return raw as ReportingPlatformEnum;
+};
+
+/**
+ * The run's submitter staff. Null when this run found no STAR user.
+ * Only the three fields the author carries — nothing else is invented.
+ */
+const tipAuthorStaff = (
+  author: SyncOptions['author'],
+): PrmsStaffSnapshot | null => {
+  if (!author) {
+    return null;
+  }
+  return {
+    email: author.email,
+    first_name: author.first_name,
+    last_name: author.last_name,
+  };
 };
 
 export interface PrmsSyncResponseData {
@@ -73,6 +92,18 @@ export class PrmsSyncPersistedRefusalException extends UnprocessableEntityExcept
 
 export interface SyncOptions {
   now?: Date;
+  /**
+   * Server-only. No DTO or controller accepts this (design §8).
+   * Absent is the HTTP route.
+   */
+  origin?: 'TIP_SYNC';
+  /** Null and absent both refuse; neither falls back to the stored alignment. */
+  tocMapping?: TipTocMappingDto | null;
+  author?: {
+    email: string;
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 const KEY_FIELD = /api[_-]?key/i;
@@ -144,6 +175,9 @@ export class ResultPrmsSyncService {
     const environment = this.appConfig.ARI_IS_PRODUCTION ? 'PROD' : 'TEST';
     const userId = this.currentUser.user_id;
     const snapshot = await this.logRepository.loadGateSnapshot(resultId);
+    if (options.origin === 'TIP_SYNC') {
+      snapshot.origin = options.origin;
+    }
     const gate = evaluateSyncGate(snapshot);
 
     if (!gate.allowed) {
@@ -218,7 +252,26 @@ export class ResultPrmsSyncService {
       }
       storedPrmsResultCode = aggregate.prms_result_code ?? null;
       platformCode = platformCodeOf(aggregate);
-      payload = this.payloadBuilder.build(aggregate);
+      if (options.origin === 'TIP_SYNC') {
+        const staff = tipAuthorStaff(options.author);
+        aggregate.created_by = staff;
+        aggregate.submitted_by = {
+          staff: staff as PrmsStaffSnapshot,
+          submitted_date: aggregate.created_at,
+          comment: null,
+        };
+        if (options.tocMapping == null) {
+          throw new PrmsPayloadBuildError(
+            `Missing mandatory field 'toc_mapping'`,
+            'toc_mapping',
+          );
+        }
+        payload = this.payloadBuilder.build(aggregate, {
+          tocMapping: options.tocMapping,
+        });
+      } else {
+        payload = this.payloadBuilder.build(aggregate);
+      }
     } catch (error) {
       if (error instanceof PrmsPayloadBuildError) {
         await this.settleAttempt(

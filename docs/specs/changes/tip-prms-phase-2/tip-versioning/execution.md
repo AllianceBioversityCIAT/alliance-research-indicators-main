@@ -312,9 +312,27 @@ WHERE lr.link_result_id IS NULL;
 - **Budget:** review rounds after T-07 = 15 (T-07: 3). Owner accepted the overrun.
 - **Final status:** PASS on attempt 3 · **Final verification:** VERIFIED for unit/build/tsc and quick gates; MySQL evidence per the lines above.
 
-### T-08 — HITL on Dev and documentation — in progress
+### T-08 — HITL on Dev and documentation — PASS
 
 - **2026-10-23 — merge and deploy:** `AC-1761-TIP-integration-adjustments-to-push-Knowledge-Products` merged into `dev` (`99fe979c`, owner pushed). Conflicts in `save-all-sections.service.ts` (+ spec) with `results/cross-platform-duplicate-resolution` on `dev`: kept dev's group-resolver path; added `target` (lookup, `isAppliedVersion`, `target.officialCode` on create), `OMITTED_DUPLICATE → 'skipped'` outcome (falsifier: line removed → the skipped test red), row-only rollback when `compensateRowOnly`, else dev's `rollbackCreatedResult`; `query.service.spec.ts` row-only test rewritten on dev's `buildService` harness. Gates on the merge: `npm test` 465/465 suites, 4891/4891; build 0; tsc 0; eslint on touched files 0. Interaction checked: dev's duplicate candidates are live rows only (`dedupScopeSql`: `COALESCE(is_snapshot, FALSE) = FALSE`), and a TIP-only group (live + versions) is never corrected; edge case recorded — an AICCRA Capacity Sharing row with the same handle and the live row's year would make dev's resolver delete the TIP live row (dev's intended rule; AICCRA has no live sync). Only new migration in the push: `1792764939185-mergeTipHandleDuplicates` (child 1's migrations were already on `dev`).
 - **Owner debug (2026-10-23):** owner reported handles with no version (`10568/174462`, `10568/180413`, `10568/180508`, all 2025). Leader read-only checks: TIP **test** API (`tiptst.ciat.cgiar.org`, 2025, 644 items) returns only `174462` (id 18525, Journal Article); the other two are absent (not in TIP test — expected to have no version). Dev DB (`192.168.20.210`, SELECT only): `174462` → live `result_id 878` (code 18525, 2025, `is_snapshot 0`) and version `result_id 36551` (code 18525, 2025, `is_snapshot 1`), both written 2026-10-24 01:50 UTC. Owner (verbatim): "acabo de revisar la que dijiste que si esta y efectivamente si esta fue error de cache al parecer".
 - **Owner (2026-10-23):** one full TIP sync only on Dev (against TIP test, on a DB loaded from a Prod bulk); no second run ("no tengo tiempo para ejecutar eso solo lo corri una vez"). R-TVR-008 live repeat therefore **not done** — rests on the Implementer's local run (run 2 `created 0`); accepted by the owner.
 - **Leader read-only duplicate check on Dev (`192.168.20.210`, SELECT only, owner "ok"):** TIP active rows — live 8567 (= 8630 − the 63 merged), versions 6522; handles with > 1 live row **0**; duplicate versions (same code + year) **0**; versions without a live row of their code **0**. The single run left no duplicate.
+- **Owner HITL (2026-10-26, verbatim):** "ya quedo en dev revise los datos y los vi bien creo que ya podemos cerrar" — after the quick change `quick/tip-version-selector-hide-live` was also merged to `dev`. Earlier the same session: the multi-year/version view checked on TIP result 29031 ("si ves que sale la version que esta perfecto"); `174462` version confirmed after a cache refresh. P-13 (client shows TIP versions) settled by the owner's observation. P-16 (dashboard counts) — owner: "revise los datos y los vi bien".
+- **Docs:** `docs/trd/trd.md` §9.1 TIP row — one result per handle, versions per year, 409 run guard, spec pointer.
+- **Review:** `skip-eligible` claim — the only change is TRD text, reviewed by the owner at this HITL; no code. Recorded as REVIEW_SKIPPED below.
+- **Not done (owner-accepted):** R-TVR-008 live second run (rests on the Implementer's local run + the Leader's read-only duplicate check, 0 duplicates).
+- **Final status:** PASS.
+
+## REVIEW_SKIPPED: T-08
+
+| Field | Content |
+|---|---|
+| predicate evidence | No falsifier applies (human check task); verification = owner's words quoted above; `Consumers`: P-13, P-16 — settled by the owner's observation |
+| overrides checked | (a)–(g) evaluated: (c) derived evidence — none; TRD text only; no code, contract, or data change in T-08 |
+| evidence re-run | n/a — no command; the owner's HITL is the check |
+| models | Leader (Claude Opus 5.5) wrote the TRD line |
+
+## Summary
+
+All 9 tasks done (T-01..T-08 + T-02b). Commits `f07c181e`, `90569290`, `f86fa009`, `0736f851`, `df6edc07`, `79be5c83`, `1c88171f`, `6c36e806`, merged to `dev` (`99fe979c`), plus the T-08 docs. Review rounds 15 vs budget 11 (owner accepted at the tripwire). Owner decisions during execution: 409 refusal (T-02), async `.catch` (T-02b), `maxWorkers: 1` on integration runs, no further local full-sync runs (R-TVR-008 repeat moved live, then accepted as not done), TIP-scoped JD-12 backout recipe. Follow-ups out of scope: OpenSearch `No data found` per snapshot upload (skip uploads when `isSnapshot`); `UNHANDLED_REJECTION` from the non-awaited RMQ emit in the save path; 4 sibling integration suites broken before this spec.

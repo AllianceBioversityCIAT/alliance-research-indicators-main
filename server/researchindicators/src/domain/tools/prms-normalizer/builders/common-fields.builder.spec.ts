@@ -778,6 +778,70 @@ describe('CommonFieldsBuilder', () => {
     });
   });
 
+  describe('TIP toc_mapping override (R-TPP-004)', () => {
+    const tipMapping = {
+      science_program_id: 'SP02',
+      aow_compose_code: 'SP02-AOW01',
+      toc_result_id: 19191,
+      result_title: 'TIP result title',
+      result_indicator_description: 'TIP indicator description',
+      result_indicator_type_name: 'TIP indicator type',
+      target_contribution: 7,
+      toc_internal_id: 'internal-not-sent',
+      toc_result_indicator_id: 'indicator-not-sent',
+    };
+
+    const sevenTipKeys = {
+      science_program_id: 'SP02',
+      aow_compose_code: 'SP02-AOW01',
+      toc_result_id: 19191,
+      result_title: 'TIP result title',
+      result_indicator_description: 'TIP indicator description',
+      result_indicator_type_name: 'TIP indicator type',
+      target_contribution: 7,
+    };
+
+    it('emits exactly the seven TIP keys and no stored-alignment keys', () => {
+      const payload = builder.build(baseAggregate(), {
+        tocMapping: tipMapping,
+      });
+
+      expect(payload.toc_mapping).toEqual(sevenTipKeys);
+    });
+
+    it('omits an empty aow_compose_code and a null target_contribution', () => {
+      const payload = builder.build(baseAggregate(), {
+        tocMapping: {
+          science_program_id: 'SP02',
+          aow_compose_code: '',
+          target_contribution: null,
+        },
+      });
+
+      expect(payload.toc_mapping).toEqual({ science_program_id: 'SP02' });
+    });
+
+    it('refuses a TIP tocMapping with no science_program_id', () => {
+      const build = () =>
+        builder.build(baseAggregate(), {
+          tocMapping: { aow_compose_code: 'SP02-AOW01' },
+        });
+
+      expect(build).toThrow(PrmsPayloadBuildError);
+      expect(build).toThrow(
+        "Missing mandatory field 'toc_mapping.science_program_id'",
+      );
+      expect.assertions(3);
+      try {
+        build();
+      } catch (error) {
+        expect((error as PrmsPayloadBuildError).field).toBe(
+          'toc_mapping.science_program_id',
+        );
+      }
+    });
+  });
+
   describe('contributing_bilateral_projects (2026-09-21)', () => {
     // PRMS refused the old shape by name: "no project of the 2026 reporting phase
     // matches grant_title \"A1080-CROP TRUST Providing for ...\". Send the
