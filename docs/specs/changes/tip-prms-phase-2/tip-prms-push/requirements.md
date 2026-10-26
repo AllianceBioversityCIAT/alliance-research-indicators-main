@@ -194,6 +194,13 @@ Every other common field (title, description, geo focus, evidence, partners, con
 - GIVEN a TIP candidate with an empty description (TIP `abstract`), or no `'Handled'` evidence
 - THEN the attempt is recorded `REFUSED_BY_STAR` with "Missing mandatory field '<field>'" naming the **first** field that fails, and PRMS is not called
 
+#### Scenario: Empty description (amended 2026-10-26, DD-10)
+
+- GIVEN a TIP candidate whose description (TIP `abstract`) is empty
+- THEN the payload is sent without a `description` key and PRMS decides; a PRMS rejection is recorded as R-TPP-006 describes
+- AND IT MUST NOT send an invented or empty-string description
+- BUT the STAR path (no `origin`) still refuses with "Missing mandatory field 'description'"
+
 ### R-TPP-005 — Submitter without a STAR user is not pushed
 
 A TIP candidate whose submitter has no STAR user SHALL NOT be sent. The attempt SHALL be recorded `REFUSED_BY_STAR` with a reason that names the missing author (FD-3).
@@ -202,6 +209,13 @@ A TIP candidate whose submitter has no STAR user SHALL NOT be sent. The attempt 
 
 - GIVEN the TIP submitter was not found in Alliance staff (the sync logged the warning and left `userData` null)
 - THEN no PRMS call is made and the log row reads "Missing mandatory field '<field>'" for the first field that fails (`created_by` when the lead center resolves)
+
+#### Scenario: Submitter not resolved this run (amended 2026-10-26, DD-11)
+
+- GIVEN this run did not resolve the TIP submitter, AND the TIP live row of the same official code has a STAR `created_by`
+- THEN that user is the push author and actor
+- BUT a submitter this run resolved still wins (JD-7), and the refusal above applies only when neither exists
+- AND when the result has no lead contact with a STAR staff row, the same user is sent as `lead_contact_person` (in TIP the main contact is the submitter); a present lead contact is never replaced (DD-11b)
 
 ### R-TPP-006 — Outcomes are recorded as for STAR
 

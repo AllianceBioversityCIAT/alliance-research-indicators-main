@@ -41,10 +41,14 @@ export class PayloadBuilder {
    * Common fields stay flat at `data`; the type builder's same-named nested
    * object is merged in (D-B). Gating lives at the endpoint, not here.
    * `overrides.tocMapping`, when present, replaces the stored alignment.
+   * `overrides.optionalDescription` is forwarded to the common-fields builder.
    */
   build(
     aggregate: PrmsSyncAggregate,
-    overrides?: { tocMapping?: TipTocMappingDto },
+    overrides?: {
+      tocMapping?: TipTocMappingDto;
+      optionalDescription?: boolean;
+    },
   ): PrmsNormalizerRequestDto {
     const type = this.resolveType(aggregate.indicator_id);
     const common = this.commonFields.build(aggregate, overrides);

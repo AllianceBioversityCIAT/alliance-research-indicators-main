@@ -135,3 +135,34 @@ Orca run `run_c3dc2881e028`.
 - **Requirements covered:** R-TPP-003 (SQL), R-TPP-002 (`idsWithPrmsCode` on MySQL), R-TPP-006 *PRMS accepts* + BUT not onto a STAR row, R-TPP-005 / R-TPP-007 null actor; requirements §7 rows *Gate snapshot SQL*, *Null actor*, *Code written to a STAR row*.
 - **Decisions made:** task closed `[x]` on the Reviewer PASS with criterion 2 left unticked and annotated (precedent: child 2 T-07 *Full gates*, "Pre-existing deviation (not ticked)"). Reported to the owner at this gate.
 - **Final verification:** VERIFIED. Review rounds: 5/8.
+
+---
+
+## T-06 — Live TIP push on Dev → PRMS TEST (HITL) — attempt 1: INCONCLUSIVE
+
+- **Date:** 2026-10-26 · **Run by:** owner (TIP sync on Dev, year 2026) · **Read by:** Leader, `result_prms_sync_log` on the shared Dev DB, SELECT only in a READ ONLY transaction.
+- **Rows (`platform_code = 'TIP'`, environment `TEST`):**
+
+  | id | external_reference | outcome | failure_reason | created_by |
+  |---|---|---|---|---|
+  | 4 | `TIP-28404` | `REFUSED_BY_STAR` | `Missing mandatory field 'description'` | 30 |
+  | 5 | `TIP-28684` | `REFUSED_BY_STAR` | `Missing mandatory field 'created_by'` | NULL |
+
+- **What it proves:** the gate lift works live — both status-20 TIP KPs were claimed (DD-1, R-TPP-003). Both were refused by the payload builder before any PRMS call (`http_status`, `request_id` NULL).
+- **Causes (read-only):** `TIP-28404`: `results.description` is NULL on the live row (29183) and the version row (36919), because TIP sent no `abstract`. `TIP-28684`: this run did not resolve the TIP submitter, so `userData` was null and version row 36951 has `created_by` NULL. The TIP live row 29463 still holds `created_by = 718`, an active STAR user with an active Alliance staff row, and STAR shows that user as the result's responsible person.
+- **Disqualifier hit:** no candidate reached PRMS, so P-14 / FD-2 / OQ-2 (does PRMS accept `TIP-<code>`) are **not settled**.
+
+### Owner decisions (2026-10-26)
+
+- **DD-10:** for a TIP sync push, `description` is not a STAR-side blocker. When it is empty, the key is omitted (never invented, never `""`), PRMS decides, and the owner raises any PRMS rejection with the PRMS team. Rationale (owner): TIP results are very unlikely to be edited and re-sent, and PRMS adjusts its contract as irresolvable conflicts appear. The STAR path is unchanged. Amends R-TPP-004 *Missing mandatory value* for the description case only.
+- **DD-11:** when the run does not resolve the TIP submitter, the push author and actor fall back to the `created_by` stored on the TIP live row of the same official code. A submitter resolved by this run still wins (JD-7). Amends R-TPP-005: the refusal applies only when neither exists.
+- **Rework:** T-06a dispatched (Grok, Orca task `task_450834cfd6fa`), brief `scratchpad/t06a-brief.md`.
+- **T-06a attempt 1 (Grok, `ctx_6623c74d181a`):** DD-10 and DD-11 implemented. Worker reported jest 29 suites / 521 tests green, eslint, tsc and build exit 0, and falsifiers (a)–(c) observed red then reverted. Before review, the Leader ran a read-only Dev check: TIP-28684 has no active main contact with an Alliance staff row on its live row (29463) or its version row (36951), so its next attempt would refuse on `lead_contact_person`.
+- **DD-11b (Leader, within the owner's DD-11 intent):** the TIP importer builds `main_contact_person` from the submitter's carnet, so in TIP the lead contact is the submitter. For a TIP sync push, an empty lead contact falls back to the same author used for `created_by`, and a present one is never replaced. `liveAuthorFor` also filters `is_active` and orders deterministically. This goes to the same worker as rework 1 (`ctx_7d556438607a`, brief `scratchpad/t06a-rework.md`); it is a scope addition, not a Reviewer FAIL, so no attempt is consumed.
+- **T-06a rework 1 (same worker, `ctx_7d556438607a`):** DD-11b and `liveAuthorFor` (`is_active`, `result_id DESC`). Worker reported scoped jest 29 suites / 524 tests, eslint, tsc and build green, and falsifiers (d) and (e) observed red then reverted.
+- **Leader evidence re-run: VERIFIED.** Scoped jest 29/29 suites, 524/524 tests. `npx eslint` on the 9 changed files exit 0. `tsc --noEmit` exit 0. `npm run build` exit 0. Full `npm test -- --silent`: 449/449 suites, 4520/4520 tests.
+- **Reviewer (akili-reviewer, opus): PASS.** DD-10, DD-11 and DD-11b match the amended R-TPP-004 and R-TPP-005 scenarios. The STAR path (`sync(resultId)` with no options) is unchanged.
+  - Advisory (a): a contact with an email but blank names counts as missing, so DD-11b replaces it. This is the accepted "empty per `requireStaff`" reading, because such a contact would be refused on `lead_contact_person` anyway.
+  - Advisory (b): `liveAuthorFor` filters `is_snapshot = false`, so a TIP live row whose `is_snapshot` is NULL gets no fallback. This matches `idsWithPrmsCode`. Live evidence row 29463 has `is_snapshot = 0`.
+  - Advisory (c): the `actor as SecUser` cast hides the null case, as before.
+- **KZ-017:** the `liveAuthorFor` SQL is proven only against mocks. The equivalent predicates were checked read-only on Dev (live row 29463: TIP, `is_snapshot` 0, `is_active` 1, `created_by` 718). Whether PRMS accepts a KP without `description`, and `TIP-<code>` itself (P-14 / FD-2), is settled only by the owner's next live run (T-06 attempt 2).

@@ -975,7 +975,9 @@ describe('ResultPrmsSyncService', () => {
       ...overrides,
     });
 
-    const tipKpAggregate = (): PrmsSyncAggregate =>
+    const tipKpAggregate = (
+      overrides: Partial<PrmsSyncAggregate> = {},
+    ): PrmsSyncAggregate =>
       buildableAggregate({
         result_official_code: 19191,
         platform_code: ReportingPlatformEnum.TIP,
@@ -988,6 +990,7 @@ describe('ResultPrmsSyncService', () => {
           },
         ],
         type_slices: emptySlices(),
+        ...overrides,
       });
 
     const realService = (): ResultPrmsSyncService =>
@@ -1180,6 +1183,113 @@ describe('ResultPrmsSyncService', () => {
       expect(toc.science_program_id).toBe('STORED-SP');
       expect(toc.result_title).toBe(STORED_ALIGNMENT_TITLE);
       expect(toc.aow_compose_code).toBeUndefined();
+    });
+
+    it('sends a TIP sync with a null description and omits the description key (DD-10)', async () => {
+      const snapshot = eligibleFacts({
+        platform_code: 'TIP',
+        result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        result_official_code: 19191,
+      });
+      logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ description: null }),
+      );
+      acceptIngest('TIP-19191');
+
+      const result = await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(normalizer.ingest).toHaveBeenCalled();
+      expect('description' in ingestedData()).toBe(false);
+    });
+
+    it('refuses a STAR result with a null description and does not call PRMS (DD-10)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        buildableAggregate({ description: null }),
+      );
+
+      const reason = await refusalReason(() => realService().sync(42));
+
+      expect(reason).toBe("Missing mandatory field 'description'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
+    });
+
+    const LEAD_L = {
+      email: 'lead.contact@cgiar.org',
+      first_name: 'Lead',
+      last_name: 'Contact',
+    };
+
+    it('uses the run author as lead_contact_person when the TIP contact is empty (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ lead_contact: null }),
+      );
+      acceptIngest('TIP-19191');
+
+      const result = await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(ingestedData().lead_contact_person).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+      });
+    });
+
+    it('keeps a present lead contact when the TIP sync also has an author (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ lead_contact: LEAD_L }),
+      );
+      acceptIngest('TIP-19191');
+
+      await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(ingestedData().lead_contact_person).toEqual({
+        email: LEAD_L.email,
+        name: 'Lead Contact',
+      });
+    });
+
+    it('refuses a STAR result with an empty lead contact and does not call PRMS (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        buildableAggregate({ lead_contact: null }),
+      );
+
+      const reason = await refusalReason(() => realService().sync(42));
+
+      expect(reason).toBe("Missing mandatory field 'lead_contact_person'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
     });
   });
 });

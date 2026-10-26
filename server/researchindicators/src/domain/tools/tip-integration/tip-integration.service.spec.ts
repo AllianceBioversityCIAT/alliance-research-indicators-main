@@ -56,7 +56,11 @@ describe('TipIntegrationService', () => {
   let prmsRepository: jest.Mocked<PrmsRepository>;
   let clarisaSdgsService: jest.Mocked<ClarisaSdgsService>;
   let bilateralService: { importAlignmentFromTip: jest.Mock };
-  let tipHandleRepository: { resolve: jest.Mock; idsWithPrmsCode: jest.Mock };
+  let tipHandleRepository: {
+    resolve: jest.Mock;
+    idsWithPrmsCode: jest.Mock;
+    liveAuthorFor: jest.Mock;
+  };
   let resultPrmsSyncService: { sync: jest.Mock };
   let reportingYearResolver: { resolve: jest.Mock };
   let currentUser: { setSystemUser: jest.Mock; clearSystemUser: jest.Mock };
@@ -249,6 +253,7 @@ describe('TipIntegrationService', () => {
               otherVersions: [],
             }),
             idsWithPrmsCode: jest.fn().mockResolvedValue([]),
+            liveAuthorFor: jest.fn().mockResolvedValue(null),
           },
         },
         {
@@ -2591,6 +2596,104 @@ describe('TipIntegrationService', () => {
       expect(resultPrmsSyncService.sync).not.toHaveBeenCalled();
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(1);
       expect(syncProcessLogService.markFailed).not.toHaveBeenCalled();
+    });
+
+    it('uses the TIP live author when this run did not resolve a submitter (DD-11)', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      const liveUser = {
+        sec_user_id: 718,
+        email: 'live.author@cgiar.org',
+        first_name: 'Live',
+        last_name: 'Author',
+      };
+      tipHandleRepository.liveAuthorFor.mockResolvedValue(liveUser);
+
+      await runPush(2026, [
+        candidateRow('http://h/fallback', 2026, { userData: null }),
+      ]);
+
+      expect(tipHandleRepository.liveAuthorFor).toHaveBeenCalledWith(101);
+      expect(currentUser.setSystemUser).toHaveBeenCalledWith(liveUser, true);
+      expect(resultPrmsSyncService.sync.mock.calls[0][1]).toEqual({
+        origin: 'TIP_SYNC',
+        tocMapping: mapping,
+        author: {
+          email: liveUser.email,
+          first_name: liveUser.first_name,
+          last_name: liveUser.last_name,
+        },
+      });
+    });
+
+    it('does not look up the live author when this run resolved a submitter (JD-7)', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+
+      await runPush(2026, [
+        candidateRow('http://h/submitter', 2026, { userData: userA }),
+      ]);
+
+      expect(tipHandleRepository.liveAuthorFor).not.toHaveBeenCalled();
+      expect(currentUser.setSystemUser).toHaveBeenCalledWith(userA, true);
+      expect(resultPrmsSyncService.sync.mock.calls[0][1].author).toEqual({
+        email: userA.email,
+        first_name: userA.first_name,
+        last_name: userA.last_name,
+      });
+    });
+
+    it('passes a null author when the live row has no created_by user (DD-11)', async () => {
+      installSaves({
+        versionId: () => 101,
+        liveId: () => 202,
+      });
+      tipHandleRepository.liveAuthorFor.mockResolvedValue(null);
+
+      await runPush(2026, [
+        candidateRow('http://h/nobody', 2026, { userData: null }),
+      ]);
+
+      expect(tipHandleRepository.liveAuthorFor).toHaveBeenCalledWith(101);
+      expect(currentUser.setSystemUser).toHaveBeenCalledWith(null, true);
+      expect(resultPrmsSyncService.sync.mock.calls[0][1].author).toBeNull();
+    });
+
+    it('counts a live-author lookup failure as ERROR and still sends the next candidate', async () => {
+      installSaves({
+        versionId: (payload) =>
+          payload.public_link.endsWith('/b') ? 202 : 101,
+        liveId: (payload) => (payload.public_link.endsWith('/b') ? 1202 : 1101),
+      });
+      tipHandleRepository.liveAuthorFor.mockRejectedValue(
+        new Error('live author lookup failed'),
+      );
+      const log = jest.spyOn((service as any).logger, 'log');
+      const errorLog = jest.spyOn((service as any).logger, 'error');
+
+      await runPush(2026, [
+        candidateRow('http://h/a', 2026, { userData: null }),
+        candidateRow('http://h/b', 2026, { userData: userB }),
+      ]);
+
+      expect(errorLog).toHaveBeenCalledWith(
+        'PRMS push ERROR result 101: live author lookup failed',
+      );
+      expect(
+        resultPrmsSyncService.sync.mock.calls.map((call) => call[0]),
+      ).toEqual([202]);
+      expect(resultPrmsSyncService.sync.mock.calls[0][1].author).toEqual({
+        email: userB.email,
+        first_name: userB.first_name,
+        last_name: userB.last_name,
+      });
+      expect(pushLine(log)).toContain('ERROR=1');
+      expect(currentUser.clearSystemUser).toHaveBeenCalled();
+      expect(tipHandleRepository.liveAuthorFor).toHaveBeenCalledTimes(1);
     });
   });
 });
