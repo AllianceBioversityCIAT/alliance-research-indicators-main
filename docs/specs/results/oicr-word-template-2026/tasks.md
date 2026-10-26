@@ -6,7 +6,7 @@
 - **Owner:** STAR / ARI squad
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (approved; Judgment Day APPROVED, see ./judgment.md)
-- **Last updated:** 2026-10-23
+- **Last updated:** 2026-10-26
 
 ---
 
@@ -23,6 +23,7 @@
 | T-07 | Retire the WASM path: files, global script, dead API, dead env keys *(done; reversed by T-09, PV-1)* | client | S | T-04, T-06 | checklist |
 | T-09 | **PV-1** Restore the legacy WASM path for Portfolio 1 and route downloads by portfolio (service + button) | client | M | T-07 | full |
 | T-10 | **PV-1** Visibility for Portfolio 1 and 2; the link page resolves the portfolio before downloading | client | M | T-09 | full |
+| T-11 | **Validation R-1** A Portfolio 1 failure shows exactly one readable toast | client | S | T-10 | full |
 | T-08 | Baseline docs + HITL checks (Word 2026 and 2025, email link, timing, Dev download) | docs + both | S | T-01…T-07, T-09, T-10 | checklist |
 
 ```mermaid
@@ -37,6 +38,8 @@ graph TD
   T05[T-05 visibility]
   T07 --> T09[T-09 legacy restore + routing]
   T09 --> T10[T-10 visibility P1+P2 + page]
+  T10 --> T11[T-11 one toast on 2025 failure]
+  T11 --> T08
   T03 --> T08[T-08 docs + HITL]
   T05 --> T08
   T10 --> T08
@@ -310,7 +313,7 @@ graph TD
 
 - **Status:** done (PASS attempt 1, 2026-10-23 — see `execution.md`) · **Size:** M · **Dependencies:** T-04 · **Review:** `full` — auth routing and the login round trip
 - **Requirements covered:**
-  - R-OWT-009: login required, return with the same code, auto-download, navigate on success, loading, error without navigation, and the BUT for a 2025 link.
+  - R-OWT-009: login required, return with the same code, auto-download, navigate on success, loading, error without navigation, and ~~the BUT for a 2025 link~~ (superseded by PV-1: the 2025 link is owned by T-10).
   - R-OWT-010: redirect; missing parameter → error.
 - **Design refs:** §2.2 (routes, page rows), §6, D-OWT-10, P-12
 - **Scope:**
@@ -438,6 +441,34 @@ graph TD
   - [x] Full client suite green (Leader; 347/347 suites, 8093 tests).
 - **Skills:** `angular-developer`
 
+### T-11 — A Portfolio 1 failure shows exactly one readable toast (validation R-1)
+
+- **Status:** todo · **Size:** S · **Dependencies:** T-10 · **Review:** `full` — shared interceptor and the error UX
+- **Origin:** `validation-report.md` §6 FAIL / §11 R-1 (2026-10-26), owner direction "Corregir todo".
+- **Requirements covered:** R-OWT-008 ("one error toast", Portfolio 1 path); R-OWT-013 bullet 2 ("one error toast with the legacy error text").
+- **Design refs:** §16 (PV-1), §12 D-OWT-9 (the download owns its error UX), D-OWT-17; P-13, P-17.
+- **Defect:** `TP.get` resolves an HTTP error (`to-promise.service.ts:164-166`), so a failed `GET_OICRDetails` first gets the global interceptor toast; then `OicrLegacyDownloadService.getOicrDetails` (outside its `try`) throws a `TypeError` that reaches the button as a second toast. A failed 2025 template fetch (`WasmService.downloadTemplate`, HttpClient) does the same.
+- **Scope:**
+  - `http-error.interceptor.ts`: URL-scoped exclusions `oicr/details` (only reader is the legacy path, P-17) and `templates/2025_OICR_Template.docx`, beside `isOicrWordTemplateError`.
+  - `OicrDownloadService.download`, Portfolio 1 branch: a **thrown** error (not a `{ success: false }` result) becomes a fixed, user-readable message; a `{ success: false, error }` result keeps rejecting with its text.
+  - **No change** to `OicrLegacyDownloadService`, `WasmService` or `public/go/*` (R-OWT-013: legacy unchanged).
+- **Tests:**
+  - Interceptor spec: an error on `oicr/details` and on `…/templates/2025_OICR_Template.docx` → no toast; another URL → toast.
+  - Button spec **with `httpErrorInterceptor` registered** (`provideHttpClient(withInterceptors([...]))`, real `ApiService`/`ToPromiseService`/`OicrDownloadService`, real legacy service or one that performs the real `GET_OICRDetails`): a Portfolio 1 click whose `results/oicr/details/…` request is flushed with a 400 → **exactly one** toast, with the fixed message, not a `TypeError` text.
+  - Service spec: Portfolio 1, legacy throws → rejects with the fixed message.
+- **Verification:** changed specs; `npm run build`; `npx tsc -p tsconfig.spec.json --noEmit` (945 baseline); `npm run lint -- --quiet`. Full suite: Leader.
+- **Falsifier:**
+  - Remove the `oicr/details` exclusion → the one-toast button test red (2 toasts).
+  - Pass the thrown error through unmapped → the fixed-message assertion red.
+- **Red run:** observed red, quoted in `execution.md`, reverted.
+- **Disqualifier:** a toast test without the interceptor registered cannot see the double toast (the gap that hid R-1). A test that fakes `{ success: false }` does not exercise the thrown path.
+- **Consumers:** `http-error.interceptor.spec.ts`, `download-oicr-template.component.spec.ts`, `oicr-download.service.spec.ts`.
+- **Done criteria:**
+  - [ ] Specs green; falsifiers observed red.
+  - [ ] Build green.
+  - [ ] Full client suite green (Leader).
+- **Skills:** `angular-developer`, `error-handling-patterns`
+
 ### T-08 — Baseline docs and human checks
 
 - **Status:** in progress [~] — docs half PASS 2026-10-26; HITL on Dev open · **Size:** S · **Dependencies:** T-01…T-07, T-09, T-10 deployed to Dev · **Review:** `checklist` — doc edits plus quoted human evidence
@@ -464,7 +495,7 @@ graph TD
 - **Consumers:** none.
 - **Done criteria:**
   - [x] Docs updated, grep at 0 (3 → 0, see `execution.md`).
-  - [ ] Seven HITL observations quoted (item 3 counts the button and the link).
+  - [ ] Seven HITL observations quoted — six items, with item 3 counted twice (button and link). Item 1 is one observation covering both STAR-554 and STAR-626.
 - **Skills:** `cognitive-doc-design`
 
 ---
@@ -519,7 +550,8 @@ graph TD
 | R-OWT-011 · a 2026 download does not fetch the template or run the WASM | T-04 (button path), T-09 (no pre-load; P2 routing) |
 | R-OWT-011 · BUT `main.wasm` and S3 must NOT be requested | T-08 (network check) |
 | R-OWT-012 · baseline docs | T-08 |
-| R-OWT-013 · legacy restored unchanged, pinned to the 2025 file, one toast on failure | T-09 |
+| R-OWT-013 · legacy restored unchanged, pinned to the 2025 file | T-09 |
+| R-OWT-013 / R-OWT-008 · one readable toast on a Portfolio 1 failure | T-11 (validation R-1) |
 | R-OWT-013 · document identical to the pre-spec 2025 download | T-08 (Word) |
 | NFR-OWT-001 · ≤ 5 s | T-08 |
 | NFR-OWT-002 · handler errors logged | T-03 |
@@ -533,13 +565,13 @@ Every row names a task. No gap is discharged by citing another requirement.
 
 | # | Date | Risk / Blocker | Mitigation | Owner | Status |
 |---|---|---|---|---|---|
-| RB-1 | 2026-10-23 | P-22: the Dev server may not reach S3 | T-03 first step; Pivot if refuted | T-03 | open |
+| RB-1 | 2026-10-23 | P-22: the Dev server may not reach S3 | T-03 first step; Pivot if refuted | T-03 | closed 2026-10-23 by owner attestation ("no hay problema en el server de dev funciona bien"); re-confirmed by the T-08 Dev download |
 | RB-2 | 2026-10-23 | The Word repair prompt cannot be tested in CI | T-08 HITL on both real OICRs | owner | open |
 | RB-3 | 2026-10-23 | The server env var must exist before the client deploy | Rollout order in design §11 | owner | open |
 
 ## Done definition
 
-- [ ] All T-01…T-10 are `done`, each with a Reviewer PASS recorded in `execution.md`.
+- [ ] All T-01…T-11 are `done`, each with a Reviewer PASS recorded in `execution.md`.
 - [ ] The feature was exercised in the running product (T-08) **before** `/akili-validate` (KZ-007).
 - [ ] Coverage floors green (server 60 %, client floors).
 - [ ] Swagger documents the endpoint.

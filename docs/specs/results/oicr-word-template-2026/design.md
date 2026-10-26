@@ -38,8 +38,8 @@ On the client:
 | Serve a filled, faithful 2026 template from the server | R-OWT-001, 002, 004, 005, 007 |
 | Map STAR values onto the exact Word options | R-OWT-003 |
 | Fail loudly and never half-fill | R-OWT-006, NFR-OWT-002 |
-| Button for 2026 only, and an email link that survives login | R-OWT-008, 009, 010 |
-| One generation path: the client stops building documents | R-OWT-011, 012 |
+| ~~Button for 2026 only~~ Button for 2025 and 2026 (PV-1), and an email link that survives login | R-OWT-008, 009, 010, 013 |
+| ~~One generation path: the client stops building documents~~ Two paths chosen by portfolio: the server for 2026, the unchanged legacy client WASM for 2025 (PV-1) | R-OWT-011, 012, 013 |
 
 **Non-goals**
 
@@ -57,10 +57,12 @@ On the client:
 ```mermaid
 flowchart LR
   subgraph Client
-    B[download-oicr-template button] --> S[OicrDownloadService.download]
+    B[download-oicr-template button] --> S["OicrDownloadService.download(code, portfolio)"]
     R["/oicr/download/:resultCode (rolesGuard)"] --> P[OicrDownloadComponent] --> S
     L["/oicr/download?resultCode= (legacy)"] --> P
-    S --> A[ApiService.GET_OicrWordTemplate → TP.getBlob]
+    P -->|GET_Metadata → portfolio| S
+    S -->|portfolio 1| LG["OicrLegacyDownloadService → GET_OICRDetails + WasmService (2025 template)"]
+    S -->|portfolio 2| A[ApiService.GET_OicrWordTemplate → TP.getBlob]
   end
   A -->|JWT| C[ResultOicrController GET word-template/:resultCode]
   C --> W[OicrWordTemplateService]
@@ -98,10 +100,10 @@ Sibling `*.spec.ts` files are added for the engine, mapper, service and controll
 | Path | Change |
 |---|---|
 | `app/shared/services/api.service.ts` | **+ `GET_OicrWordTemplate(code)`** via `TP.getBlob`, **without** `useResultInterceptor`, so the download is always the live OICR (D-OWT-15) |
-| `app/shared/services/oicr-download.service.ts` | **Rewritten:** `download(code)` fetches the blob, saves it as `STAR_OICR_<code>_<yyyyMMdd>_<HHmm>.docx` in local time (today's name), and turns an error Blob into a message (D-9) |
+| `app/shared/services/oicr-download.service.ts` | **Rewritten** (routing added by PV-1, §16: `download(code, portfolioId)`, `1` → legacy, `2` → server): the server path fetches the blob, saves it as `STAR_OICR_<code>_<yyyyMMdd>_<HHmm>.docx` in local time (today's name), and turns an error Blob into a message (D-9) |
 | `app/shared/utils/download-blob.util.ts` | **New:** a shared `downloadBlob(blob, name)` (D-12) |
 | `app/shared/components/download-oicr-template/*` | Loses its WASM dependency (no `wasmLoaded` gating). Calls the service and shows an error toast on failure |
-| `app/shared/utils/oicr-template-download.util.ts` | Visibility: hidden **unless** the portfolio resolves to 2. The constant `OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED` is removed (D-11) |
+| `app/shared/utils/oicr-template-download.util.ts` | Visibility: hidden **unless** the portfolio resolves to ~~2~~ 1 or 2 (PV-1). The constant `OICR_TEMPLATE_DOWNLOAD_PORTFOLIO_2_ENABLED` is removed (D-11) |
 | `app/shared/interceptors/http-error.interceptor.ts` | **+ URL-scoped exclusion** `oicr/word-template`, beside `isAgrovocSearchError` (D-9) |
 | `app/app.routes.ts` | **+ `oicr/download/:resultCode`** with `canMatch: [rolesGuard]`, `data: { isLoggedIn: true }`. The existing `oicr/download` stays as the legacy entry (D-10) |
 | `app/pages/oicr-download/*` | Reads the code from the path. A legacy query code is navigated (`replaceUrl`) to the path form. Shows loading and error, and navigates to General Information only on success |
@@ -270,7 +272,7 @@ All of them go through `LoggerUtil`. Success adds nothing beyond the request log
 | Controller (server) | `StreamableFile` type and disposition · a missing result → 400 `Result not found` with **no** service/HttpService call (J-7; the getter throws in the handler, R-A-5) | Handler return |
 | Client | Visibility over P1/P2/unknown × published · service: file name, blob save, error message order (`errors` → `description` → generic; non-JSON body) · interceptor exclusion · page: path code, legacy redirect, error keeps the page · **routes config**: the new route has `canMatch: [rolesGuard]` and `data.isLoggedIn === true` (J-20) | Component/service/route specs (KZ-015: arrange the transition) |
 | Build gates | Server: `npm ls jszip @xmldom/xmldom` (both direct), `npm run build`. Client: `npm run build`, `npx tsc -p tsconfig.spec.json` (J-20) | Command exit + output |
-| HITL | Owner's checks, each quoted in `execution.md` (KZ-002):<br>· open STAR-554 and STAR-626 in Word (no repair prompt, "+" and dropdowns work, revisions visible)<br>· logged-out email-link round trip<br>· timing ≤ 5 s<br>· **one download from the deployed Dev server** (S3 egress, P-22) | Human |
+| HITL | Owner's checks, each quoted in `execution.md` (KZ-002):<br>· open STAR-554 and STAR-626 in Word (no repair prompt, "+" and dropdowns work, revisions visible)<br>· logged-out email-link round trip<br>· timing ≤ 5 s<br>· **one download from the deployed Dev server** (S3 egress, P-22)<br>· **PV-1:** a 2025 OICR (e.g. STAR-120) from the button and from its link opens in Word like the pre-spec 2025 document | Human |
 
 Coverage stays above the global 60 % (server) and the client floors.
 
@@ -326,7 +328,7 @@ One reviewer, one question per reversion: *"what does removing this break?"* Out
 
 | Measure | Estimate |
 |---|---|
-| Tasks | 8 (4 server, 4 client incl. docs/HITL) |
+| Tasks | 8 (3 server, 4 client, 1 docs + HITL) — 11 after PV-1 (T-09, T-10) and validation R-1 (T-11) |
 | LOC | ~1 400 added (≈ 700 server code + tests over the engine/mapper/drift guards, ≈ 450 client code + tests, ≈ 250 fixture-driven test helpers and docs), plus ≈ 1 600 text lines deleted (`main.go` 342, `wasm_exec.js` 575, WASM service and spec 351, old download service and spec 320) and the binary `main.wasm` (J-24) |
 | Review rounds | 12 (1.5 per task; the engine and mapper are the likely second rounds) |
 

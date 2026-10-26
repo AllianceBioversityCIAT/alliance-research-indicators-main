@@ -684,3 +684,16 @@
   - the owner's local quote "lo veo perfecto ambos agnos".
   
   Neither discharges a Dev clause.
+
+## Validation remediation — R-3 spec wording (Leader, 2026-10-26)
+
+- **Owner direction:** "Corregir todo" (AskUserQuestion after `/akili-validate`, which returned 1 FAIL, 8 BLOCKED and 3 WARN).
+- **R-1 (the FAIL):** became task **T-11**, added to `tasks.md` with an owner-directed remediation. It is dispatched to Cursor `grok-4.7-medium`, Orca `task_e46bb7cdf698` / `ctx_33df72bf8991`.
+- **R-3 (spec wording) edits:**
+  - `design.md` §1 goals (two rows struck and amended for PV-1);
+  - the §2 mermaid (legacy branch and `GET_Metadata` added);
+  - the §2.2 rows for `oicr-download.service.ts` and `oicr-template-download.util.ts` (PV-1 routing and the "1 or 2" rule);
+  - the §10 HITL row (the 2025 Word check added);
+  - §14 tasks ("3 server, 4 client, 1 docs + HITL", 11 after PV-1 and R-1);
+  - `tasks.md`: header date, RB-1 closed (owner attestation), the T-06 "BUT for a 2025 link" coverage struck in favour of T-10, and the T-08 HITL count clarified.
+- **HITL count correction:** the T-08 docs entry above lists "Word 2026 ×2". That pair is **one** observation (item 1 covers STAR-554 and STAR-626), so the count is seven, as `tasks.md` states. The earlier line is left as written; this note corrects it.
