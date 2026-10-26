@@ -145,7 +145,7 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 
 ### T-03 — Service: `TIP_SYNC` options, run author, no stored-alignment fallback
 
-- [ ] **Status:** pending · **Size:** M · **Dependencies:** T-01, T-02
+- [x] **Status:** done 2026-10-26 (PASS, `execution.md`) · **Size:** M · **Dependencies:** T-01, T-02
 - **Requirements covered:**
   - R-TPP-004: the `created_by` / `submitted_by` rows. *Missing mandatory value* names the first failing field. AND IT MUST NOT send `toc_mapping` from the stored alignment.
   - R-TPP-005 *Unknown submitter*: no PRMS call; the log reads the first failing field.
@@ -184,9 +184,9 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
   - `test/prms-sync.e2e-spec.ts`
 - **Review:** `full` — this is the shared engine entry point used by the STAR button.
 - **Done criteria:**
-  - [ ] New cases green; controller and service specs green unchanged.
-  - [ ] Falsifiers (a), (b) and (c) observed red and reverted.
-  - [ ] tsc and build are green.
+  - [x] New cases green; controller and service specs green unchanged.
+  - [x] Falsifiers (a), (b) and (c) observed red and reverted.
+  - [x] tsc and build are green.
 - **Skills:** `nestjs-expert`, `error-handling-patterns`, `tdd`.
 
 ---
