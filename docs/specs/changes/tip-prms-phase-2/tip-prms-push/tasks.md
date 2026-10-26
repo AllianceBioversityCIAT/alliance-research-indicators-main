@@ -273,7 +273,7 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 
 ### T-05 — Integration spec on real MySQL, then full gates
 
-- [ ] **Status:** pending · **Size:** M · **Dependencies:** T-04
+- [x] **Status:** done 2026-10-26 (PASS, `execution.md`; criterion 2 not met — pre-existing) · **Size:** M · **Dependencies:** T-04
 - **Requirements covered:**
   - R-TPP-003 on generated SQL: the snapshot reads `platform_code`.
   - R-TPP-002: `idsWithPrmsCode` returns only rows with a code.
@@ -308,9 +308,9 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 - **Consumers:** the full server suite, `test/result-prms-sync-claim-concurrency.integration-spec.ts`, `test/prms-platform-identity.integration-spec.ts`, `test/tip-versioning.integration-spec.ts`, `test/prms-sync.e2e-spec.ts`.
 - **Review:** `checklist` — test-only. The re-measure of the full suite is the Leader's own step (root `CLAUDE.md` §4.3).
 - **Done criteria:**
-  - [ ] The integration spec is green on the TEST container; falsifiers observed red and reverted.
-  - [ ] The full unit suite, the integration suite and the PRMS e2e are green, re-measured by the Leader with no worker active.
-  - [ ] tsc and build are green.
+  - [x] The integration spec is green on the TEST container; falsifiers observed red and reverted.
+  - [ ] The full unit suite, the integration suite and the PRMS e2e are green, re-measured by the Leader with no worker active. — **Not met, pre-existing (2026-10-26):** unit suite green (449/449, 4500/4500); 4 sibling integration suites and 2/5 `prms-sync` e2e cases fail identically at `534579d5` (see `execution.md` T-05).
+  - [x] tsc and build are green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
