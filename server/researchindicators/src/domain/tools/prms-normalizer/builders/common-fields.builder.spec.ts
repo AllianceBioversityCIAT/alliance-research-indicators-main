@@ -1250,4 +1250,35 @@ describe('CommonFieldsBuilder', () => {
       expect(data.external_reference).toBe(reference);
     });
   });
+
+  describe('optional description (DD-10)', () => {
+    it.each([null, '', '   '])(
+      'omits the description key when optionalDescription is true and the value is %j',
+      (description) => {
+        const data = builder.build(baseAggregate({ description }), {
+          optionalDescription: true,
+        });
+
+        expect('description' in data).toBe(false);
+      },
+    );
+
+    it('sends the description text when optionalDescription is true and the text is present', () => {
+      const data = builder.build(
+        baseAggregate({ description: 'A real TIP abstract' }),
+        { optionalDescription: true },
+      );
+
+      expect(data.description).toBe('A real TIP abstract');
+    });
+
+    it('still throws naming description when there is no override and the description is null', () => {
+      const aggregate = baseAggregate({ description: null });
+
+      expect(() => builder.build(aggregate)).toThrow(PrmsPayloadBuildError);
+      expect(() => builder.build(aggregate)).toThrow(
+        "Missing mandatory field 'description'",
+      );
+    });
+  });
 });

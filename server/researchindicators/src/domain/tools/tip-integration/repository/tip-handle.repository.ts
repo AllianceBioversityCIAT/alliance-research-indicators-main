@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, IsNull, Not } from 'typeorm';
+import { SecUser } from '../../../complementary-entities/secondary/user/dto/sec-user.dto';
 import { Result } from '../../../entities/results/entities/result.entity';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+import { SecUserEntity } from '../../../entities/users/entities/sec-user.entity';
 
 export interface TipHandleRow {
   result_id: number;
@@ -81,6 +84,52 @@ export class TipHandleRepository {
       },
     });
     return rows.map((row) => Number(row.result_id));
+  }
+
+  /**
+   * STAR user stored as created_by on the active TIP live row that shares
+   * this row's official code. Several live rows resolve to the highest
+   * result_id. A missing version row, official code, live row, created_by
+   * or user resolves to null. created_by is select-false on the entity,
+   * so the live lookup names it in select.
+   */
+  async liveAuthorFor(resultId: number): Promise<SecUser | null> {
+    const results = this.dataSource.getRepository(Result);
+    const version = await results.findOne({
+      select: { result_id: true, result_official_code: true },
+      where: { result_id: resultId },
+    });
+    if (version?.result_official_code == null) {
+      return null;
+    }
+
+    const live = await results.findOne({
+      select: { result_id: true, created_by: true },
+      where: {
+        platform_code: ReportingPlatformEnum.TIP,
+        is_snapshot: false,
+        is_active: true,
+        result_official_code: version.result_official_code,
+      },
+      order: { result_id: 'DESC' },
+    });
+    if (live?.created_by == null) {
+      return null;
+    }
+
+    const user = await this.dataSource.getRepository(SecUserEntity).findOne({
+      where: { sec_user_id: Number(live.created_by) },
+    });
+    if (user == null) {
+      return null;
+    }
+
+    const author = new SecUser();
+    author.sec_user_id = Number(user.sec_user_id);
+    author.email = user.email;
+    author.first_name = user.first_name ?? undefined;
+    author.last_name = user.last_name ?? undefined;
+    return author;
   }
 }
 

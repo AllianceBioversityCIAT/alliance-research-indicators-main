@@ -835,13 +835,16 @@ export class TipIntegrationService extends BaseApi {
       let errors = 0;
       for (const candidate of toSend) {
         try {
-          this._currentUser.setSystemUser(candidate.userData as SecUser, true);
+          const actor =
+            candidate.userData ??
+            (await this.tipHandleRepository.liveAuthorFor(candidate.resultId));
+          this._currentUser.setSystemUser(actor as SecUser, true);
           const synced = await this.resultPrmsSyncService.sync(
             candidate.resultId,
             {
               origin: 'TIP_SYNC',
               tocMapping: candidate.tocMapping,
-              author: authorForPush(candidate.userData),
+              author: authorForPush(actor),
             },
           );
           bumpPushOutcome(outcomes, synced.outcome);

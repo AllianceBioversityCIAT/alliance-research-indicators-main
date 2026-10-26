@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { DataSource, In, IsNull, Not } from 'typeorm';
 import { Result } from '../../../entities/results/entities/result.entity';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+import { SecUserEntity } from '../../../entities/users/entities/sec-user.entity';
 import { ResultPrmsSyncModule } from '../../../entities/result-prms-sync/result-prms-sync.module';
 import { TipIntegrationModule } from '../tip-integration.module';
 import {
@@ -365,6 +367,134 @@ describe('TipHandleRepository.idsWithPrmsCode', () => {
         result_id: In([10, 20, 30]),
         prms_result_code: Not(IsNull()),
       },
+    });
+  });
+});
+
+describe('TipHandleRepository.liveAuthorFor', () => {
+  const OFFICIAL_CODE = 28404;
+
+  function harness(options: {
+    version: unknown;
+    live?: unknown;
+    user?: unknown;
+  }) {
+    const findOne = jest.fn().mockResolvedValueOnce(options.version);
+    if (options.version != null) {
+      findOne.mockResolvedValueOnce(
+        options.live === undefined ? null : options.live,
+      );
+    }
+    const userFindOne = jest.fn().mockResolvedValue(options.user ?? null);
+    const getRepository = jest.fn().mockImplementation((entity: unknown) => {
+      if (entity === SecUserEntity) {
+        return { findOne: userFindOne };
+      }
+      return { findOne };
+    });
+    return {
+      repository: new TipHandleRepository({
+        getRepository,
+      } as unknown as DataSource),
+      findOne,
+      userFindOne,
+      getRepository,
+    };
+  }
+
+  it('returns null and does not look for a live row when the version row is missing', async () => {
+    const { repository, findOne, getRepository } = harness({ version: null });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toBeNull();
+
+    expect(findOne).toHaveBeenCalledTimes(1);
+    expect(findOne).toHaveBeenCalledWith({
+      select: { result_id: true, result_official_code: true },
+      where: { result_id: 50 },
+    });
+    expect(getRepository).not.toHaveBeenCalledWith(SecUserEntity);
+  });
+
+  it('returns null when the version row has no official code', async () => {
+    const { repository, findOne, getRepository } = harness({
+      version: { result_id: 50, result_official_code: null },
+    });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toBeNull();
+
+    expect(findOne).toHaveBeenCalledTimes(1);
+    expect(getRepository).not.toHaveBeenCalledWith(SecUserEntity);
+  });
+
+  it('returns null when no TIP live row shares the official code', async () => {
+    const { repository, findOne, getRepository } = harness({
+      version: { result_id: 50, result_official_code: OFFICIAL_CODE },
+      live: null,
+    });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toBeNull();
+
+    expect(findOne).toHaveBeenNthCalledWith(2, {
+      select: { result_id: true, created_by: true },
+      where: {
+        platform_code: ReportingPlatformEnum.TIP,
+        is_snapshot: false,
+        is_active: true,
+        result_official_code: OFFICIAL_CODE,
+      },
+      order: { result_id: 'DESC' },
+    });
+    expect(getRepository).not.toHaveBeenCalledWith(SecUserEntity);
+  });
+
+  it('returns null and does not load a user when the live row has no created_by', async () => {
+    const { repository, userFindOne, getRepository } = harness({
+      version: { result_id: 50, result_official_code: OFFICIAL_CODE },
+      live: { result_id: 9, created_by: null },
+    });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toBeNull();
+
+    expect(userFindOne).not.toHaveBeenCalled();
+    expect(getRepository).not.toHaveBeenCalledWith(SecUserEntity);
+  });
+
+  it('returns null when created_by does not match a user', async () => {
+    const { repository, userFindOne } = harness({
+      version: { result_id: 50, result_official_code: OFFICIAL_CODE },
+      live: { result_id: 9, created_by: 718 },
+      user: null,
+    });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toBeNull();
+
+    expect(userFindOne).toHaveBeenCalledWith({
+      where: { sec_user_id: 718 },
+    });
+  });
+
+  it('returns the STAR user stored on the TIP live row', async () => {
+    const { repository, userFindOne } = harness({
+      version: { result_id: 50, result_official_code: OFFICIAL_CODE },
+      live: { result_id: 9, created_by: '718' },
+      user: {
+        sec_user_id: '718',
+        email: 'live.author@cgiar.org',
+        first_name: 'Live',
+        last_name: 'Author',
+      },
+    });
+
+    await expect(repository.liveAuthorFor(50)).resolves.toEqual(
+      expect.objectContaining({
+        sec_user_id: 718,
+        email: 'live.author@cgiar.org',
+        first_name: 'Live',
+        last_name: 'Author',
+      }),
+    );
+    expect(userFindOne).toHaveBeenCalledWith({
+      where: { sec_user_id: 718 },
     });
   });
 });

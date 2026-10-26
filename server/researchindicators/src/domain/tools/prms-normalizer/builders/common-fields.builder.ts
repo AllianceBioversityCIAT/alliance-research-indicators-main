@@ -86,6 +86,20 @@ const requirePresent = (
   return value;
 };
 
+/**
+ * DD-10. A TIP sync may omit description when STAR has none. The key is
+ * absent, never "". Every other caller still requires the field.
+ */
+const descriptionField = (
+  value: string | null | undefined,
+  optional: boolean | undefined,
+): { description: string } | Record<string, never> => {
+  if (optional === true && (value == null || String(value).trim() === '')) {
+    return {};
+  }
+  return { description: requirePresent(value, 'description') };
+};
+
 const requireStaff = (
   staff: PrmsStaffSnapshot | null | undefined,
   field: string,
@@ -459,7 +473,10 @@ export class CommonFieldsBuilder {
    */
   build(
     aggregate: PrmsSyncAggregate,
-    overrides?: { tocMapping?: TipTocMappingDto },
+    overrides?: {
+      tocMapping?: TipTocMappingDto;
+      optionalDescription?: boolean;
+    },
   ): Record<string, unknown> {
     const leadCenter = resolveCenter(aggregate.primary_contract);
     const createdBy = requireStaff(aggregate.created_by, 'created_by');
@@ -512,7 +529,10 @@ export class CommonFieldsBuilder {
 
       lead_center: leadCenter,
       title: requirePresent(aggregate.title, 'title'),
-      description: requirePresent(aggregate.description, 'description'),
+      ...descriptionField(
+        aggregate.description,
+        overrides?.optionalDescription,
+      ),
       toc_mapping:
         overrides?.tocMapping != null
           ? buildTipTocMapping(overrides.tocMapping)

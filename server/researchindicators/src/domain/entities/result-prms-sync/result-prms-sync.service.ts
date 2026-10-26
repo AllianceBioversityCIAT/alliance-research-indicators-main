@@ -58,6 +58,20 @@ const tipAuthorStaff = (
   };
 };
 
+/**
+ * DD-11b. Matches requireStaff: a null snapshot, a blank email, or a
+ * blank name cannot be sent as lead_contact_person.
+ */
+const leadContactMissing = (staff: PrmsStaffSnapshot | null): boolean => {
+  if (!staff) {
+    return true;
+  }
+  if (staff.email == null || String(staff.email).trim() === '') {
+    return true;
+  }
+  return `${staff.first_name} ${staff.last_name}`.trim() === '';
+};
+
 export interface PrmsSyncResponseData {
   outcome: PrmsSyncOutcome;
   attempt_number: number | null;
@@ -260,6 +274,9 @@ export class ResultPrmsSyncService {
           submitted_date: aggregate.created_at,
           comment: null,
         };
+        if (staff != null && leadContactMissing(aggregate.lead_contact)) {
+          aggregate.lead_contact = staff;
+        }
         if (options.tocMapping == null) {
           throw new PrmsPayloadBuildError(
             `Missing mandatory field 'toc_mapping'`,
@@ -268,6 +285,7 @@ export class ResultPrmsSyncService {
         }
         payload = this.payloadBuilder.build(aggregate, {
           tocMapping: options.tocMapping,
+          optionalDescription: true,
         });
       } else {
         payload = this.payloadBuilder.build(aggregate);
