@@ -1,5 +1,7 @@
+import { HttpModule } from '@nestjs/axios';
 import { forwardRef, Module } from '@nestjs/common';
 import { ResultOicrService } from './result-oicr.service';
+import { OicrWordTemplateService } from './word-template/oicr-word-template.service';
 import { ResultOicrController } from './result-oicr.controller';
 import { ResultTagsModule } from '../result-tags/result-tags.module';
 import { ResultUsersModule } from '../result-users/result-users.module';
@@ -20,8 +22,14 @@ import { ResultStatusWorkflowModule } from '../result-status-workflow/result-sta
 
 @Module({
   controllers: [ResultOicrController],
-  providers: [ResultOicrService, MessageMicroservice, ResultOicrRepository],
+  providers: [
+    ResultOicrService,
+    MessageMicroservice,
+    ResultOicrRepository,
+    OicrWordTemplateService,
+  ],
   imports: [
+    HttpModule,
     ResultTagsModule,
     ResultUsersModule,
     LinkResultsModule,

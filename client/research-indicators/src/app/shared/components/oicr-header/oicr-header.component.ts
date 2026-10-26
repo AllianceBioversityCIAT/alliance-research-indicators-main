@@ -34,10 +34,10 @@ export class OicrHeaderComponent {
 
   isPublished = computed(() => Number(this.data?.status_id) === this.publishedStatusId);
 
-  /** When the download button applies by status, before the Portfolio 2 rule. */
+  /** When the download button applies by status, before the portfolio rule. */
   canDownloadTemplate = computed(() => this.showDownload && !this.isPublished());
 
-  /** Portfolio 2 has no OICR template yet, so the button is hidden there. */
+  /** Hidden unless the portfolio resolves to 1 or 2. */
   isTemplateDownloadHidden = computed(() => isOicrTemplateDownloadHidden(this.cache.currentMetadata()));
 
   showDownloadTemplate = computed(() => this.canDownloadTemplate() && !this.isTemplateDownloadHidden());

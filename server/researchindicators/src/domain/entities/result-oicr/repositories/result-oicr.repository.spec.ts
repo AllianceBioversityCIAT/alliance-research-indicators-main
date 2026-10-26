@@ -281,4 +281,178 @@ describe('ResultOicrRepository', () => {
       expect(out).toBe(rows);
     });
   });
+
+  describe('getWordTemplateData', () => {
+    const resultId = 554;
+
+    function sqlOf(sql: unknown): string {
+      return String(sql);
+    }
+
+    it('filters every source on is_active and binds the result id', async () => {
+      jest.spyOn(repository, 'query').mockResolvedValue([]);
+
+      await repository.getWordTemplateData(resultId);
+
+      const calls = (repository.query as jest.Mock).mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      for (const [sql, params] of calls) {
+        expect(sqlOf(sql)).toContain('is_active = 1');
+        expect(sqlOf(sql)).not.toContain(String(resultId));
+        expect(params).toEqual([resultId]);
+      }
+      const handle = calls
+        .map(([sql]) => sqlOf(sql))
+        .find((sql) => sql.includes('TEMP_result_external_oicrs'));
+      expect(handle).toContain("source = 'external'");
+      expect(handle).toContain("source = 'result'");
+      expect(handle).toContain('teo.handle_link');
+      expect(handle).toContain('ro_linked.cgspace_link');
+      expect(handle).toContain('LIMIT 1');
+    });
+
+    it('orders research areas by result_lever_id and filters lever role 3', async () => {
+      jest.spyOn(repository, 'query').mockResolvedValue([]);
+
+      await repository.getWordTemplateData(resultId);
+
+      const levers = (repository.query as jest.Mock).mock.calls
+        .map(([sql]) => sqlOf(sql))
+        .find((sql) => sql.includes('result_levers'));
+      expect(levers).toContain('ORDER BY rl.result_lever_id');
+      expect(levers).toContain('lever_role_id = 3');
+      expect(levers).toContain('is_active = 1');
+    });
+
+    it('filters the main project on is_primary and contract role 1', async () => {
+      jest.spyOn(repository, 'query').mockResolvedValue([]);
+
+      await repository.getWordTemplateData(resultId);
+
+      const project = (repository.query as jest.Mock).mock.calls
+        .map(([sql]) => sqlOf(sql))
+        .find((sql) => sql.includes('result_contracts'));
+      expect(project).toContain('is_primary = 1');
+      expect(project).toContain('contract_role_id = 1');
+      expect(project).toContain('is_active = 1');
+    });
+
+    it('takes the first main contact with user role 1', async () => {
+      jest.spyOn(repository, 'query').mockResolvedValue([]);
+
+      await repository.getWordTemplateData(resultId);
+
+      const contact = (repository.query as jest.Mock).mock.calls
+        .map(([sql]) => sqlOf(sql))
+        .find((sql) => sql.includes('result_users'));
+      expect(contact).toContain('user_role_id = 1');
+      expect(contact).toContain('is_active = 1');
+      expect(contact).toContain('LIMIT 1');
+    });
+
+    it('orders regions, countries and sub-nationals by name', async () => {
+      jest.spyOn(repository, 'query').mockResolvedValue([]);
+
+      await repository.getWordTemplateData(resultId);
+
+      const sqls = (repository.query as jest.Mock).mock.calls.map(([sql]) =>
+        sqlOf(sql),
+      );
+      expect(sqls.find((sql) => sql.includes('clarisa_regions'))).toContain(
+        'ORDER BY cr.name',
+      );
+      expect(sqls.find((sql) => sql.includes('clarisa_countries'))).toContain(
+        'ORDER BY cc.name',
+      );
+      expect(
+        sqls.find((sql) => sql.includes('result_countries_sub_nationals')),
+      ).toContain('ORDER BY sn.name');
+    });
+
+    it('coerces um49Code with Number() and keeps the query row order', async () => {
+      jest
+        .spyOn(repository, 'query')
+        .mockImplementation(async (sql: string) => {
+          if (sql.includes('result_countries_sub_nationals')) {
+            return [
+              { result_country_id: '9', name: 'Nairobi' },
+              { result_country_id: '9', name: 'Makueni' },
+            ];
+          }
+          if (sql.includes('clarisa_countries')) {
+            return [{ result_country_id: '9', name: 'Kenya' }];
+          }
+          if (sql.includes('clarisa_regions') || sql.includes('um49Code')) {
+            return [{ code: '202', name: 'Sub-Saharan Africa' }];
+          }
+          if (sql.includes('result_levers')) {
+            return [
+              { lever_id: '10', is_primary: 1, custom_lever_name: null },
+              { lever_id: '16', is_primary: 0, custom_lever_name: 'ignored' },
+            ];
+          }
+          if (sql.includes('result_contracts')) {
+            return [
+              {
+                agreement_id: 'A554',
+                description: 'STAR-554 primary contract',
+              },
+            ];
+          }
+          if (sql.includes('TEMP_result_external_oicrs')) {
+            return [{ handle_link: 'https://hdl.handle.net/10568/554' }];
+          }
+          if (sql.includes('result_users')) {
+            return [
+              {
+                first_name: 'Ana',
+                last_name: 'García',
+                position: 'Scientist',
+                center: 'CIAT',
+                email: 'ana.garcia@cgiar.org',
+              },
+            ];
+          }
+          if (sql.includes('FROM results')) {
+            return [
+              {
+                reporting_year: 2026,
+                title: 'STAR-554 outcome title',
+                geo_scope_id: '2',
+                comment_geo_scope: 'Eastern and western Africa focus',
+                elaboration: 'Line one',
+                tag_id: '2',
+              },
+            ];
+          }
+          return [];
+        });
+
+      const out = await repository.getWordTemplateData(resultId);
+
+      expect(out.regions).toEqual([{ code: 202, name: 'Sub-Saharan Africa' }]);
+      expect(out.reportingYear).toBe('2026');
+      expect(out.tagId).toBe(2);
+      expect(out.geoScopeId).toBe(2);
+      expect(out.previousHandle).toBe('https://hdl.handle.net/10568/554');
+      expect(out.mainProject).toEqual({
+        agreementId: 'A554',
+        description: 'STAR-554 primary contract',
+      });
+      expect(out.researchAreas).toEqual([
+        { leverId: 10, isPrimary: true, customName: null },
+        { leverId: 16, isPrimary: false, customName: 'ignored' },
+      ]);
+      expect(out.countries).toEqual([
+        { name: 'Kenya', subNationals: ['Nairobi', 'Makueni'] },
+      ]);
+      expect(out.contact).toEqual({
+        firstName: 'Ana',
+        lastName: 'García',
+        position: 'Scientist',
+        center: 'CIAT',
+        email: 'ana.garcia@cgiar.org',
+      });
+    });
+  });
 });

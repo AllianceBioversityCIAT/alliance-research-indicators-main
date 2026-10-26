@@ -171,7 +171,9 @@ describe('ResultStatusWorkflowRepository', () => {
 
     expect(out.customData.oicr_internal_code).toBe('O1');
     expect(out.customData.sharepoint_url).toBe('http://sp');
-    expect(out.customData.download_url).toContain('resultCode=88');
+    expect(out.customData.download_url).toBe(
+      'https://app.test/oicr/download/88',
+    );
   });
 
   it('getDataForRevisionResult uses submission_history join', async () => {

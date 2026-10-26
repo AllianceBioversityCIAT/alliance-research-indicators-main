@@ -1,8 +1,8 @@
 @if (onlyIcon) {
 <button type="button"
   class="flex h-[2.2rem] w-[2.125rem] cursor-pointer items-center justify-center rounded-[5px] border-0 bg-transparent transition-colors duration-150 hover:bg-[#f2f7fb] active:bg-[#035ba91a] disabled:cursor-not-allowed disabled:opacity-50"
-  [disabled]="!wasmLoaded() || processing()"
-  [pTooltip]="wasmLoaded() ? 'Download OICR Template' : 'Is not possible to download the template'"
+  [disabled]="processing()"
+  pTooltip="Download OICR Template"
   tooltipPosition="bottom" (click)="downloadOicrTemplate()">
   @if (processing()) {
   <i class="pi pi-spin pi-spinner text-[16px] text-[#035BA9]"></i>
@@ -22,9 +22,8 @@
   }
 </button>
 } @else {
-<p-button [disabled]="!wasmLoaded()" label="Download OICR Template" variant="outlined" [loading]="this.processing()"
-  size="small" [pTooltip]="this.wasmLoaded() ? '' : 'Is not possible to download the template'" tooltipPosition="left"
-  (onClick)="downloadOicrTemplate()">
+<p-button label="Download OICR Template" variant="outlined" [loading]="processing()"
+  size="small" (onClick)="downloadOicrTemplate()">
   <ng-template pTemplate="icon">
     <div>
       <svg width="18" height="18" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -104,7 +104,7 @@ describe('httpErrorInterceptor', () => {
 
     let errorCaught: any;
     interceptor(mockRequest, mockHandler).subscribe({
-      next: () => {},
+      next: () => { },
       error: error => {
         errorCaught = error;
       }
@@ -997,22 +997,110 @@ describe('httpErrorInterceptor', () => {
     });
   });
 
-  it('should fall back to the generic message when the error carries no usable detail', fakeAsync(() => {
-    const bare = { status: 500, message: '', error: null } as unknown as HttpErrorResponse;
-    mockHandler = jest.fn().mockReturnValue(throwError(() => bare));
+  it('should not toast an oicr/word-template error, and should toast an error on another URL', done => {
+    const oicrRequest = new HttpRequest('GET', 'http://test.com/api/results/oicr/word-template/554');
+    const oicrError = new HttpErrorResponse({
+      error: { errors: 'Result is not an OICR', description: 'BadRequestException' },
+      status: 400,
+      statusText: 'Bad Request'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => oicrError));
     mockCacheService.isLoggedIn.mockReturnValue(true);
-    mockCacheService.dataCache.mockReturnValue({});
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
     mockApiService.saveErrors.mockResolvedValue(undefined);
 
-    let errorCaught: unknown;
-    interceptor(mockRequest, mockHandler).subscribe({ error: e => (errorCaught = e) });
-    tick();
+    interceptor(oicrRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: oicrCaught => {
+        expect(oicrCaught).toBe(oicrError);
 
-    expect(errorCaught).toBe(bare);
-    expect(mockActionsService.showToast).toHaveBeenCalledWith({
-      detail: 'Something went wrong, please try again.',
-      severity: 'error',
-      summary: 'Error'
+        const otherRequest = new HttpRequest('GET', 'http://test.com/api/results/554/general-information');
+        const otherError = new HttpErrorResponse({
+          error: { errors: 'Upstream failed' },
+          status: 500,
+          statusText: 'Internal Server Error'
+        });
+        mockHandler = jest.fn().mockReturnValue(throwError(() => otherError));
+
+        interceptor(otherRequest, mockHandler).subscribe({
+          next: () => done.fail('Should have thrown an error'),
+          error: otherCaught => {
+            expect(otherCaught).toBe(otherError);
+            expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+            expect(mockActionsService.showToast).toHaveBeenCalledWith({
+              detail: 'Upstream failed',
+              severity: 'error',
+              summary: 'Error'
+            });
+            expect(mockActionsService.showToast).not.toHaveBeenCalledWith(expect.objectContaining({ detail: 'Result is not an OICR' }));
+            done();
+          }
+        });
+      }
     });
-  }));
+  });
+
+  it('should not toast an oicr/details or 2025 template error, and should toast an error on another URL', done => {
+    const detailsRequest = new HttpRequest('GET', 'http://test.com/api/results/oicr/details/554');
+    const detailsError = new HttpErrorResponse({
+      error: { errors: 'Result is inactive', description: 'BadRequestException' },
+      status: 400,
+      statusText: 'Bad Request'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => detailsError));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(detailsRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: detailsCaught => {
+        expect(detailsCaught).toBe(detailsError);
+
+        const templateRequest = new HttpRequest('GET', 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/templates/2025_OICR_Template.docx');
+        const templateError = new HttpErrorResponse({
+          error: 'Http failure',
+          status: 403,
+          statusText: 'Forbidden'
+        });
+        mockHandler = jest.fn().mockReturnValue(throwError(() => templateError));
+
+        interceptor(templateRequest, mockHandler).subscribe({
+          next: () => done.fail('Should have thrown an error'),
+          error: templateCaught => {
+            expect(templateCaught).toBe(templateError);
+            expect(mockActionsService.showToast).not.toHaveBeenCalled();
+
+            const otherRequest = new HttpRequest('GET', 'http://test.com/api/results/554/general-information');
+            const otherError = new HttpErrorResponse({
+              error: { errors: 'Upstream failed' },
+              status: 500,
+              statusText: 'Internal Server Error'
+            });
+            mockHandler = jest.fn().mockReturnValue(throwError(() => otherError));
+
+            interceptor(otherRequest, mockHandler).subscribe({
+              next: () => done.fail('Should have thrown an error'),
+              error: otherCaught => {
+                expect(otherCaught).toBe(otherError);
+                expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+                expect(mockActionsService.showToast).toHaveBeenCalledWith({
+                  detail: 'Upstream failed',
+                  severity: 'error',
+                  summary: 'Error'
+                });
+                done();
+              }
+            });
+          }
+        });
+      }
+    });
+  });
 });

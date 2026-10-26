@@ -71,7 +71,7 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     return isStarPdfReportEligibleFromResultId(this.cache.currentMetadata()?.indicator_id, resultId);
   });
   starPdfReportDisabled = computed(() => isStarInnDevPdfTemporarilyDisabled(this.cache.currentMetadata()?.indicator_id));
-  /** OICR results only, and not Portfolio 2 — that portfolio has no template yet. */
+  /** OICR results only, and only when the portfolio resolves to 1 or 2. */
   showOicrTemplateDownload = computed(() => {
     const metadata = this.cache.currentMetadata();
     return metadata?.indicator_id === OICR_INDICATOR_ID && !isOicrTemplateDownloadHidden(metadata);
