@@ -2,7 +2,7 @@
 
 - **Module:** tip-integration (server) — touches `shared/services/save-all-sections`, `shared/utils/query.service`, `sync-process-log`
 - **Spec id:** 2026-10-tip-versioning
-- **Status:** not-started
+- **Status:** done (2026-10-26)
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED round 1)
@@ -228,7 +228,7 @@ Every task is in the server package — run them **sequentially** (root `CLAUDE.
 
 ### T-08 — HITL on Dev and documentation
 
-- [ ] **Status:** todo · **Size:** S · **Dependencies:** T-07 (and the owner's push)
+- [x] **Status:** done · **Size:** S · **Dependencies:** T-07 (and the owner's push)
 - **Requirements covered:** P-13 / P-16 settlement; rollout §11 steps 2–3.
 - **Design refs:** §6, §11, P-13, P-16.
 - **Scope:** after the owner pushes to `dev` (pipeline applies the migration): owner takes the TIP-scoped backout snapshot (design §11 step 2), runs one full TIP sync **and then a second one** (R-TVR-008 live check, moved here from T-07 on 2026-10-23: run 2 must create 0 rows — compare TIP row counts before/after run 2) and the OpenSearch results reset; owner checks (1) a multi-year handle (e.g. `hdl.handle.net/10568/181023`) opens as one TIP result with its versions in the selector; (2) results lists / dashboards show TIP counts the owner considers right. Docs: `docs/trd/trd.md` §9.1 TIP row (one result per handle, versions per year); server child guide §8 if the owner wants the rule recorded.
