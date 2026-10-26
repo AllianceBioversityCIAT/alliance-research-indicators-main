@@ -100,7 +100,7 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 
 ### T-02 — Builder: TIP `toc_mapping` override
 
-- [ ] **Status:** pending · **Size:** S · **Dependencies:** none
+- [x] **Status:** done 2026-10-26 (PASS, `execution.md`) · **Size:** S · **Dependencies:** none
 - **Requirements covered:**
   - R-TPP-004 *Payload shape*: the TIP fields TIP gave; BUT it must NOT invent a value (the key is omitted).
   - The `toc_mapping` row of the R-TPP-004 table: seven keys.
@@ -136,9 +136,9 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
   The grep was run 2026-10-26 for `CommonFieldsBuilder|PayloadBuilder|payloadBuilder.build`.
 - **Review:** `checklist` — additive, an optional parameter, and the no-override path is pinned by existing tests.
 - **Done criteria:**
-  - [ ] The new cases and the existing builder tests are green.
-  - [ ] Falsifiers observed red and reverted.
-  - [ ] tsc is green.
+  - [x] The new cases and the existing builder tests are green.
+  - [x] Falsifiers observed red and reverted.
+  - [x] tsc is green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---
