@@ -265,13 +265,23 @@ export class CreateOicrFormComponent implements OnInit {
     { allowSignalWrites: true }
   );
 
-  private readonly publishedStatusId = 14;
+  /** Published (14) and Postponed (11): an admin can still open the full OICR form to edit everything. */
+  private readonly fullEditStatusIds = [14, 11];
 
   showEditPublishedOicrButton = computed(
     () =>
       this.createResultManagementService.editingOicr() &&
-      this.createResultManagementService.statusId() === this.publishedStatusId &&
+      this.fullEditStatusIds.includes(this.createResultManagementService.statusId() ?? -1) &&
       this.rolesService.isAdmin()
+  );
+
+  /** Reporting year shown in the OICR header: the OICR's own year, else the result's. */
+  oicrReportYear = computed(
+    () =>
+      this.createResultManagementService.createOicrBody().base_information?.year ||
+      this.createResultManagementService.year() ||
+      this.cache.currentMetadata()?.report_year ||
+      null
   );
 
   currentContract = computed(() => {

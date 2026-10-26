@@ -51,10 +51,13 @@ export class SubmitResultContentComponent {
       const currentStatusId = currentMetadata?.status_id;
       const resultStatus = currentMetadata?.result_status;
       const resultOfficialCode = currentMetadata?.result_official_code;
-      const headerWithCode =
+      const withCode =
         resultOfficialCode !== null && resultOfficialCode !== undefined
           ? { ...base, result_official_code: resultOfficialCode }
           : base;
+      // The year is always visible in the OICR header.
+      const reportYear = withCode.report_year ?? currentMetadata?.report_year;
+      const headerWithCode = reportYear ? { ...withCode, report_year: reportYear } : withCode;
       
       if (currentStatusId != null && resultStatus) {
         return {
