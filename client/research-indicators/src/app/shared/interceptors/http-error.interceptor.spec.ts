@@ -1042,4 +1042,65 @@ describe('httpErrorInterceptor', () => {
       }
     });
   });
+
+  it('should not toast an oicr/details or 2025 template error, and should toast an error on another URL', done => {
+    const detailsRequest = new HttpRequest('GET', 'http://test.com/api/results/oicr/details/554');
+    const detailsError = new HttpErrorResponse({
+      error: { errors: 'Result is inactive', description: 'BadRequestException' },
+      status: 400,
+      statusText: 'Bad Request'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => detailsError));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(detailsRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: detailsCaught => {
+        expect(detailsCaught).toBe(detailsError);
+
+        const templateRequest = new HttpRequest('GET', 'https://alliance-files-storage.s3.us-east-1.amazonaws.com/templates/2025_OICR_Template.docx');
+        const templateError = new HttpErrorResponse({
+          error: 'Http failure',
+          status: 403,
+          statusText: 'Forbidden'
+        });
+        mockHandler = jest.fn().mockReturnValue(throwError(() => templateError));
+
+        interceptor(templateRequest, mockHandler).subscribe({
+          next: () => done.fail('Should have thrown an error'),
+          error: templateCaught => {
+            expect(templateCaught).toBe(templateError);
+            expect(mockActionsService.showToast).not.toHaveBeenCalled();
+
+            const otherRequest = new HttpRequest('GET', 'http://test.com/api/results/554/general-information');
+            const otherError = new HttpErrorResponse({
+              error: { errors: 'Upstream failed' },
+              status: 500,
+              statusText: 'Internal Server Error'
+            });
+            mockHandler = jest.fn().mockReturnValue(throwError(() => otherError));
+
+            interceptor(otherRequest, mockHandler).subscribe({
+              next: () => done.fail('Should have thrown an error'),
+              error: otherCaught => {
+                expect(otherCaught).toBe(otherError);
+                expect(mockActionsService.showToast).toHaveBeenCalledTimes(1);
+                expect(mockActionsService.showToast).toHaveBeenCalledWith({
+                  detail: 'Upstream failed',
+                  severity: 'error',
+                  summary: 'Error'
+                });
+                done();
+              }
+            });
+          }
+        });
+      }
+    });
+  });
 });

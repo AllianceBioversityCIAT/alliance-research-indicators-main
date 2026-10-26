@@ -697,3 +697,43 @@
   - §14 tasks ("3 server, 4 client, 1 docs + HITL", 11 after PV-1 and R-1);
   - `tasks.md`: header date, RB-1 closed (owner attestation), the T-06 "BUT for a 2025 link" coverage struck in favour of T-10, and the T-08 HITL count clarified.
 - **HITL count correction:** the T-08 docs entry above lists "Word 2026 ×2". That pair is **one** observation (item 1 covers STAR-554 and STAR-626), so the count is seven, as `tasks.md` states. The earlier line is left as written; this note corrects it.
+
+### T-11 — A Portfolio 1 failure shows exactly one readable toast (validation R-1)
+
+- **Status:** PASS (attempt 1).
+- **Date:** 2026-10-26
+- **Effort:** medium.
+- **Review mode:** lens checklist (single reviewer). Task `Review: full`.
+
+#### Attempt 1
+
+- **Implementer:** Cursor `grok-4.7-medium`, Orca `run_704dd2d24af9` / `task_e46bb7cdf698` / `ctx_33df72bf8991` (retained until PASS, released after). Brief: `T-11-brief.md`, report: `T-11-report.md` (session scratchpad).
+- **Files changed:**
+  - `http-error.interceptor.ts` (+ spec): exclusions for `oicr/details` and `templates/2025_OICR_Template.docx`;
+  - `oicr-download.service.ts` (+ spec): in the Portfolio 1 branch, a thrown error now becomes `OICR_LEGACY_DOWNLOAD_ERROR` ("Could not download the 2025 OICR template. Please try again.");
+  - `download-oicr-template.component.spec.ts`: a button test with the real interceptor and the real legacy path.
+- **The legacy is unchanged:** `git diff --stat HEAD` over `oicr-legacy-download.service.ts`, `go/` and `public/go/` is empty (Leader).
+- **Falsifiers (verbatim, reverted):**
+  - With the `oicr/details` exclusion removed: `Expected number of calls: 1` / `Received number of calls: 2` at `expect(showToast).toHaveBeenCalledTimes(1)`.
+  - With the thrown error left unmapped: `Expected substring: "Could not download the 2025 OICR template. Please try again."` / `Received message: "Cannot read properties of undefined (reading 'other_projects')"`.
+- **Evidence re-run (Leader, inline, no worker active): VERIFIED.**
+  - 3 specs: `Tests: 52 passed, 52 total`.
+  - `npm run build`: exit 0. `npm run lint -- --quiet`: exit 0.
+  - Full client suite: `Test Suites: 1 failed, 346 passed, 347 total` · `Tests: 7896 passed`.
+    - The failed suite is `results-center.service.spec.ts`: `A jest worker process (pid=70680) was terminated by another process: signal=SIGSEGV`.
+    - Re-run in isolation: `Tests: 200 passed, 200 total`.
+    - 7896 + 200 = 8096, which is the prior 8093 plus 3 new tests.
+- **Reviewer:** `STATUS: PASS` (`akili-reviewer`, Claude opus).
+  - The disqualifier is met: the real interceptor and the real legacy path are wired in, and a real 400 reaches the unguarded `other_projects` read. `saveErrors` still runs for the excluded URLs.
+  - The exclusions are URL-scoped. `oicr/details` has one caller (`api.service.ts:1181`), and the template string matches only `wasm.service.ts:35`.
+  - `{success:false}` keeps its own text, and the Portfolio 2 and unknown branches are unchanged.
+- **ADVISORY (4R, recorded, non-gating):**
+  - READABILITY: when S3 fails on the 2025 template, the single toast reads `Error downloading template: [object Object]`. That is the legacy error text R-OWT-013 asks for, but it is not readable. A possible fix is to map that prefix in `OicrDownloadService`.
+  - RELIABILITY: on the Portfolio 1 thrown path, the server's message (e.g. "Result is inactive") is replaced by the fixed message. T-11 prescribes this.
+  - RISK (KZ-017): the template URL string lives in two places, `interceptor.ts:128` and `wasm.service.ts:35`. Nothing goes red if the template file is renamed. A cross-reference comment or a test would close that.
+- **runtime events:** none.
+- **spawns:**
+  - implementer (Cursor grok-4.7-medium): not reported by host, ended complete;
+  - reviewer: 16 calls, 63,166 tokens, ended complete.
+- **Requirements covered:** R-OWT-008 ("one error toast", Portfolio 1 path) and R-OWT-013 bullet 2.
+- **Final verification:** PASS.

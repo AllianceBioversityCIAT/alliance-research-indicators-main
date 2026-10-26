@@ -11,6 +11,9 @@ export const OICR_WORD_TEMPLATE_GENERIC_ERROR = 'Could not download the OICR tem
 /** Shown when the portfolio is neither 1 (legacy) nor 2 (server). */
 export const OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR = 'This OICR does not have a Word template download for its portfolio.';
 
+/** Shown when the Portfolio 1 (2025) path throws instead of returning `{ success: false }`. */
+export const OICR_LEGACY_DOWNLOAD_ERROR = 'Could not download the 2025 OICR template. Please try again.';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -20,7 +23,12 @@ export class OicrDownloadService {
 
   async download(code: string | number, portfolioId: number | null | undefined): Promise<void> {
     if (portfolioId === 1) {
-      const result = await this.legacy.generateAndDownload(code);
+      let result: Awaited<ReturnType<OicrLegacyDownloadService['generateAndDownload']>>;
+      try {
+        result = await this.legacy.generateAndDownload(code);
+      } catch {
+        throw new Error(OICR_LEGACY_DOWNLOAD_ERROR);
+      }
       if (!result.success) {
         throw new Error(result.error);
       }

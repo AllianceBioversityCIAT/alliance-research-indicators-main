@@ -122,6 +122,11 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
         // here would be the technical "Http failure…" message.
         const isOicrWordTemplateError = req.url.includes('oicr/word-template');
 
+        // Portfolio 1 owns its toast. `oicr/details` is read only by the legacy
+        // path, and the 2025 template fetch fails on the same click.
+        const isOicrLegacyDetailsError = req.url.includes('oicr/details');
+        const isOicrLegacyTemplateError = req.url.includes('templates/2025_OICR_Template.docx');
+
         if (
           cache.isLoggedIn() &&
           error.status !== 409 &&
@@ -132,7 +137,9 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           !isPoolFundingAlignmentValidationError &&
           !isPrmsSyncError &&
           !isAgrovocSearchError &&
-          !isOicrWordTemplateError
+          !isOicrWordTemplateError &&
+          !isOicrLegacyDetailsError &&
+          !isOicrLegacyTemplateError
         ) {
           // `error.error.errors` alone silently produced a blank toast for every
           // endpoint whose envelope carries `description` instead of `errors`

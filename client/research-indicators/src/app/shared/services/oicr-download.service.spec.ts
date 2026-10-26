@@ -1,6 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { OicrDownloadService, OICR_WORD_TEMPLATE_GENERIC_ERROR, OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR } from './oicr-download.service';
+import {
+  OicrDownloadService,
+  OICR_LEGACY_DOWNLOAD_ERROR,
+  OICR_WORD_TEMPLATE_GENERIC_ERROR,
+  OICR_WORD_TEMPLATE_UNKNOWN_PORTFOLIO_ERROR
+} from './oicr-download.service';
 import { OicrLegacyDownloadService } from './oicr-legacy-download.service';
 import { ApiService } from './api.service';
 
@@ -111,6 +116,13 @@ describe('OicrDownloadService', () => {
     legacyMock.generateAndDownload.mockResolvedValue({ success: false, error: 'X' });
 
     await expect(service.download(554, 1)).rejects.toThrow('X');
+    expect(apiMock.GET_OicrWordTemplate).not.toHaveBeenCalled();
+  });
+
+  it('maps a thrown legacy error to the fixed message', async () => {
+    legacyMock.generateAndDownload.mockRejectedValue(new TypeError("Cannot read properties of undefined (reading 'other_projects')"));
+
+    await expect(service.download(554, 1)).rejects.toThrow(OICR_LEGACY_DOWNLOAD_ERROR);
     expect(apiMock.GET_OicrWordTemplate).not.toHaveBeenCalled();
   });
 });

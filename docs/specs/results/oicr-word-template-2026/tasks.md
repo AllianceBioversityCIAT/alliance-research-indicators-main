@@ -443,7 +443,7 @@ graph TD
 
 ### T-11 — A Portfolio 1 failure shows exactly one readable toast (validation R-1)
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-10 · **Review:** `full` — shared interceptor and the error UX
+- **Status:** done (PASS attempt 1, 2026-10-26 — see `execution.md`) · **Size:** S · **Dependencies:** T-10 · **Review:** `full` — shared interceptor and the error UX
 - **Origin:** `validation-report.md` §6 FAIL / §11 R-1 (2026-10-26), owner direction "Corregir todo".
 - **Requirements covered:** R-OWT-008 ("one error toast", Portfolio 1 path); R-OWT-013 bullet 2 ("one error toast with the legacy error text").
 - **Design refs:** §16 (PV-1), §12 D-OWT-9 (the download owns its error UX), D-OWT-17; P-13, P-17.
@@ -464,9 +464,9 @@ graph TD
 - **Disqualifier:** a toast test without the interceptor registered cannot see the double toast (the gap that hid R-1). A test that fakes `{ success: false }` does not exercise the thrown path.
 - **Consumers:** `http-error.interceptor.spec.ts`, `download-oicr-template.component.spec.ts`, `oicr-download.service.spec.ts`.
 - **Done criteria:**
-  - [ ] Specs green; falsifiers observed red.
-  - [ ] Build green.
-  - [ ] Full client suite green (Leader).
+  - [x] Specs green; falsifiers observed red.
+  - [x] Build green.
+  - [x] Full client suite green (Leader; 7896 + 200 isolated re-run after a runner SIGSEGV).
 - **Skills:** `angular-developer`, `error-handling-patterns`
 
 ### T-08 — Baseline docs and human checks
