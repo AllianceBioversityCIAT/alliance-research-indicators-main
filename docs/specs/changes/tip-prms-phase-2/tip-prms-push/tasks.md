@@ -44,7 +44,7 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
 
 ### T-01 — Gate: TIP equivalences, only for the TIP sync
 
-- [ ] **Status:** pending · **Size:** S · **Dependencies:** none
+- [x] **Status:** done 2026-10-26 (PASS, `execution.md`) · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-TPP-003, all five scenarios:
   - *Eligible TIP KP* — the gate allows it.
   - *TIP KP with the section not green* — refused, recorded `REFUSED_BY_STAR`.
@@ -90,10 +90,10 @@ Every task is in the server package, so run them **sequentially** (root `CLAUDE.
   The grep was run 2026-10-26 over `src` and `test`, `*spec.ts`, for `SyncGateSnapshot|evaluateSyncGate|loadGateSnapshot|indicator_mappable|Knowledge Product and OICR`.
 - **Review:** `full` — this is the shared gate on STAR's critical path.
 - **Done criteria:**
-  - [ ] The new cases and every existing gate test are green.
-  - [ ] Falsifiers (a) and (b) were observed red and reverted.
-  - [ ] Entry order, statuses, messages and `persistsRow` are unchanged (diff reviewed).
-  - [ ] tsc and build are green.
+  - [x] The new cases and every existing gate test are green.
+  - [x] Falsifiers (a) and (b) were observed red and reverted.
+  - [x] Entry order, statuses, messages and `persistsRow` are unchanged (diff reviewed).
+  - [x] tsc and build are green.
 - **Skills:** `nestjs-expert`, `tdd`.
 
 ---

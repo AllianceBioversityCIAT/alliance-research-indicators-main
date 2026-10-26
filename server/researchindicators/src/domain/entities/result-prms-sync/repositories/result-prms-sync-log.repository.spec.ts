@@ -633,6 +633,22 @@ describe('ResultPrmsSyncLogRepository', () => {
       policy_type_id: null,
     };
 
+    it('loadGateSnapshot selects r.platform_code and maps it, and does not set origin', async () => {
+      query.mockResolvedValueOnce([
+        {
+          ...snapshotRow,
+          platform_code: 'TIP',
+        },
+      ]);
+
+      const snapshot = await repository.loadGateSnapshot(555);
+
+      const selectSql = query.mock.calls[0][0] as string;
+      expect(selectSql).toContain('r.platform_code');
+      expect(snapshot.platform_code).toBe('TIP');
+      expect(snapshot.origin).toBeUndefined();
+    });
+
     it('loadGateSnapshot selects r.report_year_id and sets reporting_year from the resolver', async () => {
       resolveYear.mockResolvedValue(2027);
       query.mockResolvedValueOnce([

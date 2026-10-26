@@ -173,6 +173,7 @@ export class ResultPrmsSyncLogRepository {
         r.result_status_id,
         r.indicator_id,
         r.report_year_id,
+        r.platform_code,
         pool_funding_alignment_validation(r.result_id) AS alignment_green,
         ac.agreement_id,
         ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
@@ -227,6 +228,7 @@ export class ResultPrmsSyncLogRepository {
       report_year:
         row.report_year_id == null ? null : Number(row.report_year_id),
       reporting_year: reportingYear,
+      platform_code: platformCodeOf(row),
     };
   }
 
