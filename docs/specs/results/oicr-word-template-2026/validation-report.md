@@ -176,6 +176,15 @@ Result: WARN, pending archive sync.
 | R-3 | WARN | Spec wording: strike or amend design §1 goals, the §2.2 util and service rows, the mermaid, the §10 HITL row; tasks.md header date, T-06 coverage, RB-1 status, the HITL count, and design §14 "4 server" | Leader (spec edit, with correction closure) |
 | R-4 | WARN | Server child guide: `word-template/` and `ARI_OICR_TEMPLATE_URL`; CodeGraph re-index | `/akili-archive` |
 
+### Remediation status (2026-10-26, after the owner chose "Corregir todo")
+
+| # | Status |
+|---|---|
+| R-1 | **Fixed** by T-11 (`7fb30187`), Reviewer PASS, falsifier `Expected 1 / Received 2` observed red |
+| R-2 | **Open:** owner HITL on Dev |
+| R-3 | **Applied** (`06e131d0`); forward sweep clean |
+| R-4 | Pending `/akili-archive` |
+
 ## 12. Archive Readiness Recommendation
 
 **Not ready.** Archive after:
