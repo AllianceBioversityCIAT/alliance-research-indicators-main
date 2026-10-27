@@ -234,8 +234,7 @@ export class ClarisaProjectsService {
     const now = Date.now();
     const phase = await this.reportingYearResolver.resolve();
     if (
-      this.cache &&
-      this.cache.phase === phase &&
+      this.cache?.phase === phase &&
       now - this.cache.fetchedAt < this.TTL_MS
     ) {
       return this.cache.data;
@@ -267,7 +266,7 @@ export class ClarisaProjectsService {
 
       return data;
     } catch (err) {
-      if (this.cache && this.cache.phase === phase) {
+      if (this.cache?.phase === phase) {
         this.logger.warn(
           `[ClarisaProjectsService] upstream error; serving stale cache (age=${Math.round(
             (now - this.cache.fetchedAt) / 1000,

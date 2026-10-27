@@ -287,10 +287,10 @@ export class StarResultsExportRepository {
   ): Record<string, unknown>[] {
     const byId = new Map<string, Record<string, unknown>>();
     for (const row of phase3Rows) {
-      byId.set(String(row.result_id), row);
+      byId.set(String(row.result_id as number | string), row);
     }
     return phase2Rows.map((row) => {
-      const devRow = byId.get(String(row.result_id));
+      const devRow = byId.get(String(row.result_id as number | string));
       const merged: Record<string, unknown> = { ...row };
       for (const column of STAR_INNOVATION_DEV_RAW_COLUMNS) {
         merged[column.key] = devRow
