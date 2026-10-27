@@ -61,9 +61,9 @@ export class SubmissionService {
     if (this.cache.isExternalResult()) {
       return false;
     }
-    // OICR Published (14) and Postponed (11): only an admin can edit the full form, which they
-    // reach through "Edit all OICR metadata" in the OICR modal.
-    if ((statusId === 14 || statusId === 11) && this.rolesService.isAdmin()) {
+    // OICR Published (14), Postponed (11) and Not Accepted (15): only an admin can edit the full
+    // form, which they reach through "Edit all OICR metadata" in the OICR modal.
+    if ((statusId === 14 || statusId === 11 || statusId === 15) && this.rolesService.isAdmin()) {
       return true;
     }
     const hasEditableStatus = editableStatuses.includes(statusId);
