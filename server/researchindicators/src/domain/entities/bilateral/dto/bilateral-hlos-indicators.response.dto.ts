@@ -20,9 +20,9 @@
 //   - `result_type` + `allowed_levels` are computed server-side ONLY, via
 //     `utils/toc-level-rules.util.ts` (single source of truth, D-V2-3).
 //     `allowed_levels: []` ⇒ `catalogs: []` and zero upstream calls.
-//   - `version_locked` = result's live version year !== MAPPABLE_LIVE_VERSION
-//     (2026, D-V2-7). Catalogs are still returned when locked — the FE
-//     renders the locked state (R-BIL-097).
+//   - `version_locked` = result's live version year !== the configured
+//     reporting year (`app_config.ARI_PRMS_SYNC`). Catalogs are still
+//     returned when locked — the FE renders the locked state (R-BIL-097).
 //   - Every top-level field is present in EVERY response variant, including
 //     unmapped (`mapping_status: 'unmapped'`, `catalogs: []`).
 //   - An upstream `{"response":[]}` for an (SP, level) is a VALID empty
@@ -55,7 +55,10 @@ export class BilateralTocCatalogIndicator {
   @ApiProperty({ type: String, nullable: true, example: '10' })
   target_value: string | null;
 
-  @ApiProperty({ example: 2026, description: 'MAPPABLE_LIVE_VERSION (2026)' })
+  @ApiProperty({
+    example: 2026,
+    description: 'Configured reporting year (`app_config.ARI_PRMS_SYNC`).',
+  })
   target_year: number;
 }
 
@@ -119,7 +122,11 @@ export class BilateralHlosIndicatorsResponse {
   @ApiProperty({ enum: TOC_LEVELS, isArray: true, example: ['OUTPUT'] })
   allowed_levels: TocLevel[];
 
-  @ApiProperty({ example: false })
+  @ApiProperty({
+    example: false,
+    description:
+      'True when report_year_id differs from the configured reporting year (`app_config.ARI_PRMS_SYNC`).',
+  })
   version_locked: boolean;
 
   // One entry per SP, in deterministic SP order.

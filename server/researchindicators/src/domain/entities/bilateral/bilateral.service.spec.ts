@@ -22,6 +22,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { UpdatePoolFundingAlignmentDto } from './dto/update-pool-funding-alignment.dto';
@@ -65,6 +66,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   // T-01 (R-BIL-125 AC.4) — named so the cascade-pin tests below can assert
   // deactivation calls; behavior is unchanged (still a bare jest.fn()).
   const deactivateForSps = jest.fn();
+  const resolveReportingYear = jest.fn();
 
   // Mimic TypeORM's actual save: echo back the payload (merged with an id)
   // so `savedMapping` carries the lever_code / indicator_code / indicator_type
@@ -106,6 +108,8 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
   beforeEach(async () => {
     transaction.mockImplementation(async (cb) => cb(fakeManager));
     findActiveTocRows.mockResolvedValue([]);
+    resolveReportingYear.mockReset();
+    resolveReportingYear.mockResolvedValue(2026);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -187,6 +191,10 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
           // tests can assert the upstream client is NEVER touched.
           provide: TocIntegrationService,
           useValue: { getTocResults, getTocResultsForSps },
+        },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: resolveReportingYear },
         },
         { provide: BilateralProjectMappingService, useValue: {} },
       ],
@@ -277,8 +285,11 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
         // Null until the result syncs; the field is ALWAYS present on the response.
         prms_result_code: null,
         is_read_only: false,
+        display_only: false,
         // T-07 (R-BIL-096): both fields ALWAYS present on the response.
         version_locked: false,
+        has_pool_funding_data: true,
+        reporting_year: 2026,
         toc_alignments: [],
       });
     });
@@ -330,6 +341,243 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.getAlignment(999, '999', user),
       ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    // R-PRY-007 (amended 2026-10-08) — display-only read for a non-eligible
+    // result that still carries a record. Expected values come from the spec
+    // matrix, not recomputed from the service.
+    describe('display_only (R-PRY-007)', () => {
+      const ctx = (overrides: Record<string, unknown> = {}) => ({
+        result_id: 34283,
+        result_official_code: 20081,
+        is_pool_funding_contributor: false,
+        is_synced_to_prms: false,
+        is_snapshot: false,
+        platform_code: 'STAR',
+        report_year_id: 2025,
+        prms_result_code: null,
+        ...overrides,
+      });
+      const alignmentRow = {
+        id: 1,
+        result_id: 34283,
+        has_contribution: true,
+        selected_levers: [],
+        sp_roles: [{ sp_code: 'SP05', sp_role: 'PRIMARY' }],
+      };
+      // Non-empty on purpose: an empty ToC cannot tell the gate apart.
+      const tocRow = {
+        id: 10,
+        sp_code: 'SP05',
+        aligns_with_toc: true,
+        level: 'OUTPUT',
+        toc_result_id: 7220,
+        indicator_id: null,
+        quantitative_contribution: null,
+      };
+
+      beforeEach(() => {
+        resolveReportingYear.mockResolvedValue(2026);
+        findAllCatalog.mockResolvedValue([
+          {
+            official_code: 'SP05',
+            name: 'SP Five',
+            category: 'Science programs',
+            color: '#000000',
+            icon_key: 'SP05',
+          },
+        ]);
+      });
+
+      it('eligible live: data returned, not display_only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({ is_pool_funding_contributor: true, report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBe(true);
+        expect(out.toc_alignments).toHaveLength(1);
+        expect(out.is_read_only).toBe(false);
+      });
+
+      it('STAR-20081: non-eligible snapshot, unsynced, SP05/7220 -> display_only with data, ToC, read-only', async () => {
+        findContext.mockResolvedValueOnce(
+          ctx({
+            is_snapshot: 1,
+            is_synced_to_prms: 0,
+            prms_result_code: 28663,
+          }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.eligible).toBe(false);
+        expect(out.display_only).toBe(true);
+        expect(out.has_contribution).toBe(true);
+        expect(out.selected_science_programs).toEqual([
+          expect.objectContaining({ code: 'SP05', role: 'PRIMARY' }),
+        ]);
+        expect(out.toc_alignments).toEqual([
+          expect.objectContaining({
+            sp_code: 'SP05',
+            level: 'OUTPUT',
+            toc_result_id: 7220,
+          }),
+        ]);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible snapshot without a PRMS code or sync is still display_only (isSnapshot alone)', async () => {
+        findContext.mockResolvedValueOnce(ctx({ is_snapshot: 1 }));
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(true);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible live with a PRMS code: display_only and read-only', async () => {
+        findContext.mockResolvedValueOnce(ctx({ prms_result_code: 28663 }));
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(true);
+        expect(out.has_contribution).toBe(true);
+        expect(out.is_read_only).toBe(true);
+      });
+
+      it('non-eligible live, no code, unsynced: data hidden, not display_only', async () => {
+        findContext.mockResolvedValueOnce(ctx());
+        findActiveAlignment.mockResolvedValueOnce(alignmentRow);
+        findActiveTocRows.mockResolvedValueOnce([tocRow]);
+
+        const out = await service.getAlignment(34283, '20081', user);
+
+        expect(out.display_only).toBe(false);
+        expect(out.has_contribution).toBeNull();
+        expect(out.selected_science_programs).toEqual([]);
+        expect(out.toc_alignments).toEqual([]);
+        expect(out.is_read_only).toBe(false);
+      });
+    });
+
+    describe('reporting-year flags (R-PRY-002, R-PRY-006)', () => {
+      const flagContext = (overrides: Record<string, unknown> = {}) => ({
+        result_id: 19792,
+        result_official_code: 19792,
+        is_pool_funding_contributor: true,
+        is_synced_to_prms: false,
+        platform_code: 'STAR',
+        report_year_id: 2026,
+        prms_result_code: null,
+        ...overrides,
+      });
+
+      it('version_locked is false for a 2026 result when the configured year is 2026', async () => {
+        resolveReportingYear.mockResolvedValue(2026);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(false);
+        expect(out.reporting_year).toBe(2026);
+      });
+
+      it('version_locked is true for a 2026 result when the configured year is 2027', async () => {
+        resolveReportingYear.mockResolvedValue(2027);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2026 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(true);
+        expect(out.reporting_year).toBe(2027);
+      });
+
+      it('version_locked is false for a 2027 result when the configured year is 2027', async () => {
+        resolveReportingYear.mockResolvedValue(2027);
+        findContext.mockResolvedValueOnce(
+          flagContext({ report_year_id: 2027 }),
+        );
+        findActiveAlignment.mockResolvedValueOnce(null);
+
+        const out = await service.getAlignment(19792, '19792', user);
+
+        expect(out.version_locked).toBe(false);
+        expect(out.reporting_year).toBe(2027);
+      });
+
+      it.each([
+        {
+          label: 'null contribution, unsynced, no code',
+          hasContribution: null,
+          synced: false,
+          code: null,
+          expected: false,
+        },
+        {
+          label: 'false contribution, unsynced, no code',
+          hasContribution: false,
+          synced: false,
+          code: null,
+          expected: true,
+        },
+        {
+          label: 'null contribution, synced, no code',
+          hasContribution: null,
+          synced: true,
+          code: null,
+          expected: true,
+        },
+        {
+          label: 'null contribution, unsynced, code 9746',
+          hasContribution: null,
+          synced: false,
+          code: 9746,
+          expected: true,
+        },
+      ])(
+        'has_pool_funding_data is $expected when $label',
+        async ({ hasContribution, synced, code, expected }) => {
+          findContext.mockResolvedValueOnce(
+            flagContext({
+              is_synced_to_prms: synced,
+              prms_result_code: code,
+            }),
+          );
+          findActiveAlignment.mockResolvedValueOnce(
+            hasContribution === null
+              ? null
+              : {
+                  id: 1,
+                  result_id: 19792,
+                  has_contribution: hasContribution,
+                  selected_levers: [],
+                  sp_roles: [],
+                },
+          );
+
+          const out = await service.getAlignment(19792, '19792', user);
+
+          expect(out.has_pool_funding_data).toBe(expected);
+          expect(out.reporting_year).toBe(2026);
+        },
+      );
     });
 
     // -------------------------------------------------------------------------
@@ -1014,24 +1262,27 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       findContext.mockResolvedValueOnce(eligibleContext());
       findActiveAlignment.mockResolvedValueOnce(null);
 
-      // R-BIL-123 AC.2 (PATCH half — Reviewer FAIL, T-08 attempt 2). The
-      // describe-level `beforeEach` mocks `getAlignment` to `{}`, so this
-      // override gives it a REAL role-bearing shape instead, then the
-      // assertion below reads `updateAlignment`'s OWN return value. That is
-      // what makes AC.2 falsifiable: if anything between `const response =
-      // await this.getAlignment(...)` and `updateAlignment`'s `return
-      // response` (bilateral.service.ts:869-876) drops or rewrites a field
-      // — e.g. stripping `role` off `selected_science_programs` — this
-      // assertion goes red. The two-read test below never calls
-      // `updateAlignment` at all, so it cannot see that defect (see its
-      // comment).
-      jest.spyOn(service, 'getAlignment').mockResolvedValueOnce({
-        result_code: '19792',
-        selected_science_programs: [
-          { code: 'SP06', role: 'PRIMARY' },
-          { code: 'SP09', role: 'CONTRIBUTING' },
-        ],
-      } as never);
+      // R-BIL-123 AC.2 (PATCH half). updateAlignment returns the private
+      // `buildAlignment` read-back (it no longer re-enters `getAlignment`,
+      // so the year resolved for the write is the year on the read). This
+      // override gives that read-back a role-bearing shape, then the
+      // assertion below reads `updateAlignment`'s OWN return value. If
+      // anything between the `buildAlignment` call and the return drops or
+      // rewrites a field — e.g. stripping `role` — this assertion goes red.
+      jest
+        .spyOn(
+          service as unknown as {
+            buildAlignment: () => Promise<unknown>;
+          },
+          'buildAlignment',
+        )
+        .mockResolvedValueOnce({
+          result_code: '19792',
+          selected_science_programs: [
+            { code: 'SP06', role: 'PRIMARY' },
+            { code: 'SP09', role: 'CONTRIBUTING' },
+          ],
+        });
 
       const dto: UpdatePoolFundingAlignmentDto = {
         has_contribution: true,
@@ -1637,6 +1888,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       result_id: 19792,
       result_official_code: 19792,
       version_id: 1,
+      report_year_id: 2026,
       is_pool_funding_contributor: true,
       is_synced_to_prms: false,
       platform_code: 'STAR',
@@ -1729,6 +1981,7 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       result_id: 19792,
       result_official_code: 19792,
       version_id: 1,
+      report_year_id: 2026,
       is_pool_funding_contributor: true,
       is_synced_to_prms: false,
       platform_code: 'STAR',
@@ -1769,6 +2022,109 @@ describe('BilateralService — canonical coverage (T-15.6)', () => {
       await expect(
         service.deleteContribution(19792, '19792', 'IND-001', user, 'SP01'),
       ).rejects.toBeInstanceOf(NotFoundException);
+      expect(transaction).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-04 / R-PRY-004
+  // Contribution POST and PATCH share upsertContribution; DELETE is
+  // deleteContribution. Both enter through getEditableContributionContext.
+  // ---------------------------------------------------------------------------
+  describe('contribution writes — reporting-year lock (R-PRY-004)', () => {
+    const lockedContext = {
+      result_id: 19792,
+      result_official_code: 19792,
+      version_id: 1,
+      report_year_id: 2025,
+      is_pool_funding_contributor: true,
+      is_synced_to_prms: false,
+      platform_code: 'STAR',
+    };
+    const alignment = {
+      id: 1,
+      result_id: 19792,
+      has_contribution: true,
+      selected_levers: [{ lever_code: 'SP01', lever_name: 'SP01' }],
+    };
+
+    async function expectYearLocked(run: () => Promise<unknown>) {
+      let thrown: HttpException | undefined;
+      try {
+        await run();
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+      expect(thrown).toBeInstanceOf(ConflictException);
+      const response = thrown!.getResponse() as {
+        message: { code: string };
+      };
+      expect(response.message.code).toBe('pool_funding_year_locked');
+      expect(fakeRepo.save).not.toHaveBeenCalled();
+      expect(transaction).not.toHaveBeenCalled();
+    }
+
+    it.each(['POST', 'PATCH'])(
+      '%s contribution on a 2025 result → 409 pool_funding_year_locked',
+      async () => {
+        findContext.mockResolvedValueOnce(lockedContext);
+        findActiveAlignment.mockResolvedValueOnce(alignment);
+        findActiveMapping.mockResolvedValueOnce(null);
+
+        await expectYearLocked(() =>
+          service.upsertContribution(
+            19792,
+            '19792',
+            'IND-001',
+            { indicator_type: 'NOOP', narrative: 'x' } as never,
+            user,
+            'SP01',
+          ),
+        );
+      },
+    );
+
+    it('DELETE contribution on a 2025 result → 409 pool_funding_year_locked', async () => {
+      findContext.mockResolvedValueOnce(lockedContext);
+      findActiveAlignment.mockResolvedValueOnce(alignment);
+      findActiveMapping.mockResolvedValueOnce({
+        id: 7,
+        result_id: 19792,
+        lever_code: 'SP01',
+        indicator_code: 'IND-001',
+        indicator_type: 'NOOP',
+      });
+
+      await expectYearLocked(() =>
+        service.deleteContribution(19792, '19792', 'IND-001', user, 'SP01'),
+      );
+    });
+
+    it('PRMS-sourced 2025 contribution keeps the PRMS 409 (source gate first)', async () => {
+      findContext.mockResolvedValueOnce({
+        ...lockedContext,
+        platform_code: 'PRMS',
+      });
+
+      let thrown: HttpException | undefined;
+      try {
+        await service.upsertContribution(
+          19792,
+          '19792',
+          'IND-001',
+          { indicator_type: 'NOOP' } as never,
+          user,
+          'SP01',
+        );
+      } catch (err) {
+        thrown = err as HttpException;
+      }
+
+      expect(thrown).toBeInstanceOf(ConflictException);
+      expect(thrown!.message).toBe(
+        'Result is PRMS-sourced; bilateral alignment is read-only in STAR',
+      );
+      expect(fakeRepo.save).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
   });

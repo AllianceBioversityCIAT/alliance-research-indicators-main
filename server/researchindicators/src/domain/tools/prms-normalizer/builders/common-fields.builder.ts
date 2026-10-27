@@ -435,6 +435,11 @@ export class CommonFieldsBuilder {
           'external_reference',
         ),
       ),
+      // Re-push only. A first push has no stored code, and the key must be
+      // absent — null or "" would tell PRMS the code is blank.
+      ...(aggregate.prms_result_code == null
+        ? {}
+        : { result_code: String(aggregate.prms_result_code) }),
       keep_editing: false,
       created_date: (aggregate.created_at instanceof Date
         ? aggregate.created_at

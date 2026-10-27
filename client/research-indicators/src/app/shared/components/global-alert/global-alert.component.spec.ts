@@ -6,7 +6,8 @@ import { signal } from '@angular/core';
 import { GlobalAlert } from '@shared/interfaces/global-alert.interface';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { SelectModule } from 'primeng/select';
+import { Select, SelectModule } from 'primeng/select';
+import { By } from '@angular/platform-browser';
 import { InputComponent } from '../custom-fields/input/input.component';
 import { apiServiceMock } from '../../../testing/mock-services.mock';
 import { GetYear } from '@shared/interfaces/get-year.interface';
@@ -20,8 +21,12 @@ describe('GlobalAlertComponent', () => {
   beforeEach(async () => {
     const mockActionsService = {
       globalAlertsStatus: signal<GlobalAlert[]>([]),
-      hideGlobalAlert: jest.fn()
+      hideGlobalAlert: jest.fn(),
+      replaceGlobalAlert: jest.fn()
     };
+    mockActionsService.replaceGlobalAlert.mockImplementation((index: number, alert: GlobalAlert) =>
+      mockActionsService.globalAlertsStatus.update(prev => prev.map((cur, i) => (i === index ? alert : cur)))
+    );
 
     const mockServiceLocator = {
       getService: jest.fn()
@@ -460,5 +465,113 @@ describe('GlobalAlertComponent', () => {
     component.onDetailLinkClick(mockEvent, 0);
 
     expect(mockEvent.preventDefault).not.toHaveBeenCalled();
+  });
+  describe('update-result-year prompt (infoCard / cancelSwapsTo / excludeYears)', () => {
+    const years = [2028, 2027, 2026, 2025].map(report_year => ({ report_year, has_reported: 0 }) as GetYear);
+    const listMock = { list: jest.fn() };
+    const html = () => fixture.nativeElement as HTMLElement;
+    const optionYears = () => {
+      const select = fixture.debugElement.query(By.directive(Select));
+      return (select.componentInstance.options as GetYear[]).map(o => o.report_year);
+    };
+    const clickCancel = () => {
+      const btn = html().querySelector('p-button button') as HTMLButtonElement;
+      btn.click();
+      fixture.detectChanges();
+    };
+    let cancelEvent: jest.Mock;
+    let picker: GlobalAlert;
+    let prompt: GlobalAlert;
+
+    beforeEach(() => {
+      listMock.list.mockReturnValue(years);
+      serviceLocator.getService.mockReturnValue(listMock as unknown as ReturnType<ServiceLocatorService['getService']>);
+      cancelEvent = jest.fn();
+      picker = {
+        severity: 'info',
+        summary: 'Pick',
+        detail: 'pick a year',
+        serviceName: 'testService' as GlobalAlert['serviceName'],
+        selectorLabel: 'Year',
+        selectorRequired: true,
+        selectorExcludeValues: [2026]
+      };
+      prompt = {
+        severity: 'info',
+        summary: 'Prompt',
+        detail: 'prompt detail',
+        infoCard: { badge: '2026 VERSION', caption: 'Created from approved' },
+        cancelCallback: { label: 'Other year', event: cancelEvent },
+        cancelSwapsTo: picker
+      };
+    });
+
+    it('renders the infoCard as real text and no selector (g1)', () => {
+      actionsService.globalAlertsStatus.set([prompt]);
+      fixture.detectChanges();
+      expect(html().querySelector('.info-card-badge')?.textContent?.trim()).toBe('2026 VERSION');
+      expect(html().querySelector('.info-card-caption')?.textContent?.trim()).toBe('Created from approved');
+      expect(html().querySelector('p-select')).toBeNull();
+    });
+
+    it('swaps in place on Cancel when cancelSwapsTo is set (g2)', () => {
+      actionsService.globalAlertsStatus.set([prompt]);
+      fixture.detectChanges();
+      const before = html().querySelector('.alert-overlay');
+      expect(before).not.toBeNull();
+      expect(html().querySelector('p-select')).toBeNull();
+
+      clickCancel();
+
+      expect(cancelEvent).toHaveBeenCalledTimes(1);
+      expect(actionsService.globalAlertsStatus().length).toBe(1);
+      expect(html().querySelector('.alert-overlay')).toBe(before);
+      expect(html().querySelector('p-select')).not.toBeNull();
+      expect(actionsService.hideGlobalAlert).not.toHaveBeenCalled();
+    });
+
+    it('excludes 2026 from the rendered options after the swap (g3)', () => {
+      actionsService.globalAlertsStatus.set([prompt]);
+      fixture.detectChanges();
+      clickCancel();
+      expect(optionYears()).toEqual([2028, 2027, 2025]);
+    });
+
+    it('closes on Cancel without cancelSwapsTo (g4)', () => {
+      actionsService.globalAlertsStatus.set([{ severity: 'info', summary: 'x', detail: 'y', cancelCallback: { label: 'Cancel', event: cancelEvent } }]);
+      fixture.detectChanges();
+      clickCancel();
+      expect(cancelEvent).toHaveBeenCalledTimes(1);
+      expect(actionsService.hideGlobalAlert).toHaveBeenCalledWith(0);
+      expect(actionsService.replaceGlobalAlert).not.toHaveBeenCalled();
+    });
+
+    it('closes on the x button without swapping or running cancelCallback (g5)', () => {
+      actionsService.globalAlertsStatus.set([prompt]);
+      fixture.detectChanges();
+      (html().querySelector('i.pi-times') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(actionsService.hideGlobalAlert).toHaveBeenCalledWith(0);
+      expect(actionsService.replaceGlobalAlert).not.toHaveBeenCalled();
+      expect(cancelEvent).not.toHaveBeenCalled();
+    });
+
+    it('keeps the same options reference without selectorExcludeValues (g6)', () => {
+      actionsService.globalAlertsStatus.set([{ ...picker, selectorExcludeValues: undefined }]);
+      fixture.detectChanges();
+      const select = fixture.debugElement.query(By.directive(Select));
+      expect(select.componentInstance.options).toBe(years);
+    });
+
+    it('resets the warning and body selection after the swap (g7)', () => {
+      actionsService.globalAlertsStatus.set([prompt]);
+      fixture.detectChanges();
+      component.showReportedWarning = true;
+      component.body.set({ commentValue: 'x', selectValue: 2025 });
+      clickCancel();
+      expect(component.showReportedWarning).toBe(false);
+      expect(component.body().selectValue).toBeNull();
+      expect(component.body().commentValue).toBe('');
+    });
   });
 });

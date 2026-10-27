@@ -28,7 +28,7 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
       project.project_mappings_array?.some(
         (m) =>
           m.status === 'Confirmed' &&
-          m.global_unit_object?.cgiar_entity_type_object?.code === 22,
+          /^SP\d/i.test(m.global_unit_object?.smo_code?.trim() ?? ''),
       ) ?? false,
   );
 

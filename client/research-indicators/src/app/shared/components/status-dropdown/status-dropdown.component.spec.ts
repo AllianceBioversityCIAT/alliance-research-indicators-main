@@ -52,6 +52,23 @@ describe('StatusDropdownComponent', () => {
     expect(component.isOpen()).toBe(false);
   });
 
+  // Owner 2026-10-26: from OICR Postponed, "OICR Accepted" had no icon. It takes the Accept icon of the
+  // OICR review modal (pi-check-circle, green), next to Not Accepted's red pi-times-circle.
+  it('from Postponed, OICR Accepted shows the review modal Accept icon and Not Accepted keeps its own', () => {
+    component.availableStatuses.set([
+      { id: 15, result_status_id: 15, name: 'OICR Not Accepted', transition_direction: 'unknown' },
+      { id: 10, result_status_id: 10, name: 'OICR Accepted', transition_direction: 'unknown' }
+    ] as never);
+    component.isOpen.set(true);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const accepted = el.querySelector('[data-testid="status-option-accepted-icon"] i');
+    expect(accepted?.className).toContain('pi-check-circle');
+    expect(accepted?.className).toContain('text-[#509C55]');
+    expect(el.querySelector('.pi-times-circle')).not.toBeNull();
+    expect(el.querySelectorAll('[data-testid="status-option-accepted-icon"]')).toHaveLength(1);
+  });
+
   describe('getAvailableStatuses', () => {
     it('should return empty array when statusId is 0', async () => {
       component.statusId = 0;

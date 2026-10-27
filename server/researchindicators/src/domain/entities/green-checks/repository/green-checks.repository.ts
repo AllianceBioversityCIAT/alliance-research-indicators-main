@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { FindGreenChecksDto } from '../dto/find-green-checks.dto';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { Result } from '../../results/entities/result.entity';
@@ -314,6 +314,128 @@ export class GreenCheckRepository {
 
     const query = `CALL SP_versioning(?);`;
     return this.dataSource.query<Result>(query, [resultCode]);
+  }
+
+  /**
+   * @sdd-spec docs/specs/bilateral/pool-funding-update-carryover — T-01 (design §6, D-2, D-3, D-4, D-9)
+   *
+   * Replaces the live result's Pool Funding section with a copy of the
+   * snapshot's active rows. Alignment, SP and ToC rows are soft-deactivated;
+   * indicator mappings are hard-deleted because `uq_rpfim_result_indicator_active`
+   * is a plain UNIQUE that includes `is_active`, so an inactive twin would
+   * collide on the next deactivation (here or in `SP_versioning`).
+   * Runs only on the passed manager so it shares the caller's transaction.
+   */
+  async carryOverPoolFunding(
+    manager: EntityManager,
+    liveResultId: number,
+    snapshotResultId: number,
+    userId: number,
+  ): Promise<void> {
+    await manager.query(
+      `UPDATE result_pool_funding_alignment_sp sp
+        INNER JOIN result_pool_funding_alignment a ON a.id = sp.alignment_id
+        SET sp.is_active = FALSE, sp.deleted_at = NOW(), sp.updated_by = ?
+        WHERE sp.is_active = TRUE AND a.result_id = ?`,
+      [userId, liveResultId],
+    );
+    await manager.query(
+      `UPDATE result_pool_funding_alignment
+        SET is_active = FALSE, deleted_at = NOW(), updated_by = ?
+        WHERE is_active = TRUE AND result_id = ?`,
+      [userId, liveResultId],
+    );
+    await manager.query(
+      `UPDATE result_pool_funding_toc_alignment
+        SET is_active = FALSE, deleted_at = NOW(), updated_by = ?
+        WHERE is_active = TRUE AND result_id = ?`,
+      [userId, liveResultId],
+    );
+    await manager.query(
+      `DELETE FROM result_pool_funding_indicator_mapping WHERE result_id = ?`,
+      [liveResultId],
+    );
+
+    await manager.query(
+      `INSERT INTO result_pool_funding_alignment (
+          created_at, created_by, updated_at, updated_by, is_active, deleted_at,
+          result_id, has_contribution
+        )
+        SELECT NOW(), ?, NOW(), ?, TRUE, NULL, ?, pfa.has_contribution
+        FROM result_pool_funding_alignment pfa
+        WHERE pfa.is_active = TRUE AND pfa.result_id = ?
+        ORDER BY pfa.id DESC
+        LIMIT 1`,
+      [userId, userId, liveResultId, snapshotResultId],
+    );
+    const newAlignment: { id: number }[] = await manager.query(
+      `SELECT id FROM result_pool_funding_alignment
+        WHERE is_active = TRUE AND result_id = ?
+        LIMIT 1`,
+      [liveResultId],
+    );
+    const newAlignmentId = newAlignment?.[0]?.id;
+
+    if (newAlignmentId != null) {
+      await manager.query(
+        `INSERT INTO result_pool_funding_alignment_sp (
+            created_at, created_by, updated_at, updated_by, is_active, deleted_at,
+            alignment_id, sp_code, sp_role
+          )
+          SELECT NOW(), ?, NOW(), ?, TRUE, NULL, ?, sp.sp_code, sp.sp_role
+          FROM result_pool_funding_alignment_sp sp
+            INNER JOIN result_pool_funding_alignment src ON src.id = sp.alignment_id
+          WHERE sp.is_active = TRUE
+            AND src.is_active = TRUE
+            AND src.result_id = ?`,
+        [userId, userId, newAlignmentId, snapshotResultId],
+      );
+    }
+
+    await manager.query(
+      `INSERT INTO result_pool_funding_toc_alignment (
+          created_at, created_by, updated_at, updated_by, is_active, deleted_at,
+          result_id, sp_code, aligns_with_toc, level, toc_result_id,
+          indicator_id, quantitative_contribution, toc_result_title,
+          indicator_description, unit_messurament, target_value, target_year
+        )
+        SELECT NOW(), ?, NOW(), ?, TRUE, NULL, ?,
+          toc.sp_code, toc.aligns_with_toc, toc.level, toc.toc_result_id,
+          toc.indicator_id, toc.quantitative_contribution, toc.toc_result_title,
+          toc.indicator_description, toc.unit_messurament, toc.target_value, toc.target_year
+        FROM result_pool_funding_toc_alignment toc
+        WHERE toc.is_active = TRUE AND toc.result_id = ?`,
+      [userId, userId, liveResultId, snapshotResultId],
+    );
+
+    await manager.query(
+      `INSERT INTO result_pool_funding_indicator_mapping (
+          created_at, created_by, updated_at, updated_by, is_active, deleted_at,
+          result_id, lever_code, indicator_code, indicator_type,
+          result_capacity_sharing_id, result_knowledge_product_id,
+          result_policy_change_id, result_innovation_dev_id,
+          other_contribution_narrative, is_stale
+        )
+        SELECT NOW(), ?, NOW(), ?, TRUE, NULL, ?,
+          im.lever_code, im.indicator_code, im.indicator_type,
+          IF(im.result_capacity_sharing_id IS NULL, NULL, ?),
+          IF(im.result_knowledge_product_id IS NULL, NULL, ?),
+          IF(im.result_policy_change_id IS NULL, NULL, ?),
+          IF(im.result_innovation_dev_id IS NULL, NULL, ?),
+          im.other_contribution_narrative, im.is_stale
+        FROM result_pool_funding_indicator_mapping im
+        WHERE im.is_active = TRUE AND im.result_id = ?`,
+      [
+        userId,
+        userId,
+        liveResultId,
+        liveResultId,
+        liveResultId,
+        liveResultId,
+        liveResultId,
+        snapshotResultId,
+      ],
+    );
   }
 
   async getDataForReviseResult(

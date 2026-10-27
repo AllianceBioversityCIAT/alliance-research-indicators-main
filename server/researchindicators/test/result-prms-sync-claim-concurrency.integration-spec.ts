@@ -19,6 +19,7 @@ import { PayloadBuilder } from '../src/domain/tools/prms-normalizer/builders/pay
 import { PrmsNormalizerService } from '../src/domain/tools/prms-normalizer/prms-normalizer.service';
 import { AppConfig } from '../src/domain/shared/utils/app-config.util';
 import { CurrentUserUtil } from '../src/domain/shared/utils/current-user.util';
+import { ReportingYearResolver } from '../src/domain/shared/utils/reporting-year.resolver';
 import { PrmsWebhookDeliveryRepository } from '../src/domain/entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 
 // @sdd-spec docs/specs/bilateral/prms-sync/sync-engine — T-11 rework
@@ -191,7 +192,9 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
   });
 
   it('two service.sync calls started before either settles produce one POST, one ACCEPTED row, and one 409', async () => {
-    const logRepository = new ResultPrmsSyncLogRepository(dataSource);
+    const logRepository = new ResultPrmsSyncLogRepository(dataSource, {
+      resolve: async () => 2026,
+    } as unknown as ReportingYearResolver);
     jest
       .spyOn(logRepository, 'loadGateSnapshot')
       .mockResolvedValue(eligibleFacts(dc11ResultId, DC11_OFFICIAL_CODE));
@@ -276,7 +279,9 @@ describe('T-11 — claim-then-settle live concurrency (DC-11 / QA-7)', () => {
   });
 
   it('two concurrent REFUSED_BY_STAR inserts get distinct monotonic attempt_numbers', async () => {
-    const logRepository = new ResultPrmsSyncLogRepository(dataSource);
+    const logRepository = new ResultPrmsSyncLogRepository(dataSource, {
+      resolve: async () => 2026,
+    } as unknown as ReportingYearResolver);
     const [first, second] = await Promise.all([
       logRepository.insertRefusedByStar({
         resultId: refusalResultId,

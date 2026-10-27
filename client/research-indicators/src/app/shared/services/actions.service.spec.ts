@@ -105,6 +105,22 @@ describe('ActionsService', () => {
     expect(service.globalAlertsStatus().length).toBe(0);
   });
 
+  it('replaceGlobalAlert swaps the alert at the index without growing the list (a1)', () => {
+    const a = { severity: 'info', summary: 'a', detail: 'a' } as const;
+    const b = { severity: 'info', summary: 'b', detail: 'b' } as const;
+    service.showGlobalAlert({ ...a });
+    service.replaceGlobalAlert(0, { ...b });
+    expect(service.globalAlertsStatus().length).toBe(1);
+    expect(service.globalAlertsStatus()[0].summary).toBe('b');
+  });
+
+  it('replaceGlobalAlert does not clear any service (a2)', () => {
+    service.showGlobalAlert({ severity: 'info', summary: 'a', detail: 'a' });
+    (serviceLocatorMock.clearService as jest.Mock).mockClear();
+    service.replaceGlobalAlert(0, { severity: 'info', summary: 'b', detail: 'b', serviceName: 'actorTypes' });
+    expect(serviceLocatorMock.clearService).not.toHaveBeenCalled();
+  });
+
   it('should add global alert with serviceName and clear service', () => {
     service.showGlobalAlert({
       severity: 'info',

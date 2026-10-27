@@ -5,6 +5,7 @@ import { ResultKnowledgeProduct } from '../../entities/result-knowledge-product/
 import { CreateResultPolicyChangeDto } from '../../entities/result-policy-change/dto/create-result-policy-change.dto';
 import { UpdateResultCapacitySharingDto } from '../../entities/result-capacity-sharing/dto/update-result-capacity-sharing.dto';
 import { CreateResultInnovationDevDto } from '../../entities/result-innovation-dev/dto/create-result-innovation-dev.dto';
+import { CreateResultInnovationUseDto } from '../../entities/result-innovation-use/dto/create-result-innovation-use.dto';
 import { UpdateIpRightDto } from '../../entities/result-ip-rights/dto/update-ip-right.dto';
 import { ResultStatusEnum } from '../../entities/result-status/enum/result-status.enum';
 import { CreateResultDto } from '../../entities/results/dto/create-result.dto';
@@ -20,6 +21,8 @@ export class ExternalMappersDto {
   is_version_applied?: boolean;
   official_code: number;
   resultOfficialCode: number;
+  prms_result_code?: number;
+  prms_phase_id?: number;
   external_link: string;
   public_link: string;
   status_id: ResultStatusEnum;
@@ -36,4 +39,5 @@ export class ExternalMappersDto {
   capacitySharing: UpdateResultCapacitySharingDto;
   innovationDev: CreateResultInnovationDevDto;
   ipRights: UpdateIpRightDto;
+  innovationUse?: CreateResultInnovationUseDto;
 }

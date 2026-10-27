@@ -35,6 +35,7 @@ export type ControlListServices =
   | 'openSearchResult'
   | 'innoDevOutput'
   | 'innoUseOutput'
+  | 'policyChangeLinkableResults'
   | 'openSearchSubNationals'
   | 'getAllIndicators'
   | 'allResultStatus'

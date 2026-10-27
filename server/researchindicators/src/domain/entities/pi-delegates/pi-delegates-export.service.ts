@@ -43,7 +43,7 @@ export const BY_PROJECT_COLUMNS: ExcelColumnSpec[] = [
   { key: 'project_code', header: 'Project code', width: 16 },
   { key: 'project_name', header: 'Project name', width: 50 },
   { key: 'status', header: 'Status', width: 16 },
-  { key: 'pool_funding', header: 'Pool funding contributor', width: 22 },
+  { key: 'pool_funding', header: 'Contributing to CGIAR Portfolio', width: 30 },
   { key: 'pi_name', header: 'Principal Investigator', width: 28 },
   {
     key: 'delegate_count',
@@ -79,7 +79,8 @@ export function buildByProjectFiltersText(
   const parts: string[] = [];
   if (filters?.role === 'pi') parts.push('Role: Principal Investigator');
   if (filters?.role === 'delegate') parts.push('Role: PI Delegate');
-  if (filters?.ongoing_only) parts.push('Ongoing projects');
+  if (filters?.ongoing_w3_bilateral_only)
+    parts.push('Ongoing W3 & Bilateral only');
   if (filters?.without_delegates_only) parts.push('Projects without delegates');
   const q = clean(filters?.search);
   if (q) parts.push(`Search: "${q}"`);

@@ -187,6 +187,7 @@ export class ResultPrmsSyncService {
     }
 
     let payload: PrmsNormalizerRequestDto;
+    let storedPrmsResultCode: number | null = null;
     try {
       const aggregate = await this.aggregateRepository.loadByResultId(resultId);
       if (!aggregate) {
@@ -202,6 +203,7 @@ export class ResultPrmsSyncService {
         );
         throw new NotFoundException('Result not found');
       }
+      storedPrmsResultCode = aggregate.prms_result_code ?? null;
       payload = this.payloadBuilder.build(aggregate);
     } catch (error) {
       if (error instanceof PrmsPayloadBuildError) {
@@ -248,6 +250,7 @@ export class ResultPrmsSyncService {
         externalReference,
         prmsResultCode: interpreted.prmsResultCode,
         prmsPhaseId: interpreted.prmsPhaseId,
+        storedPrmsResultCode,
       },
       { resultOfficialCode: claim.resultOfficialCode, environment },
     );

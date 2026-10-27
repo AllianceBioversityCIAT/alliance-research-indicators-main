@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { CustomTagComponent } from './custom-tag.component';
+import { CustomTagComponent, POOL_FUNDING_TAG_LABEL } from './custom-tag.component';
 import { STATUS_COLOR_MAP } from '@shared/constants/status-colors';
 
 describe('CustomTagComponent', () => {
@@ -82,5 +82,26 @@ describe('CustomTagComponent', () => {
     expect(span.className).toContain('break-words');
     expect(span.className).toContain('line-clamp-2');
     expect(span.className).not.toContain('truncate');
+  });
+
+  it('labels every pool-funding tag "Contributing to CGIAR Portfolio" with an info icon tooltip', () => {
+    component.statusId = 'pool-funding';
+    component.statusName = 'Contributing to Pool Funding';
+    expect(component.displayName()).toBe(POOL_FUNDING_TAG_LABEL);
+    expect(component.iconTooltip()).toBe(
+      'Contributing to CGIAR Portfolio (Science Programs and Accelerators)'
+    );
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('i.pi')).not.toBeNull();
+  });
+
+  it('keeps other tags as passed: no icon unless asked, icon tooltip from the input', () => {
+    component.statusId = '1';
+    component.statusName = 'Active';
+    component.tooltip = 'Status help';
+    expect(component.displayName()).toBe('Active');
+    expect(component.iconTooltip()).toBe('Status help');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('i.pi')).toBeNull();
   });
 });

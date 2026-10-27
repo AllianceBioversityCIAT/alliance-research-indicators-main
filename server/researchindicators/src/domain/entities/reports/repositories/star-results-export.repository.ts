@@ -3,10 +3,13 @@ import { DataSource } from 'typeorm';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { FullFiltersReportDto } from '../dto/filters-report.dto';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
+import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import { ResultSortEnum } from '../../results/enum/result-sort.enum';
+import { SessionFormatEnum } from '../../session-formats/enums/session-format.enum';
 import { ResultRepository } from '../../results/repositories/result.repository';
+import { STAR_INNOVATION_DEV_RAW_COLUMNS } from '../handlers/star-results-metadata/star-results-metadata.innovation-dev.columns';
 
 /**
  * Excel “Raw data” rows (`report_*` views).
@@ -24,7 +27,13 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  *    - `sortOrderV2WithSearchRelevance` in the `ORDER BY`
  * 2. **Query on `report_general_information gi`**: only `WHERE gi.result_id IN (…)` with the
  *    `result_id` values that already passed phase 1, and `ORDER BY FIELD(…)` to **repeat the same order**
- *    returned by `findResultsV2` (does not re-implement filters in the view).
+ *    returned by `findResultsV2` (does not re-implement filters in the view). The select list includes
+ *    `gi.result_id AS result_id` so Phase 3 can merge onto that key.
+ * 3. **Phase 3** on `report_innovation_dev`: `SELECT result_id, <31 innovation_dev_* aliases>
+ *    FROM report_innovation_dev WHERE result_id IN (…)` (one placeholder per id), on the same
+ *    pinned connection and transaction as Phase 2. Rows merge by `String(result_id)`. Phase 2's
+ *    order is kept. A Phase 2 row with no Phase 3 row gets `Not applicable` on every
+ *    Innovation Development column.
  *
  * **Front pagination (`page` / `limit` on the DTO):** does not cap the Excel file; phase 1 walks
  * every internal page of `findResultsV2` until all rows are fetched (fixed chunk size in code).
@@ -34,7 +43,7 @@ import { ResultRepository } from '../../results/repositories/result.repository';
  * Requires MySQL views: report_general_information, report_alliance_alignment,
  * report_partners, report_geo_location, report_evidences, report_ip_rights,
  * report_capacity_sharing_development, report_policy_change, report_oicr,
- * report_link_result.
+ * report_link_result, report_innovation_use, report_innovation_dev.
  */
 @Injectable()
 export class StarResultsExportRepository {
@@ -49,6 +58,9 @@ export class StarResultsExportRepository {
    * are not truncated at the default 1024-byte limit. `SET LOCAL` reverts on commit/rollback.
    */
   private static readonly GROUP_CONCAT_MAX_LEN = 4_194_304;
+
+  /** DD-1: a Phase 2 row with no Phase 3 row must not leave a blank Innovation Development cell. */
+  private static readonly INNOVATION_DEV_NOT_APPLICABLE = 'Not applicable';
 
   constructor(
     private readonly dataSource: DataSource,
@@ -67,6 +79,7 @@ export class StarResultsExportRepository {
   ): Promise<Record<string, unknown>[]> {
     const selectBody = `
       SELECT
+        gi.result_id AS result_id,
         gi.result_code AS result_code,
         gi.platform_code AS platform_code,
         gi.public_link AS public_link,
@@ -89,7 +102,10 @@ export class StarResultsExportRepository {
         aa.contributing_projects AS contributing_projects,
         aa.primary_lever AS primary_lever,
         aa.contributor_lever AS contributor_lever,
+        aa.strategic_objectives AS strategic_objectives,
+        aa.impact_outcomes AS impact_outcomes,
         aa.sdg_targets AS sdg_targets,
+        aa.sdgs AS sdgs,
         pr.partners AS partners,
         gl.geo_scope_name AS geo_scope_name,
         gl.countries AS countries,
@@ -113,6 +129,7 @@ export class StarResultsExportRepository {
         csd.group_session_participants_non_binary AS number_people_trained_non_binary,
         csd.group_session_purpose_name AS group_session_purpose_name,
         csd.group_is_attending_organization AS group_is_attending_organization,
+        oob.organizations_on_behalf AS organizations_on_behalf,
         csd.individual_trainee_affiliation AS individual_trainee_affiliation,
         csd.individual_trainee_name AS individual_trainee_name,
         csd.individual_trainee_nationality AS individual_trainee_nationality,
@@ -135,13 +152,21 @@ export class StarResultsExportRepository {
         oc.maturity_level AS maturity_level,
         oc.outcome_impact_statement AS outcome_impact_statement,
         oc.short_outcome_impact_statement AS short_outcome_impact_statement,
-        CONCAT_WS(CHAR(10), oc.quantifications, oc.extrapolated_estimates) AS quantification,
+        oc.quantifications AS quantification_actual_count,
+        oc.extrapolated_estimates AS quantification_extrapolated_estimates,
         oc.authors_contact_persons AS authors_contact_persons,
         oc.for_external_use AS for_external_use,
         oc.for_external_use_description AS for_external_use_description,
         oc.existing_oicr AS existing_oicr,
         oc.cgspace_link AS cgspace_link,
-        lkr.link_results AS link_results
+        lkr.link_results AS link_results,
+        iu.innovation_use_level AS innovation_use_level,
+        iu.innovation_use_level_explanation AS innovation_use_level_explanation,
+        iu.innovation_use_linked_dev AS innovation_use_linked_dev,
+        CONCAT('${this.appConfig.ARI_CLIENT_HOST}/result/', iu.innovation_use_linked_dev_code, '/general-information') AS innovation_use_linked_dev_url,
+        iu.innovation_use_actors AS innovation_use_actors,
+        iu.innovation_use_organizations AS innovation_use_organizations,
+        iu.innovation_use_quantifications AS innovation_use_quantifications
       FROM report_general_information gi
       LEFT JOIN report_alliance_alignment aa ON aa.result_id = gi.result_id
       LEFT JOIN report_partners pr ON pr.result_id = gi.result_id
@@ -149,9 +174,43 @@ export class StarResultsExportRepository {
       LEFT JOIN report_evidences ev ON ev.result_id = gi.result_id
       LEFT JOIN report_ip_rights ip ON ip.result_id = gi.result_id
       LEFT JOIN report_capacity_sharing_development csd ON csd.result_id = gi.result_id
+      LEFT JOIN LATERAL (
+        SELECT report_field(
+          (
+            SELECT GROUP_CONCAT(
+              IF(
+                ci.code IS NULL,
+                CONCAT('• Unknown (id ', ri.institution_id, ')'),
+                CONCAT_WS('', '• [id: ', ci.code, '] ', ci.acronym, ' - (HQ:', cil.name, ') ', ci.name)
+              )
+              ORDER BY ri.result_institution_id
+              SEPARATOR '\n'
+            )
+            FROM result_institutions ri
+            LEFT JOIN clarisa_institutions ci ON ci.code = ri.institution_id
+            LEFT JOIN clarisa_institution_locations cil
+              ON cil.institution_id = ci.code AND cil.isHeadquarter = TRUE
+            WHERE ri.result_id = gi.result_id
+              AND ri.institution_role_id = ${InstitutionRolesEnum.TRAINEE_ORGANIZATION_REPRESENTATIVE}
+              AND ri.is_active = TRUE
+          ),
+          TRUE,
+          COALESCE(
+            r.indicator_id = ${IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT}
+              AND rcs.session_format_id = ${SessionFormatEnum.GROUP}
+              AND rcs.is_attending_organization = TRUE,
+            FALSE
+          )
+        ) AS organizations_on_behalf
+        FROM results r
+        LEFT JOIN result_capacity_sharing rcs
+          ON rcs.result_id = r.result_id AND rcs.is_active = TRUE
+        WHERE r.result_id = gi.result_id
+      ) oob ON TRUE
       LEFT JOIN report_policy_change pc ON pc.result_id = gi.result_id
       LEFT JOIN report_oicr oc ON oc.result_id = gi.result_id
-      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id`;
+      LEFT JOIN report_link_result lkr ON lkr.result_id = gi.result_id
+      LEFT JOIN report_innovation_use iu ON iu.result_id = gi.result_id`;
 
     const v2Filters = this.mapReportDtoToFindResultsV2Filters(filters);
     const search = filters.filters.search ?? '';
@@ -175,16 +234,18 @@ export class StarResultsExportRepository {
       WHERE gi.result_id IN (${ph})
       ORDER BY FIELD(gi.result_id, ${ph})`;
     const params = [...orderedIds, ...orderedIds];
-    return this.queryPhase2WithGroupConcatLimit(sql, params);
+    return this.queryPhase2WithGroupConcatLimit(sql, params, orderedIds);
   }
 
   /**
    * Pins one pool connection, raises `group_concat_max_len` for the transaction only, then runs
-   * the export SELECT (views rely on nested `GROUP_CONCAT`).
+   * Phase 2 and Phase 3 (views rely on nested `GROUP_CONCAT`). Phase 3 failure rolls the
+   * transaction back with Phase 2.
    */
   private async queryPhase2WithGroupConcatLimit(
     sql: string,
     params: unknown[],
+    orderedIds: number[],
   ): Promise<Record<string, unknown>[]> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -193,18 +254,51 @@ export class StarResultsExportRepository {
       await queryRunner.query(
         `SET LOCAL group_concat_max_len = ${StarResultsExportRepository.GROUP_CONCAT_MAX_LEN}`,
       );
-      const rows = (await queryRunner.query(sql, params)) as Record<
+      const phase2Rows = (await queryRunner.query(sql, params)) as Record<
         string,
         unknown
       >[];
+      const placeholders = orderedIds.map(() => '?').join(',');
+      const innovationDevKeys = STAR_INNOVATION_DEV_RAW_COLUMNS.map(
+        (column) => column.key,
+      ).join(', ');
+      const phase3Sql = `SELECT result_id, ${innovationDevKeys} FROM report_innovation_dev WHERE result_id IN (${placeholders})`;
+      const phase3Rows = (await queryRunner.query(
+        phase3Sql,
+        orderedIds,
+      )) as Record<string, unknown>[];
       await queryRunner.commitTransaction();
-      return rows;
+      return this.mergeInnovationDevRows(phase2Rows, phase3Rows);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
     } finally {
       await queryRunner.release();
     }
+  }
+
+  /**
+   * DD-1 merge: `String(result_id)` on both sides, Phase 2 order, every Innovation Development
+   * key filled with `Not applicable` when Phase 3 has no row for that id.
+   */
+  private mergeInnovationDevRows(
+    phase2Rows: Record<string, unknown>[],
+    phase3Rows: Record<string, unknown>[],
+  ): Record<string, unknown>[] {
+    const byId = new Map<string, Record<string, unknown>>();
+    for (const row of phase3Rows) {
+      byId.set(String(row.result_id as number | string), row);
+    }
+    return phase2Rows.map((row) => {
+      const devRow = byId.get(String(row.result_id as number | string));
+      const merged: Record<string, unknown> = { ...row };
+      for (const column of STAR_INNOVATION_DEV_RAW_COLUMNS) {
+        merged[column.key] = devRow
+          ? devRow[column.key]
+          : StarResultsExportRepository.INNOVATION_DEV_NOT_APPLICABLE;
+      }
+      return merged;
+    });
   }
 
   private mapReportDtoToFindResultsV2Filters(dto: FullFiltersReportDto): {
