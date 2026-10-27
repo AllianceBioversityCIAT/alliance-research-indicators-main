@@ -1,0 +1,209 @@
+[
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_37ee249c",
+    "type": ["skos:Concept"],
+    "prefLabel": "acoustic beacons",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_8632",
+    "type": ["skos:Concept"],
+    "prefLabel": "adzuki beans",
+    "lang": "en",
+    "altLabel": "adsuki beans",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_8632",
+    "type": ["skos:Concept"],
+    "prefLabel": "adzuki beans",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_33786",
+    "type": ["skos:Concept"],
+    "prefLabel": "Parkia biglobosa",
+    "lang": "en",
+    "altLabel": "African locust beans",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_4273bb0a",
+    "type": ["skos:Concept"],
+    "prefLabel": "Sphenostylis stenocarpa",
+    "lang": "en",
+    "altLabel": "African yam beans",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_24811",
+    "type": ["skos:Concept"],
+    "prefLabel": "ACP",
+    "lang": "en",
+    "altLabel": "African, Caribbean and Pacific Group of States",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_6322",
+    "type": ["skos:Concept"],
+    "prefLabel": "Psophocarpus tetragonolobus",
+    "lang": "en",
+    "altLabel": "asparagus bean (Psophocarpus)",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_670",
+    "type": ["skos:Concept"],
+    "prefLabel": "asparagus beans",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_43050",
+    "type": ["skos:Concept"],
+    "prefLabel": "Austronibea oedogenys",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_8632",
+    "type": ["skos:Concept"],
+    "prefLabel": "adzuki beans",
+    "lang": "en",
+    "altLabel": "azuki beans",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_de4c5ffc",
+    "type": ["skos:Concept"],
+    "prefLabel": "bambara groundnuts",
+    "lang": "en",
+    "altLabel": "bambara beans",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_7beffa51",
+    "type": ["skos:Concept"],
+    "prefLabel": "barrier beaches",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_c91f415e",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach accretion",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_4841b2c5",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach berms",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_c737d7ad",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach cusps",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_f1a870c8",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach erosion",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_58237769",
+    "type": ["skos:Concept"],
+    "prefLabel": "foreshore",
+    "lang": "en",
+    "altLabel": "beach face",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_cec84345",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach features",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_b455f33a",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach ridges",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_ab40e556",
+    "type": ["skos:Concept"],
+    "prefLabel": "beach seines",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_3077",
+    "type": ["skos:Concept"],
+    "prefLabel": "Fragaria chiloensis",
+    "lang": "en",
+    "altLabel": "beach strawberry",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_850",
+    "type": ["skos:Concept"],
+    "prefLabel": "beaches",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_14161243",
+    "type": ["skos:Concept"],
+    "prefLabel": "beachrock",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_3fab03cb",
+    "type": ["skos:Concept"],
+    "prefLabel": "acoustic transponders",
+    "lang": "en",
+    "altLabel": "beacons (transponders)",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_35010",
+    "type": ["skos:Concept"],
+    "prefLabel": "beak",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_35636",
+    "type": ["skos:Concept"],
+    "prefLabel": "beak and feather disease virus",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_1216e5d0",
+    "type": ["skos:Concept"],
+    "prefLabel": "beam transmittance meters",
+    "lang": "en",
+    "vocab": "agrovoc"
+  },
+  {
+    "uri": "http://aims.fao.org/aos/agrovoc/c_1216e5d0",
+    "type": ["skos:Concept"],
+    "prefLabel": "beam transmittance meters",
+    "lang": "en",
+    "altLabel": "beam transmittometers",
+    "vocab": "agrovoc"
+  }
+]

@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { GreenCheckRepository } from './green-checks.repository';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
@@ -332,5 +332,76 @@ describe('GreenCheckRepository', () => {
     expect(out.result_id).toBe(10);
     expect(out.rev_first_name).toBe('R');
     expect(out.sub_first_name).toBe('S');
+  });
+
+  describe('carryOverPoolFunding', () => {
+    // @sdd-spec docs/specs/bilateral/pool-funding-update-carryover — T-01
+    // Mocked manager: proves statement order and parameters only. SQL
+    // semantics are proven by test/fixtures/pool-funding-update-carryover.fixture-spec.ts (T-02).
+    const run = async (alignmentRows: { id: number }[]) => {
+      const managerQuery = jest.fn(async (sql: string, _params?: unknown[]) =>
+        /^\s*SELECT id FROM result_pool_funding_alignment/.test(sql)
+          ? alignmentRows
+          : {},
+      );
+      const manager = { query: managerQuery } as unknown as EntityManager;
+      await repository.carryOverPoolFunding(manager, 10, 99, 7);
+      return managerQuery.mock.calls.map(([sql, params]) => [
+        String(sql).replace(/\s+/g, ' ').trim(),
+        params,
+      ]) as [string, unknown[]][];
+    };
+
+    it('clears the live section before inserting the snapshot copies', async () => {
+      const calls = await run([{ id: 555 }]);
+      const firstInsert = calls.findIndex(([sql]) => sql.startsWith('INSERT'));
+      const clears = calls
+        .map(([sql], i) => [sql, i] as const)
+        .filter(([sql]) => /^(UPDATE|DELETE)/.test(sql));
+
+      expect(clears).toHaveLength(4);
+      expect(clears.every(([, i]) => i < firstInsert)).toBe(true);
+      expect(calls[3][0]).toBe(
+        'DELETE FROM result_pool_funding_indicator_mapping WHERE result_id = ?',
+      );
+      expect(calls[3][1]).toEqual([10]);
+      expect(queryMock).not.toHaveBeenCalled();
+    });
+
+    it('attaches the copied SP rows to the new live alignment id', async () => {
+      const calls = await run([{ id: 555 }]);
+      const spInsert = calls.find(([sql]) =>
+        sql.startsWith('INSERT INTO result_pool_funding_alignment_sp'),
+      );
+
+      expect(spInsert?.[1]).toEqual([7, 7, 555, 99]);
+    });
+
+    it('skips the SP insert when no live alignment was created', async () => {
+      const calls = await run([]);
+
+      expect(
+        calls.some(([sql]) =>
+          sql.startsWith('INSERT INTO result_pool_funding_alignment_sp'),
+        ),
+      ).toBe(false);
+      expect(
+        calls.some(([sql]) =>
+          sql.startsWith('INSERT INTO result_pool_funding_toc_alignment'),
+        ),
+      ).toBe(true);
+    });
+
+    it('remaps non-null mapping section links to the live result id', async () => {
+      const calls = await run([{ id: 555 }]);
+      const mapping = calls.find(([sql]) =>
+        sql.startsWith('INSERT INTO result_pool_funding_indicator_mapping'),
+      );
+
+      expect(mapping?.[0]).toContain(
+        'IF(im.result_knowledge_product_id IS NULL, NULL, ?)',
+      );
+      expect(mapping?.[1]).toEqual([7, 7, 10, 10, 10, 10, 10, 99]);
+    });
   });
 });

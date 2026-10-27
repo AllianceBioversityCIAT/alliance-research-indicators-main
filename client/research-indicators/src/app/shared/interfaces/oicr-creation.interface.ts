@@ -1,5 +1,6 @@
 import { Country, Region } from './get-geo-location.interface';
 import { ResultImpactArea } from './impact-area.interface';
+import { ResultStatus } from './result-config.interface';
 import { GetSdgs } from './get-sdgs.interface';
 import { ResultLeverSdgTargetPayload } from './lever-sdg-target.interface';
 
@@ -90,9 +91,14 @@ export interface StepFour {
   general_comment: string;
 }
 
+/** Table an existing OICR comes from: TEMP_external_oicrs (external) or results (result). */
+export type ExistingOicrSource = 'external' | 'result';
+
 export interface LinkResult {
   result_id?: number;
   external_oicr_id: number;
+  /** Absent on links saved before OICRs from results could be selected — those are 'external'. */
+  source?: ExistingOicrSource;
 }
 
 export interface PatchOicr {
@@ -125,12 +131,20 @@ export interface NotableReferencePayload {
 }
 
 export interface Oicr {
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  is_active?: boolean;
   id: number;
+  /** Sent by GET temp/oicrs; treated as 'external' when absent. */
+  source?: ExistingOicrSource;
   title: string;
   result_status: string;
+  /** Status with its display config (colors, icon, description); null when it cannot be resolved. */
+  status?: ResultStatus | null;
   maturity_level: string;
   report_year: string;
+  external_id?: string;
+  /** `result_oicrs.oicr_internal_code`; shown instead of `external_id` when present. */
+  oicr_internal_code?: string | null;
+  handle_link?: string | null;
 }

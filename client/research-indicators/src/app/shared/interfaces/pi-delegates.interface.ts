@@ -82,6 +82,8 @@ export interface ProjectDelegates {
   pi_name: string | null;
   /** agresso_contracts.contract_status. */
   status: string | null;
+  /** agresso_contracts.funding_type — Agresso short code (BLR, BLU, W3R, W3U, …). */
+  funding_type: string | null;
   /** agresso_contracts.start_date. */
   start_date: Date | null;
   /** agresso_contracts.end_date. */
@@ -156,4 +158,27 @@ export type PiDelegateScope = 'managed' | 'all';
 /** `&scope=…` when a scope is given, the empty string otherwise. */
 export function piDelegateScopeParam(scope?: PiDelegateScope): string {
   return scope ? `&scope=${encodeURIComponent(scope)}` : '';
+}
+
+/** Body of POST /pi-delegates/export/by-project/xlsx. */
+export interface PiDelegatesExportByProjectBody {
+  user_id: number;
+  scope?: PiDelegateScope;
+  /** Codes of the rows currently shown, in display order. */
+  project_codes: string[];
+  filters?: {
+    search?: string;
+    role?: 'all' | 'pi' | 'delegate';
+    ongoing_w3_bilateral_only?: boolean;
+    without_delegates_only?: boolean;
+  };
+}
+
+/** Body of POST /pi-delegates/export/by-person/xlsx. */
+export interface PiDelegatesExportByPersonBody {
+  user_id: number;
+  scope?: PiDelegateScope;
+  /** Ids of the rows currently shown, in display order. */
+  delegate_user_ids: number[];
+  filters?: { search?: string };
 }

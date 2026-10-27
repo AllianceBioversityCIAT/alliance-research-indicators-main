@@ -17,18 +17,23 @@ import {
   computed,
   inject,
   input,
-  linkedSignal
+  linkedSignal,
+  signal,
+  viewChild
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TableModule } from 'primeng/table';
+import { Table, TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
 import { TooltipModule } from 'primeng/tooltip';
 import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
+import { FiltersActionButtonsComponent } from '@components/filters-action-buttons/filters-action-buttons.component';
 import { SearchExportControlsComponent } from '@components/search-export-controls/search-export-controls.component';
 import { PiDelegatesClientService } from '../../services/pi-delegates.client.service';
 import { ActionsService } from '@services/actions.service';
+import { CacheService } from '@services/cache/cache.service';
+import { buildPiDelegatesExportFileName, downloadBlob } from '../../utils/pi-delegates-export.util';
 
 /** A single row in the By-person table (locally defined — not from the service). */
 export interface PersonRow {
@@ -50,6 +55,7 @@ export interface PersonRow {
     InputTextModule,
     TooltipModule,
     SearchExportControlsComponent,
+    FiltersActionButtonsComponent,
     CustomTagComponent
   ],
   templateUrl: './by-person.component.html',
@@ -61,6 +67,7 @@ export class ByPersonComponent {
 
   readonly service = inject(PiDelegatesClientService);
   private readonly actions = inject(ActionsService);
+  private readonly cache = inject(CacheService);
 
   // ─── Assign output (T-UI-07 wires the actual modal) ─────────────────────────
   // Assign button emits the delegate_user_id; the parent/page shell opens the modal.
@@ -114,6 +121,37 @@ export class ByPersonComponent {
   /** Clear Filters on the shared search control: resets the search term. */
   clearFilters(): void {
     this.searchTerm.set('');
+  }
+
+  // ─── Excel export ─────────────────────────────────────────────────────────────
+  // Exports exactly the people the table shows, honouring a user-applied sort via
+  // the p-table's processedData (falls back to filteredRows() before it renders).
+
+  readonly table = viewChild(Table);
+  readonly isExporting = signal(false);
+
+  private currentDelegateIds(): number[] {
+    const processed = this.table()?.processedData as PersonRow[] | undefined;
+    return (processed ?? this.filteredRows()).map(row => row.delegate_user_id);
+  }
+
+  async exportTable(): Promise<void> {
+    if (this.isExporting()) return;
+    this.isExporting.set(true);
+    try {
+      const search = this.searchTerm().trim();
+      const blob = await this.service.exportByPerson(this.currentDelegateIds(), search ? { search } : {});
+      if (!blob?.size) throw new Error('Empty export file');
+      downloadBlob(blob, buildPiDelegatesExportFileName('by_person', new Date(), this.cache.dataCache().user));
+    } catch {
+      this.actions.showToast({
+        severity: 'error',
+        summary: 'Export failed',
+        detail: 'The people could not be exported. Please try again.'
+      });
+    } finally {
+      this.isExporting.set(false);
+    }
   }
 
   // ─── Revoke (R-UI-008) ────────────────────────────────────────────────────────

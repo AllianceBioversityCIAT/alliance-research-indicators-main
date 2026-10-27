@@ -35,6 +35,7 @@ function makeProject(overrides: Partial<ProjectDelegates> = {}): ProjectDelegate
     pi_user_id: null,
     pi_name: null,
     status: 'Active',
+    funding_type: null,
     start_date: null,
     end_date: null,
     delegates: [{ delegate_user_id: 1, name: 'Alice', email: 'alice@example.com', is_active: true }],

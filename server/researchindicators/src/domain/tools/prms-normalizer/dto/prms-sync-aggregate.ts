@@ -106,6 +106,12 @@ export interface PrmsSyncTypeSlices {
 export interface PrmsSyncAggregate {
   result_id: number;
   result_official_code: number | string;
+  /**
+   * `results.prms_result_code` on the version being pushed. Present only
+   * after a previous accept; a re-push sends it as `result_code` and the
+   * settle must not overwrite it. Null on a first push.
+   */
+  prms_result_code: number | null;
   indicator_id: number | null;
   created_at: Date;
   title: string | null;

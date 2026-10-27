@@ -53,15 +53,10 @@ describe('TocIntegrationService', () => {
   let service: TocIntegrationService;
   let httpGet: jest.Mock;
   const originalHost = process.env.ARI_TOC_INTEGRATION_HOST;
-  const originalYear = process.env.ARI_PRMS_SYNC;
 
   beforeEach(async () => {
     process.env.ARI_TOC_INTEGRATION_HOST =
       'https://lambda-toc.clarisa.cgiar.org';
-    // Cleared EXPLICITLY. The URL assertions below expect no `?year=`, and
-    // without this they would pass only because the variable happens to be unset
-    // in this runner -- a machine or CI step that exports it would flip them.
-    delete process.env.ARI_PRMS_SYNC;
     httpGet = jest.fn();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -78,11 +73,6 @@ describe('TocIntegrationService', () => {
     jest.clearAllMocks();
     jest.useRealTimers();
     process.env.ARI_TOC_INTEGRATION_HOST = originalHost;
-    if (originalYear === undefined) {
-      delete process.env.ARI_PRMS_SYNC;
-    } else {
-      process.env.ARI_PRMS_SYNC = originalYear;
-    }
   });
 
   describe('getTocResults', () => {
@@ -91,79 +81,60 @@ describe('TocIntegrationService', () => {
         of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
       );
 
-      const out = await service.getTocResults('SP01', 'OUTPUT');
+      const out = await service.getTocResults('SP01', 'OUTPUT', 2026);
 
       expect(httpGet).toHaveBeenCalledTimes(1);
       expect(httpGet).toHaveBeenCalledWith(
-        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01',
+        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01?year=2026',
       );
       expect(out).toHaveLength(1);
       expect(out[0].toc_result_id).toBe(5187);
       expect(out[0].indicators[0].unit_messurament).toBe('Number');
     });
 
-    // --- `?year=` from ARI_PRMS_SYNC (2026-09-21) ---------------------------
-    // The reporting year is held nowhere else in STAR: no app_config row, no other
-    // ENV var, and every report_years row is is_active = 1 (verified against the
-    // Dev database), so it had to become a variable of its own.
-
-    it('appends ?year= from ARI_PRMS_SYNC when it is set', async () => {
-      process.env.ARI_PRMS_SYNC = '2026';
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-02 / R-PRY-002
+    it('puts the caller year on the lambda-toc URL', async () => {
       httpGet.mockReturnValueOnce(
         of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
       );
 
-      await service.getTocResults('SP01', 'OUTPUT');
+      await service.getTocResults('SP01', 'OUTPUT', 2027);
 
       expect(httpGet).toHaveBeenCalledWith(
-        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01?year=2026',
+        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01?year=2027',
       );
     });
 
-    it('OMITS the param entirely when ARI_PRMS_SYNC is unset -- never sends `year=`', async () => {
-      // An empty `year=` is a different request from no `year` at all, and the
-      // upstream is entitled to treat it differently. Unset must leave the URL
-      // byte-identical to what it was before this parameter existed.
-      delete process.env.ARI_PRMS_SYNC;
-      httpGet.mockReturnValueOnce(
-        of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
-      );
+    it('refetches when the year changes and returns that year payload', async () => {
+      httpGet.mockImplementation((url: string) => {
+        const year = new URL(url).searchParams.get('year');
+        const id = year === '2027' ? 2027 : 2026;
+        return of({ data: envelopeFor('SP01', 'OUTPUT', [id]) });
+      });
 
-      await service.getTocResults('SP01', 'OUTPUT');
+      const yearA = await service.getTocResults('SP01', 'OUTPUT', 2026);
+      const yearB = await service.getTocResults('SP01', 'OUTPUT', 2027);
 
-      const calledWith = httpGet.mock.calls[0][0] as string;
-      expect(calledWith).not.toContain('year');
-      expect(calledWith).toBe(
-        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01',
-      );
-    });
-
-    it('omits the param when ARI_PRMS_SYNC is blank or whitespace', async () => {
-      process.env.ARI_PRMS_SYNC = '   ';
-      httpGet.mockReturnValueOnce(
-        of({ data: envelopeFor('SP01', 'OUTPUT', [5187]) }),
-      );
-
-      await service.getTocResults('SP01', 'OUTPUT');
-
-      expect(httpGet.mock.calls[0][0]).not.toContain('year');
+      expect(httpGet).toHaveBeenCalledTimes(2);
+      expect(yearA[0].toc_result_id).toBe(2026);
+      expect(yearB[0].toc_result_id).toBe(2027);
     });
 
     it('serves from cache within TTL and refetches after TTL expiry (fake timers)', async () => {
       jest.useFakeTimers();
       httpGet.mockReturnValue(of({ data: envelopeFor('SP01', 'OUTPUT', [1]) }));
 
-      await service.getTocResults('SP01', 'OUTPUT');
+      await service.getTocResults('SP01', 'OUTPUT', 2026);
       expect(httpGet).toHaveBeenCalledTimes(1);
 
       // Fresh hit — within TTL, zero HTTP.
       jest.advanceTimersByTime(TTL_MS - 1000);
-      await service.getTocResults('SP01', 'OUTPUT');
+      await service.getTocResults('SP01', 'OUTPUT', 2026);
       expect(httpGet).toHaveBeenCalledTimes(1);
 
       // After >5 min total, the entry is stale — a new HTTP call is made.
       jest.advanceTimersByTime(2000);
-      await service.getTocResults('SP01', 'OUTPUT');
+      await service.getTocResults('SP01', 'OUTPUT', 2026);
       expect(httpGet).toHaveBeenCalledTimes(2);
     });
 
@@ -172,8 +143,8 @@ describe('TocIntegrationService', () => {
         .mockReturnValueOnce(of({ data: envelopeFor('SP01', 'OUTPUT', [1]) }))
         .mockReturnValueOnce(of({ data: envelopeFor('SP01', 'OUTCOME', [2]) }));
 
-      const a = await service.getTocResults('SP01', 'OUTPUT');
-      const b = await service.getTocResults('SP01', 'OUTCOME');
+      const a = await service.getTocResults('SP01', 'OUTPUT', 2026);
+      const b = await service.getTocResults('SP01', 'OUTCOME', 2026);
 
       expect(a[0].toc_result_id).toBe(1);
       expect(b[0].toc_result_id).toBe(2);
@@ -181,11 +152,11 @@ describe('TocIntegrationService', () => {
     });
 
     it('throws 503 when sp or level is missing', async () => {
-      await expect(service.getTocResults('', 'OUTPUT')).rejects.toBeInstanceOf(
-        ServiceUnavailableException,
-      );
       await expect(
-        service.getTocResults('SP01', '' as TocLevel),
+        service.getTocResults('', 'OUTPUT', 2026),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(
+        service.getTocResults('SP01', '' as TocLevel, 2026),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(httpGet).not.toHaveBeenCalled();
     });
@@ -193,7 +164,7 @@ describe('TocIntegrationService', () => {
     it('throws 503 when ARI_TOC_INTEGRATION_HOST is missing', async () => {
       delete process.env.ARI_TOC_INTEGRATION_HOST;
       await expect(
-        service.getTocResults('SP01', 'OUTPUT'),
+        service.getTocResults('SP01', 'OUTPUT', 2026),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(httpGet).not.toHaveBeenCalled();
     });
@@ -209,7 +180,7 @@ describe('TocIntegrationService', () => {
       httpGet.mockReturnValueOnce(
         of({ data: envelopeFor('SP01', 'OUTPUT', [1]) }),
       );
-      await service.getTocResults('SP01', 'OUTPUT');
+      await service.getTocResults('SP01', 'OUTPUT', 2026);
       expect(httpGet).toHaveBeenCalledTimes(1);
 
       jest.advanceTimersByTime(TTL_MS + 1000);
@@ -220,7 +191,7 @@ describe('TocIntegrationService', () => {
         })),
       );
 
-      const out = await service.getTocResults('SP01', 'OUTPUT');
+      const out = await service.getTocResults('SP01', 'OUTPUT', 2026);
 
       expect(out).toHaveLength(1);
       expect(out[0].toc_result_id).toBe(1);
@@ -241,7 +212,7 @@ describe('TocIntegrationService', () => {
       httpGet.mockReturnValueOnce(throwError(() => new Error('upstream down')));
 
       await expect(
-        service.getTocResults('SP01', 'OUTPUT'),
+        service.getTocResults('SP01', 'OUTPUT', 2026),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(errorSpy).toHaveBeenCalledTimes(1);
       expect(errorSpy).toHaveBeenCalledWith(
@@ -252,8 +223,8 @@ describe('TocIntegrationService', () => {
     it('caches an empty {"response":[]} payload as a valid empty catalog (no re-probe within TTL)', async () => {
       httpGet.mockReturnValueOnce(of({ data: { response: [] } }));
 
-      const first = await service.getTocResults('SP01', 'EOI');
-      const second = await service.getTocResults('SP01', 'EOI');
+      const first = await service.getTocResults('SP01', 'EOI', 2026);
+      const second = await service.getTocResults('SP01', 'EOI', 2026);
 
       expect(first).toEqual([]);
       expect(second).toEqual([]);
@@ -264,7 +235,7 @@ describe('TocIntegrationService', () => {
       httpGet.mockReturnValueOnce(of({ data: {} as TocIntegrationEnvelope }));
 
       await expect(
-        service.getTocResults('SP01', 'OUTPUT'),
+        service.getTocResults('SP01', 'OUTPUT', 2026),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
   });
@@ -272,7 +243,7 @@ describe('TocIntegrationService', () => {
   describe('getTocResultsForSps (NFR-BIL-091)', () => {
     it('fans out exactly sps×levels upstream calls and keys the map `${sp}:${level}`', async () => {
       httpGet.mockImplementation((url: string) => {
-        const match = /category\/(\w+)\/initiative\/(\w+)$/.exec(url);
+        const match = /category\/(\w+)\/initiative\/(\w+)/.exec(url);
         const [, level, sp] = match ?? [];
         return of({
           data: envelopeFor(sp, level as TocLevel, [sp === 'SP01' ? 1 : 3]),
@@ -282,6 +253,7 @@ describe('TocIntegrationService', () => {
       const out = await service.getTocResultsForSps(
         ['SP01', 'SP03'],
         ['OUTPUT', 'OUTCOME'],
+        2026,
       );
 
       expect(httpGet).toHaveBeenCalledTimes(4);
@@ -303,20 +275,38 @@ describe('TocIntegrationService', () => {
       await service.getTocResultsForSps(
         ['SP01', 'SP03'],
         ['OUTPUT', 'OUTCOME'],
+        2026,
       );
       expect(httpGet).toHaveBeenCalledTimes(4);
 
       const out = await service.getTocResultsForSps(
         ['SP01', 'SP03'],
         ['OUTPUT', 'OUTCOME'],
+        2026,
       );
       expect(httpGet).toHaveBeenCalledTimes(4);
       expect(out.size).toBe(4);
     });
 
+    it('keeps the public Map key as sp:level for a non-default year', async () => {
+      httpGet.mockImplementation((url: string) => {
+        const year = new URL(url).searchParams.get('year');
+        const id = year === '2027' ? 77 : 66;
+        return of({ data: envelopeFor('SP01', 'OUTPUT', [id]) });
+      });
+
+      const out = await service.getTocResultsForSps(['SP01'], ['OUTPUT'], 2027);
+
+      expect([...out.keys()]).toEqual(['SP01:OUTPUT']);
+      expect(out.get('SP01:OUTPUT')?.[0].toc_result_id).toBe(77);
+      expect(httpGet).toHaveBeenCalledWith(
+        'https://lambda-toc.clarisa.cgiar.org/api/toc-integration/toc/results/category/OUTPUT/initiative/SP01?year=2027',
+      );
+    });
+
     it('returns an empty map for empty input without calling upstream', async () => {
-      const noSps = await service.getTocResultsForSps([], ['OUTPUT']);
-      const noLevels = await service.getTocResultsForSps(['SP01'], []);
+      const noSps = await service.getTocResultsForSps([], ['OUTPUT'], 2026);
+      const noLevels = await service.getTocResultsForSps(['SP01'], [], 2026);
 
       expect(noSps.size).toBe(0);
       expect(noLevels.size).toBe(0);

@@ -609,6 +609,7 @@ export class PiDelegatesService {
         project?.pi_user_id != null ? Number(project.pi_user_id) : null,
       pi_name: formatPersonName(project?.pi_name) || null,
       status: project?.contract_status ?? null,
+      funding_type: project?.funding_type ?? null,
       start_date: project?.start_date ?? null,
       end_date: project?.end_date ?? null,
       delegates: delegates.map((d) => ({
@@ -795,6 +796,7 @@ export class PiDelegatesService {
       pi_user_id: p.pi_user_id != null ? Number(p.pi_user_id) : null,
       pi_name: formatPersonName(p.pi_name) || null,
       status: p.contract_status ?? null,
+      funding_type: p.funding_type ?? null,
       start_date: p.start_date ?? null,
       end_date: p.end_date ?? null,
       delegates: (delegatesByProject.get(p.agreement_id) ?? []).map((d) => ({

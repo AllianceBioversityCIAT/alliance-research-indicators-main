@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 import { ClarisaProjectsModule } from './clarisa-projects.module';
 import { ClarisaProjectsService } from './clarisa-projects.service';
 import { MappingPhaseResolver } from './mapping-phase.resolver';
@@ -47,6 +48,7 @@ describe('ClarisaProjectsService', () => {
   let service: ClarisaProjectsService;
   let phaseResolver: MappingPhaseResolver;
   let connectionGet: jest.Mock;
+  let resolveReportingYear: jest.Mock;
   let mockRepository: {
     findOne: jest.Mock;
   };
@@ -62,6 +64,7 @@ describe('ClarisaProjectsService', () => {
     mockDataSource = {
       getRepository: jest.fn().mockReturnValue(mockRepository),
     };
+    resolveReportingYear = jest.fn().mockResolvedValue(2026);
 
     // Build the REAL ClarisaProjectsModule to prove all module providers (including MappingPhaseResolver)
     // are properly registered in the module (Design §11 F-2 gate).
@@ -70,8 +73,14 @@ describe('ClarisaProjectsService', () => {
         ClarisaProjectsModule,
         {
           module: class MockDbModule {},
-          providers: [{ provide: DataSource, useValue: mockDataSource }],
-          exports: [DataSource],
+          providers: [
+            { provide: DataSource, useValue: mockDataSource },
+            {
+              provide: ReportingYearResolver,
+              useValue: { resolve: resolveReportingYear },
+            },
+          ],
+          exports: [DataSource, ReportingYearResolver],
           global: true,
         },
       ],
@@ -202,7 +211,38 @@ describe('ClarisaProjectsService', () => {
       expect(service.hasSciencePrograms(project)).toBe(false);
     });
 
-    it('returns false when mapping is Confirmed but cgiar_entity_type_object code is not 22 (e.g. 26 for AOW)', () => {
+    it.each([
+      [23, 'Scaling programs', 'SP09'],
+      [24, 'Accelerators', 'SP13'],
+    ])(
+      'returns true for a Confirmed SP filed under entity code %i (%s, %s) — no entity-type narrowing',
+      (code, typeName, smoCode) => {
+        const project: ClarisaProject = {
+          id: 322,
+          short_name: 'B-A1080',
+          source_of_funding: 'bilateral',
+          project_mappings_array: [
+            {
+              id: 527,
+              project_id: 322,
+              program_id: 411,
+              allocation: 100,
+              status: 'Confirmed',
+              global_unit_object: {
+                id: 411,
+                name: 'Genebank',
+                smo_code: smoCode,
+                cgiar_entity_type_object: { code, name: typeName },
+              },
+            },
+          ],
+        };
+
+        expect(service.hasSciencePrograms(project)).toBe(true);
+      },
+    );
+
+    it('returns false when mapping is Confirmed but the mapping is an AOW (code 26, AOWxx smo_code)', () => {
       const project: ClarisaProject = {
         id: 3,
         short_name: 'P-AOW-MAPPING',
@@ -265,7 +305,60 @@ describe('ClarisaProjectsService', () => {
 
       expect(out.map((p) => p.id)).toEqual([1, 3]);
       expect(connectionGet).toHaveBeenCalledTimes(1);
-      expect(connectionGet).toHaveBeenCalledWith('api/projects');
+      expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2026');
+    });
+
+    // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-02 / R-PRY-002, NFR-PRY-001
+    describe('reporting-year phase', () => {
+      it('requests api/projects?phase= from the resolver', async () => {
+        resolveReportingYear.mockResolvedValueOnce(2027);
+        connectionGet.mockResolvedValueOnce([bilateralProject(1, 'A')]);
+
+        await service.findProjectById(1);
+
+        expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2027');
+      });
+
+      it('refetches inside the TTL when the phase changes and returns the new payload', async () => {
+        resolveReportingYear
+          .mockResolvedValueOnce(2026)
+          .mockResolvedValueOnce(2027);
+        connectionGet
+          .mockResolvedValueOnce([bilateralProject(2026, 'Y2026')])
+          .mockResolvedValueOnce([bilateralProject(2027, 'Y2027')]);
+
+        const first = await service.findProjectById(2026);
+        const second = await service.findProjectById(2027);
+
+        expect(connectionGet).toHaveBeenCalledTimes(2);
+        expect(connectionGet).toHaveBeenNthCalledWith(
+          1,
+          'api/projects?phase=2026',
+        );
+        expect(connectionGet).toHaveBeenNthCalledWith(
+          2,
+          'api/projects?phase=2027',
+        );
+        expect(first?.short_name).toBe('Y2026');
+        expect(second?.short_name).toBe('Y2027');
+      });
+
+      it('does not serve an old phase when the new phase fetch fails', async () => {
+        resolveReportingYear
+          .mockResolvedValueOnce(2026)
+          .mockResolvedValueOnce(2027);
+        connectionGet
+          .mockResolvedValueOnce([bilateralProject(1, 'OLD')])
+          .mockRejectedValueOnce(new Error('upstream down'));
+
+        const cached = await service.findProjectById(1);
+        expect(cached?.short_name).toBe('OLD');
+
+        await expect(service.findProjectById(1)).rejects.toBeInstanceOf(
+          ServiceUnavailableException,
+        );
+        expect(connectionGet).toHaveBeenCalledTimes(2);
+      });
     });
 
     it('excludes bilateral projects led by other centers or without lead', async () => {

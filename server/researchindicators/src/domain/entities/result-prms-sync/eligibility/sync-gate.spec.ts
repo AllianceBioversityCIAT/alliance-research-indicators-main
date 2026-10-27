@@ -256,4 +256,87 @@ describe('evaluateSyncGate', () => {
     expect(decision.httpStatus).toBe(null);
     expect(transport.ingest).toHaveBeenCalledTimes(1);
   });
+
+  // R-PRY-005 / D-6. Expected values are the scenario literals (2025 vs 2026),
+  // not a recomputation of the gate predicate.
+  it('refuses a 2025 result when the reporting year is 2026, naming both years, with persistsRow false', () => {
+    const decision = attemptSend(
+      eligible({ report_year: 2025, reporting_year: 2026 }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('reporting_year');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(decision.description).toContain('2025');
+    expect(decision.description).toContain('2026');
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('returns not_already_synced for an already-synced 2025 result even when the year also mismatches', () => {
+    const decision = attemptSend(
+      eligible({
+        is_synced_to_prms: true,
+        report_year: 2025,
+        reporting_year: 2026,
+      }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('not_already_synced');
+    expect(decision.persistsRow).toBe(false);
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('passes when report_year and reporting_year are both absent', () => {
+    const decision = attemptSend(eligible(), transport);
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.entryId).toBe(null);
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a null result year when a reporting year is present', () => {
+    const decision = attemptSend(
+      eligible({ report_year: null, reporting_year: 2026 }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(false);
+    expect(decision.entryId).toBe('reporting_year');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(decision.description).toContain('2026');
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('refuses when the result year is 2026 and the configured reporting year is 2027', () => {
+    const decision = attemptSend(
+      eligible({ report_year: 2026, reporting_year: 2027 }),
+      transport,
+    );
+
+    expect(decision.entryId).toBe('reporting_year');
+    expect(decision.httpStatus).toBe(HttpStatus.CONFLICT);
+    expect(decision.persistsRow).toBe(false);
+    expect(decision.description).toContain('2026');
+    expect(decision.description).toContain('2027');
+    expect(transport.ingest).not.toHaveBeenCalled();
+  });
+
+  it('treats raw-SQL string report_year "2025" as equal to reporting_year 2025', () => {
+    const decision = attemptSend(
+      eligible({
+        report_year: '2025' as unknown as number,
+        reporting_year: 2025,
+      }),
+      transport,
+    );
+
+    expect(decision.allowed).toBe(true);
+    expect(decision.entryId).toBe(null);
+    expect(transport.ingest).toHaveBeenCalledTimes(1);
+  });
 });

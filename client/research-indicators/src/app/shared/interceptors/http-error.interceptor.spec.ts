@@ -587,6 +587,56 @@ describe('httpErrorInterceptor', () => {
     });
   });
 
+  it('should not show toast when a 502 comes from tools/agrovoc/search', done => {
+    const agrovocRequest = new HttpRequest('GET', 'http://test.com/api/tools/agrovoc/search?query=x');
+    const errorResponse = new HttpErrorResponse({
+      error: { description: 'AGROVOC service is unavailable' },
+      status: 502,
+      statusText: 'Bad Gateway'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(agrovocRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: error => {
+        expect(error).toBe(errorResponse);
+        expect(mockActionsService.showToast).not.toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
+  it('should show toast when a 502 comes from results general-information', done => {
+    const generalInformationRequest = new HttpRequest('GET', 'http://test.com/api/results/1/general-information');
+    const errorResponse = new HttpErrorResponse({
+      error: { errors: 'Upstream failed' },
+      status: 502,
+      statusText: 'Bad Gateway'
+    });
+
+    mockHandler = jest.fn().mockReturnValue(throwError(() => errorResponse));
+    mockCacheService.isLoggedIn.mockReturnValue(true);
+    mockCacheService.dataCache.mockReturnValue({
+      user: { sec_user_id: 1, first_name: 'X', last_name: 'Y', email: 'x@y.z' }
+    });
+    mockApiService.saveErrors.mockResolvedValue(undefined);
+
+    interceptor(generalInformationRequest, mockHandler).subscribe({
+      next: () => done.fail('Should have thrown an error'),
+      error: error => {
+        expect(error).toBe(errorResponse);
+        expect(mockActionsService.showToast).toHaveBeenCalled();
+        done();
+      }
+    });
+  });
+
   it('should not show toast when 400 comes from /pool-funding-tag (bilateral inline-error path)', done => {
     const poolFundingTagRequest = new HttpRequest('PATCH', 'http://test.com/api/v1/agresso/contracts/AC-1594/pool-funding-tag', {
       is_pool_funding_contributor: true

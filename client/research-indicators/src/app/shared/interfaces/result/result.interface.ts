@@ -27,6 +27,7 @@ export interface Result {
   geo_scope_id: null;
   indicators?: { name: string; icon_src: string };
   result_status?: ResultStatus;
+  result_status_id?: number;
   contract_id?: string | null;
   contract_description?: string | null;
   result_contracts?: { contract_id: string; contract?: { description?: string }; is_primary?: number };

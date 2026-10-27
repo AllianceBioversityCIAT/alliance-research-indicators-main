@@ -26,6 +26,9 @@ export interface GlobalAlert {
   hideCancelButton?: boolean;
   hideCloseButton?: boolean;
   onDetailLinkClick?: () => void;
+  infoCard?: { badge: string; caption: string };
+  selectorExcludeValues?: number[];
+  cancelSwapsTo?: GlobalAlert;
 }
 
 interface Callback {

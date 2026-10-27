@@ -164,6 +164,15 @@ export class ProjectDelegatesResponseDto {
 
   @ApiProperty({
     type: String,
+    description:
+      'agresso_contracts.funding_type (Agresso short code, e.g. BLR, BLU, W3R, W3U)',
+    nullable: true,
+    example: 'BLR',
+  })
+  funding_type!: string | null;
+
+  @ApiProperty({
+    type: String,
     format: 'date-time',
     description: 'agresso_contracts.start_date',
     nullable: true,

@@ -17,7 +17,7 @@
   <div class="flex flex-col xl:flex-row gap-4">
     @if (showOicrNo) {
     <div class="flex-1 xl:max-w-[428px]">
-      <app-input [isRequired]="true" label="OICR No" helperText="Internal code assigned by SPRM." [signal]="body"
+      <app-input [isRequired]="true" label="OICR No" helperText="Internal code assigned by MELP." [signal]="body"
         [disabled]="isOicrNoDisabled" placeholder="e.g. LAC-2501" [optionValue]="oicrNoOptionValue">
       </app-input>
     </div>
@@ -35,22 +35,30 @@
   <div class="flex flex-col">
     <app-select label="Select existing OICR" helperText="Select an OICR previously reported in the Alliance."
       [signal]="body" [optionValue]="oicrOptionValue" optionLabel="title" serviceName="oicrResults" [isRequired]="true"
-      [customFilterBy]="'external_id,title,maturity_level,report_year'" (selectEvent)="onSelectOicr($event)"
+      [customFilterBy]="'oicr_internal_code,external_id,title,maturity_level,report_year'" (selectEvent)="onSelectOicr($event)"
       placeholder="Select OICR" scrollHeight="310px" [disabled]="disabled || this.createResultManagementService.editingOicr()"
       [hideSelected]="false" textSpan="OICR selected">
       <!-- Item template -->
       <ng-template #item let-item>
         <div class="flex flex-col gap-2 text-[14px] w-full min-w-0" pTooltip="{{ item?.title }}">
           <p class="text-[#4C5158] font-[400] w-full overflow-hidden whitespace-nowrap text-ellipsis">
-            <b>{{ item?.external_id }} -</b>
+            <b>{{ oicrDisplayCode(item) }} -</b>
             {{ item?.title }}
           </p>
 
-          <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
-            <button
-              class="uppercase max-w-24 text-[10px] font-semibold px-2 py-1 rounded-lg border border-[#7CB580] text-[#358540]">
-              Published
-            </button>
+          <!-- div, not p: app-custom-tag renders block content, which a <p> cannot hold. -->
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
+            <!-- Same status tag as the Results Center table, driven by the status config from the API. -->
+            @if (item?.status) {
+            <app-custom-tag [statusId]="item.status.result_status_id ?? ''" [tiny]="true"
+              [statusName]="item.status.name ?? ''" [statusColor]="item.status.config?.color?.text ?? ''"
+              [statusBackground]="item.status.config?.color?.background ?? ''"
+              [statusBorder]="item.status.config?.color?.border ?? ''" [icon]="true"
+              [iconName]="item.status.config?.icon?.name ?? ''" [iconColor]="item.status.config?.icon?.color ?? ''"
+              [tooltip]="item.status.description ?? ''"></app-custom-tag>
+            } @else if (item?.result_status) {
+            <app-custom-tag [statusName]="item.result_status" [tiny]="true"></app-custom-tag>
+            }
             Maturity level <i class="pi pi-arrow-right !text-[8px] text-[#777C83] pl-1"></i>
             <span class="text-[#345B8F] uppercase">{{ item?.maturity_level }}</span>
             <span class="text-[#B9C0C5]">|</span>
@@ -64,7 +72,7 @@
                 item?.handle_link }}</a>
             </span>
             }
-          </p>
+          </div>
         </div>
       </ng-template>
 
@@ -77,7 +85,7 @@
               <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
             </div>
             <div class="flex">
-              <p class="text-[#4C5158] font-[500] flex leading-4">{{ item?.external_id }} -{{ item?.title }}</p>
+              <p class="text-[#4C5158] font-[500] flex leading-4">{{ oicrDisplayCode(item) }} -{{ item?.title }}</p>
             </div>
             <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#777C83] !font-['Space_Grotesk']">
               <button

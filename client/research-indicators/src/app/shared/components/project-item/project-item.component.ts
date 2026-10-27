@@ -3,7 +3,8 @@ import { Component, computed, EventEmitter, inject, Input, OnChanges, OnInit, Ou
 import { ResultsCenterService } from '@pages/platform/pages/results-center/results-center.service';
 import { GetContractsByUser, IndicatorElement } from '@shared/interfaces/get-contracts-by-user.interface';
 import { GetProjectDetail, GetProjectDetailIndicator } from '@shared/interfaces/get-project-detail.interface';
-import { CustomTagComponent } from '../custom-tag/custom-tag.component';
+import { TooltipModule } from 'primeng/tooltip';
+import { POOL_FUNDING_TAG_LABEL, POOL_FUNDING_TAG_TOOLTIP, CustomTagComponent } from '../custom-tag/custom-tag.component';
 import { ProjectType, ProjectUtilsService } from '@shared/services/project-utils.service';
 
 type ProjectItemIndicator = IndicatorElement | GetProjectDetailIndicator;
@@ -11,11 +12,13 @@ type ProjectItemIndicator = IndicatorElement | GetProjectDetailIndicator;
 @Component({
   selector: 'app-project-item',
   standalone: true,
-  imports: [DatePipe, CustomTagComponent],
+  imports: [DatePipe, CustomTagComponent, TooltipModule],
   templateUrl: './project-item.component.html',
   styleUrl: './project-item.component.scss'
 })
 export class ProjectItemComponent implements OnInit, OnChanges {
+  readonly poolFundingLabel = POOL_FUNDING_TAG_LABEL;
+  readonly poolFundingTooltip = POOL_FUNDING_TAG_TOOLTIP;
   private readonly projectUtils = inject(ProjectUtilsService);
   private readonly resultsCenterService = inject(ResultsCenterService, { optional: true });
 

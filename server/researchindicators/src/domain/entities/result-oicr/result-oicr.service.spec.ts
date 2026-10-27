@@ -71,6 +71,8 @@ describe('ResultOicrService', () => {
     mockDataSource = {
       getRepository: jest.fn().mockReturnValue(mockMainRepo),
       transaction: jest.fn(),
+      // get_portfolio_id_by_result — Portfolio 1 unless a test says otherwise
+      manager: { query: jest.fn().mockResolvedValue([{ portfolio_id: 1 }]) },
     } as any;
 
     mockCurrentUser = {
@@ -367,6 +369,7 @@ describe('ResultOicrService', () => {
 
       const mockEntityManager = {
         getRepository: jest.fn().mockReturnValue(mockResultRepo),
+        query: jest.fn().mockResolvedValue([{ portfolio_id: 1 }]),
       } as any;
 
       mockResultsService.createResult.mockResolvedValue(
@@ -411,6 +414,34 @@ describe('ResultOicrService', () => {
         mockCreatedResult,
       );
       expect(result).toEqual(mockCreatedResult);
+    });
+
+    it('does not merge the contract lever into a Portfolio 2 OICR (step 2 holds Research Areas)', async () => {
+      const data = {
+        base_information: { title: 'T' } as any,
+        step_two: { primary_lever: [{ lever_id: 12 }], contributor_lever: [] },
+      } as any;
+      mockResultsService.createResult.mockResolvedValue({
+        result_id: 777,
+      } as any);
+      Object.defineProperty(mockDataSource, 'manager', {
+        value: {
+          getRepository: jest.fn(),
+          query: jest.fn().mockResolvedValue([{ portfolio_id: 2 }]),
+        },
+        writable: true,
+      });
+      jest
+        .spyOn(service as any, 'updateOicrSteps')
+        .mockResolvedValue(undefined);
+      jest
+        .spyOn(service, 'sendMessageOicr')
+        .mockResolvedValue(undefined as any);
+
+      await service.createOicr(data);
+
+      expect(mockResultLeversService.find).not.toHaveBeenCalled();
+      expect(data.step_two.primary_lever).toEqual([{ lever_id: 12 }]);
     });
 
     it('should handle error when createResult fails', async () => {
@@ -549,6 +580,39 @@ describe('ResultOicrService', () => {
   });
 
   describe('stepTwoOicr', () => {
+    it('saves Research Areas (role 3) for a Portfolio 2 result, keeping primary vs contributing', async () => {
+      (mockDataSource.manager.query as jest.Mock).mockResolvedValueOnce([
+        { portfolio_id: 2 },
+      ]);
+      mockResultLeversService.create.mockResolvedValue(undefined);
+
+      await service.stepTwoOicr(
+        {
+          primary_lever: [
+            { lever_id: '18', custom_lever_name: 'Seed team' },
+          ] as any,
+          contributor_lever: [{ lever_id: '12' }] as any,
+        },
+        123,
+      );
+
+      expect(mockDataSource.manager.query).toHaveBeenCalledWith(
+        'SELECT get_portfolio_id_by_result(?) AS portfolio_id',
+        [123],
+      );
+      expect(mockResultLeversService.create).toHaveBeenCalledWith(
+        123,
+        [
+          { lever_id: '18', is_primary: true, custom_lever_name: 'Seed team' },
+          { lever_id: '12', is_primary: false, custom_lever_name: undefined },
+        ],
+        'lever_id',
+        LeverRolesEnum.RESEARCH_AREAS_ALIGNMENT,
+        undefined,
+        ['is_primary', 'custom_lever_name'],
+      );
+    });
+
     it('should execute step two operations', async () => {
       // Arrange
       const resultId = 123;
@@ -1254,8 +1318,11 @@ describe('ResultOicrService', () => {
 
       expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
         resultId,
-        [{ external_oicr_id: 456 }],
+        [{ external_oicr_id: 456, source: 'external' }],
         'external_oicr_id',
+        undefined,
+        undefined,
+        ['source'],
       );
     });
 
@@ -1350,6 +1417,9 @@ describe('ResultOicrService', () => {
         resultId,
         [], // Should pass empty array for undefined
         'external_oicr_id',
+        undefined,
+        undefined,
+        ['source'],
       );
     });
   });
@@ -1507,6 +1577,33 @@ describe('ResultOicrService', () => {
   });
 
   describe('stepOneOicr', () => {
+    it('stores a link to an OICR from results with source=result', async () => {
+      mockResultUsersService.create.mockResolvedValue(undefined);
+      mockResultTagsService.create.mockResolvedValue([{ tag_id: 2 }] as any);
+      mockTempExternalOicrsService.create.mockResolvedValue(undefined);
+      mockResultOicrRepository.update.mockResolvedValue({ affected: 1 } as any);
+      mockCurrentUser.audit.mockReturnValue({} as any);
+
+      await service.stepOneOicr(
+        {
+          main_contact_person: { user_id: 456 } as any,
+          tagging: { tag_id: 2 } as any,
+          link_result: { external_oicr_id: 3311, source: 'result' } as any,
+          outcome_impact_statement: 'Statement',
+        },
+        123,
+      );
+
+      expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
+        123,
+        [{ external_oicr_id: 3311, source: 'result' }],
+        'external_oicr_id',
+        undefined,
+        undefined,
+        ['source'],
+      );
+    });
+
     it('should execute step one operations with temp external OICR', async () => {
       // Arrange
       const resultId = 123;
@@ -1549,10 +1646,11 @@ describe('ResultOicrService', () => {
 
       expect(mockTempExternalOicrsService.create).toHaveBeenCalledWith(
         resultId,
-        [{ external_oicr_id: 789 }],
+        [{ external_oicr_id: 789, source: 'external' }],
         'external_oicr_id',
         undefined,
         undefined,
+        ['source'],
       );
 
       expect(mockResultOicrRepository.update).toHaveBeenCalledWith(resultId, {
@@ -1590,6 +1688,7 @@ describe('ResultOicrService', () => {
         'external_oicr_id',
         undefined,
         undefined,
+        ['source'],
       );
     });
 

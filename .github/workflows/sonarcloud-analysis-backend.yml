@@ -77,7 +77,8 @@ jobs:
             -Dsonar.organization=alliancebioversityciat \
             -Dsonar.host.url=https://sonarcloud.io \
             -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/migrations/**,**/*.spec.ts \
+            -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/migrations/**,**/*.spec.ts,**/*-spec.ts,test/** \
+            -Dsonar.cpd.exclusions=**/*.dictionary.ts \
             -Dsonar.coverage.exclusions=** \
             -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info
         working-directory: ./server/researchindicators

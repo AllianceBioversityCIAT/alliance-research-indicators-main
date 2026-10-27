@@ -13,6 +13,7 @@ import { GetResultsService } from '@shared/services/control-list/get-results.ser
 import { CacheService } from '@shared/services/cache/cache.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { GetYearsService } from '@shared/services/control-list/get-years.service';
+import { OicrReportingYearService } from '@shared/services/oicr-reporting-year.service';
 import { WordCountService } from '@shared/services/word-count.service';
 import { CreateResultManagementService } from '../../services/create-result-management.service';
 
@@ -22,6 +23,7 @@ describe('CreateResultFormComponent', () => {
 
   let router: Router;
   let apiServiceMock: any;
+  let oicrReportingYearMock: { year: ReturnType<typeof signal<number>>; load: jest.Mock };
   let actionsServiceMock: any;
   let yearsServiceMock: any;
   let resultsServiceMock: any;
@@ -44,6 +46,8 @@ describe('CreateResultFormComponent', () => {
         // intentionally left blank for testing
       }
     };
+
+    oicrReportingYearMock = { year: signal(2026), load: jest.fn().mockResolvedValue(2026) };
 
     apiServiceMock = {
       POST_Result: jest.fn(),
@@ -129,7 +133,8 @@ describe('CreateResultFormComponent', () => {
         { provide: AllModalsService, useValue: allModalsServiceMock },
         { provide: CacheService, useValue: cacheServiceMock },
         { provide: CreateResultManagementService, useValue: createResultManagementServiceMock },
-        { provide: WordCountService, useValue: wordCountServiceMock }
+        { provide: WordCountService, useValue: wordCountServiceMock },
+        { provide: OicrReportingYearService, useValue: oicrReportingYearMock }
       ]
     }).compileComponents();
 
@@ -494,6 +499,19 @@ describe('CreateResultFormComponent', () => {
     component.onIndicatorChange(5);
     expect(component.body().indicator_id).toBe(5);
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('loads the configured OICR reporting year on creation', () => {
+    expect(oicrReportingYearMock.load).toHaveBeenCalled();
+  });
+
+  it('offers and preselects the configured OICR reporting year when OICR is chosen', () => {
+    oicrReportingYearMock.year.set(2027);
+
+    component.onIndicatorChange(5);
+
+    expect(component.body().year).toBe(2027);
+    expect(component.oicrYearOptions()).toEqual([{ report_year: 2027 }]);
   });
 
   it('isW1W2NonOicr should return true for W1/W2 non-OICR combinations', () => {

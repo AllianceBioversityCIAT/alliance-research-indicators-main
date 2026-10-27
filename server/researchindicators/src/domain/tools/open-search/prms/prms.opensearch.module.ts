@@ -8,9 +8,12 @@ import { PooledFundingContractsModule } from '../../../entities/pooled-funding-c
 import { ClarisaLeversModule } from '../../clarisa/entities/clarisa-levers/clarisa-levers.module';
 import { SyncProcessLogModule } from '../../../entities/sync-process-log/sync-process-log.module';
 import { PrmsRepository } from './repositories/prms.repository';
+import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { ClarisaCountriesModule } from '../../clarisa/entities/clarisa-countries/clarisa-countries.module';
 import { ClarisaRegionsModule } from '../../clarisa/entities/clarisa-regions/clarisa-regions.module';
 import { ClarisaInstitutionsModule } from '../../clarisa/entities/clarisa-institutions/clarisa-institutions.module';
+import { BilateralModule } from '../../../entities/bilateral/bilateral.module';
+import { GreenChecksModule } from '../../../entities/green-checks/green-checks.module';
 import { SaveAllSectionsModule } from '../../../shared/services/save-all-sections.module';
 import { ClarisaInnovationCharacteristicsModule } from '../../clarisa/entities/clarisa-innovation-characteristics/clarisa-innovation-characteristics.module';
 import { ClarisaInnovationTypesModule } from '../../clarisa/entities/clarisa-innovation-types/clarisa-innovation-types.module';
@@ -20,7 +23,13 @@ import { ClarisaInstitutionTypesModule } from '../../clarisa/entities/clarisa-in
 
 @Module({
   controllers: [PrmsOpenSearchController],
-  providers: [PrmsOpenSearchService, PrmsRepository],
+  providers: [
+    PrmsOpenSearchService,
+    PrmsRepository,
+    // History writer; it only needs the DataSource, same as in
+    // ResultPrmsSyncModule.
+    PrmsWebhookDeliveryRepository,
+  ],
   exports: [PrmsOpenSearchService, PrmsRepository],
   imports: [
     HttpModule,
@@ -38,6 +47,8 @@ import { ClarisaInstitutionTypesModule } from '../../clarisa/entities/clarisa-in
     ClarisaActorTypesModule,
     ClarisaInstitutionTypesModule,
     SaveAllSectionsModule,
+    GreenChecksModule,
+    BilateralModule,
   ],
 })
 export class PrmsOpenSearchModule {}

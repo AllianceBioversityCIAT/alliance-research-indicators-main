@@ -1,8 +1,13 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { LinkResultsService } from '../link-results/link-results.service';
 import { CreateResultPolicyChangeDto } from './dto/create-result-policy-change.dto';
 import { LinkResultRolesEnum } from '../link-result-roles/enum/link-result-roles.enum';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { Result } from '../results/entities/result.entity';
 import { ResultInstitutionsService } from '../result-institutions/result-institutions.service';
 import { ResultPolicyChange } from './entities/result-policy-change.entity';
 import { InstitutionRolesEnum } from '../institution-roles/enums/institution-roles.enum';
@@ -95,6 +100,8 @@ export class ResultPolicyChangeService {
       createResultPolicyChangeDto,
     );
 
+    await this.assertInnovationLinkTypes(createResultPolicyChangeDto);
+
     const innoSave: Partial<LinkResult>[] = [];
     if (createResultPolicyChangeDto?.innovation_development)
       innoSave.push({
@@ -175,6 +182,58 @@ export class ResultPolicyChangeService {
           : Number(policyChange.usd_amount),
       amount_status: policyChange?.amount_status ?? null,
     };
+  }
+
+  /**
+   * Rejects a non-null link whose result is missing or has the wrong
+   * indicator. Status and `is_active` are not part of the check: a link
+   * saved before its target changed status must still save (DD-3).
+   * Runs before the transaction, so a rejection writes nothing.
+   */
+  private async assertInnovationLinkTypes(
+    dto: CreateResultPolicyChangeDto,
+  ): Promise<void> {
+    const required: {
+      field: 'innovation_development' | 'innovation_use';
+      id: number;
+      indicator: IndicatorsEnum;
+    }[] = [];
+
+    if (dto?.innovation_development != null) {
+      required.push({
+        field: 'innovation_development',
+        id: dto.innovation_development,
+        indicator: IndicatorsEnum.INNOVATION_DEV,
+      });
+    }
+    if (dto?.innovation_use != null) {
+      required.push({
+        field: 'innovation_use',
+        id: dto.innovation_use,
+        indicator: IndicatorsEnum.INNOVATION_USE,
+      });
+    }
+    if (required.length === 0) {
+      return;
+    }
+
+    const found = await this.dataSource.getRepository(Result).find({
+      select: { result_id: true, indicator_id: true },
+      where: { result_id: In(required.map((item) => item.id)) },
+    });
+    const indicatorById = new Map(
+      found.map((row) => [row.result_id, row.indicator_id]),
+    );
+
+    for (const item of required) {
+      if (indicatorById.get(item.id) !== item.indicator) {
+        throw new BadRequestException(
+          item.field === 'innovation_development'
+            ? 'innovation_development is not an existing Innovation Development result'
+            : 'innovation_use is not an existing Innovation Use result',
+        );
+      }
+    }
   }
 
   /**

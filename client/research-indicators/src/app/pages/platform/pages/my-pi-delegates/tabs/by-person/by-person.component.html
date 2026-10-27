@@ -41,10 +41,19 @@
            Same p-button recipe as "New Project Result" on Project Detail
            (shared/components/project-results-table) — the platform's one
            add-something affordance, so it must not look like a second design. -->
-      <div class="by-person__assign-new-wrapper ml-auto">
-        <p-button label="Assign New Delegate" icon="pi pi-plus" severity="info" size="small"
-          styleClass="by-person__assign-new !rounded-[9px] !h-7.5 !text-[13px]" [style]="{ 'min-width': '95px' }"
-          (onClick)="onAssignNewDelegate()" />
+      <div class="ml-auto flex items-center gap-3">
+        <app-filters-action-buttons
+          [showExportButton]="true"
+          exportLabel="Export people"
+          [isExportLoading]="isExporting()"
+          (export)="exportTable()"
+        ></app-filters-action-buttons>
+
+        <div class="by-person__assign-new-wrapper">
+          <p-button label="Assign New Delegate" icon="pi pi-plus" severity="info" size="small"
+            styleClass="by-person__assign-new !rounded-[9px] !h-7.5 !text-[13px]" [style]="{ 'min-width': '95px' }"
+            (onClick)="onAssignNewDelegate()" />
+        </div>
       </div>
     </div>
 

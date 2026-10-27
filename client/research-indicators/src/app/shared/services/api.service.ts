@@ -1,5 +1,5 @@
 import { Injectable, WritableSignal, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
 import { LoginRes, MainResponse } from '../interfaces/responses.interface';
 import {
@@ -7,6 +7,8 @@ import {
   DelegateProjects,
   PiDelegateHistoryEntry,
   PiDelegateScope,
+  PiDelegatesExportByPersonBody,
+  PiDelegatesExportByProjectBody,
   piDelegateScopeParam,
   ProjectDelegates
 } from '../interfaces/pi-delegates.interface';
@@ -104,6 +106,7 @@ import { GetVersions } from '@shared/interfaces/get-versions.interface';
 import { AskForHelp } from '../components/all-modals/modals-content/ask-for-help-modal/interfaces/ask-for-help.interface';
 import { GreenChecks } from '@shared/interfaces/get-green-checks.interface';
 import { HttpParams } from '@angular/common/http';
+import { AgrovocTerm } from '@shared/interfaces/agrovoc-term.interface';
 import { GetInnovationDetails } from '@shared/interfaces/get-innovation-details.interface';
 import { GetInnovationUseDetails } from '@shared/interfaces/get-innovation-use-details.interface';
 import { InnovationUseLevel } from '@shared/interfaces/get-innovation-use-levels.interface';
@@ -150,7 +153,7 @@ import {
 } from '@shared/interfaces/app-config.interface';
 import { GetTags } from '@shared/interfaces/get-tags.interface';
 import { GetOICRDetails } from '@shared/interfaces/gets/get-oicr-details.interface';
-import { LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
+import { ExistingOicrSource, LeverStrategicOutcome, Oicr, OicrCreation, PatchOicr } from '@shared/interfaces/oicr-creation.interface';
 import { LeverSdgTargetApi, PatchLeverSdgTargetsRequest } from '@shared/interfaces/lever-sdg-target.interface';
 import { MaturityLevel } from '@shared/interfaces/maturity-level.interface';
 import { InteractionFeedbackPayload } from '@shared/interfaces/feedback-interaction.interface';
@@ -1176,6 +1179,9 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
+  GET_AgrovocSearch$ = (query: string): Observable<MainResponse<AgrovocTerm[]>> =>
+    this.TP.getObservable<AgrovocTerm[]>('tools/agrovoc/search', { params: new HttpParams().set('query', query) });
+
   GET_ImpactAreas = (): Promise<MainResponse<ImpactArea[]>> => {
     const url = () => `tools/clarisa/impact-areas`;
     return this.TP.get(url(), {});
@@ -1314,8 +1320,8 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  GET_OICRMetadata = (resultCode: number): Promise<MainResponse<OicrCreation>> => {
-    const url = () => `temp/oicrs/${resultCode}/metadata`;
+  GET_OICRMetadata = (resultCode: number, source?: ExistingOicrSource): Promise<MainResponse<OicrCreation>> => {
+    const url = () => `temp/oicrs/${resultCode}/metadata${source ? `?source=${source}` : ''}`;
     return this.TP.get(url(), {});
   };
 
@@ -1497,6 +1503,22 @@ export class ApiService {
     return firstValueFrom(
       this.TP.http.delete<MainResponse<unknown>>(url, { body })
     );
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-project/xlsx → xlsx blob.
+   * `project_codes` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByProjectXlsx = (body: PiDelegatesExportByProjectBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-project/xlsx', body, {});
+  };
+
+  /**
+   * POST /api/pi-delegates/export/by-person/xlsx → xlsx blob.
+   * `delegate_user_ids` are the rows currently shown, in display order.
+   */
+  POST_PiDelegatesExportByPersonXlsx = (body: PiDelegatesExportByPersonBody): Promise<Blob> => {
+    return this.TP.postBlob('pi-delegates/export/by-person/xlsx', body, {});
   };
 
   /**

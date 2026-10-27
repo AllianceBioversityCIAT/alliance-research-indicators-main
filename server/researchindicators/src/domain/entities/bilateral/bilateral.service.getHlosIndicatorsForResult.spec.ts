@@ -17,6 +17,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaCgiarEntitiesService } from '../../tools/clarisa/cgiar-entities/clarisa-cgiar-entities.service';
 import { PrmsTocService } from '../../tools/prms-toc/prms-toc.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { BilateralProjectMappingService } from '../bilateral-project-mapping/bilateral-project-mapping.service';
 import {
   TocIndicatorTarget,
@@ -48,8 +49,8 @@ import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 //      (R-BIL-090 AC.1, R-BIL-091 AC.1, NFR-BIL-091)
 //   7. allowed_levels: [] (Knowledge Product) → catalogs: [], ZERO
 //      TocIntegrationService calls (R-BIL-091 AC.2)
-//   8. version_locked flag off report_year_id vs MAPPABLE_LIVE_VERSION,
-//      both branches (R-BIL-097 read flag)
+//   8. version_locked flag off report_year_id vs the configured reporting
+//      year, both branches (R-BIL-097 read flag)
 //
 // Fixture parity: the `handoffTocResult` builder mirrors the upstream payload
 // in the STAR client handoff §2 (backend-handoff.md) — same field names AND
@@ -196,8 +197,11 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
   const findProjectById = jest.fn();
   const findProjectByExternalCode = jest.fn();
   const getTocResultsForSps = jest.fn();
+  const resolveReportingYear = jest.fn();
 
   beforeEach(async () => {
+    resolveReportingYear.mockReset();
+    resolveReportingYear.mockResolvedValue(2026);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BilateralService,
@@ -243,6 +247,10 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
           useValue: { getAreasOfWorkBySp: jest.fn() },
         },
         { provide: PrmsTocService, useValue: {} },
+        {
+          provide: ReportingYearResolver,
+          useValue: { resolve: resolveReportingYear },
+        },
         { provide: TocIntegrationService, useValue: { getTocResultsForSps } },
         {
           provide: BilateralProjectMappingService,
@@ -341,6 +349,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).toHaveBeenCalledWith(
       ['SP02', 'SP06'],
       ['OUTPUT'],
+      2026,
     );
     expect(out.mapping_status).toBe('mapped');
     expect(out.clarisa_project).toEqual({
@@ -487,6 +496,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).toHaveBeenCalledWith(
       ['SP01', 'SP03'],
       ['OUTCOME', 'EOI'],
+      2026,
     );
 
     expect(out.mapping_status).toBe('mapped');
@@ -537,7 +547,7 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     expect(getTocResultsForSps).toHaveBeenCalledTimes(0);
   });
 
-  it('sets version_locked: true when the live version year differs from MAPPABLE_LIVE_VERSION', async () => {
+  it('sets version_locked: true when the result year differs from the configured reporting year', async () => {
     findContext.mockResolvedValueOnce(
       context({ report_year_id: 2025, agresso_agreement_id: null }),
     );
@@ -545,6 +555,84 @@ describe('BilateralService.getHlosIndicatorsForResult (T-03/T-04)', () => {
     const out = await service.getHlosIndicatorsForResult(19792, '19792');
 
     expect(out.version_locked).toBe(true);
+  });
+
+  it('version_locked is false for a 2026 result when the configured year is 2026', async () => {
+    resolveReportingYear.mockResolvedValue(2026);
+    findContext.mockResolvedValueOnce(
+      context({ report_year_id: 2026, agresso_agreement_id: null }),
+    );
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.version_locked).toBe(false);
+  });
+
+  it('version_locked is true for a 2026 result when the configured year is 2027', async () => {
+    resolveReportingYear.mockResolvedValue(2027);
+    findContext.mockResolvedValueOnce(
+      context({ report_year_id: 2026, agresso_agreement_id: null }),
+    );
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(out.version_locked).toBe(true);
+  });
+
+  it('picks the target whose target_date matches the configured year 2027', async () => {
+    resolveReportingYear.mockResolvedValue(2027);
+    findContext.mockResolvedValueOnce(
+      context({
+        indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      }),
+    );
+    findActiveByAgreementId.mockResolvedValueOnce({
+      clarisa_project_id: 22,
+      clarisa_project_short_name: 'DESIRA',
+    });
+    findProjectById.mockResolvedValueOnce({
+      id: 22,
+      short_name: 'DESIRA',
+      project_mappings_array: [sp(1, 'SP01')],
+    });
+    getTocResultsForSps.mockResolvedValueOnce(
+      new Map([
+        [
+          'SP01:OUTPUT',
+          [
+            tocResult('SP01', 1, {
+              indicators: [
+                {
+                  indicator_id: 10,
+                  toc_result_indicator_id: 'tri-1',
+                  related_node_id: 'node-1',
+                  indicator_description: 'Indicator for 1',
+                  unit_messurament: 'Number',
+                  type_value: 'Custom',
+                  type_name: 'Custom type',
+                  location: null,
+                  targets: [
+                    { target_value: '12', target_date: '2026' },
+                    { target_value: '77', target_date: '2027' },
+                  ],
+                },
+              ],
+            }),
+          ],
+        ],
+      ]),
+    );
+
+    const out = await service.getHlosIndicatorsForResult(19792, '19792');
+
+    expect(getTocResultsForSps).toHaveBeenCalledWith(
+      ['SP01'],
+      ['OUTPUT'],
+      2027,
+    );
+    const indicator = out.catalogs[0].levels[0].toc_results[0].indicators[0];
+    expect(indicator.target_value).toBe('77');
+    expect(indicator.target_year).toBe(2027);
   });
 
   it('R-PSP-002: ToC catalog resolves the exact same non-empty SP set as getScienceProgramsForResult for Pending-only project', async () => {

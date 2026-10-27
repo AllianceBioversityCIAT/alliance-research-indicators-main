@@ -80,6 +80,17 @@ describe('SubmissionService', () => {
     expect(service.isEditableStatus()).toBe(true);
   });
 
+  // Owner 2026-10-26: a Postponed OICR can be fully edited by an admin, as a Published one.
+  it.each([
+    [true, true],
+    [false, false]
+  ])('isEditableStatus for postponed status_id 11 when admin=%p -> %p', (admin, expected) => {
+    cacheMock.currentMetadata.mockReturnValue({ status_id: 11 });
+    cacheMock.getCurrentPlatformCode.mockReturnValue('STAR');
+    rolesMock.isAdmin.mockReturnValue(admin);
+    expect(service.isEditableStatus()).toBe(expected);
+  });
+
   it('isEditableStatus false for published status_id 14 on STAR when user is not admin', () => {
     cacheMock.currentMetadata.mockReturnValue({ status_id: 14 });
     cacheMock.getCurrentPlatformCode.mockReturnValue('STAR');

@@ -25,6 +25,11 @@
         <div class="p-1.5 bg-[#FFF3F3] rounded-sm flex items-center justify-center">
           <i class="pi pi-times-circle !text-[13px] text-[#cf0808]"></i>
         </div>
+        } @else if (status.transition_direction === 'unknown' && status.result_status_id === 10) {
+        <!-- OICR Accepted: same icon and colour as Accept in the OICR review modal (submit-result-content) -->
+        <div class="p-1.5 bg-[#F6FAF7] rounded-sm flex items-center justify-center" data-testid="status-option-accepted-icon">
+          <i class="pi pi-check-circle !text-[13px] text-[#509C55]"></i>
+        </div>
         } @else if (status.transition_direction === 'unknown' && status.result_status_id === 11) {
         <div class="p-1.5 bg-[#FFF6ED] rounded-sm flex items-center justify-center">
           <i class="pi pi-minus-circle !text-[13px] text-[#e69f00]"></i>

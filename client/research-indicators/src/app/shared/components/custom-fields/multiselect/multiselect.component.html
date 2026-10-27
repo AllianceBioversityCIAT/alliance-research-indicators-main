@@ -108,7 +108,8 @@
     [class.columns-xl-3]="columnsOnXl && columnsOnXlCount === 3"
     [class.selected-items--stack-gap]="hideRemoveIcon"
     [class.selected-items--custom-surface]="!!selectedItemsSurfaceColor.trim()"
-    [style.--multiselect-selected-surface]="selectedItemsSurfaceColor.trim() || null">
+    [style.--multiselect-selected-surface]="selectedItemsSurfaceColor.trim() || null"
+    [style.max-height]="!this.disabledSelectedScroll && selectedItemsMaxHeight ? selectedItemsMaxHeight : null">
     @for (row of selectedOptions(); track trackSelectedOptionRow($index, row)) {
     <div class="item  {{ dark ? ' !bg-[#e8ebed] !border-[#c6cdd1]/40' : 'abc-grey-100' }}"
       [class.item--full-row]="hideRemoveIcon">

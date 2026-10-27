@@ -3,4 +3,5 @@ export interface TransformResultCodeResponse {
   result_id: number;
   result_official_code: number;
   result_status_id: number;
+  updated_at?: string | null;
 }

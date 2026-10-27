@@ -49,6 +49,7 @@ function makeProjectDelegates(overrides: Partial<ProjectDelegates> = {}): Projec
     pi_user_id: null,
     pi_name: null,
     status: 'active',
+    funding_type: null,
     start_date: null,
     end_date: null,
     delegates: [],

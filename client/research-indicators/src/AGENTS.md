@@ -150,9 +150,18 @@ Declared in [`../tsconfig.json`](../tsconfig.json) and mirrored in [`../jest.con
     counters made clickable, and `matchesRole()` calls the very same `isPiOf()` / `isDelegateOf()`
     those counters use. Re-deriving the rule inside the filter is how a chip ends up showing a
     different set than the number it sits under. They combine with the search box (AND) and
-    `clearFilters()` resets them. The selected chip is marked by `--ac-light-blue-50` **plus a
-    heavier font weight** — no underline, which read as a tab strip when these are filters on the
-    table below, and the weight is what carries the state without colour (NFR-UI-002).
+    `clearFilters()` resets them. Beside them, under the "Quick views" label, sit two **independent toggles**
+    (`ongoingOnly`, `withoutDelegatesOnly`) that AND with any role chip, each other and the search:
+    *Ongoing projects* uses the Status badge's own rule (`statusDisplay().statusId === 1`; a missing
+    status, rendered "—", is not ongoing) and
+    *Projects without delegates* calls `service.hasNoDelegate()`, the predicate behind the
+    "Projects without PI delegate" counter. `clearFilters()` resets them too. The two kinds of control are drawn differently on purpose, because a row of five identical pills hid which
+    were exclusive: **role is a segmented control** (the Pooled Funding Monitor "Viewing" look — one rounded track,
+    the selected segment filled navy; `role="radiogroup"` `aria-label="Your role"`, `role="radio"` + `aria-checked`,
+    roving `tabindex`, Arrow Left/Right select and move focus), a 1px divider follows, then the two toggles are
+    **checkbox chips** (`role="checkbox"` + `aria-checked`, `pi-stop` when off / `pi-check-square` when on, navy
+    border on `--ac-pfm-info-bg` and semibold when on) inside a `role="group"` `aria-label="Refine"`. No underline
+    (it read as a tab strip); "filled" / "ticked" plus `aria-checked` carry the state without colour (NFR-UI-002).
   - **Adding something is one affordance platform-wide.** *Assign New Delegate* reuses the
     `New Project Result` recipe verbatim — `<p-button icon="pi pi-plus" severity="info" size="small"
     styleClass="!rounded-[9px] !h-7.5 !text-[13px]">` from `shared/components/project-results-table`.

@@ -11,6 +11,9 @@ import { WordCountService } from '@shared/services/word-count.service';
 import { ActionsService } from '@shared/services/actions.service';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { CreateResultManagementService } from '../../all-modals/modals-content/create-result-modal/services/create-result-management.service';
+import { OicrResultsService } from '@shared/services/short-control-list/oicr-results.service';
+import { Oicr } from '@shared/interfaces/oicr-creation.interface';
+import { CustomTagComponent } from '@components/custom-tag/custom-tag.component';
 
 // Lightweight stand-ins for the real field components, used only in the "disabled input (F-3)" suite below so
 // the real template renders (instead of the '' override used elsewhere in this file) without pulling in the
@@ -33,6 +36,9 @@ import { CreateResultManagementService } from '../../all-modals/modals-content/c
     @if (rowsTemplate) {
       <ng-container *ngTemplateOutlet="rowsTemplate; context: { $implicit: fakeSelectedOption }"></ng-container>
     }
+    @if (itemTemplate) {
+      <ng-container *ngTemplateOutlet="itemTemplate; context: { $implicit: fakeOption }"></ng-container>
+    }
   `
 })
 class StubSelectComponent {
@@ -53,8 +59,31 @@ class StubSelectComponent {
   @Input() textSpan = '';
 
   @ContentChild('rows') rowsTemplate?: TemplateRef<unknown>;
+  @ContentChild('item') itemTemplate?: TemplateRef<unknown>;
 
-  fakeSelectedOption = { external_id: 'LAC-2501', title: 'Fake OICR', maturity_level: 'High', report_year: 2024 };
+  // One dropdown option, with the status config GET temp/oicrs returns.
+  fakeOption: Record<string, unknown> = {
+    id: 3311,
+    external_id: '3138',
+    title: 'Result OICR',
+    result_status: 'OICR Accepted',
+    status: {
+      result_status_id: 10,
+      name: 'OICR Accepted',
+      description: 'Accepted by the MEL team',
+      config: {
+        color: { text: '#7CB580', border: '#A8CEAB', background: null },
+        icon: { name: 'pi pi-exclamation-circle', color: '#7CB580' }
+      }
+    }
+  };
+
+  fakeSelectedOption: Record<string, unknown> = {
+    external_id: 'LAC-2501',
+    title: 'Fake OICR',
+    maturity_level: 'High',
+    report_year: 2024
+  };
 }
 
 @Component({ selector: 'app-textarea', standalone: true, template: '' })
@@ -93,6 +122,7 @@ describe('OicrFormFieldsComponent', () => {
 
   let apiMock: jest.Mocked<ApiService>;
   let utilsMock: jest.Mocked<UtilsService>;
+  let oicrResultsMock: { list: WritableSignal<Oicr[]> };
   let wordCountMock: jest.Mocked<WordCountService>;
   let actionsMock: jest.Mocked<ActionsService>;
   let rolesMock: Partial<RolesService> & { canEditOicr?: jest.Mock };
@@ -111,7 +141,15 @@ describe('OicrFormFieldsComponent', () => {
     utilsMock = {
       getNestedPropertySignal: jest.fn(),
       setNestedPropertyWithReduceSignal: jest.fn(),
+      setNestedPropertyWithReduce: jest.fn((obj: any, path: string, value: unknown) => {
+        const keys = path.split('.');
+        const last = keys.pop() as string;
+        const target = keys.reduce((acc, key) => (acc[key] ??= {}), obj);
+        target[last] = value;
+      }),
     } as unknown as jest.Mocked<UtilsService>;
+
+    oicrResultsMock = { list: signal<Oicr[]>([]) };
 
     wordCountMock = {
       getWordCount: jest.fn().mockReturnValue(0),
@@ -142,6 +180,7 @@ describe('OicrFormFieldsComponent', () => {
         { provide: ActionsService, useValue: actionsMock },
         { provide: RolesService, useValue: rolesMock },
         { provide: CreateResultManagementService, useValue: createResultMock },
+        { provide: OicrResultsService, useValue: oicrResultsMock },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     })
@@ -195,10 +234,26 @@ describe('OicrFormFieldsComponent', () => {
     });
   });
 
-  it('onSelectOicr should delegate to getOicrMetadata', () => {
+  it('onSelectOicr treats an id missing from the list as a TEMP_external_oicrs row', () => {
     const spy = jest.spyOn(component as any, 'getOicrMetadata').mockResolvedValue(undefined);
     component.onSelectOicr(99);
-    expect(spy).toHaveBeenCalledWith(99);
+    expect(spy).toHaveBeenCalledWith(99, 'external');
+    expect((component.body() as any).link_result.source).toBe('external');
+  });
+
+  it('onSelectOicr stores source=result for an OICR from results and asks for its metadata', () => {
+    oicrResultsMock.list.set([
+      { id: 12, source: 'external' } as Oicr,
+      { id: 3311, source: 'result' } as Oicr
+    ]);
+    component.oicrOptionValue = { body: 'step_one.link_result.external_oicr_id', option: 'id' };
+    component.body.set({ step_one: { link_result: { external_oicr_id: 3311 } } } as any);
+    const spy = jest.spyOn(component as any, 'getOicrMetadata').mockResolvedValue(undefined);
+
+    component.onSelectOicr(3311);
+
+    expect((component.body() as any).step_one.link_result).toEqual({ external_oicr_id: 3311, source: 'result' });
+    expect(spy).toHaveBeenCalledWith(3311, 'result');
   });
 
   it('clearOicrSelection default input function should be callable', () => {
@@ -227,7 +282,8 @@ describe('OicrFormFieldsComponent', () => {
         },
       } as any;
       apiMock.GET_OICRMetadata.mockResolvedValue(response);
-      await component.getOicrMetadata(10);
+      await component.getOicrMetadata(10, 'result');
+      expect(apiMock.GET_OICRMetadata).toHaveBeenCalledWith(10, 'result');
       const body = createResultMock.createOicrBody();
       expect(body.step_one.outcome_impact_statement).toBe('S');
       expect(body.step_two.contributor_lever).toEqual([{ lever_id: 3 }]);
@@ -436,12 +492,20 @@ describe('OicrFormFieldsComponent', () => {
           { provide: WordCountService, useValue: wordCountMock },
           { provide: ActionsService, useValue: actionsMock },
           { provide: RolesService, useValue: rolesMock },
-          { provide: CreateResultManagementService, useValue: createResultMock }
+          { provide: CreateResultManagementService, useValue: createResultMock },
+          { provide: OicrResultsService, useValue: oicrResultsMock }
         ]
       })
         .overrideComponent(OicrFormFieldsComponent, {
           set: {
-            imports: [CommonModule, TooltipModule, StubSelectComponent, StubTextareaComponent, StubInputComponent]
+            imports: [
+              CommonModule,
+              TooltipModule,
+              StubSelectComponent,
+              StubTextareaComponent,
+              StubInputComponent,
+              CustomTagComponent
+            ]
           }
         })
         .compileComponents();
@@ -449,6 +513,25 @@ describe('OicrFormFieldsComponent', () => {
       disabledFixture = TestBed.createComponent(OicrFormFieldsComponent);
       disabledComponent = disabledFixture.componentInstance;
       disabledComponent.body = signal<any>({});
+    });
+
+    it('renders each existing OICR option with its status tag, colors, icon and tooltip from the API config', () => {
+      disabledComponent.body.set({ tagging: { tag_id: 2 } } as any);
+      disabledFixture.detectChanges();
+
+      const tag = disabledFixture.debugElement.query(By.directive(CustomTagComponent))
+        .componentInstance as CustomTagComponent;
+      expect(tag.statusName).toBe('OICR Accepted');
+      expect(tag.statusId).toBe(10);
+      expect(tag.statusColor).toBe('#7CB580');
+      expect(tag.statusBorder).toBe('#A8CEAB');
+      expect(tag.statusBackground).toBe('');
+      expect(tag.icon).toBe(true);
+      expect(tag.iconName).toBe('pi pi-exclamation-circle');
+      expect(tag.iconColor).toBe('#7CB580');
+      expect(tag.tooltip).toBe('Accepted by the MEL team');
+      // One line: the tag grows to fit its name instead of wrapping it.
+      expect(tag.multiline).toBe(false);
     });
 
     it('defaults to false so existing consumers (e.g. the create-result modal) are unaffected', () => {
@@ -547,7 +630,61 @@ describe('OicrFormFieldsComponent', () => {
         expect(clearIcon).not.toBeNull();
       });
     });
+
+    describe('existing-OICR code shown in the option (oicr_internal_code over result_official_code)', () => {
+      // GET temp/oicrs returns `external_id` (results.result_official_code) and, for rows backed by
+      // result_oicrs, `oicr_internal_code`. The option must show the internal code when the row has one
+      // and keep falling back to the official code when it does not.
+      const renderOptions = () => {
+        disabledComponent.body = signal<any>({ tagging: { tag_id: 2 }, link_result: { external_oicr_id: 5 } });
+        disabledFixture.detectChanges();
+        return disabledFixture.debugElement
+          .queryAll(By.directive(StubSelectComponent))
+          .find(sel => (sel.componentInstance as StubSelectComponent).label === 'Select existing OICR')!;
+      };
+
+      it('prefers oicr_internal_code in the #item and #rows templates when the row has one', () => {
+        const select = renderOptions();
+        const stub = select.componentInstance as StubSelectComponent;
+        stub.fakeOption = { ...stub.fakeOption, oicr_internal_code: 'OICR-LAC-2025-01' };
+        stub.fakeSelectedOption = { ...stub.fakeSelectedOption, oicr_internal_code: 'OICR-AFR-2024-07' };
+        disabledFixture.detectChanges();
+
+        const text = select.nativeElement.textContent as string;
+        expect(text).toContain('OICR-LAC-2025-01');
+        expect(text).toContain('OICR-AFR-2024-07');
+        expect(text).not.toContain('3138');
+        expect(text).not.toContain('LAC-2501');
+      });
+
+      it.each([undefined, null, '   '])('falls back to external_id when oicr_internal_code is %p', code => {
+        const select = renderOptions();
+        const stub = select.componentInstance as StubSelectComponent;
+        stub.fakeOption = { ...stub.fakeOption, oicr_internal_code: code };
+        stub.fakeSelectedOption = { ...stub.fakeSelectedOption, oicr_internal_code: code };
+        disabledFixture.detectChanges();
+
+        const text = select.nativeElement.textContent as string;
+        expect(text).toContain('3138');
+        expect(text).toContain('LAC-2501');
+      });
+
+      it('lets the user search by the internal code too', () => {
+        const stub = renderOptions().componentInstance as StubSelectComponent;
+        expect(stub.customFilterBy.split(',')).toContain('oicr_internal_code');
+      });
+
+      it.each([
+        [{ oicr_internal_code: 'OICR-1', external_id: '3138' }, 'OICR-1'],
+        [{ oicr_internal_code: '  OICR-2  ', external_id: '3138' }, 'OICR-2'],
+        [{ oicr_internal_code: '', external_id: '3138' }, '3138'],
+        [{ oicr_internal_code: null, external_id: '3138' }, '3138'],
+        [{ external_id: ' 3138 ' }, '3138'],
+        [{}, ''],
+        [null, '']
+      ])('oicrDisplayCode(%p) -> %p', (item, expected) => {
+        expect(disabledComponent.oicrDisplayCode(item as any)).toBe(expected);
+      });
+    });
   });
 });
-
-

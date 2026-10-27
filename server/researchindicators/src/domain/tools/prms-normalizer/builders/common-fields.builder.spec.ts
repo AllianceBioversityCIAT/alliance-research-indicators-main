@@ -54,6 +54,7 @@ const baseAggregate = (
 ): PrmsSyncAggregate => ({
   result_id: 9001,
   result_official_code: 1441061,
+  prms_result_code: null,
   indicator_id: 1,
   created_at: CREATED_AT,
   title: 'Capacity sharing common-fields fixture',
@@ -1126,6 +1127,23 @@ describe('CommonFieldsBuilder', () => {
   describe('keep_editing (homologation.md §4)', () => {
     it('sends keep_editing false inside data', () => {
       expect(builder.build(baseAggregate()).keep_editing).toBe(false);
+    });
+  });
+
+  describe('result_code on re-push', () => {
+    it('sends the stored PRMS code as a string immediately after external_reference', () => {
+      const data = builder.build(baseAggregate({ prms_result_code: 9475 }));
+
+      expect(data.result_code).toBe('9475');
+      expect(typeof data.result_code).toBe('string');
+      const keys = Object.keys(data);
+      expect(keys[keys.indexOf('external_reference') + 1]).toBe('result_code');
+    });
+
+    it('omits result_code when the pushed version has no stored PRMS code', () => {
+      const data = builder.build(baseAggregate({ prms_result_code: null }));
+
+      expect('result_code' in data).toBe(false);
     });
   });
 });

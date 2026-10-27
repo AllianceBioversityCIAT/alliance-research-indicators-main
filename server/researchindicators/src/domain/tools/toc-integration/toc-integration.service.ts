@@ -15,8 +15,10 @@ import {
 // Do NOT inject CurrentUserUtil, ResultsUtil, or any other REQUEST-scoped
 // provider. The level-based catalog read hot path goes through this service.
 //
-// Cache strategy (per design §6.2): TTL only, in-memory, keyed `${sp}:${level}`
-// (e.g. `SP01:OUTPUT`). ToC catalog changes are rare.
+// Cache strategy (per design §6.2, D-4): TTL only, in-memory. The internal
+// key is `${year}:${sp}:${level}` (e.g. `2026:SP01:OUTPUT`) so a reporting-year
+// change cannot be served from another year's entry. ToC catalog changes
+// are rare. The Map `getTocResultsForSps` returns stays keyed `${sp}:${level}`.
 //
 // Resilience (per NFR-BIL-090): on upstream error with WARM cache, serve the
 // cached catalog + LoggerUtil warn (sp, level, upstream status). On COLD
@@ -41,11 +43,16 @@ export class TocIntegrationService {
   constructor(private readonly http: HttpService) {}
 
   /**
-   * Fetch the ToC results catalog for a single (SP, level) pair.
-   * Cached for TTL_MS keyed `${sp}:${level}`. Returns the inner `response`
-   * array — callers do not see the upstream envelope wrapper.
+   * Fetch the ToC results catalog for a single (SP, level) at `year`.
+   * Cached for TTL_MS under the internal key `${year}:${sp}:${level}`.
+   * Returns the inner `response` array — callers do not see the upstream
+   * envelope wrapper. The service does not resolve the year itself.
    */
-  async getTocResults(sp: string, level: TocLevel): Promise<TocResult[]> {
+  async getTocResults(
+    sp: string,
+    level: TocLevel,
+    year: number,
+  ): Promise<TocResult[]> {
     const normalizedSp = sp?.trim();
     const normalizedLevel = level?.trim() as TocLevel;
 
@@ -55,7 +62,7 @@ export class TocIntegrationService {
       );
     }
 
-    const key = this.cacheKey(normalizedSp, normalizedLevel);
+    const key = this.internalCacheKey(year, normalizedSp, normalizedLevel);
     const now = Date.now();
     const hit = this.cache.get(key);
     if (hit && now - hit.fetchedAt < this.TTL_MS) {
@@ -64,19 +71,12 @@ export class TocIntegrationService {
 
     try {
       const host = this.assertHost();
-      // `year` comes from ENV.PRMS_SYNC_YEAR (`ARI_PRMS_SYNC`). Appended only when
-      // set: an unset value leaves the URL byte-identical to what it was before
-      // this parameter existed, rather than sending an empty `year=`.
-      //
-      // Deliberately NOT part of the cache key: the key `${sp}:${level}` is the
-      // public shape of the Map `getTocResultsForSps` returns and that
-      // `bilateral.service` indexes by, so widening it would be a contract change.
-      // It is safe here because the year is process-constant — it comes from the
-      // environment, so a change to it arrives with a restart, which empties the
-      // cache anyway.
-      const year = ENV.PRMS_SYNC_YEAR;
+      // The caller passes the reporting year, and it is always sent. The
+      // internal cache key includes it, so a year change is a miss and cannot
+      // be answered from another year's catalog. The public Map key returned
+      // by getTocResultsForSps stays `${sp}:${level}`.
       const base = `${host.replace(/\/$/, '')}/api/toc-integration/toc/results/category/${normalizedLevel}/initiative/${normalizedSp}`;
-      const url = year ? `${base}?year=${encodeURIComponent(year)}` : base;
+      const url = `${base}?year=${encodeURIComponent(String(year))}`;
       const { data } = await firstValueFrom(
         this.http.get<TocIntegrationEnvelope>(url),
       );
@@ -126,13 +126,14 @@ export class TocIntegrationService {
   async getTocResultsForSps(
     sps: string[],
     levels: TocLevel[],
+    year: number,
   ): Promise<Map<string, TocResult[]>> {
     const out = new Map<string, TocResult[]>();
     if (!sps?.length || !levels?.length) return out;
 
     const combos = sps.flatMap((sp) => levels.map((level) => ({ sp, level })));
     const results = await Promise.all(
-      combos.map((c) => this.getTocResults(c.sp, c.level)),
+      combos.map((c) => this.getTocResults(c.sp, c.level, year)),
     );
 
     combos.forEach((c, i) => {
@@ -153,8 +154,14 @@ export class TocIntegrationService {
     this.cache.clear();
   }
 
+  /** Public Map key. Stays `${sp}:${level}` — bilateral indexes this shape. */
   private cacheKey(sp: string, level: TocLevel): string {
     return `${sp}:${level}`;
+  }
+
+  /** Internal cache identity. Includes the reporting year so years do not collide. */
+  private internalCacheKey(year: number, sp: string, level: TocLevel): string {
+    return `${year}:${this.cacheKey(sp, level)}`;
   }
 
   private assertHost(): string {

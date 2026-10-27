@@ -22,14 +22,6 @@ export type TocResultTypeKey =
   | 'innovation_use'
   | 'unknown';
 
-/**
- * Hardcoded mappable live version year (D-V2-7, R-BIL-097). The version
- * gate anchors on `results.report_year_id` (`report_years.report_year`,
- * literal year) compared against this constant — intentionally a constant,
- * not an env var, per the handoff.
- */
-export const MAPPABLE_LIVE_VERSION = 2026;
-
 const INDICATOR_RESULT_TYPE_KEYS: Record<IndicatorsEnum, TocResultTypeKey> = {
   [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT]: 'capacity_sharing',
   [IndicatorsEnum.INNOVATION_DEV]: 'innovation_dev',
