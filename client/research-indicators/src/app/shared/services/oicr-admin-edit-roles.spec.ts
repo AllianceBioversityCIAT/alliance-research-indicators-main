@@ -5,7 +5,7 @@ import { RolesService } from './cache/roles.service';
 import { CacheService } from './cache/cache.service';
 import { CreateResultManagementService } from '../components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
 
-// Owner 2026-10-26: "Edit all OICR metadata" on a Postponed (11) or Published (14) OICR is for the
+// Owner 2026-10-26/27: "Edit all OICR metadata" on a Postponed (11), Not Accepted (15) or Published (14) OICR is for the
 // two admin roles, System Admin (1) AND Center Admin (9), and nobody else. Both the modal button and
 // the full form's editability go through RolesService.isAdmin(); here the REAL RolesService decides,
 // with each role on its own, so a role mapping change cannot slip past mocked `isAdmin` stubs.
@@ -39,7 +39,7 @@ function setup(roleId: number, statusId: number) {
   return { roles: TestBed.inject(RolesService), submission: TestBed.inject(SubmissionService) };
 }
 
-describe('OICR full edit on Postponed / Published: both admins, nobody else', () => {
+describe('OICR full edit on Postponed / Not Accepted / Published: both admins, nobody else', () => {
   it.each([
     ['System Admin', true],
     ['Center Admin', true],
@@ -56,6 +56,11 @@ describe('OICR full edit on Postponed / Published: both admins, nobody else', ()
     ['Contributor', 11, false],
     ['Technical Support', 11, false],
     ['Mel Regional Expert', 11, false],
+    ['System Admin', 15, true],
+    ['Center Admin', 15, true],
+    ['Contributor', 15, false],
+    ['Technical Support', 15, false],
+    ['Mel Regional Expert', 15, false],
     ['System Admin', 14, true],
     ['Center Admin', 14, true],
     ['Contributor', 14, false]

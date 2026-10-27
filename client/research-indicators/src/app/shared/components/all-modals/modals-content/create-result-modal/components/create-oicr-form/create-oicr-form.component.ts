@@ -265,8 +265,8 @@ export class CreateOicrFormComponent implements OnInit {
     { allowSignalWrites: true }
   );
 
-  /** Published (14) and Postponed (11): an admin can still open the full OICR form to edit everything. */
-  private readonly fullEditStatusIds = [14, 11];
+  /** Published (14), Postponed (11) and Not Accepted (15): an admin can still open the full OICR form to edit everything. */
+  private readonly fullEditStatusIds = [14, 11, 15];
 
   showEditPublishedOicrButton = computed(
     () =>
