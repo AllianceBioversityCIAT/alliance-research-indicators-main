@@ -139,6 +139,16 @@
                   date: 'dd/MM/yyyy' }}</span>
               </div>
             </div>
+            <!-- Always visible (no hover): how to take this Postponed / Not Accepted OICR up again for a newer
+                 year. Only where the "Edit all OICR metadata" button exists (admins), so it never points at
+                 a button the user does not have. -->
+            @if (showEditPublishedOicrButton()) {
+            <p class="m-0 mt-3 flex items-center gap-2 text-[13px] leading-[18px] text-[#777c83]" data-testid="oicr-reuse-hint">
+              <i class="pi pi-info-circle !text-[13px] !leading-none text-[#777c83]" aria-hidden="true"></i>
+              <span>Want to report this OICR again for a newer year? Use
+                <span class="font-semibold">Edit all OICR metadata</span> at the bottom of the form.</span>
+            </p>
+            }
           </div>
           <div class="flex items-center justify-end gap-4 min-w-[200px]">
             <span
