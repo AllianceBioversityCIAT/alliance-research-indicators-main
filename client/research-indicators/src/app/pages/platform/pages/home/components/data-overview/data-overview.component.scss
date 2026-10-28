@@ -175,6 +175,10 @@
     &:focus-visible {
       box-shadow: 0 0 0 2px rgb(22 137 202 / 45%);
     }
+
+    &--static {
+      cursor: default;
+    }
   }
 
   .status-bar-label {
