@@ -12,14 +12,18 @@ import { MappingSourceEnum } from '../enum/mapping-source.enum';
 // which is preserved as a point-in-time record). Soft-delete via `is_active`
 // from AuditableEntity.
 //
-// Partial-uniqueness "(agresso_agreement_id) WHERE is_active = true" is enforced
-// by a MySQL generated column + unique index defined in the matching migration
-// (D-PI-9). The generated column is intentionally NOT mapped here; TypeORM
-// would otherwise try to write to it.
+// Uniqueness is one row per (agresso_agreement_id, reporting_year), whether
+// the row is active or inactive, via UNIQUE index uk_bpm_agreement_year.
+// Migration annualizeBilateralProjectMapping drops the generated column
+// active_agreement_id and uk_bpm_active_agreement (D-PI-9). That generated
+// column stays unmapped. TypeORM would try to write it.
 @Entity('bilateral_project_mapping')
 @Index('idx_bpm_agreement', ['agresso_agreement_id'])
 @Index('idx_bpm_clarisa_project', ['clarisa_project_id'])
 @Index('idx_bpm_clarisa_external_code', ['clarisa_external_code'])
+@Index('uk_bpm_agreement_year', ['agresso_agreement_id', 'reporting_year'], {
+  unique: true,
+})
 export class BilateralProjectMapping extends AuditableEntity {
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id!: number;
@@ -31,6 +35,14 @@ export class BilateralProjectMapping extends AuditableEntity {
     comment: 'FK-by-value to agresso_contract.agreement_id',
   })
   agresso_agreement_id!: string;
+
+  @Column('int', {
+    name: 'reporting_year',
+    nullable: false,
+    comment:
+      'Reporting year of this mapping. Writers set it explicitly. There is no database default.',
+  })
+  reporting_year!: number;
 
   @Column('int', {
     name: 'clarisa_project_id',
