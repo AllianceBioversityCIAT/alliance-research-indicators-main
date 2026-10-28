@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpInterceptorFn, HttpRequest, HttpHandlerFn, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
 import { ApiService } from '../services/api.service';
@@ -518,9 +518,19 @@ describe('httpErrorInterceptor', () => {
       })
     );
 
-    // When saveErrors fails, the error is propagated through the observable
-    expect(errorCaught).toBe(true);
+    // H58 — a failing error tracker must not fail the request it was only reporting on
+    expect(errorCaught).toBe(false);
 
+    subscription.unsubscribe();
+  }));
+
+  it('H58: does not report a slow file download (blob) to the error tracker', fakeAsync(() => {
+    const blobRequest = mockRequest.clone({ responseType: 'blob' });
+    const subscription = interceptor(blobRequest, () => NEVER).subscribe();
+
+    tick(5000);
+
+    expect(mockApiService.saveErrors).not.toHaveBeenCalled();
     subscription.unsubscribe();
   }));
 
