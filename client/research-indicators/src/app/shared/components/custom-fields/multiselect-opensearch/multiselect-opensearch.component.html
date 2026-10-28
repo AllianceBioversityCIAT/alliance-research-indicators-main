@@ -16,6 +16,7 @@
       [loading]="this.loadingList()"
       [options]="this.listInstance()"
       [filter]="!this.service?.isOpenSearch()"
+      [autofocusFilter]="true"
       [filterBy]="this.optionLabel"
       [optionLabel]="this.optionLabel"
       [showToggleAll]="false"
@@ -25,7 +26,8 @@
       (onChange)="this.setValue($event)"
       [virtualScroll]="true"
       [virtualScrollItemSize]="41"
-      [emptyMessage]="'No results found. Try different keywords.'">
+      [emptyMessage]="'No results found. Try different keywords.'"
+      (onPanelShow)="focusOpenSearchFilter()">
       <ng-template pTemplate="header">
         <div class="p-dropdown-header">
           <div class="p-input-icon-left p-fluid">
