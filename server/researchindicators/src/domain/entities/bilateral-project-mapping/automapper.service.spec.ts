@@ -8,6 +8,7 @@ import { AgressoContract } from '../agresso-contract/entities/agresso-contract.e
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 
 // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-02 / R-CAM-001 (both
 // scenarios; AC.2, AC.3, AC.4), NFR-CAM-001 — and T-03 / R-CAM-002 (idempotency),
@@ -19,6 +20,7 @@ import { User } from '../../complementary-entities/secondary/user/user.entity';
 // eligible cohort's known prefix mix ({B-, C-}), not to assert reality.
 
 const fakeUser = { sec_user_id: 77 } as User;
+const YEAR = 2026;
 
 describe('AutomapperService', () => {
   let service: AutomapperService;
@@ -35,6 +37,7 @@ describe('AutomapperService', () => {
     update: jest.Mock;
   };
   let mockDataSource: { getRepository: jest.Mock; transaction: jest.Mock };
+  let mockReportingYearResolver: { resolve: jest.Mock };
 
   const makeContractQb = (contracts: Partial<AgressoContract>[] = []) => {
     const qb: Record<string, jest.Mock> = {};
@@ -58,6 +61,7 @@ describe('AutomapperService', () => {
     let codeFilter: string[] | null = null;
     let agreementFilter: string[] | null = null;
     let activeFilter: boolean | null = null;
+    let yearFilter: number | null = null;
     const sqlClauses: string[] = [];
 
     const executeBrackets = (brackets: Brackets) => {
@@ -136,6 +140,12 @@ describe('AutomapperService', () => {
         ) {
           activeFilter = true;
         }
+        if (
+          clause === 'bpm.reporting_year = :reportingYear' &&
+          typeof params?.reportingYear === 'number'
+        ) {
+          yearFilter = params.reportingYear;
+        }
         return qb;
       },
     );
@@ -174,6 +184,9 @@ describe('AutomapperService', () => {
       }
       if (activeFilter === true) {
         filtered = filtered.filter((r) => r.is_active === true);
+      }
+      if (yearFilter !== null) {
+        filtered = filtered.filter((r) => r.reporting_year === yearFilter);
       }
       return filtered;
     });
@@ -218,8 +231,27 @@ describe('AutomapperService', () => {
       confidence_score: null,
       notes: null,
       is_active: true,
+      reporting_year: YEAR,
       ...overrides,
     }) as BilateralProjectMapping;
+
+  const bindTxStore = (store: BilateralProjectMapping[]) => {
+    let nextId = 9000;
+    txMappingRepo.createQueryBuilder.mockImplementation(() =>
+      makeMappingQb(store),
+    );
+    txMappingRepo.create.mockImplementation((row) => ({ ...row }));
+    txMappingRepo.save.mockImplementation(async (row) => {
+      const saved = { id: nextId++, ...row } as BilateralProjectMapping;
+      store.push(saved);
+      return saved;
+    });
+    txMappingRepo.update.mockImplementation(async (criteria, partial) => {
+      const row = store.find((r) => r.id === (criteria as { id: number }).id);
+      if (row) Object.assign(row, partial);
+      return { affected: row ? 1 : 0 };
+    });
+  };
 
   // A synthetic 198-project cohort with a {B-, C-} prefix mix, each with a
   // distinct derived id and a matching AGRESSO contract — the happy path at
@@ -254,6 +286,9 @@ describe('AutomapperService', () => {
       save: jest.fn(async (x) => ({ id: 999, ...x })),
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
+    mockReportingYearResolver = {
+      resolve: jest.fn().mockResolvedValue(YEAR),
+    };
     mockDataSource = {
       // Discriminates by entity, the way DataSource.getRepository(Entity)
       // does for real — resolve() reads AgressoContract, classify() (preview)
@@ -281,6 +316,10 @@ describe('AutomapperService', () => {
           useValue: mockClarisaProjectsService,
         },
         { provide: DataSource, useValue: mockDataSource },
+        {
+          provide: ReportingYearResolver,
+          useValue: mockReportingYearResolver,
+        },
       ],
     }).compile();
 
@@ -304,7 +343,7 @@ describe('AutomapperService', () => {
         makeContractQb(buildMatchingContracts(198)),
       );
 
-      const result = await service.resolve(2026);
+      const result = await service.resolve();
 
       expect(result.resolved).toHaveLength(198);
       expect(result.ambiguous).toHaveLength(0);
@@ -442,7 +481,12 @@ describe('AutomapperService', () => {
 
       const result = await service.resolve();
 
-      expect(result).toEqual({ resolved: [], ambiguous: [], unresolved: [] });
+      expect(result).toEqual({
+        reportingYear: YEAR,
+        resolved: [],
+        ambiguous: [],
+        unresolved: [],
+      });
     });
 
     it('does NOT abort when at least one project in the cohort carries external_code', async () => {
@@ -486,14 +530,17 @@ describe('AutomapperService', () => {
   });
 
   describe('Eligibility comes from the shipped predicates only', () => {
-    it('delegates entirely to ClarisaProjectsService.listBilateralProjects, passing phase through', async () => {
+    it('passes the resolver year into listBilateralProjects once, under the phase option', async () => {
+      mockReportingYearResolver.resolve.mockResolvedValue(2027);
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([]);
 
-      await service.resolve(2026);
+      const result = await service.resolve();
 
+      expect(mockReportingYearResolver.resolve).toHaveBeenCalledTimes(1);
       expect(
         mockClarisaProjectsService.listBilateralProjects,
-      ).toHaveBeenCalledWith({ phase: 2026 });
+      ).toHaveBeenCalledWith({ phase: 2027 });
+      expect(result.reportingYear).toBe(2027);
     });
   });
 
@@ -531,7 +578,7 @@ describe('AutomapperService', () => {
   // T-04 — coverage() = design §4 GET .../coverage, R-CAM-004.
   // ---------------------------------------------------------------------
   describe('R-CAM-004 — coverage()', () => {
-    it('AC.1/AC.2 — mapped + pending = reachable, asserted as an invariant (not three constants)', async () => {
+    it('AC.1/AC.2 — mapped + pending + inactive = reachable', async () => {
       const cohort = buildFullCohort(198); // ids 2001..2198
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -546,16 +593,23 @@ describe('AutomapperService', () => {
         ]),
       );
 
-      const result = await service.coverage(2026);
+      const result = await service.coverage();
 
-      // THE GATE — this must hold no matter how mapped/pending were computed.
-      expect(result.mapped + result.pending).toBe(result.reachable);
-      expect(result).toEqual({ mapped: 4, pending: 194, reachable: 198 });
+      expect(result.mapped + result.pending + result.inactive).toBe(
+        result.reachable,
+      );
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 4,
+        pending: 194,
+        inactive: 0,
+        reachable: 198,
+      });
     });
 
     it('scopes the mapped-row read to the cohort ids — the IN-list clause that guarantees mapped <= reachable', async () => {
-      // Argument-shape corroboration: verifies qb.where receives a Brackets
-      // instance and qb.andWhere receives the is_active constraint.
+      // Argument-shape corroboration: Brackets match, current year, no
+      // is_active predicate. The behavioural gate is the A1697 fixture.
       const cohort = buildFullCohort(3); // ids 2001, 2002, 2003
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -566,9 +620,14 @@ describe('AutomapperService', () => {
       await service.coverage();
 
       expect(qb.where).toHaveBeenCalledWith(expect.any(Brackets));
-      expect(qb.andWhere).toHaveBeenCalledWith('bpm.is_active = :isActive', {
-        isActive: true,
-      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'bpm.reporting_year = :reportingYear',
+        { reportingYear: YEAR },
+      );
+      expect(qb.andWhere).not.toHaveBeenCalledWith(
+        'bpm.is_active = :isActive',
+        expect.anything(),
+      );
     });
 
     it('does NOT count an active mapping row for a project outside the cohort (IN-list scoping, behavioural)', async () => {
@@ -597,17 +656,26 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 1, pending: 0, reachable: 1 });
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 1,
+        pending: 0,
+        inactive: 0,
+        reachable: 1,
+      });
     });
 
-    it('AC.1 — reachable derives from listBilateralProjects (the shipped predicates), passing phase through', async () => {
+    it('passes the resolver year into listBilateralProjects and returns it', async () => {
+      mockReportingYearResolver.resolve.mockResolvedValue(2027);
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue([]);
 
-      await service.coverage(2026);
+      const result = await service.coverage();
 
+      expect(mockReportingYearResolver.resolve).toHaveBeenCalledTimes(1);
       expect(
         mockClarisaProjectsService.listBilateralProjects,
-      ).toHaveBeenCalledWith({ phase: 2026 });
+      ).toHaveBeenCalledWith({ phase: 2027 });
+      expect(result.reporting_year).toBe(2027);
     });
 
     it('zero-cohort — reachable 0 returned without dividing, mapping table never queried', async () => {
@@ -615,12 +683,20 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 0, pending: 0, reachable: 0 });
-      expect(result.mapped + result.pending).toBe(result.reachable);
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 0,
+        pending: 0,
+        inactive: 0,
+        reachable: 0,
+      });
+      expect(result.mapped + result.pending + result.inactive).toBe(
+        result.reachable,
+      );
       expect(mockMappingRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
 
-    it('mapped excludes an inactive row for an otherwise-eligible project (is_active gate)', async () => {
+    it('counts an inactive current-year row as inactive, not pending', async () => {
       const cohort = [project({ id: 3001, external_code: 'C-Z1' })];
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -633,10 +709,16 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 0,
+        pending: 0,
+        inactive: 1,
+        reachable: 1,
+      });
     });
 
-    it('AC.3/DD-6 — no figure is derived from the AGRESSO contract table, and no fourth figure exists', async () => {
+    it('AC.3 — no figure is derived from the AGRESSO contract table', async () => {
       const cohort = buildFullCohort(5);
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -649,9 +731,11 @@ describe('AutomapperService', () => {
         AgressoContract,
       );
       expect(Object.keys(result).sort()).toEqual([
+        'inactive',
         'mapped',
         'pending',
         'reachable',
+        'reporting_year',
       ]);
     });
 
@@ -675,10 +759,16 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 1, pending: 0, reachable: 1 });
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 1,
+        pending: 0,
+        inactive: 0,
+        reachable: 1,
+      });
     });
 
-    it('mapped excludes an inactive row whose clarisa_project_id is in cohort with no active sister row (Brackets correctness)', async () => {
+    it('counts an inactive project-id match as inactive when no active row matches', async () => {
       // Cohort has project id 4001; DB only has an INACTIVE row with clarisa_project_id 4001.
       const cohort = [project({ id: 4001, external_code: 'C-W1' })];
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
@@ -697,10 +787,16 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 0,
+        pending: 0,
+        inactive: 1,
+        reachable: 1,
+      });
     });
 
-    it('mapped excludes an inactive row whose clarisa_external_code matches with no active sister row', async () => {
+    it('counts an inactive external-code match as inactive when no active row matches', async () => {
       // Cohort has project with external_code 'A999'; DB has only an INACTIVE row with that code.
       const cohort = [project({ id: 555, external_code: 'C-A999' })];
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
@@ -719,10 +815,16 @@ describe('AutomapperService', () => {
 
       const result = await service.coverage();
 
-      expect(result).toEqual({ mapped: 0, pending: 1, reachable: 1 });
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 0,
+        pending: 0,
+        inactive: 1,
+        reachable: 1,
+      });
     });
 
-    it('generates SQL with parentheses wrapping the OR condition before AND is_active (Rider F-14)', async () => {
+    it('generates SQL with parentheses wrapping the OR before the year predicate', async () => {
       const cohort = [project({ id: 2001, external_code: 'C-P001' })];
       mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
         cohort,
@@ -733,7 +835,90 @@ describe('AutomapperService', () => {
       await service.coverage();
 
       const sql = qb.getQuery();
-      expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*is_active/);
+      expect(sql).toMatch(/WHERE \(.*OR.*\) AND .*reporting_year/);
+      expect(sql).not.toMatch(/is_active/);
+    });
+
+    it('R-APM-009 AC.1 — 197 active, 1 inactive, 198 reachable → 197 / 0 / 1 / 198', async () => {
+      const cohort = buildFullCohort(198);
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      const rows = cohort.map((p, index) =>
+        mappingRow({
+          id: index + 1,
+          clarisa_project_id: p.id,
+          is_active: index !== 0,
+          source: MappingSourceEnum.DERIVED,
+          reporting_year: YEAR,
+        }),
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb(rows));
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 197,
+        pending: 0,
+        inactive: 1,
+        reachable: 198,
+      });
+      expect(result.mapped + result.pending + result.inactive).toBe(
+        result.reachable,
+      );
+    });
+
+    it('§6.4 mixed match — active by id wins over inactive by code', async () => {
+      const cohort = [
+        project({ id: 100, external_code: 'C-MIX1' }),
+        project({ id: 200, external_code: 'C-ONLY-INACTIVE' }),
+      ];
+      mockClarisaProjectsService.listBilateralProjects.mockResolvedValue(
+        cohort,
+      );
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 1,
+            clarisa_project_id: 100,
+            clarisa_external_code: 'OTHER',
+            is_active: true,
+            reporting_year: YEAR,
+          }),
+          mappingRow({
+            id: 2,
+            clarisa_project_id: 999,
+            clarisa_external_code: 'MIX1',
+            is_active: false,
+            reporting_year: YEAR,
+          }),
+          mappingRow({
+            id: 3,
+            clarisa_project_id: 888,
+            clarisa_external_code: 'ONLY-INACTIVE',
+            is_active: false,
+            reporting_year: YEAR,
+          }),
+          mappingRow({
+            id: 4,
+            clarisa_project_id: 100,
+            clarisa_external_code: 'PRIOR',
+            is_active: true,
+            reporting_year: 2025,
+          }),
+        ]),
+      );
+
+      const result = await service.coverage();
+
+      expect(result).toEqual({
+        reporting_year: YEAR,
+        mapped: 1,
+        pending: 0,
+        inactive: 1,
+        reachable: 2,
+      });
     });
   });
 
@@ -745,22 +930,24 @@ describe('AutomapperService', () => {
       const resolved = [candidate(2001, 'D900')];
       mockMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb([]));
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
       expect(result.toCreate.map((e) => e.clarisaProjectId)).toEqual([2001]);
       expect(result.alreadyMapped).toHaveLength(0);
       expect(result.divergent).toHaveLength(0);
-      expect(result.supersede).toHaveLength(0);
+      expect(result.toUpdate).toHaveLength(0);
+      expect(result.inactive).toHaveLength(0);
     });
 
     it('never touches the mapping table when resolved is empty', async () => {
-      const result = await service.classify([]);
+      const result = await service.classify([], YEAR);
 
       expect(result).toEqual({
         toCreate: [],
         alreadyMapped: [],
+        toUpdate: [],
         divergent: [],
-        supersede: [],
+        inactive: [],
       });
       expect(mockMappingRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
@@ -781,14 +968,15 @@ describe('AutomapperService', () => {
         ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
       expect(result.alreadyMapped.map((e) => e.clarisaProjectId)).toEqual([
         1516,
       ]);
       expect(result.toCreate).toHaveLength(0);
       expect(result.divergent).toHaveLength(0);
-      expect(result.supersede).toHaveLength(0);
+      expect(result.toUpdate).toHaveLength(0);
+      expect(result.inactive).toHaveLength(0);
     });
   });
 
@@ -808,12 +996,13 @@ describe('AutomapperService', () => {
         ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
       expect(result.divergent.map((e) => e.clarisaProjectId)).toEqual([1516]);
       expect(result.toCreate).toHaveLength(0);
       expect(result.alreadyMapped).toHaveLength(0);
-      expect(result.supersede).toHaveLength(0);
+      expect(result.toUpdate).toHaveLength(0);
+      expect(result.inactive).toHaveLength(0);
     });
 
     it('classifies the three pre-2026 MANUAL rows (CLARISA ids 22, 138, 246) as divergent, none rewritten', async () => {
@@ -848,38 +1037,105 @@ describe('AutomapperService', () => {
         ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
       expect(result.divergent.map((e) => e.clarisaProjectId).sort()).toEqual([
         1601, 1602, 1603,
       ]);
       expect(result.toCreate).toHaveLength(0);
       expect(result.alreadyMapped).toHaveLength(0);
-      expect(result.supersede).toHaveLength(0);
+      expect(result.toUpdate).toHaveLength(0);
+      expect(result.inactive).toHaveLength(0);
     });
   });
 
-  describe('classify (step 6) — R-CAM-005: non-MANUAL row, different project → supersede', () => {
-    it('classifies an active non-MANUAL row pointing at a different project as supersede', async () => {
-      const resolved = [candidate(500, 'D514')];
+  describe('§6.3 — one current-year row per bucket, sources varied', () => {
+    it('lands each table row in exactly one bucket', async () => {
+      const resolved = [
+        candidate(1100, 'R1'),
+        candidate(2100, 'R2'),
+        candidate(3100, 'R3'),
+        candidate(4100, 'R4'),
+        candidate(5100, 'R5'),
+        candidate(6100, 'R6'),
+        candidate(7100, 'R7'),
+      ];
       mockMappingRepo.createQueryBuilder.mockReturnValue(
         makeMappingQb([
           mappingRow({
-            id: 7,
-            agresso_agreement_id: 'D514',
-            clarisa_project_id: 25, // an earlier-phase project
+            id: 2,
+            agresso_agreement_id: 'R2',
+            clarisa_project_id: 2100,
             source: MappingSourceEnum.DERIVED,
             is_active: true,
+          }),
+          mappingRow({
+            id: 3,
+            agresso_agreement_id: 'R3',
+            clarisa_project_id: 31,
+            source: MappingSourceEnum.AI_AUTO,
+            is_active: true,
+          }),
+          mappingRow({
+            id: 4,
+            agresso_agreement_id: 'R4',
+            clarisa_project_id: 41,
+            source: MappingSourceEnum.MANUAL,
+            is_active: true,
+          }),
+          mappingRow({
+            id: 5,
+            agresso_agreement_id: 'R5',
+            clarisa_project_id: 5100,
+            source: MappingSourceEnum.MANUAL,
+            is_active: false,
+          }),
+          mappingRow({
+            id: 6,
+            agresso_agreement_id: 'R6',
+            clarisa_project_id: 61,
+            source: MappingSourceEnum.DERIVED,
+            is_active: false,
+          }),
+          mappingRow({
+            id: 7,
+            agresso_agreement_id: 'R7',
+            clarisa_project_id: 71,
+            source: MappingSourceEnum.MANUAL,
+            is_active: false,
           }),
         ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
-      expect(result.supersede.map((e) => e.clarisaProjectId)).toEqual([500]);
-      expect(result.toCreate).toHaveLength(0);
-      expect(result.alreadyMapped).toHaveLength(0);
-      expect(result.divergent).toHaveLength(0);
+      expect(result.toCreate.map((e) => e.derivedContractId)).toEqual(['R1']);
+      expect(result.alreadyMapped.map((e) => e.derivedContractId)).toEqual([
+        'R2',
+      ]);
+      expect(result.toUpdate.map((e) => e.derivedContractId)).toEqual(['R3']);
+      expect(result.toUpdate[0].existingMappingId).toBe(3);
+      expect(result.divergent.map((e) => e.derivedContractId).sort()).toEqual([
+        'R4',
+        'R7',
+      ]);
+      expect(result.inactive.map((e) => e.derivedContractId).sort()).toEqual([
+        'R5',
+        'R6',
+      ]);
+      expect(result.inactive.find((e) => e.derivedContractId === 'R5')).toEqual(
+        expect.objectContaining({ refreshed: false, existingMappingId: 5 }),
+      );
+      expect(result.inactive.find((e) => e.derivedContractId === 'R6')).toEqual(
+        expect.objectContaining({ refreshed: true, existingMappingId: 6 }),
+      );
+      const placed =
+        result.toCreate.length +
+        result.alreadyMapped.length +
+        result.toUpdate.length +
+        result.divergent.length +
+        result.inactive.length;
+      expect(placed).toBe(resolved.length);
     });
   });
 
@@ -907,7 +1163,7 @@ describe('AutomapperService', () => {
         ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
       expect(result.alreadyMapped.map((e) => e.clarisaProjectId)).toEqual([
         1516,
@@ -915,72 +1171,48 @@ describe('AutomapperService', () => {
     });
   });
 
-  describe('classify (step 6) — the is_active gate on the mapping-table read (KZ-001 recurrence 8)', () => {
-    it('reads the mapping table with the is_active gate and the IN-list shape (argument-shape corroboration)', async () => {
+  describe('classify — current-year rows only, no is_active filter', () => {
+    it('reads the agreement IN-list and the carried year, and does not filter is_active', async () => {
       const resolved = [candidate(500, 'D514')];
       const qb = makeMappingQb([]);
       mockMappingRepo.createQueryBuilder.mockReturnValue(qb);
 
-      await service.classify(resolved);
+      await service.classify(resolved, YEAR);
 
       expect(qb.where).toHaveBeenCalledWith(
         'bpm.agresso_agreement_id IN (:...ids)',
         { ids: ['D514'] },
       );
-      expect(qb.andWhere).toHaveBeenCalledWith('bpm.is_active = :isActive', {
-        isActive: true,
-      });
+      expect(qb.andWhere).toHaveBeenCalledWith(
+        'bpm.reporting_year = :reportingYear',
+        { reportingYear: YEAR },
+      );
+      expect(qb.andWhere).not.toHaveBeenCalledWith(
+        'bpm.is_active = :isActive',
+        expect.anything(),
+      );
+      expect(mockReportingYearResolver.resolve).not.toHaveBeenCalled();
     });
 
-    it('picks the ACTIVE row, never a stale inactive one that shares the same agresso_agreement_id after a prior supersede', async () => {
-      // After any supersede, exactly this shape exists in the real table:
-      // one inactive MANUAL row and one active DERIVED row sharing the same
-      // agresso_agreement_id. Without the is_active gate, Map.set's
-      // last-write-wins would pick whichever row TypeORM happens to return
-      // last — silently landing on alreadyMapped (skip) or supersede
-      // (re-deactivating the dead row while bypassing the live one),
-      // depending on row order. This is D-3/D-2, the spec's two highest-
-      // severity defect classes (requirements.md §7), one recurrence of the
-      // same gap T-02 closed on the AGRESSO side (KZ-001, recurrence 8).
+    it('does not see a prior-year row for the same agreement', async () => {
       const resolved = [candidate(500, 'D514')];
-      const inactiveOldRow = mappingRow({
-        id: 22,
-        agresso_agreement_id: 'D514',
-        clarisa_project_id: 22,
-        source: MappingSourceEnum.MANUAL,
-        is_active: false,
-      });
-      const activeCurrentRow = mappingRow({
-        id: 25,
-        agresso_agreement_id: 'D514',
-        clarisa_project_id: 25,
-        source: MappingSourceEnum.DERIVED,
-        is_active: true,
-      });
-      // Deliberately returned ACTIVE-first, INACTIVE-second: if the
-      // production is_active `andWhere` is ever dropped, makeMappingQb's
-      // getMany() stops filtering and returns BOTH rows in this order —
-      // and the classify() Map's last-write-wins would then overwrite the
-      // correct id-25 entry with the stale id-22 one, reddening this
-      // assertion. With the gate in place, only activeCurrentRow survives
-      // the mock's filter and id 25 is all the Map ever sees.
       mockMappingRepo.createQueryBuilder.mockReturnValue(
-        makeMappingQb([activeCurrentRow, inactiveOldRow]),
+        makeMappingQb([
+          mappingRow({
+            id: 8,
+            agresso_agreement_id: 'D514',
+            clarisa_project_id: 500,
+            source: MappingSourceEnum.DERIVED,
+            is_active: false,
+            reporting_year: 2025,
+          }),
+        ]),
       );
 
-      const result = await service.classify(resolved);
+      const result = await service.classify(resolved, YEAR);
 
-      expect(result.supersede).toHaveLength(1);
-      expect(result.supersede[0]).toEqual(
-        expect.objectContaining({
-          clarisaProjectId: 500,
-          existingMappingId: 25,
-          existingClarisaProjectId: 25,
-        }),
-      );
-      expect(result.toCreate).toHaveLength(0);
-      expect(result.alreadyMapped).toHaveLength(0);
-      expect(result.divergent).toHaveLength(0);
+      expect(result.toCreate).toHaveLength(1);
+      expect(result.inactive).toHaveLength(0);
     });
   });
 
@@ -992,18 +1224,20 @@ describe('AutomapperService', () => {
       const resolved = [candidate(800, 'D800')];
       txMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb([]));
 
-      const result = await service.apply(resolved, fakeUser);
+      const result = await service.apply(resolved, fakeUser, YEAR);
 
       expect(result.created).toBe(1);
       expect(result.alreadyMapped).toBe(0);
       expect(result.divergent).toBe(0);
-      expect(result.superseded).toBe(0);
+      expect(result.updated).toBe(0);
+      expect(result.inactive).toBe(0);
       expect(txMappingRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           agresso_agreement_id: 'D800',
           clarisa_project_id: 800,
           clarisa_external_code: 'D800',
           source: MappingSourceEnum.DERIVED,
+          reporting_year: YEAR,
           confidence_score: null,
           is_active: true,
         }),
@@ -1025,7 +1259,7 @@ describe('AutomapperService', () => {
       ];
       txMappingRepo.createQueryBuilder.mockReturnValue(makeMappingQb([]));
 
-      await service.apply(resolved, fakeUser);
+      await service.apply(resolved, fakeUser, YEAR);
 
       expect(txMappingRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1056,11 +1290,12 @@ describe('AutomapperService', () => {
         makeMappingQb([existingManualRow]),
       );
 
-      const result = await service.apply(resolved, fakeUser);
+      const result = await service.apply(resolved, fakeUser, YEAR);
 
       expect(result.divergent).toBe(1);
       expect(result.created).toBe(0);
-      expect(result.superseded).toBe(0);
+      expect(result.updated).toBe(0);
+      expect(result.inactive).toBe(0);
       // No write call of any kind touched this row.
       expect(txMappingRepo.update).not.toHaveBeenCalled();
       expect(txMappingRepo.create).not.toHaveBeenCalled();
@@ -1078,50 +1313,82 @@ describe('AutomapperService', () => {
     });
   });
 
-  describe('apply — R-CAM-005: supersession creates two rows, never re-points the existing one', () => {
-    it('deactivates the existing non-MANUAL row and creates a separate new active row', async () => {
-      const resolved = [candidate(500, 'D514')];
-      txMappingRepo.createQueryBuilder.mockReturnValue(
-        makeMappingQb([
-          mappingRow({
-            id: 7,
-            agresso_agreement_id: 'D514',
-            clarisa_project_id: 25,
-            source: MappingSourceEnum.DERIVED,
-            is_active: true,
-          }),
-        ]),
-      );
-
-      const result = await service.apply(resolved, fakeUser);
-
-      expect(result.superseded).toBe(1);
-      expect(result.created).toBe(0);
-
-      // The deactivate — targets the OLD row by id only.
-      expect(txMappingRepo.update).toHaveBeenCalledTimes(1);
-      const [updateCriteria, updatePayload] = txMappingRepo.update.mock
-        .calls[0] as [Record<string, unknown>, Record<string, unknown>];
-      expect(updateCriteria).toEqual({ id: 7 });
-      expect(updatePayload).toEqual(
-        expect.objectContaining({ is_active: false }),
-      );
-      // Never update agresso_agreement_id on the existing row (R-CAM-005 AC.2).
-      expect(updatePayload).not.toHaveProperty('agresso_agreement_id');
-      expect(updatePayload).not.toHaveProperty('clarisa_project_id');
-
-      // The new row — a separate create()+save(), never the same row.
-      expect(txMappingRepo.create).toHaveBeenCalledTimes(1);
-      expect(txMappingRepo.save).toHaveBeenCalledTimes(1);
-      expect(txMappingRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
+  describe('apply — §6.3 rows 3 and 6 update in place and never write is_active', () => {
+    it('row 3 keeps its id and refreshes CLARISA fields; a second Apply writes 0', async () => {
+      const store = [
+        mappingRow({
+          id: 7,
           agresso_agreement_id: 'D514',
-          clarisa_project_id: 500,
-          source: MappingSourceEnum.DERIVED,
-          confidence_score: null,
+          clarisa_project_id: 25,
+          clarisa_project_short_name: 'OLD',
+          clarisa_external_code: 'OLD',
+          source: MappingSourceEnum.AI_AUTO,
           is_active: true,
+          reporting_year: YEAR,
         }),
+      ];
+      bindTxStore(store);
+      const resolved = [candidate(500, 'D514', 'Full 500', 'SP-500')];
+
+      const first = await service.apply(resolved, fakeUser, YEAR);
+
+      expect(first.updated).toBe(1);
+      expect(first.created).toBe(0);
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(7);
+      expect(store[0].clarisa_project_id).toBe(500);
+      expect(store[0].clarisa_project_short_name).toBe('SP-500');
+      expect(store[0].clarisa_external_code).toBe('D514');
+      expect(store[0].source).toBe(MappingSourceEnum.AI_AUTO);
+      expect(store[0].is_active).toBe(true);
+      expect(store[0].updated_by).toBe(fakeUser.sec_user_id);
+      expect(txMappingRepo.save).not.toHaveBeenCalled();
+      const [, payload] = txMappingRepo.update.mock.calls[0] as [
+        { id: number },
+        Record<string, unknown>,
+      ];
+      expect(payload).not.toHaveProperty('is_active');
+      expect(payload).not.toHaveProperty('deleted_at');
+      expect(payload).not.toHaveProperty('source');
+
+      const second = await service.apply(resolved, fakeUser, YEAR);
+      expect(second.updated).toBe(0);
+      expect(second.alreadyMapped).toBe(1);
+      expect(second.created).toBe(0);
+      expect(txMappingRepo.update).toHaveBeenCalledTimes(1);
+      expect(txMappingRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('row 6 refreshes CLARISA fields and stays inactive', async () => {
+      const deletedAt = new Date('2026-01-02T00:00:00.000Z');
+      const store = [
+        mappingRow({
+          id: 66,
+          agresso_agreement_id: 'R6',
+          clarisa_project_id: 61,
+          source: MappingSourceEnum.DERIVED,
+          is_active: false,
+          deleted_at: deletedAt,
+          reporting_year: YEAR,
+        }),
+      ];
+      bindTxStore(store);
+
+      const result = await service.apply(
+        [candidate(6100, 'R6', 'Full 6100', 'SP-6100')],
+        fakeUser,
+        YEAR,
       );
+
+      expect(result.inactive).toBe(1);
+      expect(result.updated).toBe(0);
+      expect(result.created).toBe(0);
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(66);
+      expect(store[0].clarisa_project_id).toBe(6100);
+      expect(store[0].is_active).toBe(false);
+      expect(store[0].deleted_at).toEqual(deletedAt);
+      expect(store[0].source).toBe(MappingSourceEnum.DERIVED);
     });
   });
 
@@ -1131,7 +1398,7 @@ describe('AutomapperService', () => {
 
       // First apply: nothing exists yet -> toCreate -> one save().
       txMappingRepo.createQueryBuilder.mockReturnValueOnce(makeMappingQb([]));
-      const first = await service.apply(resolved, fakeUser);
+      const first = await service.apply(resolved, fakeUser, YEAR);
       expect(first.created).toBe(1);
       expect(txMappingRepo.save).toHaveBeenCalledTimes(1);
 
@@ -1150,14 +1417,77 @@ describe('AutomapperService', () => {
           }),
         ]),
       );
-      const second = await service.apply(resolved, fakeUser);
+      const second = await service.apply(resolved, fakeUser, YEAR);
 
       expect(second.created).toBe(0);
+      expect(second.updated).toBe(0);
       expect(second.alreadyMapped).toBe(1);
       // Total create-writing calls across BOTH applies stayed at 1 — the row
       // count is unchanged after the first apply (R-CAM-002 AC.2).
       expect(txMappingRepo.save).toHaveBeenCalledTimes(1);
       expect(txMappingRepo.create).toHaveBeenCalledTimes(1);
+      expect(txMappingRepo.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // @akili-spec docs/specs/bilateral/annualized-project-mapping — T-05 /
+  // R-APM-005 scenario A1697. Apply ×3 must re-classify each time (KZ-015).
+  describe('R-APM-005 scenario A1697 — inactive DERIVED row is not re-created', () => {
+    it('Apply ×3 leaves exactly one current-year row, is_active false, deleted_at untouched', async () => {
+      const deletedAt = new Date('2026-09-16T00:41:13.511Z');
+      const store: BilateralProjectMapping[] = [
+        mappingRow({
+          id: 1697,
+          agresso_agreement_id: 'A1697',
+          clarisa_project_id: 501,
+          clarisa_external_code: 'A1697',
+          clarisa_project_short_name: 'SP-501',
+          source: MappingSourceEnum.DERIVED,
+          is_active: false,
+          deleted_at: deletedAt,
+          reporting_year: YEAR,
+        }),
+      ];
+      bindTxStore(store);
+
+      const resolved = [candidate(501, 'A1697')];
+      await service.apply(resolved, fakeUser, YEAR);
+      await service.apply(resolved, fakeUser, YEAR);
+      await service.apply(resolved, fakeUser, YEAR);
+
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(1697);
+      expect(store[0].is_active).toBe(false);
+      expect(store[0].deleted_at).toEqual(deletedAt);
+      expect(txMappingRepo.save).not.toHaveBeenCalled();
+      expect(txMappingRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('lists A1697 under inactive in the preview and not under toCreate', async () => {
+      mockMappingRepo.createQueryBuilder.mockReturnValue(
+        makeMappingQb([
+          mappingRow({
+            id: 1697,
+            agresso_agreement_id: 'A1697',
+            clarisa_project_id: 501,
+            source: MappingSourceEnum.DERIVED,
+            is_active: false,
+            reporting_year: YEAR,
+          }),
+        ]),
+      );
+
+      const result = await service.classify([candidate(501, 'A1697')], YEAR);
+
+      expect(result.inactive).toEqual([
+        expect.objectContaining({
+          derivedContractId: 'A1697',
+          existingMappingId: 1697,
+          refreshed: false,
+          action: 'inactive',
+        }),
+      ]);
+      expect(result.toCreate).toHaveLength(0);
     });
   });
 

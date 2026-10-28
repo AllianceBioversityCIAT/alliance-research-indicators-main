@@ -217,3 +217,43 @@
 - **Requirements covered:** R-APM-002 AC.1, AC.2 (grep, server), AC.3 (row deactivated by migration), scenario AND IT MUST NOT serve another year's feed · R-APM-003 (`GET clarisa/projects/bilateral` without `phase`) · R-APM-010 (server endpoint removal)
 - **Running totals vs budget (design §12):** tasks 4/10 · LOC +1,382/−575 (~1,500) · review rounds 8/~14. **Forecast:** T-05 (size L) will almost certainly cross the LOC budget. The tripwire is evaluated at T-05's finalize.
 - **Final verification:** VERIFIED (above)
+
+### T-05 — Automapper: five disjoint buckets, in-place update, coverage with `inactive` — PASS (attempt 1)
+
+- **Date:** 2026-10-28 · **Final status:** PASS
+- **Skills:** `nestjs-expert`, `tdd`, `api-design-principles` (task defaults) · **Effort:** `grok-4.7-xhigh` (size L, core owner-decided rules)
+- **Orca:** task `task_f75d5726b3e1`, dispatch `ctx_90a3ff9c6f04` (terminal `term_1530f368-…`); released after PASS
+- **Attempts:** 1
+- **Files changed:** `server/researchindicators/src/domain/entities/bilateral-project-mapping/automapper.service.ts` (+spec) · `automapper.controller.ts` (+spec) · `dto/automapper-run.dto.ts`
+- **Red at HEAD (observed, without `--silent`):** `Apply ×3 leaves exactly one current-year row, is_active false, deleted_at untouched`, `automapper.service.spec.ts:1203` `expect(store).toHaveLength(1)`: Expected length 1, Received length 2 (inactive id 1697 + a new active id 9000).
+- **Falsifier 1 (observed):** `.andWhere('bpm.is_active = :isActive', { isActive: true })` restored in `classifyAgainstExisting` → same title, `:1458`, Expected length 1 / Received 2. Reverted.
+- **Falsifier 2 (observed):** `clarisaFieldUpdate` writes `is_active: true` → `row 6 refreshes CLARISA fields and stays inactive`, `:1389`, Expected false / Received true. Reverted.
+- **§6.3 → tests:** `lands each table row in exactly one bucket` covers §6.3 rows 1–6 and R-APM-005 table rows 1–7, with sources DERIVED / AI_AUTO / MANUAL and different projects on the inactive rows (R5 vs R6). Plus dedicated cases: toCreate (with `reporting_year` on the insert), alreadyMapped (MANUAL), row 3 keeps its id and a second Apply writes 0, row 6 stays inactive, A1697 listed under `inactive` not `toCreate`, idempotent create, the §6.4 mixed match, `does not see a prior-year row`.
+- **R-APM-009 AC.1:** `197 active, 1 inactive, 198 reachable → 197 / 0 / 1 / 198` green. **R-APM-003:** a real Nest HTTP test: `POST auto-map/preview {phase:2025}` → 400, nothing classified; `GET coverage?phase=2025` → 2026 figures.
+- **Implementer verification:** build exit 0 · eslint 5 files exit 0 · `npm test -- --silent src/domain/entities/bilateral-project-mapping src/domain/tools/clarisa src/domain/shared/utils` → 85 suites / 700 tests passed · `phase` grep in the controller + DTO → no matches.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** `npm run build` → `BUILD_EXIT:0` · `npx eslint <5 files>` → `ESLINT_EXIT:0` · `npm test -- --silent src/domain/entities/bilateral-project-mapping src/domain/tools/clarisa src/domain/shared/utils src/domain/entities/bilateral` → `Test Suites: 98 passed, 98 total` / `Tests: 946 passed, 946 total` · by title: `✓ R-APM-009 AC.1 — 197 active, 1 inactive, 198 reachable → 197 / 0 / 1 / 198`, `✓ row 6 refreshes CLARISA fields and stays inactive`, `✓ Apply ×3 leaves exactly one current-year row, is_active false, deleted_at untouched` · `grep phase automapper.controller.ts dto/automapper-run.dto.ts` → none.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: PASS`**. "I found no spec violations in T-05 (attempt 1)." Verified: classify is scoped by `reporting_year = :reportingYear` with no `is_active` filter; automation-owned = `source !== MANUAL`; rows 3/6 write only project id / short name / external code / `updated_by`; the insert year comes from `resolve()` only (DD-10); classification re-runs inside the transaction; §6.4 precedence; DTOs match §5 (`supersede` removed); `{phase}` → 400; controller log fields. KZ-017: a missing year scope in classify is caught by behavior (`does not see a prior-year row`).
+- **ADVISORY (labelled advisory, not gating):**
+  1. KZ-017: the R-APM-004 scenario "mapped 0" for coverage is evidenced only by argument shape and a regex. In the mixed fixture the 2025 row is masked by an active 2026 row. Option: a fixture whose only rows are active 2025 rows → `{mapped 0}`.
+  2. Falsifier 1 trips only on the exact restored string, because the mock QueryBuilder filters on that literal clause. A different spelling of the same filter would not be caught.
+  3. DD-10 re-resolution inside `apply` is undetected, because the resolver mock equals the carried year. Option: `apply(…, 2027)` with the resolver at 2026.
+  4. **Forward pointer → T-06:** the R-APM-011 AC.5 sequence ("after activate, the next Apply classifies normally") needs T-06's `activate()`. It is **not covered by T-05**. tasks.md §4 assigns it to "T-05 (suite) + T-06 (activate)", so the T-06 brief must carry it, with the test living in T-05's suite.
+  5. RESILIENCE: two concurrent Apply runs on a `toCreate` agreement → 1062 on `uk_bpm_agreement_year`, surfaced as a raw error. This is pre-existing (the same was true under the old key).
+  6. READABILITY: `counts.updated` counts row 3 only; row-6 writes are counted under `inactive`. Document this in the T-08 client contract, or add `counts.refreshed`.
+  7. Gap: the mock QueryBuilder is not MySQL. Collation, `uk_bpm_agreement_year` and `reporting_year NOT NULL` are not exercised by T-05.
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer akili-reviewer/opus: not reported by host at the time of writing, ended complete
+- **Not Done / Assumptions (verbatim, translated from the worker's Spanish; assumptions only, nothing owed):** "`counts.updated` is the length of `toUpdate` (row 3). Row 6 writes and is counted under `inactive`, with `refreshed: true`." · "The `ClarisaProjectsService.listBilateralProjects` option is still named `phase`. It was not renamed." · "The POST `{}` in the HTTP test answers 201 because that app does not mount `ResponseInterceptor`; the envelope carries status 200."
+- **Requirements covered:** R-APM-005 AC.1–5, table rows 1–7, the A1697 scenario (THEN / BUT / AND IT MUST) · R-APM-003 AC.1, AC.2 · R-APM-009 AC.1 · R-APM-004 AC.2 (preview/coverage) · R-APM-011 "BUT must NOT be reactivated by Apply" · R-APM-002 scenario THEN (coverage/preview)
+- **Running totals vs budget (design §12):** tasks 5/10 · LOC **+2,316**/−1,026 (budget ~1,500) · review rounds 9/~14. **BUDGET TRIPWIRE FIRED. See the block below.**
+- **Final verification:** VERIFIED (above)
+
+## Budget Tripwire: after T-05 (2026-10-28)
+
+| Measure | Budget (design §12) | Actual after 5/10 tasks | Delta |
+| --- | --- | --- | --- |
+| Tasks | 10 | 5 done | on plan |
+| LOC added (incl. tests) | ~1,500 | +2,316 (deleted −1,026) | **+816 (+54%) with 5 tasks left** |
+| Review rounds | ~14 | 9 | on plan so far (2 reworks: T-03, T-04) |
+
+**Cause:** test volume. The spec's own falsifiability rules (KZ-001 executed SQL, generated-SQL assertions per reader, one fixture per §6.3 row, red observed on the final file) put most of the lines into specs: T-03 +536 (7 reader assertions + integration + copy-drift), T-05 +934 (+~600 in `automapper.service.spec.ts`). Production code is close to the design's estimate. The §12 estimate counted "server ~700, migrations ~400" and under-sized the test share. Remaining: T-06 (M, server), T-07 (S, SSR), T-08–T-10 (client, ~350 estimated).
+**Status:** stopped for the owner. The tripwire is never logged `auto-approved`.

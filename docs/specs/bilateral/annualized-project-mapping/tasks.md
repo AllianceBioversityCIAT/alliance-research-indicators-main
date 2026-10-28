@@ -154,7 +154,7 @@ graph TD
 
 ### T-05 — Automapper: five disjoint buckets, in-place update, coverage with `inactive`
 
-- **Status:** todo · **Size:** L · **Dependencies:** T-01, T-04
+- **Status:** done (PASS 2026-10-28) · **Size:** L · **Dependencies:** T-01, T-04
 - **Requirements:**
   - R-APM-005: AC.1–5, the table's 7 rows, scenario *A1697* (THEN one row / BUT must NOT create a second / AND IT MUST list under inactive).
   - R-APM-003: AC.1 (`400`), AC.2.
@@ -184,10 +184,10 @@ graph TD
 - **Consumers:** client interfaces and dialog (T-08/T-09); controller log line; `bilateral-mapping.service.ts` Pending list (reads `toCreate`, `ambiguous`, `unresolved`, unchanged keys).
 - **Review:** `full`: core behavior change, owner-decided rules.
 - **Done:**
-  - [ ] Every R-APM-005 table row has a passing case.
-  - [ ] Both falsifiers executed.
-  - [ ] The R-APM-009 AC.1 fixture `197 / 0 / 1 / 198` green.
-  - [ ] Build and eslint green; Swagger shows no `phase`.
+  - [x] Every R-APM-005 table row has a passing case.
+  - [x] Both falsifiers executed.
+  - [x] The R-APM-009 AC.1 fixture `197 / 0 / 1 / 198` green.
+  - [x] Build and eslint green; Swagger shows no `phase`.
 - **Skills:** nestjs-expert, tdd, api-design-principles
 
 ### T-06 — Mapping service: year scope, upsert create, activate, ownership

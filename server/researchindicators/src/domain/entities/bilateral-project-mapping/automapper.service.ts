@@ -4,6 +4,7 @@ import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-pro
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
 import { LoggerUtil } from '../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { normalizeExternalCode } from './utils/external-code.util';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
@@ -15,23 +16,28 @@ import { User } from '../../complementary-entities/secondary/user/user.entity';
 //
 // SINGLETON-SCOPED BY DESIGN — see bilateral-project-mapping.module.ts header
 // and parent design.md §12 DD-11 (inherited from clarisa-project-automapping).
-// Injects ClarisaProjectsService and DataSource ONLY.
+// Injects ClarisaProjectsService, DataSource, and ReportingYearResolver.
+// ReportingYearResolver is a singleton whose own constructor takes DataSource
+// only (global-utils.module.ts); it does not carry Scope.REQUEST.
 // Do NOT inject AgressoContractRepository (it carries Scope.REQUEST via
 // CurrentUserUtil) and do NOT import AgressoContractModule — cascading
 // REQUEST scope through this module re-introduces the DI cycle NFR-BAS-001
 // exists to prevent. Read AGRESSO via DataSource.getRepository(), the
 // pattern already shipped in bilateral-mapping-coverage.service.ts.
-// The bilateral_project_mapping table (T-03's own concern) is read/written
-// the SAME way — DataSource.getRepository(BilateralProjectMapping) — so the
-// DI shape stays exactly ClarisaProjectsService + DataSource; no new
-// constructor dependency, no BilateralProjectMappingRepository injection.
+// The bilateral_project_mapping table is read/written the SAME way —
+// DataSource.getRepository(BilateralProjectMapping) — so there is still no
+// BilateralProjectMappingRepository injection.
 //
-// Resolution only (design.md §5 steps 1-5): eligible cohort -> guard ->
-// derive -> group -> confirm in AGRESSO. NO WRITES. Classification against
-// existing mapping rows (step 6: alreadyMapped / divergent / supersede) and
-// apply are T-03's scope — this service's `resolved` bucket means "unique,
-// exists in AGRESSO, not yet checked against existing mapping rows (the
-// bilateral_project_mapping table) — step 6 is T-03's".
+// Resolution (design.md §5 steps 1-5): eligible cohort -> guard ->
+// derive -> group -> confirm in AGRESSO. NO WRITES. `resolved` means
+// "unique, exists in AGRESSO, not yet checked against the current-year
+// mapping row". Classification (§6.3: toCreate / alreadyMapped / toUpdate /
+// divergent / inactive) is the next step and never writes `is_active`.
+//
+// @akili-spec docs/specs/bilateral/annualized-project-mapping — T-05 /
+// R-APM-005, R-APM-009, DD-4, DD-8, DD-10. resolve() reads the reporting
+// year once and returns it. classify/apply/coverage carry that value;
+// listBilateralProjects still receives it under the option name `phase`.
 //
 // T-03 DTO TRAP (resolved, see execution.md T-00 FORWARD POINTER): the
 // admin-facing CreateBilateralProjectMappingDto requires `confidence_score`
@@ -51,49 +57,56 @@ export interface AutomapperCandidate {
 }
 
 export interface AutomapperResolution {
+  reportingYear: number;
   resolved: AutomapperCandidate[];
   ambiguous: AutomapperCandidate[];
   unresolved: AutomapperCandidate[];
 }
 
-// design.md §5 step 6 — classification of a `resolved` candidate against the
-// existing bilateral_project_mapping row (if any) for its derived contract.
-// `toCreate` needs nothing beyond the candidate; the other three buckets
-// exist because of an active row, so they carry it — typed separately so a
-// missing `existingMappingId` is a compile error, not a runtime possibility
-// (T-05's supersede/deactivate write depends on it being present).
+// §6.3 — one current-year row per agreement, any is_active. `toCreate` has
+// no existing row. The other buckets carry that row's id so an in-place
+// update cannot target the wrong record. `inactive.refreshed` is true only
+// when Apply rewrote the CLARISA fields (row 6) and left is_active false.
 export interface AutomapperToCreateEntry extends AutomapperCandidate {
   action: 'toCreate';
 }
 
 export interface AutomapperReconciledEntry extends AutomapperCandidate {
-  action: 'alreadyMapped' | 'divergent' | 'supersede';
+  action: 'alreadyMapped' | 'divergent' | 'toUpdate';
   existingMappingId: number;
   existingClarisaProjectId: number;
+}
+
+export interface AutomapperInactiveEntry extends AutomapperCandidate {
+  action: 'inactive';
+  existingMappingId: number;
+  existingClarisaProjectId: number;
+  refreshed: boolean;
 }
 
 export interface AutomapperClassification {
   toCreate: AutomapperToCreateEntry[];
   alreadyMapped: AutomapperReconciledEntry[];
+  toUpdate: AutomapperReconciledEntry[];
   divergent: AutomapperReconciledEntry[];
-  supersede: AutomapperReconciledEntry[];
+  inactive: AutomapperInactiveEntry[];
 }
 
 export interface AutomapperApplyResult {
   created: number;
   alreadyMapped: number;
   divergent: number;
-  superseded: number;
+  updated: number;
+  inactive: number;
 }
 
-// design.md §4 GET .../coverage, R-CAM-004. `reachable` is the eligible-
-// project count (the shipped predicates, same call resolve() makes);
-// `mapped` + `pending` partition it exactly — never a fourth figure, and
-// never a figure computed against the AGRESSO contract table (DD-6, the
-// requirement's own `BUT it must NOT`).
+// §6.4 / R-APM-009. mapped + pending + inactive = reachable. Never a figure
+// computed against the AGRESSO contract table.
 export interface AutomapperCoverage {
+  reporting_year: number;
   mapped: number;
   pending: number;
+  inactive: number;
   reachable: number;
 }
 
@@ -104,14 +117,16 @@ export class AutomapperService {
   constructor(
     private readonly clarisaProjectsService: ClarisaProjectsService,
     private readonly dataSource: DataSource,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
-  async resolve(phase?: number | string): Promise<AutomapperResolution> {
-    // Step 1: the eligible cohort, via ClarisaProjectsService's shipped
-    // selection predicates (see project-selector.util.ts). No re-derivation
-    // of eligibility happens here — NFR-CAM-003's sibling rule.
+  async resolve(): Promise<AutomapperResolution> {
+    // DD-10: one read per operation. Callers carry `reportingYear` into
+    // classify/apply so a mid-request config flip cannot mix years.
+    // The CLARISA option is still named `phase` (T-04 contract).
+    const reportingYear = await this.reportingYearResolver.resolve();
     const cohort = await this.clarisaProjectsService.listBilateralProjects({
-      phase,
+      phase: reportingYear,
     });
 
     // Step 2: NFR-CAM-001 guard. Cohort non-empty AND zero projects carry
@@ -207,22 +222,20 @@ export class AutomapperService {
       `run complete: cohort=${cohort.length}, resolved=${resolved.length}, ambiguous=${ambiguous.length}, unresolved=${unresolved.length}`,
     );
 
-    return { resolved, ambiguous, unresolved };
+    return { reportingYear, resolved, ambiguous, unresolved };
   }
 
   /**
-   * design.md §5 step 6 — PREVIEW ONLY, no writes. Consults the existing
-   * active bilateral_project_mapping row (if any) for each resolved
-   * candidate's derived contract id and classifies it per the table:
-   * none -> toCreate; active/same project -> alreadyMapped; active MANUAL/
-   * different project -> divergent (R-CAM-003, never touched); active
-   * non-MANUAL/different project -> supersede (R-CAM-005).
+   * PREVIEW ONLY, no writes. Classifies each resolved candidate against the
+   * current-year row for its agreement (any is_active) per §6.3 rows 1–6.
+   * `reportingYear` is the value resolve() already returned (DD-10).
    */
   async classify(
     resolved: AutomapperCandidate[],
+    reportingYear: number,
   ): Promise<AutomapperClassification> {
     const repo = this.dataSource.getRepository(BilateralProjectMapping);
-    return this.classifyAgainstExisting(repo, resolved);
+    return this.classifyAgainstExisting(repo, resolved, reportingYear);
   }
 
   /**
@@ -237,51 +250,55 @@ export class AutomapperService {
   async apply(
     resolved: AutomapperCandidate[],
     user: User,
+    reportingYear: number,
   ): Promise<AutomapperApplyResult> {
     const actorUserId = user.sec_user_id;
 
     return this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(BilateralProjectMapping);
-      const classification = await this.classifyAgainstExisting(repo, resolved);
+      const classification = await this.classifyAgainstExisting(
+        repo,
+        resolved,
+        reportingYear,
+      );
 
       for (const entry of classification.toCreate) {
-        const row = repo.create(this.newDerivedRow(entry, actorUserId));
+        const row = repo.create(
+          this.newDerivedRow(entry, actorUserId, reportingYear),
+        );
         await repo.save(row);
       }
 
-      for (const entry of classification.supersede) {
-        // Deactivate the superseded row by id ONLY — never re-point its
-        // agresso_agreement_id or clarisa_project_id (R-CAM-005 AC.2). The
-        // edit dialog already tells users the contract is immutable after
-        // creation; automation inherits that rule.
+      // Rows 3 and 6: in-place CLARISA refresh by id. Never is_active,
+      // deleted_at, or source — activation belongs to the user (R-APM-011).
+      const refreshes = [
+        ...classification.toUpdate,
+        ...classification.inactive.filter((entry) => entry.refreshed),
+      ];
+      for (const entry of refreshes) {
+        this.logger._log(
+          `automapper update id=${entry.existingMappingId}: clarisa_project_id ${entry.existingClarisaProjectId} → ${entry.clarisaProjectId}`,
+        );
         await repo.update(
           { id: entry.existingMappingId },
-          {
-            is_active: false,
-            deleted_at: new Date(),
-            updated_by: actorUserId,
-          },
+          this.clarisaFieldUpdate(entry, actorUserId),
         );
-
-        // Supersession is deactivate + CREATE — two rows, never one row
-        // mutated in place.
-        const row = repo.create(this.newDerivedRow(entry, actorUserId));
-        await repo.save(row);
       }
 
-      // alreadyMapped and divergent are report-only buckets — no write for
-      // either. A divergent MANUAL row is left byte-identical (R-CAM-003).
+      // alreadyMapped, divergent, and inactive(refreshed: false) write nothing.
 
       const result: AutomapperApplyResult = {
         created: classification.toCreate.length,
         alreadyMapped: classification.alreadyMapped.length,
         divergent: classification.divergent.length,
-        superseded: classification.supersede.length,
+        updated: classification.toUpdate.length,
+        inactive: classification.inactive.length,
       };
 
       this.logger._log(
-        `apply complete: created=${result.created}, alreadyMapped=${result.alreadyMapped}, ` +
-          `divergent=${result.divergent}, superseded=${result.superseded}`,
+        `apply complete: reporting_year=${reportingYear}, created=${result.created}, ` +
+          `updated=${result.updated}, alreadyMapped=${result.alreadyMapped}, ` +
+          `inactive=${result.inactive}, divergent=${result.divergent}`,
       );
 
       return result;
@@ -289,40 +306,33 @@ export class AutomapperService {
   }
 
   /**
-   * design.md §4 GET .../coverage, R-CAM-004. Returns the dashboard's three
-   * figures — mapped, pending, reachable — never a fourth (DD-6).
+   * GET .../coverage. `reachable` comes from the same
+   * ClarisaProjectsService.listBilateralProjects call resolve() makes.
+   * Current-year rows only. Precedence (§6.4): a project is `mapped` if any
+   * matched row is active, else `inactive` if any matched row exists, else
+   * `pending`. That is what keeps mapped + pending + inactive = reachable.
+   * Match is by project id OR normalized external code, as before.
    *
-   * `reachable` MUST come from the exact same call resolve() makes
-   * (ClarisaProjectsService.listBilateralProjects) — this is R-CAM-004 AC.1
-   * and NFR-CAM-003's sibling rule: no local reimplementation of "which
-   * projects count" (K-005, KZ-013).
+   * NOT BilateralMappingCoverageService.getCoverageReport() — that instrument
+   * reports against the contract table. The two coexist.
    *
-   * `mapped` is a direct project-id lookup against bilateral_project_mapping
-   * — NOT resolve()/classify()'s derived-AGRESSO-contract-id round trip.
-   * Those answer "does this project's derived contract id already have an
-   * active mapping row"; coverage answers the simpler question the
-   * requirement actually asks — "is this eligible project already mapped" —
-   * which is R-CAM-004's own framing ("of which 4 are mapped").
-   *
-   * `pending` is ALWAYS `reachable - mapped`. It is never queried or derived
-   * from any contract-table count (R-CAM-004's `BUT it must NOT`; D-4) — the
-   * 1377 unpaired BLR contracts are not pending work and never enter this
-   * method at all.
-   *
-   * NOT BilateralMappingCoverageService.getCoverageReport() — that is S1's
-   * contract-first measurement instrument in this same folder, and it reports
-   * against the contract table, the denominator R-CAM-004 explicitly forbids.
-   * The two coexist; do not extend or call one from the other.
+   * The year is resolved once here (coverage is its own operation, DD-10).
    */
-  async coverage(phase?: number | string): Promise<AutomapperCoverage> {
+  async coverage(): Promise<AutomapperCoverage> {
+    const reportingYear = await this.reportingYearResolver.resolve();
     const cohort = await this.clarisaProjectsService.listBilateralProjects({
-      phase,
+      phase: reportingYear,
     });
     const reachable = cohort.length;
 
-    // Zero-cohort case: nothing to query, nothing to divide.
     if (reachable === 0) {
-      return { mapped: 0, pending: 0, reachable: 0 };
+      return {
+        reporting_year: reportingYear,
+        mapped: 0,
+        pending: 0,
+        inactive: 0,
+        reachable: 0,
+      };
     }
 
     const cohortProjectIds = cohort.map((p) => p.id);
@@ -345,36 +355,36 @@ export class AutomapperService {
           }
         }),
       )
-      .andWhere('bpm.is_active = :isActive', { isActive: true });
+      .andWhere('bpm.reporting_year = :reportingYear', { reportingYear });
 
-    const mappedRows = await qb.getMany();
-
-    const mappedProjectIds = new Set(
-      mappedRows.map((r) => r.clarisa_project_id),
-    );
-    const mappedExternalCodes = new Set(
-      mappedRows
-        .map((r) => r.clarisa_external_code?.trim().toUpperCase())
-        .filter(Boolean),
-    );
+    const rows = await qb.getMany();
 
     let mapped = 0;
-    for (const p of cohort) {
-      const normCode = normalizeExternalCode(p.external_code).normalized;
-      if (
-        mappedProjectIds.has(p.id) ||
-        (normCode && mappedExternalCodes.has(normCode))
-      ) {
+    let inactive = 0;
+    for (const project of cohort) {
+      const normCode = normalizeExternalCode(project.external_code).normalized;
+      const matches = rows.filter((row) =>
+        this.rowMatchesProject(row, project.id, normCode),
+      );
+      if (matches.some((row) => row.is_active === true)) {
         mapped++;
+      } else if (matches.length > 0) {
+        inactive++;
       }
     }
-    const pending = reachable - mapped;
+    const pending = reachable - mapped - inactive;
 
     this.logger._log(
-      `coverage: reachable=${reachable}, mapped=${mapped}, pending=${pending}`,
+      `coverage: reporting_year=${reportingYear}, reachable=${reachable}, mapped=${mapped}, pending=${pending}, inactive=${inactive}`,
     );
 
-    return { mapped, pending, reachable };
+    return {
+      reporting_year: reportingYear,
+      mapped,
+      pending,
+      inactive,
+      reachable,
+    };
   }
 
   /**
@@ -384,21 +394,25 @@ export class AutomapperService {
   private async classifyAgainstExisting(
     repo: Repository<BilateralProjectMapping>,
     resolved: AutomapperCandidate[],
+    reportingYear: number,
   ): Promise<AutomapperClassification> {
     const toCreate: AutomapperToCreateEntry[] = [];
     const alreadyMapped: AutomapperReconciledEntry[] = [];
+    const toUpdate: AutomapperReconciledEntry[] = [];
     const divergent: AutomapperReconciledEntry[] = [];
-    const supersede: AutomapperReconciledEntry[] = [];
+    const inactive: AutomapperInactiveEntry[] = [];
 
     if (resolved.length === 0) {
-      return { toCreate, alreadyMapped, divergent, supersede };
+      return { toCreate, alreadyMapped, toUpdate, divergent, inactive };
     }
 
     const ids = resolved.map((c) => c.derivedContractId);
+    // Current-year rows in ANY state. An is_active filter here is what made
+    // an inactive A1697 look absent and get a second row inserted (P-9).
     const existingRows = await repo
       .createQueryBuilder('bpm')
       .where('bpm.agresso_agreement_id IN (:...ids)', { ids })
-      .andWhere('bpm.is_active = :isActive', { isActive: true })
+      .andWhere('bpm.reporting_year = :reportingYear', { reportingYear })
       .getMany();
 
     // Same case/whitespace symmetry fix as T-02's AGRESSO-side lookup
@@ -421,68 +435,68 @@ export class AutomapperService {
         continue;
       }
 
-      if (existing.clarisa_project_id === candidate.clarisaProjectId) {
-        alreadyMapped.push({
-          ...candidate,
-          action: 'alreadyMapped',
-          existingMappingId: existing.id,
-          existingClarisaProjectId: existing.clarisa_project_id,
+      const sameProject =
+        existing.clarisa_project_id === candidate.clarisaProjectId;
+      const automationOwned = existing.source !== MappingSourceEnum.MANUAL;
+      const reconciled = {
+        ...candidate,
+        existingMappingId: existing.id,
+        existingClarisaProjectId: existing.clarisa_project_id,
+      };
+
+      if (sameProject && existing.is_active === true) {
+        alreadyMapped.push({ ...reconciled, action: 'alreadyMapped' });
+        continue;
+      }
+
+      if (sameProject) {
+        // Row 5 — inactive, same project, any source. No write.
+        inactive.push({
+          ...reconciled,
+          action: 'inactive',
+          refreshed: false,
         });
         continue;
       }
 
-      // Existing active row points at a DIFFERENT project than the matcher
-      // just derived.
-      if (existing.source === MappingSourceEnum.MANUAL) {
-        // MANUAL is immutable to automation — not "usually", never. Report
-        // it; a silent skip and a clean agreement are indistinguishable in
-        // the output (R-CAM-003 "AND IT MUST").
-        divergent.push({
-          ...candidate,
-          action: 'divergent',
-          existingMappingId: existing.id,
-          existingClarisaProjectId: existing.clarisa_project_id,
-        });
-      } else {
-        // Phases supersede: deactivate + create, never re-point (R-CAM-005).
-        supersede.push({
-          ...candidate,
-          action: 'supersede',
-          existingMappingId: existing.id,
-          existingClarisaProjectId: existing.clarisa_project_id,
-        });
+      if (!automationOwned) {
+        // Row 4 — MANUAL, different project, active or inactive. No write.
+        divergent.push({ ...reconciled, action: 'divergent' });
+        continue;
       }
+
+      if (existing.is_active === true) {
+        toUpdate.push({ ...reconciled, action: 'toUpdate' });
+        continue;
+      }
+
+      // Row 6 — inactive, different project, automation-owned. Refresh fields.
+      inactive.push({ ...reconciled, action: 'inactive', refreshed: true });
     }
 
-    return { toCreate, alreadyMapped, divergent, supersede };
+    return { toCreate, alreadyMapped, toUpdate, divergent, inactive };
   }
 
   /**
-   * The row payload for a row the matcher creates — whether via toCreate or
-   * as the new active row of a supersede. `source` is ALWAYS T-00's DERIVED
-   * value (NFR-CAM-004 — never AI_SUGGESTED/AI_AUTO) and `confidence_score`
-   * is ALWAYS null (NFR-CAM-002 — a constant 1.0 is worse than empty, DD-7).
-   * Written directly against the entity shape — deliberately NOT through
-   * CreateBilateralProjectMappingDto, whose @ValidateIf(source !== MANUAL)
-   * requires confidence_score and would fight this null (see file header).
+   * Insert payload for §6.3 row 1. `source` is ALWAYS DERIVED and
+   * `confidence_score` is ALWAYS null. `reporting_year` is the carried year
+   * (the column is NOT NULL and has no default). `is_active` is true only
+   * on this insert — updates never write it.
    *
-   * `clarisa_project_short_name`'s own column comment is "Snapshot of
-   * CLARISA short_name at mapping time (D-PI-11)" — it takes
-   * clarisaProjectShortName, never clarisaProjectFullName. Writing the full
-   * name here would leave the table showing a silent mix of short and full
-   * names across MANUAL vs matcher-created rows.
+   * `clarisa_project_short_name` takes clarisaProjectShortName, never the
+   * full name (column comment: snapshot of CLARISA short_name).
    */
   private newDerivedRow(
     entry: AutomapperCandidate,
     actorUserId: number,
+    reportingYear: number,
   ): Partial<BilateralProjectMapping> {
     return {
       agresso_agreement_id: entry.derivedContractId,
+      reporting_year: reportingYear,
       clarisa_project_id: entry.clarisaProjectId,
       clarisa_project_short_name: entry.clarisaProjectShortName ?? null,
-      clarisa_external_code: entry.externalCode
-        ? normalizeExternalCode(entry.externalCode).normalized || null
-        : null,
+      clarisa_external_code: this.normalizedExternalCode(entry),
       source: MappingSourceEnum.DERIVED,
       confidence_score: null,
       notes: null,
@@ -490,6 +504,38 @@ export class AutomapperService {
       created_by: actorUserId,
       updated_by: actorUserId,
     };
+  }
+
+  /**
+   * In-place CLARISA refresh for §6.3 rows 3 and 6. The omitted fields are
+   * the rule: this object must not contain `is_active`, `deleted_at`, or
+   * `source`.
+   */
+  private clarisaFieldUpdate(
+    entry: AutomapperCandidate,
+    actorUserId: number,
+  ): Partial<BilateralProjectMapping> {
+    return {
+      clarisa_project_id: entry.clarisaProjectId,
+      clarisa_project_short_name: entry.clarisaProjectShortName ?? null,
+      clarisa_external_code: this.normalizedExternalCode(entry),
+      updated_by: actorUserId,
+    };
+  }
+
+  private normalizedExternalCode(entry: AutomapperCandidate): string | null {
+    if (!entry.externalCode) return null;
+    return normalizeExternalCode(entry.externalCode).normalized || null;
+  }
+
+  private rowMatchesProject(
+    row: BilateralProjectMapping,
+    projectId: number,
+    normCode: string,
+  ): boolean {
+    if (row.clarisa_project_id === projectId) return true;
+    if (!normCode) return false;
+    return row.clarisa_external_code?.trim().toUpperCase() === normCode;
   }
 
   /**
