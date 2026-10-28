@@ -90,7 +90,7 @@ describe('ActionsService', () => {
   it('should call router.navigate in changeResultRoute', async () => {
     await service.changeResultRoute(123);
     expect(routerMock.navigate).toHaveBeenCalledWith(['load-results'], { skipLocationChange: true });
-    expect(routerMock.navigate).toHaveBeenCalledWith(['result', 123]);
+    expect(routerMock.navigate).toHaveBeenCalledWith(['result', 'STAR-123']);
   });
 
   it('should set toastMessage', () => {

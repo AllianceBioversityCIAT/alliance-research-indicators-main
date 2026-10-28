@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of, Subject } from 'rxjs';
 import ResultComponent from './result.component';
 import { cacheServiceMock, getMetadataServiceMock } from 'src/app/testing/mock-services.mock';
@@ -195,10 +195,23 @@ describe('ResultComponent branch coverage - constructor and metadata', () => {
     expect(mockCache.setCurrentResultId).toHaveBeenCalledWith('STAR-456');
   });
 
-  it('sets currentResultId when id is numeric string', () => {
+  it('H14: rewrites a bare numeric id to the STAR- prefixed url instead of using it', () => {
+    const router = TestBed.inject(Router);
+    jest.spyOn(router, 'url', 'get').mockReturnValue('/result/789/policy-change?version=2025');
+    const navigateSpy = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    (mockCache.setCurrentResultId as jest.Mock).mockClear();
+
     params$.next({ id: '789' });
     fixture.detectChanges();
-    expect(mockCache.setCurrentResultId).toHaveBeenCalledWith('789');
+
+    expect(navigateSpy).toHaveBeenCalledWith('/result/STAR-789/policy-change?version=2025', { replaceUrl: true });
+    expect(mockCache.setCurrentResultId).not.toHaveBeenCalled();
+  });
+
+  it('sets currentResultId from a STAR- prefixed id', () => {
+    params$.next({ id: 'STAR-789' });
+    fixture.detectChanges();
+    expect(mockCache.setCurrentResultId).toHaveBeenCalledWith('STAR-789');
   });
 
   it('getCurrentResultIdentifier returns idParam when present', () => {
@@ -301,25 +314,25 @@ describe('ResultComponent pool funding pre-fetch memo includes version (R-PFV-00
   });
 
   it('re-issues getAlignment when switching version and when switching back to live', () => {
-    params$.next({ id: '19941' });
+    params$.next({ id: 'STAR-19941' });
     queryParams$.next({});
     fixture.detectChanges();
     TestBed.flushEffects();
     expect(getAlignment).toHaveBeenCalledTimes(1);
-    expect(getAlignment).toHaveBeenCalledWith('19941');
+    expect(getAlignment).toHaveBeenCalledWith('STAR-19941');
 
     getAlignment.mockClear();
     queryParams$.next({ version: '2026' });
     fixture.detectChanges();
     TestBed.flushEffects();
     expect(getAlignment).toHaveBeenCalledTimes(1);
-    expect(getAlignment).toHaveBeenCalledWith('19941');
+    expect(getAlignment).toHaveBeenCalledWith('STAR-19941');
 
     getAlignment.mockClear();
     queryParams$.next({});
     fixture.detectChanges();
     TestBed.flushEffects();
     expect(getAlignment).toHaveBeenCalledTimes(1);
-    expect(getAlignment).toHaveBeenCalledWith('19941');
+    expect(getAlignment).toHaveBeenCalledWith('STAR-19941');
   });
 });
