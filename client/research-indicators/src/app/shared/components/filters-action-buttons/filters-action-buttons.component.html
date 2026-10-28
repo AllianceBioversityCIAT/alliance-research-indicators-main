@@ -3,7 +3,7 @@
   @if (showExportButton) {
   <p-button icon="pi pi-file-excel !text-[12px]"
     styleClass="!rounded-[8px] !text-[12px] !py-1 !max-h-[27px] !min-w-[180px] !bg-white !text-[#035BA9] !border-[#035BA9]"
-    (keydown.enter)="!isExportLoading && export.emit()" (click)="!isExportLoading && export.emit()"
+    (click)="!isExportLoading && export.emit()"
     [label]="isExportLoading ? '' : exportLabel" class="p-button-outlined" [outlined]="true"
     [disabled]="isExportLoading" [loading]="isExportLoading"></p-button>
   }

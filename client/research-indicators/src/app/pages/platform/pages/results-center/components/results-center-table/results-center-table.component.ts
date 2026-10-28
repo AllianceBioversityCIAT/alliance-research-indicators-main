@@ -175,10 +175,15 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
     return `STAR_results_metadata_${yyyymmdd}_${hhmm}_${initials}.xlsx`;
   }
 
+  // H42 — one export at a time across every table instance, so a single click can never
+  // produce two workbooks even if the action reaches more than one handler.
+  private static exportInFlight = false;
+
   async exportTable() {
-    if (this.isExporting()) {
+    if (this.isExporting() || ResultsCenterTableComponent.exportInFlight) {
       return;
     }
+    ResultsCenterTableComponent.exportInFlight = true;
     this.isExporting.set(true);
     try {
       const blob = await this.apiService.GET_ResultCenterXlsx(
@@ -208,6 +213,7 @@ export class ResultsCenterTableComponent implements AfterViewInit, OnDestroy {
         console.error('Error details:', error.message, error.stack);
       }
     } finally {
+      ResultsCenterTableComponent.exportInFlight = false;
       this.isExporting.set(false);
     }
   }
