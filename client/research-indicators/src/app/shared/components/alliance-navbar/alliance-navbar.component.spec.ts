@@ -310,6 +310,10 @@ describe('AllianceNavbarComponent', () => {
     ]);
   });
 
+  it('should keep a menu option active when only the query string changes (Results Center filters)', () => {
+    expect(component.exactPathMatch).toEqual({ paths: 'exact', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' });
+  });
+
   it('should handle ResizeObserver callback execution (covers lines 73-74)', () => {
     const mockNavbar = document.createElement('div');
     mockNavbar.id = 'navbar';
