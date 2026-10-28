@@ -351,12 +351,14 @@ export class SubmitResultContentComponent {
   }
 
   private async handlePostSubmitForLegacyFlow(): Promise<boolean> {
+    const reviewStatusId = this.submissionService.statusSelected()?.statusId;
     const response = await this.api.PATCH_SubmitResult({
       resultCode: this.cache.getCurrentNumericResultId(),
       comment: this.submissionService.comment(),
       status: this.submissionService.statusSelected()!.statusId
     });
     if (!response.successfulRequest) return false;
+    this.showReviewConfirmation(reviewStatusId);
     if (this.submissionService.statusSelected()?.statusId === 6) this.submissionService.comment.set('');
     await this.metadata.update(this.cache.getCurrentNumericResultId());
     this.cache.lastResultId.set(null);
@@ -434,6 +436,18 @@ export class SubmitResultContentComponent {
         this.allModalsService.closeModal('submitResult');
       }
     }
+  }
+
+  // H50 — review decisions confirm themselves with the same alert Submit ("RESULT SUBMITTED") uses.
+  private showReviewConfirmation(statusId: number | undefined): void {
+    const confirmations: Record<number, { summary: string; detail: string }> = {
+      6: { summary: 'RESULT APPROVED', detail: 'The result was approved successfully.' },
+      5: { summary: 'REVISION REQUESTED', detail: 'The result was sent back to the submitter for revision.' },
+      7: { summary: 'RESULT NOT APPROVED', detail: 'The result was marked as not approved.' }
+    };
+    const confirmation = statusId == null ? undefined : confirmations[statusId];
+    if (!confirmation) return;
+    this.actions.showGlobalAlert({ severity: 'success', hasNoButton: true, ...confirmation });
   }
 
   // H20 — the confirmation must describe what the chosen decision actually does to the OICR.

@@ -648,6 +648,16 @@ describe('SubmitResultContentComponent', () => {
   });
 
   it.each([
+    [6, 'RESULT APPROVED'],
+    [5, 'REVISION REQUESTED'],
+    [7, 'RESULT NOT APPROVED']
+  ])('H50: a legacy review decision (status %i) confirms with the shared success alert', (statusId: number, summary: string) => {
+    const alertSpy = jest.spyOn(component.actions, 'showGlobalAlert').mockImplementation(() => undefined);
+    (component as any).showReviewConfirmation(statusId);
+    expect(alertSpy).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary }));
+  });
+
+  it.each([
     [10, 'backstopping from the MELP team'],
     [11, 'now Postponed'],
     [15, 'now Not Accepted']
