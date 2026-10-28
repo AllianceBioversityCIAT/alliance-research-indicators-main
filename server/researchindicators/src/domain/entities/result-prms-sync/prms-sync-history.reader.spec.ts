@@ -208,6 +208,7 @@ const RESULT_ROW = {
   report_year_id: YEAR,
   prms_result_code: 452,
   prms_phase_id: 6,
+  prms_sp_code: 'SP03',
 };
 
 describe('PrmsSyncHistoryReader', () => {
@@ -272,6 +273,7 @@ describe('PrmsSyncHistoryReader', () => {
 
     expect(history.prms_result_code).toBe(452);
     expect(history.prms_phase_id).toBe(6);
+    expect(history.prms_sp_code).toBe('SP03');
     expect(history.sync_count).toBe(2);
     expect(history.events.map((event) => event.id)).toEqual([
       103, 102, 104, 101,
@@ -351,6 +353,30 @@ describe('PrmsSyncHistoryReader', () => {
     expect(history.sync_count).toBe(0);
     expect(history.prms_result_code).toBeNull();
     expect(history.prms_phase_id).toBeNull();
+  });
+
+  it('reads the phase and the PRIMARY SP from the pushed version when the row has no phase', async () => {
+    installFixture(query, FIXTURE, [RESULT_ROW]);
+
+    await reader.getHistory(RESULT_ID);
+
+    const metaSql = issuedCall(query, /prms_phase_id/).sql;
+    expect(metaSql).toMatch(
+      /COALESCE\(r\.prms_phase_id, v\.prms_phase_id\) AS prms_phase_id/,
+    );
+    expect(metaSql).toMatch(/pushed\.is_snapshot = TRUE/);
+    expect(metaSql).toMatch(/pushed\.prms_phase_id IS NOT NULL/);
+    expect(metaSql).toMatch(/pushed\.platform_code <=> r\.platform_code/);
+    expect(metaSql).toMatch(/sp\.sp_role = 'PRIMARY'/);
+    expect(metaSql).toMatch(/AS prms_sp_code/);
+  });
+
+  it('carries a null prms_sp_code when the result has no PRIMARY SP', async () => {
+    installFixture(query, [], [{ ...RESULT_ROW, prms_sp_code: null }]);
+
+    const history = await reader.getHistory(RESULT_ID);
+
+    expect(history.prms_sp_code).toBeNull();
   });
 
   it('carries a null prms_phase_id when the column is null', async () => {

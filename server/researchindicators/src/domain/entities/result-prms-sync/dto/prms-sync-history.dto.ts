@@ -72,6 +72,14 @@ export class PrmsSyncHistoryDto {
   prms_phase_id: number | null;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'PRIMARY Science Program code of the pushed version (e.g. SP03). Null when the result has no active PRIMARY SP.',
+  })
+  prms_sp_code: string | null;
+
+  @ApiProperty({
     description:
       "Count of active non-duplicate STAR rows with status PENDING_REVIEW for this result's reporting year.",
   })
