@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { PiDelegatesRepository } from './pi-delegates.repository';
 import { AppConfig } from '../../../shared/utils/app-config.util';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 
 // Shape guard for the project-scoped authorization query.
 //
@@ -162,6 +163,12 @@ describe('PiDelegatesRepository — scope=all variants', () => {
       //   is what My Projects tags and this table used to contradict.
       expect(sql).toContain('bilateral_project_mapping');
       expect(sql).toMatch(/AS is_pool_funding_contributor/);
+      // Year AND is inside the EXISTS of the SQL this method sends.
+      expect(sql).toContain('bpm.reporting_year');
+      expect(sql).toContain(currentReportingYearSql);
+      expect(sql).toMatch(
+        /OR EXISTS \(\s*SELECT 1 FROM bilateral_project_mapping bpm\s*WHERE bpm\.agresso_agreement_id = ac\.agreement_id\s*AND bpm\.is_active = 1\s*AND bpm\.reporting_year =/,
+      );
     },
   );
 

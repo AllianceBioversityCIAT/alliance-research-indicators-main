@@ -102,7 +102,7 @@ graph TD
 
 ### T-03 — Year-scope the shared readers and re-create the DB function
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02
+- **Status:** done (PASS 2026-10-28, attempt 2) · **Size:** M · **Dependencies:** T-01, T-02
 - **Requirements:** R-APM-004 (AC.1, AC.3, AC.4; scenario *prior-year rows are invisible*: THEN / BUT must NOT alter / AND IT MUST still be there)
 - **Design:** §6.2 table (rows `pool-funding.util.ts`, `result-prms-sync-aggregate.repository.ts`), §4.2 literal-SQL rule; P-10, P-10b, P-11, P-13, P-28
 - **Scope:**
@@ -120,10 +120,10 @@ graph TD
 - **Consumers:** the 7 predicate call sites (design §6.2); DB-function callers `green-checks.repository.ts:71` and `result-prms-sync-log.repository.ts:163`; predicate-text specs above.
 - **Review:** `full`: shared predicate, 7 call sites + a DB function.
 - **Done:**
-  - [ ] Falsifiers executed.
-  - [ ] Migration `up`/`down`/`up` on the TEST schema.
-  - [ ] Pinned specs updated, with the diff listed.
-  - [ ] Build and eslint green.
+  - [x] Falsifiers executed.
+  - [x] Migration `up`/`down`/`up` on the TEST schema.
+  - [x] Pinned specs updated, with the diff listed.
+  - [x] Build and eslint green.
 - **Skills:** nestjs-expert, tdd
 
 ### T-04 — CLARISA unification: one year, retire the old key
