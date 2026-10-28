@@ -2215,7 +2215,7 @@ describe('MyProjectsService', () => {
       expect(poolChips).toHaveLength(1);
       expect(poolChips[0]).toEqual({
         label: 'CONTRIBUTING TO POOL FUNDING',
-        value: 'Contributing to Pool Funding'
+        value: 'Contributing to CGIAR Portfolio'
       });
     });
 

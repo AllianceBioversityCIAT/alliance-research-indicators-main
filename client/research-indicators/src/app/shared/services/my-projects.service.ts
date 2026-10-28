@@ -287,7 +287,7 @@ export class MyProjectsService {
     if (filters.startDate) items.push({ label: 'START DATE', value: formatDate(filters.startDate) });
     if (filters.endDate) items.push({ label: 'END DATE', value: formatDate(filters.endDate) });
     if (filters.poolFundingOnly) {
-      items.push({ label: 'CONTRIBUTING TO POOL FUNDING', value: 'Contributing to Pool Funding' });
+      items.push({ label: 'CONTRIBUTING TO POOL FUNDING', value: 'Contributing to CGIAR Portfolio' });
     }
 
     return items;
