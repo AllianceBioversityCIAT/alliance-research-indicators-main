@@ -13,11 +13,51 @@ import {
  * Q1 — result metadata. The reporting year is resolved here, never from
  * the client. Flat predicates only: no OR (design §5, KZ-017).
  * `platform_code` is selected so the history key can bind it (design §7.5).
+ *
+ * The phase and the PRIMARY Science Program live on the pushed row: the
+ * version of this code, year and platform that holds `prms_phase_id`. The
+ * live row stores only `prms_result_code`, and its pool-funding alignment can
+ * be inactive once a version exists, so both are read from that version when
+ * the row itself has no phase. The client builds the PRMS review link from
+ * `prms_sp_code`, `prms_phase_id` and `prms_result_code`.
  */
 const RESULT_METADATA_SQL = `
-      SELECT result_official_code, report_year_id, prms_result_code, prms_phase_id, platform_code
-      FROM results
-      WHERE result_id = ?
+      SELECT
+        r.result_official_code,
+        r.report_year_id,
+        r.prms_result_code,
+        COALESCE(r.prms_phase_id, v.prms_phase_id) AS prms_phase_id,
+        r.platform_code,
+        (
+          SELECT sp.sp_code
+          FROM result_pool_funding_alignment a
+          INNER JOIN result_pool_funding_alignment_sp sp
+            ON sp.alignment_id = a.id
+            AND sp.is_active = TRUE
+            AND sp.sp_role = 'PRIMARY'
+          WHERE a.result_id = CASE
+              WHEN r.prms_phase_id IS NOT NULL THEN r.result_id
+              ELSE COALESCE(v.result_id, r.result_id)
+            END
+            AND a.is_active = TRUE
+          ORDER BY sp.id DESC
+          LIMIT 1
+        ) AS prms_sp_code
+      FROM results r
+      LEFT JOIN results v
+        ON v.result_id = (
+          SELECT pushed.result_id
+          FROM results pushed
+          WHERE pushed.result_official_code = r.result_official_code
+            AND pushed.report_year_id = r.report_year_id
+            AND pushed.platform_code <=> r.platform_code
+            AND pushed.is_snapshot = TRUE
+            AND pushed.is_active = TRUE
+            AND pushed.prms_phase_id IS NOT NULL
+          ORDER BY pushed.result_id DESC
+          LIMIT 1
+        )
+      WHERE r.result_id = ?
     `;
 
 /**
@@ -188,6 +228,7 @@ export class PrmsSyncHistoryReader {
           prms_result_code?: unknown;
           prms_phase_id?: unknown;
           platform_code?: unknown;
+          prms_sp_code?: unknown;
         }
       | undefined;
     if (!resultRow) {
@@ -215,6 +256,7 @@ export class PrmsSyncHistoryReader {
       return {
         prms_result_code: asNullableNumber(resultRow.prms_result_code),
         prms_phase_id: asNullableNumber(resultRow.prms_phase_id),
+        prms_sp_code: asNullableString(resultRow.prms_sp_code),
         sync_count: syncCount,
         events: (eventRows as Record<string, unknown>[]).map(mapHistoryEvent),
       };

@@ -847,6 +847,7 @@ describe('ResultSidebarComponent', () => {
         data: {
           prms_result_code: 9746,
           prms_phase_id: 6,
+          prms_sp_code: 'SP03',
           sync_count: 1,
           events: [syncedEvent]
         }

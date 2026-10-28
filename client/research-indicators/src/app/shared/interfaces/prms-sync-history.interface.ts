@@ -22,6 +22,8 @@ export interface PrmsSyncHistoryEvent {
 export interface PrmsSyncHistoryResponse {
   prms_result_code: number | null;
   prms_phase_id: number | null;
+  /** PRIMARY Science Program of the pushed version (e.g. `SP03`); part of the PRMS review link. */
+  prms_sp_code?: string | null;
   sync_count: number;
   events: PrmsSyncHistoryEvent[];
 }

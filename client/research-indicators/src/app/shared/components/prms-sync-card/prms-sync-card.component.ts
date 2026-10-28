@@ -45,10 +45,11 @@ export class PrmsSyncCardComponent {
   });
   readonly showSyncCount = computed(() => this.history().sync_count > 0);
   readonly showCode = computed(() => this.history().prms_result_code != null);
+  /** PRMS bilateral review screen of this result, under its PRIMARY Science Program. */
   readonly deepLink = computed(() => {
-    const { prms_result_code: code, prms_phase_id: phase } = this.history();
-    if (code == null || phase == null) return null;
-    return `${environment.prmsUrl}/result/result-detail/${code}/general-information?phase=${phase}`;
+    const { prms_result_code: code, prms_phase_id: phase, prms_sp_code: sp } = this.history();
+    if (code == null || phase == null || !sp) return null;
+    return `${environment.prmsUrl}/result-framework-reporting/entity-details/${encodeURIComponent(sp)}/bilateral-review?phase=${phase}&reviewResult=${code}`;
   });
 
   focusHistoryLink(): void {
