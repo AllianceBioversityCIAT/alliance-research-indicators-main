@@ -56,9 +56,10 @@ export default class PromptManagerComponent implements OnInit {
     if (!value) return '—';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '—';
-    const datePart = new Intl.DateTimeFormat('en-US', {
-      month: '2-digit',
+    // H24 — dd/mm/yyyy, the platform-wide date format.
+    const datePart = new Intl.DateTimeFormat('en-GB', {
       day: '2-digit',
+      month: '2-digit',
       year: 'numeric'
     }).format(date);
     const timePart = new Intl.DateTimeFormat('en-US', {
