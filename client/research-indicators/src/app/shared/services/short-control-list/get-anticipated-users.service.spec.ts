@@ -18,7 +18,7 @@ describe('GetAnticipatedUsersService', () => {
   it('should initialize with correct anticipated users data', () => {
     const expectedData = [
       { name: 'This is yet to be determined', value: 1 },
-      { name: 'User have been determined', value: 2 }
+      { name: 'Users have been determined', value: 2 }
     ];
 
     expect(service.list()).toEqual(expectedData);
@@ -40,7 +40,7 @@ describe('GetAnticipatedUsersService', () => {
   it('should have second user with correct properties', () => {
     const secondUser = service.list()[1];
 
-    expect(secondUser.name).toBe('User have been determined');
+    expect(secondUser.name).toBe('Users have been determined');
     expect(secondUser.value).toBe(2);
     expect(typeof secondUser.name).toBe('string');
     expect(typeof secondUser.value).toBe('number');
