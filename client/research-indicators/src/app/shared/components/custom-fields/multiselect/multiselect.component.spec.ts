@@ -565,9 +565,21 @@ describe('MultiselectComponent', () => {
     const result = component.listWithDisabled();
 
     expect(result).toEqual([
-      { id: 1, name: 'Option 1', disabled: { id: 1 } },
-      { id: 2, name: 'Option 2', disabled: undefined }
+      { id: 1, name: 'Option 1', disabled: true },
+      { id: 2, name: 'Option 2', disabled: false }
     ]);
+  });
+
+  it('H40: disables an option whose id arrives as a string (saved primary lever vs numeric control list)', () => {
+    component.optionsDisabled.set([{ id: '1' }]);
+    mockService.list.mockReturnValue([
+      { id: 1, name: 'Option 1' },
+      { id: 2, name: 'Option 2' }
+    ]);
+    component.ngOnInit();
+    TestBed.flushEffects();
+
+    expect(component.listWithDisabled().map((o: { disabled: boolean }) => o.disabled)).toEqual([true, false]);
   });
 
   it('should handle listWithDisabled when service.list() returns undefined (optional chain map)', () => {
