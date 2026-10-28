@@ -1715,6 +1715,35 @@ describe('ResultsService', () => {
       mockQueryService.deleteFullResultById.mockResolvedValue(undefined);
     });
 
+    it('H13: removes every deleted result from the OpenSearch index', async () => {
+      mockMainRepo.find.mockResolvedValue(mockResults);
+
+      await service.deleteResultsByParameters({
+        resultIds: [10, 20],
+        testing: false,
+      } as any);
+
+      expect(
+        mockOpenSearchResultApi.uploadSingleToOpenSearch,
+      ).toHaveBeenCalledWith({ result_id: 10 }, ElasticOperationEnum.DELETE);
+      expect(
+        mockOpenSearchResultApi.uploadSingleToOpenSearch,
+      ).toHaveBeenCalledWith({ result_id: 20 }, ElasticOperationEnum.DELETE);
+    });
+
+    it('H13: leaves the index alone in testing mode', async () => {
+      mockMainRepo.find.mockResolvedValue(mockResults);
+
+      await service.deleteResultsByParameters({
+        resultIds: [10],
+        testing: true,
+      } as any);
+
+      expect(
+        mockOpenSearchResultApi.uploadSingleToOpenSearch,
+      ).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException when no results match the filters', async () => {
       mockMainRepo.find.mockResolvedValue([]);
 
