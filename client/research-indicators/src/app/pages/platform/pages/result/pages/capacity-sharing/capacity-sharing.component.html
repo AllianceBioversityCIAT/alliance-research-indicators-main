@@ -109,6 +109,11 @@
           [disabled]="!submission.isEditableStatus()" type="number"></app-input>
       </div>
     </div>
+    @if (participantsExceedTotal()) {
+    <p class="text-[13px] atc-red-1 mb-6" role="alert">
+      Female, male and non-binary participants add up to more than the total participants.
+    </p>
+    }
 
     <div class="flex flex-col xl:flex-row gap-8">
       <div class="flex-1">
@@ -192,6 +197,11 @@
           placeholder="Select the end date"></app-calendar-input>
       </div>
     </div>
+    @if (isLongTermTooShort()) {
+    <p class="text-[13px] atc-red-1 mb-6" role="alert">
+      A long-term training must last 3 months or more. Adjust the dates or choose Short-term.
+    </p>
+    }
 
     <div class="mt-5">
       <app-radio-button label="Delivery modality" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
