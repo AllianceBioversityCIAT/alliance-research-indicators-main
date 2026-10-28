@@ -193,6 +193,44 @@ describe('CapacitySharingComponent', () => {
   });
 
   describe('saveData', () => {
+    it('H8: blocks saving when the participants by sex add up to more than the total', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      component.body.set({
+        session_format_id: 2,
+        group: { session_participants_total: 10, session_participants_female: 6, session_participants_male: 6 }
+      } as any);
+
+      expect(component.participantsExceedTotal()).toBe(true);
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).not.toHaveBeenCalled();
+      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+    });
+
+    it('H8: accepts a split that matches the total', () => {
+      component.body.set({
+        group: { session_participants_total: 12, session_participants_female: 6, session_participants_male: 6 }
+      } as any);
+      expect(component.participantsExceedTotal()).toBe(false);
+    });
+
+    it('H10: blocks a long-term training shorter than 3 months', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      component.body.set({ session_length_id: 2, start_date: new Date(2026, 0, 1), end_date: new Date(2026, 0, 4) });
+
+      expect(component.isLongTermTooShort()).toBe(true);
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).not.toHaveBeenCalled();
+    });
+
+    it('H10: accepts a long-term training of exactly 3 months', () => {
+      component.body.set({ session_length_id: 2, start_date: new Date(2026, 0, 1), end_date: new Date(2026, 3, 1) });
+      expect(component.isLongTermTooShort()).toBe(false);
+    });
+
     it('should send ISO 8601 UTC strings to the API', async () => {
       submission.isEditableStatus.mockReturnValue(true);
       apiService.PATCH_CapacitySharing.mockResolvedValue({});
