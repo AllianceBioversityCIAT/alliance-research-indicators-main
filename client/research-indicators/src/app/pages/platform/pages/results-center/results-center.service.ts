@@ -258,6 +258,10 @@ export class ResultsCenterService {
   resultsTablePaginatorRows = signal(10);
   resultsTableTotalRecords = signal(0);
   private lastSuccessfulResultsFetchKey: string | null = null;
+  // Every main() call takes a ticket; only the newest one may write the table. On reload the
+  // table's first lazy load fires before the URL/session filters are seeded, and when that
+  // unfiltered response landed last it replaced the filtered one while the chips stayed active.
+  private resultsRequestSeq = 0;
   resultsTableSortField = signal<string>('result_official_code');
   resultsTableSortOrder = signal<-1 | 1>(-1);
 
@@ -490,6 +494,7 @@ export class ResultsCenterService {
   }
 
   async main() {
+    const requestId = ++this.resultsRequestSeq;
     this.loading.set(true);
     const primaryContractIdAtRequest = this.primaryContractId();
     const activeTabIdAtRequest = this.myResultsFilterItem()?.id;
@@ -576,6 +581,10 @@ export class ResultsCenterService {
         } as Result & { primaryLeverSort: string; _creatorFullName: string };
       });
 
+      if (requestId !== this.resultsRequestSeq) {
+        return;
+      }
+
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext) {
         this.resultsTableTotalRecords.set(total);
@@ -584,6 +593,9 @@ export class ResultsCenterService {
       }
     } catch (error) {
       console.error('Error loading results:', error);
+      if (requestId !== this.resultsRequestSeq) {
+        return;
+      }
       this.lastSuccessfulResultsFetchKey = null;
       const stillSameContext = this.primaryContractId() === primaryContractIdAtRequest && this.myResultsFilterItem()?.id === activeTabIdAtRequest;
       if (stillSameContext) {
@@ -591,7 +603,9 @@ export class ResultsCenterService {
         this.list.set([]);
       }
     } finally {
-      this.loading.set(false);
+      if (requestId === this.resultsRequestSeq) {
+        this.loading.set(false);
+      }
     }
   }
   handleResultsTableLazyLoad(event: TableLazyLoadEvent): void {
