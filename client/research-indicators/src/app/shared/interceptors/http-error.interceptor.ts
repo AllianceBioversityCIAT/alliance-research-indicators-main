@@ -1,5 +1,5 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
-import { catchError, timer, merge, throwError, ignoreElements, from, switchMap } from 'rxjs';
+import { catchError, timer, merge, throwError, ignoreElements, from, switchMap, EMPTY } from 'rxjs';
 import { inject } from '@angular/core';
 import { ActionsService } from '@services/actions.service';
 import { CacheService } from '../services/cache/cache.service';
@@ -56,14 +56,19 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const timeoutCheck = timer(5000).pipe(
     switchMap(() => {
       const timeoutObj = createErrorObj('pending', 'Request is taking longer than 5 seconds to respond');
-      return from(api.saveErrors(timeoutObj));
+      // H58 — the tracker answering 500 must never fail the user's own, still-pending request.
+      return from(api.saveErrors(timeoutObj)).pipe(catchError(() => EMPTY));
     }),
     ignoreElements() // Ignore the timer values
   );
 
+  // H58 — file exports (blob responses) legitimately take longer than 5 s; reporting them as
+  // slow requests sent a POST to the error tracker on every Excel export.
+  const slowRequestCheck = req.responseType === 'blob' ? EMPTY : timeoutCheck;
+
   // Use merge instead of race to run both observables
   return merge(
-    timeoutCheck,
+    slowRequestCheck,
     next(req).pipe(
       catchError((error: HttpErrorResponse) => {
         const errorObj = createErrorObj('error', error.message, error);
