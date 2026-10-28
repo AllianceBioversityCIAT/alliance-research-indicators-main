@@ -201,10 +201,12 @@ export const routes: Routes = [
           title: 'Project Detail'
         },
         children: [
+          // H59 — `redirectTo: '../'` is not a valid redirect and left a blank page. The parent
+          // renders the results table whenever the last segment is `project-results`, so this
+          // only has to match; it renders nothing of its own.
           {
             path: 'project-results',
-            redirectTo: '../',
-            pathMatch: 'full'
+            children: []
           },
           {
             path: 'project-dashboard',
@@ -366,9 +368,11 @@ export const routes: Routes = [
       }
     ]
   },
+  // H59 — there is no `not-found` route, so redirecting there failed the navigation and
+  // rendered a blank page. Signed-out visitors never reach this: the landing route catches them.
   {
     path: '**',
-    redirectTo: 'not-found',
+    redirectTo: 'home',
     pathMatch: 'full'
   }
 ];
