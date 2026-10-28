@@ -551,21 +551,23 @@ export class ResultSidebarComponent {
         label: 'Confirm',
         event: (data?: { comment?: string; selected?: string }) => {
           (async () => {
+            const wasSubmitted = this.submissionService.currentResultIsSubmitted();
             const response = await this.api.PATCH_SubmitResult({
               resultCode: this.cache.getCurrentNumericResultId(),
               comment: data?.comment ?? '',
-              status: this.submissionService.currentResultIsSubmitted() ? 4 : 2
+              status: wasSubmitted ? 4 : 2
             });
             this.metadata.update(this.cache.getCurrentNumericResultId());
             this.submissionService.refreshSubmissionHistory.update(v => v + 1);
             if (!response.successfulRequest) {
               this.actions.showToast({ severity: 'error', summary: 'Error', detail: response.errorDetail.errors });
-            } else if (!this.submissionService.currentResultIsSubmitted()) {
+            } else {
+              // H50 — unsubmitting confirms itself with the same alert Submit uses.
               this.actions.showGlobalAlert({
                 severity: 'success',
                 hasNoButton: true,
-                summary: 'RESULT SUBMITTED',
-                detail: 'The result was submitted successfully.'
+                summary: wasSubmitted ? 'RESULT UNSUBMITTED' : 'RESULT SUBMITTED',
+                detail: wasSubmitted ? 'The result was unsubmitted successfully.' : 'The result was submitted successfully.'
               });
             }
           })();
