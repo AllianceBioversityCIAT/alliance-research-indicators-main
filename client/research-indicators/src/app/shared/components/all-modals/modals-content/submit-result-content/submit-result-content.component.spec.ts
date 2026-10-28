@@ -647,6 +647,14 @@ describe('SubmitResultContentComponent', () => {
     });
   });
 
+  it.each([
+    [10, 'backstopping from the MELP team'],
+    [11, 'now Postponed'],
+    [15, 'now Not Accepted']
+  ])('H20: the OICR review confirmation matches the decision (status %i)', (statusId: number, fragment: string) => {
+    expect((component as any).oicrReviewOutcomeMessage(statusId)).toContain(fragment);
+  });
+
   it('should handle latest flow submit review with non-approve', async () => {
     mockAllModalsService.submitResultOrigin!.set('latest');
     
@@ -681,7 +689,7 @@ describe('SubmitResultContentComponent', () => {
       severity: 'success',
       summary: 'Review submitted successfully',
       hasNoCancelButton: true,
-      detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.',
+      detail: 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.',
       confirmCallback: {
         label: 'Done',
         event: expect.any(Function)

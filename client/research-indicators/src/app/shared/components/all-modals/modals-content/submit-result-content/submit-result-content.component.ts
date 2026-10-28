@@ -392,7 +392,8 @@ export class SubmitResultContentComponent {
 
   async submitReview(): Promise<void> {
     if (this.allModalsService.submitResultOrigin?.() === 'latest') {
-      const isApprove = this.submissionService.statusSelected()?.statusId === 10;
+      const reviewStatusId = this.submissionService.statusSelected()?.statusId;
+      const isApprove = reviewStatusId === 10;
       const formValue = this.form();
       const body = this.buildLatestBody(isApprove, formValue);
       const response = await this.api.PATCH_SubmitResult(
@@ -418,7 +419,7 @@ export class SubmitResultContentComponent {
         severity: 'success',
         summary: 'Review submitted successfully',
         hasNoCancelButton: true,
-        detail: 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.',
+        detail: this.oicrReviewOutcomeMessage(reviewStatusId),
         confirmCallback: {
           label: 'Done',
           event: () => {
@@ -433,6 +434,17 @@ export class SubmitResultContentComponent {
         this.allModalsService.closeModal('submitResult');
       }
     }
+  }
+
+  // H20 — the confirmation must describe what the chosen decision actually does to the OICR.
+  private oicrReviewOutcomeMessage(statusId: number | undefined): string {
+    if (statusId === 11) {
+      return 'Your review has been submitted. The OICR is now Postponed and can be reported again in a later reporting year.';
+    }
+    if (statusId === 15) {
+      return 'Your review has been submitted. The OICR is now Not Accepted and will not continue in the OICR development process.';
+    }
+    return 'Your review has been submitted and the OICR development process will continue with backstopping from the MELP team.';
   }
 
   private cleanUpSubmitResultData(): void {
