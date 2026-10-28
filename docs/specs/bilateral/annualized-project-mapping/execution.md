@@ -241,7 +241,7 @@
   5. RESILIENCE: two concurrent Apply runs on a `toCreate` agreement → 1062 on `uk_bpm_agreement_year`, surfaced as a raw error. This is pre-existing (the same was true under the old key).
   6. READABILITY: `counts.updated` counts row 3 only; row-6 writes are counted under `inactive`. Document this in the T-08 client contract, or add `counts.refreshed`.
   7. Gap: the mock QueryBuilder is not MySQL. Collation, `uk_bpm_agreement_year` and `reporting_year NOT NULL` are not exercised by T-05.
-- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer akili-reviewer/opus: not reported by host at the time of writing, ended complete
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer akili-reviewer/opus 15 calls, 111 858 tokens, ended complete
 - **Not Done / Assumptions (verbatim, translated from the worker's Spanish; assumptions only, nothing owed):** "`counts.updated` is the length of `toUpdate` (row 3). Row 6 writes and is counted under `inactive`, with `refreshed: true`." · "The `ClarisaProjectsService.listBilateralProjects` option is still named `phase`. It was not renamed." · "The POST `{}` in the HTTP test answers 201 because that app does not mount `ResponseInterceptor`; the envelope carries status 200."
 - **Requirements covered:** R-APM-005 AC.1–5, table rows 1–7, the A1697 scenario (THEN / BUT / AND IT MUST) · R-APM-003 AC.1, AC.2 · R-APM-009 AC.1 · R-APM-004 AC.2 (preview/coverage) · R-APM-011 "BUT must NOT be reactivated by Apply" · R-APM-002 scenario THEN (coverage/preview)
 - **Running totals vs budget (design §12):** tasks 5/10 · LOC **+2,316**/−1,026 (budget ~1,500) · review rounds 9/~14. **BUDGET TRIPWIRE FIRED. See the block below.**
