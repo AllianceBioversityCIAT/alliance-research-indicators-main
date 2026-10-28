@@ -1,3 +1,4 @@
+import { DateFormatConfigService } from '@shared/services/date-format-config.service';
 // @akili-spec changes/profile-simulation
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
@@ -84,7 +85,8 @@ describe('SimulationBannerComponent', () => {
         { provide: CacheService, useValue: mockCacheService },
         { provide: ImpersonationService, useValue: mockImpersonationService },
         { provide: ActionsService, useValue: mockActionsService },
-        { provide: WebsocketService, useValue: mockWebsocketService }
+        { provide: WebsocketService, useValue: mockWebsocketService },
+        { provide: DateFormatConfigService, useValue: { config: signal(null) } }
       ]
     }).compileComponents();
 
@@ -124,9 +126,9 @@ describe('SimulationBannerComponent', () => {
     expect(banner.textContent).toContain('Ana Sandoval');
   });
 
-  it('formats the started time as HH:mm from session().started_at', () => {
+  it('H23: formats the started time in the configured app timezone, labelled', () => {
     fixture.detectChanges();
-    expect(component.startedTime()).toMatch(/^\d{2}:32$/);
+    expect(component.startedTime()).toMatch(/^\d{1,2}:32\s?(am|pm) \(UTC\)$/i);
   });
 
   it('returns an empty started time when no session is present (no started_at to format)', () => {
