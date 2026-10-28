@@ -75,7 +75,7 @@ graph TD
 
 ### T-02 — Single year definition: `currentReportingYearSql`, resolver executes it
 
-- **Status:** todo · **Size:** M · **Dependencies:** none
+- **Status:** done (PASS 2026-10-28) · **Size:** M · **Dependencies:** none
 - **Requirements:** R-APM-002 (scenario: THEN / BUT not wait / AND IT MUST NOT serve a stale feed — the resolver part), NFR-APM-002
 - **Design:** §6.1; DD-2; P-1, P-2, P-26, P-28
 - **Scope:**
@@ -94,10 +94,10 @@ graph TD
 - **Consumers:** `ReportingYearResolver` callers (`clarisa-projects.service.ts:59`, `bilateral.service.ts:169`, `pool-funding-mapping-apply.service.ts:459`, `result-prms-sync-log.repository.ts:110`) keep the same signature. Specs that mock `resolve()`: grep `ReportingYearResolver` over `src/**/*.spec.ts` and list the hits in `execution.md`.
 - **Review:** `full`: shared rule used by every reader.
 - **Done:**
-  - [ ] All 8 integration cases are green and quoted, or the gap is recorded.
-  - [ ] Both falsifiers executed.
-  - [ ] Placeholder unit test green; its mutation (`?` in a comment) goes red.
-  - [ ] Build and eslint green.
+  - [x] All 8 integration cases are green and quoted, or the gap is recorded.
+  - [x] Both falsifiers executed.
+  - [x] Placeholder unit test green; its mutation (`?` in a comment) goes red.
+  - [x] Build and eslint green.
 - **Skills:** nestjs-expert, tdd
 
 ### T-03 — Year-scope the shared readers and re-create the DB function

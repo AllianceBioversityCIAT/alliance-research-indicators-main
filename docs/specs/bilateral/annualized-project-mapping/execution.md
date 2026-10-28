@@ -47,3 +47,33 @@
 - **Decisions:** none beyond the effort choice above.
 - **Running totals vs budget (design §12):** tasks 1/10 · LOC +434/−5 (~1,500) · review rounds 2/~14 (two parallel lens verdicts)
 - **Final verification:** VERIFIED (above)
+
+### T-02 — Single year definition: `currentReportingYearSql`, resolver executes it — PASS (attempt 1)
+
+- **Date:** 2026-10-28 · **Final status:** PASS
+- **Skills:** `nestjs-expert`, `tdd` (task defaults, unchanged) · **Effort:** `grok-4.7-high` (shared rule, well specified)
+- **Orca:** task `task_87da2f9b346f`, dispatch `ctx_e6e93a10c2d8` (fresh worker; retained through review, released after PASS)
+- **Attempts:** 1
+- **Files changed:** `server/researchindicators/src/domain/shared/utils/reporting-year.resolver.ts` · `…/reporting-year.resolver.spec.ts` · `server/researchindicators/test/reporting-year-sql.integration-spec.ts` (new)
+- **RB-2 closed by probe (Leader, before dispatch):** the assumption was "the SQL integration cannot run because `PID_MYSQL_*` is absent". The probe showed `PID_MYSQL_*` defaults to the scratch container (127.0.0.1:3307, root, `ari_scratch_test`) and needs only the password. `PID_MYSQL_PASSWORD=<ARI_TEST_MYSQL_USER_PASS> npx jest --config ./test/jest-integration.json test/pi-delegates-auth-sql.integration-spec.ts` → `Tests: 5 passed, 5 total`. Integration specs are runnable for this spec. This is no longer a gap.
+- **First step (observed):** the old JS rule and the new SQL rule agree on all 8 cases (`'2027\n'` → 2027 under both). A naive SQL port (`TRIM` + `REGEXP`, no `CHAR_LENGTH`) already disagreed on `'\t2027'` (2026 vs 2027). At HEAD, the flip unit test was green (`12 passed`) and the integration import was a setup red: `TS2305: … has no exported member 'currentReportingYearSql'`.
+- **Implementation note:** `CHAR_LENGTH(norm) = 4` was added beside `REGEXP '^[0-9]{4}$'`. On MySQL 8.0.46, `$` matches before a trailing LF (measured: `HEX('2027\n') = 323032370A`, and `TRIM(value) REGEXP '^[0-9]{4}$'` = 1). The Reviewer ruled this faithful to "exactly 4 ASCII digits" and required: it also rejects `\v` and `\f`.
+- **Integration (scratch MySQL, TEMPORARY `app_config`, `connectionLimit: 1`):** `Tests: 8 passed, 8 total`: `2027`→2027, `' 2027 '`→2027, `'2027\n'`→2027, `'\t2027'`→2027, `'abc'`→2026, `''`→2026, inactive→2026, missing→2026.
+- **Falsifier 1 (normalisation dropped), observed red:** `✕ resolves active '2027\n' to 2027 … Received: 2026` · `✕ resolves active '\t2027' to 2027 … Received: 2026` · `Tests: 2 failed, 6 passed, 8 total`. Reverted.
+- **Falsifier 2 (`resolve()` cached), observed red:** `● ReportingYearResolver › returns the new value on the second call when the row changes — Expected: 2027, Received: 2026`. Reverted.
+- **Placeholder mutation (`/* ? */` in the fragment), observed red:** `● … exports a fragment with no placeholders — Expected pattern: not /\?/`. Reverted.
+- **Consumers (`ReportingYearResolver` in `src/**/*.spec.ts`):** 12 files, 28 hits (the full list is in the worker evidence): the resolver spec, `result-prms-sync-log.repository.spec.ts`, `pool-funding-mapping-apply.service.spec.ts`, `clarisa-projects.service.spec.ts`, and 8 `bilateral.service*.spec.ts` files. The `resolve(): Promise<number>` signature is unchanged.
+- **Implementer verification:** eslint exit 0 · `npm test` (utils + 11 consumer specs) → 40 suites / 481 tests passed · integration 8/8 · `npm run build` exit 0.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** from `server/researchindicators`: `npm run build` → `BUILD_EXIT:0` · `npx eslint <3 files>` → `ESLINT_EXIT:0` · `npm test -- --silent src/domain/shared/utils <consumer specs> src/domain/entities/bilateral` (a superset of the worker's list) → `Test Suites: 53 passed, 53 total` / `Tests: 698 passed, 698 total` · integration → `Tests: 8 passed, 8 total`.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: PASS`**. "T-02 meets design §6.1 and DD-2, and covers the resolver part of R-APM-002 and NFR-APM-002." Rulings: (1) `CHAR_LENGTH(norm) = 4` is faithful and required; (2) the TS warning gate does not break "TS and SQL cannot drift" for the value callers receive, because the returned number is the SQL column (unit case: column 2031 with raw `not-a-year` → 2031).
+- **ADVISORY (labelled advisory, not gating):**
+  - RELIABILITY/KZ-017: no test runs `resolve()`'s full SQL (including the `raw_value` subquery) against MySQL with `namedPlaceholders: true`. Only the fragment is executed. Read by hand: no failure found.
+  - READABILITY/drift: the row filter and the year rule are each written twice (fragment vs the `raw_value` subquery; fragment vs `isUsableReportingYearRaw`). Only the log line could drift. Option: return `is_usable` from SQL.
+  - RISK: the integration `beforeEach` `DELETE FROM app_config` would reach a real table only if `CREATE TEMPORARY TABLE` failed and Jest still ran the hooks. That is guarded by the no-default password. Low risk.
+  - READABILITY: the unit spec's `yearFromRaw` mock is a third copy of the rule. It is disclosed: only the integration suite proves evaluation.
+- **What the checks cannot reach (worker, accepted):** the unit spec mocks `query`; the integration suite never calls `resolve()`; build excludes specs; consumer specs mock `resolve()`. The worker also noted that CodeGraph has no index at this worktree root, so callers came from grep.
+- **spawns:** Implementer Cursor/grok-4.7-high: not reported by host, ended complete · Reviewer akili-reviewer/opus: not reported by host at the time of writing, ended complete
+- **Not Done / Assumptions (verbatim from the worker):** "None owed. Judgment: `CHAR_LENGTH(norm) = 4` is how "exactly 4 ASCII digits" is true on MySQL 8.0.46, because `$` matches before a trailing newline. The warning gate in TS (`\t\r\n` → space, ASCII-space trim, `[0-9]{4}`) only chooses the existing log line. The returned number is the SQL column (unit case: column `2031` with raw `not-a-year` returns 2031)."
+- **Requirements covered:** R-APM-002 scenario: THEN (resolver), BUT not wait for a TTL · NFR-APM-002
+- **Running totals vs budget (design §12):** tasks 2/10 · LOC +632/−63 (~1,500) · review rounds 3/~14
+- **Final verification:** VERIFIED (above)
