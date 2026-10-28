@@ -71,6 +71,7 @@ describe('ProjectDashboardComponent', () => {
   let resultsCenterServiceMock: { initializeProjectDashboardResultsTable: jest.Mock };
   let fileManagerServiceMock: { uploadFile: jest.Mock };
   let documentOverviewServiceMock: {
+    getCachedSummary: jest.Mock;
     fetchDocumentOverviewSummary: jest.Mock;
     generateDocumentOverview: jest.Mock;
     deleteDocumentOverviewFiles: jest.Mock;
@@ -105,7 +106,7 @@ describe('ProjectDashboardComponent', () => {
     };
   }
 
-  async function setup(contractId: string | null = 'C-1', options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean }) {
+  async function setup(contractId: string | null = 'C-1', options?: { isAdmin?: boolean; emptyOverview?: boolean; rejectOverviewFetch?: boolean; cachedOverview?: unknown }) {
     topMainContactsMock = createRankedServiceMock();
     topPartnersMock = createRankedServiceMock();
     topLeversMock = createRankedServiceMock();
@@ -115,6 +116,7 @@ describe('ProjectDashboardComponent', () => {
       uploadFile: jest.fn().mockResolvedValue({ data: { filename: 'stored-file.pdf' } })
     };
     documentOverviewServiceMock = {
+      getCachedSummary: jest.fn().mockReturnValue(options?.cachedOverview),
       fetchDocumentOverviewSummary: options?.rejectOverviewFetch
         ? jest.fn().mockRejectedValue(new Error('fetch failed'))
         : jest.fn().mockResolvedValue(
@@ -247,6 +249,17 @@ describe('ProjectDashboardComponent', () => {
 
   afterEach(() => {
     TestBed.resetTestingModule();
+  });
+
+  it('H29: shows the summary already seen this session immediately instead of a loading state', async () => {
+    let resolveFetch!: (value: unknown) => void;
+    await setup('C-1', { cachedOverview: { overview: { project_summary: 'Cached paragraph.' } } });
+    documentOverviewServiceMock.fetchDocumentOverviewSummary.mockImplementation(() => new Promise(r => (resolveFetch = r)));
+    (component as any).loadExecutiveOverviewSummary();
+
+    expect(component.executiveOverviewParagraphs()).toEqual(['Cached paragraph.']);
+    expect(component.executiveOverviewLoading()).toBe(false);
+    resolveFetch({ overview: { project_summary: 'Fresh paragraph.' } });
   });
 
   it('should load project dashboard data for the parent contract', async () => {
@@ -1120,7 +1133,7 @@ describe('ProjectDashboardComponent', () => {
           { provide: Router, useValue: routerMock },
           { provide: ProjectUtilsService, useValue: { getLeverName: jest.fn(), sortIndicators: jest.fn((items: any[]) => items) } },
           { provide: FileManagerService, useValue: { uploadFile: jest.fn() } },
-          { provide: DocumentOverviewService, useValue: { fetchDocumentOverviewSummary: jest.fn().mockResolvedValue({}), generateDocumentOverview: jest.fn(), deleteDocumentOverviewFiles: jest.fn() } },
+          { provide: DocumentOverviewService, useValue: { getCachedSummary: jest.fn(), fetchDocumentOverviewSummary: jest.fn().mockResolvedValue({}), generateDocumentOverview: jest.fn(), deleteDocumentOverviewFiles: jest.fn() } },
           { provide: RolesService, useValue: { isAdmin: jest.fn().mockReturnValue(false) } },
           { provide: ActionsService, useValue: { showToast: jest.fn(), showGlobalAlert: jest.fn() } }
         ]
