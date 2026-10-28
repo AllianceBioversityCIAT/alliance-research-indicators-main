@@ -358,6 +358,8 @@ export class SubmitResultContentComponent {
       status: this.submissionService.statusSelected()!.statusId
     });
     if (!response.successfulRequest) return false;
+    // H44 — an open Submission History panel only reloads when this counter moves.
+    this.submissionService.refreshSubmissionHistory.update(v => v + 1);
     this.showReviewConfirmation(reviewStatusId);
     if (this.submissionService.statusSelected()?.statusId === 6) this.submissionService.comment.set('');
     await this.metadata.update(this.cache.getCurrentNumericResultId());
@@ -408,7 +410,8 @@ export class SubmitResultContentComponent {
       );
       
       if (!response.successfulRequest) return;
-      
+
+      this.submissionService.refreshSubmissionHistory.update(v => v + 1);
       this.form.set({ mel_regional_expert: '', oicr_internal_code: '', sharepoint_link: '' });
       this.submissionService.comment.set('');
       this.submissionService.statusSelected.set(null);
