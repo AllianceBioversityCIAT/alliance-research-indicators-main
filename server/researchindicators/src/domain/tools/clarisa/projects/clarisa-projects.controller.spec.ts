@@ -1,8 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import { PATH_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
-import { ROLES_KEY, RolesGuard } from '../../../shared/guards/roles.guard';
+import { ROLES_KEY } from '../../../shared/guards/roles.guard';
 import { QueryParseBool } from '../../../shared/pipes/query-parse-boolean.pipe';
 import { ClarisaProjectsController } from './clarisa-projects.controller';
 import { ClarisaProjectsService } from './clarisa-projects.service';
@@ -13,16 +13,15 @@ import { ClarisaProject } from './dto/clarisa-project.types';
 // @sdd-spec docs/specs/bugfix/bilateral-picker-fields — T-01 / R-BPF-001, R-BPF-002, R-BPF-006, NFR-BPF-001, NFR-BPF-003
 // Covers the admin picker endpoint:
 //   - role gate metadata (CENTER_ADMIN, SYSTEM_ADMIN)
-//   - query params: search, phase (forwarded), only-with-science-programs (via QueryParseBool)
+//   - query params: search, only-with-science-programs (via QueryParseBool); no phase query
 //   - additive response fields: full_name, description, phase, source_center_acronym, has_science_programs
 //   - trim of upstream payload (Confirmed + code 22 SPs only)
-//   - non-numeric phase error propagation (400)
+//   - no GET phases route (R-APM-010)
 //   - in-memory search substring filter (short_name OR full_name, not description)
 //   - deterministic case-insensitive sorting by full_name (falling back to short_name)
 describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
   let controller: ClarisaProjectsController;
   const listBilateralProjects = jest.fn();
-  const getEligiblePhases = jest.fn();
   const hasSciencePrograms = jest.fn(
     (project: ClarisaProject) =>
       project.project_mappings_array?.some(
@@ -40,7 +39,6 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
           provide: ClarisaProjectsService,
           useValue: {
             listBilateralProjects,
-            getEligiblePhases,
             hasSciencePrograms,
           },
         },
@@ -190,40 +188,20 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
     expect(data[0].full_name?.length).toBe(255);
   });
 
-  it('forwards phase parameter to the service (R-BAS-003)', async () => {
-    listBilateralProjects.mockResolvedValueOnce([
-      {
-        id: 3,
-        short_name: 'T-PJ-2025-CIAT',
-        source_of_funding: 'Bilateral',
-        phase: 2025,
-        source_center_acronym: 'CIAT',
-        has_science_programs: false,
-        project_mappings_array: [],
-      },
-    ]);
-
-    const response = await controller.listBilateral(undefined, 2025, false);
-    expect(listBilateralProjects).toHaveBeenCalledWith({
-      phase: 2025,
-      onlyWithSciencePrograms: false,
-    });
-    const data = (response as { data: { id: number; phase: number }[] }).data;
-    expect(data[0].phase).toBe(2025);
-  });
-
-  it('lets non-numeric phase throw BadRequestException (R-BAS-003)', async () => {
-    listBilateralProjects.mockRejectedValueOnce(
-      new BadRequestException('Invalid phase "abc": must be a numeric value.'),
-    );
-
-    await expect(
-      controller.listBilateral(undefined, 'abc' as any, false),
-    ).rejects.toThrow(BadRequestException);
-    expect(listBilateralProjects).toHaveBeenCalledWith({
-      phase: 'abc',
-      onlyWithSciencePrograms: false,
-    });
+  it('does not register GET phases (R-APM-010)', () => {
+    const paths = Object.getOwnPropertyNames(
+      ClarisaProjectsController.prototype,
+    )
+      .filter((name) => name !== 'constructor')
+      .map((name) =>
+        Reflect.getMetadata(
+          PATH_METADATA,
+          ClarisaProjectsController.prototype[name],
+        ),
+      );
+    expect(paths).toContain('bilateral');
+    expect(paths).not.toContain('phases');
+    expect(ClarisaProjectsController.prototype).not.toHaveProperty('getPhases');
   });
 
   it('forwards onlyWithSciencePrograms parameter parsed by QueryParseBool (R-BAS-004)', async () => {
@@ -237,9 +215,8 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
     expect(parsedUndefined).toBe(false);
 
     listBilateralProjects.mockResolvedValueOnce([]);
-    await controller.listBilateral(undefined, undefined, parsedTrue);
+    await controller.listBilateral(undefined, parsedTrue);
     expect(listBilateralProjects).toHaveBeenCalledWith({
-      phase: undefined,
       onlyWithSciencePrograms: true,
     });
   });
@@ -450,75 +427,6 @@ describe('ClarisaProjectsController (T-04 / T-15.15 / T-01)', () => {
       const data2 = (res2 as { data: { id: number }[] }).data;
       expect(data1.map((p) => p.id)).toEqual(data2.map((p) => p.id));
       expect(data1).toHaveLength(3);
-    });
-  });
-
-  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002, NFR-CPC-003
-  describe('getPhases (R-CPC-003, NFR-CPC-003)', () => {
-    it('is gated by CENTER_ADMIN + SYSTEM_ADMIN roles', () => {
-      const reflector = new Reflector();
-      const roles = reflector.get<SecRolesEnum[]>(
-        ROLES_KEY,
-        controller.getPhases,
-      );
-      expect(roles).toEqual([
-        SecRolesEnum.CENTER_ADMIN,
-        SecRolesEnum.SYSTEM_ADMIN,
-      ]);
-    });
-
-    it('delegates to ClarisaProjectsService.getEligiblePhases and wraps the envelope, data riding untouched', async () => {
-      const serviceResult = {
-        phases: [
-          { phase: 2025, count: 2 },
-          { phase: 2024, count: 1 },
-        ],
-        phaseAbsentCount: 0,
-      };
-      getEligiblePhases.mockResolvedValueOnce(serviceResult);
-
-      const response = await controller.getPhases();
-
-      expect(getEligiblePhases).toHaveBeenCalledTimes(1);
-      expect((response as { data: unknown }).data).toBe(serviceResult);
-      expect(response).toMatchObject({
-        description: 'CLARISA eligible project phases',
-        status: 200,
-      });
-    });
-
-    // NFR-CPC-003: enforcement, not just metadata — a REAL RolesGuard +
-    // REAL Reflector evaluated against getPhases' @Roles metadata.
-    describe('role enforcement — denied vs allowed', () => {
-      const guard = new RolesGuard(new Reflector());
-      const contextFor = (requestUser: unknown) =>
-        ({
-          switchToHttp: () => ({ getRequest: () => ({ user: requestUser }) }),
-          getHandler: () => ClarisaProjectsController.prototype.getPhases,
-          getClass: () => ClarisaProjectsController,
-        }) as never;
-
-      it('denies a user without CENTER_ADMIN or SYSTEM_ADMIN', () => {
-        expect(
-          guard.canActivate(contextFor({ roles: [SecRolesEnum.TESTER] })),
-        ).toBe(false);
-      });
-
-      it('denies an unauthenticated request (no user on the request)', () => {
-        expect(guard.canActivate(contextFor(undefined))).toBe(false);
-      });
-
-      it('allows CENTER_ADMIN', () => {
-        expect(
-          guard.canActivate(contextFor({ roles: [SecRolesEnum.CENTER_ADMIN] })),
-        ).toBe(true);
-      });
-
-      it('allows SYSTEM_ADMIN (platform bypass)', () => {
-        expect(
-          guard.canActivate(contextFor({ roles: [SecRolesEnum.SYSTEM_ADMIN] })),
-        ).toBe(true);
-      });
     });
   });
 });

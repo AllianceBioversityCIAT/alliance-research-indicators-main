@@ -149,3 +149,71 @@
 - **Requirements covered:** R-APM-004 AC.1, AC.3 (SQL level), AC.4 and the scenario (THEN / BUT must NOT alter / AND IT MUST show on switching back) · NFR-APM-001 (the function migration is reversible) · NFR-APM-003 (`EXPLAIN` quoted)
 - **Running totals vs budget (design §12):** tasks 3/10 · LOC +1,168/−79 (~1,500) · review rounds 6/~14. **Forecast:** server + migrations are already at ~1,170 against ~1,100 budgeted for those two lines, with T-04/T-05/T-06 (server) still open. The LOC tripwire will likely fire during T-04 or T-05.
 - **Final verification:** VERIFIED (above)
+
+### T-04 — CLARISA unification: one year, retire the old key — attempt 1: FAIL (rework in progress)
+
+- **Date:** 2026-10-28 · **Skills:** `nestjs-expert`, `api-design-principles` (Leader added `api-design-principles` for the endpoint/query removals) · **Effort:** `grok-4.7-high`
+- **Orca:** task `task_f2c5ddd3296e`, dispatch `ctx_4a78f3b8678e` (terminal `term_c4b0b584-…`), retained for rework
+- **Files changed (attempt 1):** `.env.example` · `app-config-key.enum.ts` (`@deprecated`) · `bilateral-mapping-coverage.service.ts` (+spec) · `bilateral-project-mapping.controller.ts` (+spec) · `dto/coverage-report.query.dto.ts` · `env.utils.ts` · `clarisa-projects.{service,controller}.ts` (+specs) · `clarisa-projects.module.ts` · deleted `mapping-phase.resolver.ts` (+spec) and `dto/clarisa-project-phase.types.ts` · new `src/db/migrations/1793221840500-retireClarisaProjectsPhaseKey.ts`
+- **Red at HEAD (observed):** `● ClarisaProjectsService › listBilateralProjects › filters the eligible cohort to ARI_PRMS_SYNC 2026 when the old key row is 2025 (R-APM-002 AC.1)`: Expected `[2]`, Received `[1]`, at `clarisa-projects.service.spec.ts:741`. Falsifier (`listBilateralProjects` back on `MappingPhaseResolver`): same title and line, same red. Reverted.
+- **AC.2 grep (worker):** `rg -n 'MappingPhaseResolver|ARI_CLARISA_PROJECTS_PHASE|CLARISA_PROJECTS_PHASE|getEligiblePhases|projects/phases' src test` → 13 matches on 12 lines: the spec (7), the retire migration (2), the enum (2), seed migration `1786738949211` (2); `test/` 0; `.env.example` 0. The grep cannot see `client/` (T-10) or `docs/`.
+- **Migration rehearsal (scratch):** the row was present (`simple_value` 2026, `is_active` 1). execute → `is_active 0`; revert → `1`; execute → `0`.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** `npm run build` → `BUILD_EXIT:0` · `npx eslint <all changed .ts>` → `ESLINT_EXIT:0` · `npm test -- --silent src/domain/tools/clarisa src/domain/entities/bilateral-project-mapping src/domain/shared/utils src/domain/entities/app-config` → `Test Suites: 89 passed, 89 total` / `Tests: 717 passed, 717 total` · `migration:test:revert` exit 0 / `migration:test:execute` exit 0 (1793221840500) · `rg -c` AC.2 → enum 1, seed 2, retire 2, spec 7.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: FAIL`**. Full report, verbatim:
+
+> STATUS: FAIL
+>
+> SUMMARY: T-04 (attempt 1) does most of its job. The resolver swap, the deletions, the module, ENV and `.env.example` cleanup, the Swagger removals, the `@deprecated` enum member and the retire migration all conform, and the AC.1 red/falsifier evidence is sound because the fixture keys differ (2025 vs 2026). The gate fails on one item: the coverage row that T-04 owns. "R-APM-002 | scenario — AND IT MUST NOT serve another year's feed | T-04 (feed cache keyed by the year)" is not met when a year is carried in. The Implementer's own assumption ("a carried year that differs from the resolver still filters a feed fetched for the resolver year") describes the defect itself. It is not deferrable to T-05.
+>
+> ISSUES:
+> 1. **Discovered Issue:** `listBilateralProjects` resolves `targetPhase` from the carried year (`clarisa-projects.service.ts:85`). It then calls `getCachedAll()` (`:86`), which ignores that year. `getCachedAll` re-reads `reportingYearResolver.resolve()` (`:207`), keys the cache by that year and fetches `api/projects?phase=<resolverYear>` (`:222`). So the cohort is the resolver year's feed filtered by `matchesPhase(p.phase, carried)`. This is reachable two ways.
+>    - **Today:** `AutomapperService.resolve(phase)` (`automapper.service.ts:113-115`) still forwards the body `phase`. `POST auto-map/preview {phase:2025}` with `ARI_PRMS_SYNC=2026` fetches the 2026 feed and filters it to 2025. CLARISA filters by phase on its side, so the cohort comes back empty.
+>    - **After T-05:** the DD-10 race. `resolve()` reads 2026, an admin saves 2027 mid-request, and `getCachedAll` then fetches the 2027 feed and filters it to 2026. That serves another year's feed under the carried year, which is the scenario's "AND IT MUST NOT" clause.
+>
+>    The existing spec masks this. At `clarisa-projects.service.spec.ts:688-709` a feed fetched as `?phase=2026` is mocked to contain 2025 rows, and the test asserts id 1. A real CLARISA response would not contain those rows.
+>    - **Violated Rule:** requirements.md R-APM-002 scenario: "AND IT MUST NOT serve a CLARISA feed cached for 2026 as 2027's". tasks.md §4: the row "AND IT MUST NOT serve another year's feed → T-04 (feed cache keyed by the year)". design.md §6.1 DD-10: "`ClarisaProjectsService.listBilateralProjects` accepts it, so the cohort and the writes share one year". T-04's Design line names "DD-10 (the `listBilateralProjects` accepts a carried year)". This is T-04's clause, not T-05's: T-05 only changes the automapper so it carries the year, while the guarantee that a carried year selects that year's feed lives inside `ClarisaProjectsService`, which is T-04's scope.
+>    - **Remediation Suggestion:**
+>      - Change `getCachedAll(year: number)` to take the resolved `targetPhase` from `listBilateralProjects`. Do the same from `listProjectsForCoverage`, and use the resolver for `findProjectById` / `findProjectByExternalCode`. Key the cache and build the fetch path from that argument, and keep the stale-on-error branch keyed by the same year.
+>      - Add a test with the resolver at 2026 and a carried 2025: assert `connectionGet` is called with `'api/projects?phase=2025'`, and a follow-up uncarried call makes a second fetch for `?phase=2026` (a cache miss).
+>      - Correct the `:688` fixture so a feed contains only the requested phase.
+>      - Observe the new test red at the current tree first (K-004).
+>
+> ADVISORY:
+> - RELIABILITY: the migration's `down` sets `is_active = 1` unconditionally, so a row that was already inactive before `up` gets reactivated. Reachable only if the row was inactive before deploy. The scratch pre-check showed it active, so this is acceptable as reversible, but the header could say so.
+> - READABILITY: the carried year still travels as the option name `phase`, and the 400 text still reads "Invalid phase". This is tolerable until T-05 renames it; flag it for T-05.
+> - Checked and conformant:
+>   - `process.env.ARI_CLARISA_PROJECTS_PHASE` test (`spec:1101-1129`): it sets both the old app_config row and the env var to 2025 and asserts slice `[51]` and `phaseUsed` 2026. That proves neither source is read by `listProjectsForCoverage`, a valid negative now that `ENV.CLARISA_PROJECTS_PHASE` is deleted. The try/finally restores the env var correctly.
+>   - Swagger: the `phase` `@ApiQuery` was removed from `GET clarisa/projects/bilateral` and `GET coverage-report`. Handlers otherwise unchanged; no new endpoints.
+>   - A leftover `phase` query does not 400:
+>     - `GET bilateral` binds only the named `@Query` params, so `phase` is ignored with a 200.
+>     - `GET coverage-report` uses `ValidationPipe({ whitelist: true, transform: true })` with no `forbidNonWhitelisted`, so `phase` is stripped with a 200. This matches R-APM-003 ("A `phase` query on a GET is stripped and ignored").
+>     - The controller-spec `validate()` case runs no pipe, so it proves no validation error but not the stripping. That gap is noted.
+>   - Enum JSDoc is accurate (`@deprecated — retained only so migration 1786738949211 compiles; read nowhere`).
+>   - P-28: the SQL contains no `?` and no `:word`, the key is backticked and is a single quoted literal. The scratch execute/revert/execute run is evidenced (K-006).
+>   - AC.2: the grep scope excludes `client/` (T-10), as declared.
+
+- **Leader adjudication:** in scope. tasks.md §4 assigns "AND IT MUST NOT serve another year's feed" to T-04, and T-04's Design line names DD-10. The FAIL consumes attempt 1.
+- **Rework plan:** attempt 2 goes to the same worker (owner rule), with the report verbatim. Effort bumped high → xhigh **in the brief only**: a reused Orca terminal cannot change `--model`, so the model stays `grok-4.7-high` (precedent: agrovoc T-03).
+- **spawns (attempt 1):** Implementer Cursor/grok-4.7-high: not reported by host, ended complete · Reviewer akili-reviewer/opus 17 calls, 92 775 tokens, ended fail
+
+### T-04 — CLARISA unification: one year, retire the old key — attempt 2: PASS (final)
+
+- **Date:** 2026-10-28 · **Final status:** PASS (attempt 2 of 3)
+- **Effort:** bumped high → xhigh **in the brief only**. The reused terminal kept `grok-4.7-high`.
+- **Orca:** rework task `task_cfca0852de06`, dispatch `ctx_ea04b82974be`, same terminal `term_c4b0b584-…`; released after PASS
+- **Files changed (attempt 2):** `clarisa-projects.service.ts`, `clarisa-projects.service.spec.ts`. `getCachedAll(phase)` takes the resolved year: `listBilateralProjects` / `listProjectsForCoverage` pass `resolveListingYear(carried)`, while `findProjectById` / `findProjectByExternalCode` pass the resolver year. The cache key, the fetch path `api/projects?phase=` and the stale-on-error branch all use that argument. The `:688` fixture now holds only the requested phase.
+- **Red at the attempt-1 tree (observed):** `● … fetches the carried year and refetches when the next call has no carried year (R-APM-002)`: Expected `"api/projects?phase=2025"`, Received `"api/projects?phase=2026"`, `Number of calls: 1`, `> 734 | expect(connectionGet).toHaveBeenNthCalledWith(`.
+- **Falsifier (observed, reverted):** the argument was overwritten inside `getCachedAll` (`phase = await this.reportingYearResolver.resolve();`). Same title, same line 734, same red.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** `npm run build` → `BUILD_EXIT:0` · `npx eslint <2 files>` → `ESLINT_EXIT:0` · `npm test -- --silent src/domain/tools/clarisa src/domain/entities/bilateral-project-mapping src/domain/shared/utils src/domain/entities/app-config` → `Test Suites: 89 passed, 89 total` / `Tests: 718 passed, 718 total` · new test by title → `✓ fetches the carried year and refetches when the next call has no carried year (R-APM-002)` · `grep reportingYearResolver clarisa-projects.service.ts` → :58 constructor, :132 fallback, :137, :148 (none inside `getCachedAll`). The attempt-1 migration rehearsal and AC.2 grep stand (unchanged files).
+- **Reviewer (attempt 2)** (`akili-reviewer`/opus, rework override (e)): **`STATUS: PASS`**. "The attempt-1 FAIL is fixed." Every path into `getCachedAll` passes a pre-resolved year. The fetch path, the cache hit (`cache.phase === phase` within TTL) and stale-on-error (`this.cache?.phase === phase`, else cold 503) are all keyed by it, so another year's stale feed is never served. The single-slot cache was judged acceptable: a year change is always a miss.
+- **ADVISORY (all rounds, labelled advisory, not gating):**
+  - RELIABILITY: `getCacheFetchedAt()` reports the age of whichever year occupies the single slot. It could report another year's age if a carried-year listing interleaves with an automapper report. Option: `getCacheFetchedAt(phase)`. *Forward pointer for T-05* (automapper reads it).
+  - RESILIENCE: with a single slot, alternating years plus an upstream error gives a 503 where a per-year map would serve stale. This is correct by spec.
+  - READABILITY: the file header's resilience paragraph should say "for the same year". The carried year still travels as option `phase`, and the 400 text says "Invalid phase". *Forward pointer for T-05* (rename when automapper carries the year).
+  - RELIABILITY: the retire migration's `down` sets `is_active = 1` unconditionally, which reactivates a row that was inactive before `up`.
+  - The controller-spec `validate()` case runs no pipe, so the stripping of a leftover `phase` query (whitelist, no `forbidNonWhitelisted` → 200) is shown by reading the code, not executed.
+- **spawns:** attempt 1: Implementer Cursor/grok-4.7-high not reported by host, ended complete; Reviewer opus 17 calls, 92 775 tokens, ended fail · attempt 2: Implementer (same worker) not reported by host, ended complete; Reviewer opus 6 calls, 55 366 tokens, ended complete
+- **Not Done / Assumptions (attempt 2, verbatim, nothing owed):** "None owed. The cache is one slot: a carried-year fetch replaces another year's warm entry, which is the miss the new test asserts. Lookups by id and external code still use the resolver year, so they refetch when the slot holds a different year. Automapper still forwards `{ phase }` and was not modified (T-05)."
+- **Requirements covered:** R-APM-002 AC.1, AC.2 (grep, server), AC.3 (row deactivated by migration), scenario AND IT MUST NOT serve another year's feed · R-APM-003 (`GET clarisa/projects/bilateral` without `phase`) · R-APM-010 (server endpoint removal)
+- **Running totals vs budget (design §12):** tasks 4/10 · LOC +1,382/−575 (~1,500) · review rounds 8/~14. **Forecast:** T-05 (size L) will almost certainly cross the LOC budget. The tripwire is evaluated at T-05's finalize.
+- **Final verification:** VERIFIED (above)

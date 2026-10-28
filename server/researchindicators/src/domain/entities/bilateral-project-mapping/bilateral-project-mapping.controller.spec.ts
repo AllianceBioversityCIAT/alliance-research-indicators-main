@@ -108,11 +108,10 @@ describe('BilateralProjectMappingController', () => {
       coverageService.getCoverageReport.mockResolvedValue(mockReport);
 
       const out = await controller.getCoverageReport({
-        phase: 2026,
         'limit-samples': 15,
       });
 
-      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(2026, 15);
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(15);
       expect(out.status).toBe(HttpStatus.OK);
       expect(out.description).toMatch(/coverage report generated/i);
       expect(out.data).toBe(mockReport);
@@ -129,10 +128,7 @@ describe('BilateralProjectMappingController', () => {
 
       await controller.getCoverageReport({});
 
-      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(
-        undefined,
-        undefined,
-      );
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(undefined);
     });
 
     it('sets description indicating upstream contract is not published when upstream_contract_available is false (R-CPA-005)', async () => {
@@ -161,15 +157,14 @@ describe('BilateralProjectMappingController', () => {
   });
 
   describe('CoverageReportQueryDto validation', () => {
-    it('accepts valid query with phase and limit-samples', async () => {
+    it('accepts limit-samples and does not declare phase', async () => {
       const dto = plainToInstance(CoverageReportQueryDto, {
-        phase: 2026,
         'limit-samples': 10,
       });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
-      expect(dto.phase).toBe(2026);
       expect(dto['limit-samples']).toBe(10);
+      expect(dto).not.toHaveProperty('phase');
     });
 
     it('rejects limit-samples < 1 (e.g. 0)', async () => {
@@ -188,12 +183,14 @@ describe('BilateralProjectMappingController', () => {
       expect(errors.some((e) => e.property === 'limit-samples')).toBe(true);
     });
 
-    it('rejects non-integer phase', async () => {
+    it('ignores a phase query property (R-APM-003)', async () => {
       const dto = plainToInstance(CoverageReportQueryDto, {
         phase: 'not-a-number',
+        'limit-samples': 10,
       });
       const errors = await validate(dto);
-      expect(errors.some((e) => e.property === 'phase')).toBe(true);
+      expect(errors.some((e) => e.property === 'phase')).toBe(false);
+      expect(errors).toHaveLength(0);
     });
   });
 

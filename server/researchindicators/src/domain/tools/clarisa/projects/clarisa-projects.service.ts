@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -6,8 +7,6 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { Clarisa } from '../clarisa.connection';
 import { ClarisaProject } from './dto/clarisa-project.types';
-import { ClarisaProjectPhasesResponse } from './dto/clarisa-project-phase.types';
-import { MappingPhaseResolver } from './mapping-phase.resolver';
 import {
   ALLIANCE_CENTRE_SET,
   isAllianceProject,
@@ -37,6 +36,7 @@ import { ReportingYearResolver } from '../../../shared/utils/reporting-year.reso
 // instead of leaking an upstream stack trace.
 
 export interface ListBilateralProjectsOptions {
+  /** Carried reporting year (DD-10). Omitted → ReportingYearResolver. */
   phase?: number | string;
   onlyWithSciencePrograms?: boolean;
 }
@@ -55,7 +55,6 @@ export class ClarisaProjectsService {
 
   constructor(
     http: HttpService,
-    private readonly phaseResolver: MappingPhaseResolver,
     private readonly reportingYearResolver: ReportingYearResolver,
   ) {
     this.connection = new Clarisa(http);
@@ -83,8 +82,8 @@ export class ClarisaProjectsService {
   async listBilateralProjects(
     options?: ListBilateralProjectsOptions,
   ): Promise<ClarisaProject[]> {
-    const targetPhase = await this.phaseResolver.resolvePhase(options?.phase);
-    const all = await this.getCachedAll();
+    const targetPhase = await this.resolveListingYear(options?.phase);
+    const all = await this.getCachedAll(targetPhase);
 
     const eligible = all.filter(
       (p) =>
@@ -112,57 +111,31 @@ export class ClarisaProjectsService {
     return withFlag;
   }
 
-  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002, DD-2, DD-5
-  //
-  // Returns the distinct phases present in the ELIGIBLE cohort (bilateral +
-  // Alliance), each with a project count, plus a separate count of projects
-  // whose phase is absent — so an admin never sees a year with zero
-  // eligible projects (design.md §6.1 / DD-2).
-  //
-  // Deliberately applies isBilateralFunding + isAllianceProject only — NOT
-  // matchesPhase. Enumerating phases from a phase-filtered cohort
-  // (e.g. listBilateralProjects()) would be circular: it would only ever
-  // surface the phase already selected. Reads getCachedAll() directly so
-  // no additional CLARISA call is made (NFR-CPC-002).
-  async getEligiblePhases(): Promise<ClarisaProjectPhasesResponse> {
-    const all = await this.getCachedAll();
-    const eligible = all.filter(
-      (p) => isBilateralFunding(p.source_of_funding) && isAllianceProject(p),
-    );
-
-    const counts = new Map<number, number>();
-    let phaseAbsentCount = 0;
-
-    for (const p of eligible) {
-      const phase = p.phase;
-      const isBlank =
-        phase === null ||
-        phase === undefined ||
-        (typeof phase === 'string' && phase.trim() === '');
-      if (isBlank) {
-        phaseAbsentCount++;
-        continue;
+  /**
+   * Carried year wins (DD-10). Otherwise the reporting-year resolver.
+   * A non-numeric carried year is the same 400 the old resolver raised.
+   */
+  private async resolveListingYear(carried?: number | string): Promise<number> {
+    if (
+      carried !== undefined &&
+      carried !== null &&
+      String(carried).trim() !== ''
+    ) {
+      const parsed = Number(carried);
+      if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
+        throw new BadRequestException(
+          `Invalid phase "${carried}": must be a numeric value.`,
+        );
       }
-
-      const numericPhase = Number(phase);
-      if (Number.isNaN(numericPhase)) {
-        phaseAbsentCount++;
-        continue;
-      }
-
-      counts.set(numericPhase, (counts.get(numericPhase) ?? 0) + 1);
+      return parsed;
     }
-
-    const phases = Array.from(counts.entries())
-      .map(([phase, count]) => ({ phase, count }))
-      .sort((a, b) => b.phase - a.phase);
-
-    return { phases, phaseAbsentCount };
+    return this.reportingYearResolver.resolve();
   }
 
   async findProjectById(id: number): Promise<ClarisaProject | null> {
     if (!Number.isFinite(id)) return null;
-    const all = await this.getCachedAll();
+    const year = await this.reportingYearResolver.resolve();
+    const all = await this.getCachedAll(year);
     return all.find((p) => p.id === id) ?? null;
   }
 
@@ -172,7 +145,8 @@ export class ClarisaProjectsService {
   ): Promise<ClarisaProject | null> {
     const { normalized } = normalizeExternalCode(externalCode);
     if (!normalized) return null;
-    const all = await this.getCachedAll();
+    const year = await this.reportingYearResolver.resolve();
+    const all = await this.getCachedAll(year);
     return (
       all.find(
         (p) => normalizeExternalCode(p.external_code).normalized === normalized,
@@ -181,13 +155,13 @@ export class ClarisaProjectsService {
   }
 
   // @sdd-spec docs/specs/bilateral/clarisa-project-automapping — T-02 / R-CPA-002
-  async listProjectsForCoverage(phase?: number | string): Promise<{
+  async listProjectsForCoverage(): Promise<{
     all: ClarisaProject[];
     slice: ClarisaProject[];
     phaseUsed: number;
   }> {
-    const targetPhase = await this.phaseResolver.resolvePhase(phase);
-    const all = await this.getCachedAll();
+    const targetPhase = await this.resolveListingYear();
+    const all = await this.getCachedAll(targetPhase);
 
     const slice = all.filter((p) => {
       if (
@@ -230,9 +204,8 @@ export class ClarisaProjectsService {
     this.cache = null;
   }
 
-  private async getCachedAll(): Promise<ClarisaProject[]> {
+  private async getCachedAll(phase: number): Promise<ClarisaProject[]> {
     const now = Date.now();
-    const phase = await this.reportingYearResolver.resolve();
     if (
       this.cache?.phase === phase &&
       now - this.cache.fetchedAt < this.TTL_MS
@@ -241,12 +214,12 @@ export class ClarisaProjectsService {
     }
 
     try {
-      // `phase` is the reporting year the resolver just read, the same year
-      // TocIntegrationService sends. It is always sent. The cache records
-      // that phase: a different phase is a miss, so a year change cannot be
-      // served from another year's feed. On upstream error a cached feed is
-      // served only when its phase matches; a mismatch falls through to the
-      // cold-cache 503 below.
+      // `phase` is the year the caller already resolved: the carried year
+      // for a listing, otherwise the reporting-year resolver. It is always
+      // sent. The cache records that phase: a different phase is a miss, so
+      // a year change cannot be served from another year's feed. On upstream
+      // error a cached feed is served only when its phase matches; a
+      // mismatch falls through to the cold-cache 503 below.
       const path = `api/projects?phase=${encodeURIComponent(String(phase))}`;
       const data = await this.connection.get<ClarisaProject[]>(path);
       this.cache = { data, fetchedAt: now, phase };

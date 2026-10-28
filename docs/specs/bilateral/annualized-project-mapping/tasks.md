@@ -128,7 +128,7 @@ graph TD
 
 ### T-04 — CLARISA unification: one year, retire the old key
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-02
+- **Status:** done (PASS 2026-10-28, attempt 2) · **Size:** M · **Dependencies:** T-02
 - **Requirements:** R-APM-002 (AC.1, AC.2, AC.3; scenario: AND IT MUST NOT serve a feed cached for another year), R-APM-003 (the `GET clarisa/projects/bilateral` part), R-APM-010 (server part)
 - **Design:** §6.6, DD-3, DD-9, DD-10 (the `listBilateralProjects` accepts a carried year); P-3, P-4, P-14, P-27
 - **Scope:**
@@ -146,10 +146,10 @@ graph TD
 - **Consumers:** grep `MappingPhaseResolver|ARI_CLARISA_PROJECTS_PHASE|CLARISA_PROJECTS_PHASE|getEligiblePhases|projects/phases` over `server/researchindicators/{src,test}`. Expected remaining hits: migrations, docs, the `@deprecated` enum member. List all hits in `execution.md` (R-APM-002 AC.2). Client caller `GET_ClarisaProjectPhases` is removed in T-10.
 - **Review:** `full`.
 - **Done:**
-  - [ ] Falsifier executed.
-  - [ ] AC.2 grep quoted.
-  - [ ] Retire migration rehearsed on the TEST schema.
-  - [ ] `npm run build` green (proves migration `1786738949211` still compiles).
+  - [x] Falsifier executed.
+  - [x] AC.2 grep quoted.
+  - [x] Retire migration rehearsed on the TEST schema.
+  - [x] `npm run build` green (proves migration `1786738949211` still compiles).
 - **Skills:** nestjs-expert
 
 ### T-05 — Automapper: five disjoint buckets, in-place update, coverage with `inactive`

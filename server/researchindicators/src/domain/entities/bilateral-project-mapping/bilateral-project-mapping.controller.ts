@@ -81,12 +81,6 @@ export class BilateralProjectMappingController {
       'Generate coverage report classifying bilateral contracts against CLARISA projects',
   })
   @ApiQuery({
-    name: 'phase',
-    required: false,
-    type: Number,
-    description: 'CLARISA phase filter override (e.g. 2026)',
-  })
-  @ApiQuery({
     name: 'limit-samples',
     required: false,
     type: Number,
@@ -96,17 +90,15 @@ export class BilateralProjectMappingController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async getCoverageReport(@Query() query: CoverageReportQueryDto) {
     const limitSamples = query['limit-samples'];
-    return this.coverageService
-      .getCoverageReport(query.phase, limitSamples)
-      .then((data) =>
-        ResponseUtils.format({
-          data,
-          description: data.environment.upstream_contract_available
-            ? 'Bilateral mapping coverage report generated'
-            : `Bilateral mapping coverage report: upstream contract is not published in the measured environment (${data.environment.clarisa_host})`,
-          status: HttpStatus.OK,
-        }),
-      );
+    return this.coverageService.getCoverageReport(limitSamples).then((data) =>
+      ResponseUtils.format({
+        data,
+        description: data.environment.upstream_contract_available
+          ? 'Bilateral mapping coverage report generated'
+          : `Bilateral mapping coverage report: upstream contract is not published in the measured environment (${data.environment.clarisa_host})`,
+        status: HttpStatus.OK,
+      }),
+    );
   }
 
   @Get(':id')

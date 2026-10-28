@@ -502,8 +502,8 @@ describe('BilateralMappingCoverageService', () => {
         makeContractQb(fixedContracts),
       );
 
-      const report1 = await service.getCoverageReport(2026);
-      const report2 = await service.getCoverageReport(2026);
+      const report1 = await service.getCoverageReport();
+      const report2 = await service.getCoverageReport();
 
       expect(report1.resolution).toEqual(report2.resolution);
       expect(report1.normalization).toEqual(report2.normalization);
@@ -758,7 +758,7 @@ describe('BilateralMappingCoverageService', () => {
         makeContractQb([]),
       );
 
-      const report = await service.getCoverageReport(2026);
+      const report = await service.getCoverageReport();
 
       expect(report.clarisa.slice_size).toBe(3);
       expect(report.clarisa.source_center_acronym).toEqual({
@@ -874,7 +874,7 @@ describe('BilateralMappingCoverageService', () => {
         makeContractQb(contracts),
       );
 
-      const report = await service.getCoverageReport(2026, 2);
+      const report = await service.getCoverageReport(2);
 
       expect(report.resolution?.EXACT_CODE.count).toBe(3);
       expect(report.samples?.EXACT_CODE).toHaveLength(2);
