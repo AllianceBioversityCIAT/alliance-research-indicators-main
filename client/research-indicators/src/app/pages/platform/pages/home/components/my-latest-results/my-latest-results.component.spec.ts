@@ -691,15 +691,8 @@ describe('MyLatestResultsComponent', () => {
       renderCardFor(PLATFORM_CODES.TIP);
     });
 
-    it('does NOT navigate when the .more-vert overflow icon is clicked (negative)', async () => {
-      const moreVertIcon = harness.fixture.nativeElement.querySelector('.more-vert__icon') as HTMLElement;
-      expect(moreVertIcon).toBeTruthy();
-
-      moreVertIcon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-      harness.fixture.detectChanges();
-      await harness.fixture.whenStable();
-
-      expect(router.url).toBe('/');
+    it('H35: the card no longer renders an inert ⋮ control that did nothing when clicked', () => {
+      expect(harness.fixture.nativeElement.querySelector('.more-vert')).toBeNull();
     });
 
     it('DOES navigate to the STAR shell route when the card body is clicked (positive — proves the negative test above is not vacuous)', async () => {
