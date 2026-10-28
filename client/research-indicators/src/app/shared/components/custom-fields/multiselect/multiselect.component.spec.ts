@@ -1163,6 +1163,19 @@ describe('MultiselectComponent', () => {
       jest.restoreAllMocks();
     });
 
+    it('onMultiselectPanelShow focuses the OpenSearch search box so one click is enough', () => {
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      (component as any).openSearchFilterInput = { nativeElement: input };
+      jest.spyOn(component as any, 'applyMultiselectPanelMaxWidth').mockImplementation(() => {});
+
+      component.onMultiselectPanelShow();
+
+      expect(document.activeElement).toBe(input);
+      input.remove();
+      jest.restoreAllMocks();
+    });
+
     it('onMultiselectPanelHide clears width in browser', () => {
       const clearSpy = jest.spyOn(component as any, 'clearMultiselectPanelMaxWidth').mockImplementation(() => {});
       component.onMultiselectPanelHide();

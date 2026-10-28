@@ -59,6 +59,7 @@ export class MultiselectComponent implements OnInit, OnChanges {
   private listSyncEffect?: EffectRef;
 
   @ViewChild(MultiSelect) private readonly primeMultiSelect?: MultiSelect;
+  @ViewChild('filter') private readonly openSearchFilterInput?: ElementRef<HTMLInputElement>;
 
   @ContentChild('rows') rows!: TemplateRef<any>;
   @ContentChild('selectedItems') selectedItems!: TemplateRef<any>;
@@ -513,6 +514,8 @@ export class MultiselectComponent implements OnInit, OnChanges {
     if (!isPlatformBrowser(this.platformId)) {
       return;
     }
+    // The OpenSearch header is a custom template, so PrimeNG's autofocusFilter cannot reach it.
+    this.openSearchFilterInput?.nativeElement.focus();
     this.ngZone.runOutsideAngular(() => {
       requestAnimationFrame(() => this.applyMultiselectPanelMaxWidth());
     });
