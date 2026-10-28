@@ -149,6 +149,22 @@ describe('DataOverviewComponent', () => {
     });
   });
 
+  describe('H17 — Deleted row', () => {
+    it('renders Deleted as a count without a Results Center link, other statuses stay links', () => {
+      component.showChart.set(true);
+      component.chartLegend.set([
+        { color: '#000', label: 'Deleted', value: 2, result_status_id: 8 },
+        { color: '#000', label: 'Draft', value: 5, result_status_id: 4 }
+      ]);
+      fixture.detectChanges();
+
+      const rows: HTMLElement[] = Array.from(fixture.nativeElement.querySelectorAll('.status-bar-row'));
+      expect(rows[0].querySelector('a')).toBeNull();
+      expect(rows[0].textContent).toContain('Deleted');
+      expect(rows[1].querySelector('a.status-bar-link')).not.toBeNull();
+    });
+  });
+
   describe('statusRowQueryParams (R-RCU-007 AC.1, AC.1b)', () => {
     it('resolves the canonical status slug from the frozen vocabulary and adds tab=my', () => {
       expect(
