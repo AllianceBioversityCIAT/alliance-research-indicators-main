@@ -275,13 +275,13 @@
                 <td>
                   <a [routerLink]="projectDetailRoute(project.agreement_id)" (click)="$event.stopPropagation()"
                     class="block" style="color: inherit; text-decoration: none">
-                    {{ project.start_date ? (project.start_date | date: 'shortDate') : '-' }}
+                    {{ project.start_date ? (project.start_date | date: 'dd/MM/yyyy') : '-' }}
                   </a>
                 </td>
                 <td>
                   <a [routerLink]="projectDetailRoute(project.agreement_id)" (click)="$event.stopPropagation()"
                     class="block" style="color: inherit; text-decoration: none">
-                    {{ project.end_date ? (project.end_date | date: 'shortDate') : '-' }}
+                    {{ project.end_date ? (project.end_date | date: 'dd/MM/yyyy') : '-' }}
                   </a>
                 </td>
               </tr>
