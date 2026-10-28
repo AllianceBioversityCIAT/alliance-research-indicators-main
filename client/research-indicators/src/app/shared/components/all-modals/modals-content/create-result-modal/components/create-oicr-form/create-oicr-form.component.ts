@@ -574,7 +574,7 @@ export class CreateOicrFormComponent implements OnInit {
     } else {
       this.actions.showGlobalAlert({
         severity: 'success',
-        summary: `Thank you for ${(this.createResultManagementService.currentRequestedResultCode() && 'update') || ''} your submission`,
+        summary: this.createResultManagementService.currentRequestedResultCode() ? 'Thank you for updating your submission' : 'Thank you for your submission',
         hasNoCancelButton: true,
         detail:
           'Your OICR will be reviewed by MELP and the assigned regional MEL specialist will reach out to support you in finalizing the next steps of the OICR development process.',
