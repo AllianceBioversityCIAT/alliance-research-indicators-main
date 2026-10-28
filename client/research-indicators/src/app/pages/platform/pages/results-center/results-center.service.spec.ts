@@ -2381,6 +2381,25 @@ describe('ResultsCenterService', () => {
   });
 
   describe('main', () => {
+    it('should keep the newest request when an older, unfiltered one resolves last (reload race)', async () => {
+      let resolveUnfiltered!: (value: { results: unknown[]; total: number }) => void;
+      const filteredResult = { ...mockResults[0], result_official_code: 'FILTERED' };
+      mockGetResultsService.fetchPaginated
+        .mockImplementationOnce(() => new Promise(resolve => (resolveUnfiltered = resolve)))
+        .mockResolvedValueOnce({ results: [filteredResult], total: 1 });
+
+      const unfiltered = service.main();
+      service.resultsFilter.update(prev => ({ ...prev, 'status-codes': [1] }));
+      await service.main();
+
+      resolveUnfiltered({ results: [{ ...mockResults[0], result_official_code: 'UNFILTERED' }], total: 99 });
+      await unfiltered;
+
+      expect(service.list().map(r => r.result_official_code)).toEqual(['FILTERED']);
+      expect(service.resultsTableTotalRecords()).toBe(1);
+      expect(service.loading()).toBe(false);
+    });
+
     it('should pass contract-codes when primaryContractId is set', async () => {
       service.primaryContractId.set('contract-123');
       await service.main();
