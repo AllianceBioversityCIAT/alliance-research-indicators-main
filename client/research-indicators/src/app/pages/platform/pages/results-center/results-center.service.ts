@@ -135,15 +135,7 @@ export class ResultsCenterService {
       path: 'primaryLeverSort',
       header: 'Primary Lever',
       maxWidth: 'max-w-[100px]',
-      getValue: (result: Result) => {
-        if (!result.result_levers || !Array.isArray(result.result_levers)) return '-';
-        const primaryLevers = result.result_levers.filter(rl => rl.is_primary === 1);
-        if (primaryLevers.length === 0) return '-';
-        return primaryLevers
-          .map(rl => rl.lever?.short_name)
-          .filter(Boolean)
-          .join(', ');
-      }
+      getValue: (result: Result) => this.getPrimaryLeverDisplay(result)
     },
     {
       field: 'year',
@@ -196,6 +188,16 @@ export class ResultsCenterService {
       .filter(column => column.filter)
       .flatMap(column => column.filterPaths ?? [column.path])
   );
+
+  /**
+   * H16 — 2026–2030 results align to Research Areas instead of levers, so the column was blank
+   * for them. Primary levers first (2010–2025); otherwise the result's Research Areas.
+   */
+  getPrimaryLeverDisplay(result: Result): string {
+    const primaryLevers = Array.isArray(result.result_levers) ? result.result_levers.filter(rl => rl.is_primary === 1) : [];
+    const leverNames = primaryLevers.map(row => this.getPortfolioItemLabel(row)).filter(Boolean);
+    return leverNames.length ? leverNames.join(', ') : this.getResearchAreasDisplay(result);
+  }
 
   private getResearchAreasDisplay(result: Result): string {
     const directRows = this.asArray(result.result_research_areas ?? result.research_areas);
