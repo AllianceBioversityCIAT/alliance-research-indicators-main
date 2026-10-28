@@ -294,12 +294,13 @@ export class AssignPiDelegateComponent implements OnInit {
     } as unknown as ProjectType);
   }
 
-  /** dd MMM yyyy, or an em dash when the date is absent. */
+  /** dd/mm/yyyy, or an em dash when the date is absent. */
   formatDate(value: Date | string | null | undefined): string {
     if (value == null) return '—';
     const date = value instanceof Date ? value : new Date(value);
     if (isNaN(date.getTime())) return String(value);
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    // H24 — dd/mm/yyyy, the platform-wide date format.
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 
   // ─── Open-close tracking (to reset + pre-load on open) ────────────────────────

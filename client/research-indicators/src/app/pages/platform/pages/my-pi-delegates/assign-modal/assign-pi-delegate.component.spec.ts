@@ -999,10 +999,10 @@ describe('AssignPiDelegateComponent', () => {
       expect(text).toContain('ROWS-1 - Project ROWS-1');
       expect(text).toContain('Start date');
       expect(text).toContain('End date');
-      // Month/year only: the ISO date is rendered in the viewer's timezone, so the
-      // day can shift by one — the same behaviour as the By project table.
-      expect(text).toContain('Jan 2024');
-      expect(text).toContain('Dec 2026');
+      // H24 — dd/mm/yyyy. Month/year only: the ISO date is rendered in the viewer's
+      // timezone, so the day can shift by one — the same behaviour as the By project table.
+      expect(text).toMatch(/\d{2}\/01\/2024/);
+      expect(text).toMatch(/\d{2}\/12\/2026/);
       // Status renders through the shared tag, like the By project table
       const tag = fixture.nativeElement.querySelector('app-custom-tag div') as HTMLElement | null;
       expect(tag?.textContent?.trim()).toBe('Ongoing');
