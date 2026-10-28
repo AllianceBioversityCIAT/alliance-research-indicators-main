@@ -175,7 +175,9 @@ export class ResultsCenterService {
       minWidth: 'min-w-[110px]',
       maxWidth: 'max-w-[110px]',
 
-      getValue: (result: Result) => (result.created_at ? new Date(result.created_at).toLocaleDateString() : '-')
+      // H24 — dd/mm/yyyy regardless of the browser locale.
+      getValue: (result: Result) =>
+        result.created_at ? new Date(result.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'
     },
     {
       field: 'public_link',
