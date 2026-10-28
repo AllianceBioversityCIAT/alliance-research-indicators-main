@@ -649,13 +649,14 @@ describe('SubmitResultContentComponent', () => {
   });
 
   it('H44: a successful legacy review refreshes the open Submission History panel', async () => {
-    mockSubmissionService.statusSelected.set({ statusId: 5 });
+    const submission = mockSubmissionService as any;
+    submission.statusSelected.set({ statusId: 5 });
     mockApiService.PATCH_SubmitResult = jest.fn().mockResolvedValue({ successfulRequest: true });
-    const before = mockSubmissionService.refreshSubmissionHistory();
+    const before = submission.refreshSubmissionHistory();
 
     await (component as any).handlePostSubmitForLegacyFlow();
 
-    expect(mockSubmissionService.refreshSubmissionHistory()).toBe(before + 1);
+    expect(submission.refreshSubmissionHistory()).toBe(before + 1);
   });
 
   it.each([
