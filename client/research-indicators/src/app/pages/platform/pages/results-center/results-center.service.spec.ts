@@ -2382,7 +2382,7 @@ describe('ResultsCenterService', () => {
 
   describe('main', () => {
     it('should keep the newest request when an older, unfiltered one resolves last (reload race)', async () => {
-      let resolveUnfiltered!: (value: { results: unknown[]; total: number }) => void;
+      let resolveUnfiltered!: (value: { results: Result[]; total: number }) => void;
       const filteredResult = { ...mockResults[0], result_official_code: 'FILTERED' };
       mockGetResultsService.fetchPaginated
         .mockImplementationOnce(() => new Promise(resolve => (resolveUnfiltered = resolve)))
