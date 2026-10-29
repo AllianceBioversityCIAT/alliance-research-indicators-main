@@ -407,3 +407,7 @@
 - **Requirements covered:** R-APM-006 (toast) · R-APM-007 AC.1, AC.2 · R-APM-008 AC.1 · R-APM-009 AC.2 · R-APM-011 (client Activate)
 - **Running totals vs budget (design §12):** tasks 11/11 code-complete (T-07/T-09 wait on the owner check) · review rounds 16/~14 (over, reported per the owner's standing decision)
 - **Final verification:** VERIFIED (automated part; tsc-spec caveat as in T-08); visual part pending
+
+## Held code committed on the owner's instruction (2026-10-29)
+
+The owner said "haz commit" before the visual check. The held code is committed: `24d52826` (T-07 SSR page) and `37bcdd6a` (T-08 + T-09 + T-10 client, 18 files). The owner's manual/visual checks for T-07 and T-09 stay **open** Done items, to be done after the migrations are applied and this branch is deployed. Nothing is pushed.
