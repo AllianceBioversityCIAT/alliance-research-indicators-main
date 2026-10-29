@@ -249,7 +249,7 @@ graph TD
 
 ### T-07 — `/admin` SSR page: Activate, Year column, upsert outcome, copy
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-06
+- **Status:** in review (owner manual check pending) · **Size:** S · **Dependencies:** T-06
 - **Requirements:** R-APM-011 (SSR clause), R-APM-006 (outcome surfaced), R-APM-007 (Year column — SSR part)
 - **Design:** §7 SSR row; P-16
 - **Scope:** `src/admin/client/pages/BilateralProjectMappings.tsx`:
@@ -264,8 +264,8 @@ graph TD
 - **Consumers:** none beyond the page.
 - **Review:** `checklist`: small copy/action change behind an already-tested endpoint.
 - **Done:**
-  - [ ] Build green.
-  - [ ] Grep for stale "re-create" copy returns 0.
+  - [x] Build green.
+  - [x] Grep for stale "re-create" copy returns 0.
   - [ ] Owner's manual check quoted.
 - **Skills:** react-doctor
 

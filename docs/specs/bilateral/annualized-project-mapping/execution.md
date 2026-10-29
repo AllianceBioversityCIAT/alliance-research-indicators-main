@@ -365,3 +365,20 @@
 - **Commit hold:** the modal is a visible UI change and `api.service.ts`/the interface file also carry T-08's held hunks, so the T-10 files stay uncommitted and are committed with T-08/T-09 after the owner's visual check.
 - **Requirements covered:** R-APM-010 AC.1 · R-APM-008 AC.2
 - **Final verification:** VERIFIED (tsc-spec caveat as in T-08)
+
+### T-07 — `/admin` SSR page: Activate, Year column, upsert outcome, copy — PASS (attempt 1), code held uncommitted for the owner's manual check
+
+- **Date:** 2026-10-29 · **Final status:** PASS (owner manual check pending)
+- **Skills:** `react-doctor` · **Effort:** `grok-4.7-medium`
+- **Orca:** task `task_640eb989a6d5`, dispatch `ctx_e430519ef65d` (parallel with T-10, cross-package); advisory follow-up on the same terminal: task `task_bea1b00a1156`, dispatch `ctx_196de6fddb34`; released after PASS
+- **Files changed:** `server/researchindicators/src/admin/client/pages/BilateralProjectMappings.tsx` (+75/−13). `admin.service.ts` unchanged: `list()` returns whole entities, so `reporting_year` already reaches the page.
+- **Change:** `reporting_year` on the row type and a **Year** column (empty-state `colSpan` 7 → 8) · `activateRow` → `PATCH /api/bilateral-project-mappings/:id/activate` with confirmation, body `{ notes }`, error surfaced, refresh · inactive rows show **Activate** in place of the disabled "Already inactive" control · create shows `outcome` from `body.data` ("Mapping created (id N)." / "Existing mapping updated (id N).") in an `alert alert-success` · no "re-create" wording.
+- **Tests:** no automated coverage. `rg -n BilateralProjectMappings src/admin --glob '*.spec.*'` → only `admin.service.spec.ts` and `admin.controller.spec.ts` (the list wrapper); no spec imports the page.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** `npm run build` exit 0 (nest + vite) · `npx eslint <page>` exit 0 · `npm test -- --silent src/admin` 3 suites / 11 tests passed (they cover none of this diff) · `grep -ciE "re-create|recreate" <page>` → 0.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: PASS`**. "All four scope bullets are present, the activate call matches the deactivate call field for field, and `outcome` is read from the correct envelope level." Body `{ notes }` is accepted by `BilateralProjectMappingNotesDto` under `forbidNonWhitelisted`.
+- **ADVISORY → fixed (same worker):** the edit-form hint "An inactive mapping is reactivated." could never show next to an inactive row and read as if editing reactivates. Now: "Contract is immutable. To change an inactive mapping, activate it first from the row Activate button." eslint 0, build 0, grep 0 (worker); Leader grep confirms `:596`.
+- **spawns:** Implementer Cursor/grok-4.7-medium ×2 dispatches: not reported by host, ended complete · Reviewer akili-reviewer/opus 9 calls, 67 952 tokens, ended complete
+- **Owner manual check (Done item, OPEN):** `/admin/bilateral-project-mappings` → filter "Inactive only" → an Inactive row shows **Activate** → click → confirm → after reload the row is Active. New mapping on a contract that already has a row this year → "Existing mapping updated (id …)". The Year column shows `reporting_year`. A page with no inactive row is not evidence.
+- **Commit hold:** visible UI change → the page stays uncommitted until the owner's check.
+- **Requirements covered:** R-APM-011 (SSR clause) · R-APM-006 (outcome surfaced) · R-APM-007 (SSR Year column)
+- **Final verification:** VERIFIED (automated part); manual part pending
