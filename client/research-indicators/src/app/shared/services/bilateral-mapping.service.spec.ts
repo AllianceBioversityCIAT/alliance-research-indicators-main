@@ -1,6 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { BilateralMappingService } from './bilateral-mapping.service';
 import { ApiService } from './api.service';
+import { ToPromiseService } from './to-promise.service';
+import { CacheService } from './cache/cache.service';
+import { ControlListCacheService } from './control-list-cache.service';
+import { SignalEndpointService } from './signal-endpoint.service';
 import { MainResponse } from '@shared/interfaces/responses.interface';
 import { FindContracts, FindContractsResponse } from '@shared/interfaces/find-contracts.interface';
 import {
@@ -22,6 +26,7 @@ describe('BilateralMappingService', () => {
     GET_BilateralMappingCoverage: jest.Mock;
     POST_AutomapperPreview: jest.Mock;
     POST_AutomapperApply: jest.Mock;
+    PATCH_ActivateBilateralMapping: jest.Mock;
   };
 
   beforeEach(() => {
@@ -35,7 +40,8 @@ describe('BilateralMappingService', () => {
       GET_FindContracts: jest.fn(),
       GET_BilateralMappingCoverage: jest.fn(),
       POST_AutomapperPreview: jest.fn(),
-      POST_AutomapperApply: jest.fn()
+      POST_AutomapperApply: jest.fn(),
+      PATCH_ActivateBilateralMapping: jest.fn()
     };
     TestBed.configureTestingModule({
       providers: [BilateralMappingService, { provide: ApiService, useValue: mockApi }]
@@ -73,6 +79,7 @@ describe('BilateralMappingService', () => {
 
   const mapping = (overrides: Partial<BilateralProjectMapping> = {}): BilateralProjectMapping => ({
     id: 11,
+    reporting_year: 2026,
     agresso_agreement_id: 'D504',
     clarisa_project_id: 22,
     clarisa_project_short_name: 'Project 22',
@@ -105,8 +112,9 @@ describe('BilateralMappingService', () => {
     it('returns pending unmapped candidates when status is pending', async () => {
       mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
         ok({
+          reporting_year: 2026,
           feedFetchedAt: null,
-          counts: { toCreate: 1, alreadyMapped: 0, ambiguous: 0, unresolved: 0, divergent: 0, supersede: 0 },
+          counts: { toCreate: 1, alreadyMapped: 0, toUpdate: 0, ambiguous: 0, unresolved: 0, divergent: 0, inactive: 0 },
           toCreate: [
             {
               clarisaProjectId: 1403,
@@ -121,11 +129,12 @@ describe('BilateralMappingService', () => {
           ambiguous: [],
           unresolved: [],
           divergent: [],
-          supersede: []
+          toUpdate: [],
+          inactive: []
         })
       );
 
-      const result = await service.list({ status: 'pending' }, 2026);
+      const result = await service.list({ status: 'pending' });
 
       expect(result).not.toBeNull();
       expect(result?.items).toHaveLength(1);
@@ -136,9 +145,54 @@ describe('BilateralMappingService', () => {
           clarisa_project_full_name: 'Rice Project',
           agresso_agreement_id: 'A1676',
           mapping_status: 'Pending',
-          source: 'UNMAPPED'
+          source: 'UNMAPPED',
+          reporting_year: 2026
         })
       );
+    });
+
+    it('pending list excludes toUpdate and inactive rows', async () => {
+      mockApi.POST_AutomapperPreview.mockResolvedValueOnce(
+        ok({
+          reporting_year: 2026,
+          feedFetchedAt: null,
+          counts: { toCreate: 0, alreadyMapped: 0, toUpdate: 1, ambiguous: 0, unresolved: 0, divergent: 0, inactive: 1 },
+          toCreate: [],
+          alreadyMapped: [],
+          ambiguous: [],
+          unresolved: [],
+          divergent: [],
+          toUpdate: [
+            {
+              clarisaProjectId: 9,
+              clarisaProjectFullName: 'Update me',
+              clarisaProjectShortName: 'Upd',
+              externalCode: 'U-1',
+              derivedContractId: 'U1',
+              action: 'toUpdate',
+              existingMappingId: 3,
+              existingClarisaProjectId: 8
+            }
+          ],
+          inactive: [
+            {
+              clarisaProjectId: 4,
+              clarisaProjectFullName: 'Inactive',
+              clarisaProjectShortName: 'Ina',
+              externalCode: 'I-1',
+              derivedContractId: 'I1',
+              action: 'inactive',
+              existingMappingId: 4,
+              existingClarisaProjectId: 4,
+              refreshed: true
+            }
+          ]
+        })
+      );
+
+      const result = await service.list({ status: 'pending' });
+
+      expect(result?.items).toEqual([]);
     });
 
     it('returns null on successfulRequest:false (AC-03.3)', async () => {
@@ -173,6 +227,20 @@ describe('BilateralMappingService', () => {
       const result = await service.create({ agresso_agreement_id: 'D504', clarisa_project_id: 22 });
 
       expect(result).toEqual({ ok: true, data: row });
+    });
+
+    it('maps outcome created and updated from the response', async () => {
+      const created = { ...mapping(), outcome: 'created' as const };
+      mockApi.POST_BilateralProjectMapping.mockResolvedValueOnce(ok(created));
+      const createdResult = await service.create({ agresso_agreement_id: 'D504', clarisa_project_id: 22 });
+      expect(createdResult).toEqual({ ok: true, data: created });
+      if (createdResult.ok) expect(createdResult.data.outcome).toBe('created');
+
+      const updated = { ...mapping(), outcome: 'updated' as const };
+      mockApi.POST_BilateralProjectMapping.mockResolvedValueOnce(ok(updated));
+      const updatedResult = await service.create({ agresso_agreement_id: 'D504', clarisa_project_id: 22 });
+      expect(updatedResult).toEqual({ ok: true, data: updated });
+      if (updatedResult.ok) expect(updatedResult.data.outcome).toBe('updated');
     });
 
     it('409 conflict → message from errorDetail.errors, NOT the exception name', async () => {
@@ -255,6 +323,18 @@ describe('BilateralMappingService', () => {
     });
   });
 
+  describe('activate', () => {
+    it('calls PATCH bilateral-project-mappings/:id/activate', async () => {
+      const row = mapping({ is_active: true });
+      mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
+
+      const result = await service.activate(11);
+
+      expect(result).toEqual({ ok: true, data: row });
+      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11);
+    });
+  });
+
   describe('loadAgressoOptions', () => {
     it('maps agreement_id/description and drops entries without agreement_id', async () => {
       const rows: FindContracts[] = [
@@ -324,10 +404,10 @@ describe('BilateralMappingService', () => {
       const coverageData = { mapped: 4, pending: 194, reachable: 198 };
       mockApi.GET_BilateralMappingCoverage.mockResolvedValue(ok(coverageData));
 
-      const result = await service.getCoverage(2026);
+      const result = await service.getCoverage();
 
       expect(result).toEqual(coverageData);
-      expect(mockApi.GET_BilateralMappingCoverage).toHaveBeenCalledWith(2026);
+      expect(mockApi.GET_BilateralMappingCoverage).toHaveBeenCalledWith();
     });
 
     it('returns null on failure', async () => {
@@ -344,28 +424,31 @@ describe('BilateralMappingService', () => {
   describe('previewAutoMap', () => {
     it('returns preview report on success', async () => {
       const previewData = {
+        reporting_year: 2026,
         feedFetchedAt: '2026-08-19T21:10:00.000Z',
         counts: {
           toCreate: 190,
           alreadyMapped: 4,
+          toUpdate: 1,
           ambiguous: 0,
           unresolved: 0,
           divergent: 3,
-          supersede: 1
+          inactive: 0
         },
         toCreate: [],
         alreadyMapped: [],
+        toUpdate: [],
         ambiguous: [],
         unresolved: [],
         divergent: [],
-        supersede: []
+        inactive: []
       };
       mockApi.POST_AutomapperPreview.mockResolvedValue(ok(previewData));
 
-      const result = await service.previewAutoMap(2026);
+      const result = await service.previewAutoMap();
 
       expect(result).toEqual(previewData);
-      expect(mockApi.POST_AutomapperPreview).toHaveBeenCalledWith({ phase: 2026 });
+      expect(mockApi.POST_AutomapperPreview).toHaveBeenCalledWith({});
     });
 
     it('returns null on failure', async () => {
@@ -380,26 +463,50 @@ describe('BilateralMappingService', () => {
   });
 
   describe('applyAutoMap', () => {
+    it('apply body is {}', async () => {
+      mockApi.POST_AutomapperApply.mockResolvedValue(
+        ok({
+          feedFetchedAt: null,
+          counts: {
+            created: 0,
+            updated: 0,
+            alreadyMapped: 0,
+            ambiguous: 0,
+            unresolved: 0,
+            divergent: 0,
+            inactive: 0
+          },
+          ambiguous: [],
+          unresolved: []
+        })
+      );
+
+      await service.applyAutoMap();
+
+      expect(mockApi.POST_AutomapperApply).toHaveBeenCalledWith({});
+    });
+
     it('returns { ok: true, data } on success', async () => {
       const applyData = {
         feedFetchedAt: '2026-08-19T21:10:00.000Z',
         counts: {
           created: 190,
+          updated: 1,
           alreadyMapped: 4,
           ambiguous: 0,
           unresolved: 0,
           divergent: 3,
-          superseded: 1
+          inactive: 0
         },
         ambiguous: [],
         unresolved: []
       };
       mockApi.POST_AutomapperApply.mockResolvedValue(ok(applyData));
 
-      const result = await service.applyAutoMap(2026);
+      const result = await service.applyAutoMap();
 
       expect(result).toEqual({ ok: true, data: applyData });
-      expect(mockApi.POST_AutomapperApply).toHaveBeenCalledWith({ phase: 2026 });
+      expect(mockApi.POST_AutomapperApply).toHaveBeenCalledWith({});
     });
 
     it('returns { ok: false, status, message } on failure', async () => {
@@ -415,6 +522,35 @@ describe('BilateralMappingService', () => {
         message: 'No external codes in cohort'
       });
     });
+  });
+});
+
+describe('PATCH_ActivateBilateralMapping URL', () => {
+  it('patches bilateral-project-mappings/:id/activate with an empty body', async () => {
+    const patch = jest.fn().mockResolvedValue({ successfulRequest: true, data: { id: 11 } });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        { provide: ToPromiseService, useValue: { patch } },
+        { provide: CacheService, useValue: {} },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: jest.fn().mockImplementation((urlFn: () => string) => {
+              if (typeof urlFn === 'function') urlFn();
+              return { get: jest.fn(), post: jest.fn() };
+            })
+          }
+        }
+      ]
+    });
+
+    const api = TestBed.inject(ApiService);
+    await api.PATCH_ActivateBilateralMapping(11);
+
+    expect(patch).toHaveBeenCalledWith('bilateral-project-mappings/11/activate', {}, { useResultInterceptor: true });
   });
 });
 

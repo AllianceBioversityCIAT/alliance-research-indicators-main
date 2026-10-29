@@ -99,12 +99,11 @@ import {
   AutomapperApplyResponse,
   AutomapperCoverage,
   AutomapperPreviewResponse,
-  AutomapperRunRequest,
   BilateralMappingListPage,
   BilateralMappingListQuery,
+  BilateralMappingUpsertResult,
   BilateralProjectMapping,
   ClarisaBilateralProjectOption,
-  ClarisaProjectPhasesResponse,
   CreateBilateralMappingBody,
   UpdateBilateralMappingBody
 } from '@interfaces/bilateral/bilateral-project-mapping.interface';
@@ -893,7 +892,7 @@ export class ApiService {
     return this.TP.get(url(), {});
   };
 
-  POST_BilateralProjectMapping = (body: CreateBilateralMappingBody): Promise<MainResponse<BilateralProjectMapping>> => {
+  POST_BilateralProjectMapping = (body: CreateBilateralMappingBody): Promise<MainResponse<BilateralMappingUpsertResult>> => {
     const url = () => `bilateral-project-mappings`;
     return this.TP.post(url(), body, { useResultInterceptor: true });
   };
@@ -908,36 +907,33 @@ export class ApiService {
     return this.TP.patch(url(), {}, { useResultInterceptor: true });
   };
 
-  // @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / T-06
-  GET_BilateralMappingCoverage = (phase?: number): Promise<MainResponse<AutomapperCoverage>> => {
+  // Mirror of deactivate. Optional notes stay off the wire until a caller sends them;
+  // the server accepts `{ notes? }` and an empty body (design §5, R-APM-011).
+  PATCH_ActivateBilateralMapping = (id: number): Promise<MainResponse<BilateralProjectMapping>> => {
+    const url = () => `bilateral-project-mappings/${id}/activate`;
+    return this.TP.patch(url(), {}, { useResultInterceptor: true });
+  };
+
+  // @akili-spec docs/specs/bilateral/annualized-project-mapping — T-08 / R-APM-003
+  // The year is resolved on the server. No `phase` query or body.
+  GET_BilateralMappingCoverage = (): Promise<MainResponse<AutomapperCoverage>> => {
     const url = () => `bilateral-project-mappings/coverage`;
-    const params: Record<string, string> = {};
-    if (phase !== undefined) params['phase'] = String(phase);
-    return this.TP.getWithParams(url(), params);
+    return this.TP.getWithParams(url(), {});
   };
 
-  POST_AutomapperPreview = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperPreviewResponse>> => {
+  POST_AutomapperPreview = (body: object = {}): Promise<MainResponse<AutomapperPreviewResponse>> => {
     const url = () => `bilateral-project-mappings/auto-map/preview`;
-    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
+    return this.TP.post(url(), body, { useResultInterceptor: true });
   };
 
-  POST_AutomapperApply = (body?: AutomapperRunRequest): Promise<MainResponse<AutomapperApplyResponse>> => {
+  POST_AutomapperApply = (body: object = {}): Promise<MainResponse<AutomapperApplyResponse>> => {
     const url = () => `bilateral-project-mappings/auto-map/apply`;
-    return this.TP.post(url(), body ?? {}, { useResultInterceptor: true });
+    return this.TP.post(url(), body, { useResultInterceptor: true });
   };
 
   GET_ClarisaBilateralProjects = (search?: string): Promise<MainResponse<ClarisaBilateralProjectOption[]>> => {
     const url = () => `tools/clarisa/projects/bilateral`;
     if (search) return this.TP.getWithParams(url(), { search });
-    return this.TP.get(url(), {});
-  };
-
-  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-03 / R-CPC-003
-  // Distinct CLARISA project phases present in the eligible cohort, with a
-  // per-year count. Powers the admin-editable year selector on the
-  // Configuration Variables edit modal (design.md §7.2).
-  GET_ClarisaProjectPhases = (): Promise<MainResponse<ClarisaProjectPhasesResponse>> => {
-    const url = () => `tools/clarisa/projects/phases`;
     return this.TP.get(url(), {});
   };
 

@@ -21,14 +21,16 @@ describe('AutomapperDialogComponent', () => {
   };
 
   const samplePreview: AutomapperPreviewResponse = {
+    reporting_year: 2026,
     feedFetchedAt: '2026-08-19T21:10:00.000Z',
     counts: {
       toCreate: 2,
       alreadyMapped: 1,
+      toUpdate: 0,
       ambiguous: 2,
       unresolved: 2,
       divergent: 1,
-      supersede: 1
+      inactive: 0
     },
     toCreate: [
       {
@@ -104,29 +106,21 @@ describe('AutomapperDialogComponent', () => {
         derivedContractId: '' // empty derivedContractId -> must render "no external_code" (F-B)
       }
     ],
-    supersede: [
-      {
-        clarisaProjectId: 1900,
-        clarisaProjectFullName: 'Phase 2026 Project',
-        clarisaProjectShortName: 'Phase 2026 Project',
-        externalCode: 'C-S500',
-        derivedContractId: 'S500',
-        action: 'supersede',
-        existingMappingId: 5,
-        existingClarisaProjectId: 138
-      }
-    ]
+    toUpdate: [],
+    inactive: []
   };
 
   const sampleApplyResponse: AutomapperApplyResponse = {
+    reporting_year: 2026,
     feedFetchedAt: '2026-08-19T21:10:00.000Z',
     counts: {
       created: 2,
+      updated: 0,
       alreadyMapped: 1,
       ambiguous: 2,
       unresolved: 2,
       divergent: 1,
-      superseded: 1
+      inactive: 0
     },
     ambiguous: samplePreview.ambiguous,
     unresolved: samplePreview.unresolved
@@ -384,7 +378,7 @@ describe('AutomapperDialogComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
 
-      expect(mockService.applyAutoMap).toHaveBeenCalledWith(2026);
+      expect(mockService.applyAutoMap).toHaveBeenCalledWith();
       expect(component.applyResult()).toEqual(sampleApplyResponse);
       expect(emittedResult).toEqual(sampleApplyResponse);
       expect(mockActions.showToast).toHaveBeenCalledWith(expect.objectContaining({
@@ -396,7 +390,6 @@ describe('AutomapperDialogComponent', () => {
       const resultPanel = queryEl('[data-testid="apply-result-panel"]');
       expect(resultPanel).not.toBeNull();
       expect(queryEl('[data-testid="apply-count-created"]')!.textContent?.trim()).toBe('2');
-      expect(queryEl('[data-testid="apply-count-superseded"]')!.textContent?.trim()).toBe('1');
     });
 
     it('surfaces error message when applyAutoMap fails', async () => {
@@ -424,6 +417,136 @@ describe('AutomapperDialogComponent', () => {
       const errorEl = queryEl('[data-testid="apply-error-text"]');
       expect(errorEl).not.toBeNull();
       expect(errorEl!.textContent).toContain('No external codes in cohort');
+    });
+  });
+
+  describe('R-APM-005 / R-APM-007 buckets', () => {
+    it('has no supersede bucket and shows the reporting year from the preview', async () => {
+      mockService.previewAutoMap.mockResolvedValue({ ...samplePreview, reporting_year: 2027 });
+
+      fixture.detectChanges();
+      expect(queryEl('[data-testid="automapper-year"]')).toBeNull();
+      expect(queryEl('[data-testid="tab-supersede"]')).toBeNull();
+
+      fixture.componentRef.setInput('visible', true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const yearEl = queryEl('[data-testid="automapper-year"]');
+      expect(yearEl?.textContent?.trim()).toBe('Reporting year 2027');
+      expect(queryEl('[data-testid="tab-supersede"]')).toBeNull();
+      expect(queryEl('[data-testid="panel-supersede"]')).toBeNull();
+      expect(queryEl('[data-testid="tab-toUpdate"]')).not.toBeNull();
+      expect(queryEl('[data-testid="tab-inactive"]')).not.toBeNull();
+
+      component.selectTab('inactive');
+      fixture.detectChanges();
+      const copy = queryEl('[data-testid="inactive-bucket-copy"]');
+      expect(copy?.textContent ?? '').not.toMatch(/supersede/i);
+      expect(copy?.textContent ?? '').not.toContain('deactivated and replaced');
+    });
+
+    it('keeps Apply enabled when the preview has only toUpdate', async () => {
+      mockService.previewAutoMap.mockResolvedValue({
+        ...samplePreview,
+        reporting_year: 2027,
+        counts: {
+          ...samplePreview.counts,
+          toCreate: 0,
+          toUpdate: 1,
+          inactive: 0
+        },
+        toCreate: [],
+        toUpdate: [
+          {
+            clarisaProjectId: 1600,
+            clarisaProjectFullName: 'Updated project',
+            clarisaProjectShortName: 'Updated',
+            externalCode: 'C-A511',
+            derivedContractId: 'A511',
+            action: 'toUpdate' as const,
+            existingMappingId: 9,
+            existingClarisaProjectId: 22
+          }
+        ],
+        inactive: []
+      });
+
+      fixture.detectChanges();
+      expect(queryEl('[data-testid="start-apply-btn"]')).toBeNull();
+
+      fixture.componentRef.setInput('visible', true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const applyBtn = queryEl<HTMLButtonElement>('[data-testid="start-apply-btn"]');
+      expect(applyBtn).not.toBeNull();
+      expect(applyBtn!.disabled).toBe(false);
+      expect(component.canApply()).toBe(true);
+    });
+
+    it('keeps Apply enabled when the only writable item is an inactive row with refreshed=true', async () => {
+      mockService.previewAutoMap.mockResolvedValue({
+        ...samplePreview,
+        counts: { ...samplePreview.counts, toCreate: 0, toUpdate: 0, inactive: 1 },
+        toCreate: [],
+        toUpdate: [],
+        inactive: [
+          {
+            clarisaProjectId: 1700,
+            clarisaProjectFullName: 'Refreshed inactive',
+            clarisaProjectShortName: 'Refreshed',
+            externalCode: 'C-A1697',
+            derivedContractId: 'A1697',
+            action: 'inactive' as const,
+            existingMappingId: 11,
+            existingClarisaProjectId: 22,
+            refreshed: true
+          }
+        ]
+      });
+
+      fixture.componentRef.setInput('visible', true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const applyBtn = queryEl<HTMLButtonElement>('[data-testid="start-apply-btn"]');
+      expect(applyBtn).not.toBeNull();
+      expect(applyBtn!.disabled).toBe(false);
+    });
+
+    it('disables Apply when the only item is an inactive row with refreshed=false', async () => {
+      mockService.previewAutoMap.mockResolvedValue({
+        ...samplePreview,
+        counts: { ...samplePreview.counts, toCreate: 0, toUpdate: 0, inactive: 1 },
+        toCreate: [],
+        toUpdate: [],
+        inactive: [
+          {
+            clarisaProjectId: 1701,
+            clarisaProjectFullName: 'Unchanged inactive',
+            clarisaProjectShortName: 'Unchanged',
+            externalCode: 'C-A1697',
+            derivedContractId: 'A1697',
+            action: 'inactive' as const,
+            existingMappingId: 12,
+            existingClarisaProjectId: 22,
+            refreshed: false
+          }
+        ]
+      });
+
+      fixture.componentRef.setInput('visible', true);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const applyBtn = queryEl<HTMLButtonElement>('[data-testid="start-apply-btn"]');
+      expect(applyBtn).not.toBeNull();
+      expect(applyBtn!.disabled).toBe(true);
     });
   });
 });

@@ -17,7 +17,9 @@
     <!-- Subheader info: feed freshness (F-C / §7) -->
     <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[var(--ac-grey-200)]">
       <div class="flex flex-col">
-        <span class="text-xs font-semibold atc-grey-700">CLARISA Project Phase: {{ phase() }}</span>
+        @if (displayedReportingYear(); as year) {
+          <span class="text-xs font-semibold atc-grey-700" data-testid="automapper-year">Reporting year {{ year }}</span>
+        }
         <span class="text-xs atc-grey-600" data-testid="preview-feed-timestamp">
           Feed Cache: {{ formattedFeedFetchedAt() }}
         </span>
@@ -88,12 +90,16 @@
             <span class="text-lg font-bold atc-green-600" data-testid="apply-count-created">{{ res.counts.created }}</span>
           </div>
           <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
-            <span class="text-xs atc-grey-600">Superseded</span>
-            <span class="text-lg font-bold atc-primary-blue-600" data-testid="apply-count-superseded">{{ res.counts.superseded }}</span>
+            <span class="text-xs atc-grey-600">Updated</span>
+            <span class="text-lg font-bold atc-primary-blue-600" data-testid="apply-count-updated">{{ res.counts.updated }}</span>
           </div>
           <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
             <span class="text-xs atc-grey-600">Already Mapped</span>
             <span class="text-lg font-bold atc-grey-700" data-testid="apply-count-alreadyMapped">{{ res.counts.alreadyMapped }}</span>
+          </div>
+          <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
+            <span class="text-xs atc-grey-600">Inactive</span>
+            <span class="text-lg font-bold atc-grey-700" data-testid="apply-count-inactive">{{ res.counts.inactive }}</span>
           </div>
           <div class="flex flex-col p-2.5 rounded border border-[var(--ac-grey-200)] abc-grey-100">
             <span class="text-xs atc-grey-600">Divergent</span>
@@ -158,6 +164,42 @@
           <button
             type="button"
             class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'alreadyMapped'"
+            (click)="selectTab('alreadyMapped')"
+            data-testid="tab-alreadyMapped"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'alreadyMapped'">
+            <span>Already Mapped</span>
+            <span class="bil-tab-badge">{{ prev.counts.alreadyMapped }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'toUpdate'"
+            (click)="selectTab('toUpdate')"
+            data-testid="tab-toUpdate"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'toUpdate'">
+            <span>To Update</span>
+            <span class="bil-tab-badge bil-tab-badge--green">{{ prev.counts.toUpdate }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
+            [class.bil-tab-btn--active]="activeTab() === 'inactive'"
+            (click)="selectTab('inactive')"
+            data-testid="tab-inactive"
+            role="tab"
+            [attr.aria-selected]="activeTab() === 'inactive'">
+            <span>Inactive</span>
+            <span class="bil-tab-badge">{{ prev.counts.inactive }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="bil-tab-btn"
             [class.bil-tab-btn--active]="activeTab() === 'divergent'"
             (click)="selectTab('divergent')"
             data-testid="tab-divergent"
@@ -189,30 +231,6 @@
             [attr.aria-selected]="activeTab() === 'unresolved'">
             <span>Unresolved</span>
             <span class="bil-tab-badge">{{ prev.counts.unresolved }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="bil-tab-btn"
-            [class.bil-tab-btn--active]="activeTab() === 'supersede'"
-            (click)="selectTab('supersede')"
-            data-testid="tab-supersede"
-            role="tab"
-            [attr.aria-selected]="activeTab() === 'supersede'">
-            <span>Superseded</span>
-            <span class="bil-tab-badge">{{ prev.counts.supersede }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="bil-tab-btn"
-            [class.bil-tab-btn--active]="activeTab() === 'alreadyMapped'"
-            (click)="selectTab('alreadyMapped')"
-            data-testid="tab-alreadyMapped"
-            role="tab"
-            [attr.aria-selected]="activeTab() === 'alreadyMapped'">
-            <span>Already Mapped</span>
-            <span class="bil-tab-badge">{{ prev.counts.alreadyMapped }}</span>
           </button>
         </div>
 
@@ -368,31 +386,29 @@
           </div>
         }
 
-        <!-- 5. SUPERSEDED (R-CAM-005) -->
-        @if (activeTab() === 'supersede') {
-          <div class="flex flex-col gap-2" data-testid="panel-supersede">
+        <!-- TO UPDATE (R-APM-005): in-place CLARISA field rewrite, row stays active -->
+        @if (activeTab() === 'toUpdate') {
+          <div class="flex flex-col gap-2" data-testid="panel-toUpdate">
             <p class="m-0 text-xs atc-grey-700">
-              Mappings from previous phases that will be deactivated and replaced by a new active row for this phase.
+              Active automation-owned mappings whose CLARISA project changed. Apply updates the project fields in place and leaves the row active.
             </p>
-            @if (prev.supersede.length === 0) {
-              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No superseded mappings in this run.</p>
+            @if (prev.toUpdate.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No mappings to update.</p>
             } @else {
               <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
                 <table class="w-full text-xs text-left">
                   <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
                     <tr>
                       <th class="p-2 atc-grey-800 font-semibold">Contract</th>
-                      <th class="p-2 atc-grey-800 font-semibold">Deactivating Previous Mapping</th>
-                      <th class="p-2 atc-grey-800 font-semibold">Creating New Mapping</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Current project</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Updated CLARISA project</th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (item of prev.supersede; track item.existingMappingId) {
-                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]">
+                    @for (item of prev.toUpdate; track item.existingMappingId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]" data-testid="to-update-row">
                         <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
-                        <td class="p-2 atc-grey-700">
-                          Project ID {{ item.existingClarisaProjectId }} (Mapping #{{ item.existingMappingId }})
-                        </td>
+                        <td class="p-2 atc-grey-700">Project ID {{ item.existingClarisaProjectId }}</td>
                         <td class="p-2 atc-grey-900" [title]="formatProject(item)">
                           {{ formatProject(item) }}
                           <span class="atc-grey-600">(id: {{ item.clarisaProjectId }})</span>
@@ -406,7 +422,45 @@
           </div>
         }
 
-        <!-- 6. ALREADY MAPPED -->
+        <!-- INACTIVE: stays inactive; refreshed rows are rewritten in place -->
+        @if (activeTab() === 'inactive') {
+          <div class="flex flex-col gap-2" data-testid="panel-inactive">
+            <p class="m-0 text-xs atc-grey-700" data-testid="inactive-bucket-copy">
+              Inactive mappings stay inactive. Apply never reactivates them. A refreshed row has its CLARISA fields updated in place; the others are left unchanged.
+            </p>
+            @if (prev.inactive.length === 0) {
+              <p class="m-0 text-xs italic atc-grey-500 py-3 text-center">No inactive mappings in this run.</p>
+            } @else {
+              <div class="max-h-[280px] overflow-y-auto border border-[var(--ac-grey-200)] rounded">
+                <table class="w-full text-xs text-left">
+                  <thead class="abc-grey-100 border-b border-[var(--ac-grey-200)] sticky top-0">
+                    <tr>
+                      <th class="p-2 atc-grey-800 font-semibold">Contract</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Existing project</th>
+                      <th class="p-2 atc-grey-800 font-semibold">Refreshed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (item of prev.inactive; track item.existingMappingId) {
+                      <tr class="border-b border-[var(--ac-grey-200)] hover:bg-[var(--ac-grey-100)]" data-testid="inactive-row">
+                        <td class="p-2 font-mono font-medium atc-grey-900">{{ item.derivedContractId }}</td>
+                        <td class="p-2 atc-grey-700">
+                          Project ID {{ item.existingClarisaProjectId }}
+                          <span class="atc-grey-600 block">(Mapping #{{ item.existingMappingId }})</span>
+                        </td>
+                        <td class="p-2 atc-grey-900" data-testid="inactive-refreshed">
+                          {{ item.refreshed ? 'Yes' : 'No' }}
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ALREADY MAPPED -->
         @if (activeTab() === 'alreadyMapped') {
           <div class="flex flex-col gap-2" data-testid="panel-alreadyMapped">
             <p class="m-0 text-xs atc-grey-700">
@@ -518,7 +572,7 @@
             label="Apply auto-mapping"
             icon="pi pi-bolt"
             class="p-button-sm"
-            [disabled]="loadingPreview() || (preview()!.counts.toCreate === 0 && preview()!.counts.supersede === 0)"
+            [disabled]="loadingPreview() || !canApply()"
             (click)="onStartApply()"
             data-testid="start-apply-btn">
           </button>

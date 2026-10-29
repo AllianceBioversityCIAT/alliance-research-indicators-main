@@ -6,6 +6,7 @@ import {
   AutomapperCoverage,
   AutomapperPreviewResponse,
   BilateralProjectMapping,
+  BilateralMappingUpsertResult,
   BilateralMappingListPage,
   BilateralMappingListQuery,
   ClarisaBilateralProjectOption,
@@ -28,9 +29,9 @@ export class BilateralMappingService {
   private readonly api = inject(ApiService);
 
   // AC-03.3 — on failure return null so the component shows the error state. Never throws.
-  async list(query?: BilateralMappingListQuery, phase?: number): Promise<BilateralMappingListPage | null> {
+  async list(query?: BilateralMappingListQuery): Promise<BilateralMappingListPage | null> {
     if (query?.status === 'pending') {
-      const preview = await this.previewAutoMap(phase);
+      const preview = await this.previewAutoMap();
       if (!preview) return null;
 
       const unmappedCandidates = [
@@ -56,6 +57,7 @@ export class BilateralMappingService {
 
       const items: BilateralProjectMapping[] = paginated.map(c => ({
         id: -c.clarisaProjectId,
+        reporting_year: preview.reporting_year,
         agresso_agreement_id: c.derivedContractId || '—',
         agresso_description: null,
         clarisa_project_id: c.clarisaProjectId,
@@ -98,7 +100,7 @@ export class BilateralMappingService {
     return res?.successfulRequest ? res.data : null;
   }
 
-  async create(body: CreateBilateralMappingBody): Promise<MappingMutationResult<BilateralProjectMapping>> {
+  async create(body: CreateBilateralMappingBody): Promise<MappingMutationResult<BilateralMappingUpsertResult>> {
     const res = await this.api.POST_BilateralProjectMapping(body);
     return this.toMutationResult(res);
   }
@@ -111,6 +113,11 @@ export class BilateralMappingService {
   // AC-07.3 — idempotent server-side; same result shape as create/update.
   async deactivate(id: number): Promise<MappingMutationResult<BilateralProjectMapping>> {
     const res = await this.api.PATCH_BilateralProjectMappingDeactivate(id);
+    return this.toMutationResult(res);
+  }
+
+  async activate(id: number): Promise<MappingMutationResult<BilateralProjectMapping>> {
+    const res = await this.api.PATCH_ActivateBilateralMapping(id);
     return this.toMutationResult(res);
   }
 
@@ -151,8 +158,8 @@ export class BilateralMappingService {
    * Fetches coverage metrics: mapped / pending / reachable against eligible CLARISA cohort.
    * On failure returns null so the component can render the error state without crashing.
    */
-  async getCoverage(phase?: number): Promise<AutomapperCoverage | null> {
-    const res = await this.api.GET_BilateralMappingCoverage(phase);
+  async getCoverage(): Promise<AutomapperCoverage | null> {
+    const res = await this.api.GET_BilateralMappingCoverage();
     return res?.successfulRequest && res.data ? res.data : null;
   }
 
@@ -160,16 +167,16 @@ export class BilateralMappingService {
    * Generates a preview of the automapper run without writing any rows.
    * On failure returns null.
    */
-  async previewAutoMap(phase?: number): Promise<AutomapperPreviewResponse | null> {
-    const res = await this.api.POST_AutomapperPreview(phase !== undefined ? { phase } : undefined);
+  async previewAutoMap(): Promise<AutomapperPreviewResponse | null> {
+    const res = await this.api.POST_AutomapperPreview({});
     return res?.successfulRequest && res.data ? res.data : null;
   }
 
   /**
    * Applies the automapper run server-side.
    */
-  async applyAutoMap(phase?: number): Promise<MappingMutationResult<AutomapperApplyResponse>> {
-    const res = await this.api.POST_AutomapperApply(phase !== undefined ? { phase } : undefined);
+  async applyAutoMap(): Promise<MappingMutationResult<AutomapperApplyResponse>> {
+    const res = await this.api.POST_AutomapperApply({});
     return this.toMutationResult<AutomapperApplyResponse>(res);
   }
 

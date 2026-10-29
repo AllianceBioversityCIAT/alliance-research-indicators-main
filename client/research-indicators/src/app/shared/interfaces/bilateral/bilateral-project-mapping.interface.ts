@@ -3,6 +3,7 @@ export type MappingStatus = 'Mapped' | 'Pending' | 'Inactive';
 
 export interface BilateralProjectMapping {
   id: number;
+  reporting_year: number;
   agresso_agreement_id: string;
   agresso_description?: string | null;
   clarisa_project_id: number;
@@ -17,6 +18,11 @@ export interface BilateralProjectMapping {
   updated_at: string;
   created_by?: number | null;
   updated_by?: number | null;
+}
+
+/** POST create/upsert payload: the row plus whether the server inserted or updated it. */
+export interface BilateralMappingUpsertResult extends BilateralProjectMapping {
+  outcome: 'created' | 'updated';
 }
 
 export interface BilateralMappingListMeta {
@@ -68,35 +74,9 @@ export interface ClarisaBilateralProjectOption {
   science_programs?: { code?: string; name?: string; portfolio?: string; allocation?: number }[];
 }
 
-// @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-03 / R-CPC-003, R-CPC-004
-// Mirrors the server's ClarisaProjectPhasesResponse (T-02) — the distinct
-// `phase` values present in the eligible (bilateral + Alliance) cohort, each
-// with a per-year project count, plus a separate count of eligible projects
-// whose phase could not be resolved. Powers the admin-editable year selector
-// in the Configuration Variables edit modal (design.md §7.2).
-export interface ClarisaProjectPhaseCount {
-  /** A distinct phase value present in the eligible cohort, e.g. 2025. */
-  phase: number;
-  /** Number of eligible projects carrying this phase. */
-  count: number;
-}
-
-export interface ClarisaProjectPhasesResponse {
-  /** Distinct phases with their project counts, ordered descending by phase. */
-  phases: ClarisaProjectPhaseCount[];
-  /**
-   * Count of eligible projects whose phase is absent/unresolvable. Lets the
-   * client distinguish "CLARISA publishes no phase data" from "there are no
-   * projects" (R-CPC-003 scenario 2).
-   */
-  phaseAbsentCount: number;
-}
-
-// ── Automapper (S2 — T-06) ──────────────────────────────────────────────────
-
-export interface AutomapperRunRequest {
-  phase?: number;
-}
+// ── Automapper (annualized-project-mapping — design §5) ────────────────────
+// The run request stays empty: the server rejects any caller field, including
+// a year (R-APM-003). `{}` is the only body the client sends.
 
 export interface AutomapperCandidate {
   clarisaProjectId: number;
@@ -107,9 +87,17 @@ export interface AutomapperCandidate {
 }
 
 export interface AutomapperReconciledEntry extends AutomapperCandidate {
-  action: 'alreadyMapped' | 'divergent' | 'supersede';
+  action: 'alreadyMapped' | 'divergent' | 'toUpdate';
   existingMappingId: number;
   existingClarisaProjectId: number;
+}
+
+export interface AutomapperInactiveEntry extends AutomapperCandidate {
+  action: 'inactive';
+  existingMappingId: number;
+  existingClarisaProjectId: number;
+  /** True when Apply rewrote this inactive row's CLARISA fields in place. */
+  refreshed: boolean;
 }
 
 export interface AutomapperToCreateEntry extends AutomapperCandidate {
@@ -119,33 +107,39 @@ export interface AutomapperToCreateEntry extends AutomapperCandidate {
 export interface AutomapperPreviewCounts {
   toCreate: number;
   alreadyMapped: number;
+  toUpdate: number;
   ambiguous: number;
   unresolved: number;
   divergent: number;
-  supersede: number;
+  inactive: number;
 }
 
 export interface AutomapperPreviewResponse {
+  reporting_year: number;
   feedFetchedAt: string | null;
   counts: AutomapperPreviewCounts;
   toCreate: AutomapperToCreateEntry[];
   alreadyMapped: AutomapperReconciledEntry[];
+  toUpdate: AutomapperReconciledEntry[];
   ambiguous: AutomapperCandidate[];
   unresolved: AutomapperCandidate[];
   divergent: AutomapperReconciledEntry[];
-  supersede: AutomapperReconciledEntry[];
+  inactive: AutomapperInactiveEntry[];
 }
 
 export interface AutomapperApplyCounts {
   created: number;
+  /** Row-3 in-place updates only. Row-6 refreshes are counted under `inactive`. */
+  updated: number;
   alreadyMapped: number;
   ambiguous: number;
   unresolved: number;
   divergent: number;
-  superseded: number;
+  inactive: number;
 }
 
 export interface AutomapperApplyResponse {
+  reporting_year: number;
   feedFetchedAt: string | null;
   counts: AutomapperApplyCounts;
   ambiguous: AutomapperCandidate[];
@@ -153,8 +147,10 @@ export interface AutomapperApplyResponse {
 }
 
 export interface AutomapperCoverage {
+  reporting_year: number;
   mapped: number;
   pending: number;
+  inactive: number;
   reachable: number;
 }
 

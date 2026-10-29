@@ -19,6 +19,7 @@ import { mockBilateralMapping, mockBilateralMappingListPage } from 'src/app/test
 function makeRow(overrides: Partial<BilateralProjectMapping> = {}): BilateralProjectMapping {
   return {
     id: 1,
+    reporting_year: 2026,
     agresso_agreement_id: 'A511',
     clarisa_project_id: 22,
     clarisa_project_short_name: 'ACIAR',
@@ -77,6 +78,7 @@ describe('BilateralMappingComponent', () => {
     create: jest.Mock;
     update: jest.Mock;
     deactivate: jest.Mock;
+    activate: jest.Mock;
     loadAgressoOptions: jest.Mock;
     loadClarisaProjectOptions: jest.Mock;
     getCoverage: jest.Mock;
@@ -93,6 +95,7 @@ describe('BilateralMappingComponent', () => {
       create: jest.fn(),
       update: jest.fn(),
       deactivate: jest.fn(),
+      activate: jest.fn(),
       loadAgressoOptions: jest.fn().mockResolvedValue(AGRESSO_OPTIONS),
       loadClarisaProjectOptions: jest.fn().mockResolvedValue(CLARISA_OPTIONS),
       getCoverage: jest.fn().mockResolvedValue({ mapped: 4, pending: 194, reachable: 198 }),
@@ -538,6 +541,17 @@ describe('BilateralMappingComponent', () => {
       component.onSort({ data, field: 'updated_at', order: -1 });
       expect(data.map(r => r.id)).toEqual([3, 1, 2]);
     });
+
+    it('sorts the Year column by reporting_year', () => {
+      const data = [
+        makeRow({ id: 1, reporting_year: 2028 }),
+        makeRow({ id: 2, reporting_year: 2026 }),
+        makeRow({ id: 3, reporting_year: 2027 })
+      ];
+
+      component.onSort({ data, field: 'reporting_year', order: 1 });
+      expect(data.map(r => r.reporting_year)).toEqual([2026, 2027, 2028]);
+    });
   });
 
   // ── NFR-BTE-001: Accessibility and keyboard focus for tooltips ────────────
@@ -767,6 +781,26 @@ describe('BilateralMappingComponent', () => {
         clarisa_project_id: 22
       });
       expect(mockService.create.mock.calls[0][0]).not.toHaveProperty('notes');
+    });
+
+    it('R-APM-006 — toast says Mapping updated when the create outcome is updated', async () => {
+      const existing = makeRow({ id: 6, agresso_agreement_id: 'A511', clarisa_project_id: 22 });
+      mockService.create.mockResolvedValue({ ok: true, data: { ...existing, outcome: 'updated' } });
+      mockService.list.mockResolvedValue(makePage([existing]));
+
+      component.openCreateDialog();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      component.selectedAgreement.set('A511');
+      component.selectedProjectId.set(22);
+      await component.onSave();
+
+      expect(mockActions.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Bilateral Mapping',
+        detail: 'Mapping updated'
+      });
     });
   });
 
@@ -1325,6 +1359,74 @@ describe('BilateralMappingComponent', () => {
     });
   });
 
+  describe('Activate action (R-APM-011)', () => {
+    const inactiveRow = makeRow({ id: 4, agresso_agreement_id: 'A1697', is_active: false, mapping_status: 'Inactive' });
+
+    beforeEach(async () => {
+      mockService.list.mockResolvedValue(makePage([inactiveRow, makeRow({ id: 1, is_active: true })]));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await delayMs(0);
+      fixture.detectChanges();
+    });
+
+    it('renders Activate on inactive rows and Deactivate on active rows', () => {
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelectorAll('[data-testid="activate-btn"]').length).toBe(1);
+      expect(root.querySelectorAll('[data-testid="deactivate-btn"]').length).toBe(1);
+    });
+
+    it('asks for confirmation and does not call activate until the admin confirms', () => {
+      component.requestActivate(inactiveRow);
+      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(arg.summary).toBe('Activate mapping');
+      expect(mockService.activate).not.toHaveBeenCalled();
+    });
+
+    it('calls activate and reloads the list after confirmation', async () => {
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...inactiveRow, is_active: true } });
+      const callsBefore = mockService.list.mock.calls.length;
+      const coverageBefore = mockService.getCoverage.mock.calls.length;
+
+      component.requestActivate(inactiveRow);
+      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      arg.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.activate).toHaveBeenCalledWith(inactiveRow.id);
+      expect(mockService.list.mock.calls.length).toBeGreaterThan(callsBefore);
+      expect(mockService.getCoverage.mock.calls.length).toBeGreaterThan(coverageBefore);
+      expect(mockActions.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Bilateral Mapping',
+        detail: 'Mapping activated'
+      });
+    });
+
+    it('shows an error toast and does not report the list as activated when activate fails', async () => {
+      mockService.activate.mockResolvedValue({ ok: false, status: 404, message: 'Mapping not found' });
+      const callsBefore = mockService.list.mock.calls.length;
+
+      component.requestActivate(inactiveRow);
+      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      arg.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockActions.showToast).toHaveBeenCalledWith({
+        severity: 'error',
+        summary: 'Bilateral Mapping',
+        detail: 'Mapping not found'
+      });
+      expect(mockActions.showToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ detail: 'Mapping activated' })
+      );
+      expect(mockService.list.mock.calls.length).toBe(callsBefore);
+      expect(component.rows().find(row => row.id === inactiveRow.id)?.is_active).toBe(false);
+    });
+  });
+
   // ── onNotesInput clips at max length ──────────────────────────────────────
 
   it('onNotesInput clips the input at notesMaxLength (500 chars)', () => {
@@ -1747,7 +1849,7 @@ describe('BilateralMappingComponent', () => {
       const popoverContent = document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
       expect(popoverContent).not.toBeNull();
       expect(popoverContent?.textContent).toContain('About Bilateral Project Mapping');
-      expect(popoverContent?.textContent).toContain('Phase 2026');
+      expect(popoverContent?.textContent).not.toContain('Phase');
       expect(popoverContent?.textContent).toContain('CLARISA');
       expect(popoverContent?.textContent).toContain('AGRESSO');
     });
@@ -1763,7 +1865,60 @@ describe('BilateralMappingComponent', () => {
 
       expect(tableHeaders.some(h => h?.includes('Agreement ID (AGRESSO)'))).toBe(true);
       expect(tableHeaders.some(h => h?.includes('CLARISA Project (Bilateral)'))).toBe(true);
+
+      const lastUpdated = tableHeaders.findIndex(h => h?.includes('Last Updated'));
+      const year = tableHeaders.findIndex(h => h?.trim().startsWith('Year'));
+      const actions = tableHeaders.findIndex(h => h?.includes('Actions'));
+      expect(year).toBeGreaterThan(lastUpdated);
+      expect(actions).toBeGreaterThan(year);
+
+      const yearCell = root.querySelector('[data-testid="year-cell"]');
+      expect(yearCell?.textContent?.trim()).toBe(String(makeRow().reporting_year));
     });
+  });
+
+  // ── R-APM-007: year comes from coverage, never a template literal ────────
+
+  it('R-APM-007 — header and help show the year emitted after coverage loads, never a literal', async () => {
+    let resolveCoverage: (value: {
+      reporting_year: number;
+      mapped: number;
+      pending: number;
+      inactive: number;
+      reachable: number;
+    } | null) => void = () => {};
+    mockService.getCoverage.mockReturnValue(new Promise(resolve => { resolveCoverage = resolve; }));
+    mockService.list.mockResolvedValue(makePage([]));
+
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    const helpBtn = (root.querySelector('[data-testid="help-popover-btn"] button') ??
+      root.querySelector('[data-testid="help-popover-btn"]')) as HTMLElement;
+    helpBtn.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const readHelp = (): string => {
+      const node = document.querySelector('[data-testid="help-popover-content"]') ??
+        root.querySelector('[data-testid="help-popover-content"]');
+      return node?.textContent ?? '';
+    };
+
+    // KZ-015: coverage has not resolved, so the emitted year is not on screen yet.
+    expect(readHelp()).not.toContain('2027');
+    expect(root.querySelector('[data-testid="reporting-year-badge"]')).toBeNull();
+
+    resolveCoverage({ reporting_year: 2027, mapped: 1, pending: 0, inactive: 0, reachable: 1 });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const badge = root.querySelector('[data-testid="reporting-year-badge"]');
+    expect(badge?.textContent?.trim()).toBe('2027');
+    expect(readHelp()).toContain('2027');
+    expect(readHelp()).not.toContain('Phase 2026');
   });
 });
 

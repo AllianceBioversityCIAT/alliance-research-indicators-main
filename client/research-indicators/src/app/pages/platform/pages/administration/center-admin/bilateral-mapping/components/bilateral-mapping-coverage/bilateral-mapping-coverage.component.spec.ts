@@ -12,8 +12,10 @@ describe('BilateralMappingCoverageComponent', () => {
   };
 
   const sampleCoverage: AutomapperCoverage = {
+    reporting_year: 2026,
     mapped: 4,
     pending: 194,
+    inactive: 0,
     reachable: 198
   };
 
@@ -46,7 +48,7 @@ describe('BilateralMappingCoverageComponent', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    const expectedText = 'Coverage 4 / 198 · 2% (eligible CLARISA projects, phase 2026)';
+    const expectedText = `Coverage 4 / 198 · 2% (eligible CLARISA projects, ${sampleCoverage.reporting_year})`;
     expect(component.denominatorText()).toBe(expectedText);
 
     const denomEl = fixture.nativeElement.querySelector('[data-testid="coverage-denominator"]');
@@ -56,7 +58,7 @@ describe('BilateralMappingCoverageComponent', () => {
 
   // ── Hard Requirement 2: Exactly THREE cards (DD-6) ───────────────────────
 
-  it('renders EXACTLY three cards and no fourth card (DD-6 / Hard Requirement 2)', async () => {
+  it('renders four coverage cards including the inactive figure (DD-8 / R-APM-009)', async () => {
     mockService.getCoverage.mockResolvedValue(sampleCoverage);
 
     fixture.detectChanges();
@@ -64,18 +66,20 @@ describe('BilateralMappingCoverageComponent', () => {
     fixture.detectChanges();
 
     const cards = fixture.nativeElement.querySelectorAll('[data-testid="coverage-card"]');
-    expect(cards.length).toBe(3);
+    expect(cards.length).toBe(4);
 
     const mappedVal = fixture.nativeElement.querySelector('[data-testid="coverage-mapped-val"]');
     const pendingVal = fixture.nativeElement.querySelector('[data-testid="coverage-pending-val"]');
+    const inactiveVal = fixture.nativeElement.querySelector('[data-testid="coverage-inactive-val"]');
     const reachableVal = fixture.nativeElement.querySelector('[data-testid="coverage-reachable-val"]');
 
     expect(mappedVal.textContent.trim()).toBe('4');
     expect(pendingVal.textContent.trim()).toBe('194');
+    expect(inactiveVal.textContent.trim()).toBe('0');
     expect(reachableVal.textContent.trim()).toBe('198');
 
-    // Invariant: mapped + pending === reachable
-    expect(component.coverage()!.mapped + component.coverage()!.pending).toBe(component.coverage()!.reachable);
+    const cov = component.coverage()!;
+    expect(cov.mapped + cov.pending + cov.inactive).toBe(cov.reachable);
   });
 
   // ── Hard Requirement 3: Loading shows skeleton, NEVER zero ───────────────
@@ -136,7 +140,13 @@ describe('BilateralMappingCoverageComponent', () => {
   // ── Hard Requirement 5: Empty state explains no eligible projects ────────
 
   it('explains no eligible projects when reachable is 0 instead of showing 0/0 (Hard Requirement 5)', async () => {
-    mockService.getCoverage.mockResolvedValue({ mapped: 0, pending: 0, reachable: 0 });
+    mockService.getCoverage.mockResolvedValue({
+      reporting_year: 2027,
+      mapped: 0,
+      pending: 0,
+      inactive: 0,
+      reachable: 0
+    });
 
     fixture.detectChanges();
     await fixture.whenStable();
@@ -146,9 +156,8 @@ describe('BilateralMappingCoverageComponent', () => {
 
     const emptyEl = fixture.nativeElement.querySelector('[data-testid="coverage-empty"]');
     expect(emptyEl).not.toBeNull();
-    expect(emptyEl.textContent).toContain('No eligible CLARISA projects found for phase 2026.');
+    expect(emptyEl.textContent).toContain('CLARISA has no eligible projects for 2027 yet');
 
-    // Cards are NOT rendered in empty state
     const cards = fixture.nativeElement.querySelectorAll('[data-testid="coverage-card"]');
     expect(cards.length).toBe(0);
   });
@@ -174,5 +183,103 @@ describe('BilateralMappingCoverageComponent', () => {
     component.openAutomapper.subscribe(() => { emitted = true; });
     component.onTriggerAutoMap();
     expect(emitted).toBe(true);
+  });
+
+  // ── R-APM-008: one readiness note per state, after the load transition ──
+
+  describe('R-APM-008 readiness notes', () => {
+    function holdCoverage(): { resolve: (value: AutomapperCoverage | null) => void } {
+      let resolve: (value: AutomapperCoverage | null) => void = () => {};
+      mockService.getCoverage.mockReturnValue(new Promise(r => { resolve = r; }));
+      return { resolve: value => resolve(value) };
+    }
+
+    it('R-APM-008 — loading shows the skeleton and does not emit a year', async () => {
+      const pending = holdCoverage();
+      const years: number[] = [];
+      component.reportingYear.subscribe(year => years.push(year));
+
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-loading"]')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-readiness"]')).toBeNull();
+      expect(years).toEqual([]);
+
+      pending.resolve(sampleCoverage);
+      await fixture.whenStable();
+    });
+
+    it('R-APM-008 — CLARISA error shows the unavailable message and does not emit a year', async () => {
+      const pending = holdCoverage();
+      const years: number[] = [];
+      component.reportingYear.subscribe(year => years.push(year));
+
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-error"]')).toBeNull();
+
+      pending.resolve(null);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const errorEl = fixture.nativeElement.querySelector('[data-testid="coverage-error"]');
+      expect(errorEl).not.toBeNull();
+      expect(errorEl.textContent).toContain('Coverage data is currently unavailable.');
+      expect(years).toEqual([]);
+    });
+
+    it('R-APM-008 — reachable = 0 says CLARISA has no eligible projects for the loaded year', async () => {
+      const pending = holdCoverage();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-empty"]')).toBeNull();
+
+      pending.resolve({ reporting_year: 2027, mapped: 0, pending: 0, inactive: 0, reachable: 0 });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const note = fixture.nativeElement.querySelector('[data-testid="coverage-readiness"]');
+      expect(note.textContent.trim()).toBe('CLARISA has no eligible projects for 2027 yet');
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-card"]')).toBeNull();
+    });
+
+    it('R-APM-008 — reachable > 0 and mapped = 0 says no mappings yet and names the loaded year', async () => {
+      const pending = holdCoverage();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-no-mappings"]')).toBeNull();
+
+      pending.resolve({ reporting_year: 2027, mapped: 0, pending: 3, inactive: 0, reachable: 3 });
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const note = fixture.nativeElement.querySelector('[data-testid="coverage-readiness"]');
+      expect(note.textContent.trim()).toBe('No mappings for 2027 yet — run Auto-map');
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-card"]')).toBeNull();
+    });
+
+    it('R-APM-008 — normal coverage is labelled with the loaded year and shows the inactive figure', async () => {
+      const pending = holdCoverage();
+      const years: number[] = [];
+      component.reportingYear.subscribe(year => years.push(year));
+
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="coverage-denominator"]')).toBeNull();
+
+      const loaded: AutomapperCoverage = {
+        reporting_year: 2027,
+        mapped: 197,
+        pending: 0,
+        inactive: 1,
+        reachable: 198
+      };
+      pending.resolve(loaded);
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(years).toEqual([2027]);
+      const inactiveVal = fixture.nativeElement.querySelector('[data-testid="coverage-inactive-val"]');
+      expect(inactiveVal.textContent.trim()).toBe('1');
+      const denom = fixture.nativeElement.querySelector('[data-testid="coverage-denominator"]');
+      expect(denom.textContent).toContain('2027');
+      expect(denom.textContent).not.toContain('phase');
+    });
   });
 });

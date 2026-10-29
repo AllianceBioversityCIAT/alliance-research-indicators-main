@@ -26,7 +26,11 @@
 
   <!-- Loading State: PrimeNG skeleton (Hard Requirement 3: skeleton, NEVER a zero) -->
   @if (loading()) {
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="coverage-loading" aria-live="polite">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="coverage-loading" aria-live="polite">
+      <div class="flex flex-col gap-2 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)]" data-testid="coverage-skeleton">
+        <p-skeleton width="60%" height="14px"></p-skeleton>
+        <p-skeleton width="40%" height="24px"></p-skeleton>
+      </div>
       <div class="flex flex-col gap-2 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)]" data-testid="coverage-skeleton">
         <p-skeleton width="60%" height="14px"></p-skeleton>
         <p-skeleton width="40%" height="24px"></p-skeleton>
@@ -69,19 +73,24 @@
   } @else if (coverage()) {
     @let cov = coverage()!;
     @if (cov.reachable === 0) {
-      <!-- Empty State: reachable 0 explains the feed has no eligible projects (Hard Requirement 5) -->
-      <div class="flex flex-col items-center gap-1 py-4 text-center abc-white-1 rounded-[8px] border border-[var(--ac-grey-200)]" data-testid="coverage-empty">
+      <!-- R-APM-008: CLARISA has nothing eligible for this year yet -->
+      <div class="flex flex-col items-center gap-1 py-4 text-center abc-white-1 rounded-[8px] border border-[var(--ac-grey-200)]" data-testid="coverage-empty" role="status">
         <i class="pi pi-info-circle text-2xl atc-grey-500" aria-hidden="true"></i>
-        <p class="m-0 text-sm font-medium atc-grey-800">
-          No eligible CLARISA projects found for phase {{ phase() }}.
+        <p class="m-0 text-sm font-medium atc-grey-800" data-testid="coverage-readiness">
+          CLARISA has no eligible projects for {{ cov.reporting_year }} yet
         </p>
-        <p class="m-0 text-xs atc-grey-600">
-          Coverage cannot be computed when the eligible cohort is empty.
+      </div>
+    } @else if (cov.mapped === 0) {
+      <!-- R-APM-008: eligible projects exist, but none are mapped yet -->
+      <div class="flex flex-col items-center gap-1 py-4 text-center abc-white-1 rounded-[8px] border border-[var(--ac-grey-200)]" data-testid="coverage-no-mappings" role="status">
+        <i class="pi pi-info-circle text-2xl atc-grey-500" aria-hidden="true"></i>
+        <p class="m-0 text-sm font-medium atc-grey-800" data-testid="coverage-readiness">
+          No mappings for {{ cov.reporting_year }} yet — run Auto-map
         </p>
       </div>
     } @else {
-      <!-- EXACTLY THREE CARDS (Hard Requirement 2, DD-6): Mapped, Pending, Reachable -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="coverage-cards-container">
+      <!-- DD-8: Mapped, Pending, Inactive, Reachable -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="coverage-cards-container">
         <!-- Card 1: Mapped -->
         <div
           class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-mapped"
@@ -104,7 +113,18 @@
           </span>
         </div>
 
-        <!-- Card 3: Reachable -->
+        <!-- Card 3: Inactive (R-APM-009) -->
+        <div
+          class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-inactive"
+          data-testid="coverage-card"
+          data-card-type="inactive">
+          <span class="text-xs font-medium uppercase tracking-wide atc-grey-600">Inactive</span>
+          <span class="text-2xl font-bold atc-grey-700" data-testid="coverage-inactive-val">
+            {{ cov.inactive }}
+          </span>
+        </div>
+
+        <!-- Card 4: Reachable -->
         <div
           class="flex flex-col gap-1 rounded-[8px] p-3 abc-white-1 border border-[var(--ac-grey-200)] bil-card-reachable"
           data-testid="coverage-card"
