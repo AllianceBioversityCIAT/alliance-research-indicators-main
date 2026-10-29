@@ -257,3 +257,5 @@
 
 **Cause:** test volume. The spec's own falsifiability rules (KZ-001 executed SQL, generated-SQL assertions per reader, one fixture per §6.3 row, red observed on the final file) put most of the lines into specs: T-03 +536 (7 reader assertions + integration + copy-drift), T-05 +934 (+~600 in `automapper.service.spec.ts`). Production code is close to the design's estimate. The §12 estimate counted "server ~700, migrations ~400" and under-sized the test share. Remaining: T-06 (M, server), T-07 (S, SSR), T-08–T-10 (client, ~350 estimated).
 **Status:** stopped for the owner. The tripwire is never logged `auto-approved`.
+
+**Owner decision (2026-10-29):** "Continue to T-06 (Recommended)". The overrun is accepted without re-baselining design §12. The tripwire stays armed against the original figures, so it is re-reported (not re-asked) at each later finalize.
