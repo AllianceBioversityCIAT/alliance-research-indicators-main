@@ -580,12 +580,34 @@ describe('BilateralProjectMappingService', () => {
           reporting_year: CURRENT_YEAR,
           clarisa_project_id: 1,
           clarisa_external_code: 'D527',
-          source: MappingSourceEnum.AI_SUGGESTED,
+          source: MappingSourceEnum.MANUAL,
           is_active: true,
           created_by: 42,
           updated_by: 42,
         }),
       );
+    });
+
+    it('create on an absent row with source AI_AUTO stores MANUAL (R-APM-006 AC.5)', async () => {
+      lockLookup(null);
+      txCreate.mockImplementation((row) => row);
+      txSave.mockImplementation(async (row) => ({ id: 31, ...row }));
+      mockClarisaProjectsService.findProjectById.mockResolvedValue({
+        id: 1,
+        external_code: 'B-D527',
+      });
+
+      const result = (await service.create(
+        {
+          agresso_agreement_id: 'D900',
+          clarisa_project_id: 1,
+          source: MappingSourceEnum.AI_AUTO,
+        },
+        fakeUser,
+      )) as UpsertResult;
+
+      expect(result.outcome).toBe('created');
+      expect(result.source).toBe(MappingSourceEnum.MANUAL);
     });
 
     it('create on an inactive row returns the same id and stays inactive', async () => {
@@ -771,6 +793,57 @@ describe('BilateralProjectMappingService', () => {
       expect(out.source).toBe(MappingSourceEnum.MANUAL);
       expect(out.clarisa_project_id).toBe(2);
       expect(out.clarisa_external_code).toBe('D527');
+    });
+
+    it('PATCH a MANUAL row with an unchanged project and source AI_SUGGESTED stays MANUAL (R-APM-006 AC.5)', async () => {
+      const row = {
+        id: 6,
+        reporting_year: CURRENT_YEAR,
+        clarisa_project_id: 4,
+        clarisa_external_code: 'KEEP',
+        source: MappingSourceEnum.MANUAL,
+        is_active: true,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.update(
+        6,
+        {
+          clarisa_project_id: 4,
+          source: MappingSourceEnum.AI_SUGGESTED,
+        },
+        fakeUser,
+      );
+
+      expect(out.source).toBe(MappingSourceEnum.MANUAL);
+      expect(out.clarisa_project_id).toBe(4);
+      expect(out.clarisa_external_code).toBe('KEEP');
+    });
+
+    it('PATCH a DERIVED row with an unchanged project stores MANUAL (R-APM-006 AC.5)', async () => {
+      const row = {
+        id: 8,
+        reporting_year: CURRENT_YEAR,
+        clarisa_project_id: 4,
+        clarisa_external_code: 'KEEP',
+        source: MappingSourceEnum.DERIVED,
+        is_active: true,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.update(
+        8,
+        {
+          clarisa_project_id: 4,
+          source: MappingSourceEnum.AI_AUTO,
+        },
+        fakeUser,
+      );
+
+      expect(out.source).toBe(MappingSourceEnum.MANUAL);
+      expect(out.clarisa_external_code).toBe('KEEP');
     });
 
     it('sets clarisa_external_code to null and warns when the feed throws on PATCH', async () => {

@@ -297,3 +297,21 @@
 - **Owner decision:** "Force MANUAL on every human write (Recommended)".
 - **Execute-time spec edits (recorded at the moment made):** `requirements.md` R-APM-006 gains **AC.5** (every human write stores MANUAL; a submitted `source` is ignored). `design.md` §6.5 *Absent* bullet and *Ownership on human edit* bullet are amended. `tasks.md` gains **T-06b** (S, deps T-06) and a §4 coverage row. These broaden an approved rule at the owner's explicit direction, not by Leader inference. The next Reviewer brief carries "conformance to `design.md#6.5` and R-APM-006 AC.5 as amended 2026-10-29".
 - **Correction sweep:** grep for the superseded rule across the spec folder. The only remaining hits are the present-branch wording (still true), the T-06 execution record (history, left unchanged) and the T-06b falsifier text (intended).
+
+### T-06b — Force MANUAL on every human write (owner amendment 2026-10-29) — PASS (attempt 1)
+
+- **Date:** 2026-10-29 · **Final status:** PASS
+- **Skills:** `nestjs-expert`, `tdd` · **Effort:** `grok-4.7-medium` (S, well specified)
+- **Orca:** task `task_57bbf90fbc00`, dispatch `ctx_7b031e27030e` (ran in parallel with T-08, cross-package); released after PASS
+- **Files changed:** `server/researchindicators/src/domain/entities/bilateral-project-mapping/bilateral-project-mapping.service.ts` (+spec)
+- **Reds at HEAD (observed, without `--silent`):** `create on an absent row with source AI_AUTO stores MANUAL (R-APM-006 AC.5)` :610, Expected "MANUAL" / Received "AI_AUTO" · `PATCH a MANUAL row with an unchanged project and source AI_SUGGESTED stays MANUAL (R-APM-006 AC.5)` :819, Received "AI_SUGGESTED" · `PATCH a DERIVED row with an unchanged project stores MANUAL (R-APM-006 AC.5)` :845, Received "AI_AUTO".
+- **Falsifier (observed):** restored `source: dto.source ?? MappingSourceEnum.MANUAL` on the absent insert → :610 red again. Reverted.
+- **T-06 test changed:** `create on an absent row returns outcome created` now expects MANUAL stored while the DTO still sends `AI_SUGGESTED`. The old assertion encoded the rule AC.5 replaced.
+- **Implementer verification:** build exit 0 · eslint 2 files exit 0 · 21 suites / 409 tests passed.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** run after the parallel client worker reported (root guide: no measurement beside an active worker). `npm run build` → `BUILD_EXIT:0` · `npx eslint <2 files>` → `ESLINT_EXIT:0` · `npm test -- --silent src/domain/entities/bilateral-project-mapping src/domain/entities/bilateral src/domain/tools/clarisa` → `Test Suites: 69 passed, 69 total` / `Tests: 749 passed, 749 total` · `-t "R-APM-006 AC.5"` → 3 passed. The Reviewer was spawned before the re-run (it judged the diff alone) and was told the re-run was pending. Closure waited for it.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist; named check "conformance to `design.md#6.5` and R-APM-006 AC.5 as amended 2026-10-29"): **`STATUS: PASS`**. The absent insert, the present branch and `update()` all set MANUAL unconditionally. A PATCH changing only notes/confidence also becomes MANUAL, which the amended text covers ("every `PATCH :id`, project changed or not"). No DTO change. The Disqualifier is met. The changed T-06 test is justified.
+- **ADVISORY:** no test pins a notes-only PATCH → MANUAL. `activate()`/`deactivate()` keep the existing source, which is correct and consistent with R-APM-011 AC.5; §6.5 could say so explicitly. Two different citations (FB-1 vs R-APM-006 AC.5) are used for the same rule.
+- **spawns:** Implementer Cursor/grok-4.7-medium: not reported by host, ended complete · Reviewer akili-reviewer/opus 8 calls, 62 113 tokens, ended complete
+- **Requirements covered:** R-APM-006 AC.5 (amended 2026-10-29)
+- **Running totals vs budget (design §12):** tasks 7/11 (T-06b added) · LOC +3,364/−1,144 (overrun accepted 2026-10-29) · review rounds 12/~14
+- **Final verification:** VERIFIED (above)

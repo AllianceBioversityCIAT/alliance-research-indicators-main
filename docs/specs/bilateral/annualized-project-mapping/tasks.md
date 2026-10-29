@@ -230,7 +230,7 @@ graph TD
 
 ### T-06b — Force MANUAL on every human write (owner amendment 2026-10-29)
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-06
+- **Status:** done (PASS 2026-10-29) · **Size:** S · **Dependencies:** T-06
 - **Origin:** owner decision at the T-06 gate ("Force MANUAL on every human write"), resolving a spec tension between design §6.3 (automation-owned = any source other than MANUAL) and the create DTO accepting `AI_AUTO`/`AI_SUGGESTED` (P-20).
 - **Requirements:** R-APM-006 AC.5 (amended 2026-10-29)
 - **Design:** §6.5 *Ownership on human edit* (amended 2026-10-29); P-20
@@ -242,9 +242,9 @@ graph TD
 - **Consumers:** the T-06 tests that assert a stored non-MANUAL source on create or PATCH (update them); `/admin` SSR and STAR client create forms (unchanged; they may still send `source`).
 - **Review:** `full`.
 - **Done:**
-  - [ ] Falsifier executed.
-  - [ ] Listed tests green.
-  - [ ] Build and eslint green.
+  - [x] Falsifier executed.
+  - [x] Listed tests green.
+  - [x] Build and eslint green.
 - **Skills:** nestjs-expert, tdd
 
 ### T-07 — `/admin` SSR page: Activate, Year column, upsert outcome, copy

@@ -238,13 +238,13 @@ export class BilateralProjectMappingService {
       dto.clarisa_project_id !== undefined &&
       dto.clarisa_project_id !== previousProjectId;
     if (projectChanged) {
-      row.source = MappingSourceEnum.MANUAL;
       row.clarisa_external_code = await this.externalCodeFor(
         dto.clarisa_project_id as number,
       );
-    } else if (dto.source !== undefined) {
-      row.source = dto.source;
     }
+    // Every human PATCH stores MANUAL. A submitted source is ignored
+    // (R-APM-006 AC.5), whether or not the project changed.
+    row.source = MappingSourceEnum.MANUAL;
     if (dto.confidence_score !== undefined) {
       row.confidence_score = dto.confidence_score;
     }
@@ -333,7 +333,9 @@ export class BilateralProjectMappingService {
           clarisa_external_code: await this.externalCodeFor(
             dto.clarisa_project_id,
           ),
-          source: dto.source ?? MappingSourceEnum.MANUAL,
+          // A person submitted this insert. A submitted source is ignored
+          // (R-APM-006 AC.5).
+          source: MappingSourceEnum.MANUAL,
           confidence_score: dto.confidence_score ?? null,
           notes: dto.notes ?? null,
           is_active: true,
