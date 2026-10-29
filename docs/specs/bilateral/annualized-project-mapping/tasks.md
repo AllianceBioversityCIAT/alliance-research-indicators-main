@@ -326,7 +326,7 @@ graph TD
 
 ### T-10 — Client env-variable modal: remove the CLARISA-phase selector
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-08
+- **Status:** done · **Size:** S · **Dependencies:** T-08
 - **Requirements:** R-APM-010 (AC.1), R-APM-008 (AC.2)
 - **Design:** §7 modal row; P-14
 - **Scope:** `edit-environment-variable-modal.component.{ts,html}`: remove the `CLARISA_PHASE_CONFIG_KEY` branch, its signals, the `GET_ClarisaProjectPhases` call and the `ClarisaProjectPhase*` imports. In `api.service.ts`, remove `GET_ClarisaProjectPhases`.
@@ -337,9 +337,9 @@ graph TD
 - **Consumers:** `edit-environment-variable-modal.component.spec.ts`; grep `clarisa-phase-select|CLARISA_PHASE_CONFIG_KEY|GET_ClarisaProjectPhases` over `client/` returns 0 after the change.
 - **Review:** `checklist`: removal only.
 - **Done:**
-  - [ ] Falsifier executed.
-  - [ ] Grep = 0.
-  - [ ] Both `tsc` gates green.
+  - [x] Falsifier executed.
+  - [x] Grep = 0.
+  - [x] Both `tsc` gates green (app exit 0; spec 945 = HEAD, recorded caveat).
 - **Skills:** angular-developer
 
 ---

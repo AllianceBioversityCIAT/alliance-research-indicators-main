@@ -346,3 +346,22 @@
 - **Requirements covered:** R-APM-003 AC.3 · R-APM-006 client side (create `outcome`) · R-APM-011 client API (`PATCH_ActivateBilateralMapping`)
 - **Running totals vs budget (design §12):** tasks 8/11 · LOC +3,601/−1,275 (overrun accepted 2026-10-29) · review rounds 13/~14
 - **Final verification:** VERIFIED (above, with the tsc-spec caveat recorded)
+
+### T-10 — Client env-variable modal: remove the CLARISA-phase selector — PASS (attempt 1), code held uncommitted for the owner's visual check
+
+- **Date:** 2026-10-29 · **Final status:** PASS
+- **Skills:** `angular-developer` · **Effort:** `grok-4.7-medium`
+- **Orca:** task `task_ec9cb828b6e8`, dispatch `ctx_d838dc034794` (ran in parallel with T-07, cross-package); released after PASS
+- **Files changed:** `edit-environment-variable-modal.component.{ts,html,spec.ts}` · `shared/services/api.service.ts` (`GET_ClarisaProjectPhases` + its import removed) · `shared/interfaces/bilateral/bilateral-project-mapping.interface.ts` (`ClarisaProjectPhaseCount`, `ClarisaProjectPhasesResponse` removed; no other importer)
+- **Red run:** none expected at HEAD (the selector was keyed to the old key, so `ARI_PRMS_SYNC` was already a plain input); the proof is the falsifier.
+- **Falsifier (observed, no `--silent`):** `isClarisaPhaseKey` re-introduced keyed to `ARI_PRMS_SYNC` → `renders a plain value input when editing ARI_PRMS_SYNC`, `spec.ts:171 expect(simpleValueInputExists()).toBe(true)`, Expected true, Received false. Reverted.
+- **Consumer grep:** `grep -rnE "clarisa-phase-select|CLARISA_PHASE_CONFIG_KEY|GET_ClarisaProjectPhases|ClarisaProjectPhase" client/research-indicators/src` → 0 (worker and Leader).
+- **Evidence re-run (Leader inline, non-author, after both workers reported), VERIFIED:** `tsc -p tsconfig.app.json` exit 0 · `tsc -p tsconfig.spec.json` 945 errors (= HEAD), 0 in the modal files · `npm run lint -- --quiet` "All files pass linting." · `npx jest --silent <modal dir> src/app/shared/services` → 121 suites / 2063 tests passed · grep 0.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: PASS`**. "T-10 removes the CLARISA-phase selector completely, with no dead code; T-08's hunks are unchanged; the new spec asserts on `ARI_PRMS_SYNC` itself, not only on the old key, so the Disqualifier is met."
+- **ADVISORY (not gating, not reworked):**
+  - RELIABILITY: the "no phases request" cases (`spec.ts:185`, `:190-199`) cannot go red as written, because the component no longer injects `ApiService`, so the Proxy records nothing. The removal is proven by the code and the grep = 0. A stronger form would use `HttpTestingController.expectNone(/projects\/phases/)`.
+  - READABILITY: `phaseRequests()` (`spec.ts:159-161`) has a dead second condition.
+- **spawns:** Implementer Cursor/grok-4.7-medium: not reported by host, ended complete · Reviewer akili-reviewer/opus 9 calls, 60 012 tokens, ended complete
+- **Commit hold:** the modal is a visible UI change and `api.service.ts`/the interface file also carry T-08's held hunks, so the T-10 files stay uncommitted and are committed with T-08/T-09 after the owner's visual check.
+- **Requirements covered:** R-APM-010 AC.1 · R-APM-008 AC.2
+- **Final verification:** VERIFIED (tsc-spec caveat as in T-08)
