@@ -290,3 +290,10 @@
 - **Requirements covered:** R-APM-004 AC.2 (list) + by-id 404s · R-APM-006 AC.1–4 · R-APM-011 AC.1–5 (AC.5 jointly with T-05's suite) and the scenario ("AND IT MUST only by the explicit action")
 - **Running totals vs budget (design §12):** tasks 6/10 · LOC +3,284/−1,139 (budget ~1,500; overrun accepted by the owner 2026-10-29) · review rounds 11/~14
 - **Final verification:** VERIFIED (above)
+
+## Spec amendment: T-06 gate (2026-10-29)
+
+- **Tension (from T-06 Reviewer A advisory):** design §6.3 makes any non-MANUAL source automation-owned, while the create DTO accepts `AI_AUTO`/`AI_SUGGESTED` (P-20) and T-06 kept `dto.source ?? MANUAL` on the absent branch. So a person's create could be overwritten by the next Apply.
+- **Owner decision:** "Force MANUAL on every human write (Recommended)".
+- **Execute-time spec edits (recorded at the moment made):** `requirements.md` R-APM-006 gains **AC.5** (every human write stores MANUAL; a submitted `source` is ignored). `design.md` §6.5 *Absent* bullet and *Ownership on human edit* bullet are amended. `tasks.md` gains **T-06b** (S, deps T-06) and a §4 coverage row. These broaden an approved rule at the owner's explicit direction, not by Leader inference. The next Reviewer brief carries "conformance to `design.md#6.5` and R-APM-006 AC.5 as amended 2026-10-29".
+- **Correction sweep:** grep for the superseded rule across the spec folder. The only remaining hits are the present-branch wording (still true), the T-06 execution record (history, left unchanged) and the T-06b falsifier text (intended).

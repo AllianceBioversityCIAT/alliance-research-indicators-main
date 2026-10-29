@@ -228,6 +228,25 @@ graph TD
   - [x] Build and eslint green; Swagger shows `PATCH :id/activate`.
 - **Skills:** nestjs-expert, tdd, api-design-principles, error-handling-patterns
 
+### T-06b — Force MANUAL on every human write (owner amendment 2026-10-29)
+
+- **Status:** todo · **Size:** S · **Dependencies:** T-06
+- **Origin:** owner decision at the T-06 gate ("Force MANUAL on every human write"), resolving a spec tension between design §6.3 (automation-owned = any source other than MANUAL) and the create DTO accepting `AI_AUTO`/`AI_SUGGESTED` (P-20).
+- **Requirements:** R-APM-006 AC.5 (amended 2026-10-29)
+- **Design:** §6.5 *Ownership on human edit* (amended 2026-10-29); P-20
+- **Scope:** `bilateral-project-mapping.service.ts`: the absent-branch insert and every `update()` (PATCH, project changed or not) store `source = MANUAL` and ignore a submitted `source`. The present branch already does this (T-06). No DTO or contract change: a submitted `source` stays accepted by validation and is ignored.
+- **Tests (`bilateral-project-mapping.service.spec.ts`):** create on absent with `source: 'AI_AUTO'` → stored `MANUAL`; PATCH a MANUAL row with an unchanged project and `source: 'AI_SUGGESTED'` → stays `MANUAL`; PATCH a DERIVED row with an unchanged project → `MANUAL`.
+- **Falsifier:** restore `dto.source ?? MANUAL` on the absent branch → the `AI_AUTO` case stores `AI_AUTO` and goes red.
+- **Red run:** to be observed against `HEAD` (`cf524706`). Expected: the absent-branch case stores `AI_AUTO`.
+- **Disqualifier:** a case that submits no `source` cannot tell "forced" from "defaulted". The cases must submit a non-MANUAL source.
+- **Consumers:** the T-06 tests that assert a stored non-MANUAL source on create or PATCH (update them); `/admin` SSR and STAR client create forms (unchanged; they may still send `source`).
+- **Review:** `full`.
+- **Done:**
+  - [ ] Falsifier executed.
+  - [ ] Listed tests green.
+  - [ ] Build and eslint green.
+- **Skills:** nestjs-expert, tdd
+
 ### T-07 — `/admin` SSR page: Activate, Year column, upsert outcome, copy
 
 - **Status:** todo · **Size:** S · **Dependencies:** T-06
@@ -354,6 +373,7 @@ graph TD
 | R-APM-005 | *A1697* — BUT must NOT create a second row | T-05 |
 | R-APM-005 | *A1697* — AND IT MUST list under *inactive* | T-05 |
 | R-APM-006 | AC.1–4 | T-06 |
+| R-APM-006 | AC.5 (every human write is MANUAL; amended 2026-10-29) | T-06b |
 | R-APM-006 | outcome surfaced in STAR | T-09 |
 | R-APM-006 | outcome surfaced in SSR | T-07 |
 | R-APM-007 | AC.1, AC.2 (STAR) | T-09 |

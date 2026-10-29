@@ -188,6 +188,7 @@ There is also a defect. Auto-map's classification reads **active rows only** (`a
 - [ ] AC.1 — `POST /bilateral-project-mappings` for an agreement with an inactive 2026 row returns success. The same `id` comes back, `is_active = false`, with the new project.
 - [ ] AC.2 — A second POST for the same agreement and year never increases the row count.
 - [ ] AC.3 — The response distinguishes *created* vs *updated*.
+- [ ] AC.5 — *(amended 2026-10-29, owner decision at the T-06 gate)* Every human write stores `source = MANUAL`: a create on the absent branch, a create on the present branch, and every `PATCH :id`, whether or not the project changes. A submitted `source` is ignored. So a person can never leave a row that Auto-map treats as automation-owned (R-APM-005 / design §6.3).
 
 ### R-APM-007 — Admin screen shows the year
 

@@ -202,11 +202,11 @@ Each eligible project is matched to current-year rows by project id **or** norma
 
 ### 6.5 Mapping service (DD-5, DD-6, fixes judgment W-4, I-1)
 - `create()`: inside a transaction, lock the current-year row for the agreement.
-  - **Absent** → insert active, outcome `created`.
+  - **Absent** → insert active with `source = MANUAL` (any submitted `source` is ignored; amended 2026-10-29), outcome `created`.
   - **Present** → write the submitted project fields, set `source = MANUAL` (any submitted `source` is ignored on this branch), leave `is_active` alone, outcome `updated`.
   - **Retry:** on `ER_DUP_ENTRY` (1062), `ER_LOCK_DEADLOCK` (1213) or `ER_LOCK_WAIT_TIMEOUT` (1205), retry **once** in a fresh transaction, which then takes the update branch. A second failure surfaces as an error, never a raw 500 message.
 - **External code (I-1):** whenever create or PATCH changes `clarisa_project_id`, the service sets `clarisa_external_code` from the cached CLARISA feed entry for that id, or `null` if the feed lacks it. A stale code would otherwise mark the old project as mapped in coverage.
-- **Ownership on human edit (I-1, RB-5):** any human change of project — create-upsert or `PATCH :id` — forces `source = MANUAL` and ignores a submitted `source`, so the next Apply leaves the row alone (bucket 4).
+- **Ownership on human edit (I-1, RB-5; amended 2026-10-29):** **every** human write — create on the absent branch, create on the present branch, and every `PATCH :id` (project changed or not) — stores `source = MANUAL` and ignores a submitted `source`, so the next Apply leaves the row alone (bucket 4). *Amendment reason:* the DTO accepts `AI_AUTO`/`AI_SUGGESTED` (P-20), and §6.3 treats any non-MANUAL source as automation-owned, so a person could otherwise create a row that the next Apply overwrites (T-06 Reviewer A advisory; owner decision: "Force MANUAL on every human write").
 - **CLARISA feed dependency (RB-6):** `clarisaProjectsService` stops being `@Optional()` in `BilateralProjectMappingService`, because the external-code refresh needs it. A feed error during the refresh sets the code to `null` and logs a warning; it never fails the write.
 - `activate()`: mirrors `deactivate()` (P-19). It is idempotent, sets `is_active = true` and `deleted_at = null`, and records `updated_by` and optional `notes`.
 - Every by-id method returns `404` for a row whose `reporting_year` is not the current year.
