@@ -7,6 +7,7 @@ import { AlianceManagementApp } from '../../../tools/broker/aliance-management.a
 import { SecRolesEnum } from '../../../shared/enum/sec_role.enum';
 import { OrderFieldsEnum } from '../enum/order-fields.enum';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AgressoContractStatus } from '../../../shared/enum/agresso-contract.enum';
@@ -999,6 +1000,12 @@ describe('AgressoContractRepository', () => {
       expect(sql.split(predicate).length - 1).toBe(1);
       // Fails if the raw-column projection is restored in the inner select.
       expect(sql).not.toMatch(/^\s*ac\.is_pool_funding_contributor,\s*$/m);
+      // Year clause on the SQL this repository sends (call site: projection).
+      expect(sql).toContain('bpm.reporting_year');
+      expect(sql).toContain(currentReportingYearSql);
+      expect(sql).toMatch(
+        /OR EXISTS \(\s*SELECT 1 FROM bilateral_project_mapping bpm\s*WHERE bpm\.agresso_agreement_id = ac\.agreement_id\s*AND bpm\.is_active = 1\s*AND bpm\.reporting_year =/,
+      );
     });
 
     it('should filter with the effective predicate on both count and main queries when pool-funding is true', async () => {
@@ -1019,6 +1026,11 @@ describe('AgressoContractRepository', () => {
 
       expect(countQuerySql).toContain(`AND ${predicate} = 1`);
       expect(mainQuerySql).toContain(`AND ${predicate} = 1`);
+      // Year clause on both queries this repository sends (call site: filter).
+      expect(countQuerySql).toContain('bpm.reporting_year');
+      expect(countQuerySql).toContain(currentReportingYearSql);
+      expect(mainQuerySql).toContain('bpm.reporting_year');
+      expect(mainQuerySql).toContain(currentReportingYearSql);
       // Fails if the old raw-column filter is restored (tasks.md T-04 acceptance).
       expect(countQuerySql).not.toContain(
         'AND ac.is_pool_funding_contributor =',
@@ -1066,6 +1078,24 @@ describe('AgressoContractRepository', () => {
       const predicate = effectivePoolFundingContributorSql('ac');
 
       expect(sql).not.toContain(`AND ${predicate} = `);
+    });
+
+    it('sends the year-scoped predicate when ordering by pool funding', async () => {
+      (repository.query as jest.Mock).mockResolvedValue([]);
+
+      await repository.getContracts(
+        undefined,
+        undefined,
+        OrderFieldsEnum.POOL_FUNDING_CONTRIBUTOR,
+        'ASC',
+      );
+
+      const sql = mainSql();
+      expect(sql).toMatch(/ORDER BY[\s\S]*bpm\.reporting_year/);
+      expect(sql).toContain(currentReportingYearSql);
+      expect(sql).toMatch(
+        /OR EXISTS \(\s*SELECT 1 FROM bilateral_project_mapping bpm\s*WHERE bpm\.agresso_agreement_id = ac\.agreement_id\s*AND bpm\.is_active = 1\s*AND bpm\.reporting_year =/,
+      );
     });
   });
 

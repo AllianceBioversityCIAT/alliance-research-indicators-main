@@ -2782,18 +2782,13 @@ describe('ApiService - remaining endpoint coverage', () => {
       expect(tp.patch).toHaveBeenCalledWith('bilateral-project-mappings/7/deactivate', {}, { useResultInterceptor: true });
     });
 
-    it('GET_BilateralMappingCoverage passes the phase when defined', async () => {
-      await service.GET_BilateralMappingCoverage(3);
-      expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings/coverage', { phase: '3' });
-    });
-
-    it('GET_BilateralMappingCoverage sends no phase when undefined', async () => {
+    it('GET_BilateralMappingCoverage requests the coverage route with empty params', async () => {
       await service.GET_BilateralMappingCoverage();
       expect(tp.getWithParams).toHaveBeenCalledWith('bilateral-project-mappings/coverage', {});
     });
 
     it('POST_AutomapperPreview posts the body', async () => {
-      const body = { phase: 1 } as any;
+      const body = { echo: true } as any;
       await service.POST_AutomapperPreview(body);
       expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/preview', body, { useResultInterceptor: true });
     });
@@ -2804,7 +2799,7 @@ describe('ApiService - remaining endpoint coverage', () => {
     });
 
     it('POST_AutomapperApply posts the body', async () => {
-      const body = { phase: 1 } as any;
+      const body = { echo: true } as any;
       await service.POST_AutomapperApply(body);
       expect(tp.post).toHaveBeenCalledWith('bilateral-project-mappings/auto-map/apply', body, { useResultInterceptor: true });
     });
@@ -2823,11 +2818,6 @@ describe('ApiService - remaining endpoint coverage', () => {
     it('GET_ClarisaBilateralProjects uses plain get without search', async () => {
       await expect(service.GET_ClarisaBilateralProjects()).resolves.toEqual({ data: 'get' });
       expect(tp.get).toHaveBeenCalledWith('tools/clarisa/projects/bilateral', {});
-    });
-
-    it('GET_ClarisaProjectPhases gets the phases route', async () => {
-      await service.GET_ClarisaProjectPhases();
-      expect(tp.get).toHaveBeenCalledWith('tools/clarisa/projects/phases', {});
     });
   });
 

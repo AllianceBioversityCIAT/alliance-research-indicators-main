@@ -9,6 +9,13 @@
             <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
               Bilateral Project Mapping
             </h1>
+            @if (reportingYear(); as year) {
+              <span
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]"
+                data-testid="reporting-year-badge">
+                {{ year }}
+              </span>
+            }
             <button
               pButton
               type="button"
@@ -22,12 +29,18 @@
               <div class="flex flex-col gap-3 p-2 text-sm atc-grey-800" data-testid="help-popover-content">
                 <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
                   <span class="font-semibold text-sm atc-primary-blue-600">About Bilateral Project Mapping</span>
-                  <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
-                    Phase 2026
-                  </span>
+                  @if (reportingYear(); as year) {
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
+                      {{ year }}
+                    </span>
+                  }
                 </div>
                 <p class="m-0 leading-relaxed text-[13px]">
-                  In this module, bilateral projects from CLARISA (filtered by the active phase, e.g., Phase 2026) are mapped and reconciled against AGRESSO agreements and contracts.
+                  @if (reportingYear(); as year) {
+                    In this module, bilateral projects from CLARISA for reporting year {{ year }} are mapped and reconciled against AGRESSO agreements and contracts.
+                  } @else {
+                    In this module, bilateral projects from CLARISA are mapped and reconciled against AGRESSO agreements and contracts.
+                  }
                 </p>
                 <p class="m-0 leading-relaxed text-[13px]">
                   This mapping ensures that Science Program alignments, Pool Funding contributions, and indicator reporting reflect active bilateral agreements accurately in STAR.
@@ -61,7 +74,7 @@
 
         <!-- Mapping Coverage strip (T-06 / R-CAM-004 AC.4) -->
         <app-bilateral-mapping-coverage
-          [phase]="phase()"
+          (reportingYear)="onReportingYear($event)"
           (openAutomapper)="openAutomapperDialog()">
         </app-bilateral-mapping-coverage>
 
@@ -192,6 +205,12 @@
                       <p-sortIcon field="updated_at"></p-sortIcon>
                     </div>
                   </th>
+                  <th pSortableColumn="reporting_year" class="atc-primary-blue-900" scope="col">
+                    <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">
+                      Year
+                      <p-sortIcon field="reporting_year"></p-sortIcon>
+                    </div>
+                  </th>
                   <th class="atc-primary-blue-900" scope="col">
                     <div class="flex items-center font-[500] leading-4.5 gap-2 text-[14px]">Actions</div>
                   </th>
@@ -278,6 +297,10 @@
                     {{ row.updated_at | date: 'dd MMM yyyy' }}
                   </td>
 
+                  <td class="text-sm atc-grey-900" data-testid="year-cell">
+                    {{ row.reporting_year }}
+                  </td>
+
                   <!-- Row actions (T-BIL-CAM-05: Edit; T-BIL-CAM-06: Deactivate; R-BTE-003: + Map for Pending) -->
                   <td class="flex items-center gap-1">
                     @if (row.mapping_status === 'Pending' || row.source === 'UNMAPPED') {
@@ -311,6 +334,17 @@
                           (click)="requestDeactivate(row)"
                           aria-label="Deactivate mapping"
                           data-testid="deactivate-btn">
+                        </button>
+                      } @else {
+                        <!-- R-APM-011: Activate sits in the deactivate slot on inactive rows -->
+                        <button
+                          pButton
+                          type="button"
+                          icon="pi pi-check"
+                          class="p-button-text p-button-sm"
+                          (click)="requestActivate(row)"
+                          aria-label="Activate mapping"
+                          data-testid="activate-btn">
                         </button>
                       }
                     }
@@ -550,6 +584,5 @@
 <!-- Automapper Dialog (T-06 / R-CAM-002, R-CAM-003) -->
 <app-automapper-dialog
   [(visible)]="automapperDialogOpen"
-  [phase]="phase()"
   (applied)="onAutomapperApplied()">
 </app-automapper-dialog>

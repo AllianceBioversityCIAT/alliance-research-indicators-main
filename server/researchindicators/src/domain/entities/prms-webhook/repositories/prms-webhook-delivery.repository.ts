@@ -132,7 +132,7 @@ const asOk = (
   if (Array.isArray(result)) {
     return (result[0] ?? {}) as { insertId?: number; affectedRows?: number };
   }
-  return (result ?? {}) as { insertId?: number; affectedRows?: number };
+  return result ?? {};
 };
 
 /**

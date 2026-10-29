@@ -63,6 +63,7 @@ describe('AutomapperController', () => {
   >;
 
   const emptyResolution: AutomapperResolution = {
+    reportingYear: 2026,
     resolved: [],
     ambiguous: [],
     unresolved: [],
@@ -70,18 +71,22 @@ describe('AutomapperController', () => {
   const emptyClassification: AutomapperClassification = {
     toCreate: [],
     alreadyMapped: [],
+    toUpdate: [],
     divergent: [],
-    supersede: [],
+    inactive: [],
   };
   const emptyApplyResult: AutomapperApplyResult = {
     created: 0,
     alreadyMapped: 0,
     divergent: 0,
-    superseded: 0,
+    updated: 0,
+    inactive: 0,
   };
   const coverageFixture: AutomapperCoverage = {
+    reporting_year: 2026,
     mapped: 4,
     pending: 194,
+    inactive: 0,
     reachable: 198,
   };
 
@@ -177,10 +182,13 @@ describe('AutomapperController', () => {
 
   describe('preview — writes nothing (R-CAM-002 AC.1)', () => {
     it('calls resolve() + classify() and never apply() (F1)', async () => {
-      await controller.preview({ phase: 2026 });
+      await controller.preview({});
 
-      expect(service.resolve).toHaveBeenCalledWith(2026);
-      expect(service.classify).toHaveBeenCalledWith(emptyResolution.resolved);
+      expect(service.resolve).toHaveBeenCalledWith();
+      expect(service.classify).toHaveBeenCalledWith(
+        emptyResolution.resolved,
+        2026,
+      );
       // The gate: a row/write count taken before and after, proxied here
       // (no DB in this suite, per the T-05 brief) by asserting the ONLY
       // mutating service method was never invoked. Making preview() call
@@ -208,25 +216,42 @@ describe('AutomapperController', () => {
           existingClarisaProjectId: 40,
         },
       ];
-      const supersede = [
+      const toUpdate = [
         {
           ...makeCandidate({ clarisaProjectId: 5 }),
-          action: 'supersede' as const,
+          action: 'toUpdate' as const,
           existingMappingId: 12,
           existingClarisaProjectId: 50,
         },
       ];
+      const inactive = [
+        {
+          ...makeCandidate({ clarisaProjectId: 6 }),
+          action: 'inactive' as const,
+          existingMappingId: 13,
+          existingClarisaProjectId: 60,
+          refreshed: true,
+        },
+      ];
 
       service.resolve.mockResolvedValueOnce({
-        resolved: [...toCreate, ...alreadyMapped, ...divergent, ...supersede],
+        reportingYear: 2026,
+        resolved: [
+          ...toCreate,
+          ...alreadyMapped,
+          ...divergent,
+          ...toUpdate,
+          ...inactive,
+        ],
         ambiguous,
         unresolved,
       });
       service.classify.mockResolvedValueOnce({
         toCreate,
         alreadyMapped,
+        toUpdate,
         divergent,
-        supersede,
+        inactive,
       });
       service.getFeedFetchedAt.mockReturnValueOnce(1_700_000_000_000);
 
@@ -234,13 +259,15 @@ describe('AutomapperController', () => {
 
       expect(out.status).toBe(HttpStatus.OK);
       expect(out.description).toMatch(/no rows written/i);
+      expect(out.data.reporting_year).toBe(2026);
       expect(out.data.counts).toEqual({
         toCreate: 1,
         alreadyMapped: 1,
+        toUpdate: 1,
         ambiguous: 1,
         unresolved: 1,
         divergent: 1,
-        supersede: 1,
+        inactive: 1,
       });
       expect(out.data.feedFetchedAt).toBe(
         new Date(1_700_000_000_000).toISOString(),
@@ -249,7 +276,8 @@ describe('AutomapperController', () => {
       expect(out.data.ambiguous).toEqual(ambiguous);
       expect(out.data.unresolved).toEqual(unresolved);
       expect(out.data.divergent).toEqual(divergent);
-      expect(out.data.supersede).toEqual(supersede);
+      expect(out.data.toUpdate).toEqual(toUpdate);
+      expect(out.data.inactive).toEqual(inactive);
     });
 
     it('handles a null feed timestamp (cold cache) without throwing', async () => {
@@ -275,6 +303,7 @@ describe('AutomapperController', () => {
         const ambiguous = [makeCandidate({ clarisaProjectId: 2 })];
         const unresolved = [makeCandidate({ clarisaProjectId: 3 })];
         service.resolve.mockResolvedValueOnce({
+          reportingYear: 2026,
           resolved,
           ambiguous,
           unresolved,
@@ -282,8 +311,9 @@ describe('AutomapperController', () => {
         service.classify.mockResolvedValueOnce({
           toCreate: [{ ...resolved[0], action: 'toCreate' as const }],
           alreadyMapped: [],
+          toUpdate: [],
           divergent: [],
-          supersede: [],
+          inactive: [],
         });
         const fetchedAt = 1_700_000_000_000;
         service.getFeedFetchedAt.mockReturnValueOnce(fetchedAt);
@@ -294,7 +324,8 @@ describe('AutomapperController', () => {
         // hardcoded `feedFetchedAt=unknown`, which would pass even if the
         // real timestamp were never interpolated (T-05 rework, closer #2).
         expect(logSpy).toHaveBeenCalledWith(
-          'automapper preview: cohort=3, toCreate=1, alreadyMapped=0, ambiguous=1, unresolved=1, ' +
+          'automapper preview: reporting_year=2026, cohort=3, toCreate=1, alreadyMapped=0, toUpdate=0, inactive=0, ' +
+            'ambiguous=1, unresolved=1, ' +
             `feedFetchedAt=${new Date(fetchedAt).toISOString()}`,
         );
       } finally {
@@ -307,15 +338,20 @@ describe('AutomapperController', () => {
     it('derives `resolved` by calling resolve() itself, then passes it to apply() (Finding 1)', async () => {
       const resolvedCandidates = [makeCandidate()];
       service.resolve.mockResolvedValueOnce({
+        reportingYear: 2026,
         resolved: resolvedCandidates,
         ambiguous: [],
         unresolved: [],
       });
 
-      await controller.apply(reqUser as never, { phase: 2026 });
+      await controller.apply(reqUser as never, {});
 
-      expect(service.resolve).toHaveBeenCalledWith(2026);
-      expect(service.apply).toHaveBeenCalledWith(resolvedCandidates, fakeUser);
+      expect(service.resolve).toHaveBeenCalledWith();
+      expect(service.apply).toHaveBeenCalledWith(
+        resolvedCandidates,
+        fakeUser,
+        2026,
+      );
     });
 
     // F3 — the body cannot inject arbitrary pairs. AutomapperRunRequestDto
@@ -327,13 +363,13 @@ describe('AutomapperController', () => {
     it('IGNORES a caller-supplied candidate list smuggled onto the body (F3)', async () => {
       const legitimateResolved = [makeCandidate({ clarisaProjectId: 999 })];
       service.resolve.mockResolvedValueOnce({
+        reportingYear: 2026,
         resolved: legitimateResolved,
         ambiguous: [],
         unresolved: [],
       });
 
       const maliciousBody = {
-        phase: 2026,
         resolved: [{ clarisaProjectId: 1, derivedContractId: 'FORGED' }],
         candidates: [{ clarisaProjectId: 2, derivedContractId: 'ALSO-FORGED' }],
       } as never;
@@ -350,10 +386,11 @@ describe('AutomapperController', () => {
       );
     });
 
-    it('wraps created/alreadyMapped/divergent/superseded plus ambiguous+unresolved from resolve()', async () => {
+    it('wraps created/updated/inactive plus ambiguous+unresolved from resolve()', async () => {
       const ambiguous = [makeCandidate({ clarisaProjectId: 7 })];
       const unresolved = [makeCandidate({ clarisaProjectId: 8 })];
       service.resolve.mockResolvedValueOnce({
+        reportingYear: 2026,
         resolved: [makeCandidate()],
         ambiguous,
         unresolved,
@@ -362,20 +399,23 @@ describe('AutomapperController', () => {
         created: 1,
         alreadyMapped: 2,
         divergent: 3,
-        superseded: 4,
+        updated: 4,
+        inactive: 5,
       });
       service.getFeedFetchedAt.mockReturnValueOnce(1_700_000_000_000);
 
-      const out = await controller.apply(reqUser as never, { phase: 2026 });
+      const out = await controller.apply(reqUser as never, {});
 
       expect(out.status).toBe(HttpStatus.OK);
+      expect(out.data.reporting_year).toBe(2026);
       expect(out.data.counts).toEqual({
         created: 1,
+        updated: 4,
         alreadyMapped: 2,
         ambiguous: 1,
         unresolved: 1,
         divergent: 3,
-        superseded: 4,
+        inactive: 5,
       });
       expect(out.data.ambiguous).toEqual(ambiguous);
       expect(out.data.unresolved).toEqual(unresolved);
@@ -384,13 +424,9 @@ describe('AutomapperController', () => {
       );
     });
 
-    // design.md §9 — same summary-line requirement as preview, for apply.
-    // divergent/superseded are non-zero here deliberately: RB-3's stated
-    // purpose is "why do I have 194 new rows", and a supersede deactivates
-    // one row AND inserts another, so an apply log line that drops
-    // superseded undercounts what the run actually wrote (T-05 rework,
-    // closer #1). Zero values would not catch a dropped interpolation.
-    it('logs one summary line with cohort size, all six counts (incl. divergent/superseded), and the feed timestamp (§9, RB-3)', async () => {
+    // Zero values would not catch a dropped interpolation. updated and
+    // inactive are non-zero here on purpose.
+    it('logs reporting_year, updated and inactive on the apply summary line', async () => {
       const logSpy = jest
         .spyOn(LoggerUtil.prototype, '_log')
         .mockImplementation(() => undefined);
@@ -400,6 +436,7 @@ describe('AutomapperController', () => {
       // every later test in the file (T-05 rework, closer #3).
       try {
         service.resolve.mockResolvedValueOnce({
+          reportingYear: 2026,
           resolved: [makeCandidate({ clarisaProjectId: 1 })],
           ambiguous: [makeCandidate({ clarisaProjectId: 2 })],
           unresolved: [],
@@ -408,7 +445,8 @@ describe('AutomapperController', () => {
           created: 1,
           alreadyMapped: 0,
           divergent: 2,
-          superseded: 3,
+          updated: 3,
+          inactive: 4,
         });
         const fetchedAt = 1_700_000_000_000;
         service.getFeedFetchedAt.mockReturnValueOnce(fetchedAt);
@@ -418,8 +456,8 @@ describe('AutomapperController', () => {
         // Exact string, not a `.+` wildcard — see the preview test's
         // comment (T-05 rework, closer #2).
         expect(logSpy).toHaveBeenCalledWith(
-          'automapper apply: cohort=2, created=1, alreadyMapped=0, ambiguous=1, unresolved=0, ' +
-            `divergent=2, superseded=3, feedFetchedAt=${new Date(fetchedAt).toISOString()}`,
+          'automapper apply: reporting_year=2026, cohort=2, created=1, updated=3, alreadyMapped=0, ambiguous=1, unresolved=0, ' +
+            `divergent=2, inactive=4, feedFetchedAt=${new Date(fetchedAt).toISOString()}`,
         );
       } finally {
         logSpy.mockRestore();
@@ -429,16 +467,11 @@ describe('AutomapperController', () => {
 
   describe('coverage', () => {
     it('delegates to service.coverage and wraps the envelope', async () => {
-      const out = await controller.coverage({ phase: 2026 });
+      const out = await controller.coverage({});
 
-      expect(service.coverage).toHaveBeenCalledWith(2026);
+      expect(service.coverage).toHaveBeenCalledWith();
       expect(out.status).toBe(HttpStatus.OK);
       expect(out.data).toEqual(coverageFixture);
-    });
-
-    it('passes undefined phase through when omitted', async () => {
-      await controller.coverage({});
-      expect(service.coverage).toHaveBeenCalledWith(undefined);
     });
   });
 
@@ -468,6 +501,102 @@ describe('AutomapperController', () => {
         expect(contents).not.toMatch(/@Cron/);
       },
     );
+  });
+});
+
+describe('R-APM-003 — caller year is rejected on POST and ignored on GET', () => {
+  let app: INestApplication;
+  let resolveMock: jest.Mock;
+  let classifyMock: jest.Mock;
+  let coverageMock: jest.Mock;
+
+  beforeAll(async () => {
+    resolveMock = jest.fn().mockResolvedValue({
+      reportingYear: 2026,
+      resolved: [],
+      ambiguous: [],
+      unresolved: [],
+    });
+    classifyMock = jest.fn().mockResolvedValue({
+      toCreate: [],
+      alreadyMapped: [],
+      toUpdate: [],
+      divergent: [],
+      inactive: [],
+    });
+    coverageMock = jest.fn().mockResolvedValue({
+      reporting_year: 2026,
+      mapped: 197,
+      pending: 0,
+      inactive: 1,
+      reachable: 198,
+    });
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [AutomapperController],
+      providers: [
+        {
+          provide: AutomapperService,
+          useValue: {
+            resolve: resolveMock,
+            classify: classifyMock,
+            apply: jest.fn(),
+            coverage: coverageMock,
+            getFeedFetchedAt: jest.fn().mockReturnValue(null),
+          },
+        },
+      ],
+    })
+      .overrideGuard(RolesGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('POST auto-map/preview { phase: 2025 } → 400 and classifies nothing', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auto-map/preview')
+      .send({ phase: 2025 });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(resolveMock).not.toHaveBeenCalled();
+    expect(classifyMock).not.toHaveBeenCalled();
+  });
+
+  it('POST auto-map/preview {} returns the 2026 preview', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/auto-map/preview')
+      .send({});
+
+    // Nest's @Post default is 201 when no interceptor rewrites it. The
+    // envelope status inside the body is 200.
+    expect(res.status).toBe(HttpStatus.CREATED);
+    expect(res.body.status).toBe(HttpStatus.OK);
+    expect(res.body.data.reporting_year).toBe(2026);
+    expect(resolveMock).toHaveBeenCalledWith();
+    expect(classifyMock).toHaveBeenCalledWith([], 2026);
+  });
+
+  it('GET coverage?phase=2025 returns 2026 figures', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/coverage')
+      .query({ phase: 2025 });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(res.body.data).toEqual({
+      reporting_year: 2026,
+      mapped: 197,
+      pending: 0,
+      inactive: 1,
+      reachable: 198,
+    });
+    expect(coverageMock).toHaveBeenCalledWith();
   });
 });
 

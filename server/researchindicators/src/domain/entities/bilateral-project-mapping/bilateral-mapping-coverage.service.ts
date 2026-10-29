@@ -40,10 +40,7 @@ export class BilateralMappingCoverageService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async getCoverageReport(
-    phase?: number | string,
-    limitSamples = 10,
-  ): Promise<CoverageReportDto> {
+  async getCoverageReport(limitSamples = 10): Promise<CoverageReportDto> {
     const host = process.env.ARI_CLARISA_HOST ?? '';
     const measuredAt = new Date().toISOString();
     const maxSamples =
@@ -51,7 +48,7 @@ export class BilateralMappingCoverageService {
 
     // Step 1 & 2: Fetch CLARISA projects (all and slice)
     const { all, slice, phaseUsed } =
-      await this.clarisaProjectsService.listProjectsForCoverage(phase);
+      await this.clarisaProjectsService.listProjectsForCoverage();
 
     // Compute CLARISA block (measurable on both paths)
     const clarisaSplits = this.computeClarisaSplits(all, slice, phaseUsed);

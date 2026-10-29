@@ -18,9 +18,11 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiPropertyOptional,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { IsOptional, IsString } from 'class-validator';
 import { Request } from 'express';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -36,7 +38,12 @@ import { CoverageReportQueryDto } from './dto/coverage-report.query.dto';
 
 type RequestWithUser = Request & { user?: User };
 
-class DeactivateBilateralProjectMappingDto {
+class BilateralProjectMappingNotesDto {
+  @ApiPropertyOptional({
+    description: 'Optional operator note recorded on the row',
+  })
+  @IsOptional()
+  @IsString()
   notes?: string;
 }
 
@@ -81,12 +88,6 @@ export class BilateralProjectMappingController {
       'Generate coverage report classifying bilateral contracts against CLARISA projects',
   })
   @ApiQuery({
-    name: 'phase',
-    required: false,
-    type: Number,
-    description: 'CLARISA phase filter override (e.g. 2026)',
-  })
-  @ApiQuery({
     name: 'limit-samples',
     required: false,
     type: Number,
@@ -96,17 +97,15 @@ export class BilateralProjectMappingController {
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async getCoverageReport(@Query() query: CoverageReportQueryDto) {
     const limitSamples = query['limit-samples'];
-    return this.coverageService
-      .getCoverageReport(query.phase, limitSamples)
-      .then((data) =>
-        ResponseUtils.format({
-          data,
-          description: data.environment.upstream_contract_available
-            ? 'Bilateral mapping coverage report generated'
-            : `Bilateral mapping coverage report: upstream contract is not published in the measured environment (${data.environment.clarisa_host})`,
-          status: HttpStatus.OK,
-        }),
-      );
+    return this.coverageService.getCoverageReport(limitSamples).then((data) =>
+      ResponseUtils.format({
+        data,
+        description: data.environment.upstream_contract_available
+          ? 'Bilateral mapping coverage report generated'
+          : `Bilateral mapping coverage report: upstream contract is not published in the measured environment (${data.environment.clarisa_host})`,
+        status: HttpStatus.OK,
+      }),
+    );
   }
 
   @Get(':id')
@@ -136,13 +135,16 @@ export class BilateralProjectMappingController {
     @Req() request: RequestWithUser,
     @Body() payload: CreateBilateralProjectMappingDto,
   ) {
-    return this.service.create(payload, request.user).then((data) =>
-      ResponseUtils.format({
+    return this.service.create(payload, request.user).then((data) => {
+      const updated = data.outcome === 'updated';
+      return ResponseUtils.format({
         data,
-        description: 'Bilateral project mapping created',
-        status: HttpStatus.CREATED,
-      }),
-    );
+        description: updated
+          ? 'Bilateral project mapping updated'
+          : 'Bilateral project mapping created',
+        status: updated ? HttpStatus.OK : HttpStatus.CREATED,
+      });
+    });
   }
 
   @Patch(':id')
@@ -170,13 +172,49 @@ export class BilateralProjectMappingController {
     );
   }
 
+  @Patch(':id/activate')
+  @ApiOperation({
+    summary:
+      'Reactivate a current-year bilateral project mapping. A prior-year id is not found.',
+  })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiBody({ type: BilateralProjectMappingNotesDto, required: false })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  async activate(
+    @Req() request: RequestWithUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body?: BilateralProjectMappingNotesDto,
+  ) {
+    return this.service.activate(id, request.user, body?.notes).then((data) =>
+      ResponseUtils.format({
+        data,
+        description: 'Bilateral project mapping activated',
+        status: HttpStatus.OK,
+      }),
+    );
+  }
+
   @Patch(':id/deactivate')
   @ApiOperation({ summary: 'Soft-deactivate a bilateral project mapping' })
   @ApiParam({ name: 'id', type: Number })
+  @ApiBody({ type: BilateralProjectMappingNotesDto, required: false })
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
   async deactivate(
     @Req() request: RequestWithUser,
     @Param('id', ParseIntPipe) id: number,
-    @Body() body?: DeactivateBilateralProjectMappingDto,
+    @Body() body?: BilateralProjectMappingNotesDto,
   ) {
     return this.service.deactivate(id, request.user, body?.notes).then((data) =>
       ResponseUtils.format({

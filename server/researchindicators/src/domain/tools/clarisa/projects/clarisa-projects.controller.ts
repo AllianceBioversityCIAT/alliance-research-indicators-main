@@ -44,13 +44,6 @@ export class ClarisaProjectsController {
       'Optional case-insensitive substring match on `short_name`, `full_name`, or `external_code`. Filtered in memory after the upstream cache.',
   })
   @ApiQuery({
-    name: 'phase',
-    required: false,
-    type: Number,
-    description:
-      'Optional explicit reporting phase filter (tier 1). Non-numeric value results in HTTP 400.',
-  })
-  @ApiQuery({
     name: 'only-with-science-programs',
     required: false,
     type: Boolean,
@@ -59,12 +52,10 @@ export class ClarisaProjectsController {
   })
   async listBilateral(
     @Query('search') search?: string,
-    @Query('phase') phase?: number,
     @Query('only-with-science-programs', QueryParseBool)
     onlyWithSciencePrograms?: boolean,
   ) {
     const all = await this.projectsService.listBilateralProjects({
-      phase,
       onlyWithSciencePrograms,
     });
     const needle = search?.trim().toLowerCase();
@@ -126,27 +117,6 @@ export class ClarisaProjectsController {
                 })),
         };
       }),
-    });
-  }
-
-  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002, NFR-CPC-003
-  //
-  // Sibling to `bilateral`, same roles/envelope/Swagger discipline. Powers
-  // the admin-editable year selector on the Configuration Variables screen
-  // (design.md §5) — thin delegate, no filtering logic here.
-  @Get('phases')
-  @Roles(SecRolesEnum.CENTER_ADMIN, SecRolesEnum.SYSTEM_ADMIN)
-  @ApiOperation({
-    summary:
-      'List distinct CLARISA project phases present in the eligible (bilateral + Alliance) cohort, with a per-year project count. Powers the admin-editable phase config selector.',
-  })
-  async getPhases() {
-    const result = await this.projectsService.getEligiblePhases();
-
-    return ResponseUtils.format({
-      description: 'CLARISA eligible project phases',
-      status: HttpStatus.OK,
-      data: result,
     });
   }
 }

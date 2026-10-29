@@ -1,5 +1,7 @@
 // @akili-spec docs/specs/innovation-dev/excel-export
-import { writeFileSync } from 'fs';
+import { mkdtempSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { dataSource } from '../../../src/db/config/mysql/orm.test.config';
 import { IndicatorsEnum } from '../../../src/domain/entities/indicators/enum/indicators.enum';
 import { ActorRolesEnum } from '../../../src/domain/entities/actor-roles/enum/actor-roles.enum';
@@ -9,6 +11,12 @@ import { emptyFullFiltersReportDto } from '../../../src/domain/entities/reports/
 import { StarResultsExportRepository } from '../../../src/domain/entities/reports/repositories/star-results-export.repository';
 import { AppConfig } from '../../../src/domain/shared/utils/app-config.util';
 import { ResultRepository } from '../../../src/domain/entities/results/repositories/result.repository';
+
+// EXPLAIN and timing artifacts go to a private per-run directory, not a
+// shared path under the system temp dir.
+let artifactDirPath: string | undefined;
+const artifactDir = (): string =>
+  (artifactDirPath ??= mkdtempSync(join(tmpdir(), 'report-innovation-dev-')));
 
 /**
  * T-02 parity, one-row and EXPLAIN gate for `report_innovation_dev`.
@@ -2267,7 +2275,10 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
       expect(fromAt).toBeGreaterThanOrEqual(0);
       expect(whereAt).toBeGreaterThan(fromAt);
       const phase2Probe = `SELECT gi.result_id\n${capturedSql.slice(fromAt, whereAt)}WHERE gi.result_id IN (1, 2, 3)`;
-      writeFileSync('/tmp/t02-idx-phase2-probe.sql', phase2Probe);
+      writeFileSync(
+        join(artifactDir(), 't02-idx-phase2-probe.sql'),
+        phase2Probe,
+      );
       const [modeRow] = await q(`SELECT @@SESSION.sql_mode AS mode`);
       await q(
         `SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'`,
@@ -2310,7 +2321,7 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
       const plan = planText(
         await q(`EXPLAIN FORMAT=TREE ${phase3}`, phase3Params),
       );
-      writeFileSync('/tmp/t02-idx-explain.txt', plan);
+      writeFileSync(join(artifactDir(), 't02-idx-explain.txt'), plan);
 
       const materializes = plan
         .split('\n')
@@ -2350,7 +2361,7 @@ describe('report_innovation_dev view (T-02 excel-export)', () => {
       }
       const timing = summarize(samples);
       writeFileSync(
-        '/tmp/t02-idx-timing.json',
+        join(artifactDir(), 't02-idx-timing.json'),
         JSON.stringify(
           {
             samples,

@@ -9,6 +9,7 @@ import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../enum/reporting-platform.enum';
 import { IndicatorsEnum } from '../../indicators/enum/indicators.enum';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 
 describe('ResultRepository', () => {
   let repository: ResultRepository;
@@ -714,6 +715,14 @@ describe('ResultRepository', () => {
       // gated on is_active, so deactivation removes the derived badge.
       expect(sql).toContain('bpm.agresso_agreement_id = ac.agreement_id');
       expect(sql).toContain('bpm.is_active = 1');
+      // Year AND is inside the EXISTS, after is_active, so it does not change
+      // the OR between the manual tag and the mapping (KZ-017). Asserted on
+      // the SQL string this repository sends.
+      expect(sql).toContain('bpm.reporting_year');
+      expect(sql).toContain(currentReportingYearSql);
+      expect(sql).toMatch(
+        /OR EXISTS \(\s*SELECT 1 FROM bilateral_project_mapping bpm\s*WHERE bpm\.agresso_agreement_id = ac\.agreement_id\s*AND bpm\.is_active = 1\s*AND bpm\.reporting_year =/,
+      );
       // The two branches are OR-ed (no AND / suppress column): pure OR means an
       // active mapping wins over a manual false.
       expect(sql).toMatch(

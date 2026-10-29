@@ -1,7 +1,10 @@
 import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
-import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
+import {
+  currentReportingYearSql,
+  ReportingYearResolver,
+} from '../../../shared/utils/reporting-year.resolver';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PolicyTypesEnum } from '../../policy-types/enum/policy-types.enum';
 import {
@@ -576,9 +579,14 @@ describe('ResultPrmsSyncLogRepository', () => {
     };
 
     const flagCall = () =>
-      query.mock.calls.find((call) =>
-        String(call[0]).includes('FROM app_config'),
-      );
+      query.mock.calls.find((call) => {
+        const sql = String(call[0]);
+        // The gate snapshot now embeds currentReportingYearSql, which also
+        // reads app_config. The button read is the one that binds `key`.
+        return (
+          sql.includes('FROM app_config') && sql.includes('WHERE `key` = ?')
+        );
+      });
 
     it('stores disabled only when simple_value is the exact disable string', async () => {
       query
@@ -662,6 +670,11 @@ describe('ResultPrmsSyncLogRepository', () => {
 
       const selectSql = query.mock.calls[0][0] as string;
       expect(selectSql).toContain('r.report_year_id');
+      expect(selectSql).toContain('bpm.reporting_year');
+      expect(selectSql).toContain(currentReportingYearSql);
+      expect(selectSql).toMatch(
+        /OR EXISTS \(\s*SELECT 1 FROM bilateral_project_mapping bpm\s*WHERE bpm\.agresso_agreement_id = ac\.agreement_id\s*AND bpm\.is_active = 1\s*AND bpm\.reporting_year =/,
+      );
       expect(snapshot.report_year).toBe(2025);
       expect(snapshot.reporting_year).toBe(2027);
     });

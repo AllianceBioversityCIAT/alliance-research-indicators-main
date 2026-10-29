@@ -5,7 +5,6 @@ import {
   OnInit,
   computed,
   inject,
-  input,
   output,
   signal
 } from '@angular/core';
@@ -27,11 +26,11 @@ import { AutomapperCoverage } from '@interfaces/bilateral/bilateral-project-mapp
 export class BilateralMappingCoverageComponent implements OnInit {
   private readonly service = inject(BilateralMappingService);
 
-  /** Target CLARISA phase (defaults to 2026). */
-  readonly phase = input<number>(2026);
-
   /** Emitted when the admin clicks the "Auto-map" button. */
   readonly openAutomapper = output<void>();
+
+  /** Loaded reporting year from the coverage response (R-APM-007 / DD-8). */
+  readonly reportingYear = output<number>();
 
   // State signals
   readonly coverage = signal<AutomapperCoverage | null>(null);
@@ -50,14 +49,15 @@ export class BilateralMappingCoverageComponent implements OnInit {
 
   /**
    * Printed denominator string (R-CAM-004 AC.4 / Hard Requirement 1).
-   * Example: "Coverage 4 / 198 · 2% (eligible CLARISA projects, phase 2026)"
-   * The figure must not be quotable without the denominator context.
+   * Example: "Coverage 4 / 198 · 2% (eligible CLARISA projects, {year})"
+   * The year is the one the coverage response carried, never a template literal.
    */
   readonly denominatorText = computed(() => {
     const cov = this.coverage();
     if (!cov) return '';
     const pct = this.coveragePercentage();
-    return `Coverage ${cov.mapped} / ${cov.reachable} · ${pct}% (eligible CLARISA projects, phase ${this.phase()})`;
+    const year = typeof cov.reporting_year === 'number' ? `, ${cov.reporting_year}` : '';
+    return `Coverage ${cov.mapped} / ${cov.reachable} · ${pct}% (eligible CLARISA projects${year})`;
   });
 
   ngOnInit(): void {
@@ -72,13 +72,16 @@ export class BilateralMappingCoverageComponent implements OnInit {
     this.loading.set(true);
     this.error.set(false);
 
-    const result = await this.service.getCoverage(this.phase());
+    const result = await this.service.getCoverage();
 
     if (result === null) {
       this.error.set(true);
       this.coverage.set(null);
     } else {
       this.coverage.set(result);
+      if (typeof result.reporting_year === 'number') {
+        this.reportingYear.emit(result.reporting_year);
+      }
     }
     this.loading.set(false);
   }

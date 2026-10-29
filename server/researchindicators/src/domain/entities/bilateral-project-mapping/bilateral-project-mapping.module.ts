@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
+import { BilateralProjectMappingHistory } from './entities/bilateral-project-mapping-history.entity';
 import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
 import { BilateralProjectMappingController } from './bilateral-project-mapping.controller';
@@ -31,7 +32,13 @@ import { ClarisaProjectsModule } from '../../tools/clarisa/projects/clarisa-proj
 // hazard twice, deliberately guarded both times.
 @Module({
   imports: [
-    TypeOrmModule.forFeature([BilateralProjectMapping]),
+    // History is a read-only archive written only by the annualize migration.
+    // Registering it keeps entity metadata aligned with the table. No controller
+    // or repository exposes it.
+    TypeOrmModule.forFeature([
+      BilateralProjectMapping,
+      BilateralProjectMappingHistory,
+    ]),
     ClarisaProjectsModule,
   ],
   controllers: [AutomapperController, BilateralProjectMappingController],

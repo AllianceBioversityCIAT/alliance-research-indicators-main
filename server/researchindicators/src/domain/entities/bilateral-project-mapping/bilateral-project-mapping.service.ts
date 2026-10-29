@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
+import { HttpException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { BilateralProjectMapping } from './entities/bilateral-project-mapping.entity';
@@ -18,26 +13,60 @@ import {
   PaginatedBilateralProjectMappings,
 } from './dto/list-bilateral-project-mappings.query.dto';
 import { MappingSourceEnum } from './enum/mapping-source.enum';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
+import { LoggerUtil } from '../../shared/utils/logger.util';
+import { sqlErrorsHelper } from '../../shared/const/sql-errors.const';
+import { normalizeExternalCode } from './utils/external-code.util';
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / R-BIL-080 / R-BIL-078
 // @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements — T-BTE-01 / R-BTE-002 / NFR-BTE-003 / DD-1
+// @akili-spec docs/specs/bilateral/annualized-project-mapping — T-06 /
+// R-APM-004, R-APM-006, R-APM-011, design §6.5, DD-5, DD-6.
 //
 // SINGLETON-SCOPED BY DESIGN — see ../bilateral/bilateral.service.ts header
 // and parent design.md §3.4 Constraint A. Do NOT inject CurrentUserUtil or
 // ResultsUtil; the User is passed in from the controller.
 //
-// 409 partial-unique conflict handling: the DB enforces the constraint via
-// the `uk_bpm_active_agreement` unique index on the generated column
-// `active_agreement_id` (D-PI-9). We additionally do a transactional
-// SELECT ... FOR UPDATE inside `create` so the 409 response is deterministic
-// and the caller sees a clean error envelope instead of a raw 1062.
+// create() upserts the current-year row for the agreement (active or not).
+// A concurrent insert can still hit 1062, and the row lock can hit 1213 or
+// 1205. Those three are retried once in a fresh transaction. A second
+// failure is a mapped HTTP error, never the driver text.
+
+export type BilateralProjectMappingUpsertResult = BilateralProjectMapping & {
+  outcome: 'created' | 'updated';
+};
+
+const RETRYABLE_MYSQL_ERRNOS: ReadonlySet<number> = new Set([1062, 1213, 1205]);
+
+const mysqlErrno = (error: unknown): number | undefined => {
+  if (!error || typeof error !== 'object') return undefined;
+  const candidate = error as {
+    errno?: unknown;
+    driverError?: { errno?: unknown };
+  };
+  if (typeof candidate.errno === 'number') return candidate.errno;
+  if (typeof candidate.driverError?.errno === 'number') {
+    return candidate.driverError.errno;
+  }
+  return undefined;
+};
+
+const isRetryableMysql = (error: unknown): boolean => {
+  const errno = mysqlErrno(error);
+  return errno !== undefined && RETRYABLE_MYSQL_ERRNOS.has(errno);
+};
+
 @Injectable()
 export class BilateralProjectMappingService {
+  private readonly logger: LoggerUtil = new LoggerUtil({
+    name: BilateralProjectMappingService.name,
+  });
+
   constructor(
     private readonly repo: BilateralProjectMappingRepository,
     private readonly dataSource: DataSource,
-    @Optional()
-    private readonly clarisaProjectsService?: ClarisaProjectsService,
+    private readonly clarisaProjectsService: ClarisaProjectsService,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
   async list(
@@ -47,6 +76,7 @@ export class BilateralProjectMappingService {
   > {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
+    const reportingYear = await this.reportingYearResolver.resolve();
 
     const qb = this.repo
       .createQueryBuilder('bpm')
@@ -56,6 +86,7 @@ export class BilateralProjectMappingService {
         'ac.agreement_id = bpm.agresso_agreement_id',
       )
       .addSelect(['ac.description', 'ac.projectDescription'])
+      .andWhere('bpm.reporting_year = :reportingYear', { reportingYear })
       .orderBy('bpm.updated_at', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -92,20 +123,20 @@ export class BilateralProjectMappingService {
     const { entities, raw } = rawAndEntities;
 
     const clarisaNameMap = new Map<number, string>();
-    if (this.clarisaProjectsService) {
-      try {
-        const clarisaProjects =
-          await this.clarisaProjectsService.listBilateralProjects();
-        if (clarisaProjects) {
-          for (const cp of clarisaProjects) {
-            if (cp.id !== undefined && cp.id !== null) {
-              clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
-            }
+    try {
+      const clarisaProjects =
+        await this.clarisaProjectsService.listBilateralProjects({
+          phase: reportingYear,
+        });
+      if (clarisaProjects) {
+        for (const cp of clarisaProjects) {
+          if (cp.id !== undefined && cp.id !== null) {
+            clarisaNameMap.set(cp.id, cp.full_name ?? cp.short_name ?? '');
           }
         }
-      } catch {
-        // Non-blocking if CLARISA service is temporarily unavailable
       }
+    } catch {
+      // Non-blocking if CLARISA service is temporarily unavailable
     }
 
     const items: EnrichedBilateralProjectMapping[] = entities.map(
@@ -144,30 +175,24 @@ export class BilateralProjectMappingService {
   }
 
   async findById(id: number): Promise<BilateralProjectMapping> {
-    const row = await this.repo.findOne({ where: { id } });
-    if (!row) {
-      throw new NotFoundException('Bilateral project mapping not found');
-    }
-    return row;
+    return this.loadCurrentYearRow(id);
   }
 
   /**
    * Lookup helper used by BilateralService.getScienceProgramsForResult (T-15.11).
-   * Returns the active mapping for the given AGRESSO agreement_id, or null.
-   *
-   * The partial-unique index guarantees AT MOST one active row per contract.
-   * If the index were somehow bypassed, this method returns the most-recently-updated
-   * row — `findActiveByAgreementId` is implemented as a hot path; logging is
-   * deliberately quiet here.
+   * Returns the active current-year mapping for the given AGRESSO agreement_id,
+   * or null. Uniqueness is one row per (agreement, reporting_year).
    */
   async findActiveByAgreementId(
     agreementId: string,
   ): Promise<BilateralProjectMapping | null> {
     if (!agreementId?.trim()) return null;
+    const reportingYear = await this.reportingYearResolver.resolve();
     return this.repo.findOne({
       where: {
         agresso_agreement_id: agreementId.trim(),
         is_active: true,
+        reporting_year: reportingYear,
       },
       order: { updated_at: 'DESC' },
     });
@@ -176,43 +201,22 @@ export class BilateralProjectMappingService {
   async create(
     dto: CreateBilateralProjectMappingDto,
     user: User,
-  ): Promise<BilateralProjectMapping> {
-    const actorUserId = user.sec_user_id;
-    const agreementId = dto.agresso_agreement_id.trim();
-
-    return this.dataSource.transaction(async (manager) => {
-      const txRepo = manager.getRepository(BilateralProjectMapping);
-
-      // Make the conflict response deterministic by checking inside the
-      // transaction. The UNIQUE INDEX is the real safety net (per D-PI-9);
-      // this SELECT just produces a clean 409 instead of a raw 1062.
-      const existingActive = await txRepo
-        .createQueryBuilder('bpm')
-        .setLock('pessimistic_write')
-        .where('bpm.agresso_agreement_id = :id', { id: agreementId })
-        .andWhere('bpm.is_active = true')
-        .getOne();
-
-      if (existingActive) {
-        throw new ConflictException(
-          'Active mapping already exists for this contract',
-        );
+  ): Promise<BilateralProjectMappingUpsertResult> {
+    try {
+      return await this.writeUpsert(dto, user);
+    } catch (error) {
+      if (!isRetryableMysql(error)) throw error;
+      this.logger._warn(
+        `bilateral mapping upsert retry after MySQL errno ${mysqlErrno(error)}`,
+      );
+      try {
+        return await this.writeUpsert(dto, user);
+      } catch (retryError) {
+        if (!isRetryableMysql(retryError)) throw retryError;
+        const mapped = sqlErrorsHelper({ errno: mysqlErrno(retryError) });
+        throw new HttpException(mapped.message, mapped.status);
       }
-
-      const row = txRepo.create({
-        agresso_agreement_id: agreementId,
-        clarisa_project_id: dto.clarisa_project_id,
-        clarisa_project_short_name: dto.clarisa_project_short_name ?? null,
-        source: dto.source ?? MappingSourceEnum.MANUAL,
-        confidence_score: dto.confidence_score ?? null,
-        notes: dto.notes ?? null,
-        is_active: true,
-        created_by: actorUserId,
-        updated_by: actorUserId,
-      });
-
-      return txRepo.save(row);
-    });
+    }
   }
 
   async update(
@@ -220,8 +224,9 @@ export class BilateralProjectMappingService {
     dto: UpdateBilateralProjectMappingDto,
     user: User,
   ): Promise<BilateralProjectMapping> {
-    const row = await this.findById(id);
+    const row = await this.loadCurrentYearRow(id);
     const actorUserId = user.sec_user_id;
+    const previousProjectId = row.clarisa_project_id;
 
     if (dto.clarisa_project_id !== undefined) {
       row.clarisa_project_id = dto.clarisa_project_id;
@@ -229,9 +234,17 @@ export class BilateralProjectMappingService {
     if (dto.clarisa_project_short_name !== undefined) {
       row.clarisa_project_short_name = dto.clarisa_project_short_name;
     }
-    if (dto.source !== undefined) {
-      row.source = dto.source;
+    const projectChanged =
+      dto.clarisa_project_id !== undefined &&
+      dto.clarisa_project_id !== previousProjectId;
+    if (projectChanged) {
+      row.clarisa_external_code = await this.externalCodeFor(
+        dto.clarisa_project_id as number,
+      );
     }
+    // Every human PATCH stores MANUAL. A submitted source is ignored
+    // (R-APM-006 AC.5), whether or not the project changed.
+    row.source = MappingSourceEnum.MANUAL;
     if (dto.confidence_score !== undefined) {
       row.confidence_score = dto.confidence_score;
     }
@@ -248,7 +261,7 @@ export class BilateralProjectMappingService {
     user: User,
     notes?: string,
   ): Promise<BilateralProjectMapping> {
-    const row = await this.findById(id);
+    const row = await this.loadCurrentYearRow(id);
     if (row.is_active === false) {
       // Idempotent — already deactivated.
       return row;
@@ -260,5 +273,120 @@ export class BilateralProjectMappingService {
       row.notes = notes;
     }
     return this.repo.save(row);
+  }
+
+  async activate(
+    id: number,
+    user: User,
+    notes?: string,
+  ): Promise<BilateralProjectMapping> {
+    const row = await this.loadCurrentYearRow(id);
+    if (row.is_active === true) {
+      return row;
+    }
+    row.is_active = true;
+    row.deleted_at = null;
+    row.updated_by = user.sec_user_id;
+    if (notes !== undefined) {
+      row.notes = notes;
+    }
+    return this.repo.save(row);
+  }
+
+  private async loadCurrentYearRow(
+    id: number,
+  ): Promise<BilateralProjectMapping> {
+    const row = await this.repo.findOne({ where: { id } });
+    if (!row) {
+      throw new NotFoundException('Bilateral project mapping not found');
+    }
+    const reportingYear = await this.reportingYearResolver.resolve();
+    if (row.reporting_year !== reportingYear) {
+      throw new NotFoundException('Bilateral project mapping not found');
+    }
+    return row;
+  }
+
+  private async writeUpsert(
+    dto: CreateBilateralProjectMappingDto,
+    user: User,
+  ): Promise<BilateralProjectMappingUpsertResult> {
+    const actorUserId = user.sec_user_id;
+    const agreementId = dto.agresso_agreement_id.trim();
+    const reportingYear = await this.reportingYearResolver.resolve();
+
+    return this.dataSource.transaction(async (manager) => {
+      const txRepo = manager.getRepository(BilateralProjectMapping);
+      const existing = await txRepo
+        .createQueryBuilder('bpm')
+        .setLock('pessimistic_write')
+        .where('bpm.agresso_agreement_id = :id', { id: agreementId })
+        .andWhere('bpm.reporting_year = :reportingYear', { reportingYear })
+        .getOne();
+
+      if (!existing) {
+        const row = txRepo.create({
+          agresso_agreement_id: agreementId,
+          reporting_year: reportingYear,
+          clarisa_project_id: dto.clarisa_project_id,
+          clarisa_project_short_name: dto.clarisa_project_short_name ?? null,
+          clarisa_external_code: await this.externalCodeFor(
+            dto.clarisa_project_id,
+          ),
+          // A person submitted this insert. A submitted source is ignored
+          // (R-APM-006 AC.5).
+          source: MappingSourceEnum.MANUAL,
+          confidence_score: dto.confidence_score ?? null,
+          notes: dto.notes ?? null,
+          is_active: true,
+          created_by: actorUserId,
+          updated_by: actorUserId,
+        });
+        const saved = await txRepo.save(row);
+        return { ...saved, outcome: 'created' };
+      }
+
+      const projectChanged =
+        existing.clarisa_project_id !== dto.clarisa_project_id;
+      existing.clarisa_project_id = dto.clarisa_project_id;
+      if (dto.clarisa_project_short_name !== undefined) {
+        existing.clarisa_project_short_name = dto.clarisa_project_short_name;
+      }
+      // A person submitted this branch, including a resubmit of the same
+      // project. Submitted source is ignored (FB-1).
+      existing.source = MappingSourceEnum.MANUAL;
+      if (projectChanged) {
+        existing.clarisa_external_code = await this.externalCodeFor(
+          dto.clarisa_project_id,
+        );
+      }
+      if (dto.confidence_score !== undefined) {
+        existing.confidence_score = dto.confidence_score;
+      }
+      if (dto.notes !== undefined) {
+        existing.notes = dto.notes;
+      }
+      existing.updated_by = actorUserId;
+      const saved = await txRepo.save(existing);
+      return { ...saved, outcome: 'updated' };
+    });
+  }
+
+  private async externalCodeFor(projectId: number): Promise<string | null> {
+    try {
+      const project =
+        await this.clarisaProjectsService.findProjectById(projectId);
+      if (!project) return null;
+      const normalized = normalizeExternalCode(
+        project.external_code,
+      ).normalized;
+      return normalized || null;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : 'unknown error';
+      this.logger._warn(
+        `CLARISA feed error while refreshing clarisa_external_code for project ${projectId}: ${detail}`,
+      );
+      return null;
+    }
   }
 }

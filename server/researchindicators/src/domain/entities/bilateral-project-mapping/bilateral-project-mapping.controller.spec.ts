@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { HttpStatus } from '@nestjs/common';
+import { HttpStatus, INestApplication } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import request from 'supertest';
 import { BilateralProjectMappingController } from './bilateral-project-mapping.controller';
 import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
 import { BilateralMappingCoverageService } from './bilateral-mapping-coverage.service';
@@ -108,11 +110,10 @@ describe('BilateralProjectMappingController', () => {
       coverageService.getCoverageReport.mockResolvedValue(mockReport);
 
       const out = await controller.getCoverageReport({
-        phase: 2026,
         'limit-samples': 15,
       });
 
-      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(2026, 15);
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(15);
       expect(out.status).toBe(HttpStatus.OK);
       expect(out.description).toMatch(/coverage report generated/i);
       expect(out.data).toBe(mockReport);
@@ -129,10 +130,7 @@ describe('BilateralProjectMappingController', () => {
 
       await controller.getCoverageReport({});
 
-      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(
-        undefined,
-        undefined,
-      );
+      expect(coverageService.getCoverageReport).toHaveBeenCalledWith(undefined);
     });
 
     it('sets description indicating upstream contract is not published when upstream_contract_available is false (R-CPA-005)', async () => {
@@ -161,15 +159,14 @@ describe('BilateralProjectMappingController', () => {
   });
 
   describe('CoverageReportQueryDto validation', () => {
-    it('accepts valid query with phase and limit-samples', async () => {
+    it('accepts limit-samples and does not declare phase', async () => {
       const dto = plainToInstance(CoverageReportQueryDto, {
-        phase: 2026,
         'limit-samples': 10,
       });
       const errors = await validate(dto);
       expect(errors).toHaveLength(0);
-      expect(dto.phase).toBe(2026);
       expect(dto['limit-samples']).toBe(10);
+      expect(dto).not.toHaveProperty('phase');
     });
 
     it('rejects limit-samples < 1 (e.g. 0)', async () => {
@@ -188,12 +185,14 @@ describe('BilateralProjectMappingController', () => {
       expect(errors.some((e) => e.property === 'limit-samples')).toBe(true);
     });
 
-    it('rejects non-integer phase', async () => {
+    it('ignores a phase query property (R-APM-003)', async () => {
       const dto = plainToInstance(CoverageReportQueryDto, {
         phase: 'not-a-number',
+        'limit-samples': 10,
       });
       const errors = await validate(dto);
-      expect(errors.some((e) => e.property === 'phase')).toBe(true);
+      expect(errors.some((e) => e.property === 'phase')).toBe(false);
+      expect(errors).toHaveLength(0);
     });
   });
 
@@ -220,6 +219,45 @@ describe('BilateralProjectMappingController', () => {
         fakeUser,
       );
       expect(out.status).toBe(HttpStatus.CREATED);
+    });
+
+    it('returns 201 when the upsert outcome is created', async () => {
+      service.create.mockResolvedValue({
+        id: 7,
+        outcome: 'created',
+      } as never);
+
+      const out = await controller.create(reqUser as never, {
+        agresso_agreement_id: 'D527',
+        clarisa_project_id: 1,
+      });
+
+      expect(out.status).toBe(HttpStatus.CREATED);
+      expect(out.data).toEqual(
+        expect.objectContaining({ id: 7, outcome: 'created' }),
+      );
+    });
+
+    it('returns 200 when the upsert outcome is updated', async () => {
+      service.create.mockResolvedValue({
+        id: 11,
+        outcome: 'updated',
+        is_active: false,
+      } as never);
+
+      const out = await controller.create(reqUser as never, {
+        agresso_agreement_id: 'A1697',
+        clarisa_project_id: 2,
+      });
+
+      expect(out.status).toBe(HttpStatus.OK);
+      expect(out.data).toEqual(
+        expect.objectContaining({
+          id: 11,
+          outcome: 'updated',
+          is_active: false,
+        }),
+      );
     });
   });
 
@@ -260,5 +298,107 @@ describe('BilateralProjectMappingController', () => {
       expect(service.deactivate).toHaveBeenCalledWith(5, fakeUser, undefined);
       expect(out.status).toBe(HttpStatus.OK);
     });
+  });
+});
+
+// Real RolesGuard + Reflector, same shape as
+// impersonation.controller.spec.ts. A guard mock that always returns true
+// would stay green if @Roles were removed (T-06 disqualifier).
+describe('PATCH :id/activate (R-APM-011)', () => {
+  let app: INestApplication;
+  let activate: jest.Mock;
+  let deactivate: jest.Mock;
+
+  beforeAll(async () => {
+    activate = jest.fn().mockResolvedValue({ id: 5, is_active: true });
+    deactivate = jest.fn().mockResolvedValue({ id: 5, is_active: false });
+
+    const moduleRef = await Test.createTestingModule({
+      controllers: [BilateralProjectMappingController],
+      providers: [
+        {
+          provide: BilateralProjectMappingService,
+          useValue: {
+            activate,
+            deactivate,
+            list: jest.fn(),
+            findById: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+          },
+        },
+        {
+          provide: BilateralMappingCoverageService,
+          useValue: { getCoverageReport: jest.fn() },
+        },
+        Reflector,
+        RolesGuard,
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.use((req, _res, next) => {
+      const rolesHeader = req.headers['x-test-roles'];
+      req.user = {
+        sec_user_id: 42,
+        roles: rolesHeader ? JSON.parse(rolesHeader as string) : [],
+      };
+      next();
+    });
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  afterEach(() => jest.clearAllMocks());
+
+  it('PATCH :id/activate returns 200 for CENTER_ADMIN and passes notes', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .send({ notes: 'restored' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'restored',
+    );
+  });
+
+  it('denied role → 403 for activate', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CONTRIBUTOR]))
+      .send({});
+
+    expect(res.status).toBe(HttpStatus.FORBIDDEN);
+    expect(activate).not.toHaveBeenCalled();
+  });
+
+  it('PATCH :id/deactivate keeps optional notes through the validation pipe', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .send({ notes: 'wrong project' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'wrong project',
+    );
+  });
+
+  it('PATCH :id/activate rejects a non-whitelisted body field', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
+      .send({ notes: 'ok', extra: true });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(activate).not.toHaveBeenCalled();
   });
 });

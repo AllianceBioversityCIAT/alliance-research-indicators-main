@@ -1,51 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsInt, IsOptional } from 'class-validator';
 
-// @akili-spec docs/specs/bilateral/clarisa-automapper-s2 — T-05 / design.md §4, §7
+// @akili-spec docs/specs/bilateral/annualized-project-mapping — T-05 /
+// design.md §5, DD-7. R-APM-003.
 //
-// The run report is the SAME SHAPE for preview and apply (design §4): four
-// buckets plus ambiguous/unresolved, each entry carrying external_code,
-// derived contract id, full_name and the CLARISA project id (R-5) so the
-// review surface never shows a bare number. `feedFetchedAt` states the
-// CLARISA cache's fetch timestamp (§7, K-016) — a run right after a feed
-// change can still read a cached cohort.
-//
-// The request body carries `phase` and NOTHING else — no candidate list,
-// no "resolved" field. Apply derives `resolved` server-side by calling
-// AutomapperService.resolve() itself (T-05 Finding 1 / execution.md T-03
-// forward pointer); accepting a candidate list here would let a caller
-// bypass R-CAM-001's AGRESSO-existence confirmation entirely.
+// The run report keeps the existing envelope (feedFetchedAt, counts,
+// ambiguous, unresolved) and replaces the supersede bucket with toUpdate
+// and inactive. Apply derives its candidate set by calling
+// AutomapperService.resolve() itself. This request class stays empty so
+// forbidNonWhitelisted rejects any caller-supplied field, including a year
+// or a candidate list. Accepting a candidate list would bypass the
+// AGRESSO-existence confirmation.
 
-export class AutomapperRunRequestDto {
-  @ApiPropertyOptional({
-    description: 'CLARISA phase filter override (e.g. 2026)',
-    type: Number,
-    example: 2026,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  phase?: number;
-}
+export class AutomapperRunRequestDto {}
 
-export class AutomapperCoverageQueryDto {
-  @ApiPropertyOptional({
-    description: 'CLARISA phase filter override (e.g. 2026)',
-    type: Number,
-    example: 2026,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  phase?: number;
-}
+export class AutomapperCoverageQueryDto {}
 
-// Output-only shapes — mirror AutomapperCandidate / AutomapperReconciledEntry
-// in automapper.service.ts field-for-field. Declared as classes (not the
-// service's interfaces) purely so @nestjs/swagger can generate a schema;
-// no validation decorators, since nothing here is ever deserialized from a
-// request.
+// Output-only shapes — mirror the service interfaces field-for-field.
+// Declared as classes so @nestjs/swagger can generate a schema. Nothing
+// here is deserialized from a request.
 export class AutomapperCandidateDto {
   @ApiProperty() clarisaProjectId!: number;
   @ApiProperty({ nullable: true }) clarisaProjectFullName!: string | null;
@@ -56,12 +28,25 @@ export class AutomapperCandidateDto {
 
 export class AutomapperReconciledEntryDto extends AutomapperCandidateDto {
   @ApiProperty({
-    enum: ['alreadyMapped', 'divergent', 'supersede'],
+    enum: ['alreadyMapped', 'divergent', 'toUpdate'],
   })
-  action!: 'alreadyMapped' | 'divergent' | 'supersede';
+  action!: 'alreadyMapped' | 'divergent' | 'toUpdate';
 
   @ApiProperty() existingMappingId!: number;
   @ApiProperty() existingClarisaProjectId!: number;
+}
+
+export class AutomapperInactiveEntryDto extends AutomapperCandidateDto {
+  @ApiProperty({ enum: ['inactive'] })
+  action!: 'inactive';
+
+  @ApiProperty() existingMappingId!: number;
+  @ApiProperty() existingClarisaProjectId!: number;
+  @ApiProperty({
+    description:
+      'True when Apply rewrote this inactive row CLARISA fields in place.',
+  })
+  refreshed!: boolean;
 }
 
 export class AutomapperToCreateEntryDto extends AutomapperCandidateDto {
@@ -72,17 +57,17 @@ export class AutomapperToCreateEntryDto extends AutomapperCandidateDto {
 export class AutomapperPreviewCountsDto {
   @ApiProperty() toCreate!: number;
   @ApiProperty() alreadyMapped!: number;
+  @ApiProperty() toUpdate!: number;
   @ApiProperty() ambiguous!: number;
   @ApiProperty() unresolved!: number;
   @ApiProperty() divergent!: number;
-  @ApiProperty() supersede!: number;
+  @ApiProperty() inactive!: number;
 }
 
-// R-CAM-002 AC.3's four counts are toCreate/alreadyMapped/ambiguous/
-// unresolved; divergent and supersede ride along because R-CAM-003 and
-// R-CAM-005 require the divergence/supersession to be surfaced, not just
-// counted (T-06 consumes them for the review surface).
 export class AutomapperPreviewResponseDto {
+  @ApiProperty({ description: 'Reporting year resolved once for this run.' })
+  reporting_year!: number;
+
   @ApiPropertyOptional({
     nullable: true,
     type: String,
@@ -101,6 +86,9 @@ export class AutomapperPreviewResponseDto {
   @ApiProperty({ type: [AutomapperReconciledEntryDto] })
   alreadyMapped!: AutomapperReconciledEntryDto[];
 
+  @ApiProperty({ type: [AutomapperReconciledEntryDto] })
+  toUpdate!: AutomapperReconciledEntryDto[];
+
   @ApiProperty({ type: [AutomapperCandidateDto] })
   ambiguous!: AutomapperCandidateDto[];
 
@@ -110,26 +98,26 @@ export class AutomapperPreviewResponseDto {
   @ApiProperty({ type: [AutomapperReconciledEntryDto] })
   divergent!: AutomapperReconciledEntryDto[];
 
-  @ApiProperty({ type: [AutomapperReconciledEntryDto] })
-  supersede!: AutomapperReconciledEntryDto[];
+  @ApiProperty({ type: [AutomapperInactiveEntryDto] })
+  inactive!: AutomapperInactiveEntryDto[];
 }
 
 export class AutomapperApplyCountsDto {
   @ApiProperty() created!: number;
+  @ApiProperty() updated!: number;
   @ApiProperty() alreadyMapped!: number;
   @ApiProperty() ambiguous!: number;
   @ApiProperty() unresolved!: number;
   @ApiProperty() divergent!: number;
-  @ApiProperty() superseded!: number;
+  @ApiProperty() inactive!: number;
 }
 
-// apply() (design §5 step 7) re-runs classification against CURRENT state
-// inside its own transaction rather than trusting a caller-supplied
-// classification — so only `created`/`alreadyMapped`/`divergent`/
-// `superseded` come from the write itself; `ambiguous`/`unresolved` (and
-// their entries) come from the same resolve() call the endpoint made to
-// derive `resolved` server-side, run immediately before the write.
+// apply() re-runs classification against CURRENT state inside its own
+// transaction rather than trusting a caller-supplied classification.
 export class AutomapperApplyResponseDto {
+  @ApiProperty({ description: 'Reporting year resolved once for this run.' })
+  reporting_year!: number;
+
   @ApiPropertyOptional({
     nullable: true,
     type: String,
@@ -150,7 +138,9 @@ export class AutomapperApplyResponseDto {
 }
 
 export class AutomapperCoverageResponseDto {
+  @ApiProperty() reporting_year!: number;
   @ApiProperty() mapped!: number;
   @ApiProperty() pending!: number;
+  @ApiProperty() inactive!: number;
   @ApiProperty() reachable!: number;
 }

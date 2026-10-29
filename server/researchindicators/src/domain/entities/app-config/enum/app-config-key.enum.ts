@@ -1,5 +1,6 @@
 export enum AppConfigKey {
   ARI_CLARISA_API_KEY = 'ARI_CLARISA_API_KEY',
+  /** @deprecated — retained only so migration 1786738949211 compiles; read nowhere */
   ARI_CLARISA_PROJECTS_PHASE = 'ARI_CLARISA_PROJECTS_PHASE',
   ARI_PRMS_SYNC = 'ARI_PRMS_SYNC',
   PORTFOLIO_2026_SDG_TARGET_CODES = 'PORTFOLIO_2026_SDG_TARGET_CODES',

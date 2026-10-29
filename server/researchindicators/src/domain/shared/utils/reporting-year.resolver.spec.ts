@@ -1,8 +1,8 @@
 import { DataSource } from 'typeorm';
-import { AppConfig } from '../../entities/app-config/entities/app-config.entity';
 import { AppConfigKey } from '../../entities/app-config/enum/app-config-key.enum';
 import { LoggerUtil } from './logger.util';
 import {
+  currentReportingYearSql,
   DEFAULT_REPORTING_YEAR,
   ReportingYearResolver,
 } from './reporting-year.resolver';
@@ -13,44 +13,44 @@ type ConfigRow = {
   is_active: boolean;
 };
 
-type FindWhere = {
-  key?: string;
-  is_active?: boolean;
-};
-
 /**
- * Repository stand-in. Applies the `where` the resolver actually sends, so
- * dropping `is_active` returns the inactive `'2027'` row (falsifier c).
+ * Stand-in for the SELECT. It applies the active-row filter and the year
+ * rule so a unit test can flip the stored value. What the SQL evaluates to
+ * is proved by test/reporting-year-sql.integration-spec.ts, which executes
+ * the exported fragment.
  */
-function matchingRow(rows: ConfigRow[], where: FindWhere): ConfigRow | null {
-  return (
-    rows.find((row) => {
-      if (where.key !== undefined && row.key !== where.key) {
-        return false;
-      }
-      if (where.is_active !== undefined && row.is_active !== where.is_active) {
-        return false;
-      }
-      return true;
-    }) ?? null
-  );
+function yearFromRaw(raw: string | null): number {
+  if (typeof raw !== 'string') {
+    return DEFAULT_REPORTING_YEAR;
+  }
+  const normalized = raw.replace(/[\t\r\n]/g, ' ').replace(/^ +| +$/g, '');
+  return /^[0-9]{4}$/.test(normalized)
+    ? Number(normalized)
+    : DEFAULT_REPORTING_YEAR;
 }
 
 describe('ReportingYearResolver', () => {
   let resolver: ReportingYearResolver;
   let rows: ConfigRow[];
-  let findOne: jest.Mock;
-  let getRepository: jest.Mock;
+  let query: jest.Mock;
   let warnSpy: jest.SpyInstance;
 
   beforeEach(() => {
     rows = [];
-    findOne = jest.fn(
-      async (options?: { where?: FindWhere }): Promise<ConfigRow | null> =>
-        matchingRow(rows, options?.where ?? {}),
-    );
-    getRepository = jest.fn().mockReturnValue({ findOne });
-    const dataSource = { getRepository };
+    query = jest.fn(async () => {
+      const row = rows.find(
+        (candidate) =>
+          candidate.key === AppConfigKey.ARI_PRMS_SYNC && candidate.is_active,
+      );
+      const raw = row?.simple_value ?? null;
+      return [
+        {
+          reporting_year: String(yearFromRaw(raw)),
+          raw_value: raw,
+        },
+      ];
+    });
+    const dataSource = { query };
     warnSpy = jest
       .spyOn(LoggerUtil.prototype, '_warn')
       .mockImplementation(() => undefined);
@@ -76,18 +76,22 @@ describe('ReportingYearResolver', () => {
     expect(DEFAULT_REPORTING_YEAR).toBe(2026);
   });
 
+  it('exports a fragment with no placeholders', () => {
+    expect(currentReportingYearSql).not.toMatch(/\?/);
+    expect(currentReportingYearSql).not.toMatch(/:\w/);
+    expect(currentReportingYearSql).toContain('`key`');
+  });
+
   it("returns 2027 when the active row is '2027'", async () => {
     active('2027');
 
     await expect(resolver.resolve()).resolves.toBe(2027);
 
     expect(warnSpy).not.toHaveBeenCalled();
-    expect(findOne).toHaveBeenCalledWith({
-      where: {
-        key: AppConfigKey.ARI_PRMS_SYNC,
-        is_active: true,
-      },
-    });
+    const sql = String(query.mock.calls[0][0]);
+    expect(sql).toContain(currentReportingYearSql);
+    expect(sql).toContain('AS raw_value');
+    expect(sql).not.toContain(';');
   });
 
   it("returns 2027 when the active row is ' 2027 '", async () => {
@@ -150,16 +154,16 @@ describe('ReportingYearResolver', () => {
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('asks the repository for the AppConfig entity', async () => {
-    active('2026');
+  it('executes the fragment and returns the SELECT year column', async () => {
+    query.mockResolvedValueOnce([
+      { reporting_year: '2031', raw_value: 'not-a-year' },
+    ]);
 
-    await resolver.resolve();
-
-    expect(getRepository).toHaveBeenCalledWith(AppConfig);
+    await expect(resolver.resolve()).resolves.toBe(2031);
   });
 
   it('degrades a failed read to 2026 and warns with the key', async () => {
-    findOne.mockRejectedValue(new Error('connection refused'));
+    query.mockRejectedValueOnce(new Error('connection refused'));
 
     await expect(resolver.resolve()).resolves.toBe(2026);
 

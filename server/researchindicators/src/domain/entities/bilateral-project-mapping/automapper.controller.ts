@@ -10,13 +10,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiOperation,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -57,13 +51,13 @@ type RequestWithUser = Request & { user?: User };
 // or GET .../coverage matches `:id` first and ParseIntPipe throws trying
 // to parse the literal string "coverage" as a number.
 //
-// ⚠️ apply() NEVER accepts a candidate list from the request body — see
-// AutomapperRunRequestDto: the body carries `phase` and nothing else.
-// `resolved` is ALWAYS re-derived server-side via automapperService.resolve()
-// (execution.md T-03 "FORWARD POINTERS TO T-05" #1). Accepting a
+// ⚠️ apply() NEVER accepts a candidate list or a year from the request
+// body. AutomapperRunRequestDto is an empty class, so forbidNonWhitelisted
+// rejects both. `resolved` and the reporting year are ALWAYS re-derived
+// server-side via automapperService.resolve() (DD-10). Accepting a
 // caller-supplied {clarisaProjectId, derivedContractId} list would let any
 // admin POST arbitrary pairs and have them written as DERIVED rows,
-// bypassing R-CAM-001's AGRESSO-existence confirmation entirely.
+// bypassing the AGRESSO-existence confirmation entirely.
 //
 // No scheduling decorator anywhere in this module — R-CAM-002 forbids
 // running the matcher on a schedule in this version; it is admin-triggered
@@ -99,8 +93,8 @@ export class AutomapperController {
       transform: true,
     }),
   )
-  async preview(@Body() body?: AutomapperRunRequestDto) {
-    const report = await this.buildPreviewReport(body?.phase);
+  async preview(@Body() _body?: AutomapperRunRequestDto) {
+    const report = await this.buildPreviewReport();
     return ResponseUtils.format({
       data: report,
       description: 'Automapper preview generated (no rows written)',
@@ -123,49 +117,46 @@ export class AutomapperController {
   )
   async apply(
     @Req() request: RequestWithUser,
-    @Body() body?: AutomapperRunRequestDto,
+    @Body() _body?: AutomapperRunRequestDto,
   ) {
-    // `resolved` comes ONLY from this call — never from `body`. There is no
-    // field on AutomapperRunRequestDto a caller could use to smuggle a
-    // candidate list through even by mistake (T-05 Finding 1).
-    const { resolved, ambiguous, unresolved } =
-      await this.automapperService.resolve(body?.phase);
+    // `resolved` and the year come ONLY from this call — never from the
+    // body. AutomapperRunRequestDto has no fields a caller could use to
+    // smuggle a candidate list or a year through.
+    const { reportingYear, resolved, ambiguous, unresolved } =
+      await this.automapperService.resolve();
+    // Cache age of whichever year resolve() just fetched. Read immediately,
+    // before any later call could refresh the single cache slot.
     const feedFetchedAt = this.automapperService.getFeedFetchedAt();
     const applyResult = await this.automapperService.apply(
       resolved,
       request.user,
+      reportingYear,
     );
 
     const report: AutomapperApplyResponseDto = {
+      reporting_year: reportingYear,
       feedFetchedAt: feedFetchedAt
         ? new Date(feedFetchedAt).toISOString()
         : null,
       counts: {
         created: applyResult.created,
+        updated: applyResult.updated,
         alreadyMapped: applyResult.alreadyMapped,
         ambiguous: ambiguous.length,
         unresolved: unresolved.length,
         divergent: applyResult.divergent,
-        superseded: applyResult.superseded,
+        inactive: applyResult.inactive,
       },
       ambiguous,
       unresolved,
     };
 
-    // design.md §9 — one summary line per run: cohort size, the four
-    // bucket counts, feed timestamp, preview vs apply (this is apply).
-    // divergent/superseded ride along even though they are outside §9's
-    // literal "four counts": RB-3's stated purpose for this line is "the
-    // answer to why do I have 194 new rows", and a supersede deactivates
-    // one row AND inserts another — omitting it would leave `created`
-    // reading as an undercount of what the run actually wrote (T-05
-    // rework, closer #1).
     const cohortSize = resolved.length + ambiguous.length + unresolved.length;
     this.logger._log(
-      `automapper apply: cohort=${cohortSize}, created=${report.counts.created}, ` +
-        `alreadyMapped=${report.counts.alreadyMapped}, ambiguous=${report.counts.ambiguous}, ` +
+      `automapper apply: reporting_year=${report.reporting_year}, cohort=${cohortSize}, created=${report.counts.created}, ` +
+        `updated=${report.counts.updated}, alreadyMapped=${report.counts.alreadyMapped}, ambiguous=${report.counts.ambiguous}, ` +
         `unresolved=${report.counts.unresolved}, divergent=${report.counts.divergent}, ` +
-        `superseded=${report.counts.superseded}, feedFetchedAt=${report.feedFetchedAt ?? 'unknown'}`,
+        `inactive=${report.counts.inactive}, feedFetchedAt=${report.feedFetchedAt ?? 'unknown'}`,
     );
 
     return ResponseUtils.format({
@@ -180,17 +171,11 @@ export class AutomapperController {
   @Get('coverage')
   @ApiOperation({
     summary:
-      'Automapper coverage: mapped / pending / reachable against the eligible cohort (never a contract-table denominator).',
-  })
-  @ApiQuery({
-    name: 'phase',
-    required: false,
-    type: Number,
-    description: 'CLARISA phase filter override (e.g. 2026)',
+      'Automapper coverage: mapped / pending / inactive / reachable for the current reporting year (never a contract-table denominator).',
   })
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async coverage(@Query() query: AutomapperCoverageQueryDto) {
-    const data = await this.automapperService.coverage(query?.phase);
+  async coverage(@Query() _query: AutomapperCoverageQueryDto) {
+    const data = await this.automapperService.coverage();
     return ResponseUtils.format({
       data,
       description: 'Automapper coverage computed',
@@ -200,44 +185,47 @@ export class AutomapperController {
 
   /**
    * Preview NEVER writes: it calls resolve() + classify() only, never
-   * apply() (the F1 falsifier in T-05's brief — mutating this method to
-   * call apply() must redden a write-count test, not a status-code test).
+   * apply() (mutating this method to call apply() must redden a
+   * write-count test, not a status-code test).
    */
-  private async buildPreviewReport(
-    phase?: number,
-  ): Promise<AutomapperPreviewResponseDto> {
-    const { resolved, ambiguous, unresolved } =
-      await this.automapperService.resolve(phase);
+  private async buildPreviewReport(): Promise<AutomapperPreviewResponseDto> {
+    const { reportingYear, resolved, ambiguous, unresolved } =
+      await this.automapperService.resolve();
+    // Same cache-age read as apply: immediately after this run's fetch.
     const feedFetchedAt = this.automapperService.getFeedFetchedAt();
-    const classification = await this.automapperService.classify(resolved);
+    const classification = await this.automapperService.classify(
+      resolved,
+      reportingYear,
+    );
 
     const report: AutomapperPreviewResponseDto = {
+      reporting_year: reportingYear,
       feedFetchedAt: feedFetchedAt
         ? new Date(feedFetchedAt).toISOString()
         : null,
       counts: {
         toCreate: classification.toCreate.length,
         alreadyMapped: classification.alreadyMapped.length,
+        toUpdate: classification.toUpdate.length,
         ambiguous: ambiguous.length,
         unresolved: unresolved.length,
         divergent: classification.divergent.length,
-        supersede: classification.supersede.length,
+        inactive: classification.inactive.length,
       },
       toCreate: classification.toCreate,
       alreadyMapped: classification.alreadyMapped,
+      toUpdate: classification.toUpdate,
       ambiguous,
       unresolved,
       divergent: classification.divergent,
-      supersede: classification.supersede,
+      inactive: classification.inactive,
     };
 
-    // design.md §9 — one summary line per run: cohort size, the four
-    // bucket counts, feed timestamp, preview vs apply (this is preview).
     const cohortSize = resolved.length + ambiguous.length + unresolved.length;
     this.logger._log(
-      `automapper preview: cohort=${cohortSize}, toCreate=${report.counts.toCreate}, ` +
-        `alreadyMapped=${report.counts.alreadyMapped}, ambiguous=${report.counts.ambiguous}, ` +
-        `unresolved=${report.counts.unresolved}, feedFetchedAt=${report.feedFetchedAt ?? 'unknown'}`,
+      `automapper preview: reporting_year=${report.reporting_year}, cohort=${cohortSize}, toCreate=${report.counts.toCreate}, ` +
+        `alreadyMapped=${report.counts.alreadyMapped}, toUpdate=${report.counts.toUpdate}, inactive=${report.counts.inactive}, ` +
+        `ambiguous=${report.counts.ambiguous}, unresolved=${report.counts.unresolved}, feedFetchedAt=${report.feedFetchedAt ?? 'unknown'}`,
     );
 
     return report;

@@ -9,14 +9,13 @@ import { DataSource } from 'typeorm';
 import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 import { ClarisaProjectsModule } from './clarisa-projects.module';
 import { ClarisaProjectsService } from './clarisa-projects.service';
-import { MappingPhaseResolver } from './mapping-phase.resolver';
 import { ClarisaProject } from './dto/clarisa-project.types';
 
 // @sdd-spec docs/specs/bugfix/bilateral-alliance-selector — T-03 / R-BAS-001, R-BAS-002, R-BAS-003, R-BAS-004, R-BAS-005, R-BAS-006, NFR-BAS-001
 //
 // Tests ClarisaProjectsService through the REAL compiled ClarisaProjectsModule (DD-5, J-F-2).
-// Covers: bilateral selection predicates composition, phase resolver delegation,
-// single science-programs computation, resilience, cache TTL, and observability.
+// Covers: bilateral selection predicates, reporting-year cohort, science-programs
+// computation, resilience, cache TTL, and observability.
 
 const bilateralProject = (
   id: number,
@@ -46,7 +45,6 @@ const window3Project = (id: number, shortName: string): ClarisaProject => ({
 
 describe('ClarisaProjectsService', () => {
   let service: ClarisaProjectsService;
-  let phaseResolver: MappingPhaseResolver;
   let connectionGet: jest.Mock;
   let resolveReportingYear: jest.Mock;
   let mockRepository: {
@@ -66,8 +64,7 @@ describe('ClarisaProjectsService', () => {
     };
     resolveReportingYear = jest.fn().mockResolvedValue(2026);
 
-    // Build the REAL ClarisaProjectsModule to prove all module providers (including MappingPhaseResolver)
-    // are properly registered in the module (Design §11 F-2 gate).
+    // Build the REAL ClarisaProjectsModule to prove its providers are registered.
     const module: TestingModule = await Test.createTestingModule({
       imports: [
         ClarisaProjectsModule,
@@ -90,7 +87,6 @@ describe('ClarisaProjectsService', () => {
       .compile();
 
     service = module.get(ClarisaProjectsService);
-    phaseResolver = module.get(MappingPhaseResolver);
 
     // Replace the inner Clarisa connection with a stub.
     connectionGet = jest.fn();
@@ -98,15 +94,19 @@ describe('ClarisaProjectsService', () => {
       get: connectionGet,
     };
     service.resetCacheForTests();
-    phaseResolver.resetCacheForTests();
   });
 
   afterEach(() => jest.clearAllMocks());
 
   describe('Module Compilation & DI Architecture (NFR-BAS-001, DD-5)', () => {
-    it('compiles the real ClarisaProjectsModule with MappingPhaseResolver in providers', () => {
+    it('compiles the real ClarisaProjectsModule without MappingPhaseResolver', () => {
       expect(service).toBeDefined();
-      expect(phaseResolver).toBeDefined();
+      expect(Reflect.getMetadata('providers', ClarisaProjectsModule)).toEqual([
+        ClarisaProjectsService,
+      ]);
+      expect(Reflect.getMetadata('exports', ClarisaProjectsModule)).toEqual([
+        ClarisaProjectsService,
+      ]);
     });
   });
 
@@ -686,7 +686,78 @@ describe('ClarisaProjectsService', () => {
     });
 
     it('filters by explicit phase option when passed in options (R-BAS-003)', async () => {
+      // A CLARISA feed for one phase contains only that phase. The 2026 row
+      // used to sit in this 2025 request and let matchesPhase hide a fetch
+      // that had asked for the resolver year.
       const fixture: ClarisaProject[] = [
+        {
+          id: 1,
+          short_name: 'P-2025',
+          source_of_funding: 'Bilateral',
+          source_center_acronym: 'CIAT',
+          phase: 2025,
+        },
+      ];
+
+      connectionGet.mockResolvedValueOnce(fixture);
+
+      const out2025 = await service.listBilateralProjects({ phase: 2025 });
+      expect(connectionGet).toHaveBeenCalledWith('api/projects?phase=2025');
+      expect(out2025.map((p) => p.id)).toEqual([1]);
+    });
+
+    // R-APM-002: the carried year is the fetch key, not a filter over another year's feed.
+    it('fetches the carried year and refetches when the next call has no carried year (R-APM-002)', async () => {
+      resolveReportingYear.mockResolvedValue(2026);
+      connectionGet
+        .mockResolvedValueOnce([
+          {
+            id: 1,
+            short_name: 'P-2025',
+            source_of_funding: 'Bilateral',
+            source_center_acronym: 'CIAT',
+            phase: 2025,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 2,
+            short_name: 'P-2026',
+            source_of_funding: 'Bilateral',
+            source_center_acronym: 'CIAT',
+            phase: 2026,
+          },
+        ]);
+
+      const carried = await service.listBilateralProjects({ phase: 2025 });
+
+      expect(connectionGet).toHaveBeenNthCalledWith(
+        1,
+        'api/projects?phase=2025',
+      );
+      expect(carried.map((p) => p.id)).toEqual([1]);
+
+      const uncarried = await service.listBilateralProjects();
+
+      expect(connectionGet).toHaveBeenCalledTimes(2);
+      expect(connectionGet).toHaveBeenNthCalledWith(
+        2,
+        'api/projects?phase=2026',
+      );
+      expect(uncarried.map((p) => p.id)).toEqual([2]);
+    });
+
+    // R-APM-002 AC.1. The two keys MUST differ: old row 2025, ARI_PRMS_SYNC 2026.
+    // A same-year fixture cannot tell which key filtered the cohort.
+    it('filters the eligible cohort to ARI_PRMS_SYNC 2026 when the old key row is 2025 (R-APM-002 AC.1)', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        key: 'ARI_CLARISA_PROJECTS_PHASE',
+        simple_value: '2025',
+        is_active: true,
+      });
+      resolveReportingYear.mockResolvedValue(2026);
+
+      connectionGet.mockResolvedValueOnce([
         {
           id: 1,
           short_name: 'P-2025',
@@ -701,12 +772,11 @@ describe('ClarisaProjectsService', () => {
           source_center_acronym: 'CIAT',
           phase: 2026,
         },
-      ];
+      ]);
 
-      connectionGet.mockResolvedValueOnce(fixture);
+      const out = await service.listBilateralProjects();
 
-      const out2025 = await service.listBilateralProjects({ phase: 2025 });
-      expect(out2025.map((p) => p.id)).toEqual([1]);
+      expect(out.map((p) => p.id)).toEqual([2]);
     });
 
     it('logs a warning naming CLARISA host when zero projects are eligible (R-BAS-006)', async () => {
@@ -730,150 +800,6 @@ describe('ClarisaProjectsService', () => {
       );
 
       warnSpy.mockRestore();
-    });
-  });
-
-  // @akili-spec docs/specs/bilateral/clarisa-phase-config-variable — T-02 / R-CPC-003, NFR-CPC-002
-  //
-  // KZ-013: fixtures below encode the 2026-08-18 measurement — CLARISA test
-  // served 299 projects, all `phase = 2025`; CLARISA production serves all
-  // `phase = null`. If the upstream feed's shape changes, these tests keep
-  // passing while reality diverges — see requirements.md K-013.
-  describe('getEligiblePhases (R-CPC-003, NFR-CPC-002)', () => {
-    it('offers only the phase actually present in the eligible cohort, not an ineligible year (R-CPC-003 scenario 1 — the trap)', async () => {
-      connectionGet.mockResolvedValueOnce([
-        // Eligible: Bilateral + Alliance, phase 2025 — the only phase that
-        // should ever appear in the response.
-        {
-          id: 1,
-          short_name: 'ELIGIBLE-2025-A',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'CIAT',
-          phase: 2025,
-          project_mappings_array: [],
-        },
-        {
-          id: 2,
-          short_name: 'ELIGIBLE-2025-B',
-          source_of_funding: 'BILATERAL - RESTRICTED',
-          source_center_acronym: 'BIOVERSITY',
-          phase: 2025,
-          project_mappings_array: [],
-        },
-        // Ineligible (SRV funding — Window 3 no longer qualifies as ineligible
-        // after R-W3B-001) but carries phase 2026. If the derivation were
-        // circular (i.e. read from listBilateralProjects(), which already
-        // applies matchesPhase) or derived from the FULL payload instead of
-        // the eligible cohort, 2026 would leak into the result.
-        {
-          id: 3,
-          short_name: 'INELIGIBLE-2026',
-          source_of_funding: 'SRV',
-          source_center_acronym: 'CIAT',
-          phase: 2026,
-          project_mappings_array: [],
-        },
-      ]);
-
-      const result = await service.getEligiblePhases();
-
-      expect(result.phases).toEqual([{ phase: 2025, count: 2 }]);
-      expect(result.phases.some((p) => p.phase === 2026)).toBe(false);
-    });
-
-    it('omits a year whose projects exist but none are eligible (non-Alliance / non-bilateral)', async () => {
-      connectionGet.mockResolvedValueOnce([
-        // 2026 has projects, but none pass isBilateralFunding + isAllianceProject.
-        {
-          id: 10,
-          short_name: 'NON-ALLIANCE-2026',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'IITA', // not an Alliance centre
-          phase: 2026,
-          project_mappings_array: [],
-        },
-        {
-          id: 11,
-          short_name: 'NON-BILATERAL-2026',
-          source_of_funding: 'SRV', // not bilateral funding (Window 3 no longer qualifies after R-W3B-001)
-          source_center_acronym: 'CIAT',
-          phase: 2026,
-          project_mappings_array: [],
-        },
-        // 2025 has one genuinely eligible project.
-        {
-          id: 12,
-          short_name: 'ELIGIBLE-2025',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'CIAT',
-          phase: 2025,
-          project_mappings_array: [],
-        },
-      ]);
-
-      const result = await service.getEligiblePhases();
-
-      expect(result.phases).toEqual([{ phase: 2025, count: 1 }]);
-      expect(result.phases.some((p) => p.phase === 2026)).toBe(false);
-    });
-
-    it('returns an empty year set AND a non-zero absent-phase count when every eligible project has phase: null (production today, K-013)', async () => {
-      connectionGet.mockResolvedValueOnce([
-        {
-          id: 20,
-          short_name: 'PROD-NULL-1',
-          source_of_funding: 'BILATERAL - RESTRICTED',
-          source_center_acronym: 'CIAT',
-          phase: null,
-          project_mappings_array: [],
-        },
-        {
-          id: 21,
-          short_name: 'PROD-NULL-2',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'BIOVERSITY',
-          phase: null,
-          project_mappings_array: [],
-        },
-        // Ineligible project also without a phase — must NOT be counted.
-        {
-          id: 22,
-          short_name: 'NON-ALLIANCE-NULL',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'IITA',
-          phase: null,
-          project_mappings_array: [],
-        },
-      ]);
-
-      const result = await service.getEligiblePhases();
-
-      expect(result.phases).toEqual([]);
-      expect(result.phaseAbsentCount).toBe(2);
-    });
-
-    it('does NOT trigger an additional CLARISA call when served from a warm cache (NFR-CPC-002)', async () => {
-      connectionGet.mockResolvedValueOnce([
-        {
-          id: 30,
-          short_name: 'WARM-CACHE-2025',
-          source_of_funding: 'Bilateral',
-          source_center_acronym: 'CIAT',
-          phase: 2025,
-          project_mappings_array: [],
-        },
-      ]);
-
-      // Warm the cache via a different consumer of getCachedAll().
-      await service.listBilateralProjects();
-      expect(connectionGet).toHaveBeenCalledTimes(1);
-
-      // Phases request must be served from the same warm cache — no
-      // additional upstream call.
-      const result = await service.getEligiblePhases();
-
-      expect(connectionGet).toHaveBeenCalledTimes(1);
-      expect(result.phases).toEqual([{ phase: 2025, count: 1 }]);
     });
   });
 
@@ -1163,8 +1089,7 @@ describe('ClarisaProjectsService', () => {
 
       connectionGet.mockResolvedValueOnce(phaseFixture);
 
-      const { all, slice, phaseUsed } =
-        await service.listProjectsForCoverage(2026);
+      const { all, slice, phaseUsed } = await service.listProjectsForCoverage();
 
       expect(all).toHaveLength(3);
       expect(slice.map((p) => p.id)).toEqual([10, 20]);
@@ -1204,69 +1129,36 @@ describe('ClarisaProjectsService', () => {
       expect(phaseUsed).toBe(2026);
     });
 
-    it('resolves phase via ARI_CLARISA_PROJECTS_PHASE env var when caller phase is omitted (AC.4)', async () => {
-      const multiPhaseFixture: ClarisaProject[] = [
-        {
-          id: 50,
-          short_name: 'P-2025',
-          source_center_acronym: 'CIAT',
-          phase: 2025,
-          source_of_funding: 'Bilateral',
-        },
-        {
-          id: 51,
-          short_name: 'P-2026',
-          source_center_acronym: 'CIAT',
-          phase: 2026,
-          source_of_funding: 'Bilateral',
-        },
-      ];
-
+    it('uses the reporting year when the old key row and the env both say 2025 (R-APM-002 AC.1)', async () => {
+      mockRepository.findOne.mockResolvedValue({
+        key: 'ARI_CLARISA_PROJECTS_PHASE',
+        simple_value: '2025',
+        is_active: true,
+      });
+      resolveReportingYear.mockResolvedValue(2026);
       const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
       try {
         process.env.ARI_CLARISA_PROJECTS_PHASE = '2025';
-        connectionGet.mockResolvedValueOnce(multiPhaseFixture);
+        connectionGet.mockResolvedValueOnce([
+          {
+            id: 50,
+            short_name: 'P-2025',
+            source_center_acronym: 'CIAT',
+            phase: 2025,
+            source_of_funding: 'Bilateral',
+          },
+          {
+            id: 51,
+            short_name: 'P-2026',
+            source_center_acronym: 'CIAT',
+            phase: 2026,
+            source_of_funding: 'Bilateral',
+          },
+        ]);
 
         const { slice, phaseUsed } = await service.listProjectsForCoverage();
 
-        expect(slice.map((p) => p.id)).toEqual([50]);
-        expect(phaseUsed).toBe(2025);
-      } finally {
-        if (originalEnv !== undefined) {
-          process.env.ARI_CLARISA_PROJECTS_PHASE = originalEnv;
-        } else {
-          delete process.env.ARI_CLARISA_PROJECTS_PHASE;
-        }
-      }
-    });
-
-    it('allows caller argument to override ARI_CLARISA_PROJECTS_PHASE env var', async () => {
-      const multiPhaseFixture: ClarisaProject[] = [
-        {
-          id: 60,
-          short_name: 'P-2025',
-          source_center_acronym: 'CIAT',
-          phase: 2025,
-          source_of_funding: 'Bilateral',
-        },
-        {
-          id: 61,
-          short_name: 'P-2026',
-          source_center_acronym: 'BIOVERSITY',
-          phase: 2026,
-          source_of_funding: 'Bilateral',
-        },
-      ];
-
-      const originalEnv = process.env.ARI_CLARISA_PROJECTS_PHASE;
-      try {
-        process.env.ARI_CLARISA_PROJECTS_PHASE = '2025';
-        connectionGet.mockResolvedValueOnce(multiPhaseFixture);
-
-        const { slice, phaseUsed } =
-          await service.listProjectsForCoverage(2026);
-
-        expect(slice.map((p) => p.id)).toEqual([61]);
+        expect(slice.map((p) => p.id)).toEqual([51]);
         expect(phaseUsed).toBe(2026);
       } finally {
         if (originalEnv !== undefined) {
@@ -1277,13 +1169,13 @@ describe('ClarisaProjectsService', () => {
       }
     });
 
-    it('rejects with BadRequestException when caller passes non-numeric phase argument', async () => {
-      await expect(service.listProjectsForCoverage('abc')).rejects.toThrow(
-        BadRequestException,
-      );
-      await expect(service.listProjectsForCoverage('abc')).rejects.toThrow(
-        'Invalid phase "abc": must be a numeric value.',
-      );
+    it('rejects a non-numeric carried year on listBilateralProjects', async () => {
+      await expect(
+        service.listBilateralProjects({ phase: 'abc' }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.listBilateralProjects({ phase: 'abc' }),
+      ).rejects.toThrow('Invalid phase "abc": must be a numeric value.');
     });
 
     it('does NOT filter by source_of_funding or project_mappings_array, retaining window3 and empty mappings (DD-2)', async () => {
@@ -1349,7 +1241,7 @@ describe('ClarisaProjectsService', () => {
 
       connectionGet.mockResolvedValueOnce(fullFixture);
 
-      const result = await service.listProjectsForCoverage(2026);
+      const result = await service.listProjectsForCoverage();
 
       expect(result.all).toHaveLength(3);
       expect(result.all.map((p) => p.id)).toEqual([80, 81, 82]);

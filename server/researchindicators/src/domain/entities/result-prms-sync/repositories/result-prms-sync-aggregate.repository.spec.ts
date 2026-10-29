@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AppConfig } from '../../../shared/utils/app-config.util';
 import { CommonFieldsBuilder } from '../../../tools/prms-normalizer/builders/common-fields.builder';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-roles.enum';
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
@@ -117,6 +118,20 @@ describe('ResultPrmsSyncAggregateRepository', () => {
     await expect(repository.loadByResultId(42)).resolves.toBeNull();
     expect(query.mock.calls[0][1]).toEqual([42]);
     expect(query.mock.calls[0][0]).toContain('secondary_db.sec_users');
+  });
+
+  it('scopes the contract mapping join to the current reporting year', async () => {
+    mockQueries({ header: [headerRow] });
+    await repository.loadByResultId(42);
+    const contractSql = String(
+      query.mock.calls.find((call) =>
+        String(call[0]).includes('FROM result_contracts rc'),
+      )?.[0] ?? '',
+    );
+    expect(contractSql).toMatch(
+      /LEFT JOIN bilateral_project_mapping bpm\s*ON bpm\.agresso_agreement_id = rc\.contract_id\s*AND bpm\.is_active = TRUE\s*AND bpm\.reporting_year =/,
+    );
+    expect(contractSql).toContain(currentReportingYearSql);
   });
 
   it('loads the aggregate without opening HTTP and coerces tinyint booleans', async () => {

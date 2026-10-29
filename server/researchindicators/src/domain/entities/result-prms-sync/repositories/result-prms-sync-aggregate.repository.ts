@@ -4,6 +4,7 @@ import { InstitutionRolesEnum } from '../../institution-roles/enums/institution-
 import { ResultStatusEnum } from '../../result-status/enum/result-status.enum';
 import { UserRolesEnum } from '../../user-roles/enum/user-roles.enum';
 import { AppConfig } from '../../../shared/utils/app-config.util';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 import {
   PrmsContractSnapshot,
   PrmsStaffSnapshot,
@@ -210,6 +211,7 @@ export class ResultPrmsSyncAggregateRepository {
         LEFT JOIN bilateral_project_mapping bpm
           ON bpm.agresso_agreement_id = rc.contract_id
           AND bpm.is_active = TRUE
+          AND bpm.reporting_year = ${currentReportingYearSql}
         WHERE rc.result_id = ?
           AND rc.is_active = TRUE
         `,

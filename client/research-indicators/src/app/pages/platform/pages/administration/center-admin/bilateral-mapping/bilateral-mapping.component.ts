@@ -225,16 +225,13 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     const sf = this.statusFilter();
     const src = this.sourceFilter();
 
-    const result = await this.service.list(
-      {
-        page: this.page(),
-        limit: this.limit(),
-        ...(this.search().trim() ? { search: this.search().trim() } : {}),
-        ...(sf !== 'all' ? { status: sf } : {}),
-        ...(src !== 'all' ? { source: src as BilateralMappingSource } : {})
-      },
-      this.phase()
-    );
+    const result = await this.service.list({
+      page: this.page(),
+      limit: this.limit(),
+      ...(this.search().trim() ? { search: this.search().trim() } : {}),
+      ...(sf !== 'all' ? { status: sf } : {}),
+      ...(src !== 'all' ? { source: src as BilateralMappingSource } : {})
+    });
 
     // NF-06: always resolve to a terminal state — never leave spinner forever.
     if (result === null) {
@@ -300,12 +297,19 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     }
   }
 
-  // ── Automapper dialog state & handlers (T-06) ─────────────────────────────
+  // ── Automapper dialog state & handlers (T-06 / R-APM-007) ────────────────
   readonly automapperDialogOpen = signal(false);
-  readonly phase = signal(2026);
+  /** Set from the coverage strip once it loads. Null until then — no literal fallback. */
+  readonly reportingYear = signal<number | null>(null);
 
   /** Child coverage strip viewChild for programmatic refresh on automapper apply. */
   readonly coverageComponent = viewChild(BilateralMappingCoverageComponent);
+
+  onReportingYear(year: number): void {
+    if (typeof year === 'number' && Number.isFinite(year)) {
+      this.reportingYear.set(year);
+    }
+  }
 
   openAutomapperDialog(): void {
     this.automapperDialogOpen.set(true);
@@ -464,11 +468,17 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     });
 
     if (result.ok) {
-      // AC-05.4: close, toast, reload, telemetry
+      // R-APM-006: the response distinguishes created vs updated. A missing outcome
+      // stays on the created toast so older payloads keep the previous wording.
+      const updated = result.data.outcome === 'updated';
       this.closeDialog();
-      this.actions.showToast({ severity: 'success', summary: 'Bilateral Mapping', detail: 'Mapping created' });
+      this.actions.showToast({
+        severity: 'success',
+        summary: 'Bilateral Mapping',
+        detail: updated ? 'Mapping updated' : 'Mapping created'
+      });
       void this.load();
-      this.clarity.trackEvent('bilateral.mapping.created', {
+      this.clarity.trackEvent(updated ? 'bilateral.mapping.updated' : 'bilateral.mapping.created', {
         agresso_agreement_id: agresso_agreement_id as unknown as string,
         clarisa_project_id: clarisa_project_id as unknown as string
       });
@@ -530,6 +540,48 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
       severity: 'error',
       summary: 'Bilateral Mapping',
       detail: result.message || 'Could not deactivate mapping. Please try again.'
+    });
+  }
+
+  // ── Activate action (R-APM-011) — mirror of deactivate, on inactive rows ─
+
+  /**
+   * Confirmation before PATCH activate. The button sits in the deactivate slot
+   * and is only offered for inactive rows.
+   */
+  requestActivate(row: BilateralProjectMapping): void {
+    this.actions.showGlobalAlert({
+      severity: 'confirm',
+      summary: 'Activate mapping',
+      detail: `Activate the mapping for agreement ${row.agresso_agreement_id}?`,
+      confirmCallback: { label: 'Activate', event: () => { void this.confirmActivate(row); } },
+      cancelCallback: { label: 'Cancel' }
+    });
+  }
+
+  /** Calls activate, then reloads the list and the coverage strip. */
+  async confirmActivate(row: BilateralProjectMapping): Promise<void> {
+    const result = await this.service.activate(row.id);
+
+    if (result.ok) {
+      this.actions.showToast({
+        severity: 'success',
+        summary: 'Bilateral Mapping',
+        detail: 'Mapping activated'
+      });
+      this.clarity.trackEvent('bilateral.mapping.activated', {
+        mapping_id: row.id as unknown as string,
+        agresso_agreement_id: row.agresso_agreement_id as unknown as string
+      });
+      void this.load();
+      void this.coverageComponent()?.loadCoverage();
+      return;
+    }
+
+    this.actions.showToast({
+      severity: 'error',
+      summary: 'Bilateral Mapping',
+      detail: result.message || 'Could not activate mapping. Please try again.'
     });
   }
 

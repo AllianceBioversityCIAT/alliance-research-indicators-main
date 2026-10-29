@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { currentReportingYearSql } from '../../../shared/utils/reporting-year.resolver';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import {
   mapMonitoredRow,
@@ -253,7 +254,11 @@ describe('PooledFundingMonitorRepository scope guard', () => {
       for (const [sql, params] of all) {
         expect(sql).toContain('r.report_year_id = ?');
         expect(params).toContain(2026);
-        expect(sql).not.toContain('2026');
+        // effectivePoolFundingContributorSql embeds currentReportingYearSql,
+        // whose fallback is the literal DEFAULT_REPORTING_YEAR. Strip that
+        // shared fragment so this guard only rejects a result-year interpolation.
+        const resultYearSql = sql.split(currentReportingYearSql).join('');
+        expect(resultYearSql).not.toContain('2026');
       }
     });
 

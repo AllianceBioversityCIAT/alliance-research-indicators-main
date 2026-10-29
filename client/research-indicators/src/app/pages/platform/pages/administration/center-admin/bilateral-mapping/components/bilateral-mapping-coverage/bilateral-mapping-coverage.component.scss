@@ -13,6 +13,10 @@
   border-left: 4px solid var(--ac-orange-1);
 }
 
+.bil-card-inactive {
+  border-left: 4px solid var(--ac-grey-500);
+}
+
 .bil-card-reachable {
   border-left: 4px solid var(--ac-primary-blue-600);
 }

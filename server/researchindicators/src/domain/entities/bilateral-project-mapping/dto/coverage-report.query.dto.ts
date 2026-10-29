@@ -6,16 +6,6 @@ import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class CoverageReportQueryDto {
   @ApiPropertyOptional({
-    description: 'CLARISA phase filter override (e.g. 2026)',
-    type: Number,
-    example: 2026,
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  phase?: number;
-
-  @ApiPropertyOptional({
     name: 'limit-samples',
     description:
       'Maximum number of sample contract mappings returned per resolution tier (range: 1-50, default: 10)',

@@ -19,6 +19,7 @@ import {
 export function mockBilateralMapping(overrides: Partial<BilateralProjectMapping> = {}): BilateralProjectMapping {
   return {
     id: 11,
+    reporting_year: 2026,
     agresso_agreement_id: 'D504',
     clarisa_project_id: 22,
     clarisa_project_short_name: 'ACIAR',

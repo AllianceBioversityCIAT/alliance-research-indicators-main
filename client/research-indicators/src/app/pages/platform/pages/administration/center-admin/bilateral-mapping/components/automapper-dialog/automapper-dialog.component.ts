@@ -4,7 +4,6 @@ import {
   computed,
   effect,
   inject,
-  input,
   model,
   output,
   signal,
@@ -25,11 +24,12 @@ import {
 
 export type AutomapperBucketTab =
   | 'toCreate'
+  | 'alreadyMapped'
+  | 'toUpdate'
+  | 'inactive'
   | 'divergent'
   | 'ambiguous'
-  | 'unresolved'
-  | 'supersede'
-  | 'alreadyMapped';
+  | 'unresolved';
 
 @Component({
   selector: 'app-automapper-dialog',
@@ -45,9 +45,6 @@ export class AutomapperDialogComponent {
 
   /** Visibility of the dialog. Two-way bound. */
   readonly visible = model<boolean>(false);
-
-  /** Target CLARISA phase (defaults to 2026). */
-  readonly phase = input<number>(2026);
 
   /** Emitted when an apply operation succeeds so parent can reload list and coverage. */
   readonly applied = output<AutomapperApplyResponse>();
@@ -76,6 +73,25 @@ export class AutomapperDialogComponent {
       }
     });
   }
+
+  /**
+   * Year carried by the preview, or by the apply result once the run finishes.
+   * Absent until one of those responses arrives — no literal fallback.
+   */
+  readonly displayedReportingYear = computed(() => {
+    return this.preview()?.reporting_year ?? this.applyResult()?.reporting_year ?? null;
+  });
+
+  /**
+   * Apply writes toCreate, toUpdate, and inactive rows whose CLARISA fields
+   * will be refreshed. Any of those is enough to enable Apply (T-09 carry-in).
+   */
+  readonly canApply = computed(() => {
+    const prev = this.preview();
+    if (!prev) return false;
+    const refreshed = prev.inactive.filter(row => row.refreshed).length;
+    return prev.counts.toCreate + prev.counts.toUpdate + refreshed > 0;
+  });
 
   /**
    * Formatted feed fetch time (F-C / §7).
@@ -135,7 +151,7 @@ export class AutomapperDialogComponent {
     this.applyError.set(null);
     this.confirmingApply.set(false);
 
-    const result = await this.service.previewAutoMap(this.phase());
+    const result = await this.service.previewAutoMap();
 
     if (result === null) {
       this.previewError.set('Could not generate automapper preview. Please try again.');
@@ -145,14 +161,18 @@ export class AutomapperDialogComponent {
       // Pick initial active tab based on where there are items
       if (result.counts.toCreate > 0) {
         this.activeTab.set('toCreate');
+      } else if (result.counts.toUpdate > 0) {
+        this.activeTab.set('toUpdate');
+      } else if (result.inactive.some(row => row.refreshed)) {
+        this.activeTab.set('inactive');
       } else if (result.counts.divergent > 0) {
         this.activeTab.set('divergent');
       } else if (result.counts.ambiguous > 0) {
         this.activeTab.set('ambiguous');
       } else if (result.counts.unresolved > 0) {
         this.activeTab.set('unresolved');
-      } else if (result.counts.supersede > 0) {
-        this.activeTab.set('supersede');
+      } else if (result.counts.inactive > 0) {
+        this.activeTab.set('inactive');
       } else {
         this.activeTab.set('alreadyMapped');
       }
@@ -177,7 +197,7 @@ export class AutomapperDialogComponent {
     this.applying.set(true);
     this.applyError.set(null);
 
-    const res = await this.service.applyAutoMap(this.phase());
+    const res = await this.service.applyAutoMap();
 
     if (res.ok) {
       this.confirmingApply.set(false);
