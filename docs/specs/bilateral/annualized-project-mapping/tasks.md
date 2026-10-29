@@ -271,7 +271,7 @@ graph TD
 
 ### T-08 — Client contract: API methods, service, interfaces, fixture
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-05, T-06
+- **Status:** done (PASS 2026-10-29; client code committed with T-09 after the visual check) · **Size:** M · **Dependencies:** T-05, T-06
 - **Requirements:** R-APM-003 (AC.3), R-APM-006 (client side), R-APM-011 (client API)
 - **Design:** §5, §7 (service row), §8; P-15, P-29
 - **Scope:**
@@ -286,9 +286,9 @@ graph TD
 - **Consumers:** grep `AutomapperPreviewResponse|AutomapperApplyResponse|AutomapperCoverage|supersede|GET_BilateralMappingCoverage|POST_Automapper` over `client/research-indicators/src` and list the hits.
 - **Review:** `full`: contract mirror.
 - **Done:**
-  - [ ] Falsifiers executed.
-  - [ ] Both `tsc` gates green.
-  - [ ] Client tests green (flaky-suite rule: a failed suite with 0 failed tests is re-run first).
+  - [x] Falsifiers executed.
+  - [x] Both `tsc` gates green. *(app: exit 0. spec: 945 errors, all pre-existing (= HEAD, per-file identical, 0 TS1005); T-08 adds none. Literal green is unattainable on this repo; see execution.md.)*
+  - [x] Client tests green (flaky-suite rule: a failed suite with 0 failed tests is re-run first).
 - **Skills:** angular-developer
 
 ### T-09 — Client UI: year from coverage, Year column, Activate, readiness note, dialog

@@ -315,3 +315,34 @@
 - **Requirements covered:** R-APM-006 AC.5 (amended 2026-10-29)
 - **Running totals vs budget (design §12):** tasks 7/11 (T-06b added) · LOC +3,364/−1,144 (overrun accepted 2026-10-29) · review rounds 12/~14
 - **Final verification:** VERIFIED (above)
+
+### T-08 — Client contract: API methods, service, interfaces, fixture — PASS (attempt 1), code held uncommitted for the owner's visual check
+
+- **Date:** 2026-10-29 · **Final status:** PASS
+- **Skills:** `angular-developer` (task default) · **Effort:** `grok-4.7-high`
+- **Orca:** task `task_cbad4149bef9`, dispatch `ctx_a7a73f4df978` (ran in parallel with T-06b, cross-package); released after PASS
+- **Files changed:** `shared/interfaces/bilateral/bilateral-project-mapping.interface.ts` · `shared/services/api.service.ts` · `shared/services/bilateral-mapping.service.ts` (+spec) · `testing/bilateral-project-mapping.fixture.ts` · minimal compile edits: `bilateral-mapping.component.ts` (+spec), `bilateral-mapping-coverage.component.ts` (+spec), `automapper-dialog.component.{ts,html}` (+spec)
+- **Red at HEAD (observed):** `BilateralMappingService › applyAutoMap › apply body is {}`: Expected `{}`, Received `{ "phase": 2026 }` (`> 402`).
+- **Falsifier 1 (observed, final spec):** `applyAutoMap` sends `{ phase: 2026 }` → same title, `> 486`, same red. Reverted.
+- **Falsifier 2 (observed, compile gate):** a probe literal with `supersede: []` typed `AutomapperPreviewResponse` → `tsc -p tsconfig.app.json`: `error TS2353: Object literal may only specify known properties, and 'supersede' does not exist in type 'AutomapperPreviewResponse'`, exit 2. Reverted → exit 0.
+- **Consumer grep:** `rg -n 'AutomapperPreviewResponse|AutomapperApplyResponse|AutomapperCoverage|supersede|GET_BilateralMappingCoverage|POST_Automapper' client/research-indicators/src` → 73 lines / 18 files: 53 contract hits in 8 files, plus 20 unrelated English "supersede/superseded" (results-center, innovation-use, pi-delegates, pool-funding, impersonation, user-search). The full list is in the worker evidence.
+- **Minimal compile edits (T-09/T-10 files):** `list()` and `getCoverage()` no longer pass a phase. The dialog's `previewAutoMap()`/`applyAutoMap()` take no phase. The dialog HTML drops the Superseded apply tile, the Supersede tab and its panel, because they read fields that were removed. Apply is disabled on `counts.toCreate === 0`. The `phase` signal/inputs are kept for the existing copy (T-09). `GET_ClarisaProjectPhases` is untouched (T-10).
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** run after both parallel workers reported.
+  - `npx tsc -p tsconfig.app.json --noEmit` → `TSC_APP_EXIT:0`, 0 errors.
+  - `npx tsc -p tsconfig.spec.json --noEmit` → exit 2, **945 errors, all pre-existing**. HEAD = 945, measured by swapping the 12 T-08 files back to `HEAD` and then restoring them; per-file counts identical; `TS1005` = 0 (no parse abort). T-08 adds no spec type error. **The literal "both tsc gates green" is unattainable on this repo** (the root guide's K-004 note records the same 945).
+  - `npm run lint -- --quiet` → `LINT_EXIT:0`, "All files pass linting."
+  - `npx jest --coverage=false --silent src/app/shared/services <bilateral-mapping dir>` → `Test Suites: 123 passed, 123 total` / `Tests: 2157 passed, 2157 total`.
+  - `✓ apply body is {}`.
+  - A path-filtered run with coverage on exits 1 only because of the global coverage floors (K-020), not because of tests.
+- **Reviewer** (`akili-reviewer`/opus, lens checklist): **`STATUS: PASS`**. "T-08 matches its task text, R-APM-003 AC.3 and the committed server contract." Field-by-field mirror of `automapper-run.dto.ts`: preview `reporting_year`/`toUpdate`/`inactive`/`refreshed`, no `supersede`; apply counts `updated`/`inactive`, no `superseded`; coverage `reporting_year`/`inactive`; create `outcome`; activate `{}` is valid (`body?` optional). No `phase` on any mapping call. The Pending list is unchanged and pinned by `pending list excludes toUpdate and inactive rows`. The Supersede removal is a minimal compile edit, not T-09 scope creep. Ruling on the tsc Done item: record it as above, never as plain green.
+- **ADVISORY (labelled advisory, not gating):**
+  - **Forward pointer → T-09 (carry-in, must be in the T-09 brief):** the dialog's Apply button is disabled when `preview.counts.toCreate === 0`. A preview with only `toUpdate` rows (row 3) or row-6 refreshes therefore cannot be applied from STAR. Before T-08, `supersede > 0` enabled it, and `toUpdate` took over that role. Reachable. T-09 must enable Apply on `toCreate + toUpdate` (+ refreshing `inactive` per §6.3).
+  - Until T-09, the dialog shows no tab, tile or count for `toUpdate`/`inactive`.
+  - READABILITY: `POST_AutomapperPreview`/`POST_AutomapperApply` take `body: object = {}`. Type it `Record<string, never>` (or drop it) so a future `{ phase }` fails at compile time. A stale comment about "optional notes" sits on activate.
+  - RELIABILITY: two spec mocks (`apply body is {}`, getCoverage) omit `reporting_year`. They pass only because `jest.Mock` is untyped.
+- **spawns:** Implementer Cursor/grok-4.7-high: not reported by host, ended complete · Reviewer akili-reviewer/opus: not reported by host at the time of writing, ended complete
+- **Not Done / Assumptions (verbatim, translated from the worker; assumptions only, nothing owed):** "`tsc -p tsconfig.spec.json` is not exit 0. The one error in a file this task touched is the HEAD `Select` value-as-type. A whole-tree before/after stash was not run because a server worker is editing `server/` in this checkout." (The Leader has since run the before/after: 945 = 945.) · "`create` does not rewrite `outcome`; it returns `res.data` typed as `BilateralMappingUpsertResult`." · "Activate sends `{}`, not `{ notes }`, matching today's deactivate method." · "The dialog no longer renders the supersede bucket. `toUpdate`/`inactive` are on the type and are not drawn (T-09)."
+- **Commit hold (owner rule: no commit of a visible UI change before the owner sees it):** T-08 changes the dialog template (tabs/tiles removed, Apply-disable rule). The 12 client files stay **uncommitted** and will be committed together with T-09 after the owner's visual check. This entry and the checkbox are committed now, as evidence-before-checkbox.
+- **Requirements covered:** R-APM-003 AC.3 · R-APM-006 client side (create `outcome`) · R-APM-011 client API (`PATCH_ActivateBilateralMapping`)
+- **Running totals vs budget (design §12):** tasks 8/11 · LOC +3,601/−1,275 (overrun accepted 2026-10-29) · review rounds 13/~14
+- **Final verification:** VERIFIED (above, with the tsc-spec caveat recorded)
