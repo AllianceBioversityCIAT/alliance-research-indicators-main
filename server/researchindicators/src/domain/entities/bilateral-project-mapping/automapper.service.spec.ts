@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UnprocessableEntityException } from '@nestjs/common';
 import { Brackets, DataSource } from 'typeorm';
 import { AutomapperService, AutomapperCandidate } from './automapper.service';
+import { BilateralProjectMappingService } from './bilateral-project-mapping.service';
+import { BilateralProjectMappingRepository } from './repositories/bilateral-project-mapping.repository';
 import { ClarisaProjectsService } from '../../tools/clarisa/projects/clarisa-projects.service';
 import { ClarisaProject } from '../../tools/clarisa/projects/dto/clarisa-project.types';
 import { AgressoContract } from '../agresso-contract/entities/agresso-contract.entity';
@@ -1509,6 +1511,99 @@ describe('AutomapperService', () => {
       mockClarisaProjectsService.getCacheFetchedAt.mockReturnValue(null);
 
       expect(service.getFeedFetchedAt()).toBeNull();
+    });
+  });
+
+  // @akili-spec docs/specs/bilateral/annualized-project-mapping — T-06 /
+  // R-APM-011 AC.5 and the scenario (deactivate → Apply → activate → Apply).
+  // KZ-015: the transitions are the assertion, not a pre-built end state.
+  describe('R-APM-011 scenario — deactivate, Apply, activate, Apply', () => {
+    it('a row deactivated → Apply leaves it inactive → activate() → the next Apply classifies it normally, never creating a second row', async () => {
+      const store: BilateralProjectMapping[] = [
+        mappingRow({
+          id: 42,
+          agresso_agreement_id: 'X42',
+          clarisa_project_id: 501,
+          clarisa_external_code: 'X42',
+          clarisa_project_short_name: 'SP-501',
+          source: MappingSourceEnum.DERIVED,
+          is_active: true,
+          reporting_year: YEAR,
+        }),
+      ];
+      bindTxStore(store);
+
+      const repo = {
+        findOne: jest.fn(
+          async ({ where }: { where: { id: number } }) =>
+            store.find((row) => row.id === where.id) ?? null,
+        ),
+        save: jest.fn(async (row: BilateralProjectMapping) => {
+          const index = store.findIndex((item) => item.id === row.id);
+          if (index >= 0) store[index] = row;
+          else store.push(row);
+          return row;
+        }),
+        createQueryBuilder: jest.fn(() => makeMappingQb(store)),
+      };
+
+      const mappingModule = await Test.createTestingModule({
+        providers: [
+          BilateralProjectMappingService,
+          { provide: BilateralProjectMappingRepository, useValue: repo },
+          { provide: DataSource, useValue: mockDataSource },
+          {
+            provide: ClarisaProjectsService,
+            useValue: mockClarisaProjectsService,
+          },
+          {
+            provide: ReportingYearResolver,
+            useValue: mockReportingYearResolver,
+          },
+        ],
+      }).compile();
+      const mappingService = mappingModule.get(BilateralProjectMappingService);
+
+      await mappingService.deactivate(42, fakeUser, 'admin decision');
+      expect(store).toHaveLength(1);
+      expect(store[0].is_active).toBe(false);
+      expect(store[0].deleted_at).toBeInstanceOf(Date);
+
+      const sameProject = [candidate(501, 'X42')];
+      const firstApply = await service.apply(sameProject, fakeUser, YEAR);
+      const secondApply = await service.apply(sameProject, fakeUser, YEAR);
+
+      expect(firstApply.created).toBe(0);
+      expect(firstApply.inactive).toBe(1);
+      expect(secondApply.created).toBe(0);
+      expect(secondApply.inactive).toBe(1);
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(42);
+      expect(store[0].is_active).toBe(false);
+
+      await mappingService.activate(42, fakeUser);
+      expect(store[0].is_active).toBe(true);
+      expect(store[0].deleted_at).toBeNull();
+      expect(store).toHaveLength(1);
+
+      const afterActivate = await service.apply(sameProject, fakeUser, YEAR);
+      expect(afterActivate.alreadyMapped).toBe(1);
+      expect(afterActivate.created).toBe(0);
+      expect(afterActivate.updated).toBe(0);
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(42);
+      expect(store[0].is_active).toBe(true);
+
+      const differentProject = [candidate(900, 'X42', 'Full 900', 'SP-900')];
+      const refreshed = await service.apply(differentProject, fakeUser, YEAR);
+      expect(refreshed.updated).toBe(1);
+      expect(refreshed.created).toBe(0);
+      expect(store).toHaveLength(1);
+      expect(store[0].id).toBe(42);
+      expect(store[0].clarisa_project_id).toBe(900);
+      expect(store[0].is_active).toBe(true);
+      expect(store[0].source).toBe(MappingSourceEnum.DERIVED);
+      expect(txMappingRepo.save).not.toHaveBeenCalled();
     });
   });
 });

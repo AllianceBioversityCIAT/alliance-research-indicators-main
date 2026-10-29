@@ -192,7 +192,7 @@ graph TD
 
 ### T-06 — Mapping service: year scope, upsert create, activate, ownership
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01, T-02
+- **Status:** done (PASS 2026-10-29) · **Size:** M · **Dependencies:** T-01, T-02
 - **Requirements:**
   - R-APM-004: AC.2 (list), and the by-id 404s.
   - R-APM-006: AC.1–4.
@@ -223,9 +223,9 @@ graph TD
 - **Consumers:** `bilateral.service.ts:211` (SP chain); `/admin` SSR page (T-07); client service (T-08). The service's testing modules must provide `ReportingYearResolver` and `ClarisaProjectsService` (P-17).
 - **Review:** `full`.
 - **Done:**
-  - [ ] Falsifiers executed.
-  - [ ] All listed tests green.
-  - [ ] Build and eslint green; Swagger shows `PATCH :id/activate`.
+  - [x] Falsifiers executed.
+  - [x] All listed tests green.
+  - [x] Build and eslint green; Swagger shows `PATCH :id/activate`.
 - **Skills:** nestjs-expert, tdd, api-design-principles, error-handling-patterns
 
 ### T-07 — `/admin` SSR page: Activate, Year column, upsert outcome, copy
