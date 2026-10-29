@@ -24,6 +24,7 @@ interface BilateralProjectMapping {
   confidence_score?: number | null;
   notes?: string | null;
   is_active: boolean;
+  reporting_year: number;
   created_at: string;
   updated_at: string;
   created_by?: number | null;
@@ -88,6 +89,7 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
   >('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
@@ -211,6 +213,7 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
     }
     setFormSubmitting(true);
     setFormError(null);
+    setNotice(null);
     try {
       const project = clarisaProjects.find(
         (p) => p.id === formClarisaProjectId,
@@ -248,6 +251,15 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
         );
       }
       setShowForm(false);
+      if (formMode === 'create') {
+        const saved = body?.data;
+        const id = saved?.id;
+        if (saved?.outcome === 'created') {
+          setNotice(`Mapping created (id ${id}).`);
+        } else if (saved?.outcome === 'updated') {
+          setNotice(`Existing mapping updated (id ${id}).`);
+        }
+      }
       await refresh({ page: 1 });
     } catch (err) {
       setFormError((err as Error).message);
@@ -272,6 +284,38 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notes: 'Deactivated via admin panel' }),
+        },
+      );
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          typeof body?.errors === 'string'
+            ? body.errors
+            : (body?.errors?.message ?? `HTTP ${res.status}`),
+        );
+      }
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const activateRow = async (row: BilateralProjectMapping) => {
+    if (
+      !window.confirm(
+        `Activate mapping for ${row.agresso_agreement_id} → CLARISA project ${row.clarisa_project_id}?`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/bilateral-project-mappings/${row.id}/activate`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: 'Activated via admin panel' }),
         },
       );
       const body = await res.json();
@@ -357,6 +401,12 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                 </div>
               )}
 
+              {notice && (
+                <div className="alert alert-success" role="alert">
+                  {notice}
+                </div>
+              )}
+
               <div className="table-responsive">
                 <table className="table table-hover align-middle">
                   <thead>
@@ -367,13 +417,14 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                       <th>Notes</th>
                       <th>State</th>
                       <th>Updated</th>
+                      <th>Year</th>
                       <th className="text-end">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {page.items.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="text-center text-muted py-4">
+                        <td colSpan={8} className="text-center text-muted py-4">
                           No mappings found.
                         </td>
                       </tr>
@@ -418,6 +469,7 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                             {new Date(row.updated_at).toLocaleString()}
                           </small>
                         </td>
+                        <td>{row.reporting_year}</td>
                         <td className="text-end">
                           <button
                             className="btn btn-sm btn-outline-secondary me-2"
@@ -426,21 +478,30 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                             title={
                               row.is_active
                                 ? 'Edit this mapping'
-                                : 'Inactive — re-create instead'
+                                : 'Inactive — activate this mapping to edit it'
                             }
                           >
                             <i className="fas fa-edit"></i>
                           </button>
-                          <button
-                            className="btn btn-sm btn-outline-danger"
-                            onClick={() => deactivateRow(row)}
-                            disabled={!row.is_active}
-                            title={
-                              row.is_active ? 'Deactivate' : 'Already inactive'
-                            }
-                          >
-                            <i className="fas fa-power-off"></i>
-                          </button>
+                          {row.is_active ? (
+                            <button
+                              className="btn btn-sm btn-outline-danger"
+                              onClick={() => deactivateRow(row)}
+                              title="Deactivate"
+                            >
+                              <i className="fas fa-power-off me-1"></i>
+                              Deactivate
+                            </button>
+                          ) : (
+                            <button
+                              className="btn btn-sm btn-outline-success"
+                              onClick={() => activateRow(row)}
+                              title="Activate"
+                            >
+                              <i className="fas fa-power-off me-1"></i>
+                              Activate
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -531,7 +592,8 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
                     )}
                     {formMode === 'edit' && (
                       <small className="text-muted">
-                        Contract is immutable. Deactivate + re-create to change.
+                        Contract is immutable. To change an inactive mapping,
+                        activate it first from the row Activate button.
                       </small>
                     )}
                   </div>
