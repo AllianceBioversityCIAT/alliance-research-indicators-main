@@ -382,3 +382,28 @@
 - **Commit hold:** visible UI change → the page stays uncommitted until the owner's check.
 - **Requirements covered:** R-APM-011 (SSR clause) · R-APM-006 (outcome surfaced) · R-APM-007 (SSR Year column)
 - **Final verification:** VERIFIED (automated part); manual part pending
+
+### T-09 — Client UI: year from coverage, Year column, Activate, readiness note, dialog — PASS (attempt 1), code held uncommitted for the owner's visual check
+
+- **Date:** 2026-10-29 · **Final status:** PASS (owner visual check pending)
+- **Skills:** `angular-developer`, `ui-ux-pro-max` · **Effort:** `grok-4.7-high`
+- **Orca:** task `task_f37a07b21f04`, dispatch `ctx_12cb19580b3e`; advisory test follow-up on the same terminal: task `task_292e5ed4e2e5`, dispatch `ctx_b454d1750af9`; released after PASS
+- **Files changed (T-09's own, on top of T-08/T-10):** `bilateral-mapping.component.{ts,html,spec.ts}` · `bilateral-mapping-coverage.component.{ts,html,scss,spec.ts}` · `automapper-dialog.component.{ts,html,spec.ts}`
+- **Change:** `reportingYear = signal<number | null>(null)`, set only from the coverage strip's new `reportingYear` output; header badge and help text render the year only when known · Year column after *Last Updated*, sortable · **Activate** in the deactivate slot of inactive rows, with confirmation; reloads list and coverage · created/updated toast from `outcome` · coverage: `inactive` figure and the 5 exclusive R-APM-008 states · dialog: year line from `reporting_year`, *To Update* and *Inactive* tabs, Updated/Inactive apply counts, no supersede · **carry-in:** `canApply = toCreate + toUpdate + inactive.filter(refreshed).length > 0`.
+- **Red at baseline (observed, no `--silent`):** `R-APM-007 — header and help show the year emitted after coverage loads, never a literal` → Expected `"2027"`, Received `undefined` (`> 1809`).
+- **Falsifier 1 (observed):** header badge hard-coded `2026` → same title, Expected `"2027"`, Received `"2026"` (`> 1894`). Reverted.
+- **Falsifier 2 (observed):** `reachable === 0` branch removed → `R-APM-008 — reachable = 0 says CLARISA has no eligible projects for the loaded year`, Expected "CLARISA has no eligible projects for 2027 yet", Received "No mappings for 2027 yet — run Auto-map" (`> 240`). Reverted.
+- **Falsifier 3 (follow-up, observed):** `refreshed` filter dropped from `canApply` → `disables Apply when the only item is an inactive row with refreshed=false`, `automapper-dialog.component.spec.ts:549` Expected true, Received false. Reverted.
+- **R-APM-008 state → test:** loading / CLARISA error / `reachable = 0` / `reachable > 0, mapped = 0` / normal — one `R-APM-008 — …` case each; every case holds `getCoverage` pending, asserts the state absent, then resolves (KZ-015).
+- **Literal-year grep:** `grep -nE "20[0-9]{2}"` over the three templates → 0. The doc comment at `bilateral-mapping-coverage.component.ts:52` now reads `{year}`.
+- **Evidence re-run (Leader inline, non-author), VERIFIED:** `tsc -p tsconfig.app.json` exit 0 · `tsc -p tsconfig.spec.json` 945 (= HEAD; 1 pre-existing `TS2749` on `Select` in the page spec, present at HEAD) · `npm run lint -- --quiet` "All files pass linting." · jest (mapping folder + `shared/services` + env modal) 124 suites / 2185 tests passed; after the follow-up, mapping folder 3 suites / 125 tests passed · literal-year grep 0.
+- **Reviewer** (`akili-reviewer`/opus, lens full): **`STATUS: PASS`**. "Every item in scope is present, nothing is out of scope, and I found no blocking issue." `canApply` matches the carry-in exactly; the 5 states are exclusive and use the requirement's wording verbatim; tokens only (3 SCSS lines on `var(--ac-grey-500)`).
+- **ADVISORY:**
+  - Tests → **fixed** (same worker): refreshed / non-refreshed `canApply` cases, coverage reload after Activate, Activate error toast; comment year → `{year}`.
+  - **RELIABILITY → owner question (open):** when every eligible contract is deactivated (`reachable > 0`, `mapped = 0`, `inactive > 0`), the strip says "No mappings for {year} yet — run Auto-map", but Auto-map never reactivates, and the Inactive card is hidden in that state. This follows R-APM-008's table literally. Raised at the visual check.
+- **spawns:** Implementer Cursor/grok-4.7-high ×2 dispatches: not reported by host, ended complete · Reviewer akili-reviewer/opus 10 calls, 78 742 tokens, ended complete
+- **Owner visual check (Done item, OPEN):** column fit with the Year column, the four-card grid at `sm`, Activate icon position, readiness note states, dialog tabs (jsdom cannot measure layout).
+- **Commit hold:** T-08 + T-09 + T-10 client files stay uncommitted until the owner's visual check.
+- **Requirements covered:** R-APM-006 (toast) · R-APM-007 AC.1, AC.2 · R-APM-008 AC.1 · R-APM-009 AC.2 · R-APM-011 (client Activate)
+- **Running totals vs budget (design §12):** tasks 11/11 code-complete (T-07/T-09 wait on the owner check) · review rounds 16/~14 (over, reported per the owner's standing decision)
+- **Final verification:** VERIFIED (automated part; tsc-spec caveat as in T-08); visual part pending

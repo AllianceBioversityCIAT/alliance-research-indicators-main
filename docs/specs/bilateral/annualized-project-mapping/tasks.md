@@ -293,7 +293,7 @@ graph TD
 
 ### T-09 — Client UI: year from coverage, Year column, Activate, readiness note, dialog
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-08
+- **Status:** in review (owner visual check pending) · **Size:** M · **Dependencies:** T-08
 - **Requirements:**
   - R-APM-007: AC.1, AC.2.
   - R-APM-008: AC.1, all five states.
@@ -318,9 +318,9 @@ graph TD
 - **Consumers:** `bilateral-mapping.component.spec.ts`, `bilateral-mapping-coverage.component.spec.ts`, `automapper-dialog.component.spec.ts`.
 - **Review:** `full`.
 - **Done:**
-  - [ ] Falsifiers executed.
-  - [ ] `grep -nE "20[0-9]{2}"` over the three templates returns 0 literal years (R-APM-007 AC.2).
-  - [ ] Both `tsc` gates and lint green.
+  - [x] Falsifiers executed.
+  - [x] `grep -nE "20[0-9]{2}"` over the three templates returns 0 literal years (R-APM-007 AC.2).
+  - [x] Both `tsc` gates and lint green (app exit 0; spec 945 = HEAD, recorded caveat).
   - [ ] Owner's visual check quoted.
 - **Skills:** angular-developer, ui-ux-pro-max
 
