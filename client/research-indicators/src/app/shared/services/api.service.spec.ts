@@ -2777,9 +2777,13 @@ describe('ApiService - remaining endpoint coverage', () => {
       expect(tp.patch).toHaveBeenCalledWith('bilateral-project-mappings/7', body, { useResultInterceptor: true });
     });
 
-    it('PATCH_BilateralProjectMappingDeactivate patches the deactivate route with empty body', async () => {
-      await service.PATCH_BilateralProjectMappingDeactivate(7);
-      expect(tp.patch).toHaveBeenCalledWith('bilateral-project-mappings/7/deactivate', {}, { useResultInterceptor: true });
+    it('PATCH_BilateralProjectMappingDeactivate patches the deactivate route with the justification body', async () => {
+      await service.PATCH_BilateralProjectMappingDeactivate(7, { justification: 'Contract closed' });
+      expect(tp.patch).toHaveBeenCalledWith(
+        'bilateral-project-mappings/7/deactivate',
+        { justification: 'Contract closed' },
+        { useResultInterceptor: true }
+      );
     });
 
     it('GET_BilateralMappingCoverage requests the coverage route with empty params', async () => {

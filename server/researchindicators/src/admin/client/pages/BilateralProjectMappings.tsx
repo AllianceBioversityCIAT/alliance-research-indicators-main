@@ -283,7 +283,9 @@ const BilateralProjectMappings: React.FC<BilateralProjectMappingsProps> = ({
           method: 'PATCH',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: 'Deactivated via admin panel' }),
+          body: JSON.stringify({
+            justification: 'Deactivated via admin panel',
+          }),
         },
       );
       const body = await res.json();

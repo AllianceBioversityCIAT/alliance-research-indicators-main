@@ -11,6 +11,7 @@ import { SelectModule } from 'primeng/select';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { TextareaModule } from 'primeng/textarea';
+import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { PopoverModule } from 'primeng/popover';
 import { TooltipModule } from 'primeng/tooltip';
 import { BilateralMappingService } from '@services/bilateral-mapping.service';
@@ -27,6 +28,19 @@ import { AutomapperDialogComponent } from './components/automapper-dialog/automa
 
 export type MappingStatusFilter = 'all' | 'mapped' | 'pending' | 'inactive';
 type DialogMode = 'create' | 'edit';
+
+/** Values the confirmation acts on. Captured when Save is pressed, not read again later. */
+interface StatusChangePlan {
+  id: number;
+  agreementId: string;
+  target: 'activate' | 'deactivate';
+  /** Trimmed justification. Always set on deactivate; set on activate only when non-blank. */
+  justification?: string;
+  /** Present only when Notes differ from the snapshot. */
+  notes?: string;
+  /** Present only on activate, and only when the project differs from the snapshot. */
+  clarisa_project_id?: number;
+}
 
 /** Option shape used by p-select in filter dropdowns. */
 interface SelectOption<T extends string> {
@@ -73,6 +87,7 @@ const SOURCE_OPTIONS: SelectOption<SourceFilter>[] = [
     ButtonModule,
     DialogModule,
     TextareaModule,
+    ToggleSwitchModule,
     PopoverModule,
     TooltipModule,
     BilateralMappingCoverageComponent,
@@ -159,55 +174,66 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   /** Notes length cap (mirrors JUSTIFICATION_MAX_LENGTH pattern). */
   readonly notesMaxLength = NOTES_MAX_LENGTH;
 
+  // Status lives in the Edit modal. initialActive is the only record of the row's
+  // status at open — editSnapshot stays project + notes.
+  readonly statusActive = signal(true);
+  readonly initialActive = signal<boolean | null>(null);
+  readonly justification = signal('');
+  /** Last stored status_justification, shown read-only. Empty when the row has none. */
+  readonly lastJustification = signal('');
+  readonly confirmPending = signal(false);
+  /**
+   * CLARISA pick stashed while the admin is inactivating.
+   * `undefined` means nothing is stashed; `null` is a cleared picker.
+   */
+  private pickedProjectId: number | null | undefined = undefined;
+  /**
+   * Project shown on the row when Edit opened. Kept in the picker options when the
+   * loaded cohort does not include it, so the select can render its label.
+   */
+  private currentProjectOption: ClarisaBilateralProjectOption | null = null;
+
+  readonly statusChanged = computed(
+    () => this.dialogMode() === 'edit' && this.initialActive() !== null && this.statusActive() !== this.initialActive()
+  );
+  readonly isInactivating = computed(() => this.statusChanged() && !this.statusActive());
+
   // --- Computed save-enable logic ---
 
-  /** CREATE: both pickers must be set (AC-05.3). EDIT: at least one field changed (AC-06.4). */
-  readonly canSave = computed(() => {
-    if (this.saving()) return false;
-    if (this.dialogMode() === 'create') {
-      return !!this.selectedAgreement() && this.selectedProjectId() !== null;
-    }
-    // Edit: dirty check against snapshot
-    const snap = this.editSnapshot;
-    if (!snap) return false;
-    return (
-      this.selectedProjectId() !== snap.clarisa_project_id ||
-      this.notes() !== snap.notes
-    );
-  });
+  /**
+   * CREATE: both pickers must be set (AC-05.3).
+   * EDIT without a status change: at least one field changed (AC-06.4); a missing snapshot blocks only this row.
+   * EDIT inactivating: a non-blank justification. EDIT activating: a project must stay selected.
+   * The button also stays disabled while a confirmation or a request is in flight.
+   */
+  readonly canSave = computed(() => !this.saving() && !this.confirmPending() && this.formSavable());
 
   ngOnInit(): void {
     // Debounce the search input stream (AC-04.1)
-    this.searchInput$
-      .pipe(debounceTime(300), takeUntil(this.destroy$))
-      .subscribe(term => {
-        this.search.set(term);
-        this.page.set(1);
-        void this.load();
-      });
+    this.searchInput$.pipe(debounceTime(300), takeUntil(this.destroy$)).subscribe(term => {
+      this.search.set(term);
+      this.page.set(1);
+      void this.load();
+    });
 
     // Lazy server-side AGRESSO search: debounce keystrokes → server fetch → replace options.
     // distinctUntilChanged avoids repeat calls for identical terms (e.g. focus/blur noise).
-    this.agressoFilter$
-      .pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
-      .subscribe(term => {
-        this.agressoOptionsLoading.set(true);
-        void this.service.loadAgressoOptions(term || undefined).then(opts => {
-          this.agressoOptions.set(opts);
-          this.agressoOptionsLoading.set(false);
-        });
+    this.agressoFilter$.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$)).subscribe(term => {
+      this.agressoOptionsLoading.set(true);
+      void this.service.loadAgressoOptions(term || undefined).then(opts => {
+        this.agressoOptions.set(opts);
+        this.agressoOptionsLoading.set(false);
       });
+    });
 
     // Lazy server-side CLARISA search: same debounce pattern.
-    this.clarisaFilter$
-      .pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$))
-      .subscribe(term => {
-        this.clarisaOptionsLoading.set(true);
-        void this.service.loadClarisaProjectOptions(term || undefined).then(opts => {
-          this.clarisaOptions.set(opts);
-          this.clarisaOptionsLoading.set(false);
-        });
+    this.clarisaFilter$.pipe(debounceTime(300), distinctUntilChanged(), takeUntil(this.destroy$)).subscribe(term => {
+      this.clarisaOptionsLoading.set(true);
+      void this.service.loadClarisaProjectOptions(term || undefined).then(opts => {
+        this.clarisaOptions.set(this.withCurrentProject(opts));
+        this.clarisaOptionsLoading.set(false);
       });
+    });
 
     void this.load();
   }
@@ -289,11 +315,16 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
   /** Human-readable source label for display in the table badge. */
   sourceLabel(source: BilateralMappingSource): string {
     switch (source) {
-      case 'MANUAL': return 'Manual';
-      case 'DERIVED': return 'Derived';
-      case 'AI_SUGGESTED': return 'AI Suggested';
-      case 'AI_AUTO': return 'AI Auto';
-      case 'UNMAPPED': return 'Unmapped';
+      case 'MANUAL':
+        return 'Manual';
+      case 'DERIVED':
+        return 'Derived';
+      case 'AI_SUGGESTED':
+        return 'AI Suggested';
+      case 'AI_AUTO':
+        return 'AI Auto';
+      case 'UNMAPPED':
+        return 'Unmapped';
     }
   }
 
@@ -332,6 +363,8 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.notes.set('');
     this.saveError.set(null);
     this.editSnapshot = null;
+    this.currentProjectOption = null;
+    this.resetStatusDraft(null);
     this.dialogOpen.set(true);
     void this.loadPickerOptions();
   }
@@ -342,16 +375,14 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.editingId.set(null);
     this.editingAgreementId.set(null);
     const agressoId =
-      row.agresso_agreement_id &&
-      row.agresso_agreement_id !== '—' &&
-      !row.agresso_agreement_id.includes('Derived')
-        ? row.agresso_agreement_id
-        : null;
+      row.agresso_agreement_id && row.agresso_agreement_id !== '—' && !row.agresso_agreement_id.includes('Derived') ? row.agresso_agreement_id : null;
     this.selectedAgreement.set(agressoId);
     this.selectedProjectId.set(row.clarisa_project_id);
     this.notes.set('');
     this.saveError.set(null);
     this.editSnapshot = null;
+    this.currentProjectOption = null;
+    this.resetStatusDraft(null);
     this.dialogOpen.set(true);
     void this.loadPickerOptions();
   }
@@ -370,15 +401,117 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
       clarisa_project_id: row.clarisa_project_id,
       notes: row.notes ?? ''
     };
+    this.currentProjectOption = this.projectOptionFromRow(row);
+    this.resetStatusDraft(row.is_active);
+    this.lastJustification.set(row.status_justification?.trim() ?? '');
     this.dialogOpen.set(true);
     void this.loadPickerOptions();
   }
 
-  /** Closes the dialog and resets transient state. */
+  /**
+   * Ignores a hide request while a confirmation or a save is in flight.
+   * A false value at any other time closes the dialog (one-way visible binding).
+   */
+  onDialogVisibleChange(visible: boolean): void {
+    if (visible) return;
+    if (this.confirmPending() || this.saving()) return;
+    this.finishClose();
+  }
+
+  /** Closes the dialog and resets transient state. No-op while a confirmation or save is in flight. */
   closeDialog(): void {
+    if (this.confirmPending() || this.saving()) return;
+    this.finishClose();
+  }
+
+  private finishClose(): void {
     this.dialogOpen.set(false);
     this.saveError.set(null);
     this.editSnapshot = null;
+    this.currentProjectOption = null;
+    this.lastJustification.set('');
+  }
+
+  /** Row fields the picker can label even when the CLARISA cohort omits this project. */
+  private projectOptionFromRow(row: BilateralProjectMapping): ClarisaBilateralProjectOption {
+    const shortName = row.clarisa_project_short_name?.trim() || `Project ${row.clarisa_project_id}`;
+    const fullName = row.clarisa_project_full_name?.trim();
+    const externalCode = row.clarisa_external_code?.trim();
+    return {
+      id: row.clarisa_project_id,
+      short_name: shortName,
+      ...(fullName ? { full_name: fullName } : {}),
+      ...(externalCode ? { external_code: externalCode } : {})
+    };
+  }
+
+  private withCurrentProject(options: ClarisaBilateralProjectOption[]): ClarisaBilateralProjectOption[] {
+    const current = this.currentProjectOption;
+    if (!current || options.some(option => option.id === current.id)) return options;
+    return [current, ...options];
+  }
+
+  private resetStatusDraft(initial: boolean | null): void {
+    this.confirmPending.set(false);
+    this.pickedProjectId = undefined;
+    this.justification.set('');
+    this.lastJustification.set('');
+    this.initialActive.set(initial);
+    this.statusActive.set(initial ?? true);
+  }
+
+  /**
+   * Dirty / required-field check. confirmPending and saving are not included here so
+   * onSave's re-entry guard is what stops a second confirmation.
+   */
+  private formSavable(): boolean {
+    if (this.dialogMode() === 'create') {
+      return !!this.selectedAgreement() && this.selectedProjectId() !== null;
+    }
+    if (this.statusChanged()) {
+      if (this.isInactivating()) return this.justification().trim().length > 0;
+      return this.selectedProjectId() !== null;
+    }
+    const snap = this.editSnapshot;
+    if (!snap) return false;
+    return this.selectedProjectId() !== snap.clarisa_project_id || this.notes() !== snap.notes;
+  }
+
+  onStatusToggle(value: boolean): void {
+    const initial = this.initialActive();
+    const was = this.statusActive();
+    const enteringInactivating = initial === true && was === true && value === false;
+    const leavingInactivating = initial === true && was === false && value === true;
+    this.statusActive.set(value);
+
+    if (enteringInactivating) {
+      this.pickedProjectId = this.selectedProjectId();
+      this.selectedProjectId.set(this.editSnapshot?.clarisa_project_id ?? null);
+    } else if (leavingInactivating && this.pickedProjectId !== undefined) {
+      this.selectedProjectId.set(this.pickedProjectId);
+      this.pickedProjectId = undefined;
+    }
+
+    if (was !== value) {
+      this.justification.set('');
+    }
+  }
+
+  onJustificationInput(value: string): void {
+    const clipped = value.length > NOTES_MAX_LENGTH ? value.slice(0, NOTES_MAX_LENGTH) : value;
+    this.justification.set(clipped);
+  }
+
+  private blurFocus(): void {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }
+
+  private focusSaveButton(): void {
+    queueMicrotask(() => {
+      const btn = document.querySelector('[data-testid="dialog-save-btn"]');
+      if (btn instanceof HTMLElement) btn.focus();
+    });
   }
 
   /**
@@ -390,12 +523,9 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     this.optionsLoading.set(true);
     this.agressoOptionsLoading.set(false);
     this.clarisaOptionsLoading.set(false);
-    const [agresso, clarisa] = await Promise.all([
-      this.service.loadAgressoOptions(),
-      this.service.loadClarisaProjectOptions()
-    ]);
+    const [agresso, clarisa] = await Promise.all([this.service.loadAgressoOptions(), this.service.loadClarisaProjectOptions()]);
     this.agressoOptions.set(agresso);
-    this.clarisaOptions.set(clarisa);
+    this.clarisaOptions.set(this.withCurrentProject(clarisa));
     this.optionsLoading.set(false);
   }
 
@@ -438,9 +568,16 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     return `${code} — ${title}`;
   }
 
-  /** Dispatches create or update depending on the current dialog mode. */
+  /** Dispatches create, update, or a confirmed status change depending on the dialog. */
   async onSave(): Promise<void> {
-    if (!this.canSave()) return;
+    if (this.confirmPending() || this.saving()) return;
+    if (!this.formSavable()) return;
+
+    if (this.dialogMode() === 'edit' && this.statusChanged()) {
+      this.openStatusConfirmation();
+      return;
+    }
+
     this.saving.set(true);
     this.saveError.set(null);
 
@@ -451,6 +588,96 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     }
 
     this.saving.set(false);
+  }
+
+  private openStatusConfirmation(): void {
+    const id = this.editingId();
+    if (id === null) return;
+
+    const activating = this.statusActive();
+    const notesEdited = this.editSnapshot !== null && this.notes() !== this.editSnapshot.notes;
+    const projectId = this.selectedProjectId();
+    const projectChanged = activating && this.editSnapshot !== null && projectId !== null && projectId !== this.editSnapshot.clarisa_project_id;
+    const trimmedJustification = this.justification().trim();
+    const plan: StatusChangePlan = {
+      id,
+      agreementId: this.editingAgreementId() ?? '',
+      target: activating ? 'activate' : 'deactivate',
+      ...(activating ? (trimmedJustification.length > 0 ? { justification: trimmedJustification } : {}) : { justification: trimmedJustification }),
+      ...(notesEdited ? { notes: this.notes().trim() } : {}),
+      ...(projectChanged && projectId !== null ? { clarisa_project_id: projectId } : {})
+    };
+    this.confirmPending.set(true);
+    this.blurFocus();
+
+    const verb = activating ? 'Activate' : 'Inactivate';
+    const participle = activating ? 'activated' : 'inactivated';
+    this.actions.showGlobalAlert({
+      severity: activating ? 'confirm' : 'secondary',
+      summary: `${verb} mapping`,
+      detail: `The mapping for agreement ${plan.agreementId} will be ${participle}. Continue?`,
+      hideCloseButton: true,
+      confirmCallback: {
+        label: verb,
+        event: () => {
+          void this.applyStatusChange(plan);
+        }
+      },
+      cancelCallback: {
+        label: 'Cancel',
+        event: () => {
+          this.confirmPending.set(false);
+          this.focusSaveButton();
+        }
+      }
+    });
+  }
+
+  private async applyStatusChange(plan: StatusChangePlan): Promise<void> {
+    this.confirmPending.set(false);
+    this.saving.set(true);
+    this.saveError.set(null);
+
+    try {
+      const activateOpts = this.activateOptions(plan);
+      const result =
+        plan.target === 'deactivate'
+          ? await this.service.deactivate(plan.id, plan.justification ?? '', ...(plan.notes !== undefined ? [plan.notes] : []))
+          : activateOpts
+            ? await this.service.activate(plan.id, activateOpts)
+            : await this.service.activate(plan.id);
+
+      if (result.ok) {
+        this.saving.set(false);
+        this.finishClose();
+        this.actions.showToast({
+          severity: 'success',
+          summary: 'Bilateral Mapping',
+          detail: plan.target === 'deactivate' ? 'Mapping inactivated' : 'Mapping activated'
+        });
+        void this.load();
+        void this.coverageComponent()?.loadCoverage();
+        this.clarity.trackEvent(plan.target === 'deactivate' ? 'bilateral.mapping.deactivated' : 'bilateral.mapping.activated', {
+          mapping_id: plan.id as unknown as string,
+          agresso_agreement_id: plan.agreementId as unknown as string
+        });
+        return;
+      }
+
+      this.saveError.set(result.message || 'An error occurred. Please try again.');
+      this.focusSaveButton();
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private activateOptions(plan: StatusChangePlan): { notes?: string; clarisa_project_id?: number; justification?: string } | undefined {
+    if (plan.notes === undefined && plan.clarisa_project_id === undefined && plan.justification === undefined) return undefined;
+    return {
+      ...(plan.notes !== undefined ? { notes: plan.notes } : {}),
+      ...(plan.clarisa_project_id !== undefined ? { clarisa_project_id: plan.clarisa_project_id } : {}),
+      ...(plan.justification !== undefined ? { justification: plan.justification } : {})
+    };
   }
 
   /** Executes the POST create flow (AC-05.4 / AC-05.5 / AC-05.6). */
@@ -471,7 +698,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
       // R-APM-006: the response distinguishes created vs updated. A missing outcome
       // stays on the created toast so older payloads keep the previous wording.
       const updated = result.data.outcome === 'updated';
-      this.closeDialog();
+      this.finishClose();
       this.actions.showToast({
         severity: 'success',
         summary: 'Bilateral Mapping',
@@ -489,100 +716,6 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
     // (already resolved to errorDetail.errors by the service; NOT errorDetail.description)
     // AC-05.6: 400 validation — same inline surface
     this.saveError.set(result.message || 'An error occurred. Please try again.');
-  }
-
-  // ── Deactivate action (T-BIL-CAM-06) ─────────────────────────────────────
-
-  /**
-   * Shows a confirmation alert before deactivating (AC-07.2).
-   * Only offered for rows where is_active === true; a no-op call on an
-   * inactive row is safe (AC-07.3) but the button is hidden by the template.
-   */
-  requestDeactivate(row: BilateralProjectMapping): void {
-    this.actions.showGlobalAlert({
-      severity: 'confirm',
-      summary: 'Deactivate mapping',
-      detail: `Deactivate the mapping for agreement ${row.agresso_agreement_id}?`,
-      confirmCallback: { label: 'Deactivate', event: () => { void this.confirmDeactivate(row); } },
-      cancelCallback: { label: 'Cancel' }
-    });
-  }
-
-  /**
-   * Executes the deactivate request after the user confirmed (AC-07.1).
-   * Updates the row in-place on success (AC-07.1), shows a success toast,
-   * fires the telemetry event (design §10).
-   * On failure shows an error toast — idempotent-friendly (AC-07.3).
-   */
-  async confirmDeactivate(row: BilateralProjectMapping): Promise<void> {
-    const result = await this.service.deactivate(row.id);
-
-    if (result.ok) {
-      // AC-07.1: update the row's is_active to false in-place in the rows() signal
-      this.rows.update(current =>
-        current.map(r => (r.id === row.id ? { ...r, is_active: false, mapping_status: 'Inactive' } : r))
-      );
-      this.actions.showToast({
-        severity: 'success',
-        summary: 'Bilateral Mapping',
-        detail: 'Mapping deactivated'
-      });
-      // Design §10 telemetry
-      this.clarity.trackEvent('bilateral.mapping.deactivated', {
-        mapping_id: row.id as unknown as string,
-        agresso_agreement_id: row.agresso_agreement_id as unknown as string
-      });
-      return;
-    }
-
-    // AC-07.3: surface the error without crashing; idempotent-friendly
-    this.actions.showToast({
-      severity: 'error',
-      summary: 'Bilateral Mapping',
-      detail: result.message || 'Could not deactivate mapping. Please try again.'
-    });
-  }
-
-  // ── Activate action (R-APM-011) — mirror of deactivate, on inactive rows ─
-
-  /**
-   * Confirmation before PATCH activate. The button sits in the deactivate slot
-   * and is only offered for inactive rows.
-   */
-  requestActivate(row: BilateralProjectMapping): void {
-    this.actions.showGlobalAlert({
-      severity: 'confirm',
-      summary: 'Activate mapping',
-      detail: `Activate the mapping for agreement ${row.agresso_agreement_id}?`,
-      confirmCallback: { label: 'Activate', event: () => { void this.confirmActivate(row); } },
-      cancelCallback: { label: 'Cancel' }
-    });
-  }
-
-  /** Calls activate, then reloads the list and the coverage strip. */
-  async confirmActivate(row: BilateralProjectMapping): Promise<void> {
-    const result = await this.service.activate(row.id);
-
-    if (result.ok) {
-      this.actions.showToast({
-        severity: 'success',
-        summary: 'Bilateral Mapping',
-        detail: 'Mapping activated'
-      });
-      this.clarity.trackEvent('bilateral.mapping.activated', {
-        mapping_id: row.id as unknown as string,
-        agresso_agreement_id: row.agresso_agreement_id as unknown as string
-      });
-      void this.load();
-      void this.coverageComponent()?.loadCoverage();
-      return;
-    }
-
-    this.actions.showToast({
-      severity: 'error',
-      summary: 'Bilateral Mapping',
-      detail: result.message || 'Could not activate mapping. Please try again.'
-    });
   }
 
   /** Executes the PATCH update flow (AC-06.2 / AC-06.3). */
@@ -603,7 +736,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
 
     if (result.ok) {
       // AC-06.2: close, toast, reload, telemetry
-      this.closeDialog();
+      this.finishClose();
       this.actions.showToast({ severity: 'success', summary: 'Bilateral Mapping', detail: 'Mapping updated' });
       void this.load();
       const projectId = this.selectedProjectId();

@@ -271,31 +271,40 @@ describe('BilateralProjectMappingController', () => {
   });
 
   describe('deactivate', () => {
-    it('passes optional notes through', async () => {
+    it('passes justification through', async () => {
       service.deactivate.mockResolvedValue({
         id: 5,
         is_active: false,
       } as never);
 
       const out = await controller.deactivate(reqUser as never, 5, {
-        notes: 'wrong project',
+        justification: 'wrong project',
       });
 
       expect(service.deactivate).toHaveBeenCalledWith(
         5,
         fakeUser,
         'wrong project',
+        undefined,
       );
       expect(out.status).toBe(HttpStatus.OK);
     });
 
-    it('works without a body', async () => {
+    it('passes a justification body and optional notes', async () => {
       service.deactivate.mockResolvedValue({
         id: 5,
         is_active: false,
       } as never);
-      const out = await controller.deactivate(reqUser as never, 5);
-      expect(service.deactivate).toHaveBeenCalledWith(5, fakeUser, undefined);
+      const out = await controller.deactivate(reqUser as never, 5, {
+        justification: 'Contract closed',
+        notes: 'fresh note',
+      });
+      expect(service.deactivate).toHaveBeenCalledWith(
+        5,
+        fakeUser,
+        'Contract closed',
+        'fresh note',
+      );
       expect(out.status).toBe(HttpStatus.OK);
     });
   });
@@ -365,6 +374,8 @@ describe('PATCH :id/activate (R-APM-011)', () => {
       5,
       expect.objectContaining({ sec_user_id: 42 }),
       'restored',
+      undefined,
+      undefined,
     );
   });
 
@@ -378,17 +389,198 @@ describe('PATCH :id/activate (R-APM-011)', () => {
     expect(activate).not.toHaveBeenCalled();
   });
 
-  it('PATCH :id/deactivate keeps optional notes through the validation pipe', async () => {
+  it('PATCH :id/deactivate passes a justification through the validation pipe', async () => {
     const res = await request(app.getHttpServer())
       .patch('/5/deactivate')
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
-      .send({ notes: 'wrong project' });
+      .send({ justification: 'wrong project' });
 
     expect(res.status).toBe(HttpStatus.OK);
     expect(deactivate).toHaveBeenCalledWith(
       5,
       expect.objectContaining({ sec_user_id: 42 }),
       'wrong project',
+      undefined,
+    );
+  });
+
+  const centerAdmin = () => JSON.stringify([SecRolesEnum.CENTER_ADMIN]);
+
+  it('AC.1 rejects {} and the error payload names justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({});
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/justification/);
+  });
+
+  it('AC.1 rejects whitespace-only justification and the error payload names justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: '   ' });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/justification/);
+    expect(JSON.stringify(res.body)).not.toMatch(/should not exist/);
+  });
+
+  it('AC.3 rejects a 501-character justification and the error payload names justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: 'a'.repeat(501) });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(
+      /justification must be shorter than or equal to 500 characters/,
+    );
+  });
+
+  it('AC.2 stores a padded justification trimmed', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: ' Contract closed ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'Contract closed',
+      undefined,
+    );
+  });
+
+  it('P-11 stores " x " as "x"', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: ' x ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'x',
+      undefined,
+    );
+  });
+
+  it('AC.4 accepts the admin-panel justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: 'Deactivated via admin panel' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'Deactivated via admin panel',
+      undefined,
+    );
+  });
+
+  it('rejects a body that sends notes without justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: 'x' });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/justification/);
+  });
+
+  it('trims optional notes and passes them with the justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: 'Contract closed', notes: '  side note  ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'Contract closed',
+      'side note',
+    );
+  });
+
+  it('PATCH :id/activate passes clarisa_project_id', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ clarisa_project_id: 77 });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      undefined,
+      77,
+      undefined,
+    );
+  });
+
+  it('AC.5 activate with an empty body returns 200', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({});
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalled();
+  });
+
+  it('R-MSE-008 trims an optional justification and passes it to activate', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: ' Contract renewed ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      undefined,
+      undefined,
+      'Contract renewed',
+    );
+  });
+
+  it('R-MSE-008 accepts a blank justification without rejecting it', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: '   ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      undefined,
+      undefined,
+      '',
+    );
+  });
+
+  it('R-MSE-008 rejects a 501-character justification and the error payload names justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: 'a'.repeat(501) });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(activate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(
+      /justification must be shorter than or equal to 500 characters/,
     );
   });
 

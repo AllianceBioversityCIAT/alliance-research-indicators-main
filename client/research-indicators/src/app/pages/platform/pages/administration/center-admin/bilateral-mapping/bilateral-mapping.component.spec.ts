@@ -1,4 +1,5 @@
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-03, T-BIL-CAM-05, T-BIL-CAM-06)
+// @sdd-spec docs/specs/bilateral/mapping-status-in-edit-modal (T-03 / R-MSE-001..004)
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -108,6 +109,7 @@ describe('BilateralMappingComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BilateralMappingComponent],
       providers: [
+        provideNoopAnimations(),
         { provide: BilateralMappingService, useValue: mockService },
         { provide: ActionsService, useValue: mockActions },
         { provide: ClarityService, useValue: mockClarity }
@@ -543,11 +545,7 @@ describe('BilateralMappingComponent', () => {
     });
 
     it('sorts the Year column by reporting_year', () => {
-      const data = [
-        makeRow({ id: 1, reporting_year: 2028 }),
-        makeRow({ id: 2, reporting_year: 2026 }),
-        makeRow({ id: 3, reporting_year: 2027 })
-      ];
+      const data = [makeRow({ id: 1, reporting_year: 2028 }), makeRow({ id: 2, reporting_year: 2026 }), makeRow({ id: 3, reporting_year: 2027 })];
 
       component.onSort({ data, field: 'reporting_year', order: 1 });
       expect(data.map(r => r.reporting_year)).toEqual([2026, 2027, 2028]);
@@ -1062,13 +1060,11 @@ describe('BilateralMappingComponent', () => {
 
   describe('agressoOptionLabel', () => {
     it('returns "id — description" when description is present', () => {
-      expect(component.agressoOptionLabel({ agreement_id: 'A511', description: 'ACIAR Bilateral' }))
-        .toBe('A511 — ACIAR Bilateral');
+      expect(component.agressoOptionLabel({ agreement_id: 'A511', description: 'ACIAR Bilateral' })).toBe('A511 — ACIAR Bilateral');
     });
 
     it('returns just the id when description is empty', () => {
-      expect(component.agressoOptionLabel({ agreement_id: 'A511', description: '' }))
-        .toBe('A511');
+      expect(component.agressoOptionLabel({ agreement_id: 'A511', description: '' })).toBe('A511');
     });
   });
 
@@ -1184,219 +1180,379 @@ describe('BilateralMappingComponent', () => {
     });
   });
 
-  // ── T-BIL-CAM-06: Deactivate with confirmation (AC-07.1 / AC-07.2 / AC-07.3) ──
+  // ── R-MSE-001..004: status lives in the Edit modal ─────────────────────────
 
-  describe('requestDeactivate — confirmation gate (AC-07.2)', () => {
-    const activeRow = makeRow({ id: 1, agresso_agreement_id: 'A511', is_active: true });
-
-    beforeEach(async () => {
-      mockService.list.mockResolvedValue(makePage([activeRow]));
-      fixture.detectChanges();
-      await fixture.whenStable();
-      await delayMs(0);
-      fixture.detectChanges();
-    });
-
-    it('calls ActionsService.showGlobalAlert with correct shape and does NOT call service.deactivate (AC-07.2)', () => {
-      component.requestDeactivate(activeRow);
-
-      expect(mockActions.showGlobalAlert).toHaveBeenCalledTimes(1);
-      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-      expect(arg.severity).toBe('confirm');
-      expect(arg.summary).toBe('Deactivate mapping');
-      expect(arg.detail).toContain('A511');
-      expect(typeof arg.confirmCallback?.event).toBe('function');
-      expect(arg.cancelCallback?.label).toBe('Cancel');
-
-      // Not called yet — confirmation not fired
-      expect(mockService.deactivate).not.toHaveBeenCalled();
-    });
-
-    it('cancel (never invoking the confirmCallback) does NOT call service.deactivate (AC-07.2)', () => {
-      component.requestDeactivate(activeRow);
-      // Cancel: do NOT invoke the confirmCallback.event
-      expect(mockService.deactivate).not.toHaveBeenCalled();
-    });
-
-    it('invoking confirmCallback.event triggers service.deactivate (AC-07.2)', async () => {
-      mockService.deactivate.mockResolvedValue({ ok: true, data: { ...activeRow, is_active: false } });
-      component.rows.set([activeRow]);
-
-      component.requestDeactivate(activeRow);
-      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-
-      // Simulate user clicking "Deactivate" in the alert
-      arg.confirmCallback?.event?.();
-      await fixture.whenStable();
-      await delayMs(0);
-
-      expect(mockService.deactivate).toHaveBeenCalledWith(activeRow.id);
-    });
-  });
-
-  describe('confirmDeactivate — success path (AC-07.1)', () => {
-    const activeRow = makeRow({ id: 1, agresso_agreement_id: 'A511', is_active: true });
-
-    beforeEach(async () => {
-      mockService.list.mockResolvedValue(makePage([activeRow]));
-      fixture.detectChanges();
-      await fixture.whenStable();
-      await delayMs(0);
-    });
-
-    it('updates the row is_active to false in-place, shows success toast, fires trackEvent (AC-07.1)', async () => {
-      const deactivatedRow = { ...activeRow, is_active: false };
-      mockService.deactivate.mockResolvedValue({ ok: true, data: deactivatedRow });
-      component.rows.set([activeRow]);
-
-      await component.confirmDeactivate(activeRow);
-      await fixture.whenStable();
-      await delayMs(0);
-
-      // Row mutated in-place — no full reload required
-      const updatedRows = component.rows();
-      expect(updatedRows[0].is_active).toBe(false);
-
-      // Success toast (AC-07.1)
-      expect(mockActions.showToast).toHaveBeenCalledWith({
-        severity: 'success',
-        summary: 'Bilateral Mapping',
-        detail: 'Mapping deactivated'
-      });
-
-      // Telemetry (design §10)
-      expect(mockClarity.trackEvent).toHaveBeenCalledWith('bilateral.mapping.deactivated', {
-        mapping_id: activeRow.id,
-        agresso_agreement_id: activeRow.agresso_agreement_id
-      });
-    });
-
-    it('only mutates the target row; other rows remain unchanged', async () => {
-      const otherRow = makeRow({ id: 2, agresso_agreement_id: 'D527', is_active: true });
-      mockService.deactivate.mockResolvedValue({ ok: true, data: { ...activeRow, is_active: false } });
-      component.rows.set([activeRow, otherRow]);
-
-      await component.confirmDeactivate(activeRow);
-      await fixture.whenStable();
-      await delayMs(0);
-
-      const updatedRows = component.rows();
-      expect(updatedRows.find(r => r.id === 1)?.is_active).toBe(false);
-      expect(updatedRows.find(r => r.id === 2)?.is_active).toBe(true);
-    });
-  });
-
-  describe('confirmDeactivate — failure path (AC-07.3)', () => {
-    const activeRow = makeRow({ id: 1, agresso_agreement_id: 'A511', is_active: true });
-
-    beforeEach(async () => {
-      mockService.list.mockResolvedValue(makePage([activeRow]));
-      fixture.detectChanges();
-      await fixture.whenStable();
-      await delayMs(0);
-    });
-
-    it('shows an error toast with result.message and does not change is_active on failure (AC-07.3)', async () => {
-      const errorMessage = 'Mapping not found';
-      mockService.deactivate.mockResolvedValue({ ok: false, status: 404, message: errorMessage });
-      component.rows.set([activeRow]);
-
-      await component.confirmDeactivate(activeRow);
-      await fixture.whenStable();
-      await delayMs(0);
-
-      // Row not mutated
-      expect(component.rows()[0].is_active).toBe(true);
-
-      // Error toast surfaced (AC-07.3)
-      expect(mockActions.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'error', detail: errorMessage })
+  describe('Mapping status in the Edit modal (R-MSE-001..004)', () => {
+    function byTestId(id: string): HTMLElement | null {
+      return (
+        (fixture.nativeElement.querySelector(`[data-testid="${id}"]`) as HTMLElement | null) ??
+        (document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null)
       );
+    }
 
-      // No telemetry on failure
-      expect(mockClarity.trackEvent).not.toHaveBeenCalled();
-    });
-
-    it('deactivating an already-inactive row — ok:false does not crash the UI (AC-07.3)', async () => {
-      const inactiveRow = makeRow({ id: 3, is_active: false });
-      mockService.deactivate.mockResolvedValue({ ok: false, status: 400, message: 'Already inactive' });
-      component.rows.set([inactiveRow]);
-
-      // Must not throw
-      await expect(component.confirmDeactivate(inactiveRow)).resolves.toBeUndefined();
-
-      expect(component.rows()[0].is_active).toBe(false); // unchanged
-    });
-  });
-
-  describe('Deactivate button visibility (AC-07.3)', () => {
-    it('renders the Deactivate button only for active rows', async () => {
-      const activeRow = makeRow({ id: 1, is_active: true });
-      const inactiveRow = makeRow({ id: 2, is_active: false });
-      mockService.list.mockResolvedValue(makePage([activeRow, inactiveRow]));
-
+    async function renderClosed(rows: BilateralProjectMapping[]): Promise<void> {
+      mockService.list.mockResolvedValue(makePage(rows));
       fixture.detectChanges();
       await fixture.whenStable();
       await delayMs(0);
       fixture.detectChanges();
+    }
 
-      const deactivateBtns = fixture.nativeElement.querySelectorAll('[data-testid="deactivate-btn"]');
-      expect(deactivateBtns.length).toBe(1);
-    });
-
-    it('renders no Deactivate button when all rows are inactive', async () => {
-      const inactiveRow1 = makeRow({ id: 1, is_active: false });
-      const inactiveRow2 = makeRow({ id: 2, is_active: false });
-      mockService.list.mockResolvedValue(makePage([inactiveRow1, inactiveRow2]));
-
+    async function openEdit(row: BilateralProjectMapping): Promise<void> {
+      component.openEditDialog(row);
       fixture.detectChanges();
       await fixture.whenStable();
       await delayMs(0);
       fixture.detectChanges();
+    }
 
-      const deactivateBtns = fixture.nativeElement.querySelectorAll('[data-testid="deactivate-btn"]');
-      expect(deactivateBtns.length).toBe(0);
-    });
-  });
-
-  describe('Activate action (R-APM-011)', () => {
-    const inactiveRow = makeRow({ id: 4, agresso_agreement_id: 'A1697', is_active: false, mapping_status: 'Inactive' });
-
-    beforeEach(async () => {
-      mockService.list.mockResolvedValue(makePage([inactiveRow, makeRow({ id: 1, is_active: true })]));
+    function clickStatusToggle(): void {
+      const host = byTestId('status-toggle');
+      expect(host).not.toBeNull();
+      const clickable = host!.querySelector('[data-pc-section="root"]') as HTMLElement | null;
+      expect(clickable).not.toBeNull();
+      clickable!.click();
       fixture.detectChanges();
+    }
+
+    /** p-select applies the selected label in an effect, after the binding CD. */
+    async function flushPickerLabel(): Promise<void> {
       await fixture.whenStable();
       await delayMs(0);
       fixture.detectChanges();
+    }
+
+    function setJustification(value: string): void {
+      const area = byTestId('justification-input') as HTMLTextAreaElement | null;
+      expect(area).not.toBeNull();
+      area!.value = value;
+      area!.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+    }
+
+    function statusInput(): HTMLInputElement | null {
+      return byTestId('status-toggle')?.querySelector('input') ?? null;
+    }
+
+    afterEach(() => {
+      document.body.querySelectorAll('.p-dialog, .p-dialog-mask, .p-component-overlay').forEach(node => node.remove());
     });
 
-    it('renders Activate on inactive rows and Deactivate on active rows', () => {
+    it('renders edit on active and inactive rows and no deactivate or activate action (R-MSE-001)', async () => {
+      const activeRow = makeRow({ id: 1, is_active: true, mapping_status: 'Mapped' });
+      const inactiveRow = makeRow({ id: 2, is_active: false, mapping_status: 'Inactive', agresso_agreement_id: 'A1697' });
+      await renderClosed([activeRow, inactiveRow]);
+
       const root: HTMLElement = fixture.nativeElement;
-      expect(root.querySelectorAll('[data-testid="activate-btn"]').length).toBe(1);
-      expect(root.querySelectorAll('[data-testid="deactivate-btn"]').length).toBe(1);
+      expect(root.querySelectorAll('[data-testid="deactivate-btn"]').length).toBe(0);
+      expect(root.querySelectorAll('[data-testid="activate-btn"]').length).toBe(0);
+      expect(root.querySelectorAll('[data-testid="edit-btn"]').length).toBe(2);
+      expect(root.querySelectorAll('[data-testid="pending-map-btn"]').length).toBe(0);
     });
 
-    it('asks for confirmation and does not call activate until the admin confirms', () => {
-      component.requestActivate(inactiveRow);
-      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-      expect(arg.summary).toBe('Activate mapping');
+    it('renders only + Map on a Pending row and on an UNMAPPED row (R-MSE-001)', async () => {
+      const pending = makeRow({ id: 3, mapping_status: 'Pending', is_active: false, source: 'MANUAL' });
+      const unmapped = makeRow({ id: 4, source: 'UNMAPPED', is_active: true, mapping_status: 'Mapped' });
+      await renderClosed([pending, unmapped]);
+
+      const root: HTMLElement = fixture.nativeElement;
+      expect(root.querySelectorAll('[data-testid="pending-map-btn"]').length).toBe(2);
+      expect(root.querySelectorAll('[data-testid="edit-btn"]').length).toBe(0);
+      expect(root.querySelectorAll('[data-testid="deactivate-btn"]').length).toBe(0);
+      expect(root.querySelectorAll('[data-testid="activate-btn"]').length).toBe(0);
+    });
+
+    it('shows a Status control that reads Active in edit and omits it from create and + Map (R-MSE-002)', async () => {
+      const activeRow = makeRow({ id: 11, is_active: true, agresso_agreement_id: 'A511' });
+      await renderClosed([activeRow]);
+      await openEdit(activeRow);
+
+      const input = statusInput();
+      expect(input).not.toBeNull();
+      expect(input!.getAttribute('aria-label')).toBe('Mapping status: Active');
+      expect(input!.getAttribute('aria-checked')).toBe('true');
+      const statusLabel = document.querySelector('label[for="bilMapStatusToggle"]');
+      expect(statusLabel?.textContent).toContain('Status');
+      expect(byTestId('status-toggle')?.parentElement?.textContent).toContain('Active');
+
+      component.closeDialog();
+      fixture.detectChanges();
+      component.openCreateDialog();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(byTestId('status-toggle')).toBeNull();
+
+      component.closeDialog();
+      fixture.detectChanges();
+      component.openMapDialogForPending(makeRow({ id: 3, mapping_status: 'Pending', source: 'MANUAL' }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(byTestId('status-toggle')).toBeNull();
+      expect(mockService.activate).not.toHaveBeenCalled();
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+    });
+
+    it('shows the stored justification under Status as soon as Edit opens (R-MSE-008)', async () => {
+      const row = makeRow({
+        id: 60,
+        is_active: true,
+        status_justification: 'Contract closed',
+        agresso_agreement_id: 'A511'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      const line = byTestId('last-justification');
+      expect(line).not.toBeNull();
+      expect(line!.textContent).toContain('Last justification');
+      expect(line!.textContent).toContain('Contract closed');
+      expect(byTestId('justification-input')).toBeNull();
+    });
+
+    it('hides Last justification when the row has none (R-MSE-008)', async () => {
+      const row = makeRow({ id: 61, status_justification: null, agresso_agreement_id: 'A1697' });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      expect(byTestId('last-justification')).toBeNull();
+    });
+
+    it('hides Last justification in the create dialog (R-MSE-008)', async () => {
+      await renderClosed([]);
+      component.openCreateDialog();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(byTestId('last-justification')).toBeNull();
+    });
+
+    it('enables Save when an inactive mapping is switched to Active and nothing else changes (R-MSE-002)', async () => {
+      const inactiveRow = makeRow({
+        id: 4,
+        is_active: false,
+        mapping_status: 'Inactive',
+        agresso_agreement_id: 'A1697',
+        notes: 'kept'
+      });
+      await renderClosed([inactiveRow]);
+      await openEdit(inactiveRow);
+
+      expect(statusInput()?.getAttribute('aria-label')).toBe('Mapping status: Inactive');
+      expect(component.canSave()).toBe(false);
+      clickStatusToggle();
+
+      expect(component.canSave()).toBe(true);
+      const saveBtn = byTestId('dialog-save-btn') as HTMLButtonElement | null;
+      expect(saveBtn).not.toBeNull();
+      expect(saveBtn!.disabled).toBe(false);
+      expect(mockService.activate).not.toHaveBeenCalled();
+      expect(mockService.update).not.toHaveBeenCalled();
+    });
+
+    it('restores the picked project after a status round trip and the deactivate plan carries no project (R-MSE-002)', async () => {
+      const row = makeRow({
+        id: 7,
+        is_active: true,
+        clarisa_project_id: 22,
+        agresso_agreement_id: 'A511',
+        notes: 'old note'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      component.selectedProjectId.set(99);
+      fixture.detectChanges();
+      await flushPickerLabel();
+      expect(component.selectedProjectId()).toBe(99);
+      expect(byTestId('clarisa-picker')?.textContent).toContain('USAID');
+
+      clickStatusToggle();
+      await flushPickerLabel();
+      expect(component.selectedProjectId()).toBe(22);
+      expect(byTestId('clarisa-picker')?.classList.contains('p-disabled')).toBe(true);
+      expect(byTestId('clarisa-picker')?.textContent).toContain('ACIAR');
+
+      clickStatusToggle();
+      await flushPickerLabel();
+      expect(component.selectedProjectId()).toBe(99);
+      expect(byTestId('clarisa-picker')?.classList.contains('p-disabled')).toBe(false);
+      expect(byTestId('clarisa-picker')?.textContent).toContain('USAID');
+
+      clickStatusToggle();
+      setJustification('Contract closed');
+      mockService.deactivate.mockResolvedValue({ ok: true, data: { ...row, is_active: false } });
+      await component.onSave();
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.deactivate).toHaveBeenCalledTimes(1);
+      expect(mockService.deactivate).toHaveBeenCalledWith(7, 'Contract closed');
+      expect(mockService.update).not.toHaveBeenCalled();
       expect(mockService.activate).not.toHaveBeenCalled();
     });
 
-    it('calls activate and reloads the list after confirmation', async () => {
-      mockService.activate.mockResolvedValue({ ok: true, data: { ...inactiveRow, is_active: true } });
-      const callsBefore = mockService.list.mock.calls.length;
+    it('keeps Notes and shows an empty Justification below Status (R-MSE-003, R-MSE-006)', async () => {
+      const row = makeRow({ id: 8, is_active: true, notes: 'old note', agresso_agreement_id: 'A511' });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      expect(byTestId('notes-input')).not.toBeNull();
+      clickStatusToggle();
+
+      const area = byTestId('justification-input') as HTMLTextAreaElement | null;
+      const notes = byTestId('notes-input');
+      const picker = byTestId('clarisa-picker');
+      expect(area).not.toBeNull();
+      expect(notes).not.toBeNull();
+      expect((notes as HTMLTextAreaElement).value).toBe('old note');
+      expect(area!.compareDocumentPosition(picker!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(area!.value).toBe('');
+      expect(area!.getAttribute('placeholder')).toBe('Why is this mapping being inactivated?');
+      expect(component.canSave()).toBe(false);
+
+      setJustification('   ');
+      expect(component.canSave()).toBe(false);
+      await component.onSave();
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+      expect(mockService.update).not.toHaveBeenCalled();
+      expect(mockService.activate).not.toHaveBeenCalled();
+      expect(mockActions.showGlobalAlert).not.toHaveBeenCalled();
+
+      setJustification('reason');
+      expect(component.canSave()).toBe(true);
+      clickStatusToggle();
+      expect(byTestId('notes-input')).not.toBeNull();
+      clickStatusToggle();
+      const reentered = byTestId('justification-input') as HTMLTextAreaElement | null;
+      expect(reentered).not.toBeNull();
+      expect(reentered!.value).toBe('');
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('opens one confirmation and ignores a second Save, hide, and close until Cancel (R-MSE-004)', async () => {
+      const row = makeRow({ id: 9, is_active: true, notes: 'old note', agresso_agreement_id: 'D504' });
+      await renderClosed([row]);
+      await openEdit(row);
+      clickStatusToggle();
+      setJustification('  Contract closed  ');
+
+      await component.onSave();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(mockActions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert).toEqual(
+        expect.objectContaining({
+          severity: 'secondary',
+          summary: 'Inactivate mapping',
+          detail: 'The mapping for agreement D504 will be inactivated. Continue?',
+          hideCloseButton: true
+        })
+      );
+      expect(alert.confirmCallback?.label).toBe('Inactivate');
+      expect(alert.cancelCallback?.label).toBe('Cancel');
+      expect(component.canSave()).toBe(false);
+      expect((byTestId('dialog-save-btn') as HTMLButtonElement).disabled).toBe(true);
+      expect((byTestId('dialog-cancel-btn') as HTMLButtonElement).disabled).toBe(true);
+      expect(byTestId('status-toggle')?.querySelector('[data-pc-section="root"]')?.classList.contains('p-disabled')).toBe(true);
+      expect((byTestId('justification-input') as HTMLTextAreaElement).disabled).toBe(true);
+
+      await component.onSave();
+      expect(mockActions.showGlobalAlert).toHaveBeenCalledTimes(1);
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+
+      component.onDialogVisibleChange(false);
+      expect(component.dialogOpen()).toBe(true);
+      expect(component.justification().trim()).toBe('Contract closed');
+      component.closeDialog();
+      expect(component.dialogOpen()).toBe(true);
+      expect(component.statusActive()).toBe(false);
+
+      alert.cancelCallback?.event?.();
+      fixture.detectChanges();
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+      expect(component.dialogOpen()).toBe(true);
+      expect(component.confirmPending()).toBe(false);
+      expect(component.justification()).toBe('  Contract closed  ');
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('sends the justification captured at Save, then closes with the inactivated toast (R-MSE-003, R-MSE-004)', async () => {
+      const row = makeRow({ id: 10, is_active: true, notes: 'old note', agresso_agreement_id: 'A511' });
+      await renderClosed([row]);
+      await openEdit(row);
+      clickStatusToggle();
+      setJustification('  Contract closed  ');
+      mockService.deactivate.mockResolvedValue({
+        ok: true,
+        data: { ...row, is_active: false, status_justification: 'Contract closed' }
+      });
+      mockService.list.mockResolvedValue(
+        makePage([{ ...row, is_active: false, status_justification: 'Contract closed', mapping_status: 'Inactive' }])
+      );
+      const listCallsBefore = mockService.list.mock.calls.length;
       const coverageBefore = mockService.getCoverage.mock.calls.length;
 
-      component.requestActivate(inactiveRow);
-      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-      arg.confirmCallback?.event?.();
+      await component.onSave();
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+      component.justification.set('changed after save');
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+      fixture.detectChanges();
+
+      expect(mockService.deactivate).toHaveBeenCalledTimes(1);
+      expect(mockService.deactivate).toHaveBeenCalledWith(10, 'Contract closed');
+      expect(component.dialogOpen()).toBe(false);
+      expect(mockActions.showToast).toHaveBeenCalledWith({
+        severity: 'success',
+        summary: 'Bilateral Mapping',
+        detail: 'Mapping inactivated'
+      });
+      expect(mockClarity.trackEvent).toHaveBeenCalledWith('bilateral.mapping.deactivated', {
+        mapping_id: 10,
+        agresso_agreement_id: 'A511'
+      });
+      expect(mockService.list.mock.calls.length).toBeGreaterThan(listCallsBefore);
+      expect(mockService.getCoverage.mock.calls.length).toBeGreaterThan(coverageBefore);
+    });
+
+    it('activates with edited notes and omits notes when they were not edited (R-MSE-004)', async () => {
+      const edited = makeRow({
+        id: 12,
+        is_active: false,
+        mapping_status: 'Inactive',
+        notes: 'old note',
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([edited]);
+      await openEdit(edited);
+      component.notes.set('kept note');
+      clickStatusToggle();
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...edited, is_active: true, notes: 'kept note' } });
+
+      await component.onSave();
+      const editedAlert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(editedAlert.summary).toBe('Activate mapping');
+      expect(editedAlert.detail).toBe('The mapping for agreement A1697 will be activated. Continue?');
+      expect(editedAlert.confirmCallback?.label).toBe('Activate');
+      expect(editedAlert.hideCloseButton).toBe(true);
+      expect(mockService.activate).not.toHaveBeenCalled();
+      editedAlert.confirmCallback?.event?.();
       await fixture.whenStable();
       await delayMs(0);
 
-      expect(mockService.activate).toHaveBeenCalledWith(inactiveRow.id);
-      expect(mockService.list.mock.calls.length).toBeGreaterThan(callsBefore);
-      expect(mockService.getCoverage.mock.calls.length).toBeGreaterThan(coverageBefore);
+      expect(mockService.activate).toHaveBeenCalledTimes(1);
+      expect(mockService.activate).toHaveBeenCalledWith(12, { notes: 'kept note' });
       expect(mockActions.showToast).toHaveBeenCalledWith({
         severity: 'success',
         summary: 'Bilateral Mapping',
@@ -1404,26 +1560,342 @@ describe('BilateralMappingComponent', () => {
       });
     });
 
-    it('shows an error toast and does not report the list as activated when activate fails', async () => {
-      mockService.activate.mockResolvedValue({ ok: false, status: 404, message: 'Mapping not found' });
-      const callsBefore = mockService.list.mock.calls.length;
+    it('omits notes on activate when they were not edited (R-MSE-004)', async () => {
+      const plain = makeRow({
+        id: 13,
+        is_active: false,
+        mapping_status: 'Inactive',
+        notes: 'unchanged',
+        agresso_agreement_id: 'D527'
+      });
+      await renderClosed([plain]);
+      await openEdit(plain);
+      clickStatusToggle();
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...plain, is_active: true } });
 
-      component.requestActivate(inactiveRow);
-      const arg = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
-      arg.confirmCallback?.event?.();
+      await component.onSave();
+      const plainAlert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(mockService.activate).not.toHaveBeenCalled();
+      plainAlert.confirmCallback?.event?.();
       await fixture.whenStable();
       await delayMs(0);
 
-      expect(mockActions.showToast).toHaveBeenCalledWith({
-        severity: 'error',
-        summary: 'Bilateral Mapping',
-        detail: 'Mapping not found'
-      });
-      expect(mockActions.showToast).not.toHaveBeenCalledWith(
-        expect.objectContaining({ detail: 'Mapping activated' })
+      expect(mockService.activate).toHaveBeenCalledTimes(1);
+      expect(mockService.activate).toHaveBeenCalledWith(13);
+    });
+
+    it('keeps the dialog open with the inline error when the status request fails (R-MSE-004)', async () => {
+      const row = makeRow({ id: 14, is_active: true, notes: 'old note', agresso_agreement_id: 'A511' });
+      await renderClosed([row]);
+      await openEdit(row);
+      clickStatusToggle();
+      setJustification('Contract closed');
+
+      let resolveDeactivate: (value: { ok: boolean; status: number; message: string }) => void = () => undefined;
+      mockService.deactivate.mockReturnValue(
+        new Promise(resolve => {
+          resolveDeactivate = resolve;
+        })
       );
-      expect(mockService.list.mock.calls.length).toBe(callsBefore);
-      expect(component.rows().find(row => row.id === inactiveRow.id)?.is_active).toBe(false);
+
+      await component.onSave();
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      expect(component.saving()).toBe(true);
+      component.onDialogVisibleChange(false);
+      expect(component.dialogOpen()).toBe(true);
+      component.closeDialog();
+      expect(component.dialogOpen()).toBe(true);
+
+      resolveDeactivate({ ok: false, status: 400, message: 'Agreement is closed' });
+      await fixture.whenStable();
+      await delayMs(0);
+      fixture.detectChanges();
+
+      expect(component.dialogOpen()).toBe(true);
+      expect(component.saving()).toBe(false);
+      expect(byTestId('save-error')?.textContent).toContain('Agreement is closed');
+      expect(mockActions.showToast).not.toHaveBeenCalled();
+      expect(mockClarity.trackEvent).not.toHaveBeenCalled();
+    });
+
+    it('closes the dialog when visibleChange is false and nothing is pending (R2-1)', async () => {
+      const row = makeRow({ id: 15, is_active: true });
+      await renderClosed([row]);
+      await openEdit(row);
+      expect(component.dialogOpen()).toBe(true);
+
+      const gate = (component as unknown as { onDialogVisibleChange?: (visible: boolean) => void }).onDialogVisibleChange;
+      expect(typeof gate).toBe('function');
+      gate!.call(component, false);
+      expect(component.dialogOpen()).toBe(false);
+    });
+
+    it('saves a notes-only edit with one update and no confirmation (R-MSE-004)', async () => {
+      const row = makeRow({ id: 16, is_active: true, clarisa_project_id: 22, notes: 'original' });
+      await renderClosed([row]);
+      await openEdit(row);
+      component.notes.set('only notes');
+      mockService.update.mockResolvedValue({ ok: true, data: { ...row, notes: 'only notes' } });
+
+      await component.onSave();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockActions.showGlobalAlert).not.toHaveBeenCalled();
+      expect(mockService.update).toHaveBeenCalledTimes(1);
+      expect(mockService.update).toHaveBeenCalledWith(16, { notes: 'only notes' });
+      expect(mockService.deactivate).not.toHaveBeenCalled();
+      expect(mockService.activate).not.toHaveBeenCalled();
+    });
+
+    it('keeps the CLARISA picker enabled when activating and disabled when inactivating (R-MSE-007)', async () => {
+      const inactive = makeRow({
+        id: 21,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 22,
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([inactive]);
+      await openEdit(inactive);
+
+      expect(byTestId('clarisa-picker')?.classList.contains('p-disabled')).toBe(false);
+      clickStatusToggle();
+      expect(component.statusActive()).toBe(true);
+      expect(byTestId('clarisa-picker')?.classList.contains('p-disabled')).toBe(false);
+      expect(component.canSave()).toBe(true);
+      component.selectedProjectId.set(null);
+      fixture.detectChanges();
+      expect(component.canSave()).toBe(false);
+    });
+
+    it('disables the CLARISA picker while inactivating (R-MSE-007)', async () => {
+      const active = makeRow({ id: 22, is_active: true, clarisa_project_id: 22, agresso_agreement_id: 'A511' });
+      await renderClosed([active]);
+      await openEdit(active);
+      clickStatusToggle();
+      expect(byTestId('clarisa-picker')?.classList.contains('p-disabled')).toBe(true);
+    });
+
+    it('sends the changed project on activate and edited notes on deactivate (R-MSE-006, R-MSE-007)', async () => {
+      const inactive = makeRow({
+        id: 30,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 22,
+        notes: 'old note',
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([inactive]);
+      await openEdit(inactive);
+      clickStatusToggle();
+      component.selectedProjectId.set(99);
+      fixture.detectChanges();
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...inactive, is_active: true, clarisa_project_id: 99 } });
+
+      await component.onSave();
+      const activateAlert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(mockService.activate).not.toHaveBeenCalled();
+      activateAlert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.activate).toHaveBeenCalledTimes(1);
+      expect(mockService.activate).toHaveBeenCalledWith(30, { clarisa_project_id: 99 });
+      expect(mockService.update).not.toHaveBeenCalled();
+
+      const active = makeRow({
+        id: 31,
+        is_active: true,
+        clarisa_project_id: 22,
+        notes: 'old note',
+        agresso_agreement_id: 'A511'
+      });
+      await renderClosed([active]);
+      await openEdit(active);
+      clickStatusToggle();
+      setJustification('Contract closed');
+      const notes = byTestId('notes-input') as HTMLTextAreaElement;
+      notes.value = 'fresh note';
+      notes.dispatchEvent(new Event('input', { bubbles: true }));
+      fixture.detectChanges();
+      mockService.deactivate.mockResolvedValue({ ok: true, data: { ...active, is_active: false } });
+
+      await component.onSave();
+      const deactivateAlert = mockActions.showGlobalAlert.mock.calls.at(-1)?.[0] as GlobalAlert;
+      deactivateAlert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.deactivate).toHaveBeenCalledWith(31, 'Contract closed', 'fresh note');
+    });
+
+    it('shows the inactive row project when the loaded options omit it (R-MSE-007)', async () => {
+      const row = makeRow({
+        id: 40,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 77,
+        clarisa_project_short_name: 'ORPHAN',
+        clarisa_project_full_name: 'Orphan bilateral',
+        clarisa_external_code: 'B-A1697',
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+      await flushPickerLabel();
+
+      expect(component.clarisaOptions().some(option => option.id === 77)).toBe(true);
+      expect(byTestId('clarisa-picker')?.textContent).toContain('B-A1697 — Orphan bilateral');
+    });
+
+    it('does not keep the previous row project once the next edit project is already in the cohort', async () => {
+      const rowA = makeRow({
+        id: 41,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 77,
+        clarisa_project_short_name: 'ORPHAN',
+        clarisa_project_full_name: 'Orphan bilateral'
+      });
+      const rowB = makeRow({
+        id: 42,
+        is_active: true,
+        clarisa_project_id: 22,
+        clarisa_project_short_name: 'ACIAR'
+      });
+      await renderClosed([rowA, rowB]);
+      await openEdit(rowA);
+      await flushPickerLabel();
+      expect(component.clarisaOptions().some(option => option.id === 77)).toBe(true);
+
+      component.closeDialog();
+      fixture.detectChanges();
+      await openEdit(rowB);
+      await flushPickerLabel();
+
+      expect(component.clarisaOptions().some(option => option.id === 77)).toBe(false);
+      expect(component.clarisaOptions().filter(option => option.id === 22)).toHaveLength(1);
+    });
+
+    it('shows an optional Justification when activating and clears it on the way back (R-MSE-008)', async () => {
+      const row = makeRow({
+        id: 50,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 22,
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      expect(byTestId('justification-input')).toBeNull();
+      clickStatusToggle();
+
+      const area = byTestId('justification-input') as HTMLTextAreaElement | null;
+      const label = document.querySelector('label[for="bilMapJustification"]');
+      expect(area).not.toBeNull();
+      expect(label?.textContent).toContain('Justification');
+      expect(label?.textContent).toContain('(optional)');
+      expect(label?.querySelector('.atc-red-1')).toBeNull();
+      expect(area!.getAttribute('aria-required')).not.toBe('true');
+      expect(area!.getAttribute('placeholder')).toBe('Why is this mapping being activated?');
+      expect(area!.value).toBe('');
+      expect(component.canSave()).toBe(true);
+
+      setJustification('Contract renewed');
+      clickStatusToggle();
+      clickStatusToggle();
+      const reopened = byTestId('justification-input') as HTMLTextAreaElement | null;
+      expect(reopened).not.toBeNull();
+      expect(reopened!.value).toBe('');
+      expect(component.canSave()).toBe(true);
+    });
+
+    it('sends the trimmed justification captured at Save when activating (R-MSE-008)', async () => {
+      const row = makeRow({
+        id: 51,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 22,
+        notes: 'old note',
+        agresso_agreement_id: 'A1697'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+      clickStatusToggle();
+      setJustification('  Contract renewed  ');
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...row, is_active: true } });
+
+      await component.onSave();
+      expect(mockService.activate).not.toHaveBeenCalled();
+      component.justification.set('changed after save');
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(alert.severity).toBe('confirm');
+      alert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.activate).toHaveBeenCalledTimes(1);
+      expect(mockService.activate).toHaveBeenCalledWith(51, { justification: 'Contract renewed' });
+    });
+
+    it('omits justification on activate when the field is blank or whitespace (R-MSE-008)', async () => {
+      const row = makeRow({
+        id: 52,
+        is_active: false,
+        mapping_status: 'Inactive',
+        clarisa_project_id: 22,
+        agresso_agreement_id: 'D527'
+      });
+      await renderClosed([row]);
+      await openEdit(row);
+      clickStatusToggle();
+      setJustification('   ');
+      expect(component.canSave()).toBe(true);
+      mockService.activate.mockResolvedValue({ ok: true, data: { ...row, is_active: true } });
+
+      await component.onSave();
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(mockService.activate).toHaveBeenCalledTimes(1);
+      expect(mockService.activate).toHaveBeenCalledWith(52);
+    });
+
+    it('warns when inactivating and confirms when activating (R-MSE-008)', async () => {
+      const active = makeRow({ id: 53, is_active: true, clarisa_project_id: 22, agresso_agreement_id: 'A511' });
+      await renderClosed([active]);
+      await openEdit(active);
+      clickStatusToggle();
+      setJustification('Contract closed');
+      await component.onSave();
+      const inactivateAlert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      expect(inactivateAlert.severity).toBe('secondary');
+      expect(inactivateAlert.summary).toBe('Inactivate mapping');
+    });
+
+    it('names the Status control and marks Justification required (NFR-MSE-001)', async () => {
+      const row = makeRow({ id: 17, is_active: true, notes: 'old note' });
+      await renderClosed([row]);
+      await openEdit(row);
+
+      const input = statusInput();
+      expect(input?.getAttribute('aria-label')).toBe('Mapping status: Active');
+      const statusLabel = document.querySelector('label[for="bilMapStatusToggle"]');
+      expect(statusLabel).not.toBeNull();
+      expect(statusLabel?.getAttribute('for')).toBe('bilMapStatusToggle');
+      expect(input?.id).toBe('bilMapStatusToggle');
+
+      clickStatusToggle();
+      const area = byTestId('justification-input');
+      expect(area?.getAttribute('aria-required')).toBe('true');
+      const justificationLabel = document.querySelector('label[for="bilMapJustification"]');
+      expect(justificationLabel?.textContent).toContain('Justification');
+      expect(justificationLabel?.querySelector('.atc-red-1')?.textContent).toBe('*');
     });
   });
 
@@ -1837,7 +2309,8 @@ describe('BilateralMappingComponent', () => {
       await fixture.whenStable();
 
       const root: HTMLElement = fixture.nativeElement;
-      const helpBtn = (root.querySelector('[data-testid="help-popover-btn"] button') ?? root.querySelector('[data-testid="help-popover-btn"]')) as HTMLElement;
+      const helpBtn = (root.querySelector('[data-testid="help-popover-btn"] button') ??
+        root.querySelector('[data-testid="help-popover-btn"]')) as HTMLElement;
       expect(helpBtn).not.toBeNull();
       expect(helpBtn.getAttribute('aria-label') ?? helpBtn.parentElement?.getAttribute('aria-label')).toBe('About Bilateral Project Mapping');
 
@@ -1846,7 +2319,8 @@ describe('BilateralMappingComponent', () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      const popoverContent = document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
+      const popoverContent =
+        document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
       expect(popoverContent).not.toBeNull();
       expect(popoverContent?.textContent).toContain('About Bilateral Project Mapping');
       expect(popoverContent?.textContent).not.toContain('Phase');
@@ -1880,14 +2354,20 @@ describe('BilateralMappingComponent', () => {
   // ── R-APM-007: year comes from coverage, never a template literal ────────
 
   it('R-APM-007 — header and help show the year emitted after coverage loads, never a literal', async () => {
-    let resolveCoverage: (value: {
-      reporting_year: number;
-      mapped: number;
-      pending: number;
-      inactive: number;
-      reachable: number;
-    } | null) => void = () => {};
-    mockService.getCoverage.mockReturnValue(new Promise(resolve => { resolveCoverage = resolve; }));
+    let resolveCoverage: (
+      value: {
+        reporting_year: number;
+        mapped: number;
+        pending: number;
+        inactive: number;
+        reachable: number;
+      } | null
+    ) => void = () => {};
+    mockService.getCoverage.mockReturnValue(
+      new Promise(resolve => {
+        resolveCoverage = resolve;
+      })
+    );
     mockService.list.mockResolvedValue(makePage([]));
 
     fixture.detectChanges();
@@ -1902,8 +2382,7 @@ describe('BilateralMappingComponent', () => {
     await fixture.whenStable();
 
     const readHelp = (): string => {
-      const node = document.querySelector('[data-testid="help-popover-content"]') ??
-        root.querySelector('[data-testid="help-popover-content"]');
+      const node = document.querySelector('[data-testid="help-popover-content"]') ?? root.querySelector('[data-testid="help-popover-content"]');
       return node?.textContent ?? '';
     };
 
@@ -2082,12 +2561,21 @@ describe('BilateralMappingComponent', () => {
       expect(component.dialogOpen()).toBe(true);
     });
 
-    it('deactivate failure without a message shows the generic error toast', async () => {
+    it('deactivate failure without a message keeps the dialog open with the generic save error', async () => {
+      expect(component.dialogOpen()).toBe(false);
       mockService.deactivate.mockResolvedValue({ ok: false, status: 500, message: '' });
-      await component.confirmDeactivate(makeRow());
-      expect(mockActions.showToast).toHaveBeenCalledWith(
-        expect.objectContaining({ severity: 'error', detail: 'Could not deactivate mapping. Please try again.' })
-      );
+      component.openEditDialog(makeRow({ id: 7, is_active: true }));
+      component.onStatusToggle(false);
+      component.justification.set('Contract closed');
+      await component.onSave();
+      const alert = mockActions.showGlobalAlert.mock.calls[0][0] as GlobalAlert;
+      alert.confirmCallback?.event?.();
+      await fixture.whenStable();
+      await delayMs(0);
+
+      expect(component.saveError()).toBe('An error occurred. Please try again.');
+      expect(component.dialogOpen()).toBe(true);
+      expect(mockActions.showToast).not.toHaveBeenCalled();
     });
 
     it('handleUpdate returns early without an editing id or snapshot', async () => {

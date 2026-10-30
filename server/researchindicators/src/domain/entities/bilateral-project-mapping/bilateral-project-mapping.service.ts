@@ -226,8 +226,118 @@ export class BilateralProjectMappingService {
   ): Promise<BilateralProjectMapping> {
     const row = await this.loadCurrentYearRow(id);
     const actorUserId = user.sec_user_id;
-    const previousProjectId = row.clarisa_project_id;
 
+    await this.applyClarisaProjectChange(row, dto);
+    if (dto.confidence_score !== undefined) {
+      row.confidence_score = dto.confidence_score;
+    }
+    if (dto.notes !== undefined) {
+      row.notes = dto.notes;
+    }
+    row.updated_by = actorUserId;
+
+    return this.repo.save(row);
+  }
+
+  async deactivate(
+    id: number,
+    user: User,
+    justification?: string,
+    notes?: string,
+  ): Promise<BilateralProjectMapping> {
+    const row = await this.loadCurrentYearRow(id);
+    const writeJustification = justification !== undefined;
+    const writeNotes = notes !== undefined;
+    if (row.is_active === false) {
+      if (!writeJustification && !writeNotes) {
+        // Idempotent — already deactivated, nothing to record.
+        return row;
+      }
+      if (writeJustification) {
+        row.status_justification = justification;
+      }
+      if (writeNotes) {
+        row.notes = notes;
+      }
+      row.updated_by = user.sec_user_id;
+      return this.repo.save(row);
+    }
+    row.is_active = false;
+    row.deleted_at = new Date();
+    row.updated_by = user.sec_user_id;
+    if (writeJustification) {
+      row.status_justification = justification;
+    }
+    if (writeNotes) {
+      row.notes = notes;
+    }
+    return this.repo.save(row);
+  }
+
+  async activate(
+    id: number,
+    user: User,
+    notes?: string,
+    clarisaProjectId?: number,
+    justification?: string,
+  ): Promise<BilateralProjectMapping> {
+    const row = await this.loadCurrentYearRow(id);
+    const projectDiffers =
+      clarisaProjectId !== undefined &&
+      clarisaProjectId !== row.clarisa_project_id;
+    const trimmedJustification =
+      typeof justification === 'string' ? justification.trim() : undefined;
+    const writeJustification =
+      trimmedJustification !== undefined && trimmedJustification.length > 0;
+    if (row.is_active === true) {
+      if (notes === undefined && !projectDiffers && !writeJustification) {
+        return row;
+      }
+      if (notes !== undefined) {
+        row.notes = notes;
+      }
+      if (writeJustification) {
+        row.status_justification = trimmedJustification;
+      }
+      if (projectDiffers) {
+        await this.applyClarisaProjectChange(row, {
+          clarisa_project_id: clarisaProjectId,
+        });
+      }
+      row.updated_by = user.sec_user_id;
+      return this.repo.save(row);
+    }
+    row.is_active = true;
+    row.deleted_at = null;
+    row.updated_by = user.sec_user_id;
+    if (notes !== undefined) {
+      row.notes = notes;
+    }
+    if (writeJustification) {
+      row.status_justification = trimmedJustification;
+    }
+    if (projectDiffers) {
+      await this.applyClarisaProjectChange(row, {
+        clarisa_project_id: clarisaProjectId,
+      });
+    }
+    return this.repo.save(row);
+  }
+
+  /**
+   * Project-change half of update(). A supplied short name is copied; a
+   * changed clarisa_project_id refreshes clarisa_external_code from CLARISA.
+   * Source becomes MANUAL on every call, matching update() (R-APM-006 AC.5).
+   * Activate calls this only when the supplied project id differs.
+   */
+  private async applyClarisaProjectChange(
+    row: BilateralProjectMapping,
+    dto: {
+      clarisa_project_id?: number;
+      clarisa_project_short_name?: string;
+    },
+  ): Promise<void> {
+    const previousProjectId = row.clarisa_project_id;
     if (dto.clarisa_project_id !== undefined) {
       row.clarisa_project_id = dto.clarisa_project_id;
     }
@@ -245,52 +355,6 @@ export class BilateralProjectMappingService {
     // Every human PATCH stores MANUAL. A submitted source is ignored
     // (R-APM-006 AC.5), whether or not the project changed.
     row.source = MappingSourceEnum.MANUAL;
-    if (dto.confidence_score !== undefined) {
-      row.confidence_score = dto.confidence_score;
-    }
-    if (dto.notes !== undefined) {
-      row.notes = dto.notes;
-    }
-    row.updated_by = actorUserId;
-
-    return this.repo.save(row);
-  }
-
-  async deactivate(
-    id: number,
-    user: User,
-    notes?: string,
-  ): Promise<BilateralProjectMapping> {
-    const row = await this.loadCurrentYearRow(id);
-    if (row.is_active === false) {
-      // Idempotent — already deactivated.
-      return row;
-    }
-    row.is_active = false;
-    row.deleted_at = new Date();
-    row.updated_by = user.sec_user_id;
-    if (notes !== undefined) {
-      row.notes = notes;
-    }
-    return this.repo.save(row);
-  }
-
-  async activate(
-    id: number,
-    user: User,
-    notes?: string,
-  ): Promise<BilateralProjectMapping> {
-    const row = await this.loadCurrentYearRow(id);
-    if (row.is_active === true) {
-      return row;
-    }
-    row.is_active = true;
-    row.deleted_at = null;
-    row.updated_by = user.sec_user_id;
-    if (notes !== undefined) {
-      row.notes = notes;
-    }
-    return this.repo.save(row);
   }
 
   private async loadCurrentYearRow(
