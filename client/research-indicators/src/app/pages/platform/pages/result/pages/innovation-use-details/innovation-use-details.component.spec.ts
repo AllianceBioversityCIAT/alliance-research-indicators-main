@@ -3077,7 +3077,7 @@ describe('InnovationUseDetailsComponent', () => {
   // fixture created before the first detectChanges().
   // =================================================================================================
   describe('T-11 — R-MSD-012 AC.3: max/min are DERIVED from scale at this call site, not hard-coded (DD-14)', () => {
-    it('forwards the scale-4 derived symmetric bound to the real app-input instance', () => {
+    it('forwards the scale-4 derived max and a floor of 0 to the real app-input instance (H9)', () => {
       component.addQuantification();
       fixture.detectChanges();
 
@@ -3087,13 +3087,13 @@ describe('InnovationUseDetailsComponent', () => {
       // Literal from requirements.md R-MSD-012 AC.2 / design.md §6.2's Leader-verified table — not
       // recomputed here via the same formula under test (that would be tautological).
       expect(numberInput.max).toBe(549_755_813_887);
-      expect(numberInput.min).toBe(-549_755_813_887);
+      expect(numberInput.min).toBe(0);
       expect(numberInput.maxFractionDigits).toBe(4);
     });
   });
 
-  describe('T-11 — R-MSD-008: the placeholder no longer says "positive" (DD-5, AC.1/AC.2)', () => {
-    it('renders a placeholder without the word "positive" on the Number field\'s native input (not asserted on the class property alone)', () => {
+  describe('H9 — the placeholder says "positive" again: negatives are no longer allowed', () => {
+    it('renders "Enter a positive number" on the Number field\'s native input (not asserted on the class property alone)', () => {
       component.addQuantification();
       fixture.detectChanges();
 
@@ -3101,8 +3101,7 @@ describe('InnovationUseDetailsComponent', () => {
       const numberInputDe = numberFieldOf(quantCard);
       const nativeInput = numberInputDe.query(By.css('input')).nativeElement as HTMLInputElement;
 
-      expect(nativeInput.placeholder).not.toContain('positive');
-      expect(nativeInput.placeholder.length).toBeGreaterThan(0);
+      expect(nativeInput.placeholder).toBe('Enter a positive number');
     });
   });
 
@@ -3160,7 +3159,7 @@ describe('InnovationUseDetailsComponent', () => {
       expect(inputNumberInstance.step).toBe(1);
     });
 
-    it("decrementing from 0 goes below zero — min is negative here, so PrimeNG's validateValue() does not clamp at 0", () => {
+    it("H9: decrementing from 0 stays at 0 — min is 0, so PrimeNG's validateValue() clamps there", () => {
       component.addQuantification();
       fixture.detectChanges();
 
@@ -3173,7 +3172,7 @@ describe('InnovationUseDetailsComponent', () => {
       // DOM mousedown (see this task's completion report for what that does and does not close).
       inputNumberInstance.spin({} as Event, -1);
 
-      expect(inputNumberInstance.value).toBe(-1);
+      expect(inputNumberInstance.value).toBe(0);
     });
   });
 

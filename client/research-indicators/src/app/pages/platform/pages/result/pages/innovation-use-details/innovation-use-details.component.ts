@@ -43,9 +43,9 @@ const JUSTIFICATION_MIN_LEVEL = 6;
 /** The `quantification_number` column's scale (`DECIMAL(24,4)`, DD-1) — also bound as `maxFractionDigits`. */
 const QUANTIFICATION_NUMBER_SCALE = 4;
 const QUANTIFICATION_NUMBER_MAX = deriveMaxForScale(QUANTIFICATION_NUMBER_SCALE);
-const QUANTIFICATION_NUMBER_MIN = -QUANTIFICATION_NUMBER_MAX;
-/** R-MSD-008 / SC-4: the shared card's default ("Enter a positive number") is false here — signed values are allowed. */
-const QUANTIFICATION_NUMBER_PLACEHOLDER = 'Enter a number';
+// H9 — decimals stay, negatives do not (product ruling, 2026-10-30).
+const QUANTIFICATION_NUMBER_MIN = 0;
+const QUANTIFICATION_NUMBER_PLACEHOLDER = 'Enter a positive number';
 
 /**
  * R-IUP-020 (Amendment 01 / T-14, §5.8) — the guidance callout's calculator link and the
