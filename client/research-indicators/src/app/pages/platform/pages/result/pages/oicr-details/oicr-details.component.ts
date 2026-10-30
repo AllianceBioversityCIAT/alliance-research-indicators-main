@@ -29,9 +29,10 @@ import { deriveMaxForScale } from '@utils/quantification-number-bound.util';
 // derived from the scale so they cannot drift apart.
 const OICR_QUANTIFICATION_SCALE = 4;
 const OICR_QUANTIFICATION_MAX = deriveMaxForScale(OICR_QUANTIFICATION_SCALE);
-const OICR_QUANTIFICATION_MIN = -OICR_QUANTIFICATION_MAX;
-/** Placeholder copy for OICR Number fields — signed values are allowed. */
-const OICR_QUANTIFICATION_PLACEHOLDER = 'Enter a number';
+// H9 — decimals stay, negatives do not (product ruling, 2026-10-30).
+const OICR_QUANTIFICATION_MIN = 0;
+/** Placeholder copy for OICR Number fields. */
+const OICR_QUANTIFICATION_PLACEHOLDER = 'Enter a positive number';
 
 
 @Component({
