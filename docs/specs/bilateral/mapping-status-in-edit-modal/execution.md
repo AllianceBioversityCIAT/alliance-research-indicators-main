@@ -193,3 +193,18 @@ Owner, verbatim: "me agrada haz commit" ("I like it, commit"), after reviewing t
 
 - **Verdict:** code PASS (Reviewer, all reworks) + owner HITL approval → T-03 done. Worker released.
 - Open product question (not blocking): changing the CLARISA project on edit/activate keeps the previous project's short-name snapshot (pre-existing `update()` behaviour).
+
+## T-04 — Docs: decisions log and TRD
+
+- **Implementer:** Grok `grok-4.7-medium` (cursor, task `task_df3cfc27e01e`, dispatch `ctx_f8af22ca3c7d`). Report `/tmp/T-04-report.md`.
+- **Falsifier (worker, before edit):** `grep -n "mapping-status-in-edit-modal" docs/ux-ui/design.md docs/trd/trd.md` → no lines, exit 1.
+- **Attempt 1:** decisions-log entry `docs/ux-ui/design.md:600-605` (§12.2); TRD §6.3 note `docs/trd/trd.md:310-317`. Sweep grep (4 literals) → only the new entry's supersession sentence. **Reviewer** (`akili-reviewer`, checklist): **`STATUS: FAIL`** — TRD omitted the trim/≤500/400 rules on activate `justification` and deactivate `notes` (controller.ts:73-77, :98-102). Reviewer's own case-insensitive sweep (bilateral, R-APM-011, (in)activat*, justification, ban icon, row action) found no stale hits in either file; it cannot see the PRD, other specs, or wording without those words.
+- **Attempt 2** (same worker, task `task_357984c4837f`): trd.md:314-315 now state both caps and the 400; activate `notes` left uncapped (DTO has none). **Reviewer: `STATUS: PASS`**.
+- **Evidence re-run (Leader): VERIFIED** — `git diff --stat` → only `docs/trd/trd.md` (+9) and `docs/ux-ui/design.md` (+7); greps → 1 hit each for the spec path, 3 for `status_justification` in the TRD.
+- **Verdict:** PASS → T-04 done. All tasks done.
+
+## Run close
+
+- Tasks: T-01, T-02, T-05, T-06 PASS first attempt; T-03 PASS after one Reviewer FAIL (stale test) plus owner-driven amendments A-2, A-3, A-3b across four HITL rounds; T-04 PASS on attempt 2.
+- Open items for validate/archive: (1) product question — changing the CLARISA project on edit/activate keeps the previous short-name snapshot; (2) the disposable-harness migration chain is broken at `CreatePiDelegates1787600000000` (pre-existing; this spec's migration SQL was verified by hand, up and down); (3) advisories — blank deactivate `notes` stores `''`; activate `notes` uncapped; no cross-open test for the last-justification reset; Save refocus after Cancel not confirmed in HITL.
+- Nothing pushed.

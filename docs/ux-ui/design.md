@@ -597,6 +597,13 @@ Per-screen note (STAR): dark+light parity is not codified as a hard product cons
   - **No Save on a past year.** Save is absent, not disabled, through the opt-in `hideSave` input on the shared `NavigationButtonsComponent` (default `false`, so every other screen is unchanged). *Owner decision.* *Rationale:* a disabled Save reads as "fixable"; the year lock is permanent for that result.
 - **2026-10-08 — A non-eligible snapshot or PRMS result shows Pool Funding display-only.** Spec: `docs/specs/bilateral/pool-funding-reporting-year` (R-PRY-007). A result whose contract is not eligible but that already carries a snapshot, a PRMS sync or a PRMS code shows its saved Pool Funding record read-only under a grey `pf-alignment-display-only-banner` (`DISPLAY_ONLY_BANNER`: "This result's contract does not contribute to Pool Funding. The saved Pool Funding record below is shown for reference and is read-only."). There is no Save, no PRMS SYNC and no redirect. *Owner decision.*
 
+- **2026-10-30 — A bilateral mapping's status changes inside the Edit modal.** Spec: `docs/specs/bilateral/mapping-status-in-edit-modal`. A mapped row keeps only **Edit**. The Deactivate and Activate row actions are removed, which supersedes R-APM-011's row Activate.
+  - **Second confirmation.** Save asks again only when status changed. Inactivate uses the shared alert's amber `secondary` severity; activate keeps `confirm`.
+  - **Justification.** On any status change the field sits directly under the Status toggle. It is required to inactivate and optional to activate. The stored value is `status_justification` (last value only: overwritten, no history). Notes stays an independent field.
+  - **Last justification.** When a value is already stored, the modal shows it read-only ("Last justification") in a panel from the moment it opens. The editable field appears only on a status change and starts empty.
+  - **CLARISA picker.** Locked only while inactivating. On activation it stays editable, and the chosen project is applied in that same activate request. One save, one request.
+  - *Rationale:* one modal for every change to a mapping, with a recorded reason that does not overwrite Notes. Final behaviour is amendments A-2, A-3, and A-3b.
+
 ---
 
 ## 13. Open Gaps / Open Questions

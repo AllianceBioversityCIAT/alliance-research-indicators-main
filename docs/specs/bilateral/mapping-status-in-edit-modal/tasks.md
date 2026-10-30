@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-10-mapping-status-in-edit-modal
-- **Status:** in-progress
+- **Status:** done
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
@@ -170,7 +170,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-04 — Docs: decisions log and TRD
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-01, T-03 (and the T-03 HITL)
+- **Status:** done · **Size:** S · **Dependencies:** T-01, T-03 (and the T-03 HITL)
 - **Requirements covered:** traceability for R-MSE-001 (supersedes R-APM-011's row Activate) and R-MSE-005 (API contract)
 - **Design references:** reversion table, §5
 - **Files touched (intended):** `docs/ux-ui/design.md` (decisions log entry), `docs/trd/trd.md` (one sentence in the Center Admin / bilateral mapping API line)
@@ -182,7 +182,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Consumers:** none (documentation).
 - **Review:** `checklist` — baseline docs other agents read.
 - **Done criteria:**
-  - [ ] both docs carry the entry; sweep hits resolved
+  - [x] both docs carry the entry; sweep hits resolved
 - **Skills:** `cognitive-doc-design`
 
 ---
