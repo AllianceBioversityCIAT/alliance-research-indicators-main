@@ -6,12 +6,15 @@ export type StarDictionaryRow = {
 };
 
 /**
- * Data dictionary sheet rows, in sheet order: the header row, then one row
- * per Raw data column, labelled with that column's header and in column
+ * Data dictionary sheet rows, in sheet order: one row per Raw data column, labelled with that column's header and in column
  * order (star-results-metadata.dictionary.spec.ts enforces it). Moved out of
  * the `report_data_dictionary` table so the whole workbook layout lives in
  * code; the export no longer reads that table. Section names, fills and the
  * explanations that existed were taken from the Dev table on 2026-10-16.
+ *
+ * No header row here: the workbook builder already writes one from
+ * STAR_RESULTS_METADATA_DICTIONARY_COLUMNS, and repeating it duplicated the
+ * Section / Field / Explanation line in the sheet (H43).
  *
  * A row with `section_fill_argb` starts a new fill band; rows without one
  * inherit the previous fill.
@@ -20,12 +23,6 @@ export type StarDictionaryRow = {
  */
 export const STAR_RESULTS_METADATA_DICTIONARY_ROWS: readonly StarDictionaryRow[] =
   [
-    {
-      section: 'Section',
-      field_label: 'Field',
-      explanation: 'Explanation',
-      section_fill_argb: 'FF455A64',
-    },
     {
       section: 'General Information',
       field_label: 'Result Code',
