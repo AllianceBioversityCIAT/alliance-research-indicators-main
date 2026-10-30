@@ -103,7 +103,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
   3. **canSave (§7.2)** incl. `!confirmPending()`; the `!snap` guard applies only to the no-status-change row.
   4. **Save (§7.3):** re-entry guard; captured plan; `showGlobalAlert` with `hideCloseButton: true`, the summary/detail/button/toast strings from the §7.3 table; cancel clears `confirmPending`; `applyStatusChange(plan)`: one request, success → close + toast + `load()` + `loadCoverage()` + Clarity `bilateral.mapping.deactivated|activated`; failure → inline `saveError`.
   5. **Dialog close gate (§7.3, R2-1, R2-2):** `[visible]="dialogOpen()"` + `(visibleChange)="onDialogVisibleChange($event)"`: `false` while `confirmPending() || saving()` is ignored; `false` otherwise calls `closeDialog()`. `closeDialog()` returns early while `confirmPending() || saving()`. `[closable]="!(confirmPending() || saving())"`, `[focusTrap]="!confirmPending()"`. Form controls and dialog Cancel disabled while pending. Optional (R2-4): refocus Save after Cancel / failure.
-  6. **Template (§7.4):** Status `p-toggleswitch` (import `ToggleSwitchModule`) with `<label for>`, `[ariaLabel]`, Active/Inactive text, `data-testid="status-toggle"`, edit mode only; CLARISA picker `[disabled]="statusChanged() || confirmPending()"`; Justification textarea (`justification-input`, label + red `*`, `aria-required="true"`, placeholder, `n/500`) replacing Notes while inactivating. Token utilities only — no hex, no new tokens.
+  6. **Template (§7.4):** Status `p-toggleswitch` (import `ToggleSwitchModule`) with `<label for>`, `[ariaLabel]`, Active/Inactive text, `data-testid="status-toggle"`, edit mode only; CLARISA picker `[disabled]="statusChanged() || confirmPending()"` *(A-2: `isInactivating()`)*; Justification textarea (`justification-input`, label + red `*`, `aria-required="true"`, placeholder, `n/500`) replacing Notes while inactivating *(A-2: under the toggle; Notes always rendered)*. Token utilities only — no hex, no new tokens.
 - **Rework scope (Amendment A-2, R-MSE-006/007, DD-9/DD-10; owner HITL 2026-10-30):**
   7. API + service (`api.service.ts`, `bilateral-mapping.service.ts` + spec): deactivate sends `{ justification, notes? }`; activate sends `{ notes?, clarisa_project_id? }`, each key only when set.
   8. Justification field directly below the Status toggle; Notes always rendered, optional, independent; inactivating may also save an edited Notes in the same deactivate request.
@@ -114,9 +114,9 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
   - DOM: active and inactive rows render `edit-btn` and no `deactivate-btn` / `activate-btn`; Pending row renders only `pending-map-btn` (R-MSE-001).
   - Status toggle present in edit, absent in create and "+ Map"; reads Active for an active row; toggling alone enables Save for Inactive → Active, and for Active → Inactive once a justification is typed (R-MSE-002 as amended 2026-10-30).
   - Project round trip: pick project B, toggle Inactive (picker disabled, shows snapshot project A), toggle back → picker enabled showing B; the deactivate plan carries no project (R-MSE-002).
-  - Inactivating: Justification replaces Notes, empty on entry and on re-entry; Save disabled for `''` and `'   '`; no service call (R-MSE-003).
+  - Inactivating: Justification appears *(A-2: Notes stays)*, empty on entry and on re-entry; Save disabled for `''` and `'   '`; no service call (R-MSE-003).
   - Confirmation: Save opens exactly one alert with `hideCloseButton: true` and the §7.3 strings, zero service calls before `confirmCallback.event()`; second `onSave()` while pending → still one alert, zero calls; `onDialogVisibleChange(false)` and `closeDialog()` while pending → `dialogOpen()` still true and values kept; cancel → zero calls, dialog open, `confirmPending` false (R-MSE-004).
-  - Confirm deactivate → exactly one `deactivate(id, 'Contract closed')` with the trimmed text captured at Save even if the signal changes afterwards; success → dialog closed, toast "Mapping inactivated", `load` + `loadCoverage` called. Confirm activate with edited notes → `activate(id, notes)`; unedited → `activate(id)`.
+  - Confirm deactivate → exactly one `deactivate(id, 'Contract closed')` with the trimmed text captured at Save even if the signal changes afterwards; success → dialog closed, toast "Mapping inactivated", `load` + `loadCoverage` called. Confirm activate with edited notes → `activate(id, notes)`; unedited → `activate(id)`. *(A-2: `activate(id, { notes })` / `activate(id, { clarisa_project_id })` / `activate(id)`.)*
   - Failure → dialog open, `save-error` shows the message, no success toast; `onDialogVisibleChange(false)` while `saving()` ignored.
   - Not pending: `onDialogVisibleChange(false)` closes the dialog (R2-1).
   - Plain notes edit → no alert, one `update` call (R-MSE-004 "not double-confirmed").
@@ -135,7 +135,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-05 — Server: `status_justification` column; deactivate `{ justification, notes? }`; activate accepts a project (Amendment A-2)
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Status:** done · **Size:** M · **Dependencies:** T-01
 - **Requirements covered:** R-MSE-006, R-MSE-007 (server), R-MSE-005 as amended
 - **Design references:** DD-9, DD-10, DD-11, DD-8
 - **Files touched (intended):** `server/researchindicators/src/domain/entities/bilateral-project-mapping/{entities/bilateral-project-mapping.entity.ts, bilateral-project-mapping.controller.ts, bilateral-project-mapping.service.ts, *.spec.ts}`, one new migration under `server/researchindicators/src/db/migrations/`, `server/researchindicators/src/admin/client/pages/BilateralProjectMappings.tsx` (body key only)
@@ -144,8 +144,8 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Falsifier:** write the justification to `notes` → "notes untouched" test red; drop `clarisa_project_id` handling in activate → "reactivate onto B" test red.
 - **Review:** `full` — contract change + migration.
 - **Done criteria:**
-  - [ ] tests for R-MSE-006 scenario, AC.1–AC.6 re-keyed to `justification`, activate-with-project (transition + idempotent), notes untouched; falsifiers observed red
-  - [ ] lint, build, full server suite green
+  - [x] tests for R-MSE-006 scenario, AC.1–AC.6 re-keyed to `justification`, activate-with-project (transition + idempotent), notes untouched; falsifiers observed red
+  - [x] lint, build, full server suite green
 - **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
 
 ### T-04 — Docs: decisions log and TRD

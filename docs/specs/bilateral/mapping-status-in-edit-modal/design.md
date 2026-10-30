@@ -55,7 +55,7 @@ server/researchindicators/src/domain/entities/bilateral-project-mapping/
 └── bilateral-project-mapping.service.spec.ts      # new idempotent-with-notes cases (deactivate + activate)
 client/research-indicators/src/app/
 ├── shared/services/api.service.ts                 # deactivate/activate accept optional body
-├── shared/services/bilateral-mapping.service.ts   # deactivate(id, notes) / activate(id, notes?)
+├── shared/services/bilateral-mapping.service.ts   # deactivate(id, justification, notes?) / activate(id, { notes?, clarisa_project_id? }) (A-2)
 ├── shared/services/bilateral-mapping.service.spec.ts
 └── pages/platform/pages/administration/center-admin/bilateral-mapping/
     ├── bilateral-mapping.component.ts             # status state, canSave, save branch, confirm
@@ -123,7 +123,7 @@ Activate keeps `BilateralProjectMappingNotesDto` (optional notes).
 0. **Re-entry guard (J-1):** if `confirmPending()` or `saving()`, return immediately — a keyboard Enter/Space on the still-focused Save opens nothing.
 1. No status change → existing `handleUpdate()` (no confirmation).
 2. Status change → capture a **plan** `{ id, agreementId, target: 'activate' | 'deactivate', notes }` from the current signals (J-10: confirm acts on what the alert describes, not on values read later), set `confirmPending(true)`, blur the focused element, then `showGlobalAlert({ severity: 'confirm', summary, detail, hideCloseButton: true, confirmCallback: { label, event: () => void this.applyStatusChange(plan) }, cancelCallback: { label: 'Cancel', event: () => this.confirmPending.set(false) } })`. `hideCloseButton` (P-10) removes the X that closes without either callback, so `confirmPending` always clears through Confirm or Cancel.
-3. `applyStatusChange(plan)` sets `confirmPending(false)` and `saving(true)`, calls `service.deactivate(plan.id, plan.notes)` or `service.activate(plan.id, plan.notes)` (`plan.notes` is `undefined` for activate when notes were not edited); on `ok` → `closeDialog()`, toast, `load()`, `coverageComponent()?.loadCoverage()`, Clarity event (`bilateral.mapping.deactivated` / `.activated`, existing names kept); on error → `saveError.set(message || fallback)` in the still-open dialog; finally `saving.set(false)`.
+3. `applyStatusChange(plan)` sets `confirmPending(false)` and `saving(true)`, calls `service.deactivate(plan.id, plan.justification, plan.notes)` or `service.activate(plan.id, { notes, clarisa_project_id })` (A-2: `notes` / `clarisa_project_id` only when they differ from the snapshot); on `ok` → `closeDialog()`, toast, `load()`, `coverageComponent()?.loadCoverage()`, Clarity event (`bilateral.mapping.deactivated` / `.activated`, existing names kept); on error → `saveError.set(message || fallback)` in the still-open dialog; finally `saving.set(false)`.
 
 **While `confirmPending()` (J-2, J-12, round 2 A2-1/B2-1):**
 - **The hide path is gated, not the Escape input.** PrimeNG reads `closeOnEscape` only when the dialog shows and its Escape handler and header X both end in `close()` → `visibleChange.emit(false)` (P-9), so binding `closeOnEscape` later changes nothing. The dialog therefore drops the two-way `[(visible)]` and binds `[visible]="dialogOpen()"` with `(visibleChange)="onDialogVisibleChange($event)"`, which ignores `false` while `confirmPending()`; `closeDialog()` also returns early while pending, so `(onHide)` cannot reset the form under the alert. `[closable]="!confirmPending()"` hides the header X as well.
@@ -140,14 +140,14 @@ Activate keeps `BilateralProjectMappingNotesDto` (optional notes).
 
 - **Actions cell:** the non-Pending branch keeps only the Edit button (`edit-btn`); the `@if (row.is_active)` deactivate/activate block is removed.
 - **Status control** (edit mode only), placed after the AGRESSO read-only field: visible label "Status" (`<label for>` the `inputId`), `p-toggleswitch` (`ToggleSwitchModule`, precedent `shared/components/all-modals/modals-content/edit-environment-variable-modal/edit-environment-variable-modal.component.html:66`; that precedent binds string `trueValue`/`falseValue`, this one binds the boolean default) with `[ngModel]="statusActive()"` `(ngModelChange)="onStatusToggle($event)"`, a text "Active" / "Inactive" next to it, and the **`[ariaLabel]` input** (not a host `aria-label`, which PrimeNG does not forward — J-11) set to "Mapping status: Active|Inactive"; `data-testid="status-toggle"`.
-- **CLARISA picker:** `[disabled]="statusChanged() || confirmPending()"`; the toggle handler swaps its value (§7.1, DD-3).
-- **Notes / Justification:** `@if (isInactivating())` renders a Justification textarea (`data-testid="justification-input"`, label "Justification" + red `*`, `aria-required="true"`, placeholder "Why is this mapping being inactivated?", counter `n/500`); else the existing Notes textarea.
+- **CLARISA picker:** `[disabled]="isInactivating() || confirmPending() || saving()"` (A-2, DD-10); the toggle handler swaps its value only in the inactivating direction.
+- **Notes / Justification:** `@if (isInactivating())` renders a Justification textarea (`data-testid="justification-input"`, label "Justification" + red `*`, `aria-required="true"`, placeholder "Why is this mapping being inactivated?", counter `n/500`); *(A-2, DD-9: it renders directly under the Status toggle and the Notes textarea is always rendered.)*
 - Tokens: existing `atc-*` / `var(--ac-*)` utilities only; no new SCSS beyond spacing if needed.
 
 ## 8. Shared Contracts or Package Extensions
 
-- `ApiService.PATCH_BilateralProjectMappingDeactivate(id, body: { notes: string })` sends `body`; `PATCH_ActivateBilateralMapping(id, body?: { notes?: string })` sends `body ?? {}` so an activate without notes keeps the empty body AC.5 relies on (`api.service.ts:905-915`, J-7).
-- `BilateralMappingService.deactivate(id, notes)` sends `{ notes }`; `activate(id, notes?)` sends `{ notes }` only when `notes !== undefined`, else no body argument.
+- `ApiService.PATCH_BilateralProjectMappingDeactivate(id, body: { notes: string })` sends `body` *(A-2: `{ justification, notes? }`)*; `PATCH_ActivateBilateralMapping(id, body?: { notes?: string })` *(A-2: `{ notes?, clarisa_project_id? }`)* sends `body ?? {}` so an activate without notes keeps the empty body AC.5 relies on (`api.service.ts:905-915`, J-7).
+- *(A-2)* `BilateralMappingService.deactivate(id, justification, notes?)` sends `{ justification, notes? }`; `activate(id, opts?)` sends only the keys that are set, `{}` when none.
 - Existing assertions that change (J-7): `bilateral-mapping.service.spec.ts:322` and `:334` (`toHaveBeenCalledWith(11)`); the `{}` activate-body assertion at `:553` must stay green.
 
 ## 9. Design Decisions

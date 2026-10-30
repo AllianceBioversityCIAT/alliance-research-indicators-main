@@ -116,3 +116,27 @@ Leader defaults (owner may overrule): deactivate wire key renamed `notes` → `j
 New task T-05 (server) added; T-03 rework scope items 7–10 added; T-04 scope updated. Budget: already over (accepted at the T-03 gate); A-2 adds a migration and a server task — tripwire re-noted, not re-asked, since the owner initiated the scope.
 
 Rollout note: the new column needs its migration applied to the DB the owner's local server uses before the next HITL — a human step.
+
+Dispatch (A-2): T-05 → task `task_9fb68b9ea8b8`, dispatch `ctx_da77851db7ba`, fresh Grok (`grok-4.7-high`, cursor). T-03 rework → task `task_a560609e79e3`, dispatch `ctx_bb42b3c98721`, same terminal `term_603737fb-…` as T-03 (effort bumped to xhigh). Parallel, cross-package (editing only).
+
+## T-05 — Server: `status_justification` column; deactivate `{ justification, notes? }`; activate accepts a project (A-2)
+
+- **Implementer:** Grok `grok-4.7-high` (cursor, Orca task `task_9fb68b9ea8b8`, dispatch `ctx_da77851db7ba`), attempt 1. Report `/tmp/T-05-report.md`.
+- **Red run (worker):** assertion-level reds observed after signatures compiled, e.g. R-MSE-006 `Expected: "old note" Received: "Contract closed"`; reactivate onto B `Expected: 2 Received: 1`; old `{ notes: "x" }` body `Expected: 400 Received: 200`.
+- **Falsifiers (worker):** (a) justification also written to notes → `Expected: "old note" Received: "Contract closed"`; (b) activate ignores `clarisa_project_id` → `Expected: 2 Received: 1`. Both reverted.
+- **Worker verification:** bilateral folder jest `8 suites / 180 tests passed`; eslint on 7 files exit 0; `npm run build` exit 0.
+- **Evidence re-run (Leader, non-author): VERIFIED** — full server suite `npm test -- --silent` → `Test Suites: 441 passed, 441 total` / `Tests: 4295 passed, 4295 total`.
+- **Reviewer:** `akili-reviewer` (opus), full → **`STATUS: PASS`**. Justification never lands in notes (both paths); `applyClarisaProjectChange` is a verbatim extraction of update()'s block; migration additive/reversible and matches the entity; DTO + Swagger + SSR correct; service-level optional `justification` acceptable (sole caller's DTO requires it).
+- **Recorded gaps (Leader action):**
+  - Migration `1793389030636-addStatusJustificationToBilateralProjectMapping.ts` **not executed** (K-006). To run on the disposable TEST harness (`compose:test:up`, `migration:test:bootstrap`, `migration:test:revert`) before archive; applying to the shared Dev DB is the owner's step.
+  - R-MSE-007 parenthetical claimed the short-name snapshot is refreshed; `update()` copies it only when supplied. Spec text corrected (Leader, option a) — reactivating onto B keeps A's short name, same as `PATCH :id` today. Product follow-up if the owner wants the snapshot refreshed from CLARISA.
+- **Advisories:** deactivate blank `notes` saves `''`; activate `notes` uncapped (pre-existing); helper docstring vs activate's `source` behavior; no controller test for invalid `clarisa_project_id` on activate.
+- **Spec drift cleaned (Leader, from both reviews):** requirements R-MSE-003/004/005/007 lines, design §3/§7.3/§7.4/§8, tasks T-03 bullets now carry A-2 wording.
+- **Verdict:** PASS → T-05 done.
+
+### T-03 rework attempt 1 (A-2) — Reviewer FAIL
+
+- Worker report `/tmp/T-03-rework-report.md`: empty-picker root cause — `GET tools/clarisa/projects/bilateral` returns only the current-phase cohort; an inactive row's project is often absent, so p-select has the id but no option (`primeng-select.mjs` assigns `selectedOption` only when the index ≠ -1). Fix seeds the row's project into options. Targeted jest 161/161; lint, build, spec tsc set identical.
+- **Evidence re-run (Leader): VERIFIED** — full client suite 8121/8121 tests; 1 untouched suite (`get-project-status.service.spec.ts`) killed by runner SIGSEGV twice, passes 3/3 alone (runner, not product).
+- **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: FAIL`** — 1 issue: `bilateral-mapping.component.spec.ts:1459-1460,1487` still asserts the pre-A-2 notes overwrite with a tautological readback of the mock (violates R-MSE-006). Component/services clean, no regression of the original T-03 guards.
+- **Attempt 2** dispatched to the same worker (task `task_d0d8d3485c32`), effort xhigh (ceiling, no bump), plus advisories A (seed not duplicated / not stale across opens, with falsifier) and B (seeded label carries `external_code`).

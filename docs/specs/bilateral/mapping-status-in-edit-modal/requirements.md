@@ -114,7 +114,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - THEN Save is disabled
 - BUT it must NOT send any request
 
-#### Scenario: Justification overwrites notes
+#### Scenario: ~~Justification overwrites notes~~ *(superseded by A-2 → R-MSE-006 "Justification leaves notes alone")*
 
 - GIVEN a mapping whose notes read "old note"
 - WHEN the admin inactivates it with justification "Contract closed" and confirms
@@ -147,7 +147,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - THEN the inactivation confirmation is shown
 - AND IT MUST send no request before the admin confirms
 - WHEN the admin confirms
-- THEN exactly one `PATCH …/deactivate` is sent with `{ notes: <justification> }`
+- THEN exactly one `PATCH …/deactivate` is sent with `{ justification: <justification> }` *(A-2; plus `notes` only when edited)*
 - AND the modal closes, the toast reads "Mapping inactivated", the row shows Inactive
 
 #### Scenario: Cancel the confirmation
@@ -175,7 +175,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - **As a** product owner **I want** the justification enforced by the API **so that** no client can inactivate a mapping without a reason.
 
 **Details:**
-- Inputs: `PATCH /api/bilateral-project-mappings/:id/deactivate`, body `{ notes: string }`.
+- Inputs: `PATCH /api/bilateral-project-mappings/:id/deactivate`, body `{ notes: string }` *(A-2: now `{ justification: string, notes?: string }`, justification → `status_justification`; R-MSE-006)*.
 - Behavior: `notes` is required; trimmed, it must be 1–500 characters. The trimmed value is stored and replaces `notes`, **also when the row is already inactive** (another admin got there first): the status stays inactive and the justification is still written. Activate keeps `notes` optional; when supplied on an already-active row it is likewise written.
 - Outputs: `200`, `ServerResponseDto` with `data` = the updated mapping, description "Bilateral project mapping deactivated" (unchanged).
 - Errors: missing, blank, or over-500 `notes` → `400` through the validation pipe, row unchanged.
@@ -212,7 +212,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 ### R-MSE-007 — CLARISA project editable when activating
 
 - The CLARISA picker is locked to the initial project **only while inactivating** (Active → Inactive). On Inactive → Active it stays editable.
-- `PATCH :id/activate` body: `{ notes?: string, clarisa_project_id?: number }`. A supplied project different from the current one is applied with the same rules as `PATCH :id` (snapshot name/external code refreshed) in the **same** request — one save, one request.
+- `PATCH :id/activate` body: `{ notes?: string, clarisa_project_id?: number }`. A supplied project different from the current one is applied with the same rules as `PATCH :id` (external code refreshed, `source` set to MANUAL; the short-name snapshot is copied only when supplied, as in `PATCH :id` — corrected 2026-10-30 after the T-05 review) in the **same** request — one save, one request.
 - An inactive mapping opened in Edit must show its current CLARISA project in the picker (the 2026-10-30 HITL saw it empty; diagnose and fix).
 
 #### Scenario: Reactivate onto another project

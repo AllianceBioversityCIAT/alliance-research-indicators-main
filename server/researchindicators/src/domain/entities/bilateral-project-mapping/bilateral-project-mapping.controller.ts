@@ -24,7 +24,14 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { Request } from 'express';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -47,12 +54,21 @@ class BilateralProjectMappingNotesDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'Re-point to a different CLARISA project while activating',
+    minimum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  clarisa_project_id?: number;
 }
 
 class DeactivateBilateralProjectMappingDto {
   @ApiProperty({
     description:
-      'Required justification recorded on the row. Trimmed; must be 1–500 characters.',
+      'Required inactivation justification. Trimmed; must be 1–500 characters. Stored in status_justification.',
     maxLength: 500,
     example: 'Contract closed',
   })
@@ -60,7 +76,18 @@ class DeactivateBilateralProjectMappingDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  notes!: string;
+  justification!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional operator note. Trimmed; at most 500 characters. Written only when supplied.',
+    maxLength: 500,
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
 }
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / R-BIL-080
@@ -207,19 +234,21 @@ export class BilateralProjectMappingController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body?: BilateralProjectMappingNotesDto,
   ) {
-    return this.service.activate(id, request.user, body?.notes).then((data) =>
-      ResponseUtils.format({
-        data,
-        description: 'Bilateral project mapping activated',
-        status: HttpStatus.OK,
-      }),
-    );
+    return this.service
+      .activate(id, request.user, body?.notes, body?.clarisa_project_id)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: 'Bilateral project mapping activated',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 
   @Patch(':id/deactivate')
   @ApiOperation({
     summary:
-      'Soft-deactivate a bilateral project mapping. A justification (notes) is required.',
+      'Soft-deactivate a bilateral project mapping. A justification is required.',
   })
   @ApiParam({ name: 'id', type: Number })
   @ApiBody({ type: DeactivateBilateralProjectMappingDto, required: true })
@@ -235,12 +264,14 @@ export class BilateralProjectMappingController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: DeactivateBilateralProjectMappingDto,
   ) {
-    return this.service.deactivate(id, request.user, body.notes).then((data) =>
-      ResponseUtils.format({
-        data,
-        description: 'Bilateral project mapping deactivated',
-        status: HttpStatus.OK,
-      }),
-    );
+    return this.service
+      .deactivate(id, request.user, body.justification, body.notes)
+      .then((data) =>
+        ResponseUtils.format({
+          data,
+          description: 'Bilateral project mapping deactivated',
+          status: HttpStatus.OK,
+        }),
+      );
   }
 }

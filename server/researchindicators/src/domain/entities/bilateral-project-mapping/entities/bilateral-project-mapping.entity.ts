@@ -88,4 +88,12 @@ export class BilateralProjectMapping extends AuditableEntity {
     nullable: true,
   })
   notes?: string | null;
+
+  @Column('text', {
+    name: 'status_justification',
+    nullable: true,
+    comment:
+      'Last inactivation justification. Overwritten on each deactivate. Independent of notes.',
+  })
+  status_justification?: string | null;
 }
