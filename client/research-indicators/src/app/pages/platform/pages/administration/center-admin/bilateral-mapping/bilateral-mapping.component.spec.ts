@@ -1230,7 +1230,7 @@ describe('BilateralMappingComponent', () => {
       await fixture.whenStable();
       await delayMs(0);
 
-      expect(mockService.deactivate).toHaveBeenCalledWith(activeRow.id);
+      expect(mockService.deactivate).toHaveBeenCalledWith(activeRow.id, activeRow.notes ?? '');
     });
   });
 

@@ -316,10 +316,10 @@ describe('BilateralMappingService', () => {
       const row = mapping({ is_active: false });
       mockApi.PATCH_BilateralProjectMappingDeactivate.mockResolvedValue(ok(row));
 
-      const result = await service.deactivate(11);
+      const result = await service.deactivate(11, 'x');
 
       expect(result).toEqual({ ok: true, data: row });
-      expect(mockApi.PATCH_BilateralProjectMappingDeactivate).toHaveBeenCalledWith(11);
+      expect(mockApi.PATCH_BilateralProjectMappingDeactivate).toHaveBeenCalledWith(11, { notes: 'x' });
     });
   });
 
@@ -332,6 +332,16 @@ describe('BilateralMappingService', () => {
 
       expect(result).toEqual({ ok: true, data: row });
       expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11);
+    });
+
+    it('forwards notes when they were edited', async () => {
+      const row = mapping({ is_active: true });
+      mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
+
+      const result = await service.activate(11, 'n');
+
+      expect(result).toEqual({ ok: true, data: row });
+      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11, { notes: 'n' });
     });
   });
 
@@ -551,6 +561,39 @@ describe('PATCH_ActivateBilateralMapping URL', () => {
     await api.PATCH_ActivateBilateralMapping(11);
 
     expect(patch).toHaveBeenCalledWith('bilateral-project-mappings/11/activate', {}, { useResultInterceptor: true });
+  });
+});
+
+describe('PATCH_BilateralProjectMappingDeactivate URL', () => {
+  it('patches bilateral-project-mappings/:id/deactivate with the notes body', async () => {
+    const patch = jest.fn().mockResolvedValue({ successfulRequest: true, data: { id: 11 } });
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        ApiService,
+        { provide: ToPromiseService, useValue: { patch } },
+        { provide: CacheService, useValue: {} },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: jest.fn().mockImplementation((urlFn: () => string) => {
+              if (typeof urlFn === 'function') urlFn();
+              return { get: jest.fn(), post: jest.fn() };
+            })
+          }
+        }
+      ]
+    });
+
+    const api = TestBed.inject(ApiService);
+    await api.PATCH_BilateralProjectMappingDeactivate(11, { notes: 'x' });
+
+    expect(patch).toHaveBeenCalledWith(
+      'bilateral-project-mappings/11/deactivate',
+      { notes: 'x' },
+      { useResultInterceptor: true }
+    );
   });
 });
 

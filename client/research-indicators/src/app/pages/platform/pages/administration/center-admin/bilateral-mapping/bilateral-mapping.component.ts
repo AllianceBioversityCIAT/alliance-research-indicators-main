@@ -515,7 +515,7 @@ export default class BilateralMappingComponent implements OnInit, OnDestroy {
    * On failure shows an error toast — idempotent-friendly (AC-07.3).
    */
   async confirmDeactivate(row: BilateralProjectMapping): Promise<void> {
-    const result = await this.service.deactivate(row.id);
+    const result = await this.service.deactivate(row.id, row.notes ?? '');
 
     if (result.ok) {
       // AC-07.1: update the row's is_active to false in-place in the rows() signal

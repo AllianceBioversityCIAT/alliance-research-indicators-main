@@ -902,16 +902,22 @@ export class ApiService {
     return this.TP.patch(url(), body, { useResultInterceptor: true });
   };
 
-  PATCH_BilateralProjectMappingDeactivate = (id: number): Promise<MainResponse<BilateralProjectMapping>> => {
+  PATCH_BilateralProjectMappingDeactivate = (
+    id: number,
+    body: { notes: string }
+  ): Promise<MainResponse<BilateralProjectMapping>> => {
     const url = () => `bilateral-project-mappings/${id}/deactivate`;
-    return this.TP.patch(url(), {}, { useResultInterceptor: true });
+    return this.TP.patch(url(), body, { useResultInterceptor: true });
   };
 
-  // Mirror of deactivate. Optional notes stay off the wire until a caller sends them;
-  // the server accepts `{ notes? }` and an empty body (design §5, R-APM-011).
-  PATCH_ActivateBilateralMapping = (id: number): Promise<MainResponse<BilateralProjectMapping>> => {
+  // Optional notes stay off the wire until a caller sends them.
+  // An omitted body becomes `{}` so activate without notes keeps the empty body (R-MSE-005 AC.5).
+  PATCH_ActivateBilateralMapping = (
+    id: number,
+    body?: { notes?: string }
+  ): Promise<MainResponse<BilateralProjectMapping>> => {
     const url = () => `bilateral-project-mappings/${id}/activate`;
-    return this.TP.patch(url(), {}, { useResultInterceptor: true });
+    return this.TP.patch(url(), body ?? {}, { useResultInterceptor: true });
   };
 
   // @akili-spec docs/specs/bilateral/annualized-project-mapping — T-08 / R-APM-003

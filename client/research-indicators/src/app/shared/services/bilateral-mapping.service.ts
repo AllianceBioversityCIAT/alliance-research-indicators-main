@@ -111,13 +111,16 @@ export class BilateralMappingService {
   }
 
   // AC-07.3 — idempotent server-side; same result shape as create/update.
-  async deactivate(id: number): Promise<MappingMutationResult<BilateralProjectMapping>> {
-    const res = await this.api.PATCH_BilateralProjectMappingDeactivate(id);
+  async deactivate(id: number, notes: string): Promise<MappingMutationResult<BilateralProjectMapping>> {
+    const res = await this.api.PATCH_BilateralProjectMappingDeactivate(id, { notes });
     return this.toMutationResult(res);
   }
 
-  async activate(id: number): Promise<MappingMutationResult<BilateralProjectMapping>> {
-    const res = await this.api.PATCH_ActivateBilateralMapping(id);
+  async activate(id: number, notes?: string): Promise<MappingMutationResult<BilateralProjectMapping>> {
+    const res =
+      notes !== undefined
+        ? await this.api.PATCH_ActivateBilateralMapping(id, { notes })
+        : await this.api.PATCH_ActivateBilateralMapping(id);
     return this.toMutationResult(res);
   }
 

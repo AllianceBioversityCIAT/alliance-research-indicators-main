@@ -65,7 +65,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-02 — Client: API and service forward the justification / notes
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-MSE-004 (request bodies: "deactivate with the justification", "activate with notes if edited"), R-MSE-005 AC.5 (empty activate body kept)
 - **Design references:** §8, J-7
 - **Files touched (intended):**
@@ -81,8 +81,8 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Consumers:** `bilateral-mapping.service.spec.ts`, `bilateral-mapping.component.ts` (caller, T-03), `bilateral-mapping.component.spec.ts` (mocks the service — T-03).
 - **Review:** `checklist` — two signature changes with tests.
 - **Done criteria:**
-  - [ ] both methods forward bodies; activate without notes sends `{}`
-  - [ ] falsifiers observed red; suite green; lint, build and spec type-check clean for the file
+  - [x] both methods forward bodies; activate without notes sends `{}`
+  - [x] falsifiers observed red; suite green; lint, build and spec type-check clean for the file
 - **Skills:** `angular-developer`
 
 ### T-03 — Client: Status control, justification, second confirmation, one row action

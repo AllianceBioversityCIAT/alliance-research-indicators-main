@@ -40,3 +40,28 @@
 - **Issues encountered:** the brief named `src/domain/tools/automapper` for the consumer suite; the consumer actually lives in the same folder (`bilateral-project-mapping/automapper.service.spec.ts`) and ran inside the folder command.
 - **Budget running totals:** tasks 1 / 4 · LOC 185 / ~450 · review rounds 1 / 5 — within budget.
 - **Gate:** auto-approved (owner's standing direction: continue until FATAL_FAIL / HALT / Pivot / tripwire).
+
+### T-02 — Client: API and service forward the justification / notes — PASS (attempt 1)
+
+- **Date:** 2026-10-30 · **Final status:** PASS
+- **Skills:** `angular-developer` (task default) · **Effort:** `grok-4.7-medium` (two signature changes, well specified)
+- **Orca:** task `task_8455204771a1`, dispatch `ctx_6d3f24608ff3` (terminal `term_1dcc2349-…`), parallel with T-01 (cross-package). `worker-start` returned `state: failed, stage: dispatch_input`: the prompt was pasted but not submitted, and the dispatch capability was revoked. The Leader submitted the pasted prompt (Enter) and told the worker to skip lifecycle commands and write its report to `/tmp/T-02-report.md`.
+- **runtime events:** spawn failure (dispatch input not submitted, capability revoked) ×1 → rung 1 (same worker resumed by terminal input; report delivered by file)
+- **Attempts:** 1
+- **Files changed:** `client/research-indicators/src/app/shared/services/{api.service.ts, bilateral-mapping.service.ts, bilateral-mapping.service.spec.ts}`; compile-keeping only: `…/bilateral-mapping/bilateral-mapping.component.ts:518` (`deactivate(row.id, row.notes ?? '')`) and the matching assertion in `bilateral-mapping.component.spec.ts:1230` (+66 / −14)
+- **Red run (pre-change code):** `Expected: 11, {"notes": "x"} / Received: 11` (deactivate); activate-with-notes `Expected: 11, {"notes": "n"} / Received: 11`; deactivate URL assertion `Expected { notes: "x" } / Received {}`.
+- **Falsifiers (post-change, observed red, reverted):** `body ?? {}` → `body` makes the empty-body activate test show `- {}` / `+ undefined`; deactivate body dropped → `- {"notes": "x"}` / `+ {}`.
+- **Implementer verification:** service spec 29 passed · component folder 3 suites / 125 passed · `npm run lint -- --quiet` exit 0 · `npm run build` exit 0 · spec tsc set for `bilateral-mapping.service.spec`: empty before, empty after (project total 945 → 945).
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** from `client/research-indicators/`: `npx jest src/app/shared/services/bilateral-mapping.service.spec.ts src/app/pages/platform/pages/administration/center-admin/bilateral-mapping --coverage=false` → `Test Suites: 4 passed, 4 total` / `Tests: 154 passed, 154 total` · `LINT_EXIT:0` · `BUILD_EXIT:0` · tsc spec grep count → 0.
+- **Reviewer:** `akili-reviewer`/opus — **`STATUS: PASS`**. "The diff matches design §8 and the R-MSE-004/R-MSE-005 request bodies exactly"; J-7 test points all covered; HTTP still only through `ApiService`; the temporary call site makes no behavior claim and is conformant. ISSUES: none.
+- **ADVISORY (not gating):**
+  - RISK (interim only): until T-03 lands, the row Deactivate action sends `{ notes: '' }` for a row without notes (server 400 after T-01), or resends the old notes as the justification. T-03 removes the row action and this call site; the T-03 Reviewer should confirm `row.notes ?? ''` is gone.
+  - RELIABILITY: `activate(id, '')` sends `{ notes: '' }` (correct per §8). T-03's "notes if edited" must pass `undefined`, not `''`, when notes were not edited.
+  - READABILITY: the activate comment now cites R-MSE-005 AC.5 in place of R-APM-011; the supersession is recorded by T-04.
+- **Forward pointers → T-03:** (1) remove `row.notes ?? ''` with the row action; (2) activate passes `undefined` when notes were not edited (joins the T-01 RISK pointer).
+- **Assumptions (worker, verbatim):** "`row.notes` is `string | null | undefined`, so the temporary deactivate call uses `row.notes ?? ''` so `npm run build` type-checks. T-03 replaces this call site. No behavior claim rides on the empty-string fallback."
+- **spawns:** Implementer Cursor/grok-4.7-medium: not reported by host, ended complete · Reviewer akili-reviewer/opus 5 calls, 42 877 tokens, ended complete
+- **Requirements covered:** R-MSE-004 (request bodies), R-MSE-005 AC.5 (client keeps `{}` on activate)
+- **Decisions made:** none beyond the spec.
+- **Budget running totals:** tasks 2 / 4 · LOC 265 / ~450 · review rounds 2 / 5 — within budget.
+- **Gate:** auto-approved (owner's standing direction).
