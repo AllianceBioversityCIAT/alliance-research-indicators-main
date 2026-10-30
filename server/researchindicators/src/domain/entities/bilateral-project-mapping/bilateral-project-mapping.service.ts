@@ -279,17 +279,25 @@ export class BilateralProjectMappingService {
     user: User,
     notes?: string,
     clarisaProjectId?: number,
+    justification?: string,
   ): Promise<BilateralProjectMapping> {
     const row = await this.loadCurrentYearRow(id);
     const projectDiffers =
       clarisaProjectId !== undefined &&
       clarisaProjectId !== row.clarisa_project_id;
+    const trimmedJustification =
+      typeof justification === 'string' ? justification.trim() : undefined;
+    const writeJustification =
+      trimmedJustification !== undefined && trimmedJustification.length > 0;
     if (row.is_active === true) {
-      if (notes === undefined && !projectDiffers) {
+      if (notes === undefined && !projectDiffers && !writeJustification) {
         return row;
       }
       if (notes !== undefined) {
         row.notes = notes;
+      }
+      if (writeJustification) {
+        row.status_justification = trimmedJustification;
       }
       if (projectDiffers) {
         await this.applyClarisaProjectChange(row, {
@@ -304,6 +312,9 @@ export class BilateralProjectMappingService {
     row.updated_by = user.sec_user_id;
     if (notes !== undefined) {
       row.notes = notes;
+    }
+    if (writeJustification) {
+      row.status_justification = trimmedJustification;
     }
     if (projectDiffers) {
       await this.applyClarisaProjectChange(row, {

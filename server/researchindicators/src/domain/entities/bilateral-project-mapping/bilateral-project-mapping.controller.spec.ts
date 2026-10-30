@@ -375,6 +375,7 @@ describe('PATCH :id/activate (R-APM-011)', () => {
       expect.objectContaining({ sec_user_id: 42 }),
       'restored',
       undefined,
+      undefined,
     );
   });
 
@@ -524,6 +525,7 @@ describe('PATCH :id/activate (R-APM-011)', () => {
       expect.objectContaining({ sec_user_id: 42 }),
       undefined,
       77,
+      undefined,
     );
   });
 
@@ -535,6 +537,51 @@ describe('PATCH :id/activate (R-APM-011)', () => {
 
     expect(res.status).toBe(HttpStatus.OK);
     expect(activate).toHaveBeenCalled();
+  });
+
+  it('R-MSE-008 trims an optional justification and passes it to activate', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: ' Contract renewed ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      undefined,
+      undefined,
+      'Contract renewed',
+    );
+  });
+
+  it('R-MSE-008 accepts a blank justification without rejecting it', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: '   ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      undefined,
+      undefined,
+      '',
+    );
+  });
+
+  it('R-MSE-008 rejects a 501-character justification and the error payload names justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({ justification: 'a'.repeat(501) });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(activate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(
+      /justification must be shorter than or equal to 500 characters/,
+    );
   });
 
   it('PATCH :id/activate rejects a non-whitelisted body field', async () => {

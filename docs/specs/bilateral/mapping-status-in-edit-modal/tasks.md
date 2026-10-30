@@ -155,7 +155,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-06 — Server: activate accepts an optional justification (Amendment A-3)
 
-- **Status:** todo · **Size:** S · **Dependencies:** T-05
+- **Status:** done · **Size:** S · **Dependencies:** T-05
 - **Requirements covered:** R-MSE-008 (server)
 - **Design references:** DD-12
 - **Files touched (intended):** bilateral-project-mapping `controller.ts`, `service.ts`, `controller.spec.ts`, `service.spec.ts`
@@ -164,8 +164,8 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Falsifier:** drop the write → "activate with justification" test red.
 - **Review:** `full`.
 - **Done criteria:**
-  - [ ] tests (transition, idempotent, absent → untouched, 501 → 400) pass; falsifier observed red
-  - [ ] lint, build, full server suite green
+  - [x] tests (transition, idempotent, absent → untouched, 501 → 400) pass; falsifier observed red
+  - [x] lint, build, full server suite green
 - **Skills:** `nestjs-expert`, `tdd`
 
 ### T-04 — Docs: decisions log and TRD

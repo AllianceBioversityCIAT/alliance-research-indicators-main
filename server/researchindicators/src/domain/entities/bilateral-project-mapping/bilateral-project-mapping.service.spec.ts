@@ -28,6 +28,7 @@ type ActivateFn = (
   user: User,
   notes?: string,
   clarisaProjectId?: number,
+  justification?: string,
 ) => Promise<BilateralProjectMapping>;
 
 describe('BilateralProjectMappingService', () => {
@@ -950,12 +951,18 @@ describe('BilateralProjectMappingService', () => {
   });
 
   describe('activate (R-APM-011)', () => {
-    const activate = (id: number, notes?: string, clarisaProjectId?: number) =>
+    const activate = (
+      id: number,
+      notes?: string,
+      clarisaProjectId?: number,
+      justification?: string,
+    ) =>
       (service as unknown as { activate: ActivateFn }).activate(
         id,
         fakeUser,
         notes,
         clarisaProjectId,
+        justification,
       );
 
     it('activate is idempotent on an already-active row', async () => {
@@ -1094,6 +1101,67 @@ describe('BilateralProjectMappingService', () => {
       const out = await activate(5);
 
       expect(out.is_active).toBe(true);
+      expect(out.status_justification).toBe('Contract closed');
+      expect(out.notes).toBe('old note');
+    });
+
+    it('R-MSE-008 writes a trimmed justification when activating an inactive row', async () => {
+      const row = {
+        id: 5,
+        is_active: false,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: new Date('2026-01-02T00:00:00.000Z'),
+        status_justification: 'Contract closed',
+        notes: 'old note',
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await activate(5, undefined, undefined, ' Contract renewed ');
+
+      expect(out.status_justification).toBe('Contract renewed');
+      expect(out.notes).toBe('old note');
+      expect(out.is_active).toBe(true);
+      expect(repoSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('R-MSE-008 saves an already-active row when only a justification is supplied', async () => {
+      const row = {
+        id: 5,
+        is_active: true,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: null,
+        status_justification: 'Contract closed',
+        notes: 'old note',
+        updated_by: 7,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await activate(5, undefined, undefined, 'Contract renewed');
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.status_justification).toBe('Contract renewed');
+      expect(out.is_active).toBe(true);
+      expect(out.deleted_at).toBeNull();
+      expect(out.notes).toBe('old note');
+      expect(out.updated_by).toBe(42);
+    });
+
+    it('R-MSE-008 leaves status_justification unchanged when the justification is blank', async () => {
+      const row = {
+        id: 5,
+        is_active: false,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: new Date('2026-01-02T00:00:00.000Z'),
+        status_justification: 'Contract closed',
+        notes: 'old note',
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await activate(5, undefined, undefined, '   ');
+
       expect(out.status_justification).toBe('Contract closed');
       expect(out.notes).toBe('old note');
     });

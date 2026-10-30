@@ -152,3 +152,13 @@ Dispatch (A-2): T-05 → task `task_9fb68b9ea8b8`, dispatch `ctx_da77851db7ba`, 
 ### T-03 — second HITL (owner, 2026-10-30) → Amendment A-3
 
 Owner observed (translated): A-2 behaves as asked, but "it being required when inactivating doesn't mean I can't add a justification when activating — the field only shows when I inactivate"; and on the inactivate confirmation (green pencil, `confirm`): "fine if you're updating something, but if the action is inactivate it should be a warning, amber". Spec change, not a code FAIL. Recorded as R-MSE-008, DD-12, DD-13; new task T-06 (server); T-03 scope item 11. Leader choice: `secondary` severity (amber triangle), because `warning`'s icon is a clock (`pi-history`); the owner may overrule.
+
+## T-06 — Server: activate accepts an optional justification (A-3)
+
+- **Implementer:** Grok `grok-4.7-medium` (cursor, task `task_342f9c4c0864`, dispatch `ctx_3fbf02f2e686`), attempt 1. Report `/tmp/T-06-report.md`.
+- **Red run (worker):** `-t "R-MSE-008"` → 5 failed / 1 passed; transition `Expected: "Contract renewed" Received: "Contract closed"`; idempotent `Expected number of calls: 1 Received: 0`; 501 → message did not name justification (`property justification should not exist`). The blank-unchanged test was green before (disclosed; it discriminates only once a write exists).
+- **Falsifier:** both assignments removed → `Expected: "Contract renewed" Received: "Contract closed"`; restored, folder 186/186.
+- **Worker verification:** bilateral folder 8 suites / 186 tests; eslint exit 0; build exit 0.
+- **Evidence re-run (Leader): VERIFIED** — full server suite `Test Suites: 441 passed, 441 total` / `Tests: 4301 passed, 4301 total`.
+- **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: PASS`**. Advisory: no test pins that a blank justification on an already-active row skips the save (code does skip it).
+- **Verdict:** PASS → T-06 done.

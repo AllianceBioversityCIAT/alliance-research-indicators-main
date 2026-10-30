@@ -63,6 +63,18 @@ class BilateralProjectMappingNotesDto {
   @IsInt()
   @Min(1)
   clarisa_project_id?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Optional activation justification. Trimmed; at most 500 characters. Written to status_justification only when non-blank.',
+    maxLength: 500,
+    example: 'Contract renewed',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @MaxLength(500)
+  justification?: string;
 }
 
 class DeactivateBilateralProjectMappingDto {
@@ -235,7 +247,13 @@ export class BilateralProjectMappingController {
     @Body() body?: BilateralProjectMappingNotesDto,
   ) {
     return this.service
-      .activate(id, request.user, body?.notes, body?.clarisa_project_id)
+      .activate(
+        id,
+        request.user,
+        body?.notes,
+        body?.clarisa_project_id,
+        body?.justification,
+      )
       .then((data) =>
         ResponseUtils.format({
           data,
