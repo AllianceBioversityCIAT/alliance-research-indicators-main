@@ -271,7 +271,7 @@ describe('BilateralProjectMappingController', () => {
   });
 
   describe('deactivate', () => {
-    it('passes optional notes through', async () => {
+    it('passes notes through', async () => {
       service.deactivate.mockResolvedValue({
         id: 5,
         is_active: false,
@@ -289,13 +289,19 @@ describe('BilateralProjectMappingController', () => {
       expect(out.status).toBe(HttpStatus.OK);
     });
 
-    it('works without a body', async () => {
+    it('passes a justification body', async () => {
       service.deactivate.mockResolvedValue({
         id: 5,
         is_active: false,
       } as never);
-      const out = await controller.deactivate(reqUser as never, 5);
-      expect(service.deactivate).toHaveBeenCalledWith(5, fakeUser, undefined);
+      const out = await controller.deactivate(reqUser as never, 5, {
+        notes: 'Contract closed',
+      });
+      expect(service.deactivate).toHaveBeenCalledWith(
+        5,
+        fakeUser,
+        'Contract closed',
+      );
       expect(out.status).toBe(HttpStatus.OK);
     });
   });
@@ -378,7 +384,7 @@ describe('PATCH :id/activate (R-APM-011)', () => {
     expect(activate).not.toHaveBeenCalled();
   });
 
-  it('PATCH :id/deactivate keeps optional notes through the validation pipe', async () => {
+  it('PATCH :id/deactivate passes a justification through the validation pipe', async () => {
     const res = await request(app.getHttpServer())
       .patch('/5/deactivate')
       .set('x-test-roles', JSON.stringify([SecRolesEnum.CENTER_ADMIN]))
@@ -390,6 +396,93 @@ describe('PATCH :id/activate (R-APM-011)', () => {
       expect.objectContaining({ sec_user_id: 42 }),
       'wrong project',
     );
+  });
+
+  const centerAdmin = () => JSON.stringify([SecRolesEnum.CENTER_ADMIN]);
+
+  it('AC.1 rejects {} and the error payload names notes', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({});
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/notes/);
+  });
+
+  it('AC.1 rejects whitespace-only notes and the error payload names notes', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: '   ' });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/notes/);
+  });
+
+  it('AC.3 rejects a 501-character justification and the error payload names notes', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: 'a'.repeat(501) });
+
+    expect(res.status).toBe(HttpStatus.BAD_REQUEST);
+    expect(deactivate).not.toHaveBeenCalled();
+    expect(JSON.stringify(res.body)).toMatch(/notes/);
+  });
+
+  it('AC.2 stores a padded justification trimmed', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: ' Contract closed ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'Contract closed',
+    );
+  });
+
+  it('P-11 stores " x " as "x"', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: ' x ' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'x',
+    );
+  });
+
+  it('AC.4 accepts the admin-panel justification', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/deactivate')
+      .set('x-test-roles', centerAdmin())
+      .send({ notes: 'Deactivated via admin panel' });
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(deactivate).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ sec_user_id: 42 }),
+      'Deactivated via admin panel',
+    );
+  });
+
+  it('AC.5 activate with an empty body returns 200', async () => {
+    const res = await request(app.getHttpServer())
+      .patch('/5/activate')
+      .set('x-test-roles', centerAdmin())
+      .send({});
+
+    expect(res.status).toBe(HttpStatus.OK);
+    expect(activate).toHaveBeenCalled();
   });
 
   it('PATCH :id/activate rejects a non-whitelisted body field', async () => {

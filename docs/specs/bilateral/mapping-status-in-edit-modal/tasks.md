@@ -2,7 +2,7 @@
 
 - **Module:** bilateral
 - **Spec id:** 2026-10-mapping-status-in-edit-modal
-- **Status:** not-started
+- **Status:** in-progress
 - **Owner:** David Casañas
 - **Linked requirements:** ./requirements.md
 - **Linked design:** ./design.md (judgment: ./judgment.md — APPROVED)
@@ -35,7 +35,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-01 — Server: deactivate requires a trimmed justification; idempotent calls write supplied notes
 
-- **Status:** todo · **Size:** S · **Dependencies:** none
+- **Status:** done · **Size:** S · **Dependencies:** none
 - **Requirements covered:** R-MSE-005 (AC.1–AC.6), R-MSE-003 ("Justification overwrites notes" — server half)
 - **Design references:** §5, §6, DD-5, DD-8, P-2, P-4, P-6, P-11
 - **Files touched (intended):**
@@ -58,9 +58,9 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Consumers:** `controller.spec.ts` (`:273-298`, `:381-390`), `service.spec.ts` (`describe('deactivate (R-BIL-080)')`, `describe('activate (R-APM-011)')`), `automapper.service.spec.ts:1520-1567` (deactivates an active row with a note — must stay green), `admin/client/pages/BilateralProjectMappings.tsx:281-286` (sends a note — AC.4), client `api.service.ts:906` (T-02).
 - **Review:** `full` — changes a write contract other clients call and an idempotency rule.
 - **Done criteria:**
-  - [ ] P-11 settled and recorded as step 1
-  - [ ] AC.1–AC.6 each owned by a passing test; falsifiers (a)–(c) observed red
-  - [ ] server suite for the folder green; eslint clean; build green
+  - [x] P-11 settled and recorded as step 1
+  - [x] AC.1–AC.6 each owned by a passing test; falsifiers (a)–(c) observed red
+  - [x] server suite for the folder green; eslint clean; build green
 - **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
 
 ### T-02 — Client: API and service forward the justification / notes

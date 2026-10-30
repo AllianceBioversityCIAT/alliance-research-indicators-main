@@ -263,6 +263,11 @@ export class BilateralProjectMappingService {
   ): Promise<BilateralProjectMapping> {
     const row = await this.loadCurrentYearRow(id);
     if (row.is_active === false) {
+      if (notes !== undefined) {
+        row.notes = notes;
+        row.updated_by = user.sec_user_id;
+        return this.repo.save(row);
+      }
       // Idempotent — already deactivated.
       return row;
     }
@@ -282,6 +287,11 @@ export class BilateralProjectMappingService {
   ): Promise<BilateralProjectMapping> {
     const row = await this.loadCurrentYearRow(id);
     if (row.is_active === true) {
+      if (notes !== undefined) {
+        row.notes = notes;
+        row.updated_by = user.sec_user_id;
+        return this.repo.save(row);
+      }
       return row;
     }
     row.is_active = true;

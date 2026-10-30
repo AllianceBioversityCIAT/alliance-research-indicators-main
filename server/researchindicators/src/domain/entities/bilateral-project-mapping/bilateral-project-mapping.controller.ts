@@ -18,11 +18,13 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
+  ApiProperty,
   ApiPropertyOptional,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Request } from 'express';
 import { User } from '../../complementary-entities/secondary/user/user.entity';
 import { Roles } from '../../shared/decorators/roles.decorator';
@@ -45,6 +47,20 @@ class BilateralProjectMappingNotesDto {
   @IsOptional()
   @IsString()
   notes?: string;
+}
+
+class DeactivateBilateralProjectMappingDto {
+  @ApiProperty({
+    description:
+      'Required justification recorded on the row. Trimmed; must be 1–500 characters.',
+    maxLength: 500,
+    example: 'Contract closed',
+  })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  notes!: string;
 }
 
 // @sdd-spec docs/specs/bilateral-module/pending-items — T-15.14 / R-BIL-080
@@ -201,9 +217,12 @@ export class BilateralProjectMappingController {
   }
 
   @Patch(':id/deactivate')
-  @ApiOperation({ summary: 'Soft-deactivate a bilateral project mapping' })
+  @ApiOperation({
+    summary:
+      'Soft-deactivate a bilateral project mapping. A justification (notes) is required.',
+  })
   @ApiParam({ name: 'id', type: Number })
-  @ApiBody({ type: BilateralProjectMappingNotesDto, required: false })
+  @ApiBody({ type: DeactivateBilateralProjectMappingDto, required: true })
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -214,9 +233,9 @@ export class BilateralProjectMappingController {
   async deactivate(
     @Req() request: RequestWithUser,
     @Param('id', ParseIntPipe) id: number,
-    @Body() body?: BilateralProjectMappingNotesDto,
+    @Body() body: DeactivateBilateralProjectMappingDto,
   ) {
-    return this.service.deactivate(id, request.user, body?.notes).then((data) =>
+    return this.service.deactivate(id, request.user, body.notes).then((data) =>
       ResponseUtils.format({
         data,
         description: 'Bilateral project mapping deactivated',

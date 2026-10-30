@@ -354,6 +354,28 @@ describe('BilateralProjectMappingService', () => {
       expect(repoSave).not.toHaveBeenCalled();
     });
 
+    it('AC.6 writes supplied notes on an already-inactive row without touching status', async () => {
+      const deletedAt = new Date('2026-01-02T00:00:00.000Z');
+      const row = {
+        id: 5,
+        is_active: false,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: deletedAt,
+        notes: 'old note',
+        updated_by: 7,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await service.deactivate(5, fakeUser, 'Late reason');
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.notes).toBe('Late reason');
+      expect(out.is_active).toBe(false);
+      expect(out.deleted_at).toBe(deletedAt);
+      expect(out.updated_by).toBe(42);
+    });
+
     it('404s when the row does not exist', async () => {
       repoFindOne.mockResolvedValueOnce(null);
       await expect(service.deactivate(999, fakeUser)).rejects.toBeInstanceOf(
@@ -907,6 +929,27 @@ describe('BilateralProjectMappingService', () => {
 
       expect(out).toBe(row);
       expect(repoSave).not.toHaveBeenCalled();
+    });
+
+    it('writes supplied notes on an already-active row without touching status', async () => {
+      const row = {
+        id: 5,
+        is_active: true,
+        reporting_year: CURRENT_YEAR,
+        deleted_at: null,
+        notes: 'old note',
+        updated_by: 7,
+      };
+      repoFindOne.mockResolvedValueOnce(row);
+      repoSave.mockImplementation(async (saved) => saved);
+
+      const out = await activate(5, 'Late reason');
+
+      expect(repoSave).toHaveBeenCalledTimes(1);
+      expect(out.notes).toBe('Late reason');
+      expect(out.is_active).toBe(true);
+      expect(out.deleted_at).toBeNull();
+      expect(out.updated_by).toBe(42);
     });
 
     it('activate on an inactive current-year row sets is_active and clears deleted_at', async () => {
