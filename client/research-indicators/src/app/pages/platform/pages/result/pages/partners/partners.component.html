@@ -29,7 +29,6 @@
           label="Partner(s) that made a significant contribution to the achievement of the result that is being submitted"
           description="Partner organizations you collaborated with or are currently collaborating with to generate this result."
           [isRequired]="true" [signal]="body"
-          [helperText]="'Partner organizations you collaborated with or are currently collaborating with to generate this result.'"
           optionLabel="html_full_name" optionValue="institution_id" signalOptionValue="institutions"
           [disabled]="!submission.isEditableStatus()"
           [removeCondition]="!submission.isEditableStatus() ? canRemove : canRemoveInstitution" removeTooltip="{{
