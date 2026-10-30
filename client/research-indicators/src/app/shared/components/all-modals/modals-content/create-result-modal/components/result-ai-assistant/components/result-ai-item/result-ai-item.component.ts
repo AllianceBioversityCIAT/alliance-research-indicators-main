@@ -98,9 +98,12 @@ export class ResultAiItemComponent implements OnChanges {
       });
   }
 
+  // H45 — this used to window.open a background tab at /result/<number>, so the click
+  // looked like it did nothing. It now opens the result here, like "Create and open".
   openResult(item: AIAssistantResult) {
-    const url = `/result/${item.result_official_code}/general-information`;
-    window.open(url, '_blank');
+    const resultCode = `STAR-${String(item.result_official_code).replace(/^STAR-/i, '')}`;
+    this.allModalsService.closeModal('createResult');
+    void this.router.navigate(['result', resultCode, 'general-information']);
   }
 
   isAIAssistantResult(item: AIAssistantResult | GetOsResult): item is AIAssistantResult {
