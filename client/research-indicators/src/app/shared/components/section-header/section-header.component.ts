@@ -22,7 +22,8 @@ import {
   getStarReportViewerUrl,
   isStarInnDevPdfTemporarilyDisabled,
   isStarPdfReportEligibleFromResultId,
-  openStarPdfReportInNewTab
+  openStarPdfReportInNewTab,
+  STAR_PDF_COMING_SOON_TOOLTIP
 } from '@shared/utils/star-pdf-report.util';
 import { isOicrTemplateDownloadHidden } from '@shared/utils/oicr-template-download.util';
 
@@ -63,11 +64,18 @@ export class SectionHeaderComponent implements OnDestroy, AfterViewInit, OnInit 
     const statusId = this.cache.currentMetadata()?.status_id;
     return statusId === 5 || statusId === 7 || (statusId === 4 && this.cache.isMyResult()) || this.rolesService.isAdmin();
   });
+  // H36 — every STAR result shows the PDF icon. Indicators without a report yet get it
+  // greyed out with a "Coming soon" tooltip, instead of hiding it with no explanation.
   showStarPdfReport = computed(() => {
     const resultId = this.cache.currentResultId() || this.currentResultId();
-    return isStarPdfReportEligibleFromResultId(this.cache.currentMetadata()?.indicator_id, resultId);
+    return String(resultId ?? '').trim().toUpperCase().startsWith(`${PLATFORM_CODES.STAR}-`);
   });
-  starPdfReportDisabled = computed(() => isStarInnDevPdfTemporarilyDisabled(this.cache.currentMetadata()?.indicator_id));
+  starPdfReportDisabled = computed(() => {
+    const indicatorId = this.cache.currentMetadata()?.indicator_id;
+    const resultId = this.cache.currentResultId() || this.currentResultId();
+    return !isStarPdfReportEligibleFromResultId(indicatorId, resultId) || isStarInnDevPdfTemporarilyDisabled(indicatorId);
+  });
+  readonly starPdfComingSoonTooltip = STAR_PDF_COMING_SOON_TOOLTIP;
   /** OICR results only, and not Portfolio 2 — that portfolio has no template yet. */
   showOicrTemplateDownload = computed(() => {
     const metadata = this.cache.currentMetadata();

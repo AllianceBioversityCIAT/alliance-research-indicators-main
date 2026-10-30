@@ -486,20 +486,31 @@ describe('SectionHeaderComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('app-download-oicr-template').length).toBe(0);
   });
 
-  it('showStarPdfReport should require STAR result and supported indicators', () => {
+  it('showStarPdfReport should show for every STAR result and disable indicators without a report (H36)', () => {
     (cacheService.currentResultId as any).set('STAR-8');
     (cacheService.currentMetadata as any).set({ indicator_id: 1, result_official_code: 8, report_year: 2026 });
     expect(component.showStarPdfReport()).toBe(true);
+    expect(component.starPdfReportDisabled()).toBe(false);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 2, result_official_code: 8, report_year: 2026 });
     expect(component.showStarPdfReport()).toBe(true);
 
     (cacheService.currentMetadata as any).set({ indicator_id: 4, result_official_code: 8, report_year: 2026 });
-    expect(component.showStarPdfReport()).toBe(false);
+    expect(component.showStarPdfReport()).toBe(true);
+    expect(component.starPdfReportDisabled()).toBe(true);
 
     (cacheService.currentResultId as any).set('PRMS-8');
     (cacheService.currentMetadata as any).set({ indicator_id: 1, result_official_code: 8, report_year: 2026 });
     expect(component.showStarPdfReport()).toBe(false);
+  });
+
+  it('H36: renders the greyed PDF icon with a Coming soon tooltip for an indicator without a report', () => {
+    (cacheService.currentResultId as any).set('STAR-8');
+    (cacheService.currentMetadata as any).set({ indicator_id: 4, result_official_code: 8, report_year: 2026 });
+    fixture.detectChanges();
+    const icon: HTMLElement | null = fixture.nativeElement.querySelector('span[role="img"] .pi-file-pdf');
+    expect(icon).not.toBeNull();
+    expect(icon?.parentElement?.getAttribute('aria-label')).toBe('PDF report: Coming soon');
   });
 
   it('showStarPdfReport should use private currentResultId when cache id is falsy', () => {
