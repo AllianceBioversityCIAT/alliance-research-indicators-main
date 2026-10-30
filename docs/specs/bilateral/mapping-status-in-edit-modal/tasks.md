@@ -22,7 +22,10 @@ graph TD
   T-02[Client: API + service forward notes]
   T-03[Client: Edit modal status, justification, confirmation, row actions]
   T-04[Docs: decisions log + TRD]
+  T-05[Server A-2: status_justification column + activate project]
   T-02 --> T-03
+  T-05 --> T-03
+  T-05 --> T-04
   T-01 --> T-04
   T-03 --> T-04
 ```
@@ -87,7 +90,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-03 — Client: Status control, justification, second confirmation, one row action
 
-- **Status:** todo · **Size:** M · **Dependencies:** T-02
+- **Status:** in-progress (HITL 2026-10-30 → rework under Amendment A-2) · **Size:** M · **Dependencies:** T-02, T-05
 - **Requirements covered:** R-MSE-001, R-MSE-002, R-MSE-003 (client), R-MSE-004, NFR-MSE-001 (automatable half), NFR-MSE-002
 - **Design references:** §7.1–§7.4, DD-2, DD-3, DD-4, DD-6, DD-7, reversion table, P-1, P-3, P-7, P-10; judgment R2-1..R2-4
 - **Files touched (intended):**
@@ -101,10 +104,15 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
   4. **Save (§7.3):** re-entry guard; captured plan; `showGlobalAlert` with `hideCloseButton: true`, the summary/detail/button/toast strings from the §7.3 table; cancel clears `confirmPending`; `applyStatusChange(plan)`: one request, success → close + toast + `load()` + `loadCoverage()` + Clarity `bilateral.mapping.deactivated|activated`; failure → inline `saveError`.
   5. **Dialog close gate (§7.3, R2-1, R2-2):** `[visible]="dialogOpen()"` + `(visibleChange)="onDialogVisibleChange($event)"`: `false` while `confirmPending() || saving()` is ignored; `false` otherwise calls `closeDialog()`. `closeDialog()` returns early while `confirmPending() || saving()`. `[closable]="!(confirmPending() || saving())"`, `[focusTrap]="!confirmPending()"`. Form controls and dialog Cancel disabled while pending. Optional (R2-4): refocus Save after Cancel / failure.
   6. **Template (§7.4):** Status `p-toggleswitch` (import `ToggleSwitchModule`) with `<label for>`, `[ariaLabel]`, Active/Inactive text, `data-testid="status-toggle"`, edit mode only; CLARISA picker `[disabled]="statusChanged() || confirmPending()"`; Justification textarea (`justification-input`, label + red `*`, `aria-required="true"`, placeholder, `n/500`) replacing Notes while inactivating. Token utilities only — no hex, no new tokens.
+- **Rework scope (Amendment A-2, R-MSE-006/007, DD-9/DD-10; owner HITL 2026-10-30):**
+  7. API + service (`api.service.ts`, `bilateral-mapping.service.ts` + spec): deactivate sends `{ justification, notes? }`; activate sends `{ notes?, clarisa_project_id? }`, each key only when set.
+  8. Justification field directly below the Status toggle; Notes always rendered, optional, independent; inactivating may also save an edited Notes in the same deactivate request.
+  9. CLARISA picker `[disabled]` only while inactivating (`isInactivating()`), not on activation; stash/restore applies to the inactivating direction only; the activate plan carries `clarisa_project_id` when it differs from the snapshot; Save requires a project when activating.
+  10. Diagnose and fix: an inactive mapping opened in Edit shows an empty CLARISA picker (value set, option missing from `clarisaOptions`). Red test first.
 - **Tests (component spec; construct closed, then `openEditDialog` — KZ-015):**
   - retire the row-action tests (`requestDeactivate — confirmation gate`, `confirmDeactivate — success/failure`, `Deactivate button visibility`, `Activate action (R-APM-011)`) and replace with:
   - DOM: active and inactive rows render `edit-btn` and no `deactivate-btn` / `activate-btn`; Pending row renders only `pending-map-btn` (R-MSE-001).
-  - Status toggle present in edit, absent in create and "+ Map"; reads Active for an active row; toggling alone enables Save (R-MSE-002).
+  - Status toggle present in edit, absent in create and "+ Map"; reads Active for an active row; toggling alone enables Save for Inactive → Active, and for Active → Inactive once a justification is typed (R-MSE-002 as amended 2026-10-30).
   - Project round trip: pick project B, toggle Inactive (picker disabled, shows snapshot project A), toggle back → picker enabled showing B; the deactivate plan carries no project (R-MSE-002).
   - Inactivating: Justification replaces Notes, empty on entry and on re-entry; Save disabled for `''` and `'   '`; no service call (R-MSE-003).
   - Confirmation: Save opens exactly one alert with `hideCloseButton: true` and the §7.3 strings, zero service calls before `confirmCallback.event()`; second `onSave()` while pending → still one alert, zero calls; `onDialogVisibleChange(false)` and `closeDialog()` while pending → `dialogOpen()` still true and values kept; cancel → zero calls, dialog open, `confirmPending` false (R-MSE-004).
@@ -120,10 +128,25 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Consumers:** `bilateral-mapping.component.spec.ts` — the only file pinning the removed hooks/handlers (P-3, grep over `client/research-indicators` and `server/researchindicators`: 2 files, component `.ts` + spec). `ActionsService.showGlobalAlert` is called, not changed.
 - **Review:** `full` — UI state machine with a double-submit and close-path guard.
 - **Done criteria:**
-  - [ ] every listed test passes and falsifiers (a)–(d) observed red
-  - [ ] lint, build, spec type-check clean; full client suite green (Leader re-measure)
+  - [x] every listed test passes and falsifiers (a)–(d) observed red
+  - [x] lint, build, spec type-check clean; full client suite green (Leader re-measure)
   - [ ] **HITL (owner, running app):** confirmation renders above the modal (P-8); Tab reaches Confirm/Cancel and Escape does not close the modal while pending (P-9); toggle looks right in light and dark; header X disappearing while pending is acceptable (R2-5). Quote what the owner observed.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
+
+### T-05 — Server: `status_justification` column; deactivate `{ justification, notes? }`; activate accepts a project (Amendment A-2)
+
+- **Status:** todo · **Size:** M · **Dependencies:** T-01
+- **Requirements covered:** R-MSE-006, R-MSE-007 (server), R-MSE-005 as amended
+- **Design references:** DD-9, DD-10, DD-11, DD-8
+- **Files touched (intended):** `server/researchindicators/src/domain/entities/bilateral-project-mapping/{entities/bilateral-project-mapping.entity.ts, bilateral-project-mapping.controller.ts, bilateral-project-mapping.service.ts, *.spec.ts}`, one new migration under `server/researchindicators/src/db/migrations/`, `server/researchindicators/src/admin/client/pages/BilateralProjectMappings.tsx` (body key only)
+- **Scope:** add the column (entity + hand-written additive migration, `up` adds / `down` drops); deactivate DTO `justification` (required, trim, 1–500) + optional `notes` (trim, ≤500); service writes `status_justification`, never `notes` from the justification, on both the transition and the idempotent path; activate DTO adds optional `clarisa_project_id` (int) reusing `update()`'s project-change logic (snapshot name, external code) in the same save, on both paths; activate leaves `status_justification` alone; SSR page sends `{ justification: … }`; Swagger updated.
+- **Verification:** from `server/researchindicators/`: the two bilateral specs `--coverage=false`, `npx eslint <touched>`, `npm run build`, then full `npm test -- --silent` (Leader). Migration not applied by the worker (shared Dev DB — owner step).
+- **Falsifier:** write the justification to `notes` → "notes untouched" test red; drop `clarisa_project_id` handling in activate → "reactivate onto B" test red.
+- **Review:** `full` — contract change + migration.
+- **Done criteria:**
+  - [ ] tests for R-MSE-006 scenario, AC.1–AC.6 re-keyed to `justification`, activate-with-project (transition + idempotent), notes untouched; falsifiers observed red
+  - [ ] lint, build, full server suite green
+- **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
 
 ### T-04 — Docs: decisions log and TRD
 
@@ -131,7 +154,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Requirements covered:** traceability for R-MSE-001 (supersedes R-APM-011's row Activate) and R-MSE-005 (API contract)
 - **Design references:** reversion table, §5
 - **Files touched (intended):** `docs/ux-ui/design.md` (decisions log entry), `docs/trd/trd.md` (one sentence in the Center Admin / bilateral mapping API line)
-- **Scope:** decisions-log entry dated on completion: status change moved into the Edit modal with a second confirmation; justification required on inactivate, stored in `notes`, overwritten; supersedes the R-APM-011 row action. TRD: `PATCH /api/bilateral-project-mappings/:id/deactivate` requires `notes` (trimmed 1–500, `400` otherwise); idempotent calls with notes write them.
+- **Scope:** decisions-log entry dated on completion: status change moved into the Edit modal with a second confirmation; justification required on inactivate, stored in `status_justification` (overwritten, notes untouched — A-2); CLARISA editable on activation; supersedes the R-APM-011 row action. TRD: `PATCH …/:id/deactivate` requires `justification` (trimmed 1–500, `400` otherwise) and accepts `notes`; `PATCH …/:id/activate` accepts `notes` and `clarisa_project_id`; new column `status_justification`.
 - **Verification:** `grep -n "mapping-status-in-edit-modal" docs/ux-ui/design.md docs/trd/trd.md` → ≥ 1 hit each; correction sweep: `grep -rn "Deactivate button\|row Activate\|activate-btn" docs/ux-ui docs/trd` reviewed and each hit updated or recorded as historical.
 - **Falsifier:** an entry that cites the wrong path → the first grep returns 0 hits for that file.
 - **Red run:** baseline observed: `grep -n "mapping-status-in-edit-modal" docs/ux-ui/design.md docs/trd/trd.md` → no hits at `43dd6341` (spec created after).

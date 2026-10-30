@@ -65,3 +65,54 @@
 - **Decisions made:** none beyond the spec.
 - **Budget running totals:** tasks 2 / 4 · LOC 265 / ~450 · review rounds 2 / 5 — within budget.
 - **Gate:** auto-approved (owner's standing direction).
+
+### T-03 — Client: Status control, justification, second confirmation, one row action — code PASS (attempt 1); HITL pending; budget tripwire
+
+- **Date:** 2026-10-30 · **Final status:** code `PASS`; task stays open (`[~]`) — the HITL done criterion is owed to the owner, and the budget tripwire fired (below)
+- **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd` (task defaults) · **Effort:** `grok-4.7-xhigh` (UI state machine with double-submit and close-path guards)
+- **Orca:** task `task_6fde05c56f06`, dispatch `ctx_7acf30be5325` (terminal `term_603737fb-…`); retained (HITL may need rework)
+- **Attempts:** 1
+- **Files changed:** `client/research-indicators/src/app/pages/platform/pages/administration/center-admin/bilateral-mapping/{bilateral-mapping.component.ts, .html, .spec.ts}` (+714 / −440; about half is Prettier reflow, per Reviewer B)
+- **Red run (pre-change component, assertion level):** new describe 11 failed / 2 passed. Quotes: deactivate-btn `Expected: 0 / Received: 1`; status toggle `expect(input).not.toBeNull() / Received: null`; ariaLabel `Expected: "Mapping status: Inactive" / Received: undefined`; visibleChange gate `Expected: "function" / Received: "undefined"`; project round trip `Expected substring: "USAID" / Received string: "ACIAR"`. Already green before (not cited as reds): Pending/UNMAPPED renders only + Map; notes-only edit → one update, no confirmation.
+- **Falsifiers (post-change, observed red, reverted):** (a) onSave guard reduced to `saving()` → `showGlobalAlert` `Expected number of calls: 1 / Received number of calls: 2`; (b) onDialogVisibleChange always closes → `dialogOpen()` `Expected: true / Received: false`; (c) applyStatusChange reads `justification()` → `Expected: 10, "Contract closed" / Received: 10, "changed after save"`; (d) row-action block restored → deactivate-btn `Expected: 0 / Received: 1`.
+- **Implementer verification:** folder jest `--coverage=false` → 3 suites / 126 passed · `npm run lint -- --quiet` "All files pass linting." · `npm run build` exit 0 · spec tsc set for component.spec identical before/after (one pre-existing `TS2749` on `Select`).
+- **Evidence re-run (Leader inline, non-author) — VERIFIED:** from `client/research-indicators/`: folder jest → `Test Suites: 3 passed, 3 total` / `Tests: 126 passed, 126 total` · `LINT_EXIT:0` · `BUILD_EXIT:0` · tsc set: the single pre-existing `TS2749` line · **full client suite** `npm test -- --silent` → `Test Suites: 347 passed, 347 total` / `Tests: 8118 passed, 8118 total`.
+- **Execute-time spec edit:** `design.md` §9 DD-7, 2026-10-30 — wording aligned with §7.3 (hide path gated in `onDialogVisibleChange`/`closeDialog`, `focusTrap` off while pending, `closeOnEscape` not toggled; judgment R2-3). Reason: the worker flagged the stale `closeOnEscape` wording. Meaning unchanged. Carried as a named check to both Reviewers; carry once more to the T-04 Reviewer.
+- **Reviewer (parallel lens mode — effort `xhigh`):**
+  - A, `akili-reviewer`/opus, lens RELIABILITY: **`STATUS: PASS`**. State machine matches §7.1–§7.4 and amended DD-7; every open path resets via `resetStatusDraft`; stash/restore honours the `undefined` sentinel; `confirmPending`/`saving` clear on Confirm, Cancel, success and failure; no other path can leave `confirmPending` stuck; tests respect KZ-015 and invoke the real callbacks. Forward pointers (1) and (2) hold.
+  - B, `akili-reviewer`/opus, lens RISK: **`STATUS: PASS`**. No request before Confirm or after Cancel; no double request (alert closes in the same click handler); no project sent with a status change; justification trimmed at Save; notes on activate only when they differ from the snapshot; §7.3 strings exact; Clarity names kept; a11y attributes and tokens conform.
+- **ADVISORY (not gating):**
+  - RISK/RELIABILITY (both reviewers): clearing Notes (or whitespace-only) then activating sends `activate(id, '')`, which wipes the stored notes (DD-8). Intended by R-MSE-003 ("an edited value is saved"), but the Activate confirmation does not say notes will be cleared.
+  - RISK: the activate tests do not assert the `bilateral.mapping.activated` Clarity event or `load`/`loadCoverage`; only deactivate does.
+  - RELIABILITY: R2-4 refocus-Save probably no-ops — `focusSaveButton()` runs in a microtask before change detection re-enables Save (inferred, not run). Check in the HITL keyboard pass.
+  - RESILIENCE: `onSave`'s create/update branch has no try/finally; a future rejection would leave `saving` stuck and the dialog unclosable under the new gate. Not reachable today (`ToPromiseService` maps errors to `successfulRequest: false`).
+  - READABILITY: about half the diff is unrelated Prettier reflow.
+- **Not Done / Assumptions (worker, verbatim):**
+  - "R-MSE-002's active-row scenario says a status change alone enables Save. R-MSE-003 and design §7.2 keep Save disabled while the justification is empty or whitespace. Implemented §7.2. 'Toggling alone enables Save' is the Inactive → Active case (no justification). Active → Inactive enables Save only after a non-blank justification, with no project change."
+  - "Design DD-7 still mentions `closeOnEscape` (judgment R2-3, wording only). Not edited: scope is the three component files. The dialog does not bind `closeOnEscape`; hide is gated in `onDialogVisibleChange` and `closeDialog`." → resolved by the Leader's DD-7 edit above.
+  - No owed item → not a continuation.
+- **Spec tension (Pivot-lightest, to the owner at this gate):** `requirements.md` R-MSE-002 scenario "Edit an active mapping" ("AND IT MUST make Save enabled when only the Status control is changed") vs R-MSE-003 / design §7.2 (Save disabled while the justification is blank). Both Reviewers: code correct under §7.2. Proposed one-line amendment to R-MSE-002 — owner decision pending.
+- **spawns:** Implementer Cursor/grok-4.7-xhigh: not reported by host, ended complete · Reviewer A akili-reviewer/opus 18 calls, 112 693 tokens, ended complete · Reviewer B akili-reviewer/opus 17 calls, 107 894 tokens, ended complete
+- **Requirements covered:** R-MSE-001, R-MSE-002, R-MSE-003 (client), R-MSE-004, NFR-MSE-001 (automatable half), NFR-MSE-002
+- **Budget running totals:** tasks 3 / 4 · LOC 1 419 / ~450 (insertions + deletions, same metric as T-01/T-02; T-03 alone 1 154) · review rounds 4 / 5 (T-03 counted as two verdicts) — **BUDGET TRIPWIRE: LOC ≈ 3.2× the design §12 estimate.** Cause: the component spec was largely rewritten (+585 lines churn) and Prettier reflowed the touched files; the design estimated ~150 component + ~170 specs. Escalated to the owner; not logged auto-approved.
+- **HITL owed (owner, running app):** confirmation above the modal (P-8); Tab reaches Confirm/Cancel and Escape does not close the modal while pending (P-9, R2-2); toggle in light and dark; header X disappearing while pending acceptable (R2-5); refocus of Save after Cancel (advisory).
+- **Owner decisions at the T-03 gate (2026-10-30, AskUserQuestion):**
+  - Spec tension → "Enmendar R-MSE-002". `requirements.md` R-MSE-002 Behavior bullet and scenario "Edit an active mapping" amended: Save enables immediately for Inactive → Active, and for Active → Inactive once a justification is typed (R-MSE-003). Code unchanged; meaning of R-MSE-003/§7.2 unchanged.
+  - Budget tripwire → "Aceptar y continuar". Overrun accepted by the owner; cause recorded above. Not auto-approved.
+
+### T-03 — HITL (owner, running app, 2026-10-30) → rework; Amendment A-2
+
+Owner observed, verbatim (translated from Spanish): "when it is inactive and I activate it, the CLARISA field is disabled; when it is active and I inactivate it, it is normal that field is disabled". "The justification should be below the activation toggle." "Don't replace the notes — notes may be used for other things; the justification is only for the status." Screenshots also show an inactive mapping opening with an **empty** CLARISA picker (clear-X visible, so a value is set but its option is missing).
+
+Classification: not a code FAIL against the spec (the picker lock on activation and the notes overwrite were specified, DD-3/DD-4) — an owner-driven **spec change**. Attempt counter for T-03 unchanged; rework goes to the same retained worker.
+
+Owner decisions (AskUserQuestion, 2026-10-30):
+- Justification storage → **new column** `status_justification` (last value, overwritten) — R-MSE-006, DD-9.
+- CLARISA on activation → **editable, same request** (`activate` accepts `clarisa_project_id`) — R-MSE-007, DD-10.
+- Justification on activation → **inactivate only** (unchanged).
+
+Leader defaults (owner may overrule): deactivate wire key renamed `notes` → `justification` (plus optional `notes`); activate does not clear `status_justification` (DD-11); `/admin` SSR page updated to the new key.
+
+New task T-05 (server) added; T-03 rework scope items 7–10 added; T-04 scope updated. Budget: already over (accepted at the T-03 gate); A-2 adds a migration and a server task — tripwire re-noted, not re-asked, since the owner initiated the scope.
+
+Rollout note: the new column needs its migration applied to the DB the owner's local server uses before the next HITL — a human step.

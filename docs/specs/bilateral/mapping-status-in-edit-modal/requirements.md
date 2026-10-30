@@ -16,7 +16,9 @@
 
 ## Executive Summary
 
-Today each row of the Bilateral Project Mapping table has two actions: **Edit** (pencil) and **Deactivate / Activate** (ban / check icon), each with its own flow. This spec moves the status change **into the Edit modal**: the row keeps only Edit, the modal gains an Active/Inactive control, and saving a status change asks for a **second confirmation** ("This mapping will be inactivated / activated"). Inactivating additionally requires a **justification**, stored in the mapping's existing `notes` column and **overwritten** each time — no history.
+Today each row of the Bilateral Project Mapping table has two actions: **Edit** (pencil) and **Deactivate / Activate** (ban / check icon), each with its own flow. This spec moves the status change **into the Edit modal**: the row keeps only Edit, the modal gains an Active/Inactive control, and saving a status change asks for a **second confirmation** ("This mapping will be inactivated / activated"). Inactivating additionally requires a **justification**, stored in a dedicated `status_justification` column (overwritten each time, no history) — **Notes is never replaced** (Amendment A-2).
+
+> **Amendment A-2 (2026-10-30, owner at the T-03 HITL gate) supersedes** every clause below that stores the justification in `notes`, replaces the Notes field with Justification, or locks the CLARISA picker on activation. See §4b.
 
 The AC-1797 ticket also names "export the filtered list". The owner scoped that **out** of this spec (2026-10-30).
 
@@ -71,8 +73,8 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 **Behavior:**
 - The Edit modal shows a **Status** control with two states, Active and Inactive, initialized from the row's `is_active`.
 - The control is present only in edit mode; the create dialog ("New mapping" and "+ Map") does not show it.
-- Changing the control alone makes the form savable (it counts as a change).
-- While the status differs from its initial value, the CLARISA project picker is disabled and shows the initial project; a status change saves status and notes only (see design DD-3).
+- Changing the control alone makes the form savable (it counts as a change); when the change is Active → Inactive, the justification required by R-MSE-003 must also be filled.
+- ~~While the status differs from its initial value, the CLARISA project picker is disabled~~ *(superseded by A-2: locked only while inactivating; editable on activation)*.
 - Setting the control back to its initial value restores the modal to its normal edit behavior, including any CLARISA project the admin had picked before switching the status.
 
 #### Scenario: Project pick survives a status round trip
@@ -87,7 +89,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - GIVEN an active mapping
 - WHEN the admin opens Edit
 - THEN the Status control reads Active
-- AND IT MUST make Save enabled when only the Status control is changed
+- AND IT MUST make Save enabled when only the Status control is changed — immediately for Inactive → Active; for Active → Inactive once a justification is typed (R-MSE-003). *(Amended 2026-10-30 by the owner at the T-03 gate, resolving the tension with R-MSE-003 / design §7.2.)*
 
 #### Scenario: Create flow is unchanged
 
@@ -100,9 +102,9 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - **As a** product owner **I want** a reason for every inactivation **so that** an inactive mapping says why.
 
 **Behavior:**
-- When the Status control changes from Active to Inactive, the Notes field is replaced by a **Justification** field: required, empty on entry, same 500-character cap and counter as Notes.
+- *(A-2: Justification renders directly below the Status control and Notes stays visible and independent.)* When the Status control changes from Active to Inactive, a **Justification** field appears: required, empty on entry, same 500-character cap and counter as Notes.
 - Save stays disabled while the justification is empty or whitespace only.
-- On a confirmed save the justification (trimmed) is written to `notes`, replacing the previous value; no previous justification is kept anywhere.
+- On a confirmed save the justification (trimmed) is written to `status_justification`, replacing the previous justification; `notes` is untouched unless the admin edited it (A-2).
 - When the Status control changes from Inactive to Active, no justification is required; Notes stays the normal optional field, and an edited value is saved with the activation.
 
 #### Scenario: Inactivate without a justification
@@ -189,6 +191,36 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 
 **Out of scope:** history of justifications; exporting the filtered list (AC-1797's other item, owner-deferred).
 
+## 4b. Amendment A-2 — justification has its own column; CLARISA editable on activation
+
+*Owner decisions at the T-03 HITL gate, 2026-10-30. Where this section and an earlier clause disagree, this section wins.*
+
+### R-MSE-006 — Justification stored apart from Notes
+
+- A new nullable `text` column `bilateral_project_mapping.status_justification` holds the last inactivation justification; each inactivation overwrites it (no history). `notes` is never written by the justification.
+- `PATCH :id/deactivate` body: `{ justification: string, notes?: string }`. `justification` is required, trimmed, 1–500 chars (`400` otherwise) and written to `status_justification`; `notes`, when supplied, is written to `notes`. Both are written also on an already-inactive row (idempotent path, as AC.6).
+- Activate does **not** clear `status_justification` and requires no justification.
+- The `/admin` SSR page sends `{ justification: 'Deactivated via admin panel' }`.
+- In the Edit modal the Justification field sits **directly below the Status control**; Notes stays visible, optional and independent in both directions.
+
+#### Scenario: Justification leaves notes alone
+- GIVEN a mapping whose notes read "old note"
+- WHEN the admin inactivates it with justification "Contract closed" and confirms
+- THEN `status_justification` reads exactly "Contract closed"
+- AND `notes` still reads "old note"
+
+### R-MSE-007 — CLARISA project editable when activating
+
+- The CLARISA picker is locked to the initial project **only while inactivating** (Active → Inactive). On Inactive → Active it stays editable.
+- `PATCH :id/activate` body: `{ notes?: string, clarisa_project_id?: number }`. A supplied project different from the current one is applied with the same rules as `PATCH :id` (snapshot name/external code refreshed) in the **same** request — one save, one request.
+- An inactive mapping opened in Edit must show its current CLARISA project in the picker (the 2026-10-30 HITL saw it empty; diagnose and fix).
+
+#### Scenario: Reactivate onto another project
+- GIVEN an inactive mapping on project A open in Edit
+- WHEN the admin switches Status to Active, picks project B and confirms
+- THEN exactly one `PATCH …/activate` is sent with `{ clarisa_project_id: B }`
+- AND the row is active on project B
+
 ## 5. Non-Functional Requirements
 
 ### NFR-MSE-001 — Accessibility
@@ -204,14 +236,15 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 
 ## 6. Data requirements
 
-No schema change. `bilateral_project_mapping.notes` (nullable `text`) is reused as the justification sink. No migration, no backfill.
+~~No schema change.~~ *(A-2)* One additive migration: nullable `text` column `bilateral_project_mapping.status_justification`. No backfill. Applying it to the shared Dev DB is a human step.
 
 ## 7. API surface delta
 
 | Endpoint | Change |
 | --- | --- |
 | `PATCH /api/bilateral-project-mappings/:id/deactivate` | body `notes` becomes **required**, trimmed 1–500 chars; Swagger `@ApiBody` becomes required |
-| `PATCH /api/bilateral-project-mappings/:id/activate` | none (client starts sending optional `notes` when edited) |
+| `PATCH /api/bilateral-project-mappings/:id/deactivate` (A-2) | body becomes `{ justification (required), notes? }` → `status_justification` |
+| `PATCH /api/bilateral-project-mappings/:id/activate` | *(A-2)* optional `notes` and `clarisa_project_id` |
 | `PATCH /api/bilateral-project-mappings/:id` | none |
 
 The path is unversioned (`/api/bilateral-project-mappings/...`; no `@Version` on this controller — cite in design).
@@ -251,6 +284,8 @@ None blocking. Resolved by the owner on 2026-10-30: justification lives in `note
 | R-MSE-003 | Justification required when inactivating |
 | R-MSE-004 | Second confirmation before a status change is saved |
 | R-MSE-005 | Server requires the justification on deactivate |
+| R-MSE-006 | Justification stored apart from Notes (A-2) |
+| R-MSE-007 | CLARISA project editable when activating (A-2) |
 | NFR-MSE-001 | Accessibility |
 | NFR-MSE-002 | No new hex literals or tokens |
 
