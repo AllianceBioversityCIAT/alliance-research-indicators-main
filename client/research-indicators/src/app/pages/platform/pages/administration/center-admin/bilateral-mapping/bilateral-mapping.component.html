@@ -2,13 +2,10 @@
   <div class="flex w-full flex-col gap-5">
     <div class="content-section w-full">
       <div class="bilateral-mapping flex w-full min-w-0 flex-col abc-white-2 p-[30px] mb-10 rounded-[10px] gap-6">
-
         <!-- Page title, Help Popover + Action Buttons (T-BIL-CAM-05, R-BIL-UI-001, R-BIL-UI-002, R-BTE-005) -->
         <div class="flex flex-wrap items-center justify-between gap-4 px-2">
           <div class="flex items-center gap-2">
-            <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">
-              Bilateral Project Mapping
-            </h1>
+            <h1 class="font-['Inter'] fs-[17] font-bold leading-[18px] atc-primary-blue-600 m-0 break-all">Bilateral Project Mapping</h1>
             @if (reportingYear(); as year) {
               <span
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]"
@@ -23,27 +20,29 @@
               class="p-button-text p-button-sm !p-0 !w-[22px] !h-[22px] atc-grey-700 hover:atc-primary-blue-600 cursor-pointer"
               (click)="helpOp.toggle($event)"
               data-testid="help-popover-btn"
-              aria-label="About Bilateral Project Mapping">
-            </button>
+              aria-label="About Bilateral Project Mapping"></button>
             <p-popover #helpOp [style]="{ width: '380px' }" appendTo="body">
               <div class="flex flex-col gap-3 p-2 text-sm atc-grey-800" data-testid="help-popover-content">
                 <div class="flex items-center justify-between border-b pb-2 border-[var(--ac-grey-200)]">
                   <span class="font-semibold text-sm atc-primary-blue-600">About Bilateral Project Mapping</span>
                   @if (reportingYear(); as year) {
-                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
+                    <span
+                      class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium abc-primary-blue-50 atc-primary-blue-600 border border-[var(--ac-primary-blue-200)]">
                       {{ year }}
                     </span>
                   }
                 </div>
                 <p class="m-0 leading-relaxed text-[13px]">
                   @if (reportingYear(); as year) {
-                    In this module, bilateral projects from CLARISA for reporting year {{ year }} are mapped and reconciled against AGRESSO agreements and contracts.
+                    In this module, bilateral projects from CLARISA for reporting year {{ year }} are mapped and reconciled against AGRESSO agreements
+                    and contracts.
                   } @else {
                     In this module, bilateral projects from CLARISA are mapped and reconciled against AGRESSO agreements and contracts.
                   }
                 </p>
                 <p class="m-0 leading-relaxed text-[13px]">
-                  This mapping ensures that Science Program alignments, Pool Funding contributions, and indicator reporting reflect active bilateral agreements accurately in STAR.
+                  This mapping ensures that Science Program alignments, Pool Funding contributions, and indicator reporting reflect active bilateral
+                  agreements accurately in STAR.
                 </p>
               </div>
             </p-popover>
@@ -73,9 +72,7 @@
         </div>
 
         <!-- Mapping Coverage strip (T-06 / R-CAM-004 AC.4) -->
-        <app-bilateral-mapping-coverage
-          (reportingYear)="onReportingYear($event)"
-          (openAutomapper)="openAutomapperDialog()">
+        <app-bilateral-mapping-coverage (reportingYear)="onReportingYear($event)" (openAutomapper)="openAutomapperDialog()">
         </app-bilateral-mapping-coverage>
 
         <!-- Search + filters bar (AC-04.1 / AC-04.2 / AC-04.3, R-BTE-003) -->
@@ -133,17 +130,10 @@
             <i class="pi pi-spinner pi-spin atc-primary-blue-400" aria-hidden="true"></i>
             <span class="text-sm atc-grey-800">Loading mappings…</span>
           </div>
-
         } @else if (loadError()) {
           <!-- Error state (AC-03.3) -->
-          <div
-            class="flex flex-col gap-3 rounded border px-4 py-4 bil-error-block"
-            role="alert"
-            aria-live="assertive"
-            data-testid="error-state">
-            <p class="m-0 text-sm font-semibold atc-red-1">
-              We could not load bilateral mappings. Please try again.
-            </p>
+          <div class="flex flex-col gap-3 rounded border px-4 py-4 bil-error-block" role="alert" aria-live="assertive" data-testid="error-state">
+            <p class="m-0 text-sm font-semibold atc-red-1">We could not load bilateral mappings. Please try again.</p>
             <button
               type="button"
               class="inline-flex items-center gap-2 self-start rounded-[13px] abc-primary-blue-400 px-4 py-2 text-sm atc-white-1 cursor-pointer"
@@ -153,14 +143,12 @@
               Retry
             </button>
           </div>
-
         } @else if (rows().length === 0) {
           <!-- Empty state (AC-03.4) -->
           <div class="flex flex-col items-center gap-2 py-10 text-center" data-testid="empty-state">
             <i class="pi pi-inbox text-3xl atc-grey-500" aria-hidden="true"></i>
             <p class="m-0 text-sm atc-grey-800">No mappings found. Try adjusting your search or filters.</p>
           </div>
-
         } @else {
           <!-- Table (AC-03.1, R-BTE-001..004, NFR-BTE-001) -->
           <div class="w-full overflow-x-auto">
@@ -172,7 +160,6 @@
               styleClass="bil-map-table"
               data-testid="mappings-table"
               aria-label="Bilateral project mappings">
-
               <ng-template pTemplate="header">
                 <tr>
                   <th pSortableColumn="agresso_agreement_id" class="atc-primary-blue-900" scope="col">
@@ -242,7 +229,7 @@
                   <td class="text-sm">
                     <div class="flex flex-col">
                       <div class="flex items-center gap-1 font-semibold atc-grey-900">
-                        <span>{{ row.clarisa_project_short_name || ('Project ' + row.clarisa_project_id) }}</span>
+                        <span>{{ row.clarisa_project_short_name || 'Project ' + row.clarisa_project_id }}</span>
                         <span class="text-xs font-normal text-[var(--ac-grey-600)]">(id {{ row.clarisa_project_id }})</span>
                       </div>
                       @if (row.clarisa_project_full_name) {
@@ -263,7 +250,9 @@
                   <!-- Source badge -->
                   <td>
                     <span
-                      class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-source-badge bil-source-badge--{{ row.source }}"
+                      class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bil-source-badge bil-source-badge--{{
+                        row.source
+                      }}"
                       [attr.data-source]="row.source">
                       {{ sourceLabel(row.source) }}
                     </span>
@@ -301,7 +290,7 @@
                     {{ row.reporting_year }}
                   </td>
 
-                  <!-- Row actions (T-BIL-CAM-05: Edit; T-BIL-CAM-06: Deactivate; R-BTE-003: + Map for Pending) -->
+                  <!-- Row actions: Edit for mapped rows; + Map for Pending / UNMAPPED (R-MSE-001) -->
                   <td class="flex items-center gap-1">
                     @if (row.mapping_status === 'Pending' || row.source === 'UNMAPPED') {
                       <button
@@ -312,8 +301,7 @@
                         class="p-button-outlined p-button-sm !h-[26px] !px-2 !text-xs !rounded-[6px]"
                         (click)="openMapDialogForPending(row)"
                         [attr.aria-label]="'Map project ' + (row.clarisa_project_short_name || row.clarisa_project_id)"
-                        data-testid="pending-map-btn">
-                      </button>
+                        data-testid="pending-map-btn"></button>
                     } @else {
                       <button
                         pButton
@@ -322,31 +310,7 @@
                         class="p-button-text p-button-sm"
                         (click)="openEditDialog(row)"
                         [attr.aria-label]="'Edit mapping for ' + row.agresso_agreement_id"
-                        data-testid="edit-btn">
-                      </button>
-                      @if (row.is_active) {
-                        <!-- AC-07.2: confirmation is shown before the request fires -->
-                        <button
-                          pButton
-                          type="button"
-                          icon="pi pi-ban"
-                          class="p-button-text p-button-sm p-button-danger"
-                          (click)="requestDeactivate(row)"
-                          aria-label="Deactivate mapping"
-                          data-testid="deactivate-btn">
-                        </button>
-                      } @else {
-                        <!-- R-APM-011: Activate sits in the deactivate slot on inactive rows -->
-                        <button
-                          pButton
-                          type="button"
-                          icon="pi pi-check"
-                          class="p-button-text p-button-sm"
-                          (click)="requestActivate(row)"
-                          aria-label="Activate mapping"
-                          data-testid="activate-btn">
-                        </button>
-                      }
+                        data-testid="edit-btn"></button>
                     }
                   </td>
                 </tr>
@@ -367,7 +331,6 @@
             </p-paginator>
           }
         }
-
       </div>
     </div>
   </div>
@@ -377,19 +340,19 @@
 <!-- @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (AC-05.x / AC-06.x) -->
 <p-dialog
   [header]="dialogMode() === 'create' ? 'New Bilateral Mapping' : 'Edit Bilateral Mapping'"
-  [(visible)]="dialogOpen"
+  [visible]="dialogOpen()"
+  (visibleChange)="onDialogVisibleChange($event)"
   [modal]="true"
   [draggable]="false"
   [resizable]="false"
   [style]="{ width: '560px' }"
-  [closable]="true"
+  [closable]="!(confirmPending() || saving())"
+  [focusTrap]="!confirmPending()"
   (onHide)="closeDialog()"
   appendTo="body"
   data-testid="mapping-dialog"
   aria-labelledby="bilMapDialogTitle">
-
   <div class="flex flex-col gap-5">
-
     <!-- Pickers loading state -->
     @if (optionsLoading()) {
       <div class="flex items-center gap-2 py-2" aria-live="polite">
@@ -436,9 +399,7 @@
             }
           </ng-template>
           <ng-template pTemplate="item" let-opt>
-            <span
-              class="bil-picker-option-label"
-              [title]="agressoOptionLabel(opt)">
+            <span class="bil-picker-option-label" [title]="agressoOptionLabel(opt)">
               {{ agressoOptionLabel(opt) }}
             </span>
           </ng-template>
@@ -456,6 +417,59 @@
       }
     </div>
 
+    @if (dialogMode() === 'edit') {
+      <div class="flex flex-col gap-5">
+        <div class="flex flex-col gap-1">
+          <label for="bilMapStatusToggle" class="text-sm font-medium atc-grey-800">Status</label>
+          <div class="flex items-center gap-2">
+            <p-toggleswitch
+              inputId="bilMapStatusToggle"
+              [ngModel]="statusActive()"
+              (ngModelChange)="onStatusToggle($event)"
+              [disabled]="confirmPending() || saving()"
+              [ariaLabel]="'Mapping status: ' + (statusActive() ? 'Active' : 'Inactive')"
+              data-testid="status-toggle">
+            </p-toggleswitch>
+            <span class="text-sm atc-grey-800">{{ statusActive() ? 'Active' : 'Inactive' }}</span>
+          </div>
+        </div>
+        @if (lastJustification()) {
+          <div class="bil-sp-preview rounded px-3 py-2 flex flex-col gap-1" data-testid="last-justification">
+            <p class="m-0 flex items-center gap-2 text-xs font-semibold text-[var(--ac-grey-600)]">
+              <i class="pi pi-history" aria-hidden="true"></i>
+              Last justification
+            </p>
+            <p class="m-0 text-sm atc-grey-800 whitespace-pre-wrap break-words">{{ lastJustification() }}</p>
+          </div>
+        }
+        @if (statusChanged()) {
+          <div class="flex flex-col gap-1">
+            <label for="bilMapJustification" class="text-sm font-medium atc-grey-800">
+              @if (isInactivating()) {
+                Justification <span class="atc-red-1" aria-hidden="true">*</span>
+              } @else {
+                Justification <span class="text-xs text-[var(--ac-grey-600)]">(optional)</span>
+              }
+            </label>
+            <textarea
+              pTextarea
+              id="bilMapJustification"
+              rows="3"
+              class="w-full"
+              [maxlength]="notesMaxLength"
+              [placeholder]="isInactivating() ? 'Why is this mapping being inactivated?' : 'Why is this mapping being activated?'"
+              [ngModel]="justification()"
+              (ngModelChange)="onJustificationInput($event)"
+              [disabled]="confirmPending() || saving()"
+              [attr.aria-required]="isInactivating() ? 'true' : null"
+              data-testid="justification-input">
+            </textarea>
+            <p class="m-0 text-xs text-[var(--ac-grey-600)] text-right">{{ justification().length }}/{{ notesMaxLength }}</p>
+          </div>
+        }
+      </div>
+    }
+
     <!-- CLARISA project picker (AC-05.2 / AC-06.1) -->
     <div class="flex flex-col gap-1">
       <label for="bilMapClarisaPicker" class="text-sm font-medium atc-grey-800">
@@ -471,6 +485,7 @@
         optionValue="id"
         [ngModel]="selectedProjectId()"
         (ngModelChange)="selectedProjectId.set($event)"
+        [disabled]="isInactivating() || confirmPending() || saving()"
         placeholder="Select CLARISA project…"
         [filter]="true"
         filterBy="short_name,full_name,external_code"
@@ -491,9 +506,7 @@
           }
         </ng-template>
         <ng-template pTemplate="item" let-opt>
-          <span
-            class="bil-picker-option-label"
-            [title]="clarisaOptionLabel(opt)">
+          <span class="bil-picker-option-label" [title]="clarisaOptionLabel(opt)">
             {{ clarisaOptionLabel(opt) }}
           </span>
         </ng-template>
@@ -519,7 +532,7 @@
       }
     </div>
 
-    <!-- Notes (optional, max 500 chars) -->
+    <!-- Notes stay visible in both directions. Justification, when shown, sits under Status. -->
     <div class="flex flex-col gap-1">
       <label for="bilMapNotes" class="text-sm font-medium atc-grey-800">
         Notes <span class="text-xs text-[var(--ac-grey-600)]">(optional)</span>
@@ -533,6 +546,7 @@
         placeholder="Add notes about this mapping…"
         [ngModel]="notes()"
         (ngModelChange)="onNotesInput($event)"
+        [disabled]="confirmPending() || saving()"
         aria-label="Mapping notes"
         data-testid="notes-input">
       </textarea>
@@ -541,18 +555,13 @@
 
     <!-- Inline save error (role="alert" — surfaces 409 / 400 message from result.message) -->
     @if (saveError()) {
-      <div
-        class="bil-save-error-block rounded px-3 py-3"
-        role="alert"
-        aria-live="assertive"
-        data-testid="save-error">
+      <div class="bil-save-error-block rounded px-3 py-3" role="alert" aria-live="assertive" data-testid="save-error">
         <p class="m-0 text-sm atc-red-1">
           <i class="pi pi-exclamation-triangle mr-2" aria-hidden="true"></i>
           {{ saveError() }}
         </p>
       </div>
     }
-
   </div>
 
   <!-- Dialog footer -->
@@ -563,9 +572,10 @@
         type="button"
         label="Cancel"
         class="p-button-outlined p-button-secondary"
+        [disabled]="confirmPending() || saving()"
         (click)="closeDialog()"
-        data-testid="dialog-cancel-btn">
-      </button>
+        aria-label="Cancel"
+        data-testid="dialog-cancel-btn"></button>
       <button
         pButton
         type="button"
@@ -574,15 +584,11 @@
         [loading]="saving()"
         (click)="onSave()"
         data-testid="dialog-save-btn"
-        [attr.aria-disabled]="!canSave()">
-      </button>
+        [attr.aria-label]="saving() ? 'Saving…' : 'Save'"
+        [attr.aria-disabled]="!canSave()"></button>
     </div>
   </ng-template>
-
 </p-dialog>
 
 <!-- Automapper Dialog (T-06 / R-CAM-002, R-CAM-003) -->
-<app-automapper-dialog
-  [(visible)]="automapperDialogOpen"
-  (applied)="onAutomapperApplied()">
-</app-automapper-dialog>
+<app-automapper-dialog [(visible)]="automapperDialogOpen" (applied)="onAutomapperApplied()"> </app-automapper-dialog>

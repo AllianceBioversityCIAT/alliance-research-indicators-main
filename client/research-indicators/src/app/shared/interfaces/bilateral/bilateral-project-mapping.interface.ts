@@ -9,9 +9,13 @@ export interface BilateralProjectMapping {
   clarisa_project_id: number;
   clarisa_project_short_name?: string | null;
   clarisa_project_full_name?: string | null;
+  /** Normalized CLARISA external code stored on the mapping row. */
+  clarisa_external_code?: string | null;
   source: BilateralMappingSource;
   confidence_score?: number | null;
   notes?: string | null;
+  /** Last inactivation reason. Null until the mapping has been inactivated. */
+  status_justification?: string | null;
   is_active: boolean;
   mapping_status?: MappingStatus;
   created_at: string;
@@ -181,5 +185,3 @@ export function formatClarisaProjectLabel(project: {
   }
   return `${shortName} — ${fullName}`;
 }
-
-

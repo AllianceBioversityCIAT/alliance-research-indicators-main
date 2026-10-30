@@ -830,10 +830,7 @@ export class ApiService {
     return this.TP.get(url(), { params });
   };
 
-  PATCH_PoolFundingTag = (
-    code: string,
-    body: PoolFundingTagPatchBody
-  ): Promise<MainResponse<PoolFundingTagPatchResponse>> => {
+  PATCH_PoolFundingTag = (code: string, body: PoolFundingTagPatchBody): Promise<MainResponse<PoolFundingTagPatchResponse>> => {
     const url = () => `agresso/contracts/${encodeURIComponent(code)}/pool-funding-tag`;
     return this.TP.patch(url(), body, { useResultInterceptor: true });
   };
@@ -866,10 +863,7 @@ export class ApiService {
     return this.TP.get(this.bilateralPath(resultCode, '/hlos-indicators'), { useResultInterceptor: true });
   };
 
-  PATCH_PoolFundingAlignment = (
-    resultCode: string,
-    body: UpdatePoolFundingAlignmentDto
-  ): Promise<MainResponse<AlignmentResponse>> => {
+  PATCH_PoolFundingAlignment = (resultCode: string, body: UpdatePoolFundingAlignmentDto): Promise<MainResponse<AlignmentResponse>> => {
     return this.TP.patch(this.bilateralPath(resultCode), body, { useResultInterceptor: true });
   };
 
@@ -904,17 +898,17 @@ export class ApiService {
 
   PATCH_BilateralProjectMappingDeactivate = (
     id: number,
-    body: { notes: string }
+    body: { justification: string; notes?: string }
   ): Promise<MainResponse<BilateralProjectMapping>> => {
     const url = () => `bilateral-project-mappings/${id}/deactivate`;
     return this.TP.patch(url(), body, { useResultInterceptor: true });
   };
 
-  // Optional notes stay off the wire until a caller sends them.
-  // An omitted body becomes `{}` so activate without notes keeps the empty body (R-MSE-005 AC.5).
+  // Each key is included only when the caller set it.
+  // An omitted body becomes `{}` so activate with no edits keeps the empty body (R-MSE-005 AC.5).
   PATCH_ActivateBilateralMapping = (
     id: number,
-    body?: { notes?: string }
+    body?: { notes?: string; clarisa_project_id?: number; justification?: string }
   ): Promise<MainResponse<BilateralProjectMapping>> => {
     const url = () => `bilateral-project-mappings/${id}/activate`;
     return this.TP.patch(url(), body ?? {}, { useResultInterceptor: true });
@@ -1364,9 +1358,7 @@ export class ApiService {
     body: { project_ids?: string[]; delegate_user_ids?: number[] } | { pi_delegate_ids?: number[] }
   ): Promise<MainResponse<unknown>> => {
     const url = this.TP.getEnv(undefined) + `pi-delegates`;
-    return firstValueFrom(
-      this.TP.http.delete<MainResponse<unknown>>(url, { body })
-    );
+    return firstValueFrom(this.TP.http.delete<MainResponse<unknown>>(url, { body }));
   };
 
   /**
@@ -1390,9 +1382,11 @@ export class ApiService {
    * Exactly one parameter must be provided.
    * Returns delegation history entries NEWEST-FIRST.
    */
-  GET_PIDelegatesHistory = (
-    params: { project_id?: string; delegate_user_id?: number; scope?: PiDelegateScope }
-  ): Promise<MainResponse<PiDelegateHistoryEntry[]>> => {
+  GET_PIDelegatesHistory = (params: {
+    project_id?: string;
+    delegate_user_id?: number;
+    scope?: PiDelegateScope;
+  }): Promise<MainResponse<PiDelegateHistoryEntry[]>> => {
     let qs: string;
     if (params.project_id !== undefined) {
       qs = `project_id=${encodeURIComponent(params.project_id)}`;

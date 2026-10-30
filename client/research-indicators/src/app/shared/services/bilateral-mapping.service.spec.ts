@@ -196,9 +196,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('returns null on successfulRequest:false (AC-03.3)', async () => {
-      mockApi.GET_BilateralProjectMappings.mockResolvedValue(
-        err<BilateralMappingListPage>(500, { errors: 'boom' })
-      );
+      mockApi.GET_BilateralProjectMappings.mockResolvedValue(err<BilateralMappingListPage>(500, { errors: 'boom' }));
 
       const result = await service.list();
 
@@ -212,9 +210,7 @@ describe('BilateralMappingService', () => {
       mockApi.GET_BilateralProjectMapping.mockResolvedValueOnce(ok(row));
       expect(await service.get(11)).toEqual(row);
 
-      mockApi.GET_BilateralProjectMapping.mockResolvedValueOnce(
-        err<BilateralProjectMapping>(404, { errors: 'not found' })
-      );
+      mockApi.GET_BilateralProjectMapping.mockResolvedValueOnce(err<BilateralProjectMapping>(404, { errors: 'not found' }));
       expect(await service.get(99)).toBeNull();
     });
   });
@@ -259,9 +255,7 @@ describe('BilateralMappingService', () => {
         message: 'Active mapping already exists for this contract'
       });
       // Guard against reading the exception class name.
-      expect(result).not.toEqual(
-        expect.objectContaining({ message: 'ConflictException' })
-      );
+      expect(result).not.toEqual(expect.objectContaining({ message: 'ConflictException' }));
     });
 
     it('400 → { ok:false, status:400, message:<errors text> }', async () => {
@@ -291,9 +285,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('400 → surfaces errorDetail.errors text', async () => {
-      mockApi.PATCH_BilateralProjectMapping.mockResolvedValue(
-        err<BilateralProjectMapping>(400, { errors: 'notes is too long' })
-      );
+      mockApi.PATCH_BilateralProjectMapping.mockResolvedValue(err<BilateralProjectMapping>(400, { errors: 'notes is too long' }));
 
       const result = await service.update(11, { notes: 'x' });
 
@@ -301,9 +293,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('falls back to top-level description when errorDetail.errors is empty', async () => {
-      mockApi.PATCH_BilateralProjectMapping.mockResolvedValue(
-        err<BilateralProjectMapping>(500, { errors: '' }, 'Internal Server Error')
-      );
+      mockApi.PATCH_BilateralProjectMapping.mockResolvedValue(err<BilateralProjectMapping>(500, { errors: '' }, 'Internal Server Error'));
 
       const result = await service.update(11, { notes: 'x' });
 
@@ -312,36 +302,66 @@ describe('BilateralMappingService', () => {
   });
 
   describe('deactivate', () => {
-    it('happy path → { ok:true, data }', async () => {
+    it('sends justification and omits notes when they were not edited (R-MSE-006)', async () => {
       const row = mapping({ is_active: false });
       mockApi.PATCH_BilateralProjectMappingDeactivate.mockResolvedValue(ok(row));
 
-      const result = await service.deactivate(11, 'x');
+      const result = await service.deactivate(11, 'Contract closed');
 
       expect(result).toEqual({ ok: true, data: row });
-      expect(mockApi.PATCH_BilateralProjectMappingDeactivate).toHaveBeenCalledWith(11, { notes: 'x' });
+      expect(mockApi.PATCH_BilateralProjectMappingDeactivate).toHaveBeenCalledWith(11, { justification: 'Contract closed' });
+    });
+
+    it('sends edited notes beside the justification (R-MSE-006)', async () => {
+      const row = mapping({ is_active: false });
+      mockApi.PATCH_BilateralProjectMappingDeactivate.mockResolvedValue(ok(row));
+
+      await service.deactivate(11, 'Contract closed', 'kept note');
+
+      expect(mockApi.PATCH_BilateralProjectMappingDeactivate).toHaveBeenCalledWith(11, {
+        justification: 'Contract closed',
+        notes: 'kept note'
+      });
     });
   });
 
   describe('activate', () => {
-    it('calls PATCH bilateral-project-mappings/:id/activate', async () => {
+    it('calls PATCH bilateral-project-mappings/:id/activate with an empty body', async () => {
       const row = mapping({ is_active: true });
       mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
 
       const result = await service.activate(11);
 
       expect(result).toEqual({ ok: true, data: row });
-      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11);
+      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11, {});
     });
 
     it('forwards notes when they were edited', async () => {
       const row = mapping({ is_active: true });
       mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
 
-      const result = await service.activate(11, 'n');
+      const result = await service.activate(11, { notes: 'n' });
 
       expect(result).toEqual({ ok: true, data: row });
       expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11, { notes: 'n' });
+    });
+
+    it('forwards justification only when it was typed (R-MSE-008)', async () => {
+      const row = mapping({ is_active: true });
+      mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
+
+      await service.activate(11, { justification: 'Contract renewed' });
+
+      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11, { justification: 'Contract renewed' });
+    });
+
+    it('forwards only clarisa_project_id when the project changed (R-MSE-007)', async () => {
+      const row = mapping({ is_active: true });
+      mockApi.PATCH_ActivateBilateralMapping.mockResolvedValue(ok(row));
+
+      await service.activate(11, { clarisa_project_id: 99 });
+
+      expect(mockApi.PATCH_ActivateBilateralMapping).toHaveBeenCalledWith(11, { clarisa_project_id: 99 });
     });
   });
 
@@ -402,9 +422,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('returns [] on failure', async () => {
-      mockApi.GET_ClarisaBilateralProjects.mockResolvedValue(
-        err<ClarisaBilateralProjectOption[]>(500, { errors: 'boom' })
-      );
+      mockApi.GET_ClarisaBilateralProjects.mockResolvedValue(err<ClarisaBilateralProjectOption[]>(500, { errors: 'boom' }));
       expect(await service.loadClarisaProjectOptions()).toEqual([]);
     });
   });
@@ -421,9 +439,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('returns null on failure', async () => {
-      mockApi.GET_BilateralMappingCoverage.mockResolvedValue(
-        err(500, { errors: 'coverage error' })
-      );
+      mockApi.GET_BilateralMappingCoverage.mockResolvedValue(err(500, { errors: 'coverage error' }));
 
       const result = await service.getCoverage();
 
@@ -462,9 +478,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('returns null on failure', async () => {
-      mockApi.POST_AutomapperPreview.mockResolvedValue(
-        err(500, { errors: 'preview failed' })
-      );
+      mockApi.POST_AutomapperPreview.mockResolvedValue(err(500, { errors: 'preview failed' }));
 
       const result = await service.previewAutoMap();
 
@@ -520,9 +534,7 @@ describe('BilateralMappingService', () => {
     });
 
     it('returns { ok: false, status, message } on failure', async () => {
-      mockApi.POST_AutomapperApply.mockResolvedValue(
-        err(422, { errors: 'No external codes in cohort' })
-      );
+      mockApi.POST_AutomapperApply.mockResolvedValue(err(422, { errors: 'No external codes in cohort' }));
 
       const result = await service.applyAutoMap();
 
@@ -565,7 +577,7 @@ describe('PATCH_ActivateBilateralMapping URL', () => {
 });
 
 describe('PATCH_BilateralProjectMappingDeactivate URL', () => {
-  it('patches bilateral-project-mappings/:id/deactivate with the notes body', async () => {
+  it('patches bilateral-project-mappings/:id/deactivate with the justification body', async () => {
     const patch = jest.fn().mockResolvedValue({ successfulRequest: true, data: { id: 11 } });
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -587,13 +599,12 @@ describe('PATCH_BilateralProjectMappingDeactivate URL', () => {
     });
 
     const api = TestBed.inject(ApiService);
-    await api.PATCH_BilateralProjectMappingDeactivate(11, { notes: 'x' });
+    await api.PATCH_BilateralProjectMappingDeactivate(11, { justification: 'Contract closed' });
 
     expect(patch).toHaveBeenCalledWith(
       'bilateral-project-mappings/11/deactivate',
-      { notes: 'x' },
+      { justification: 'Contract closed' },
       { useResultInterceptor: true }
     );
   });
 });
-

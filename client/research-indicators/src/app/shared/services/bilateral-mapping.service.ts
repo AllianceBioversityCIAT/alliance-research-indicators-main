@@ -20,9 +20,7 @@ import { FindContracts } from '@shared/interfaces/find-contracts.interface';
 // human-readable text) alongside `status` for 409-vs-400 routing.
 // @sdd-spec docs/specs/bilateral-module/center-admin-project-mapping (T-BIL-CAM-02)
 // @sdd-spec docs/specs/changes/bilateral-mapping-table-enhancements (T-BTE-02 / R-BTE-003)
-export type MappingMutationResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; message: string };
+export type MappingMutationResult<T> = { ok: true; data: T } | { ok: false; status: number; message: string };
 
 @Injectable({ providedIn: 'root' })
 export class BilateralMappingService {
@@ -34,11 +32,7 @@ export class BilateralMappingService {
       const preview = await this.previewAutoMap();
       if (!preview) return null;
 
-      const unmappedCandidates = [
-        ...(preview.toCreate ?? []),
-        ...(preview.ambiguous ?? []),
-        ...(preview.unresolved ?? [])
-      ];
+      const unmappedCandidates = [...(preview.toCreate ?? []), ...(preview.ambiguous ?? []), ...(preview.unresolved ?? [])];
 
       const needle = query.search?.trim().toLowerCase();
       const filtered = needle
@@ -111,16 +105,22 @@ export class BilateralMappingService {
   }
 
   // AC-07.3 — idempotent server-side; same result shape as create/update.
-  async deactivate(id: number, notes: string): Promise<MappingMutationResult<BilateralProjectMapping>> {
-    const res = await this.api.PATCH_BilateralProjectMappingDeactivate(id, { notes });
+  async deactivate(id: number, justification: string, notes?: string): Promise<MappingMutationResult<BilateralProjectMapping>> {
+    const body: { justification: string; notes?: string } = { justification };
+    if (notes !== undefined) body.notes = notes;
+    const res = await this.api.PATCH_BilateralProjectMappingDeactivate(id, body);
     return this.toMutationResult(res);
   }
 
-  async activate(id: number, notes?: string): Promise<MappingMutationResult<BilateralProjectMapping>> {
-    const res =
-      notes !== undefined
-        ? await this.api.PATCH_ActivateBilateralMapping(id, { notes })
-        : await this.api.PATCH_ActivateBilateralMapping(id);
+  async activate(
+    id: number,
+    opts?: { notes?: string; clarisa_project_id?: number; justification?: string }
+  ): Promise<MappingMutationResult<BilateralProjectMapping>> {
+    const body: { notes?: string; clarisa_project_id?: number; justification?: string } = {};
+    if (opts?.notes !== undefined) body.notes = opts.notes;
+    if (opts?.clarisa_project_id !== undefined) body.clarisa_project_id = opts.clarisa_project_id;
+    if (opts?.justification !== undefined) body.justification = opts.justification;
+    const res = await this.api.PATCH_ActivateBilateralMapping(id, body);
     return this.toMutationResult(res);
   }
 
@@ -185,9 +185,7 @@ export class BilateralMappingService {
 
   // Shared mutation-envelope mapper: success → { ok:true, data }; failure →
   // { ok:false, status, message } with the message resolved by extractApiError.
-  private toMutationResult<T>(
-    res: MainResponse<T> | undefined
-  ): MappingMutationResult<T> {
+  private toMutationResult<T>(res: MainResponse<T> | undefined): MappingMutationResult<T> {
     if (res?.successfulRequest && res.data !== undefined) {
       return { ok: true, data: res.data };
     }

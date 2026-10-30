@@ -94,7 +94,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 
 ### T-03 — Client: Status control, justification, second confirmation, one row action
 
-- **Status:** in-progress (HITL 2026-10-30 → rework under Amendment A-2) · **Size:** M · **Dependencies:** T-02, T-05
+- **Status:** done (owner HITL approved 2026-10-30 after A-2/A-3/A-3b) · **Size:** M · **Dependencies:** T-02, T-05
 - **Requirements covered:** R-MSE-001, R-MSE-002, R-MSE-003 (client), R-MSE-004, NFR-MSE-001 (automatable half), NFR-MSE-002
 - **Design references:** §7.1–§7.4, DD-2, DD-3, DD-4, DD-6, DD-7, reversion table, P-1, P-3, P-7, P-10; judgment R2-1..R2-4
 - **Files touched (intended):**
@@ -135,7 +135,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
 - **Done criteria:**
   - [x] every listed test passes and falsifiers (a)–(d) observed red
   - [x] lint, build, spec type-check clean; full client suite green (Leader re-measure)
-  - [ ] **HITL (owner, running app):** confirmation renders above the modal (P-8); Tab reaches Confirm/Cancel and Escape does not close the modal while pending (P-9); toggle looks right in light and dark; header X disappearing while pending is acceptable (R2-5). Quote what the owner observed.
+  - [x] **HITL (owner, running app):** confirmation renders above the modal (P-8); Tab reaches Confirm/Cancel and Escape does not close the modal while pending (P-9); toggle looks right in light and dark; header X disappearing while pending is acceptable (R2-5). Quote what the owner observed.
 - **Skills:** `angular-developer`, `ui-ux-pro-max`, `tdd`
 
 ### T-05 — Server: `status_justification` column; deactivate `{ justification, notes? }`; activate accepts a project (Amendment A-2)

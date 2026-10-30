@@ -179,3 +179,17 @@ Owner decision (AskUserQuestion): show the stored justification **read-only** on
 - Rework 4 (same worker, task `task_0f96ae100f8f`): read-only "Last justification:" line under the toggle when `status_justification` is non-blank; red `Received: null` before; falsifier (gate on `statusChanged()`) red. Targeted 170/170, lint clean, build exit 0, tsc set unchanged.
 - **Evidence re-run (Leader): VERIFIED** — full client suite `Test Suites: 347 passed, 347 total` / `Tests: 8133 passed, 8133 total`.
 - **Reviewer** (`akili-reviewer`, checklist): **`STATUS: PASS`**. Advisory: the no-stale-value reset is proven by code reading only (no cross-open test).
+
+### T-03 — fourth HITL (owner, 2026-10-30) → visual rework 5
+
+Owner (translated): "the data is there, but the style/design makes it get lost" (read-only last justification flush against the editable field's label). The S287 null-justification report is treated as closed: a later save stored "just a test" correctly, consistent with a server that had not been restarted after T-06 (not proven; reopen with a request payload if it recurs).
+- Rework 5 (same worker, task `task_20561be45263`): panel reusing `bil-sp-preview` (tokens `--ac-grey-100/200`), `pi-history` icon `aria-hidden`, label + pre-wrapped text; Status block `gap-5`. Template only. Targeted 170/170, lint clean, build exit 0 (no style-budget hit).
+- **Evidence re-run (Leader): VERIFIED** — full client suite `Test Suites: 347 passed, 347 total` / `Tests: 8133 passed, 8133 total`.
+- **Reviewer** (`akili-reviewer`, checklist): **`STATUS: PASS`**. Light/dark rendering left to the owner's HITL.
+
+### T-03 — owner HITL approval (2026-10-30)
+
+Owner, verbatim: "me agrada haz commit" ("I like it, commit"), after reviewing the A-2/A-3/A-3b behaviour and the last-justification panel in the running app (native client + server, shared Dev DB with the `status_justification` migration applied by the owner). Not separately confirmed: dark-theme rendering of the panel, Save refocus after Cancel.
+
+- **Verdict:** code PASS (Reviewer, all reworks) + owner HITL approval → T-03 done. Worker released.
+- Open product question (not blocking): changing the CLARISA project on edit/activate keeps the previous project's short-name snapshot (pre-existing `update()` behaviour).
