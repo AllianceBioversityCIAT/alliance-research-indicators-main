@@ -221,6 +221,20 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 - THEN exactly one `PATCH …/activate` is sent with `{ clarisa_project_id: B }`
 - AND the row is active on project B
 
+### R-MSE-008 — Justification on both directions; amber inactivate confirmation (Amendment A-3)
+
+*Owner at the second T-03 HITL, 2026-10-30. Wins over earlier clauses.*
+
+- The Justification field appears for **any** status change, directly under the Status toggle: **required** when inactivating (unchanged), **optional** when activating ("(optional)" label, no red `*`, activation placeholder).
+- `PATCH :id/activate` accepts optional `justification` (trimmed, ≤500); when supplied and non-blank it overwrites `status_justification`; when absent, `status_justification` is left untouched (DD-11 still holds for that case).
+- The inactivate confirmation uses the amber `secondary` severity of the shared global alert (`pi-exclamation-triangle`, amber icon and button); the activate confirmation keeps `confirm`.
+
+#### Scenario: Activate with an optional justification
+- GIVEN an inactive mapping open in Edit
+- WHEN the admin switches Status to Active, types "Contract renewed" in Justification and confirms
+- THEN exactly one `PATCH …/activate` is sent with `{ justification: "Contract renewed" }`
+- AND `status_justification` reads "Contract renewed"
+
 ## 5. Non-Functional Requirements
 
 ### NFR-MSE-001 — Accessibility
@@ -286,6 +300,7 @@ None blocking. Resolved by the owner on 2026-10-30: justification lives in `note
 | R-MSE-005 | Server requires the justification on deactivate |
 | R-MSE-006 | Justification stored apart from Notes (A-2) |
 | R-MSE-007 | CLARISA project editable when activating (A-2) |
+| R-MSE-008 | Justification on both directions; amber inactivate confirmation (A-3) |
 | NFR-MSE-001 | Accessibility |
 | NFR-MSE-002 | No new hex literals or tokens |
 

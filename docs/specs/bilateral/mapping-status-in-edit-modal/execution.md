@@ -140,3 +140,15 @@ Dispatch (A-2): T-05 → task `task_9fb68b9ea8b8`, dispatch `ctx_da77851db7ba`, 
 - **Evidence re-run (Leader): VERIFIED** — full client suite 8121/8121 tests; 1 untouched suite (`get-project-status.service.spec.ts`) killed by runner SIGSEGV twice, passes 3/3 alone (runner, not product).
 - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: FAIL`** — 1 issue: `bilateral-mapping.component.spec.ts:1459-1460,1487` still asserts the pre-A-2 notes overwrite with a tautological readback of the mock (violates R-MSE-006). Component/services clean, no regression of the original T-03 guards.
 - **Attempt 2** dispatched to the same worker (task `task_d0d8d3485c32`), effort xhigh (ceiling, no bump), plus advisories A (seed not duplicated / not stale across opens, with falsifier) and B (seeded label carries `external_code`).
+
+### T-03 rework attempt 2 (A-2) — Reviewer PASS; HITL pending
+
+- Worker report `/tmp/T-03-rework2-report.md`: tautological notes assertion removed; mocks carry `status_justification`; new cohort-switch test (falsifier: accumulate options → `Expected: false Received: true`); seeded option carries `external_code` (red: `Expected substring: "B-A1697 — Orphan bilateral" Received: "ORPHAN — Orphan bilateral"`). Targeted jest 162/162, lint clean, build exit 0.
+- **Evidence re-run (Leader): VERIFIED** — full client suite `Test Suites: 347 passed, 347 total` / `Tests: 8125 passed, 8125 total`; spec type-check filtered to bilateral files → only the pre-existing `TS2749` on `Select` (unchanged set).
+- **Reviewer** (same `akili-reviewer`, scoped re-review): **`STATUS: PASS`**.
+- **Migration check (T-05 gap, K-006):** the full disposable-harness chain (`compose:test:down/up`, `migration:test:bootstrap`) fails at an unrelated older migration — `CreatePiDelegates1787600000000`: "Referencing column 'project_id' and referenced column 'agreement_id' … are incompatible" (baseline drift, pre-existing, out of scope). Instead, the migration's exact `up` and `down` SQL were executed by hand on the scratch `bilateral_project_mapping` table: up → `status_justification text YES NULL`; down → column gone. SQL verified executable and reversible; the TypeORM runner path itself was not exercised.
+- T-03 code is PASS; the done criterion **HITL** stays open until the owner re-tests A-2 in the running app. Client changes stay uncommitted (no commit before visual approval). Worker `ctx_bb42b3c98721` / terminal `term_603737fb-…` retained.
+
+### T-03 — second HITL (owner, 2026-10-30) → Amendment A-3
+
+Owner observed (translated): A-2 behaves as asked, but "it being required when inactivating doesn't mean I can't add a justification when activating — the field only shows when I inactivate"; and on the inactivate confirmation (green pencil, `confirm`): "fine if you're updating something, but if the action is inactivate it should be a warning, amber". Spec change, not a code FAIL. Recorded as R-MSE-008, DD-12, DD-13; new task T-06 (server); T-03 scope item 11. Leader choice: `secondary` severity (amber triangle), because `warning`'s icon is a clock (`pi-history`); the owner may overrule.

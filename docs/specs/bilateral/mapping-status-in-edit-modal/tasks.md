@@ -26,6 +26,10 @@ graph TD
   T-02 --> T-03
   T-05 --> T-03
   T-05 --> T-04
+  T-06[Server A-3: activate justification]
+  T-05 --> T-06
+  T-06 --> T-03
+  T-06 --> T-04
   T-01 --> T-04
   T-03 --> T-04
 ```
@@ -108,6 +112,7 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
   7. API + service (`api.service.ts`, `bilateral-mapping.service.ts` + spec): deactivate sends `{ justification, notes? }`; activate sends `{ notes?, clarisa_project_id? }`, each key only when set.
   8. Justification field directly below the Status toggle; Notes always rendered, optional, independent; inactivating may also save an edited Notes in the same deactivate request.
   9. CLARISA picker `[disabled]` only while inactivating (`isInactivating()`), not on activation; stash/restore applies to the inactivating direction only; the activate plan carries `clarisa_project_id` when it differs from the snapshot; Save requires a project when activating.
+  11. *(A-3, R-MSE-008, DD-12/13)* Justification renders for any status change (required + red `*` when inactivating; "(optional)" + activation placeholder when activating); the activate plan carries `justification` when non-blank; inactivate confirmation `severity: 'secondary'`, activate stays `confirm`.
   10. Diagnose and fix: an inactive mapping opened in Edit shows an empty CLARISA picker (value set, option missing from `clarisaOptions`). Red test first.
 - **Tests (component spec; construct closed, then `openEditDialog` — KZ-015):**
   - retire the row-action tests (`requestDeactivate — confirmation gate`, `confirmDeactivate — success/failure`, `Deactivate button visibility`, `Activate action (R-APM-011)`) and replace with:
@@ -147,6 +152,21 @@ T-01 and T-02 are parallel-safe (different packages). T-03 needs T-02's service 
   - [x] tests for R-MSE-006 scenario, AC.1–AC.6 re-keyed to `justification`, activate-with-project (transition + idempotent), notes untouched; falsifiers observed red
   - [x] lint, build, full server suite green
 - **Skills:** `nestjs-expert`, `api-design-principles`, `tdd`
+
+### T-06 — Server: activate accepts an optional justification (Amendment A-3)
+
+- **Status:** todo · **Size:** S · **Dependencies:** T-05
+- **Requirements covered:** R-MSE-008 (server)
+- **Design references:** DD-12
+- **Files touched (intended):** bilateral-project-mapping `controller.ts`, `service.ts`, `controller.spec.ts`, `service.spec.ts`
+- **Scope:** activate DTO adds optional `justification` (trim, `@IsString`, `@MaxLength(500)`); service writes `status_justification` when it is supplied and non-blank, on both the transition and the idempotent path; when it is absent, leave the column untouched. Swagger updated.
+- **Verification:** bilateral folder jest `--coverage=false`, `npx eslint <touched>`, `npm run build`; full suite (Leader).
+- **Falsifier:** drop the write → "activate with justification" test red.
+- **Review:** `full`.
+- **Done criteria:**
+  - [ ] tests (transition, idempotent, absent → untouched, 501 → 400) pass; falsifier observed red
+  - [ ] lint, build, full server suite green
+- **Skills:** `nestjs-expert`, `tdd`
 
 ### T-04 — Docs: decisions log and TRD
 
