@@ -162,3 +162,20 @@ Owner observed (translated): A-2 behaves as asked, but "it being required when i
 - **Evidence re-run (Leader): VERIFIED** — full server suite `Test Suites: 441 passed, 441 total` / `Tests: 4301 passed, 4301 total`.
 - **Reviewer** (`akili-reviewer`, opus, full): **`STATUS: PASS`**. Advisory: no test pins that a blank justification on an already-active row skips the save (code does skip it).
 - **Verdict:** PASS → T-06 done.
+
+### T-03 rework (A-3) — Reviewer PASS; third HITL pending
+
+- Worker report `/tmp/T-03-rework3-report.md`: reds — field null on activation; service body `{}`; severity `Expected: "secondary" Received: "confirm"`. Falsifiers (a) `@if (isInactivating())` → field null; (b) severity back to `confirm` → red. Targeted 167/167, lint clean, build exit 0, touched-spec tsc set unchanged (only pre-existing `TS2749`).
+- **Evidence re-run (Leader): VERIFIED** — full client suite `Tests: 8129 passed, 8129 total`; untouched `banner.component.spec.ts` failed at runner level only, passes 1/1 alone. `git status` confirms the shared global-alert component is untouched.
+- **Reviewer** (`akili-reviewer`, scoped): **`STATUS: PASS`**. Advisory applied by the Leader: NFR-MSE-001 narrowed (`aria-required` only when inactivating). Other advisory: one test uses `.not.toBe('true')` where `toBeNull()` is exact (non-blocking).
+- Client still uncommitted pending the owner's third HITL; worker retained.
+
+### T-03 — third HITL (owner, 2026-10-30) → A-3b; open defect report
+
+Owner (translated): "I activated it with the comment 'test' but now when I edit it the comment doesn't show; it stays hidden and only appears when I flip the toggle." Owner typed 'test' in **both** Notes and Justification. Read-only query of the shared DB: row 192 (S287, 2026) `notes='test'`, `status_justification=NULL` — **the activate justification was not stored**. Client plan/service/API verified by reading to send `{ justification }`; the activate route has `forbidNonWhitelisted`, so a pre-T-06 server would have returned 400, not 200. Cause **not yet determined** — owner asked for the Network payload/response of a fresh activate and to confirm the server runs this worktree after `4a1e8d26`. Open.
+
+Owner decision (AskUserQuestion): show the stored justification **read-only** on open → A-3b bullet in R-MSE-008.
+
+- Rework 4 (same worker, task `task_0f96ae100f8f`): read-only "Last justification:" line under the toggle when `status_justification` is non-blank; red `Received: null` before; falsifier (gate on `statusChanged()`) red. Targeted 170/170, lint clean, build exit 0, tsc set unchanged.
+- **Evidence re-run (Leader): VERIFIED** — full client suite `Test Suites: 347 passed, 347 total` / `Tests: 8133 passed, 8133 total`.
+- **Reviewer** (`akili-reviewer`, checklist): **`STATUS: PASS`**. Advisory: the no-stale-value reset is proven by code reading only (no cross-open test).

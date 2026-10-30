@@ -227,6 +227,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 
 - The Justification field appears for **any** status change, directly under the Status toggle: **required** when inactivating (unchanged), **optional** when activating ("(optional)" label, no red `*`, activation placeholder).
 - `PATCH :id/activate` accepts optional `justification` (trimmed, ≤500); when supplied and non-blank it overwrites `status_justification`; when absent, `status_justification` is left untouched (DD-11 still holds for that case).
+- *(A-3b, owner third HITL)* When the row has a stored `status_justification`, the Edit modal shows it **read-only** under the Status toggle ("Last justification: …") from the moment it opens; the editable field still appears only on a status change and starts empty.
 - The inactivate confirmation uses the amber `secondary` severity of the shared global alert (`pi-exclamation-triangle`, amber icon and button); the activate confirmation keeps `confirm`.
 
 #### Scenario: Activate with an optional justification
@@ -240,7 +241,7 @@ The AC-1797 ticket also names "export the filtered list". The owner scoped that 
 ### NFR-MSE-001 — Accessibility
 
 - **Category:** a11y (PRD C-4, WCAG 2.1 AA)
-- **Target:** the Status control is keyboard-operable, has a visible label and an accessible name that states the current value; the Justification field has a label, `aria-required="true"`, and the required marker; the confirmation's Confirm and Cancel buttons are reachable and operable by keyboard while the modal is open.
+- **Target:** the Status control is keyboard-operable, has a visible label and an accessible name that states the current value; the Justification field has a label, and — when inactivating — `aria-required="true"` and the required marker (optional, without either, when activating; A-3); the confirmation's Confirm and Cancel buttons are reachable and operable by keyboard while the modal is open.
 - **How verified:** component test on attributes + manual keyboard pass (Tab to Status, toggle, Save, reach Confirm/Cancel) at the HITL pause.
 
 ### NFR-MSE-002 — No new hex literals or tokens
