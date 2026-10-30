@@ -42,7 +42,7 @@
         @if (selectedItems) {
         <ng-container *ngTemplateOutlet="selectedItems; context: { $implicit: value }"></ng-container>
         } @else {
-        {{ selectedOptions().length > 0 ? selectedOptions().length + ' items selected' : '' }}
+        {{ selectedOptions().length > 0 ? selectedOptions().length + (selectedOptions().length === 1 ? ' item selected' : ' items selected') : '' }}
         }
       </ng-template>
 

@@ -28,7 +28,7 @@
       appendTo="body"
       [virtualScroll]="true"
       [virtualScrollItemSize]="41">
-      <ng-template let-value pTemplate="selectedItems"> {{ this.body().value?.length }} items selected </ng-template>
+      <ng-template let-value pTemplate="selectedItems"> {{ this.body().value?.length }} {{ this.body().value?.length === 1 ? 'item' : 'items' }} selected </ng-template>
 
       @if (!this.hideSelected) {
         <ng-template let-item pTemplate="item"><span [innerHTML]="item[this.optionLabel]"></span></ng-template>
