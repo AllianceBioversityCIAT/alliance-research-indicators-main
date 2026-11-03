@@ -193,26 +193,38 @@ describe('CapacitySharingComponent', () => {
   });
 
   describe('saveData', () => {
-    it('H8: blocks saving when the participants by sex add up to more than the total', async () => {
+    it('H8: saves and raises the total to the sum when the participants by sex add up to more', async () => {
       submission.isEditableStatus.mockReturnValue(true);
       apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
       component.body.set({
         session_format_id: 2,
         group: { session_participants_total: 10, session_participants_female: 6, session_participants_male: 6 }
       } as any);
 
-      expect(component.participantsExceedTotal()).toBe(true);
       await component.saveData();
 
-      expect(apiService.PATCH_CapacitySharing).not.toHaveBeenCalled();
-      expect(actions.showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalledWith(
+        expect.objectContaining({ group: expect.objectContaining({ session_participants_total: 12 }) })
+      );
     });
 
-    it('H8: accepts a split that matches the total', () => {
+    it('H8: keeps a total that already covers the sum', async () => {
+      submission.isEditableStatus.mockReturnValue(true);
+      apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
       component.body.set({
-        group: { session_participants_total: 12, session_participants_female: 6, session_participants_male: 6 }
+        session_format_id: 2,
+        group: { session_participants_total: 20, session_participants_female: 6, session_participants_male: 6 }
       } as any);
-      expect(component.participantsExceedTotal()).toBe(false);
+
+      await component.saveData();
+
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalledWith(
+        expect.objectContaining({ group: expect.objectContaining({ session_participants_total: 20 }) })
+      );
     });
 
     it('H10: saves a long-term training shorter than 3 months (expected behaviour)', async () => {
