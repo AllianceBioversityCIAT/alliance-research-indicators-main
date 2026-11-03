@@ -197,11 +197,6 @@
           placeholder="Select the end date"></app-calendar-input>
       </div>
     </div>
-    @if (isLongTermTooShort()) {
-    <p class="text-[13px] atc-red-1 mb-6" role="alert">
-      A long-term training must last 3 months or more. Adjust the dates or choose Short-term.
-    </p>
-    }
 
     <div class="mt-5">
       <app-radio-button label="Delivery modality" [isRequired]="true" [disabled]="!submission.isEditableStatus()"
