@@ -1247,12 +1247,28 @@ export class BilateralService {
         ? (kept.unit_messurament ?? null)
         : lookup.unitMessurament,
       target_value: useKept ? (kept.target_value ?? null) : lookup.targetValue,
-      target_year: useKept
-        ? (kept.target_year ?? null)
-        : lookup.indicatorMatched
-          ? year
-          : null,
+      target_year: this.tipTargetYear(
+        useKept,
+        kept,
+        lookup.indicatorMatched,
+        year,
+      ),
     };
+  }
+
+  private tipTargetYear(
+    useKept: boolean,
+    kept: ResultPoolFundingTocAlignment | null,
+    indicatorMatched: boolean,
+    year: number,
+  ): number | null {
+    if (useKept) {
+      return kept.target_year ?? null;
+    }
+    if (indicatorMatched) {
+      return year;
+    }
+    return null;
   }
 
   private tipAlignmentUnchanged(
@@ -1265,7 +1281,7 @@ export class BilateralService {
     mapping: TipTocMappingDto,
     upsert: TocAlignmentUpsertInput,
   ): boolean {
-    if (!alignment || alignment.has_contribution !== true) return false;
+    if (alignment?.has_contribution !== true) return false;
     const roles = alignment.sp_roles ?? [];
     if (
       roles.length !== 1 ||
@@ -1313,9 +1329,26 @@ export class BilateralService {
   }
 
   private sameTipText(stored: unknown, incoming: unknown): boolean {
-    const norm = (value: unknown) =>
-      value === null || value === undefined ? null : String(value).trim();
-    return norm(stored) === norm(incoming);
+    return this.tipComparableText(stored) === this.tipComparableText(incoming);
+  }
+
+  /** Same text as `String(value).trim()` for string, number and boolean. */
+  private tipComparableText(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    switch (typeof value) {
+      case 'string':
+        return value.trim();
+      case 'number':
+      case 'boolean':
+      case 'bigint':
+        return String(value).trim();
+      case 'object': {
+        const text = JSON.stringify(value);
+        return text === undefined ? null : text;
+      }
+      default:
+        return String(value).trim();
+    }
   }
 
   private sameTipScalar(stored: unknown, incoming: unknown): boolean {

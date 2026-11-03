@@ -114,7 +114,7 @@ export class TipIntegrationController {
             this.logger.error(error.message, error.stack);
             return;
           }
-          this.logger.error(String(error));
+          this.logger.error(formatNonError(error));
         });
       return ResponseUtils.format({
         data: 'IPR data synced asynchronously',
@@ -132,6 +132,32 @@ export class TipIntegrationController {
           data: data,
         }),
       );
+  }
+}
+
+/**
+ * Strings, numbers and booleans stay `String(value)`. Objects use JSON
+ * so a thrown non-Error is not coerced to `[object Object]`.
+ */
+function formatNonError(error: unknown): string {
+  switch (typeof error) {
+    case 'string':
+    case 'number':
+    case 'boolean':
+    case 'bigint':
+      return String(error);
+    case 'object':
+      if (error === null) return 'null';
+      try {
+        const text = JSON.stringify(error);
+        return text === undefined
+          ? Object.prototype.toString.call(error)
+          : text;
+      } catch {
+        return Object.prototype.toString.call(error);
+      }
+    default:
+      return String(error);
   }
 }
 

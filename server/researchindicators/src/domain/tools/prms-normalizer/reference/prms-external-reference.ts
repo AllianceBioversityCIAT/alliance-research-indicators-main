@@ -23,7 +23,7 @@ const PREFIXED_PLATFORMS = (
  * integer — neither is a code this pair emits (design §7.1).
  */
 const parseCanonicalCode = (text: string): number | null => {
-  if (!/^[0-9]+$/.test(text)) {
+  if (!/^\d+$/.test(text)) {
     return null;
   }
   const code = Number(text);

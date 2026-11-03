@@ -17,6 +17,7 @@ import {
   TipKnowledgeProductDto,
   TipKnowledgeProductsResponseDto,
   TipMappedResult,
+  TipProjectDto,
   TipRegionDto,
   TipTocMappingDto,
 } from './dto/response-year-tip.dto';
@@ -296,161 +297,200 @@ export class TipIntegrationService extends BaseApi {
     const knownAgreementIds = await this.loadKnownAgreementIds(results);
     const resultsMapped: TipMappedResult[] = [];
     for (const data of results) {
-      const year = data?.year;
       if (isEmpty(data?.data)) continue;
-      const result = data.data;
-      const resultMapped = new TipMappedResult();
-      // TIP API no longer returns id — blocked until TIP restores the field
-      resultMapped.official_code = null;
-      resultMapped.is_version_applied = data.is_version ?? false;
-      resultMapped.public_link = result.link;
-      resultMapped.created_at = new Date(result.created_at);
-      resultMapped.status_id = ResultStatusEnum.COMPLETED_IN_TIP;
-
-      const mappedProjects = mapTipProjects(
-        result.project,
-        knownAgreementIds,
-        result.id,
-        this.logger,
-      );
-
-      resultMapped.createResult = {
-        title: result.name,
-        year: year,
-        description: result.abstract,
-        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
-        contract_id: mappedProjects.createContractId,
-      };
-      let allianceUserStaff: AllianceUserStaff = null;
-      if (!isEmpty(result?.submitter)) {
-        const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
-          result.submitter?.idCard,
-          result.submitter?.email,
-        );
-
-        const dataToSearch =
-          result.submitter?.idCard ?? result.submitter?.email;
-        if (!isEmpty(dataToSearch)) {
-          allianceUserStaff = await this.dataSource
-            .getRepository(AllianceUserStaff)
-            .findOne({
-              where: [
-                {
-                  carnet: dataToSearch,
-                },
-                {
-                  email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
-                },
-              ],
-            });
-        }
-
-        if (!isEmpty(allianceUserStaff)) {
-          if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
-            resultMapped.userData =
-              await this.resultsService.createUserProcess(allianceUserStaff);
-          } else {
-            await this.resultRepository.unpdateCarnetUser(
-              existsUser?.sec_user_id,
-              existsUser?.carnet,
-            );
-            resultMapped.userData = existsUser;
-            if (!isEmpty(existsUser)) {
-              resultMapped.userData.carnet = result.submitter?.idCard;
-            }
-          }
-        }
-      }
-
-      let carnet = null;
-      if (!isEmpty(allianceUserStaff)) {
-        carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
-      } else {
-        this.logger.warn(
-          `User ${result?.submitter?.idCard} not found in Alliance User Staff`,
-        );
-      }
-
-      const keywords = result.keywords?.map((keyword) => keyword?.trim());
-
-      resultMapped.generalInformation = {
-        title: result.name,
-        year: year,
-        description: result.abstract,
-        main_contact_person: !isEmpty(carnet)
-          ? ({
-              user_id: carnet,
-            } as ResultUser)
-          : null,
-        keywords: keywords,
-      };
-
-      const saveSdgs = await this.clarisaSdgsService.findSdgByTipFormat(
-        result.sdgs,
-      );
-      const sdgs: Partial<ResultSdg>[] = saveSdgs.map((sdg) => ({
-        clarisa_sdg_id: sdg.id,
-      }));
-
-      const primaryLever = await this.mapLevers(result.levers);
-      resultMapped.alignments = {
-        primary_levers: primaryLever.map<ResultLever>(
-          (lever) =>
-            ({
-              lever_id: lever.id,
-            }) as unknown as ResultLever,
-        ),
-        contracts: mappedProjects.contracts as ResultContract[],
-        contributor_levers: [],
-        result_sdgs: sdgs as ResultSdg[],
-      };
-
-      const regions = await this.mapRegions(result.region);
-      const countries = await this.mapCountries(result.countries);
-
-      resultMapped.geoScope = {
-        regions: regions.map(
-          (region) => ({ region_id: region.um49Code }) as ResultRegion,
-        ),
-        countries: countries.map(
-          (country) =>
-            ({
-              country_id: country.isoAlpha2,
-            }) as unknown as ResultCountry,
-        ),
-        geo_scope_id: this.setGeoScopeId(regions, countries),
-        comment_geo_scope: null,
-      };
-
-      resultMapped.evidence = {
-        evidence: [
-          {
-            evidence_url: result.link,
-            evidence_description: 'Handled',
-          },
-          {
-            evidence_url: result.doi,
-            evidence_description: 'DOI',
-          },
-        ] as unknown as ResultEvidence[],
-        notable_references: [],
-      };
-
-      const collection = result.collection?.join('; ');
-      resultMapped.knowledgeProduct = {
-        type: result.type.join(', '),
-        citation: result.citation,
-        open_access: result.access_status === 'Open Access',
-        access_status: result.access_status,
-        publication_date: result.publication_date,
-        collection,
-        tip_id: result.id,
-      } as ResultKnowledgeProduct;
-
-      resultMapped.poolFunding = mappedProjects.poolFunding;
-      resultsMapped.push(resultMapped);
+      resultsMapped.push(await this.mapTipProduct(data, knownAgreementIds));
     }
     return resultsMapped;
+  }
+
+  private async mapTipProduct(
+    data: TemportalDataResponse<TipKnowledgeProductDto>,
+    knownAgreementIds: Set<string>,
+  ): Promise<TipMappedResult> {
+    const year = data?.year;
+    const result = data.data;
+    const resultMapped = new TipMappedResult();
+    // TIP API no longer returns id — blocked until TIP restores the field
+    resultMapped.official_code = null;
+    resultMapped.is_version_applied = data.is_version ?? false;
+    resultMapped.public_link = result.link;
+    resultMapped.created_at = new Date(result.created_at);
+    resultMapped.status_id = ResultStatusEnum.COMPLETED_IN_TIP;
+
+    const mappedProjects = mapTipProjects(
+      result.project,
+      knownAgreementIds,
+      result.id,
+      this.logger,
+    );
+
+    resultMapped.createResult = {
+      title: result.name,
+      year: year,
+      description: result.abstract,
+      indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      contract_id: mappedProjects.createContractId,
+    };
+    const allianceUserStaff = await this.attachTipSubmitter(
+      result,
+      resultMapped,
+    );
+    const carnet = this.tipCarnet(result, resultMapped, allianceUserStaff);
+
+    const keywords = result.keywords?.map((keyword) => keyword?.trim());
+
+    resultMapped.generalInformation = {
+      title: result.name,
+      year: year,
+      description: result.abstract,
+      main_contact_person: !isEmpty(carnet)
+        ? ({
+            user_id: carnet,
+          } as ResultUser)
+        : null,
+      keywords: keywords,
+    };
+
+    const saveSdgs = await this.clarisaSdgsService.findSdgByTipFormat(
+      result.sdgs,
+    );
+    const sdgs: Partial<ResultSdg>[] = saveSdgs.map((sdg) => ({
+      clarisa_sdg_id: sdg.id,
+    }));
+
+    const primaryLever = await this.mapLevers(result.levers);
+    resultMapped.alignments = {
+      primary_levers: primaryLever.map<ResultLever>(
+        (lever) =>
+          ({
+            lever_id: lever.id,
+          }) as unknown as ResultLever,
+      ),
+      contracts: mappedProjects.contracts as ResultContract[],
+      contributor_levers: [],
+      result_sdgs: sdgs as ResultSdg[],
+    };
+
+    const regions = await this.mapRegions(result.region);
+    const countries = await this.mapCountries(result.countries);
+
+    resultMapped.geoScope = {
+      regions: regions.map(
+        (region) => ({ region_id: region.um49Code }) as ResultRegion,
+      ),
+      countries: countries.map(
+        (country) =>
+          ({
+            country_id: country.isoAlpha2,
+          }) as unknown as ResultCountry,
+      ),
+      geo_scope_id: this.setGeoScopeId(regions, countries),
+      comment_geo_scope: null,
+    };
+
+    resultMapped.evidence = {
+      evidence: [
+        {
+          evidence_url: result.link,
+          evidence_description: 'Handled',
+        },
+        {
+          evidence_url: result.doi,
+          evidence_description: 'DOI',
+        },
+      ] as unknown as ResultEvidence[],
+      notable_references: [],
+    };
+
+    const collection = result.collection?.join('; ');
+    resultMapped.knowledgeProduct = {
+      type: result.type.join(', '),
+      citation: result.citation,
+      open_access: result.access_status === 'Open Access',
+      access_status: result.access_status,
+      publication_date: result.publication_date,
+      collection,
+      tip_id: result.id,
+    } as ResultKnowledgeProduct;
+
+    resultMapped.poolFunding = mappedProjects.poolFunding;
+    return resultMapped;
+  }
+
+  private async attachTipSubmitter(
+    result: TipKnowledgeProductDto,
+    resultMapped: TipMappedResult,
+  ): Promise<AllianceUserStaff | null> {
+    let allianceUserStaff: AllianceUserStaff = null;
+    if (!isEmpty(result?.submitter)) {
+      const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
+        result.submitter?.idCard,
+        result.submitter?.email,
+      );
+
+      const dataToSearch = result.submitter?.idCard ?? result.submitter?.email;
+      if (!isEmpty(dataToSearch)) {
+        allianceUserStaff = await this.dataSource
+          .getRepository(AllianceUserStaff)
+          .findOne({
+            where: [
+              {
+                carnet: dataToSearch,
+              },
+              {
+                email: Like(`%${dataToSearch?.trim()?.toLowerCase()}%`),
+              },
+            ],
+          });
+      }
+
+      if (!isEmpty(allianceUserStaff)) {
+        await this.assignTipUser(
+          resultMapped,
+          existsUser,
+          allianceUserStaff,
+          result,
+        );
+      }
+    }
+    return allianceUserStaff;
+  }
+
+  private async assignTipUser(
+    resultMapped: TipMappedResult,
+    existsUser: SecUser,
+    allianceUserStaff: AllianceUserStaff,
+    result: TipKnowledgeProductDto,
+  ): Promise<void> {
+    if (isEmpty(existsUser) && !isEmpty(allianceUserStaff)) {
+      resultMapped.userData =
+        await this.resultsService.createUserProcess(allianceUserStaff);
+    } else {
+      await this.resultRepository.unpdateCarnetUser(
+        existsUser?.sec_user_id,
+        existsUser?.carnet,
+      );
+      resultMapped.userData = existsUser;
+      if (!isEmpty(existsUser)) {
+        resultMapped.userData.carnet = result.submitter?.idCard;
+      }
+    }
+  }
+
+  private tipCarnet(
+    result: TipKnowledgeProductDto,
+    resultMapped: TipMappedResult,
+    allianceUserStaff: AllianceUserStaff | null,
+  ) {
+    let carnet = null;
+    if (!isEmpty(allianceUserStaff)) {
+      carnet = resultMapped?.userData?.carnet ?? result?.submitter?.idCard;
+    } else {
+      this.logger.warn(
+        `User ${result?.submitter?.idCard} not found in Alliance User Staff`,
+      );
+    }
+    return carnet;
   }
 
   private async loadKnownAgreementIds(
@@ -461,8 +501,7 @@ export class TipIntegrationService extends BaseApi {
     for (const data of results) {
       if (isEmpty(data?.data)) continue;
       const project = data.data.project;
-      const items =
-        project == null ? [] : Array.isArray(project) ? project : [project];
+      const items = tipProjectList(project);
       for (const item of items) {
         const agreementId = item?.agreement_id;
         if (agreementId == null || agreementId === '' || seen.has(agreementId))
@@ -641,7 +680,7 @@ export class TipIntegrationService extends BaseApi {
 
     try {
       for (const year of years) {
-        const source = byYear.get(year)!;
+        const source = byYear.get(year);
         const versionId = resolution.versions[year]?.result_id;
         const saved = await this.saveResultService.saveAllSections(
           this.payloadForSave(source),
@@ -675,7 +714,7 @@ export class TipIntegrationService extends BaseApi {
         const notBelowLive =
           resolution.live == null || liveYear >= resolution.live.report_year_id;
         if (cameFromThisRun && notBelowLive) {
-          const source = byYear.get(liveYear)!;
+          const source = byYear.get(liveYear);
           const liveId = resolution.live?.result_id;
           const saved = await this.saveResultService.saveAllSections(
             this.payloadForSave(source),
@@ -789,84 +828,18 @@ export class TipIntegrationService extends BaseApi {
     const started = Date.now();
     try {
       const reportingYear = await this.reportingYearResolver.resolve();
-      const seen = new Set<number>();
-      const candidates: TipPushCandidate[] = [];
-      for (const candidate of raw) {
-        if (candidate.year !== reportingYear || seen.has(candidate.resultId)) {
-          continue;
-        }
-        seen.add(candidate.resultId);
-        candidates.push(candidate);
-      }
+      const candidates = this.candidatesForReportingYear(raw, reportingYear);
       if (candidates.length === 0) {
         this.logger.log('PRMS push: candidates=0');
         return;
       }
 
       const outcomes = zeroPushOutcomes();
-      let skipped = 0;
-      let notEligible = 0;
-      const pending: TipPushReady[] = [];
-      for (const candidate of candidates) {
-        if (candidate.tocMapping == null) {
-          notEligible += 1;
-        } else {
-          pending.push({ ...candidate, tocMapping: candidate.tocMapping });
-        }
-      }
-
-      const codedIds =
-        pending.length === 0
-          ? []
-          : await this.tipHandleRepository.idsWithPrmsCode(
-              pending.map((candidate) => candidate.resultId),
-            );
-      const coded = new Set(codedIds);
-      const toSend: TipPushReady[] = [];
-      for (const candidate of pending) {
-        if (coded.has(candidate.resultId)) {
-          skipped += 1;
-        } else {
-          toSend.push(candidate);
-        }
-      }
-
-      let notSent = 0;
-      let errors = 0;
+      const { pending, notEligible } = this.splitPushEligible(candidates);
+      const { toSend, skipped } = await this.withoutExistingPrmsCode(pending);
+      const tally = { notSent: 0, errors: 0 };
       for (const candidate of toSend) {
-        try {
-          const actor =
-            candidate.userData ??
-            (await this.tipHandleRepository.liveAuthorFor(candidate.resultId));
-          this._currentUser.setSystemUser(actor as SecUser, true);
-          const synced = await this.resultPrmsSyncService.sync(
-            candidate.resultId,
-            {
-              origin: 'TIP_SYNC',
-              tocMapping: candidate.tocMapping,
-              author: authorForPush(actor),
-            },
-          );
-          bumpPushOutcome(outcomes, synced.outcome);
-        } catch (error) {
-          if (error instanceof PrmsSyncPersistedRefusalException) {
-            outcomes[PrmsSyncOutcome.REFUSED_BY_STAR] += 1;
-          } else if (error instanceof HttpException) {
-            notSent += 1;
-            this.logger.warn(
-              `PRMS push NOT_SENT result ${candidate.resultId} status=${error.getStatus()} message=${error.message}`,
-            );
-          } else {
-            errors += 1;
-            const message =
-              error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(
-              `PRMS push ERROR result ${candidate.resultId}: ${message}`,
-            );
-          }
-        } finally {
-          this._currentUser.clearSystemUser();
-        }
+        await this.pushOneCandidate(candidate, outcomes, tally);
       }
 
       this.logger.log(
@@ -875,8 +848,8 @@ export class TipIntegrationService extends BaseApi {
           skipped,
           notEligible,
           outcomes,
-          notSent,
-          errors,
+          tally.notSent,
+          tally.errors,
           Date.now() - started,
         ),
       );
@@ -885,6 +858,110 @@ export class TipIntegrationService extends BaseApi {
       this.logger.error(`PRMS push phase failed: ${message}`);
     }
   }
+
+  private candidatesForReportingYear(
+    raw: TipPushCandidate[],
+    reportingYear: number,
+  ): TipPushCandidate[] {
+    const seen = new Set<number>();
+    const candidates: TipPushCandidate[] = [];
+    for (const candidate of raw) {
+      if (candidate.year !== reportingYear || seen.has(candidate.resultId)) {
+        continue;
+      }
+      seen.add(candidate.resultId);
+      candidates.push(candidate);
+    }
+    return candidates;
+  }
+
+  private splitPushEligible(candidates: TipPushCandidate[]): {
+    pending: TipPushReady[];
+    notEligible: number;
+  } {
+    let notEligible = 0;
+    const pending: TipPushReady[] = [];
+    for (const candidate of candidates) {
+      if (candidate.tocMapping == null) {
+        notEligible += 1;
+      } else {
+        pending.push({ ...candidate, tocMapping: candidate.tocMapping });
+      }
+    }
+    return { pending, notEligible };
+  }
+
+  private async withoutExistingPrmsCode(pending: TipPushReady[]): Promise<{
+    toSend: TipPushReady[];
+    skipped: number;
+  }> {
+    const codedIds =
+      pending.length === 0
+        ? []
+        : await this.tipHandleRepository.idsWithPrmsCode(
+            pending.map((candidate) => candidate.resultId),
+          );
+    const coded = new Set(codedIds);
+    const toSend: TipPushReady[] = [];
+    let skipped = 0;
+    for (const candidate of pending) {
+      if (coded.has(candidate.resultId)) {
+        skipped += 1;
+      } else {
+        toSend.push(candidate);
+      }
+    }
+    return { toSend, skipped };
+  }
+
+  private async pushOneCandidate(
+    candidate: TipPushReady,
+    outcomes: PushOutcomeCounts,
+    tally: { notSent: number; errors: number },
+  ): Promise<void> {
+    try {
+      const actor =
+        candidate.userData ??
+        (await this.tipHandleRepository.liveAuthorFor(candidate.resultId));
+      this._currentUser.setSystemUser(actor, true);
+      const synced = await this.resultPrmsSyncService.sync(candidate.resultId, {
+        origin: 'TIP_SYNC',
+        tocMapping: candidate.tocMapping,
+        author: authorForPush(actor),
+      });
+      bumpPushOutcome(outcomes, synced.outcome);
+    } catch (error) {
+      if (error instanceof PrmsSyncPersistedRefusalException) {
+        outcomes[PrmsSyncOutcome.REFUSED_BY_STAR] += 1;
+      } else if (error instanceof HttpException) {
+        tally.notSent += 1;
+        this.logger.warn(
+          `PRMS push NOT_SENT result ${candidate.resultId} status=${error.getStatus()} message=${error.message}`,
+        );
+      } else {
+        tally.errors += 1;
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(
+          `PRMS push ERROR result ${candidate.resultId}: ${message}`,
+        );
+      }
+    } finally {
+      this._currentUser.clearSystemUser();
+    }
+  }
+}
+
+function tipProjectList(
+  project: TipProjectDto | TipProjectDto[] | null | undefined,
+): TipProjectDto[] {
+  if (project == null) {
+    return [];
+  }
+  if (Array.isArray(project)) {
+    return project;
+  }
+  return [project];
 }
 
 type TipPoolImport = {
