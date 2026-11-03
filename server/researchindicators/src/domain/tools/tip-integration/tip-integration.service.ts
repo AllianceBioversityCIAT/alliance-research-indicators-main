@@ -1009,7 +1009,7 @@ function bumpPushOutcome(
   outcomes: PushOutcomeCounts,
   outcome: PrmsSyncOutcome,
 ): void {
-  if (Object.prototype.hasOwnProperty.call(outcomes, outcome)) {
+  if ((PUSH_OUTCOME_KEYS as readonly PrmsSyncOutcome[]).includes(outcome)) {
     outcomes[outcome as PushOutcomeKey] += 1;
   }
 }

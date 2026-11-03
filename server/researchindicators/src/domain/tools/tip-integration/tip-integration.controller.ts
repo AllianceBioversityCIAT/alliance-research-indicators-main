@@ -140,24 +140,15 @@ export class TipIntegrationController {
  * so a thrown non-Error is not coerced to `[object Object]`.
  */
 function formatNonError(error: unknown): string {
-  switch (typeof error) {
-    case 'string':
-    case 'number':
-    case 'boolean':
-    case 'bigint':
-      return String(error);
-    case 'object':
-      if (error === null) return 'null';
-      try {
-        const text = JSON.stringify(error);
-        return text === undefined
-          ? Object.prototype.toString.call(error)
-          : text;
-      } catch {
-        return Object.prototype.toString.call(error);
-      }
-    default:
-      return String(error);
+  if (typeof error !== 'object' || error === null) {
+    return String(
+      error as string | number | boolean | bigint | symbol | null | undefined,
+    );
+  }
+  try {
+    return JSON.stringify(error) ?? Object.prototype.toString.call(error);
+  } catch {
+    return Object.prototype.toString.call(error);
   }
 }
 

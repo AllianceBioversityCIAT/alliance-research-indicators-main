@@ -1335,20 +1335,8 @@ export class BilateralService {
   /** Same text as `String(value).trim()` for string, number and boolean. */
   private tipComparableText(value: unknown): string | null {
     if (value === null || value === undefined) return null;
-    switch (typeof value) {
-      case 'string':
-        return value.trim();
-      case 'number':
-      case 'boolean':
-      case 'bigint':
-        return String(value).trim();
-      case 'object': {
-        const text = JSON.stringify(value);
-        return text === undefined ? null : text;
-      }
-      default:
-        return String(value).trim();
-    }
+    if (typeof value === 'object') return JSON.stringify(value) ?? null;
+    return String(value as string | number | boolean | bigint).trim();
   }
 
   private sameTipScalar(stored: unknown, incoming: unknown): boolean {
