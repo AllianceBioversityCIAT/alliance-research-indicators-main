@@ -140,7 +140,8 @@ export class TipIntegrationController {
  * so a thrown non-Error is not coerced to `[object Object]`.
  */
 function formatNonError(error: unknown): string {
-  if (error === null || error === undefined) return String(error);
+  if (error === null) return 'null';
+  if (error === undefined) return 'undefined';
   if (typeof error === 'object') {
     try {
       return JSON.stringify(error) ?? Object.prototype.toString.call(error);
