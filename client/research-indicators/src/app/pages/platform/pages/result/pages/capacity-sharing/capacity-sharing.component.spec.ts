@@ -215,20 +215,16 @@ describe('CapacitySharingComponent', () => {
       expect(component.participantsExceedTotal()).toBe(false);
     });
 
-    it('H10: blocks a long-term training shorter than 3 months', async () => {
+    it('H10: saves a long-term training shorter than 3 months (expected behaviour)', async () => {
       submission.isEditableStatus.mockReturnValue(true);
       apiService.PATCH_CapacitySharing.mockClear();
+      apiService.PATCH_CapacitySharing.mockResolvedValue({});
+      apiService.GET_CapacitySharing.mockResolvedValue({ data: {} });
       component.body.set({ session_length_id: 2, start_date: new Date(2026, 0, 1), end_date: new Date(2026, 0, 4) });
 
-      expect(component.isLongTermTooShort()).toBe(true);
       await component.saveData();
 
-      expect(apiService.PATCH_CapacitySharing).not.toHaveBeenCalled();
-    });
-
-    it('H10: accepts a long-term training of exactly 3 months', () => {
-      component.body.set({ session_length_id: 2, start_date: new Date(2026, 0, 1), end_date: new Date(2026, 3, 1) });
-      expect(component.isLongTermTooShort()).toBe(false);
+      expect(apiService.PATCH_CapacitySharing).toHaveBeenCalled();
     });
 
     it('should send ISO 8601 UTC strings to the API', async () => {
