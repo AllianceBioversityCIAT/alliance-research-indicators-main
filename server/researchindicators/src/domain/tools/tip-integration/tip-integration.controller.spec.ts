@@ -78,7 +78,53 @@ describe('TipIntegrationController', () => {
   it('handleTipCloneKnowledgeProducts syncs without year filter', async () => {
     mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
     await controller.handleTipCloneKnowledgeProducts();
-    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith();
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(
+      undefined,
+    );
+  });
+
+  it('handleTipCloneKnowledgeProducts passes a finite year', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    await controller.handleTipCloneKnowledgeProducts({ year: 2026 });
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2026);
+  });
+
+  it('handleTipCloneKnowledgeProducts drops a non-finite year', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    await controller.handleTipCloneKnowledgeProducts({
+      year: Number.POSITIVE_INFINITY,
+    });
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(
+      undefined,
+    );
+  });
+
+  it('handleTipCloneKnowledgeProducts coerces a numeric string year', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    await controller.handleTipCloneKnowledgeProducts({
+      year: '2025',
+    } as unknown as { year?: number });
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2025);
+  });
+
+  it('handleTipCloneKnowledgeProducts reads a stringified RMQ payload', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    await controller.handleTipCloneKnowledgeProducts(
+      '{"year":2024}' as unknown as { year?: number },
+    );
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(2024);
+  });
+
+  it('handleTipCloneKnowledgeProducts ignores an unparseable payload', async () => {
+    mockService.getKnowledgeProductsByYear.mockResolvedValue(undefined);
+    await expect(
+      controller.handleTipCloneKnowledgeProducts(
+        'not-json' as unknown as { year?: number },
+      ),
+    ).resolves.toBeUndefined();
+    expect(mockService.getKnowledgeProductsByYear).toHaveBeenCalledWith(
+      undefined,
+    );
   });
 
   it('getIprDataRest', async () => {

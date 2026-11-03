@@ -8,7 +8,7 @@ import {
   Patch,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { MessagePattern } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { TipIntegrationService } from './tip-integration.service';
 import { TipIprDataDto } from './dto/tip-ipr-data.dto';
 import {
@@ -43,8 +43,12 @@ export class TipIntegrationController {
   }
 
   @MessagePattern('tip-clone-knowledge-products')
-  async handleTipCloneKnowledgeProducts() {
-    await this.tipIntegrationService.getKnowledgeProductsByYear();
+  async handleTipCloneKnowledgeProducts(
+    @Payload() payload?: { year?: number },
+  ) {
+    await this.tipIntegrationService.getKnowledgeProductsByYear(
+      reportingYearFromClonePayload(payload),
+    );
   }
 
   @ApiOperation({ summary: 'Get all IPR data for TIP integration' })
@@ -129,4 +133,31 @@ export class TipIntegrationController {
         }),
       );
   }
+}
+
+/**
+ * `emitToPattern` JSON.stringifies the body, so the RMQ handler receives a
+ * string. A finite number (or a numeric string) is the only year we forward.
+ */
+function reportingYearFromClonePayload(payload: unknown): number | undefined {
+  let body: unknown = payload;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  if (body === null || typeof body !== 'object') {
+    return undefined;
+  }
+  const raw = (body as { year?: unknown }).year;
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : undefined;
+  }
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const coerced = Number(raw.trim());
+    return Number.isFinite(coerced) ? coerced : undefined;
+  }
+  return undefined;
 }
