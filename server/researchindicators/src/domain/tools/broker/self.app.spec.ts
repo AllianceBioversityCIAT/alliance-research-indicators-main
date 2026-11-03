@@ -66,4 +66,23 @@ describe('SelfApp', () => {
       year: 2026,
     });
   });
+
+  it('returns the rejected promise from emitToPattern', async () => {
+    const failure = new Error('publish failed');
+    jest
+      .spyOn(
+        service as unknown as {
+          emitToPattern: (
+            pattern: string,
+            message: unknown,
+          ) => Promise<unknown>;
+        },
+        'emitToPattern',
+      )
+      .mockRejectedValue(failure);
+
+    await expect(service.executeTipCloneKnowledgeProducts()).rejects.toBe(
+      failure,
+    );
+  });
 });

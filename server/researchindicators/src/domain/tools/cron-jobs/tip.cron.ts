@@ -17,8 +17,13 @@ export class TipCron {
   }
 
   @Cron('0 0 * * 0') // Every Sunday at midnight
-  cloneNormalEntities(): void {
-    this._selfApp.executeTipCloneKnowledgeProducts();
+  async cloneNormalEntities(): Promise<void> {
+    try {
+      await this._selfApp.executeTipCloneKnowledgeProducts();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger._error(`Failed to clone TIP knowledge products: ${detail}`);
+    }
   }
 
   @Cron('0 0 * * 1-6') // Monday-Saturday at midnight
@@ -28,7 +33,7 @@ export class TipCron {
       this.logger._log(
         `Cloning TIP knowledge products for reporting year ${year}`,
       );
-      this._selfApp.executeTipCloneKnowledgeProducts(year);
+      await this._selfApp.executeTipCloneKnowledgeProducts(year);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       this.logger._error(

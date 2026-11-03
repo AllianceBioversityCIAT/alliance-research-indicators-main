@@ -13,8 +13,8 @@ export class SelfApp extends BrokerConnectionBase {
     this.emitToPattern('clone-normal-entities', {});
   }
 
-  executeTipCloneKnowledgeProducts(year?: number): void {
-    this.emitToPattern(
+  executeTipCloneKnowledgeProducts(year?: number): Promise<unknown> {
+    return this.emitToPattern(
       'tip-clone-knowledge-products',
       year === undefined ? {} : { year },
     );

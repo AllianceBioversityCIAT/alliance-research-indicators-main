@@ -39,8 +39,8 @@ describe('TipCron', () => {
     ).toEqual(expect.objectContaining({ cronTime: '0 0 * * 1-6' }));
   });
 
-  it('weekly clone calls execute with no year', () => {
-    cron.cloneNormalEntities();
+  it('weekly clone calls execute with no year', async () => {
+    await cron.cloneNormalEntities();
     expect(executeTipCloneKnowledgeProducts).toHaveBeenCalledTimes(1);
     expect(executeTipCloneKnowledgeProducts).toHaveBeenCalledWith();
     expect(resolve).not.toHaveBeenCalled();
@@ -74,5 +74,38 @@ describe('TipCron', () => {
 
     expect(executeTipCloneKnowledgeProducts).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('db down'));
+  });
+
+  it('logs and resolves when the Sunday publish fails', async () => {
+    executeTipCloneKnowledgeProducts.mockRejectedValue(
+      new Error('broker down'),
+    );
+    const errorSpy = jest
+      .spyOn(logger, '_error')
+      .mockImplementation(() => undefined);
+
+    await expect(cron.cloneNormalEntities()).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to clone TIP knowledge products: broker down',
+    );
+  });
+
+  it('logs and resolves when the daily publish fails', async () => {
+    resolve.mockResolvedValue(2026);
+    executeTipCloneKnowledgeProducts.mockRejectedValue(
+      new Error('broker down'),
+    );
+    const errorSpy = jest
+      .spyOn(logger, '_error')
+      .mockImplementation(() => undefined);
+
+    await expect(
+      cron.cloneReportingYearKnowledgeProducts(),
+    ).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Failed to clone TIP knowledge products for the reporting year: broker down',
+    );
   });
 });
