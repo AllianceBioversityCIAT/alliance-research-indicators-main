@@ -258,6 +258,16 @@ describe('PoolFundingAlignmentComponent', () => {
 
       expect(patchAlignmentMock).not.toHaveBeenCalled();
     });
+
+    it('H3: saves pending changes first when canSave() allows it', async () => {
+      Object.defineProperty(component, 'canSave', { value: () => true });
+      const onSave = jest.spyOn(component, 'onSave').mockResolvedValue();
+
+      await component.onBack();
+
+      expect(onSave).toHaveBeenCalled();
+      expect(onSave.mock.invocationCallOrder[0]).toBeLessThan(routerNavigate.mock.invocationCallOrder[0]);
+    });
   });
 
   it('renders the section title help button aligned with tooltip text', () => {
