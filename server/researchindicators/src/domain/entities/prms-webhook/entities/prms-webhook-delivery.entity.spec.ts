@@ -97,6 +97,13 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(metadata.relations).toHaveLength(0);
   });
 
+  it('platform_code is varchar(50) NULL', () => {
+    const platformCode = column('platform_code');
+    expect(platformCode.type).toBe('varchar');
+    expect(platformCode.length).toBe('50');
+    expect(platformCode.isNullable).toBe(true);
+  });
+
   it('result_official_code is varchar(191) NULL', () => {
     const resultOfficialCode = column('result_official_code');
     expect(resultOfficialCode.type).toBe('varchar');
@@ -116,6 +123,7 @@ describe('PrmsWebhookDelivery entity metadata', () => {
     expect(index).toBeDefined();
     expect(index?.isUnique).toBe(false);
     expect(index?.columns.map((indexed) => indexed.propertyName)).toEqual([
+      'platform_code',
       'result_official_code',
       'result_year',
     ]);
@@ -244,7 +252,7 @@ describe('PrmsWebhookDelivery entity metadata', () => {
       {
         name: 'idx_result_prms_sync_history_code_year',
         unique: false,
-        columns: ['result_official_code', 'result_year'],
+        columns: ['platform_code', 'result_official_code', 'result_year'],
       },
       {
         name: 'idx_result_prms_sync_history_delivery_id',
@@ -268,6 +276,7 @@ describe('PrmsWebhookDelivery entity metadata', () => {
         'occurred_at',
         'environment',
         'correlation_outcome',
+        'platform_code',
         'result_official_code',
         'result_year',
         'prms_result_id',

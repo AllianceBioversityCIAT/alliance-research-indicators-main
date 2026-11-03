@@ -42,6 +42,7 @@ type FixtureRow = {
   is_active: boolean;
   result_official_code: number;
   result_year: number;
+  platform_code: string;
   changes: Record<string, unknown> | null;
 };
 
@@ -62,6 +63,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: null,
   },
   {
@@ -80,6 +82,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: null,
   },
   {
@@ -98,6 +101,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: {
       'Theory of Change level': { before: 'EOI', after: '2030 Outcome' },
     },
@@ -118,6 +122,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: null,
   },
   {
@@ -136,6 +141,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: null,
   },
   {
@@ -154,6 +160,7 @@ const FIXTURE: FixtureRow[] = [
     is_active: false,
     result_official_code: OFFICIAL_CODE,
     result_year: YEAR,
+    platform_code: 'STAR',
     changes: null,
   },
   {
@@ -172,6 +179,26 @@ const FIXTURE: FixtureRow[] = [
     is_active: true,
     result_official_code: OFFICIAL_CODE,
     result_year: FOREIGN_YEAR,
+    platform_code: 'STAR',
+    changes: null,
+  },
+  {
+    id: 108,
+    event_source: 'STAR',
+    status: 'PENDING_REVIEW',
+    decision: null,
+    occurred_at: '2026-08-08T15:00:00.000Z',
+    decided_at: '2026-12-01T00:00:00.000Z',
+    justification: 'tip push',
+    reviewer_name: null,
+    reviewer_role: null,
+    first_name: 'Tip',
+    last_name: 'User',
+    duplicate_of_id: null,
+    is_active: true,
+    result_official_code: OFFICIAL_CODE,
+    result_year: YEAR,
+    platform_code: 'TIP',
     changes: null,
   },
 ];
@@ -181,6 +208,7 @@ const RESULT_ROW = {
   report_year_id: YEAR,
   prms_result_code: 452,
   prms_phase_id: 6,
+  prms_sp_code: 'SP03',
 };
 
 describe('PrmsSyncHistoryReader', () => {
@@ -218,6 +246,7 @@ describe('PrmsSyncHistoryReader', () => {
     expect(metaSql.sql).toMatch(/report_year_id/);
     expect(metaSql.sql).toMatch(/prms_result_code/);
     expect(metaSql.sql).toMatch(/prms_phase_id/);
+    expect(metaSql.sql).toMatch(/platform_code/);
     expect(metaSql.sql).not.toMatch(/\bOR\b/);
     expect(metaSql.params).toEqual([RESULT_ID]);
 
@@ -228,20 +257,23 @@ describe('PrmsSyncHistoryReader', () => {
     expect(eventsSql.sql).toMatch(/is_active = TRUE/);
     expect(eventsSql.sql).toMatch(/h\.result_year = \?/);
     expect(eventsSql.sql).toMatch(/h\.result_official_code = \?/);
+    expect(eventsSql.sql).toMatch(/h\.platform_code = \?/);
     expect(eventsSql.sql).toMatch(/LEFT JOIN sec_users/);
     expect(eventsSql.sql).not.toMatch(/\bOR\b/);
-    expect(eventsSql.params).toEqual([OFFICIAL_CODE, YEAR]);
+    expect(eventsSql.params).toEqual([OFFICIAL_CODE, YEAR, 'STAR']);
 
     expect(countSql.sql).toMatch(/event_source = 'STAR'/);
     expect(countSql.sql).toMatch(/status = 'PENDING_REVIEW'/);
     expect(countSql.sql).toMatch(/duplicate_of_id IS NULL/);
     expect(countSql.sql).toMatch(/is_active = TRUE/);
     expect(countSql.sql).toMatch(/result_year = \?/);
+    expect(countSql.sql).toMatch(/platform_code = \?/);
     expect(countSql.sql).not.toMatch(/\bOR\b/);
-    expect(countSql.params).toEqual([OFFICIAL_CODE, YEAR]);
+    expect(countSql.params).toEqual([OFFICIAL_CODE, YEAR, 'STAR']);
 
     expect(history.prms_result_code).toBe(452);
     expect(history.prms_phase_id).toBe(6);
+    expect(history.prms_sp_code).toBe('SP03');
     expect(history.sync_count).toBe(2);
     expect(history.events.map((event) => event.id)).toEqual([
       103, 102, 104, 101,
@@ -275,6 +307,30 @@ describe('PrmsSyncHistoryReader', () => {
     expect(history.events.map((event) => event.id)).not.toContain(105);
     expect(history.events.map((event) => event.id)).not.toContain(106);
     expect(history.events.map((event) => event.id)).not.toContain(107);
+    expect(history.events.map((event) => event.id)).not.toContain(108);
+  });
+
+  it('binds the result platform, reading NULL as STAR, and hides the other platform', async () => {
+    installFixture(query, FIXTURE, [{ ...RESULT_ROW, platform_code: 'TIP' }]);
+
+    const history = await reader.getHistory(RESULT_ID);
+
+    const eventsSql = issuedCall(query, /FROM result_prms_sync_history h/);
+    const countSql = issuedCall(query, /COUNT\(\*\)/);
+    expect(eventsSql.sql).toMatch(/h\.platform_code = \?/);
+    expect(eventsSql.params).toEqual([OFFICIAL_CODE, YEAR, 'TIP']);
+    expect(countSql.params).toEqual([OFFICIAL_CODE, YEAR, 'TIP']);
+    expect(history.events.map((event) => event.id)).toEqual([108]);
+    expect(history.sync_count).toBe(1);
+  });
+
+  it('a NULL platform_code on the result is bound as STAR', async () => {
+    installFixture(query, FIXTURE, [{ ...RESULT_ROW, platform_code: null }]);
+
+    await reader.getHistory(RESULT_ID);
+
+    const eventsSql = issuedCall(query, /FROM result_prms_sync_history h/);
+    expect(eventsSql.params).toEqual([OFFICIAL_CODE, YEAR, 'STAR']);
   });
 
   it('returns an empty timeline and sync_count 0 when the result was never synced', async () => {
@@ -297,6 +353,30 @@ describe('PrmsSyncHistoryReader', () => {
     expect(history.sync_count).toBe(0);
     expect(history.prms_result_code).toBeNull();
     expect(history.prms_phase_id).toBeNull();
+  });
+
+  it('reads the phase and the PRIMARY SP from the pushed version when the row has no phase', async () => {
+    installFixture(query, FIXTURE, [RESULT_ROW]);
+
+    await reader.getHistory(RESULT_ID);
+
+    const metaSql = issuedCall(query, /prms_phase_id/).sql;
+    expect(metaSql).toMatch(
+      /COALESCE\(r\.prms_phase_id, v\.prms_phase_id\) AS prms_phase_id/,
+    );
+    expect(metaSql).toMatch(/pushed\.is_snapshot = TRUE/);
+    expect(metaSql).toMatch(/pushed\.prms_phase_id IS NOT NULL/);
+    expect(metaSql).toMatch(/pushed\.platform_code <=> r\.platform_code/);
+    expect(metaSql).toMatch(/sp\.sp_role = 'PRIMARY'/);
+    expect(metaSql).toMatch(/AS prms_sp_code/);
+  });
+
+  it('carries a null prms_sp_code when the result has no PRIMARY SP', async () => {
+    installFixture(query, [], [{ ...RESULT_ROW, prms_sp_code: null }]);
+
+    const history = await reader.getHistory(RESULT_ID);
+
+    expect(history.prms_sp_code).toBeNull();
   });
 
   it('carries a null prms_phase_id when the column is null', async () => {
@@ -446,7 +526,7 @@ function projectHistory(
   rows: FixtureRow[],
 ): FixtureRow[] | Array<Record<string, number>> {
   let matched = rows.slice();
-  const [code, year] = params;
+  const [code, year, platform] = params;
 
   if (/result_official_code\s*=\s*\?/.test(sql)) {
     matched = matched.filter(
@@ -455,6 +535,9 @@ function projectHistory(
   }
   if (/result_year\s*=\s*\?/.test(sql)) {
     matched = matched.filter((row) => Number(row.result_year) === Number(year));
+  }
+  if (/platform_code\s*=\s*\?/.test(sql)) {
+    matched = matched.filter((row) => row.platform_code === platform);
   }
   if (/duplicate_of_id\s+IS\s+NULL/i.test(sql)) {
     matched = matched.filter((row) => row.duplicate_of_id == null);

@@ -1,3 +1,5 @@
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+
 /**
  * Already-loaded Result aggregate for PRMS payload assembly.
  * The repository loads it; builders map it. No database and no HTTP
@@ -106,6 +108,12 @@ export interface PrmsSyncTypeSlices {
 export interface PrmsSyncAggregate {
   result_id: number;
   result_official_code: number | string;
+  /**
+   * `results.platform_code`. Absent on aggregates loaded before the column
+   * was selected; the builder treats that as STAR so an existing STAR
+   * payload stays the bare code.
+   */
+  platform_code?: ReportingPlatformEnum | null;
   /**
    * `results.prms_result_code` on the version being pushed. Present only
    * after a previous accept; a re-push sends it as `result_code` and the

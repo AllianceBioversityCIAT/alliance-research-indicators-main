@@ -7,6 +7,7 @@ import { PolicyStagesEnum } from '../../../entities/policy-stages/enum/policy-st
 import { PolicyTypesEnum } from '../../../entities/policy-types/enum/policy-types.enum';
 import { QuantificationRolesEnum } from '../../../entities/quantification-roles/enum/quantification-roles.enum';
 import { SessionLengthEnum } from '../../../entities/session-lengths/enum/session-lengths.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
 import {
   PrmsSyncAggregate,
@@ -309,6 +310,71 @@ describe('PayloadBuilder', () => {
       expect(block.handle).not.toBe(
         'https://doi.org/10.1007/s10668-024-05173-5',
       );
+    });
+
+    it('builds a TIP knowledge product with TIP- reference and handle (R-TPP-004)', () => {
+      const row = resultOf(
+        completeAggregate({
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+          platform_code: ReportingPlatformEnum.TIP,
+          evidence: [
+            {
+              link: 'https://hdl.handle.net/10568/148990',
+              description: 'Handled',
+              is_private: false,
+            },
+          ],
+        }),
+      );
+      const data = row.data as Record<string, unknown>;
+      const block = data.knowledge_product as Record<string, unknown>;
+
+      expect(row.type).toBe('knowledge_product');
+      expect(data.external_reference).toBe('TIP-19191');
+      expect(block.handle).toBe('https://hdl.handle.net/10568/148990');
+    });
+
+    it('passes a TIP tocMapping override through as exactly those seven keys', () => {
+      const envelope = serialize(
+        builder.build(
+          completeAggregate({
+            indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+            evidence: [
+              {
+                link: 'https://hdl.handle.net/10568/148990',
+                description: 'Handled',
+                is_private: false,
+              },
+            ],
+          }),
+          {
+            tocMapping: {
+              science_program_id: 'SP02',
+              aow_compose_code: 'SP02-AOW01',
+              toc_result_id: 19191,
+              result_title: 'TIP result title',
+              result_indicator_description: 'TIP indicator description',
+              result_indicator_type_name: 'TIP indicator type',
+              target_contribution: 7,
+              toc_internal_id: 'internal-not-sent',
+              toc_result_indicator_id: 'indicator-not-sent',
+            },
+          },
+        ),
+      );
+      const results = envelope.results as Array<Record<string, unknown>>;
+      const data = results[0].data as Record<string, unknown>;
+
+      expect(data.toc_mapping).toEqual({
+        science_program_id: 'SP02',
+        aow_compose_code: 'SP02-AOW01',
+        toc_result_id: 19191,
+        result_title: 'TIP result title',
+        result_indicator_description: 'TIP indicator description',
+        result_indicator_type_name: 'TIP indicator type',
+        target_contribution: 7,
+      });
     });
   });
 
