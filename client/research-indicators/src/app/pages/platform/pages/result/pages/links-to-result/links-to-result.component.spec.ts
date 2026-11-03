@@ -117,9 +117,10 @@ describe('LinksToResultComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should navigate back to geographic scope', async () => {
+  it('H3: saves before navigating back to geographic scope, like Next', async () => {
     router.navigate.mockClear();
     await component.navigate('back');
+    expect(apiService.PATCH_LinkedResults).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['result', '123', 'geographic-scope'], { queryParams: { version: '1.0' }, replaceUrl: true });
   });
 
