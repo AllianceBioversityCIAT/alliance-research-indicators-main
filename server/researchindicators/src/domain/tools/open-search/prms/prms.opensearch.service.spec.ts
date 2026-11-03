@@ -1294,6 +1294,64 @@ describe('PrmsOpenSearchService', () => {
       ]);
     });
 
+    it('stores a child type as root + sub-type and a grandchild as root + its parent', async () => {
+      // Dev catalog rows behind PRMS result 25425.
+      const catalog = [
+        { code: 37, name: 'NGO', parent_code: null },
+        { code: 44, name: 'NGO National', parent_code: 37 },
+        { code: 45, name: 'NGO National (General)', parent_code: 44 },
+        { code: 67, name: 'Government', parent_code: null },
+        { code: 69, name: 'Government (Subnational)', parent_code: 67 },
+        { code: 76, name: 'Public-Private Partnership', parent_code: null },
+      ];
+      institutionTypeRepo.findOne.mockImplementation(
+        async ({ where }) =>
+          catalog.find((row) =>
+            where.code !== undefined
+              ? row.code === where.code
+              : row.name === where.name,
+          ) ?? null,
+      );
+
+      const mapped = await run(
+        summary({
+          current_section: {
+            actors: [],
+            organizations: [
+              { institution_type_name: 'NGO National (General)', how_many: 8 },
+              {
+                institution_type_name: 'Government (Subnational)',
+                how_many: 7,
+              },
+              {
+                institution_type_name: 'Public-Private Partnership',
+                how_many: 1,
+              },
+            ],
+            other_quantitative: [],
+          },
+        }),
+      );
+
+      expect(mapped.organizations).toEqual([
+        expect.objectContaining({
+          institution_type_id: 37,
+          sub_institution_type_id: 44,
+          organization_count: 8,
+        }),
+        expect.objectContaining({
+          institution_type_id: 67,
+          sub_institution_type_id: 69,
+          organization_count: 7,
+        }),
+        expect.objectContaining({
+          institution_type_id: 76,
+          sub_institution_type_id: undefined,
+          organization_count: 1,
+        }),
+      ]);
+    });
+
     it('maps other quantitative measures to quantifications', async () => {
       const mapped = await run(
         summary({

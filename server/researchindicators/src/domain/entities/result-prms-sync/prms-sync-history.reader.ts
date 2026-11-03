@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { LoggerUtil } from '../../shared/utils/logger.util';
 import { formatPersonName } from '../../shared/utils/name-format.util';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
 import { PRMS_SYNC_HTTP_DESCRIPTIONS } from './dto/prms-sync.dto';
 import {
   PrmsSyncHistoryDto,
@@ -11,16 +12,58 @@ import {
 /**
  * Q1 — result metadata. The reporting year is resolved here, never from
  * the client. Flat predicates only: no OR (design §5, KZ-017).
+ * `platform_code` is selected so the history key can bind it (design §7.5).
+ *
+ * The phase and the PRIMARY Science Program live on the pushed row: the
+ * version of this code, year and platform that holds `prms_phase_id`. The
+ * live row stores only `prms_result_code`, and its pool-funding alignment can
+ * be inactive once a version exists, so both are read from that version when
+ * the row itself has no phase. The client builds the PRMS review link from
+ * `prms_sp_code`, `prms_phase_id` and `prms_result_code`.
  */
 const RESULT_METADATA_SQL = `
-      SELECT result_official_code, report_year_id, prms_result_code, prms_phase_id
-      FROM results
-      WHERE result_id = ?
+      SELECT
+        r.result_official_code,
+        r.report_year_id,
+        r.prms_result_code,
+        COALESCE(r.prms_phase_id, v.prms_phase_id) AS prms_phase_id,
+        r.platform_code,
+        (
+          SELECT sp.sp_code
+          FROM result_pool_funding_alignment a
+          INNER JOIN result_pool_funding_alignment_sp sp
+            ON sp.alignment_id = a.id
+            AND sp.is_active = TRUE
+            AND sp.sp_role = 'PRIMARY'
+          WHERE a.result_id = CASE
+              WHEN r.prms_phase_id IS NOT NULL THEN r.result_id
+              ELSE COALESCE(v.result_id, r.result_id)
+            END
+            AND a.is_active = TRUE
+          ORDER BY sp.id DESC
+          LIMIT 1
+        ) AS prms_sp_code
+      FROM results r
+      LEFT JOIN results v
+        ON v.result_id = (
+          SELECT pushed.result_id
+          FROM results pushed
+          WHERE pushed.result_official_code = r.result_official_code
+            AND pushed.report_year_id = r.report_year_id
+            AND pushed.platform_code <=> r.platform_code
+            AND pushed.is_snapshot = TRUE
+            AND pushed.is_active = TRUE
+            AND pushed.prms_phase_id IS NOT NULL
+          ORDER BY pushed.result_id DESC
+          LIMIT 1
+        )
+      WHERE r.result_id = ?
     `;
 
 /**
  * Q2 — timeline. Newest first by COALESCE(decided_at, occurred_at), then id.
  * Duplicate deliveries and inactive rows are not timeline entries.
+ * Keyed on the result's platform as well as code and year (R-PPI-002).
  */
 const EVENTS_SQL = `
       SELECT h.*, su.first_name, su.last_name
@@ -28,24 +71,36 @@ const EVENTS_SQL = `
       LEFT JOIN sec_users su ON su.sec_user_id = h.actor_user_id
       WHERE h.result_official_code = ?
         AND h.result_year = ?
+        AND h.platform_code = ?
         AND h.duplicate_of_id IS NULL
         AND h.is_active = TRUE
       ORDER BY COALESCE(h.decided_at, h.occurred_at) DESC, h.id DESC
     `;
 
 /**
- * Q3 — sync_count counts STAR pushes awaiting review, not inbound decisions.
+ * Q3 — sync_count counts pushes awaiting review on this platform, not
+ * inbound decisions and not another platform's rows.
  */
 const SYNC_COUNT_SQL = `
       SELECT COUNT(*)
       FROM result_prms_sync_history
       WHERE result_official_code = ?
         AND result_year = ?
+        AND platform_code = ?
         AND event_source = 'STAR'
         AND status = 'PENDING_REVIEW'
         AND duplicate_of_id IS NULL
         AND is_active = TRUE
     `;
+
+/** NULL `results.platform_code` is STAR, matching the payload builder. */
+const platformCodeOf = (row: { platform_code?: unknown }): string => {
+  const raw = row.platform_code;
+  if (typeof raw !== 'string') {
+    return ReportingPlatformEnum.STAR;
+  }
+  return raw;
+};
 
 const asNullableNumber = (value: unknown): number | null =>
   value == null || value === '' ? null : Number(value);
@@ -172,6 +227,8 @@ export class PrmsSyncHistoryReader {
           report_year_id?: unknown;
           prms_result_code?: unknown;
           prms_phase_id?: unknown;
+          platform_code?: unknown;
+          prms_sp_code?: unknown;
         }
       | undefined;
     if (!resultRow) {
@@ -180,15 +237,18 @@ export class PrmsSyncHistoryReader {
 
     const officialCode = resultRow.result_official_code;
     const year = resultRow.report_year_id;
+    const platform = platformCodeOf(resultRow);
 
     try {
       const eventRows: unknown[] = await this.dataSource.query(EVENTS_SQL, [
         officialCode,
         year,
+        platform,
       ]);
       const countRows: unknown[] = await this.dataSource.query(SYNC_COUNT_SQL, [
         officialCode,
         year,
+        platform,
       ]);
       const countRow = countRows[0] as Record<string, unknown> | undefined;
       const syncCount = Number(countRow?.['COUNT(*)'] ?? 0);
@@ -196,6 +256,7 @@ export class PrmsSyncHistoryReader {
       return {
         prms_result_code: asNullableNumber(resultRow.prms_result_code),
         prms_phase_id: asNullableNumber(resultRow.prms_phase_id),
+        prms_sp_code: asNullableString(resultRow.prms_sp_code),
         sync_count: syncCount,
         events: (eventRows as Record<string, unknown>[]).map(mapHistoryEvent),
       };

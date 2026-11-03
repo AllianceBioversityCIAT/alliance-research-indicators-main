@@ -221,4 +221,27 @@ describe('QueryService', () => {
       expect(result).toBeUndefined();
     });
   });
+
+  describe('deleteResultRowById', () => {
+    it('hard-deletes only the given id when that row is live and has a family', async () => {
+      mockFindOne.mockResolvedValue({
+        result_id: 42,
+        result_official_code: 21156,
+        platform_code: ReportingPlatformEnum.TIP,
+        is_snapshot: false,
+      });
+      mockFind.mockResolvedValue([{ result_id: 42 }, { result_id: 43 }]);
+      mockQuery.mockResolvedValue(undefined);
+
+      await service.deleteResultRowById(42);
+
+      expect(mockQuery).toHaveBeenCalledTimes(1);
+      expect(mockQuery).toHaveBeenCalledWith(
+        'SELECT full_delete_result_version(?)',
+        [42],
+      );
+      expect(mockFindOne).not.toHaveBeenCalled();
+      expect(mockFind).not.toHaveBeenCalled();
+    });
+  });
 });
