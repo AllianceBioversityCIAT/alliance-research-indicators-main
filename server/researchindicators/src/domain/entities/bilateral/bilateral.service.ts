@@ -1336,7 +1336,17 @@ export class BilateralService {
   private tipComparableText(value: unknown): string | null {
     if (value === null || value === undefined) return null;
     if (typeof value === 'object') return JSON.stringify(value) ?? null;
-    return String(value as string | number | boolean | bigint).trim();
+    if (typeof value === 'string') return value.trim();
+    if (
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      typeof value === 'bigint' ||
+      typeof value === 'symbol' ||
+      typeof value === 'function'
+    ) {
+      return value.toString().trim();
+    }
+    return null;
   }
 
   private sameTipScalar(stored: unknown, incoming: unknown): boolean {
