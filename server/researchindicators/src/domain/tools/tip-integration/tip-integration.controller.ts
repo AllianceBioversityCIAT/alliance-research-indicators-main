@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Controller,
   Get,
   Query,
@@ -7,7 +8,7 @@ import {
   Patch,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { MessagePattern } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { TipIntegrationService } from './tip-integration.service';
 import { TipIprDataDto } from './dto/tip-ipr-data.dto';
 import {
@@ -17,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SetUpInterceptor } from '../../shared/Interceptors/setup.interceptor';
+import { LoggerUtil } from '../../shared/utils/logger.util';
 import { ResponseUtils } from '../../shared/utils/response.utils';
 import {
   QueryIndicators,
@@ -29,6 +31,10 @@ import { TrueFalseEnum } from '../../shared/enum/queries.enum';
 @ApiBearerAuth()
 @UseInterceptors(SetUpInterceptor)
 export class TipIntegrationController {
+  private readonly logger = new LoggerUtil({
+    name: TipIntegrationController.name,
+  });
+
   constructor(private readonly tipIntegrationService: TipIntegrationService) {}
 
   @MessagePattern('tip.get-ipr-data')
@@ -37,8 +43,12 @@ export class TipIntegrationController {
   }
 
   @MessagePattern('tip-clone-knowledge-products')
-  async handleTipCloneKnowledgeProducts() {
-    await this.tipIntegrationService.getKnowledgeProductsByYear();
+  async handleTipCloneKnowledgeProducts(
+    @Payload() payload?: { year?: number },
+  ) {
+    await this.tipIntegrationService.getKnowledgeProductsByYear(
+      reportingYearFromClonePayload(payload),
+    );
   }
 
   @ApiOperation({ summary: 'Get all IPR data for TIP integration' })
@@ -93,9 +103,19 @@ export class TipIntegrationController {
     asyncProcess?: TrueFalseEnum,
   ) {
     if (asyncProcess == TrueFalseEnum.TRUE) {
-      this.tipIntegrationService.getKnowledgeProductsByYear(
-        year ? +year : undefined,
-      );
+      this.tipIntegrationService
+        .getKnowledgeProductsByYear(year ? +year : undefined)
+        .catch((error: unknown) => {
+          if (error instanceof ConflictException) {
+            this.logger.warn(error.message);
+            return;
+          }
+          if (error instanceof Error) {
+            this.logger.error(error.message, error.stack);
+            return;
+          }
+          this.logger.error(String(error));
+        });
       return ResponseUtils.format({
         data: 'IPR data synced asynchronously',
         description: 'IPR data synced asynchronously',
@@ -113,4 +133,31 @@ export class TipIntegrationController {
         }),
       );
   }
+}
+
+/**
+ * `emitToPattern` JSON.stringifies the body, so the RMQ handler receives a
+ * string. A finite number (or a numeric string) is the only year we forward.
+ */
+function reportingYearFromClonePayload(payload: unknown): number | undefined {
+  let body: unknown = payload;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+  if (body === null || typeof body !== 'object') {
+    return undefined;
+  }
+  const raw = (body as { year?: unknown }).year;
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : undefined;
+  }
+  if (typeof raw === 'string' && raw.trim() !== '') {
+    const coerced = Number(raw.trim());
+    return Number.isFinite(coerced) ? coerced : undefined;
+  }
+  return undefined;
 }

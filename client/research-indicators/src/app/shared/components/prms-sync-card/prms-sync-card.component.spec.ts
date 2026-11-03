@@ -25,6 +25,7 @@ function history(partial: Partial<PrmsSyncHistoryResponse> = {}): PrmsSyncHistor
   return {
     prms_result_code: 452,
     prms_phase_id: 6,
+    prms_sp_code: 'SP03',
     sync_count: 1,
     events: [
       event({
@@ -127,7 +128,9 @@ describe('PrmsSyncCardComponent', () => {
       expect(open.tagName).toBe('A');
       expect(open.querySelector('svg')).not.toBeNull();
       expect(open.textContent).toContain('Open result in PRMS');
-      expect(open.getAttribute('href')).toBe('https://prtest.example.test/result/result-detail/452/general-information?phase=6');
+      expect(open.getAttribute('href')).toBe(
+        'https://prtest.example.test/result-framework-reporting/entity-details/SP03/bilateral-review?phase=6&reviewResult=452'
+      );
       expect(open.getAttribute('target')).toBe('_blank');
       expect(open.getAttribute('rel')).toBe('noopener noreferrer');
 
@@ -229,6 +232,13 @@ describe('PrmsSyncCardComponent', () => {
     expect(text(code)).toContain('PRMS code:');
     expect(text(code)).toContain('452');
     expect(code.textContent).not.toContain('PRMS ID');
+  });
+
+  it('keeps the PRMS code line and hides the link when the Science Program is unknown', () => {
+    const host = render(history({ prms_sp_code: null }));
+
+    expect(host.querySelector('[data-testid="prms-sync-open"]')).toBeNull();
+    expect(text(host.querySelector('[data-testid="prms-sync-code"]') as HTMLElement)).toContain('452');
   });
 
   it('hides the link and the code line when the result code is null', () => {

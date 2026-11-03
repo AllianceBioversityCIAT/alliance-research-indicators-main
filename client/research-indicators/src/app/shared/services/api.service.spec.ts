@@ -295,6 +295,22 @@ describe('ApiService', () => {
       expect(mockToPromiseService.get).toHaveBeenCalledWith('v1/results/19792/pool-funding-alignment', { useResultInterceptor: true });
     });
 
+    // D-7 — the route token is digits-only. STAR-, TIP- and a bare code all
+    // arrive as the same numeric path.
+    it.each([
+      ['TIP-123', '123'],
+      ['STAR-123', '123'],
+      ['123', '123']
+    ] as const)('bilateralPath sends digits for %s', (resultCode, digits) => {
+      (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });
+
+      service.GET_PoolFundingAlignment(resultCode);
+
+      expect(mockToPromiseService.get).toHaveBeenCalledWith(`v1/results/${digits}/pool-funding-alignment`, {
+        useResultInterceptor: true
+      });
+    });
+
     it('should URL-encode the (post-strip) resultCode for GET_PoolFundingAlignment', () => {
       const resultCode = 'edge case#1';
       (mockToPromiseService.get as jest.Mock).mockResolvedValue({ data: {} });

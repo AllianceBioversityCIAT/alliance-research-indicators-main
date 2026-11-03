@@ -48,14 +48,16 @@ const ALLOWED_LEVELS_BY_RESULT_TYPE: Partial<
 > = {
   capacity_sharing: ['OUTPUT'],
   innovation_dev: ['OUTPUT'],
+  // @sdd-spec docs/specs/changes/tip-prms-phase-2/prms-platform-identity — T-10
+  knowledge_product: ['OUTPUT'],
   policy_change: ['OUTCOME', 'EOI'],
   innovation_use: ['OUTCOME'],
 };
 
 /**
  * Single source of truth (D-V2-3) for the `result_type` → `allowed_levels`
- * rule table (R-BIL-091). Any result type without an explicit row — pending
- * OQ-V2-5 — maps to `[]` (⇒ `catalogs: []`, zero upstream calls).
+ * rule table (R-BIL-091). Any result type without an explicit row maps to
+ * `[]` (⇒ `catalogs: []`, zero upstream calls).
  */
 export function allowedLevelsFor(resultTypeKey: string): TocLevel[] {
   const levels =
