@@ -94,15 +94,6 @@ export default class CapacitySharingComponent {
     return split > Number(total);
   });
 
-  // H10 — Long-term means "3 months and more" (session_lengths.name), so the dates must span at least that.
-  isLongTermTooShort = computed(() => {
-    const { start_date, end_date } = this.body() ?? {};
-    if (!this.isLongTermSelected() || !this.hasBothDates({ start_date, end_date })) return false;
-    const minimumEnd = new Date(start_date as string | number | Date);
-    minimumEnd.setMonth(minimumEnd.getMonth() + 3);
-    return new Date(end_date as string | number | Date).getTime() < minimumEnd.getTime();
-  });
-
   protected clearDegreeIdIfNotLongTerm() {
     const current = this.body();
     if (current?.degree_id) {
@@ -176,7 +167,6 @@ export default class CapacitySharingComponent {
     if (this.body().session_format_id === 2 && this.participantsExceedTotal()) {
       return 'Female, male and non-binary participants cannot add up to more than the total participants.';
     }
-    if (this.isLongTermTooShort()) return 'A long-term training must last 3 months or more.';
     return '';
   }
 
