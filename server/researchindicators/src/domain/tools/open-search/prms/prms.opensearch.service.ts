@@ -56,6 +56,7 @@ import { TocLevel } from '../../toc-integration/dto/toc-integration.types';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { ClarisaLeversService } from '../../clarisa/entities/clarisa-levers/clarisa-levers.service';
 import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
+import { ContractRolesEnum } from '../../../entities/result-contracts/enum/contract-roles.enum';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
 import { firstValueFrom } from 'rxjs';
 import { CounterResults } from '../../tip-integration/dto/response-year-tip.dto';
@@ -387,8 +388,12 @@ export class PrmsOpenSearchService
 
       const { results: dataProcessed, sources } =
         await this.processDataAsStar(prmsResults);
+      const resultsToSave = await this.preserveExistingContracts(
+        dataProcessed,
+        counters,
+      );
 
-      await this.saveResultService.bulkSaveAllSections(dataProcessed, {
+      await this.saveResultService.bulkSaveAllSections(resultsToSave, {
         platformCode: ReportingPlatformEnum.STAR,
         resultSaved,
         currentCode,
@@ -400,7 +405,7 @@ export class PrmsOpenSearchService
           is_snapshot: 'is_version_applied',
         },
       });
-      await this.finalizeImportedResults(dataProcessed, sources);
+      await this.finalizeImportedResults(resultsToSave, sources);
       await this.syncProcessLogService.update(syncProcessLog.id, counters);
       await this.syncProcessLogService.endSync(syncProcessLog.id);
     } catch (error) {
@@ -408,6 +413,80 @@ export class PrmsOpenSearchService
       this.logger.error(`Error getting PRMS data as STAR: ${errorMessage}`);
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
+    }
+  }
+
+  /**
+   * As-STAR only. An empty resolved contract list must not replace the
+   * ALIGNMENT contracts already stored on a live STAR row: the alignment save
+   * deactivates every active row missing from the payload, including when that
+   * payload is empty. Copy the stored rows back so the replace writes the same
+   * contracts. A result that is not in STAR yet keeps `[]`. If the lookup
+   * fails, that result is left out of the save so the empty list cannot wipe
+   * its contracts.
+   */
+  private async preserveExistingContracts(
+    results: ExternalMappersDto[],
+    counters: CounterResults,
+  ): Promise<ExternalMappersDto[]> {
+    const ready: ExternalMappersDto[] = [];
+    for (const result of results) {
+      if (!isEmpty(result.alignments?.contracts)) {
+        ready.push(result);
+        continue;
+      }
+      const kept = await this.copyExistingAlignmentContracts(result, counters);
+      if (kept) ready.push(result);
+    }
+    return ready;
+  }
+
+  /**
+   * @returns false when the lookup failed and the result must not be saved.
+   */
+  private async copyExistingAlignmentContracts(
+    result: ExternalMappersDto,
+    counters: CounterResults,
+  ): Promise<boolean> {
+    try {
+      const existing = await this.dataSource.getRepository(Result).findOne({
+        where: {
+          prms_result_code: result.prms_result_code,
+          platform_code: ReportingPlatformEnum.STAR,
+          report_year_id: result.createResult.year,
+          is_snapshot: false,
+        },
+        select: { result_id: true, result_official_code: true },
+      });
+      if (!existing) return true;
+
+      const stored = await this.dataSource.getRepository(ResultContract).find({
+        where: {
+          result_id: existing.result_id,
+          contract_role_id: ContractRolesEnum.ALIGNMENT,
+          is_active: true,
+        },
+      });
+      result.alignments.contracts = stored.map(
+        (row) =>
+          ({
+            contract_id: row.contract_id,
+            is_primary: row.is_primary,
+          }) as ResultContract,
+      );
+      if (stored.length > 0) {
+        this.logger.warn(
+          `Keeping existing contracts for PRMS result ${result.prms_result_code}.`,
+        );
+      }
+      return true;
+    } catch (error) {
+      counters.errorRecords += 1;
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Skipping PRMS result ${result.prms_result_code}: existing contracts could not be read, so they were not replaced. ${errorMessage}`,
+      );
+      return false;
     }
   }
 
@@ -1302,13 +1381,16 @@ export class PrmsOpenSearchService
 
   /**
    * External codes on `bilateral_projects`, trimmed, blank-dropped and
-   * de-duplicated in payload order. `external_code` is `agreement_id`.
+   * de-duplicated in payload order. A leading `B-` (any case) is removed
+   * after trimming, and de-duplication uses that code, so `B-A1616` and
+   * `A1616` are one contract and the first one keeps its place.
+   * `external_code` is `agreement_id`.
    */
   private bilateralExternalCodes(item: ResultResponseMapper): string[] {
     const codes: string[] = [];
     const seen = new Set<string>();
     for (const project of item.bilateral_projects ?? []) {
-      const code = project?.external_code?.trim() ?? '';
+      const code = (project?.external_code?.trim() ?? '').replace(/^b-/i, '');
       if (code === '' || seen.has(code)) continue;
       seen.add(code);
       codes.push(code);
@@ -1465,8 +1547,15 @@ export class PrmsOpenSearchService
       const lever = await this.clarisaLeversService.homologatedData(
         primaryContract?.departmentId,
       );
+      const contractsFromBilateralProjects =
+        options.contractsFromBilateralProjects === true;
+      // As-STAR must not call findByShortName with an empty lever: that
+      // lookup returns the first clarisa_levers row.
       const clarisaLever =
-        await this.clarisaLeversService.findByShortName(lever);
+        contractsFromBilateralProjects && isEmpty(lever)
+          ? null
+          : await this.clarisaLeversService.findByShortName(lever);
+      const resolvedLeverId = prmsLever?.id ?? clarisaLever?.id;
 
       const savedPrimaryContract = [
         ...contributingContracts
@@ -1488,11 +1577,14 @@ export class PrmsOpenSearchService
       }
 
       result.alignments = {
-        primary_levers: [
-          {
-            lever_id: prmsLever?.id ?? clarisaLever?.id,
-          } as unknown as ResultLever,
-        ],
+        primary_levers:
+          contractsFromBilateralProjects && isEmpty(resolvedLeverId)
+            ? []
+            : [
+                {
+                  lever_id: resolvedLeverId,
+                } as unknown as ResultLever,
+              ],
         contracts: savedPrimaryContract,
         contributor_levers: [],
         result_sdgs: [],

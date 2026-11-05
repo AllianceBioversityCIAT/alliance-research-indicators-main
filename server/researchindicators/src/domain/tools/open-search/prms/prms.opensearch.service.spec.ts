@@ -29,6 +29,8 @@ import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-pr
 import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
 import { ResultStatusEnum } from '../../../entities/result-status/enum/result-status.enum';
 import { Result } from '../../../entities/results/entities/result.entity';
+import { ResultContract } from '../../../entities/result-contracts/entities/result-contract.entity';
+import { ContractRolesEnum } from '../../../entities/result-contracts/enum/contract-roles.enum';
 import { GreenCheckRepository } from '../../../entities/green-checks/repository/green-checks.repository';
 import { PrmsWebhookDeliveryRepository } from '../../../entities/prms-webhook/repositories/prms-webhook-delivery.repository';
 import { PrmsKnowledgeProductDto } from './dto/prms-response.dto';
@@ -62,6 +64,7 @@ describe('PrmsOpenSearchService', () => {
   let resultRepoHandle: { findOne: jest.Mock; update: jest.Mock };
   let allianceStaffRepoHandle: { findOne: jest.Mock };
   let agressoContractRepoHandle: { find: jest.Mock };
+  let resultContractRepoHandle: { find: jest.Mock };
   let resultsService: jest.Mocked<ResultsService>;
   let resultRepository: jest.Mocked<ResultRepository>;
   let queryService: jest.Mocked<QueryService>;
@@ -148,6 +151,9 @@ describe('PrmsOpenSearchService', () => {
     agressoContractRepoHandle = {
       find: jest.fn().mockResolvedValue([]),
     };
+    resultContractRepoHandle = {
+      find: jest.fn().mockResolvedValue([]),
+    };
     temporalRepoHandle = {
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -158,6 +164,9 @@ describe('PrmsOpenSearchService', () => {
         }
         if (entity === AgressoContract) {
           return agressoContractRepoHandle;
+        }
+        if (entity === ResultContract) {
+          return resultContractRepoHandle;
         }
         if (entity === SyncStagingRecordsEntity) {
           return temporalRepoHandle;
@@ -679,7 +688,7 @@ describe('PrmsOpenSearchService', () => {
           phase_id: 8,
         }),
       ]);
-      resultRepoHandle.findOne.mockResolvedValueOnce({
+      resultRepoHandle.findOne.mockResolvedValue({
         result_id: 777,
         result_official_code: 5001,
       });
@@ -709,7 +718,7 @@ describe('PrmsOpenSearchService', () => {
       prmsRepository.findTemporalResults.mockResolvedValue([
         buildTemporalMapper({ result_code: '10', status_id: '5' }),
       ]);
-      resultRepoHandle.findOne.mockResolvedValueOnce({
+      resultRepoHandle.findOne.mockResolvedValue({
         result_id: 777,
         result_official_code: 5001,
       });
@@ -727,7 +736,7 @@ describe('PrmsOpenSearchService', () => {
       prmsRepository.findTemporalResults.mockResolvedValue([
         buildTemporalMapper({ result_code: '10', status_id: '5', phase_id: 8 }),
       ]);
-      resultRepoHandle.findOne.mockResolvedValueOnce({
+      resultRepoHandle.findOne.mockResolvedValue({
         result_id: 777,
         result_official_code: 5001,
       });
@@ -759,13 +768,15 @@ describe('PrmsOpenSearchService', () => {
           year: '2025',
         }),
       ]);
-      resultRepoHandle.findOne
-        .mockResolvedValueOnce({ result_official_code: 5001 })
-        .mockResolvedValueOnce(null);
+      resultRepoHandle.findOne.mockImplementation(async ({ where }) =>
+        where?.prms_result_code === 10
+          ? { result_id: 10, result_official_code: 5001 }
+          : null,
+      );
 
       await service.getDataAsStar({ year: 2025 });
 
-      expect(resultRepoHandle.findOne).toHaveBeenCalledTimes(2);
+      expect(resultRepoHandle.findOne).toHaveBeenCalledTimes(4);
       expect(dataSource.getRepository).toHaveBeenCalledWith(Result);
       expect(resultRepoHandle.findOne).toHaveBeenNthCalledWith(1, {
         where: {
@@ -789,9 +800,15 @@ describe('PrmsOpenSearchService', () => {
         buildTemporalMapper({ result_code: '10', status_id: '6' }),
         buildTemporalMapper({ result_code: '11', status_id: '6' }),
       ]);
-      resultRepoHandle.findOne
-        .mockResolvedValueOnce({ result_official_code: 5001 })
-        .mockResolvedValueOnce({ result_official_code: 5002 });
+      resultRepoHandle.findOne.mockImplementation(async ({ where }) => {
+        if (where?.prms_result_code === 10) {
+          return { result_official_code: 5001 };
+        }
+        if (where?.prms_result_code === 11) {
+          return { result_official_code: 5002 };
+        }
+        return null;
+      });
       greenCheckRepository.createSnapshot.mockRejectedValueOnce(
         new Error('SP failed'),
       );
@@ -2381,6 +2398,257 @@ describe('PrmsOpenSearchService', () => {
           }),
         ]),
       );
+    });
+  });
+
+  describe('as-STAR contract and lever adjustments', () => {
+    const onePage = () =>
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+
+    const savedResults = () =>
+      saveResultService.bulkSaveAllSections.mock.calls[0][0];
+
+    const project = (
+      external_code: string | null,
+    ): PrmsBilateralProjectMapper => ({
+      short_name: 'USA - USAID - (BAFY)',
+      organization_code: 'Bioversity (Alliance)',
+      external_code,
+    });
+
+    const contract = (agreement_id: string) =>
+      ({
+        agreement_id,
+        departmentId: 'DEPT',
+      }) as AgressoContract;
+
+    const runAsStar = async (
+      dataOverrides: Partial<ResultResponseMapper> = {},
+    ) => {
+      const processed = await (
+        service as unknown as {
+          processDataAsStar: (rows: PrmsTemporalResponseMapper[]) => Promise<{
+            results: ExternalMappersDto[];
+          }>;
+        }
+      ).processDataAsStar([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          ...dataOverrides,
+        }),
+      ]);
+      return processed.results;
+    };
+
+    it('keeps the stored ALIGNMENT contracts when an existing as-STAR result resolves none', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultContractRepoHandle.find.mockResolvedValue([
+        { contract_id: 'A1616', is_primary: true },
+        { contract_id: 'D100', is_primary: false },
+      ]);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()[0].alignments.contracts).toEqual([
+        expect.objectContaining({ contract_id: 'A1616', is_primary: true }),
+        expect.objectContaining({ contract_id: 'D100', is_primary: false }),
+      ]);
+      expect(resultRepoHandle.findOne).toHaveBeenCalledWith({
+        where: {
+          prms_result_code: 28731,
+          platform_code: ReportingPlatformEnum.STAR,
+          report_year_id: 2025,
+          is_snapshot: false,
+        },
+        select: { result_id: true, result_official_code: true },
+      });
+      expect(resultContractRepoHandle.find).toHaveBeenCalledWith({
+        where: {
+          result_id: 34105,
+          contract_role_id: ContractRolesEnum.ALIGNMENT,
+          is_active: true,
+        },
+      });
+      expect(
+        warnSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('28731') &&
+              message.includes('Keeping existing contracts'),
+          ),
+      ).toBe(true);
+      warnSpy.mockRestore();
+    });
+
+    it('leaves contracts empty for a new as-STAR result and does not warn', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()[0].alignments.contracts).toEqual([]);
+      expect(resultContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(
+        warnSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some((message) => message.includes('Keeping existing contracts')),
+      ).toBe(false);
+      warnSpy.mockRestore();
+    });
+
+    it('does not save a result when the existing-contract lookup throws', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockRejectedValue(new Error('db down'));
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()).toEqual([]);
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({ errorRecords: 1 }),
+      );
+      expect(
+        errorSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('28731') &&
+              message.includes('were not replaced'),
+          ),
+      ).toBe(true);
+      errorSpy.mockRestore();
+    });
+
+    it('does not warn when the existing row has no alignment contracts', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultContractRepoHandle.find.mockResolvedValue([]);
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()[0].alignments.contracts).toEqual([]);
+      expect(
+        warnSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some((message) => message.includes('Keeping existing contracts')),
+      ).toBe(false);
+      warnSpy.mockRestore();
+    });
+
+    it('does not read stored contracts when PRMS already resolved one', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [project('A1616')],
+        }),
+      ]);
+      agressoContractRepoHandle.find.mockResolvedValue([contract('A1616')]);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(savedResults()[0].alignments.contracts).toEqual([
+        expect.objectContaining({ contract_id: 'A1616', is_primary: true }),
+      ]);
+    });
+
+    it('does not look up a lever by an empty short name and sends no primary lever', async () => {
+      clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
+      clarisaLeversService.homologatedData.mockReturnValueOnce(null as any);
+
+      const [out] = await runAsStar({ bilateral_projects: [] });
+
+      expect(clarisaLeversService.findByShortName).not.toHaveBeenCalled();
+      expect(out.alignments.primary_levers).toEqual([]);
+    });
+
+    it('treats a leading B- as the same agreement and keeps the first code', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([contract('A1616')]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [
+          project('b-A1616'),
+          project('B-A1616'),
+          project('A1616'),
+        ],
+      });
+
+      expect(out.createResult.contract_id).toBe('A1616');
+      expect(out.alignments.contracts).toEqual([
+        expect.objectContaining({ contract_id: 'A1616', is_primary: true }),
+      ]);
+      expect(
+        agressoContractRepoHandle.find.mock.calls[0][0].where.agreement_id
+          .value,
+      ).toEqual(['A1616']);
+    });
+
+    it('still sends an empty contract list and looks the lever up on fetch-prms-data', async () => {
+      pooledFundingContractsService.findMappingPooledFundingContracts.mockResolvedValueOnce(
+        [],
+      );
+      clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
+      clarisaLeversService.homologatedData.mockReturnValueOnce(null as any);
+      clarisaLeversService.findByShortName.mockResolvedValueOnce(null as any);
+
+      const out = await service.processData([buildTemporalMapper()]);
+
+      expect(out[0].alignments.contracts).toEqual([]);
+      expect(clarisaLeversService.findByShortName).toHaveBeenCalledWith(null);
+      expect(out[0].alignments.primary_levers).toEqual([
+        expect.objectContaining({ lever_id: undefined }),
+      ]);
     });
   });
 
