@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { DataSource, Like } from 'typeorm';
+import { AgressoContract } from '../../../entities/agresso-contract/entities/agresso-contract.entity';
 import { of } from 'rxjs';
 import {
   PrmsOpenSearchService,
@@ -21,6 +22,7 @@ import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entitie
 import {
   ResultResponseMapper,
   PrmsTemporalResponseMapper,
+  PrmsBilateralProjectMapper,
 } from './dto/prms-response.dto';
 import { ResultPrmsStatusMapper, ResultTypeEnum } from './enum/rsult-type.enum';
 import { SyncProcessEnum } from '../../../entities/sync-process-log/enum/sync-process.enum';
@@ -59,6 +61,7 @@ describe('PrmsOpenSearchService', () => {
   let dataSource: { getRepository: jest.Mock };
   let resultRepoHandle: { findOne: jest.Mock; update: jest.Mock };
   let allianceStaffRepoHandle: { findOne: jest.Mock };
+  let agressoContractRepoHandle: { find: jest.Mock };
   let resultsService: jest.Mocked<ResultsService>;
   let resultRepository: jest.Mocked<ResultRepository>;
   let queryService: jest.Mocked<QueryService>;
@@ -142,6 +145,9 @@ describe('PrmsOpenSearchService', () => {
     allianceStaffRepoHandle = {
       findOne: jest.fn(),
     };
+    agressoContractRepoHandle = {
+      find: jest.fn().mockResolvedValue([]),
+    };
     temporalRepoHandle = {
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -149,6 +155,9 @@ describe('PrmsOpenSearchService', () => {
       getRepository: jest.fn().mockImplementation((entity) => {
         if (entity === AllianceUserStaff) {
           return allianceStaffRepoHandle;
+        }
+        if (entity === AgressoContract) {
+          return agressoContractRepoHandle;
         }
         if (entity === SyncStagingRecordsEntity) {
           return temporalRepoHandle;
@@ -2141,6 +2150,237 @@ describe('PrmsOpenSearchService', () => {
       });
       expect(clarisaActorTypesService.findByName).toHaveBeenCalled();
       expect(clarisaInstitutionTypesService.findByName).toHaveBeenCalled();
+    });
+  });
+
+  describe('processDataAsStar bilateral projects', () => {
+    const project = (
+      external_code: string | null,
+      organization_code = 'Bioversity (Alliance)',
+    ): PrmsBilateralProjectMapper => ({
+      short_name: 'USA - USAID - (BAFY)',
+      organization_code,
+      external_code,
+    });
+
+    const contract = (agreement_id: string, departmentId = 'DEPT') =>
+      ({
+        agreement_id,
+        departmentId,
+      }) as AgressoContract;
+
+    const runAsStar = async (
+      dataOverrides: Partial<ResultResponseMapper> = {},
+    ) => {
+      const processed = await (
+        service as unknown as {
+          processDataAsStar: (rows: PrmsTemporalResponseMapper[]) => Promise<{
+            results: ExternalMappersDto[];
+          }>;
+        }
+      ).processDataAsStar([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          ...dataOverrides,
+        }),
+      ]);
+      return processed.results;
+    };
+
+    it('maps a single bilateral code as the primary contract', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('D412', 'DEPT-1'),
+      ]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [project('D412')],
+      });
+
+      expect(out.createResult.contract_id).toBe('D412');
+      expect(out.alignments.contracts).toEqual([
+        expect.objectContaining({ contract_id: 'D412', is_primary: true }),
+      ]);
+      expect(
+        pooledFundingContractsService.findMappingPooledFundingContracts,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps payload order when the repository returns contracts in another order', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('D100', 'c'),
+        contract('D999', 'b'),
+        contract('D412', 'a'),
+      ]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [
+          project('D412', 'Bioversity (Alliance)'),
+          project('D999', 'CIAT (Alliance)'),
+          project('D100', 'AfricaRice'),
+        ],
+      });
+
+      expect(out.createResult.contract_id).toBe('D412');
+      expect(
+        out.alignments.contracts
+          .filter((row) => row.is_primary)
+          .map((row) => row.contract_id),
+      ).toEqual(['D412']);
+      expect(
+        out.alignments.contracts
+          .filter((row) => !row.is_primary)
+          .map((row) => row.contract_id),
+      ).toEqual(['D999', 'D100']);
+      expect(
+        agressoContractRepoHandle.find.mock.calls[0][0].where.agreement_id
+          .value,
+      ).toEqual(['D412', 'D999', 'D100']);
+    });
+
+    it('treats the next valid code as primary when the first codes are null or blank', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('D412'),
+        contract('D999'),
+      ]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [
+          project(null),
+          project('   '),
+          project(' D999 '),
+          project('D412'),
+        ],
+      });
+
+      expect(out.createResult.contract_id).toBe('D999');
+      expect(
+        out.alignments.contracts.find((row) => row.is_primary)?.contract_id,
+      ).toBe('D999');
+      expect(
+        agressoContractRepoHandle.find.mock.calls[0][0].where.agreement_id
+          .value,
+      ).toEqual(['D999', 'D412']);
+    });
+
+    it('drops an unknown code with a warning and does not make it primary', async () => {
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+      agressoContractRepoHandle.find.mockResolvedValue([contract('D412')]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [project('NOPE'), project('D412')],
+      });
+
+      expect(out.createResult.contract_id).toBe('D412');
+      expect(out.alignments.contracts.map((row) => row.contract_id)).toEqual([
+        'D412',
+      ]);
+      expect(
+        out.alignments.contracts.find((row) => row.is_primary)?.contract_id,
+      ).toBe('D412');
+      const messages = warnSpy.mock.calls.map((call) => String(call[0]));
+      expect(
+        messages.some(
+          (message) => message.includes('NOPE') && message.includes('28731'),
+        ),
+      ).toBe(true);
+      warnSpy.mockRestore();
+    });
+
+    it('keeps one contract row when the payload repeats a code', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('D999'),
+        contract('D412'),
+      ]);
+
+      const [out] = await runAsStar({
+        bilateral_projects: [
+          project('D412'),
+          project(' D412 '),
+          project('D999'),
+        ],
+      });
+
+      expect(out.alignments.contracts).toHaveLength(2);
+      expect(out.createResult.contract_id).toBe('D412');
+      expect(
+        out.alignments.contracts.map((row) => row.contract_id).sort(),
+      ).toEqual(['D412', 'D999']);
+      expect(
+        agressoContractRepoHandle.find.mock.calls[0][0].where.agreement_id
+          .value,
+      ).toEqual(['D412', 'D999']);
+    });
+
+    it('imports the result with no contracts when bilateral_projects is empty', async () => {
+      const results = await runAsStar({ bilateral_projects: [] });
+
+      expect(results).toHaveLength(1);
+      expect(results[0].createResult.contract_id).toBeUndefined();
+      expect(results[0].alignments.contracts).toEqual([]);
+      expect(agressoContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(dataSource.getRepository).not.toHaveBeenCalledWith(
+        AgressoContract,
+      );
+      expect(
+        pooledFundingContractsService.findMappingPooledFundingContracts,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('imports the result with no contracts when bilateral_projects is missing', async () => {
+      const results = await runAsStar();
+
+      expect(results).toHaveLength(1);
+      expect(results[0].createResult.contract_id).toBeUndefined();
+      expect(results[0].alignments.contracts).toEqual([]);
+      expect(agressoContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(
+        pooledFundingContractsService.findMappingPooledFundingContracts,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('passes the primary contract departmentId to homologatedData', async () => {
+      agressoContractRepoHandle.find.mockResolvedValue([
+        contract('D999', 'OTHER'),
+        contract('D412', 'DEPT-PRIMARY'),
+      ]);
+
+      await runAsStar({
+        bilateral_projects: [project('D412'), project('D999')],
+      });
+
+      expect(clarisaLeversService.homologatedData).toHaveBeenCalledWith(
+        'DEPT-PRIMARY',
+      );
+      expect(clarisaLeversService.homologatedData).not.toHaveBeenCalledWith(
+        'OTHER',
+      );
+    });
+
+    it('keeps pooled-funding mapping on processData and ignores bilateral_projects', async () => {
+      const out = await service.processData([
+        buildTemporalMapper({
+          bilateral_projects: [project('D412')],
+        }),
+      ]);
+
+      expect(
+        pooledFundingContractsService.findMappingPooledFundingContracts,
+      ).toHaveBeenCalledWith('PFUND');
+      expect(agressoContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(out[0].createResult.contract_id).toBe('primary-ag');
+      expect(out[0].alignments.contracts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            contract_id: 'primary-ag',
+            is_primary: true,
+          }),
+          expect.objectContaining({
+            contract_id: 'contrib-ag',
+            is_primary: false,
+          }),
+        ]),
+      );
     });
   });
 

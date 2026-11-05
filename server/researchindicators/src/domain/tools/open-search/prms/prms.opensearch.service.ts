@@ -20,9 +20,10 @@ import {
 } from '../../../shared/global-dto/external-mappers.dto';
 import { IndicatorHomologation } from './homologation/indicator.homologation';
 import { AllianceUserStaff } from '../../../entities/alliance-user-staff/entities/alliance-user-staff.entity';
+import { AgressoContract } from '../../../entities/agresso-contract/entities/agresso-contract.entity';
 import { ResultRepository } from '../../../entities/results/repositories/result.repository';
 import { isEmpty } from '../../../shared/utils/object.utils';
-import { DataSource, Like } from 'typeorm';
+import { DataSource, In, Like } from 'typeorm';
 import { ResultEvidence } from '../../../entities/result-evidences/entities/result-evidence.entity';
 import { ResultKnowledgeProduct } from '../../../entities/result-knowledge-product/entities/result-knowledge-product.entity';
 import {
@@ -482,7 +483,9 @@ export class PrmsOpenSearchService
       return true;
     });
 
-    const results = await this.processData(importable);
+    const results = await this.processData(importable, {
+      contractsFromBilateralProjects: true,
+    });
     for (const result of results) {
       const source = sources.get(result.official_code);
       result.status_id = ResultPrmsToStarStatusMapper[Number(source.status_id)];
@@ -1297,8 +1300,95 @@ export class PrmsOpenSearchService
     return mapped ? ipRights : undefined;
   }
 
+  /**
+   * External codes on `bilateral_projects`, trimmed, blank-dropped and
+   * de-duplicated in payload order. `external_code` is `agreement_id`.
+   */
+  private bilateralExternalCodes(item: ResultResponseMapper): string[] {
+    const codes: string[] = [];
+    const seen = new Set<string>();
+    for (const project of item.bilateral_projects ?? []) {
+      const code = project?.external_code?.trim() ?? '';
+      if (code === '' || seen.has(code)) continue;
+      seen.add(code);
+      codes.push(code);
+    }
+    return codes;
+  }
+
+  /**
+   * As-STAR contracts come from `bilateral_projects`, not pooled funding.
+   * A code with no `agresso_contracts` row is dropped so the result alignment
+   * is not rejected by the contract foreign key. Payload order picks the primary.
+   */
+  private async resolveContractsFromBilateralProjects(
+    item: ResultResponseMapper,
+  ): Promise<{
+    primaryContract?: AgressoContract;
+    contributingContracts: AgressoContract[];
+  }> {
+    const codes = this.bilateralExternalCodes(item);
+    if (codes.length === 0) {
+      return { contributingContracts: [] };
+    }
+
+    const found = await this.dataSource.getRepository(AgressoContract).find({
+      where: { agreement_id: In(codes) },
+    });
+    const byAgreement = new Map(
+      found.map((contract) => [contract.agreement_id, contract]),
+    );
+
+    const ordered: AgressoContract[] = [];
+    for (const code of codes) {
+      const contract = byAgreement.get(code);
+      if (!contract) {
+        this.logger.warn(
+          `Dropping bilateral external code ${code} on PRMS result ${item.result_code}: no agresso_contracts row.`,
+        );
+        continue;
+      }
+      ordered.push(contract);
+    }
+
+    const [primaryContract, ...contributingContracts] = ordered;
+    return { primaryContract, contributingContracts };
+  }
+
+  /** Default contract mapping for `fetch-prms-data` (`getData`). */
+  private async resolveContractsFromPooledFunding(
+    item: ResultResponseMapper,
+  ): Promise<{
+    primaryContract?: AgressoContract;
+    contributingContracts: AgressoContract[];
+  }> {
+    const leadCenterAcronym: string = item?.contributing_centers?.find(
+      (center) => center.is_lead,
+    )?.acronym;
+
+    const contracts =
+      await this.pooledFundingContractsService.findMappingPooledFundingContracts(
+        item?.primary_entity?.official_code,
+      );
+
+    const primaryContract = contracts.find(
+      (contract) =>
+        contract?.ubwClientDescription?.toUpperCase()?.trim() ===
+        AcronymExContractEnum[leadCenterAcronym],
+    );
+
+    const contributingContracts = contracts.filter(
+      (contract) =>
+        contract?.ubwClientDescription?.toUpperCase()?.trim() !==
+        AcronymExContractEnum[leadCenterAcronym],
+    );
+
+    return { primaryContract, contributingContracts };
+  }
+
   async processData(
     prmsData: PrmsTemporalResponseMapper[],
+    options: { contractsFromBilateralProjects?: boolean } = {},
   ): Promise<ExternalMappersDto[]> {
     const results: ExternalMappersDto[] = [];
     for (const data of prmsData) {
@@ -1320,26 +1410,10 @@ export class PrmsOpenSearchService
       result.created_at = item?.created_date;
       result.status_id = ResultPrmsStatusMapper?.[item?.status_id];
 
-      const leadCenterAcronym: string = item?.contributing_centers?.find(
-        (center) => center.is_lead,
-      )?.acronym;
-
-      const contracts =
-        await this.pooledFundingContractsService.findMappingPooledFundingContracts(
-          item?.primary_entity?.official_code,
-        );
-
-      const primaryContract = contracts.find(
-        (contract) =>
-          contract?.ubwClientDescription?.toUpperCase()?.trim() ===
-          AcronymExContractEnum[leadCenterAcronym],
-      );
-
-      const contributingContracts = contracts.filter(
-        (contract) =>
-          contract?.ubwClientDescription?.toUpperCase()?.trim() !==
-          AcronymExContractEnum[leadCenterAcronym],
-      );
+      const { primaryContract, contributingContracts } =
+        options.contractsFromBilateralProjects
+          ? await this.resolveContractsFromBilateralProjects(item)
+          : await this.resolveContractsFromPooledFunding(item);
 
       if (!isEmpty(item?.created_by)) {
         const existsUser = await this.resultRepository.findUserByEmailOrCarnet(
