@@ -46,6 +46,7 @@ import { ClarisaInnovationReadinessLevelsService } from '../../clarisa/entities/
 import { ClarisaActorTypesService } from '../../clarisa/entities/clarisa-actor-types/clarisa-actor-types.service';
 import { ClarisaInstitutionTypesService } from '../../clarisa/entities/clarisa-institution-types/clarisa-institution-types.service';
 import { IndicatorsEnum } from '../../../entities/indicators/enum/indicators.enum';
+import { filterByUniqueKeyWithPriority } from '../../../shared/utils/array.util';
 import { ClarisaInnovationUseLevel } from '../../clarisa/entities/clarisa-innovation-use-levels/entities/clarisa-innovation-use-level.entity';
 import { ClarisaInstitutionType } from '../../clarisa/entities/clarisa-institution-types/entities/clarisa-institution-type.entity';
 
@@ -2549,6 +2550,7 @@ describe('PrmsOpenSearchService', () => {
           .some(
             (message) =>
               message.includes('28731') &&
+              message.includes('contributor levers') &&
               message.includes('were not replaced'),
           ),
       ).toBe(true);
@@ -2603,6 +2605,221 @@ describe('PrmsOpenSearchService', () => {
       ]);
     });
 
+    it('copies stored contributor levers when PRMS already resolved a contract', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [project('A1616')],
+        }),
+      ]);
+      agressoContractRepoHandle.find.mockResolvedValue([contract('A1616')]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultContractRepoHandle.find.mockResolvedValue([
+        { contract_id: 'STORED', is_primary: true },
+      ]);
+      resultsService.findResultAlignment.mockResolvedValue({
+        contributor_levers: [
+          {
+            lever_id: 'L-HAND',
+            custom_lever_name: 'Added by hand',
+            is_primary: false,
+            result_lever_id: 9,
+            result_lever_sdg_targets: [
+              { result_lever_id: 9, sdg_target_id: 20 },
+            ],
+          },
+        ],
+      } as any);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()[0].alignments.contributor_levers).toEqual([
+        {
+          lever_id: 'L-HAND',
+          custom_lever_name: 'Added by hand',
+          result_lever_sdg_targets: [{ result_lever_id: 9, sdg_target_id: 20 }],
+        },
+      ]);
+      expect(savedResults()[0].alignments.contracts).toEqual([
+        expect.objectContaining({ contract_id: 'A1616', is_primary: true }),
+      ]);
+      expect(
+        savedResults()[0].alignments.contracts.some(
+          (row) => row.contract_id === 'STORED',
+        ),
+      ).toBe(false);
+      expect(resultContractRepoHandle.find).not.toHaveBeenCalled();
+    });
+
+    it('copies stored contributor levers and their SDG targets onto an existing as-STAR result', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultsService.findResultAlignment.mockResolvedValue({
+        contributor_levers: [
+          {
+            lever_id: 'L-HAND',
+            custom_lever_name: 'Added by hand',
+            is_primary: false,
+            result_lever_id: 9,
+            result_lever_sdg_targets: [
+              { result_lever_id: 9, sdg_target_id: 20 },
+            ],
+          },
+          {
+            lever_id: 'L-BARE',
+            custom_lever_name: null,
+            result_lever_sdg_targets: [],
+          },
+        ],
+      } as any);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(resultsService.findResultAlignment).toHaveBeenCalledWith(34105);
+      expect(savedResults()[0].alignments.contributor_levers).toEqual([
+        {
+          lever_id: 'L-HAND',
+          custom_lever_name: 'Added by hand',
+          result_lever_sdg_targets: [{ result_lever_id: 9, sdg_target_id: 20 }],
+        },
+        {
+          lever_id: 'L-BARE',
+          custom_lever_name: null,
+          result_lever_sdg_targets: [],
+        },
+      ]);
+      expect(savedResults()[0].alignments.result_sdgs).toEqual([]);
+    });
+
+    it('keeps contributor levers empty when the as-STAR result is new', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue(null);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()[0].alignments.contributor_levers).toEqual([]);
+      expect(resultsService.findResultAlignment).not.toHaveBeenCalled();
+    });
+
+    it('lets the new primary lever win when a stored contributor lever has the same lever_id', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultsService.findResultAlignment.mockResolvedValue({
+        contributor_levers: [
+          {
+            lever_id: 88,
+            custom_lever_name: 'overlaps primary',
+            result_lever_sdg_targets: [{ sdg_target_id: 3 }],
+          },
+          {
+            lever_id: 'L-OTHER',
+            custom_lever_name: 'kept',
+            result_lever_sdg_targets: [],
+          },
+        ],
+      } as any);
+
+      await service.getDataAsStar({ year: 2025 });
+
+      const alignment = savedResults()[0].alignments;
+      const primaryLevers = alignment.primary_levers.map((lever) => ({
+        lever_id: lever.lever_id,
+        is_primary: true,
+        custom_lever_name: lever.custom_lever_name,
+        result_lever_sdg_targets: lever.result_lever_sdg_targets,
+      }));
+      const contributorLevers = alignment.contributor_levers.map((lever) => ({
+        lever_id: lever.lever_id,
+        is_primary: false,
+        custom_lever_name: lever.custom_lever_name,
+        result_lever_sdg_targets: lever.result_lever_sdg_targets,
+      }));
+      const merged = filterByUniqueKeyWithPriority(
+        [...primaryLevers, ...contributorLevers],
+        'lever_id',
+        'is_primary',
+      );
+
+      expect(alignment.primary_levers).toEqual([
+        expect.objectContaining({ lever_id: 88 }),
+      ]);
+      expect(merged).toEqual([
+        expect.objectContaining({
+          lever_id: 88,
+          is_primary: true,
+          custom_lever_name: undefined,
+        }),
+        expect.objectContaining({
+          lever_id: 'L-OTHER',
+          is_primary: false,
+          custom_lever_name: 'kept',
+        }),
+      ]);
+    });
+
+    it('skips the result and counts an error when the stored-alignment lookup throws', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          bilateral_projects: [],
+        }),
+      ]);
+      resultRepoHandle.findOne.mockResolvedValue({
+        result_id: 34105,
+        result_official_code: 5001,
+      });
+      resultsService.findResultAlignment.mockRejectedValue(
+        new Error('alignment down'),
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(savedResults()).toEqual([]);
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({ errorRecords: 1 }),
+      );
+    });
+
     it('does not look up a lever by an empty short name and sends no primary lever', async () => {
       clarisaLeversService.findOne.mockResolvedValueOnce(null as any);
       clarisaLeversService.homologatedData.mockReturnValueOnce(null as any);
@@ -2645,6 +2862,7 @@ describe('PrmsOpenSearchService', () => {
       const out = await service.processData([buildTemporalMapper()]);
 
       expect(out[0].alignments.contracts).toEqual([]);
+      expect(out[0].alignments.contributor_levers).toEqual([]);
       expect(clarisaLeversService.findByShortName).toHaveBeenCalledWith(null);
       expect(out[0].alignments.primary_levers).toEqual([
         expect.objectContaining({ lever_id: undefined }),

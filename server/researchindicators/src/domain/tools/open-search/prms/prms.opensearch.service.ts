@@ -388,7 +388,7 @@ export class PrmsOpenSearchService
 
       const { results: dataProcessed, sources } =
         await this.processDataAsStar(prmsResults);
-      const resultsToSave = await this.preserveExistingContracts(
+      const resultsToSave = await this.preserveExistingAlignment(
         dataProcessed,
         counters,
       );
@@ -417,25 +417,25 @@ export class PrmsOpenSearchService
   }
 
   /**
-   * As-STAR only. An empty resolved contract list must not replace the
-   * ALIGNMENT contracts already stored on a live STAR row: the alignment save
-   * deactivates every active row missing from the payload, including when that
-   * payload is empty. Copy the stored rows back so the replace writes the same
-   * contracts. A result that is not in STAR yet keeps `[]`. If the lookup
-   * fails, that result is left out of the save so the empty list cannot wipe
-   * its contracts.
+   * As-STAR only. One live-row lookup per result (`prms_result_code`, platform
+   * STAR, report year, not a snapshot). The alignment save deactivates every
+   * active contract or lever missing from the payload, so a re-import must
+   * send back what STAR already stores.
+   *
+   * Contracts are copied back only when the resolved PRMS list is empty, so a
+   * list PRMS did resolve still replaces the stored one. Contributor levers
+   * are copied whenever the row exists, including their SDG targets, because
+   * the save rewrites targets from the payload. A result that is not in STAR
+   * yet keeps both lists empty. If the lookup fails, that result is left out
+   * of the save so the empty lists cannot wipe what is stored.
    */
-  private async preserveExistingContracts(
+  private async preserveExistingAlignment(
     results: ExternalMappersDto[],
     counters: CounterResults,
   ): Promise<ExternalMappersDto[]> {
     const ready: ExternalMappersDto[] = [];
     for (const result of results) {
-      if (!isEmpty(result.alignments?.contracts)) {
-        ready.push(result);
-        continue;
-      }
-      const kept = await this.copyExistingAlignmentContracts(result, counters);
+      const kept = await this.copyExistingAlignment(result, counters);
       if (kept) ready.push(result);
     }
     return ready;
@@ -444,7 +444,7 @@ export class PrmsOpenSearchService
   /**
    * @returns false when the lookup failed and the result must not be saved.
    */
-  private async copyExistingAlignmentContracts(
+  private async copyExistingAlignment(
     result: ExternalMappersDto,
     counters: CounterResults,
   ): Promise<boolean> {
@@ -460,31 +460,49 @@ export class PrmsOpenSearchService
       });
       if (!existing) return true;
 
-      const stored = await this.dataSource.getRepository(ResultContract).find({
-        where: {
-          result_id: existing.result_id,
-          contract_role_id: ContractRolesEnum.ALIGNMENT,
-          is_active: true,
-        },
-      });
-      result.alignments.contracts = stored.map(
-        (row) =>
-          ({
-            contract_id: row.contract_id,
-            is_primary: row.is_primary,
-          }) as ResultContract,
-      );
-      if (stored.length > 0) {
-        this.logger.warn(
-          `Keeping existing contracts for PRMS result ${result.prms_result_code}.`,
+      if (isEmpty(result.alignments?.contracts)) {
+        const stored = await this.dataSource
+          .getRepository(ResultContract)
+          .find({
+            where: {
+              result_id: existing.result_id,
+              contract_role_id: ContractRolesEnum.ALIGNMENT,
+              is_active: true,
+            },
+          });
+        result.alignments.contracts = stored.map(
+          (row) =>
+            ({
+              contract_id: row.contract_id,
+              is_primary: row.is_primary,
+            }) as ResultContract,
         );
+        if (stored.length > 0) {
+          this.logger.warn(
+            `Keeping existing contracts for PRMS result ${result.prms_result_code}.`,
+          );
+        }
       }
+
+      const storedAlignment = await this.resultsService.findResultAlignment(
+        existing.result_id,
+      );
+      result.alignments.contributor_levers = (
+        storedAlignment?.contributor_levers ?? []
+      ).map(
+        (lever) =>
+          ({
+            lever_id: lever.lever_id,
+            custom_lever_name: lever.custom_lever_name,
+            result_lever_sdg_targets: lever.result_lever_sdg_targets ?? [],
+          }) as ResultLever,
+      );
       return true;
     } catch (error) {
       counters.errorRecords += 1;
       const errorMessage = (error as Error).message ?? 'Unknown error';
       this.logger.error(
-        `Skipping PRMS result ${result.prms_result_code}: existing contracts could not be read, so they were not replaced. ${errorMessage}`,
+        `Skipping PRMS result ${result.prms_result_code}: stored contracts and contributor levers could not be read, so they were not replaced. ${errorMessage}`,
       );
       return false;
     }
