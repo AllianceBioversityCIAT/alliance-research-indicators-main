@@ -39,8 +39,11 @@
   </div>
 
   <!-- H54 — the modal is centred vertically, so content that appears on selection (message, comment box)
-       made it grow and jump. The space they need is reserved up front. -->
-  <div [class]="allModalsService.submitResultOrigin() !== 'latest' ? 'min-h-[232px]' : 'min-h-[200px]'">
+       made it grow and jump. The space they need is reserved up front. For the OICR review the tallest
+       option is "Accepted" (expert select + OICR No + SharePoint link with their required notices, 261px
+       measured) — reserving only the comment box's 200px still let it jump. For Review Result the tallest
+       are Revise/Reject (message + comment box, 239.4px measured). -->
+  <div [class]="allModalsService.submitResultOrigin() !== 'latest' ? 'min-h-[240px]' : 'min-h-[262px]'">
   @if (submissionService.statusSelected()?.message && allModalsService.submitResultOrigin() !== 'latest') {
   <p class="text-[15px] text-[#4c5158] my-5">
     {{ submissionService.statusSelected()?.message }}
