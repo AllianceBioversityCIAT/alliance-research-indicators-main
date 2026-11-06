@@ -305,6 +305,30 @@ describe('SubmitResultContentComponent', () => {
     expect(mockSubmissionService.statusSelected()).toBeNull();
   });
 
+  it('preselects Accepted when the OICR review opens (H54)', () => {
+    mockAllModalsService.submitResultOrigin!.set('latest');
+    mockCacheService.currentMetadata!.set({ status_id: undefined });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(10);
+
+    mockCacheService.currentMetadata!.set({ status_id: 9 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(10);
+  });
+
+  it('keeps a decision already taken on the OICR instead of Accepted (H54)', () => {
+    mockAllModalsService.submitResultOrigin!.set('latest');
+    mockCacheService.currentMetadata!.set({ status_id: 11 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()?.statusId).toBe(11);
+  });
+
+  it('does not preselect anything in Review Result (H54)', () => {
+    mockCacheService.currentMetadata!.set({ status_id: 9 });
+    component.setInitialSelectedReviewOption();
+    expect(mockSubmissionService.statusSelected!()).toBeNull();
+  });
+
   it('constructor should register callbacks in AllModalsService', () => {
     expect((mockAllModalsService.setSubmitReview as jest.Mock)).toHaveBeenCalled();
     expect((mockAllModalsService.setDisabledSubmitReview as jest.Mock)).toHaveBeenCalled();
