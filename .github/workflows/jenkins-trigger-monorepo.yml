@@ -3,7 +3,8 @@ name: Trigger Jenkins Job
 on:
   push:
     branches:
-      - dev
+      # dev removed (STAR DEV cutover): a push to dev runs star-dev-cicd.yml -> roar-monorepo-dev-cd.
+      # roar-monorepo-dev stays available through workflow_dispatch from dev (manual recovery).
       - staging
       - main
   workflow_dispatch: # This allows the workflow to be manually triggered if needed
