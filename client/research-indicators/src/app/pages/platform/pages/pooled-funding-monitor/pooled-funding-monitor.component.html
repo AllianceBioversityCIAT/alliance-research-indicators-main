@@ -1,5 +1,5 @@
 <!-- @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09 -->
-<!-- Read-only page (R-PFM-014): no sync controls, no "PRMS sync" label, two tabs only. Tokens only (NFR-PFM-003). -->
+<!-- Read-only page (R-PFM-014): no sync controls, no "PRMS sync" label, three tabs (coverage, queue, stats). Tokens only (NFR-PFM-003). -->
 <div class="flex flex-col pb-8" data-testid="pfm-page">
   <!-- White band (as My PI Delegates): header, scope, KPIs and tab strip on the surface; panels below on the page background -->
   <div class="flex flex-col bg-[var(--ac-pfm-surface)] pt-[8px] sm:pt-[12px] md:pt-[20px]" data-testid="pfm-band">
@@ -92,13 +92,14 @@
   }
   @if (!piEmpty()) {
   <div class="border border-t-0 border-solid border-[color:var(--ac-grey-200)] p-4">
-    @if (store.tab() === 'coverage') {
-      <div role="tabpanel" id="pfm-panel-coverage" aria-labelledby="pfm-tab-coverage" tabindex="0" data-testid="pfm-panel-coverage">
+    @if (store.tab() === 'coverage' || store.tab() === 'stats') {
+      @let tab = store.tab();
+      <div role="tabpanel" [id]="'pfm-panel-' + tab" [attr.aria-labelledby]="'pfm-tab-' + tab" tabindex="0" [attr.data-testid]="'pfm-panel-' + tab">
         @if (store.summaryState().loading || (!store.summary() && !store.summaryState().error)) {
           <div class="h-48 animate-pulse rounded-lg bg-[var(--ac-pfm-neutral-bg)]" data-testid="pfm-coverage-skeleton" aria-busy="true"></div>
         } @else if (store.summaryState().error) {
           <div class="text-[13px] text-[var(--ac-pfm-danger-fg)]" role="alert" data-testid="pfm-coverage-error">
-            Portfolio coverage could not be loaded.
+            {{ tab === 'coverage' ? 'Portfolio coverage' : 'Stats' }} could not be loaded.
             <button
               type="button"
               class="cursor-pointer border-0 bg-transparent font-semibold text-[var(--ac-pfm-danger-fg)] underline"
@@ -108,7 +109,11 @@
           </div>
         } @else {
           @if (store.summary(); as summary) {
-            <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
+            @if (tab === 'coverage') {
+              <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
+            } @else {
+              <app-pfm-stats-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
+            }
           }
         }
       </div>
