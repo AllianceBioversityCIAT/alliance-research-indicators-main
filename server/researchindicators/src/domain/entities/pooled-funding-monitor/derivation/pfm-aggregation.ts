@@ -133,6 +133,35 @@ export const buildSpCoverage = (
   );
 };
 
+export interface PfmSyncedType {
+  id: number;
+  name: string;
+  synced: number;
+}
+
+/**
+ * Stats tab: results already in PRMS (any review status), by result type, most first. Same set as
+ * the In-PRMS slices of the PRMS status chart, so both add up to the same total.
+ */
+export const buildSyncedByType = (
+  rows: PfmDerivedMonitoredRow[],
+): PfmSyncedType[] => {
+  const byId = new Map<number, PfmSyncedType>();
+  for (const { row, d } of rows) {
+    if (d.prmsStatus === PfmPrmsStatusEnum.NOT_SENT) continue;
+    const entry = byId.get(row.indicator_id) ?? {
+      id: row.indicator_id,
+      name: row.indicator_name ?? `Type ${row.indicator_id}`,
+      synced: 0,
+    };
+    entry.synced += 1;
+    byId.set(row.indicator_id, entry);
+  }
+  return [...byId.values()].sort(
+    (a, b) => b.synced - a.synced || a.name.localeCompare(b.name),
+  );
+};
+
 /** R-PFM-008: last six UTC calendar months incl. current, oldest first, zero-filled. */
 export const buildMonthlySeries = (
   sparse: PfmMonthlySync[],
@@ -291,6 +320,7 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthlySync[];
   synced_this_year: number;
+  synced_by_type: PfmSyncedType[];
   project_progress: PfmProjectProgress[];
   prms_rejection_reasons: PfmRejectionReason[];
   /** Quick-view counts of the whole scope (no filters), so the coverage tab and the queue agree. */
@@ -314,6 +344,7 @@ export const buildPfmSummary = (i: PfmSummaryInput): PfmSummary => ({
   sp_coverage: buildSpCoverage(i.rows),
   monthly: buildMonthlySeries(i.monthlySyncs, i.now),
   synced_this_year: i.syncedThisYear,
+  synced_by_type: buildSyncedByType(i.rows),
   project_progress: buildProjectProgress(i.rows),
   prms_rejection_reasons: buildRejectionReasons(i.rows),
   chip_counts: countPfmChips(i.rows),
