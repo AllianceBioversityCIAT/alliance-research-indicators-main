@@ -347,13 +347,22 @@ describe('PooledFundingMonitorComponent', () => {
       await flush();
     });
 
-    it('renders exactly two tabs in a tablist with aria-selected', () => {
+    it('renders exactly three tabs in a tablist with aria-selected', () => {
       const tabs = Array.from(el.querySelectorAll('[role="tablist"] [role="tab"]'));
-      expect(tabs.map(t => t.textContent?.trim())).toEqual(['Portfolio coverage', 'Results queue']);
-      expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
-      expect(tabs.map(t => t.getAttribute('tabindex'))).toEqual(['0', '-1']);
-      // aria-controls only on the selected tab: the inactive panel is not in the DOM
-      expect(tabs.map(t => t.getAttribute('aria-controls'))).toEqual(['pfm-panel-coverage', null]);
+      expect(tabs.map(t => t.textContent?.trim())).toEqual(['Portfolio coverage', 'Results queue', 'Stats']);
+      expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+      expect(tabs.map(t => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+      // aria-controls only on the selected tab: the inactive panels are not in the DOM
+      expect(tabs.map(t => t.getAttribute('aria-controls'))).toEqual(['pfm-panel-coverage', null, null]);
+    });
+
+    it('the Stats tab shows the charts in its own panel', async () => {
+      fixture.componentInstance.selectTab('stats');
+      await flush();
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-panel-stats')?.getAttribute('aria-labelledby')).toBe('pfm-tab-stats');
+      expect(q('pfm-panel-stats')?.querySelector('[data-testid="pfm-stats-tab"]')).not.toBeNull();
+      expect(q('pfm-panel-coverage')).toBeNull();
     });
 
     it('ArrowRight / ArrowLeft / End / Home move selection and focus', async () => {
@@ -365,16 +374,19 @@ describe('PooledFundingMonitorComponent', () => {
       expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
       expect(document.activeElement).toBe(q('pfm-tab-queue') ?? undefined);
 
-      await press('pfm-tab-queue', 'ArrowRight'); // wraps
+      await press('pfm-tab-queue', 'ArrowRight');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
+
+      await press('pfm-tab-stats', 'ArrowRight'); // wraps
       expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
 
       await press('pfm-tab-coverage', 'ArrowLeft'); // wraps back
-      expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
 
-      await press('pfm-tab-queue', 'Home');
+      await press('pfm-tab-stats', 'Home');
       expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
       await press('pfm-tab-coverage', 'End');
-      expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
     });
 
     it('ArrowLeft from the second tab goes to the first', async () => {
@@ -404,7 +416,7 @@ describe('PooledFundingMonitorComponent', () => {
     expect(buttons.some(t => /sync/i.test(t))).toBe(false);
     expect(el.textContent).not.toMatch(/Sync now/i);
     expect(el.textContent).not.toMatch(/PRMS sync:/i);
-    expect(el.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(el.querySelectorAll('[role="tab"]')).toHaveLength(3);
   });
 
   // Owner 2026-10-22: back from a result (breadcrumb or browser Back) = the same place in the queue.
