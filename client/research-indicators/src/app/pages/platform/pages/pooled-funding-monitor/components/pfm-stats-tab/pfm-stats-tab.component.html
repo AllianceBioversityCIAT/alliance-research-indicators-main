@@ -1,0 +1,6 @@
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-2" data-testid="pfm-stats-tab">
+  <app-pfm-sp-coverage-card [rows]="summary().sp_coverage" [scope]="scope()" (openSp)="openQueue.emit({ sp: $event })" />
+  <app-pfm-prms-status-card [pipeline]="summary().pipeline" (open)="openQueue.emit({ chip: $event })" />
+  <app-pfm-sync-activity-card [monthly]="summary().monthly" [syncedThisYear]="summary().synced_this_year" [scope]="scope()" />
+  <app-pfm-synced-by-type-card [types]="summary().synced_by_type ?? []" />
+</div>
