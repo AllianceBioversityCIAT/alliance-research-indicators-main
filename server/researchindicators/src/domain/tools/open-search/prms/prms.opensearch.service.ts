@@ -362,10 +362,16 @@ export class PrmsOpenSearchService
   }
 
   /**
-   * Imports PRMS results as STAR results. STAR assigns the official code; the
-   * PRMS `result_code` is kept in `prms_result_code` and is the key a re-run
-   * uses to update instead of creating again. A result that lands as APPROVED
-   * is versioned right away, without checking completeness.
+   * Imports PRMS results as STAR results. The PRMS `result_code` is kept in
+   * `prms_result_code`. Each object is matched to live STAR rows with that
+   * code (platform STAR, not a snapshot, active).
+   *
+   * No live row: STAR assigns the official code, the live row is created, and
+   * a result that lands as Approved is versioned right away, without checking
+   * completeness. Exactly one live row: that official code gets a snapshot for
+   * the PRMS year, built from the PRMS payload, and the live row is not
+   * modified. More than one live row: the object is skipped and counted as an
+   * error.
    */
   async getDataAsStar(params: PrmsSearchParams) {
     const executionCode = uuidv4();
@@ -388,8 +394,45 @@ export class PrmsOpenSearchService
 
       const { results: dataProcessed, sources } =
         await this.processDataAsStar(prmsResults);
+      const resultsToCreate: ExternalMappersDto[] = [];
+      for (const result of dataProcessed) {
+        let liveRows: Pick<Result, 'result_id' | 'result_official_code'>[];
+        try {
+          liveRows = await this.findLiveStarRows(result.prms_result_code);
+        } catch (error) {
+          counters.errorRecords += 1;
+          const errorMessage = (error as Error).message ?? 'Unknown error';
+          this.logger.error(
+            `Skipping PRMS result ${result.prms_result_code}: live STAR results could not be read. ${errorMessage}`,
+          );
+          continue;
+        }
+        if (liveRows.length > 1) {
+          counters.errorRecords += 1;
+          const officialCodes = liveRows
+            .map((row) => row.result_official_code)
+            .join(', ');
+          this.logger.error(
+            `Skipping PRMS result ${result.prms_result_code}: more than one live STAR result (${officialCodes}).`,
+          );
+          continue;
+        }
+        if (liveRows.length === 1) {
+          await this.saveExistingStarVersion(
+            result,
+            liveRows[0],
+            sources.get(result.prms_result_code),
+            counters,
+            resultSaved,
+            currentCode,
+          );
+          continue;
+        }
+        resultsToCreate.push(result);
+      }
+
       const resultsToSave = await this.preserveExistingAlignment(
-        dataProcessed,
+        resultsToCreate,
         counters,
       );
 
@@ -414,6 +457,129 @@ export class PrmsOpenSearchService
     } finally {
       await this.prmsRepository.deleteTemporalResults(executionCode);
     }
+  }
+
+  /**
+   * Live STAR rows for a PRMS code. The year is not part of the key: a live
+   * result exists once, and the PRMS year becomes a snapshot of that code.
+   */
+  private findLiveStarRows(prmsResultCode: number) {
+    return this.dataSource.getRepository(Result).find({
+      where: {
+        prms_result_code: prmsResultCode,
+        platform_code: ReportingPlatformEnum.STAR,
+        is_snapshot: false,
+        is_active: true,
+      },
+      select: { result_id: true, result_official_code: true },
+    });
+  }
+
+  /**
+   * Builds the PRMS year as a snapshot of the live official code. The live
+   * row is not passed to the save.
+   *
+   * `results` has no unique key on (official code, snapshot, year), only the
+   * non-unique index `idx_results_official_code_snapshot_report_year`, so the
+   * new snapshot is created first. Previous snapshots for that code and year
+   * are removed only after the save succeeds. A failed save is compensated
+   * inside `saveAllSections`: the new row is a snapshot, and
+   * `deleteFullResultById` then deletes only that row, so `compensateRowOnly`
+   * is not used.
+   */
+  private async saveExistingStarVersion(
+    result: ExternalMappersDto,
+    live: Pick<Result, 'result_id' | 'result_official_code'>,
+    source: ResultResponseMapper | undefined,
+    counters: CounterResults,
+    resultSaved: number[],
+    currentCode: { current: number },
+  ): Promise<void> {
+    const officialCode = live.result_official_code;
+    const year = result.createResult.year;
+    let previousIds: number[] = [];
+    try {
+      const previous = await this.dataSource.getRepository(Result).find({
+        where: {
+          result_official_code: officialCode,
+          report_year_id: year,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: true,
+        },
+        select: { result_id: true },
+      });
+      previousIds = previous.map((row) => row.result_id);
+    } catch (error) {
+      counters.errorRecords += 1;
+      const errorMessage = (error as Error).message ?? 'Unknown error';
+      this.logger.error(
+        `Skipping PRMS result ${result.prms_result_code}: the existing version of STAR result ${officialCode} year ${year} could not be read. ${errorMessage}`,
+      );
+      return;
+    }
+
+    const payload: ExternalMappersDto = {
+      ...result,
+      status_id: ResultStatusEnum.APPROVED,
+    };
+    if (isEmpty(source?.phase_id)) {
+      this.logger.warn(
+        `PRMS result ${result.prms_result_code} has no phase_id; STAR result ${officialCode} year ${year} is versioned without one.`,
+      );
+    } else {
+      payload.prms_phase_id = source.phase_id;
+    }
+
+    const saved = await this.saveResultService.saveAllSections(payload, {
+      platformCode: ReportingPlatformEnum.STAR,
+      resultSaved,
+      currentCode,
+      counters,
+      skipDuplicateValidation: true,
+      target: {
+        officialCode,
+        isSnapshot: true,
+      },
+    });
+    if (saved.outcome !== 'created' || saved.resultId == null) {
+      if (saved.outcome === 'skipped') {
+        counters.errorRecords += 1;
+        this.logger.error(
+          `Skipping PRMS result ${result.prms_result_code}: the version of STAR result ${officialCode} year ${year} was not saved.`,
+        );
+      }
+      return;
+    }
+
+    const failedIds: number[] = [];
+    for (const resultId of previousIds) {
+      try {
+        await this._queryService.deleteFullResultById(resultId);
+      } catch (error) {
+        failedIds.push(resultId);
+        const errorMessage = (error as Error).message ?? 'Unknown error';
+        this.logger.error(
+          `Error removing previous version ${resultId} of STAR result ${officialCode} year ${year} after creating version ${saved.resultId}: ${errorMessage}`,
+        );
+      }
+    }
+
+    // saveAllSections counts every new row as created. Replacing a version
+    // that was already stored for this year is an update, but only when every
+    // previous snapshot is gone. Two snapshots for the same code and year
+    // break SP_delete_result_version and createSnapshot later.
+    if (failedIds.length > 0) {
+      counters.errorRecords += 1;
+      this.logger.error(
+        `STAR result ${officialCode} year ${year} kept previous version(s) ${failedIds.join(', ')} beside the new version ${saved.resultId}.`,
+      );
+    } else if (previousIds.length > 0) {
+      counters.createdRecords -= 1;
+      counters.updatedRecords += 1;
+    }
+
+    await this.importAlignment(result, source, saved.resultId);
+    await this.recordImportedHistory(result, source, officialCode);
   }
 
   /**

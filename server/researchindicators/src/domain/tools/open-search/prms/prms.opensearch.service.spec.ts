@@ -62,7 +62,11 @@ describe('PrmsOpenSearchService', () => {
   let service: PrmsOpenSearchService;
   let httpService: jest.Mocked<HttpService>;
   let dataSource: { getRepository: jest.Mock };
-  let resultRepoHandle: { findOne: jest.Mock; update: jest.Mock };
+  let resultRepoHandle: {
+    findOne: jest.Mock;
+    find: jest.Mock;
+    update: jest.Mock;
+  };
   let allianceStaffRepoHandle: { findOne: jest.Mock };
   let agressoContractRepoHandle: { find: jest.Mock };
   let resultContractRepoHandle: { find: jest.Mock };
@@ -144,6 +148,7 @@ describe('PrmsOpenSearchService', () => {
   beforeEach(async () => {
     resultRepoHandle = {
       findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue(undefined),
     };
     allianceStaffRepoHandle = {
@@ -263,6 +268,10 @@ describe('PrmsOpenSearchService', () => {
           provide: SaveResultService,
           useValue: {
             bulkSaveAllSections: jest.fn().mockResolvedValue(undefined),
+            saveAllSections: jest.fn().mockResolvedValue({
+              resultId: null,
+              outcome: 'created',
+            }),
           },
         },
         {
@@ -638,6 +647,18 @@ describe('PrmsOpenSearchService', () => {
       expect(savedResults()[0]).toEqual(
         expect.objectContaining({ prms_result_code: 28731 }),
       );
+      expect(extraData).not.toHaveProperty('skipDuplicateValidation');
+      expect(extraData).not.toHaveProperty('target');
+      expect(saveResultService.saveAllSections).not.toHaveBeenCalled();
+      expect(resultRepoHandle.find).toHaveBeenCalledWith({
+        where: {
+          prms_result_code: 28731,
+          platform_code: ReportingPlatformEnum.STAR,
+          is_snapshot: false,
+          is_active: true,
+        },
+        select: { result_id: true, result_official_code: true },
+      });
       expect(prmsRepository.deleteTemporalResults).toHaveBeenCalled();
     });
 
@@ -818,6 +839,323 @@ describe('PrmsOpenSearchService', () => {
 
       expect(greenCheckRepository.createSnapshot).toHaveBeenCalledTimes(2);
       expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+    });
+  });
+
+  describe('getDataAsStar existing STAR result', () => {
+    const onePage = () =>
+      httpService.get.mockReturnValue(
+        of({ data: { totalPages: 1, data: [] } }) as any,
+      );
+
+    const tocAlignment = [
+      {
+        entity: { official_code: 'SP06', name: 'Climate Action' },
+        initiative_role: 'Primary submitter',
+        toc_results: [
+          {
+            level: 'High Level Output',
+            sub_entity: { official_code: 'SP06', description: null },
+            result_name: 'HLO 3.1.1',
+          },
+        ],
+      },
+    ];
+
+    const liveRow = {
+      result_id: 34105,
+      result_official_code: 5001,
+    };
+
+    const importOne = (
+      overrides: Partial<ResultResponseMapper> = {},
+      versions: { result_id: number }[] = [],
+    ) => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+          phase_id: 8,
+          toc_alignment: tocAlignment as ResultResponseMapper['toc_alignment'],
+          ...overrides,
+        }),
+      ]);
+      resultRepoHandle.find.mockImplementation(async ({ where }) => {
+        if (where?.is_snapshot === false) return [liveRow];
+        if (where?.is_snapshot === true) return versions;
+        return [];
+      });
+    };
+
+    it('versions the PRMS year onto the live official code and does not touch the live row', async () => {
+      importOne();
+      saveResultService.saveAllSections.mockImplementation(
+        async (dto, extra) => {
+          extra.counters.createdRecords += 1;
+          extra.resultSaved.push(dto.official_code);
+          return { resultId: 9001, outcome: 'created' };
+        },
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(saveResultService.saveAllSections).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prms_result_code: 28731,
+          prms_phase_id: 8,
+          status_id: ResultStatusEnum.APPROVED,
+          createResult: expect.objectContaining({ year: 2025, title: 'Title' }),
+        }),
+        expect.objectContaining({
+          platformCode: ReportingPlatformEnum.STAR,
+          skipDuplicateValidation: true,
+          currentCode: { current: null },
+          target: { officialCode: 5001, isSnapshot: true },
+        }),
+      );
+      const extra = saveResultService.saveAllSections.mock.calls[0][1];
+      expect(extra.resultSaved).toContain(28731);
+      expect(extra).not.toHaveProperty('duplicateByTitle');
+      expect(extra.target).not.toHaveProperty('resultId');
+      expect(extra).not.toHaveProperty('compensateRowOnly');
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith(
+        [],
+        expect.anything(),
+      );
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+      expect(resultsService.findResultAlignment).not.toHaveBeenCalled();
+      expect(resultsService.updateResultAlignment).not.toHaveBeenCalled();
+      expect(resultContractRepoHandle.find).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+      expect(bilateralService.importAlignmentFromPrms).toHaveBeenCalledWith(
+        9001,
+        expect.objectContaining({ primarySpCode: 'SP06' }),
+        null,
+      );
+      expect(prmsHistoryRepository.replaceImportedHistory).toHaveBeenCalledWith(
+        { resultOfficialCode: '5001', resultYear: 2025 },
+        expect.any(Array),
+      );
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({
+          createdRecords: 1,
+          updatedRecords: 0,
+          errorRecords: 0,
+        }),
+      );
+    });
+
+    it('warns and omits prms_phase_id when PRMS sends no phase', async () => {
+      importOne({ phase_id: undefined });
+      saveResultService.saveAllSections.mockResolvedValue({
+        resultId: 9001,
+        outcome: 'created',
+      });
+      const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      const payload = saveResultService.saveAllSections.mock.calls[0][0];
+      expect(payload.prms_phase_id).toBeUndefined();
+      expect(
+        warnSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('28731') && message.includes('no phase_id'),
+          ),
+      ).toBe(true);
+      warnSpy.mockRestore();
+    });
+
+    it('replaces an existing year version only after the new one is saved', async () => {
+      importOne({}, [{ result_id: 8800 }]);
+      saveResultService.saveAllSections.mockImplementation(
+        async (_dto, extra) => {
+          extra.counters.createdRecords += 1;
+          return { resultId: 9001, outcome: 'created' };
+        },
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(queryService.deleteFullResultById).toHaveBeenCalledTimes(1);
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(8800);
+      expect(
+        saveResultService.saveAllSections.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        queryService.deleteFullResultById.mock.invocationCallOrder[0],
+      );
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({
+          createdRecords: 0,
+          updatedRecords: 1,
+          errorRecords: 0,
+        }),
+      );
+    });
+
+    it('keeps the existing year version when the save fails', async () => {
+      importOne({}, [{ result_id: 8800 }]);
+      saveResultService.saveAllSections.mockImplementation(
+        async (_dto, extra) => {
+          extra.counters.errorRecords += 1;
+          return { resultId: 42, outcome: 'error' };
+        },
+      );
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(queryService.deleteFullResultById).not.toHaveBeenCalled();
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+      expect(bilateralService.importAlignmentFromPrms).not.toHaveBeenCalled();
+      expect(
+        prmsHistoryRepository.replaceImportedHistory,
+      ).not.toHaveBeenCalled();
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({
+          createdRecords: 0,
+          updatedRecords: 0,
+          errorRecords: 1,
+        }),
+      );
+    });
+
+    it('counts an error and does not count an update when removing the old version fails', async () => {
+      importOne({}, [{ result_id: 8800 }, { result_id: 8801 }]);
+      saveResultService.saveAllSections.mockImplementation(
+        async (_dto, extra) => {
+          extra.counters.createdRecords += 1;
+          return { resultId: 9001, outcome: 'created' };
+        },
+      );
+      queryService.deleteFullResultById.mockRejectedValue(
+        new Error('delete failed'),
+      );
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(8800);
+      expect(queryService.deleteFullResultById).toHaveBeenCalledWith(8801);
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({
+          createdRecords: 1,
+          updatedRecords: 0,
+          errorRecords: 1,
+        }),
+      );
+      expect(
+        errorSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('5001') &&
+              message.includes('2025') &&
+              message.includes('8800') &&
+              message.includes('8801') &&
+              message.includes('9001'),
+          ),
+      ).toBe(true);
+      errorSpy.mockRestore();
+    });
+
+    it('counts an error and continues when the live-row lookup fails', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+        }),
+        buildTemporalMapper({
+          result_code: '28732',
+          status_id: '6',
+          year: '2025',
+        }),
+      ]);
+      resultRepoHandle.find.mockImplementation(async ({ where }) => {
+        if (where?.prms_result_code === 28731) {
+          throw new Error('db down');
+        }
+        return [];
+      });
+      resultRepoHandle.findOne.mockResolvedValue(null);
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(syncProcessLogService.endSync).toHaveBeenCalledWith(99);
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({ errorRecords: 1 }),
+      );
+      expect(
+        saveResultService.bulkSaveAllSections.mock.calls[0][0].map(
+          (row) => row.prms_result_code,
+        ),
+      ).toEqual([28732]);
+      expect(
+        errorSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('28731') && message.includes('db down'),
+          ),
+      ).toBe(true);
+      errorSpy.mockRestore();
+    });
+
+    it('skips the object and counts an error when more than one live STAR row exists', async () => {
+      onePage();
+      prmsRepository.findTemporalResults.mockResolvedValue([
+        buildTemporalMapper({
+          result_code: '28731',
+          status_id: '6',
+          year: '2025',
+        }),
+      ]);
+      resultRepoHandle.find.mockResolvedValue([
+        { result_id: 1, result_official_code: 5001 },
+        { result_id: 2, result_official_code: 5002 },
+      ]);
+      const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+      await service.getDataAsStar({ year: 2025 });
+
+      expect(saveResultService.saveAllSections).not.toHaveBeenCalled();
+      expect(saveResultService.bulkSaveAllSections).toHaveBeenCalledWith(
+        [],
+        expect.anything(),
+      );
+      expect(greenCheckRepository.createSnapshot).not.toHaveBeenCalled();
+      expect(resultRepoHandle.update).not.toHaveBeenCalled();
+      expect(syncProcessLogService.update).toHaveBeenCalledWith(
+        99,
+        expect.objectContaining({ errorRecords: 1 }),
+      );
+      expect(
+        errorSpy.mock.calls
+          .map((call) => String(call[0]))
+          .some(
+            (message) =>
+              message.includes('28731') &&
+              message.includes('5001') &&
+              message.includes('5002'),
+          ),
+      ).toBe(true);
+      errorSpy.mockRestore();
     });
   });
 
