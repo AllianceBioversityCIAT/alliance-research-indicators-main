@@ -6,7 +6,7 @@ import { StatusConfig } from '@shared/interfaces/result-config.interface';
 export const PFM_SCOPES = ['mine', 'all'] as const;
 export type PfmScope = (typeof PFM_SCOPES)[number];
 
-export const PFM_TABS = ['coverage', 'queue'] as const;
+export const PFM_TABS = ['coverage', 'queue', 'stats'] as const;
 export type PfmTab = (typeof PFM_TABS)[number];
 
 export const PFM_CHIPS = ['all', 'need_attention', 'mapping_incomplete', 'ready_to_sync', 'rejected', 'synced', 'awaiting_pi', 'no_sp_contribution', 'prms_pending', 'prms_approved'] as const;
@@ -55,6 +55,13 @@ export interface PfmSpCoverage {
   total: number;
 }
 
+/** Results already in PRMS of one result type (indicator). */
+export interface PfmSyncedType {
+  id: number;
+  name: string;
+  synced: number;
+}
+
 export interface PfmMonthly {
   /** 'YYYY-MM' */
   month: string;
@@ -95,6 +102,8 @@ export interface PfmSummary {
   sp_coverage: PfmSpCoverage[];
   monthly: PfmMonthly[];
   synced_this_year: number;
+  /** Results already in PRMS by result type, most first. Optional: older servers omit it. */
+  synced_by_type?: PfmSyncedType[];
   /** Furthest behind (most remaining) first. Optional: absent from a server older than the coverage redesign. */
   project_progress?: PfmProjectProgress[];
   prms_rejection_reasons?: PfmRejectionReason[];
