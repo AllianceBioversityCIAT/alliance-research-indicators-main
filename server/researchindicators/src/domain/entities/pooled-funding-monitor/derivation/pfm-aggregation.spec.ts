@@ -14,6 +14,7 @@ import {
   buildProjectProgress,
   buildRejectionReasons,
   buildSpCoverage,
+  buildSyncedByType,
   deriveMonitoredRows,
   PFM_CHIP_COUNT_KEYS,
   PFM_NO_REASON,
@@ -237,6 +238,19 @@ describe('pfm-aggregation', () => {
         { code: 'SP03', name: 'Program SP03', synced: 1, total: 2 },
       ]);
       expect(buildSpCoverage([])).toEqual([]);
+    });
+
+    it('synced by type: in PRMS only, most first, adds up to the PRMS status chart', () => {
+      expect(s.synced_by_type).toEqual([
+        { id: 1, name: 'Policy change', synced: 2 },
+        { id: 4, name: 'Policy change', synced: 1 },
+        { id: 6, name: 'Policy change', synced: 1 },
+      ]);
+      const inPrms = s.pipeline.stages
+        .filter((x) => x.group === 'in_prms')
+        .reduce((a, x) => a + x.value, 0);
+      expect(s.synced_by_type.reduce((a, t) => a + t.synced, 0)).toBe(inPrms);
+      expect(buildSyncedByType([])).toEqual([]);
     });
 
     it('monthly: six months incl. current, zero-filled, out-of-window ignored', () => {
