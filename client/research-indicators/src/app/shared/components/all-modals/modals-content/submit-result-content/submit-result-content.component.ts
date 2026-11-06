@@ -117,13 +117,20 @@ export class SubmitResultContentComponent {
   }
   setInitialSelectedReviewOption(): void {
     const currentStatusId = this.cache.currentMetadata()?.status_id;
-    if (currentStatusId == null) return;
+    const matchingOption =
+      currentStatusId == null ? undefined : this.reviewOptions().find(option => option.statusId === currentStatusId);
 
-    const matchingOption = this.reviewOptions().find(option => option.statusId === currentStatusId);
-    
     if (matchingOption && !matchingOption.disabled) {
       this.submissionService.statusSelected.set(matchingOption);
-    } else {
+      return;
+    }
+
+    // H54 — the OICR review opens with "Accepted" already chosen; a decision already taken is kept above.
+    const isLatest = this.allModalsService.submitResultOrigin?.() === 'latest';
+    const accepted = isLatest ? this.reviewOptions().find(option => option.key === 'approve') : undefined;
+    if (accepted) {
+      this.submissionService.statusSelected.set(accepted);
+    } else if (currentStatusId != null) {
       this.submissionService.statusSelected.set(null);
     }
   }
