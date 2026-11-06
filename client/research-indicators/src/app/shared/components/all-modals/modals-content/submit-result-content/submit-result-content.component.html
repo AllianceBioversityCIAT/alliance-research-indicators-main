@@ -16,7 +16,7 @@
               ? 'cursor-not-allowed opacity-50' 
               : 'cursor-pointer has-[:focus-visible]:outline-none has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#1689CA] has-[:focus-visible]:ring-offset-2'
           }} {{
-            option.selected ? 'border-[#1689CA]/20 border-1 bg-[#79D9FF]/8' : 'bg-white'
+            option.selected ? 'border-[#1689CA]/20 border-1 bg-[#79D9FF]/8' : 'border-transparent border-1 bg-white'
           }}" [attr.data-option-key]="option.key" [attr.aria-label]="option.label + ': ' + option.description"
       [attr.aria-disabled]="option.disabled" (keydown)="onOptionKeydown($event, option, i)"
       (click)="selectOption(option)" (focus)="onOptionFocus(option)">
