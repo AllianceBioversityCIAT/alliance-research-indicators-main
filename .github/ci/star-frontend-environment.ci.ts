@@ -2,11 +2,14 @@
 //
 // Copied by the workflow to client/research-indicators/src/environments/environment.ts (git-ignored) before the
 // tests, and removed afterwards (.github/scripts/remove-frontend-config.sh). It is NOT a deploy configuration:
-//   * no real endpoint, no credential, no Secrets Manager read: every value is the inert placeholder of the versioned
-//     template client/research-indicators/src/environments/environment.example.ts;
+//   * no real endpoint, no credential, no Secrets Manager read: the keys and the non-string values are those of the
+//     versioned template client/research-indicators/src/environments/environment.example.ts;
+//   * every string is NON-EMPTY, as in the real configuration: URLs point to the reserved `.invalid` domain (never
+//     resolves) and identifiers are `ci-<key>`. Empty strings change the code path (e.g. version-selector calls
+//     window.open only when environment.prmsUrl / tipUrl are non-empty, and its specs expect that call);
 //   * plus `webSocketServerUrl`, read by the client (room.component.spec.ts) but absent from the template;
 //   * production: false and localAuthBypass: false.
-// Jest compiles with isolatedModules (no type check), so the tests only need these keys to exist.
+// Jest compiles with isolatedModules (no type check), so the tests need these keys to exist with real-shaped values.
 // Keep it in sync with the keys the client reads (`environment.<key>`).
 export const environment = {
   production: false,
@@ -23,35 +26,35 @@ export const environment = {
   fastResponseUrl: 'http://localhost:3000/api',
   webSocketServerUrl: 'http://localhost:3000',
 
-  documentOverviewUrl: '',
-  fileManagerUrl: '',
-  filesStorageUrl: '',
-  feedbackUrl: '',
-  releasesNotesApiUrl: '',
-  releaseNotesDatabaseId: '',
-  saveErrorsUrl: '',
-  textMiningUrl: '',
-  tipUrl: '',
-  prmsUrl: '',
-  flagsUrl: '',
+  documentOverviewUrl: 'https://document-overview.ci.invalid/',
+  fileManagerUrl: 'https://file-manager.ci.invalid/',
+  filesStorageUrl: 'https://files-storage.ci.invalid/',
+  feedbackUrl: 'https://feedback.ci.invalid/',
+  releasesNotesApiUrl: 'https://releases-notes-api.ci.invalid/',
+  releaseNotesDatabaseId: 'ci-release-notes-database-id',
+  saveErrorsUrl: 'https://save-errors.ci.invalid/',
+  textMiningUrl: 'https://text-mining.ci.invalid/',
+  tipUrl: 'https://tip.ci.invalid/',
+  prmsUrl: 'https://prms.ci.invalid/',
+  flagsUrl: 'https://flags.ci.invalid/',
   frontBaseUrl: 'http://localhost:4200',
-  frontVersionKey: '',
-  frontVersionUrl: '',
-  s3Folder: '',
-  oicrTemplateName: '',
-  keyProjectOverview: '',
-  keyTextMining: '',
+  frontVersionKey: 'ci-front-version-key',
+  frontVersionUrl: 'https://front-version.ci.invalid/',
+  s3Folder: 'ci-s3-folder',
+  oicrTemplateName: 'ci-oicr-template-name',
+  keyProjectOverview: 'ci-key-project-overview',
+  keyTextMining: 'ci-key-text-mining',
 
-  // --- Secrets: supply real values, never commit them ----------------------
-  clarisaApiKey: '',
-  clarityProjectId: '',
-  cognitoClientId: '',
-  cognitoDomain: '',
-  cognitoIdentityProvider: '',
+  // --- Secret-shaped keys: inert CI values only, never real secrets ---------
+  clarisaApiKey: 'ci-clarisa-api-key',
+  clarityProjectId: 'ci-clarity-project-id',
+  cognitoClientId: 'ci-cognito-client-id',
+  cognitoDomain: 'https://cognito-domain.ci.invalid/',
+  cognitoIdentityProvider: 'ci-cognito-identity-provider',
   cognitoRedirectUri: 'http://localhost:4200/auth',
-  googleAnalyticsId: '',
-  mapboxAccessToken: '',
-  mapboxGeocodingUrl: '',
+  googleAnalyticsId: 'ci-google-analytics-id',
+  mapboxAccessToken: 'ci-mapbox-access-token',
+  mapboxGeocodingUrl: 'https://mapbox-geocoding.ci.invalid',
 
   // --- Numbers, not strings. See trap 1 above. -----------------------------
   hotjarId: 0,
