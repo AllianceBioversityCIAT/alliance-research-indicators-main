@@ -13,6 +13,8 @@ import {
   seedOrgUnits,
   seedOrgUnitVersions,
   SeedEntry,
+  SEED_DIRECTORS,
+  SEED_ENTRIES,
   SEED_LAST_ID,
 } from '../src/db/seeds/org-structure.seed';
 import { seedControlListValues } from '../src/db/seeds/control-lists.seed';
@@ -391,16 +393,16 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
   });
 
   describe('directors (seed report and Falsifier 2)', () => {
-    it('prints the seed report; stored carnets are the real matches, never the mockup carnets', async () => {
+    it('prints the seed report; stored carnets are the real matches, never the source keys', async () => {
       const { report } = await resolveSeedDirectors(runner);
-      expect(report).toHaveLength(11);
+      expect(report).toHaveLength(83);
 
       console.log(
         [
           '[org-structure-seed] SEED REPORT (director per node, resolved on the local staff table)',
           ...report.map(
             (r) =>
-              `  ${r.code} "${r.unitName}" | mockup ${r.mockupKey} ${r.mockupName} <${r.email}> | ${r.outcome}` +
+              `  ${r.code} "${r.unitName}" | ${r.directorName} <${r.email ?? 'no email'}> | ${r.outcome}` +
               (r.carnet ? ` -> carnet ${r.carnet} (${r.staffName})` : ''),
           ),
           `  matched ${report.filter((r) => r.outcome === 'matched').length} of ${report.length}`,
@@ -420,7 +422,7 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
           expect(staff).toHaveLength(1);
         }
       }
-      // Nodes without a director in the mockup stay NULL.
+      // Nodes without a director in the source stay NULL.
       expect(
         await scalar(
           `SELECT COUNT(*) FROM org_unit_versions
@@ -505,6 +507,36 @@ describe('Organizational Structure — seed against real MySQL (T-05)', () => {
       expect(matchDirector([], { name: 'A B', email: 'd@x.org' }).outcome).toBe(
         'no match',
       );
+    });
+
+    it('a director with no email is matched by name only, never by an empty email', () => {
+      const noEmail = {
+        carnet: 'X1',
+        first_name: 'Other',
+        last_name: 'Person',
+        email: null,
+        is_active: 1,
+      };
+      const named = {
+        ...noEmail,
+        carnet: 'X2',
+        first_name: 'A',
+        last_name: 'B',
+      };
+      expect(matchDirector([noEmail], { name: 'A B', email: null })).toEqual({
+        outcome: 'no match',
+        carnet: null,
+        staffName: null,
+      });
+      expect(
+        matchDirector([noEmail, named], { name: 'A B', email: null }),
+      ).toMatchObject({ outcome: 'matched', carnet: 'X2' });
+    });
+
+    it('every director key used by an entry exists in SEED_DIRECTORS', () => {
+      const keys = SEED_ENTRIES.map((e) => e[5]).filter((k) => k !== null);
+      expect(keys).toHaveLength(83);
+      expect(keys.filter((k) => !(k in SEED_DIRECTORS))).toEqual([]);
     });
   });
 

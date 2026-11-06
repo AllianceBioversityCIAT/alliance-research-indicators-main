@@ -10,7 +10,8 @@ import {
  *
  * Loads the 117 entries of the approved mockup tree (ids 1..117, versions
  * `[2026, open)`, one `seed` log row each, no delegates) and resolves the
- * directors against THIS database's staff table. The data and the idempotent
+ * directors of the requester's org-structure sheet (department and unit
+ * directors) against THIS database's staff table. The data and the idempotent
  * insert functions live in `src/db/seeds/org-structure.seed.ts`; this file
  * exports ONLY its class because `orm.config.ts` treats every exported
  * function in `migrations/**` as a migration (D-ORG-14).
