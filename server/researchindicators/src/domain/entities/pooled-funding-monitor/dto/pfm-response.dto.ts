@@ -39,6 +39,13 @@ export class PfmSpCoverageDto {
   @ApiProperty() total: number;
 }
 
+export class PfmSyncedTypeDto {
+  @ApiProperty({ description: 'Result type (indicator) id.' }) id: number;
+  @ApiProperty() name: string;
+  @ApiProperty({ description: 'Results of this type already in PRMS.' })
+  synced: number;
+}
+
 export class PfmMonthlyDto {
   @ApiProperty({ example: '2026-10' }) month: string;
   @ApiProperty() synced: number;
@@ -112,6 +119,12 @@ export class PfmSummaryResponseDto {
       'Distinct monitored results with an ACCEPTED sync in the current UTC calendar year.',
   })
   synced_this_year: number;
+  @ApiProperty({
+    type: [PfmSyncedTypeDto],
+    description:
+      'Results already in PRMS (any review status) by result type, most first.',
+  })
+  synced_by_type: PfmSyncedTypeDto[];
   @ApiProperty({
     type: [PfmProjectProgressDto],
     description: 'Per project, furthest behind (most remaining) first.',
