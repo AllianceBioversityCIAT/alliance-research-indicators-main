@@ -5,7 +5,8 @@ on:
     branches:
       # dev removed (STAR DEV cutover): a push to dev runs star-dev-cicd.yml -> roar-monorepo-dev-cd.
       # roar-monorepo-dev stays available through workflow_dispatch from dev (manual recovery).
-      - staging
+      # staging removed (STAR STAGING cutover): a push to staging runs star-staging-ci.yml -> roar-monorepo-staging-ci.
+      # roar-monorepo-staging stays available through workflow_dispatch from staging (manual recovery).
       - main
   workflow_dispatch: # This allows the workflow to be manually triggered if needed
 
