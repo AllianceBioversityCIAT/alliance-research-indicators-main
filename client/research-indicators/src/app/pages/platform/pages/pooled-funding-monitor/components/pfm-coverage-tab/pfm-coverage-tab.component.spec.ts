@@ -43,9 +43,12 @@ function render(summary: PfmSummary) {
 }
 
 describe('PfmCoverageTabComponent', () => {
-  it('leads with what is in PRMS, then what to do next, then the SP and sync activity detail', () => {
+  it('leads with what is in PRMS, then what to do next; the charts live in the Stats tab', () => {
     const { el, q } = render(SUMMARY);
-    const order = ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card'].map(id =>
+    for (const chart of ['pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card', 'pfm-type-card']) {
+      expect(q(chart)).toBeNull();
+    }
+    const order = ['pfm-progress-card', 'pfm-next-steps-card'].map(id =>
       Array.from(el.querySelectorAll('[data-testid]')).indexOf(q(id) as Element)
     );
     expect(order.every(i => i >= 0)).toBe(true);
@@ -74,7 +77,7 @@ describe('PfmCoverageTabComponent', () => {
     expect(q('pfm-pipeline-card')).toBeNull();
   });
 
-  it('every click asks the page to open the queue: quick view from the next steps, SP filter from a program', () => {
+  it('every click asks the page to open the queue on a quick view', () => {
     TestBed.configureTestingModule({ imports: [PfmCoverageTabComponent] });
     const fixture = TestBed.createComponent(PfmCoverageTabComponent);
     fixture.componentRef.setInput('summary', SUMMARY);
@@ -84,11 +87,9 @@ describe('PfmCoverageTabComponent', () => {
     fixture.componentInstance.openQueue.subscribe(t => targets.push(t));
     const el = fixture.nativeElement as HTMLElement;
     (el.querySelector('[data-testid="pfm-next-ready_to_sync"]') as HTMLElement).click();
-    (el.querySelector('[data-testid="pfm-sp-open-SP06"]') as HTMLElement).click();
     (el.querySelector('[data-testid="pfm-progress-done"]') as HTMLElement).click();
     (el.querySelector('[data-testid="pfm-progress-left"]') as HTMLElement).click();
-    (el.querySelector('[data-testid="pfm-prms-legend-rejected"]') as HTMLElement).click();
-    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { sp: 'SP06' }, { chip: 'synced' }, { chip: 'need_attention' }, { chip: 'rejected' }]);
+    expect(targets).toEqual([{ chip: 'ready_to_sync' }, { chip: 'synced' }, { chip: 'need_attention' }]);
   });
 
   it('falls back to the KPI figures when the server does not send chip_counts yet', () => {
@@ -113,11 +114,9 @@ describe('PfmCoverageTabComponent', () => {
     };
     const { el } = render(empty);
     const states = Array.from(el.querySelectorAll('[data-testid="pfm-empty-state"]')).map(e => e.textContent?.trim());
-    expect(states).toEqual(['Nothing yet', 'Nothing yet', 'Nothing yet', 'Nothing yet', 'Nothing yet']);
-    for (const card of ['pfm-progress-card', 'pfm-next-steps-card', 'pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card']) {
+    expect(states).toEqual(['Nothing yet', 'Nothing yet']);
+    for (const card of ['pfm-progress-card', 'pfm-next-steps-card']) {
       expect(el.querySelector(`[data-testid="${card}"] [data-testid="pfm-empty-state"]`)).not.toBeNull();
     }
-    expect(el.querySelector('[data-testid="pfm-sync-bars"]')).toBeNull();
-    expect(el.querySelector('[data-testid="pfm-sp-legend"]')).toBeNull();
   });
 });
