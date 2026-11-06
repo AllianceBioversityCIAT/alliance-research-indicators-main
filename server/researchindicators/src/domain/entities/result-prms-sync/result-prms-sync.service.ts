@@ -14,7 +14,10 @@ import { interpretPrmsSyncResponse } from '../../tools/prms-normalizer/response/
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
 import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
 import type { TipTocMappingDto } from '../../tools/tip-integration/dto/response-year-tip.dto';
-import type { PrmsStaffSnapshot } from '../../tools/prms-normalizer/dto/prms-sync-aggregate';
+import type {
+  PrmsStaffSnapshot,
+  PrmsSyncAggregate,
+} from '../../tools/prms-normalizer/dto/prms-sync-aggregate';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
@@ -248,7 +251,7 @@ export class ResultPrmsSyncService {
 
     let payload: PrmsNormalizerRequestDto;
     let storedPrmsResultCode: number | null = null;
-    let platformCode = ReportingPlatformEnum.STAR;
+    let platformCode: ReportingPlatformEnum;
     try {
       const aggregate = await this.aggregateRepository.loadByResultId(resultId);
       if (!aggregate) {
@@ -267,26 +270,7 @@ export class ResultPrmsSyncService {
       storedPrmsResultCode = aggregate.prms_result_code ?? null;
       platformCode = platformCodeOf(aggregate);
       if (options.origin === 'TIP_SYNC') {
-        const staff = tipAuthorStaff(options.author);
-        aggregate.created_by = staff;
-        aggregate.submitted_by = {
-          staff: staff as PrmsStaffSnapshot,
-          submitted_date: aggregate.created_at,
-          comment: null,
-        };
-        if (staff != null && leadContactMissing(aggregate.lead_contact)) {
-          aggregate.lead_contact = staff;
-        }
-        if (options.tocMapping == null) {
-          throw new PrmsPayloadBuildError(
-            `Missing mandatory field 'toc_mapping'`,
-            'toc_mapping',
-          );
-        }
-        payload = this.payloadBuilder.build(aggregate, {
-          tocMapping: options.tocMapping,
-          optionalDescription: true,
-        });
+        payload = this.buildTipSyncPayload(aggregate, options);
       } else {
         payload = this.payloadBuilder.build(aggregate);
       }
@@ -360,6 +344,32 @@ export class ResultPrmsSyncService {
       prms_result_code: interpreted.prmsResultCode,
       failure_reason: interpreted.failureReason,
     };
+  }
+
+  private buildTipSyncPayload(
+    aggregate: PrmsSyncAggregate,
+    options: SyncOptions,
+  ): PrmsNormalizerRequestDto {
+    const staff = tipAuthorStaff(options.author);
+    aggregate.created_by = staff;
+    aggregate.submitted_by = {
+      staff,
+      submitted_date: aggregate.created_at,
+      comment: null,
+    };
+    if (staff != null && leadContactMissing(aggregate.lead_contact)) {
+      aggregate.lead_contact = staff;
+    }
+    if (options.tocMapping == null) {
+      throw new PrmsPayloadBuildError(
+        `Missing mandatory field 'toc_mapping'`,
+        'toc_mapping',
+      );
+    }
+    return this.payloadBuilder.build(aggregate, {
+      tocMapping: options.tocMapping,
+      optionalDescription: true,
+    });
   }
 
   /**
