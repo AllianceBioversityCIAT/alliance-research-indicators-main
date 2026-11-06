@@ -11,9 +11,5 @@
     <app-pfm-progress-card class="h-full" [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
   </div>
   <app-pfm-next-steps-card [counts]="counts()" (open)="openQueue.emit({ chip: $event })" />
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-    <app-pfm-sp-coverage-card [rows]="summary().sp_coverage" [scope]="scope()" (openSp)="openQueue.emit({ sp: $event })" />
-    <app-pfm-prms-status-card [pipeline]="summary().pipeline" (open)="openQueue.emit({ chip: $event })" />
-    <app-pfm-sync-activity-card [monthly]="summary().monthly" [syncedThisYear]="summary().synced_this_year" [scope]="scope()" />
-  </div>
+  <!-- The charts (Science Program, PRMS status, sync activity, by type) live in the Stats tab. -->
 </div>

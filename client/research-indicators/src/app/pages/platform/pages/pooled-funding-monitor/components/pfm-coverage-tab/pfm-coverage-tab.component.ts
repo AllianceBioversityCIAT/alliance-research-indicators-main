@@ -4,9 +4,6 @@ import { DecimalPipe } from '@angular/common';
 import { PfmChip, PfmChipCounts, PfmScope, PfmSummary } from '../../pfm.interfaces';
 import { PfmNextStepsCardComponent } from '../pfm-next-steps-card/pfm-next-steps-card.component';
 import { PfmProgressCardComponent } from '../pfm-progress-card/pfm-progress-card.component';
-import { PfmPrmsStatusCardComponent } from '../pfm-prms-status-card/pfm-prms-status-card.component';
-import { PfmSpCoverageCardComponent } from '../pfm-sp-coverage-card/pfm-sp-coverage-card.component';
-import { PfmSyncActivityCardComponent } from '../pfm-sync-activity-card/pfm-sync-activity-card.component';
 
 /** What a click on a coverage chart opens in the Results queue. */
 export interface PfmQueueTarget {
@@ -15,13 +12,13 @@ export interface PfmQueueTarget {
 }
 
 /**
- * Coverage tab, built to lead to action: how much is in PRMS, what to do next, then the Science
- * Program and sync-activity detail. Every number is a quick view (or an SP filter) and a click opens
+ * Coverage tab, built to lead to action: how much is in PRMS and what to do next (the charts are in
+ * the Stats tab). Every number is a quick view (or an SP filter) and a click opens
  * the Results queue on it. Loading / error / Retry for the summary request live in the page panel.
  */
 @Component({
   selector: 'app-pfm-coverage-tab',
-  imports: [DecimalPipe, PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmPrmsStatusCardComponent, PfmSyncActivityCardComponent],
+  imports: [DecimalPipe, PfmProgressCardComponent, PfmNextStepsCardComponent],
   templateUrl: './pfm-coverage-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
