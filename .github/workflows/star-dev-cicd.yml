@@ -32,8 +32,8 @@
 #   URL), org.cgiar.cicd.run (<run id>-<attempt>), org.cgiar.cicd.unit (backend | frontend).
 #
 # Slack (reusable workflow slack-notify.reusable.yml; one message per event, never duplicated):
-#   started               Jenkins, legacy stage Start of the CD job (real deploys only); GitHub Actions posts none,
-#                         so a deploy never gets two start messages (as MARLO PROD)
+#   started               GitHub Actions, at the start of the run (the whole CI/CD process), as Reporting Tool DEV;
+#                         the stage Start of roar-monorepo-dev-cd is skipped (START_MESSAGE_FROM_GITHUB_ACTIONS)
 #   failed                GitHub Actions, only when the run fails before Jenkins started the deploy build
 #   succeeded / failed    Jenkins, for the deploy (post block of the CD job, legacy messages)
 #
@@ -80,6 +80,20 @@ env:
   CI: 'true'
 
 jobs:
+  # ---------------------------------------------------------------- start notification
+  # Runs in parallel with the checks and never blocks them.
+  notify-start:
+    name: notify start (Slack)
+    permissions: {}
+    uses: ./.github/workflows/slack-notify.reusable.yml
+    with:
+      status: started
+      title: STAR NEW ENVIRONMENT
+      project: STAR
+      environment-label: DEV
+    secrets:
+      SLACK_NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.SLACK_NOTIFICATIONS_WEBHOOK_URL }}
+
   # ---------------------------------------------------------------- mandatory checks (no Docker)
   # No secret and no AWS access: the backend specs set their own environment values and mock the database; lint
   # reads no variable (owner decisions D-2, D-3). Same commands as the legacy job (L48-L125), on the runner.
@@ -326,7 +340,7 @@ jobs:
     uses: ./.github/workflows/slack-notify.reusable.yml
     with:
       status: failed
-      title: STAR monorepo
+      title: STAR NEW ENVIRONMENT
       project: STAR
       environment-label: DEV
       detail: >-
