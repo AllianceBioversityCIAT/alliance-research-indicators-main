@@ -358,7 +358,7 @@ Every task depends on the one before it. They share the module's service, contro
 
 ### T-06 — HITL: browser, mockup and seed review
 
-- **Status:** in progress — **resumed 2026-10-22 after T-12** (was paused for the delegates pivot) (Pivot: delegates versioned per year; execution.md → *Pivot Record*) · **Size:** S · **Dependencies:** T-05; resumes after T-12 · **Owner:** requester
+- **Status:** **done (2026-11-06, closed by the requester: "Ya quedo todo probado. Podriamos cerrar la T-06" — one blanket statement, role not stated; execution.md → *T-06 — closed by the requester*)** — resumed 2026-10-22 after T-12 (was paused for the delegates pivot) (Pivot: delegates versioned per year; execution.md → *Pivot Record*) · **Size:** S · **Dependencies:** T-05; resumes after T-12 · **Owner:** requester
 - **Requirements covered:** the requirements §10 substitutes: tree rendering, expand/collapse, column resize; visual fidelity to the mockup; seed content against the source sheet. NFR-ORG-005 manual keyboard pass. R-ORG-013 AC.1 seen with a real Center-Admin-only user.
 - **Design refs:** §6, §10 *Manual (HITL)*, mockup artboard 2
 - **Scope:** no code. With the app running locally (`docker compose up --build -d` or the native commands):
@@ -372,9 +372,9 @@ Every task depends on the one before it. They share the module's service, contro
 - **Disqualifier:** a check done with a System Admin user instead of a Center-Admin-only user; a criterion ticked on an observation that covers an adjacent property.
 - **Review:** none (human step); the Leader records the quoted observations in `execution.md`.
 - **Done criteria:**
-  - [ ] Steps 1–6 quoted, the role named for each step.
-  - [ ] Mockup differences listed (accepted / rework).
-  - [ ] Seed review result and director follow-ups recorded.
+  - [x] Steps 1–6 quoted, the role named for each step. *(Closed by the requester on a blanket statement, not one quote per step; role not stated — execution.md, 2026-11-06)*
+  - [x] Mockup differences listed (accepted / rework). *(None reported — recorded as all accepted)*
+  - [x] Seed review result and director follow-ups recorded. *(83/83 directors re-seeded and matched 2026-11-06; open follow-up: the 2 second persons from the sheet)*
 
 ---
 
@@ -403,7 +403,7 @@ Every task depends on the one before it. They share the module's service, contro
 - **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–4 observed red, then reverted. *(Leader re-measure 352/352, 8136/8136 — execution.md § T-07)*
-  - [ ] Requester re-checks items 1, 2, 3 and 5 in the browser during T-06 (quoted there).
+  - [x] Requester re-checks items 1, 2, 3 and 5 in the browser during T-06 (quoted there). *(Covered by the requester's T-06 closure, 2026-11-06)*
 
 ---
 
@@ -424,7 +424,7 @@ Every task depends on the one before it. They share the module's service, contro
 - **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–3 observed red, then reverted; change list recorded in execution.md. *(Leader re-measure 352/352, 8140/8140 — execution.md § T-08)*
-  - [ ] Requester re-checks the chips and the form's look in the browser during T-06 (quoted there).
+  - [x] Requester re-checks the chips and the form's look in the browser during T-06 (quoted there). *(Covered by the requester's T-06 closure, 2026-11-06)*
 
 ---
 
@@ -447,7 +447,7 @@ Every task depends on the one before it. They share the module's service, contro
 - **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–4 observed red, then reverted. *(Leader re-measure 352/352, 8142/8142 — execution.md § T-09)*
-  - [ ] Requester re-checks the delegates field in the browser during T-06 (quoted there).
+  - [x] Requester re-checks the delegates field in the browser during T-06 (quoted there). *(Covered by the requester's T-06 closure, 2026-11-06)*
 
 ---
 
@@ -463,7 +463,7 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `standard`. **Skills:** angular-developer; systematic-debugging on any failure.
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–3 observed red, then reverted. *(Leader re-measure ×3 352/352, 8148/8148 — execution.md § T-10)*
-  - [ ] Requester re-checks the default in the browser during T-06 (quoted there).
+  - [x] Requester re-checks the default in the browser during T-06 (quoted there). *(Covered by the requester's T-06 closure, 2026-11-06)*
 
 ---
 
@@ -484,7 +484,7 @@ Every task depends on the one before it. They share the module's service, contro
 - **Review:** `standard`. **Skills:** angular-developer, ui-ux-pro-max; systematic-debugging on any failure.
 - **Done criteria:**
   - [x] Client `npm test -- --silent`, `npm run lint -- --quiet`, `ng build`, tsc spec baseline (945), all green; falsifiers 1–2 observed red, then reverted. *(Leader re-measure 352/352, 8150/8150 — execution.md § T-11)*
-  - [ ] Requester re-checks the alignment in the browser during T-06 (quoted there).
+  - [x] Requester re-checks the alignment in the browser during T-06 (quoted there). *(Covered by the requester's T-06 closure, 2026-11-06)*
 
 ---
 

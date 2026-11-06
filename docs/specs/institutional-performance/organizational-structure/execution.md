@@ -665,3 +665,15 @@ OrgSaveOutcomeDto.action enum :: create,edit_in_place,new_version,code_change
 - **Why not `migration:revert`:** on local `stardb` the 17 staging migrations (ids 395–411) were executed **after** `…004` (392) and `…005` (394). A typeorm revert undoes the last executed migration first, so it would have undone staging migrations. Instead, a one-off script (local-host guard `127.0.0.1/stardb`, deleted after use) ran in one transaction: `DELETE FROM org_unit_delegates` (the requester's 3 test rows, removal approved), then `SeedOrgStructure1791000000004.down()`, then `.up()`. The `migrations` table is unchanged. `…005` was not cycled: with no delegate rows, its down+up only recreates the same empty table.
 - **Observed counts:** before `{"units":117,"versions":118,"logs":121,"delegates":3,"with_director":12}` → after down `{0,0,0,0,0}` → after up `{"units":117,"versions":117,"logs":117,"delegates":0,"with_director":83}`. ORG-047 → carnet `16265`, JOSE STEFAN VAN OOSTEN MOLANO, `j.vanoosten@cgiar.org`.
 - **Verification:** server `tsc --noEmit` 0; `npx eslint` on the 3 changed files 0; `test:integration "org-structure|control-lists"` → `Test Suites: 1 skipped, 14 passed` · `Tests: 3 skipped, 271 passed, 274 total`. The 4 reds recorded on 2026-10-28 are gone, because the requester's test data and the rows from the old seed were removed.
+
+## T-06 — closed by the requester (2026-11-06)
+
+- **Requester's words:** "Ya realice las pruebas y considero que todo quedo correcto." (2026-11-06) and, after the per-step checklist (steps 1–6, the T-07…T-11 re-checks, the two second persons from the sheet) was put to them: "Ya quedo todo probado. Podriamos cerrar la T-06".
+- **Decision:** T-06 closed on the requester's instruction. The requester owns this human step (KZ-002).
+- **Limits of this record (stated so they are not read as more):**
+  - It is **one blanket statement**, not a quote per step.
+  - The **role used for step 1** (Center-Admin-only vs System Admin) was **not stated**. The task's disqualifier names exactly that case.
+  - **Mockup differences:** none reported; recorded as *none reported / all accepted*.
+  - The re-checks owed by T-07, T-08, T-09, T-10 and T-11 are covered by the same statement.
+  - The A1 accessibility decision from T-08 was not addressed separately.
+- **Seed review and director follow-ups:** the seeded tree and the 83 directors were re-applied locally and checked on 2026-11-06 (section above): 83/83 matched, ORG-047 via `j.vanoosten@cgiar.org`. **Open follow-up:** the second person in two cells of the sheet (Climate Readiness: Deissy Martinez Baron; Biodiversity and Restoration: Christopher Kettle) is not seeded. Whether to add them as delegates by hand is not decided.
