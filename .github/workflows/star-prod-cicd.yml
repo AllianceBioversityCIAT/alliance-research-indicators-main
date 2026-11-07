@@ -1,0 +1,267 @@
+# STAR PROD (alliance-research-indicators-main, branch main): CI and backend image on GitHub Actions, CD on Jenkins
+# (CD-only job roar-monorepo-prod-cd, devops PIPES/ALLIANCE-INDICATORS/monorepo/prod/github-actions-cd/Jenkinsfile).
+# Reporting Tool PROD pattern (owner decision 2026-11-07):
+#
+#   GitHub Actions (lint, tests, backend image)  ->  roar-monorepo-prod-cd  ->  STAR PROD server (SSH) + S3/CloudFront
+#
+# The legacy all-in-one job roar-monorepo-main (devops PIPES/ALLIANCE-INDICATORS/monorepo/prod/Jenkinsfile) is NOT used
+# by this workflow; jenkins-trigger-monorepo.yml no longer starts it on push to main (cutover). It stays available for
+# manual recovery (workflow_dispatch of jenkins-trigger-monorepo.yml from main, or Jenkins).
+# `dry-run` of the Jenkins hand-over (job `deploy` below) is false: roar-monorepo-prod-cd deploys from the first valid
+# run (owner decision R-2, 2026-11-07), after it verified the run, the backend digest and that main's head is still this
+# commit. true = the job only verifies the request.
+#
+# Trigger: push to main only (promotion from staging). The file also lives on staging and dev, where it never runs.
+# There is no workflow_dispatch: roar-monorepo-prod-cd accepts only `push` runs of this workflow. No pull_request.
+#   The checks of the legacy job, without Docker: backend lint and tests, frontend lint and tests with the inert CI
+#   environment (.github/ci/star-frontend-environment.ci.ts, as STAGING), CI script checks; then ONE publish job (common
+#   quality barrier) that builds ONLY the backend image from the original Dockerfile (--target production), on a clean
+#   checkout, and pushes it to roar-main-application-server-prod by immutable digest; then the hand-over to Jenkins with
+#   that digest, the commit and this run (jenkins-cd.reusable.yml). Jenkins deploys the backend over SSH with the
+#   TypeORM migrations, builds the frontend with npm from the verified commit (PROD configuration from Secrets Manager)
+#   and publishes it to S3 + CloudFront. No frontend image or artifact is produced here.
+#
+# Contract with roar-monorepo-prod-cd (keep in sync with the Jenkinsfile):
+#   workflow path .github/workflows/star-prod-cicd.yml, event push, branch main;
+#   job names: 'backend checks (lint, test)', 'frontend checks (lint, test)', 'CI script checks (bash -n, ShellCheck)',
+#              'publish image (backend)';
+#   ARTIFACTS "backend=sha256:<64 hex>" only; tag gha-<run id>-<attempt>; labels org.opencontainers.image.revision
+#   (this commit), org.opencontainers.image.source (repository URL), org.cgiar.cicd.run (<run id>-<attempt>),
+#   org.cgiar.cicd.unit (backend).
+#
+# Slack (#notifications-platform, Reporting Tool format, title [STAR NEW ENVIRONMENT] (PROD); never duplicated):
+#   started               GitHub Actions, at the start of the run (job notify-start, no needs); the CD job has no Start
+#   failed                GitHub Actions, only when the run fails before Jenkins started the deploy build
+#   succeeded / failed    Jenkins roar-monorepo-prod-cd, for the deploy (post block)
+#
+# GitHub Environment star-prod (deployment branches: main only; no required reviewers; admins cannot bypass): used by
+# the publish job (ECR push) and by the Jenkins hand-over.
+#   Variables: CICD_BOUND_REF, CICD_AWS_REGION, CICD_ECR_SERVER_REPOSITORY.
+#   Secret: CICD_BUILD_ROLE_ARN (an identifier, a secret only so GitHub masks it in these public logs).
+#   The build role star-prod-github-ci trusts only the environment star-prod and the ref refs/heads/main, and may only
+#   push to roar-main-application-server-prod (no secret, no S3, no CloudFront).
+#   Jenkins: repository secrets JENKINS_USERNAME and JENKINS_API_TOKEN. Slack: organization secret
+#   SLACK_NOTIFICATIONS_WEBHOOK_URL; without it the notifications are skipped with a warning and never block.
+#
+# Secret handling: this workflow reads NO application secret. OIDC only in the publish job, with
+# `output-env-credentials: false`: the credentials reach only the push step. The docker build runs through
+# .github/scripts/without-oidc.sh (no AWS credential, no OIDC request variable).
+#
+# Action pinning: every `uses:` is a full commit SHA (same SHAs as star-dev-cicd.yml):
+#   actions/checkout                       v7.0.1  3d3c42e5aac5ba805825da76410c181273ba90b1
+#   actions/setup-node                     v7.0.0  820762786026740c76f36085b0efc47a31fe5020
+#   aws-actions/configure-aws-credentials  v6.3.0  e1253824e5c10ff9df46874f81ed3ec929e19cfd
+# The local reusable workflows (./.github/workflows/*.reusable.yml) run from this same commit.
+name: star-prod-cicd
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: star-prod-cicd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+
+jobs:
+  # ---------------------------------------------------------------- start notification
+  # Runs in parallel with the checks and never blocks them.
+  notify-start:
+    name: notify start (Slack)
+    permissions: {}
+    uses: ./.github/workflows/slack-notify.reusable.yml
+    with:
+      status: started
+      title: STAR NEW ENVIRONMENT
+      project: STAR
+      environment-label: PROD
+    secrets:
+      SLACK_NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.SLACK_NOTIFICATIONS_WEBHOOK_URL }}
+
+  # ---------------------------------------------------------------- mandatory checks (no Docker, no AWS)
+  backend-checks:
+    name: backend checks (lint, test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: server/researchindicators
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The version of the backend Dockerfile (node:22.23.4-alpine), as star-dev-cicd.yml.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.23.4
+          cache: npm
+          cache-dependency-path: server/researchindicators/package-lock.json
+      - name: Install dependencies (lockfile)
+        run: npm ci --no-audit --no-fund
+      # `eslint ... --fix` as the legacy jobs: fixes stay on this runner (the image is built from a clean checkout).
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm run test
+
+  # Inert CI environment, as star-staging-ci.yml: no PROD configuration is read by the CI.
+  frontend-checks:
+    name: frontend checks (lint, test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: client/research-indicators
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # The major version of the frontend Dockerfile (node:20-alpine), as star-dev-cicd.yml.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/research-indicators/package-lock.json
+      - name: Install dependencies (lockfile)
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/without-oidc.sh" npm ci --no-audit --no-fund
+      - name: CI environment file (inert values, no credentials)
+        run: |
+          set -euo pipefail
+          f=src/environments/environment.ts
+          git check-ignore -q "$f" || { echo "::error::$f is not git-ignored (fail closed)"; exit 1; }
+          install -m 0644 "$GITHUB_WORKSPACE/.github/ci/star-frontend-environment.ci.ts" "$f"
+      - name: Lint
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/without-oidc.sh" npm run lint
+      # jest --coverage with the project's own thresholds (jest.config.ts), as the legacy jobs.
+      - name: Unit tests with coverage
+        run: bash "$GITHUB_WORKSPACE/.github/scripts/without-oidc.sh" npm run test:coverage
+      - name: Remove the environment file and the caches that hold copies of it
+        if: always()
+        working-directory: .
+        run: bash .github/scripts/remove-frontend-config.sh
+
+  ci-script-checks:
+    name: CI script checks (bash -n, ShellCheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Syntax
+        run: |
+          for f in .github/scripts/*.sh; do bash -n "$f"; done
+      - name: ShellCheck (preinstalled on the runner)
+        run: shellcheck --severity=warning .github/scripts/*.sh
+
+  # ---------------------------------------------------------------- common quality barrier + publish (backend only)
+  # Starts only when ALL mandatory checks passed, on its own clean checkout of this commit. Docker builds only the
+  # backend image of the legacy job (L139-L149, `docker build --target production` in server/researchindicators).
+  publish-image:
+    name: publish image (backend)
+    needs: [backend-checks, frontend-checks, ci-script-checks]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: star-prod
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      backend-digest: ${{ steps.push-backend.outputs.digest }}
+    env:
+      LOCAL_BACKEND: local/backend:${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Enforce bound ref
+        env:
+          BOUND_REF: ${{ vars.CICD_BOUND_REF }}
+          CURRENT_REF: ${{ github.ref }}
+        run: |
+          if [ -z "${BOUND_REF:-}" ] || [ "$CURRENT_REF" != "$BOUND_REF" ]; then echo "::error::ref is not the bound ref (fail closed)"; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build backend image (legacy `--target production` in server/researchindicators)
+        run: >-
+          bash .github/scripts/without-oidc.sh docker build
+          --file server/researchindicators/Dockerfile
+          --target production
+          --label "org.opencontainers.image.revision=${{ github.sha }}"
+          --label "org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
+          --label "org.cgiar.cicd.run=${{ github.run_id }}-${{ github.run_attempt }}"
+          --label org.cgiar.cicd.unit=backend
+          --tag "$LOCAL_BACKEND"
+          -- server/researchindicators
+      - name: Assume the build role through OIDC for the push (credentials not exported to the job)
+        id: aws
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.CICD_BUILD_ROLE_ARN }}
+          aws-region: ${{ vars.CICD_AWS_REGION }}
+          role-session-name: star-prod-ci-${{ github.run_id }}
+          mask-aws-account-id: true
+          output-env-credentials: false
+          output-credentials: true
+      - name: Push backend image and capture its digest
+        id: push-backend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ steps.aws.outputs.aws-access-key-id }}
+          AWS_SECRET_ACCESS_KEY: ${{ steps.aws.outputs.aws-secret-access-key }}
+          AWS_SESSION_TOKEN: ${{ steps.aws.outputs.aws-session-token }}
+          AWS_REGION: ${{ vars.CICD_AWS_REGION }}
+          REPOSITORY: ${{ vars.CICD_ECR_SERVER_REPOSITORY }}
+          LOCAL: ${{ env.LOCAL_BACKEND }}
+          TAG: gha-${{ github.run_id }}-${{ github.run_attempt }}
+        run: bash .github/scripts/push-image.sh
+
+  # ---------------------------------------------------------------- CD hand-over to Jenkins
+  # Only after `publish-image` succeeded with the digest. Jenkins deploys exactly this digest and builds the frontend
+  # from this commit.
+  deploy:
+    name: deploy (Jenkins roar-monorepo-prod-cd)
+    needs: publish-image
+    if: >-
+      needs.publish-image.result == 'success'
+      && needs.publish-image.outputs.backend-digest != ''
+    permissions: {}
+    uses: ./.github/workflows/jenkins-cd.reusable.yml
+    with:
+      jenkins-job: roar-monorepo-prod-cd
+      environment: star-prod
+      dry-run: false # real deploy from the first valid run (owner decision R-2, 2026-11-07); true = validation only
+      artifacts: backend=${{ needs.publish-image.outputs.backend-digest }}
+    secrets:
+      JENKINS_USERNAME: ${{ secrets.JENKINS_USERNAME }}
+      JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
+
+  # ---------------------------------------------------------------- CI failure notification
+  # Only when the run failed before Jenkins started a build (a check, the publish or the hand-over itself).
+  # Once Jenkins started the build, Jenkins reports the outcome.
+  notify-ci-failure:
+    name: notify CI failure (Slack)
+    needs: [backend-checks, frontend-checks, ci-script-checks, publish-image, deploy]
+    if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')) }}
+    permissions: {}
+    uses: ./.github/workflows/slack-notify.reusable.yml
+    with:
+      status: failed
+      title: STAR NEW ENVIRONMENT
+      project: STAR
+      environment-label: PROD
+      detail: >-
+        backend-checks=${{ needs.backend-checks.result }},
+        frontend-checks=${{ needs.frontend-checks.result }},
+        ci-script-checks=${{ needs.ci-script-checks.result }},
+        publish-image=${{ needs.publish-image.result }},
+        jenkins-hand-over=${{ needs.deploy.result }}
+    secrets:
+      SLACK_NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.SLACK_NOTIFICATIONS_WEBHOOK_URL }}
