@@ -314,3 +314,62 @@ describe('PooledFundingMonitorRepository scope guard', () => {
     expect(await repository.isPiOfAnyContributingProject(7)).toBe(false);
   });
 });
+
+describe('PooledFundingMonitorRepository.findContributingProjects delegates', () => {
+  const dataSource = { query: jest.fn() } as unknown as DataSource;
+  const repository = new PooledFundingMonitorRepository(dataSource);
+
+  it('returns each delegate as My PI Delegates shows it: name, email and active state, by last name', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      {
+        code: 'A1',
+        name: 'Project',
+        lead_pi: 'ALVAREZ, MARIA',
+        status: 'Ongoing',
+        delegates: JSON.stringify([
+          {
+            first_name: 'DANIELA',
+            last_name: 'ZUNIGA',
+            email: 'd.z@cgiar.org',
+            status_id: 1,
+          },
+          {
+            first_name: 'MANUEL',
+            last_name: 'ALMANZAR',
+            email: 'm.a@cgiar.org',
+            status_id: 3,
+          },
+        ]),
+      },
+      { code: 'A2', name: null, lead_pi: null, delegates: null },
+    ]);
+    const rows = await repository.findContributingProjects({
+      scope: PfmScopeEnum.ALL,
+    });
+    expect(rows[0].delegates).toEqual([
+      { name: 'Manuel Almanzar', email: 'm.a@cgiar.org', is_active: false },
+      { name: 'Daniela Zuniga', email: 'd.z@cgiar.org', is_active: true },
+    ]);
+    expect(rows[1].delegates).toEqual([]);
+  });
+
+  it('shows the PI first name first, in title case, and passes the contract status through', async () => {
+    (dataSource.query as jest.Mock).mockResolvedValue([
+      {
+        code: 'A1',
+        name: 'P',
+        lead_pi: 'VAN ETTEN, JACOB',
+        status: 'Completed',
+        delegates: null,
+      },
+      { code: 'A2', name: 'P', lead_pi: null, status: null, delegates: null },
+    ]);
+    const rows = await repository.findContributingProjects({
+      scope: PfmScopeEnum.ALL,
+    });
+    expect(rows.map((r) => [r.lead_pi, r.status])).toEqual([
+      ['Jacob Van Etten', 'Completed'],
+      [null, null],
+    ]);
+  });
+});
