@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ClarisaGeoScopeEnum } from '../../clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { ReportingPlatformEnum } from '../../../entities/results/enum/reporting-platform.enum';
+import type { TipTocMappingDto } from '../../tip-integration/dto/response-year-tip.dto';
 import {
   PrmsSyncAggregate,
   PrmsStaffSnapshot,
 } from '../dto/prms-sync-aggregate';
 import { homologateCenter } from '../homologation/center.homologation';
+import { prmsRef } from '../reference/prms-external-reference';
 
 /**
  * Build failure for a missing or invalid common-field mapping.
@@ -81,6 +84,20 @@ const requirePresent = (
     );
   }
   return value;
+};
+
+/**
+ * DD-10. A TIP sync may omit description when STAR has none. The key is
+ * absent, never "". Every other caller still requires the field.
+ */
+const descriptionField = (
+  value: string | null | undefined,
+  optional: boolean | undefined,
+): { description: string } | Record<string, never> => {
+  if (optional === true && (value == null || String(value).trim() === '')) {
+    return {};
+  }
+  return { description: requirePresent(value, 'description') };
 };
 
 const requireStaff = (
@@ -231,6 +248,48 @@ const buildTocMapping = (
   // reported, not an absent one.
   if (primary.quantitative_contribution != null) {
     toc.target_contribution = primary.quantitative_contribution;
+  }
+  return toc;
+};
+
+const isAbsentTipValue = (value: unknown): boolean => {
+  if (value == null) {
+    return true;
+  }
+  return typeof value === 'string' && value.trim() === '';
+};
+
+/**
+ * TIP `toc_mapping` (R-TPP-004). Only the seven keys TIP is allowed to send.
+ * `toc_internal_id` and `toc_result_indicator_id` stay off the payload.
+ * Empty strings and nulls are omitted; `0` is a contribution and is sent.
+ */
+const buildTipTocMapping = (
+  mapping: TipTocMappingDto,
+): Record<string, unknown> => {
+  const toc: Record<string, unknown> = {
+    science_program_id: requirePresent(
+      mapping.science_program_id,
+      'toc_mapping.science_program_id',
+    ),
+  };
+  if (!isAbsentTipValue(mapping.aow_compose_code)) {
+    toc.aow_compose_code = mapping.aow_compose_code;
+  }
+  if (!isAbsentTipValue(mapping.toc_result_id)) {
+    toc.toc_result_id = mapping.toc_result_id;
+  }
+  if (!isAbsentTipValue(mapping.result_title)) {
+    toc.result_title = mapping.result_title;
+  }
+  if (!isAbsentTipValue(mapping.result_indicator_description)) {
+    toc.result_indicator_description = mapping.result_indicator_description;
+  }
+  if (!isAbsentTipValue(mapping.result_indicator_type_name)) {
+    toc.result_indicator_type_name = mapping.result_indicator_type_name;
+  }
+  if (!isAbsentTipValue(mapping.target_contribution)) {
+    toc.target_contribution = mapping.target_contribution;
   }
   return toc;
 };
@@ -412,7 +471,13 @@ export class CommonFieldsBuilder {
    * Maps the already-loaded aggregate to the flat common `data` block
    * (homologation.md §4). Type-specific nesting is T-07/T-08/T-09.
    */
-  build(aggregate: PrmsSyncAggregate): Record<string, unknown> {
+  build(
+    aggregate: PrmsSyncAggregate,
+    overrides?: {
+      tocMapping?: TipTocMappingDto;
+      optionalDescription?: boolean;
+    },
+  ): Record<string, unknown> {
     const leadCenter = resolveCenter(aggregate.primary_contract);
     const createdBy = requireStaff(aggregate.created_by, 'created_by');
     if (!aggregate.submitted_by) {
@@ -426,15 +491,23 @@ export class CommonFieldsBuilder {
       'submitted_by',
     );
 
+    const officialCode = requirePresent(
+      aggregate.result_official_code == null
+        ? null
+        : String(aggregate.result_official_code),
+      'external_reference',
+    );
+
     const data: Record<string, unknown> = {
-      external_reference: String(
-        requirePresent(
-          aggregate.result_official_code == null
-            ? null
-            : String(aggregate.result_official_code),
-          'external_reference',
-        ),
+      external_reference: prmsRef(
+        aggregate.platform_code ?? ReportingPlatformEnum.STAR,
+        officialCode,
       ),
+      // Re-push only. A first push has no stored code, and the key must be
+      // absent — null or "" would tell PRMS the code is blank.
+      ...(aggregate.prms_result_code == null
+        ? {}
+        : { result_code: String(aggregate.prms_result_code) }),
       keep_editing: false,
       created_date: (aggregate.created_at instanceof Date
         ? aggregate.created_at
@@ -456,8 +529,14 @@ export class CommonFieldsBuilder {
 
       lead_center: leadCenter,
       title: requirePresent(aggregate.title, 'title'),
-      description: requirePresent(aggregate.description, 'description'),
-      toc_mapping: buildTocMapping(aggregate),
+      ...descriptionField(
+        aggregate.description,
+        overrides?.optionalDescription,
+      ),
+      toc_mapping:
+        overrides?.tocMapping != null
+          ? buildTipTocMapping(overrides.tocMapping)
+          : buildTocMapping(aggregate),
       geo_focus: buildGeoFocus(aggregate),
       contributing_center: [leadCenter],
     };

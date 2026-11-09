@@ -39,6 +39,9 @@ export class NavigationButtonsComponent {
   @Input() showBack = true;
   @Input() showNext = true;
   @Input() showSave = false;
+  // Opt-in: suppresses Save outright, even for an editable submission status
+  // (pool-funding-reporting-year T-08). Default false leaves every screen as is.
+  @Input() hideSave = false;
   @Input() disableSave = false;
   @Input() disableNext = false;
 

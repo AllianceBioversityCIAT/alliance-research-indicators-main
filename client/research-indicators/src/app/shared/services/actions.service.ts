@@ -186,6 +186,10 @@ export class ActionsService {
     this.globalAlertsStatus.update(prev => [...prev, globalAlert]);
   }
 
+  replaceGlobalAlert(index: number, globalAlert: GlobalAlert) {
+    this.globalAlertsStatus.update(prev => prev.map((current, i) => (i === index ? globalAlert : current)));
+  }
+
   hideGlobalAlert(index: number) {
     this.globalAlertsStatus.update(prev => prev.filter((_, i) => i !== index));
   }

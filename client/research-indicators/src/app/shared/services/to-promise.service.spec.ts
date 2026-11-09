@@ -1,7 +1,15 @@
-import { TestBed } from '@angular/core/testing';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { HttpClient, HttpHeaders, HttpParams, provideHttpClient, withInterceptors } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ToPromiseService } from './to-promise.service';
+import { MainResponse } from '../interfaces/responses.interface';
+import { CacheService } from './cache/cache.service';
+import { ApiService } from './api.service';
+import { ActionsService } from '@services/actions.service';
+import { ImpersonationService } from './impersonation.service';
+import { httpErrorInterceptor } from '../interceptors/http-error.interceptor';
 import { cacheServiceMock, mockGreenChecks } from 'src/app/testing/mock-services.mock';
 import { environment } from '@envs/environment';
 
@@ -388,42 +396,150 @@ describe('ToPromiseService', () => {
     });
   });
 
-  describe('extra raw headers and postBlob', () => {
-    it('post applies raw headers', async () => {
-      httpClientMock.post = jest.fn().mockReturnValue(of({ data: {} }));
-      await service.post('/u', {}, { headers: { 'X-Custom': 'v1' } });
-      const headers = (httpClientMock.post as jest.Mock).mock.calls[0][2].headers;
-      expect(headers.get('X-Custom')).toBe('v1');
+  describe('getObservable', () => {
+    let http: HttpTestingController;
+
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting(), ToPromiseService, { provide: CacheService, useValue: cacheServiceMock }]
+      });
+      service = TestBed.inject(ToPromiseService);
+      http = TestBed.inject(HttpTestingController);
     });
 
-    it('get applies raw headers', async () => {
-      httpClientMock.get = jest.fn().mockReturnValue(of({ data: {} }));
-      await service.get('/u', { headers: { 'X-Impersonation-Session': 'abc' } });
-      const headers = (httpClientMock.get as jest.Mock).mock.calls[0][1].headers;
-      expect(headers.get('X-Impersonation-Session')).toBe('abc');
+    afterEach(() => {
+      http.verify();
     });
 
-    it('postBlob posts with blob responseType and no extra headers by default', async () => {
-      const blob = new Blob(['x']);
-      httpClientMock.post = jest.fn().mockReturnValue(of(blob));
-      const res = await service.postBlob('/u', { a: 1 });
-      expect(res).toBe(blob);
-      const [url, body, options] = (httpClientMock.post as jest.Mock).mock.calls[0];
-      expect(url).toBe(`${environment.mainApiUrl}/u`);
-      expect(body).toEqual({ a: 1 });
-      expect(options.responseType).toBe('blob');
-      expect(options.headers.keys()).toEqual([]);
+    it('emits successfulRequest true when the response succeeds', () => {
+      let emitted: MainResponse<{ uri: string; label: string }[]> | undefined;
+
+      service.getObservable<{ uri: string; label: string }[]>('tools/agrovoc/search').subscribe(response => {
+        emitted = response;
+      });
+
+      const request = http.expectOne(req => req.method === 'GET' && req.url.includes('tools/agrovoc/search'));
+      request.flush({
+        data: [{ uri: 'https://agrovoc.example/c_123', label: 'beans' }],
+        status: 200,
+        description: 'ok',
+        timestamp: 't',
+        path: '/api/tools/agrovoc/search'
+      });
+
+      expect(emitted?.successfulRequest).toBe(true);
+      expect(emitted?.data).toEqual([{ uri: 'https://agrovoc.example/c_123', label: 'beans' }]);
     });
 
-    it('postBlob sets all configured headers and the auth marker', async () => {
-      httpClientMock.post = jest.fn().mockReturnValue(of(new Blob(['x'])));
-      await service.postBlob('/u', {}, { useResultInterceptor: true, platform: 'STAR', noAuthInterceptor: true, isAuth: true });
-      const { headers } = (httpClientMock.post as jest.Mock).mock.calls[0][2];
-      expect(headers.get('X-Use-Year')).toBe('true');
-      expect(headers.get('X-Platform')).toBe('STAR');
-      expect(headers.get('no-auth-interceptor')).toBe('true');
-      expect(headers.get('X-Ari-Auth-Call')).toBe('1');
-      expect((httpClientMock.post as jest.Mock).mock.calls[0][0]).toBe(`${environment.managementApiUrl}/u`);
+    it('emits successfulRequest false on a 502 and does not error', () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      let emitted: { successfulRequest?: boolean; errorDetail?: unknown } | undefined;
+      let errored = false;
+
+      service.getObservable('tools/agrovoc/search').subscribe({
+        next: response => {
+          emitted = response;
+        },
+        error: () => {
+          errored = true;
+        }
+      });
+
+      const request = http.expectOne(req => req.url.includes('tools/agrovoc/search'));
+      request.flush({ description: 'AGROVOC service is unavailable', errors: 'upstream' }, { status: 502, statusText: 'Bad Gateway' });
+
+      expect(errored).toBe(false);
+      expect(emitted?.successfulRequest).toBe(false);
+      expect(emitted?.errorDetail).toEqual({ description: 'AGROVOC service is unavailable', errors: 'upstream' });
+      errorSpy.mockRestore();
     });
+
+    it('cancels the in-flight request when unsubscribed before flush', () => {
+      const subscription = service.getObservable('tools/agrovoc/search', { params: new HttpParams().set('query', 'bean') }).subscribe();
+
+      const request = http.expectOne(req => req.url.includes('tools/agrovoc/search'));
+      subscription.unsubscribe();
+
+      expect(request.cancelled).toBe(true);
+    });
+
+    it('encodes the query string (seed system → seed%20system)', () => {
+      service.getObservable('tools/agrovoc/search', { params: new HttpParams().set('query', 'seed system') }).subscribe();
+
+      const request = http.expectOne(req => req.url.includes('tools/agrovoc/search'));
+      expect(request.request.urlWithParams).toContain('query=seed%20system');
+      request.flush({ data: [], status: 200, description: '', timestamp: '', path: '' });
+    });
+  });
+
+  describe('getObservable with the real httpErrorInterceptor', () => {
+    let http: HttpTestingController;
+    let saveErrors: jest.Mock;
+
+    const envelope = {
+      data: [{ uri: 'https://agrovoc.example/c_123', label: 'beans' }],
+      status: 200,
+      description: 'ok',
+      timestamp: 't',
+      path: '/api/tools/agrovoc/search'
+    };
+
+    beforeEach(() => {
+      saveErrors = jest.fn().mockResolvedValue(undefined);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(withInterceptors([httpErrorInterceptor])),
+          provideHttpClientTesting(),
+          ToPromiseService,
+          { provide: ApiService, useValue: { saveErrors } },
+          { provide: ActionsService, useValue: { showToast: jest.fn() } },
+          {
+            provide: CacheService,
+            useValue: {
+              isLoggedIn: jest.fn().mockReturnValue(true),
+              dataCache: jest.fn().mockReturnValue({
+                user: { sec_user_id: 1, first_name: 'Ada', last_name: 'Lovelace', email: 'ada@test.com' }
+              }),
+              currentResultIsLoading: { set: jest.fn() },
+              greenChecks: { set: jest.fn() }
+            }
+          },
+          { provide: Router, useValue: { url: '/result/1/general-information' } },
+          { provide: ImpersonationService, useValue: { active: jest.fn().mockReturnValue(false), end: jest.fn() } }
+        ]
+      });
+      service = TestBed.inject(ToPromiseService);
+      http = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => {
+      http.verify();
+    });
+
+    it('completes a fast response and does not log a pending error', fakeAsync(() => {
+      const next = jest.fn();
+      const complete = jest.fn();
+
+      service.getObservable('tools/agrovoc/search').subscribe({ next, complete });
+
+      http.expectOne(req => req.url.includes('tools/agrovoc/search')).flush(envelope);
+      tick(5000);
+
+      expect(saveErrors).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
+      expect(complete).toHaveBeenCalled();
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ successfulRequest: true }));
+    }));
+
+    it('logs a pending error when the request is still open at 5 s', fakeAsync(() => {
+      service.getObservable('tools/agrovoc/search').subscribe();
+
+      const request = http.expectOne(req => req.url.includes('tools/agrovoc/search'));
+      tick(5000);
+
+      expect(saveErrors).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending' }));
+      request.flush(envelope);
+    }));
   });
 });

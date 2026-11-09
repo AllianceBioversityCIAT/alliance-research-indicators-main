@@ -16,17 +16,17 @@ import {
   tocLevelCode,
 } from './pool-funding-mapping-diff.service';
 import { TocIntegrationService } from '../../tools/toc-integration/toc-integration.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import {
   TocIndicator,
   TocResult,
 } from '../../tools/toc-integration/dto/toc-integration.types';
-import { MAPPABLE_LIVE_VERSION } from '../bilateral/utils/toc-level-rules.util';
 
 /**
  * Applies an approved pool-funding diff onto the version's own rows.
  *
- * The version is the active snapshot for (result_official_code, result_year)
- * on the history row — the same row the diff compared. A changed value is
+ * The version is the active snapshot for (platform, result_official_code,
+ * result_year) on the history row — the same row the diff compared. A changed value is
  * never updated in place: the active row is deactivated and a new row is
  * inserted. Runs after the diff, post-acknowledgement, and must not throw —
  * the 2xx is already gone, and correlation_outcome plus processing_state
@@ -35,7 +35,7 @@ import { MAPPABLE_LIVE_VERSION } from '../bilateral/utils/toc-level-rules.util';
 
 const HISTORY_SQL = `
 SELECT decision, changes, correlation_outcome, raw_body,
-       result_official_code, result_year
+       platform_code, result_official_code, result_year
 FROM result_prms_sync_history
 WHERE id = ?
 `;
@@ -246,12 +246,16 @@ const withResolvedIndicator = (
 
 /**
  * Mirrors `BilateralService.resolveLiveTargetValue` (R-BIL-090 AC.3): the
- * `targets[]` entry for the live version wins, else null. Written here rather
- * than shared so the webhook path does not pull in the bilateral service.
+ * `targets[]` entry for the configured reporting year wins, else null.
+ * Written here rather than shared so the webhook path does not pull in
+ * the bilateral service.
  */
-const liveTargetValue = (indicator: TocIndicator): string | null =>
+const liveTargetValue = (
+  indicator: TocIndicator,
+  year: number,
+): string | null =>
   (indicator.targets ?? []).find(
-    (target) => target.target_date === String(MAPPABLE_LIVE_VERSION),
+    (target) => target.target_date === String(year),
   )?.target_value ?? null;
 
 const inheritedFrom = (row: TocRow): InheritedToc => ({
@@ -452,6 +456,7 @@ export class PoolFundingMappingApplyService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tocIntegration: TocIntegrationService,
+    private readonly reportingYearResolver: ReportingYearResolver,
   ) {}
 
   /**
@@ -460,7 +465,8 @@ export class PoolFundingMappingApplyService {
    */
   async apply(input: PoolFundingApplyInput): Promise<void> {
     try {
-      await this.applyUnsafe(input);
+      const year = await this.reportingYearResolver.resolve();
+      await this.applyUnsafe(input, year);
     } catch (error) {
       this.logger._error(
         `Pool-funding apply failed for result_prms_sync_history id=${input.historyId} result_id=${input.resultId}: ${errorText(error)}`,
@@ -468,7 +474,10 @@ export class PoolFundingMappingApplyService {
     }
   }
 
-  private async applyUnsafe(input: PoolFundingApplyInput): Promise<void> {
+  private async applyUnsafe(
+    input: PoolFundingApplyInput,
+    year: number,
+  ): Promise<void> {
     const rows: Array<Record<string, unknown>> = await this.dataSource.query(
       HISTORY_SQL,
       [input.historyId],
@@ -507,6 +516,7 @@ export class PoolFundingMappingApplyService {
       (sql, params) => this.dataSource.query(sql, params),
       officialCode,
       reportYearId,
+      scalar(row.platform_code),
     );
     if (snapshot.ok === false) {
       this.logger._warn(
@@ -520,6 +530,7 @@ export class PoolFundingMappingApplyService {
     const resolvedIndicator = await this.resolveIndicator(
       input.historyId,
       row.raw_body,
+      year,
     );
 
     await this.dataSource.transaction(async (manager) => {
@@ -585,6 +596,7 @@ export class PoolFundingMappingApplyService {
   private async resolveIndicator(
     historyId: number,
     rawBody: unknown,
+    year: number,
   ): Promise<ResolvedIndicator | null> {
     const callback = readCallbackPrimary(rawBody);
     if (callback.mappings.length !== 1) {
@@ -609,7 +621,7 @@ export class PoolFundingMappingApplyService {
 
     let results: TocResult[];
     try {
-      results = await this.tocIntegration.getTocResults(sp, level);
+      results = await this.tocIntegration.getTocResults(sp, level, year);
     } catch (error) {
       this.logger._warn(
         `Pool-funding apply could not read the ToC catalog for history id=${historyId} (${sp}/${level}): ${errorText(error)}; the stored indicator is left in place`,
@@ -637,8 +649,8 @@ export class PoolFundingMappingApplyService {
       indicatorId: match.indicator_id,
       description: match.indicator_description ?? indicator.description,
       unitMeasurement: match.unit_messurament ?? null,
-      targetValue: liveTargetValue(match),
-      targetYear: MAPPABLE_LIVE_VERSION,
+      targetValue: liveTargetValue(match, year),
+      targetYear: year,
       quantitativeContribution: indicator.targetContribution,
     };
   }

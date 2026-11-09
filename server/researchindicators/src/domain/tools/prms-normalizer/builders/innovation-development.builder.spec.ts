@@ -26,6 +26,7 @@ const innovationAggregate = (
 ): PrmsSyncAggregate => ({
   result_id: 9008,
   result_official_code: 1441071,
+  prms_result_code: null,
   indicator_id: 2,
   created_at: new Date('2024-03-01T10:00:00.000Z'),
   title: 'Innovation development type-block fixture',

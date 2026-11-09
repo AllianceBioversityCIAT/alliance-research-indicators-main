@@ -22,14 +22,6 @@ export type TocResultTypeKey =
   | 'innovation_use'
   | 'unknown';
 
-/**
- * Hardcoded mappable live version year (D-V2-7, R-BIL-097). The version
- * gate anchors on `results.report_year_id` (`report_years.report_year`,
- * literal year) compared against this constant — intentionally a constant,
- * not an env var, per the handoff.
- */
-export const MAPPABLE_LIVE_VERSION = 2026;
-
 const INDICATOR_RESULT_TYPE_KEYS: Record<IndicatorsEnum, TocResultTypeKey> = {
   [IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT]: 'capacity_sharing',
   [IndicatorsEnum.INNOVATION_DEV]: 'innovation_dev',
@@ -56,14 +48,16 @@ const ALLOWED_LEVELS_BY_RESULT_TYPE: Partial<
 > = {
   capacity_sharing: ['OUTPUT'],
   innovation_dev: ['OUTPUT'],
+  // @sdd-spec docs/specs/changes/tip-prms-phase-2/prms-platform-identity — T-10
+  knowledge_product: ['OUTPUT'],
   policy_change: ['OUTCOME', 'EOI'],
   innovation_use: ['OUTCOME'],
 };
 
 /**
  * Single source of truth (D-V2-3) for the `result_type` → `allowed_levels`
- * rule table (R-BIL-091). Any result type without an explicit row — pending
- * OQ-V2-5 — maps to `[]` (⇒ `catalogs: []`, zero upstream calls).
+ * rule table (R-BIL-091). Any result type without an explicit row maps to
+ * `[]` (⇒ `catalogs: []`, zero upstream calls).
  */
 export function allowedLevelsFor(resultTypeKey: string): TocLevel[] {
   const levels =

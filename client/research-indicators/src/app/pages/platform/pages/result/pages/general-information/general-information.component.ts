@@ -16,7 +16,7 @@ import { GetResultsService } from '../../../../../../shared/services/control-lis
 import { GetUserStaffService } from '../../../../../../shared/services/control-list/get-user-staff.service';
 import { SelectComponent } from '../../../../../../shared/components/custom-fields/select/select.component';
 import { GetMetadataService } from '../../../../../../shared/services/get-metadata.service';
-import { AutoCompleteModule } from 'primeng/autocomplete';
+import { AgrovocKeywordsComponent } from '@shared/components/custom-fields/agrovoc-keywords/agrovoc-keywords.component';
 import { BilateralService } from '@shared/services/bilateral.service';
 import { SubmissionService } from '@shared/services/submission.service';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
@@ -42,7 +42,7 @@ interface Option {
     InputComponent,
     TextareaComponent,
     SelectComponent,
-    AutoCompleteModule
+    AgrovocKeywordsComponent
   ],
   templateUrl: './general-information.component.html'
 })
@@ -117,16 +117,16 @@ export default class GeneralInformationComponent {
         this.getResultsService.updateList();
         await this.getData();
         await this.metadata.update(this.cache.getCurrentNumericResultId());
-      // The sidebar's Pool Funding block (OPTIONAL divider + item + PRMS SYNC) is
-      // gated on `alignment.version_locked` (the reporting YEAR, edited here) and
-      // `alignment.eligible` (the primary CONTRACT, edited in Alliance Alignment).
-      // Both are SERVER-computed and reach the sidebar only through
-      // `BilateralService.currentAlignment`, which nothing refreshes on a section
-      // save -- `result.component.ts` memoizes its fetch on `code + URL version`,
-      // and neither changes when the year is edited in this form. Without this
-      // re-fetch the block keeps its pre-save visibility until a full page reload
-      // (user-reported). Runs only after the save succeeded.
-      await this.refreshPoolFundingVisibility();
+        // The sidebar's Pool Funding block (OPTIONAL divider + item + PRMS SYNC) is
+        // gated on `alignment.version_locked` (the reporting YEAR, edited here) and
+        // `alignment.eligible` (the primary CONTRACT, edited in Alliance Alignment).
+        // Both are SERVER-computed and reach the sidebar only through
+        // `BilateralService.currentAlignment`, which nothing refreshes on a section
+        // save -- `result.component.ts` memoizes its fetch on `code + URL version`,
+        // and neither changes when the year is edited in this form. Without this
+        // re-fetch the block keeps its pre-save visibility until a full page reload
+        // (user-reported). Runs only after the save succeeded.
+        await this.refreshPoolFundingVisibility();
       } else {
         const errorMessage = response.errorDetail?.errors || response.errorDetail?.detail || 'Unable to save data, please try again';
         this.actions.showToast({

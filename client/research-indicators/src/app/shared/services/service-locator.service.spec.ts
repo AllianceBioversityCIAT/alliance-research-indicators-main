@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ServiceLocatorService } from './service-locator.service';
+import { GetPolicyChangeLinkableResultsService } from './control-list/get-policy-change-linkable-results.service';
 import { NotableReferenceTypesService } from './short-control-list/notable-reference-types.service';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ApiService } from '../services/api.service';
@@ -505,6 +506,12 @@ describe('ServiceLocatorService', () => {
     it('returns leverStrategicOutcomes service', () => {
       const result = (service as any).getOtherServices('leverStrategicOutcomes');
       expect(injectorMock.get).toHaveBeenCalled();
+      expect(result).toBe(serviceMock);
+    });
+
+    it('resolves policyChangeLinkableResults to GetPolicyChangeLinkableResultsService', () => {
+      const result = service.getService('policyChangeLinkableResults');
+      expect(injectorMock.get).toHaveBeenCalledWith(GetPolicyChangeLinkableResultsService, undefined, { optional: false });
       expect(result).toBe(serviceMock);
     });
 

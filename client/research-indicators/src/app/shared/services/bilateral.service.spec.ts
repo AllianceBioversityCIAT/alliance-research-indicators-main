@@ -16,6 +16,13 @@ import {
 } from '@interfaces/bilateral/pool-funding-alignment.interface';
 import { SAVED_TOC_ALIGNMENTS_FIXTURE, TOC_CATALOG_CAPSHARING_FIXTURE, TOC_CATALOG_TWO_SP_FIXTURE } from '../../testing/toc-catalog.fixture';
 import { PLATFORM_CODES } from '@shared/constants/platform-codes';
+import { POOL_FUNDING_PLATFORMS } from '@shared/utils/platform-code.util';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { ToPromiseService } from './to-promise.service';
+import { ControlListCacheService } from './control-list-cache.service';
+import { SignalEndpointService } from './signal-endpoint.service';
+import { environment } from '../../../environments/environment';
 
 describe('BilateralService', () => {
   let service: BilateralService;
@@ -290,19 +297,21 @@ describe('BilateralService', () => {
       expect(service.loadingAlignment()).toBe(false);
     });
 
-    // R-PFG-001 AC.1 — Bug Mode repro. Opening a non-alignment-capable result must
-    // issue ZERO calls to the alignment endpoint. Red on HEAD (today the request is
-    // always issued and the server 404s).
-    it('a TIP-prefixed result issues zero alignment requests', async () => {
+    // R-PPI-006 — TIP is capable. The numeric URL is proved by the
+    // HttpTestingController describe below (a call-count here cannot see the path).
+    it('a TIP-prefixed result issues one alignment request', async () => {
+      mockApi.GET_PoolFundingAlignment.mockResolvedValue(ok<AlignmentResponse>(baseAlignment));
+
       const result = await service.getAlignment('TIP-31288');
 
-      expect(mockApi.GET_PoolFundingAlignment).not.toHaveBeenCalled();
-      expect(result).toBeNull();
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledTimes(1);
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledWith('TIP-31288');
+      expect(result).toEqual(baseAlignment);
     });
 
-    // R-PFG-001 AC.3 / R-PFG-002 AC.2 — enumerated over PLATFORM_CODES, never a
-    // literal list (D-2: the AICCRA precedent at result.interceptor.ts:50-53).
-    it.each(Object.values(PLATFORM_CODES).filter(code => code !== PLATFORM_CODES.STAR))(
+    // R-PFG-001 AC.3 / R-PFG-002 AC.2 — enumerated over PLATFORM_CODES minus the
+    // capable set, never a literal list (D-2). AICCRA and PRMS stay at zero requests.
+    it.each(Object.values(PLATFORM_CODES).filter(code => !POOL_FUNDING_PLATFORMS.includes(code)))(
       '%s is not capable — zero alignment requests',
       async platformCode => {
         const result = await service.getAlignment(`${platformCode}-31288`);
@@ -323,21 +332,16 @@ describe('BilateralService', () => {
       expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledWith('31288');
     });
 
-    // AC.0 — the D-6 stale-state-leak guard. Green BOTH before and after on HEAD:
-    // pre-fix, the ineligible call still reaches the network and the (simulated)
-    // 404 is what nulls the state today; post-fix, the guard clears it without a
-    // request. NOT red-before evidence — it is the proof that DD-3's clearing
-    // survives either mechanism (falsified separately, see execution.md).
+    // AC.0 — the D-6 stale-state-leak guard. An incapable code (AICCRA; TIP is
+    // capable under R-PPI-006) clears state without a second request.
     it('AC.0 — after an eligible fetch populates state, an ineligible code clears it', async () => {
       mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(ok<AlignmentResponse>(baseAlignment));
       await service.getAlignment('STAR-31288');
       expect(service.currentAlignment()).toEqual(baseAlignment);
 
-      mockApi.GET_PoolFundingAlignment.mockResolvedValueOnce(
-        err<AlignmentResponse>(404, 'not found', undefined as unknown as AlignmentResponse)
-      );
-      const result = await service.getAlignment('TIP-99999');
+      const result = await service.getAlignment('AICCRA-99999');
 
+      expect(mockApi.GET_PoolFundingAlignment).toHaveBeenCalledTimes(1);
       expect(service.currentAlignment()).toBeNull();
       expect(result).toBeNull();
     });
@@ -720,6 +724,36 @@ describe('BilateralService', () => {
       service.currentAlignment.set(readOnlyFalse);
       canAccessCenterAdminSignal.set(true);
       isCurrentUserOwnerSignal.set(false);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(true);
+    });
+
+    // R-PRY-003 — an owner of an other-year result cannot change data.
+    // The fixture is an owner and not a center admin: a non-owner would
+    // already be false for a different reason.
+    it('false for an owner when version_locked is true', () => {
+      service.currentAlignment.set({ ...readOnlyFalse, version_locked: true });
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(false);
+    });
+
+    it('true for an owner when version_locked is false', () => {
+      service.currentAlignment.set({ ...readOnlyFalse, version_locked: false });
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
+      isExternalResultSignal.set(false);
+
+      expect(service.editable()).toBe(true);
+    });
+
+    it('true for an owner when version_locked is absent (fail-open)', () => {
+      service.currentAlignment.set(readOnlyFalse);
+      canAccessCenterAdminSignal.set(false);
+      isCurrentUserOwnerSignal.set(true);
       isExternalResultSignal.set(false);
 
       expect(service.editable()).toBe(true);
@@ -1130,135 +1164,129 @@ describe('BilateralService', () => {
     });
   });
 
-  // ── Coverage completion: nullish responses, in-flight dedup, stale requests ──
-
-  describe('edge branches (coverage completion)', () => {
-    const deferred = <T>() => {
-      let resolve!: (v: T) => void;
-      const promise = new Promise<T>(r => (resolve = r));
-      return { promise, resolve };
-    };
-
-    const alignmentFail = (errors: unknown): MainResponse<AlignmentResponse> =>
+  // @sdd-spec docs/specs/bilateral/pool-funding-reporting-year — T-08 / R-PRY-004
+  // The REAL GlobalExceptions body for the T-04 refusal: top-level `description` is
+  // the exception name, and the thrown `{ description, code }` sits in `errors`.
+  describe('patchAlignment 409 pool_funding_year_locked (R-PRY-004)', () => {
+    const conflict = (errors: unknown): MainResponse<AlignmentResponse> =>
       ({
         data: undefined,
-        status: 400,
+        status: 409,
         description: 'error',
         timestamp: '',
         path: '',
         successfulRequest: false,
-        errorDetail: { errors: errors as string, detail: '', description: 'Validation failed' }
+        errorDetail: { errors: errors as string, detail: '', description: 'ConflictException' }
       }) as unknown as MainResponse<AlignmentResponse>;
+    const body = { description: 'Pool Funding is read-only: result year 2025 is not the reporting year 2026', code: 'pool_funding_year_locked' };
 
-    it('patchTag success leaves a null currentContract untouched', async () => {
-      service.currentContract.set(null);
-      mockApi.PATCH_PoolFundingTag.mockResolvedValue(ok({ agreement_id: 'X', is_pool_funding_contributor: true } as PoolFundingTagPatchResponse));
-      const result = await service.patchTag('X', true);
-      expect(result.ok).toBe(true);
-      expect(service.currentContract()).toBeNull();
-    });
+    it('extracts code and errorDescription from an object errors envelope', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(body));
 
-    it('patchTag failure with a nullish response falls back to status 0 and empty description', async () => {
-      mockApi.PATCH_PoolFundingTag.mockResolvedValue(undefined);
-      expect(await service.patchTag('X', true)).toEqual({ ok: false, status: 0, description: '' });
-    });
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
 
-    it('patchTag failure without errorDetail falls back to an empty description', async () => {
-      mockApi.PATCH_PoolFundingTag.mockResolvedValue({ successfulRequest: false, status: 500 });
-      expect(await service.patchTag('X', true)).toEqual({ ok: false, status: 500, description: '' });
-    });
-
-    it('getSciencePrograms shares one in-flight request for the same result code', async () => {
-      const d = deferred<MainResponse<PoolFundingSciencePrograms>>();
-      mockApi.GET_PoolFundingSciencePrograms.mockReturnValue(d.promise);
-      const first = service.getSciencePrograms('STAR-1');
-      const second = service.getSciencePrograms('1');
-      d.resolve(ok<PoolFundingSciencePrograms>({ result_code: '1', mapping_status: 'mapped', science_programs: [] } as unknown as PoolFundingSciencePrograms));
-      expect(await first).toEqual(await second);
-      expect(mockApi.GET_PoolFundingSciencePrograms).toHaveBeenCalledTimes(1);
-    });
-
-    it('getSciencePrograms ignores a stale response when a newer request has started', async () => {
-      const d1 = deferred<MainResponse<PoolFundingSciencePrograms>>();
-      const d2 = deferred<MainResponse<PoolFundingSciencePrograms>>();
-      mockApi.GET_PoolFundingSciencePrograms.mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
-      const first = service.getSciencePrograms('1');
-      const second = service.getSciencePrograms('2');
-      d1.resolve(ok({ result_code: '1', mapping_status: 'mapped', science_programs: [{ code: 'OLD' }] } as unknown as PoolFundingSciencePrograms));
-      expect(await first).toEqual([]);
-      expect(service.sciencePrograms()).toEqual([]);
-      expect(service.loadingSciencePrograms()).toBe(true);
-      d2.resolve(ok({ result_code: '2', mapping_status: 'mapped', science_programs: [{ code: 'NEW' }] } as unknown as PoolFundingSciencePrograms));
-      expect(await second).toEqual([{ code: 'NEW' }]);
-      expect(service.loadingSciencePrograms()).toBe(false);
-    });
-
-    it('getSciencePrograms tolerates a payload without science_programs / mapping_status', async () => {
-      mockApi.GET_PoolFundingSciencePrograms.mockResolvedValue(ok(undefined as unknown as PoolFundingSciencePrograms));
-      expect(await service.getSciencePrograms('9')).toEqual([]);
-      expect(service.mappingStatus()).toBeNull();
-    });
-
-    it('patchAlignment failure with a nullish response yields status 0 and empty description', async () => {
-      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(undefined);
-      expect(await service.patchAlignment('R', { has_contribution: true })).toEqual({
+      expect(result).toEqual({
         ok: false,
-        status: 0,
-        description: ''
+        status: 409,
+        description: 'ConflictException',
+        code: 'pool_funding_year_locked',
+        errorDescription: body.description
       });
     });
 
-    it.each([
-      ['an array object', []],
-      ['null', null],
-      ['an unparsable string', '{not json'],
-      ['a non-object string', 'plain text']
-    ])('patchAlignment failure with errors as %s surfaces no structured errors', async (_label, errors) => {
-      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(alignmentFail(errors));
-      expect(await service.patchAlignment('R', { has_contribution: true })).toEqual({
-        ok: false,
-        status: 400,
-        description: 'Validation failed'
-      });
+    it('extracts them from stringified-JSON errors too', async () => {
+      mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(JSON.stringify(body)));
+
+      const result = await service.patchAlignment('RES-001', { has_contribution: true });
+
+      expect((result as { code?: string }).code).toBe('pool_funding_year_locked');
     });
 
-    it.each([
-      ['null', null],
-      ['an array', []]
-    ])('extractFieldErrors ignores a parsed value that is %s', async (_label, parsedValue) => {
-      const spy = jest.spyOn(JSON, 'parse').mockReturnValueOnce(parsedValue);
-      try {
-        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(alignmentFail('{"a":"b"}'));
-        const result = await service.patchAlignment('R', { has_contribution: true });
-        expect(result).toEqual({ ok: false, status: 400, description: 'Validation failed' });
-      } finally {
-        spy.mockRestore();
+    it('a 409 without a code object leaves code undefined (other 409s unchanged)', async () => {
+      for (const errors of ['', 'plain text', '{not-json', JSON.stringify(['x']), undefined]) {
+        mockApi.PATCH_PoolFundingAlignment.mockResolvedValue(conflict(errors));
+        const result = await service.patchAlignment('RES-001', { has_contribution: true });
+        expect(result).toEqual({ ok: false, status: 409, description: 'ConflictException' });
       }
     });
+  });
+});
 
-    it('getTocCatalog shares one in-flight request for the same result code', async () => {
-      const d = deferred<MainResponse<BilateralTocCatalogResponse>>();
-      mockApi.GET_PoolFundingHlosIndicators.mockReturnValue(d.promise);
-      const first = service.getTocCatalog('STAR-7');
-      const second = service.getTocCatalog('7');
-      d.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_CAPSHARING_FIXTURE));
-      expect(await first).toEqual(await second);
-      expect(mockApi.GET_PoolFundingHlosIndicators).toHaveBeenCalledTimes(1);
-    });
+// R-PPI-006 / D-7 — real ApiService + HttpTestingController. A mocked
+// GET_PoolFundingAlignment cannot see the path bilateralPath builds, and setting
+// currentAlignment directly cannot prove the fetch (KZ-001, KZ-015).
+describe('BilateralService getAlignment for TIP (HttpTestingController)', () => {
+  let service: BilateralService;
+  let httpMock: HttpTestingController;
+  let cache: CacheService;
 
-    it('getTocCatalog ignores a stale response when a newer request has started', async () => {
-      const d1 = deferred<MainResponse<BilateralTocCatalogResponse>>();
-      const d2 = deferred<MainResponse<BilateralTocCatalogResponse>>();
-      mockApi.GET_PoolFundingHlosIndicators.mockReturnValueOnce(d1.promise).mockReturnValueOnce(d2.promise);
-      const first = service.getTocCatalog('1');
-      const second = service.getTocCatalog('2');
-      d1.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_CAPSHARING_FIXTURE));
-      expect(await first).toBeNull();
-      expect(service.tocCatalog()).toBeNull();
-      expect(service.loadingTocCatalog()).toBe(true);
-      d2.resolve(ok<BilateralTocCatalogResponse>(TOC_CATALOG_TWO_SP_FIXTURE));
-      expect(await second).toEqual(TOC_CATALOG_TWO_SP_FIXTURE);
-      expect(service.loadingTocCatalog()).toBe(false);
+  const writableAlignment: AlignmentResponse = {
+    result_code: '123',
+    eligible: true,
+    has_pool_funding_alignment_eligible: true,
+    has_contribution: false,
+    selected_levers: [],
+    is_synced_to_prms: false,
+    is_read_only: false,
+    display_only: true,
+    version_locked: false
+  };
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        BilateralService,
+        ApiService,
+        ToPromiseService,
+        CacheService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: RolesService, useValue: { canAccessCenterAdmin: signal(true) } },
+        { provide: CurrentResultService, useValue: { isCurrentUserOwner: signal(true) } },
+        { provide: ControlListCacheService, useValue: {} },
+        {
+          provide: SignalEndpointService,
+          useValue: {
+            createEndpoint: () => ({ get: jest.fn(), post: jest.fn() })
+          }
+        }
+      ]
     });
+    service = TestBed.inject(BilateralService);
+    httpMock = TestBed.inject(HttpTestingController);
+    cache = TestBed.inject(CacheService);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('getAlignment(TIP-123) issues one request to the numeric path and stays not editable after the response', async () => {
+    expect(service.currentAlignment()).toBeNull();
+    expect(service.editable()).toBe(false);
+
+    cache.setCurrentResultId('TIP-123');
+    expect(service.editable()).toBe(false);
+
+    const pending = service.getAlignment('TIP-123');
+    expect(service.currentAlignment()).toBeNull();
+
+    const req = httpMock.expectOne(incoming => incoming.method === 'GET' && incoming.url.includes('pool-funding-alignment'));
+    expect(req.request.url).toBe(`${environment.mainApiUrl}v1/results/123/pool-funding-alignment`);
+
+    req.flush({ data: writableAlignment, status: 200, description: 'OK' });
+    const result = await pending;
+
+    expect(result).toEqual(writableAlignment);
+    expect(service.currentAlignment()).toEqual(writableAlignment);
+    expect(service.editable()).toBe(false);
+  });
+
+  it('getAlignment(AICCRA-1) issues no alignment request', async () => {
+    const result = await service.getAlignment('AICCRA-1');
+
+    expect(result).toBeNull();
+    httpMock.expectNone(incoming => incoming.url.includes('pool-funding-alignment'));
   });
 });

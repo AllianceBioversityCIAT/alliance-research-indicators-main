@@ -51,8 +51,12 @@
 // overlay with appendTo="body", so the panel escapes component encapsulation.
 // Long HLO/indicator descriptions must wrap inside a panel that matches the
 // trigger width and scrolls vertically — never expand to the longest label.
+// Policy Change innovation link pickers share this panel: their rows (code,
+// title, status tag) must wrap inside the field width instead of stretching
+// the overlay to the screen.
 .p-select-overlay.sp-toc-select-panel,
-.p-select-overlay.bil-mapping-picker-panel {
+.p-select-overlay.bil-mapping-picker-panel,
+.p-select-overlay.policy-change-link-panel {
   max-width: min(40rem, calc(100vw - 2rem)) !important;
   overflow-x: hidden;
 
@@ -69,6 +73,17 @@
     text-overflow: unset !important;
     line-height: 1.3;
     height: auto;
+    max-width: 100%;
+  }
+}
+
+// The link option is a flex row (bold code, wrapping title, status tag) inside
+// a PrimeNG option that is itself a nowrap flex row. The shared rules wrap the
+// option text; this lets the row shrink to the panel so the title breaks.
+.p-select-overlay.policy-change-link-panel {
+  .p-select-option > span {
+    flex: 1 1 auto;
+    min-width: 0;
     max-width: 100%;
   }
 }

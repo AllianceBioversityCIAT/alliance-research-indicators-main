@@ -4,13 +4,27 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { AppConfigService } from '../app-config/app-config.service';
+import { DegreesEnum } from '../degrees/enum/degrees.enum';
+import { DeliveryModalityEnum } from '../delivery-modalities/enum/delivery-modalities.enum';
 import { IndicatorsEnum } from '../indicators/enum/indicators.enum';
 import { ResultStatusEnum } from '../result-status/enum/result-status.enum';
+import { SessionLengthEnum } from '../session-lengths/enum/session-lengths.enum';
+import { ReportingPlatformEnum } from '../results/enum/reporting-platform.enum';
+import { ClarisaGeoScopeEnum } from '../../tools/clarisa/entities/clarisa-geo-scope/enum/clarisa-geo-scope.enum';
+import { PrmsSyncAggregate } from '../../tools/prms-normalizer/dto/prms-sync-aggregate';
 import { PrmsNormalizerRequestDto } from '../../tools/prms-normalizer/dto/prms-normalizer.dto';
 import { PrmsSyncOutcome } from '../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
 import { PRMS_RESULT_CODE_ABSENT } from '../../tools/prms-normalizer/response/prms-sync-response.interpreter';
+import { CapacitySharingBuilder } from '../../tools/prms-normalizer/builders/capacity-sharing.builder';
+import {
+  CommonFieldsBuilder,
+  PrmsPayloadBuildError,
+} from '../../tools/prms-normalizer/builders/common-fields.builder';
+import { InnovationDevelopmentBuilder } from '../../tools/prms-normalizer/builders/innovation-development.builder';
+import { InnovationUseBuilder } from '../../tools/prms-normalizer/builders/innovation-use.builder';
+import { KnowledgeProductBuilder } from '../../tools/prms-normalizer/builders/knowledge-product.builder';
 import { PayloadBuilder } from '../../tools/prms-normalizer/builders/payload.builder';
-import { PrmsPayloadBuildError } from '../../tools/prms-normalizer/builders/common-fields.builder';
+import { PolicyChangeBuilder } from '../../tools/prms-normalizer/builders/policy-change.builder';
 import { PrmsNormalizerService } from '../../tools/prms-normalizer/prms-normalizer.service';
 import { AppConfig } from '../../shared/utils/app-config.util';
 import { CurrentUserUtil } from '../../shared/utils/current-user.util';
@@ -255,6 +269,67 @@ describe('ResultPrmsSyncService', () => {
     );
   });
 
+  it('2025 vs 2026 is a reporting_year refusal: log insert not called and Normalizer not called', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ report_year: 2025, reporting_year: 2026 }),
+    );
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.claimAttempt).not.toHaveBeenCalled();
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).message).toContain('2025');
+    expect((refusal as ConflictException).message).toContain('2026');
+  });
+
+  it('already-synced 2025 is refused as not_already_synced, ahead of reporting_year', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({
+        is_synced_to_prms: true,
+        report_year: 2025,
+        reporting_year: 2026,
+      }),
+    );
+
+    await expect(service.sync(42)).rejects.toMatchObject({
+      message: PRMS_SYNC_ALREADY_SYNCED,
+    });
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+  });
+
+  it('calls the Normalizer when report_year and reporting_year are absent', async () => {
+    const result = await service.sync(42);
+
+    expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+    expect(normalizer.ingest).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a null result year against a non-2026 reporting year without a log row', async () => {
+    logRepository.loadGateSnapshot.mockResolvedValue(
+      eligibleFacts({ report_year: null, reporting_year: 2027 }),
+    );
+
+    let refusal: unknown;
+    try {
+      await service.sync(42);
+    } catch (error) {
+      refusal = error;
+    }
+
+    expect(refusal).toBeInstanceOf(ConflictException);
+    expect((refusal as ConflictException).message).toContain('2027');
+    expect(normalizer.ingest).not.toHaveBeenCalled();
+    expect(logRepository.insertRefusedByStar).not.toHaveBeenCalled();
+  });
+
   it('persists REFUSED_BY_STAR only when the gate says persistsRow', async () => {
     logRepository.loadGateSnapshot.mockResolvedValue(
       eligibleFacts({ pool_funding_alignment_green: false }),
@@ -490,6 +565,19 @@ describe('ResultPrmsSyncService', () => {
     );
   });
 
+  it('passes the stored PRMS result code through to settle', async () => {
+    aggregateRepository.loadByResultId.mockResolvedValue({
+      result_id: 42,
+      prms_result_code: 9475,
+    });
+
+    await service.sync(42);
+
+    expect(
+      logRepository.settleIfInFlight.mock.calls[0][0].storedPrmsResultCode,
+    ).toBe(9475);
+  });
+
   it('settles ACCEPTED with the PRMS result_code and records its absence when missing', async () => {
     const first = await service.sync(42);
     expect(first.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
@@ -564,13 +652,16 @@ describe('ResultPrmsSyncService', () => {
       // slot here to populate them with. That every one of them lands as a
       // NULL literal in the emitted INSERT is proven by the repository's
       // own spec (KZ-001: a property in generated SQL is asserted there).
+      // NULL results.platform_code is STAR. The history code is the bare
+      // official code (1001), not the payload reference (ARI-1001).
       const arg =
         outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
       expect(arg).toEqual({
         userId: 7,
         occurredAt: expect.any(Date),
         environment: 'TEST',
-        resultOfficialCode: 'ARI-1001',
+        platformCode: 'STAR',
+        resultOfficialCode: '1001',
         resultYear: 2026,
         prmsResultCode: 9199,
       });
@@ -579,11 +670,82 @@ describe('ResultPrmsSyncService', () => {
           'userId',
           'occurredAt',
           'environment',
+          'platformCode',
           'resultOfficialCode',
           'resultYear',
           'prmsResultCode',
         ].sort(),
       );
+    });
+
+    it('a STAR push whose payload reference is the bare code binds that same code', async () => {
+      aggregateRepository.loadByResultId.mockResolvedValue({
+        result_id: 42,
+        platform_code: 'STAR',
+      });
+      payloadBuilder.build.mockReturnValue(
+        envelope({ external_reference: '1001' }),
+      );
+      normalizer.ingest.mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-star',
+          results: [
+            {
+              success: true,
+              external_reference: '1001',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+
+      await service.sync(42);
+
+      const arg =
+        outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
+      // HEAD wrote the payload reference. For STAR that reference is the
+      // bare code, so the bound code is byte-identical and the platform
+      // column is the addition.
+      expect(arg.platformCode).toBe('STAR');
+      expect(arg.resultOfficialCode).toBe('1001');
+    });
+
+    it('a TIP push passes platform TIP and the bare code, not TIP-123', async () => {
+      logRepository.claimAttempt.mockResolvedValue({
+        kind: 'claimed',
+        attemptId: 9,
+        attemptNumber: 1,
+        resultOfficialCode: 123,
+        resultYear: 2026,
+      });
+      aggregateRepository.loadByResultId.mockResolvedValue({
+        result_id: 42,
+        platform_code: 'TIP',
+      });
+      payloadBuilder.build.mockReturnValue(
+        envelope({ external_reference: 'TIP-123' }),
+      );
+      normalizer.ingest.mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-tip',
+          results: [
+            {
+              success: true,
+              external_reference: 'TIP-123',
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+
+      await service.sync(42);
+
+      const arg =
+        outboundHistoryRepository.recordOutboundPendingReview.mock.calls[0][0];
+      expect(arg.platformCode).toBe('TIP');
+      expect(arg.resultOfficialCode).toBe('123');
     });
 
     it('Falsifier 1 — a throwing history write does NOT fail an otherwise-successful push, and is logged at error', async () => {
@@ -721,6 +883,413 @@ describe('ResultPrmsSyncService', () => {
       await service.sync(42);
 
       expect(outboundHistoryRepository.recordDelivery).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('TIP_SYNC authorship and toc_mapping (R-TPP-004, R-TPP-005)', () => {
+    const AUTHOR_A = {
+      email: 'submitter.a@cgiar.org',
+      first_name: 'Submitter',
+      last_name: 'Alpha',
+    };
+    const STORED_B = {
+      email: 'legacy.b@cgiar.org',
+      first_name: 'Legacy',
+      last_name: 'Beta',
+    };
+    const CREATED_AT = new Date('2024-03-01T10:00:00.000Z');
+    const HISTORY_AT = new Date('2019-11-02T08:00:00.000Z');
+    const TIP_TOC = {
+      science_program_id: 'SP01',
+      aow_compose_code: 'SP01-AOW05',
+      result_title: 'TIP result title',
+    };
+    const STORED_ALIGNMENT_TITLE = 'STORED-ALIGNMENT-TITLE';
+
+    const emptySlices = () => ({
+      capacity_sharing: null,
+      innovation_dev: null,
+      policy_change: null,
+      innovation_use: null,
+      actors: [],
+      institution_types: [],
+      quantifications: [],
+    });
+
+    const buildableAggregate = (
+      overrides: Partial<PrmsSyncAggregate> = {},
+    ): PrmsSyncAggregate => ({
+      result_id: 42,
+      result_official_code: 1001,
+      platform_code: ReportingPlatformEnum.STAR,
+      prms_result_code: null,
+      indicator_id: IndicatorsEnum.CAPACITY_SHARING_FOR_DEVELOPMENT,
+      created_at: CREATED_AT,
+      title: 'TIP push fixture',
+      description: 'A description the builder will accept',
+      geo_scope_id: ClarisaGeoScopeEnum.THIS_IS_YET_TO_BE_DETERMINED,
+      is_partner_not_applicable: true,
+      created_by: STORED_B,
+      submitted_by: {
+        staff: STORED_B,
+        submitted_date: HISTORY_AT,
+        comment: 'approved in STAR',
+      },
+      lead_contact: STORED_B,
+      primary_contract: {
+        agreement_id: 'C-POOL-001',
+        clarisa_project_short_name: 'B-C-POOL-001',
+        clarisa_external_code: 'C-POOL-001',
+        description: 'Pool grant',
+        ubwClientDescription: 'ExCIAT',
+        is_primary: true,
+      },
+      contracts: [],
+      science_programs: [
+        {
+          sp_code: 'STORED-SP',
+          sp_role: 'PRIMARY',
+          toc_result_id: 77,
+          toc_result_title: STORED_ALIGNMENT_TITLE,
+          indicator_description: 'stored indicator',
+          quantitative_contribution: 3,
+          aligns_with_toc: true,
+        },
+      ],
+      regions: [],
+      countries: [],
+      subnational_areas: [],
+      partners: [],
+      evidence: [],
+      type_slices: {
+        ...emptySlices(),
+        capacity_sharing: {
+          session_participants_female: 3,
+          session_participants_male: 2,
+          session_participants_non_binary: 0,
+          degree_id: DegreesEnum.OTHER,
+          session_length_id: SessionLengthEnum.SHORT_TERM,
+          delivery_modality_id: DeliveryModalityEnum.VIRTUAL,
+        },
+      },
+      ...overrides,
+    });
+
+    const tipKpAggregate = (
+      overrides: Partial<PrmsSyncAggregate> = {},
+    ): PrmsSyncAggregate =>
+      buildableAggregate({
+        result_official_code: 19191,
+        platform_code: ReportingPlatformEnum.TIP,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        evidence: [
+          {
+            link: 'https://hdl.handle.net/10568/148990',
+            description: 'Handled',
+            is_private: false,
+          },
+        ],
+        type_slices: emptySlices(),
+        ...overrides,
+      });
+
+    const realService = (): ResultPrmsSyncService =>
+      new ResultPrmsSyncService(
+        logRepository as unknown as ResultPrmsSyncLogRepository,
+        aggregateRepository as unknown as ResultPrmsSyncAggregateRepository,
+        new PayloadBuilder(
+          new CommonFieldsBuilder(),
+          new CapacitySharingBuilder(),
+          new InnovationDevelopmentBuilder(),
+          new PolicyChangeBuilder(),
+          new InnovationUseBuilder(),
+          new KnowledgeProductBuilder(),
+        ),
+        normalizer as unknown as PrmsNormalizerService,
+        appConfigService as unknown as AppConfigService,
+        { ARI_IS_PRODUCTION: false } as unknown as AppConfig,
+        { user_id: 7 } as unknown as CurrentUserUtil,
+        outboundHistoryRepository as unknown as PrmsWebhookDeliveryRepository,
+      );
+
+    const acceptIngest = (externalReference: string) => {
+      normalizer.ingest.mockResolvedValue({
+        status: 200,
+        body: {
+          requestId: 'Root=req-tip',
+          results: [
+            {
+              success: true,
+              external_reference: externalReference,
+              result: { result_code: 9199 },
+            },
+          ],
+        },
+      });
+    };
+
+    const ingestedData = (): Record<string, unknown> => {
+      const payload = normalizer.ingest.mock
+        .calls[0][0] as PrmsNormalizerRequestDto;
+      return payload.results[0].data as Record<string, unknown>;
+    };
+
+    const refusalReason = async (
+      run: () => Promise<unknown>,
+    ): Promise<string> => {
+      let refusal: unknown;
+      try {
+        await run();
+      } catch (error) {
+        refusal = error;
+      }
+      expect(refusal).toBeInstanceOf(PrmsSyncPersistedRefusalException);
+      return (
+        (refusal as PrmsSyncPersistedRefusalException).responseData
+          .failure_reason ?? ''
+      );
+    };
+
+    it('uses the run author for created_by and submitted_by, not results.created_by (JD-7)', async () => {
+      const snapshot = eligibleFacts({
+        platform_code: 'TIP',
+        result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        result_official_code: 19191,
+      });
+      logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
+      aggregateRepository.loadByResultId.mockResolvedValue(tipKpAggregate());
+      acceptIngest('TIP-19191');
+
+      const result = await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(snapshot.origin).toBe('TIP_SYNC');
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      const data = ingestedData();
+      expect(data.created_by).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+      });
+      expect(data.submitted_by).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+        submitted_date: CREATED_AT.toISOString(),
+      });
+      expect(data.created_by).not.toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+      });
+      const toc = data.toc_mapping as Record<string, unknown>;
+      expect(toc.science_program_id).toBe('SP01');
+      expect(toc.aow_compose_code).toBe('SP01-AOW05');
+      expect(JSON.stringify(data)).not.toContain(STORED_ALIGNMENT_TITLE);
+      expect(JSON.stringify(data)).not.toContain('STORED-SP');
+    });
+
+    it('records REFUSED_BY_STAR and does not call PRMS when the author is null (R-TPP-005)', async () => {
+      const snapshot = eligibleFacts({
+        platform_code: 'TIP',
+        result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+      });
+      logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
+      aggregateRepository.loadByResultId.mockResolvedValue(tipKpAggregate());
+
+      const reason = await refusalReason(() =>
+        realService().sync(42, {
+          origin: 'TIP_SYNC',
+          author: null,
+          tocMapping: TIP_TOC,
+        }),
+      );
+
+      expect(reason).toBe("Missing mandatory field 'created_by'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
+      expect(logRepository.settleIfInFlight).toHaveBeenCalledWith(
+        expect.objectContaining({
+          outcome: PrmsSyncOutcome.REFUSED_BY_STAR,
+          failureReason: "Missing mandatory field 'created_by'",
+        }),
+      );
+    });
+
+    const expectStoredAlignmentNotEmitted = async (
+      tocMapping: typeof TIP_TOC | null | undefined,
+    ) => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(tipKpAggregate());
+
+      const options =
+        tocMapping === undefined
+          ? { origin: 'TIP_SYNC' as const, author: AUTHOR_A }
+          : {
+              origin: 'TIP_SYNC' as const,
+              author: AUTHOR_A,
+              tocMapping,
+            };
+      const reason = await refusalReason(() => realService().sync(42, options));
+
+      expect(reason).toBe("Missing mandatory field 'toc_mapping'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
+      expect(JSON.stringify(normalizer.ingest.mock.calls)).not.toContain(
+        STORED_ALIGNMENT_TITLE,
+      );
+      expect(JSON.stringify(normalizer.ingest.mock.calls)).not.toContain(
+        'STORED-SP',
+      );
+    };
+
+    it('refuses a missing tocMapping and never emits the stored alignment (JD-6)', async () => {
+      await expectStoredAlignmentNotEmitted(undefined);
+    });
+
+    it('refuses a null tocMapping and never emits the stored alignment (JD-6)', async () => {
+      await expectStoredAlignmentNotEmitted(null);
+    });
+
+    it('without origin leaves the snapshot unset, passes no overrides, and keeps submission_history submitted_by', async () => {
+      const snapshot = eligibleFacts();
+      logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
+      const aggregate = buildableAggregate();
+      aggregateRepository.loadByResultId.mockResolvedValue(aggregate);
+      acceptIngest('1001');
+
+      const result = await realService().sync(42);
+
+      expect(snapshot.origin).toBeUndefined();
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      const data = ingestedData();
+      expect(data.created_by).toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+      });
+      expect(data.submitted_by).toEqual({
+        email: STORED_B.email,
+        name: 'Legacy Beta',
+        submitted_date: HISTORY_AT.toISOString(),
+        comment: 'approved in STAR',
+      });
+      const toc = data.toc_mapping as Record<string, unknown>;
+      expect(toc.science_program_id).toBe('STORED-SP');
+      expect(toc.result_title).toBe(STORED_ALIGNMENT_TITLE);
+      expect(toc.aow_compose_code).toBeUndefined();
+    });
+
+    it('sends a TIP sync with a null description and omits the description key (DD-10)', async () => {
+      const snapshot = eligibleFacts({
+        platform_code: 'TIP',
+        result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+        indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+        result_official_code: 19191,
+      });
+      logRepository.loadGateSnapshot.mockResolvedValue(snapshot);
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ description: null }),
+      );
+      acceptIngest('TIP-19191');
+
+      const result = await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(normalizer.ingest).toHaveBeenCalled();
+      expect('description' in ingestedData()).toBe(false);
+    });
+
+    it('refuses a STAR result with a null description and does not call PRMS (DD-10)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        buildableAggregate({ description: null }),
+      );
+
+      const reason = await refusalReason(() => realService().sync(42));
+
+      expect(reason).toBe("Missing mandatory field 'description'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
+    });
+
+    const LEAD_L = {
+      email: 'lead.contact@cgiar.org',
+      first_name: 'Lead',
+      last_name: 'Contact',
+    };
+
+    it('uses the run author as lead_contact_person when the TIP contact is empty (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ lead_contact: null }),
+      );
+      acceptIngest('TIP-19191');
+
+      const result = await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(result.outcome).toBe(PrmsSyncOutcome.ACCEPTED);
+      expect(ingestedData().lead_contact_person).toEqual({
+        email: AUTHOR_A.email,
+        name: 'Submitter Alpha',
+      });
+    });
+
+    it('keeps a present lead contact when the TIP sync also has an author (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(
+        eligibleFacts({
+          platform_code: 'TIP',
+          result_status_id: ResultStatusEnum.COMPLETED_IN_TIP,
+          indicator_id: IndicatorsEnum.KNOWLEDGE_PRODUCT,
+          result_official_code: 19191,
+        }),
+      );
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        tipKpAggregate({ lead_contact: LEAD_L }),
+      );
+      acceptIngest('TIP-19191');
+
+      await realService().sync(42, {
+        origin: 'TIP_SYNC',
+        author: AUTHOR_A,
+        tocMapping: TIP_TOC,
+      });
+
+      expect(ingestedData().lead_contact_person).toEqual({
+        email: LEAD_L.email,
+        name: 'Lead Contact',
+      });
+    });
+
+    it('refuses a STAR result with an empty lead contact and does not call PRMS (DD-11b)', async () => {
+      logRepository.loadGateSnapshot.mockResolvedValue(eligibleFacts());
+      aggregateRepository.loadByResultId.mockResolvedValue(
+        buildableAggregate({ lead_contact: null }),
+      );
+
+      const reason = await refusalReason(() => realService().sync(42));
+
+      expect(reason).toBe("Missing mandatory field 'lead_contact_person'");
+      expect(normalizer.ingest).not.toHaveBeenCalled();
     });
   });
 });

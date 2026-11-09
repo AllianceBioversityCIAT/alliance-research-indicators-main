@@ -3,14 +3,20 @@
     <div class="flex items-center {{ showTag && !shouldShowWorkflow() ? 'pb-1' : 'pb-0' }}">
       @if (showTag) {
       <div class="flex items-center gap-2">
-        <i class="pi pi-chart-pie !text-[12px] text-[#F58220] pt-0.5"></i>
-        <span class="text-[12px] text-[#8D9299] font-[400] !font-[Space_Grotesk] pr-1 pt-0.5">OICR
+        <i class="pi pi-chart-pie !text-[12px] !leading-none text-[#F58220]"></i>
+        <span class="text-[12px] leading-none text-[#8D9299] font-[400] !font-[Space_Grotesk] pr-1">OICR
           @if (data?.['result_official_code'] !== null && data?.['result_official_code'] !== undefined) {
           <span class="text-[12px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">
             {{ data?.['result_official_code'] }}
           </span>
           }
         </span>
+        @if (data?.['report_year']) {
+        <span class="flex items-center gap-1.5 pl-1 pr-2" data-testid="oicr-header-report-year" [attr.title]="'Reporting year ' + data?.['report_year']">
+          <i class="pi pi-calendar !text-[12px] !leading-none text-[#F58220]" aria-hidden="true"></i>
+          <span class="text-[12px] leading-none text-[#8D9299] font-[400] !font-[Space_Grotesk]"><span class="sr-only">Reporting year </span>{{ data?.['report_year'] }}</span>
+        </span>
+        }
         @if (shouldShowWorkflow()) {
         <app-oicr-workflow-status [currentStatusId]="data?.['status_id'] ?? null"
           [statusDescription]="data?.['status_config']?.description ?? ''"
@@ -23,13 +29,19 @@
           [statusBorder]="data?.['status_config']?.config?.color?.border ?? ''" [icon]="true"
           [iconName]="data?.['status_config']?.config?.icon?.name ?? ''"
           [iconColor]="data?.['status_config']?.config?.icon?.color ?? ''"
-          [tooltip]="data?.['status_config']?.description ?? ''" class="pb-1" [maxWidth]="'150px'"></app-custom-tag>
+          [tooltip]="data?.['status_config']?.description ?? ''" class="flex items-center" [maxWidth]="'150px'"></app-custom-tag>
         }
       </div>
       } @else {
       <div class="flex items-center gap-2">
-        <i class="pi pi-chart-pie !text-[12px] text-[#F58220]"></i>
-        <span class="text-[11px] text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
+        <i class="pi pi-chart-pie !text-[12px] !leading-none text-[#F58220]"></i>
+        <span class="text-[11px] leading-none text-[#8D9299] font-[400] !font-[Space_Grotesk]">OICR</span>
+        @if (data?.['report_year']) {
+        <span class="flex items-center gap-1.5 pl-1" data-testid="oicr-header-report-year" [attr.title]="'Reporting year ' + data?.['report_year']">
+          <i class="pi pi-calendar !text-[12px] !leading-none text-[#F58220]" aria-hidden="true"></i>
+          <span class="text-[11px] leading-none text-[#8D9299] font-[400] !font-[Space_Grotesk]"><span class="sr-only">Reporting year </span>{{ data?.['report_year'] }}</span>
+        </span>
+        }
       </div>
       }
     </div>

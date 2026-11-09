@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { TextareaComponent } from '../../../../../../shared/components/custom-fields/textarea/textarea.component';
 import { SelectComponent } from '../../../../../../shared/components/custom-fields/select/select.component';
 import { MultiselectComponent } from '../../../../../../shared/components/custom-fields/multiselect/multiselect.component';
@@ -16,6 +16,9 @@ import { SubmissionService } from '@shared/services/submission.service';
 import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
 import { VersionWatcherService } from '@shared/services/version-watcher.service';
 import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
+import { GetPolicyChangeLinkableResultsService } from '@shared/services/control-list/get-policy-change-linkable-results.service';
+import { formatInnovationDevCode, formatInnovationDevLabel } from '../innovation-use-details/innovation-use-details.component';
+import { CustomTagComponent } from '@shared/components/custom-tag/custom-tag.component';
 
 /** STAR policy_types id for "Program, Budget, or Investment". */
 const PROGRAM_BUDGET_OR_INVESTMENT_TYPE_ID = 3;
@@ -34,7 +37,8 @@ const PROGRAM_BUDGET_OR_INVESTMENT_TYPE_ID = 3;
     FormHeaderComponent,
     FormsModule,
     TooltipModule,
-    PartnerSelectedItemComponent
+    PartnerSelectedItemComponent,
+    CustomTagComponent
   ]
 })
 export default class PolicyChangeComponent {
@@ -43,6 +47,17 @@ export default class PolicyChangeComponent {
   cache = inject(CacheService);
   actions = inject(ActionsService);
   route = inject(ActivatedRoute);
+  linkableResults = inject(GetPolicyChangeLinkableResultsService);
+  readonly formatInnovationDevLabel = formatInnovationDevLabel;
+  readonly formatInnovationDevCode = formatInnovationDevCode;
+
+  /** §5.1 — disabled from this indicator's own loading, error, list, and editability. */
+  innovationDevelopmentDisabled = computed(() => this.isLinkPickerDisabled(2));
+  innovationUseDisabled = computed(() => this.isLinkPickerDisabled(6));
+  innovationDevelopmentTooltip = computed(() =>
+    this.linkPickerTooltip(2, 'There are no reported Innovation Development outputs to link.')
+  );
+  innovationUseTooltip = computed(() => this.linkPickerTooltip(6, 'There are no reported Innovation Use results to link.'));
 
   router = inject(Router);
   body = signal<GetPolicyChange>({});
@@ -67,6 +82,21 @@ export default class PolicyChangeComponent {
   canRemove = (): boolean => {
     return this.submission.isEditableStatus();
   };
+
+  private isLinkPickerDisabled(indicatorId: number): boolean {
+    if (this.linkableResults.getLoading(indicatorId)()) return true;
+    if (this.linkableResults.getError(indicatorId)()) return true;
+    if (this.linkableResults.getList(indicatorId)().length === 0) return true;
+    return !this.submission.isEditableStatus();
+  }
+
+  private linkPickerTooltip(indicatorId: number, emptyText: string): string {
+    const stillLoading = this.linkableResults.getLoading(indicatorId)();
+    const failed = this.linkableResults.getError(indicatorId)();
+    const empty = this.linkableResults.getList(indicatorId)().length === 0;
+    if (!stillLoading && !failed && empty) return emptyText;
+    return '';
+  }
 
   isProgramBudgetOrInvestment(): boolean {
     return this.body().policy_type_id === PROGRAM_BUDGET_OR_INVESTMENT_TYPE_ID;

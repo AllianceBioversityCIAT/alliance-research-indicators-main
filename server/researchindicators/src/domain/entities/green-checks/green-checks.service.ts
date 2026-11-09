@@ -608,41 +608,54 @@ export class GreenChecksService {
         'Result not found or not approved for new reporting cycle',
       );
     }
-    const result = await this.dataSource
-      .getRepository(Result)
-      .findOne({
-        where: {
-          result_official_code: resultCode,
-          is_active: true,
-          is_snapshot: false,
-        },
-      })
-      .then(async (result) => {
-        const newHistory = this.createHistoryObject(
-          result.result_id,
-          result.result_status_id,
-          ResultStatusEnum.DRAFT,
-          null,
-        );
-        await this.saveHistory(result.result_id, newHistory);
-        return result;
-      });
-
-    await repoResult.update(
-      {
-        result_official_code: resultCode,
-        is_snapshot: false,
-        is_active: true,
-      },
-      {
-        report_year_id: newReportYear,
-        result_status_id: ResultStatusEnum.DRAFT,
-        ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
-      },
+    // @sdd-spec docs/specs/bilateral/pool-funding-update-carryover — T-01 (design §2, §6, D-6, D-7)
+    // Status/year change and the Pool Funding carry-over commit together;
+    // the history row is written only after that commit.
+    const newHistory = this.createHistoryObject(
+      tempResult.result_id,
+      tempResult.result_status_id,
+      ResultStatusEnum.DRAFT,
+      null,
     );
 
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Result).update(
+        {
+          result_official_code: resultCode,
+          is_snapshot: false,
+          is_active: true,
+        },
+        {
+          report_year_id: newReportYear,
+          result_status_id: ResultStatusEnum.DRAFT,
+          ...this.currentUserUtil.audit(SetAuditEnum.UPDATE),
+        },
+      );
+
+      const snapshot = await manager.getRepository(Result).findOne({
+        where: {
+          result_official_code: resultCode,
+          report_year_id: newReportYear,
+          is_snapshot: true,
+          is_active: true,
+        },
+        order: { result_id: 'DESC' },
+      });
+
+      if (snapshot) {
+        await this.greenCheckRepository.carryOverPoolFunding(
+          manager,
+          tempResult.result_id,
+          snapshot.result_id,
+          this.currentUserUtil.user_id,
+        );
+      }
+    });
+
+    await this.saveHistory(tempResult.result_id, newHistory);
+
     return {
-      ...result,
+      ...tempResult,
       report_year_id: newReportYear,
       result_status_id: ResultStatusEnum.DRAFT,
     };

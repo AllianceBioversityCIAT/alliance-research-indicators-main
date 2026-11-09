@@ -4,6 +4,7 @@ import { TocIntegrationService } from '../../tools/toc-integration/toc-integrati
 import { TocResult } from '../../tools/toc-integration/dto/toc-integration.types';
 import { DeliveryCorrelationOutcome } from './enum/delivery-correlation-outcome.enum';
 import { PoolFundingMappingApplyService } from './pool-funding-mapping-apply.service';
+import { ReportingYearResolver } from '../../shared/utils/reporting-year.resolver';
 import { PrmsWebhookCallbackModule } from './prms-webhook-callback.module';
 
 // KZ-001 — assertions are on the SQL text and the parameter arrays.
@@ -52,6 +53,7 @@ const catalogResult = (): TocResult =>
         targets: [
           { target_value: '12', target_date: '2025' },
           { target_value: '40', target_date: '2026' },
+          { target_value: '91', target_date: '2027' },
         ],
       },
     ],
@@ -140,6 +142,7 @@ interface SnapshotRow {
   result_id: number;
   result_official_code: string;
   report_year_id: number;
+  platform_code: string;
   is_snapshot: boolean;
   is_active: boolean;
 }
@@ -154,6 +157,7 @@ class FakeApplyDb {
       result_id: RESULT_ID,
       result_official_code: CODE,
       report_year_id: YEAR,
+      platform_code: 'STAR',
       is_snapshot: false,
       is_active: true,
     },
@@ -161,6 +165,7 @@ class FakeApplyDb {
       result_id: VERSION_RESULT_ID,
       result_official_code: CODE,
       report_year_id: YEAR,
+      platform_code: 'STAR',
       is_snapshot: true,
       is_active: true,
     },
@@ -232,10 +237,15 @@ class FakeApplyDb {
     const wantsSnapshot = /is_snapshot\s*=\s*TRUE\b/i.test(sql);
     const wantsLive = /is_snapshot\s*=\s*FALSE\b/i.test(sql);
     const wantsActive = /is_active\s*=\s*TRUE\b/i.test(sql);
-    const code = params[0];
-    const year = params[1];
+    const filtersPlatform = /\bplatform_code\b/i.test(sql);
+    const platform = filtersPlatform ? params[0] : null;
+    const code = filtersPlatform ? params[1] : params[0];
+    const year = filtersPlatform ? params[2] : params[1];
     return this.snapshots
       .filter((row) => {
+        if (filtersPlatform && (row.platform_code ?? 'STAR') !== platform) {
+          return false;
+        }
         if (row.result_official_code !== code || row.report_year_id !== year) {
           return false;
         }
@@ -288,8 +298,10 @@ describe('PoolFundingMappingApplyService', () => {
   let warn: jest.SpyInstance;
   let errorLog: jest.SpyInstance;
   let catalog: FakeTocCatalog;
+  let resolveYear: jest.Mock;
 
   beforeEach(() => {
+    resolveYear = jest.fn().mockResolvedValue(2026);
     db = new FakeApplyDb();
     warn = jest
       .spyOn(LoggerUtil.prototype, '_warn')
@@ -301,6 +313,9 @@ describe('PoolFundingMappingApplyService', () => {
     service = new PoolFundingMappingApplyService(
       db as unknown as DataSource,
       catalog as unknown as TocIntegrationService,
+      {
+        resolve: resolveYear,
+      } as unknown as ReportingYearResolver,
     );
   });
 
@@ -327,6 +342,7 @@ describe('PoolFundingMappingApplyService', () => {
     db.history = {
       decision: 'APPROVE',
       correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+      platform_code: 'STAR',
       result_official_code: CODE,
       result_year: YEAR,
       changes: titleChange(),
@@ -359,6 +375,7 @@ describe('PoolFundingMappingApplyService', () => {
     db.history = {
       decision: 'APPROVE',
       correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+      platform_code: 'STAR',
       result_official_code: CODE,
       result_year: YEAR,
       changes: {
@@ -391,12 +408,40 @@ describe('PoolFundingMappingApplyService', () => {
     db.tocs = [tocRow()];
   };
 
+  it('writes targetYear from the configured reporting year when it is 2027', async () => {
+    resolveYear.mockResolvedValue(2027);
+    armIndicatorCase();
+
+    await apply();
+
+    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME', 2027);
+    const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
+    expect(inserted).toBeDefined();
+    expect((inserted as RecordedQuery).params).toEqual(
+      expect.arrayContaining(['91', 2027]),
+    );
+    expectSql(inserted as RecordedQuery, INSERT_TOC_SQL, [
+      VERSION_RESULT_ID,
+      'SP06',
+      INHERITED.aligns_with_toc,
+      INHERITED.level,
+      7169,
+      CATALOG_INDICATOR_ID,
+      '55',
+      'New title',
+      'Landscapes with an active plan',
+      'Landscapes',
+      '91',
+      2027,
+    ]);
+  });
+
   it('writes the callback indicator, not the inherited one, when the ToC result moves', async () => {
     armIndicatorCase();
 
     await apply();
 
-    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME');
+    expect(catalog.getTocResults).toHaveBeenCalledWith('SP06', 'OUTCOME', 2026);
     const inserted = writes().find((query) => /^\s*INSERT\b/i.test(query.sql));
     expect(inserted).toBeDefined();
     expectSql(inserted as RecordedQuery, INSERT_TOC_SQL, [
@@ -529,7 +574,7 @@ describe('PoolFundingMappingApplyService', () => {
       expect(snapshot).toBeDefined();
       expect(flat(snapshot?.sql ?? '')).toContain('is_snapshot = TRUE');
       expect(flat(snapshot?.sql ?? '')).toContain('is_active = TRUE');
-      expect(snapshot?.params).toEqual([CODE, YEAR]);
+      expect(snapshot?.params).toEqual(['STAR', CODE, YEAR]);
       const alignment = db.queries.find(
         (query) =>
           /^\s*SELECT\b/i.test(query.sql) &&
@@ -592,6 +637,7 @@ describe('PoolFundingMappingApplyService', () => {
       db.history = {
         decision: 'APPROVE',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        platform_code: 'STAR',
         result_official_code: CODE,
         result_year: YEAR,
         changes: {
@@ -659,6 +705,7 @@ describe('PoolFundingMappingApplyService', () => {
       db.history = {
         decision: 'APPROVE',
         correlation_outcome: DeliveryCorrelationOutcome.CORRELATED,
+        platform_code: 'STAR',
         result_official_code: CODE,
         result_year: YEAR,
         changes: {
@@ -816,6 +863,7 @@ describe('PoolFundingMappingApplyService', () => {
         result_id: VERSION_RESULT_ID + 1,
         result_official_code: CODE,
         report_year_id: YEAR,
+        platform_code: 'STAR',
         is_snapshot: true,
         is_active: true,
       });
@@ -826,6 +874,60 @@ describe('PoolFundingMappingApplyService', () => {
       expect(db.transaction).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0][0])).toContain('2 active snapshots');
+    });
+  });
+
+  describe('R-PPI-002 — mapping apply stays on the history platform', () => {
+    const TIP_SNAPSHOT_ID = VERSION_RESULT_ID + 7;
+
+    it('resolves the snapshot of the history row platform when TIP and STAR share the code and year', async () => {
+      armTitleCase({ platform_code: 'TIP' });
+      db.snapshots = [
+        {
+          result_id: RESULT_ID,
+          result_official_code: CODE,
+          report_year_id: YEAR,
+          platform_code: 'STAR',
+          is_snapshot: false,
+          is_active: true,
+        },
+        {
+          result_id: VERSION_RESULT_ID,
+          result_official_code: CODE,
+          report_year_id: YEAR,
+          platform_code: 'STAR',
+          is_snapshot: true,
+          is_active: true,
+        },
+        {
+          result_id: TIP_SNAPSHOT_ID,
+          result_official_code: CODE,
+          report_year_id: YEAR,
+          platform_code: 'TIP',
+          is_snapshot: true,
+          is_active: true,
+        },
+      ];
+
+      await apply();
+
+      const history = db.queries.find((query) =>
+        /FROM\s+result_prms_sync_history/i.test(query.sql),
+      );
+      expect(history).toBeDefined();
+      expect(flat(history?.sql ?? '')).toContain('platform_code');
+      const snapshot = db.queries.find((query) =>
+        /\bFROM\s+results\b/i.test(query.sql),
+      );
+      expect(snapshot).toBeDefined();
+      expect(flat(snapshot?.sql ?? '')).toBe(
+        "SELECT result_id FROM results WHERE COALESCE(platform_code, 'STAR') = ? AND result_official_code = ? AND report_year_id = ? AND is_snapshot = TRUE AND is_active = TRUE",
+      );
+      expect(snapshot?.params).toEqual(['TIP', CODE, YEAR]);
+      const toc = db.queries.find((query) =>
+        /result_pool_funding_toc_alignment/i.test(query.sql),
+      );
+      expect(toc?.params).toEqual([TIP_SNAPSHOT_ID]);
     });
   });
 

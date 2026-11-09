@@ -80,6 +80,7 @@ const useAggregate = (
 ): PrmsSyncAggregate => ({
   result_id: 9004,
   result_official_code: 1441064,
+  prms_result_code: null,
   indicator_id: 6,
   created_at: new Date('2024-03-01T10:00:00.000Z'),
   title: 'Innovation use type-block fixture',

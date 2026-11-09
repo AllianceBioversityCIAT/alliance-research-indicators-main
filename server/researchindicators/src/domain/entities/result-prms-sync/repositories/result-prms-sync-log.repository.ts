@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { PrmsSyncOutcome } from '../../../tools/prms-normalizer/enum/prms-sync-outcome.enum';
+import { prmsRef } from '../../../tools/prms-normalizer/reference/prms-external-reference';
+import { ReportingPlatformEnum } from '../../results/enum/reporting-platform.enum';
 import { PolicyTypeHomologation } from '../../../tools/open-search/prms/homologation/policy-type.homologation';
 import { AppConfigKey } from '../../app-config/enum/app-config-key.enum';
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
@@ -8,9 +10,21 @@ import { isFeatureFlagEnabled } from '../../../shared/utils/feature-flag.util';
 import { SyncGateSnapshot } from '../eligibility/sync-gate';
 import { PRMS_IN_FLIGHT_LIVE_WINDOW_MS } from '../result-prms-sync.constants';
 import { LoggerUtil } from '../../../shared/utils/logger.util';
+import { ReportingYearResolver } from '../../../shared/utils/reporting-year.resolver';
 
 const asBoolean = (value: unknown): boolean =>
   value === true || value === 1 || value === '1';
+
+/** NULL `results.platform_code` is STAR, matching the payload builder (`??`). */
+const platformCodeOf = (
+  row: { platform_code?: unknown } | undefined,
+): ReportingPlatformEnum => {
+  const raw = row?.platform_code;
+  if (typeof raw !== 'string') {
+    return ReportingPlatformEnum.STAR;
+  }
+  return raw as ReportingPlatformEnum;
+};
 
 const asOk = (
   result: unknown,
@@ -83,6 +97,12 @@ export interface SettleIfInFlightInput {
   externalReference?: string | null;
   prmsResultCode?: number | null;
   prmsPhaseId?: number | null;
+  /**
+   * Code already stored on the pushed version, threaded from the aggregate.
+   * Used only to warn when PRMS returns a different non-null code. The
+   * UPDATE itself never overwrites an existing code.
+   */
+  storedPrmsResultCode?: number | null;
 }
 
 export interface InsertRefusedByStarInput {
@@ -98,7 +118,10 @@ export class ResultPrmsSyncLogRepository {
     name: 'ResultPrmsSyncLogRepository',
   });
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly reportingYearResolver: ReportingYearResolver,
+  ) {}
 
   /**
    * R-PFT-003: a missing row, a non-`false` value, or a failed read is enabled.
@@ -125,6 +148,7 @@ export class ResultPrmsSyncLogRepository {
   }
 
   async loadGateSnapshot(resultId: number): Promise<PrmsSyncGateFacts> {
+    const reportingYear = await this.reportingYearResolver.resolve();
     const missing: PrmsSyncGateFacts = {
       exists: false,
       result_id: null,
@@ -136,6 +160,8 @@ export class ResultPrmsSyncLogRepository {
       indicator_id: null,
       prms_policy_type_id: null,
       prms_sync_button_enabled: false,
+      report_year: null,
+      reporting_year: reportingYear,
     };
 
     const rows = await this.dataSource.query(
@@ -146,6 +172,8 @@ export class ResultPrmsSyncLogRepository {
         r.is_synced_to_prms,
         r.result_status_id,
         r.indicator_id,
+        r.report_year_id,
+        r.platform_code,
         pool_funding_alignment_validation(r.result_id) AS alignment_green,
         ac.agreement_id,
         ${effectivePoolFundingContributorSql('ac')} AS is_pool_funding_contributor,
@@ -197,6 +225,10 @@ export class ResultPrmsSyncLogRepository {
         row.policy_type_id == null ? null : Number(row.policy_type_id),
       ),
       prms_sync_button_enabled: prmsSyncButtonEnabled,
+      report_year:
+        row.report_year_id == null ? null : Number(row.report_year_id),
+      reporting_year: reportingYear,
+      platform_code: platformCodeOf(row),
     };
   }
 
@@ -222,7 +254,8 @@ export class ResultPrmsSyncLogRepository {
   ): Promise<ClaimDecision> {
     const resultRows = await manager.query(
       `
-      SELECT result_id, result_official_code, report_year_id, is_synced_to_prms
+      SELECT result_id, result_official_code, report_year_id, is_synced_to_prms,
+             platform_code
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
@@ -237,17 +270,15 @@ export class ResultPrmsSyncLogRepository {
     }
 
     const resultOfficialCode = Number(resultRow.result_official_code);
-    // The log now keys on (official code, year) rather than the surrogate
-    // `result_id`. That is the identity PRMS uses -- `result_official_code` is sent
-    // as `external_reference` -- so an in-flight claim covers every `results` row
-    // sharing it (a live row and its snapshots), which is exactly the set that
-    // would otherwise be pushed to PRMS twice under one external reference.
+    // The log keys on (platform, external_reference, year), not the surrogate
+    // `result_id`. An in-flight claim covers every `results` row that would be
+    // pushed to PRMS under that reference. NULL platform is STAR, the same rule
+    // the payload builder uses, so the claim and the payload are one string.
+    // Written here, at CLAIM time, so rows that never reach PRMS
+    // (REFUSED_BY_STAR, expired UNKNOWN) carry it too.
     const resultYear = Number(resultRow.report_year_id);
-    // `external_reference` IS the official code -- the payload builder sends the
-    // same value -- so it doubles as the log's identity column and no separate
-    // code column is stored. Written here, at CLAIM time, so rows that never
-    // reach PRMS (REFUSED_BY_STAR, expired UNKNOWN) carry it too.
-    const externalReference = String(resultOfficialCode);
+    const platformCode = platformCodeOf(resultRow);
+    const externalReference = prmsRef(platformCode, resultOfficialCode);
 
     if (asBoolean(resultRow.is_synced_to_prms)) {
       return { kind: 'already_synced', resultOfficialCode };
@@ -257,13 +288,14 @@ export class ResultPrmsSyncLogRepository {
       `
       SELECT id, attempt_number, created_at
       FROM result_prms_sync_log
-      WHERE external_reference = ?
+      WHERE platform_code = ?
+        AND external_reference = ?
         AND result_year = ?
         AND outcome = ?
         AND is_active = TRUE
       FOR UPDATE
       `,
-      [externalReference, resultYear, PrmsSyncOutcome.IN_FLIGHT],
+      [platformCode, externalReference, resultYear, PrmsSyncOutcome.IN_FLIGHT],
     );
 
     const inFlight = inFlightRows[0];
@@ -307,26 +339,29 @@ export class ResultPrmsSyncLogRepository {
       `
       SELECT COALESCE(MAX(attempt_number), 0) AS max_attempt
       FROM result_prms_sync_log
-      WHERE external_reference = ?
+      WHERE platform_code = ?
+        AND external_reference = ?
         AND result_year = ?
       `,
-      [externalReference, resultYear],
+      [platformCode, externalReference, resultYear],
     );
     const attemptNumber = Number(nextRows[0]?.max_attempt ?? 0) + 1;
 
     const insertResult = await manager.query(
       `
       INSERT INTO result_prms_sync_log
-        (external_reference, result_year, attempt_number,
+        (platform_code, external_reference, result_year, attempt_number,
          environment, outcome, created_by, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, TRUE)
+      VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)
       `,
-      // 7 columns, 6 placeholders + literal TRUE. Keep this list and the array
+      // 8 columns, 7 placeholders + literal TRUE. Keep this list and the array
       // below in lockstep: a stray extra param shifts every value one column to
       // the right, and MySQL reports it at the FIRST type mismatch it reaches
       // ("Incorrect integer value: 'IN_FLIGHT' for column 'created_by'"), not at
-      // the column that is actually wrong.
+      // the column that is actually wrong. platform_code is NOT NULL with no
+      // default, so omitting it fails the insert.
       [
+        platformCode,
         externalReference,
         resultYear,
         attemptNumber,
@@ -364,7 +399,7 @@ export class ResultPrmsSyncLogRepository {
   ): Promise<{ attemptId: number; attemptNumber: number }> {
     const lockRows = await manager.query(
       `
-      SELECT result_id, result_official_code, report_year_id
+      SELECT result_id, result_official_code, report_year_id, platform_code
       FROM results
       WHERE result_id = ?
         AND is_active = TRUE
@@ -378,28 +413,31 @@ export class ResultPrmsSyncLogRepository {
     const lockedRow = lockRows[0];
     const resultOfficialCode = Number(lockedRow?.result_official_code);
     const resultYear = Number(lockedRow?.report_year_id);
-    const externalReference = String(resultOfficialCode);
+    const platformCode = platformCodeOf(lockedRow);
+    const externalReference = prmsRef(platformCode, resultOfficialCode);
 
     const nextRows = await manager.query(
       `
       SELECT COALESCE(MAX(attempt_number), 0) AS max_attempt
       FROM result_prms_sync_log
-      WHERE external_reference = ?
+      WHERE platform_code = ?
+        AND external_reference = ?
         AND result_year = ?
       `,
-      [externalReference, resultYear],
+      [platformCode, externalReference, resultYear],
     );
     const attemptNumber = Number(nextRows[0]?.max_attempt ?? 0) + 1;
 
     const insertResult = await manager.query(
       `
       INSERT INTO result_prms_sync_log
-        (external_reference, result_year, attempt_number,
+        (platform_code, external_reference, result_year, attempt_number,
          environment, outcome, failure_reason, prms_type, http_status,
          request_id, request_payload, response_body, created_by, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, TRUE)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, ?, TRUE)
       `,
       [
+        platformCode,
         externalReference,
         resultYear,
         attemptNumber,
@@ -508,6 +546,12 @@ export class ResultPrmsSyncLogRepository {
    * Best-effort metadata write, deliberately OUTSIDE the settle transaction and
    * deliberately unable to throw.
    *
+   * `prms_result_code` is immutable once set. The UPDATE assigns
+   * `COALESCE(prms_result_code, ?)`, so an existing code never changes and a
+   * null response code never erases one. `prms_phase_id` is always written.
+   * When the pushed version already holds a code and PRMS returns a different
+   * non-null code, the stored value is kept and the mismatch is logged.
+   *
    * These two columns are descriptive: nothing reads them to make a decision.
    * Losing them costs a lookup; losing the settle costs correctness. So a failure
    * here is logged loudly and swallowed, leaving a diagnosable mismatch (an
@@ -516,11 +560,13 @@ export class ResultPrmsSyncLogRepository {
   private async recordAcceptedPrmsMetadata(
     input: SettleIfInFlightInput,
   ): Promise<void> {
+    this.warnIfStoredPrmsResultCodeMismatch(input);
+
     try {
       await this.dataSource.query(
         `
         UPDATE results
-        SET prms_result_code = ?,
+        SET prms_result_code = COALESCE(prms_result_code, ?),
             prms_phase_id = ?
         WHERE result_id = ?
         `,
@@ -535,6 +581,79 @@ export class ResultPrmsSyncLogRepository {
         `PRMS metadata not stored for result ${input.resultId} (attempt ${input.attemptId}): ` +
           `the sync IS recorded as ACCEPTED and is_synced_to_prms is set, but prms_result_code / ` +
           `prms_phase_id were not written. Do NOT re-sync. Cause: ${
+            (error as Error)?.message ?? error
+          }`,
+      );
+    }
+
+    await this.recordPrmsResultCodeOnLiveVersion(input);
+  }
+
+  /**
+   * The COALESCE in the pushed-version UPDATE already keeps the stored code.
+   * This only makes the disagreement visible: a re-push whose PRMS response
+   * carries a different non-null code must not look like a silent success.
+   */
+  private warnIfStoredPrmsResultCodeMismatch(
+    input: SettleIfInFlightInput,
+  ): void {
+    const stored = input.storedPrmsResultCode;
+    const returned = input.prmsResultCode;
+    if (stored == null || returned == null || stored === returned) {
+      return;
+    }
+
+    this.logger._warn(
+      `PRMS result code mismatch for result ${input.resultId}: stored ${stored}, returned ${returned}. The stored code is immutable and was kept.`,
+    );
+  }
+
+  /**
+   * The push is made from a version (snapshot) row, but the PRMS code must also
+   * be visible on the live version of the same result. Only the code is copied:
+   * the phase belongs to the version that was sent, not to the live row, and
+   * is never written here.
+   *
+   * A result has one PRMS code. The value bound here is the code already stored
+   * on the pushed version when there is one (`storedPrmsResultCode`), otherwise
+   * the code PRMS just returned. A re-push that returns a different code must
+   * not plant that new code on a live row whose copy was missed earlier.
+   *
+   * The live code is immutable too. The UPDATE matches only rows whose
+   * `prms_result_code` is still NULL, so a live row that already holds a code
+   * is never overwritten. The write is skipped only when both the stored code
+   * and the returned code are null.
+   *
+   * Same best-effort contract as the snapshot write, in its own try so that one
+   * failing never skips the other.
+   */
+  private async recordPrmsResultCodeOnLiveVersion(
+    input: SettleIfInFlightInput,
+  ): Promise<void> {
+    const code = input.storedPrmsResultCode ?? input.prmsResultCode;
+    if (code == null) {
+      return;
+    }
+
+    try {
+      await this.dataSource.query(
+        `
+        UPDATE results live
+        INNER JOIN results pushed
+          ON pushed.result_official_code = live.result_official_code
+         AND live.platform_code = COALESCE(pushed.platform_code, 'STAR')
+        SET live.prms_result_code = ?
+        WHERE pushed.result_id = ?
+          AND live.is_snapshot = FALSE
+          AND live.is_active = TRUE
+          AND live.prms_result_code IS NULL
+        `,
+        [code, input.resultId],
+      );
+    } catch (error) {
+      this.logger._error(
+        `PRMS result code not stored on the live version of result ${input.resultId} (attempt ${input.attemptId}): ` +
+          `the sync IS recorded as ACCEPTED, but the live row has no prms_result_code. Do NOT re-sync. Cause: ${
             (error as Error)?.message ?? error
           }`,
       );

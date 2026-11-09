@@ -39,6 +39,7 @@ const HISTORY_COLUMNS = [
   'occurred_at',
   'environment',
   'correlation_outcome',
+  'platform_code',
   'result_official_code',
   'result_year',
   'prms_result_id',
@@ -96,6 +97,7 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   delivery.environment = row.environment as string;
   delivery.correlation_outcome =
     row.correlation_outcome as DeliveryCorrelationOutcome;
+  delivery.platform_code = (row.platform_code as string | null) ?? null;
   delivery.result_official_code =
     (row.result_official_code as string | null) ?? null;
   delivery.result_year = asNullableNumber(row.result_year);
@@ -124,11 +126,13 @@ const toDelivery = (row: RawDeliveryRow): PrmsWebhookDelivery => {
   return delivery;
 };
 
-const asOk = (result: unknown): { insertId?: number } => {
+const asOk = (
+  result: unknown,
+): { insertId?: number; affectedRows?: number } => {
   if (Array.isArray(result)) {
-    return (result[0] ?? {}) as { insertId?: number };
+    return (result[0] ?? {}) as { insertId?: number; affectedRows?: number };
   }
-  return (result ?? {}) as { insertId?: number };
+  return result ?? {};
 };
 
 /**
@@ -144,6 +148,12 @@ export interface RecordDeliveryInput {
     DeliveryCorrelationOutcome,
     DeliveryCorrelationOutcome.DUPLICATE
   >;
+  /**
+   * Parsed platform, or null when the reference did not parse
+   * (design §7.3). The delivery service computes this with `parsePrmsRef`
+   * before insert; this method stores the pair it is given.
+   */
+  platform_code: string | null;
   result_official_code: string | null;
   prms_result_id: number | null;
   prms_result_code: number | null;
@@ -186,6 +196,15 @@ export interface RecordOutboundPendingReviewInput {
   userId: number | null;
   occurredAt: Date;
   environment: string;
+  /**
+   * Platform of the pushed result. A NULL `results.platform_code` is STAR
+   * before it reaches this method (design §7.5).
+   */
+  platformCode: string;
+  /**
+   * Bare official code. STAR's payload reference is already this value;
+   * a prefixed reference is not stored here (design §7.3, D-3).
+   */
   resultOfficialCode: string | null;
   /**
    * `results.report_year_id`, already read by the claim. Paired with
@@ -194,6 +213,25 @@ export interface RecordOutboundPendingReviewInput {
    */
   resultYear: number;
   prmsResultCode: number | null;
+}
+
+/**
+ * One history row for a PRMS result imported as a STAR result
+ * (`fetch-prms-data-as-star`). There was no real push or callback, so the
+ * row carries only what the PRMS search index knows: no `delivery_id`, no
+ * reviewer, no justification, and `{}` for every JSON column.
+ */
+export interface RecordImportedHistoryInput {
+  resultOfficialCode: string;
+  resultYear: number;
+  prmsResultCode: number | null;
+  environment: string;
+  occurredAt: Date;
+  eventSource: 'STAR' | 'PRMS';
+  status: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  decision: 'APPROVE' | 'REJECT' | null;
+  decidedAt: Date | null;
+  actorUserId: number | null;
 }
 
 @Injectable()
@@ -282,15 +320,15 @@ export class PrmsWebhookDeliveryRepository {
       `
       INSERT INTO result_prms_sync_history
         (delivery_id, occurred_at, environment, correlation_outcome,
-         result_official_code, result_year, prms_result_id, prms_result_code,
-         decision, justification, decided_at, raw_body, raw_headers,
-         processing_state, processing_error, duplicate_of_id, created_by,
-         is_active, event_source, status, actor_user_id, reviewer_name,
-         reviewer_role, science_program_code, changes)
-      VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
+         platform_code, result_official_code, result_year, prms_result_id,
+         prms_result_code, decision, justification, decided_at, raw_body,
+         raw_headers, processing_state, processing_error, duplicate_of_id,
+         created_by, is_active, event_source, status, actor_user_id,
+         reviewer_name, reviewer_role, science_program_code, changes)
+      VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, TRUE,
               ?, ?, NULL, ?, NULL, NULL, NULL)
       `,
-      // 25 columns, 17 placeholders + 8 literals (result_year,
+      // 26 columns, 18 placeholders + 8 literals (result_year,
       // processing_error and created_by are NULL at insert; is_active is
       // TRUE; the four Pivot columns this ingest path still cannot
       // populate -- actor_user_id (outbound only), reviewer_role and
@@ -311,6 +349,7 @@ export class PrmsWebhookDeliveryRepository {
         input.occurred_at,
         input.environment,
         correlationOutcome,
+        input.platform_code,
         input.result_official_code,
         input.prms_result_id,
         input.prms_result_code,
@@ -339,10 +378,10 @@ export class PrmsWebhookDeliveryRepository {
   }
 
   /**
-   * History for one STAR result, in received order (R-PWH-005 AC.8).
-   * Keyed on the durable pair (`result_official_code`, `result_year`), not
+   * History for one result, in received order (R-PWH-005 AC.8).
+   * Keyed on (`platform_code`, `result_official_code`, `result_year`), not
    * on an internal id: overwriting a version deletes the id and would take
-   * the history with it.
+   * the history with it (design §7.3, D-6).
    * Plain read, no transaction, no lock, no `is_active` filter — nothing in
    * this spec flips that flag, and filtering on it would be a way to hide
    * history rows.
@@ -350,6 +389,7 @@ export class PrmsWebhookDeliveryRepository {
   async findHistoryByResultCodeAndYear(
     resultOfficialCode: string,
     resultYear: number,
+    platformCode: string,
   ): Promise<PrmsWebhookDelivery[]> {
     const rows = await this.dataSource.query(
       `
@@ -357,24 +397,28 @@ export class PrmsWebhookDeliveryRepository {
       FROM result_prms_sync_history
       WHERE result_official_code = ?
         AND result_year = ?
+        AND platform_code = ?
       ORDER BY occurred_at ASC, id ASC
       `,
-      [resultOfficialCode, resultYear],
+      [resultOfficialCode, resultYear, platformCode],
     );
     return (rows as RawDeliveryRow[]).map(toDelivery);
   }
 
   /**
-   * History across every result, uncorrelated rows (`result_year IS NULL`)
-   * included, in received order (R-PWH-005 AC.8). Deliberately no WHERE.
+   * History for one platform, in received order (R-PWH-005 AC.8, D-6).
+   * No code or year filter. A NULL platform (never parsed) is not this
+   * platform, so those rows stay out.
    */
-  async findHistory(): Promise<PrmsWebhookDelivery[]> {
+  async findHistory(platformCode: string): Promise<PrmsWebhookDelivery[]> {
     const rows = await this.dataSource.query(
       `
       SELECT ${HISTORY_COLUMNS}
       FROM result_prms_sync_history
+      WHERE platform_code = ?
       ORDER BY occurred_at ASC, id ASC
       `,
+      [platformCode],
     );
     return (rows as RawDeliveryRow[]).map(toDelivery);
   }
@@ -404,21 +448,22 @@ export class PrmsWebhookDeliveryRepository {
       `
       INSERT INTO result_prms_sync_history
         (delivery_id, occurred_at, environment, correlation_outcome,
-         result_official_code, result_year, prms_result_id, prms_result_code,
-         decision, justification, decided_at, raw_body, raw_headers,
-         processing_state, processing_error, duplicate_of_id, created_by,
-         is_active, event_source, status, actor_user_id, reviewer_name,
-         reviewer_role, science_program_code, changes)
-      VALUES (NULL, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
+         platform_code, result_official_code, result_year, prms_result_id,
+         prms_result_code, decision, justification, decided_at, raw_body,
+         raw_headers, processing_state, processing_error, duplicate_of_id,
+         created_by, is_active, event_source, status, actor_user_id,
+         reviewer_name, reviewer_role, science_program_code, changes)
+      VALUES (NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, NULL, NULL, NULL, TRUE,
               ?, ?, ?, NULL, NULL, NULL, NULL)
       `,
-      // 25 columns, 10 placeholders + 15 literals. Kept in lockstep with
+      // 26 columns, 11 placeholders + 15 literals. Kept in lockstep with
       // the column list for the same reason `recordInsideLock` flags —
       // a stray param shifts every value one column right.
       [
         input.occurredAt,
         input.environment,
         DeliveryCorrelationOutcome.CORRELATED,
+        input.platformCode,
         input.resultOfficialCode,
         input.resultYear,
         input.prmsResultCode,
@@ -428,5 +473,105 @@ export class PrmsWebhookDeliveryRepository {
         input.userId,
       ],
     );
+  }
+  /**
+   * Replaces the imported history of one result/year in one transaction:
+   * deletes the rows a previous import wrote, then writes `rows`. Re-running
+   * the import therefore leaves one set of rows instead of piling them up.
+   *
+   * The DELETE is the single exception to this table being append-only
+   * (R-PWH-005), and it can only reach imported rows: they are the only ones
+   * with no `delivery_id` and `raw_headers = {}`. A PRMS callback always
+   * stores its real headers, and a STAR push stores NULL headers, so real
+   * history is never deleted. Both the DELETE and the NOT EXISTS dedupe
+   * also require `platform_code = 'STAR'` — imported history is STAR, and
+   * a TIP row with the same code and year must survive (design §7.3, P-12).
+   */
+  async replaceImportedHistory(
+    key: { resultOfficialCode: string; resultYear: number },
+    rows: RecordImportedHistoryInput[],
+  ): Promise<{ deleted: number; inserted: number }> {
+    return this.dataSource.transaction(async (manager) => {
+      const deleteResult = await manager.query(
+        `
+        DELETE FROM result_prms_sync_history
+        WHERE result_official_code = ?
+          AND result_year = ?
+          AND platform_code = 'STAR'
+          AND delivery_id IS NULL
+          AND raw_headers = JSON_OBJECT()
+        `,
+        [key.resultOfficialCode, key.resultYear],
+      );
+      let inserted = 0;
+      for (const row of rows) {
+        if (await this.insertImportedHistory(manager, row)) inserted++;
+      }
+      return {
+        deleted: Number(asOk(deleteResult).affectedRows ?? 0),
+        inserted,
+      };
+    });
+  }
+
+  /**
+   * Writes one imported row unless the result/year already has an active row
+   * with that source and status (a real push or callback, since the import's
+   * own rows were just deleted). Returns whether a row was inserted.
+   */
+  private async insertImportedHistory(
+    manager: EntityManager,
+    input: RecordImportedHistoryInput,
+  ): Promise<boolean> {
+    const result = await manager.query(
+      `
+      INSERT INTO result_prms_sync_history
+        (delivery_id, occurred_at, environment, correlation_outcome,
+         platform_code, result_official_code, result_year, prms_result_id,
+         prms_result_code, decision, justification, decided_at, raw_body,
+         raw_headers, processing_state, processing_error, duplicate_of_id,
+         created_by, is_active, event_source, status, actor_user_id,
+         reviewer_name, reviewer_role, science_program_code, changes)
+      SELECT NULL, ?, ?, ?, 'STAR', ?, ?, NULL, ?, ?, NULL, ?, ?, ?, ?, NULL, NULL, NULL, TRUE,
+             ?, ?, ?, NULL, NULL, NULL, ?
+      FROM DUAL
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM result_prms_sync_history
+        WHERE result_official_code = ?
+          AND result_year = ?
+          AND platform_code = 'STAR'
+          AND event_source = ?
+          AND status = ?
+          AND duplicate_of_id IS NULL
+          AND is_active = TRUE
+      )
+      `,
+      // 26 columns, 15 placeholders + 11 literals (`platform_code` is the
+      // literal STAR — imported history is STAR only), then the 4 NOT
+      // EXISTS params. Keep in lockstep with the column list.
+      [
+        input.occurredAt,
+        input.environment,
+        DeliveryCorrelationOutcome.CORRELATED,
+        input.resultOfficialCode,
+        input.resultYear,
+        input.prmsResultCode,
+        input.decision,
+        input.decidedAt,
+        '{}',
+        '{}',
+        DeliveryProcessingState.PROCESSED,
+        input.eventSource,
+        input.status,
+        input.actorUserId,
+        '{}',
+        input.resultOfficialCode,
+        input.resultYear,
+        input.eventSource,
+        input.status,
+      ],
+    );
+    return Number(asOk(result).affectedRows ?? 0) > 0;
   }
 }

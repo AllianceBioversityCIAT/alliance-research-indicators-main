@@ -68,6 +68,14 @@ describe('ResultRepository', () => {
       expect(sql).toContain('FROM results r');
       expect(sql).toContain("r.result_official_code as 'Code'");
     });
+
+    it('scopes approved versions by platform_code', async () => {
+      await repository.generalReport();
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(
+        /ry ON ry\.result_official_code = r\.result_official_code\s+AND ry\.platform_code = r\.platform_code/,
+      );
+    });
   });
 
   describe('filterByPrimaryContract', () => {
@@ -91,6 +99,16 @@ describe('ResultRepository', () => {
       } as Partial<ResultFiltersInterface>);
       const sql = querySpy.mock.calls[0][0] as string;
       expect(sql).toContain('LIMIT 5 OFFSET 5');
+    });
+
+    it('scopes snapshot_years by platform_code', async () => {
+      await repository.findResultsFilters(
+        {} as Partial<ResultFiltersInterface>,
+      );
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(
+        /r2 ON r\.result_official_code = r2\.result_official_code\s+AND r\.platform_code = r2\.platform_code/,
+      );
     });
 
     it('defaults sort to ASC and accepts DESC', async () => {
@@ -437,6 +455,25 @@ describe('ResultRepository', () => {
       expect(mainSql).toMatch(/IF\([\s\S]*AS public_link/);
     });
 
+    it('scopes snapshot versions by platform_code, not by official code alone', async () => {
+      querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
+      await repository.findResultsV2(
+        '644',
+        undefined,
+        undefined,
+        emptyFindResultsV2Filters(),
+      );
+      const mainSql = querySpy.mock.calls[1][0] as string;
+      expect(mainSql).toMatch(
+        /ON r2\.result_official_code = r\.result_official_code\s+AND r2\.platform_code = r\.platform_code/,
+      );
+      const snapshotExists = mainSql.match(
+        /WHERE s\.result_official_code = r\.result_official_code\s+AND s\.platform_code = r\.platform_code/g,
+      );
+      // one in the search WHERE, one in the relevance score
+      expect(snapshotExists).toHaveLength(2);
+    });
+
     it('omits search fragments when search is empty', async () => {
       querySpy.mockResolvedValueOnce([{ total: 0 }]).mockResolvedValueOnce([]);
       await repository.findResultsV2(
@@ -613,6 +650,15 @@ describe('ResultRepository', () => {
       // The pre-change raw projection must be gone.
       expect(sql).not.toContain(
         'COALESCE(ac.is_pool_funding_contributor, FALSE)',
+      );
+    });
+
+    // R-PRY-007 — the display-only rule needs the snapshot flag in the SELECT.
+    it('selects r.is_snapshot (R-PRY-007)', async () => {
+      await repository.findPoolFundingAlignmentContext(123);
+      const sql = querySpy.mock.calls[0][0] as string;
+      expect(sql).toMatch(
+        /SELECT[\s\S]*\br\.is_snapshot\b[\s\S]*FROM results r/,
       );
     });
 

@@ -3014,6 +3014,58 @@ describe('CreateOicrFormComponent', () => {
       expect(component.showEditPublishedOicrButton()).toBe(false);
     });
 
+    // Owner 2026-10-27: under "Review again", an always-visible note (never a hover) pointing to
+    // "Edit all OICR metadata" to take a Postponed / Not Accepted OICR up for a newer year. This spec
+    // swaps the template, so the real one is read: the note sits under the button's own condition.
+    it('the reuse note is plain visible text, shown only where the Edit all OICR metadata button is', () => {
+      const html: string = require('fs').readFileSync(
+        require('path').join(__dirname, 'create-oicr-form.component.html'),
+        'utf8'
+      );
+      const at = html.indexOf('data-testid="oicr-reuse-hint"');
+      expect(at).toBeGreaterThan(-1);
+      const guard = html.lastIndexOf('@if', at);
+      expect(html.slice(guard, html.indexOf('{', guard))).toContain('showEditPublishedOicrButton()');
+      const block = html.slice(at, html.indexOf('</p>', at));
+      expect(block).toContain('Want to report this OICR again for a newer year?');
+      expect(block).toContain('Edit all OICR metadata');
+      expect(block).not.toMatch(/pTooltip|tooltip/i);
+      // centred with its icon, in the grey of "Reviewed by" (owner)
+      const p = html.slice(html.lastIndexOf('<p', at), at);
+      expect(p).toContain('items-center');
+      expect(p).toContain('text-[#777c83]');
+      expect(block).not.toContain('#035BA9');
+      // under the Review again accordion header (Postponed / Not Accepted)
+      expect(html.lastIndexOf('<p-accordion-header', at)).toBeGreaterThan(-1);
+      expect(html.indexOf('Review again', at)).toBeGreaterThan(at);
+    });
+
+    // Owner 2026-10-27: a Not Accepted (15) OICR too, same rule as Postponed.
+    it('showEditPublishedOicrButton is true for admin on a Not Accepted (15) OICR, false for non-admin', () => {
+      mockCreateResultManagementService.editingOicr.set(true);
+      mockCreateResultManagementService.statusId.set(15);
+      mockRolesService.isAdmin.mockReturnValue(true);
+      expect(component.showEditPublishedOicrButton()).toBe(true);
+      mockRolesService.isAdmin.mockReturnValue(false);
+      // a fresh status write recomputes the signal after the role changed
+      mockCreateResultManagementService.statusId.set(14);
+      mockCreateResultManagementService.statusId.set(15);
+      expect(component.showEditPublishedOicrButton()).toBe(false);
+    });
+
+    // Owner 2026-10-26: a Postponed OICR can also be fully edited by an admin.
+    it('showEditPublishedOicrButton is true for admin on a Postponed (11) OICR, false for non-admin', () => {
+      mockCreateResultManagementService.editingOicr.set(true);
+      mockCreateResultManagementService.statusId.set(11);
+      mockRolesService.isAdmin.mockReturnValue(true);
+      expect(component.showEditPublishedOicrButton()).toBe(true);
+      mockRolesService.isAdmin.mockReturnValue(false);
+      // a fresh status write recomputes the signal after the role changed
+      mockCreateResultManagementService.statusId.set(14);
+      mockCreateResultManagementService.statusId.set(11);
+      expect(component.showEditPublishedOicrButton()).toBe(false);
+    });
+
     it('showEditPublishedOicrButton is false when status is not published', () => {
       mockCreateResultManagementService.editingOicr.set(true);
       mockCreateResultManagementService.statusId.set(10);

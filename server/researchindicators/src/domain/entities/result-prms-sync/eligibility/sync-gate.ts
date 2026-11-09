@@ -24,12 +24,34 @@ export interface SyncGateSnapshot {
    * exact disable string; a missing or unreadable row is enabled (R-PFT-003).
    */
   prms_sync_button_enabled: boolean;
+  /**
+   * `results.report_year_id`. Optional so existing snapshot builders compile
+   * (D-6). A null year is a mismatch when `reporting_year` is present.
+   * Raw SQL can surface the column as a string; the gate compares with Number().
+   */
+  report_year?: number | null;
+  /**
+   * Configured reporting year from ReportingYearResolver. Absent → the
+   * `reporting_year` gate passes (D-6).
+   */
+  reporting_year?: number;
+  /**
+   * `results.platform_code`. Optional so existing snapshot literals compile
+   * (JD-12). Absent is not TIP.
+   */
+  platform_code?: string | null;
+  /**
+   * Who is asking the gate. Absent is the HTTP route (`'HTTP'`, DD-1).
+   * Only server code sets `'TIP_SYNC'`; the column is not stored.
+   */
+  origin?: 'HTTP' | 'TIP_SYNC';
 }
 
 export type SyncGateEntryId =
   | 'feature_enabled'
   | 'result_exists'
   | 'not_already_synced'
+  | 'reporting_year'
   | 'approved'
   | 'alignment_green'
   | 'pool_funding_contributor'
@@ -43,8 +65,8 @@ export interface SyncGateEntry {
   fails: (snapshot: SyncGateSnapshot) => boolean;
   /**
    * JD-3: a refusal that is not a verdict about the result writes no log row
-   * (feature_enabled, result_exists, not_already_synced). Later entries write
-   * REFUSED_BY_STAR.
+   * (feature_enabled, result_exists, not_already_synced, reporting_year).
+   * Later entries write REFUSED_BY_STAR.
    */
   persistsRow: boolean;
 }
@@ -62,8 +84,22 @@ const UNMAPPABLE_INDICATORS = new Set<number>([
   IndicatorsEnum.OICR,
 ]);
 
+/**
+ * TIP equivalences apply only to the TIP sync's push (R-TPP-003, DD-1).
+ * Platform alone would also lift the HTTP route; origin alone would lift STAR.
+ */
+export function isTipSyncPush(snapshot: SyncGateSnapshot): boolean {
+  return snapshot.origin === 'TIP_SYNC' && snapshot.platform_code === 'TIP';
+}
+
 /** PRMS `policy_type.id = 1` — Program, Budget, or Investment (D-2). */
 const PRMS_POLICY_TYPE_PROGRAM_BUDGET_OR_INVESTMENT = 1;
+
+const reportingYearDescription = (snapshot: SyncGateSnapshot): string => {
+  const resultYear =
+    snapshot.report_year == null ? 'null' : String(snapshot.report_year);
+  return `Result year ${resultYear} is not the reporting year ${snapshot.reporting_year}`;
+};
 
 const contractDescription = (snapshot: SyncGateSnapshot): string => {
   const agreementId = snapshot.primary_contract?.agreement_id;
@@ -102,12 +138,25 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     persistsRow: false,
   },
   {
+    id: 'reporting_year',
+    httpStatus: HttpStatus.CONFLICT,
+    description: reportingYearDescription,
+    fails: (snapshot) =>
+      snapshot.reporting_year !== undefined &&
+      Number(snapshot.report_year) !== snapshot.reporting_year,
+    persistsRow: false,
+  },
+  {
     id: 'approved',
     httpStatus: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
       'Result is not Approved; only results with result_status_id = 6 can be sent to PRMS',
     fails: (snapshot) =>
-      snapshot.result_status_id !== ResultStatusEnum.APPROVED,
+      snapshot.result_status_id !== ResultStatusEnum.APPROVED &&
+      !(
+        isTipSyncPush(snapshot) &&
+        snapshot.result_status_id === ResultStatusEnum.COMPLETED_IN_TIP
+      ),
     persistsRow: true,
   },
   {
@@ -133,6 +182,12 @@ export const SYNC_GATE_ENTRIES: readonly SyncGateEntry[] = [
     fails: (snapshot) => {
       if (snapshot.indicator_id == null) {
         return true;
+      }
+      if (
+        isTipSyncPush(snapshot) &&
+        snapshot.indicator_id === IndicatorsEnum.KNOWLEDGE_PRODUCT
+      ) {
+        return false;
       }
       if (UNMAPPABLE_INDICATORS.has(snapshot.indicator_id)) {
         return true;

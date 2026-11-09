@@ -1,5 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import GeneralInformationComponent from './general-information.component';
+import { AgrovocKeywordsComponent } from '@shared/components/custom-fields/agrovoc-keywords/agrovoc-keywords.component';
+import { InputComponent } from '@shared/components/custom-fields/input/input.component';
+import { TextareaComponent } from '@shared/components/custom-fields/textarea/textarea.component';
+import { SelectComponent } from '@shared/components/custom-fields/select/select.component';
+import { FormHeaderComponent } from '@shared/components/form-header/form-header.component';
+import { NavigationButtonsComponent } from '@shared/components/navigation-buttons/navigation-buttons.component';
 import {
   actionsServiceMock,
   cacheServiceMock,
@@ -84,7 +91,13 @@ describe('GeneralInformationComponent', () => {
         { provide: Router, useValue: routerMock }
       ],
       schemas: [NO_ERRORS_SCHEMA]
-    }).compileComponents();
+    })
+      .overrideComponent(InputComponent, { set: { template: '' } })
+      .overrideComponent(TextareaComponent, { set: { template: '' } })
+      .overrideComponent(SelectComponent, { set: { template: '' } })
+      .overrideComponent(FormHeaderComponent, { set: { template: '' } })
+      .overrideComponent(NavigationButtonsComponent, { set: { template: '' } })
+      .compileComponents();
 
     fixture = TestBed.createComponent(GeneralInformationComponent);
     component = fixture.componentInstance;
@@ -207,9 +220,7 @@ describe('GeneralInformationComponent', () => {
     // A refresh failure must not turn a successful save into a rejected promise
     // or an error toast -- the save already committed on the server.
     await expect(component.saveData()).resolves.toBeUndefined();
-    expect((actionsService as any).showToast).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: 'success' })
-    );
+    expect((actionsService as any).showToast).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
   });
 
   it('should not call PATCH_GeneralInformation if not editable', async () => {
@@ -728,5 +739,111 @@ describe('GeneralInformationComponent', () => {
       if (getDataSpy.mock.calls.length > 0) break;
     }
     expect(getDataSpy).toHaveBeenCalled();
+  });
+
+  describe('AGROVOC keywords wiring', () => {
+    const loadedBody = (keywords: string[]): GeneralInformation => ({
+      title: 'Test Title',
+      description: 'Test Description',
+      year: '2024',
+      keywords,
+      user_id: '1',
+      main_contact_person: { user_id: '1' }
+    });
+
+    beforeAll(() => {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: jest.fn().mockImplementation((query: string) => ({
+          matches: false,
+          media: query,
+          onchange: null,
+          addListener: jest.fn(),
+          removeListener: jest.fn(),
+          addEventListener: jest.fn(),
+          removeEventListener: jest.fn(),
+          dispatchEvent: jest.fn()
+        }))
+      });
+    });
+
+    function keywordsField(): AgrovocKeywordsComponent {
+      const found = fixture.debugElement.query(By.directive(AgrovocKeywordsComponent));
+      expect(found).not.toBeNull();
+      return found.componentInstance as AgrovocKeywordsComponent;
+    }
+
+    function arrangeEditableSave(keywords: string[]): GeneralInformation {
+      const mockData = loadedBody(keywords);
+      (submissionService as any).isEditableStatus = jest.fn().mockReturnValue(true);
+      (cacheService as any).currentResultId = jest.fn().mockReturnValue(123);
+      (apiService as any).GET_GeneralInformation = jest.fn().mockResolvedValue({ data: mockData });
+      (apiService as any).PATCH_GeneralInformation = jest.fn().mockResolvedValue({
+        successfulRequest: true,
+        status: 200,
+        data: mockData
+      });
+      (apiService as any).GET_AgrovocSearch$ = jest.fn();
+      jest.spyOn(component.bilateralService, 'getAlignment').mockResolvedValue(null);
+      return mockData;
+    }
+
+    it('renders the real app-agrovoc-keywords control and the AGROVOC helper text', () => {
+      arrangeEditableSave([]);
+      fixture.detectChanges();
+
+      const field = keywordsField();
+      expect(field).toBeInstanceOf(AgrovocKeywordsComponent);
+      expect(field.keywords()).toEqual([]);
+      expect(fixture.nativeElement.querySelector('app-agrovoc-keywords p-select')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('p-autocomplete')).toBeNull();
+      expect(fixture.nativeElement.textContent).toContain(
+        'Search and select keywords from the AGROVOC thesaurus. Use relevant terms that describe the content of your result.'
+      );
+      expect(fixture.nativeElement.textContent).toContain('Max. 4 keywords');
+      expect(fixture.nativeElement.textContent).not.toContain('Press "Enter"');
+    });
+
+    it('sends keywords: ["beans"] after the child emits the picked term', async () => {
+      arrangeEditableSave([]);
+      component.body.set(loadedBody([]));
+      fixture.detectChanges();
+
+      keywordsField().onTermPicked({
+        originalEvent: new Event('change'),
+        value: { uri: 'urn:beans', label: 'beans', alreadySelected: false }
+      });
+      fixture.detectChanges();
+
+      await component.saveData();
+
+      expect((apiService as any).PATCH_GeneralInformation).toHaveBeenCalledWith(123, expect.objectContaining({ keywords: ['beans'] }));
+    });
+
+    it('keeps a loaded legacy keyword in the PATCH body when saving without edits', async () => {
+      const mockData = arrangeEditableSave(['In-Person']);
+      fixture.detectChanges();
+
+      await component.getData();
+      fixture.detectChanges();
+
+      expect(keywordsField().keywords()).toEqual(['In-Person']);
+
+      await component.saveData();
+
+      expect((apiService as any).PATCH_GeneralInformation).toHaveBeenCalledWith(123, expect.objectContaining({ keywords: mockData.keywords }));
+    });
+
+    it('disables the keywords control when the result becomes read-only after the first render', () => {
+      (submissionService as any).isEditableStatus = jest.fn().mockReturnValue(true);
+      fixture.detectChanges();
+      expect(keywordsField().disabled()).toBe(false);
+
+      (submissionService as any).isEditableStatus = jest.fn().mockReturnValue(false);
+      fixture.detectChanges();
+
+      expect(keywordsField().disabled()).toBe(true);
+    });
   });
 });
