@@ -46,6 +46,40 @@ export class PfmSyncedTypeDto {
   synced: number;
 }
 
+export class PfmJourneyDto {
+  @ApiProperty({
+    description:
+      'Contributing projects of the scope: total, with results, without results.',
+  })
+  projects: { total: number; with_results: number; without_results: number };
+  @ApiProperty({
+    description:
+      'Every result by STAR status. Draft includes Returned; Submitted includes Under review.',
+  })
+  star: { draft: number; submitted: number; approved: number };
+  @ApiProperty({
+    description: 'Approved results by their CGIAR Portfolio answer.',
+  })
+  answer: { not_answered: number; contributes: number; no_sp: number };
+  @ApiProperty({ description: 'Approved, contributing results by mapping.' })
+  mapping: { incomplete: number; complete: number };
+  @ApiProperty({
+    description:
+      'Approved, contributing, mapped results: ready to sync or synced (rejected is part of synced).',
+  })
+  sync: { ready: number; synced: number; rejected: number };
+}
+
+export class PfmPortfolioProjectDto {
+  @ApiProperty() code: string;
+  @ApiProperty({ nullable: true }) name: string | null;
+  @ApiProperty({ nullable: true }) lead_pi: string | null;
+  @ApiProperty({ type: [String], description: 'Active PI delegates.' })
+  delegates: string[];
+  @ApiProperty({ description: 'Monitored results of the project.' })
+  results: number;
+}
+
 export class PfmMonthlyDto {
   @ApiProperty({ example: '2026-10' }) month: string;
   @ApiProperty() synced: number;
@@ -125,6 +159,17 @@ export class PfmSummaryResponseDto {
       'Results already in PRMS (any review status) by result type, most first.',
   })
   synced_by_type: PfmSyncedTypeDto[];
+  @ApiProperty({
+    type: PfmJourneyDto,
+    description: 'Coverage tab stages, each a subset of the one before.',
+  })
+  journey: PfmJourneyDto;
+  @ApiProperty({
+    type: [PfmPortfolioProjectDto],
+    description:
+      'Contributing projects of the scope, most results first; projects without results included.',
+  })
+  portfolio_projects: PfmPortfolioProjectDto[];
   @ApiProperty({
     type: [PfmProjectProgressDto],
     description: 'Per project, furthest behind (most remaining) first.',
