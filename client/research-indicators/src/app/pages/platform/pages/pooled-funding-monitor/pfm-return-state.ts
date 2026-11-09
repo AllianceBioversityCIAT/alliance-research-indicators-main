@@ -2,7 +2,7 @@
 // Back) reopens the same projects on the same page (owner 2026-10-22). Same idea as the Results Center
 // view state: sessionStorage, this browser tab only. It is read ONCE: opening the monitor any other
 // way starts fresh. Storage can be missing or blocked: every access is guarded and failure means "no state".
-import { PfmChip, PfmFilters, PfmScope, PfmTab } from './pfm.interfaces';
+import { PfmChip, PfmFilters, PfmProjectsFilter, PfmScope, PfmTab } from './pfm.interfaces';
 
 /** One project table: page, rows per page, search and sort. */
 export interface PfmGroupView {
@@ -22,6 +22,10 @@ export interface PfmReturnState {
   chip: PfmChip | null;
   openGroups: string[];
   groupViews: Record<string, PfmGroupView>;
+  /** Portfolio coverage journey stage (0-based). Optional: snapshots saved before it existed omit it. */
+  coverageStage?: number;
+  /** Portfolio coverage stage 1 projects filter. Optional, as above. */
+  projectsFilter?: PfmProjectsFilter;
   /** The result that was opened: the page scrolls back to it. */
   resultCode: string | null;
 }
