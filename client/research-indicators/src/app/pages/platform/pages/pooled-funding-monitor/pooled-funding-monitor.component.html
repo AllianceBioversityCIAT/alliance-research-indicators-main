@@ -110,7 +110,12 @@
         } @else {
           @if (store.summary(); as summary) {
             @if (tab === 'coverage') {
-              <app-pfm-coverage-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
+              <app-pfm-coverage-tab
+                [summary]="summary"
+                [scope]="store.scope()"
+                [(stage)]="store.coverageStage"
+                [(projectsFilter)]="store.coverageProjectsFilter"
+                (openQueue)="store.openQueue($event)" />
             } @else {
               <app-pfm-stats-tab [summary]="summary" [scope]="store.scope()" (openQueue)="store.openQueue($event)" />
             }
