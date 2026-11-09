@@ -192,8 +192,12 @@ export class PfmJourneyCardComponent {
     ];
   });
 
+  /** How many stages there are and the last one's index; nothing assumes five. */
+  readonly stageCount = computed(() => this.stages().length);
+  readonly lastIndex = computed(() => this.stageCount() - 1);
+
   current = computed(() => {
-    const i = Math.max(0, Math.min(4, this.stage()));
+    const i = Math.max(0, Math.min(this.lastIndex(), this.stage()));
     const stage = this.stages()[i];
     const base = stage.parts.reduce((n, p) => n + p.value, 0);
     return {
@@ -211,12 +215,12 @@ export class PfmJourneyCardComponent {
     if (i === 0) {
       return `Next: Approve or reject results — ${fmt(this.reported())} results created by ${fmt(this.journey().projects.with_results)} projects.`;
     }
-    if (i < 4) return `Next: ${all[i + 1].title} — ${fmt(all[i + 1].value)} results continue.`;
+    if (i < this.lastIndex()) return `Next: ${all[i + 1].title} — ${fmt(all[i + 1].value)} results continue.`;
     return 'Last step. Once PRMS approves them, synced results are complete.';
   }
 
   select(i: number): void {
-    if (i < 0 || i > 4) return;
+    if (i < 0 || i > this.lastIndex()) return;
     this.stageChange.emit(i);
   }
 
