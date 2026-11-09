@@ -100,7 +100,7 @@ export class PfmJourneyCardComponent {
       {
         title: 'Create results per project',
         value: j.projects.total,
-        caption: 'bilateral projects',
+        caption: 'Bilateral projects',
         story: `${fmt(j.projects.with_results)} of ${fmt(j.projects.total)} bilateral projects (${pct(j.projects.with_results, j.projects.total)}) have created results in STAR. Every project mapped to the CGIAR portfolio is expected to report at least one result.`,
         parts: [
           { label: 'Projects with results', note: 'At least one result created in STAR', value: j.projects.with_results, color: PFM_STATE.complete.fill, kind: 'next' },
@@ -118,7 +118,7 @@ export class PfmJourneyCardComponent {
       {
         title: 'Approve or reject results',
         value: reported,
-        caption: 'results reported in STAR',
+        caption: 'Results reported in STAR',
         story: `${fmt(reported)} results have been reported under ${fmt(j.projects.with_results)} bilateral projects mapped to the CGIAR portfolio. Before anything can go to PRMS, each one has to be approved in STAR.`,
         parts: [
           { label: 'Draft', note: 'Being written by the team', value: j.star.draft, color: STAR_DRAFT, kind: 'act' },
@@ -137,7 +137,7 @@ export class PfmJourneyCardComponent {
       {
         title: 'Define if it contributes to CGIAR',
         value: j.star.approved,
-        caption: 'approved results to classify',
+        caption: 'Approved results to classify',
         story: `${fmt(j.star.approved)} results (${pct(j.star.approved, reported)}) are approved. The CGIAR Portfolio alignment can be answered at any time, but only approved results count from here on.`,
         parts: [
           { label: 'Mapping not answered', note: 'No Yes / No answer yet', value: j.answer.not_answered, color: PFM_STATE.progress.fill, kind: 'act' },
@@ -156,7 +156,7 @@ export class PfmJourneyCardComponent {
       {
         title: 'Define the mapping',
         value: contributes,
-        caption: 'contributing results to map',
+        caption: 'Contributing results to map',
         story: `${fmt(contributes)} approved results contribute to the CGIAR portfolio. For each one, define the mapping — the Science Program it contributes to — so it can be synced.`,
         parts: [
           { label: 'Mapping incomplete', note: 'Science Program still missing', value: j.mapping.incomplete, color: PFM_STATE.progress.fill, kind: 'act' },
@@ -174,7 +174,7 @@ export class PfmJourneyCardComponent {
       {
         title: 'Sync to PRMS',
         value: mapped,
-        caption: 'mapped results to sync',
+        caption: 'Mapped results to sync',
         story: `${fmt(mapped)} results are approved and fully mapped. ${fmt(j.sync.ready)} still need to be synced; ${fmt(j.sync.synced)} are already in PRMS for Science Program QA.`,
         parts: [
           { label: 'Ready to sync', note: 'Approved and mapped, not synced yet', value: j.sync.ready, color: PFM_STATE.ready.fill, kind: 'act' },
