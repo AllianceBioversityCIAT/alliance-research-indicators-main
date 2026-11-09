@@ -1,0 +1,153 @@
+<section
+  class="overflow-hidden rounded-[14px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)]"
+  data-testid="pfm-journey-card"
+  aria-labelledby="pfm-journey-title">
+  @let c = current();
+  <div class="px-5 pt-6 md:px-6">
+    <div class="flex flex-wrap items-start justify-between gap-5">
+      <div class="max-w-[720px]">
+        <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.07em] font-[space_grotesk] text-[var(--ac-pfm-neutral-fg)]">The journey of a result</p>
+        <h2 id="pfm-journey-title" class="m-0 mt-1.5 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-headline">
+          {{ headline() }}
+        </h2>
+        <p class="m-0 mt-2.5 mb-1 text-[13px] leading-4.5 text-[var(--ac-pfm-neutral-fg)]">
+          Click any stage to follow projects and results through it. Mapping is optional — a result is finished when it is synced to PRMS or
+          approved as No Science Program contribution.
+        </p>
+      </div>
+      <div
+        class="flex items-center gap-4 rounded-[10px] border border-solid border-[color:var(--ac-pfm-success-bg)] bg-[var(--ac-pfm-success-bg)]/40 px-4 py-3"
+        data-testid="pfm-journey-totals">
+        <div>
+          <p class="m-0 text-[24px] font-semibold tabular-nums text-[var(--ac-pfm-success-fg)]" data-testid="pfm-journey-done">{{ doneTotal() | number }}</p>
+          <p class="m-0 text-[12px] font-medium text-[var(--ac-pfm-success-fg)]">results finished</p>
+        </div>
+        <span class="w-px self-stretch bg-[var(--ac-pfm-surface-border)]" aria-hidden="true"></span>
+        <div>
+          <p class="m-0 text-[24px] font-semibold tabular-nums text-[var(--ac-pfm-warning-fg)]" data-testid="pfm-journey-action">{{ actionTotal() | number }}</p>
+          <p class="m-0 text-[12px] font-medium text-[var(--ac-pfm-warning-fg)]">still need an action</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stepper: one button per stage; the selected one is the detail below -->
+    <div class="-mx-5 mt-5 grid grid-cols-1 sm:grid-cols-5 md:-mx-6" role="tablist" aria-label="Stages of a result">
+      @for (s of stages(); track s.title; let i = $index) {
+        @let on = i === c.index;
+        <button
+          type="button"
+          role="tab"
+          class="flex min-w-0 cursor-pointer flex-col gap-1.5 border-0 border-b border-r border-t-[3px] border-solid border-r-[color:var(--ac-pfm-surface-border)] p-3 text-left font-[inherit] transition-colors duration-200 hover:bg-[var(--ac-pfm-neutral-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)] {{
+            on
+              ? 'border-b-transparent border-t-[color:var(--ac-pfm-info-fg)] bg-[var(--ac-pfm-surface)]'
+              : 'border-b-[color:var(--ac-pfm-surface-border)] border-t-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-neutral-bg)]/50'
+          }}"
+          [attr.aria-selected]="on"
+          [attr.data-testid]="'pfm-journey-stage-' + (i + 1)"
+          (click)="select(i)">
+          <span class="flex items-center gap-2">
+            <span
+              class="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums {{
+                on
+                  ? 'bg-[var(--ac-pfm-info-fg)] text-[var(--ac-pfm-surface)]'
+                  : 'border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] text-[var(--ac-pfm-neutral-fg)]'
+              }}"
+              aria-hidden="true">{{ i + 1 }}</span>
+            <span class="text-[13px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-stage-title">{{ s.title }}</span>
+          </span>
+          <span
+            class="text-[20px] font-semibold tabular-nums {{ on ? 'text-[var(--ac-pfm-info-fg)]' : 'text-[var(--ac-pfm-accent-navy)]' }}"
+            data-testid="pfm-journey-stage-value">{{ s.value | number }}</span>
+          <span class="text-[11.5px] text-[var(--ac-pfm-neutral-fg)]">{{ s.caption }}</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Detail of the selected stage -->
+  <!-- No top border: the selected stage above opens into this detail, only the others draw a line -->
+  <div class="flex flex-wrap items-center justify-between gap-4 border-0 border-b border-solid border-[color:var(--ac-pfm-surface-border)] px-5 py-4 md:px-6">
+    <div class="flex items-center gap-3">
+      <span class="text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-journey-kicker">Stage {{ c.index + 1 }} of 5</span>
+      <span class="text-[15px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-title">{{ c.stage.title }}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        class="cursor-pointer rounded-[7px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ac-pfm-accent-navy)] disabled:cursor-default disabled:opacity-50"
+        [disabled]="c.index === 0"
+        data-testid="pfm-journey-prev"
+        (click)="select(c.index - 1)">
+        ← Previous
+      </button>
+      <button
+        type="button"
+        class="cursor-pointer rounded-[7px] border border-solid border-[color:var(--ac-pfm-info-fg)] bg-[var(--ac-pfm-info-fg)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ac-pfm-surface)] disabled:cursor-default disabled:opacity-50"
+        [disabled]="c.index === 4"
+        data-testid="pfm-journey-next"
+        (click)="select(c.index + 1)">
+        Next stage →
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)]" role="tabpanel" data-testid="pfm-journey-detail">
+    <div class="border-0 border-solid border-[color:var(--ac-pfm-surface-border)] px-5 py-5 md:px-6 lg:border-r">
+      <p class="m-0 text-[15px] font-medium leading-5 text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-story">{{ c.stage.story }}</p>
+
+      <div class="mt-5 flex h-[14px] overflow-hidden rounded-[5px] bg-[var(--ac-state-empty)]" aria-hidden="true">
+        @for (p of c.parts; track p.label) {
+          <span class="h-full" [style.flex-grow]="p.value" [style.background-color]="p.color" [attr.title]="p.label"></span>
+        }
+      </div>
+
+      <ul class="m-0 mt-4 flex list-none flex-col gap-2 p-0">
+        @for (p of c.parts; track p.label) {
+          <li
+            class="grid grid-cols-[12px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-[9px] border border-solid border-[color:var(--ac-pfm-surface-border)] px-3.5 py-2.5"
+            data-testid="pfm-journey-part">
+            <span class="h-3 w-3 rounded-[3px]" [style.background-color]="p.color" aria-hidden="true"></span>
+            <div class="min-w-0">
+              <p class="m-0 text-[13.5px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-part-label">{{ p.label }}</p>
+              <p class="m-0 mt-0.5 text-[12px] text-[var(--ac-pfm-neutral-fg)]">{{ p.note }}</p>
+            </div>
+            <div class="text-right">
+              <p class="m-0 text-[17px] font-semibold tabular-nums text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-part-value">{{ p.value | number }}</p>
+              <p class="m-0 text-[11px] text-[var(--ac-pfm-neutral-fg)]">{{ p.share }}</p>
+            </div>
+            <span
+              class="whitespace-nowrap rounded-full border border-solid px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-[0.04em] {{
+                p.kind === 'act'
+                  ? 'border-[color:var(--ac-pfm-warning-border)] bg-[var(--ac-pfm-warning-bg)] text-[var(--ac-pfm-warning-fg)]'
+                  : p.kind === 'done'
+                    ? 'border-[color:var(--ac-pfm-success-bg)] bg-[var(--ac-pfm-success-bg)] text-[var(--ac-pfm-success-fg)]'
+                    : 'border-[color:var(--ac-pfm-info-bg)] bg-[var(--ac-pfm-info-bg)] text-[var(--ac-pfm-info-fg)]'
+              }}"
+              data-testid="pfm-journey-part-tag">{{ p.tag }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+
+    <div class="flex flex-col gap-3 bg-[var(--ac-pfm-warning-bg)]/30 px-5 py-5 md:px-6" data-testid="pfm-journey-action-panel">
+      <h3 class="m-0 text-[14px] font-semibold uppercase leading-5 tracking-[0.07em] text-[var(--ac-pfm-warning-fg)]" data-testid="pfm-journey-action-title">What to do at this stage</h3>
+      <p class="m-0 text-[32px] font-semibold tabular-nums" [style.color]="c.stage.action.ink" data-testid="pfm-journey-action-value">
+        {{ c.stage.action.value | number }}
+      </p>
+      <p class="m-0 text-[14.5px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-action-label">{{ c.stage.action.label }}</p>
+      <p class="m-0 -mt-2 mb-2 text-[13px] leading-normal text-[var(--ac-pfm-neutral-fg)]">{{ c.stage.action.note }}</p>
+      <button
+        type="button"
+        class="mt-1.5 cursor-pointer self-start rounded-[8px] border-0 bg-[var(--ac-pfm-info-fg)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ac-pfm-surface)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--ac-pfm-info-fg)]"
+        data-testid="pfm-journey-cta"
+        (click)="act()">
+        {{ c.stage.action.cta }} →
+      </button>
+      <p
+        class="m-0 mt-2.5 border-0 border-t border-solid border-[color:var(--ac-pfm-warning-border)] pt-3.5 text-[12.5px] leading-4 text-[var(--ac-pfm-neutral-fg)]"
+        data-testid="pfm-journey-next-hint">
+        {{ c.nextHint }}
+      </p>
+    </div>
+  </div>
+</section>
