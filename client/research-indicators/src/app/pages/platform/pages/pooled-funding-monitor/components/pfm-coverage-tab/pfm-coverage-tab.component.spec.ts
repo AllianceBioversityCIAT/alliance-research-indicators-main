@@ -92,6 +92,77 @@ describe('PfmCoverageTabComponent', () => {
     expect(targets).toEqual([{ chip: 'ready_to_sync' }, { chip: 'synced' }, { chip: 'need_attention' }]);
   });
 
+  describe('the journey of a result', () => {
+    const WITH_JOURNEY: PfmSummary = {
+      ...SUMMARY,
+      journey: {
+        projects: { total: 3, with_results: 2, without_results: 1 },
+        star: { draft: 4, submitted: 5, approved: 22 },
+        answer: { not_answered: 2, contributes: 18, no_sp: 2 },
+        mapping: { incomplete: 3, complete: 15 },
+        sync: { ready: 6, synced: 9, rejected: 3 }
+      },
+      portfolio_projects: [
+        { code: 'P-1', name: 'One', lead_pi: 'Lead One', delegates: [], results: 20 },
+        { code: 'P-2', name: 'Two', lead_pi: 'Lead Two', delegates: [], results: 11 },
+        { code: 'P-3', name: 'Three', lead_pi: 'Lead Three', delegates: [], results: 0 }
+      ]
+    };
+
+    it('replaces the previous cards with the five stages, the projects table under stage 1', () => {
+      const { q } = render(WITH_JOURNEY);
+      expect(q('pfm-journey-card')).not.toBeNull();
+      expect(q('pfm-portfolio-projects')).not.toBeNull();
+      expect(q('pfm-total-card')).toBeNull();
+      expect(q('pfm-progress-card')).toBeNull();
+      expect(q('pfm-next-steps-card')).toBeNull();
+    });
+
+    it('the projects table belongs to stage 1 only', () => {
+      TestBed.configureTestingModule({ imports: [PfmCoverageTabComponent] });
+      const fixture = TestBed.createComponent(PfmCoverageTabComponent);
+      fixture.componentRef.setInput('summary', WITH_JOURNEY);
+      fixture.componentRef.setInput('scope', 'all');
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      (el.querySelector('[data-testid="pfm-journey-stage-2"]') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(el.querySelector('[data-testid="pfm-portfolio-projects"]')).toBeNull();
+      expect(el.querySelector('[data-testid="pfm-journey-kicker"]')?.textContent?.trim()).toBe('Stage 2 of 5');
+    });
+
+    it('a stage action opens the Results queue on its quick view', () => {
+      TestBed.configureTestingModule({ imports: [PfmCoverageTabComponent] });
+      const fixture = TestBed.createComponent(PfmCoverageTabComponent);
+      fixture.componentRef.setInput('summary', WITH_JOURNEY);
+      fixture.componentRef.setInput('scope', 'all');
+      fixture.detectChanges();
+      const targets: unknown[] = [];
+      fixture.componentInstance.openQueue.subscribe(t => targets.push(t));
+      const el = fixture.nativeElement as HTMLElement;
+      (el.querySelector('[data-testid="pfm-journey-stage-5"]') as HTMLElement).click();
+      fixture.detectChanges();
+      (el.querySelector('[data-testid="pfm-journey-cta"]') as HTMLElement).click();
+      expect(targets).toEqual([{ chip: 'ready_to_sync' }]);
+    });
+
+    it('the stage 1 action brings the table back to the projects without results', () => {
+      TestBed.configureTestingModule({ imports: [PfmCoverageTabComponent] });
+      const fixture = TestBed.createComponent(PfmCoverageTabComponent);
+      fixture.componentRef.setInput('summary', WITH_JOURNEY);
+      fixture.componentRef.setInput('scope', 'all');
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      const rows = () => el.querySelectorAll('[data-testid^="pfm-project-row-"]').length;
+      (el.querySelector('[data-testid="pfm-projects-chip-all"]') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(rows()).toBe(3);
+      (el.querySelector('[data-testid="pfm-journey-cta"]') as HTMLElement).click();
+      fixture.detectChanges();
+      expect(rows()).toBe(1);
+    });
+  });
+
   it('falls back to the KPI figures when the server does not send chip_counts yet', () => {
     const { chip_counts, ...older } = SUMMARY;
     expect(chip_counts).toBeTruthy();
