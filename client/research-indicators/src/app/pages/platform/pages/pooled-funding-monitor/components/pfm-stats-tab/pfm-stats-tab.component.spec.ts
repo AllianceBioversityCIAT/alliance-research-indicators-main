@@ -49,9 +49,9 @@ function render(summary: PfmSummary) {
 }
 
 describe('PfmStatsTabComponent', () => {
-  it('shows the four charts two by two: Science Program, PRMS status, sync activity, then by type', () => {
+  it('shows the four charts two by two: Science Program, PRMS status, by type, then sync activity', () => {
     const { el, q } = render(SUMMARY);
-    const order = ['pfm-sp-card', 'pfm-prms-status-card', 'pfm-sync-card', 'pfm-type-card'].map(id =>
+    const order = ['pfm-sp-card', 'pfm-prms-status-card', 'pfm-type-card', 'pfm-sync-card'].map(id =>
       Array.from(el.querySelectorAll('[data-testid]')).indexOf(q(id) as Element)
     );
     expect(order.every(i => i >= 0)).toBe(true);
