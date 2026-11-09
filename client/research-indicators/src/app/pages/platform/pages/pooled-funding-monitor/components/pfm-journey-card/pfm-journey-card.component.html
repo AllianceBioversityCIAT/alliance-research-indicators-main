@@ -4,7 +4,8 @@
   aria-labelledby="pfm-journey-title">
   @let c = current();
   <div class="px-5 pt-6 md:px-6">
-    <div class="flex flex-wrap items-start justify-between gap-5">
+    <!-- The totals box sits centred against the headline block, not on its top edge -->
+    <div class="flex flex-wrap items-center justify-between gap-5">
       <div class="max-w-[720px]">
         <p class="m-0 text-[11px] font-semibold uppercase tracking-[0.07em] font-[space_grotesk] text-[var(--ac-pfm-neutral-fg)]">The journey of a result</p>
         <h2 id="pfm-journey-title" class="m-0 mt-1.5 text-[15px] font-semibold leading-6 text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-headline">
@@ -18,14 +19,14 @@
       <div
         class="flex items-center gap-4 rounded-[10px] border border-solid border-[color:var(--ac-pfm-success-bg)] bg-[var(--ac-pfm-success-bg)]/40 px-4 py-3"
         data-testid="pfm-journey-totals">
-        <div>
-          <p class="m-0 text-[24px] font-semibold tabular-nums text-[var(--ac-pfm-success-fg)]" data-testid="pfm-journey-done">{{ doneTotal() | number }}</p>
-          <p class="m-0 text-[12px] font-medium text-[var(--ac-pfm-success-fg)]">results finished</p>
+        <div class="flex flex-col justify-center gap-1.5">
+          <p class="m-0 text-[24px] font-semibold leading-none tabular-nums text-[var(--ac-pfm-success-fg)]" data-testid="pfm-journey-done">{{ doneTotal() | number }}</p>
+          <p class="m-0 text-[12px] font-medium leading-4 text-[var(--ac-pfm-success-fg)]">results finished</p>
         </div>
         <span class="w-px self-stretch bg-[var(--ac-pfm-surface-border)]" aria-hidden="true"></span>
-        <div>
-          <p class="m-0 text-[24px] font-semibold tabular-nums text-[var(--ac-pfm-warning-fg)]" data-testid="pfm-journey-action">{{ actionTotal() | number }}</p>
-          <p class="m-0 text-[12px] font-medium text-[var(--ac-pfm-warning-fg)]">still need an action</p>
+        <div class="flex flex-col justify-center gap-1.5">
+          <p class="m-0 text-[24px] font-semibold leading-none tabular-nums text-[var(--ac-pfm-warning-fg)]" data-testid="pfm-journey-action">{{ actionTotal() | number }}</p>
+          <p class="m-0 text-[12px] font-medium leading-4 text-[var(--ac-pfm-warning-fg)]">still need an action</p>
         </div>
       </div>
     </div>
@@ -67,10 +68,12 @@
   <!-- Detail of the selected stage -->
   <!-- No top border: the selected stage above opens into this detail, only the others draw a line -->
   <div class="flex flex-wrap items-center justify-between gap-4 border-0 border-b border-solid border-[color:var(--ac-pfm-surface-border)] px-5 py-4 md:px-6">
-    <div class="flex items-center gap-3">
-      <span class="text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-journey-kicker">Stage {{ c.index + 1 }} of 5</span>
-      <span class="text-[15px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-title">{{ c.stage.title }}</span>
-    </div>
+    <!-- One line, "Stage 3 of 5 – Title", on a shared baseline (the two sizes and fonts misalign when centred) -->
+    <p class="m-0 flex flex-wrap items-baseline gap-x-2">
+      <span class="text-[12px] font-semibold font-[space_grotesk] uppercase tracking-[0.07em] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-journey-kicker">Stage {{ c.index + 1 }} of {{ stageCount() }}</span>
+      <span class="text-[14px] font-semibold text-[var(--ac-pfm-neutral-fg)]" aria-hidden="true">–</span>
+      <span class="text-[14px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-title">{{ c.stage.title }}</span>
+    </p>
     <!-- Same buttons as Back / Next in the result sections (app-navigation-buttons) -->
     <div class="flex items-center gap-3">
       <button
@@ -79,12 +82,12 @@
         [disabled]="c.index === 0"
         data-testid="pfm-journey-prev"
         (click)="select(c.index - 1)">
-        <i class="pi pi-arrow-left !text-[11px]" aria-hidden="true"></i> Previous
+        <i class="pi pi-arrow-left !text-[11px]" aria-hidden="true"></i> Previous stage
       </button>
       <button
         type="button"
         class="flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-solid border-[color:var(--ac-light-blue-400)] bg-transparent px-4 py-1.5 text-[14px] font-medium text-[var(--ac-light-blue-400)] disabled:cursor-default disabled:border-[color:var(--ac-grey-200)] disabled:bg-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
-        [disabled]="c.index === 4"
+        [disabled]="c.index === lastIndex()"
         data-testid="pfm-journey-next"
         (click)="select(c.index + 1)">
         Next stage <i class="pi pi-arrow-right !text-[11px]" aria-hidden="true"></i>
