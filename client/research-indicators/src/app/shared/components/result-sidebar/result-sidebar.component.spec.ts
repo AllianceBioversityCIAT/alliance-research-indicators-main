@@ -494,13 +494,13 @@ describe('ResultSidebarComponent', () => {
         expect(poolFundingIdx).toBe(paths.length - 1);
       });
 
-      it('uses the lowercase-"f" label "Pool funding alignment" (mockup `33356:11736` RR-F)', () => {
+      it('uses the label "CGIAR Portfolio Contribution"', () => {
         (bilateralService.currentAlignment as ReturnType<typeof signal<AlignmentResponse | null>>).set(eligibleAlignment);
 
         const options = component.allOptionsWithGreenChecks();
         const poolFundingOption = options.find(o => o.path === 'pool-funding-alignment');
 
-        expect(poolFundingOption?.label).toBe('Pool funding alignment');
+        expect(poolFundingOption?.label).toBe('CGIAR Portfolio Contribution');
       });
 
       // AR.3 — sidebar side: the new SidebarOption uses greenCheckKey 'pool_funding_alignment',
@@ -695,7 +695,7 @@ describe('ResultSidebarComponent', () => {
       const container = divider?.parentElement;
       const children = Array.from(container?.children ?? []);
       const dividerIdx = children.indexOf(divider as Element);
-      expect(children[dividerIdx + 1]?.textContent).toContain('Pool funding alignment');
+      expect(children[dividerIdx + 1]?.textContent).toContain('CGIAR Portfolio Contribution');
     });
 
     it('does not render the divider when the Pool funding alignment tab is hidden', () => {
@@ -714,7 +714,7 @@ describe('ResultSidebarComponent', () => {
     function poolFundingItem(): HTMLElement | null {
       return (
         Array.from(fixture.nativeElement.querySelectorAll('.option') as NodeListOf<HTMLElement>).find(node =>
-          (node.textContent ?? '').includes('Pool funding alignment')
+          (node.textContent ?? '').includes('CGIAR Portfolio Contribution')
         ) ?? null
       );
     }
@@ -868,7 +868,7 @@ describe('ResultSidebarComponent', () => {
       await component.fetchPrmsSyncHistory(123);
       fixture.detectChanges();
 
-      expect(poolFundingItem()?.textContent).toContain('Pool funding alignment');
+      expect(poolFundingItem()?.textContent).toContain('CGIAR Portfolio Contribution');
       expect(component.hasPoolFundingOption()).toBe(true);
       expect(syncButton()).toBeNull();
 
@@ -2720,7 +2720,7 @@ describe('ResultSidebarComponent', () => {
 
     function sectionItem(): Element | null {
       const host: HTMLElement = fixture.nativeElement;
-      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('Pool funding alignment')) ?? null;
+      return Array.from(host.querySelectorAll('.option')).find(el => el.textContent?.includes('CGIAR Portfolio Contribution')) ?? null;
     }
 
     function syncButton(): HTMLButtonElement | null {
