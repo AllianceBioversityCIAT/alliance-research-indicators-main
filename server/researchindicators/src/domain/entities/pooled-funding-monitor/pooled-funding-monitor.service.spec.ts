@@ -61,6 +61,7 @@ describe('PooledFundingMonitorService', () => {
         }),
       ]),
       countContributingProjects: jest.fn().mockResolvedValue(9),
+      findContributingProjects: jest.fn().mockResolvedValue([]),
       findMonthlySyncs: jest.fn().mockResolvedValue([]),
       countSyncedThisYear: jest.fn().mockResolvedValue(4),
       isPiOfAnyContributingProject: jest.fn().mockResolvedValue(true),
