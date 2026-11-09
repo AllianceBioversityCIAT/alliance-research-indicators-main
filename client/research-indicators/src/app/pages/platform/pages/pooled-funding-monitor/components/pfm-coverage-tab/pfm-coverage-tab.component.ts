@@ -1,12 +1,11 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-11 (R-PFM-006..008)
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model, output } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { PfmChip, PfmChipCounts, PfmScope, PfmSummary } from '../../pfm.interfaces';
+import { PfmChip, PfmChipCounts, PfmProjectsFilter, PfmScope, PfmSummary } from '../../pfm.interfaces';
 import { PfmNextStepsCardComponent } from '../pfm-next-steps-card/pfm-next-steps-card.component';
 import { PfmProgressCardComponent } from '../pfm-progress-card/pfm-progress-card.component';
-import { PfmPrmsStatusCardComponent } from '../pfm-prms-status-card/pfm-prms-status-card.component';
-import { PfmSpCoverageCardComponent } from '../pfm-sp-coverage-card/pfm-sp-coverage-card.component';
-import { PfmSyncActivityCardComponent } from '../pfm-sync-activity-card/pfm-sync-activity-card.component';
+import { PfmJourneyCardComponent } from '../pfm-journey-card/pfm-journey-card.component';
+import { PfmPortfolioProjectsComponent } from '../pfm-portfolio-projects/pfm-portfolio-projects.component';
 
 /** What a click on a coverage chart opens in the Results queue. */
 export interface PfmQueueTarget {
@@ -15,13 +14,14 @@ export interface PfmQueueTarget {
 }
 
 /**
- * Coverage tab, built to lead to action: how much is in PRMS, what to do next, then the Science
- * Program and sync-activity detail. Every number is a quick view (or an SP filter) and a click opens
+ * Coverage tab, built to lead to action: the journey of a result through five stages, each with
+ * what to do next (the charts are in the Stats tab). A server without the journey yet keeps the
+ * previous cards: how much is in PRMS and what to do next. Every number is a quick view (or an SP filter) and a click opens
  * the Results queue on it. Loading / error / Retry for the summary request live in the page panel.
  */
 @Component({
   selector: 'app-pfm-coverage-tab',
-  imports: [DecimalPipe, PfmProgressCardComponent, PfmNextStepsCardComponent, PfmSpCoverageCardComponent, PfmPrmsStatusCardComponent, PfmSyncActivityCardComponent],
+  imports: [DecimalPipe, PfmProgressCardComponent, PfmNextStepsCardComponent, PfmJourneyCardComponent, PfmPortfolioProjectsComponent],
   templateUrl: './pfm-coverage-tab.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -29,6 +29,13 @@ export class PfmCoverageTabComponent {
   summary = input.required<PfmSummary>();
   scope = input.required<PfmScope>();
   openQueue = output<PfmQueueTarget>();
+
+  /**
+   * Selected stage of the journey (0-based; stage 1 shows the projects table) and that table's filter.
+   * Two-way: the page keeps them, so leaving for the Results queue and coming back keeps the stage.
+   */
+  readonly stage = model(0);
+  readonly projectsFilter = model<PfmProjectsFilter>('without');
 
   /** The scope's quick-view counts; a server without them falls back to the KPI figures. */
   counts = computed<PfmChipCounts>(() => {

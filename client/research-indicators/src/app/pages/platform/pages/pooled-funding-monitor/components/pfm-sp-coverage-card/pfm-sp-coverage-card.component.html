@@ -4,7 +4,8 @@
   @if (view().length === 0) {
     <app-pfm-empty-state />
   } @else {
-  <p class="m-0 mt-1 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-how">{{ help.spHowToRead }}</p>
+  <!-- Same summary line as the coverage projects table / My PI Delegates -->
+  <p class="atc-grey-600 m-0 mt-1 font-['Barlow'] text-[12px] italic leading-[1.5]" data-testid="pfm-sp-how">{{ help.spHowToRead }}</p>
   <p class="m-0 mt-4 flex gap-5 text-[12px] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-sp-legend">
     <span class="inline-flex items-center gap-2" tabindex="0" [pTooltip]="help.spSynced" tooltipEvent="both" tooltipPosition="top"
       ><span class="h-3 w-3 rounded-[4px]" [style.background-color]="syncedFill" aria-hidden="true"></span

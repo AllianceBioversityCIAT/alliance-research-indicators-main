@@ -347,13 +347,22 @@ describe('PooledFundingMonitorComponent', () => {
       await flush();
     });
 
-    it('renders exactly two tabs in a tablist with aria-selected', () => {
+    it('renders exactly three tabs in a tablist with aria-selected', () => {
       const tabs = Array.from(el.querySelectorAll('[role="tablist"] [role="tab"]'));
-      expect(tabs.map(t => t.textContent?.trim())).toEqual(['Portfolio coverage', 'Results queue']);
-      expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false']);
-      expect(tabs.map(t => t.getAttribute('tabindex'))).toEqual(['0', '-1']);
-      // aria-controls only on the selected tab: the inactive panel is not in the DOM
-      expect(tabs.map(t => t.getAttribute('aria-controls'))).toEqual(['pfm-panel-coverage', null]);
+      expect(tabs.map(t => t.textContent?.trim())).toEqual(['Portfolio coverage', 'Results queue', 'Stats']);
+      expect(tabs.map(t => t.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false']);
+      expect(tabs.map(t => t.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+      // aria-controls only on the selected tab: the inactive panels are not in the DOM
+      expect(tabs.map(t => t.getAttribute('aria-controls'))).toEqual(['pfm-panel-coverage', null, null]);
+    });
+
+    it('the Stats tab shows the charts in its own panel', async () => {
+      fixture.componentInstance.selectTab('stats');
+      await flush();
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-panel-stats')?.getAttribute('aria-labelledby')).toBe('pfm-tab-stats');
+      expect(q('pfm-panel-stats')?.querySelector('[data-testid="pfm-stats-tab"]')).not.toBeNull();
+      expect(q('pfm-panel-coverage')).toBeNull();
     });
 
     it('ArrowRight / ArrowLeft / End / Home move selection and focus', async () => {
@@ -365,16 +374,19 @@ describe('PooledFundingMonitorComponent', () => {
       expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
       expect(document.activeElement).toBe(q('pfm-tab-queue') ?? undefined);
 
-      await press('pfm-tab-queue', 'ArrowRight'); // wraps
+      await press('pfm-tab-queue', 'ArrowRight');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
+
+      await press('pfm-tab-stats', 'ArrowRight'); // wraps
       expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
 
       await press('pfm-tab-coverage', 'ArrowLeft'); // wraps back
-      expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
 
-      await press('pfm-tab-queue', 'Home');
+      await press('pfm-tab-stats', 'Home');
       expect(q('pfm-tab-coverage')?.getAttribute('aria-selected')).toBe('true');
       await press('pfm-tab-coverage', 'End');
-      expect(q('pfm-tab-queue')?.getAttribute('aria-selected')).toBe('true');
+      expect(q('pfm-tab-stats')?.getAttribute('aria-selected')).toBe('true');
     });
 
     it('ArrowLeft from the second tab goes to the first', async () => {
@@ -404,7 +416,57 @@ describe('PooledFundingMonitorComponent', () => {
     expect(buttons.some(t => /sync/i.test(t))).toBe(false);
     expect(el.textContent).not.toMatch(/Sync now/i);
     expect(el.textContent).not.toMatch(/PRMS sync:/i);
-    expect(el.querySelectorAll('[role="tab"]')).toHaveLength(2);
+    expect(el.querySelectorAll('[role="tab"]')).toHaveLength(3);
+  });
+
+  // Owner 2026-11-09: a stage action opens the Results queue; coming back must keep the stage.
+  describe('Portfolio coverage keeps its stage', () => {
+    const journey = {
+      projects: { total: 3, with_results: 2, without_results: 1 },
+      star: { draft: 4, submitted: 5, approved: 22 },
+      answer: { not_answered: 2, contributes: 18, no_sp: 2 },
+      mapping: { incomplete: 3, complete: 15 },
+      sync: { ready: 6, synced: 9, rejected: 3 }
+    };
+    beforeEach(() => api.GET_PfmSummary.mockImplementation((scope: PfmScope) => Promise.resolve(ok({ ...summary(scope), journey, portfolio_projects: [] }))));
+
+    it('a stage action opens the Results queue and coming back shows the same stage', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      q('pfm-journey-stage-2')!.click();
+      await flush();
+      q('pfm-journey-cta')!.click();
+      await flush();
+      expect(fixture.componentInstance.store.tab()).toBe('queue');
+      expect(fixture.componentInstance.store.chip()).toBe('awaiting_pi');
+
+      fixture.componentInstance.selectTab('coverage');
+      await flush();
+      expect(q('pfm-journey-kicker')?.textContent?.trim()).toBe('Stage 2 of 5');
+      expect(q('pfm-journey-stage-2')?.getAttribute('aria-selected')).toBe('true');
+    });
+
+    it('leaving for a result saves the stage, and coming back restores it', async () => {
+      await create();
+      fixture.detectChanges();
+      await flush();
+      q('pfm-journey-stage-4')!.click();
+      await flush();
+      routerEvents.next(new NavigationStart(1, '/result/STAR-629/general-information?from=pfm-monitor'));
+      expect(JSON.parse(sessionStorage.getItem('pfm-monitor-return-state') ?? 'null')).toEqual(
+        expect.objectContaining({ coverageStage: 3, projectsFilter: 'without' })
+      );
+
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      await create();
+      fixture.detectChanges();
+      await flush();
+      fixture.componentInstance.selectTab('coverage');
+      await flush();
+      expect(q('pfm-journey-kicker')?.textContent?.trim()).toBe('Stage 4 of 5');
+    });
   });
 
   // Owner 2026-10-22: back from a result (breadcrumb or browser Back) = the same place in the queue.

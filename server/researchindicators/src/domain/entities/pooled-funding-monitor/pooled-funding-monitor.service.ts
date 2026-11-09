@@ -96,6 +96,7 @@ export class PooledFundingMonitorService {
       syncedThisYear,
       isPiOfAny,
       managesAnyProject,
+      contributingProjects,
     ] = await Promise.all([
       this.repository.findMonitoredResults(repoScope),
       this.repository.countContributingProjects(),
@@ -103,6 +104,7 @@ export class PooledFundingMonitorService {
       this.repository.countSyncedThisYear(repoScope, now),
       this.repository.isPiOfAnyContributingProject(userId),
       this.repository.managesAnyProject(userId),
+      this.repository.findContributingProjects(repoScope),
     ]);
     const rows = deriveMonitoredRows(monitored);
     const summary = buildPfmSummary({
@@ -110,6 +112,7 @@ export class PooledFundingMonitorService {
       rows,
       projectsTotal,
       monthlySyncs,
+      contributingProjects,
       syncedThisYear,
       isPiOfAny,
       managesAnyProject,

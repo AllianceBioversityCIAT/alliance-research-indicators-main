@@ -1,6 +1,6 @@
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-09
 //
-// Page shell of the CGIAR Portfolio Contribution Monitor: header, scope toggle, KPI cards, the two
+// Page shell of the CGIAR Portfolio Contribution Monitor: header, scope toggle, KPI cards, the three
 // tabs and the PI-empty / loading / error states. The tab bodies (coverage, queue) are filled by
 // T-11..T-13. Read-only: no Sync button, no "PRMS sync" label (R-PFM-014). Tailwind only, no stylesheet.
 
@@ -13,13 +13,14 @@ import { resultCodeFromUrl } from './pfm-return-state';
 import { RolesService } from '@shared/services/cache/roles.service';
 import { PfmCoverageTabComponent } from './components/pfm-coverage-tab/pfm-coverage-tab.component';
 import { PfmQueueTabComponent } from './components/pfm-queue-tab/pfm-queue-tab.component';
+import { PfmStatsTabComponent } from './components/pfm-stats-tab/pfm-stats-tab.component';
 import { PFM_TABS, PfmScope, PfmTab } from './pfm.interfaces';
 import { PfmStoreService } from './services/pfm-store.service';
 
 @Component({
   selector: 'app-pooled-funding-monitor',
   standalone: true,
-  imports: [PfmCoverageTabComponent, PfmQueueTabComponent],
+  imports: [PfmCoverageTabComponent, PfmQueueTabComponent, PfmStatsTabComponent],
   providers: [PfmStoreService],
   templateUrl: './pooled-funding-monitor.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -80,7 +81,8 @@ export default class PooledFundingMonitorComponent implements OnInit {
   );
   readonly tabs: { value: PfmTab; label: string }[] = [
     { value: 'coverage', label: 'Portfolio coverage' },
-    { value: 'queue', label: 'Results queue' }
+    { value: 'queue', label: 'Results queue' },
+    { value: 'stats', label: 'Stats' }
   ];
 
   /** PI scope, summary loaded, and the viewer is PI of nothing: show the empty state, never portfolio data. */

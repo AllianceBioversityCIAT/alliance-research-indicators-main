@@ -60,6 +60,15 @@ export interface PfmMonitoredRow extends PfmRawRow {
   contributing_sps: PfmSpRef[];
 }
 
+/** A contributing project of the scope, whether it has results or not (coverage stage 1). */
+export interface PfmContributingProjectRow {
+  code: string;
+  name: string | null;
+  lead_pi: string | null;
+  /** Active PI delegates as "LAST, FIRST", sorted. */
+  delegates: string[];
+}
+
 export interface PfmMonthlySync {
   /** 'YYYY-MM', UTC calendar month. Months without syncs are absent (T-03 zero-fills). */
   month: string;
@@ -400,6 +409,63 @@ export class PooledFundingMonitorRepository {
          AND ${effectivePoolFundingContributorSql('ac')}`,
     );
     return Number(rows[0]?.total ?? 0);
+  }
+
+  /**
+   * Coverage stage 1: every contributing project of the scope with its lead PI and active
+   * delegates. Same project set as `countContributingProjects` (all) or the PI predicate
+   * (mine); results per project are counted by the service from the monitored rows, so a
+   * project with none shows up with 0.
+   */
+  async findContributingProjects(
+    scope: PfmRepositoryScope,
+  ): Promise<PfmContributingProjectRow[]> {
+    const clauses = [
+      'ac.is_active = 1',
+      effectivePoolFundingContributorSql('ac'),
+    ];
+    const params: unknown[] = [];
+    if (scope.scope === PfmScopeEnum.MINE) {
+      if (!Number.isInteger(scope.userId)) {
+        throw new Error('PI scope requires the authenticated sec_user_id');
+      }
+      const pi = this.piPredicate(scope.userId);
+      clauses.push(pi.sql);
+      params.push(...pi.params);
+    }
+    const rows: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT
+         ac.agreement_id AS code,
+         COALESCE(NULLIF(TRIM(ac.short_title), ''), ac.description) AS name,
+         ac.project_lead_description AS lead_pi,
+         (
+           SELECT JSON_ARRAYAGG(TRIM(CONCAT_WS(', ', su.last_name, su.first_name)))
+           FROM pi_delegates pd
+           INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
+           WHERE pd.project_id = ac.agreement_id
+             AND pd.is_active = 1
+         ) AS delegates
+       FROM agresso_contracts ac
+       WHERE ${clauses.join('\n         AND ')}
+       ORDER BY ac.agreement_id ASC`,
+      params,
+    );
+    return rows.map((row) => {
+      const raw =
+        typeof row.delegates === 'string'
+          ? (JSON.parse(row.delegates) as unknown)
+          : row.delegates;
+      const delegates = (Array.isArray(raw) ? raw : [])
+        .map((name) => String(name ?? '').trim())
+        .filter((name) => name.length > 0)
+        .sort((a, b) => a.localeCompare(b));
+      return {
+        code: String(row.code),
+        name: (row.name as string | null) ?? null,
+        lead_pi: (row.lead_pi as string | null) ?? null,
+        delegates,
+      };
+    });
   }
 
   /**

@@ -13,6 +13,7 @@ import {
   PFM_TABS,
   PfmChip,
   PfmFilters,
+  PfmProjectsFilter,
   PfmQueue,
   PfmQueueQuery,
   PfmResultRow,
@@ -36,6 +37,9 @@ export class PfmStoreService {
   readonly filters = signal<PfmFilters>({ ...EMPTY_FILTERS });
   /** Active quick-view chip; null = none. */
   readonly chip = signal<PfmChip | null>(null);
+  /** Portfolio coverage: selected journey stage (0-based) and the stage 1 projects filter, kept across tabs. */
+  readonly coverageStage = signal(0);
+  readonly coverageProjectsFilter = signal<PfmProjectsFilter>('without');
 
   readonly summary = signal<PfmSummary | null>(null);
   readonly queue = signal<PfmQueue | null>(null);
@@ -83,6 +87,9 @@ export class PfmStoreService {
       this.groupViews.set(back.groupViews ?? {});
       this.openGroups.set(new Set(back.openGroups ?? []));
       this.focusResult.set(back.resultCode);
+      // Any stage index; the journey card clamps it to the stages it has.
+      if (Number.isInteger(back.coverageStage) && back.coverageStage! >= 0) this.coverageStage.set(back.coverageStage!);
+      if (back.projectsFilter && ['all', 'with', 'without'].includes(back.projectsFilter)) this.coverageProjectsFilter.set(back.projectsFilter);
       this.syncUrl();
     }
     rememberPfmScope(this.scope());
@@ -100,6 +107,8 @@ export class PfmStoreService {
       chip: this.chip(),
       openGroups: [...this.openGroups()],
       groupViews: this.groupViews(),
+      coverageStage: this.coverageStage(),
+      projectsFilter: this.coverageProjectsFilter(),
       resultCode
     });
   }

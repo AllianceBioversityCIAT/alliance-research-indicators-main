@@ -14,6 +14,9 @@ import {
   buildProjectProgress,
   buildRejectionReasons,
   buildSpCoverage,
+  buildSyncedByType,
+  buildJourney,
+  buildPortfolioProjects,
   deriveMonitoredRows,
   PFM_CHIP_COUNT_KEYS,
   PFM_NO_REASON,
@@ -239,6 +242,19 @@ describe('pfm-aggregation', () => {
       expect(buildSpCoverage([])).toEqual([]);
     });
 
+    it('synced by type: in PRMS only, most first, adds up to the PRMS status chart', () => {
+      expect(s.synced_by_type).toEqual([
+        { id: 1, name: 'Policy change', synced: 2 },
+        { id: 4, name: 'Policy change', synced: 1 },
+        { id: 6, name: 'Policy change', synced: 1 },
+      ]);
+      const inPrms = s.pipeline.stages
+        .filter((x) => x.group === 'in_prms')
+        .reduce((a, x) => a + x.value, 0);
+      expect(s.synced_by_type.reduce((a, t) => a + t.synced, 0)).toBe(inPrms);
+      expect(buildSyncedByType([])).toEqual([]);
+    });
+
     it('monthly: six months incl. current, zero-filled, out-of-window ignored', () => {
       expect(s.monthly).toEqual([
         { month: '2026-05', synced: 0 },
@@ -279,6 +295,74 @@ describe('pfm-aggregation', () => {
       expect(e.kpis.monitored).toBe(0);
       expect(e.pipeline.total).toBe(0);
       expect(e.pipeline.stages.every((x) => x.value === 0)).toBe(true);
+    });
+  });
+
+  describe('coverage journey (five stages, each a subset of the one before)', () => {
+    const projects = buildPortfolioProjects(
+      ['P-E', 'P-D', 'P-C', 'P-B', 'P-A'].map((code) => ({
+        code,
+        name: `Project ${code}`,
+        lead_pi: `PI ${code}`,
+        delegates: code === 'P-A' ? ['DOE, JANE'] : [],
+      })),
+      derived,
+    );
+
+    it('lists every contributing project, most results first, the ones without results last', () => {
+      expect(projects.map((p) => [p.code, p.results])).toEqual([
+        ['P-A', 4],
+        ['P-B', 4],
+        ['P-C', 4],
+        ['P-D', 1],
+        ['P-E', 0],
+      ]);
+      expect(projects[0].delegates).toEqual(['DOE, JANE']);
+    });
+
+    it('counts each stage from the one before it', () => {
+      expect(buildJourney(derived, projects)).toEqual({
+        projects: { total: 5, with_results: 4, without_results: 1 },
+        // Draft includes Returned (r10); Submitted includes Under review (r9)
+        star: { draft: 2, submitted: 2, approved: 9 },
+        answer: { not_answered: 0, contributes: 7, no_sp: 2 },
+        mapping: { incomplete: 2, complete: 5 },
+        sync: { ready: 1, synced: 4, rejected: 1 },
+      });
+    });
+
+    it('an approved result with no CGIAR Portfolio answer stops at stage 3', () => {
+      const j = buildJourney(
+        deriveMonitoredRows([mk(99, 'P-A', NO_ALIGN)]),
+        [],
+      );
+      expect(j.star.approved).toBe(1);
+      expect(j.answer).toEqual({ not_answered: 1, contributes: 0, no_sp: 0 });
+      expect(j.mapping).toEqual({ incomplete: 0, complete: 0 });
+    });
+
+    it('the summary carries the journey and the projects', () => {
+      const s = buildPfmSummary({
+        scope: PfmScopeEnum.ALL,
+        rows: derived,
+        projectsTotal: 5,
+        monthlySyncs: [],
+        contributingProjects: [
+          { code: 'P-Z', name: null, lead_pi: null, delegates: [] },
+        ],
+        syncedThisYear: 0,
+        isPiOfAny: true,
+        now: new Date('2026-10-08T12:00:00Z'),
+      });
+      expect(s.portfolio_projects).toEqual([
+        { code: 'P-Z', name: null, lead_pi: null, delegates: [], results: 0 },
+      ]);
+      expect(s.journey.projects).toEqual({
+        total: 1,
+        with_results: 0,
+        without_results: 1,
+      });
+      expect(s.journey.star).toEqual({ draft: 2, submitted: 2, approved: 9 });
     });
   });
 
