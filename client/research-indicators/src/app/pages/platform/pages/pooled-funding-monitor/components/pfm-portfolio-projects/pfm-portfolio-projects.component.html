@@ -84,19 +84,77 @@
         </tr>
       </ng-template>
       <ng-template pTemplate="body" let-p>
-        <tr [attr.data-testid]="'pfm-project-row-' + p.code">
+        <tr class="text-[14px]" [attr.data-testid]="'pfm-project-row-' + p.code">
           <td class="min-w-[6rem]">
             <span class="rounded-lg bg-[var(--ac-pfm-neutral-bg)] px-2 py-1 text-[13px] text-[var(--ac-pfm-neutral-fg)]">{{ p.code }}</span>
           </td>
           <td class="min-w-[14rem] max-w-[26rem]">
             <div class="line-clamp-2 break-words" [attr.title]="p.name">{{ p.name || '—' }}</div>
           </td>
+          <td class="min-w-[8rem]" data-testid="pfm-project-status">
+            <app-custom-tag [statusId]="p.statusId" [statusName]="p.statusName" maxWidth="130px" [multiline]="true"></app-custom-tag>
+          </td>
           <td class="min-w-[9rem]">{{ p.lead_pi || '—' }}</td>
+          <!-- Same chips as My PI Delegates (name over email, inactive in red), without the revoke X -->
           <td class="min-w-[10rem]" data-testid="pfm-project-delegates">
-            @for (d of p.delegates; track d) {
-              <span class="block">{{ d }}</span>
-            } @empty {
+            @if (p.delegates.length === 0) {
               <span>—</span>
+            } @else {
+              <div class="flex flex-wrap gap-1.5" role="list" [attr.aria-label]="'Delegates for ' + p.code">
+                @for (d of p.delegates.slice(0, maxVisibleDelegates); track d.name + d.email) {
+<span
+                class="inline-flex items-center gap-2 rounded-[6px] border border-solid px-[9px] py-[5px] {{
+                  d.is_active ? 'border-[color:var(--ac-grey-200)] bg-[var(--ac-grey-100)] text-[var(--ac-grey-900)]' : 'border-[color:var(--ac-red-1)]/10 bg-[var(--ac-red-1)]/[0.08] text-[var(--ac-red-1)]'
+                }}"
+                role="listitem"
+                [attr.aria-label]="d.name + (d.is_active ? '' : ' (inactive)') + (d.email ? ' (' + d.email + ')' : '')"
+                data-testid="pfm-project-delegate">
+                @if (!d.is_active) {
+                  <i class="pi pi-exclamation-circle shrink-0 rotate-180 cursor-help !text-[12px]" pTooltip="This user is no longer active" tooltipPosition="top" aria-label="This user is no longer active"></i>
+                }
+                <span class="flex min-w-0 flex-col">
+                  <span class="whitespace-nowrap text-[13px] font-medium leading-[17px]">{{ d.name }}</span>
+                  @if (d.email) {
+                    <span class="whitespace-nowrap text-[12px] leading-4 text-[var(--ac-grey-700)]">{{ d.email }}</span>
+                  }
+                </span>
+              </span>
+                }
+                @if (p.delegates.length > maxVisibleDelegates) {
+                  <button
+                    type="button"
+                    class="cursor-pointer self-center border-0 bg-transparent p-0 text-[12px] text-[var(--ac-light-blue-400)] underline"
+                    [attr.aria-label]="p.delegates.length - maxVisibleDelegates + ' more delegates'"
+                    data-testid="pfm-project-delegates-more"
+                    (click)="morePopover.toggle($event)">
+                    +{{ p.delegates.length - maxVisibleDelegates }} more
+                  </button>
+                  <p-popover #morePopover [baseZIndex]="10000">
+                    <div class="mb-2.5 font-['Barlow'] text-[14px] text-[var(--ac-primary-blue-600)]">PI Delegates</div>
+                    <div class="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto" role="list" data-testid="pfm-project-delegates-all">
+                      @for (d of p.delegates; track d.name + d.email) {
+<span
+                class="inline-flex items-center gap-2 rounded-[6px] border border-solid px-[9px] py-[5px] {{
+                  d.is_active ? 'border-[color:var(--ac-grey-200)] bg-[var(--ac-grey-100)] text-[var(--ac-grey-900)]' : 'border-[color:var(--ac-red-1)]/10 bg-[var(--ac-red-1)]/[0.08] text-[var(--ac-red-1)]'
+                }}"
+                role="listitem"
+                [attr.aria-label]="d.name + (d.is_active ? '' : ' (inactive)') + (d.email ? ' (' + d.email + ')' : '')"
+                data-testid="pfm-project-delegate">
+                @if (!d.is_active) {
+                  <i class="pi pi-exclamation-circle shrink-0 rotate-180 cursor-help !text-[12px]" pTooltip="This user is no longer active" tooltipPosition="top" aria-label="This user is no longer active"></i>
+                }
+                <span class="flex min-w-0 flex-col">
+                  <span class="whitespace-nowrap text-[13px] font-medium leading-[17px]">{{ d.name }}</span>
+                  @if (d.email) {
+                    <span class="whitespace-nowrap text-[12px] leading-4 text-[var(--ac-grey-700)]">{{ d.email }}</span>
+                  }
+                </span>
+              </span>
+                      }
+                    </div>
+                  </p-popover>
+                }
+              </div>
             }
           </td>
           <td class="min-w-[5rem] tabular-nums {{ p.results ? '' : 'font-semibold text-[var(--ac-state-alert-fg)]' }}" data-testid="pfm-project-results">
