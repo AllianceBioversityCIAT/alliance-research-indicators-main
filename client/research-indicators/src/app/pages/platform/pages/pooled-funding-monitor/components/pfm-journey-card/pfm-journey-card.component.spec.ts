@@ -82,6 +82,12 @@ describe('PfmJourneyCardComponent', () => {
     expect(stages).toEqual([3, 2, 0]);
   });
 
+  it('counts the stages instead of assuming five, and clamps a stage past the last', () => {
+    const { q } = render(9);
+    expect(q('pfm-journey-kicker')?.textContent?.trim()).toBe('Stage 5 of 5');
+    expect((q('pfm-journey-next') as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('Previous is off on the first stage and Next on the last', () => {
     expect((render(0).q('pfm-journey-prev') as HTMLButtonElement).disabled).toBe(true);
     TestBed.resetTestingModule();
