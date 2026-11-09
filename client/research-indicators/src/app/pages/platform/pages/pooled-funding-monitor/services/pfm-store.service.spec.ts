@@ -369,6 +369,29 @@ describe('PfmStoreService', () => {
     expect(second.focusResult()).toBe('STAR-1');
   });
 
+  it('keeps the coverage stage and projects filter across a return, ignoring a stage out of range', () => {
+    sessionStorage.clear();
+    const first = build();
+    first.coverageStage.set(2);
+    first.coverageProjectsFilter.set('all');
+    first.saveReturnState(null);
+    TestBed.resetTestingModule();
+    const second = build();
+    second.init();
+    expect(second.coverageStage()).toBe(2);
+    expect(second.coverageProjectsFilter()).toBe('all');
+
+    TestBed.resetTestingModule();
+    sessionStorage.setItem(
+      'pfm-monitor-return-state',
+      JSON.stringify({ v: 1, savedAt: Date.now(), scope: 'mine', tab: 'coverage', filters: {}, chip: null, openGroups: [], groupViews: {}, coverageStage: 9, resultCode: null })
+    );
+    const third = build();
+    third.init();
+    expect(third.coverageStage()).toBe(0);
+    expect(third.coverageProjectsFilter()).toBe('without');
+  });
+
   it('setScope to the current scope and setTab to the current tab do nothing', async () => {
     const store = build();
     store.init();
