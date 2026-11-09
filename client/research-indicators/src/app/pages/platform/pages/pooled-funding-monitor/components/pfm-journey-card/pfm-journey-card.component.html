@@ -58,7 +58,7 @@
           <span
             class="text-[20px] font-semibold tabular-nums {{ on ? 'text-[var(--ac-pfm-info-fg)]' : 'text-[var(--ac-pfm-accent-navy)]' }}"
             data-testid="pfm-journey-stage-value">{{ s.value | number }}</span>
-          <span class="text-[11.5px] text-[var(--ac-pfm-neutral-fg)]">{{ s.caption }}</span>
+          <span class="text-[12px] -mt-2 text-[var(--ac-pfm-neutral-fg)]">{{ s.caption }}</span>
         </button>
       }
     </div>
@@ -71,22 +71,23 @@
       <span class="text-[11px] font-semibold uppercase tracking-[0.07em] text-[var(--ac-pfm-neutral-fg)]" data-testid="pfm-journey-kicker">Stage {{ c.index + 1 }} of 5</span>
       <span class="text-[15px] font-semibold text-[var(--ac-pfm-accent-navy)]" data-testid="pfm-journey-title">{{ c.stage.title }}</span>
     </div>
-    <div class="flex items-center gap-2">
+    <!-- Same buttons as Back / Next in the result sections (app-navigation-buttons) -->
+    <div class="flex items-center gap-3">
       <button
         type="button"
-        class="cursor-pointer rounded-[7px] border border-solid border-[color:var(--ac-pfm-surface-border)] bg-[var(--ac-pfm-surface)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ac-pfm-accent-navy)] disabled:cursor-default disabled:opacity-50"
+        class="flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-solid border-[color:var(--ac-light-blue-400)] bg-transparent px-4 py-1.5 text-[14px] font-medium text-[var(--ac-light-blue-400)] disabled:cursor-default disabled:border-[color:var(--ac-grey-200)] disabled:bg-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
         [disabled]="c.index === 0"
         data-testid="pfm-journey-prev"
         (click)="select(c.index - 1)">
-        ← Previous
+        <i class="pi pi-arrow-left !text-[11px]" aria-hidden="true"></i> Previous
       </button>
       <button
         type="button"
-        class="cursor-pointer rounded-[7px] border border-solid border-[color:var(--ac-pfm-info-fg)] bg-[var(--ac-pfm-info-fg)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ac-pfm-surface)] disabled:cursor-default disabled:opacity-50"
+        class="flex cursor-pointer items-center gap-2 rounded-[13px] border-1 border-solid border-[color:var(--ac-light-blue-400)] bg-transparent px-4 py-1.5 text-[14px] font-medium text-[var(--ac-light-blue-400)] disabled:cursor-default disabled:border-[color:var(--ac-grey-200)] disabled:bg-[var(--ac-grey-200)] disabled:text-[var(--ac-grey-500)]"
         [disabled]="c.index === 4"
         data-testid="pfm-journey-next"
         (click)="select(c.index + 1)">
-        Next stage →
+        Next stage <i class="pi pi-arrow-right !text-[11px]" aria-hidden="true"></i>
       </button>
     </div>
   </div>
