@@ -70,12 +70,24 @@ export class PfmJourneyDto {
   sync: { ready: number; synced: number; rejected: number };
 }
 
+export class PfmProjectDelegateDto {
+  @ApiProperty({ example: 'Jane Doe' }) name: string;
+  @ApiProperty({ nullable: true, example: 'j.doe@cgiar.org' })
+  email: string | null;
+  @ApiProperty({ description: 'False when the user is no longer active.' })
+  is_active: boolean;
+}
+
 export class PfmPortfolioProjectDto {
   @ApiProperty() code: string;
   @ApiProperty({ nullable: true }) name: string | null;
   @ApiProperty({ nullable: true }) lead_pi: string | null;
-  @ApiProperty({ type: [String], description: 'Active PI delegates.' })
-  delegates: string[];
+  @ApiProperty({ nullable: true, example: 'Ongoing' }) status: string | null;
+  @ApiProperty({
+    type: [PfmProjectDelegateDto],
+    description: 'Active PI delegates.',
+  })
+  delegates: PfmProjectDelegateDto[];
   @ApiProperty({ description: 'Monitored results of the project.' })
   results: number;
 }

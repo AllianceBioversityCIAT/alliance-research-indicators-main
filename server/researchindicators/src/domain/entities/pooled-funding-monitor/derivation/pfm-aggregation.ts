@@ -4,6 +4,7 @@ import { PfmScopeEnum } from '../enum/pfm-scope.enum';
 import { PfmStarLabelEnum } from '../enum/pfm-star-label.enum';
 import type {
   PfmContributingProjectRow,
+  PfmProjectDelegate,
   PfmMonitoredRow,
   PfmMonthlySync,
 } from '../repositories/pooled-funding-monitor.repository';
@@ -169,7 +170,8 @@ export interface PfmPortfolioProject {
   code: string;
   name: string | null;
   lead_pi: string | null;
-  delegates: string[];
+  status: string | null;
+  delegates: PfmProjectDelegate[];
   results: number;
 }
 
