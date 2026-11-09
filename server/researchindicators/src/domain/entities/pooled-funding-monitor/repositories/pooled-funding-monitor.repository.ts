@@ -4,6 +4,11 @@ import { ResultStatusConfig } from '../../result-status/entities/result-status.e
 import { effectivePoolFundingContributorSql } from '../../../shared/utils/pool-funding.util';
 import { PfmRawRow } from '../derivation/pfm-derivation';
 import { PfmScopeEnum } from '../enum/pfm-scope.enum';
+import { UserStatusEnum } from '../../users/enum/user-status.enum';
+import {
+  formatLastFirstName,
+  formatPersonName,
+} from '../../../shared/utils/name-format.util';
 
 // @akili-spec docs/specs/bilateral/prms-sync/pooled-funding-monitor — T-02
 
@@ -64,9 +69,19 @@ export interface PfmMonitoredRow extends PfmRawRow {
 export interface PfmContributingProjectRow {
   code: string;
   name: string | null;
+  /** "First Last" in title case (Agresso stores "LAST, FIRST"). */
   lead_pi: string | null;
-  /** Active PI delegates as "LAST, FIRST", sorted. */
-  delegates: string[];
+  /** agresso_contracts.contract_status (Ongoing, Completed…), the My Projects Status column. */
+  status: string | null;
+  /** Active PI delegates, by last then first name. */
+  delegates: PfmProjectDelegate[];
+}
+
+/** A PI delegate as My PI Delegates shows it: name, email and whether the user is still active. */
+export interface PfmProjectDelegate {
+  name: string;
+  email: string | null;
+  is_active: boolean;
 }
 
 export interface PfmMonthlySync {
@@ -438,8 +453,14 @@ export class PooledFundingMonitorRepository {
          ac.agreement_id AS code,
          COALESCE(NULLIF(TRIM(ac.short_title), ''), ac.description) AS name,
          ac.project_lead_description AS lead_pi,
+         ac.contract_status AS status,
          (
-           SELECT JSON_ARRAYAGG(TRIM(CONCAT_WS(', ', su.last_name, su.first_name)))
+           SELECT JSON_ARRAYAGG(JSON_OBJECT(
+             'first_name', su.first_name,
+             'last_name', su.last_name,
+             'email', su.email,
+             'status_id', su.status_id
+           ))
            FROM pi_delegates pd
            INNER JOIN sec_users su ON su.sec_user_id = pd.delegate_user_id
            WHERE pd.project_id = ac.agreement_id
@@ -455,14 +476,34 @@ export class PooledFundingMonitorRepository {
         typeof row.delegates === 'string'
           ? (JSON.parse(row.delegates) as unknown)
           : row.delegates;
-      const delegates = (Array.isArray(raw) ? raw : [])
-        .map((name) => String(name ?? '').trim())
-        .filter((name) => name.length > 0)
-        .sort((a, b) => a.localeCompare(b));
+      const delegates = (
+        (Array.isArray(raw) ? raw : []) as Record<string, unknown>[]
+      )
+        .map((d) => ({
+          first: String(d?.first_name ?? '').trim(),
+          last: String(d?.last_name ?? '').trim(),
+          email: (d?.email as string | null) ?? null,
+          status: Number(d?.status_id),
+        }))
+        .filter((d) => d.first || d.last)
+        // Same order and fields as My PI Delegates (findActiveDelegatesWithUser + list)
+        .sort(
+          (a, b) =>
+            a.last.localeCompare(b.last) || a.first.localeCompare(b.first),
+        )
+        .map((d) => ({
+          name: formatPersonName(`${d.first} ${d.last}`),
+          email: d.email,
+          is_active: [
+            UserStatusEnum.ACCEPTED,
+            UserStatusEnum.EXTERNAL_ACCEPTED,
+          ].includes(d.status),
+        }));
       return {
         code: String(row.code),
         name: (row.name as string | null) ?? null,
-        lead_pi: (row.lead_pi as string | null) ?? null,
+        lead_pi: formatLastFirstName(row.lead_pi as string | null) || null,
+        status: (row.status as string | null) ?? null,
         delegates,
       };
     });

@@ -304,7 +304,11 @@ describe('pfm-aggregation', () => {
         code,
         name: `Project ${code}`,
         lead_pi: `PI ${code}`,
-        delegates: code === 'P-A' ? ['DOE, JANE'] : [],
+        status: 'Ongoing',
+        delegates:
+          code === 'P-A'
+            ? [{ name: 'Jane Doe', email: 'j.doe@cgiar.org', is_active: true }]
+            : [],
       })),
       derived,
     );
@@ -317,7 +321,9 @@ describe('pfm-aggregation', () => {
         ['P-D', 1],
         ['P-E', 0],
       ]);
-      expect(projects[0].delegates).toEqual(['DOE, JANE']);
+      expect(projects[0].delegates).toEqual([
+        { name: 'Jane Doe', email: 'j.doe@cgiar.org', is_active: true },
+      ]);
     });
 
     it('counts each stage from the one before it', () => {
@@ -348,14 +354,27 @@ describe('pfm-aggregation', () => {
         projectsTotal: 5,
         monthlySyncs: [],
         contributingProjects: [
-          { code: 'P-Z', name: null, lead_pi: null, delegates: [] },
+          {
+            code: 'P-Z',
+            name: null,
+            lead_pi: null,
+            status: null,
+            delegates: [],
+          },
         ],
         syncedThisYear: 0,
         isPiOfAny: true,
         now: new Date('2026-10-08T12:00:00Z'),
       });
       expect(s.portfolio_projects).toEqual([
-        { code: 'P-Z', name: null, lead_pi: null, delegates: [], results: 0 },
+        {
+          code: 'P-Z',
+          name: null,
+          lead_pi: null,
+          status: null,
+          delegates: [],
+          results: 0,
+        },
       ]);
       expect(s.journey.projects).toEqual({
         total: 1,

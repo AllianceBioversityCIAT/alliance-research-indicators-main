@@ -2,13 +2,17 @@ import { TestBed } from '@angular/core/testing';
 import { PfmPortfolioProjectsComponent } from './pfm-portfolio-projects.component';
 import { AllModalsService } from '@shared/services/cache/all-modals.service';
 import { CreateResultManagementService } from '@shared/components/all-modals/modals-content/create-result-modal/services/create-result-management.service';
-import { PfmPortfolioProject } from '../../pfm.interfaces';
+import { PfmPortfolioProject, PfmProjectDelegate } from '../../pfm.interfaces';
+
+/** Name and email lines of a delegate chip, joined. */
+const chipText = (chip: Element) => Array.from(chip.lastElementChild!.children).map(s => s.textContent?.trim()).join(' ');
+const dlg = (name: string, is_active = true): PfmProjectDelegate => ({ name, email: name.split(' ')[0].toLowerCase() + '@cgiar.org', is_active });
 
 const PROJECTS: PfmPortfolioProject[] = [
-  { code: 'A357', name: 'Genetic improvement in Cassava', lead_pi: 'NEWBY, JONATHAN', delegates: ['CEBALLOS, HERNAN', 'LOPEZ, LUIS'], results: 4 },
-  { code: 'A180', name: 'Biological nitrification inhibition', lead_pi: 'ARANGO, JACOBO', delegates: [], results: 1 },
-  { code: 'D527', name: 'Iniciativas climaticamente inteligentes', lead_pi: 'BECERRA, LUIS', delegates: ['QUINTERO, MARCELA'], results: 0 },
-  { code: 'ULZ53', name: 'Seeds of Life - East Timor', lead_pi: null, delegates: [], results: 0 }
+  { code: 'A357', name: 'Genetic improvement in Cassava', lead_pi: 'Newby, Jonathan', status: 'Ongoing', delegates: [dlg('Hernan Ceballos'), dlg('Luis Lopez', false), dlg('Ana Ruiz')], results: 4 },
+  { code: 'A180', name: 'Biological nitrification inhibition', lead_pi: 'Arango, Jacobo', status: 'Completed', delegates: [], results: 1 },
+  { code: 'D527', name: 'Iniciativas climaticamente inteligentes', lead_pi: 'Becerra, Luis', status: 'Suspended', delegates: [dlg('Marcela Quintero')], results: 0 },
+  { code: 'ULZ53', name: 'Seeds of Life - East Timor', lead_pi: null, status: null, delegates: [], results: 0 }
 ];
 
 describe('PfmPortfolioProjectsComponent', () => {
@@ -64,14 +68,63 @@ describe('PfmPortfolioProjectsComponent', () => {
     expect(codes()).toEqual(['D527', 'ULZ53']);
   });
 
-  it('lists every delegate, and a dash when the project has none', () => {
+  it('shows each delegate as My PI Delegates does, name over email, and a dash when the project has none', () => {
     const { fixture, q, el } = render();
     q('pfm-projects-chip-all')!.click();
     fixture.detectChanges();
     const delegates = Array.from(el.querySelectorAll('[data-testid="pfm-project-delegates"]')).map(cell =>
-      Array.from(cell.querySelectorAll('span')).map(s => s.textContent?.trim())
+      cell.querySelectorAll('[data-testid="pfm-project-delegate"]').length
+        ? Array.from(cell.querySelectorAll('[data-testid="pfm-project-delegate"]')).map(c => chipText(c))
+        : [cell.textContent?.trim()]
     );
-    expect(delegates).toEqual([['CEBALLOS, HERNAN', 'LOPEZ, LUIS'], ['—'], ['QUINTERO, MARCELA'], ['—']]);
+    expect(delegates).toEqual([['Hernan Ceballos hernan@cgiar.org', 'Luis Lopez luis@cgiar.org'], ['—'], ['Marcela Quintero marcela@cgiar.org'], ['—']]);
+    expect(el.querySelector('[data-testid="pfm-project-delegates"] .pi-times')).toBeNull();
+  });
+
+  it('marks an inactive delegate the way My PI Delegates does', () => {
+    const { fixture, q, el } = render();
+    q('pfm-projects-chip-all')!.click();
+    fixture.detectChanges();
+    const chips = el.querySelectorAll('[data-testid="pfm-project-row-A357"] [data-testid="pfm-project-delegate"]');
+    expect(chips[0].querySelector('.pi-exclamation-circle')).toBeNull();
+    expect(chips[1].getAttribute('aria-label')).toBe('Luis Lopez (inactive) (luis@cgiar.org)');
+    expect(chips[1].querySelector('.pi-exclamation-circle')).not.toBeNull();
+  });
+
+  it('puts the delegates beyond the visible ones behind "+N more", which lists them all', () => {
+    const { fixture, q, el } = render();
+    q('pfm-projects-chip-all')!.click();
+    fixture.detectChanges();
+    const row = () => el.querySelector('[data-testid="pfm-project-row-A357"]')!;
+    const more = row().querySelector<HTMLButtonElement>('[data-testid="pfm-project-delegates-more"]')!;
+    expect(more.textContent?.trim()).toBe('+1 more');
+    expect(row().querySelector('[data-testid="pfm-project-delegates-all"]')).toBeNull();
+    more.click();
+    fixture.detectChanges();
+    const all = document.querySelector('[data-testid="pfm-project-delegates-all"]')!;
+    expect(Array.from(all.querySelectorAll('[data-testid="pfm-project-delegate"]')).map(c => chipText(c))).toEqual([
+      'Hernan Ceballos hernan@cgiar.org',
+      'Luis Lopez luis@cgiar.org',
+      'Ana Ruiz ana@cgiar.org'
+    ]);
+  });
+
+  it('shows the My Projects status tag from the contract status, after Project Name', () => {
+    const { fixture, q, el } = render();
+    q('pfm-projects-chip-all')!.click();
+    fixture.detectChanges();
+    const status = Array.from(el.querySelectorAll('[data-testid="pfm-project-status"]')).map(c => c.textContent?.trim());
+    // No contract status falls back to Ongoing, as on My Projects
+    expect(status).toEqual(['Ongoing', 'Completed', 'Suspended', 'Ongoing']);
+    const headers = Array.from(el.querySelectorAll('th')).map(th => th.textContent?.trim());
+    expect(headers.slice(0, 3)).toEqual(['Code', 'Project Name', 'Status']);
+  });
+
+  it('rows use the Results queue text size', () => {
+    const { fixture, q, el } = render();
+    q('pfm-projects-chip-all')!.click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-testid="pfm-project-row-A357"]')!.classList).toContain('text-[14px]');
   });
 
   it('Create Result opens the create-result modal on that project', () => {
@@ -96,11 +149,12 @@ describe('PfmPortfolioProjectsComponent', () => {
     expect(Array.from(el.querySelectorAll('[data-testid^="pfm-projects-col-"]')).map(th => th.textContent?.trim())).toEqual([
       'Code',
       'Project Name',
+      'Status',
       'Principal Investigator',
       'PI Delegates',
       'Results'
     ]);
-    expect(el.querySelectorAll('p-sorticon, p-sortIcon').length).toBe(5);
+    expect(el.querySelectorAll('p-sorticon, p-sortIcon').length).toBe(6);
   });
 
   it('the quick views are one choice: arrows move it', () => {

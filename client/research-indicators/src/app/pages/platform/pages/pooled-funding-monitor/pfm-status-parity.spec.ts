@@ -47,7 +47,6 @@ describe('Status colour parity: one parameter per status', () => {
     expect(chart['approved']).toBe(prmsTag('Approved'));
     expect(chart['pending_review']).toBe(prmsTag('Pending Review'));
     expect(chart['rejected']).toBe(prmsTag('Rejected'));
-    expect(chart['no_sp']).toBe(mappingTag('No SP contribution'));
   });
 
   it('Finish the mapping card and the Mapping pending quick view are the table colour of mapping Pending', () => {

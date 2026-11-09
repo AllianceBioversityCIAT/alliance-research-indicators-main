@@ -83,8 +83,17 @@ export interface PfmPortfolioProject {
   code: string;
   name: string | null;
   lead_pi: string | null;
-  delegates: string[];
+  /** Contract status (Ongoing, Completed…), as My Projects shows it. */
+  status: string | null;
+  delegates: PfmProjectDelegate[];
   results: number;
+}
+
+/** A PI delegate as My PI Delegates shows it. */
+export interface PfmProjectDelegate {
+  name: string;
+  email: string | null;
+  is_active: boolean;
 }
 
 export interface PfmMonthly {
